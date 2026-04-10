@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 
 import { CollectionCard } from "@/components/collection-card";
 import { Screen } from "@/components/screen";
+import { SwipeTabs } from "@/components/swipe-tabs";
 import { useAuth } from "@/lib/auth-context";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -122,82 +123,72 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.section}>
-        <View style={styles.tabRow}>
-          <Pressable
-            style={{...styles.tab, ...(collectionsTab === "mine" ? styles.tabActive : {})}}
-            onPress={() => setCollectionsTab("mine")}
-          >
-            <Text style={{...styles.tabText, ...(collectionsTab === "mine" ? styles.tabTextActive : {})}}>
-              {t("myCollections")}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={{...styles.tab, ...(collectionsTab === "friends" ? styles.tabActive : {})}}
-            onPress={() => setCollectionsTab("friends")}
-          >
-            <Text style={{...styles.tabText, ...(collectionsTab === "friends" ? styles.tabTextActive : {})}}>
-              {t("friendCollections")}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={{...styles.tab, ...(collectionsTab === "subscribed" ? styles.tabActive : {})}}
-            onPress={() => setCollectionsTab("subscribed")}
-          >
-            <Text style={{...styles.tabText, ...(collectionsTab === "subscribed" ? styles.tabTextActive : {})}}>
-              {t("tabSubscribedCollections")}
-            </Text>
-          </Pressable>
-        </View>
-
-        {collectionsTab === "mine" ? (
-          <>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionDescription}>{t("myCollectionsSubtitle")}</Text>
+        <SwipeTabs
+          tabs={[
+            { key: "mine", label: t("myCollections") },
+            { key: "friends", label: t("friendCollections") },
+            { key: "subscribed", label: t("tabSubscribedCollections") },
+          ]}
+          active={collectionsTab}
+          onChange={(k) => setCollectionsTab(k as CollectionsTab)}
+          renderTab={(key) => {
+            if (key === "mine") {
+              return (
+                <View style={styles.tabPanel}>
+                  <View style={styles.sectionHeader}>
+                    <View style={styles.sectionHeaderText}>
+                      <Text style={styles.sectionDescription}>{t("myCollectionsSubtitle")}</Text>
+                    </View>
+                    <Link href="/create-collection" asChild>
+                      <Pressable style={styles.inlineAction}>
+                        <Text style={styles.inlineActionText}>{t("newCollectionInline")}</Text>
+                      </Pressable>
+                    </Link>
+                  </View>
+                  {ownedCollections.length > 0 ? (
+                    ownedCollections.map((collection) => (
+                      <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} />
+                    ))
+                  ) : (
+                    <View style={styles.emptyCard}>
+                      <Text style={styles.emptyCardText}>{t("noOwnedCollections")}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            }
+            if (key === "friends") {
+              return (
+                <View style={styles.tabPanel}>
+                  <Text style={styles.sectionDescription}>{t("friendCollectionsSubtitle")}</Text>
+                  {friendCollections.length > 0 ? (
+                    friendCollections.map((collection) => (
+                      <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} />
+                    ))
+                  ) : (
+                    <View style={styles.emptyCard}>
+                      <Text style={styles.emptyCardText}>{t("noFriendCollections")}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            }
+            return (
+              <View style={styles.tabPanel}>
+                <Text style={styles.sectionDescription}>{t("collectionsFeedSubtitle")}</Text>
+                {subscribedCollections.length > 0 ? (
+                  subscribedCollections.map((collection) => (
+                    <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} />
+                  ))
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyCardText}>{t("noSubscribedCollections")}</Text>
+                  </View>
+                )}
               </View>
-              <Link href="/create-collection" asChild>
-                <Pressable style={styles.inlineAction}>
-                  <Text style={styles.inlineActionText}>{t("newCollectionInline")}</Text>
-                </Pressable>
-              </Link>
-            </View>
-            {ownedCollections.length > 0 ? (
-              ownedCollections.map((collection) => (
-                <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} />
-              ))
-            ) : (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyCardText}>{t("noOwnedCollections")}</Text>
-              </View>
-            )}
-          </>
-        ) : collectionsTab === "friends" ? (
-          <>
-            <Text style={styles.sectionDescription}>{t("friendCollectionsSubtitle")}</Text>
-            {friendCollections.length > 0 ? (
-              friendCollections.map((collection) => (
-                <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} />
-              ))
-            ) : (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyCardText}>{t("noFriendCollections")}</Text>
-              </View>
-            )}
-          </>
-        ) : (
-          <>
-            <Text style={styles.sectionDescription}>{t("collectionsFeedSubtitle")}</Text>
-            {subscribedCollections.length > 0 ? (
-              subscribedCollections.map((collection) => (
-                <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} />
-              ))
-            ) : (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyCardText}>{t("noSubscribedCollections")}</Text>
-              </View>
-            )}
-          </>
-        )}
+            );
+          }}
+        />
       </View>
     </Screen>
   );
@@ -337,31 +328,8 @@ const styles = StyleSheet.create({
   section: {
     gap: 14,
   },
-  tabRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  tab: {
-    flex: 1,
-    borderRadius: 999,
-    paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: "#fff1df",
-    borderWidth: 1,
-    borderColor: "#e4c29a",
-  },
-  tabActive: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
-  },
-  tabText: {
-    color: "#5f4734",
-    fontWeight: "800",
-    fontSize: 14,
-    textAlign: "center",
-  },
-  tabTextActive: {
-    color: "#fff4e8",
+  tabPanel: {
+    gap: 14,
   },
   sectionHeader: {
     flexDirection: "row",

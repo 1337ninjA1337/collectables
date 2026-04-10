@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
-import { Link, Stack, router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { Link, Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { CollectionCard } from "@/components/collection-card";
@@ -38,40 +38,42 @@ export default function ProfileScreen() {
   const [remoteCollections, setRemoteCollections] = useState<Collection[]>([]);
   const [remoteItemCounts, setRemoteItemCounts] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    if (!localProfile && params.id && params.id !== "[id]") {
-      setLoadingRemote(true);
-      Promise.all([
-        fetchProfileById(params.id),
-        fetchCollectionsByUserId(params.id),
-      ])
+  useFocusEffect(
+    useCallback(() => {
+      if (!params.id || params.id === "[id]") return;
+
+      let active = true;
+      const needsProfileFetch = !localProfile;
+      if (needsProfileFetch) setLoadingRemote(true);
+
+      const profilePromise = needsProfileFetch
+        ? fetchProfileById(params.id)
+        : Promise.resolve(null);
+
+      Promise.all([profilePromise, fetchCollectionsByUserId(params.id)])
         .then(([p, cols]) => {
-          setRemoteProfile(p);
+          if (!active) return;
+          if (needsProfileFetch) setRemoteProfile(p);
           setRemoteCollections(cols);
-          return loadItemCounts(cols);
+          return loadItemCounts(cols, () => active);
         })
         .catch(() => {})
-        .finally(() => setLoadingRemote(false));
-    }
-  }, [localProfile, params.id]);
+        .finally(() => {
+          if (active && needsProfileFetch) setLoadingRemote(false);
+        });
 
-  // For local profiles (including self), also fetch remote collections
-  useEffect(() => {
-    if (localProfile && params.id) {
-      fetchCollectionsByUserId(params.id)
-        .then((cols) => {
-          setRemoteCollections(cols);
-          return loadItemCounts(cols);
-        })
-        .catch(() => {});
-    }
-  }, [localProfile, params.id]);
+      return () => {
+        active = false;
+      };
+    }, [localProfile, params.id]),
+  );
 
-  async function loadItemCounts(cols: Collection[]) {
+  async function loadItemCounts(cols: Collection[], isActive: () => boolean = () => true) {
     const counts: Record<string, number> = {};
     const results = await Promise.all(
       cols.map((c) => fetchItemsByCollectionId(c.id).then((items) => ({ id: c.id, count: items.length })))
     );
+    if (!isActive()) return;
     results.forEach((r) => { counts[r.id] = r.count; });
     setRemoteItemCounts(counts);
   }

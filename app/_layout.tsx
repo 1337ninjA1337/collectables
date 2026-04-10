@@ -1,8 +1,12 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Stack, router, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { BottomNav } from "@/components/bottom-nav";
 import { LoginScreen } from "@/components/login-screen";
+import { SearchOverlay } from "@/components/search-overlay";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { CollectionsProvider } from "@/lib/collections-context";
 import { I18nProvider, useI18n } from "@/lib/i18n-context";
@@ -27,6 +31,7 @@ function AppShell() {
   const { ready, session } = useAuth();
   const { ready: i18nReady, t } = useI18n();
   const pathname = usePathname();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   if (!ready || !i18nReady) {
     return (
@@ -58,42 +63,64 @@ function AppShell() {
     );
   }
 
+  const isNative = Platform.OS !== "web";
+
   return (
-    <>
+    <View style={styles.shell}>
       <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerShadowVisible: false,
-          headerStyle: {
-            backgroundColor: "#fff7ef",
-          },
-          headerTintColor: "#2f2318",
-          contentStyle: {
-            backgroundColor: "#fffaf4",
-          },
-          headerTitleStyle: {
-            fontWeight: "700",
-          },
-          headerRight: () =>
-            pathname === "/" ? null : (
-              <View style={styles.headerRightRow}>
-                {pathname !== "/settings" ? (
-                  <Pressable style={styles.headerButton} onPress={() => router.push("/settings")}>
-                    <Text style={styles.headerButtonText}>{t("settings")}</Text>
+      <View style={styles.stackWrap}>
+        <Stack
+          screenOptions={{
+            headerShadowVisible: false,
+            headerStyle: {
+              backgroundColor: "#fff7ef",
+            },
+            headerTintColor: "#2f2318",
+            contentStyle: {
+              backgroundColor: "#fffaf4",
+            },
+            headerTitleStyle: {
+              fontWeight: "700",
+            },
+            headerRight: () =>
+              isNative ? null : (
+                <View style={styles.headerRightRow}>
+                  {pathname !== "/settings" && pathname !== "/" ? (
+                    <Pressable style={styles.headerButton} onPress={() => router.push("/settings")}>
+                      <Text style={styles.headerButtonText}>{t("settings")}</Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    style={styles.headerIconButton}
+                    onPress={() => setSearchOpen(true)}
+                    accessibilityLabel={t("searchPlaceholder")}
+                  >
+                    <Ionicons name="search" size={18} color="#2a1d15" />
                   </Pressable>
-                ) : null}
-                <Pressable style={styles.homeButton} onPress={() => router.replace("/")}>
-                  <Text style={styles.homeButtonText}>{t("goHome")}</Text>
-                </Pressable>
-              </View>
-            ),
-        }}
-      />
-    </>
+                  {pathname !== "/" ? (
+                    <Pressable style={styles.homeButton} onPress={() => router.replace("/")}>
+                      <Text style={styles.homeButtonText}>{t("goHome")}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ),
+          }}
+        />
+      </View>
+      <BottomNav onSearchPress={() => setSearchOpen(true)} />
+      <SearchOverlay visible={searchOpen} onClose={() => setSearchOpen(false)} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  shell: {
+    flex: 1,
+    backgroundColor: "#fffaf4",
+  },
+  stackWrap: {
+    flex: 1,
+  },
   loadingWrap: {
     flex: 1,
     alignItems: "center",
@@ -117,6 +144,16 @@ const styles = StyleSheet.create({
     borderColor: "#e4c29a",
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+  headerIconButton: {
+    borderRadius: 999,
+    backgroundColor: "#fff1df",
+    borderWidth: 1,
+    borderColor: "#e4c29a",
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerButtonText: {
     color: "#2a1d15",

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { CollectionCard } from "@/components/collection-card";
 import { Screen } from "@/components/screen";
+import { SwipeTabs } from "@/components/swipe-tabs";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
 import { fetchItemsByCollectionId } from "@/lib/supabase-profiles";
@@ -41,8 +42,6 @@ export default function CollectionsFeedScreen() {
     return () => { active = false; };
   }, [mainTab, friendCollections, subscribedCollections]);
 
-  const visibleCollections = mainTab === "friends" ? friendCollections : subscribedCollections;
-
   return (
     <Screen>
       <View style={styles.hero}>
@@ -51,41 +50,37 @@ export default function CollectionsFeedScreen() {
         <Text style={styles.subtitle}>{t("collectionsFeedSubtitle")}</Text>
       </View>
 
-      {/* Main tabs */}
-      <View style={styles.tabRow}>
-        <Pressable
-          style={{...styles.tab, ...(mainTab === "friends" ? styles.tabActive : {})}}
-          onPress={() => setMainTab("friends")}
-        >
-          <Text style={{...styles.tabText, ...(mainTab === "friends" ? styles.tabTextActive : {})}}>
-            {t("tabFriendCollections")}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={{...styles.tab, ...(mainTab === "subscribed" ? styles.tabActive : {})}}
-          onPress={() => setMainTab("subscribed")}
-        >
-          <Text style={{...styles.tabText, ...(mainTab === "subscribed" ? styles.tabTextActive : {})}}>
-            {t("tabSubscribedCollections")}
-          </Text>
-        </Pressable>
-      </View>
-
-      {visibleCollections.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>
-            {mainTab === "friends" ? t("noFriendCollections") : t("noSubscribedCollections")}
-          </Text>
-        </View>
-      ) : (
-        visibleCollections.map((collection) => (
-          <CollectionCard
-            key={collection.id}
-            collection={collection}
-            count={getItemsForCollection(collection.id).length || itemCounts[collection.id] || 0}
-          />
-        ))
-      )}
+      <SwipeTabs
+        tabs={[
+          { key: "friends", label: t("tabFriendCollections") },
+          { key: "subscribed", label: t("tabSubscribedCollections") },
+        ]}
+        active={mainTab}
+        onChange={(k) => setMainTab(k as MainTab)}
+        renderTab={(key) => {
+          const cols = key === "friends" ? friendCollections : subscribedCollections;
+          if (cols.length === 0) {
+            return (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyText}>
+                  {key === "friends" ? t("noFriendCollections") : t("noSubscribedCollections")}
+                </Text>
+              </View>
+            );
+          }
+          return (
+            <View style={styles.tabPanel}>
+              {cols.map((collection) => (
+                <CollectionCard
+                  key={collection.id}
+                  collection={collection}
+                  count={getItemsForCollection(collection.id).length || itemCounts[collection.id] || 0}
+                />
+              ))}
+            </View>
+          );
+        }}
+      />
     </Screen>
   );
 }
@@ -114,30 +109,8 @@ const styles = StyleSheet.create({
     color: "#ead8c3",
     lineHeight: 22,
   },
-  tabRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  tab: {
-    flex: 1,
-    borderRadius: 999,
-    paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: "#fff1df",
-    borderWidth: 1,
-    borderColor: "#e4c29a",
-  },
-  tabActive: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
-  },
-  tabText: {
-    color: "#5f4734",
-    fontWeight: "800",
-    fontSize: 15,
-  },
-  tabTextActive: {
-    color: "#fff4e8",
+  tabPanel: {
+    gap: 14,
   },
   emptyCard: {
     borderRadius: 24,

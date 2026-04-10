@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Screen } from "@/components/screen";
+import { SwipeTabs } from "@/components/swipe-tabs";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { fetchProfiles, fetchProfileById } from "@/lib/supabase-profiles";
@@ -194,144 +195,131 @@ export default function PeopleScreen() {
         <Text style={styles.subtitle}>{t("peopleSubtitle")}</Text>
       </View>
 
-      {/* Main tabs */}
-      <View style={styles.tabRow}>
-        <Pressable
-          style={{...styles.tab, ...(mainTab === "discover" ? styles.tabActive : {})}}
-          onPress={() => setMainTab("discover")}
-        >
-          <Text style={{...styles.tabText, ...(mainTab === "discover" ? styles.tabTextActive : {})}}>
-            {t("tabDiscover")}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={{...styles.tab, ...(mainTab === "friends" ? styles.tabActive : {})}}
-          onPress={() => setMainTab("friends")}
-        >
-          <Text style={{...styles.tabText, ...(mainTab === "friends" ? styles.tabTextActive : {})}}>
-            {t("tabFriends")}
-            {incomingRequestUserIds.length > 0 ? ` (${incomingRequestUserIds.length})` : ""}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={{...styles.tab, ...(mainTab === "following" ? styles.tabActive : {})}}
-          onPress={() => setMainTab("following")}
-        >
-          <Text style={{...styles.tabText, ...(mainTab === "following" ? styles.tabTextActive : {})}}>
-            {t("tabFollowing")}
-          </Text>
-        </Pressable>
-      </View>
+      <SwipeTabs
+        tabs={[
+          { key: "discover", label: t("tabDiscover") },
+          {
+            key: "friends",
+            label: `${t("tabFriends")}${incomingRequestUserIds.length > 0 ? ` (${incomingRequestUserIds.length})` : ""}`,
+          },
+          { key: "following", label: t("tabFollowing") },
+        ]}
+        active={mainTab}
+        onChange={(k) => setMainTab(k as MainTab)}
+        renderTab={(key) => {
+          if (key === "discover") {
+            return (
+              <View style={styles.tabPanel}>
+                <View style={styles.searchCard}>
+                  <Text style={styles.searchLabel}>{t("searchByProfileId")}</Text>
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder={t("searchByProfileIdPlaceholder")}
+                    placeholderTextColor="#9b8571"
+                    autoCapitalize="none"
+                    style={styles.searchInput}
+                  />
+                </View>
 
-      {mainTab === "discover" ? (
-        <>
-          <View style={styles.searchCard}>
-            <Text style={styles.searchLabel}>{t("searchByProfileId")}</Text>
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={t("searchByProfileIdPlaceholder")}
-              placeholderTextColor="#9b8571"
-              autoCapitalize="none"
-              style={styles.searchInput}
-            />
-          </View>
+                {loading ? (
+                  <View style={styles.emptyCard}>
+                    <ActivityIndicator color="#d89c5b" size="large" />
+                    <Text style={styles.emptyText}>{t("loadingPeople")}</Text>
+                  </View>
+                ) : filteredPeople.length === 0 ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyText}>{t("noPeopleFound")}</Text>
+                  </View>
+                ) : (
+                  filteredPeople.map(renderProfileCard)
+                )}
 
-          {loading ? (
-            <View style={styles.emptyCard}>
-              <ActivityIndicator color="#d89c5b" size="large" />
-              <Text style={styles.emptyText}>{t("loadingPeople")}</Text>
-            </View>
-          ) : filteredPeople.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>{t("noPeopleFound")}</Text>
-            </View>
-          ) : (
-            filteredPeople.map(renderProfileCard)
-          )}
-
-          {!loading && totalPages > 1 && (
-            <View style={styles.pagination}>
-              <Pressable
-                style={{...styles.pageButton, ...(page <= 1 ? styles.pageButtonDisabled : {})}}
-                onPress={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
-                <Text style={{...styles.pageButtonText, ...(page <= 1 ? styles.pageButtonTextDisabled : {})}}>
-                  {t("prevPage")}
-                </Text>
-              </Pressable>
-              <Text style={styles.pageInfo}>{t("pageOf", { page, total: totalPages })}</Text>
-              <Pressable
-                style={{...styles.pageButton, ...(page >= totalPages ? styles.pageButtonDisabled : {})}}
-                onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-              >
-                <Text style={{...styles.pageButtonText, ...(page >= totalPages ? styles.pageButtonTextDisabled : {})}}>
-                  {t("nextPage")}
-                </Text>
-              </Pressable>
-            </View>
-          )}
-        </>
-      ) : mainTab === "friends" ? (
-        <>
-          {/* Friends sub-tabs */}
-          <View style={styles.subTabRow}>
-            <Pressable
-              style={{...styles.subTab, ...(friendsSubTab === "my" ? styles.subTabActive : {})}}
-              onPress={() => setFriendsSubTab("my")}
-            >
-              <Text style={{...styles.subTabText, ...(friendsSubTab === "my" ? styles.subTabTextActive : {})}}>
-                {t("subTabMyFriends")}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={{...styles.subTab, ...(friendsSubTab === "requests" ? styles.subTabActive : {})}}
-              onPress={() => setFriendsSubTab("requests")}
-            >
-              <Text style={{...styles.subTabText, ...(friendsSubTab === "requests" ? styles.subTabTextActive : {})}}>
-                {t("subTabRequests")}
-                {incomingRequestUserIds.length > 0 ? ` (${incomingRequestUserIds.length})` : ""}
-              </Text>
-            </Pressable>
-          </View>
-
-          {loadingFriends ? (
-            <View style={styles.emptyCard}>
-              <ActivityIndicator color="#d89c5b" size="large" />
-            </View>
-          ) : friendsSubTab === "my" ? (
-            friendProfiles.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyText}>{t("noFriendsYetTab")}</Text>
+                {!loading && totalPages > 1 && (
+                  <View style={styles.pagination}>
+                    <Pressable
+                      style={{...styles.pageButton, ...(page <= 1 ? styles.pageButtonDisabled : {})}}
+                      onPress={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1}
+                    >
+                      <Text style={{...styles.pageButtonText, ...(page <= 1 ? styles.pageButtonTextDisabled : {})}}>
+                        {t("prevPage")}
+                      </Text>
+                    </Pressable>
+                    <Text style={styles.pageInfo}>{t("pageOf", { page, total: totalPages })}</Text>
+                    <Pressable
+                      style={{...styles.pageButton, ...(page >= totalPages ? styles.pageButtonDisabled : {})}}
+                      onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                    >
+                      <Text style={{...styles.pageButtonText, ...(page >= totalPages ? styles.pageButtonTextDisabled : {})}}>
+                        {t("nextPage")}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
-            ) : (
-              friendProfiles.map(renderProfileCard)
-            )
-          ) : requestProfiles.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>{t("noRequestsYet")}</Text>
+            );
+          }
+          if (key === "friends") {
+            return (
+              <SwipeTabs
+                variant="sub"
+                tabs={[
+                  { key: "my", label: t("subTabMyFriends") },
+                  {
+                    key: "requests",
+                    label: `${t("subTabRequests")}${incomingRequestUserIds.length > 0 ? ` (${incomingRequestUserIds.length})` : ""}`,
+                  },
+                ]}
+                active={friendsSubTab}
+                onChange={(k) => setFriendsSubTab(k as FriendsSubTab)}
+                renderTab={(subKey) => {
+                  if (loadingFriends) {
+                    return (
+                      <View style={styles.emptyCard}>
+                        <ActivityIndicator color="#d89c5b" size="large" />
+                      </View>
+                    );
+                  }
+                  if (subKey === "my") {
+                    return friendProfiles.length === 0 ? (
+                      <View style={styles.emptyCard}>
+                        <Text style={styles.emptyText}>{t("noFriendsYetTab")}</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.tabPanel}>{friendProfiles.map(renderProfileCard)}</View>
+                    );
+                  }
+                  return requestProfiles.length === 0 ? (
+                    <View style={styles.emptyCard}>
+                      <Text style={styles.emptyText}>{t("noRequestsYet")}</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.tabPanel}>{requestProfiles.map(renderProfileCard)}</View>
+                  );
+                }}
+              />
+            );
+          }
+          // following
+          return (
+            <View style={styles.tabPanel}>
+              {loadingFollowing ? (
+                <View style={styles.emptyCard}>
+                  <ActivityIndicator color="#d89c5b" size="large" />
+                </View>
+              ) : followingProfiles.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyText}>{t("noFollowingYet")}</Text>
+                </View>
+              ) : (
+                followingProfiles.map(renderProfileCard)
+              )}
             </View>
-          ) : (
-            requestProfiles.map(renderProfileCard)
-          )}
-        </>
-      ) : (
-        <>
-          {loadingFollowing ? (
-            <View style={styles.emptyCard}>
-              <ActivityIndicator color="#d89c5b" size="large" />
-            </View>
-          ) : followingProfiles.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>{t("noFollowingYet")}</Text>
-            </View>
-          ) : (
-            followingProfiles.map(renderProfileCard)
-          )}
-        </>
-      )}
+          );
+        }}
+      />
     </Screen>
   );
 }
@@ -342,6 +330,9 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     padding: 24,
     gap: 10,
+  },
+  tabPanel: {
+    gap: 14,
   },
   eyebrow: {
     color: "#f5c99a",
@@ -359,56 +350,6 @@ const styles = StyleSheet.create({
   subtitle: {
     color: "#ead8c3",
     lineHeight: 22,
-  },
-  tabRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  tab: {
-    flex: 1,
-    borderRadius: 999,
-    paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: "#fff1df",
-    borderWidth: 1,
-    borderColor: "#e4c29a",
-  },
-  tabActive: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
-  },
-  tabText: {
-    color: "#5f4734",
-    fontWeight: "800",
-    fontSize: 15,
-  },
-  tabTextActive: {
-    color: "#fff4e8",
-  },
-  subTabRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  subTab: {
-    flex: 1,
-    borderRadius: 20,
-    paddingVertical: 12,
-    alignItems: "center",
-    backgroundColor: "#fffaf3",
-    borderWidth: 1,
-    borderColor: "#eadbc8",
-  },
-  subTabActive: {
-    backgroundColor: "#d89c5b",
-    borderColor: "#d89c5b",
-  },
-  subTabText: {
-    color: "#6b5543",
-    fontWeight: "700",
-    fontSize: 14,
-  },
-  subTabTextActive: {
-    color: "#241912",
   },
   searchCard: {
     borderRadius: 24,
