@@ -1,8 +1,11 @@
+import "react-native-gesture-handler";
+
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, router, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { BottomNav } from "@/components/bottom-nav";
 import { LoginScreen } from "@/components/login-screen";
@@ -10,19 +13,25 @@ import { SearchOverlay } from "@/components/search-overlay";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { CollectionsProvider } from "@/lib/collections-context";
 import { I18nProvider, useI18n } from "@/lib/i18n-context";
+import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-context";
 import { SocialProvider } from "@/lib/social-context";
+import { ToastProvider } from "@/lib/toast-context";
 import { Screen } from "@/components/screen";
 
 export default function RootLayout() {
   return (
     <I18nProvider>
-      <AuthProvider>
-        <SocialProvider>
-          <CollectionsProvider>
-            <AppShell />
-          </CollectionsProvider>
-        </SocialProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <SocialProvider>
+            <CollectionsProvider>
+              <NavAnimationProvider>
+                <AppShell />
+              </NavAnimationProvider>
+            </CollectionsProvider>
+          </SocialProvider>
+        </AuthProvider>
+      </ToastProvider>
     </I18nProvider>
   );
 }
@@ -30,6 +39,7 @@ export default function RootLayout() {
 function AppShell() {
   const { ready, session } = useAuth();
   const { ready: i18nReady, t } = useI18n();
+  const { animation } = useNavAnimation();
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -66,11 +76,14 @@ function AppShell() {
   const isNative = Platform.OS !== "web";
 
   return (
+    <GestureHandlerRootView style={styles.shell}>
     <View style={styles.shell}>
       <StatusBar style="dark" />
       <View style={styles.stackWrap}>
         <Stack
           screenOptions={{
+            animation,
+            headerBackVisible: !isNative,
             headerShadowVisible: false,
             headerStyle: {
               backgroundColor: "#fff7ef",
@@ -110,6 +123,7 @@ function AppShell() {
       <BottomNav onSearchPress={() => setSearchOpen(true)} />
       <SearchOverlay visible={searchOpen} onClose={() => setSearchOpen(false)} />
     </View>
+    </GestureHandlerRootView>
   );
 }
 

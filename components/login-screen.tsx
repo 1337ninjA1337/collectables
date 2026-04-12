@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
+import { useToast } from "@/lib/toast-context";
 
 export function LoginScreen() {
   const { configured, pending, sendEmailOtp, verifyEmailOtp, signInWithProvider } = useAuth();
   const { t } = useI18n();
+  const toast = useToast();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [awaitingCode, setAwaitingCode] = useState(false);
@@ -17,7 +19,7 @@ export function LoginScreen() {
     setEmailError(null);
 
     if (!email.trim()) {
-      Alert.alert(t("needEmailTitle"), t("needEmailText"));
+      toast.error(t("needEmailText"), t("needEmailTitle"));
       return;
     }
 
@@ -52,7 +54,7 @@ export function LoginScreen() {
   async function handleProviderLogin(provider: "google" | "apple") {
     const result = await signInWithProvider(provider);
     if (result.error) {
-      Alert.alert(t("loginFailed"), result.error);
+      toast.error(result.error, t("loginFailed"));
     }
   }
 

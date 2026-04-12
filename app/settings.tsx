@@ -2,10 +2,12 @@ import { Stack } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/screen";
+import { useAuth } from "@/lib/auth-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
 
 export default function SettingsScreen() {
   const { t, language, setLanguage, languageOptions } = useI18n();
+  const { signOut, pending } = useAuth();
 
   return (
     <Screen>
@@ -33,6 +35,14 @@ export default function SettingsScreen() {
           ))}
         </View>
       </View>
+
+      <Pressable
+        style={{...styles.signOutButton, ...(pending ? styles.signOutButtonDisabled : {})}}
+        onPress={() => void signOut()}
+        disabled={pending}
+      >
+        <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
+      </Pressable>
     </Screen>
   );
 }
@@ -97,5 +107,22 @@ const styles = StyleSheet.create({
   },
   languageChipTextActive: {
     color: "#fff4e8",
+  },
+  signOutButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#d9a0a0",
+    backgroundColor: "#fff3f3",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  signOutButtonDisabled: {
+    opacity: 0.6,
+  },
+  signOutButtonText: {
+    color: "#8d2b2b",
+    fontSize: 15,
+    fontWeight: "800",
   },
 });

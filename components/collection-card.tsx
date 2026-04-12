@@ -1,11 +1,20 @@
 import { Link } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { VisibilityBadge } from "@/components/visibility-badge";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { Collection } from "@/lib/types";
 
-export function CollectionCard({ collection, count }: { collection: Collection; count: number }) {
+export function CollectionCard({
+  collection,
+  count,
+  totalCost,
+}: {
+  collection: Collection;
+  count: number;
+  totalCost?: number;
+}) {
   const { t } = useI18n();
   const hasCover = Boolean(collection.coverPhoto);
 
@@ -16,7 +25,7 @@ export function CollectionCard({ collection, count }: { collection: Collection; 
         <View style={styles.overlay} />
         <View style={styles.content}>
           <View style={styles.topRow}>
-            <Text style={styles.role}>{collection.role === "owner" ? t("yourCollection") : t("sharedToYou")}</Text>
+            <VisibilityBadge collection={collection} />
             <Text style={styles.count}>{t("itemsCount", { count })}</Text>
           </View>
           <Text style={styles.title}>{collection.name}</Text>
@@ -26,6 +35,9 @@ export function CollectionCard({ collection, count }: { collection: Collection; 
               ? t("sharedWithPeople", { count: collection.sharedWith.length })
               : t("ownerLabel", { name: collection.ownerName })}
           </Text>
+          {typeof totalCost === "number" && totalCost > 0 ? (
+            <Text style={styles.meta}>{t("totalCost")}: {totalCost}</Text>
+          ) : null}
         </View>
       </Pressable>
     </Link>

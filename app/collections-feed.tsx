@@ -1,7 +1,9 @@
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { CollectionCard } from "@/components/collection-card";
+import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { SwipeTabs } from "@/components/swipe-tabs";
 import { useCollections } from "@/lib/collections-context";
@@ -13,7 +15,7 @@ type MainTab = "friends" | "subscribed";
 
 export default function CollectionsFeedScreen() {
   const { t } = useI18n();
-  const { friendCollections, subscribedCollections, getItemsForCollection } = useCollections();
+  const { friendCollections, subscribedCollections, getItemsForCollection, getCollectionTotalCost } = useCollections();
 
   const [mainTab, setMainTab] = useState<MainTab>("friends");
   const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
@@ -60,12 +62,22 @@ export default function CollectionsFeedScreen() {
         renderTab={(key) => {
           const cols = key === "friends" ? friendCollections : subscribedCollections;
           if (cols.length === 0) {
-            return (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyText}>
-                  {key === "friends" ? t("noFriendCollections") : t("noSubscribedCollections")}
-                </Text>
-              </View>
+            return key === "friends" ? (
+              <EmptyState
+                icon="🤝"
+                title={t("emptyFriendCollectionsTitle")}
+                hint={t("emptyFriendCollectionsHint")}
+                actionLabel={t("emptyFriendCollectionsCta")}
+                onAction={() => router.push("/people")}
+              />
+            ) : (
+              <EmptyState
+                icon="🔖"
+                title={t("emptySubscribedTitle")}
+                hint={t("emptySubscribedHint")}
+                actionLabel={t("emptySubscribedCta")}
+                onAction={() => router.push("/people")}
+              />
             );
           }
           return (
@@ -75,6 +87,7 @@ export default function CollectionsFeedScreen() {
                   key={collection.id}
                   collection={collection}
                   count={getItemsForCollection(collection.id).length || itemCounts[collection.id] || 0}
+                  totalCost={getCollectionTotalCost(collection.id)}
                 />
               ))}
             </View>
@@ -111,18 +124,5 @@ const styles = StyleSheet.create({
   },
   tabPanel: {
     gap: 14,
-  },
-  emptyCard: {
-    borderRadius: 24,
-    backgroundColor: "#fffaf3",
-    borderWidth: 1,
-    borderColor: "#eadbc8",
-    padding: 18,
-    alignItems: "center",
-    gap: 12,
-  },
-  emptyText: {
-    color: "#6b5647",
-    lineHeight: 22,
   },
 });

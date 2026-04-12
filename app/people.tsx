@@ -1,22 +1,19 @@
-import { Link, useLocalSearchParams } from "expo-router";
+import { Link } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
-import { SwipeTabs } from "@/components/swipe-tabs";
+import { SkeletonProfileList } from "@/components/skeleton";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
-import { fetchProfiles, fetchProfileById } from "@/lib/supabase-profiles";
+import { fetchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
 
 const PAGE_SIZE = 25;
 
-type MainTab = "discover" | "friends" | "following";
-type FriendsSubTab = "my" | "requests";
-
 export default function PeopleScreen() {
   const { t } = useI18n();
-  const params = useLocalSearchParams<{ tab?: string }>();
   const {
     getMyProfile,
     getRelationship,
@@ -24,35 +21,17 @@ export default function PeopleScreen() {
     followProfile,
     removeFriend,
     unfollowProfile,
-    friends,
-    following,
-    incomingRequestUserIds,
   } = useSocial();
 
-  const initialTab = (params.tab === "friends" || params.tab === "following") ? params.tab : "discover";
-  const [mainTab, setMainTab] = useState<MainTab>(initialTab);
-  const [friendsSubTab, setFriendsSubTab] = useState<FriendsSubTab>("my");
-
-  // --- Discover tab state ---
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [remoteProfiles, setRemoteProfiles] = useState<UserProfile[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // --- Friends tab state ---
-  const [friendProfiles, setFriendProfiles] = useState<UserProfile[]>([]);
-  const [requestProfiles, setRequestProfiles] = useState<UserProfile[]>([]);
-  const [loadingFriends, setLoadingFriends] = useState(false);
-
-  // --- Following tab state ---
-  const [followingProfiles, setFollowingProfiles] = useState<UserProfile[]>([]);
-  const [loadingFollowing, setLoadingFollowing] = useState(false);
-
   const myProfile = getMyProfile();
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-  // Load discover page
   const loadPage = useCallback(async (pageNum: number) => {
     setLoading(true);
     try {
@@ -65,54 +44,8 @@ export default function PeopleScreen() {
   }, []);
 
   useEffect(() => {
-    if (mainTab === "discover") {
-      void loadPage(page);
-    }
-  }, [page, loadPage, mainTab]);
-
-  // Load friend/request profiles from Supabase
-  useEffect(() => {
-    if (mainTab !== "friends") return;
-
-    setLoadingFriends(true);
-    const ids = friendsSubTab === "my" ? friends : incomingRequestUserIds;
-
-    if (ids.length === 0) {
-      if (friendsSubTab === "my") setFriendProfiles([]);
-      else setRequestProfiles([]);
-      setLoadingFriends(false);
-      return;
-    }
-
-    Promise.all(ids.map((id) => fetchProfileById(id)))
-      .then((results) => {
-        const valid = results.filter((p): p is UserProfile => p !== null);
-        if (friendsSubTab === "my") setFriendProfiles(valid);
-        else setRequestProfiles(valid);
-      })
-      .catch(() => {})
-      .finally(() => setLoadingFriends(false));
-  }, [mainTab, friendsSubTab, friends, incomingRequestUserIds]);
-
-  // Load following profiles from Supabase
-  useEffect(() => {
-    if (mainTab !== "following") return;
-
-    setLoadingFollowing(true);
-
-    if (following.length === 0) {
-      setFollowingProfiles([]);
-      setLoadingFollowing(false);
-      return;
-    }
-
-    Promise.all(following.map((id) => fetchProfileById(id)))
-      .then((results) => {
-        setFollowingProfiles(results.filter((p): p is UserProfile => p !== null));
-      })
-      .catch(() => {})
-      .finally(() => setLoadingFollowing(false));
-  }, [mainTab, following]);
+    void loadPage(page);
+  }, [page, loadPage]);
 
   const others = useMemo(
     () => remoteProfiles.filter((p) => p.id !== myProfile?.id),
@@ -131,7 +64,11 @@ export default function PeopleScreen() {
       <View key={profile.id} style={styles.card}>
         <Link href={`/profile/${profile.id}` as never} asChild>
           <Pressable style={styles.profileRow}>
-            <Image source={{ uri: profile.avatar }} style={styles.avatar} />
+            {profile.avatar ? (
+              <Image source={{ uri: profile.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatar} />
+            )}
             <View style={styles.profileMeta}>
               <Text style={styles.name}>{profile.displayName}</Text>
               <Text style={styles.username}>@{profile.username}</Text>
@@ -191,135 +128,57 @@ export default function PeopleScreen() {
     <Screen>
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>{t("community")}</Text>
-        <Text style={styles.title}>{t("peopleTitle")}</Text>
-        <Text style={styles.subtitle}>{t("peopleSubtitle")}</Text>
+        <Text style={styles.title}>{t("searchTitle")}</Text>
+        <Text style={styles.subtitle}>{t("searchSubtitle")}</Text>
       </View>
 
-      <SwipeTabs
-        tabs={[
-          { key: "discover", label: t("tabDiscover") },
-          {
-            key: "friends",
-            label: `${t("tabFriends")}${incomingRequestUserIds.length > 0 ? ` (${incomingRequestUserIds.length})` : ""}`,
-          },
-          { key: "following", label: t("tabFollowing") },
-        ]}
-        active={mainTab}
-        onChange={(k) => setMainTab(k as MainTab)}
-        renderTab={(key) => {
-          if (key === "discover") {
-            return (
-              <View style={styles.tabPanel}>
-                <View style={styles.searchCard}>
-                  <Text style={styles.searchLabel}>{t("searchByProfileId")}</Text>
-                  <TextInput
-                    value={query}
-                    onChangeText={setQuery}
-                    placeholder={t("searchByProfileIdPlaceholder")}
-                    placeholderTextColor="#9b8571"
-                    autoCapitalize="none"
-                    style={styles.searchInput}
-                  />
-                </View>
+      <View style={styles.searchCard}>
+        <Text style={styles.searchLabel}>{t("searchByProfileId")}</Text>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder={t("searchByProfileIdPlaceholder")}
+          placeholderTextColor="#9b8571"
+          autoCapitalize="none"
+          style={styles.searchInput}
+        />
+      </View>
 
-                {loading ? (
-                  <View style={styles.emptyCard}>
-                    <ActivityIndicator color="#d89c5b" size="large" />
-                    <Text style={styles.emptyText}>{t("loadingPeople")}</Text>
-                  </View>
-                ) : filteredPeople.length === 0 ? (
-                  <View style={styles.emptyCard}>
-                    <Text style={styles.emptyText}>{t("noPeopleFound")}</Text>
-                  </View>
-                ) : (
-                  filteredPeople.map(renderProfileCard)
-                )}
+      {loading ? (
+        <SkeletonProfileList count={4} />
+      ) : filteredPeople.length === 0 ? (
+        <EmptyState
+          icon="🔎"
+          title={t("emptyPeopleTitle")}
+          hint={t("emptyPeopleHint")}
+        />
+      ) : (
+        filteredPeople.map(renderProfileCard)
+      )}
 
-                {!loading && totalPages > 1 && (
-                  <View style={styles.pagination}>
-                    <Pressable
-                      style={{...styles.pageButton, ...(page <= 1 ? styles.pageButtonDisabled : {})}}
-                      onPress={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page <= 1}
-                    >
-                      <Text style={{...styles.pageButtonText, ...(page <= 1 ? styles.pageButtonTextDisabled : {})}}>
-                        {t("prevPage")}
-                      </Text>
-                    </Pressable>
-                    <Text style={styles.pageInfo}>{t("pageOf", { page, total: totalPages })}</Text>
-                    <Pressable
-                      style={{...styles.pageButton, ...(page >= totalPages ? styles.pageButtonDisabled : {})}}
-                      onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={page >= totalPages}
-                    >
-                      <Text style={{...styles.pageButtonText, ...(page >= totalPages ? styles.pageButtonTextDisabled : {})}}>
-                        {t("nextPage")}
-                      </Text>
-                    </Pressable>
-                  </View>
-                )}
-              </View>
-            );
-          }
-          if (key === "friends") {
-            return (
-              <SwipeTabs
-                variant="sub"
-                tabs={[
-                  { key: "my", label: t("subTabMyFriends") },
-                  {
-                    key: "requests",
-                    label: `${t("subTabRequests")}${incomingRequestUserIds.length > 0 ? ` (${incomingRequestUserIds.length})` : ""}`,
-                  },
-                ]}
-                active={friendsSubTab}
-                onChange={(k) => setFriendsSubTab(k as FriendsSubTab)}
-                renderTab={(subKey) => {
-                  if (loadingFriends) {
-                    return (
-                      <View style={styles.emptyCard}>
-                        <ActivityIndicator color="#d89c5b" size="large" />
-                      </View>
-                    );
-                  }
-                  if (subKey === "my") {
-                    return friendProfiles.length === 0 ? (
-                      <View style={styles.emptyCard}>
-                        <Text style={styles.emptyText}>{t("noFriendsYetTab")}</Text>
-                      </View>
-                    ) : (
-                      <View style={styles.tabPanel}>{friendProfiles.map(renderProfileCard)}</View>
-                    );
-                  }
-                  return requestProfiles.length === 0 ? (
-                    <View style={styles.emptyCard}>
-                      <Text style={styles.emptyText}>{t("noRequestsYet")}</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.tabPanel}>{requestProfiles.map(renderProfileCard)}</View>
-                  );
-                }}
-              />
-            );
-          }
-          // following
-          return (
-            <View style={styles.tabPanel}>
-              {loadingFollowing ? (
-                <View style={styles.emptyCard}>
-                  <ActivityIndicator color="#d89c5b" size="large" />
-                </View>
-              ) : followingProfiles.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyText}>{t("noFollowingYet")}</Text>
-                </View>
-              ) : (
-                followingProfiles.map(renderProfileCard)
-              )}
-            </View>
-          );
-        }}
-      />
+      {!loading && totalPages > 1 && (
+        <View style={styles.pagination}>
+          <Pressable
+            style={{...styles.pageButton, ...(page <= 1 ? styles.pageButtonDisabled : {})}}
+            onPress={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+          >
+            <Text style={{...styles.pageButtonText, ...(page <= 1 ? styles.pageButtonTextDisabled : {})}}>
+              {t("prevPage")}
+            </Text>
+          </Pressable>
+          <Text style={styles.pageInfo}>{t("pageOf", { page, total: totalPages })}</Text>
+          <Pressable
+            style={{...styles.pageButton, ...(page >= totalPages ? styles.pageButtonDisabled : {})}}
+            onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+          >
+            <Text style={{...styles.pageButtonText, ...(page >= totalPages ? styles.pageButtonTextDisabled : {})}}>
+              {t("nextPage")}
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </Screen>
   );
 }
@@ -330,9 +189,6 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     padding: 24,
     gap: 10,
-  },
-  tabPanel: {
-    gap: 14,
   },
   eyebrow: {
     color: "#f5c99a",
@@ -449,19 +305,6 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     color: "#6b5543",
     fontWeight: "800",
-  },
-  emptyCard: {
-    borderRadius: 24,
-    backgroundColor: "#fffaf3",
-    borderWidth: 1,
-    borderColor: "#eadbc8",
-    padding: 18,
-    alignItems: "center",
-    gap: 12,
-  },
-  emptyText: {
-    color: "#6b5647",
-    lineHeight: 22,
   },
   pagination: {
     flexDirection: "row",

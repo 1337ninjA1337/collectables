@@ -1,14 +1,28 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { PropsWithChildren } from "react";
-import { SafeAreaView, ScrollView, StyleSheet, View } from "react-native";
+import { RefreshControl, SafeAreaView, ScrollView, StyleSheet, View } from "react-native";
+import { NestableScrollContainer } from "./DraggableList";
 
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;
+  nestable?: boolean;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }>;
 
-export function Screen({ children, scroll = true }: ScreenProps) {
-  const content = scroll ? (
-    <ScrollView contentContainerStyle={styles.scrollContent}>{children}</ScrollView>
+export function Screen({ children, scroll = true, nestable = false, refreshing, onRefresh }: ScreenProps) {
+  const refreshControl = onRefresh ? (
+    <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor="#8a5a2b" colors={["#8a5a2b"]} />
+  ) : undefined;
+
+  const content = nestable ? (
+    <NestableScrollContainer contentContainerStyle={styles.scrollContent} refreshControl={refreshControl}>
+      {children}
+    </NestableScrollContainer>
+  ) : scroll ? (
+    <ScrollView contentContainerStyle={styles.scrollContent} refreshControl={refreshControl}>
+      {children}
+    </ScrollView>
   ) : (
     <View style={styles.scrollContent}>{children}</View>
   );

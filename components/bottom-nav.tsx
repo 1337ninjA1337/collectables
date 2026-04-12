@@ -1,8 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { useState } from "react";
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useI18n } from "@/lib/i18n-context";
+import { useNavAnimation } from "@/lib/nav-animation-context";
 import { useSocial } from "@/lib/social-context";
 
 export const BOTTOM_NAV_HEIGHT = 58;
@@ -13,6 +16,7 @@ type NavItem = {
   iconActive: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   active: boolean;
+  badge?: boolean;
 };
 
 type BottomNavProps = {
@@ -21,16 +25,48 @@ type BottomNavProps = {
 
 export function BottomNav({ onSearchPress }: BottomNavProps) {
   const pathname = usePathname();
-  const { getMyProfile } = useSocial();
+  const { getMyProfile, incomingRequestUserIds } = useSocial();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
+  const { setAnimation } = useNavAnimation();
+  const [createOpen, setCreateOpen] = useState(false);
 
   if (Platform.OS === "web") return null;
 
   const myProfile = getMyProfile();
-  const onProfile = pathname.startsWith("/profile");
-  const onSettings = pathname === "/settings";
-  const onPeople = pathname.startsWith("/people");
   const onHome = pathname === "/";
+  const onSearch = pathname === "/people" || pathname.startsWith("/people");
+  const onFriends = pathname === "/friends" || pathname.startsWith("/friends");
+  const onProfile = pathname.startsWith("/profile");
+
+  // Active highlights are mutually exclusive: friends takes precedence over search
+  const friendsActive = onFriends;
+  const searchActive = onSearch && !onFriends;
+
+  // Tab order indices for direction-aware transitions
+  // 0: home, 1: search, 2: friends, 3: profile
+  const currentTabIndex = onHome ? 0 : searchActive ? 1 : friendsActive ? 2 : onProfile ? 3 : -1;
+
+  function applyAnimation(targetIndex: number) {
+    if (currentTabIndex < 0 || targetIndex === currentTabIndex) {
+      setAnimation("default");
+      return;
+    }
+    setAnimation(targetIndex > currentTabIndex ? "slide_from_right" : "slide_from_left");
+  }
+
+  function navTo(target: string, isActive: boolean, targetIndex: number) {
+    if (isActive) return; // don't re-open active tab
+    applyAnimation(targetIndex);
+    // Defer push so the animation context state commits before navigation
+    setTimeout(() => router.push(target as never), 0);
+  }
+
+  function goHome() {
+    if (onHome) return;
+    applyAnimation(0);
+    setTimeout(() => router.replace("/"), 0);
+  }
 
   const items: NavItem[] = [
     {
@@ -38,21 +74,22 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       icon: "home-outline",
       iconActive: "home",
       active: onHome,
-      onPress: () => router.replace("/"),
+      onPress: goHome,
     },
     {
       key: "search",
       icon: "search-outline",
       iconActive: "search",
-      active: onPeople,
-      onPress: () => router.push("/people"),
+      active: false,
+      onPress: () => onSearchPress?.(),
     },
     {
       key: "friends",
       icon: "people-outline",
       iconActive: "people",
-      active: false,
-      onPress: () => router.push("/people?tab=friends" as never),
+      active: friendsActive,
+      badge: incomingRequestUserIds.length > 0,
+      onPress: () => navTo("/friends", friendsActive, 2),
     },
     {
       key: "profile",
@@ -60,37 +97,93 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       iconActive: "person",
       active: onProfile,
       onPress: () => {
-        if (myProfile) {
-          router.push(`/profile/${myProfile.id}` as never);
-        }
+        if (!myProfile) return;
+        const target = `/profile/${myProfile.id}`;
+        if (pathname === target) return;
+        applyAnimation(3);
+        setTimeout(() => router.push(target as never), 0);
       },
-    },
-    {
-      key: "settings",
-      icon: "settings-outline",
-      iconActive: "settings",
-      active: onSettings,
-      onPress: () => router.push("/settings"),
     },
   ];
 
+  const leftItems = items.slice(0, 2);
+  const rightItems = items.slice(2);
+
+  function openCreate() {
+    setCreateOpen(true);
+  }
+
+  function closeCreate() {
+    setCreateOpen(false);
+  }
+
+  function goCreateItem() {
+    closeCreate();
+    setAnimation("default");
+    setTimeout(() => router.push("/create"), 0);
+  }
+
+  function goCreateCollection() {
+    closeCreate();
+    setAnimation("default");
+    setTimeout(() => router.push("/create-collection"), 0);
+  }
+
   return (
-    <View
-      style={{
-        ...styles.wrap,
-        paddingBottom: Math.max(insets.bottom, 8),
-      }}
-    >
-      {items.map((item) => (
-        <Pressable key={item.key} style={styles.item} onPress={item.onPress}>
-          <Ionicons
-            name={item.active ? item.iconActive : item.icon}
-            size={26}
-            color={item.active ? "#261b14" : "#8a6e54"}
-          />
+    <>
+      <View
+        style={{
+          ...styles.wrap,
+          paddingBottom: Math.max(insets.bottom, 8),
+        }}
+      >
+        {leftItems.map((item) => (
+          <Pressable key={item.key} style={styles.item} onPress={item.onPress}>
+            <View>
+              <Ionicons
+                name={item.active ? item.iconActive : item.icon}
+                size={26}
+                color={item.active ? "#261b14" : "#8a6e54"}
+              />
+              {item.badge ? <View style={styles.badge} /> : null}
+            </View>
+          </Pressable>
+        ))}
+        <View style={styles.item}>
+          <Pressable style={styles.plusButton} onPress={openCreate} accessibilityLabel={t("addItem")}>
+            <Ionicons name="add" size={30} color="#fff5ea" />
+          </Pressable>
+        </View>
+        {rightItems.map((item) => (
+          <Pressable key={item.key} style={styles.item} onPress={item.onPress}>
+            <View>
+              <Ionicons
+                name={item.active ? item.iconActive : item.icon}
+                size={26}
+                color={item.active ? "#261b14" : "#8a6e54"}
+              />
+              {item.badge ? <View style={styles.badge} /> : null}
+            </View>
+          </Pressable>
+        ))}
+      </View>
+
+      <Modal visible={createOpen} transparent animationType="fade" onRequestClose={closeCreate}>
+        <Pressable style={styles.modalBackdrop} onPress={closeCreate}>
+          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+            <Pressable style={styles.modalPrimaryButton} onPress={goCreateCollection}>
+              <Text style={styles.modalPrimaryText}>{t("createCollection")}</Text>
+            </Pressable>
+            <Pressable style={styles.modalSecondaryButton} onPress={goCreateItem}>
+              <Text style={styles.modalSecondaryText}>{t("addItem")}</Text>
+            </Pressable>
+            <Pressable style={styles.modalCancelButton} onPress={closeCreate}>
+              <Text style={styles.modalCancelText}>{t("cancel")}</Text>
+            </Pressable>
+          </Pressable>
         </Pressable>
-      ))}
-    </View>
+      </Modal>
+    </>
   );
 }
 
@@ -108,5 +201,75 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 6,
+  },
+  badge: {
+    position: "absolute",
+    top: -2,
+    right: -4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#d92f2f",
+    borderWidth: 1.5,
+    borderColor: "#fff7ef",
+  },
+  plusButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#261b14",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -22,
+    borderWidth: 4,
+    borderColor: "#fff7ef",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(20, 12, 6, 0.55)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: "#fff7ef",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 22,
+    paddingBottom: 32,
+    gap: 12,
+  },
+  modalPrimaryButton: {
+    borderRadius: 22,
+    backgroundColor: "#261b14",
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  modalPrimaryText: {
+    color: "#fff5ea",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  modalSecondaryButton: {
+    borderRadius: 22,
+    backgroundColor: "#d89c5b",
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  modalSecondaryText: {
+    color: "#241912",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  modalCancelButton: {
+    borderRadius: 22,
+    backgroundColor: "#fff1df",
+    borderWidth: 1,
+    borderColor: "#e4c29a",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  modalCancelText: {
+    color: "#5f4734",
+    fontSize: 15,
+    fontWeight: "800",
   },
 });

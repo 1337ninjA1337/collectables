@@ -185,6 +185,7 @@ type DbItem = {
   created_by: string;
   created_by_user_id: string;
   created_at: string;
+  cost?: number | null;
 };
 
 function toItem(row: DbItem): CollectableItem {
@@ -200,6 +201,7 @@ function toItem(row: DbItem): CollectableItem {
     createdBy: row.created_by,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at,
+    cost: row.cost ?? null,
   };
 }
 
@@ -221,6 +223,7 @@ export async function upsertItem(item: CollectableItem): Promise<void> {
       created_by: item.createdBy,
       created_by_user_id: item.createdByUserId,
       created_at: item.createdAt,
+      cost: item.cost ?? null,
     }),
   });
 }

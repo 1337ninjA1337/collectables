@@ -1,7 +1,11 @@
+import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+import { EmptyState } from "@/components/empty-state";
+import { SkeletonProfile } from "@/components/skeleton";
 
 import { CollectionCard } from "@/components/collection-card";
 import { Screen } from "@/components/screen";
@@ -9,6 +13,7 @@ import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
+import { useToast } from "@/lib/toast-context";
 import { fetchProfileById, fetchCollectionsByUserId, fetchItemsByCollectionId } from "@/lib/supabase-profiles";
 import { CollectableItem, Collection, UserProfile } from "@/lib/types";
 
@@ -17,6 +22,7 @@ const DEFAULT_EN_PROFILE_BIO = "I collect things worth saving beautifully and sh
 export default function ProfileScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const { t } = useI18n();
+  const toast = useToast();
   const {
     getProfileById,
     getRelationship,
@@ -28,7 +34,7 @@ export default function ProfileScreen() {
     deleteProfile,
     isAdmin,
   } = useSocial();
-  const { collections, getItemsForCollection, deleteUserContent } = useCollections();
+  const { collections, getItemsForCollection, getCollectionTotalCost, deleteUserContent } = useCollections();
   const localProfile = getProfileById(params.id);
   const [remoteProfile, setRemoteProfile] = useState<UserProfile | null>(null);
   const [loadingRemote, setLoadingRemote] = useState(false);
@@ -100,7 +106,7 @@ export default function ProfileScreen() {
   if (loadingRemote && !profile) {
     return (
       <Screen>
-        <ActivityIndicator color="#d89c5b" size="large" />
+        <SkeletonProfile />
       </Screen>
     );
   }
@@ -113,10 +119,10 @@ export default function ProfileScreen() {
     );
   }
 
-  async function handleChangeAvatar() {
+  async function pickAvatarFromGallery() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(t("noAccess"), t("noAccessCover"));
+      toast.error(t("noAccessCover"), t("noAccess"));
       return;
     }
 
@@ -133,6 +139,39 @@ export default function ProfileScreen() {
         await updateMyProfile({ avatar: cloudUrl });
       }
     }
+  }
+
+  async function takeAvatarPhoto() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      toast.error(t("noAccessCamera"), t("noAccess"));
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      const localUri = result.assets[0]?.uri;
+      if (localUri) {
+        const cloudUrl = await uploadImage(localUri);
+        await updateMyProfile({ avatar: cloudUrl });
+      }
+    }
+  }
+
+  function handleChangeAvatar() {
+    if (Platform.OS === "web") {
+      void pickAvatarFromGallery();
+      return;
+    }
+    Alert.alert(t("changeProfilePhoto"), undefined, [
+      { text: t("pickFromGallery"), onPress: () => void pickAvatarFromGallery() },
+      { text: t("takePhoto"), onPress: () => void takeAvatarPhoto() },
+      { text: t("cancel"), style: "cancel" },
+    ]);
   }
 
   async function handleSaveBio() {
@@ -184,6 +223,15 @@ export default function ProfileScreen() {
     <Screen>
       <Stack.Screen options={{ title: activeProfile.displayName }} />
       <View style={styles.hero}>
+        {relationship === "self" ? (
+          <Pressable
+            style={styles.settingsIcon}
+            onPress={() => router.push("/settings")}
+            accessibilityLabel={t("settings")}
+          >
+            <Ionicons name="settings-outline" size={22} color="#fff4e8" />
+          </Pressable>
+        ) : null}
         <Image source={{ uri: activeProfile.avatar }} style={styles.avatar} />
         {relationship === "self" ? (
           <Pressable style={styles.editAvatarButton} onPress={handleChangeAvatar}>
@@ -305,17 +353,17 @@ export default function ProfileScreen() {
               key={collection.id}
               collection={collection}
               count={getItemsForCollection(collection.id).length || remoteItemCounts[collection.id] || 0}
+              totalCost={getCollectionTotalCost(collection.id)}
             />
           ))
         ) : (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>{t("subscribeToSeeCollections")}</Text>
-            <Link href="/people" asChild>
-              <Pressable style={styles.browseButton}>
-                <Text style={styles.browseButtonText}>{t("findPeople")}</Text>
-              </Pressable>
-            </Link>
-          </View>
+          <EmptyState
+            icon="🔒"
+            title={t("emptyProfileCollectionsTitle")}
+            hint={t("emptyProfileCollectionsHint")}
+            actionLabel={t("findPeople")}
+            onAction={() => router.push("/people")}
+          />
         )}
       </View>
     </Screen>
@@ -329,6 +377,21 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: "center",
     gap: 8,
+    position: "relative",
+  },
+  settingsIcon: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 244, 229, 0.12)",
+    borderWidth: 1,
+    borderColor: "#6e5541",
+    zIndex: 2,
   },
   avatar: {
     width: 104,
@@ -488,29 +551,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   saveBioButtonText: {
-    color: "#fff4e8",
-    fontWeight: "800",
-  },
-  emptyCard: {
-    borderRadius: 24,
-    backgroundColor: "#fffaf3",
-    borderWidth: 1,
-    borderColor: "#eadbc8",
-    padding: 18,
-    gap: 12,
-  },
-  emptyText: {
-    color: "#6b5647",
-    lineHeight: 22,
-  },
-  browseButton: {
-    alignSelf: "flex-start",
-    borderRadius: 999,
-    backgroundColor: "#261b14",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  browseButtonText: {
     color: "#fff4e8",
     fontWeight: "800",
   },

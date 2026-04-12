@@ -23,6 +23,9 @@ export type CollectableItem = {
   createdBy: string;
   createdByUserId: string;
   createdAt: string;
+  cost?: number | null;
+  sortOrder?: number;
+  isWishlist?: boolean;
 };
 
 export type Collection = {
@@ -35,4 +38,5 @@ export type Collection = {
   sharedWith: string[];
   sharedWithUserIds: string[];
   role: CollectionRole;
+  sortOrder?: number;
 };

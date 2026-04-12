@@ -103,9 +103,7 @@ function buildFallbackProfile(user: NonNullable<ReturnType<typeof useAuth>["user
     username: (user.user_metadata?.user_name as string | undefined) ?? baseName.toLowerCase().replace(/[^a-z0-9_]+/g, ""),
     publicId: slugifyProfileId(baseName),
     bio: "I collect things worth saving beautifully and sharing with friends.",
-    avatar:
-      (user.user_metadata?.avatar_url as string | undefined) ??
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80",
+    avatar: (user.user_metadata?.avatar_url as string | undefined) ?? "",
   };
 }
 

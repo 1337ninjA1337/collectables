@@ -1,8 +1,12 @@
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { SkeletonItemDetail } from "@/components/skeleton";
+
+import { QrCode } from "@/components/qr-code";
 import { Screen } from "@/components/screen";
+import { buildDeepLink } from "@/lib/deep-link";
 import { useAuth } from "@/lib/auth-context";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -18,6 +22,7 @@ export default function ItemDetailsScreen() {
   const localItem = getItemById(params.id);
   const [remoteItem, setRemoteItem] = useState<CollectableItem | null>(null);
   const [loadingRemote, setLoadingRemote] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
 
   useEffect(() => {
     if (!localItem && params.id && params.id !== "[id]") {
@@ -34,7 +39,7 @@ export default function ItemDetailsScreen() {
   if (loadingRemote && !item) {
     return (
       <Screen>
-        <ActivityIndicator color="#d89c5b" size="large" />
+        <SkeletonItemDetail />
       </Screen>
     );
   }
@@ -96,6 +101,10 @@ export default function ItemDetailsScreen() {
         <Text style={styles.itemMeta}>{t("addedBy", { name: activeItem.createdBy })}</Text>
       </View>
 
+      <Pressable style={styles.qrButton} onPress={() => setQrOpen(true)}>
+        <Text style={styles.qrButtonText}>{t("shareQr")}</Text>
+      </Pressable>
+
       {user?.id === activeItem.createdByUserId ? (
         <Pressable style={styles.deleteButton} onPress={handleDelete}>
           <Text style={styles.deleteButtonText}>{t("deleteItem")}</Text>
@@ -121,6 +130,30 @@ export default function ItemDetailsScreen() {
         <Text style={styles.sheetLabel}>{t("variants")}</Text>
         <Text style={styles.sheetValue}>{activeItem.variants}</Text>
       </View>
+
+      {typeof activeItem.cost === "number" ? (
+        <View style={styles.sheet}>
+          <Text style={styles.sheetLabel}>{t("costLabel")}</Text>
+          <Text style={styles.sheetValue}>{activeItem.cost}</Text>
+        </View>
+      ) : null}
+
+      <Modal visible={qrOpen} transparent animationType="fade" onRequestClose={() => setQrOpen(false)}>
+        <Pressable style={styles.qrBackdrop} onPress={() => setQrOpen(false)}>
+          <Pressable style={styles.qrCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.qrTitle}>{t("shareQrItemTitle")}</Text>
+            <Text style={styles.qrHint}>{t("shareQrItemHint")}</Text>
+            <View style={styles.qrWrap}>
+              <QrCode value={buildDeepLink(`item/${activeItem.id}`)} size={240} />
+            </View>
+            <Text style={styles.qrItemName} numberOfLines={1}>{activeItem.title}</Text>
+            <Text style={styles.qrLink} numberOfLines={1}>{buildDeepLink(`item/${activeItem.id}`)}</Text>
+            <Pressable style={styles.qrCancel} onPress={() => setQrOpen(false)}>
+              <Text style={styles.qrCancelText}>{t("cancel")}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
@@ -149,6 +182,77 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff1f1",
     paddingVertical: 16,
     alignItems: "center",
+  },
+  qrButton: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#c4a87a",
+    backgroundColor: "#fff4e5",
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  qrButtonText: {
+    color: "#5f4734",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  qrBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(38, 27, 20, 0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qrCard: {
+    backgroundColor: "#fffaf3",
+    borderRadius: 28,
+    padding: 24,
+    margin: 20,
+    alignItems: "center",
+    gap: 10,
+    maxWidth: 360,
+  },
+  qrTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#2f2318",
+  },
+  qrHint: {
+    color: "#6b5647",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  qrWrap: {
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+  },
+  qrItemName: {
+    color: "#2f2318",
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  qrLink: {
+    color: "#8f6947",
+    fontSize: 12,
+    maxWidth: 260,
+  },
+  qrCancel: {
+    marginTop: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#e4c29a",
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    backgroundColor: "#fff",
+  },
+  qrCancelText: {
+    color: "#2f2318",
+    fontWeight: "800",
+    fontSize: 14,
   },
   deleteButtonText: {
     color: "#8a2727",

@@ -1,24 +1,57 @@
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { Stack } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { NestableDraggableFlatList, ScaleDecorator, RenderItemParams } from "../components/DraggableList";
 
 import { CollectionCard } from "@/components/collection-card";
+import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { SwipeTabs } from "@/components/swipe-tabs";
 import { useAuth } from "@/lib/auth-context";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
+import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
+import { Collection } from "@/lib/types";
 
 type CollectionsTab = "mine" | "friends" | "subscribed";
 
 export default function HomeScreen() {
   const { user, signOut, pending } = useAuth();
-  const { collections, getItemsForCollection, ready, subscribedCollections } = useCollections();
+  const {
+    collections,
+    items,
+    getItemsForCollection,
+    getCollectionTotalCost,
+    getCollectionById,
+    ready,
+    subscribedCollections,
+    reorderOwnedCollections,
+    refresh,
+  } = useCollections();
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const { t } = useI18n();
   const { friends, following, getMyProfile } = useSocial();
   const [collectionsTab, setCollectionsTab] = useState<CollectionsTab>("mine");
+
+  const recentItems = useMemo(() => {
+    const ownedIds = new Set(
+      collections.filter((c) => c.role === "owner").map((c) => c.id),
+    );
+    return items
+      .filter((item) => !item.isWishlist && ownedIds.has(item.collectionId))
+      .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
+      .slice(0, 10);
+  }, [items, collections]);
 
   if (!ready) {
     return (
@@ -34,10 +67,24 @@ export default function HomeScreen() {
   const ownedCollections = collections.filter((collection) => collection.role === "owner");
   const friendCollections = collections.filter((collection) => collection.role === "viewer" && friends.includes(collection.ownerUserId));
   const myProfile = getMyProfile();
+  const isPhone = Platform.OS !== "web";
+
+  const renderOwnedCollection = ({ item: collection, drag, isActive }: RenderItemParams<Collection>) => (
+    <ScaleDecorator>
+      <Pressable onLongPress={drag} disabled={isActive} delayLongPress={150}>
+        <CollectionCard
+          collection={collection}
+          count={getItemsForCollection(collection.id).length}
+          totalCost={getCollectionTotalCost(collection.id)}
+        />
+      </Pressable>
+    </ScaleDecorator>
+  );
 
   return (
-    <Screen>
+    <Screen nestable refreshing={refreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: "Collectables" }} />
+      {isPhone ? null : (
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>{t("appName")}</Text>
         <View style={styles.profileRow}>
@@ -87,9 +134,16 @@ export default function HomeScreen() {
               <Text style={styles.peopleCtaText}>{t("peopleAndFollowing")}</Text>
             </Pressable>
           </Link>
+          <Link href="/wishlist" asChild>
+            <Pressable style={styles.peopleCta}>
+              <Text style={styles.peopleCtaText}>{t("wishlist")}</Text>
+            </Pressable>
+          </Link>
         </View>
       </View>
+      )}
 
+      {!isPhone && (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderText}>
@@ -105,22 +159,77 @@ export default function HomeScreen() {
           ) : null}
         </View>
 
-        <View style={styles.socialSummary}>
-          <Link href={"/people?tab=friends" as never} asChild>
-            <Pressable style={styles.summaryCard}>
-              <Text style={styles.summaryNumber}>{friends.length}</Text>
-              <Text style={styles.summaryLabel}>{t("friends")}</Text>
-            </Pressable>
-          </Link>
-          <Link href={"/people?tab=following" as never} asChild>
-            <Pressable style={styles.summaryCard}>
-              <Text style={styles.summaryNumber}>{following.length}</Text>
-              <Text style={styles.summaryLabel}>{t("following")}</Text>
-            </Pressable>
-          </Link>
-        </View>
+        {!isPhone && (
+          <View style={styles.socialSummary}>
+            <Link href={"/people?tab=friends" as never} asChild>
+              <Pressable style={styles.summaryCard}>
+                <Text style={styles.summaryNumber}>{friends.length}</Text>
+                <Text style={styles.summaryLabel}>{t("friends")}</Text>
+              </Pressable>
+            </Link>
+            <Link href={"/people?tab=following" as never} asChild>
+              <Pressable style={styles.summaryCard}>
+                <Text style={styles.summaryNumber}>{following.length}</Text>
+                <Text style={styles.summaryLabel}>{t("following")}</Text>
+              </Pressable>
+            </Link>
+          </View>
+        )}
 
       </View>
+      )}
+
+      <Link href="/wishlist" asChild>
+        <Pressable style={styles.wishlistBanner}>
+          <View style={styles.wishlistBannerIcon}>
+            <Text style={styles.wishlistBannerIconText}>★</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.wishlistBannerTitle}>{t("wishlist")}</Text>
+            <Text style={styles.wishlistBannerHint}>{t("wishlistHint")}</Text>
+          </View>
+          <Text style={styles.wishlistBannerArrow}>›</Text>
+        </Pressable>
+      </Link>
+
+      {recentItems.length > 0 ? (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={styles.sectionTitle}>{t("recentlyAdded")}</Text>
+              <Text style={styles.sectionDescription}>{t("recentlyAddedHint")}</Text>
+            </View>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.recentRow}
+          >
+            {recentItems.map((item) => {
+              const hasPhoto = item.photos.length > 0 && Boolean(item.photos[0]);
+              const col = getCollectionById(item.collectionId);
+              return (
+                <Link key={item.id} href={`/item/${item.id}`} asChild>
+                  <Pressable style={styles.recentCard}>
+                    {hasPhoto ? (
+                      <Image source={{ uri: item.photos[0] }} style={styles.recentImage} />
+                    ) : (
+                      <View style={{...styles.recentImage, backgroundColor: placeholderColor(item.id)}} />
+                    )}
+                    <View style={styles.recentBadge}>
+                      <Text style={styles.recentBadgeText}>NEW</Text>
+                    </View>
+                    <View style={styles.recentTextWrap}>
+                      <Text style={styles.recentTitle} numberOfLines={1}>{item.title}</Text>
+                      {col ? <Text style={styles.recentMeta} numberOfLines={1}>{col.name}</Text> : null}
+                    </View>
+                  </Pressable>
+                </Link>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <View style={styles.section}>
         <SwipeTabs
@@ -146,13 +255,21 @@ export default function HomeScreen() {
                     </Link>
                   </View>
                   {ownedCollections.length > 0 ? (
-                    ownedCollections.map((collection) => (
-                      <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} />
-                    ))
+                    <NestableDraggableFlatList
+                      data={ownedCollections}
+                      keyExtractor={(c) => c.id}
+                      renderItem={renderOwnedCollection}
+                      onDragEnd={({ data }) => reorderOwnedCollections(data.map((c) => c.id))}
+                      contentContainerStyle={styles.draggableList}
+                    />
                   ) : (
-                    <View style={styles.emptyCard}>
-                      <Text style={styles.emptyCardText}>{t("noOwnedCollections")}</Text>
-                    </View>
+                    <EmptyState
+                      icon="📚"
+                      title={t("emptyOwnedTitle")}
+                      hint={t("emptyOwnedHint")}
+                      actionLabel={t("emptyOwnedCta")}
+                      onAction={() => router.push("/create-collection")}
+                    />
                   )}
                 </View>
               );
@@ -163,12 +280,16 @@ export default function HomeScreen() {
                   <Text style={styles.sectionDescription}>{t("friendCollectionsSubtitle")}</Text>
                   {friendCollections.length > 0 ? (
                     friendCollections.map((collection) => (
-                      <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} />
+                      <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={getCollectionTotalCost(collection.id)} />
                     ))
                   ) : (
-                    <View style={styles.emptyCard}>
-                      <Text style={styles.emptyCardText}>{t("noFriendCollections")}</Text>
-                    </View>
+                    <EmptyState
+                      icon="🤝"
+                      title={t("emptyFriendCollectionsTitle")}
+                      hint={t("emptyFriendCollectionsHint")}
+                      actionLabel={t("emptyFriendCollectionsCta")}
+                      onAction={() => router.push("/people")}
+                    />
                   )}
                 </View>
               );
@@ -178,12 +299,16 @@ export default function HomeScreen() {
                 <Text style={styles.sectionDescription}>{t("collectionsFeedSubtitle")}</Text>
                 {subscribedCollections.length > 0 ? (
                   subscribedCollections.map((collection) => (
-                    <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} />
+                    <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={getCollectionTotalCost(collection.id)} />
                   ))
                 ) : (
-                  <View style={styles.emptyCard}>
-                    <Text style={styles.emptyCardText}>{t("noSubscribedCollections")}</Text>
-                  </View>
+                  <EmptyState
+                    icon="🔖"
+                    title={t("emptySubscribedTitle")}
+                    hint={t("emptySubscribedHint")}
+                    actionLabel={t("emptySubscribedCta")}
+                    onAction={() => router.push("/people")}
+                  />
                 )}
               </View>
             );
@@ -199,6 +324,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#261b14",
     borderRadius: 32,
     padding: 24,
+    gap: 12,
+  },
+  phoneActionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   eyebrow: {
@@ -331,6 +461,9 @@ const styles = StyleSheet.create({
   tabPanel: {
     gap: 14,
   },
+  draggableList: {
+    gap: 14,
+  },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -424,5 +557,88 @@ const styles = StyleSheet.create({
   loadingText: {
     color: "#6d5645",
     fontSize: 15,
+  },
+  recentRow: {
+    gap: 12,
+    paddingRight: 4,
+  },
+  recentCard: {
+    width: 140,
+    borderRadius: 20,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+    overflow: "hidden",
+  },
+  recentImage: {
+    width: 140,
+    height: 120,
+    backgroundColor: "#dbc7ae",
+  },
+  recentBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    borderRadius: 8,
+    backgroundColor: "#d89c5b",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  recentBadgeText: {
+    color: "#fff7ea",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  recentTextWrap: {
+    padding: 10,
+    gap: 2,
+  },
+  recentTitle: {
+    color: "#2f2318",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  recentMeta: {
+    color: "#8f6947",
+    fontSize: 12,
+  },
+  wishlistBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderRadius: 20,
+    padding: 16,
+    backgroundColor: "#fff4e5",
+    borderWidth: 1,
+    borderColor: "#e4c29a",
+  },
+  wishlistBannerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#d89c5b",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  wishlistBannerIconText: {
+    color: "#fff7ea",
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  wishlistBannerTitle: {
+    color: "#2f2318",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  wishlistBannerHint: {
+    color: "#8f6947",
+    fontSize: 13,
+    marginTop: 2,
+  },
+  wishlistBannerArrow: {
+    color: "#8f6947",
+    fontSize: 28,
+    fontWeight: "800",
   },
 });

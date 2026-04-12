@@ -26,6 +26,9 @@ export function ItemCard({ item }: { item: CollectableItem }) {
             <Text style={styles.meta}>{item.acquiredFrom}</Text>
             <Text style={styles.meta}>{t("photosCount", { count: item.photos.length })}</Text>
           </View>
+          {typeof item.cost === "number" ? (
+            <Text style={styles.meta}>{t("costLabel")}: {item.cost}</Text>
+          ) : null}
         </View>
       </Pressable>
     </Link>

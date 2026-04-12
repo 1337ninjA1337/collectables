@@ -7,21 +7,26 @@ import { Screen } from "@/components/screen";
 import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
+import { useToast } from "@/lib/toast-context";
 
 const FALLBACK_COVER = "";
 
 export default function CreateCollectionScreen() {
   const { addCollection } = useCollections();
   const { t } = useI18n();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [coverPhoto, setCoverPhoto] = useState("");
   const [saving, setSaving] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  async function pickCover() {
+  const nameMissing = submitAttempted && !name.trim();
+
+  async function pickFromGallery() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(t("noAccess"), t("noAccessCover"));
+      toast.error(t("noAccessCover"), t("noAccess"));
       return;
     }
 
@@ -36,9 +41,39 @@ export default function CreateCollectionScreen() {
     }
   }
 
+  async function takePhoto() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      toast.error(t("noAccessCamera"), t("noAccess"));
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setCoverPhoto(result.assets[0].uri);
+    }
+  }
+
+  function pickCover() {
+    if (Platform.OS === "web") {
+      void pickFromGallery();
+      return;
+    }
+    Alert.alert(t("collectionCoverLabel"), undefined, [
+      { text: t("pickFromGallery"), onPress: () => void pickFromGallery() },
+      { text: t("takePhoto"), onPress: () => void takePhoto() },
+      { text: t("cancel"), style: "cancel" },
+    ]);
+  }
+
   async function handleSave() {
+    setSubmitAttempted(true);
     if (!name.trim()) {
-      Alert.alert(t("needTitle"), t("needTitleText"));
+      toast.error(t("requiredFieldsMissing"), t("needTitle"));
       return;
     }
 
@@ -67,13 +102,15 @@ export default function CreateCollectionScreen() {
       </View>
 
       <View style={styles.fieldGroup}>
-        <Text style={styles.label}>{t("collectionNameLabel")}</Text>
+        <Text style={styles.label}>
+          {t("collectionNameLabel")}<Text style={styles.required}> *</Text>
+        </Text>
         <TextInput
           value={name}
           onChangeText={setName}
           placeholder={t("collectionNamePlaceholder")}
           placeholderTextColor="#9b8571"
-          style={styles.input}
+          style={{...styles.input, ...(nameMissing ? styles.inputInvalid : {})}}
         />
       </View>
 
@@ -147,6 +184,14 @@ const styles = StyleSheet.create({
   },
   inputMultiline: {
     minHeight: 132,
+  },
+  inputInvalid: {
+    borderColor: "#d92f2f",
+    borderWidth: 2,
+  },
+  required: {
+    color: "#d92f2f",
+    fontWeight: "800",
   },
   photoButton: {
     borderRadius: 20,

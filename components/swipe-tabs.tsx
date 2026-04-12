@@ -18,11 +18,13 @@ type Props = {
   onChange: (key: string) => void;
   variant?: "main" | "sub";
   renderTab: (key: string) => ReactNode;
+  /** Key of the tab whose indicator dot should be outlined red (e.g. for incoming requests). */
+  dotHighlight?: string;
 };
 
 const ANIM_DURATION = 220;
 
-export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab }: Props) {
+export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab, dotHighlight }: Props) {
   const isNative = Platform.OS !== "web";
 
   const [width, setWidth] = useState(0);
@@ -50,6 +52,7 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab 
   // useLayoutEffect runs after React commits the new slot contents but before
   // paint, so transform and slot layout update atomically — no flicker.
   useLayoutEffect(() => {
+    translateX.stopAnimation();
     translateX.setValue(0);
     animatingRef.current = false;
   }, [active, translateX]);
@@ -64,7 +67,7 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab 
     Animated.timing(translateX, {
       toValue: direction === "next" ? -w : w,
       duration: ANIM_DURATION,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start(({ finished }) => {
       if (!finished) {
         animatingRef.current = false;
@@ -133,7 +136,7 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab 
         } else {
           Animated.spring(translateX, {
             toValue: 0,
-            useNativeDriver: true,
+            useNativeDriver: false,
             speed: 20,
             bounciness: 4,
           }).start();
@@ -142,7 +145,7 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab 
       onPanResponderTerminate: () => {
         Animated.spring(translateX, {
           toValue: 0,
-          useNativeDriver: true,
+          useNativeDriver: false,
           speed: 20,
           bounciness: 4,
         }).start();
@@ -209,6 +212,7 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab 
                   ? styles.subDotActive
                   : styles.dotActive
                 : {}),
+              ...(dotHighlight === t.key ? styles.dotHighlight : {}),
             }}
           />
         ))}
@@ -306,6 +310,10 @@ const styles = StyleSheet.create({
   subDotActive: {
     backgroundColor: "#d89c5b",
     width: 18,
+  },
+  dotHighlight: {
+    borderWidth: 2,
+    borderColor: "#d92f2f",
   },
   tabRow: {
     flexDirection: "row",
