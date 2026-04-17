@@ -30,11 +30,15 @@ export function CollectionCard({
           </View>
           <Text style={styles.title}>{collection.name}</Text>
           <Text style={styles.description}>{collection.description}</Text>
-          <Text style={styles.meta}>
-            {collection.role === "owner"
-              ? t("sharedWithPeople", { count: collection.sharedWith.length })
-              : t("ownerLabel", { name: collection.ownerName })}
-          </Text>
+          {collection.role === "owner" && collection.visibility !== "public" ? (
+            <Text style={styles.meta}>
+              {t("sharedWithPeople", { count: collection.sharedWith.length })}
+            </Text>
+          ) : collection.role !== "owner" ? (
+            <Text style={styles.meta}>
+              {t("ownerLabel", { name: collection.ownerName })}
+            </Text>
+          ) : null}
           {typeof totalCost === "number" && totalCost > 0 ? (
             <Text style={styles.meta}>{t("totalCost")}: {totalCost}</Text>
           ) : null}

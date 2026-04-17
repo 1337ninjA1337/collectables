@@ -1,5 +1,5 @@
 import { authClient, isSupabaseConfigured } from "@/lib/supabase";
-import { CollectableItem, Collection, Reaction, ReactionEmoji, ReactionTargetType, UserProfile } from "@/lib/types";
+import { CollectableItem, Collection, CollectionVisibility, Reaction, ReactionEmoji, ReactionTargetType, UserProfile } from "@/lib/types";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -114,6 +114,8 @@ type DbCollection = {
   owner_name: string;
   owner_user_id: string;
   sort_order?: number | null;
+  visibility?: string | null;
+  shared_with_user_ids?: string[] | null;
 };
 
 function toCollection(row: DbCollection): Collection {
@@ -125,9 +127,10 @@ function toCollection(row: DbCollection): Collection {
     ownerName: row.owner_name,
     ownerUserId: row.owner_user_id,
     sharedWith: [],
-    sharedWithUserIds: [],
+    sharedWithUserIds: row.shared_with_user_ids ?? [],
     role: "viewer",
     sortOrder: row.sort_order ?? undefined,
+    visibility: (row.visibility as CollectionVisibility) ?? "private",
   };
 }
 
@@ -145,6 +148,8 @@ export async function upsertCollection(collection: Collection): Promise<void> {
       owner_name: collection.ownerName,
       owner_user_id: collection.ownerUserId,
       sort_order: collection.sortOrder ?? null,
+      visibility: collection.visibility ?? "private",
+      shared_with_user_ids: collection.sharedWithUserIds ?? [],
     }),
   });
 }
@@ -158,6 +163,8 @@ export async function updateRemoteCollection(id: string, updates: Partial<Collec
   if ("coverPhoto" in updates) body.cover_photo = updates.coverPhoto;
   if ("ownerName" in updates) body.owner_name = updates.ownerName;
   if ("sortOrder" in updates) body.sort_order = updates.sortOrder ?? null;
+  if ("visibility" in updates) body.visibility = updates.visibility;
+  if ("sharedWithUserIds" in updates) body.shared_with_user_ids = updates.sharedWithUserIds ?? [];
 
   if (Object.keys(body).length === 0) return;
 
@@ -188,6 +195,15 @@ export async function fetchCollectionsByUserId(userId: string): Promise<Collecti
   if (!isSupabaseConfigured) return [];
 
   const res = await supabaseRest(`/collections?owner_user_id=eq.${userId}&select=*&order=created_at.desc`);
+  const rows: DbCollection[] = await res.json();
+  return rows.map(toCollection);
+}
+
+/** Fetch only public collections for a user (for non-owners viewing a profile). */
+export async function fetchPublicCollectionsByUserId(userId: string): Promise<Collection[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const res = await supabaseRest(`/collections?owner_user_id=eq.${userId}&visibility=eq.public&select=*&order=created_at.desc`);
   const rows: DbCollection[] = await res.json();
   return rows.map(toCollection);
 }
@@ -386,6 +402,23 @@ export async function unfollowCollectionRemote(userId: string, collectionId: str
     `/collection_follows?user_id=eq.${userId}&collection_id=eq.${collectionId}`,
     { method: "DELETE" },
   );
+}
+
+// --- Collections shared with a user (via shared_with_user_ids column) ---
+
+export async function fetchCollectionsSharedWithUser(userId: string): Promise<Collection[]> {
+  if (!isSupabaseConfigured) return [];
+
+  try {
+    const res = await supabaseRest(
+      `/collections?shared_with_user_ids=cs.{${encodeURIComponent(userId)}}&select=*&order=created_at.desc`,
+    );
+    if (!res.ok) return [];
+    const rows: DbCollection[] = await res.json();
+    return rows.map(toCollection);
+  } catch {
+    return [];
+  }
 }
 
 // --- Reactions ---

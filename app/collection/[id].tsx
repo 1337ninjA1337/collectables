@@ -1,11 +1,10 @@
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Image, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { applyItemFilters, EMPTY_FILTERS, ItemFilterBar, type ItemFilters } from "@/components/item-filters";
-import { QrCode } from "@/components/qr-code";
 import { buildDeepLink } from "@/lib/deep-link";
 import { VisibilityBadge } from "@/components/visibility-badge";
 import { SkeletonCollectionDetail } from "@/components/skeleton";
@@ -21,9 +20,10 @@ import { useCollections } from "@/lib/collections-context";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
+import { useSocial } from "@/lib/social-context";
 import { fetchCollectionById, fetchItemsByCollectionId } from "@/lib/supabase-profiles";
 import { useToast } from "@/lib/toast-context";
-import { CollectableItem, Collection } from "@/lib/types";
+import { CollectableItem, Collection, CollectionVisibility } from "@/lib/types";
 
 export default function CollectionDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -41,7 +41,10 @@ export default function CollectionDetailsScreen() {
     reorderItemsInCollection,
     updateCollection,
     refresh,
+    shareCollectionWithUser,
+    unshareCollectionWithUser,
   } = useCollections();
+  const { friends, getProfileById } = useSocial();
   const [refreshing, setRefreshing] = useState(false);
   const { t } = useI18n();
   const toast = useToast();
@@ -50,12 +53,14 @@ export default function CollectionDetailsScreen() {
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [itemFilters, setItemFilters] = useState<ItemFilters>(EMPTY_FILTERS);
   const [exporting, setExporting] = useState(false);
-  const [qrOpen, setQrOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editCoverUri, setEditCoverUri] = useState("");
   const [editCoverChanged, setEditCoverChanged] = useState(false);
+  const [editVisibility, setEditVisibility] = useState<CollectionVisibility>("private");
   const [editSaving, setEditSaving] = useState(false);
   const localCollection = getCollectionById(params.id);
   const [remoteCollection, setRemoteCollection] = useState<Collection | null>(null);
@@ -80,6 +85,8 @@ export default function CollectionDetailsScreen() {
 
   const collection = localCollection ?? remoteCollection;
   const localItems = getItemsForCollection(params.id);
+  const allItems = localItems.length > 0 ? localItems : remoteItems;
+  const items = useMemo(() => applyItemFilters(allItems, itemFilters), [allItems, itemFilters]);
 
   if (loadingRemote && !collection) {
     return (
@@ -98,8 +105,6 @@ export default function CollectionDetailsScreen() {
   }
 
   const activeCollection = collection;
-  const allItems = localItems.length > 0 ? localItems : remoteItems;
-  const items = useMemo(() => applyItemFilters(allItems, itemFilters), [allItems, itemFilters]);
 
   async function confirmAndDeleteCollection() {
     await deleteCollection(activeCollection.id);
@@ -241,6 +246,7 @@ export default function CollectionDetailsScreen() {
     setEditDescription(activeCollection.description);
     setEditCoverUri(activeCollection.coverPhoto);
     setEditCoverChanged(false);
+    setEditVisibility(activeCollection.visibility ?? "private");
     setEditModalOpen(true);
   }
 
@@ -310,6 +316,7 @@ export default function CollectionDetailsScreen() {
         name: editName.trim(),
         description: editDescription.trim(),
         coverPhoto: finalCover,
+        visibility: editVisibility,
       });
       setEditModalOpen(false);
     } finally {
@@ -339,11 +346,15 @@ export default function CollectionDetailsScreen() {
           <VisibilityBadge collection={activeCollection} variant="hero" />
           <Text style={styles.heroTitle}>{activeCollection.name}</Text>
           <Text style={styles.heroText}>{activeCollection.description}</Text>
-          <Text style={styles.heroMeta}>
-            {activeCollection.role === "owner"
-              ? t("accessOpenFor", { count: activeCollection.sharedWith.length })
-              : t("viewingCollectionOf", { name: activeCollection.ownerName })}
-          </Text>
+          {activeCollection.role === "owner" && activeCollection.visibility !== "public" ? (
+            <Text style={styles.heroMeta}>
+              {t("accessOpenFor", { count: activeCollection.sharedWith.length })}
+            </Text>
+          ) : activeCollection.role !== "owner" ? (
+            <Text style={styles.heroMeta}>
+              {t("viewingCollectionOf", { name: activeCollection.ownerName })}
+            </Text>
+          ) : null}
         </View>
       </View>
 
@@ -397,8 +408,8 @@ export default function CollectionDetailsScreen() {
               <Text style={styles.exportButtonText}>{exporting ? t("exportPdfGenerating") : t("exportPdf")}</Text>
             </Pressable>
           ) : null}
-          <Pressable style={styles.qrButton} onPress={() => setQrOpen(true)}>
-            <Text style={styles.qrButtonText}>{t("shareQr")}</Text>
+          <Pressable style={styles.shareButton} onPress={() => setShareOpen(true)}>
+            <Text style={styles.shareButtonText}>{t("share")}</Text>
           </Pressable>
           <Pressable style={styles.deleteButton} onPress={handleDeleteCollection}>
             <Text style={styles.deleteButtonText}>{t("deleteCollection")}</Text>
@@ -424,8 +435,8 @@ export default function CollectionDetailsScreen() {
               <Text style={styles.exportButtonText}>{exporting ? t("exportPdfGenerating") : t("exportPdf")}</Text>
             </Pressable>
           ) : null}
-          <Pressable style={styles.qrButton} onPress={() => setQrOpen(true)}>
-            <Text style={styles.qrButtonText}>{t("shareQr")}</Text>
+          <Pressable style={styles.shareButton} onPress={() => setShareOpen(true)}>
+            <Text style={styles.shareButtonText}>{t("share")}</Text>
           </Pressable>
         </View>
       )}
@@ -527,19 +538,90 @@ export default function CollectionDetailsScreen() {
         </Pressable>
       </Modal>
 
-      <Modal visible={qrOpen} transparent animationType="fade" onRequestClose={() => setQrOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setQrOpen(false)}>
-          <Pressable style={styles.qrCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>{t("shareQrTitle")}</Text>
-            <Text style={styles.qrHint}>{t("shareQrHint")}</Text>
-            <View style={styles.qrWrap}>
-              <QrCode value={buildDeepLink(`collection/${activeCollection.id}`)} size={240} />
+      <Modal visible={shareOpen} transparent animationType="slide" onRequestClose={() => setShareOpen(false)}>
+        <Pressable style={styles.shareBackdrop} onPress={() => setShareOpen(false)}>
+          <Pressable style={styles.shareSheet} onPress={(e) => e.stopPropagation()}>
+            <ScrollView style={styles.shareScrollView} bounces={false}>
+            <View style={styles.shareHandle} />
+            <Text style={styles.shareTitle}>{t("shareTitle")}</Text>
+            <Text style={styles.shareHint}>{t("shareCollectionHint")}</Text>
+            <View style={styles.shareLinkBox}>
+              <Text style={styles.shareLinkText} numberOfLines={1}>{buildDeepLink(`collection/${activeCollection.id}`)}</Text>
             </View>
-            <Text style={styles.qrCollectionName} numberOfLines={1}>{activeCollection.name}</Text>
-            <Text style={styles.qrLink} numberOfLines={1}>{buildDeepLink(`collection/${activeCollection.id}`)}</Text>
-            <Pressable style={styles.modalCancel} onPress={() => setQrOpen(false)}>
-              <Text style={styles.modalCancelText}>{t("cancel")}</Text>
+            <View style={styles.shareActions}>
+              <Pressable
+                style={{...styles.shareCopyButton, ...(linkCopied ? styles.shareCopyButtonDone : {})}}
+                onPress={() => {
+                  const link = buildDeepLink(`collection/${activeCollection.id}`);
+                  if (Platform.OS === "web" && navigator.clipboard) {
+                    navigator.clipboard.writeText(link).then(() => {
+                      setLinkCopied(true);
+                      setTimeout(() => setLinkCopied(false), 2000);
+                    });
+                  }
+                }}
+              >
+                <Text style={{...styles.shareCopyButtonText, ...(linkCopied ? styles.shareCopyButtonTextDone : {})}}>
+                  {linkCopied ? t("linkCopied") : t("copyLink")}
+                </Text>
+              </Pressable>
+              {Platform.OS !== "web" ? (
+                <Pressable
+                  style={styles.shareNativeButton}
+                  onPress={() => {
+                    const link = buildDeepLink(`collection/${activeCollection.id}`);
+                    Share.share({ message: `${activeCollection.name}\n${link}`, url: link });
+                  }}
+                >
+                  <Text style={styles.shareNativeButtonText}>{t("shareVia")}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            {isOwner && friends.length > 0 ? (
+              <View style={styles.shareFriendsSection}>
+                <Text style={styles.shareFriendsTitle}>{t("shareWithFriends")}</Text>
+                <Text style={styles.shareFriendsHint}>{t("shareWithFriendsHint")}</Text>
+                <ScrollView style={styles.shareFriendsList} nestedScrollEnabled>
+                  {friends.map((friendId) => {
+                    const profile = getProfileById(friendId);
+                    if (!profile) return null;
+                    const isShared = activeCollection.sharedWithUserIds.includes(friendId);
+                    return (
+                      <View key={friendId} style={styles.shareFriendRow}>
+                        <View style={styles.shareFriendInfo}>
+                          {profile.avatar ? (
+                            <Image source={{ uri: profile.avatar }} style={styles.shareFriendAvatar} />
+                          ) : (
+                            <View style={{...styles.shareFriendAvatar, backgroundColor: placeholderColor(friendId)}} />
+                          )}
+                          <Text style={styles.shareFriendName} numberOfLines={1}>{profile.displayName}</Text>
+                        </View>
+                        <Pressable
+                          style={{...styles.shareFriendButton, ...(isShared ? styles.shareFriendButtonActive : {})}}
+                          onPress={() => {
+                            if (isShared) {
+                              unshareCollectionWithUser(activeCollection.id, friendId);
+                            } else {
+                              shareCollectionWithUser(activeCollection.id, friendId);
+                            }
+                          }}
+                        >
+                          <Text style={{...styles.shareFriendButtonText, ...(isShared ? styles.shareFriendButtonTextActive : {})}}>
+                            {isShared ? t("shared") : t("share")}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : isOwner && friends.length === 0 ? (
+              <Text style={styles.shareFriendsEmpty}>{t("noFriendsToShare")}</Text>
+            ) : null}
+            <Pressable style={styles.shareCancelButton} onPress={() => setShareOpen(false)}>
+              <Text style={styles.shareCancelText}>{t("cancel")}</Text>
             </Pressable>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -583,6 +665,29 @@ export default function CollectionDetailsScreen() {
               {editCoverUri ? (
                 <Image source={{ uri: editCoverUri }} style={styles.editCoverPreview} />
               ) : null}
+            </View>
+
+            <View style={styles.editFieldGroup}>
+              <Text style={styles.editFieldLabel}>{t("visibilityLabel")}</Text>
+              <View style={styles.editVisibilityRow}>
+                {(["private", "public"] as const).map((v) => {
+                  const selected = editVisibility === v;
+                  return (
+                    <Pressable
+                      key={v}
+                      style={{...styles.editVisibilityChip, ...(selected ? styles.editVisibilityChipSelected : {})}}
+                      onPress={() => setEditVisibility(v)}
+                    >
+                      <Text style={{...styles.editVisibilityChipText, ...(selected ? styles.editVisibilityChipTextSelected : {})}}>
+                        {t(v === "public" ? "visibilityPublic" : "visibilityPrivate")}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.editVisibilityHint}>
+                {editVisibility === "public" ? t("visibilityPublicHint") : t("visibilityPrivateHint")}
+              </Text>
             </View>
 
             <Pressable
@@ -684,7 +789,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
   },
-  qrButton: {
+  shareButton: {
     borderRadius: 22,
     paddingVertical: 16,
     paddingHorizontal: 18,
@@ -693,44 +798,101 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff4e5",
     alignItems: "center",
   },
-  qrButtonText: {
+  shareButtonText: {
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
   },
-  qrCard: {
+  shareBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(38, 27, 20, 0.4)",
+    justifyContent: "flex-end",
+  },
+  shareSheet: {
     backgroundColor: "#fffaf3",
-    borderRadius: 28,
-    padding: 24,
-    margin: 20,
-    alignItems: "center",
-    gap: 10,
-    maxWidth: 360,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 28,
+    gap: 12,
+  },
+  shareHandle: {
     alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#e4c29a",
   },
-  qrHint: {
+  shareTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#2f2318",
+  },
+  shareHint: {
     color: "#6b5647",
-    fontSize: 13,
-    textAlign: "center",
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
   },
-  qrWrap: {
-    padding: 12,
+  shareLinkBox: {
     borderRadius: 16,
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#eadbc8",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
-  qrCollectionName: {
-    color: "#2f2318",
-    fontSize: 16,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-  qrLink: {
+  shareLinkText: {
     color: "#8f6947",
-    fontSize: 12,
-    maxWidth: 260,
+    fontSize: 14,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  shareActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  shareCopyButton: {
+    flex: 1,
+    borderRadius: 999,
+    backgroundColor: "#261b14",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  shareCopyButtonDone: {
+    backgroundColor: "#4a7c59",
+  },
+  shareCopyButtonText: {
+    color: "#fff5ea",
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  shareCopyButtonTextDone: {
+    color: "#fff",
+  },
+  shareNativeButton: {
+    flex: 1,
+    borderRadius: 999,
+    backgroundColor: "#d89c5b",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  shareNativeButtonText: {
+    color: "#241912",
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  shareCancelButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#e4c29a",
+    paddingVertical: 14,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  shareCancelText: {
+    color: "#2f2318",
+    fontWeight: "800",
+    fontSize: 14,
   },
   addButton: {
     borderRadius: 22,
@@ -977,6 +1139,103 @@ const styles = StyleSheet.create({
     height: 160,
     borderRadius: 16,
     backgroundColor: "#dbc7ae",
+  },
+  editVisibilityRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  editVisibilityChip: {
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+  },
+  editVisibilityChipSelected: {
+    backgroundColor: "#261b14",
+    borderColor: "#261b14",
+  },
+  editVisibilityChipText: {
+    color: "#6b5647",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  editVisibilityChipTextSelected: {
+    color: "#fff7ef",
+  },
+  editVisibilityHint: {
+    color: "#7a6453",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  shareScrollView: {
+    gap: 12,
+  },
+  shareFriendsSection: {
+    gap: 10,
+    marginTop: 4,
+  },
+  shareFriendsTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#2f2318",
+  },
+  shareFriendsHint: {
+    color: "#6b5647",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  shareFriendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0e4d4",
+  },
+  shareFriendInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  shareFriendAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  shareFriendName: {
+    color: "#2f2318",
+    fontSize: 15,
+    fontWeight: "700",
+    flex: 1,
+  },
+  shareFriendButton: {
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: "#261b14",
+  },
+  shareFriendButtonActive: {
+    backgroundColor: "#4a7c59",
+  },
+  shareFriendButtonText: {
+    color: "#fff5ea",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  shareFriendButtonTextActive: {
+    color: "#fff",
+  },
+  shareFriendsList: {
+    maxHeight: 228,
+  },
+  shareFriendsEmpty: {
+    color: "#7a6453",
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 4,
   },
   editSaveButton: {
     borderRadius: 18,

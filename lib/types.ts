@@ -48,6 +48,8 @@ export type Reaction = {
   createdAt: string;
 };
 
+export type CollectionVisibility = "public" | "private";
+
 export type Collection = {
   id: string;
   name: string;
@@ -59,4 +61,5 @@ export type Collection = {
   sharedWithUserIds: string[];
   role: CollectionRole;
   sortOrder?: number;
+  visibility: CollectionVisibility;
 };

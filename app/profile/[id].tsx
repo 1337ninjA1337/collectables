@@ -14,7 +14,7 @@ import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
-import { fetchProfileById, fetchCollectionsByUserId, fetchItemsByCollectionId } from "@/lib/supabase-profiles";
+import { fetchProfileById, fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId } from "@/lib/supabase-profiles";
 import { CollectableItem, Collection, UserProfile } from "@/lib/types";
 
 const DEFAULT_EN_PROFILE_BIO = "I collect things worth saving beautifully and sharing with friends.";
@@ -25,6 +25,7 @@ export default function ProfileScreen() {
   const toast = useToast();
   const {
     getProfileById,
+    getMyProfile,
     getRelationship,
     addFriend,
     removeFriend,
@@ -36,6 +37,7 @@ export default function ProfileScreen() {
   } = useSocial();
   const { collections, getItemsForCollection, getCollectionTotalCost, deleteUserContent } = useCollections();
   const localProfile = getProfileById(params.id);
+  const myProfile = getMyProfile();
   const [remoteProfile, setRemoteProfile] = useState<UserProfile | null>(null);
   const [loadingRemote, setLoadingRemote] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
@@ -44,6 +46,8 @@ export default function ProfileScreen() {
   const [remoteCollections, setRemoteCollections] = useState<Collection[]>([]);
   const [remoteItemCounts, setRemoteItemCounts] = useState<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
+
+  const isSelf = myProfile?.id === params.id;
 
   useFocusEffect(
     useCallback(() => {
@@ -57,7 +61,11 @@ export default function ProfileScreen() {
         ? fetchProfileById(params.id)
         : Promise.resolve(null);
 
-      Promise.all([profilePromise, fetchCollectionsByUserId(params.id)])
+      const collectionsPromise = isSelf
+        ? fetchCollectionsByUserId(params.id)
+        : fetchPublicCollectionsByUserId(params.id);
+
+      Promise.all([profilePromise, collectionsPromise])
         .then(([p, cols]) => {
           if (!active) return;
           if (needsProfileFetch) setRemoteProfile(p);
@@ -72,7 +80,7 @@ export default function ProfileScreen() {
       return () => {
         active = false;
       };
-    }, [localProfile, params.id]),
+    }, [localProfile, params.id, isSelf]),
   );
 
   async function loadItemCounts(cols: Collection[], isActive: () => boolean = () => true) {
@@ -91,13 +99,13 @@ export default function ProfileScreen() {
     try {
       const [p, cols] = await Promise.all([
         fetchProfileById(params.id),
-        fetchCollectionsByUserId(params.id),
+        isSelf ? fetchCollectionsByUserId(params.id) : fetchPublicCollectionsByUserId(params.id),
       ]);
       if (p) setRemoteProfile(p);
       setRemoteCollections(cols);
       await loadItemCounts(cols);
     } catch {} finally { setRefreshing(false); }
-  }, [params.id]);
+  }, [params.id, isSelf]);
 
   const profile = localProfile ?? remoteProfile;
   const activeProfile = profile;

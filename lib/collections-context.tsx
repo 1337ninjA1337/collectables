@@ -11,12 +11,13 @@ import {
   upsertItem,
   updateRemoteItem,
   deleteRemoteItem,
-  fetchCollectionsByUserId,
+  fetchPublicCollectionsByUserId,
   fetchItemsByCollectionId,
   fetchCollectionById,
   fetchFollowedCollectionIds,
   followCollectionRemote,
   unfollowCollectionRemote,
+  fetchCollectionsSharedWithUser,
 } from "@/lib/supabase-profiles";
 import { Collection, CollectableItem, ItemCondition, ItemTag } from "@/lib/types";
 
@@ -50,6 +51,7 @@ type DraftCollectionInput = {
   name: string;
   description: string;
   coverPhoto: string;
+  visibility?: "public" | "private";
 };
 
 type CollectionsContextValue = {
@@ -62,6 +64,10 @@ type CollectionsContextValue = {
   isCollectionFollowed: (collectionId: string) => boolean;
   followCollection: (collectionId: string) => Promise<void>;
   unfollowCollection: (collectionId: string) => Promise<void>;
+  sharedWithMeCollections: Collection[];
+  shareCollectionWithUser: (collectionId: string, userId: string) => void;
+  unshareCollectionWithUser: (collectionId: string, userId: string) => void;
+  getSharedUserIds: (collectionId: string) => string[];
   getCollectionById: (id: string) => Collection | undefined;
   getItemsForCollection: (collectionId: string) => CollectableItem[];
   getCollectionTotalCost: (collectionId: string) => number;
@@ -95,6 +101,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   const [followedCollectionIds, setFollowedCollectionIds] = useState<string[]>([]);
   const [subscribedCollections, setSubscribedCollections] = useState<Collection[]>([]);
   const [subscribedItems, setSubscribedItems] = useState<CollectableItem[]>([]);
+  const [sharedWithMeCollections, setSharedWithMeCollections] = useState<Collection[]>([]);
+  const [sharedWithMeItems, setSharedWithMeItems] = useState<CollectableItem[]>([]);
   const [ready, setReady] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -233,7 +241,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         const allCols: Collection[] = [];
         const allItems: CollectableItem[] = [];
 
-        const colResults = await Promise.all(friends.map((id) => fetchCollectionsByUserId(id)));
+        const colResults = await Promise.all(friends.map((id) => fetchPublicCollectionsByUserId(id)));
         colResults.forEach((cols) => {
           cols.forEach((c) => allCols.push({ ...c, role: "viewer" }));
         });
@@ -257,6 +265,37 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     return () => { active = false; };
   }, [user, friends, refreshTick]);
 
+  // Fetch collections shared directly with the current user
+  useEffect(() => {
+    if (!user) {
+      setSharedWithMeCollections([]);
+      setSharedWithMeItems([]);
+      return;
+    }
+
+    let active = true;
+
+    async function loadShared() {
+      try {
+        const cols = await fetchCollectionsSharedWithUser(user!.id);
+        if (!active) return;
+        setSharedWithMeCollections(cols);
+
+        const itemResults = await Promise.all(cols.map((c) => fetchItemsByCollectionId(c.id)));
+        if (!active) return;
+        const allItems: CollectableItem[] = [];
+        itemResults.forEach((items) => items.forEach((item) => allItems.push(item)));
+        setSharedWithMeItems(allItems);
+      } catch {
+        // ignore
+      }
+    }
+
+    void loadShared();
+
+    return () => { active = false; };
+  }, [user, refreshTick]);
+
   const collections = useMemo(() => {
     const seen = new Set(localCollections.map((c) => c.id));
     const merged: Collection[] = [...localCollections];
@@ -269,8 +308,11 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     subscribedCollections.forEach((c) => {
       if (!seen.has(c.id)) { merged.push(c); seen.add(c.id); }
     });
+    sharedWithMeCollections.forEach((c) => {
+      if (!seen.has(c.id)) { merged.push(c); seen.add(c.id); }
+    });
     return merged;
-  }, [getVisibleCollections, localCollections, friendCollections, subscribedCollections]);
+  }, [getVisibleCollections, localCollections, friendCollections, subscribedCollections, sharedWithMeCollections]);
 
   const items = useMemo(() => {
     const seen = new Set(localItems.map((i) => i.id));
@@ -281,8 +323,11 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     for (const item of subscribedItems) {
       if (!seen.has(item.id)) { merged.push(item); seen.add(item.id); }
     }
+    for (const item of sharedWithMeItems) {
+      if (!seen.has(item.id)) { merged.push(item); seen.add(item.id); }
+    }
     return merged;
-  }, [getVisibleItems, localItems, friendItems, subscribedItems]);
+  }, [getVisibleItems, localItems, friendItems, subscribedItems, sharedWithMeItems]);
 
   const value = useMemo<CollectionsContextValue>(
     () => ({
@@ -304,6 +349,34 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         if (!user) return;
         setFollowedCollectionIds((current) => current.filter((id) => id !== collectionId));
         unfollowCollectionRemote(user.id, collectionId).catch(() => undefined);
+      },
+      sharedWithMeCollections,
+      shareCollectionWithUser: (collectionId, userId) => {
+        if (!user) return;
+        setLocalCollections((current) =>
+          current.map((col) => {
+            if (col.id !== collectionId) return col;
+            if (col.sharedWithUserIds.includes(userId)) return col;
+            const updated = { ...col, sharedWithUserIds: [...col.sharedWithUserIds, userId] };
+            updateRemoteCollection(collectionId, { sharedWithUserIds: updated.sharedWithUserIds }).catch(() => undefined);
+            return updated;
+          }),
+        );
+      },
+      unshareCollectionWithUser: (collectionId, userId) => {
+        if (!user) return;
+        setLocalCollections((current) =>
+          current.map((col) => {
+            if (col.id !== collectionId) return col;
+            const updated = { ...col, sharedWithUserIds: col.sharedWithUserIds.filter((id) => id !== userId) };
+            updateRemoteCollection(collectionId, { sharedWithUserIds: updated.sharedWithUserIds }).catch(() => undefined);
+            return updated;
+          }),
+        );
+      },
+      getSharedUserIds: (collectionId) => {
+        const col = localCollections.find((c) => c.id === collectionId);
+        return col?.sharedWithUserIds ?? [];
       },
       getCollectionById: (id) => collections.find((collection) => collection.id === id),
       getItemsForCollection: (collectionId) =>
@@ -422,6 +495,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           sharedWith: [],
           sharedWithUserIds: [],
           role: "owner",
+          visibility: input.visibility ?? "private",
         };
 
         setLocalCollections((current) => [nextCollection, ...current]);
@@ -523,7 +597,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         );
       },
     }),
-    [collections, items, localCollections, ready, user, friendCollections, subscribedCollections, followedCollectionIds],
+    [collections, items, localCollections, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;

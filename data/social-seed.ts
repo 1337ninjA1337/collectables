@@ -41,6 +41,7 @@ export const seedSocialCollections: Collection[] = [
     sharedWith: [],
     sharedWithUserIds: [],
     role: "viewer",
+    visibility: "public",
   },
   {
     id: "lev-cameras",
@@ -52,6 +53,7 @@ export const seedSocialCollections: Collection[] = [
     sharedWith: [],
     sharedWithUserIds: [],
     role: "viewer",
+    visibility: "public",
   },
   {
     id: "sofia-toys",
@@ -63,6 +65,7 @@ export const seedSocialCollections: Collection[] = [
     sharedWith: [],
     sharedWithUserIds: [],
     role: "viewer",
+    visibility: "public",
   },
 ];
 

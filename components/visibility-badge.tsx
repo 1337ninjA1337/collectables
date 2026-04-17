@@ -15,21 +15,22 @@ export function VisibilityBadge({
 }) {
   const { t } = useI18n();
 
-  const isOwner = collection.role === "owner";
-  const isShared = isOwner && collection.sharedWith.length > 0;
   const isViewer = collection.role === "viewer";
+  const isPublic = collection.visibility === "public";
 
   const label = isViewer
     ? t("visibilityViewer")
-    : isShared
-      ? t("visibilityShared")
+    : isPublic
+      ? t("visibilityPublic")
       : t("visibilityPrivate");
 
   const iconName = isViewer
     ? ("people" as const)
-    : isShared
+    : isPublic
       ? ("globe-outline" as const)
       : ("lock-closed-outline" as const);
+
+  const isShared = isPublic;
 
   const isHero = variant === "hero";
 

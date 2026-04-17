@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+NEVER RUN "npm run start", "npm run web", "npm run ios", "npm run android", USE "npm run build" to check if code compiles or not instead. See results and fix code it it's needed
+
 ## Commands
 
 ```bash

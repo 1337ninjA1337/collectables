@@ -8,6 +8,7 @@ import {
   fetchFriendRequests,
   sendFriendRequest,
   removeFriendRequest,
+  fetchProfileById,
   RemoteFriendRequest,
 } from "@/lib/supabase-profiles";
 import { Collection, CollectableItem, ProfileRelationship, UserProfile } from "@/lib/types";
@@ -133,6 +134,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [deletedProfileIds, setDeletedProfileIds] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
+  const [remoteProfiles, setRemoteProfiles] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -197,14 +199,33 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
 
   const profiles = useMemo<UserProfile[]>(() => {
     const isDeleted = (profileId: string) => deletedProfileIds.includes(profileId);
+    const seen = new Set<string>();
 
-    if (!user) {
-      return seedProfiles.map(normalizeProfile).filter((profile) => !isDeleted(profile.id));
+    const result: UserProfile[] = [];
+
+    if (user) {
+      const selfProfile = normalizeProfile(myProfileOverride ?? buildFallbackProfile(user));
+      result.push(selfProfile);
+      seen.add(selfProfile.id);
     }
 
-    const selfProfile = normalizeProfile(myProfileOverride ?? buildFallbackProfile(user));
-    return [selfProfile, ...seedProfiles.map(normalizeProfile)].filter((profile) => !isDeleted(profile.id));
-  }, [deletedProfileIds, myProfileOverride, user]);
+    for (const rp of remoteProfiles) {
+      if (!seen.has(rp.id) && !isDeleted(rp.id)) {
+        result.push(normalizeProfile(rp));
+        seen.add(rp.id);
+      }
+    }
+
+    for (const sp of seedProfiles) {
+      const normalized = normalizeProfile(sp);
+      if (!seen.has(normalized.id) && !isDeleted(normalized.id)) {
+        result.push(normalized);
+        seen.add(normalized.id);
+      }
+    }
+
+    return result;
+  }, [deletedProfileIds, myProfileOverride, remoteProfiles, user]);
 
   const isAdmin = useMemo(() => {
     if (!user) {
@@ -268,6 +289,25 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     });
     return [...uniqueIds];
   }, [friendRequests, user]);
+
+  useEffect(() => {
+    if (friends.length === 0) {
+      setRemoteProfiles([]);
+      return;
+    }
+
+    let active = true;
+
+    Promise.all(friends.map((id) => fetchProfileById(id)))
+      .then((results) => {
+        if (active) {
+          setRemoteProfiles(results.filter((p): p is UserProfile => p !== null));
+        }
+      })
+      .catch(() => {});
+
+    return () => { active = false; };
+  }, [friends]);
 
   const incomingRequestUserIds = useMemo(() => {
     if (!user) return [];

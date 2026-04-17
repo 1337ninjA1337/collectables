@@ -9,6 +9,7 @@ import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
+import { CollectionVisibility } from "@/lib/types";
 
 const FALLBACK_COVER = "";
 
@@ -22,6 +23,7 @@ export default function CreateCollectionScreen() {
   const [saving, setSaving] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [visibility, setVisibility] = useState<CollectionVisibility>("private");
 
   function applyTemplate(templateId: string) {
     const tpl = collectionTemplates.find((t) => t.id === templateId);
@@ -101,6 +103,7 @@ export default function CreateCollectionScreen() {
         name,
         description: description.trim() || t("defaultCollectionDescription"),
         coverPhoto: uploadedCover,
+        visibility,
       });
 
       router.replace(`/collection/${id}`);
@@ -175,6 +178,29 @@ export default function CreateCollectionScreen() {
         ) : (
           <Text style={styles.photoHint}>{t("coverFallbackHint")}</Text>
         )}
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>{t("visibilityLabel")}</Text>
+        <View style={styles.visibilityRow}>
+          {(["private", "public"] as const).map((v) => {
+            const selected = visibility === v;
+            return (
+              <Pressable
+                key={v}
+                style={{...styles.visibilityChip, ...(selected ? styles.visibilityChipSelected : {})}}
+                onPress={() => setVisibility(v)}
+              >
+                <Text style={{...styles.visibilityChipText, ...(selected ? styles.visibilityChipTextSelected : {})}}>
+                  {t(v === "public" ? "visibilityPublic" : "visibilityPrivate")}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.visibilityHint}>
+          {visibility === "public" ? t("visibilityPublicHint") : t("visibilityPrivateHint")}
+        </Text>
       </View>
 
       <Pressable style={{...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {})}} onPress={handleSave} disabled={saving}>
@@ -287,6 +313,35 @@ const styles = StyleSheet.create({
   photoHint: {
     color: "#7a6453",
     lineHeight: 22,
+  },
+  visibilityRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  visibilityChip: {
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+  },
+  visibilityChipSelected: {
+    backgroundColor: "#261b14",
+    borderColor: "#261b14",
+  },
+  visibilityChipText: {
+    color: "#6b5647",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  visibilityChipTextSelected: {
+    color: "#fff7ef",
+  },
+  visibilityHint: {
+    color: "#7a6453",
+    fontSize: 13,
+    lineHeight: 20,
   },
   saveButton: {
     borderRadius: 24,

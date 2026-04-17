@@ -1,12 +1,11 @@
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { SkeletonItemDetail } from "@/components/skeleton";
 
 import { PhotoPreview } from "@/components/photo-preview";
-import { QrCode } from "@/components/qr-code";
 import { ReactionBar } from "@/components/reaction-bar";
 import { Screen } from "@/components/screen";
 import { buildDeepLink } from "@/lib/deep-link";
@@ -33,7 +32,8 @@ export default function ItemDetailsScreen() {
   const localItem = getItemById(params.id);
   const [remoteItem, setRemoteItem] = useState<CollectableItem | null>(null);
   const [loadingRemote, setLoadingRemote] = useState(false);
-  const [qrOpen, setQrOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -306,8 +306,8 @@ export default function ItemDetailsScreen() {
         </Pressable>
       ) : null}
 
-      <Pressable style={styles.qrButton} onPress={() => setQrOpen(true)}>
-        <Text style={styles.qrButtonText}>{t("shareQr")}</Text>
+      <Pressable style={styles.shareButton} onPress={() => setShareOpen(true)}>
+        <Text style={styles.shareButtonText}>{t("share")}</Text>
       </Pressable>
 
       {isOwner ? (
@@ -371,18 +371,46 @@ export default function ItemDetailsScreen() {
 
       <ReactionBar targetType="item" targetId={activeItem.id} />
 
-      <Modal visible={qrOpen} transparent animationType="fade" onRequestClose={() => setQrOpen(false)}>
-        <Pressable style={styles.qrBackdrop} onPress={() => setQrOpen(false)}>
-          <Pressable style={styles.qrCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.qrTitle}>{t("shareQrItemTitle")}</Text>
-            <Text style={styles.qrHint}>{t("shareQrItemHint")}</Text>
-            <View style={styles.qrWrap}>
-              <QrCode value={buildDeepLink(`item/${activeItem.id}`)} size={240} />
+      <Modal visible={shareOpen} transparent animationType="slide" onRequestClose={() => setShareOpen(false)}>
+        <Pressable style={styles.shareBackdrop} onPress={() => setShareOpen(false)}>
+          <Pressable style={styles.shareSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.shareHandle} />
+            <Text style={styles.shareTitle}>{t("shareTitle")}</Text>
+            <Text style={styles.shareHint}>{t("shareItemHint")}</Text>
+            <View style={styles.shareLinkBox}>
+              <Text style={styles.shareLinkText} numberOfLines={1}>{buildDeepLink(`item/${activeItem.id}`)}</Text>
             </View>
-            <Text style={styles.qrItemName} numberOfLines={1}>{activeItem.title}</Text>
-            <Text style={styles.qrLink} numberOfLines={1}>{buildDeepLink(`item/${activeItem.id}`)}</Text>
-            <Pressable style={styles.qrCancel} onPress={() => setQrOpen(false)}>
-              <Text style={styles.qrCancelText}>{t("cancel")}</Text>
+            <View style={styles.shareActions}>
+              <Pressable
+                style={{...styles.shareCopyButton, ...(linkCopied ? styles.shareCopyButtonDone : {})}}
+                onPress={() => {
+                  const link = buildDeepLink(`item/${activeItem.id}`);
+                  if (Platform.OS === "web" && navigator.clipboard) {
+                    navigator.clipboard.writeText(link).then(() => {
+                      setLinkCopied(true);
+                      setTimeout(() => setLinkCopied(false), 2000);
+                    });
+                  }
+                }}
+              >
+                <Text style={{...styles.shareCopyButtonText, ...(linkCopied ? styles.shareCopyButtonTextDone : {})}}>
+                  {linkCopied ? t("linkCopied") : t("copyLink")}
+                </Text>
+              </Pressable>
+              {Platform.OS !== "web" ? (
+                <Pressable
+                  style={styles.shareNativeButton}
+                  onPress={() => {
+                    const link = buildDeepLink(`item/${activeItem.id}`);
+                    Share.share({ message: `${activeItem.title}\n${link}`, url: link });
+                  }}
+                >
+                  <Text style={styles.shareNativeButtonText}>{t("shareVia")}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <Pressable style={styles.shareCancelButton} onPress={() => setShareOpen(false)}>
+              <Text style={styles.shareCancelText}>{t("cancel")}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -466,7 +494,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: "center",
   },
-  qrButton: {
+  shareButton: {
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "#c4a87a",
@@ -474,65 +502,98 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: "center",
   },
-  qrButtonText: {
+  shareButtonText: {
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
   },
-  qrBackdrop: {
+  shareBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(38, 27, 20, 0.5)",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "rgba(38, 27, 20, 0.4)",
+    justifyContent: "flex-end",
   },
-  qrCard: {
+  shareSheet: {
     backgroundColor: "#fffaf3",
-    borderRadius: 28,
-    padding: 24,
-    margin: 20,
-    alignItems: "center",
-    gap: 10,
-    maxWidth: 360,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 28,
+    gap: 12,
   },
-  qrTitle: {
+  shareHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#e4c29a",
+  },
+  shareTitle: {
     fontSize: 20,
     fontWeight: "800",
     color: "#2f2318",
   },
-  qrHint: {
+  shareHint: {
     color: "#6b5647",
-    fontSize: 13,
-    textAlign: "center",
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
   },
-  qrWrap: {
-    padding: 12,
+  shareLinkBox: {
     borderRadius: 16,
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#eadbc8",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
-  qrItemName: {
-    color: "#2f2318",
-    fontSize: 16,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-  qrLink: {
+  shareLinkText: {
     color: "#8f6947",
-    fontSize: 12,
-    maxWidth: 260,
+    fontSize: 14,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
-  qrCancel: {
-    marginTop: 10,
+  shareActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  shareCopyButton: {
+    flex: 1,
+    borderRadius: 999,
+    backgroundColor: "#261b14",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  shareCopyButtonDone: {
+    backgroundColor: "#4a7c59",
+  },
+  shareCopyButtonText: {
+    color: "#fff5ea",
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  shareCopyButtonTextDone: {
+    color: "#fff",
+  },
+  shareNativeButton: {
+    flex: 1,
+    borderRadius: 999,
+    backgroundColor: "#d89c5b",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  shareNativeButtonText: {
+    color: "#241912",
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  shareCancelButton: {
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "#e4c29a",
-    paddingVertical: 12,
-    paddingHorizontal: 28,
+    paddingVertical: 14,
+    alignItems: "center",
     backgroundColor: "#fff",
   },
-  qrCancelText: {
+  shareCancelText: {
     color: "#2f2318",
     fontWeight: "800",
     fontSize: 14,

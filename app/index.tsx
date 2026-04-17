@@ -27,6 +27,7 @@ export default function HomeScreen() {
     getCollectionById,
     ready,
     subscribedCollections,
+    sharedWithMeCollections,
     reorderOwnedCollections,
     refresh,
   } = useCollections();
@@ -65,7 +66,10 @@ export default function HomeScreen() {
   }
 
   const ownedCollections = collections.filter((collection) => collection.role === "owner");
-  const friendCollections = collections.filter((collection) => collection.role === "viewer" && friends.includes(collection.ownerUserId));
+  const sharedWithMeIds = new Set(sharedWithMeCollections.map((c) => c.id));
+  const friendCollections = collections.filter((collection) =>
+    collection.role === "viewer" && (friends.includes(collection.ownerUserId) || sharedWithMeIds.has(collection.id))
+  );
   const myProfile = getMyProfile();
   const isPhone = Platform.OS !== "web";
 
