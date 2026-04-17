@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Image,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -27,7 +29,12 @@ import { CollectableItem } from "@/lib/types";
 export default function WishlistScreen() {
   const { t } = useI18n();
   const toast = useToast();
-  const { wishlistItems, collections, addWishlistItem, deleteItem, promoteWishlistItem } = useCollections();
+  const { wishlistItems, collections, addWishlistItem, deleteItem, promoteWishlistItem, refresh } = useCollections();
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try { await refresh(); } finally { setRefreshing(false); }
+  }, [refresh]);
   const ownedCollections = useMemo(
     () => collections.filter((c) => c.role === "owner"),
     [collections],
@@ -115,8 +122,49 @@ export default function WishlistScreen() {
     router.push(`/item/${promoteFor.id}`);
   }
 
+  const SWIPE_THRESHOLD = 80;
+  const sheetTranslateY = useRef(new Animated.Value(0)).current;
+  const scrollEnabled = useRef(true);
+
+  const sheetPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+      },
+      onPanResponderGrant: () => {
+        scrollEnabled.current = false;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          sheetTranslateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        scrollEnabled.current = true;
+        if (gestureState.dy > SWIPE_THRESHOLD || gestureState.vy > 0.5) {
+          Animated.timing(sheetTranslateY, {
+            toValue: 600,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            setAddOpen(false);
+            sheetTranslateY.setValue(0);
+          });
+        } else {
+          Animated.spring(sheetTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 10,
+          }).start();
+        }
+      },
+    }),
+  ).current;
+
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: t("wishlist") }} />
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
@@ -188,72 +236,77 @@ export default function WishlistScreen() {
       )}
 
       <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
-        <View style={styles.sheetBackdrop}>
-          <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{t("wishlistAdd")}</Text>
-            <ScrollView contentContainerStyle={styles.sheetScroll}>
-              <Text style={styles.label}>{t("itemTitleLabel")}</Text>
-              <TextInput
-                style={styles.input}
-                value={title}
-                onChangeText={setTitle}
-                placeholder={t("itemTitlePlaceholder")}
-                placeholderTextColor="#b59a80"
-              />
+        <Pressable style={styles.sheetBackdrop} onPress={() => setAddOpen(false)}>
+          <Animated.View
+            style={[styles.sheet, { transform: [{ translateY: sheetTranslateY }] }]}
+            {...sheetPanResponder.panHandlers}
+          >
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.sheetTitle}>{t("wishlistAdd")}</Text>
+              <ScrollView contentContainerStyle={styles.sheetScroll} scrollEnabled={scrollEnabled.current}>
+                <Text style={styles.label}>{t("itemTitleLabel")}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={title}
+                  onChangeText={setTitle}
+                  placeholder={t("itemTitlePlaceholder")}
+                  placeholderTextColor="#b59a80"
+                />
 
-              <Text style={styles.label}>{t("descriptionLabel")}</Text>
-              <TextInput
-                style={{ ...styles.input, ...styles.multiline }}
-                value={description}
-                onChangeText={setDescription}
-                placeholder={t("descriptionPlaceholder")}
-                placeholderTextColor="#b59a80"
-                multiline
-              />
+                <Text style={styles.label}>{t("descriptionLabel")}</Text>
+                <TextInput
+                  style={{ ...styles.input, ...styles.multiline }}
+                  value={description}
+                  onChangeText={setDescription}
+                  placeholder={t("descriptionPlaceholder")}
+                  placeholderTextColor="#b59a80"
+                  multiline
+                />
 
-              <Text style={styles.label}>{t("wishlistSource")}</Text>
-              <TextInput
-                style={styles.input}
-                value={acquiredFrom}
-                onChangeText={setAcquiredFrom}
-                placeholder={t("wishlistSourcePlaceholder")}
-                placeholderTextColor="#b59a80"
-              />
+                <Text style={styles.label}>{t("wishlistSource")}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={acquiredFrom}
+                  onChangeText={setAcquiredFrom}
+                  placeholder={t("wishlistSourcePlaceholder")}
+                  placeholderTextColor="#b59a80"
+                />
 
-              <Text style={styles.label}>{t("costLabel")}</Text>
-              <TextInput
-                style={styles.input}
-                value={cost}
-                onChangeText={setCost}
-                placeholder="0"
-                placeholderTextColor="#b59a80"
-                keyboardType="numeric"
-              />
+                <Text style={styles.label}>{t("costLabel")}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={cost}
+                  onChangeText={setCost}
+                  placeholder="0"
+                  placeholderTextColor="#b59a80"
+                  keyboardType="numeric"
+                />
 
-              <Text style={styles.label}>{t("photosLabel")}</Text>
-              <Pressable style={styles.pickButton} onPress={pickImages}>
-                <Ionicons name="images-outline" size={18} color="#2f2318" />
-                <Text style={styles.pickButtonText}>{t("pickFromGallery")}</Text>
-              </Pressable>
-              {photos.length > 0 ? (
-                <PhotoPreview photos={photos} onChange={setPhotos} maxPhotos={5} />
-              ) : null}
-            </ScrollView>
-            <View style={styles.sheetActions}>
-              <Pressable style={styles.cancelButton} onPress={() => setAddOpen(false)}>
-                <Text style={styles.cancelButtonText}>{t("cancel")}</Text>
-              </Pressable>
-              <Pressable
-                style={{ ...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {}) }}
-                onPress={handleSave}
-                disabled={saving}
-              >
-                <Text style={styles.saveButtonText}>{t("saveItem")}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
+                <Text style={styles.label}>{t("photosLabel")}</Text>
+                <Pressable style={styles.pickButton} onPress={pickImages}>
+                  <Ionicons name="images-outline" size={18} color="#2f2318" />
+                  <Text style={styles.pickButtonText}>{t("pickFromGallery")}</Text>
+                </Pressable>
+                {photos.length > 0 ? (
+                  <PhotoPreview photos={photos} onChange={setPhotos} maxPhotos={5} />
+                ) : null}
+              </ScrollView>
+              <View style={styles.sheetActions}>
+                <Pressable style={styles.cancelButton} onPress={() => setAddOpen(false)}>
+                  <Text style={styles.cancelButtonText}>{t("cancel")}</Text>
+                </Pressable>
+                <Pressable
+                  style={{ ...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {}) }}
+                  onPress={handleSave}
+                  disabled={saving}
+                >
+                  <Text style={styles.saveButtonText}>{t("saveItem")}</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Animated.View>
+        </Pressable>
       </Modal>
 
       <Modal

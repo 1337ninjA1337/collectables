@@ -43,6 +43,7 @@ export default function ProfileScreen() {
   const [editingHandle, setEditingHandle] = useState(false);
   const [remoteCollections, setRemoteCollections] = useState<Collection[]>([]);
   const [remoteItemCounts, setRemoteItemCounts] = useState<Record<string, number>>({});
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -83,6 +84,20 @@ export default function ProfileScreen() {
     results.forEach((r) => { counts[r.id] = r.count; });
     setRemoteItemCounts(counts);
   }
+
+  const handleRefresh = useCallback(async () => {
+    if (!params.id || params.id === "[id]") return;
+    setRefreshing(true);
+    try {
+      const [p, cols] = await Promise.all([
+        fetchProfileById(params.id),
+        fetchCollectionsByUserId(params.id),
+      ]);
+      if (p) setRemoteProfile(p);
+      setRemoteCollections(cols);
+      await loadItemCounts(cols);
+    } catch {} finally { setRefreshing(false); }
+  }, [params.id]);
 
   const profile = localProfile ?? remoteProfile;
   const activeProfile = profile;
@@ -220,7 +235,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: activeProfile.displayName }} />
       <View style={styles.hero}>
         {relationship === "self" ? (

@@ -192,6 +192,19 @@ export default function HomeScreen() {
         </Pressable>
       </Link>
 
+      <Link href="/stats" asChild>
+        <Pressable style={styles.statsBanner}>
+          <View style={styles.statsBannerIcon}>
+            <Text style={styles.statsBannerIconText}>⊞</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.statsBannerTitle}>{t("statsTitle")}</Text>
+            <Text style={styles.statsBannerHint}>{t("statsSubtitle")}</Text>
+          </View>
+          <Text style={styles.statsBannerArrow}>›</Text>
+        </Pressable>
+      </Link>
+
       {recentItems.length > 0 ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -637,6 +650,44 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   wishlistBannerArrow: {
+    color: "#8f6947",
+    fontSize: 28,
+    fontWeight: "800",
+  },
+  statsBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    borderRadius: 20,
+    padding: 16,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+  },
+  statsBannerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#261b14",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statsBannerIconText: {
+    color: "#fff7ef",
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  statsBannerTitle: {
+    color: "#2f2318",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  statsBannerHint: {
+    color: "#8f6947",
+    fontSize: 13,
+    marginTop: 2,
+  },
+  statsBannerArrow: {
     color: "#8f6947",
     fontSize: 28,
     fontWeight: "800",

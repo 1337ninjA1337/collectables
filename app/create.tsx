@@ -11,6 +11,12 @@ import { uploadImages } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
+import { ItemCondition, ItemTag } from "@/lib/types";
+
+const TAG_COLORS = [
+  "#d89c5b", "#c47a5a", "#7a9e7e", "#5b8fd8", "#9b7ec8",
+  "#d4765b", "#5bbbd8", "#c4a35b", "#8b6b5b", "#6b8f8f",
+];
 
 export default function CreateItemScreen() {
   const params = useLocalSearchParams<{ collectionId?: string }>();
@@ -32,6 +38,9 @@ export default function CreateItemScreen() {
   const [description, setDescription] = useState("");
   const [variants, setVariants] = useState("");
   const [cost, setCost] = useState("");
+  const [condition, setCondition] = useState<ItemCondition | "">("");
+  const [tags, setTags] = useState<ItemTag[]>([]);
+  const [tagInput, setTagInput] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -132,6 +141,8 @@ export default function CreateItemScreen() {
         variants,
         photos: uploadedPhotos,
         cost: parsedCost !== null && !Number.isNaN(parsedCost) ? parsedCost : null,
+        condition: condition || undefined,
+        tags: tags.length > 0 ? tags : undefined,
       });
 
       router.replace(`/item/${id}`);
@@ -209,6 +220,68 @@ export default function CreateItemScreen() {
         placeholder={t("costPlaceholder")}
         keyboardType="numeric"
       />
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>{t("conditionLabel")}</Text>
+        <View style={styles.conditionRow}>
+          {(["new", "excellent", "good", "fair"] as const).map((c) => {
+            const selected = condition === c;
+            return (
+              <Pressable
+                key={c}
+                style={{...styles.conditionChip, ...(selected ? styles.conditionChipSelected : {})}}
+                onPress={() => setCondition(selected ? "" : c)}
+              >
+                <Text style={{...styles.conditionChipText, ...(selected ? styles.conditionChipTextSelected : {})}}>
+                  {t(`condition${c[0].toUpperCase()}${c.slice(1)}` as "conditionNew" | "conditionExcellent" | "conditionGood" | "conditionFair")}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>{t("tagsLabel")}</Text>
+        {tags.length > 0 ? (
+          <View style={styles.tagsRow}>
+            {tags.map((tag, i) => (
+              <Pressable key={i} style={{...styles.tagChip, backgroundColor: tag.color}} onPress={() => setTags(tags.filter((_, j) => j !== i))}>
+                <Text style={styles.tagChipText}>{tag.label}</Text>
+                <Text style={styles.tagChipRemove}>x</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        <View style={styles.tagInputRow}>
+          <TextInput
+            style={styles.tagInput}
+            value={tagInput}
+            onChangeText={setTagInput}
+            placeholder={t("tagsPlaceholder")}
+            placeholderTextColor="#9b8571"
+            onSubmitEditing={() => {
+              const label = tagInput.trim();
+              if (label && !tags.some((t) => t.label.toLowerCase() === label.toLowerCase())) {
+                setTags([...tags, { label, color: TAG_COLORS[tags.length % TAG_COLORS.length] }]);
+                setTagInput("");
+              }
+            }}
+          />
+          <Pressable
+            style={{...styles.tagAddButton, ...(tagInput.trim() ? {} : styles.tagAddButtonDisabled)}}
+            onPress={() => {
+              const label = tagInput.trim();
+              if (label && !tags.some((t) => t.label.toLowerCase() === label.toLowerCase())) {
+                setTags([...tags, { label, color: TAG_COLORS[tags.length % TAG_COLORS.length] }]);
+                setTagInput("");
+              }
+            }}
+          >
+            <Text style={styles.tagAddButtonText}>{t("tagsAdd")}</Text>
+          </Pressable>
+        </View>
+      </View>
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>{t("photosLabel")}</Text>
@@ -607,6 +680,84 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 15,
+  },
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  tagChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  tagChipText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  tagChipRemove: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  tagInputRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  tagInput: {
+    flex: 1,
+    borderRadius: 22,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: "#2f2318",
+    fontSize: 15,
+  },
+  tagAddButton: {
+    borderRadius: 22,
+    backgroundColor: "#261b14",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    justifyContent: "center",
+  },
+  tagAddButtonDisabled: {
+    opacity: 0.4,
+  },
+  tagAddButtonText: {
+    color: "#fff7ef",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  conditionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  conditionChip: {
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+  },
+  conditionChipSelected: {
+    backgroundColor: "#261b14",
+    borderColor: "#261b14",
+  },
+  conditionChipText: {
+    color: "#6b5647",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  conditionChipTextSelected: {
+    color: "#fff7ef",
   },
   saveButton: {
     borderRadius: 24,

@@ -28,6 +28,7 @@ export default function PeopleScreen() {
   const [remoteProfiles, setRemoteProfiles] = useState<UserProfile[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const myProfile = getMyProfile();
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -46,6 +47,11 @@ export default function PeopleScreen() {
   useEffect(() => {
     void loadPage(page);
   }, [page, loadPage]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try { await loadPage(page); } finally { setRefreshing(false); }
+  }, [loadPage, page]);
 
   const others = useMemo(
     () => remoteProfiles.filter((p) => p.id !== myProfile?.id),
@@ -125,7 +131,7 @@ export default function PeopleScreen() {
   }
 
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>{t("community")}</Text>
         <Text style={styles.title}>{t("searchTitle")}</Text>

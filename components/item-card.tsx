@@ -26,9 +26,27 @@ export function ItemCard({ item }: { item: CollectableItem }) {
             <Text style={styles.meta}>{item.acquiredFrom}</Text>
             <Text style={styles.meta}>{t("photosCount", { count: item.photos.length })}</Text>
           </View>
-          {typeof item.cost === "number" ? (
-            <Text style={styles.meta}>{t("costLabel")}: {item.cost}</Text>
+          {item.tags && item.tags.length > 0 ? (
+            <View style={styles.tagsRow}>
+              {item.tags.map((tag, i) => (
+                <View key={i} style={{...styles.tagBadge, backgroundColor: tag.color}}>
+                  <Text style={styles.tagBadgeText}>{tag.label}</Text>
+                </View>
+              ))}
+            </View>
           ) : null}
+          <View style={styles.metaRow}>
+            {item.condition ? (
+              <View style={styles.conditionBadge}>
+                <Text style={styles.conditionBadgeText}>
+                  {t(`condition${item.condition[0].toUpperCase()}${item.condition.slice(1)}` as "conditionNew" | "conditionExcellent" | "conditionGood" | "conditionFair")}
+                </Text>
+              </View>
+            ) : null}
+            {typeof item.cost === "number" ? (
+              <Text style={styles.meta}>{t("costLabel")}: {item.cost}</Text>
+            ) : null}
+          </View>
         </View>
       </Pressable>
     </Link>
@@ -75,5 +93,31 @@ const styles = StyleSheet.create({
     color: "#8d6c4a",
     fontSize: 13,
     fontWeight: "600",
+  },
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+  },
+  tagBadge: {
+    borderRadius: 999,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+  },
+  tagBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  conditionBadge: {
+    borderRadius: 999,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    backgroundColor: "#261b14",
+  },
+  conditionBadgeText: {
+    color: "#fff7ef",
+    fontSize: 11,
+    fontWeight: "700",
   },
 });

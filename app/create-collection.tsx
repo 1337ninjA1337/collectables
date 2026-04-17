@@ -1,9 +1,10 @@
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router } from "expo-router";
 import { useState } from "react";
-import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Screen } from "@/components/screen";
+import { collectionTemplates } from "@/data/collection-templates";
 import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -20,6 +21,21 @@ export default function CreateCollectionScreen() {
   const [coverPhoto, setCoverPhoto] = useState("");
   const [saving, setSaving] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+
+  function applyTemplate(templateId: string) {
+    const tpl = collectionTemplates.find((t) => t.id === templateId);
+    if (!tpl) return;
+    const isDeselect = selectedTemplateId === templateId;
+    setSelectedTemplateId(isDeselect ? null : templateId);
+    if (isDeselect) {
+      setName("");
+      setDescription("");
+    } else {
+      setName(t(tpl.nameKey as Parameters<typeof t>[0]));
+      setDescription(t(tpl.descriptionKey as Parameters<typeof t>[0]));
+    }
+  }
 
   const nameMissing = submitAttempted && !name.trim();
 
@@ -102,6 +118,28 @@ export default function CreateCollectionScreen() {
       </View>
 
       <View style={styles.fieldGroup}>
+        <Text style={styles.label}>{t("templatePickerTitle")}</Text>
+        <Text style={styles.templateHint}>{t("templatePickerHint")}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateRow}>
+          {collectionTemplates.map((tpl) => (
+            <Pressable
+              key={tpl.id}
+              style={{...styles.templateCard, ...(selectedTemplateId === tpl.id ? styles.templateCardActive : {})}}
+              onPress={() => applyTemplate(tpl.id)}
+            >
+              <Text style={styles.templateIcon}>{tpl.icon}</Text>
+              <Text
+                style={{...styles.templateName, ...(selectedTemplateId === tpl.id ? styles.templateNameActive : {})}}
+                numberOfLines={1}
+              >
+                {t(tpl.nameKey as Parameters<typeof t>[0])}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
+      <View style={styles.fieldGroup}>
         <Text style={styles.label}>
           {t("collectionNameLabel")}<Text style={styles.required}> *</Text>
         </Text>
@@ -161,6 +199,42 @@ const styles = StyleSheet.create({
   heroText: {
     color: "#6b5543",
     lineHeight: 22,
+  },
+  templateHint: {
+    color: "#7a6453",
+    lineHeight: 20,
+    fontSize: 13,
+  },
+  templateRow: {
+    gap: 10,
+    paddingVertical: 4,
+  },
+  templateCard: {
+    backgroundColor: "#fffaf3",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    gap: 4,
+    minWidth: 80,
+  },
+  templateCardActive: {
+    borderColor: "#d89c5b",
+    borderWidth: 2,
+    backgroundColor: "#fff3e0",
+  },
+  templateIcon: {
+    fontSize: 24,
+  },
+  templateName: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#624a35",
+  },
+  templateNameActive: {
+    color: "#261b14",
   },
   fieldGroup: {
     gap: 10,

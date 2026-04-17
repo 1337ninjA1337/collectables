@@ -1,4 +1,10 @@
+export type ItemCondition = "new" | "excellent" | "good" | "fair";
 export type CollectionRole = "owner" | "viewer";
+
+export type ItemTag = {
+  label: string;
+  color: string;
+};
 export type ProfileRelationship = "self" | "friend" | "following" | "request_sent" | "request_received" | "none";
 
 export type UserProfile = {
@@ -26,6 +32,20 @@ export type CollectableItem = {
   cost?: number | null;
   sortOrder?: number;
   isWishlist?: boolean;
+  condition?: ItemCondition;
+  tags?: ItemTag[];
+};
+
+export type ReactionEmoji = "heart" | "fire" | "eyes" | "star" | "clap";
+export type ReactionTargetType = "collection" | "item";
+
+export type Reaction = {
+  id: string;
+  userId: string;
+  targetType: ReactionTargetType;
+  targetId: string;
+  emoji: ReactionEmoji;
+  createdAt: string;
 };
 
 export type Collection = {

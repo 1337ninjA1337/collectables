@@ -1,6 +1,7 @@
+import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Image, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { applyItemFilters, EMPTY_FILTERS, ItemFilterBar, type ItemFilters } from "@/components/item-filters";
@@ -11,9 +12,11 @@ import { SkeletonCollectionDetail } from "@/components/skeleton";
 import { NestableDraggableFlatList, RenderItemParams, ScaleDecorator } from "../../components/DraggableList";
 
 import { ItemCard } from "@/components/item-card";
+import { ReactionBar } from "@/components/reaction-bar";
 import { Screen } from "@/components/screen";
 import { SelectableItemRow } from "@/components/selectable-item-row";
 import { useAuth } from "@/lib/auth-context";
+import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { useI18n } from "@/lib/i18n-context";
@@ -36,6 +39,7 @@ export default function CollectionDetailsScreen() {
     followCollection,
     unfollowCollection,
     reorderItemsInCollection,
+    updateCollection,
     refresh,
   } = useCollections();
   const [refreshing, setRefreshing] = useState(false);
@@ -47,6 +51,12 @@ export default function CollectionDetailsScreen() {
   const [itemFilters, setItemFilters] = useState<ItemFilters>(EMPTY_FILTERS);
   const [exporting, setExporting] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editCoverUri, setEditCoverUri] = useState("");
+  const [editCoverChanged, setEditCoverChanged] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
   const localCollection = getCollectionById(params.id);
   const [remoteCollection, setRemoteCollection] = useState<Collection | null>(null);
   const [remoteItems, setRemoteItems] = useState<CollectableItem[]>([]);
@@ -226,6 +236,87 @@ export default function CollectionDetailsScreen() {
     }
   }
 
+  function openEditModal() {
+    setEditName(activeCollection.name);
+    setEditDescription(activeCollection.description);
+    setEditCoverUri(activeCollection.coverPhoto);
+    setEditCoverChanged(false);
+    setEditModalOpen(true);
+  }
+
+  async function pickEditCover() {
+    if (Platform.OS !== "web") {
+      Alert.alert(t("collectionCoverLabel"), undefined, [
+        {
+          text: t("pickFromGallery"),
+          onPress: () => void pickEditCoverFromGallery(),
+        },
+        {
+          text: t("takePhoto"),
+          onPress: () => void pickEditCoverFromCamera(),
+        },
+        { text: t("cancel"), style: "cancel" },
+      ]);
+      return;
+    }
+    await pickEditCoverFromGallery();
+  }
+
+  async function pickEditCoverFromGallery() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      toast.error(t("noAccessCover"), t("noAccess"));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setEditCoverUri(result.assets[0].uri);
+      setEditCoverChanged(true);
+    }
+  }
+
+  async function pickEditCoverFromCamera() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      toast.error(t("noAccessCamera"), t("noAccess"));
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setEditCoverUri(result.assets[0].uri);
+      setEditCoverChanged(true);
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editName.trim()) {
+      toast.error(t("requiredFieldsMissing"), t("needTitle"));
+      return;
+    }
+    setEditSaving(true);
+    try {
+      let finalCover = editCoverUri;
+      if (editCoverChanged && editCoverUri) {
+        finalCover = await uploadImage(editCoverUri);
+      }
+      await updateCollection(activeCollection.id, {
+        name: editName.trim(),
+        description: editDescription.trim(),
+        coverPhoto: finalCover,
+      });
+      setEditModalOpen(false);
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   const renderItemRow = ({ item, drag, isActive }: RenderItemParams<CollectableItem>) => (
     <ScaleDecorator>
       <Pressable
@@ -280,8 +371,13 @@ export default function CollectionDetailsScreen() {
         ) : null;
       })()}
 
+      <ReactionBar targetType="collection" targetId={activeCollection.id} />
+
       {user?.id === activeCollection.ownerUserId ? (
         <View style={styles.ownerActions}>
+          <Pressable style={styles.editCollectionButton} onPress={openEditModal}>
+            <Text style={styles.editCollectionButtonText}>{t("editCollection")}</Text>
+          </Pressable>
           <Link href={{ pathname: "/create", params: { collectionId: activeCollection.id } }} asChild>
             <Pressable style={styles.addButton}>
               <Text style={styles.addButtonText}>{t("addItemToCollection")}</Text>
@@ -443,6 +539,61 @@ export default function CollectionDetailsScreen() {
             <Text style={styles.qrLink} numberOfLines={1}>{buildDeepLink(`collection/${activeCollection.id}`)}</Text>
             <Pressable style={styles.modalCancel} onPress={() => setQrOpen(false)}>
               <Text style={styles.modalCancelText}>{t("cancel")}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={editModalOpen} transparent animationType="fade" onRequestClose={() => setEditModalOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setEditModalOpen(false)}>
+          <Pressable style={styles.editModalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>{t("editCollection")}</Text>
+
+            <View style={styles.editFieldGroup}>
+              <Text style={styles.editFieldLabel}>
+                {t("collectionNameLabel")}<Text style={styles.editFieldRequired}> *</Text>
+              </Text>
+              <TextInput
+                value={editName}
+                onChangeText={setEditName}
+                placeholder={t("collectionNamePlaceholder")}
+                placeholderTextColor="#9b8571"
+                style={styles.editFieldInput}
+              />
+            </View>
+
+            <View style={styles.editFieldGroup}>
+              <Text style={styles.editFieldLabel}>{t("collectionDescriptionLabel")}</Text>
+              <TextInput
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder={t("collectionDescriptionPlaceholder")}
+                placeholderTextColor="#9b8571"
+                multiline
+                textAlignVertical="top"
+                style={{...styles.editFieldInput, ...styles.editFieldInputMultiline}}
+              />
+            </View>
+
+            <View style={styles.editFieldGroup}>
+              <Text style={styles.editFieldLabel}>{t("collectionCoverLabel")}</Text>
+              <Pressable style={styles.editCoverButton} onPress={() => void pickEditCover()}>
+                <Text style={styles.editCoverButtonText}>{t("editCover")}</Text>
+              </Pressable>
+              {editCoverUri ? (
+                <Image source={{ uri: editCoverUri }} style={styles.editCoverPreview} />
+              ) : null}
+            </View>
+
+            <Pressable
+              style={{...styles.editSaveButton, ...(editSaving ? styles.editSaveButtonDisabled : {})}}
+              onPress={() => void handleSaveEdit()}
+              disabled={editSaving}
+            >
+              <Text style={styles.editSaveButtonText}>{editSaving ? t("saving") : t("saveChanges")}</Text>
+            </Pressable>
+            <Pressable style={styles.modalCancel} onPress={() => setEditModalOpen(false)}>
+              <Text style={styles.modalCancelText}>{t("cancelEdit")}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -757,6 +908,88 @@ const styles = StyleSheet.create({
   modalCancelText: {
     color: "#6a4d35",
     fontSize: 14,
+    fontWeight: "800",
+  },
+  editCollectionButton: {
+    borderRadius: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: "#c4a87a",
+    backgroundColor: "#fff4e5",
+    alignItems: "center",
+  },
+  editCollectionButtonText: {
+    color: "#5f4734",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  editModalCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#fffaf3",
+    borderRadius: 22,
+    padding: 20,
+    gap: 16,
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+  },
+  editFieldGroup: {
+    gap: 8,
+  },
+  editFieldLabel: {
+    color: "#624a35",
+    fontWeight: "800",
+    fontSize: 13,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  editFieldRequired: {
+    color: "#d92f2f",
+    fontWeight: "800",
+  },
+  editFieldInput: {
+    borderRadius: 16,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: "#2f2318",
+    fontSize: 15,
+  },
+  editFieldInputMultiline: {
+    minHeight: 90,
+  },
+  editCoverButton: {
+    borderRadius: 16,
+    backgroundColor: "#d89c5b",
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  editCoverButtonText: {
+    color: "#241912",
+    fontWeight: "800",
+    fontSize: 14,
+  },
+  editCoverPreview: {
+    width: "100%",
+    height: 160,
+    borderRadius: 16,
+    backgroundColor: "#dbc7ae",
+  },
+  editSaveButton: {
+    borderRadius: 18,
+    paddingVertical: 16,
+    alignItems: "center",
+    backgroundColor: "#261b14",
+  },
+  editSaveButtonDisabled: {
+    opacity: 0.75,
+  },
+  editSaveButtonText: {
+    color: "#fff5ea",
+    fontSize: 15,
     fontWeight: "800",
   },
 });

@@ -6,8 +6,10 @@ import { useAuth } from "@/lib/auth-context";
 import { useSocial } from "@/lib/social-context";
 import {
   upsertCollection,
+  updateRemoteCollection,
   deleteRemoteCollection,
   upsertItem,
+  updateRemoteItem,
   deleteRemoteItem,
   fetchCollectionsByUserId,
   fetchItemsByCollectionId,
@@ -16,7 +18,7 @@ import {
   followCollectionRemote,
   unfollowCollectionRemote,
 } from "@/lib/supabase-profiles";
-import { Collection, CollectableItem } from "@/lib/types";
+import { Collection, CollectableItem, ItemCondition, ItemTag } from "@/lib/types";
 
 const ITEMS_STORAGE_KEY = "collectables-items-v1";
 const COLLECTIONS_STORAGE_KEY = "collectables-collections-v1";
@@ -32,6 +34,8 @@ type DraftItemInput = {
   photos: string[];
   cost?: number | null;
   isWishlist?: boolean;
+  condition?: ItemCondition;
+  tags?: ItemTag[];
 };
 
 type DraftWishlistInput = {
@@ -67,6 +71,8 @@ type CollectionsContextValue = {
   promoteWishlistItem: (itemId: string, targetCollectionId: string) => Promise<void>;
   addItem: (input: DraftItemInput) => Promise<string>;
   addCollection: (input: DraftCollectionInput) => Promise<string>;
+  updateItem: (itemId: string, updates: Partial<CollectableItem>) => Promise<void>;
+  updateCollection: (collectionId: string, updates: Partial<Collection>) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
   deleteItems: (itemIds: string[]) => Promise<void>;
   moveItems: (itemIds: string[], targetCollectionId: string) => Promise<void>;
@@ -88,6 +94,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   const [friendItems, setFriendItems] = useState<CollectableItem[]>([]);
   const [followedCollectionIds, setFollowedCollectionIds] = useState<string[]>([]);
   const [subscribedCollections, setSubscribedCollections] = useState<Collection[]>([]);
+  const [subscribedItems, setSubscribedItems] = useState<CollectableItem[]>([]);
   const [ready, setReady] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -189,6 +196,28 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     return () => { active = false; };
   }, [user, followedCollectionIds, refreshTick]);
 
+  // Fetch items for subscribed collections
+  useEffect(() => {
+    if (!user || subscribedCollections.length === 0) {
+      setSubscribedItems([]);
+      return;
+    }
+
+    let active = true;
+
+    Promise.all(subscribedCollections.map((c) => fetchItemsByCollectionId(c.id)))
+      .then((results) => {
+        if (active) {
+          const allItems: CollectableItem[] = [];
+          results.forEach((items) => items.forEach((item) => allItems.push(item)));
+          setSubscribedItems(allItems);
+        }
+      })
+      .catch(() => {});
+
+    return () => { active = false; };
+  }, [user, subscribedCollections]);
+
   // Fetch friends' collections and items from Supabase
   useEffect(() => {
     if (!user || friends.length === 0) {
@@ -244,10 +273,16 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   }, [getVisibleCollections, localCollections, friendCollections, subscribedCollections]);
 
   const items = useMemo(() => {
-    const localIds = new Set(localItems.map((i) => i.id));
-    const deduped = friendItems.filter((i) => !localIds.has(i.id));
-    return [...localItems, ...getVisibleItems(), ...deduped];
-  }, [getVisibleItems, localItems, friendItems]);
+    const seen = new Set(localItems.map((i) => i.id));
+    const merged = [...localItems, ...getVisibleItems()];
+    for (const item of friendItems) {
+      if (!seen.has(item.id)) { merged.push(item); seen.add(item.id); }
+    }
+    for (const item of subscribedItems) {
+      if (!seen.has(item.id)) { merged.push(item); seen.add(item.id); }
+    }
+    return merged;
+  }, [getVisibleItems, localItems, friendItems, subscribedItems]);
 
   const value = useMemo<CollectionsContextValue>(
     () => ({
@@ -318,23 +353,24 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         return nextItem.id;
       },
       promoteWishlistItem: async (itemId, targetCollectionId) => {
-        let promoted: CollectableItem | undefined;
+        const acquiredAt = new Date().toISOString().slice(0, 10);
         setLocalItems((current) =>
           current.map((item) => {
             if (item.id !== itemId) return item;
-            const next = {
+            return {
               ...item,
               collectionId: targetCollectionId,
               isWishlist: false,
-              acquiredAt: item.acquiredAt || new Date().toISOString().slice(0, 10),
+              acquiredAt: item.acquiredAt || acquiredAt,
             };
-            promoted = next;
-            return next;
           }),
         );
-        if (promoted) {
-          upsertItem(promoted).catch(() => undefined);
-        }
+        upsertItem({
+          id: itemId,
+          collectionId: targetCollectionId,
+          isWishlist: false,
+          acquiredAt: acquiredAt,
+        } as CollectableItem).catch(() => undefined);
       },
       addItem: async (input) => {
         const slug =
@@ -358,6 +394,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           createdAt: new Date().toISOString(),
           cost: input.cost ?? null,
           isWishlist: input.isWishlist ?? false,
+          condition: input.condition,
+          tags: input.tags,
         };
 
         setLocalItems((current) => [nextItem, ...current]);
@@ -390,6 +428,24 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         upsertCollection(nextCollection).catch(() => undefined);
         return nextCollection.id;
       },
+      updateItem: async (itemId, updates) => {
+        setLocalItems((current) =>
+          current.map((item) => {
+            if (item.id !== itemId) return item;
+            return { ...item, ...updates, id: item.id };
+          }),
+        );
+        updateRemoteItem(itemId, updates).catch(() => undefined);
+      },
+      updateCollection: async (collectionId, updates) => {
+        setLocalCollections((current) =>
+          current.map((col) => {
+            if (col.id !== collectionId) return col;
+            return { ...col, ...updates, id: col.id };
+          }),
+        );
+        updateRemoteCollection(collectionId, updates).catch(() => undefined);
+      },
       deleteItem: async (itemId) => {
         setLocalItems((current) => current.filter((item) => item.id !== itemId));
         deleteRemoteItem(itemId).catch(() => undefined);
@@ -412,7 +468,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
             return next;
           }),
         );
-        await Promise.allSettled(moved.map((item) => upsertItem(item)));
+        await Promise.allSettled(moved.map((item) => updateRemoteItem(item.id, { collectionId: item.collectionId, sortOrder: undefined })));
       },
       deleteCollection: async (collectionId) => {
         setLocalCollections((current) => current.filter((collection) => collection.id !== collectionId));
@@ -420,33 +476,41 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         deleteRemoteCollection(collectionId).catch(() => undefined);
       },
       reorderOwnedCollections: (orderedIds) => {
+        const updated: Collection[] = [];
         setLocalCollections((current) => {
           const byId = new Map(current.map((c) => [c.id, c]));
           const reordered: Collection[] = [];
           orderedIds.forEach((id, index) => {
             const c = byId.get(id);
             if (c) {
-              reordered.push({ ...c, sortOrder: index });
+              const next = { ...c, sortOrder: index };
+              reordered.push(next);
+              updated.push(next);
               byId.delete(id);
             }
           });
-          // Append any not in the order list (e.g. shared) at the end
           byId.forEach((c) => reordered.push(c));
           return reordered;
         });
+        Promise.allSettled(updated.map((c) => updateRemoteCollection(c.id, { sortOrder: c.sortOrder }))).catch(() => undefined);
       },
       refresh: async () => {
         setRefreshTick((n) => n + 1);
       },
       reorderItemsInCollection: (collectionId, orderedIds) => {
         const indexById = new Map(orderedIds.map((id, idx) => [id, idx]));
+        const reordered: { id: string; sortOrder: number }[] = [];
         setLocalItems((current) =>
-          current.map((item) =>
-            item.collectionId === collectionId && indexById.has(item.id)
-              ? { ...item, sortOrder: indexById.get(item.id) }
-              : item,
-          ),
+          current.map((item) => {
+            if (item.collectionId === collectionId && indexById.has(item.id)) {
+              const order = indexById.get(item.id)!;
+              reordered.push({ id: item.id, sortOrder: order });
+              return { ...item, sortOrder: order };
+            }
+            return item;
+          }),
         );
+        Promise.allSettled(reordered.map((r) => updateRemoteItem(r.id, { sortOrder: r.sortOrder }))).catch(() => undefined);
       },
       deleteUserContent: async (userId) => {
         const ownedCollectionIds = new Set(

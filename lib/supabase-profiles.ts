@@ -1,5 +1,5 @@
 import { authClient, isSupabaseConfigured } from "@/lib/supabase";
-import { CollectableItem, Collection, UserProfile } from "@/lib/types";
+import { CollectableItem, Collection, Reaction, ReactionEmoji, ReactionTargetType, UserProfile } from "@/lib/types";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -113,6 +113,7 @@ type DbCollection = {
   description: string;
   owner_name: string;
   owner_user_id: string;
+  sort_order?: number | null;
 };
 
 function toCollection(row: DbCollection): Collection {
@@ -126,6 +127,7 @@ function toCollection(row: DbCollection): Collection {
     sharedWith: [],
     sharedWithUserIds: [],
     role: "viewer",
+    sortOrder: row.sort_order ?? undefined,
   };
 }
 
@@ -142,7 +144,26 @@ export async function upsertCollection(collection: Collection): Promise<void> {
       description: collection.description,
       owner_name: collection.ownerName,
       owner_user_id: collection.ownerUserId,
+      sort_order: collection.sortOrder ?? null,
     }),
+  });
+}
+
+export async function updateRemoteCollection(id: string, updates: Partial<Collection>): Promise<void> {
+  if (!isSupabaseConfigured) return;
+
+  const body: Record<string, unknown> = {};
+  if ("name" in updates) body.name = updates.name;
+  if ("description" in updates) body.description = updates.description;
+  if ("coverPhoto" in updates) body.cover_photo = updates.coverPhoto;
+  if ("ownerName" in updates) body.owner_name = updates.ownerName;
+  if ("sortOrder" in updates) body.sort_order = updates.sortOrder ?? null;
+
+  if (Object.keys(body).length === 0) return;
+
+  await supabaseRest(`/collections?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
   });
 }
 
@@ -186,6 +207,10 @@ type DbItem = {
   created_by_user_id: string;
   created_at: string;
   cost?: number | null;
+  sort_order?: number | null;
+  is_wishlist?: boolean;
+  condition?: string | null;
+  tags?: { label: string; color: string }[] | null;
 };
 
 function toItem(row: DbItem): CollectableItem {
@@ -202,6 +227,10 @@ function toItem(row: DbItem): CollectableItem {
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at,
     cost: row.cost ?? null,
+    sortOrder: row.sort_order ?? undefined,
+    isWishlist: row.is_wishlist ?? false,
+    condition: (row.condition as CollectableItem["condition"]) ?? undefined,
+    tags: row.tags ?? undefined,
   };
 }
 
@@ -224,8 +253,44 @@ export async function upsertItem(item: CollectableItem): Promise<void> {
       created_by_user_id: item.createdByUserId,
       created_at: item.createdAt,
       cost: item.cost ?? null,
+      sort_order: item.sortOrder ?? null,
+      is_wishlist: item.isWishlist ?? false,
+      condition: item.condition ?? null,
+      tags: item.tags ?? null,
     }),
   });
+}
+
+export async function updateRemoteItem(id: string, updates: Partial<CollectableItem>): Promise<void> {
+  if (!isSupabaseConfigured) return;
+
+  const body: Record<string, unknown> = {};
+  if ("title" in updates) body.title = updates.title;
+  if ("description" in updates) body.description = updates.description;
+  if ("acquiredAt" in updates) body.acquired_at = updates.acquiredAt;
+  if ("acquiredFrom" in updates) body.acquired_from = updates.acquiredFrom;
+  if ("variants" in updates) body.variants = updates.variants;
+  if ("photos" in updates) body.photos = updates.photos;
+  if ("cost" in updates) body.cost = updates.cost ?? null;
+  if ("collectionId" in updates) body.collection_id = updates.collectionId;
+  if ("sortOrder" in updates) body.sort_order = updates.sortOrder ?? null;
+  if ("isWishlist" in updates) body.is_wishlist = updates.isWishlist;
+  if ("condition" in updates) body.condition = updates.condition ?? null;
+  if ("tags" in updates) body.tags = updates.tags ?? null;
+
+  if (Object.keys(body).length === 0) return;
+
+  console.log("[updateRemoteItem] id:", id, "body:", JSON.stringify(body, null, 2));
+
+  const res = await supabaseRest(`/items?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("[updateRemoteItem] FAILED", res.status, text);
+  }
 }
 
 /** Delete an item from Supabase. */
@@ -319,6 +384,71 @@ export async function unfollowCollectionRemote(userId: string, collectionId: str
 
   await supabaseRest(
     `/collection_follows?user_id=eq.${userId}&collection_id=eq.${collectionId}`,
+    { method: "DELETE" },
+  );
+}
+
+// --- Reactions ---
+
+type DbReaction = {
+  id: string;
+  user_id: string;
+  target_type: string;
+  target_id: string;
+  emoji: string;
+  created_at: string;
+};
+
+function toReaction(row: DbReaction): Reaction {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    targetType: row.target_type as ReactionTargetType,
+    targetId: row.target_id,
+    emoji: row.emoji as ReactionEmoji,
+    createdAt: row.created_at,
+  };
+}
+
+export async function fetchReactions(targetType: ReactionTargetType, targetId: string): Promise<Reaction[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const res = await supabaseRest(
+    `/reactions?target_type=eq.${targetType}&target_id=eq.${encodeURIComponent(targetId)}&select=*`,
+  );
+  const rows: DbReaction[] = await res.json();
+  return rows.map(toReaction);
+}
+
+export async function addReaction(
+  userId: string,
+  targetType: ReactionTargetType,
+  targetId: string,
+  emoji: ReactionEmoji,
+): Promise<void> {
+  if (!isSupabaseConfigured) return;
+
+  await supabaseRest("/reactions", {
+    method: "POST",
+    body: JSON.stringify({
+      user_id: userId,
+      target_type: targetType,
+      target_id: targetId,
+      emoji,
+    }),
+  });
+}
+
+export async function removeReaction(
+  userId: string,
+  targetType: ReactionTargetType,
+  targetId: string,
+  emoji: ReactionEmoji,
+): Promise<void> {
+  if (!isSupabaseConfigured) return;
+
+  await supabaseRest(
+    `/reactions?user_id=eq.${userId}&target_type=eq.${targetType}&target_id=eq.${encodeURIComponent(targetId)}&emoji=eq.${emoji}`,
     { method: "DELETE" },
   );
 }
