@@ -22,7 +22,8 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static"
+      "output": "static",
+      "baseUrl": "/collectables"
     },
     "plugins": [
       "expo-router",
