@@ -4,7 +4,12 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 import { AuthChangeEvent, Session, User } from "@supabase/auth-js";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { deleteCloudinaryImages } from "@/lib/cloudinary";
 import { authClient, isSupabaseConfigured } from "@/lib/supabase";
+import { deleteAccountViaEdgeFunction, fetchAllUserImageUrls } from "@/lib/supabase-profiles";
+import { getAppBaseUrl } from "@/lib/env";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -18,14 +23,15 @@ type AuthContextValue = {
   verifyEmailOtp: (email: string, token: string) => Promise<{ error?: string }>;
   signInWithProvider: (provider: "google" | "apple") => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<{ error?: string }>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const redirectUri = makeRedirectUri({
-  scheme: "collectables",
-  path: "auth/callback",
-});
+const redirectUri =
+  Platform.OS === "web"
+    ? `${getAppBaseUrl()}/auth/callback`
+    : makeRedirectUri({ scheme: "collectables", path: "auth/callback" });
 
 export function AuthProvider({ children }: React.PropsWithChildren) {
   const [ready, setReady] = useState(false);
@@ -82,7 +88,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         try {
           const { error } = await authClient.signInWithOtp({
             email: email.trim(),
-            options: { shouldCreateUser: true },
+            options: { shouldCreateUser: true, emailRedirectTo: redirectUri },
           });
 
           return error ? { error: error.message } : {};
@@ -156,6 +162,37 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         setPending(true);
         try {
           await authClient.signOut();
+        } finally {
+          setPending(false);
+        }
+      },
+      deleteAccount: async () => {
+        if (!authClient || !session?.user) {
+          return { error: "Not signed in" };
+        }
+
+        const userId = session.user.id;
+
+        setPending(true);
+        try {
+          const imageUrls = await fetchAllUserImageUrls(userId);
+          await deleteCloudinaryImages(imageUrls);
+
+          const { error } = await deleteAccountViaEdgeFunction();
+          if (error) {
+            return { error };
+          }
+
+          const keys = await AsyncStorage.getAllKeys();
+          const userKeys = keys.filter(
+            (k) => k.includes(userId) || k.startsWith("collectables-"),
+          );
+          if (userKeys.length > 0) {
+            await AsyncStorage.multiRemove(userKeys);
+          }
+
+          await authClient.signOut();
+          return {};
         } finally {
           setPending(false);
         }

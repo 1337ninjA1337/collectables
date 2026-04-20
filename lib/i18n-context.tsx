@@ -355,6 +355,14 @@ const en = {
   shareWithUsers: "Share with users",
   shareWithUsersHint: "Select any app user to share this collection with them.",
   noUsersToShare: "No other users available to share with.",
+  deleteAccount: "Delete account",
+  deleteAccountSection: "Danger zone",
+  deleteAccountHint: "Permanently delete your account, all collections, items, and uploaded images. This action cannot be undone.",
+  deleteAccountTitle: "Delete your account?",
+  deleteAccountText: "All your data — collections, items, photos, friend connections — will be permanently deleted. This cannot be undone.",
+  deleteAccountConfirm: "Delete my account",
+  deleteAccountDeleting: "Deleting...",
+  deleteAccountFailed: "Could not delete account. Please try again later.",
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -718,6 +726,14 @@ const ru: TranslationMap = {
   shareWithUsers: "Поделиться с пользователями",
   shareWithUsersHint: "Выберите любого пользователя приложения, чтобы поделиться с ним этой коллекцией.",
   noUsersToShare: "Нет других пользователей для обмена.",
+  deleteAccount: "Удалить аккаунт",
+  deleteAccountSection: "Опасная зона",
+  deleteAccountHint: "Безвозвратно удалить аккаунт, все коллекции, предметы и загруженные фотографии. Это действие нельзя отменить.",
+  deleteAccountTitle: "Удалить аккаунт?",
+  deleteAccountText: "Все ваши данные — коллекции, предметы, фотографии, связи с друзьями — будут удалены навсегда. Это действие нельзя отменить.",
+  deleteAccountConfirm: "Удалить мой аккаунт",
+  deleteAccountDeleting: "Удаление...",
+  deleteAccountFailed: "Не удалось удалить аккаунт. Попробуйте позже.",
 };
 
 const be: TranslationMap = {
@@ -783,6 +799,14 @@ const be: TranslationMap = {
   languageSubtitle: "Абярыце мову інтэрфейсу праграмы.",
   goHome: "Галоўная",
   you: "Вы",
+  deleteAccount: "Выдаліць акаўнт",
+  deleteAccountSection: "Небяспечная зона",
+  deleteAccountHint: "Незваротна выдаліць акаўнт, усе калекцыі, прадметы і загружаныя фатаграфіі. Гэта дзеянне нельга адмяніць.",
+  deleteAccountTitle: "Выдаліць акаўнт?",
+  deleteAccountText: "Усе вашы даныя — калекцыі, прадметы, фатаграфіі, сувязі з сябрамі — будуць выдалены назаўсёды. Гэта дзеянне нельга адмяніць.",
+  deleteAccountConfirm: "Выдаліць мой акаўнт",
+  deleteAccountDeleting: "Выдаленне...",
+  deleteAccountFailed: "Не ўдалося выдаліць акаўнт. Паспрабуйце пазней.",
 };
 
 const pl: TranslationMap = {
@@ -838,6 +862,14 @@ const pl: TranslationMap = {
   languageSubtitle: "Wybierz język interfejsu aplikacji.",
   goHome: "Główna",
   you: "Ty",
+  deleteAccount: "Usuń konto",
+  deleteAccountSection: "Strefa zagrożenia",
+  deleteAccountHint: "Trwale usuń konto, wszystkie kolekcje, przedmioty i przesłane zdjęcia. Tej operacji nie można cofnąć.",
+  deleteAccountTitle: "Usunąć konto?",
+  deleteAccountText: "Wszystkie Twoje dane — kolekcje, przedmioty, zdjęcia, znajomości — zostaną trwale usunięte. Tej operacji nie można cofnąć.",
+  deleteAccountConfirm: "Usuń moje konto",
+  deleteAccountDeleting: "Usuwanie...",
+  deleteAccountFailed: "Nie udało się usunąć konta. Spróbuj ponownie później.",
 };
 
 const de: TranslationMap = {
@@ -889,6 +921,14 @@ const de: TranslationMap = {
   languageSubtitle: "Wählen Sie die Sprache der App-Oberfläche.",
   goHome: "Startseite",
   you: "Sie",
+  deleteAccount: "Konto löschen",
+  deleteAccountSection: "Gefahrenzone",
+  deleteAccountHint: "Konto, alle Sammlungen, Gegenstände und hochgeladene Bilder dauerhaft löschen. Diese Aktion kann nicht rückgängig gemacht werden.",
+  deleteAccountTitle: "Konto löschen?",
+  deleteAccountText: "Alle Ihre Daten — Sammlungen, Gegenstände, Fotos, Freundschaftsverbindungen — werden dauerhaft gelöscht. Dies kann nicht rückgängig gemacht werden.",
+  deleteAccountConfirm: "Mein Konto löschen",
+  deleteAccountDeleting: "Wird gelöscht...",
+  deleteAccountFailed: "Konto konnte nicht gelöscht werden. Bitte versuchen Sie es später erneut.",
 };
 
 const es: TranslationMap = {
@@ -940,6 +980,14 @@ const es: TranslationMap = {
   languageSubtitle: "Elige el idioma de la interfaz de la app.",
   goHome: "Inicio",
   you: "Tú",
+  deleteAccount: "Eliminar cuenta",
+  deleteAccountSection: "Zona de peligro",
+  deleteAccountHint: "Eliminar permanentemente la cuenta, todas las colecciones, objetos y fotos subidas. Esta acción no se puede deshacer.",
+  deleteAccountTitle: "¿Eliminar tu cuenta?",
+  deleteAccountText: "Todos tus datos — colecciones, objetos, fotos, conexiones de amistad — serán eliminados permanentemente. Esto no se puede deshacer.",
+  deleteAccountConfirm: "Eliminar mi cuenta",
+  deleteAccountDeleting: "Eliminando...",
+  deleteAccountFailed: "No se pudo eliminar la cuenta. Inténtalo de nuevo más tarde.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };

@@ -1,5 +1,6 @@
-import { Stack } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Stack, router } from "expo-router";
+import { useState } from "react";
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
@@ -7,7 +8,48 @@ import { AppLanguage, useI18n } from "@/lib/i18n-context";
 
 export default function SettingsScreen() {
   const { t, language, setLanguage, languageOptions } = useI18n();
-  const { signOut, pending } = useAuth();
+  const { signOut, deleteAccount, pending } = useAuth();
+  const [deleting, setDeleting] = useState(false);
+
+  function handleDeleteAccount() {
+    const title = t("deleteAccountTitle");
+    const message = t("deleteAccountText");
+
+    if (Platform.OS === "web") {
+      const confirmed = globalThis.confirm?.(`${title}\n\n${message}`) ?? false;
+      if (confirmed) {
+        void performDelete();
+      }
+      return;
+    }
+
+    Alert.alert(title, message, [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("deleteAccountConfirm"),
+        style: "destructive",
+        onPress: () => void performDelete(),
+      },
+    ]);
+  }
+
+  async function performDelete() {
+    setDeleting(true);
+    try {
+      const { error } = await deleteAccount();
+      if (error) {
+        if (Platform.OS === "web") {
+          globalThis.alert?.(t("deleteAccountFailed"));
+        } else {
+          Alert.alert(t("deleteAccountFailed"));
+        }
+      } else {
+        router.replace("/");
+      }
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <Screen>
@@ -43,6 +85,20 @@ export default function SettingsScreen() {
       >
         <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
       </Pressable>
+
+      <View style={styles.dangerZone}>
+        <Text style={styles.dangerTitle}>{t("deleteAccountSection")}</Text>
+        <Text style={styles.dangerText}>{t("deleteAccountHint")}</Text>
+        <Pressable
+          style={{...styles.deleteButton, ...((pending || deleting) ? styles.deleteButtonDisabled : {})}}
+          onPress={handleDeleteAccount}
+          disabled={pending || deleting}
+        >
+          <Text style={styles.deleteButtonText}>
+            {deleting ? t("deleteAccountDeleting") : t("deleteAccount")}
+          </Text>
+        </Pressable>
+      </View>
     </Screen>
   );
 }
@@ -122,6 +178,38 @@ const styles = StyleSheet.create({
   },
   signOutButtonText: {
     color: "#8d2b2b",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  dangerZone: {
+    borderRadius: 24,
+    backgroundColor: "#fff5f5",
+    borderWidth: 1,
+    borderColor: "#e8b4b4",
+    padding: 18,
+    gap: 12,
+  },
+  dangerTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#7a2020",
+  },
+  dangerText: {
+    color: "#8d4444",
+    lineHeight: 22,
+  },
+  deleteButton: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    backgroundColor: "#922a2a",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  deleteButtonDisabled: {
+    opacity: 0.6,
+  },
+  deleteButtonText: {
+    color: "#fff4e8",
     fontSize: 15,
     fontWeight: "800",
   },

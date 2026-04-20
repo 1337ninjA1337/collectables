@@ -485,3 +485,65 @@ export async function removeReaction(
     { method: "DELETE" },
   );
 }
+
+export async function fetchAllUserImageUrls(userId: string): Promise<string[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const urls: string[] = [];
+
+  const colRes = await supabaseRest(`/collections?owner_user_id=eq.${userId}&select=cover_photo`);
+  const cols: { cover_photo: string }[] = await colRes.json();
+  for (const c of cols) {
+    if (c.cover_photo) urls.push(c.cover_photo);
+  }
+
+  const itemRes = await supabaseRest(`/items?created_by_user_id=eq.${userId}&select=photos`);
+  const items: { photos: string[] }[] = await itemRes.json();
+  for (const item of items) {
+    if (item.photos) urls.push(...item.photos);
+  }
+
+  const profileRes = await supabaseRest(`/profiles?id=eq.${userId}&select=avatar`);
+  const profiles: { avatar: string }[] = await profileRes.json();
+  for (const p of profiles) {
+    if (p.avatar) urls.push(p.avatar);
+  }
+
+  return urls.filter((u) => u.includes("cloudinary"));
+}
+
+export async function deleteAllUserData(userId: string): Promise<void> {
+  if (!isSupabaseConfigured) return;
+
+  await supabaseRest(`/reactions?user_id=eq.${userId}`, { method: "DELETE" });
+  await supabaseRest(`/items?created_by_user_id=eq.${userId}`, { method: "DELETE" });
+  await supabaseRest(`/collection_follows?user_id=eq.${userId}`, { method: "DELETE" });
+  await supabaseRest(`/collections?owner_user_id=eq.${userId}`, { method: "DELETE" });
+  await supabaseRest(
+    `/friend_requests?or=(from_user_id.eq.${userId},to_user_id.eq.${userId})`,
+    { method: "DELETE" },
+  );
+  await supabaseRest(`/profiles?id=eq.${userId}`, { method: "DELETE" });
+}
+
+export async function deleteAccountViaEdgeFunction(): Promise<{ error?: string }> {
+  if (!isSupabaseConfigured) return { error: "Not configured" };
+
+  const token = await getAccessToken();
+  if (!token) return { error: "No session" };
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/delete-account`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ error: "Unknown error" }));
+    return { error: data.error ?? "Deletion failed" };
+  }
+
+  return {};
+}
