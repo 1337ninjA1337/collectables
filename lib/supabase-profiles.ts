@@ -536,6 +536,7 @@ export async function deleteAccountViaEdgeFunction(): Promise<{ error?: string }
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
+      apikey: supabaseKey,
       "Content-Type": "application/json",
     },
   });
