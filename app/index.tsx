@@ -43,6 +43,7 @@ export default function HomeScreen() {
   const { t } = useI18n();
   const { friends, following, getMyProfile } = useSocial();
   const [collectionsTab, setCollectionsTab] = useState<CollectionsTab>("mine");
+  const { isMobile } = useResponsive();
 
   const recentItems = useMemo(() => {
     const ownedIds = new Set(
@@ -71,7 +72,6 @@ export default function HomeScreen() {
     collection.role === "viewer" && (friends.includes(collection.ownerUserId) || sharedWithMeIds.has(collection.id))
   );
   const myProfile = getMyProfile();
-  const { isMobile } = useResponsive();
   const isPhone = isMobile;
 
   const renderOwnedCollection = ({ item: collection, drag, isActive }: RenderItemParams<Collection>) => (
