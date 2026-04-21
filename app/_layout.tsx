@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, router, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { BottomNav } from "@/components/bottom-nav";
@@ -16,7 +16,7 @@ import { I18nProvider, useI18n } from "@/lib/i18n-context";
 import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-context";
 import { SocialProvider } from "@/lib/social-context";
 import { ToastProvider } from "@/lib/toast-context";
-import { Screen } from "@/components/screen";
+import { Screen, useResponsive } from "@/components/screen";
 
 export default function RootLayout() {
   return (
@@ -41,6 +41,7 @@ function AppShell() {
   const { ready: i18nReady, t } = useI18n();
   const { animation } = useNavAnimation();
   const pathname = usePathname();
+  const { isMobile } = useResponsive();
   const [searchOpen, setSearchOpen] = useState(false);
 
   if (!ready || !i18nReady) {
@@ -73,7 +74,7 @@ function AppShell() {
     );
   }
 
-  const isNative = Platform.OS !== "web";
+  const showMobileNav = isMobile;
 
   return (
     <GestureHandlerRootView style={styles.shell}>
@@ -83,7 +84,7 @@ function AppShell() {
         <Stack
           screenOptions={{
             animation,
-            headerBackVisible: !isNative,
+            headerBackVisible: !showMobileNav,
             headerShadowVisible: false,
             headerStyle: {
               backgroundColor: "#fff7ef",
@@ -96,7 +97,7 @@ function AppShell() {
               fontWeight: "700",
             },
             headerRight: () =>
-              isNative ? null : (
+              showMobileNav ? null : (
                 <View style={styles.headerRightRow}>
                   {pathname !== "/settings" && pathname !== "/" ? (
                     <Pressable style={styles.headerButton} onPress={() => router.push("/settings")}>

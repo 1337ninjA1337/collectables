@@ -1,12 +1,12 @@
 import { Link, router } from "expo-router";
 import { Stack } from "expo-router";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NestableDraggableFlatList, ScaleDecorator, RenderItemParams } from "../components/DraggableList";
 
 import { CollectionCard } from "@/components/collection-card";
 import { EmptyState } from "@/components/empty-state";
-import { Screen } from "@/components/screen";
+import { Screen, useResponsive } from "@/components/screen";
 import { SwipeTabs } from "@/components/swipe-tabs";
 import { useAuth } from "@/lib/auth-context";
 import { useCollections } from "@/lib/collections-context";
@@ -71,7 +71,8 @@ export default function HomeScreen() {
     collection.role === "viewer" && (friends.includes(collection.ownerUserId) || sharedWithMeIds.has(collection.id))
   );
   const myProfile = getMyProfile();
-  const isPhone = Platform.OS !== "web";
+  const { isMobile } = useResponsive();
+  const isPhone = isMobile;
 
   const renderOwnedCollection = ({ item: collection, drag, isActive }: RenderItemParams<Collection>) => (
     <ScaleDecorator>

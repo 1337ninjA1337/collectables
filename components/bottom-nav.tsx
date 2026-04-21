@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
 import { useState } from "react";
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useResponsive } from "@/components/screen";
 import { useI18n } from "@/lib/i18n-context";
 import { useNavAnimation } from "@/lib/nav-animation-context";
 import { useSocial } from "@/lib/social-context";
@@ -31,7 +32,8 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const { setAnimation } = useNavAnimation();
   const [createOpen, setCreateOpen] = useState(false);
 
-  if (Platform.OS === "web") return null;
+  const { isMobile } = useResponsive();
+  if (!isMobile) return null;
 
   const myProfile = getMyProfile();
   const onHome = pathname === "/";

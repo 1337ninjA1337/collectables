@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 export type NavAnimation = "slide_from_right" | "slide_from_left" | "default";
 
@@ -16,8 +16,10 @@ export function NavAnimationProvider({ children }: React.PropsWithChildren) {
     setAnimationState(anim);
   }, []);
 
+  const value = useMemo(() => ({ animation, setAnimation }), [animation, setAnimation]);
+
   return (
-    <NavAnimationContext.Provider value={{ animation, setAnimation }}>
+    <NavAnimationContext.Provider value={value}>
       {children}
     </NavAnimationContext.Provider>
   );
