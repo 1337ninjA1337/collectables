@@ -18,6 +18,7 @@ import {
   followCollectionRemote,
   unfollowCollectionRemote,
   fetchCollectionsSharedWithUser,
+  fetchWishlistItemsByUserId,
 } from "@/lib/supabase-profiles";
 import { Collection, CollectableItem, ItemCondition, ItemTag } from "@/lib/types";
 
@@ -121,11 +122,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
 
     async function hydrate() {
       try {
-        const [rawCollections, rawItems, rawFollowed, remoteFollowedIds] = await Promise.all([
+        const [rawCollections, rawItems, rawFollowed, remoteFollowedIds, remoteWishlist] = await Promise.all([
           AsyncStorage.getItem(`${COLLECTIONS_STORAGE_KEY}-${activeUser.id}`),
           AsyncStorage.getItem(`${ITEMS_STORAGE_KEY}-${activeUser.id}`),
           AsyncStorage.getItem(`${FOLLOWED_COLLECTIONS_STORAGE_KEY}-${activeUser.id}`),
           fetchFollowedCollectionIds(activeUser.id),
+          fetchWishlistItemsByUserId(activeUser.id),
         ]);
 
         if (!active) {
@@ -139,7 +141,15 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         );
         const visibleCollectionIds = new Set(visibleCollections.map((collection) => collection.id));
         const parsedItems = rawItems ? (JSON.parse(rawItems) as CollectableItem[]) : seedItems;
-        const visibleItems = parsedItems.filter((item) => visibleCollectionIds.has(item.collectionId));
+        const visibleItems = parsedItems.filter((item) => visibleCollectionIds.has(item.collectionId) || item.isWishlist);
+
+        const seenIds = new Set(visibleItems.map((i) => i.id));
+        for (const wi of remoteWishlist) {
+          if (!seenIds.has(wi.id)) {
+            visibleItems.push(wi);
+            seenIds.add(wi.id);
+          }
+        }
 
         setLocalCollections(visibleCollections);
         setLocalItems(visibleItems);
