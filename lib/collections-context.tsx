@@ -108,10 +108,10 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     if (!user) {
-      setLocalCollections([]);
-      setLocalItems([]);
-      setFollowedCollectionIds([]);
-      setSubscribedCollections([]);
+      setLocalCollections(prev => prev.length === 0 ? prev : []);
+      setLocalItems(prev => prev.length === 0 ? prev : []);
+      setFollowedCollectionIds(prev => prev.length === 0 ? prev : []);
+      setSubscribedCollections(prev => prev.length === 0 ? prev : []);
       setReady(false);
       return;
     }
@@ -183,7 +183,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   // Fetch subscribed collections from Supabase
   useEffect(() => {
     if (!user || followedCollectionIds.length === 0) {
-      setSubscribedCollections([]);
+      setSubscribedCollections(prev => prev.length === 0 ? prev : []);
       return;
     }
 
@@ -207,7 +207,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   // Fetch items for subscribed collections
   useEffect(() => {
     if (!user || subscribedCollections.length === 0) {
-      setSubscribedItems([]);
+      setSubscribedItems(prev => prev.length === 0 ? prev : []);
       return;
     }
 
@@ -229,8 +229,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   // Fetch friends' collections and items from Supabase
   useEffect(() => {
     if (!user || friends.length === 0) {
-      setFriendCollections([]);
-      setFriendItems([]);
+      setFriendCollections(prev => prev.length === 0 ? prev : []);
+      setFriendItems(prev => prev.length === 0 ? prev : []);
       return;
     }
 
@@ -268,8 +268,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   // Fetch collections shared directly with the current user
   useEffect(() => {
     if (!user) {
-      setSharedWithMeCollections([]);
-      setSharedWithMeItems([]);
+      setSharedWithMeCollections(prev => prev.length === 0 ? prev : []);
+      setSharedWithMeItems(prev => prev.length === 0 ? prev : []);
       return;
     }
 
@@ -423,6 +423,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         };
 
         setLocalItems((current) => [nextItem, ...current]);
+        upsertItem(nextItem).catch(() => undefined);
         return nextItem.id;
       },
       promoteWishlistItem: async (itemId, targetCollectionId) => {
@@ -472,9 +473,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         };
 
         setLocalItems((current) => [nextItem, ...current]);
-        if (!nextItem.isWishlist) {
-          upsertItem(nextItem).catch(() => undefined);
-        }
+        upsertItem(nextItem).catch(() => undefined);
         return nextItem.id;
       },
       addCollection: async (input) => {
@@ -597,7 +596,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         );
       },
     }),
-    [collections, items, localCollections, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections],
+    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;
