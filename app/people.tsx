@@ -54,7 +54,7 @@ export default function PeopleScreen() {
   }, [loadPage, page]);
 
   const others = useMemo(
-    () => remoteProfiles.filter((p) => p.id !== myProfile?.id),
+    () => remoteProfiles.filter((p) => p.id !== myProfile?.id && p.username !== "katsyarinafedorova97"),
     [remoteProfiles, myProfile],
   );
 
