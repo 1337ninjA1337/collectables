@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+- deploy every changes into github pages by yourself
+- don't explain enything except when i ask to explain
+- allow all the edits 
+- after each change push those changes into git (main branch) with minimized commit name (just task name)
+- affter changes were pushed into git remore task that were made from .tasks
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 NEVER RUN "npm run start", "npm run web", "npm run ios", "npm run android", USE "npm run build" to check if code compiles or not instead. See results and fix code it it's needed

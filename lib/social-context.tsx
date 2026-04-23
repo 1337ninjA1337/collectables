@@ -138,10 +138,10 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     if (!user) {
-      setFollowing([]);
-      setMyProfileOverride(null);
-      setFriendRequests([]);
-      setDeletedProfileIds([]);
+      setFollowing(prev => prev.length === 0 ? prev : []);
+      setMyProfileOverride(prev => prev === null ? prev : null);
+      setFriendRequests(prev => prev.length === 0 ? prev : []);
+      setDeletedProfileIds(prev => prev.length === 0 ? prev : []);
       setReady(false);
       return;
     }
@@ -292,7 +292,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     if (friends.length === 0) {
-      setRemoteProfiles([]);
+      setRemoteProfiles(prev => prev.length === 0 ? prev : []);
       return;
     }
 

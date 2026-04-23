@@ -43,9 +43,6 @@ expo-web.out.log
 .vscode/
 .claude/
 
-# Tasks
-.tasks/
-.todo
 
 # Docs
 .docs/
