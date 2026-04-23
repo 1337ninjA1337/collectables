@@ -262,26 +262,29 @@ function toItem(row: DbItem): CollectableItem {
 export async function upsertItem(item: CollectableItem): Promise<void> {
   if (!isSupabaseConfigured) return;
 
+  const body: Record<string, unknown> = {
+    id: item.id,
+    title: item.title,
+    acquired_from: item.acquiredFrom || "",
+    description: item.description || "",
+    variants: item.variants || "",
+    photos: item.photos ?? [],
+    created_by: item.createdBy,
+    created_by_user_id: item.createdByUserId,
+    created_at: item.createdAt,
+    cost: item.cost ?? null,
+    sort_order: item.sortOrder ?? null,
+    is_wishlist: item.isWishlist ?? false,
+    condition: item.condition ?? null,
+    tags: item.tags ?? null,
+  };
+
+  if (item.collectionId) body.collection_id = item.collectionId;
+  if (item.acquiredAt) body.acquired_at = item.acquiredAt;
+
   await supabaseRest("/items", {
     method: "POST",
-    body: JSON.stringify({
-      id: item.id,
-      collection_id: item.collectionId || null,
-      title: item.title,
-      acquired_at: item.acquiredAt,
-      acquired_from: item.acquiredFrom,
-      description: item.description,
-      variants: item.variants,
-      photos: item.photos,
-      created_by: item.createdBy,
-      created_by_user_id: item.createdByUserId,
-      created_at: item.createdAt,
-      cost: item.cost ?? null,
-      sort_order: item.sortOrder ?? null,
-      is_wishlist: item.isWishlist ?? false,
-      condition: item.condition ?? null,
-      tags: item.tags ?? null,
-    }),
+    body: JSON.stringify(body),
   });
 }
 
