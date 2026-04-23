@@ -9,8 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "build": "npx expo export --platform web",
-    "deploy": "cross-env EXPO_PUBLIC_APP_URL=https://1337ninja1337.github.io/collectables npx expo export --platform web && touch dist/.nojekyll && echo > dist/.gitignore && npx gh-pages -d dist --dotfiles"
+    "build": "npx expo export --platform web && cp dist/index.html dist/404.html",
+    "deploy": "cross-env EXPO_PUBLIC_APP_URL=https://1337ninja1337.github.io/collectables npx expo export --platform web && cp dist/index.html dist/404.html && touch dist/.nojekyll && echo > dist/.gitignore && npx gh-pages -d dist --dotfiles"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
