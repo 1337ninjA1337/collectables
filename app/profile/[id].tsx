@@ -14,7 +14,8 @@ import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
-import { fetchProfileById, fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId } from "@/lib/supabase-profiles";
+import { fetchProfileById, fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
+import { placeholderColor } from "@/lib/placeholder-color";
 import { CollectableItem, Collection, UserProfile } from "@/lib/types";
 
 const DEFAULT_EN_PROFILE_BIO = "I collect things worth saving beautifully and sharing with friends.";
@@ -34,8 +35,9 @@ export default function ProfileScreen() {
     updateMyProfile,
     deleteProfile,
     isAdmin,
+    friends,
   } = useSocial();
-  const { collections, getItemsForCollection, getCollectionTotalCost, deleteUserContent } = useCollections();
+  const { collections, getItemsForCollection, getCollectionTotalCost, deleteUserContent, wishlistItems } = useCollections();
   const localProfile = getProfileById(params.id);
   const myProfile = getMyProfile();
   const [remoteProfile, setRemoteProfile] = useState<UserProfile | null>(null);
@@ -45,9 +47,11 @@ export default function ProfileScreen() {
   const [editingHandle, setEditingHandle] = useState(false);
   const [remoteCollections, setRemoteCollections] = useState<Collection[]>([]);
   const [remoteItemCounts, setRemoteItemCounts] = useState<Record<string, number>>({});
+  const [remoteWishlist, setRemoteWishlist] = useState<CollectableItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const isSelf = myProfile?.id === params.id;
+  const isFriend = friends.includes(params.id);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,11 +69,16 @@ export default function ProfileScreen() {
         ? fetchCollectionsByUserId(params.id)
         : fetchPublicCollectionsByUserId(params.id);
 
-      Promise.all([profilePromise, collectionsPromise])
-        .then(([p, cols]) => {
+      const wishlistPromise = (isSelf || isFriend)
+        ? fetchWishlistItemsByUserId(params.id)
+        : Promise.resolve([]);
+
+      Promise.all([profilePromise, collectionsPromise, wishlistPromise])
+        .then(([p, cols, wish]) => {
           if (!active) return;
           if (needsProfileFetch) setRemoteProfile(p);
           setRemoteCollections(cols);
+          setRemoteWishlist(wish);
           return loadItemCounts(cols, () => active);
         })
         .catch(() => {})
@@ -80,7 +89,7 @@ export default function ProfileScreen() {
       return () => {
         active = false;
       };
-    }, [localProfile, params.id, isSelf]),
+    }, [localProfile, params.id, isSelf, isFriend]),
   );
 
   async function loadItemCounts(cols: Collection[], isActive: () => boolean = () => true) {
@@ -97,15 +106,17 @@ export default function ProfileScreen() {
     if (!params.id || params.id === "[id]") return;
     setRefreshing(true);
     try {
-      const [p, cols] = await Promise.all([
+      const [p, cols, wish] = await Promise.all([
         fetchProfileById(params.id),
         isSelf ? fetchCollectionsByUserId(params.id) : fetchPublicCollectionsByUserId(params.id),
+        (isSelf || isFriend) ? fetchWishlistItemsByUserId(params.id) : Promise.resolve([]),
       ]);
       if (p) setRemoteProfile(p);
       setRemoteCollections(cols);
+      setRemoteWishlist(wish);
       await loadItemCounts(cols);
     } catch {} finally { setRefreshing(false); }
-  }, [params.id, isSelf]);
+  }, [params.id, isSelf, isFriend]);
 
   const profile = localProfile ?? remoteProfile;
   const activeProfile = profile;
@@ -115,6 +126,7 @@ export default function ProfileScreen() {
     : [];
   // Use remote collections if no local ones found (other user's profile)
   const profileCollections = localProfileCollections.length > 0 ? localProfileCollections : remoteCollections;
+  const visibleWishlist = isSelf ? wishlistItems : remoteWishlist;
   const localizedBio = activeProfile
     ? (activeProfile.bio === DEFAULT_EN_PROFILE_BIO ? t("defaultProfileBio") : activeProfile.bio)
     : "";
@@ -389,6 +401,37 @@ export default function ProfileScreen() {
           />
         )}
       </View>
+
+      {(isSelf || isFriend) && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t("profileWishlist")}</Text>
+          {visibleWishlist.length > 0 ? (
+            visibleWishlist.map((item) => (
+              <Link key={item.id} href={`/item/${item.id}`} asChild>
+                <Pressable style={styles.wishlistCard}>
+                  {item.photos?.[0] ? (
+                    <Image source={{ uri: item.photos[0] }} style={styles.wishlistThumb} />
+                  ) : (
+                    <View style={[styles.wishlistThumb, { backgroundColor: placeholderColor(item.id) }]} />
+                  )}
+                  <View style={styles.wishlistInfo}>
+                    <Text style={styles.wishlistName} numberOfLines={1}>{item.title}</Text>
+                    {item.description ? (
+                      <Text style={styles.wishlistDesc} numberOfLines={2}>{item.description}</Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              </Link>
+            ))
+          ) : (
+            <EmptyState
+              icon="🎁"
+              title={t("emptyProfileWishlistTitle")}
+              hint={t("emptyProfileWishlistHint")}
+            />
+          )}
+        </View>
+      )}
     </Screen>
   );
 }
@@ -581,5 +624,34 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     color: "#2d2117",
+  },
+  wishlistCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 16,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+    padding: 12,
+  },
+  wishlistThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+  },
+  wishlistInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  wishlistName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#2f2318",
+  },
+  wishlistDesc: {
+    fontSize: 13,
+    color: "#6b5647",
+    lineHeight: 18,
   },
 });
