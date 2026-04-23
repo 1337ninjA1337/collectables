@@ -202,7 +202,7 @@ export async function fetchCollectionById(id: string): Promise<Collection | null
 export async function fetchCollectionsByUserId(userId: string): Promise<Collection[]> {
   if (!isSupabaseConfigured) return [];
 
-  const res = await supabaseRest(`/collections?owner_user_id=eq.${userId}&select=*&order=created_at.desc`);
+  const res = await supabaseRest(`/collections?owner_user_id=eq.${userId}&name=neq.__wishlist__&select=*&order=created_at.desc`);
   const rows: DbCollection[] = await res.json();
   return rows.map(toCollection);
 }
@@ -211,7 +211,7 @@ export async function fetchCollectionsByUserId(userId: string): Promise<Collecti
 export async function fetchPublicCollectionsByUserId(userId: string): Promise<Collection[]> {
   if (!isSupabaseConfigured) return [];
 
-  const res = await supabaseRest(`/collections?owner_user_id=eq.${userId}&visibility=eq.public&select=*&order=created_at.desc`);
+  const res = await supabaseRest(`/collections?owner_user_id=eq.${userId}&visibility=eq.public&name=neq.__wishlist__&select=*&order=created_at.desc`);
   const rows: DbCollection[] = await res.json();
   return rows.map(toCollection);
 }
@@ -258,33 +258,67 @@ function toItem(row: DbItem): CollectableItem {
   };
 }
 
+const wishlistCollectionCache = new Map<string, string>();
+
+async function ensureWishlistCollection(userId: string, ownerName: string): Promise<string> {
+  const cached = wishlistCollectionCache.get(userId);
+  if (cached) return cached;
+
+  const wishlistId = `wishlist-${userId}`;
+
+  const res = await supabaseRest(`/collections?id=eq.${encodeURIComponent(wishlistId)}&select=id`);
+  const rows: { id: string }[] = await res.json();
+
+  if (rows.length === 0) {
+    await supabaseRest("/collections", {
+      method: "POST",
+      body: JSON.stringify({
+        id: wishlistId,
+        name: "__wishlist__",
+        cover_photo: "",
+        description: "",
+        owner_name: ownerName,
+        owner_user_id: userId,
+        sort_order: null,
+        visibility: "private",
+        shared_with_user_ids: [],
+      }),
+    });
+  }
+
+  wishlistCollectionCache.set(userId, wishlistId);
+  return wishlistId;
+}
+
 /** Upsert an item to Supabase. */
 export async function upsertItem(item: CollectableItem): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  const body: Record<string, unknown> = {
-    id: item.id,
-    title: item.title,
-    acquired_from: item.acquiredFrom || "",
-    description: item.description || "",
-    variants: item.variants || "",
-    photos: item.photos ?? [],
-    created_by: item.createdBy,
-    created_by_user_id: item.createdByUserId,
-    created_at: item.createdAt,
-    cost: item.cost ?? null,
-    sort_order: item.sortOrder ?? null,
-    is_wishlist: item.isWishlist ?? false,
-    condition: item.condition ?? null,
-    tags: item.tags ?? null,
-  };
-
-  if (item.collectionId) body.collection_id = item.collectionId;
-  if (item.acquiredAt) body.acquired_at = item.acquiredAt;
+  let collectionId = item.collectionId;
+  if (!collectionId && item.isWishlist && item.createdByUserId) {
+    collectionId = await ensureWishlistCollection(item.createdByUserId, item.createdBy);
+  }
 
   await supabaseRest("/items", {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      id: item.id,
+      collection_id: collectionId,
+      title: item.title,
+      acquired_at: item.acquiredAt || null,
+      acquired_from: item.acquiredFrom || "",
+      description: item.description || "",
+      variants: item.variants || "",
+      photos: item.photos ?? [],
+      created_by: item.createdBy,
+      created_by_user_id: item.createdByUserId,
+      created_at: item.createdAt,
+      cost: item.cost ?? null,
+      sort_order: item.sortOrder ?? null,
+      is_wishlist: item.isWishlist ?? false,
+      condition: item.condition ?? null,
+      tags: item.tags ?? null,
+    }),
   });
 }
 
