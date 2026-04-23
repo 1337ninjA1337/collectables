@@ -439,12 +439,11 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
             };
           }),
         );
-        upsertItem({
-          id: itemId,
+        updateRemoteItem(itemId, {
           collectionId: targetCollectionId,
           isWishlist: false,
           acquiredAt: acquiredAt,
-        } as CollectableItem).catch(() => undefined);
+        }).catch(() => undefined);
       },
       addItem: async (input) => {
         const slug =

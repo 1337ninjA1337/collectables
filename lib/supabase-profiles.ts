@@ -333,7 +333,7 @@ export async function updateRemoteItem(id: string, updates: Partial<CollectableI
   if ("variants" in updates) body.variants = updates.variants;
   if ("photos" in updates) body.photos = updates.photos;
   if ("cost" in updates) body.cost = updates.cost ?? null;
-  if ("collectionId" in updates) body.collection_id = updates.collectionId || null;
+  if ("collectionId" in updates && updates.collectionId) body.collection_id = updates.collectionId;
   if ("sortOrder" in updates) body.sort_order = updates.sortOrder ?? null;
   if ("isWishlist" in updates) body.is_wishlist = updates.isWishlist;
   if ("condition" in updates) body.condition = updates.condition ?? null;
