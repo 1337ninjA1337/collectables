@@ -4,6 +4,8 @@ import { CollectableItem, Collection, CollectionVisibility, Reaction, ReactionEm
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
+const HIDDEN_USERNAMES = ["katsyarinafedorova97"];
+
 type DbProfile = {
   id: string;
   email: string;
@@ -13,6 +15,10 @@ type DbProfile = {
   bio: string;
   avatar: string;
 };
+
+function isHiddenProfile(row: DbProfile): boolean {
+  return HIDDEN_USERNAMES.includes(row.username.toLowerCase());
+}
 
 function toUserProfile(row: DbProfile): UserProfile {
   return {
@@ -75,7 +81,8 @@ export async function fetchProfileById(id: string): Promise<UserProfile | null> 
 
   const res = await supabaseRest(`/profiles?id=eq.${id}&select=*`);
   const rows: DbProfile[] = await res.json();
-  return rows.length > 0 ? toUserProfile(rows[0]) : null;
+  if (rows.length === 0 || isHiddenProfile(rows[0])) return null;
+  return toUserProfile(rows[0]);
 }
 
 /** Fetch a page of profiles. Returns { data, totalCount }. */
@@ -100,8 +107,9 @@ export async function fetchProfiles(
 
   const totalCount = parseInt(res.headers.get("content-range")?.split("/")?.[1] ?? "0", 10);
   const rows: DbProfile[] = await res.json();
+  const filtered = rows.filter((r) => !isHiddenProfile(r));
 
-  return { data: rows.map(toUserProfile), totalCount };
+  return { data: filtered.map(toUserProfile), totalCount: totalCount - (rows.length - filtered.length) };
 }
 
 // --- Collections ---
@@ -330,6 +338,18 @@ export async function fetchItemsByCollectionId(collectionId: string): Promise<Co
   if (!isSupabaseConfigured) return [];
 
   const res = await supabaseRest(`/items?collection_id=eq.${collectionId}&select=*&order=created_at.desc`);
+  const rows: DbItem[] = await res.json();
+  return rows.map(toItem);
+}
+
+/** Fetch wishlist items for a specific user. */
+export async function fetchWishlistItemsByUserId(userId: string): Promise<CollectableItem[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const res = await supabaseRest(
+    `/items?created_by_user_id=eq.${userId}&is_wishlist=eq.true&select=*&order=created_at.desc`,
+  );
+  if (!res.ok) return [];
   const rows: DbItem[] = await res.json();
   return rows.map(toItem);
 }

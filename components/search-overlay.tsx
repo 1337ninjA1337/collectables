@@ -90,9 +90,8 @@ export function SearchOverlay({ visible, onClose }: Props) {
     return profiles
       .filter(
         (p) =>
-          p.username !== "katsyarinafedorova97" &&
-          (p.username.toLowerCase().includes(needle) ||
-          p.displayName.toLowerCase().includes(needle)),
+          p.username.toLowerCase().includes(needle) ||
+          p.displayName.toLowerCase().includes(needle),
       )
       .slice(0, 20);
   }, [profiles, q, filter]);
