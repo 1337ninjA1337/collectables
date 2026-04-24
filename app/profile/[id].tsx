@@ -138,7 +138,7 @@ export default function ProfileScreen() {
     }
   }, [activeProfile?.bio, activeProfile?.username, t]);
 
-  if (loadingRemote && !profile) {
+  if (loadingRemote && !activeProfile) {
     return (
       <Screen>
         <SkeletonProfile />
@@ -146,7 +146,7 @@ export default function ProfileScreen() {
     );
   }
 
-  if (!profile) {
+  if (!activeProfile) {
     return (
       <Screen>
         <Text style={styles.emptyTitle}>{t("profileNotFound")}</Text>
@@ -216,6 +216,7 @@ export default function ProfileScreen() {
   }
 
   async function handleSaveProfileId() {
+    if (!activeProfile) return;
     await updateMyProfile({
       username: profileIdDraft.trim() || activeProfile.username,
     });
@@ -223,13 +224,14 @@ export default function ProfileScreen() {
   }
 
   async function performAdminDelete() {
+    if (!activeProfile) return;
     await deleteUserContent(activeProfile.id);
     await deleteProfile(activeProfile.id);
     router.replace("/people");
   }
 
   function handleAdminDelete() {
-    if (!isAdmin || relationship === "self") {
+    if (!activeProfile || !isAdmin || relationship === "self") {
       return;
     }
 
