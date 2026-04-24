@@ -1,13 +1,14 @@
 import { Platform } from "react-native";
 
-const configuredUrl = (process.env.EXPO_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
+import { normalizeConfiguredUrl, resolveAppBaseUrl } from "@/lib/url-helpers";
+
+const configuredUrl = normalizeConfiguredUrl(process.env.EXPO_PUBLIC_APP_URL);
 
 export function getAppBaseUrl(): string {
-  if (configuredUrl) return configuredUrl;
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    const parts = window.location.pathname.split("/").filter((p) => p !== "");
-    const basePath = parts.length > 0 ? "/" + parts[0] : "";
-    return window.location.origin + basePath;
-  }
-  return "";
+  const isWeb = Platform.OS === "web" && typeof window !== "undefined";
+  return resolveAppBaseUrl(
+    configuredUrl,
+    isWeb ? window.location.origin : null,
+    isWeb ? window.location.pathname : null,
+  );
 }
