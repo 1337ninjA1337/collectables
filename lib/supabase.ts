@@ -2,10 +2,27 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AuthClient, SupportedStorage } from "@supabase/auth-js";
 import { Platform } from "react-native";
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+import {
+  canStoreRuntimeSupabaseConfig,
+  clearRuntimeSupabaseConfig,
+  readRuntimeSupabaseConfig,
+  setRuntimeSupabaseConfig,
+} from "@/lib/supabase-runtime-config";
+
+const runtime = readRuntimeSupabaseConfig();
+
+export const supabaseUrl =
+  process.env.EXPO_PUBLIC_SUPABASE_URL || runtime.url;
+export const supabasePublishableKey =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || runtime.key;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublishableKey);
+
+export {
+  canStoreRuntimeSupabaseConfig,
+  clearRuntimeSupabaseConfig,
+  setRuntimeSupabaseConfig,
+};
 
 const memoryStorage = new Map<string, string>();
 

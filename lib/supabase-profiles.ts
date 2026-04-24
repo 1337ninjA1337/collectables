@@ -1,8 +1,12 @@
-import { authClient, isSupabaseConfigured } from "@/lib/supabase";
+import {
+  authClient,
+  isSupabaseConfigured,
+  supabasePublishableKey,
+  supabaseUrl,
+} from "@/lib/supabase";
 import { CollectableItem, Collection, CollectionVisibility, Reaction, ReactionEmoji, ReactionTargetType, UserProfile } from "@/lib/types";
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+const supabaseKey = supabasePublishableKey;
 
 const HIDDEN_USERNAMES = ["katsyarinafedorova97"];// remove later
 
