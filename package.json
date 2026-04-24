@@ -9,6 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "test": "tsx --test __tests__/*.test.ts",
     "build": "npx expo export --platform web && cp dist/index.html dist/404.html",
     "deploy": "cross-env EXPO_PUBLIC_APP_URL=https://1337ninja1337.github.io/collectables npx expo export --platform web && cp dist/index.html dist/404.html && touch dist/.nojekyll && echo > dist/.gitignore && npx gh-pages -d dist --dotfiles"
   },
@@ -44,6 +45,7 @@
     "@types/react": "~19.1.10",
     "cross-env": "^10.1.0",
     "gh-pages": "^6.3.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.2"
   }
 }

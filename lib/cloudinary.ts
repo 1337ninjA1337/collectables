@@ -1,5 +1,7 @@
 import { Platform } from "react-native";
 
+import { extractPublicId } from "@/lib/cloudinary-url";
+
 const CLOUD_NAME = "dt57phtma";
 const UPLOAD_PRESET = "collectables";
 const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
@@ -50,11 +52,6 @@ const API_KEY = process.env.EXPO_PUBLIC_CLOUDINARY_API_KEY ?? "";
 const API_SECRET = process.env.EXPO_PUBLIC_CLOUDINARY_API_SECRET ?? "";
 
 export const isCloudinaryDeleteConfigured = Boolean(API_KEY && API_SECRET);
-
-function extractPublicId(cloudinaryUrl: string): string | null {
-  const match = cloudinaryUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
-  return match?.[1] ?? null;
-}
 
 async function deleteImage(publicId: string): Promise<void> {
   const timestamp = Math.floor(Date.now() / 1000).toString();

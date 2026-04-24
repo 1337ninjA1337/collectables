@@ -39,7 +39,7 @@ async function uriToBase64(uri: string): Promise<{ data: string; mimeType: strin
   return { data, mimeType };
 }
 
-function extractJson(text: string): unknown {
+export function extractJson(text: string): unknown {
   // Strip markdown code fences if present
   const trimmed = text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
   try {
