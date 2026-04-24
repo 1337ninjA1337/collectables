@@ -333,8 +333,14 @@ export default function ProfileScreen() {
           ) : null}
           {relationship === "friend" ? (
             <>
-              <Pressable style={styles.primaryAction} onPress={() => void removeFriend(activeProfile.id)}>
-                <Text style={styles.primaryActionText}>{t("removeFriend")}</Text>
+              <Pressable
+                style={styles.primaryAction}
+                onPress={() => router.push(`/chat/${activeProfile.id}` as never)}
+              >
+                <Text style={styles.primaryActionText}>{t("chatSend")}</Text>
+              </Pressable>
+              <Pressable style={styles.secondaryAction} onPress={() => void removeFriend(activeProfile.id)}>
+                <Text style={styles.secondaryActionText}>{t("removeFriend")}</Text>
               </Pressable>
               <Pressable style={styles.secondaryAction} onPress={() => void unfollowProfile(activeProfile.id)}>
                 <Text style={styles.secondaryActionText}>{t("unfollow")}</Text>

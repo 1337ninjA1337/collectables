@@ -50,6 +50,15 @@ export type Reaction = {
 
 export type CollectionVisibility = "public" | "private";
 
+export type ChatMessage = {
+  id: string;
+  chatId: string;
+  fromUserId: string;
+  toUserId: string;
+  text: string;
+  createdAt: string;
+};
+
 export type Collection = {
   id: string;
   name: string;

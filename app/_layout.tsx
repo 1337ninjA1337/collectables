@@ -11,6 +11,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { LoginScreen } from "@/components/login-screen";
 import { SearchOverlay } from "@/components/search-overlay";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { ChatProvider } from "@/lib/chat-context";
 import { CollectionsProvider } from "@/lib/collections-context";
 import { I18nProvider, useI18n } from "@/lib/i18n-context";
 import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-context";
@@ -25,9 +26,11 @@ export default function RootLayout() {
         <AuthProvider>
           <SocialProvider>
             <CollectionsProvider>
-              <NavAnimationProvider>
-                <AppShell />
-              </NavAnimationProvider>
+              <ChatProvider>
+                <NavAnimationProvider>
+                  <AppShell />
+                </NavAnimationProvider>
+              </ChatProvider>
             </CollectionsProvider>
           </SocialProvider>
         </AuthProvider>

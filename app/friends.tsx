@@ -2,11 +2,14 @@ import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { Ionicons } from "@expo/vector-icons";
+
 import { EmptyState } from "@/components/empty-state";
 import { SkeletonProfileList } from "@/components/skeleton";
 
 import { Screen } from "@/components/screen";
 import { SwipeTabs } from "@/components/swipe-tabs";
+import { useChat } from "@/lib/chat-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { fetchProfileById } from "@/lib/supabase-profiles";
@@ -31,6 +34,7 @@ export default function FriendsScreen() {
   const [requestProfiles, setRequestProfiles] = useState<UserProfile[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
+  const { unreadTotal } = useChat();
 
   useEffect(() => {
     let active = true;
@@ -97,9 +101,17 @@ export default function FriendsScreen() {
               </Pressable>
             </>
           ) : kind === "friend" ? (
-            <Pressable style={styles.secondaryAction} onPress={() => void removeFriend(profile.id)}>
-              <Text style={styles.secondaryActionText}>{t("removeFriend")}</Text>
-            </Pressable>
+            <>
+              <Pressable
+                style={styles.primaryAction}
+                onPress={() => router.push(`/chat/${profile.id}` as never)}
+              >
+                <Text style={styles.primaryActionText}>{t("chatSend")}</Text>
+              </Pressable>
+              <Pressable style={styles.secondaryAction} onPress={() => void removeFriend(profile.id)}>
+                <Text style={styles.secondaryActionText}>{t("removeFriend")}</Text>
+              </Pressable>
+            </>
           ) : (
             <Pressable style={styles.secondaryAction} onPress={() => void unfollowProfile(profile.id)}>
               <Text style={styles.secondaryActionText}>{t("unfollow")}</Text>
@@ -117,6 +129,23 @@ export default function FriendsScreen() {
         <Text style={styles.title}>{t("friendsTitle")}</Text>
         <Text style={styles.subtitle}>{t("friendsSubtitle")}</Text>
       </View>
+
+      <Pressable style={styles.chatsLink} onPress={() => router.push("/chats")}>
+        <View style={styles.chatsLinkIcon}>
+          <Ionicons name="chatbubbles-outline" size={22} color="#3a2716" />
+        </View>
+        <View style={styles.chatsLinkBody}>
+          <Text style={styles.chatsLinkTitle}>{t("chatsTitle")}</Text>
+          <Text style={styles.chatsLinkSubtitle}>{t("chatsSubtitle")}</Text>
+        </View>
+        {unreadTotal > 0 ? (
+          <View style={styles.chatsBadge}>
+            <Text style={styles.chatsBadgeText}>{unreadTotal}</Text>
+          </View>
+        ) : (
+          <Ionicons name="chevron-forward" size={20} color="#8f6947" />
+        )}
+      </Pressable>
 
       <SwipeTabs
         tabs={[
@@ -211,6 +240,54 @@ const styles = StyleSheet.create({
   subtitle: {
     color: "#ead8c3",
     lineHeight: 22,
+  },
+  chatsLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 14,
+    borderRadius: 22,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+  },
+  chatsLinkIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#fff1df",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatsLinkBody: {
+    flex: 1,
+    gap: 2,
+  },
+  chatsLinkTitle: {
+    color: "#2f2318",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  chatsLinkSubtitle: {
+    color: "#8f6947",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  chatsBadge: {
+    minWidth: 24,
+    height: 24,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: "#d92f2f",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chatsBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "800",
   },
   sectionLabel: {
     color: "#624a35",
