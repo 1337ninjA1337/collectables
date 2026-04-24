@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-
+//
 import { EmptyState } from "@/components/empty-state";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";

@@ -4,7 +4,7 @@ import { CollectableItem, Collection, CollectionVisibility, Reaction, ReactionEm
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
-const HIDDEN_USERNAMES = ["katsyarinafedorova97"];
+const HIDDEN_USERNAMES = ["katsyarinafedorova97"];// remove later
 
 type DbProfile = {
   id: string;

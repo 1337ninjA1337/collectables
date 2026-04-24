@@ -57,7 +57,7 @@ export default function PeopleScreen() {
     () => remoteProfiles.filter((p) => p.id !== myProfile?.id),
     [remoteProfiles, myProfile],
   );
-
+ //
   const filteredPeople = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return others;
