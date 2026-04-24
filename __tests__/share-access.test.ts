@@ -1,7 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { addViewerToSharedIds, shouldAutoSaveSharedCollection } from "@/lib/share-access";
+import {
+  addViewerToSharedIds,
+  removeViewerFromSharedIds,
+  shouldAutoSaveSharedCollection,
+} from "@/lib/share-access";
 import { Collection } from "@/lib/types";
 
 function makeCollection(overrides: Partial<Collection> = {}): Collection {
@@ -78,5 +82,34 @@ describe("addViewerToSharedIds", () => {
     const result = addViewerToSharedIds(input, "b");
     assert.notStrictEqual(result, input);
     assert.deepEqual(input, ["a"]);
+  });
+});
+
+describe("removeViewerFromSharedIds", () => {
+  it("removes the viewer when present", () => {
+    assert.deepEqual(removeViewerFromSharedIds(["a", "b", "c"], "b"), ["a", "c"]);
+  });
+
+  it("is a no-op when the viewer is absent", () => {
+    assert.deepEqual(removeViewerFromSharedIds(["a", "b"], "z"), ["a", "b"]);
+  });
+
+  it("handles undefined existing list", () => {
+    assert.deepEqual(removeViewerFromSharedIds(undefined, "a"), []);
+  });
+
+  it("handles empty list", () => {
+    assert.deepEqual(removeViewerFromSharedIds([], "a"), []);
+  });
+
+  it("does not mutate input", () => {
+    const input: string[] = ["a", "b"];
+    const result = removeViewerFromSharedIds(input, "a");
+    assert.notStrictEqual(result, input);
+    assert.deepEqual(input, ["a", "b"]);
+  });
+
+  it("removes all occurrences if duplicates exist", () => {
+    assert.deepEqual(removeViewerFromSharedIds(["a", "b", "a"], "a"), ["b"]);
   });
 });

@@ -21,9 +21,9 @@ import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
-import { fetchCollectionById, fetchItemsByCollectionId } from "@/lib/supabase-profiles";
+import { fetchCollectionById, fetchItemsByCollectionId, fetchProfileById } from "@/lib/supabase-profiles";
 import { useToast } from "@/lib/toast-context";
-import { CollectableItem, Collection, CollectionVisibility } from "@/lib/types";
+import { CollectableItem, Collection, CollectionVisibility, UserProfile } from "@/lib/types";
 
 export default function CollectionDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -56,6 +56,7 @@ export default function CollectionDetailsScreen() {
   const [exporting, setExporting] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [viewerProfiles, setViewerProfiles] = useState<Record<string, UserProfile>>({});
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -105,6 +106,33 @@ export default function CollectionDetailsScreen() {
   const localItems = getItemsForCollection(params.id);
   const allItems = localItems.length > 0 ? localItems : remoteItems;
   const items = useMemo(() => applyItemFilters(allItems, itemFilters), [allItems, itemFilters]);
+
+  // Resolve profile details for every viewer listed on the collection so the
+  // share sheet can show non-friends (link-granted viewers) alongside friends.
+  const sharedWithUserIds = collection?.sharedWithUserIds ?? [];
+  useEffect(() => {
+    if (!shareOpen || sharedWithUserIds.length === 0) return;
+    let cancelled = false;
+    const missing = sharedWithUserIds.filter(
+      (id) => !getProfileById(id) && !viewerProfiles[id],
+    );
+    if (missing.length === 0) return;
+    Promise.all(missing.map((id) => fetchProfileById(id).then((p) => [id, p] as const)))
+      .then((results) => {
+        if (cancelled) return;
+        const next: Record<string, UserProfile> = {};
+        for (const [id, profile] of results) {
+          if (profile) next[id] = profile;
+        }
+        if (Object.keys(next).length > 0) {
+          setViewerProfiles((prev) => ({ ...prev, ...next }));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [shareOpen, sharedWithUserIds, getProfileById, viewerProfiles]);
 
   if (loadingRemote && !collection) {
     return (
@@ -635,6 +663,36 @@ export default function CollectionDetailsScreen() {
               </View>
             ) : isOwner && friends.length === 0 ? (
               <Text style={styles.shareFriendsEmpty}>{t("noFriendsToShare")}</Text>
+            ) : null}
+            {isOwner && activeCollection.sharedWithUserIds.length > 0 ? (
+              <View style={styles.shareFriendsSection}>
+                <Text style={styles.shareFriendsTitle}>{t("peopleWithAccess")}</Text>
+                <Text style={styles.shareFriendsHint}>{t("peopleWithAccessHint")}</Text>
+                <ScrollView style={styles.shareFriendsList} nestedScrollEnabled>
+                  {activeCollection.sharedWithUserIds.map((viewerId) => {
+                    const profile = getProfileById(viewerId) ?? viewerProfiles[viewerId];
+                    const displayName = profile?.displayName ?? profile?.username ?? viewerId;
+                    return (
+                      <View key={viewerId} style={styles.shareFriendRow}>
+                        <View style={styles.shareFriendInfo}>
+                          {profile?.avatar ? (
+                            <Image source={{ uri: profile.avatar }} style={styles.shareFriendAvatar} />
+                          ) : (
+                            <View style={{...styles.shareFriendAvatar, backgroundColor: placeholderColor(viewerId)}} />
+                          )}
+                          <Text style={styles.shareFriendName} numberOfLines={1}>{displayName}</Text>
+                        </View>
+                        <Pressable
+                          style={styles.shareFriendButton}
+                          onPress={() => unshareCollectionWithUser(activeCollection.id, viewerId)}
+                        >
+                          <Text style={styles.shareFriendButtonText}>{t("removeAccess")}</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             ) : null}
             <Pressable style={styles.shareCancelButton} onPress={() => setShareOpen(false)}>
               <Text style={styles.shareCancelText}>{t("cancel")}</Text>

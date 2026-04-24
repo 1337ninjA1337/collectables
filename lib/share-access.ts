@@ -36,3 +36,15 @@ export function addViewerToSharedIds(
   if (list.includes(userId)) return [...list];
   return [...list, userId];
 }
+
+/**
+ * Remove a viewer userId from a collection's sharedWithUserIds array,
+ * returning a new array.
+ */
+export function removeViewerFromSharedIds(
+  existing: readonly string[] | undefined,
+  userId: string,
+): string[] {
+  const list = existing ?? [];
+  return list.filter((id) => id !== userId);
+}

@@ -21,7 +21,11 @@ import {
   fetchWishlistItemsByUserId,
   registerSharedCollectionViewer,
 } from "@/lib/supabase-profiles";
-import { shouldAutoSaveSharedCollection } from "@/lib/share-access";
+import {
+  addViewerToSharedIds,
+  removeViewerFromSharedIds,
+  shouldAutoSaveSharedCollection,
+} from "@/lib/share-access";
 import { Collection, CollectableItem, ItemCondition, ItemTag } from "@/lib/types";
 
 const ITEMS_STORAGE_KEY = "collectables-items-v1";
@@ -370,7 +374,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           current.map((col) => {
             if (col.id !== collectionId) return col;
             if (col.sharedWithUserIds.includes(userId)) return col;
-            const updated = { ...col, sharedWithUserIds: [...col.sharedWithUserIds, userId] };
+            const updated = { ...col, sharedWithUserIds: addViewerToSharedIds(col.sharedWithUserIds, userId) };
             updateRemoteCollection(collectionId, { sharedWithUserIds: updated.sharedWithUserIds }).catch(() => undefined);
             return updated;
           }),
@@ -381,7 +385,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         setLocalCollections((current) =>
           current.map((col) => {
             if (col.id !== collectionId) return col;
-            const updated = { ...col, sharedWithUserIds: col.sharedWithUserIds.filter((id) => id !== userId) };
+            const updated = { ...col, sharedWithUserIds: removeViewerFromSharedIds(col.sharedWithUserIds, userId) };
             updateRemoteCollection(collectionId, { sharedWithUserIds: updated.sharedWithUserIds }).catch(() => undefined);
             return updated;
           }),
