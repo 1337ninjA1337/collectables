@@ -43,6 +43,7 @@ export default function CollectionDetailsScreen() {
     refresh,
     shareCollectionWithUser,
     unshareCollectionWithUser,
+    saveSharedCollection,
   } = useCollections();
   const { friends, getProfileById } = useSocial();
   const [refreshing, setRefreshing] = useState(false);
@@ -82,6 +83,23 @@ export default function CollectionDetailsScreen() {
         .finally(() => setLoadingRemote(false));
     }
   }, [localCollection, params.id]);
+
+  // When a user opens a private collection via a shared link, persist them as
+  // a viewer so the collection appears alongside their friends' collections.
+  useEffect(() => {
+    if (!user || !remoteCollection) return;
+    if (localCollection) return;
+    let cancelled = false;
+    void saveSharedCollection(remoteCollection).then((saved) => {
+      if (!cancelled && saved) {
+        setRemoteCollection(saved);
+        toast.success(t("sharedCollectionSaved"));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, remoteCollection, localCollection, saveSharedCollection, toast, t]);
 
   const collection = localCollection ?? remoteCollection;
   const localItems = getItemsForCollection(params.id);

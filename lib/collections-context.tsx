@@ -19,7 +19,9 @@ import {
   unfollowCollectionRemote,
   fetchCollectionsSharedWithUser,
   fetchWishlistItemsByUserId,
+  registerSharedCollectionViewer,
 } from "@/lib/supabase-profiles";
+import { shouldAutoSaveSharedCollection } from "@/lib/share-access";
 import { Collection, CollectableItem, ItemCondition, ItemTag } from "@/lib/types";
 
 const ITEMS_STORAGE_KEY = "collectables-items-v1";
@@ -69,6 +71,7 @@ type CollectionsContextValue = {
   shareCollectionWithUser: (collectionId: string, userId: string) => void;
   unshareCollectionWithUser: (collectionId: string, userId: string) => void;
   getSharedUserIds: (collectionId: string) => string[];
+  saveSharedCollection: (collection: Collection) => Promise<Collection | null>;
   getCollectionById: (id: string) => Collection | undefined;
   getItemsForCollection: (collectionId: string) => CollectableItem[];
   getCollectionTotalCost: (collectionId: string) => number;
@@ -387,6 +390,35 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       getSharedUserIds: (collectionId) => {
         const col = localCollections.find((c) => c.id === collectionId);
         return col?.sharedWithUserIds ?? [];
+      },
+      saveSharedCollection: async (collection) => {
+        if (!user) return null;
+        if (!shouldAutoSaveSharedCollection(collection, user.id)) return null;
+        const updated = await registerSharedCollectionViewer(collection.id, user.id);
+        if (!updated) return null;
+        const asViewer: Collection = { ...updated, role: "viewer" };
+        setSharedWithMeCollections((current) =>
+          current.some((c) => c.id === asViewer.id)
+            ? current.map((c) => (c.id === asViewer.id ? asViewer : c))
+            : [...current, asViewer],
+        );
+        try {
+          const items = await fetchItemsByCollectionId(asViewer.id);
+          setSharedWithMeItems((current) => {
+            const seen = new Set(current.map((i) => i.id));
+            const merged = [...current];
+            for (const item of items) {
+              if (!seen.has(item.id)) {
+                merged.push(item);
+                seen.add(item.id);
+              }
+            }
+            return merged;
+          });
+        } catch {
+          // ignore: items will load on next refresh
+        }
+        return asViewer;
       },
       getCollectionById: (id) => collections.find((collection) => collection.id === id),
       getItemsForCollection: (collectionId) =>

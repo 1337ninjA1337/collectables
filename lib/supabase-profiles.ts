@@ -478,6 +478,36 @@ export async function fetchCollectionsSharedWithUser(userId: string): Promise<Co
   }
 }
 
+/**
+ * Register a visitor as an accepted viewer on a private collection. This is
+ * used when a user opens a shared deep link — the collection is then saved
+ * to their "shared with me" list so they can find it again later.
+ *
+ * Returns the updated Collection (with the viewer appended), or null if the
+ * collection could not be found / updated.
+ */
+export async function registerSharedCollectionViewer(
+  collectionId: string,
+  viewerUserId: string,
+): Promise<Collection | null> {
+  if (!isSupabaseConfigured) return null;
+
+  try {
+    const current = await fetchCollectionById(collectionId);
+    if (!current) return null;
+    if (current.ownerUserId === viewerUserId) return current;
+    if (current.visibility === "public") return current;
+    const existing = current.sharedWithUserIds ?? [];
+    if (existing.includes(viewerUserId)) return current;
+
+    const next = [...existing, viewerUserId];
+    await updateRemoteCollection(collectionId, { sharedWithUserIds: next });
+    return { ...current, sharedWithUserIds: next };
+  } catch {
+    return null;
+  }
+}
+
 // --- Reactions ---
 
 type DbReaction = {
