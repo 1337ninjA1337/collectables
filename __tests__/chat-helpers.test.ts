@@ -6,6 +6,8 @@ import {
   buildChatId,
   buildChatPreviews,
   canChatWith,
+  chooseFriendsTabBadge,
+  formatBadgeCount,
   getOtherParticipantId,
   totalUnread,
 } from "@/lib/chat-helpers";
@@ -212,5 +214,44 @@ describe("totalUnread", () => {
 
   it("returns 0 for an empty list", () => {
     assert.equal(totalUnread([]), 0);
+  });
+});
+
+describe("chooseFriendsTabBadge", () => {
+  it("returns a count badge when there are unread messages", () => {
+    assert.deepEqual(chooseFriendsTabBadge(3, 0), { kind: "count", value: 3 });
+  });
+
+  it("prefers the count badge over the request dot when both are present", () => {
+    assert.deepEqual(chooseFriendsTabBadge(2, 4), { kind: "count", value: 2 });
+  });
+
+  it("returns a dot when only friend requests are pending", () => {
+    assert.deepEqual(chooseFriendsTabBadge(0, 1), { kind: "dot" });
+  });
+
+  it("returns none when nothing is pending", () => {
+    assert.deepEqual(chooseFriendsTabBadge(0, 0), { kind: "none" });
+  });
+
+  it("treats negative inputs as zero", () => {
+    assert.deepEqual(chooseFriendsTabBadge(-1, -1), { kind: "none" });
+  });
+});
+
+describe("formatBadgeCount", () => {
+  it("returns an empty string for zero or negative counts", () => {
+    assert.equal(formatBadgeCount(0), "");
+    assert.equal(formatBadgeCount(-3), "");
+  });
+
+  it("returns the raw number for small counts", () => {
+    assert.equal(formatBadgeCount(1), "1");
+    assert.equal(formatBadgeCount(99), "99");
+  });
+
+  it("caps anything above 99 at 99+", () => {
+    assert.equal(formatBadgeCount(100), "99+");
+    assert.equal(formatBadgeCount(2500), "99+");
   });
 });

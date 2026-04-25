@@ -5,11 +5,27 @@ import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useResponsive } from "@/components/screen";
+import { useChat } from "@/lib/chat-context";
+import {
+  chooseFriendsTabBadge,
+  FriendsTabBadge,
+  formatBadgeCount,
+} from "@/lib/chat-helpers";
 import { useI18n } from "@/lib/i18n-context";
 import { useNavAnimation } from "@/lib/nav-animation-context";
 import { useSocial } from "@/lib/social-context";
 
 export const BOTTOM_NAV_HEIGHT = 58;
+
+function renderBadge(badge: FriendsTabBadge | undefined) {
+  if (!badge || badge.kind === "none") return null;
+  if (badge.kind === "dot") return <View style={styles.badge} />;
+  return (
+    <View style={styles.badgeCount}>
+      <Text style={styles.badgeCountText}>{formatBadgeCount(badge.value)}</Text>
+    </View>
+  );
+}
 
 type NavItem = {
   key: string;
@@ -17,7 +33,7 @@ type NavItem = {
   iconActive: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   active: boolean;
-  badge?: boolean;
+  badge?: FriendsTabBadge;
 };
 
 type BottomNavProps = {
@@ -27,6 +43,7 @@ type BottomNavProps = {
 export function BottomNav({ onSearchPress }: BottomNavProps) {
   const pathname = usePathname();
   const { getMyProfile, incomingRequestUserIds } = useSocial();
+  const { unreadTotal } = useChat();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { setAnimation } = useNavAnimation();
@@ -90,7 +107,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       icon: "people-outline",
       iconActive: "people",
       active: friendsActive,
-      badge: incomingRequestUserIds.length > 0,
+      badge: chooseFriendsTabBadge(unreadTotal, incomingRequestUserIds.length),
       onPress: () => navTo("/friends", friendsActive, 2),
     },
     {
@@ -147,7 +164,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
                 size={26}
                 color={item.active ? "#261b14" : "#8a6e54"}
               />
-              {item.badge ? <View style={styles.badge} /> : null}
+              {renderBadge(item.badge)}
             </View>
           </Pressable>
         ))}
@@ -164,7 +181,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
                 size={26}
                 color={item.active ? "#261b14" : "#8a6e54"}
               />
-              {item.badge ? <View style={styles.badge} /> : null}
+              {renderBadge(item.badge)}
             </View>
           </Pressable>
         ))}
@@ -214,6 +231,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#d92f2f",
     borderWidth: 1.5,
     borderColor: "#fff7ef",
+  },
+  badgeCount: {
+    position: "absolute",
+    top: -6,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    backgroundColor: "#d92f2f",
+    borderWidth: 1.5,
+    borderColor: "#fff7ef",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeCountText: {
+    color: "#fff7ef",
+    fontSize: 10,
+    fontWeight: "800",
   },
   plusButton: {
     width: 56,

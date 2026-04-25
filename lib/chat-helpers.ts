@@ -86,3 +86,32 @@ export function buildChatPreviews(
 export function totalUnread(previews: readonly ChatPreview[]): number {
   return previews.reduce((sum, p) => sum + p.unreadCount, 0);
 }
+
+/**
+ * Visual state for the bottom-nav friends tab badge. Unread chat messages
+ * win over friend-request indicators because they convey a count, while a
+ * pending request only needs a dot.
+ */
+export type FriendsTabBadge =
+  | { kind: "none" }
+  | { kind: "dot" }
+  | { kind: "count"; value: number };
+
+export function chooseFriendsTabBadge(
+  unread: number,
+  incomingRequests: number,
+): FriendsTabBadge {
+  if (unread > 0) return { kind: "count", value: unread };
+  if (incomingRequests > 0) return { kind: "dot" };
+  return { kind: "none" };
+}
+
+/**
+ * Compact label for a count badge. Caps anything above 99 at "99+" so the
+ * pill stays narrow on small screens.
+ */
+export function formatBadgeCount(value: number): string {
+  if (value <= 0) return "";
+  if (value > 99) return "99+";
+  return String(value);
+}
