@@ -14,6 +14,7 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ChatProvider } from "@/lib/chat-context";
 import { CollectionsProvider } from "@/lib/collections-context";
 import { I18nProvider, useI18n } from "@/lib/i18n-context";
+import { MarketplaceProvider } from "@/lib/marketplace-context";
 import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-context";
 import { SocialProvider } from "@/lib/social-context";
 import { ToastProvider } from "@/lib/toast-context";
@@ -27,9 +28,11 @@ export default function RootLayout() {
           <SocialProvider>
             <CollectionsProvider>
               <ChatProvider>
-                <NavAnimationProvider>
-                  <AppShell />
-                </NavAnimationProvider>
+                <MarketplaceProvider>
+                  <NavAnimationProvider>
+                    <AppShell />
+                  </NavAnimationProvider>
+                </MarketplaceProvider>
               </ChatProvider>
             </CollectionsProvider>
           </SocialProvider>

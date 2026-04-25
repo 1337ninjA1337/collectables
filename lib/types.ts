@@ -59,6 +59,20 @@ export type ChatMessage = {
   createdAt: string;
 };
 
+export type MarketplaceMode = "trade" | "sell";
+
+export type MarketplaceListing = {
+  id: string;
+  itemId: string;
+  ownerUserId: string;
+  mode: MarketplaceMode;
+  askingPrice: number | null;
+  currency: string;
+  notes: string;
+  createdAt: string;
+  soldAt: string | null;
+};
+
 export type Collection = {
   id: string;
   name: string;
