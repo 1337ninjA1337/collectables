@@ -5,11 +5,43 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
+import { usePremium } from "@/lib/premium-context";
+import { useToast } from "@/lib/toast-context";
 
 export default function SettingsScreen() {
   const { t, language, setLanguage, languageOptions } = useI18n();
   const { signOut, deleteAccount, pending } = useAuth();
+  const { isPremium, activatedAt, activatePremium, cancelPremium } = usePremium();
+  const toast = useToast();
   const [deleting, setDeleting] = useState(false);
+
+  function handleActivatePremium() {
+    activatePremium();
+    toast.success(t("premiumActivated"));
+  }
+
+  function handleCancelPremium() {
+    const title = t("premiumConfirmCancelTitle");
+    const message = t("premiumConfirmCancelText");
+    if (Platform.OS === "web") {
+      const confirmed = globalThis.confirm?.(`${title}\n\n${message}`) ?? false;
+      if (!confirmed) return;
+      cancelPremium();
+      toast.success(t("premiumCanceled"));
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("premiumCancel"),
+        style: "destructive",
+        onPress: () => {
+          cancelPremium();
+          toast.success(t("premiumCanceled"));
+        },
+      },
+    ]);
+  }
 
   function handleDeleteAccount() {
     const title = t("deleteAccountTitle");
@@ -76,6 +108,43 @@ export default function SettingsScreen() {
             </Pressable>
           ))}
         </View>
+      </View>
+
+      <View style={isPremium ? styles.premiumCardActive : styles.premiumCard}>
+        <View style={styles.premiumHeaderRow}>
+          <Text style={isPremium ? styles.premiumSectionTitleActive : styles.premiumSectionTitle}>
+            {t("premiumTitle")}
+          </Text>
+          {isPremium ? (
+            <View style={styles.premiumBadge}>
+              <Text style={styles.premiumBadgeText}>{t("premiumActive")}</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text style={isPremium ? styles.premiumSubtitleActive : styles.premiumSubtitle}>
+          {isPremium && activatedAt
+            ? t("premiumActiveSince", { date: activatedAt.slice(0, 10) })
+            : t("premiumSubtitle")}
+        </Text>
+        <View style={styles.premiumBenefits}>
+          {(["premiumBenefit1", "premiumBenefit2", "premiumBenefit3"] as const).map((key) => (
+            <View key={key} style={styles.premiumBenefitRow}>
+              <Text style={styles.premiumBenefitDot}>✦</Text>
+              <Text style={isPremium ? styles.premiumBenefitTextActive : styles.premiumBenefitText}>
+                {t(key)}
+              </Text>
+            </View>
+          ))}
+        </View>
+        {isPremium ? (
+          <Pressable style={styles.premiumCancelButton} onPress={handleCancelPremium}>
+            <Text style={styles.premiumCancelText}>{t("premiumCancel")}</Text>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.premiumActivateButton} onPress={handleActivatePremium}>
+            <Text style={styles.premiumActivateText}>{t("premiumActivate")}</Text>
+          </Pressable>
+        )}
       </View>
 
       <Pressable
@@ -211,6 +280,110 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: "#fff4e8",
     fontSize: 15,
+    fontWeight: "800",
+  },
+  premiumCard: {
+    borderRadius: 24,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+    padding: 18,
+    gap: 12,
+  },
+  premiumCardActive: {
+    borderRadius: 24,
+    backgroundColor: "#2a1e17",
+    borderWidth: 1,
+    borderColor: "#d89c5b",
+    padding: 18,
+    gap: 12,
+  },
+  premiumHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  premiumSectionTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#2f2318",
+  },
+  premiumSectionTitleActive: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#fff8ef",
+  },
+  premiumBadge: {
+    borderRadius: 999,
+    backgroundColor: "#d89c5b",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  premiumBadgeText: {
+    color: "#241912",
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+  premiumSubtitle: {
+    color: "#6b5647",
+    lineHeight: 22,
+  },
+  premiumSubtitleActive: {
+    color: "#ead8c3",
+    lineHeight: 22,
+  },
+  premiumBenefits: {
+    gap: 8,
+    marginTop: 4,
+  },
+  premiumBenefitRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+  },
+  premiumBenefitDot: {
+    color: "#d89c5b",
+    fontSize: 16,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  premiumBenefitText: {
+    flex: 1,
+    color: "#2f2318",
+    lineHeight: 22,
+  },
+  premiumBenefitTextActive: {
+    flex: 1,
+    color: "#fff7ef",
+    lineHeight: 22,
+  },
+  premiumActivateButton: {
+    borderRadius: 999,
+    backgroundColor: "#d89c5b",
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  premiumActivateText: {
+    color: "#241912",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  premiumCancelButton: {
+    borderRadius: 999,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "#e4c29a",
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  premiumCancelText: {
+    color: "#fff7ef",
+    fontSize: 14,
     fontWeight: "800",
   },
 });

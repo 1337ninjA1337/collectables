@@ -424,6 +424,20 @@ const en = {
   marketplaceSelfHint: "This is your listing. You can manage it from the item detail screen.",
   marketplacePriceHistoryLabel: "Recent prices for similar items",
   marketplacePriceHistoryHint: "Up to 10 most-recent prices on listings with similar names.",
+  premiumTitle: "Premium",
+  premiumSubtitle: "Unlock advanced collector tools and remove the marketplace cap.",
+  premiumBenefit1: "Unlimited active marketplace listings",
+  premiumBenefit2: "Priority placement in collector search",
+  premiumBenefit3: "Premium badge on your profile",
+  premiumActivate: "Activate premium",
+  premiumActive: "Premium active",
+  premiumActiveSince: (params?: TranslationParams) => `Premium since ${params?.date ?? ""}`,
+  premiumCancel: "Cancel premium",
+  premiumActivated: "Premium activated",
+  premiumCanceled: "Premium canceled",
+  premiumConfirmCancelTitle: "Cancel premium?",
+  premiumConfirmCancelText:
+    "You'll lose unlimited listings and your premium badge. The free cap returns immediately.",
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -856,6 +870,20 @@ const ru: TranslationMap = {
   marketplaceSelfHint: "Это ваше объявление. Управлять им можно с экрана предмета.",
   marketplacePriceHistoryLabel: "Недавние цены на похожие предметы",
   marketplacePriceHistoryHint: "До 10 самых свежих цен по объявлениям с похожими названиями.",
+  premiumTitle: "Премиум",
+  premiumSubtitle: "Откройте инструменты для коллекционеров и снимите лимит барахолки.",
+  premiumBenefit1: "Неограниченные активные объявления на барахолке",
+  premiumBenefit2: "Приоритет в поиске коллекционеров",
+  premiumBenefit3: "Премиум-значок в вашем профиле",
+  premiumActivate: "Активировать премиум",
+  premiumActive: "Премиум активен",
+  premiumActiveSince: (params?: TranslationParams) => `Премиум с ${params?.date ?? ""}`,
+  premiumCancel: "Отменить премиум",
+  premiumActivated: "Премиум активирован",
+  premiumCanceled: "Премиум отменён",
+  premiumConfirmCancelTitle: "Отменить премиум?",
+  premiumConfirmCancelText:
+    "Вы потеряете неограниченные объявления и премиум-значок. Бесплатный лимит вернётся сразу.",
 };
 
 const be: TranslationMap = {
@@ -976,6 +1004,20 @@ const be: TranslationMap = {
   marketplaceSelfHint: "Гэта ваша аб'ява. Кіраваць ёю можна з экрана прадмета.",
   marketplacePriceHistoryLabel: "Нядаўнія цэны на падобныя прадметы",
   marketplacePriceHistoryHint: "Да 10 апошніх цэн па аб'явах з падобнымі назвамі.",
+  premiumTitle: "Прэміум",
+  premiumSubtitle: "Адкрыйце інструменты калекцыянера і прыбярыце ліміт барахолкі.",
+  premiumBenefit1: "Неабмежаваныя актыўныя аб'явы на барахолцы",
+  premiumBenefit2: "Прыярытэт у пошуку калекцыянераў",
+  premiumBenefit3: "Прэміум-значок у вашым профілі",
+  premiumActivate: "Актываваць прэміум",
+  premiumActive: "Прэміум актыўны",
+  premiumActiveSince: (params?: TranslationParams) => `Прэміум з ${params?.date ?? ""}`,
+  premiumCancel: "Адмяніць прэміум",
+  premiumActivated: "Прэміум актываваны",
+  premiumCanceled: "Прэміум адменены",
+  premiumConfirmCancelTitle: "Адмяніць прэміум?",
+  premiumConfirmCancelText:
+    "Вы страціце неабмежаваныя аб'явы і прэміум-значок. Бясплатны ліміт вернецца адразу.",
 };
 
 const pl: TranslationMap = {
@@ -1086,6 +1128,20 @@ const pl: TranslationMap = {
   marketplaceSelfHint: "To Twoje ogłoszenie. Możesz nim zarządzać z ekranu przedmiotu.",
   marketplacePriceHistoryLabel: "Ostatnie ceny podobnych przedmiotów",
   marketplacePriceHistoryHint: "Do 10 najnowszych cen z ogłoszeń o podobnych nazwach.",
+  premiumTitle: "Premium",
+  premiumSubtitle: "Odblokuj narzędzia kolekcjonera i znieś limit ogłoszeń.",
+  premiumBenefit1: "Nieograniczona liczba aktywnych ogłoszeń",
+  premiumBenefit2: "Priorytet w wyszukiwarce kolekcjonerów",
+  premiumBenefit3: "Odznaka premium na profilu",
+  premiumActivate: "Aktywuj premium",
+  premiumActive: "Premium aktywne",
+  premiumActiveSince: (params?: TranslationParams) => `Premium od ${params?.date ?? ""}`,
+  premiumCancel: "Anuluj premium",
+  premiumActivated: "Premium aktywowane",
+  premiumCanceled: "Premium anulowane",
+  premiumConfirmCancelTitle: "Anulować premium?",
+  premiumConfirmCancelText:
+    "Stracisz nieograniczone ogłoszenia i odznakę premium. Limit darmowy wraca natychmiast.",
 };
 
 const de: TranslationMap = {
@@ -1192,6 +1248,20 @@ const de: TranslationMap = {
   marketplaceSelfHint: "Das ist deine Anzeige. Du kannst sie über die Objektseite verwalten.",
   marketplacePriceHistoryLabel: "Aktuelle Preise für ähnliche Objekte",
   marketplacePriceHistoryHint: "Bis zu 10 aktuelle Preise aus Anzeigen mit ähnlichen Namen.",
+  premiumTitle: "Premium",
+  premiumSubtitle: "Schalte Sammler-Tools frei und hebe das Marktplatzlimit auf.",
+  premiumBenefit1: "Unbegrenzte aktive Marktplatzanzeigen",
+  premiumBenefit2: "Bevorzugte Platzierung in der Sammlersuche",
+  premiumBenefit3: "Premium-Abzeichen in deinem Profil",
+  premiumActivate: "Premium aktivieren",
+  premiumActive: "Premium aktiv",
+  premiumActiveSince: (params?: TranslationParams) => `Premium seit ${params?.date ?? ""}`,
+  premiumCancel: "Premium kündigen",
+  premiumActivated: "Premium aktiviert",
+  premiumCanceled: "Premium gekündigt",
+  premiumConfirmCancelTitle: "Premium kündigen?",
+  premiumConfirmCancelText:
+    "Du verlierst unbegrenzte Anzeigen und das Premium-Abzeichen. Das kostenlose Limit gilt sofort wieder.",
 };
 
 const es: TranslationMap = {
@@ -1298,6 +1368,20 @@ const es: TranslationMap = {
   marketplaceSelfHint: "Este es tu anuncio. Puedes gestionarlo desde la pantalla del objeto.",
   marketplacePriceHistoryLabel: "Precios recientes de objetos similares",
   marketplacePriceHistoryHint: "Hasta 10 precios recientes de anuncios con nombres similares.",
+  premiumTitle: "Premium",
+  premiumSubtitle: "Desbloquea herramientas de coleccionista y elimina el límite del mercado.",
+  premiumBenefit1: "Anuncios activos ilimitados en el mercado",
+  premiumBenefit2: "Posición prioritaria en la búsqueda de coleccionistas",
+  premiumBenefit3: "Insignia premium en tu perfil",
+  premiumActivate: "Activar premium",
+  premiumActive: "Premium activo",
+  premiumActiveSince: (params?: TranslationParams) => `Premium desde ${params?.date ?? ""}`,
+  premiumCancel: "Cancelar premium",
+  premiumActivated: "Premium activado",
+  premiumCanceled: "Premium cancelado",
+  premiumConfirmCancelTitle: "¿Cancelar premium?",
+  premiumConfirmCancelText:
+    "Perderás los anuncios ilimitados y la insignia premium. El límite gratuito vuelve de inmediato.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };
