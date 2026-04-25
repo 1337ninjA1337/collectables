@@ -11,6 +11,10 @@ import {
   totalUnread,
 } from "@/lib/chat-helpers";
 import { useSocial } from "@/lib/social-context";
+import {
+  fetchMessagesForChat as cloudFetchMessagesForChat,
+  sendMessage as cloudSendMessage,
+} from "@/lib/supabase-chat";
 import { ChatMessage } from "@/lib/types";
 
 const CHAT_STORAGE_KEY = "collectables-chats-v1";
@@ -85,6 +89,53 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     AsyncStorage.setItem(storageKey, JSON.stringify(store)).catch(() => undefined);
   }, [ready, storageKey, store]);
 
+  // Pull cloud messages for every confirmed-friend chat once we have a user
+  // and the local cache has been hydrated. Cloud rows are merged on top of
+  // cached rows (deduped by id), so offline-first reads keep working when the
+  // network or Supabase config is unavailable.
+  useEffect(() => {
+    if (!ready || !user || friends.length === 0) return;
+    let cancelled = false;
+
+    void (async () => {
+      const results = await Promise.all(
+        friends.map(async (friendId) => {
+          const chatId = buildChatId(user.id, friendId);
+          const messages = await cloudFetchMessagesForChat(chatId);
+          return { chatId, messages };
+        }),
+      );
+
+      if (cancelled) return;
+
+      setStore((prev) => {
+        let nextMessages = prev.messagesByChat;
+        let touched = false;
+        for (const { chatId, messages } of results) {
+          if (messages.length === 0) continue;
+          const existing = nextMessages[chatId] ?? [];
+          let merged = existing;
+          for (const msg of messages) {
+            merged = appendMessage(merged, msg);
+          }
+          if (merged !== existing) {
+            if (!touched) {
+              nextMessages = { ...nextMessages };
+              touched = true;
+            }
+            nextMessages[chatId] = merged;
+          }
+        }
+        if (!touched) return prev;
+        return { ...prev, messagesByChat: nextMessages };
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, user, friends]);
+
   const previews = useMemo<ChatPreview[]>(() => {
     if (!user) return [];
     return buildChatPreviews(store.messagesByChat, user.id, store.lastReadByChat);
@@ -114,7 +165,19 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       if (!canMessage(otherUserId)) return null;
 
       const chatId = buildChatId(user.id, otherUserId);
-      const message: ChatMessage = {
+
+      // Try cloud first so other devices see the message and the server-issued
+      // uuid+timestamp win across clients. When the cloud send fails (offline,
+      // unconfigured, RLS reject), fall back to a locally-generated message so
+      // the UI still records the attempt; AsyncStorage caches it for re-reads.
+      const cloudMessage = await cloudSendMessage({
+        chatId,
+        fromUserId: user.id,
+        toUserId: otherUserId,
+        text: trimmed,
+      });
+
+      const message: ChatMessage = cloudMessage ?? {
         id: generateMessageId(),
         chatId,
         fromUserId: user.id,
