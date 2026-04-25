@@ -422,6 +422,8 @@ const en = {
   marketplaceListingNotFound: "Listing not found",
   marketplaceListingNotFoundHint: "It may have been removed by its owner.",
   marketplaceSelfHint: "This is your listing. You can manage it from the item detail screen.",
+  marketplacePriceHistoryLabel: "Recent prices for similar items",
+  marketplacePriceHistoryHint: "Up to 10 most-recent prices on listings with similar names.",
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -852,6 +854,8 @@ const ru: TranslationMap = {
   marketplaceListingNotFound: "Объявление не найдено",
   marketplaceListingNotFoundHint: "Возможно, владелец его уже снял.",
   marketplaceSelfHint: "Это ваше объявление. Управлять им можно с экрана предмета.",
+  marketplacePriceHistoryLabel: "Недавние цены на похожие предметы",
+  marketplacePriceHistoryHint: "До 10 самых свежих цен по объявлениям с похожими названиями.",
 };
 
 const be: TranslationMap = {
@@ -970,6 +974,8 @@ const be: TranslationMap = {
   marketplaceListingNotFound: "Аб'ява не знойдзена",
   marketplaceListingNotFoundHint: "Магчыма, уладальнік яе ўжо зняў.",
   marketplaceSelfHint: "Гэта ваша аб'ява. Кіраваць ёю можна з экрана прадмета.",
+  marketplacePriceHistoryLabel: "Нядаўнія цэны на падобныя прадметы",
+  marketplacePriceHistoryHint: "Да 10 апошніх цэн па аб'явах з падобнымі назвамі.",
 };
 
 const pl: TranslationMap = {
@@ -1078,6 +1084,8 @@ const pl: TranslationMap = {
   marketplaceListingNotFound: "Nie znaleziono ogłoszenia",
   marketplaceListingNotFoundHint: "Może zostało już usunięte przez właściciela.",
   marketplaceSelfHint: "To Twoje ogłoszenie. Możesz nim zarządzać z ekranu przedmiotu.",
+  marketplacePriceHistoryLabel: "Ostatnie ceny podobnych przedmiotów",
+  marketplacePriceHistoryHint: "Do 10 najnowszych cen z ogłoszeń o podobnych nazwach.",
 };
 
 const de: TranslationMap = {
@@ -1182,6 +1190,8 @@ const de: TranslationMap = {
   marketplaceListingNotFound: "Anzeige nicht gefunden",
   marketplaceListingNotFoundHint: "Sie wurde möglicherweise vom Eigentümer entfernt.",
   marketplaceSelfHint: "Das ist deine Anzeige. Du kannst sie über die Objektseite verwalten.",
+  marketplacePriceHistoryLabel: "Aktuelle Preise für ähnliche Objekte",
+  marketplacePriceHistoryHint: "Bis zu 10 aktuelle Preise aus Anzeigen mit ähnlichen Namen.",
 };
 
 const es: TranslationMap = {
@@ -1286,6 +1296,8 @@ const es: TranslationMap = {
   marketplaceListingNotFound: "Anuncio no encontrado",
   marketplaceListingNotFoundHint: "Puede que el propietario ya lo haya retirado.",
   marketplaceSelfHint: "Este es tu anuncio. Puedes gestionarlo desde la pantalla del objeto.",
+  marketplacePriceHistoryLabel: "Precios recientes de objetos similares",
+  marketplacePriceHistoryHint: "Hasta 10 precios recientes de anuncios con nombres similares.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };

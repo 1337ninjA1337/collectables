@@ -1,5 +1,5 @@
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
@@ -9,6 +9,7 @@ import { useChat } from "@/lib/chat-context";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useMarketplace } from "@/lib/marketplace-context";
+import { priceHistoryForTitle } from "@/lib/marketplace-helpers";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
 import { fetchProfileById } from "@/lib/supabase-profiles";
@@ -19,7 +20,7 @@ export default function ListingDetailScreen() {
   const listingId = params.id ?? "";
   const { t } = useI18n();
   const { user } = useAuth();
-  const { getListingById } = useMarketplace();
+  const { getListingById, listings } = useMarketplace();
   const { getItemById } = useCollections();
   const { getProfileById } = useSocial();
   const { ensureChatWith, canMessage } = useChat();
@@ -63,6 +64,20 @@ export default function ListingDetailScreen() {
   const ownerName = owner?.displayName ?? t("unknownUser");
   const isSelf = user?.id === listing.ownerUserId;
   const friendsOnly = !isSelf && !canMessage(listing.ownerUserId);
+
+  const referenceTitle = item?.title ?? "";
+  const priceHistory = useMemo(
+    () =>
+      referenceTitle
+        ? priceHistoryForTitle(
+            referenceTitle,
+            listings,
+            (id) => getItemById(id)?.title ?? null,
+            { excludeListingId: listing.id, limit: 10 },
+          )
+        : [],
+    [referenceTitle, listings, getItemById, listing.id],
+  );
 
   const photo = item?.photos?.find(Boolean);
   const itemTitle = item?.title ?? t("marketplaceUnknownItem");
@@ -149,6 +164,37 @@ export default function ListingDetailScreen() {
         <View style={styles.sheet}>
           <Text style={styles.sheetLabel}>{t("marketplaceNotesLabel")}</Text>
           <Text style={styles.sheetValue}>{listing.notes}</Text>
+        </View>
+      ) : null}
+
+      {priceHistory.length > 0 ? (
+        <View style={styles.sheet}>
+          <Text style={styles.sheetLabel}>{t("marketplacePriceHistoryLabel")}</Text>
+          <Text style={styles.priceHistoryHint}>{t("marketplacePriceHistoryHint")}</Text>
+          <View style={styles.priceHistoryList}>
+            {priceHistory.map((entry) => (
+              <View key={entry.listingId} style={styles.priceHistoryRow}>
+                <Text style={styles.priceHistoryDate}>
+                  {entry.recordedAt.slice(0, 10)}
+                </Text>
+                <Text style={styles.priceHistoryPrice}>
+                  {entry.price} {entry.currency}
+                </Text>
+                <View
+                  style={{
+                    ...styles.priceHistoryModeBadge,
+                    backgroundColor: entry.mode === "sell" ? "#d89c5b" : "#3a7d4f",
+                  }}
+                >
+                  <Text style={styles.priceHistoryModeText}>
+                    {entry.mode === "sell"
+                      ? t("marketplaceModeSell")
+                      : t("marketplaceModeTrade")}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
       ) : null}
 
@@ -311,5 +357,46 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 14,
     lineHeight: 20,
+  },
+  priceHistoryHint: {
+    color: "#8f6947",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  priceHistoryList: {
+    gap: 8,
+    marginTop: 4,
+  },
+  priceHistoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0e2cf",
+  },
+  priceHistoryDate: {
+    color: "#8f6947",
+    fontSize: 13,
+    fontWeight: "700",
+    minWidth: 90,
+  },
+  priceHistoryPrice: {
+    color: "#261b14",
+    fontSize: 16,
+    fontWeight: "800",
+    flex: 1,
+  },
+  priceHistoryModeBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  priceHistoryModeText: {
+    color: "#fff7ef",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 });
