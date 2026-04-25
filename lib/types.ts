@@ -15,6 +15,7 @@ export type UserProfile = {
   publicId: string;
   bio: string;
   avatar: string;
+  isPremium?: boolean;
 };
 
 export type CollectableItem = {
