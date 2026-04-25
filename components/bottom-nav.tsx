@@ -56,15 +56,27 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const onHome = pathname === "/";
   const onSearch = pathname === "/people" || pathname.startsWith("/people");
   const onFriends = pathname === "/friends" || pathname.startsWith("/friends");
+  const onMarketplace = pathname === "/marketplace" || pathname.startsWith("/marketplace") || pathname.startsWith("/listing");
   const onProfile = pathname.startsWith("/profile");
 
   // Active highlights are mutually exclusive: friends takes precedence over search
   const friendsActive = onFriends;
   const searchActive = onSearch && !onFriends;
+  const marketplaceActive = onMarketplace;
 
   // Tab order indices for direction-aware transitions
-  // 0: home, 1: search, 2: friends, 3: profile
-  const currentTabIndex = onHome ? 0 : searchActive ? 1 : friendsActive ? 2 : onProfile ? 3 : -1;
+  // 0: home, 1: search, 2: marketplace, 3: friends, 4: profile
+  const currentTabIndex = onHome
+    ? 0
+    : searchActive
+      ? 1
+      : marketplaceActive
+        ? 2
+        : friendsActive
+          ? 3
+          : onProfile
+            ? 4
+            : -1;
 
   function applyAnimation(targetIndex: number) {
     if (currentTabIndex < 0 || targetIndex === currentTabIndex) {
@@ -103,12 +115,19 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       onPress: () => onSearchPress?.(),
     },
     {
+      key: "marketplace",
+      icon: "storefront-outline",
+      iconActive: "storefront",
+      active: marketplaceActive,
+      onPress: () => navTo("/marketplace", marketplaceActive, 2),
+    },
+    {
       key: "friends",
       icon: "people-outline",
       iconActive: "people",
       active: friendsActive,
       badge: chooseFriendsTabBadge(unreadTotal, incomingRequestUserIds.length),
-      onPress: () => navTo("/friends", friendsActive, 2),
+      onPress: () => navTo("/friends", friendsActive, 3),
     },
     {
       key: "profile",
@@ -119,12 +138,14 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
         if (!myProfile) return;
         const target = `/profile/${myProfile.id}`;
         if (pathname === target) return;
-        applyAnimation(3);
+        applyAnimation(4);
         setTimeout(() => router.push(target as never), 0);
       },
     },
   ];
 
+  // Split into 2 left + 3 right and pad the left with a spacer cell so the
+  // plus button sits in the exact horizontal center (7 equal-flex cells).
   const leftItems = items.slice(0, 2);
   const rightItems = items.slice(2);
 
@@ -168,6 +189,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
             </View>
           </Pressable>
         ))}
+        <View style={styles.item} aria-hidden />
         <View style={styles.item}>
           <Pressable style={styles.plusButton} onPress={openCreate} accessibilityLabel={t("addItem")}>
             <Ionicons name="add" size={30} color="#fff5ea" />

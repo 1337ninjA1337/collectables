@@ -393,6 +393,14 @@ const en = {
   chatTyping: "is typing...",
   goFriends: "Open friends",
   unknownUser: "Unknown user",
+  marketplaceTitle: "Marketplace",
+  marketplaceEyebrow: "Trade & sell",
+  marketplaceSubtitle: "Browse items collectors are offering for trade or sale.",
+  marketplaceEmptyTitle: "No listings yet",
+  marketplaceEmpty: "Listings created by you and other collectors will appear here.",
+  marketplaceModeTrade: "Trade",
+  marketplaceModeSell: "Sell",
+  marketplaceUnknownItem: "Unknown item",
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -794,6 +802,14 @@ const ru: TranslationMap = {
   chatTyping: "печатает...",
   goFriends: "Открыть друзей",
   unknownUser: "Неизвестный пользователь",
+  marketplaceTitle: "Барахолка",
+  marketplaceEyebrow: "Обмен и продажа",
+  marketplaceSubtitle: "Смотрите, что коллекционеры предлагают на обмен или продажу.",
+  marketplaceEmptyTitle: "Пока нет объявлений",
+  marketplaceEmpty: "Здесь появятся объявления — ваши и других коллекционеров.",
+  marketplaceModeTrade: "Обмен",
+  marketplaceModeSell: "Продажа",
+  marketplaceUnknownItem: "Неизвестный предмет",
 };
 
 const be: TranslationMap = {
@@ -883,6 +899,14 @@ const be: TranslationMap = {
   chatTyping: "піша...",
   goFriends: "Адкрыць сяброў",
   unknownUser: "Невядомы карыстальнік",
+  marketplaceTitle: "Барахолка",
+  marketplaceEyebrow: "Абмен і продаж",
+  marketplaceSubtitle: "Глядзіце, што калекцыянеры прапануюць на абмен або продаж.",
+  marketplaceEmptyTitle: "Пакуль няма аб'яваў",
+  marketplaceEmpty: "Тут з'явяцца аб'явы — вашы і іншых калекцыянераў.",
+  marketplaceModeTrade: "Абмен",
+  marketplaceModeSell: "Продаж",
+  marketplaceUnknownItem: "Невядомы прадмет",
 };
 
 const pl: TranslationMap = {
@@ -962,6 +986,14 @@ const pl: TranslationMap = {
   chatTyping: "pisze...",
   goFriends: "Otwórz znajomych",
   unknownUser: "Nieznany użytkownik",
+  marketplaceTitle: "Pchli targ",
+  marketplaceEyebrow: "Wymiana i sprzedaż",
+  marketplaceSubtitle: "Przeglądaj przedmioty, które kolekcjonerzy oferują na wymianę lub sprzedaż.",
+  marketplaceEmptyTitle: "Brak ogłoszeń",
+  marketplaceEmpty: "Tutaj pojawią się ogłoszenia — Twoje i innych kolekcjonerów.",
+  marketplaceModeTrade: "Wymiana",
+  marketplaceModeSell: "Sprzedaż",
+  marketplaceUnknownItem: "Nieznany przedmiot",
 };
 
 const de: TranslationMap = {
@@ -1037,6 +1069,14 @@ const de: TranslationMap = {
   chatTyping: "schreibt...",
   goFriends: "Freunde öffnen",
   unknownUser: "Unbekannter Nutzer",
+  marketplaceTitle: "Marktplatz",
+  marketplaceEyebrow: "Tauschen & Verkaufen",
+  marketplaceSubtitle: "Stöbere durch Objekte, die Sammler zum Tausch oder Verkauf anbieten.",
+  marketplaceEmptyTitle: "Noch keine Anzeigen",
+  marketplaceEmpty: "Hier erscheinen Anzeigen — deine und die anderer Sammler.",
+  marketplaceModeTrade: "Tausch",
+  marketplaceModeSell: "Verkauf",
+  marketplaceUnknownItem: "Unbekanntes Objekt",
 };
 
 const es: TranslationMap = {
@@ -1112,6 +1152,14 @@ const es: TranslationMap = {
   chatTyping: "está escribiendo...",
   goFriends: "Abrir amigos",
   unknownUser: "Usuario desconocido",
+  marketplaceTitle: "Mercadillo",
+  marketplaceEyebrow: "Intercambio y venta",
+  marketplaceSubtitle: "Explora objetos que los coleccionistas ofrecen para intercambio o venta.",
+  marketplaceEmptyTitle: "Aún no hay anuncios",
+  marketplaceEmpty: "Aquí aparecerán los anuncios, los tuyos y los de otros coleccionistas.",
+  marketplaceModeTrade: "Intercambio",
+  marketplaceModeSell: "Venta",
+  marketplaceUnknownItem: "Objeto desconocido",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };
