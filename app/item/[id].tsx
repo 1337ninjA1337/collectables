@@ -15,6 +15,7 @@ import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useMarketplace } from "@/lib/marketplace-context";
 import { placeholderColor } from "@/lib/placeholder-color";
+import { usePremium } from "@/lib/premium-context";
 import { fetchItemById } from "@/lib/supabase-profiles";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
@@ -36,6 +37,7 @@ export default function ItemDetailsScreen() {
     addListing,
     removeListing,
   } = useMarketplace();
+  const { isPremium } = usePremium();
   const localItem = getItemById(params.id);
   const [remoteItem, setRemoteItem] = useState<CollectableItem | null>(null);
   const [loadingRemote, setLoadingRemote] = useState(false);
@@ -104,7 +106,7 @@ export default function ItemDetailsScreen() {
   const collection = getCollectionById(activeItem.collectionId);
   const isOwner = user?.id === activeItem.createdByUserId;
   const existingListing = findListingByItemId(activeItem.id);
-  const overFreeCap = !existingListing && myActiveListingCount >= 1;
+  const overFreeCap = !isPremium && !existingListing && myActiveListingCount >= 1;
 
   function enterEditMode() {
     setEditTitle(activeItem.title);
@@ -209,6 +211,7 @@ export default function ItemDetailsScreen() {
       mode: listingMode,
       askingPrice: finalPrice,
       notes: listingNotes,
+      isPremium,
     });
     if (!result) {
       toast.error(t("marketplaceListingFailed"), t("marketplaceUpgradeHint"));

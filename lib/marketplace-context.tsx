@@ -21,6 +21,7 @@ type DraftListingInput = {
   askingPrice: number | null;
   currency?: string;
   notes?: string;
+  isPremium?: boolean;
 };
 
 type MarketplaceContextValue = {
@@ -97,16 +98,8 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
   const addListing = useCallback(
     (input: DraftListingInput): MarketplaceListing | null => {
       if (!user) return null;
-      // Free-tier cap is enforced by callers via canCreateListing(); the
-      // context still validates so a stale UI state can't sneak past.
-      if (!canCreateListing(false)) {
-        // If the caller knows the user is premium they should call
-        // canCreateListing(true) first; we fall through here only when the
-        // free cap blocks the write.
-        const isOverFreeCap =
-          countActiveListingsForUser(listings, user.id) >= 1;
-        if (isOverFreeCap) return null;
-      }
+      const isPremium = input.isPremium === true;
+      if (!canCreateAnotherListing(listings, user.id, isPremium)) return null;
       const next: MarketplaceListing = {
         id: generateListingId(),
         itemId: input.itemId,
@@ -124,7 +117,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       setListings((prev) => upsertListing(prev, next));
       return next;
     },
-    [canCreateListing, listings, user],
+    [listings, user],
   );
 
   const removeListing = useCallback((id: string) => {
