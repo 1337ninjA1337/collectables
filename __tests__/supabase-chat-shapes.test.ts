@@ -7,8 +7,11 @@ import {
   chatRowToMessage,
   fetchMessagesUrl,
   friendCheckUrl,
+  inboxChannelTopic,
+  inboxFilter,
   isMutualFriendFromResponses,
   messageToInsertPayload,
+  realtimeEndpoint,
   sendMessageUrl,
   unreadCountForChat,
 } from "@/lib/supabase-chat-shapes";
@@ -196,5 +199,38 @@ describe("unreadCountForChat", () => {
 
   it("returns 0 for an empty list", () => {
     assert.equal(unreadCountForChat([], "a", ""), 0);
+  });
+});
+
+describe("inboxFilter", () => {
+  it("restricts realtime stream to rows addressed to the given user", () => {
+    assert.equal(inboxFilter("alice"), "to_user_id=eq.alice");
+  });
+});
+
+describe("inboxChannelTopic", () => {
+  it("is deterministic per user so re-subscribes hit the same channel", () => {
+    assert.equal(inboxChannelTopic("alice"), "chat-inbox-alice");
+    assert.equal(inboxChannelTopic("alice"), inboxChannelTopic("alice"));
+  });
+
+  it("differs per user", () => {
+    assert.notEqual(inboxChannelTopic("alice"), inboxChannelTopic("bob"));
+  });
+});
+
+describe("realtimeEndpoint", () => {
+  it("upgrades https to wss and appends /realtime/v1", () => {
+    assert.equal(
+      realtimeEndpoint("https://demo.supabase.co"),
+      "wss://demo.supabase.co/realtime/v1",
+    );
+  });
+
+  it("upgrades http to ws for local supabase instances", () => {
+    assert.equal(
+      realtimeEndpoint("http://localhost:54321"),
+      "ws://localhost:54321/realtime/v1",
+    );
   });
 });

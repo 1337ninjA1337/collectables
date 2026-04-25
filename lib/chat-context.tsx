@@ -14,6 +14,7 @@ import { useSocial } from "@/lib/social-context";
 import {
   fetchMessagesForChat as cloudFetchMessagesForChat,
   sendMessage as cloudSendMessage,
+  subscribeToInbox,
 } from "@/lib/supabase-chat";
 import { ChatMessage } from "@/lib/types";
 
@@ -135,6 +136,30 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       cancelled = true;
     };
   }, [ready, user, friends]);
+
+  // Realtime inbox: any INSERT on chat_messages where to_user_id = me is
+  // pushed straight into local state so other-device messages show up
+  // without a poll. RLS already restricts what the channel can deliver, so
+  // an over-permissive payload is impossible.
+  useEffect(() => {
+    if (!ready || !user) return;
+
+    const subscription = subscribeToInbox(user.id, (incoming) => {
+      setStore((prev) => {
+        const existing = prev.messagesByChat[incoming.chatId] ?? [];
+        const merged = appendMessage(existing, incoming);
+        if (merged === existing) return prev;
+        return {
+          ...prev,
+          messagesByChat: { ...prev.messagesByChat, [incoming.chatId]: merged },
+        };
+      });
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [ready, user]);
 
   const previews = useMemo<ChatPreview[]>(() => {
     if (!user) return [];

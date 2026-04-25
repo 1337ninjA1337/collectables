@@ -121,3 +121,29 @@ export function unreadCountForChat(
     (m) => m.toUserId === selfId && m.createdAt > cutoff,
   ).length;
 }
+
+/**
+ * Postgres-changes filter string for the realtime subscription. Restricts
+ * incoming inserts to rows where `to_user_id = userId`, which is the only
+ * shape RLS allows the current user to read anyway, but keeps the channel
+ * traffic narrow.
+ */
+export function inboxFilter(userId: string): string {
+  return `to_user_id=eq.${userId}`;
+}
+
+/**
+ * Deterministic per-user channel topic so re-subscribing produces the same
+ * channel name and supabase reuses it instead of opening a second one.
+ */
+export function inboxChannelTopic(userId: string): string {
+  return `chat-inbox-${userId}`;
+}
+
+/**
+ * Realtime endpoint for the supabase project. Mirrors the `wss://<host>/realtime/v1`
+ * shape that `@supabase/realtime-js` expects.
+ */
+export function realtimeEndpoint(baseUrl: string): string {
+  return `${baseUrl.replace(/^http/, "ws")}/realtime/v1`;
+}

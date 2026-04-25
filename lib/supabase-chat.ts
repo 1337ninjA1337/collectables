@@ -1,4 +1,12 @@
 import {
+  RealtimeChannel,
+  RealtimeClient,
+  REALTIME_LISTEN_TYPES,
+  REALTIME_POSTGRES_CHANGES_LISTEN_EVENT,
+  REALTIME_SUBSCRIBE_STATES,
+} from "@supabase/realtime-js";
+
+import {
   authClient,
   isSupabaseConfigured,
   supabasePublishableKey,
@@ -11,8 +19,11 @@ import {
   chatRowToMessage,
   fetchMessagesUrl,
   friendCheckUrl,
+  inboxChannelTopic,
+  inboxFilter,
   isMutualFriendFromResponses,
   messageToInsertPayload,
+  realtimeEndpoint,
   sendMessageUrl,
   SendMessageInput,
 } from "@/lib/supabase-chat-shapes";
@@ -74,6 +85,81 @@ export async function markRead(
   _lastReadAt: string,
 ): Promise<void> {
   return;
+}
+
+let realtimeClient: RealtimeClient | null = null;
+
+function getRealtimeClient(): RealtimeClient | null {
+  if (!isSupabaseConfigured) return null;
+  if (realtimeClient) return realtimeClient;
+  realtimeClient = new RealtimeClient(realtimeEndpoint(supabaseUrl!), {
+    params: { apikey: supabasePublishableKey! },
+    accessToken: () => getAccessToken(),
+  });
+  return realtimeClient;
+}
+
+export type InboxSubscription = {
+  unsubscribe: () => void;
+};
+
+/**
+ * Subscribes to a Supabase realtime channel that streams INSERTs on
+ * `chat_messages` addressed to `userId`. The callback is invoked once per
+ * incoming message, already converted to the app's `ChatMessage` shape.
+ *
+ * Returns an `InboxSubscription` whose `unsubscribe()` removes the channel
+ * and is safe to call multiple times. When supabase is not configured the
+ * function is a no-op and returns a stub subscription so callers can wire
+ * it up unconditionally.
+ */
+export function subscribeToInbox(
+  userId: string,
+  onMessage: (message: ChatMessage) => void,
+): InboxSubscription {
+  const client = getRealtimeClient();
+  if (!client || !userId) {
+    return { unsubscribe: () => undefined };
+  }
+
+  let channel: RealtimeChannel | null = client.channel(inboxChannelTopic(userId));
+  channel
+    .on(
+      REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
+      {
+        event: REALTIME_POSTGRES_CHANGES_LISTEN_EVENT.INSERT,
+        schema: "public",
+        table: "chat_messages",
+        filter: inboxFilter(userId),
+      },
+      (payload) => {
+        const row = payload.new as ChatRow | undefined;
+        if (!row || !row.id) return;
+        try {
+          onMessage(chatRowToMessage(row));
+        } catch {
+          // Ignore handler errors so a buggy listener can't kill the socket.
+        }
+      },
+    )
+    .subscribe((status) => {
+      if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
+        // Leave the channel attached so realtime-js can auto-reconnect.
+      }
+    });
+
+  return {
+    unsubscribe: () => {
+      if (!channel) return;
+      const ch = channel;
+      channel = null;
+      try {
+        void client.removeChannel(ch);
+      } catch {
+        // Best-effort cleanup; the socket may already be closed.
+      }
+    },
+  };
 }
 
 export async function isMutualFriend(
