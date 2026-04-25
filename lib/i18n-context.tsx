@@ -417,6 +417,11 @@ const en = {
   marketplaceListingRemoved: "Listing removed",
   marketplaceListingFailed: "Could not create listing",
   marketplaceUpgradeHint: "Free accounts can list one item at a time. Upgrade to premium to list more.",
+  marketplaceMessageOwner: "Message owner",
+  marketplaceOwnerLabel: "Listed by",
+  marketplaceListingNotFound: "Listing not found",
+  marketplaceListingNotFoundHint: "It may have been removed by its owner.",
+  marketplaceSelfHint: "This is your listing. You can manage it from the item detail screen.",
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -842,6 +847,11 @@ const ru: TranslationMap = {
   marketplaceListingRemoved: "Объявление снято",
   marketplaceListingFailed: "Не удалось создать объявление",
   marketplaceUpgradeHint: "На бесплатном тарифе можно выставлять только один предмет. Перейдите на премиум, чтобы выставлять больше.",
+  marketplaceMessageOwner: "Написать владельцу",
+  marketplaceOwnerLabel: "Выставил",
+  marketplaceListingNotFound: "Объявление не найдено",
+  marketplaceListingNotFoundHint: "Возможно, владелец его уже снял.",
+  marketplaceSelfHint: "Это ваше объявление. Управлять им можно с экрана предмета.",
 };
 
 const be: TranslationMap = {
@@ -955,6 +965,11 @@ const be: TranslationMap = {
   marketplaceListingRemoved: "Аб'ява знята",
   marketplaceListingFailed: "Не ўдалося стварыць аб'яву",
   marketplaceUpgradeHint: "На бясплатным тарыфе можна выстаўляць толькі адзін прадмет. Пераходзьце на прэміум, каб выстаўляць больш.",
+  marketplaceMessageOwner: "Напісаць уладальніку",
+  marketplaceOwnerLabel: "Выставіў",
+  marketplaceListingNotFound: "Аб'ява не знойдзена",
+  marketplaceListingNotFoundHint: "Магчыма, уладальнік яе ўжо зняў.",
+  marketplaceSelfHint: "Гэта ваша аб'ява. Кіраваць ёю можна з экрана прадмета.",
 };
 
 const pl: TranslationMap = {
@@ -1058,6 +1073,11 @@ const pl: TranslationMap = {
   marketplaceListingRemoved: "Ogłoszenie usunięte",
   marketplaceListingFailed: "Nie udało się utworzyć ogłoszenia",
   marketplaceUpgradeHint: "Na koncie darmowym możesz wystawić jeden przedmiot na raz. Przejdź na premium, aby wystawić więcej.",
+  marketplaceMessageOwner: "Napisz do właściciela",
+  marketplaceOwnerLabel: "Wystawił",
+  marketplaceListingNotFound: "Nie znaleziono ogłoszenia",
+  marketplaceListingNotFoundHint: "Może zostało już usunięte przez właściciela.",
+  marketplaceSelfHint: "To Twoje ogłoszenie. Możesz nim zarządzać z ekranu przedmiotu.",
 };
 
 const de: TranslationMap = {
@@ -1157,6 +1177,11 @@ const de: TranslationMap = {
   marketplaceListingRemoved: "Anzeige entfernt",
   marketplaceListingFailed: "Anzeige konnte nicht erstellt werden",
   marketplaceUpgradeHint: "Mit einem kostenlosen Konto kannst du jeweils ein Objekt inserieren. Upgrade auf Premium für mehr.",
+  marketplaceMessageOwner: "Eigentümer anschreiben",
+  marketplaceOwnerLabel: "Inseriert von",
+  marketplaceListingNotFound: "Anzeige nicht gefunden",
+  marketplaceListingNotFoundHint: "Sie wurde möglicherweise vom Eigentümer entfernt.",
+  marketplaceSelfHint: "Das ist deine Anzeige. Du kannst sie über die Objektseite verwalten.",
 };
 
 const es: TranslationMap = {
@@ -1256,6 +1281,11 @@ const es: TranslationMap = {
   marketplaceListingRemoved: "Anuncio eliminado",
   marketplaceListingFailed: "No se pudo crear el anuncio",
   marketplaceUpgradeHint: "Las cuentas gratuitas pueden publicar un objeto a la vez. Hazte premium para publicar más.",
+  marketplaceMessageOwner: "Mensaje al propietario",
+  marketplaceOwnerLabel: "Publicado por",
+  marketplaceListingNotFound: "Anuncio no encontrado",
+  marketplaceListingNotFoundHint: "Puede que el propietario ya lo haya retirado.",
+  marketplaceSelfHint: "Este es tu anuncio. Puedes gestionarlo desde la pantalla del objeto.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };
