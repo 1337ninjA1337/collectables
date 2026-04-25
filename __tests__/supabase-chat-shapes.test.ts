@@ -5,6 +5,7 @@ import {
   buildAuthHeaders,
   buildSendMessageHeaders,
   chatRowToMessage,
+  extractTypingUserIds,
   fetchMessagesUrl,
   friendCheckUrl,
   inboxChannelTopic,
@@ -13,6 +14,7 @@ import {
   messageToInsertPayload,
   realtimeEndpoint,
   sendMessageUrl,
+  typingChannelTopic,
   unreadCountForChat,
 } from "@/lib/supabase-chat-shapes";
 import { ChatMessage } from "@/lib/types";
@@ -216,6 +218,54 @@ describe("inboxChannelTopic", () => {
 
   it("differs per user", () => {
     assert.notEqual(inboxChannelTopic("alice"), inboxChannelTopic("bob"));
+  });
+});
+
+describe("typingChannelTopic", () => {
+  it("is deterministic per chat so both participants share one channel", () => {
+    assert.equal(typingChannelTopic("chat-a-b"), "chat-typing-chat-a-b");
+    assert.equal(typingChannelTopic("chat-a-b"), typingChannelTopic("chat-a-b"));
+  });
+
+  it("differs per chat", () => {
+    assert.notEqual(typingChannelTopic("chat-a-b"), typingChannelTopic("chat-c-d"));
+  });
+});
+
+describe("extractTypingUserIds", () => {
+  it("returns remote user ids whose latest payload has typing: true, excluding self", () => {
+    const state = {
+      alice: [{ typing: true }],
+      bob: [{ typing: false }],
+      carol: [{ typing: true }],
+    };
+    assert.deepEqual(extractTypingUserIds(state, "alice"), ["carol"]);
+  });
+
+  it("returns [] when nobody (other than self) is typing", () => {
+    const state = {
+      alice: [{ typing: true }],
+      bob: [{ typing: false }],
+    };
+    assert.deepEqual(extractTypingUserIds(state, "alice"), []);
+  });
+
+  it("ignores empty entry arrays and missing typing flags", () => {
+    const state = {
+      alice: [],
+      bob: [{}],
+      carol: [{ typing: true }],
+    };
+    assert.deepEqual(extractTypingUserIds(state, "self"), ["carol"]);
+  });
+
+  it("returns sorted ids so consumers can compare with reference equality patterns", () => {
+    const state = {
+      zara: [{ typing: true }],
+      bob: [{ typing: true }],
+      alice: [{ typing: true }],
+    };
+    assert.deepEqual(extractTypingUserIds(state, "self"), ["alice", "bob", "zara"]);
   });
 });
 

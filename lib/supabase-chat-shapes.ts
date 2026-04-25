@@ -147,3 +147,33 @@ export function inboxChannelTopic(userId: string): string {
 export function realtimeEndpoint(baseUrl: string): string {
   return `${baseUrl.replace(/^http/, "ws")}/realtime/v1`;
 }
+
+/**
+ * Presence-channel topic for the typing indicator. Keyed by chatId so both
+ * participants subscribe to the same channel and see each other's
+ * presence sync events.
+ */
+export function typingChannelTopic(chatId: string): string {
+  return `chat-typing-${chatId}`;
+}
+
+/**
+ * Extract the list of "currently typing" user ids from a Supabase presence
+ * state, excluding `selfId`. Each presence key is a user id whose latest
+ * tracked metadata may include `{ typing: true }`. Used by the runtime
+ * subscriber to fan out a clean list to React state.
+ */
+export function extractTypingUserIds(
+  state: Record<string, { typing?: boolean }[]>,
+  selfId: string,
+): string[] {
+  const out: string[] = [];
+  for (const [userId, entries] of Object.entries(state)) {
+    if (userId === selfId) continue;
+    if (!Array.isArray(entries) || entries.length === 0) continue;
+    if (entries.some((e) => e && e.typing === true)) {
+      out.push(userId);
+    }
+  }
+  return out.sort();
+}

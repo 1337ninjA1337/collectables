@@ -390,6 +390,7 @@ const en = {
   chatClear: "Clear chat",
   chatOnlyFriendsTitle: "Friends only",
   chatOnlyFriendsHint: "You can only chat with people you have added as friends.",
+  chatTyping: "is typing...",
   goFriends: "Open friends",
   unknownUser: "Unknown user",
 } as const;
@@ -790,6 +791,7 @@ const ru: TranslationMap = {
   chatClear: "Очистить чат",
   chatOnlyFriendsTitle: "Только для друзей",
   chatOnlyFriendsHint: "Вы можете общаться только с теми, кого добавили в друзья.",
+  chatTyping: "печатает...",
   goFriends: "Открыть друзей",
   unknownUser: "Неизвестный пользователь",
 };
@@ -878,6 +880,7 @@ const be: TranslationMap = {
   chatClear: "Ачысціць чат",
   chatOnlyFriendsTitle: "Толькі для сяброў",
   chatOnlyFriendsHint: "Вы можаце размаўляць толькі з тымі, каго дадалі ў сябры.",
+  chatTyping: "піша...",
   goFriends: "Адкрыць сяброў",
   unknownUser: "Невядомы карыстальнік",
 };
@@ -956,6 +959,7 @@ const pl: TranslationMap = {
   chatClear: "Wyczyść czat",
   chatOnlyFriendsTitle: "Tylko znajomi",
   chatOnlyFriendsHint: "Możesz rozmawiać tylko z osobami, które dodałeś do znajomych.",
+  chatTyping: "pisze...",
   goFriends: "Otwórz znajomych",
   unknownUser: "Nieznany użytkownik",
 };
@@ -1030,6 +1034,7 @@ const de: TranslationMap = {
   chatClear: "Chat löschen",
   chatOnlyFriendsTitle: "Nur Freunde",
   chatOnlyFriendsHint: "Du kannst nur mit Personen chatten, die du als Freunde hinzugefügt hast.",
+  chatTyping: "schreibt...",
   goFriends: "Freunde öffnen",
   unknownUser: "Unbekannter Nutzer",
 };
@@ -1104,6 +1109,7 @@ const es: TranslationMap = {
   chatClear: "Vaciar chat",
   chatOnlyFriendsTitle: "Solo amigos",
   chatOnlyFriendsHint: "Solo puedes chatear con personas que hayas añadido como amigos.",
+  chatTyping: "está escribiendo...",
   goFriends: "Abrir amigos",
   unknownUser: "Usuario desconocido",
 };

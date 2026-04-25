@@ -17,6 +17,7 @@ import {
   buildSendMessageHeaders,
   ChatRow,
   chatRowToMessage,
+  extractTypingUserIds,
   fetchMessagesUrl,
   friendCheckUrl,
   inboxChannelTopic,
@@ -26,6 +27,7 @@ import {
   realtimeEndpoint,
   sendMessageUrl,
   SendMessageInput,
+  typingChannelTopic,
 } from "@/lib/supabase-chat-shapes";
 import { ChatMessage } from "@/lib/types";
 
@@ -153,6 +155,83 @@ export function subscribeToInbox(
       if (!channel) return;
       const ch = channel;
       channel = null;
+      try {
+        void client.removeChannel(ch);
+      } catch {
+        // Best-effort cleanup; the socket may already be closed.
+      }
+    },
+  };
+}
+
+export type TypingSubscription = {
+  setTyping: (isTyping: boolean) => void;
+  unsubscribe: () => void;
+};
+
+/**
+ * Subscribes to a per-chat presence channel that signals which other
+ * participant is currently typing. The returned `setTyping` toggles the
+ * local presence payload; `onTypingUsersChange` receives the list of
+ * remote user ids whose latest payload had `typing: true`.
+ *
+ * No-op when supabase is not configured so the chat UI keeps working
+ * locally without a typing indicator.
+ */
+export function subscribeToTyping(
+  chatId: string,
+  selfId: string,
+  onTypingUsersChange: (userIds: string[]) => void,
+): TypingSubscription {
+  const client = getRealtimeClient();
+  if (!client || !chatId || !selfId) {
+    return { setTyping: () => undefined, unsubscribe: () => undefined };
+  }
+
+  let channel: RealtimeChannel | null = client.channel(
+    typingChannelTopic(chatId),
+    { config: { presence: { key: selfId } } },
+  );
+  let subscribed = false;
+  let pendingTyping = false;
+
+  const handleSync = () => {
+    if (!channel) return;
+    const state = channel.presenceState() as Record<
+      string,
+      { typing?: boolean }[]
+    >;
+    onTypingUsersChange(extractTypingUserIds(state, selfId));
+  };
+
+  channel
+    .on(REALTIME_LISTEN_TYPES.PRESENCE, { event: "sync" }, handleSync)
+    .on(REALTIME_LISTEN_TYPES.PRESENCE, { event: "join" }, handleSync)
+    .on(REALTIME_LISTEN_TYPES.PRESENCE, { event: "leave" }, handleSync)
+    .subscribe((status) => {
+      if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
+        subscribed = true;
+        // Track immediately so the other side sees us as a participant
+        // even before we start typing. Pushes the current pending state.
+        void channel?.track({ typing: pendingTyping });
+      }
+    });
+
+  return {
+    setTyping: (isTyping: boolean) => {
+      pendingTyping = isTyping;
+      if (!channel || !subscribed) return;
+      void channel.track({ typing: isTyping });
+    },
+    unsubscribe: () => {
+      if (!channel) return;
+      const ch = channel;
+      channel = null;
+      try {
+        if (subscribed) void ch.untrack();
+      } catch {
+        // Ignore: channel may already be torn down.
+      }
       try {
         void client.removeChannel(ch);
       } catch {

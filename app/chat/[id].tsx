@@ -20,8 +20,11 @@ import { useChat } from "@/lib/chat-context";
 import { buildChatId } from "@/lib/chat-helpers";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
+import { subscribeToTyping } from "@/lib/supabase-chat";
 import { fetchProfileById } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
+
+const TYPING_DEBOUNCE_MS = 1000;
 
 function formatTime(iso: string, locale: string | undefined): string {
   const date = new Date(iso);
@@ -45,7 +48,12 @@ export default function ChatDetailScreen() {
   const [otherProfile, setOtherProfile] = useState<UserProfile | null>(
     () => getProfileById(otherUserId) ?? null,
   );
+  const [typingUserIds, setTypingUserIds] = useState<readonly string[]>([]);
   const scrollRef = useRef<ScrollView | null>(null);
+  const typingSubRef = useRef<{ setTyping: (v: boolean) => void; unsubscribe: () => void } | null>(
+    null,
+  );
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const local = getProfileById(otherUserId);
@@ -76,6 +84,28 @@ export default function ChatDetailScreen() {
     if (chatId) markRead(chatId);
   }, [chatId, messages.length, markRead]);
 
+  // Presence-based typing indicator. We open one channel per chat, keyed by
+  // selfId, so each side sees the other's `{ typing: boolean }` payload.
+  useEffect(() => {
+    if (!chatId || !user || !allowed) {
+      setTypingUserIds([]);
+      return;
+    }
+    const sub = subscribeToTyping(chatId, user.id, (ids) => {
+      setTypingUserIds(ids);
+    });
+    typingSubRef.current = sub;
+    return () => {
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+      typingSubRef.current = null;
+      sub.setTyping(false);
+      sub.unsubscribe();
+    };
+  }, [chatId, user, allowed]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       scrollRef.current?.scrollToEnd({ animated: false });
@@ -83,8 +113,33 @@ export default function ChatDetailScreen() {
     return () => clearTimeout(timer);
   }, [messages.length]);
 
+  function handleTextChange(next: string) {
+    setText(next);
+    const sub = typingSubRef.current;
+    if (!sub) return;
+    if (next.trim().length === 0) {
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+      sub.setTyping(false);
+      return;
+    }
+    sub.setTyping(true);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      typingSubRef.current?.setTyping(false);
+      typingTimerRef.current = null;
+    }, TYPING_DEBOUNCE_MS);
+  }
+
   async function handleSend() {
     if (!text.trim()) return;
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+    typingSubRef.current?.setTyping(false);
     const msg = await sendMessage(otherUserId, text);
     if (msg) {
       setText("");
@@ -192,13 +247,21 @@ export default function ChatDetailScreen() {
           )}
         </ScrollView>
 
+        {typingUserIds.length > 0 ? (
+          <View style={styles.typingRow}>
+            <Text style={styles.typingText}>
+              {(otherProfile?.displayName ?? title) + " " + t("chatTyping")}
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.composer}>
           <TextInput
             style={styles.input}
             placeholder={t("chatInputPlaceholder")}
             placeholderTextColor="#a08970"
             value={text}
-            onChangeText={setText}
+            onChangeText={handleTextChange}
             onSubmitEditing={handleSend}
             returnKeyType="send"
             multiline
@@ -337,6 +400,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#a08970",
     paddingHorizontal: 4,
+  },
+  typingRow: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  typingText: {
+    fontSize: 12,
+    color: "#8f6947",
+    fontStyle: "italic",
   },
   composer: {
     flexDirection: "row",
