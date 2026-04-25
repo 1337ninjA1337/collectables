@@ -13,10 +13,11 @@ import { useAuth } from "@/lib/auth-context";
 import { uploadImages } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
+import { useMarketplace } from "@/lib/marketplace-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { fetchItemById } from "@/lib/supabase-profiles";
 import { useToast } from "@/lib/toast-context";
-import { CollectableItem, ItemCondition, ItemTag } from "@/lib/types";
+import { CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
 
 const TAG_COLORS = [
   "#d89c5b", "#c47a5a", "#7a9e7e", "#5b8fd8", "#9b7ec8",
@@ -29,6 +30,12 @@ export default function ItemDetailsScreen() {
   const { getItemById, getCollectionById, deleteItem, updateItem, refresh } = useCollections();
   const { t } = useI18n();
   const toast = useToast();
+  const {
+    findListingByItemId,
+    myActiveListingCount,
+    addListing,
+    removeListing,
+  } = useMarketplace();
   const localItem = getItemById(params.id);
   const [remoteItem, setRemoteItem] = useState<CollectableItem | null>(null);
   const [loadingRemote, setLoadingRemote] = useState(false);
@@ -59,6 +66,11 @@ export default function ItemDetailsScreen() {
   const [editTagInput, setEditTagInput] = useState("");
   const [editPhotos, setEditPhotos] = useState<string[]>([]);
   const [newLocalPhotos, setNewLocalPhotos] = useState<string[]>([]);
+
+  const [listingSheetOpen, setListingSheetOpen] = useState(false);
+  const [listingMode, setListingMode] = useState<MarketplaceMode>("trade");
+  const [listingPrice, setListingPrice] = useState("");
+  const [listingNotes, setListingNotes] = useState("");
 
   useEffect(() => {
     if (!localItem && params.id && params.id !== "[id]") {
@@ -91,6 +103,8 @@ export default function ItemDetailsScreen() {
   const activeItem = item;
   const collection = getCollectionById(activeItem.collectionId);
   const isOwner = user?.id === activeItem.createdByUserId;
+  const existingListing = findListingByItemId(activeItem.id);
+  const overFreeCap = !existingListing && myActiveListingCount >= 1;
 
   function enterEditMode() {
     setEditTitle(activeItem.title);
@@ -170,6 +184,44 @@ export default function ItemDetailsScreen() {
   async function confirmAndDeleteItem() {
     await deleteItem(activeItem.id);
     router.replace(collection ? `/collection/${collection.id}` : "/");
+  }
+
+  function openListingSheet() {
+    setListingMode("trade");
+    setListingPrice("");
+    setListingNotes("");
+    setListingSheetOpen(true);
+  }
+
+  function closeListingSheet() {
+    setListingSheetOpen(false);
+  }
+
+  function handleSubmitListing() {
+    if (overFreeCap) return;
+    const parsed = listingMode === "sell" ? Number(listingPrice.replace(",", ".")) : null;
+    const finalPrice =
+      listingMode === "sell" && typeof parsed === "number" && !Number.isNaN(parsed)
+        ? parsed
+        : null;
+    const result = addListing({
+      itemId: activeItem.id,
+      mode: listingMode,
+      askingPrice: finalPrice,
+      notes: listingNotes,
+    });
+    if (!result) {
+      toast.error(t("marketplaceListingFailed"), t("marketplaceUpgradeHint"));
+      return;
+    }
+    closeListingSheet();
+    toast.success(t("marketplaceListingCreated"));
+  }
+
+  function handleRemoveListing() {
+    if (!existingListing) return;
+    removeListing(existingListing.id);
+    toast.success(t("marketplaceListingRemoved"));
   }
 
   function handleDelete() {
@@ -316,6 +368,36 @@ export default function ItemDetailsScreen() {
         </Pressable>
       ) : null}
 
+      {isOwner ? (
+        existingListing ? (
+          <View style={styles.listingStatusGroup}>
+            <View style={styles.listingStatusBadge}>
+              <Text style={styles.listingStatusText}>
+                {existingListing.mode === "sell"
+                  ? t("marketplaceListedForSale")
+                  : t("marketplaceListedForTrade")}
+              </Text>
+            </View>
+            <Pressable style={styles.listingRemoveButton} onPress={handleRemoveListing}>
+              <Text style={styles.listingRemoveText}>{t("marketplaceRemoveListing")}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.listingStatusGroup}>
+            <Pressable
+              style={{ ...styles.listingButton, ...(overFreeCap ? styles.listingButtonDisabled : {}) }}
+              onPress={openListingSheet}
+              disabled={overFreeCap}
+            >
+              <Text style={styles.listingButtonText}>{t("marketplaceListOnMarketplace")}</Text>
+            </Pressable>
+            {overFreeCap ? (
+              <Text style={styles.listingHint}>{t("marketplaceUpgradeHint")}</Text>
+            ) : null}
+          </View>
+        )
+      ) : null}
+
       <View style={styles.sheet}>
         <Text style={styles.sheetLabel}>{t("acquiredHow")}</Text>
         <Text style={styles.sheetValue}>{activeItem.acquiredFrom}</Text>
@@ -370,6 +452,85 @@ export default function ItemDetailsScreen() {
       ) : null}
 
       <ReactionBar targetType="item" targetId={activeItem.id} />
+
+      <Modal
+        visible={listingSheetOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={closeListingSheet}
+      >
+        <Pressable style={styles.shareBackdrop} onPress={closeListingSheet}>
+          <Pressable style={styles.shareSheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.shareHandle} />
+            <Text style={styles.shareTitle}>{t("marketplaceListingTitle")}</Text>
+            <Text style={styles.shareHint}>{t("marketplaceListingHint")}</Text>
+
+            <View style={styles.editFieldGroup}>
+              <Text style={styles.editLabel}>{t("marketplaceModeLabel")}</Text>
+              <View style={styles.conditionRow}>
+                {(["trade", "sell"] as const).map((m) => {
+                  const selected = listingMode === m;
+                  return (
+                    <Pressable
+                      key={m}
+                      style={{ ...styles.conditionChip, ...(selected ? styles.conditionChipSelected : {}) }}
+                      onPress={() => setListingMode(m)}
+                    >
+                      <Text style={{ ...styles.conditionChipText, ...(selected ? styles.conditionChipTextSelected : {}) }}>
+                        {m === "trade" ? t("marketplaceModeTrade") : t("marketplaceModeSell")}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {listingMode === "sell" ? (
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editLabel}>{t("marketplacePriceLabel")}</Text>
+                <TextInput
+                  value={listingPrice}
+                  onChangeText={setListingPrice}
+                  placeholder={t("marketplacePricePlaceholder")}
+                  placeholderTextColor="#9b8571"
+                  keyboardType="numeric"
+                  style={styles.editInput}
+                />
+              </View>
+            ) : null}
+
+            <View style={styles.editFieldGroup}>
+              <Text style={styles.editLabel}>{t("marketplaceNotesLabel")}</Text>
+              <TextInput
+                value={listingNotes}
+                onChangeText={setListingNotes}
+                placeholder={t("marketplaceNotesPlaceholder")}
+                placeholderTextColor="#9b8571"
+                multiline
+                textAlignVertical="top"
+                style={{ ...styles.editInput, ...styles.editInputMultiline }}
+              />
+            </View>
+
+            {overFreeCap ? (
+              <Text style={styles.listingHint}>{t("marketplaceUpgradeHint")}</Text>
+            ) : null}
+
+            <View style={styles.shareActions}>
+              <Pressable
+                style={{ ...styles.shareCopyButton, ...(overFreeCap ? styles.saveButtonDisabled : {}) }}
+                onPress={handleSubmitListing}
+                disabled={overFreeCap}
+              >
+                <Text style={styles.shareCopyButtonText}>{t("marketplaceSubmitListing")}</Text>
+              </Pressable>
+            </View>
+            <Pressable style={styles.shareCancelButton} onPress={closeListingSheet}>
+              <Text style={styles.shareCancelText}>{t("cancel")}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={shareOpen} transparent animationType="slide" onRequestClose={() => setShareOpen(false)}>
         <Pressable style={styles.shareBackdrop} onPress={() => setShareOpen(false)}>
@@ -810,6 +971,56 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: "#5f4734",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  listingStatusGroup: {
+    gap: 8,
+  },
+  listingButton: {
+    borderRadius: 20,
+    backgroundColor: "#d89c5b",
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  listingButtonDisabled: {
+    opacity: 0.5,
+  },
+  listingButtonText: {
+    color: "#241912",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  listingHint: {
+    color: "#8a5a2b",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  listingStatusBadge: {
+    borderRadius: 999,
+    backgroundColor: "#3a7d4f",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    alignSelf: "flex-start",
+  },
+  listingStatusText: {
+    color: "#fff7ef",
+    fontSize: 13,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  listingRemoveButton: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#d99393",
+    backgroundColor: "#fff1f1",
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  listingRemoveText: {
+    color: "#8a2727",
     fontSize: 15,
     fontWeight: "800",
   },
