@@ -16,10 +16,11 @@ describe("settings screen wires the premium section", () => {
   });
 
   it("destructures the premium state and actions", () => {
-    assert.match(
-      src,
-      /const\s+\{\s*isPremium,\s*activatedAt,\s*activatePremium,\s*cancelPremium\s*\}\s*=\s*usePremium\(\)/,
-    );
+    assert.match(src, /isPremium/);
+    assert.match(src, /activatedAt/);
+    assert.match(src, /activatePremium/);
+    assert.match(src, /cancelPremium/);
+    assert.match(src, /=\s*usePremium\(\)/);
   });
 
   it("renders the premium title and subtitle keys", () => {

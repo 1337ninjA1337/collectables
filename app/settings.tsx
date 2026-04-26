@@ -11,7 +11,7 @@ import { useToast } from "@/lib/toast-context";
 export default function SettingsScreen() {
   const { t, language, setLanguage, languageOptions } = useI18n();
   const { signOut, deleteAccount, pending } = useAuth();
-  const { isPremium, activatedAt, activatePremium, cancelPremium } = usePremium();
+  const { ready: premiumReady, isPremium, activatedAt, activatePremium, cancelPremium } = usePremium();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
 
@@ -110,42 +110,51 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      <View style={isPremium ? styles.premiumCardActive : styles.premiumCard}>
-        <View style={styles.premiumHeaderRow}>
-          <Text style={isPremium ? styles.premiumSectionTitleActive : styles.premiumSectionTitle}>
-            {t("premiumTitle")}
+      {premiumReady ? (
+        <View style={isPremium ? styles.premiumCardActive : styles.premiumCard}>
+          <View style={styles.premiumHeaderRow}>
+            <Text style={isPremium ? styles.premiumSectionTitleActive : styles.premiumSectionTitle}>
+              {t("premiumTitle")}
+            </Text>
+            {isPremium ? (
+              <View style={styles.premiumBadge}>
+                <Text style={styles.premiumBadgeText}>{t("premiumActive")}</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={isPremium ? styles.premiumSubtitleActive : styles.premiumSubtitle}>
+            {isPremium && activatedAt
+              ? t("premiumActiveSince", { date: activatedAt.slice(0, 10) })
+              : t("premiumSubtitle")}
           </Text>
+          <View style={styles.premiumBenefits}>
+            {(["premiumBenefit1", "premiumBenefit2", "premiumBenefit3"] as const).map((key) => (
+              <View key={key} style={styles.premiumBenefitRow}>
+                <Text style={styles.premiumBenefitDot}>✦</Text>
+                <Text style={isPremium ? styles.premiumBenefitTextActive : styles.premiumBenefitText}>
+                  {t(key)}
+                </Text>
+              </View>
+            ))}
+          </View>
           {isPremium ? (
-            <View style={styles.premiumBadge}>
-              <Text style={styles.premiumBadgeText}>{t("premiumActive")}</Text>
-            </View>
-          ) : null}
+            <Pressable style={styles.premiumCancelButton} onPress={handleCancelPremium}>
+              <Text style={styles.premiumCancelText}>{t("premiumCancel")}</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={styles.premiumActivateButton} onPress={handleActivatePremium}>
+              <Text style={styles.premiumActivateText}>{t("premiumActivate")}</Text>
+            </Pressable>
+          )}
         </View>
-        <Text style={isPremium ? styles.premiumSubtitleActive : styles.premiumSubtitle}>
-          {isPremium && activatedAt
-            ? t("premiumActiveSince", { date: activatedAt.slice(0, 10) })
-            : t("premiumSubtitle")}
-        </Text>
-        <View style={styles.premiumBenefits}>
-          {(["premiumBenefit1", "premiumBenefit2", "premiumBenefit3"] as const).map((key) => (
-            <View key={key} style={styles.premiumBenefitRow}>
-              <Text style={styles.premiumBenefitDot}>✦</Text>
-              <Text style={isPremium ? styles.premiumBenefitTextActive : styles.premiumBenefitText}>
-                {t(key)}
-              </Text>
-            </View>
-          ))}
+      ) : (
+        <View style={styles.premiumCardSkeleton} testID="premium-card-skeleton">
+          <View style={styles.premiumSkeletonTitle} />
+          <View style={styles.premiumSkeletonLine} />
+          <View style={styles.premiumSkeletonLineShort} />
+          <View style={styles.premiumSkeletonButton} />
         </View>
-        {isPremium ? (
-          <Pressable style={styles.premiumCancelButton} onPress={handleCancelPremium}>
-            <Text style={styles.premiumCancelText}>{t("premiumCancel")}</Text>
-          </Pressable>
-        ) : (
-          <Pressable style={styles.premiumActivateButton} onPress={handleActivatePremium}>
-            <Text style={styles.premiumActivateText}>{t("premiumActivate")}</Text>
-          </Pressable>
-        )}
-      </View>
+      )}
 
       <Pressable
         style={{...styles.signOutButton, ...(pending ? styles.signOutButtonDisabled : {})}}
@@ -385,5 +394,38 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 14,
     fontWeight: "800",
+  },
+  premiumCardSkeleton: {
+    borderRadius: 24,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+    padding: 18,
+    gap: 12,
+    minHeight: 220,
+  },
+  premiumSkeletonTitle: {
+    height: 22,
+    width: "45%",
+    borderRadius: 8,
+    backgroundColor: "#f1e3d0",
+  },
+  premiumSkeletonLine: {
+    height: 14,
+    width: "85%",
+    borderRadius: 6,
+    backgroundColor: "#f5ead8",
+  },
+  premiumSkeletonLineShort: {
+    height: 14,
+    width: "60%",
+    borderRadius: 6,
+    backgroundColor: "#f5ead8",
+  },
+  premiumSkeletonButton: {
+    height: 44,
+    borderRadius: 999,
+    backgroundColor: "#f1e3d0",
+    marginTop: 8,
   },
 });
