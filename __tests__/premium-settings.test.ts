@@ -18,8 +18,13 @@ describe("settings screen wires the premium section", () => {
   it("destructures the premium state and actions", () => {
     assert.match(
       src,
-      /const\s+\{\s*isPremium,\s*activatedAt,\s*activatePremium,\s*cancelPremium\s*\}\s*=\s*usePremium\(\)/,
+      /const\s+\{\s*isPremium,\s*activatedAt,\s*expiresAt,\s*activatePremium,\s*cancelPremium\s*\}\s*=\s*usePremium\(\)/,
     );
+  });
+
+  it("renders the renews-on line when premium has an expiry", () => {
+    assert.match(src, /premiumRenewsOn/);
+    assert.match(src, /expiresAt\.slice\(0,\s*10\)/);
   });
 
   it("renders the premium title and subtitle keys", () => {
@@ -61,6 +66,7 @@ describe("premium translations exist in every language map", () => {
     "premiumActivate",
     "premiumActive",
     "premiumActiveSince",
+    "premiumRenewsOn",
     "premiumCancel",
     "premiumActivated",
     "premiumCanceled",

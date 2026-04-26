@@ -61,6 +61,31 @@ export function cancelPremiumState(state: PremiumState): PremiumState {
   };
 }
 
+export const PREMIUM_PERIOD_DAYS = 30;
+const MS_PER_DAY = 86_400_000;
+
+export function premiumExpiresAt(
+  state: PremiumState | null | undefined,
+  periodDays: number = PREMIUM_PERIOD_DAYS,
+): string | null {
+  if (!state || !isPremiumActive(state)) return null;
+  const stamp = state.activatedAt ?? state.premiumActivatedAt;
+  if (!stamp) return null;
+  const start = Date.parse(stamp);
+  if (!Number.isFinite(start)) return null;
+  return new Date(start + periodDays * MS_PER_DAY).toISOString();
+}
+
+export function isPremiumExpired(
+  state: PremiumState | null | undefined,
+  now: number = Date.now(),
+  periodDays: number = PREMIUM_PERIOD_DAYS,
+): boolean {
+  const expiresAt = premiumExpiresAt(state, periodDays);
+  if (!expiresAt) return false;
+  return Date.parse(expiresAt) <= now;
+}
+
 export function mergePremiumState(
   cached: PremiumState,
   remote: Partial<PremiumState> | null | undefined,
