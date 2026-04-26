@@ -16,6 +16,7 @@ type PremiumContextValue = {
   ready: boolean;
   isPremium: boolean;
   activatedAt: string | null;
+  premiumActivatedAt: string | null;
   activatePremium: () => void;
   cancelPremium: () => void;
 };
@@ -71,6 +72,7 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
       ready,
       isPremium: isPremiumActive(state),
       activatedAt: state.activatedAt,
+      premiumActivatedAt: state.premiumActivatedAt,
       activatePremium,
       cancelPremium,
     }),

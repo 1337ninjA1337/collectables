@@ -1,11 +1,13 @@
 export type PremiumState = {
   isPremium: boolean;
   activatedAt: string | null;
+  premiumActivatedAt: string | null;
 };
 
 export const DEFAULT_PREMIUM_STATE: PremiumState = {
   isPremium: false,
   activatedAt: null,
+  premiumActivatedAt: null,
 };
 
 export function premiumStorageKey(userId: string | null | undefined): string | null {
@@ -23,12 +25,18 @@ export function parsePremiumState(raw: string | null | undefined): PremiumState 
   try {
     const parsed = JSON.parse(raw) as Partial<PremiumState>;
     if (typeof parsed !== "object" || parsed === null) return DEFAULT_PREMIUM_STATE;
+    const activatedAt =
+      typeof parsed.activatedAt === "string" && parsed.activatedAt.length > 0
+        ? parsed.activatedAt
+        : null;
+    const persistedActivationLog =
+      typeof parsed.premiumActivatedAt === "string" && parsed.premiumActivatedAt.length > 0
+        ? parsed.premiumActivatedAt
+        : null;
     return {
       isPremium: parsed.isPremium === true,
-      activatedAt:
-        typeof parsed.activatedAt === "string" && parsed.activatedAt.length > 0
-          ? parsed.activatedAt
-          : null,
+      activatedAt,
+      premiumActivatedAt: persistedActivationLog ?? activatedAt,
     };
   } catch {
     return DEFAULT_PREMIUM_STATE;
@@ -40,12 +48,17 @@ export function activatePremiumState(
   now: () => string = () => new Date().toISOString(),
 ): PremiumState {
   if (state.isPremium) return state;
-  return { isPremium: true, activatedAt: now() };
+  const stamp = now();
+  return { isPremium: true, activatedAt: stamp, premiumActivatedAt: stamp };
 }
 
 export function cancelPremiumState(state: PremiumState): PremiumState {
   if (!state.isPremium) return state;
-  return { isPremium: false, activatedAt: null };
+  return {
+    isPremium: false,
+    activatedAt: null,
+    premiumActivatedAt: state.premiumActivatedAt ?? state.activatedAt,
+  };
 }
 
 export function mergePremiumState(
@@ -53,16 +66,32 @@ export function mergePremiumState(
   remote: Partial<PremiumState> | null | undefined,
 ): PremiumState {
   if (!remote) return cached;
+  const remoteLog =
+    typeof remote.premiumActivatedAt === "string" && remote.premiumActivatedAt.length > 0
+      ? remote.premiumActivatedAt
+      : null;
   const remoteIsPremium = remote.isPremium === true;
-  if (remoteIsPremium === cached.isPremium) return cached;
+  if (remoteIsPremium === cached.isPremium) {
+    if (remoteLog && remoteLog !== cached.premiumActivatedAt) {
+      return { ...cached, premiumActivatedAt: remoteLog };
+    }
+    return cached;
+  }
   if (remoteIsPremium) {
+    const remoteActivatedAt =
+      typeof remote.activatedAt === "string" && remote.activatedAt.length > 0
+        ? remote.activatedAt
+        : null;
+    const stamp = remoteActivatedAt ?? cached.activatedAt ?? new Date().toISOString();
     return {
       isPremium: true,
-      activatedAt:
-        typeof remote.activatedAt === "string" && remote.activatedAt.length > 0
-          ? remote.activatedAt
-          : (cached.activatedAt ?? new Date().toISOString()),
+      activatedAt: stamp,
+      premiumActivatedAt: remoteLog ?? cached.premiumActivatedAt ?? stamp,
     };
   }
-  return { isPremium: false, activatedAt: null };
+  return {
+    isPremium: false,
+    activatedAt: null,
+    premiumActivatedAt: remoteLog ?? cached.premiumActivatedAt ?? cached.activatedAt,
+  };
 }

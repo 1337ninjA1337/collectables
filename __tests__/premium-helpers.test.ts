@@ -33,7 +33,11 @@ describe("isPremiumActive", () => {
 
   it("returns true when isPremium is true", () => {
     assert.equal(
-      isPremiumActive({ isPremium: true, activatedAt: "2026-04-25T00:00:00.000Z" }),
+      isPremiumActive({
+        isPremium: true,
+        activatedAt: "2026-04-25T00:00:00.000Z",
+        premiumActivatedAt: "2026-04-25T00:00:00.000Z",
+      }),
       true,
     );
   });
@@ -50,10 +54,15 @@ describe("parsePremiumState", () => {
   });
 
   it("parses a valid premium state payload", () => {
-    const raw = JSON.stringify({ isPremium: true, activatedAt: "2026-04-25T00:00:00.000Z" });
+    const raw = JSON.stringify({
+      isPremium: true,
+      activatedAt: "2026-04-25T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-25T00:00:00.000Z",
+    });
     assert.deepEqual(parsePremiumState(raw), {
       isPremium: true,
       activatedAt: "2026-04-25T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-25T00:00:00.000Z",
     });
   });
 
@@ -62,6 +71,7 @@ describe("parsePremiumState", () => {
     assert.deepEqual(parsePremiumState(raw), {
       isPremium: true,
       activatedAt: null,
+      premiumActivatedAt: null,
     });
   });
 
@@ -70,28 +80,88 @@ describe("parsePremiumState", () => {
     assert.deepEqual(parsePremiumState(raw), {
       isPremium: false,
       activatedAt: "x",
+      premiumActivatedAt: "x",
+    });
+  });
+
+  it("backfills premiumActivatedAt from legacy activatedAt for older payloads", () => {
+    const raw = JSON.stringify({ isPremium: true, activatedAt: "2026-04-01T00:00:00.000Z" });
+    assert.deepEqual(parsePremiumState(raw), {
+      isPremium: true,
+      activatedAt: "2026-04-01T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    });
+  });
+
+  it("preserves a stored premiumActivatedAt log even when activatedAt is null", () => {
+    const raw = JSON.stringify({
+      isPremium: false,
+      activatedAt: null,
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    });
+    assert.deepEqual(parsePremiumState(raw), {
+      isPremium: false,
+      activatedAt: null,
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
     });
   });
 });
 
 describe("activatePremiumState", () => {
-  it("flips isPremium to true and stamps activatedAt", () => {
+  it("flips isPremium to true and stamps both activatedAt and premiumActivatedAt", () => {
     const next = activatePremiumState(DEFAULT_PREMIUM_STATE, () => "2026-04-25T12:00:00.000Z");
     assert.equal(next.isPremium, true);
     assert.equal(next.activatedAt, "2026-04-25T12:00:00.000Z");
+    assert.equal(next.premiumActivatedAt, "2026-04-25T12:00:00.000Z");
   });
 
   it("returns the same reference when already premium", () => {
-    const state: PremiumState = { isPremium: true, activatedAt: "2026-04-01T00:00:00.000Z" };
+    const state: PremiumState = {
+      isPremium: true,
+      activatedAt: "2026-04-01T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    };
     const next = activatePremiumState(state, () => "2026-04-25T12:00:00.000Z");
     assert.equal(next, state);
+  });
+
+  it("overwrites a stale premiumActivatedAt log on re-activation", () => {
+    const state: PremiumState = {
+      isPremium: false,
+      activatedAt: null,
+      premiumActivatedAt: "2026-03-01T00:00:00.000Z",
+    };
+    const next = activatePremiumState(state, () => "2026-04-25T12:00:00.000Z");
+    assert.equal(next.isPremium, true);
+    assert.equal(next.premiumActivatedAt, "2026-04-25T12:00:00.000Z");
   });
 });
 
 describe("cancelPremiumState", () => {
-  it("clears isPremium and activatedAt", () => {
-    const state: PremiumState = { isPremium: true, activatedAt: "2026-04-01T00:00:00.000Z" };
-    assert.deepEqual(cancelPremiumState(state), DEFAULT_PREMIUM_STATE);
+  it("clears isPremium and activatedAt but preserves premiumActivatedAt log", () => {
+    const state: PremiumState = {
+      isPremium: true,
+      activatedAt: "2026-04-01T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    };
+    assert.deepEqual(cancelPremiumState(state), {
+      isPremium: false,
+      activatedAt: null,
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    });
+  });
+
+  it("falls back to activatedAt when premiumActivatedAt is missing", () => {
+    const state: PremiumState = {
+      isPremium: true,
+      activatedAt: "2026-04-01T00:00:00.000Z",
+      premiumActivatedAt: null,
+    };
+    assert.deepEqual(cancelPremiumState(state), {
+      isPremium: false,
+      activatedAt: null,
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    });
   });
 
   it("returns the same reference when already free", () => {
@@ -102,13 +172,35 @@ describe("cancelPremiumState", () => {
 
 describe("mergePremiumState", () => {
   it("returns cached when remote is null", () => {
-    const cached: PremiumState = { isPremium: true, activatedAt: "2026-04-01T00:00:00.000Z" };
+    const cached: PremiumState = {
+      isPremium: true,
+      activatedAt: "2026-04-01T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    };
     assert.equal(mergePremiumState(cached, null), cached);
   });
 
-  it("returns cached when remote does not change isPremium", () => {
-    const cached: PremiumState = { isPremium: true, activatedAt: "2026-04-01T00:00:00.000Z" };
+  it("returns cached when remote does not change isPremium and brings no new log", () => {
+    const cached: PremiumState = {
+      isPremium: true,
+      activatedAt: "2026-04-01T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    };
     assert.equal(mergePremiumState(cached, { isPremium: true }), cached);
+  });
+
+  it("adopts remote premiumActivatedAt log when status matches but log is newer", () => {
+    const cached: PremiumState = {
+      isPremium: true,
+      activatedAt: "2026-04-01T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    };
+    const merged = mergePremiumState(cached, {
+      isPremium: true,
+      premiumActivatedAt: "2026-04-25T12:00:00.000Z",
+    });
+    assert.equal(merged.premiumActivatedAt, "2026-04-25T12:00:00.000Z");
+    assert.equal(merged.activatedAt, "2026-04-01T00:00:00.000Z");
   });
 
   it("upgrades cached free state when remote says premium", () => {
@@ -118,18 +210,32 @@ describe("mergePremiumState", () => {
     });
     assert.equal(merged.isPremium, true);
     assert.equal(merged.activatedAt, "2026-04-25T12:00:00.000Z");
+    assert.equal(merged.premiumActivatedAt, "2026-04-25T12:00:00.000Z");
   });
 
-  it("downgrades cached premium when remote says free", () => {
-    const cached: PremiumState = { isPremium: true, activatedAt: "2026-04-01T00:00:00.000Z" };
+  it("downgrades cached premium when remote says free, keeps the activation log", () => {
+    const cached: PremiumState = {
+      isPremium: true,
+      activatedAt: "2026-04-01T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    };
     const merged = mergePremiumState(cached, { isPremium: false });
-    assert.deepEqual(merged, DEFAULT_PREMIUM_STATE);
+    assert.deepEqual(merged, {
+      isPremium: false,
+      activatedAt: null,
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    });
   });
 
   it("preserves cached activatedAt when remote upgrades without timestamp", () => {
-    const cached: PremiumState = { isPremium: false, activatedAt: "2026-04-01T00:00:00.000Z" };
+    const cached: PremiumState = {
+      isPremium: false,
+      activatedAt: "2026-04-01T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    };
     const merged = mergePremiumState(cached, { isPremium: true });
     assert.equal(merged.isPremium, true);
     assert.equal(merged.activatedAt, "2026-04-01T00:00:00.000Z");
+    assert.equal(merged.premiumActivatedAt, "2026-04-01T00:00:00.000Z");
   });
 });
