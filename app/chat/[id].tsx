@@ -41,7 +41,7 @@ export default function ChatDetailScreen() {
   const { user } = useAuth();
   const { t, language } = useI18n();
   const { getProfileById, ensureProfilesLoaded } = useSocial();
-  const { getMessages, sendMessage, canMessage, markRead, clearChat, refreshChat } = useChat();
+  const { getMessages, sendMessage, canMessage, markRead, clearChat, refreshFromCloud } = useChat();
 
   const [text, setText] = useState("");
   const otherProfile = getProfileById(otherUserId) ?? null;
@@ -56,6 +56,14 @@ export default function ChatDetailScreen() {
     if (!otherUserId) return;
     ensureProfilesLoaded([otherUserId]);
   }, [otherUserId, ensureProfilesLoaded]);
+
+  // Refetch the chat from cloud on mount so the recipient sees the sender's
+  // latest message even if the realtime channel is silently down. Scoped to
+  // the open conversation to keep it cheap.
+  useEffect(() => {
+    if (!otherUserId) return;
+    void refreshFromCloud([otherUserId]);
+  }, [otherUserId, refreshFromCloud]);
 
   const chatId = useMemo(() => {
     if (!user || !otherUserId) return null;

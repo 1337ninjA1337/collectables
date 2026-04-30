@@ -30,7 +30,7 @@ const CHATS_REFRESH_INTERVAL_MS = 15000;
 
 export default function ChatsScreen() {
   const { t, language } = useI18n();
-  const { previews, refreshAll } = useChat();
+  const { previews, refreshFromCloud } = useChat();
   const { getProfileById, ensureProfilesLoaded, friends } = useSocial();
 
   const otherIds = useMemo(() => previews.map((p) => p.otherUserId), [previews]);
@@ -39,16 +39,12 @@ export default function ChatsScreen() {
     ensureProfilesLoaded(otherIds);
   }, [otherIds, ensureProfilesLoaded]);
 
-  // Reconcile cached previews with the cloud on mount + at a slow interval so
-  // a missed realtime push (or a chat opened on another device) shows up
-  // without a manual reload.
+  // Force a cloud refetch whenever the chats list mounts so the receiver sees
+  // any messages that arrived while the realtime channel was disconnected
+  // (e.g. publication not wired, transient network drop).
   useEffect(() => {
-    void refreshAll();
-    const handle = setInterval(() => {
-      void refreshAll();
-    }, CHATS_REFRESH_INTERVAL_MS);
-    return () => clearInterval(handle);
-  }, [refreshAll]);
+    void refreshFromCloud();
+  }, [refreshFromCloud]);
 
   return (
     <Screen>

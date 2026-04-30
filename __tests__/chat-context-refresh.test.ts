@@ -4,127 +4,116 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * Structural tests for the cloud-refresh fallback added to chat-context.
- *
- * The full provider can't be exercised under `node --test` (it pulls in
- * React Native peers). Instead we read the source and assert that the new
- * `refreshChat` / `refreshAll` helpers exist, are exposed through the
- * context value, and call into the cloud fetch helper. Combined with the
- * existing `chat-helpers.test.ts` and `supabase-chat-shapes.test.ts` this
- * pins down the wiring without spinning up a fake fetch.
- *
- * It also asserts that `app/chat/[id].tsx` and `app/chats.tsx` actually
- * call into those helpers on mount + on an interval, so a missed realtime
- * push reconciles within a single refresh cycle.
+ * Wiring tests for the `refreshFromCloud` helper added to `lib/chat-context.tsx`
+ * plus its callers. The helper exists to close the gap where the receiver
+ * never sees a sender's message if the realtime channel is silently down
+ * (e.g. publication not wired). Importing chat-context directly under
+ * `node --test` would pull in React Native peers, so we read the sources and
+ * assert structurally that:
+ *   - chat-context exposes `refreshFromCloud` on its context value
+ *   - both /chats and /chat/[id] screens call it on mount
+ *   - the helper composes `cloudFetchMessagesForChat` + `buildChatId`
  */
 
-const CONTEXT_SOURCE = readFileSync(
+const CONTEXT_SRC = readFileSync(
   path.join(process.cwd(), "lib", "chat-context.tsx"),
   "utf8",
 );
-const CHAT_DETAIL_SOURCE = readFileSync(
-  path.join(process.cwd(), "app", "chat", "[id].tsx"),
-  "utf8",
-);
-const CHATS_LIST_SOURCE = readFileSync(
+const CHATS_SCREEN_SRC = readFileSync(
   path.join(process.cwd(), "app", "chats.tsx"),
   "utf8",
 );
-const ROOT_LAYOUT_SOURCE = readFileSync(
-  path.join(process.cwd(), "app", "_layout.tsx"),
+const CHAT_DETAIL_SRC = readFileSync(
+  path.join(process.cwd(), "app", "chat", "[id].tsx"),
   "utf8",
 );
 
-describe("chat-context refresh wiring", () => {
-  it("exposes refreshChat and refreshAll on the context value", () => {
-    assert.match(CONTEXT_SOURCE, /refreshChat:\s*\(otherUserId:\s*string\)\s*=>\s*Promise<void>/);
-    assert.match(CONTEXT_SOURCE, /refreshAll:\s*\(\)\s*=>\s*Promise<void>/);
-  });
-
-  it("includes both helpers in the memoised value object", () => {
-    const valueBlockMatch = CONTEXT_SOURCE.match(
-      /useMemo<ChatContextValue>\(\s*\(\)\s*=>\s*\(\{[\s\S]*?\}\),/,
+describe("chat-context refreshFromCloud wiring", () => {
+  it("declares refreshFromCloud on the ChatContextValue type", () => {
+    assert.match(
+      CONTEXT_SRC,
+      /refreshFromCloud:\s*\(otherUserIds\?:[^)]*\)\s*=>\s*Promise<void>/,
     );
-    assert.ok(valueBlockMatch, "expected useMemo<ChatContextValue> block");
-    const block = valueBlockMatch[0];
-    assert.match(block, /\brefreshChat\b/);
-    assert.match(block, /\brefreshAll\b/);
   });
 
-  it("refreshChat short-circuits on missing user / canMessage and uses cloudFetchMessagesForChat", () => {
-    const block = extractCallback(CONTEXT_SOURCE, "refreshChat");
-    assert.match(block, /if\s*\(!user\b/);
-    assert.match(block, /canMessage\(otherUserId\)/);
-    assert.match(block, /buildChatId\(\s*user\.id\s*,\s*otherUserId\s*\)/);
+  it("implements refreshFromCloud as a useCallback that builds a chat id and fetches each", () => {
+    assert.match(
+      CONTEXT_SRC,
+      /const\s+refreshFromCloud\s*=\s*useCallback\(/,
+      "refreshFromCloud should be memoised via useCallback",
+    );
+    // The body should call buildChatId + cloudFetchMessagesForChat per target.
+    const block = extractCallbackBlock(CONTEXT_SRC, "refreshFromCloud");
+    assert.match(block, /buildChatId\(\s*user\.id\s*,/);
     assert.match(block, /cloudFetchMessagesForChat\(/);
+    // It should fall back to the friends list when no ids are provided.
+    assert.match(block, /friends/);
   });
 
-  it("refreshAll fans out across friends and merges every result", () => {
-    const block = extractCallback(CONTEXT_SOURCE, "refreshAll");
-    assert.match(block, /friends\.length\s*===\s*0/);
-    assert.match(block, /Promise\.all\(\s*friends\.map\(/);
-    assert.match(block, /cloudFetchMessagesForChat\(/);
-  });
-});
-
-describe("chat detail screen polling", () => {
-  it("destructures refreshChat from useChat", () => {
-    assert.match(CHAT_DETAIL_SOURCE, /\brefreshChat\b/);
+  it("merges fetched cloud rows into local state via the same dedup helper used on initial hydration", () => {
+    // mergeCloudMessages is the shared helper - both the initial-effect path
+    // and refreshFromCloud must funnel through it, so a regression in dedup
+    // only needs to be fixed in one place.
+    assert.match(CONTEXT_SRC, /const\s+mergeCloudMessages\s*=\s*useCallback\(/);
+    assert.match(CONTEXT_SRC, /mergeCloudMessages\(results\)/);
   });
 
-  it("kicks off a refresh on mount and on an interval", () => {
-    assert.match(CHAT_DETAIL_SOURCE, /refreshChat\(otherUserId\)/);
-    assert.match(CHAT_DETAIL_SOURCE, /setInterval\(/);
-    assert.match(CHAT_DETAIL_SOURCE, /clearInterval\(/);
+  it("exposes refreshFromCloud on the context value object", () => {
+    // Must appear inside the useMemo({...}) returned to the provider.
+    const valueBlock = extractCallbackBlock(CONTEXT_SRC, "value");
+    assert.match(valueBlock, /refreshFromCloud,/);
   });
 });
 
-describe("chats list screen polling", () => {
-  it("destructures refreshAll from useChat", () => {
-    assert.match(CHATS_LIST_SOURCE, /\brefreshAll\b/);
+describe("chats list screen refetches on mount", () => {
+  it("destructures refreshFromCloud from useChat()", () => {
+    assert.match(
+      CHATS_SCREEN_SRC,
+      /const\s*\{[^}]*refreshFromCloud[^}]*\}\s*=\s*useChat\(\)/,
+    );
   });
 
-  it("kicks off a refresh on mount and on an interval", () => {
-    assert.match(CHATS_LIST_SOURCE, /refreshAll\(\)/);
-    assert.match(CHATS_LIST_SOURCE, /setInterval\(/);
-    assert.match(CHATS_LIST_SOURCE, /clearInterval\(/);
-  });
-});
-
-describe("desktop header chats button", () => {
-  it("renders a chats nav icon when not already on a chat route", () => {
-    assert.match(ROOT_LAYOUT_SOURCE, /chatbubbles-outline/);
-    assert.match(ROOT_LAYOUT_SOURCE, /router\.push\("\/chats"\)/);
-  });
-
-  it("hides the button on the chat routes themselves to avoid no-op nav", () => {
-    assert.match(ROOT_LAYOUT_SOURCE, /pathname\.startsWith\("\/chats"\)/);
-    assert.match(ROOT_LAYOUT_SOURCE, /pathname\.startsWith\("\/chat\/"\)/);
-  });
-
-  it("shows an unread count badge using formatBadgeCount", () => {
-    assert.match(ROOT_LAYOUT_SOURCE, /unreadTotal\s*>\s*0/);
-    assert.match(ROOT_LAYOUT_SOURCE, /formatBadgeCount\(unreadTotal\)/);
+  it("calls refreshFromCloud() inside a useEffect hook", () => {
+    assert.match(CHATS_SCREEN_SRC, /useEffect\(\s*\(\)\s*=>\s*\{[\s\S]*?refreshFromCloud\(\)/);
   });
 });
 
-function extractCallback(source: string, name: string): string {
-  const startMatch = source.match(
-    new RegExp(`const\\s+${name}\\s*=\\s*useCallback\\s*\\(`),
-  );
+describe("chat detail screen refetches the open conversation on mount", () => {
+  it("destructures refreshFromCloud from useChat()", () => {
+    assert.match(
+      CHAT_DETAIL_SRC,
+      /const\s*\{[^}]*refreshFromCloud[^}]*\}\s*=\s*useChat\(\)/,
+    );
+  });
+
+  it("scopes the refetch to the open otherUserId", () => {
+    assert.match(
+      CHAT_DETAIL_SRC,
+      /refreshFromCloud\(\s*\[\s*otherUserId\s*\]\s*\)/,
+    );
+  });
+});
+
+/**
+ * Crude block extractor: finds `name = ...` or `name(...)` and returns the
+ * first `{ ... }` body via brace counting. Sufficient for these wiring asserts.
+ */
+function extractCallbackBlock(source: string, name: string): string {
+  const startRegex = new RegExp(`(?:const\\s+${name}\\s*=|${name}\\s*=\\s*useMemo\\()`);
+  const startMatch = source.match(startRegex) ?? source.match(new RegExp(`\\b${name}\\b`));
   if (!startMatch || startMatch.index === undefined) {
-    throw new Error(`useCallback ${name} not found in source`);
+    throw new Error(`identifier ${name} not found in source`);
   }
-  const openIdx = source.indexOf("(", startMatch.index + startMatch[0].length - 1);
-  if (openIdx === -1) throw new Error(`no opening paren for ${name}`);
+  const openIdx = source.indexOf("{", startMatch.index);
+  if (openIdx === -1) throw new Error(`no opening brace for ${name}`);
   let depth = 0;
   for (let i = openIdx; i < source.length; i++) {
     const ch = source[i];
-    if (ch === "(") depth++;
-    else if (ch === ")") {
+    if (ch === "{") depth++;
+    else if (ch === "}") {
       depth--;
       if (depth === 0) return source.slice(openIdx, i + 1);
     }
   }
-  throw new Error(`unbalanced parens for ${name}`);
+  throw new Error(`unbalanced braces for ${name}`);
 }

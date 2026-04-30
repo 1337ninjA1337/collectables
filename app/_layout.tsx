@@ -50,6 +50,7 @@ function AppShell() {
   const { ready, session } = useAuth();
   const { ready: i18nReady, t } = useI18n();
   const { animation } = useNavAnimation();
+  const { unreadTotal } = useChat();
   const pathname = usePathname();
   const { isMobile } = useResponsive();
   const { unreadTotal } = useChat();
@@ -136,6 +137,20 @@ function AppShell() {
                   >
                     <Ionicons name="search" size={18} color="#2a1d15" />
                   </Pressable>
+                  {pathname !== "/chats" ? (
+                    <Pressable
+                      style={styles.headerIconButton}
+                      onPress={() => router.push("/chats")}
+                      accessibilityLabel={t("chatsTitle")}
+                    >
+                      <Ionicons name="chatbubbles-outline" size={18} color="#2a1d15" />
+                      {unreadTotal > 0 ? (
+                        <View style={styles.headerBadge}>
+                          <Text style={styles.headerBadgeText}>{formatBadgeCount(unreadTotal)}</Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  ) : null}
                   {pathname !== "/" ? (
                     <Pressable style={styles.homeButton} onPress={() => router.replace("/")}>
                       <Text style={styles.homeButtonText}>{t("goHome")}</Text>
