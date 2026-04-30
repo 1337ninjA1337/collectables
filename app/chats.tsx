@@ -1,5 +1,5 @@
 import { Stack, router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
@@ -7,8 +7,6 @@ import { Screen } from "@/components/screen";
 import { useChat } from "@/lib/chat-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
-import { fetchProfileById } from "@/lib/supabase-profiles";
-import { UserProfile } from "@/lib/types";
 
 function formatWhen(isoDate: string, locale: string | undefined): string {
   const date = new Date(isoDate);
@@ -31,35 +29,13 @@ function formatWhen(isoDate: string, locale: string | undefined): string {
 export default function ChatsScreen() {
   const { t, language } = useI18n();
   const { previews } = useChat();
-  const { getProfileById, friends } = useSocial();
-  const [remoteProfiles, setRemoteProfiles] = useState<Record<string, UserProfile>>({});
+  const { getProfileById, ensureProfilesLoaded, friends } = useSocial();
 
   const otherIds = useMemo(() => previews.map((p) => p.otherUserId), [previews]);
 
   useEffect(() => {
-    let active = true;
-    const missing = otherIds.filter((id) => !getProfileById(id) && !remoteProfiles[id]);
-    if (missing.length === 0) return;
-    Promise.all(missing.map((id) => fetchProfileById(id)))
-      .then((results) => {
-        if (!active) return;
-        const next: Record<string, UserProfile> = {};
-        results.forEach((p) => {
-          if (p) next[p.id] = p;
-        });
-        if (Object.keys(next).length > 0) {
-          setRemoteProfiles((prev) => ({ ...prev, ...next }));
-        }
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [otherIds, getProfileById, remoteProfiles]);
-
-  function resolveProfile(id: string): UserProfile | undefined {
-    return getProfileById(id) ?? remoteProfiles[id];
-  }
+    ensureProfilesLoaded(otherIds);
+  }, [otherIds, ensureProfilesLoaded]);
 
   return (
     <Screen>
@@ -81,7 +57,7 @@ export default function ChatsScreen() {
       ) : (
         <View style={styles.list}>
           {previews.map((preview) => {
-            const profile = resolveProfile(preview.otherUserId);
+            const profile = getProfileById(preview.otherUserId);
             const displayName = profile?.displayName ?? t("unknownUser");
             const unread = preview.unreadCount > 0;
             return (

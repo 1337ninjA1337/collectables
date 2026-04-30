@@ -14,9 +14,9 @@ import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
-import { fetchProfileById, fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
+import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
 import { placeholderColor } from "@/lib/placeholder-color";
-import { CollectableItem, Collection, UserProfile } from "@/lib/types";
+import { CollectableItem, Collection } from "@/lib/types";
 
 const DEFAULT_EN_PROFILE_BIO = "I collect things worth saving beautifully and sharing with friends.";
 
@@ -28,6 +28,7 @@ export default function ProfileScreen() {
     getProfileById,
     getMyProfile,
     getRelationship,
+    ensureProfilesLoaded,
     addFriend,
     removeFriend,
     followProfile,
@@ -38,9 +39,8 @@ export default function ProfileScreen() {
     friends,
   } = useSocial();
   const { collections, getItemsForCollection, getCollectionTotalCost, deleteUserContent, wishlistItems } = useCollections();
-  const localProfile = getProfileById(params.id);
+  const cachedProfile = getProfileById(params.id);
   const myProfile = getMyProfile();
-  const [remoteProfile, setRemoteProfile] = useState<UserProfile | null>(null);
   const [loadingRemote, setLoadingRemote] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
   const [profileIdDraft, setProfileIdDraft] = useState("");
@@ -58,12 +58,12 @@ export default function ProfileScreen() {
       if (!params.id || params.id === "[id]") return;
 
       let active = true;
-      const needsProfileFetch = !localProfile;
+      const needsProfileFetch = !cachedProfile;
       if (needsProfileFetch) setLoadingRemote(true);
 
       const profilePromise = needsProfileFetch
-        ? fetchProfileById(params.id)
-        : Promise.resolve(null);
+        ? ensureProfilesLoaded([params.id])
+        : Promise.resolve();
 
       const collectionsPromise = isSelf
         ? fetchCollectionsByUserId(params.id)
@@ -74,9 +74,8 @@ export default function ProfileScreen() {
         : Promise.resolve([]);
 
       Promise.all([profilePromise, collectionsPromise, wishlistPromise])
-        .then(([p, cols, wish]) => {
+        .then(([, cols, wish]) => {
           if (!active) return;
-          if (needsProfileFetch) setRemoteProfile(p);
           setRemoteCollections(cols);
           setRemoteWishlist(wish);
           return loadItemCounts(cols, () => active);
@@ -89,7 +88,7 @@ export default function ProfileScreen() {
       return () => {
         active = false;
       };
-    }, [localProfile, params.id, isSelf, isFriend]),
+    }, [cachedProfile, params.id, isSelf, isFriend, ensureProfilesLoaded]),
   );
 
   async function loadItemCounts(cols: Collection[], isActive: () => boolean = () => true) {
@@ -106,19 +105,18 @@ export default function ProfileScreen() {
     if (!params.id || params.id === "[id]") return;
     setRefreshing(true);
     try {
-      const [p, cols, wish] = await Promise.all([
-        fetchProfileById(params.id),
+      ensureProfilesLoaded([params.id]);
+      const [cols, wish] = await Promise.all([
         isSelf ? fetchCollectionsByUserId(params.id) : fetchPublicCollectionsByUserId(params.id),
         (isSelf || isFriend) ? fetchWishlistItemsByUserId(params.id) : Promise.resolve([]),
       ]);
-      if (p) setRemoteProfile(p);
       setRemoteCollections(cols);
       setRemoteWishlist(wish);
       await loadItemCounts(cols);
     } catch {} finally { setRefreshing(false); }
-  }, [params.id, isSelf, isFriend]);
+  }, [params.id, isSelf, isFriend, ensureProfilesLoaded]);
 
-  const profile = localProfile ?? remoteProfile;
+  const profile = cachedProfile;
   const activeProfile = profile;
   const relationship = activeProfile ? getRelationship(activeProfile.id) : "none" as const;
   const localProfileCollections = activeProfile

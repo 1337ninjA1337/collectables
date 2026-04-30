@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { seedProfiles, seedSocialCollections, seedSocialItems } from "@/data/social-seed";
 import { useAuth } from "@/lib/auth-context";
@@ -40,6 +40,7 @@ type SocialContextValue = {
   following: string[];
   getMyProfile: () => UserProfile | undefined;
   getProfileById: (id: string) => UserProfile | undefined;
+  ensureProfilesLoaded: (ids: readonly string[]) => Promise<void>;
   getRelationship: (profileId: string) => ProfileRelationship;
   updateMyProfile: (input: Partial<Pick<UserProfile, "avatar" | "displayName" | "bio" | "publicId" | "username">>) => Promise<void>;
   addFriend: (profileId: string) => Promise<void>;
@@ -135,6 +136,11 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   const [deletedProfileIds, setDeletedProfileIds] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
   const [remoteProfiles, setRemoteProfiles] = useState<UserProfile[]>([]);
+  // Cache of profiles fetched on demand (e.g. non-friend collection viewers,
+  // chat counterparts). Lives at the provider level so every screen shares one
+  // source of truth instead of refetching the same id locally.
+  const [viewerProfiles, setViewerProfiles] = useState<Record<string, UserProfile>>({});
+  const inFlightProfileIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) {
@@ -142,6 +148,8 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       setMyProfileOverride(prev => prev === null ? prev : null);
       setFriendRequests(prev => prev.length === 0 ? prev : []);
       setDeletedProfileIds(prev => prev.length === 0 ? prev : []);
+      setViewerProfiles((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      inFlightProfileIdsRef.current.clear();
       setReady(false);
       return;
     }
@@ -316,6 +324,47 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       .map((r) => r.fromUserId);
   }, [friendRequests, friends, user]);
 
+  const profileById = useMemo(() => {
+    const map = new Map<string, UserProfile>();
+    for (const p of profiles) map.set(p.id, p);
+    return map;
+  }, [profiles]);
+
+  const ensureProfilesLoaded = useCallback(
+    async (ids: readonly string[]) => {
+      const inFlight = inFlightProfileIdsRef.current;
+      const missing = ids.filter(
+        (id) =>
+          id &&
+          !profileById.has(id) &&
+          !viewerProfiles[id] &&
+          !inFlight.has(id),
+      );
+      if (missing.length === 0) return;
+      missing.forEach((id) => inFlight.add(id));
+      try {
+        const results = await Promise.all(
+          missing.map((id) =>
+            fetchProfileById(id)
+              .then((p) => [id, p] as const)
+              .catch(() => [id, null] as const),
+          ),
+        );
+        const next: Record<string, UserProfile> = {};
+        for (const [id, profile] of results) {
+          inFlight.delete(id);
+          if (profile) next[profile.id] = profile;
+        }
+        if (Object.keys(next).length > 0) {
+          setViewerProfiles((prev) => ({ ...prev, ...next }));
+        }
+      } catch {
+        missing.forEach((id) => inFlight.delete(id));
+      }
+    },
+    [profileById, viewerProfiles],
+  );
+
   const value = useMemo<SocialContextValue>(
     () => ({
       ready,
@@ -324,8 +373,9 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       friends,
       incomingRequestUserIds,
       following,
-      getMyProfile: () => (user ? profiles.find((profile) => profile.id === user.id) : undefined),
-      getProfileById: (id) => profiles.find((profile) => profile.id === id),
+      getMyProfile: () => (user ? profileById.get(user.id) : undefined),
+      getProfileById: (id) => profileById.get(id) ?? viewerProfiles[id],
+      ensureProfilesLoaded,
       getRelationship: (profileId) => {
         if (user?.id === profileId) {
           return "self";
@@ -418,6 +468,11 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         setFriendRequests((current) =>
           current.filter((request) => request.fromUserId !== profileId && request.toUserId !== profileId),
         );
+        setViewerProfiles((current) => {
+          if (!(profileId in current)) return current;
+          const { [profileId]: _drop, ...rest } = current;
+          return rest;
+        });
       },
       getVisibleCollections: () =>
         seedSocialCollections.filter(
@@ -438,7 +493,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         return seedSocialItems.filter((item) => visibleCollectionIds.has(item.collectionId));
       },
     }),
-    [deletedProfileIds, friendRequests, following, friends, incomingRequestUserIds, isAdmin, profiles, ready, user],
+    [deletedProfileIds, ensureProfilesLoaded, friendRequests, following, friends, incomingRequestUserIds, isAdmin, profileById, profiles, ready, user, viewerProfiles],
   );
 
   return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>;

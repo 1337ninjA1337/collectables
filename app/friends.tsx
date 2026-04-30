@@ -12,7 +12,6 @@ import { SwipeTabs } from "@/components/swipe-tabs";
 import { useChat } from "@/lib/chat-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
-import { fetchProfileById } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
 
 type Tab = "friends" | "following";
@@ -26,12 +25,11 @@ export default function FriendsScreen() {
     addFriend,
     removeFriend,
     unfollowProfile,
+    getProfileById,
+    ensureProfilesLoaded,
   } = useSocial();
 
   const [tab, setTab] = useState<Tab>("friends");
-  const [friendProfiles, setFriendProfiles] = useState<UserProfile[]>([]);
-  const [followingProfiles, setFollowingProfiles] = useState<UserProfile[]>([]);
-  const [requestProfiles, setRequestProfiles] = useState<UserProfile[]>([]);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
   const { unreadTotal } = useChat();
@@ -39,39 +37,33 @@ export default function FriendsScreen() {
   useEffect(() => {
     let active = true;
     const ids = [...friends, ...incomingRequestUserIds];
-    if (ids.length === 0) {
-      setFriendProfiles([]);
-      setRequestProfiles([]);
-      return;
-    }
+    if (ids.length === 0) return;
     setLoadingFriends(true);
-    Promise.all(ids.map((id) => fetchProfileById(id)))
-      .then((rs) => {
-        if (!active) return;
-        const valid = rs.filter((p): p is UserProfile => p !== null);
-        setFriendProfiles(valid.filter((p) => friends.includes(p.id)));
-        setRequestProfiles(valid.filter((p) => incomingRequestUserIds.includes(p.id)));
-      })
+    ensureProfilesLoaded(ids)
       .catch(() => {})
       .finally(() => { if (active) setLoadingFriends(false); });
     return () => { active = false; };
-  }, [friends, incomingRequestUserIds]);
+  }, [friends, incomingRequestUserIds, ensureProfilesLoaded]);
 
   useEffect(() => {
     let active = true;
-    if (following.length === 0) {
-      setFollowingProfiles([]);
-      return;
-    }
+    if (following.length === 0) return;
     setLoadingFollowing(true);
-    Promise.all(following.map((id) => fetchProfileById(id)))
-      .then((rs) => {
-        if (active) setFollowingProfiles(rs.filter((p): p is UserProfile => p !== null));
-      })
+    ensureProfilesLoaded(following)
       .catch(() => {})
       .finally(() => { if (active) setLoadingFollowing(false); });
     return () => { active = false; };
-  }, [following]);
+  }, [following, ensureProfilesLoaded]);
+
+  const friendProfiles = friends
+    .map((id) => getProfileById(id))
+    .filter((p): p is UserProfile => p !== undefined);
+  const requestProfiles = incomingRequestUserIds
+    .map((id) => getProfileById(id))
+    .filter((p): p is UserProfile => p !== undefined);
+  const followingProfiles = following
+    .map((id) => getProfileById(id))
+    .filter((p): p is UserProfile => p !== undefined);
 
   function renderProfileCard(profile: UserProfile, kind: "friend" | "following" | "request") {
     return (

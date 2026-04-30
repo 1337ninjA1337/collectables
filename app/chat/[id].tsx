@@ -21,8 +21,6 @@ import { buildChatId } from "@/lib/chat-helpers";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { subscribeToTyping } from "@/lib/supabase-chat";
-import { fetchProfileById } from "@/lib/supabase-profiles";
-import { UserProfile } from "@/lib/types";
 
 const TYPING_DEBOUNCE_MS = 1000;
 
@@ -41,13 +39,11 @@ export default function ChatDetailScreen() {
   const otherUserId = params.id ?? "";
   const { user } = useAuth();
   const { t, language } = useI18n();
-  const { getProfileById } = useSocial();
+  const { getProfileById, ensureProfilesLoaded } = useSocial();
   const { getMessages, sendMessage, canMessage, markRead, clearChat } = useChat();
 
   const [text, setText] = useState("");
-  const [otherProfile, setOtherProfile] = useState<UserProfile | null>(
-    () => getProfileById(otherUserId) ?? null,
-  );
+  const otherProfile = getProfileById(otherUserId) ?? null;
   const [typingUserIds, setTypingUserIds] = useState<readonly string[]>([]);
   const scrollRef = useRef<ScrollView | null>(null);
   const typingSubRef = useRef<{ setTyping: (v: boolean) => void; unsubscribe: () => void } | null>(
@@ -56,21 +52,9 @@ export default function ChatDetailScreen() {
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const local = getProfileById(otherUserId);
-    if (local) {
-      setOtherProfile(local);
-      return;
-    }
-    let active = true;
-    fetchProfileById(otherUserId)
-      .then((p) => {
-        if (active && p) setOtherProfile(p);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [otherUserId, getProfileById]);
+    if (!otherUserId) return;
+    ensureProfilesLoaded([otherUserId]);
+  }, [otherUserId, ensureProfilesLoaded]);
 
   const chatId = useMemo(() => {
     if (!user || !otherUserId) return null;

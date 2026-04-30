@@ -1,5 +1,5 @@
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
@@ -12,8 +12,6 @@ import { useMarketplace } from "@/lib/marketplace-context";
 import { priceHistoryForTitle } from "@/lib/marketplace-helpers";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
-import { fetchProfileById } from "@/lib/supabase-profiles";
-import { UserProfile } from "@/lib/types";
 
 export default function ListingDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -22,28 +20,18 @@ export default function ListingDetailScreen() {
   const { user } = useAuth();
   const { getListingById, listings } = useMarketplace();
   const { getItemById } = useCollections();
-  const { getProfileById } = useSocial();
+  const { getProfileById, ensureProfilesLoaded } = useSocial();
   const { ensureChatWith, canMessage } = useChat();
 
   const listing = getListingById(listingId);
 
   const item = listing ? getItemById(listing.itemId) : undefined;
-  const localOwner = listing ? getProfileById(listing.ownerUserId) : undefined;
-  const [remoteOwner, setRemoteOwner] = useState<UserProfile | null>(null);
+  const owner = listing ? getProfileById(listing.ownerUserId) : undefined;
 
   useEffect(() => {
     if (!listing) return;
-    if (localOwner) return;
-    let active = true;
-    fetchProfileById(listing.ownerUserId)
-      .then((p) => {
-        if (active && p) setRemoteOwner(p);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [listing, localOwner]);
+    ensureProfilesLoaded([listing.ownerUserId]);
+  }, [listing, ensureProfilesLoaded]);
 
   if (!listing) {
     return (
@@ -60,7 +48,6 @@ export default function ListingDetailScreen() {
     );
   }
 
-  const owner = localOwner ?? remoteOwner;
   const ownerName = owner?.displayName ?? t("unknownUser");
   const isSelf = user?.id === listing.ownerUserId;
   const friendsOnly = !isSelf && !canMessage(listing.ownerUserId);
