@@ -7,8 +7,9 @@ with `npx expo export --platform web`, copies `index.html` to `404.html`
 `gh-pages` branch via `peaceiris/actions-gh-pages`.
 
 The workflow needs runtime credentials at build time. Without them the
-deployed site falls back to the runtime "configure Supabase" form because
-`process.env.EXPO_PUBLIC_*` is empty in the bundled JS.
+deployed site renders disabled login buttons because
+`process.env.EXPO_PUBLIC_*` is empty in the bundled JS — supply the secrets
+listed below before deploying.
 
 ## Adding the required secrets
 
@@ -34,9 +35,7 @@ deep links resolve correctly even when shared from a sub-route.
 If you change a secret, trigger a new deploy by either pushing a no-op commit
 to `main` or by going to **Actions → Deploy to GitHub Pages → Run workflow**.
 
-## Local override
-
-For testing the deployed bundle locally without rebuilding, the app reads
-`localStorage` for `collectables-supabase-url` /
-`collectables-supabase-publishable-key` (see `lib/supabase-runtime-config.ts`).
-This is a debug-only path; production users should never have to paste keys.
+The published `gh-pages` branch must only be written by this workflow so the
+bundle always carries the correct GitHub-secret-backed env. Do not run
+`npx gh-pages -d dist` from a local machine — it would publish a bundle built
+without the secrets and break login on the live site.

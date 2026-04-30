@@ -26,6 +26,8 @@ function formatWhen(isoDate: string, locale: string | undefined): string {
   }
 }
 
+const CHATS_REFRESH_INTERVAL_MS = 15000;
+
 export default function ChatsScreen() {
   const { t, language } = useI18n();
   const { previews, refreshFromCloud } = useChat();

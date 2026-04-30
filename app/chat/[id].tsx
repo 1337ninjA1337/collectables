@@ -23,6 +23,7 @@ import { useSocial } from "@/lib/social-context";
 import { subscribeToTyping } from "@/lib/supabase-chat";
 
 const TYPING_DEBOUNCE_MS = 1000;
+const REFRESH_INTERVAL_MS = 8000;
 
 function formatTime(iso: string, locale: string | undefined): string {
   const date = new Date(iso);
@@ -75,6 +76,19 @@ export default function ChatDetailScreen() {
   useEffect(() => {
     if (chatId) markRead(chatId);
   }, [chatId, messages.length, markRead]);
+
+  // Belt-and-braces fallback for realtime: pull fresh messages on mount and
+  // every few seconds while the chat is open, so a missed INSERT push (e.g.
+  // a websocket hiccup or unconfigured realtime) still reconciles within a
+  // single refresh cycle instead of waiting for the next reload.
+  useEffect(() => {
+    if (!otherUserId || !allowed) return;
+    void refreshChat(otherUserId);
+    const handle = setInterval(() => {
+      void refreshChat(otherUserId);
+    }, REFRESH_INTERVAL_MS);
+    return () => clearInterval(handle);
+  }, [otherUserId, allowed, refreshChat]);
 
   // Presence-based typing indicator. We open one channel per chat, keyed by
   // selfId, so each side sees the other's `{ typing: boolean }` payload.

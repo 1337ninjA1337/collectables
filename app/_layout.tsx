@@ -53,6 +53,7 @@ function AppShell() {
   const { unreadTotal } = useChat();
   const pathname = usePathname();
   const { isMobile } = useResponsive();
+  const { unreadTotal } = useChat();
   const [searchOpen, setSearchOpen] = useState(false);
 
   if (!ready || !i18nReady) {
@@ -113,6 +114,20 @@ function AppShell() {
                   {pathname !== "/settings" && pathname !== "/" ? (
                     <Pressable style={styles.headerButton} onPress={() => router.push("/settings")}>
                       <Text style={styles.headerButtonText}>{t("settings")}</Text>
+                    </Pressable>
+                  ) : null}
+                  {!pathname.startsWith("/chats") && !pathname.startsWith("/chat/") ? (
+                    <Pressable
+                      style={styles.headerIconButton}
+                      onPress={() => router.push("/chats")}
+                      accessibilityLabel={t("chatsTitle")}
+                    >
+                      <Ionicons name="chatbubbles-outline" size={18} color="#2a1d15" />
+                      {unreadTotal > 0 ? (
+                        <View style={styles.headerBadge}>
+                          <Text style={styles.headerBadgeText}>{formatBadgeCount(unreadTotal)}</Text>
+                        </View>
+                      ) : null}
                     </Pressable>
                   ) : null}
                   <Pressable

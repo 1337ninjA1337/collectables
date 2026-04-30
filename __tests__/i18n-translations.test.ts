@@ -60,7 +60,6 @@ describe("i18n translations", () => {
       "settings",
       "language",
       "deleteAccountConfirm",
-      "configureSupabase",
       "itemsCount",
       "sharedWithPeople",
     ];

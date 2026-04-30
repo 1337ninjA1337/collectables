@@ -27,16 +27,6 @@ const en = {
   continueApple: "Continue with Apple",
   providerHintWeb: "On web the provider opens in this tab.",
   providerHintMobile: "On mobile a system sign-in window opens and then returns to the app.",
-  configureSupabase: "Supabase needs to be connected",
-  configureSupabaseText:
-    "Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY, then enable Email, Google, and Apple in Auth settings.",
-  configureSupabaseRuntimeHint:
-    "Or paste your Supabase project URL and publishable key here — they'll be saved in this browser only and the page will reload to apply them.",
-  configureSupabaseUrlPlaceholder: "https://YOUR-PROJECT.supabase.co",
-  configureSupabaseKeyPlaceholder: "Publishable (anon) key",
-  configureSupabaseSave: "Save and reload",
-  configureSupabaseRequired: "Both Supabase URL and key are required.",
-  configureSupabaseUrlInvalid: "Supabase URL must start with http:// or https://",
   needEmailTitle: "Email required",
   needEmailText: "Enter the email where the sign-in code should be sent.",
   emailCodeRequired: "Enter both email and the code from the message.",
@@ -463,16 +453,6 @@ const ru: TranslationMap = {
   continueApple: "Продолжить через Apple",
   providerHintWeb: "На вебе провайдер откроется в этой вкладке.",
   providerHintMobile: "На телефоне откроется системное окно входа и затем приложение вернется обратно.",
-  configureSupabase: "Нужно подключить Supabase",
-  configureSupabaseText:
-    "Добавьте EXPO_PUBLIC_SUPABASE_URL и EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY, затем включите Email, Google и Apple в настройках Auth.",
-  configureSupabaseRuntimeHint:
-    "Или вставьте сюда URL вашего проекта Supabase и публичный ключ — они сохранятся только в этом браузере, страница перезагрузится и применит их.",
-  configureSupabaseUrlPlaceholder: "https://ВАШ-ПРОЕКТ.supabase.co",
-  configureSupabaseKeyPlaceholder: "Публичный (anon) ключ",
-  configureSupabaseSave: "Сохранить и перезагрузить",
-  configureSupabaseRequired: "Нужно указать и URL, и ключ Supabase.",
-  configureSupabaseUrlInvalid: "URL Supabase должен начинаться с http:// или https://",
   needEmailTitle: "Нужен email",
   needEmailText: "Введите почту, на которую отправить код для входа.",
   emailCodeRequired: "Введите email и код из письма.",
