@@ -11,7 +11,8 @@ import { BottomNav } from "@/components/bottom-nav";
 import { LoginScreen } from "@/components/login-screen";
 import { SearchOverlay } from "@/components/search-overlay";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { ChatProvider } from "@/lib/chat-context";
+import { ChatProvider, useChat } from "@/lib/chat-context";
+import { formatBadgeCount } from "@/lib/chat-helpers";
 import { CollectionsProvider } from "@/lib/collections-context";
 import { I18nProvider, useI18n } from "@/lib/i18n-context";
 import { MarketplaceProvider } from "@/lib/marketplace-context";
@@ -49,6 +50,7 @@ function AppShell() {
   const { ready, session } = useAuth();
   const { ready: i18nReady, t } = useI18n();
   const { animation } = useNavAnimation();
+  const { unreadTotal } = useChat();
   const pathname = usePathname();
   const { isMobile } = useResponsive();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -120,6 +122,20 @@ function AppShell() {
                   >
                     <Ionicons name="search" size={18} color="#2a1d15" />
                   </Pressable>
+                  {pathname !== "/chats" ? (
+                    <Pressable
+                      style={styles.headerIconButton}
+                      onPress={() => router.push("/chats")}
+                      accessibilityLabel={t("chatsTitle")}
+                    >
+                      <Ionicons name="chatbubbles-outline" size={18} color="#2a1d15" />
+                      {unreadTotal > 0 ? (
+                        <View style={styles.headerBadge}>
+                          <Text style={styles.headerBadgeText}>{formatBadgeCount(unreadTotal)}</Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  ) : null}
                   {pathname !== "/" ? (
                     <Pressable style={styles.homeButton} onPress={() => router.replace("/")}>
                       <Text style={styles.homeButtonText}>{t("goHome")}</Text>
@@ -178,6 +194,25 @@ const styles = StyleSheet.create({
     height: 34,
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerBadge: {
+    position: "absolute",
+    top: -4,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    backgroundColor: "#d92f2f",
+    borderWidth: 1.5,
+    borderColor: "#fff7ef",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerBadgeText: {
+    color: "#fff7ef",
+    fontSize: 10,
+    fontWeight: "800",
   },
   headerButtonText: {
     color: "#2a1d15",
