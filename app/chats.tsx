@@ -28,7 +28,7 @@ function formatWhen(isoDate: string, locale: string | undefined): string {
 
 export default function ChatsScreen() {
   const { t, language } = useI18n();
-  const { previews } = useChat();
+  const { previews, refreshFromCloud } = useChat();
   const { getProfileById, ensureProfilesLoaded, friends } = useSocial();
 
   const otherIds = useMemo(() => previews.map((p) => p.otherUserId), [previews]);
@@ -36,6 +36,13 @@ export default function ChatsScreen() {
   useEffect(() => {
     ensureProfilesLoaded(otherIds);
   }, [otherIds, ensureProfilesLoaded]);
+
+  // Force a cloud refetch whenever the chats list mounts so the receiver sees
+  // any messages that arrived while the realtime channel was disconnected
+  // (e.g. publication not wired, transient network drop).
+  useEffect(() => {
+    void refreshFromCloud();
+  }, [refreshFromCloud]);
 
   return (
     <Screen>

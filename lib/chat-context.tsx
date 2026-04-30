@@ -35,6 +35,7 @@ type ChatContextValue = {
   sendMessage: (otherUserId: string, text: string) => Promise<ChatMessage | null>;
   markRead: (chatId: string) => void;
   clearChat: (chatId: string) => void;
+  refreshFromCloud: (otherUserIds?: readonly string[]) => Promise<void>;
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -90,25 +91,8 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     AsyncStorage.setItem(storageKey, JSON.stringify(store)).catch(() => undefined);
   }, [ready, storageKey, store]);
 
-  // Pull cloud messages for every confirmed-friend chat once we have a user
-  // and the local cache has been hydrated. Cloud rows are merged on top of
-  // cached rows (deduped by id), so offline-first reads keep working when the
-  // network or Supabase config is unavailable.
-  useEffect(() => {
-    if (!ready || !user || friends.length === 0) return;
-    let cancelled = false;
-
-    void (async () => {
-      const results = await Promise.all(
-        friends.map(async (friendId) => {
-          const chatId = buildChatId(user.id, friendId);
-          const messages = await cloudFetchMessagesForChat(chatId);
-          return { chatId, messages };
-        }),
-      );
-
-      if (cancelled) return;
-
+  const mergeCloudMessages = useCallback(
+    (results: readonly { chatId: string; messages: ChatMessage[] }[]) => {
       setStore((prev) => {
         let nextMessages = prev.messagesByChat;
         let touched = false;
@@ -130,12 +114,52 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
         if (!touched) return prev;
         return { ...prev, messagesByChat: nextMessages };
       });
+    },
+    [],
+  );
+
+  const refreshFromCloud = useCallback(
+    async (otherUserIds?: readonly string[]) => {
+      if (!user) return;
+      const targets = otherUserIds && otherUserIds.length > 0 ? otherUserIds : friends;
+      if (targets.length === 0) return;
+      const results = await Promise.all(
+        targets.map(async (otherId) => {
+          const chatId = buildChatId(user.id, otherId);
+          const messages = await cloudFetchMessagesForChat(chatId);
+          return { chatId, messages };
+        }),
+      );
+      mergeCloudMessages(results);
+    },
+    [friends, mergeCloudMessages, user],
+  );
+
+  // Pull cloud messages for every confirmed-friend chat once we have a user
+  // and the local cache has been hydrated. Cloud rows are merged on top of
+  // cached rows (deduped by id), so offline-first reads keep working when the
+  // network or Supabase config is unavailable.
+  useEffect(() => {
+    if (!ready || !user || friends.length === 0) return;
+    let cancelled = false;
+
+    void (async () => {
+      const results = await Promise.all(
+        friends.map(async (friendId) => {
+          const chatId = buildChatId(user.id, friendId);
+          const messages = await cloudFetchMessagesForChat(chatId);
+          return { chatId, messages };
+        }),
+      );
+
+      if (cancelled) return;
+      mergeCloudMessages(results);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [ready, user, friends]);
+  }, [ready, user, friends, mergeCloudMessages]);
 
   // Realtime inbox: any INSERT on chat_messages where to_user_id = me is
   // pushed straight into local state so other-device messages show up
@@ -275,8 +299,20 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       sendMessage,
       markRead,
       clearChat,
+      refreshFromCloud,
     }),
-    [ready, previews, unreadTotal, getMessages, canMessage, ensureChatWith, sendMessage, markRead, clearChat],
+    [
+      ready,
+      previews,
+      unreadTotal,
+      getMessages,
+      canMessage,
+      ensureChatWith,
+      sendMessage,
+      markRead,
+      clearChat,
+      refreshFromCloud,
+    ],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
