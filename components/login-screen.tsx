@@ -4,10 +4,6 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-na
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
-import {
-  canStoreRuntimeSupabaseConfig,
-  setRuntimeSupabaseConfig,
-} from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 
 export function LoginScreen() {
@@ -18,9 +14,6 @@ export function LoginScreen() {
   const [code, setCode] = useState("");
   const [awaitingCode, setAwaitingCode] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [supabaseUrlInput, setSupabaseUrlInput] = useState("");
-  const [supabaseKeyInput, setSupabaseKeyInput] = useState("");
-  const [supabaseConfigError, setSupabaseConfigError] = useState<string | null>(null);
 
   async function handleSendCode() {
     setEmailError(null);
@@ -64,31 +57,6 @@ export function LoginScreen() {
       toast.error(result.error, t("loginFailed"));
     }
   }
-
-  function handleSaveSupabaseConfig() {
-    setSupabaseConfigError(null);
-
-    const trimmedUrl = supabaseUrlInput.trim();
-    const trimmedKey = supabaseKeyInput.trim();
-
-    if (!trimmedUrl || !trimmedKey) {
-      setSupabaseConfigError(t("configureSupabaseRequired"));
-      return;
-    }
-
-    if (!/^https?:\/\//i.test(trimmedUrl)) {
-      setSupabaseConfigError(t("configureSupabaseUrlInvalid"));
-      return;
-    }
-
-    setRuntimeSupabaseConfig(trimmedUrl, trimmedKey);
-
-    if (typeof window !== "undefined" && typeof window.location !== "undefined") {
-      window.location.reload();
-    }
-  }
-
-  const canConfigureAtRuntime = canStoreRuntimeSupabaseConfig();
 
   return (
     <Screen>
@@ -147,43 +115,6 @@ export function LoginScreen() {
         </Pressable>
         <Text style={styles.providerHint}>{Platform.OS === "web" ? t("providerHintWeb") : t("providerHintMobile")}</Text>
       </View>
-
-      {!configured ? (
-        <View style={styles.warningCard}>
-          <Text style={styles.warningTitle}>{t("configureSupabase")}</Text>
-          <Text style={styles.warningText}>{t("configureSupabaseText")}</Text>
-          {canConfigureAtRuntime ? (
-            <View style={styles.configForm}>
-              <Text style={styles.configHint}>{t("configureSupabaseRuntimeHint")}</Text>
-              <TextInput
-                value={supabaseUrlInput}
-                onChangeText={setSupabaseUrlInput}
-                placeholder={t("configureSupabaseUrlPlaceholder")}
-                placeholderTextColor="#a98a6e"
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={styles.input}
-              />
-              <TextInput
-                value={supabaseKeyInput}
-                onChangeText={setSupabaseKeyInput}
-                placeholder={t("configureSupabaseKeyPlaceholder")}
-                placeholderTextColor="#a98a6e"
-                autoCapitalize="none"
-                autoCorrect={false}
-                secureTextEntry
-                style={styles.input}
-              />
-              <Pressable style={styles.primaryButton} onPress={handleSaveSupabaseConfig}>
-                <Text style={styles.primaryButtonText}>{t("configureSupabaseSave")}</Text>
-              </Pressable>
-              {supabaseConfigError ? (
-                <Text style={styles.errorText}>{supabaseConfigError}</Text>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-      ) : null}
     </Screen>
   );
 }
@@ -274,31 +205,5 @@ const styles = StyleSheet.create({
   providerHint: {
     color: "#856d5a",
     lineHeight: 21,
-  },
-  warningCard: {
-    borderRadius: 28,
-    padding: 20,
-    gap: 8,
-    backgroundColor: "#fff1e6",
-    borderWidth: 1,
-    borderColor: "#f0c8a1",
-  },
-  warningTitle: {
-    color: "#8a5220",
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  warningText: {
-    color: "#8a5d36",
-    lineHeight: 22,
-  },
-  configForm: {
-    gap: 10,
-    marginTop: 8,
-  },
-  configHint: {
-    color: "#8a5d36",
-    fontSize: 13,
-    lineHeight: 19,
   },
 });
