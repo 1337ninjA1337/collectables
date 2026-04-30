@@ -4,7 +4,82 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-na
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
+import {
+  canStoreRuntimeSupabaseConfig,
+  setRuntimeSupabaseConfig,
+} from "@/lib/supabase-runtime-config";
 import { useToast } from "@/lib/toast-context";
+
+function SupabaseConfigCard() {
+  const { t } = useI18n();
+  const [url, setUrl] = useState("");
+  const [key, setKey] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const canStore = canStoreRuntimeSupabaseConfig();
+
+  function handleSave() {
+    setError(null);
+    const trimmedUrl = url.trim();
+    const trimmedKey = key.trim();
+
+    if (!trimmedUrl || !trimmedKey) {
+      setError(t("configureSupabaseRequired"));
+      return;
+    }
+
+    if (!/^https?:\/\//i.test(trimmedUrl)) {
+      setError(t("configureSupabaseUrlInvalid"));
+      return;
+    }
+
+    const ok = setRuntimeSupabaseConfig(trimmedUrl, trimmedKey);
+    if (!ok) {
+      setError(t("configureSupabaseRequired"));
+      return;
+    }
+
+    if (typeof window !== "undefined" && typeof window.location?.reload === "function") {
+      window.location.reload();
+    }
+  }
+
+  return (
+    <View style={styles.configCard}>
+      <Text style={styles.configTitle}>{t("configureSupabase")}</Text>
+      <Text style={styles.configText}>{t("configureSupabaseText")}</Text>
+      {canStore ? (
+        <>
+          <Text style={styles.configHint}>{t("configureSupabaseRuntimeHint")}</Text>
+          <TextInput
+            value={url}
+            onChangeText={setUrl}
+            placeholder={t("configureSupabaseUrlPlaceholder")}
+            placeholderTextColor="#9b8571"
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            style={styles.input}
+          />
+          <TextInput
+            value={key}
+            onChangeText={setKey}
+            placeholder={t("configureSupabaseKeyPlaceholder")}
+            placeholderTextColor="#9b8571"
+            autoCapitalize="none"
+            autoCorrect={false}
+            secureTextEntry
+            style={styles.input}
+          />
+          <Pressable style={styles.primaryButton} onPress={handleSave}>
+            <Text style={styles.primaryButtonText}>{t("configureSupabaseSave")}</Text>
+          </Pressable>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </>
+      ) : null}
+    </View>
+  );
+}
 
 export function LoginScreen() {
   const { configured, pending, sendEmailOtp, verifyEmailOtp, signInWithProvider } = useAuth();
@@ -65,6 +140,8 @@ export function LoginScreen() {
         <Text style={styles.title}>{t("authTitle")}</Text>
         <Text style={styles.subtitle}>{t("authSubtitle")}</Text>
       </View>
+
+      {!configured ? <SupabaseConfigCard /> : null}
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{t("emailLoginTitle")}</Text>
@@ -151,6 +228,30 @@ const styles = StyleSheet.create({
     backgroundColor: "#fffaf3",
     borderWidth: 1,
     borderColor: "#eadbc8",
+  },
+  configCard: {
+    borderRadius: 28,
+    padding: 20,
+    gap: 12,
+    backgroundColor: "#fff1df",
+    borderWidth: 1,
+    borderColor: "#e4c29a",
+  },
+  configTitle: {
+    color: "#3a2716",
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  configText: {
+    color: "#5f4734",
+    lineHeight: 21,
+    fontSize: 14,
+  },
+  configHint: {
+    color: "#5f4734",
+    lineHeight: 21,
+    fontSize: 14,
+    fontStyle: "italic",
   },
   sectionTitle: {
     color: "#2f2318",
