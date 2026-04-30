@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-- IN CASE THERE ARE ANY REQ CHANGES INTO DB (supabase sql commands) ADD EVERYTHING THAT I NEED TO IMPLEMENT NAMUALLY IN MANUAL-TASKS.MD 
+- IN CASE THERE ARE ANY REQ CHANGES INTO DB (supabase sql commands) ADD EVERYTHING THAT I NEED TO IMPLEMENT MANUALLY IN MANUAL-TASKS.MD 
 - NEVER push any credentials into git (if there are any creds in commit than just replace them with *paste your creds*) 
 - deploy every changes into github pages by yourself
 - don't explain enything except when i ask to explain
