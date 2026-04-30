@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 
 import {
   DEFAULT_PREMIUM_STATE,
+  PREMIUM_PERIOD_DAYS,
   PremiumState,
   activatePremiumState,
   cancelPremiumState,
   isPremiumActive,
+  isPremiumExpired,
   mergePremiumState,
   parsePremiumState,
+  premiumExpiresAt,
   premiumStorageKey,
 } from "@/lib/premium-helpers";
 
@@ -167,6 +170,101 @@ describe("cancelPremiumState", () => {
   it("returns the same reference when already free", () => {
     const next = cancelPremiumState(DEFAULT_PREMIUM_STATE);
     assert.equal(next, DEFAULT_PREMIUM_STATE);
+  });
+});
+
+describe("premiumExpiresAt", () => {
+  it("returns null when state is null/undefined or not premium", () => {
+    assert.equal(premiumExpiresAt(null), null);
+    assert.equal(premiumExpiresAt(undefined), null);
+    assert.equal(premiumExpiresAt(DEFAULT_PREMIUM_STATE), null);
+  });
+
+  it("returns null when premium but no activation timestamp is recorded", () => {
+    const state: PremiumState = {
+      isPremium: true,
+      activatedAt: null,
+      premiumActivatedAt: null,
+    };
+    assert.equal(premiumExpiresAt(state), null);
+  });
+
+  it("returns activatedAt + default 30 days when premium and stamped", () => {
+    const state: PremiumState = {
+      isPremium: true,
+      activatedAt: "2026-04-01T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    };
+    assert.equal(premiumExpiresAt(state), "2026-05-01T00:00:00.000Z");
+  });
+
+  it("honours an overridden period", () => {
+    const state: PremiumState = {
+      isPremium: true,
+      activatedAt: "2026-04-01T00:00:00.000Z",
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    };
+    assert.equal(premiumExpiresAt(state, 7), "2026-04-08T00:00:00.000Z");
+  });
+
+  it("falls back to premiumActivatedAt log when activatedAt is null", () => {
+    const state: PremiumState = {
+      isPremium: true,
+      activatedAt: null,
+      premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+    };
+    assert.equal(premiumExpiresAt(state), "2026-05-01T00:00:00.000Z");
+  });
+
+  it("returns null for an invalid timestamp", () => {
+    const state: PremiumState = {
+      isPremium: true,
+      activatedAt: "not-a-date",
+      premiumActivatedAt: null,
+    };
+    assert.equal(premiumExpiresAt(state), null);
+  });
+
+  it("uses a 30-day default period", () => {
+    assert.equal(PREMIUM_PERIOD_DAYS, 30);
+  });
+});
+
+describe("isPremiumExpired", () => {
+  const state: PremiumState = {
+    isPremium: true,
+    activatedAt: "2026-04-01T00:00:00.000Z",
+    premiumActivatedAt: "2026-04-01T00:00:00.000Z",
+  };
+
+  it("returns false for non-premium / unstamped states", () => {
+    assert.equal(isPremiumExpired(null), false);
+    assert.equal(isPremiumExpired(DEFAULT_PREMIUM_STATE), false);
+    assert.equal(
+      isPremiumExpired({ isPremium: true, activatedAt: null, premiumActivatedAt: null }),
+      false,
+    );
+  });
+
+  it("returns false the day before expiry", () => {
+    const now = Date.parse("2026-04-30T00:00:00.000Z");
+    assert.equal(isPremiumExpired(state, now), false);
+  });
+
+  it("returns true exactly at the boundary", () => {
+    const now = Date.parse("2026-05-01T00:00:00.000Z");
+    assert.equal(isPremiumExpired(state, now), true);
+  });
+
+  it("returns true after expiry", () => {
+    const now = Date.parse("2026-06-01T00:00:00.000Z");
+    assert.equal(isPremiumExpired(state, now), true);
+  });
+
+  it("respects an overridden period (7-day trial)", () => {
+    const now = Date.parse("2026-04-09T00:00:00.000Z");
+    assert.equal(isPremiumExpired(state, now, 7), true);
+    assert.equal(isPremiumExpired(state, Date.parse("2026-04-07T00:00:00.000Z"), 7), false);
   });
 });
 

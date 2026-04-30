@@ -8,7 +8,9 @@ import {
   activatePremiumState,
   cancelPremiumState,
   isPremiumActive,
+  isPremiumExpired,
   parsePremiumState,
+  premiumExpiresAt,
   premiumStorageKey,
 } from "@/lib/premium-helpers";
 
@@ -17,6 +19,7 @@ type PremiumContextValue = {
   isPremium: boolean;
   activatedAt: string | null;
   premiumActivatedAt: string | null;
+  expiresAt: string | null;
   activatePremium: () => void;
   cancelPremium: () => void;
 };
@@ -42,7 +45,8 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
       try {
         const raw = await AsyncStorage.getItem(storageKey);
         if (cancelled) return;
-        setState(parsePremiumState(raw));
+        const parsed = parsePremiumState(raw);
+        setState(isPremiumExpired(parsed) ? cancelPremiumState(parsed) : parsed);
       } catch {
         if (!cancelled) setState(DEFAULT_PREMIUM_STATE);
       } finally {
@@ -73,6 +77,7 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
       isPremium: isPremiumActive(state),
       activatedAt: state.activatedAt,
       premiumActivatedAt: state.premiumActivatedAt,
+      expiresAt: premiumExpiresAt(state),
       activatePremium,
       cancelPremium,
     }),

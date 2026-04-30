@@ -11,7 +11,7 @@ import { useToast } from "@/lib/toast-context";
 export default function SettingsScreen() {
   const { t, language, setLanguage, languageOptions } = useI18n();
   const { signOut, deleteAccount, pending } = useAuth();
-  const { ready: premiumReady, isPremium, activatedAt, activatePremium, cancelPremium } = usePremium();
+  const { ready: premiumReady, isPremium, activatedAt, expiresAt, activatePremium, cancelPremium } = usePremium();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
 
@@ -127,6 +127,11 @@ export default function SettingsScreen() {
               ? t("premiumActiveSince", { date: activatedAt.slice(0, 10) })
               : t("premiumSubtitle")}
           </Text>
+          {isPremium && expiresAt ? (
+            <Text style={styles.premiumRenewsLine}>
+              {t("premiumRenewsOn", { date: expiresAt.slice(0, 10) })}
+            </Text>
+          ) : null}
           <View style={styles.premiumBenefits}>
             {(["premiumBenefit1", "premiumBenefit2", "premiumBenefit3"] as const).map((key) => (
               <View key={key} style={styles.premiumBenefitRow}>
@@ -343,6 +348,12 @@ const styles = StyleSheet.create({
   premiumSubtitleActive: {
     color: "#ead8c3",
     lineHeight: 22,
+  },
+  premiumRenewsLine: {
+    color: "#f5c99a",
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: -4,
   },
   premiumBenefits: {
     gap: 8,
