@@ -1,10 +1,15 @@
 import { Platform } from "react-native";
 
-import { extractPublicId } from "@/lib/cloudinary-url";
+import { extractPublicId, resolveCloudinaryApiBase } from "@/lib/cloudinary-url";
 
-const CLOUD_NAME = "dt57phtma";
-const UPLOAD_PRESET = "collectables";
-const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || "dt57phtma";
+const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "collectables";
+const CLOUDINARY_API_BASE = resolveCloudinaryApiBase(
+  process.env.EXPO_PUBLIC_CLOUDINARY_URL,
+  CLOUD_NAME,
+);
+const UPLOAD_URL = `${CLOUDINARY_API_BASE}/image/upload`;
+const DESTROY_URL = `${CLOUDINARY_API_BASE}/image/destroy`;
 
 async function uriToBlob(uri: string): Promise<Blob> {
   const res = await fetch(uri);
@@ -68,7 +73,7 @@ async function deleteImage(publicId: string): Promise<void> {
   form.append("api_key", API_KEY);
   form.append("signature", signature);
 
-  await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/destroy`, {
+  await fetch(DESTROY_URL, {
     method: "POST",
     body: form,
   });
