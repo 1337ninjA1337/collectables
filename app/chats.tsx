@@ -26,9 +26,11 @@ function formatWhen(isoDate: string, locale: string | undefined): string {
   }
 }
 
+const CHATS_REFRESH_INTERVAL_MS = 15000;
+
 export default function ChatsScreen() {
   const { t, language } = useI18n();
-  const { previews } = useChat();
+  const { previews, refreshAll } = useChat();
   const { getProfileById, ensureProfilesLoaded, friends } = useSocial();
 
   const otherIds = useMemo(() => previews.map((p) => p.otherUserId), [previews]);
@@ -36,6 +38,17 @@ export default function ChatsScreen() {
   useEffect(() => {
     ensureProfilesLoaded(otherIds);
   }, [otherIds, ensureProfilesLoaded]);
+
+  // Reconcile cached previews with the cloud on mount + at a slow interval so
+  // a missed realtime push (or a chat opened on another device) shows up
+  // without a manual reload.
+  useEffect(() => {
+    void refreshAll();
+    const handle = setInterval(() => {
+      void refreshAll();
+    }, CHATS_REFRESH_INTERVAL_MS);
+    return () => clearInterval(handle);
+  }, [refreshAll]);
 
   return (
     <Screen>
