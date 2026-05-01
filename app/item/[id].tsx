@@ -38,7 +38,7 @@ export default function ItemDetailsScreen() {
     addListing,
     removeListing,
   } = useMarketplace();
-  const { isPremium } = usePremium();
+  const { isPremium, ready: premiumReady } = usePremium();
   const localItem = getItemById(params.id);
   const [remoteItem, setRemoteItem] = useState<CollectableItem | null>(null);
   const [loadingRemote, setLoadingRemote] = useState(false);
@@ -108,7 +108,7 @@ export default function ItemDetailsScreen() {
   const collection = getCollectionById(activeItem.collectionId);
   const isOwner = user?.id === activeItem.createdByUserId;
   const existingListing = findListingByItemId(activeItem.id);
-  const overFreeCap = !isPremium && !existingListing && myActiveListingCount >= 1;
+  const overFreeCap = premiumReady && !isPremium && !existingListing && myActiveListingCount >= 1;
 
   function enterEditMode() {
     setEditTitle(activeItem.title);
