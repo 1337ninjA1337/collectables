@@ -41,7 +41,7 @@ export default function ChatDetailScreen() {
   const { user } = useAuth();
   const { t, language } = useI18n();
   const { getProfileById, ensureProfilesLoaded } = useSocial();
-  const { getMessages, sendMessage, canMessage, markRead, clearChat, refreshFromCloud } = useChat();
+  const { getMessages, sendMessage, canMessage, markRead, clearChat, refreshFromCloud, realtimeOnline } = useChat();
 
   const [text, setText] = useState("");
   const otherProfile = getProfileById(otherUserId) ?? null;
@@ -221,6 +221,12 @@ export default function ChatDetailScreen() {
             </Pressable>
           ) : null}
         </View>
+
+        {allowed && !realtimeOnline ? (
+          <View style={styles.offlinePill}>
+            <Text style={styles.offlinePillText}>{t("chatOfflinePill")}</Text>
+          </View>
+        ) : null}
 
         <ScrollView
           ref={scrollRef}
@@ -406,6 +412,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#a08970",
     paddingHorizontal: 4,
+  },
+  offlinePill: {
+    alignSelf: "center",
+    backgroundColor: "#fff0d6",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#e0b87a",
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  offlinePillText: {
+    fontSize: 12,
+    color: "#7a4f1a",
+    fontWeight: "600",
   },
   typingRow: {
     paddingVertical: 6,

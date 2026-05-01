@@ -429,6 +429,7 @@ const en = {
   premiumConfirmCancelTitle: "Cancel premium?",
   premiumConfirmCancelText:
     "You'll lose unlimited listings and your premium badge. The free cap returns immediately.",
+  chatOfflinePill: "Offline · reconnecting",
   runtimeConfigTitle: "Connect your Supabase project",
   runtimeConfigSubtitle:
     "Paste your project URL and publishable key. They will be saved in this browser only.",
@@ -876,6 +877,7 @@ const ru: TranslationMap = {
   premiumConfirmCancelTitle: "Отменить премиум?",
   premiumConfirmCancelText:
     "Вы потеряете неограниченные объявления и премиум-значок. Бесплатный лимит вернётся сразу.",
+  chatOfflinePill: "Нет соединения · переподключение",
   runtimeConfigTitle: "Подключить проект Supabase",
   runtimeConfigSubtitle:
     "Вставьте URL проекта и ключ. Они сохранятся только в этом браузере.",

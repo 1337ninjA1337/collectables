@@ -118,6 +118,7 @@ export type InboxSubscription = {
 export function subscribeToInbox(
   userId: string,
   onMessage: (message: ChatMessage) => void,
+  onStatusChange?: (connected: boolean) => void,
 ): InboxSubscription {
   const client = getRealtimeClient();
   if (!client || !userId) {
@@ -145,9 +146,8 @@ export function subscribeToInbox(
       },
     )
     .subscribe((status) => {
-      if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
-        // Leave the channel attached so realtime-js can auto-reconnect.
-      }
+      const connected = status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED;
+      onStatusChange?.(connected);
     });
 
   return {

@@ -30,6 +30,7 @@ type ChatContextValue = {
   ready: boolean;
   previews: ChatPreview[];
   unreadTotal: number;
+  realtimeOnline: boolean;
   getMessages: (chatId: string) => ChatMessage[];
   canMessage: (otherUserId: string) => boolean;
   ensureChatWith: (otherUserId: string) => string | null;
@@ -50,6 +51,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   const { friends } = useSocial();
   const [store, setStore] = useState<ChatStore>({ messagesByChat: {}, lastReadByChat: {}, pendingByChatId: {} });
   const [ready, setReady] = useState(false);
+  const [realtimeOnline, setRealtimeOnline] = useState(false);
   const pendingRef = useRef<Record<string, ChatMessage[]>>({});
 
   const storageKey = user ? `${CHAT_STORAGE_KEY}-${user.id}` : null;
@@ -212,19 +214,24 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   useEffect(() => {
     if (!ready || !user) return;
 
-    const subscription = subscribeToInbox(user.id, (incoming) => {
-      setStore((prev) => {
-        const existing = prev.messagesByChat[incoming.chatId] ?? [];
-        const merged = appendMessage(existing, incoming);
-        if (merged === existing) return prev;
-        return {
-          ...prev,
-          messagesByChat: { ...prev.messagesByChat, [incoming.chatId]: merged },
-        };
-      });
-    });
+    const subscription = subscribeToInbox(
+      user.id,
+      (incoming) => {
+        setStore((prev) => {
+          const existing = prev.messagesByChat[incoming.chatId] ?? [];
+          const merged = appendMessage(existing, incoming);
+          if (merged === existing) return prev;
+          return {
+            ...prev,
+            messagesByChat: { ...prev.messagesByChat, [incoming.chatId]: merged },
+          };
+        });
+      },
+      (connected) => setRealtimeOnline(connected),
+    );
 
     return () => {
+      setRealtimeOnline(false);
       subscription.unsubscribe();
     };
   }, [ready, user]);
@@ -349,6 +356,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       ready,
       previews,
       unreadTotal,
+      realtimeOnline,
       getMessages,
       canMessage,
       ensureChatWith,
@@ -361,6 +369,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       ready,
       previews,
       unreadTotal,
+      realtimeOnline,
       getMessages,
       canMessage,
       ensureChatWith,
