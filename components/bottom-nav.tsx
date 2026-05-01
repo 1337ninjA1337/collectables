@@ -35,6 +35,58 @@ type NavItem = {
   badge?: FriendsTabBadge;
 };
 
+type NavRowProps = {
+  leftItems: NavItem[];
+  rightItems: NavItem[];
+  onPlusPress: () => void;
+  plusLabel: string;
+};
+
+function NavTab({ item }: { item: NavItem }) {
+  return (
+    <Pressable style={styles.item} onPress={item.onPress}>
+      <View style={styles.iconWrap}>
+        <Ionicons
+          name={item.active ? item.iconActive : item.icon}
+          size={22}
+          color={item.active ? "#261b14" : "#bbb0a6"}
+        />
+        {renderBadge(item.badge)}
+      </View>
+      {item.active ? <View style={styles.activeDot} /> : <View style={styles.activeDotPlaceholder} />}
+    </Pressable>
+  );
+}
+
+function NavRow({ leftItems, rightItems, onPlusPress, plusLabel }: NavRowProps) {
+  const slots = Math.max(leftItems.length, rightItems.length);
+  const paddedLeft = [...leftItems, ...Array(slots - leftItems.length).fill(null)];
+  const paddedRight = [...rightItems, ...Array(slots - rightItems.length).fill(null)];
+  return (
+    <>
+      {paddedLeft.map((item, i) =>
+        item ? (
+          <NavTab key={item.key} item={item} />
+        ) : (
+          <View key={`left-spacer-${i}`} style={styles.item} />
+        ),
+      )}
+      <View style={styles.item}>
+        <Pressable style={styles.plusButton} onPress={onPlusPress} accessibilityLabel={plusLabel}>
+          <Ionicons name="add" size={30} color="#fff5ea" />
+        </Pressable>
+      </View>
+      {paddedRight.map((item, i) =>
+        item ? (
+          <NavTab key={item.key} item={item} />
+        ) : (
+          <View key={`right-spacer-${i}`} style={styles.item} />
+        ),
+      )}
+    </>
+  );
+}
+
 type BottomNavProps = {
   onSearchPress?: () => void;
 };
@@ -191,37 +243,12 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
           paddingBottom: Math.max(insets.bottom, 8),
         }}
       >
-        {leftItems.map((item) => (
-          <Pressable key={item.key} style={styles.item} onPress={item.onPress}>
-            <View style={styles.iconWrap}>
-              <Ionicons
-                name={item.active ? item.iconActive : item.icon}
-                size={22}
-                color={item.active ? "#261b14" : "#bbb0a6"}
-              />
-              {renderBadge(item.badge)}
-            </View>
-            {item.active ? <View style={styles.activeDot} /> : <View style={styles.activeDotPlaceholder} />}
-          </Pressable>
-        ))}
-        <View style={styles.item}>
-          <Pressable style={styles.plusButton} onPress={openCreate} accessibilityLabel={t("addItem")}>
-            <Ionicons name="add" size={30} color="#fff5ea" />
-          </Pressable>
-        </View>
-        {rightItems.map((item) => (
-          <Pressable key={item.key} style={styles.item} onPress={item.onPress}>
-            <View style={styles.iconWrap}>
-              <Ionicons
-                name={item.active ? item.iconActive : item.icon}
-                size={22}
-                color={item.active ? "#261b14" : "#bbb0a6"}
-              />
-              {renderBadge(item.badge)}
-            </View>
-            {item.active ? <View style={styles.activeDot} /> : <View style={styles.activeDotPlaceholder} />}
-          </Pressable>
-        ))}
+        <NavRow
+          leftItems={leftItems}
+          rightItems={rightItems}
+          onPlusPress={openCreate}
+          plusLabel={t("addItem")}
+        />
       </View>
 
       <Modal visible={createOpen} transparent animationType="fade" onRequestClose={closeCreate}>
