@@ -288,54 +288,6 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     [store],
   );
 
-  const mergeCloudMessages = useCallback(
-    (chatId: string, messages: ChatMessage[]) => {
-      if (messages.length === 0) return;
-      setStore((prev) => {
-        const existing = prev.messagesByChat[chatId] ?? [];
-        let merged = existing;
-        for (const msg of messages) {
-          merged = appendMessage(merged, msg);
-        }
-        if (merged === existing) return prev;
-        return {
-          ...prev,
-          messagesByChat: { ...prev.messagesByChat, [chatId]: merged },
-        };
-      });
-    },
-    [],
-  );
-
-  // Public refresh hooks: re-pull messages for a single chat or every chat
-  // the current user has access to. Used as a fallback for missed realtime
-  // pushes (the primary delivery path) so opening a chat or returning to the
-  // chats screen always reconciles with the cloud.
-  const refreshChat = useCallback(
-    async (otherUserId: string) => {
-      if (!user || !otherUserId) return;
-      if (!canMessage(otherUserId)) return;
-      const chatId = buildChatId(user.id, otherUserId);
-      const messages = await cloudFetchMessagesForChat(chatId);
-      mergeCloudMessages(chatId, messages);
-    },
-    [canMessage, mergeCloudMessages, user],
-  );
-
-  const refreshAll = useCallback(async () => {
-    if (!user || friends.length === 0) return;
-    const results = await Promise.all(
-      friends.map(async (friendId) => {
-        const chatId = buildChatId(user.id, friendId);
-        const messages = await cloudFetchMessagesForChat(chatId);
-        return { chatId, messages };
-      }),
-    );
-    for (const { chatId, messages } of results) {
-      mergeCloudMessages(chatId, messages);
-    }
-  }, [friends, mergeCloudMessages, user]);
-
   const value = useMemo<ChatContextValue>(
     () => ({
       ready,
