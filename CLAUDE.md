@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+NEVER ADD a small "configured by you in this browser" badge plus a "Clear runtime credentials" button next to the new runtime Supabase config form, so a user who pasted the wrong URL/key can reset without digging into devtools `localStorage`. The clear helper (`clearRuntimeSupabaseConfig`) already exists; this is purely UI plumbing. ALWAYS USE CREDENTIALS FROM GITHUB SECRETS
+
 - always build an app using github secrets
 - push all changes ONLY into main branch.
 - IN CASE THERE ARE ANY REQ CHANGES INTO DB (supabase sql commands) ADD EVERYTHING THAT I NEED TO IMPLEMENT MANUALLY IN MANUAL-TASKS.MD 
