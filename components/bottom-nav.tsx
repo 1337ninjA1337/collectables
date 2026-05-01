@@ -56,7 +56,6 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const onSearch = pathname === "/people" || pathname.startsWith("/people");
   const onChats = pathname === "/chats" || pathname.startsWith("/chat");
   const onFriends = pathname === "/friends" || pathname.startsWith("/friends");
-  const onChats = pathname === "/chats" || pathname.startsWith("/chat");
   const onMarketplace = pathname === "/marketplace" || pathname.startsWith("/marketplace") || pathname.startsWith("/listing");
   const onProfile = pathname.startsWith("/profile");
 
