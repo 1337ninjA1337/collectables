@@ -110,8 +110,10 @@ describe("supabase-chat.ts wiring", () => {
 /**
  * Crude function-block extractor good enough for a single TS source file:
  * locates `function name` (or `export ... function name`) and returns the
- * matching `{ ... }` body via brace counting. Throws on miss so tests fail
- * loudly instead of silently regexing nothing.
+ * matching `{ ... }` body via brace counting. Skips the parameter list
+ * (which may contain destructured-default `{...}` blocks) by scanning until
+ * the outer `(...)` closes, then finds the body `{`. Throws on miss so tests
+ * fail loudly instead of silently regexing nothing.
  */
 function extractFunctionBlock(source: string, name: string): string {
   const startMatch = source.match(
@@ -120,8 +122,28 @@ function extractFunctionBlock(source: string, name: string): string {
   if (!startMatch || startMatch.index === undefined) {
     throw new Error(`function ${name} not found in source`);
   }
-  const openIdx = source.indexOf("{", startMatch.index);
+
+  // Find the opening `(` of the parameter list.
+  const parenStart = source.indexOf("(", startMatch.index);
+  if (parenStart === -1) throw new Error(`no opening paren for ${name}`);
+
+  // Walk forward past the balanced parameter list `(...)`.
+  let parenDepth = 0;
+  let parenEnd = -1;
+  for (let i = parenStart; i < source.length; i++) {
+    if (source[i] === "(") parenDepth++;
+    else if (source[i] === ")") {
+      parenDepth--;
+      if (parenDepth === 0) { parenEnd = i; break; }
+    }
+  }
+  if (parenEnd === -1) throw new Error(`unbalanced parens for ${name}`);
+
+  // The function body `{` comes after the parameter list (possibly after a
+  // return-type annotation containing `:` and `>`).
+  const openIdx = source.indexOf("{", parenEnd);
   if (openIdx === -1) throw new Error(`no opening brace for ${name}`);
+
   let depth = 0;
   for (let i = openIdx; i < source.length; i++) {
     const ch = source[i];

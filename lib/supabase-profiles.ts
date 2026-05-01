@@ -4,6 +4,22 @@ import {
   supabasePublishableKey,
   supabaseUrl,
 } from "@/lib/supabase";
+import {
+  collectionByIdUrl,
+  collectionsUrl,
+  collectionsByUserUrl,
+  friendRequestsInsertUrl,
+  friendRequestsUrl,
+  profileByIdUrl,
+  profilesPageRangeHeader,
+  profilesPageUrl,
+  profilesUrl,
+  publicCollectionsByUserUrl,
+  removeFriendRequestUrl,
+  sendFriendRequestBody,
+  upsertCollectionBody,
+  upsertProfileBody,
+} from "@/lib/supabase-profiles-shapes";
 import { CollectableItem, Collection, CollectionVisibility, Reaction, ReactionEmoji, ReactionTargetType, UserProfile } from "@/lib/types";
 
 const supabaseKey = supabasePublishableKey;
@@ -43,11 +59,14 @@ async function getAccessToken(): Promise<string | null> {
 }
 
 async function supabaseRest(
-  path: string,
+  pathOrUrl: string,
   options: { method?: string; headers?: Record<string, string>; body?: string } = {},
 ) {
+  const url = pathOrUrl.startsWith("http")
+    ? pathOrUrl
+    : `${supabaseUrl}/rest/v1${pathOrUrl}`;
   const token = await getAccessToken();
-  const res = await fetch(`${supabaseUrl}/rest/v1${path}`, {
+  const res = await fetch(url, {
     method: options.method ?? "GET",
     headers: {
       apikey: supabaseKey,
@@ -65,17 +84,9 @@ async function supabaseRest(
 export async function upsertMyProfile(profile: UserProfile): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  await supabaseRest("/profiles", {
+  await supabaseRest(profilesUrl(supabaseUrl!), {
     method: "POST",
-    body: JSON.stringify({
-      id: profile.id,
-      email: profile.email,
-      display_name: profile.displayName,
-      username: profile.username,
-      public_id: profile.publicId,
-      bio: profile.bio,
-      avatar: profile.avatar,
-    }),
+    body: JSON.stringify(upsertProfileBody(profile)),
   });
 }
 
@@ -83,7 +94,7 @@ export async function upsertMyProfile(profile: UserProfile): Promise<void> {
 export async function fetchProfileById(id: string): Promise<UserProfile | null> {
   if (!isSupabaseConfigured) return null;
 
-  const res = await supabaseRest(`/profiles?id=eq.${id}&select=*`);
+  const res = await supabaseRest(profileByIdUrl(supabaseUrl!, id));
   const rows: DbProfile[] = await res.json();
   if (rows.length === 0 || isHiddenProfile(rows[0])) return null;
   return toUserProfile(rows[0]);
@@ -96,18 +107,12 @@ export async function fetchProfiles(
 ): Promise<{ data: UserProfile[]; totalCount: number }> {
   if (!isSupabaseConfigured) return { data: [], totalCount: 0 };
 
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
-
-  const res = await supabaseRest(
-    `/profiles?select=*&order=created_at.desc&offset=${from}&limit=${pageSize}`,
-    {
-      headers: {
-        Range: `${from}-${to}`,
-        Prefer: "count=exact",
-      },
+  const res = await supabaseRest(profilesPageUrl(supabaseUrl!, page, pageSize), {
+    headers: {
+      Range: profilesPageRangeHeader(page, pageSize),
+      Prefer: "count=exact",
     },
-  );
+  });
 
   const totalCount = parseInt(res.headers.get("content-range")?.split("/")?.[1] ?? "0", 10);
   const rows: DbProfile[] = await res.json();
@@ -150,19 +155,9 @@ function toCollection(row: DbCollection): Collection {
 export async function upsertCollection(collection: Collection): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  await supabaseRest("/collections", {
+  await supabaseRest(collectionsUrl(supabaseUrl!), {
     method: "POST",
-    body: JSON.stringify({
-      id: collection.id,
-      name: collection.name,
-      cover_photo: collection.coverPhoto,
-      description: collection.description,
-      owner_name: collection.ownerName,
-      owner_user_id: collection.ownerUserId,
-      sort_order: collection.sortOrder ?? null,
-      visibility: collection.visibility ?? "private",
-      shared_with_user_ids: collection.sharedWithUserIds ?? [],
-    }),
+    body: JSON.stringify(upsertCollectionBody(collection)),
   });
 }
 
@@ -197,7 +192,7 @@ export async function deleteRemoteCollection(id: string): Promise<void> {
 export async function fetchCollectionById(id: string): Promise<Collection | null> {
   if (!isSupabaseConfigured) return null;
 
-  const res = await supabaseRest(`/collections?id=eq.${id}&select=*`);
+  const res = await supabaseRest(collectionByIdUrl(supabaseUrl!, id));
   const rows: DbCollection[] = await res.json();
   return rows.length > 0 ? toCollection(rows[0]) : null;
 }
@@ -206,7 +201,7 @@ export async function fetchCollectionById(id: string): Promise<Collection | null
 export async function fetchCollectionsByUserId(userId: string): Promise<Collection[]> {
   if (!isSupabaseConfigured) return [];
 
-  const res = await supabaseRest(`/collections?owner_user_id=eq.${userId}&name=neq.__wishlist__&select=*&order=created_at.desc`);
+  const res = await supabaseRest(collectionsByUserUrl(supabaseUrl!, userId));
   const rows: DbCollection[] = await res.json();
   return rows.map(toCollection);
 }
@@ -215,7 +210,7 @@ export async function fetchCollectionsByUserId(userId: string): Promise<Collecti
 export async function fetchPublicCollectionsByUserId(userId: string): Promise<Collection[]> {
   if (!isSupabaseConfigured) return [];
 
-  const res = await supabaseRest(`/collections?owner_user_id=eq.${userId}&visibility=eq.public&name=neq.__wishlist__&select=*&order=created_at.desc`);
+  const res = await supabaseRest(publicCollectionsByUserUrl(supabaseUrl!, userId));
   const rows: DbCollection[] = await res.json();
   return rows.map(toCollection);
 }
@@ -406,9 +401,7 @@ export type RemoteFriendRequest = {
 export async function fetchFriendRequests(userId: string): Promise<RemoteFriendRequest[]> {
   if (!isSupabaseConfigured) return [];
 
-  const res = await supabaseRest(
-    `/friend_requests?or=(from_user_id.eq.${userId},to_user_id.eq.${userId})&select=from_user_id,to_user_id`,
-  );
+  const res = await supabaseRest(friendRequestsUrl(supabaseUrl!, userId));
   return res.json();
 }
 
@@ -416,9 +409,9 @@ export async function fetchFriendRequests(userId: string): Promise<RemoteFriendR
 export async function sendFriendRequest(fromUserId: string, toUserId: string): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  await supabaseRest("/friend_requests", {
+  await supabaseRest(friendRequestsInsertUrl(supabaseUrl!), {
     method: "POST",
-    body: JSON.stringify({ from_user_id: fromUserId, to_user_id: toUserId }),
+    body: JSON.stringify(sendFriendRequestBody(fromUserId, toUserId)),
   });
 }
 
@@ -426,10 +419,7 @@ export async function sendFriendRequest(fromUserId: string, toUserId: string): P
 export async function removeFriendRequest(userA: string, userB: string): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  await supabaseRest(
-    `/friend_requests?or=(and(from_user_id.eq.${userA},to_user_id.eq.${userB}),and(from_user_id.eq.${userB},to_user_id.eq.${userA}))`,
-    { method: "DELETE" },
-  );
+  await supabaseRest(removeFriendRequestUrl(supabaseUrl!, userA, userB), { method: "DELETE" });
 }
 
 // --- Collection Follows ---

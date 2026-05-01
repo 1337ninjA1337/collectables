@@ -177,3 +177,37 @@ export function extractTypingUserIds(
   }
   return out.sort();
 }
+
+// --- chat_reads (cross-device last-read sync) ---
+
+export type ChatReadRow = {
+  user_id: string;
+  chat_id: string;
+  last_read_at: string;
+};
+
+export function chatReadsUrl(baseUrl: string, userId: string): string {
+  return `${baseUrl}/rest/v1/chat_reads?user_id=eq.${encodeURIComponent(userId)}&select=chat_id,last_read_at`;
+}
+
+export function chatReadsUpsertUrl(baseUrl: string): string {
+  return `${baseUrl}/rest/v1/chat_reads`;
+}
+
+export function buildChatReadUpsertHeaders(
+  apiKey: string,
+  token: string | null,
+): Record<string, string> {
+  return {
+    ...buildAuthHeaders(apiKey, token),
+    Prefer: "resolution=merge-duplicates,return=minimal",
+  };
+}
+
+export function chatReadUpsertBody(
+  userId: string,
+  chatId: string,
+  lastReadAt: string,
+): Record<string, string> {
+  return { user_id: userId, chat_id: chatId, last_read_at: lastReadAt };
+}

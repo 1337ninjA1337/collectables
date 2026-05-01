@@ -14,7 +14,12 @@ import {
 } from "@/lib/supabase";
 import {
   buildAuthHeaders,
+  buildChatReadUpsertHeaders,
   buildSendMessageHeaders,
+  chatReadUpsertBody,
+  ChatReadRow,
+  chatReadsUrl,
+  chatReadsUpsertUrl,
   ChatRow,
   chatRowToMessage,
   extractTypingUserIds,
@@ -38,17 +43,26 @@ import { ChatMessage } from "@/lib/types";
  * code paths in chat-context keep working unchanged.
  */
 
+export type TokenProvider = () => Promise<string | null>;
+export type FetchFn = typeof fetch;
+
 async function getAccessToken(): Promise<string | null> {
   if (!authClient) return null;
   const { data } = await authClient.getSession();
   return data.session?.access_token ?? null;
 }
 
-export async function fetchMessagesForChat(chatId: string): Promise<ChatMessage[]> {
+export async function fetchMessagesForChat(
+  chatId: string,
+  {
+    fetcher = fetch as FetchFn,
+    tokenProvider = getAccessToken,
+  }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
+): Promise<ChatMessage[]> {
   if (!isSupabaseConfigured) return [];
 
-  const token = await getAccessToken();
-  const res = await fetch(fetchMessagesUrl(supabaseUrl!, chatId), {
+  const token = await tokenProvider();
+  const res = await fetcher(fetchMessagesUrl(supabaseUrl!, chatId), {
     headers: buildAuthHeaders(supabasePublishableKey!, token),
   });
   if (!res.ok) return [];
@@ -59,11 +73,15 @@ export async function fetchMessagesForChat(chatId: string): Promise<ChatMessage[
 
 export async function sendMessage(
   input: SendMessageInput,
+  {
+    fetcher = fetch as FetchFn,
+    tokenProvider = getAccessToken,
+  }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
 ): Promise<ChatMessage | null> {
   if (!isSupabaseConfigured) return null;
 
-  const token = await getAccessToken();
-  const res = await fetch(sendMessageUrl(supabaseUrl!), {
+  const token = await tokenProvider();
+  const res = await fetcher(sendMessageUrl(supabaseUrl!), {
     method: "POST",
     headers: buildSendMessageHeaders(supabasePublishableKey!, token),
     body: JSON.stringify(messageToInsertPayload(input)),
@@ -118,6 +136,7 @@ export type InboxSubscription = {
 export function subscribeToInbox(
   userId: string,
   onMessage: (message: ChatMessage) => void,
+  onStatusChange?: (connected: boolean) => void,
 ): InboxSubscription {
   const client = getRealtimeClient();
   if (!client || !userId) {
@@ -145,9 +164,8 @@ export function subscribeToInbox(
       },
     )
     .subscribe((status) => {
-      if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
-        // Leave the channel attached so realtime-js can auto-reconnect.
-      }
+      const connected = status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED;
+      onStatusChange?.(connected);
     });
 
   return {
@@ -244,18 +262,68 @@ export function subscribeToTyping(
 export async function isMutualFriend(
   userA: string,
   userB: string,
+  {
+    fetcher = fetch as FetchFn,
+    tokenProvider = getAccessToken,
+  }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
 ): Promise<boolean> {
   if (!isSupabaseConfigured) return false;
   if (!userA || !userB || userA === userB) return false;
 
-  const token = await getAccessToken();
+  const token = await tokenProvider();
   const headers = buildAuthHeaders(supabasePublishableKey!, token);
   const [r1, r2] = await Promise.all([
-    fetch(friendCheckUrl(supabaseUrl!, userA, userB), { headers }),
-    fetch(friendCheckUrl(supabaseUrl!, userB, userA), { headers }),
+    fetcher(friendCheckUrl(supabaseUrl!, userA, userB), { headers }),
+    fetcher(friendCheckUrl(supabaseUrl!, userB, userA), { headers }),
   ]);
   if (!r1.ok || !r2.ok) return false;
 
   const [a, b] = await Promise.all([r1.json(), r2.json()]);
   return isMutualFriendFromResponses(a, b);
+}
+
+/**
+ * Fetch the server-side last-read timestamps for all chats belonging to
+ * `userId`. Returns a Record<chatId, lastReadAt> or empty when unconfigured.
+ */
+export async function fetchChatReads(
+  userId: string,
+  {
+    fetcher = fetch as FetchFn,
+    tokenProvider = getAccessToken,
+  }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
+): Promise<Record<string, string>> {
+  if (!isSupabaseConfigured || !userId) return {};
+
+  const token = await tokenProvider();
+  const res = await fetcher(chatReadsUrl(supabaseUrl!, userId), {
+    headers: buildAuthHeaders(supabasePublishableKey!, token),
+  });
+  if (!res.ok) return {};
+
+  const rows = (await res.json()) as ChatReadRow[];
+  return Object.fromEntries(rows.map((r) => [r.chat_id, r.last_read_at]));
+}
+
+/**
+ * Persist the last-read timestamp for a single chat to the server so other
+ * devices can pick it up on next hydration. No-op when unconfigured.
+ */
+export async function upsertChatRead(
+  userId: string,
+  chatId: string,
+  lastReadAt: string,
+  {
+    fetcher = fetch as FetchFn,
+    tokenProvider = getAccessToken,
+  }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
+): Promise<void> {
+  if (!isSupabaseConfigured || !userId || !chatId || !lastReadAt) return;
+
+  const token = await tokenProvider();
+  await fetcher(chatReadsUpsertUrl(supabaseUrl!), {
+    method: "POST",
+    headers: buildChatReadUpsertHeaders(supabasePublishableKey!, token),
+    body: JSON.stringify(chatReadUpsertBody(userId, chatId, lastReadAt)),
+  });
 }
