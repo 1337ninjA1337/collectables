@@ -180,6 +180,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: "#2f2318",
     fontSize: 16,
+    fontFamily: 'DMSans-Regular',
   },
   primaryButton: {
     borderRadius: 22,
@@ -213,9 +214,11 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontSize: 14,
     fontWeight: "600",
+    fontFamily: 'DMSans-SemiBold',
   },
   providerHint: {
     color: "#856d5a",
     lineHeight: 21,
+    fontFamily: 'DMSans-Regular',
   },
 });
