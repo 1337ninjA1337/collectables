@@ -4,6 +4,11 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-na
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
+import {
+  clearRuntimeSupabaseConfig,
+  isRuntimeConfigured,
+  setRuntimeSupabaseConfig,
+} from "@/lib/supabase";
 import { useToast } from "@/lib/toast-context";
 
 export function LoginScreen() {
@@ -14,6 +19,25 @@ export function LoginScreen() {
   const [code, setCode] = useState("");
   const [awaitingCode, setAwaitingCode] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [runtimeUrl, setRuntimeUrl] = useState("");
+  const [runtimeKey, setRuntimeKey] = useState("");
+
+  function handleSaveRuntimeConfig() {
+    const url = runtimeUrl.trim();
+    const key = runtimeKey.trim();
+    if (!url || !key) return;
+    setRuntimeSupabaseConfig(url, key);
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
+  }
+
+  function handleClearRuntimeConfig() {
+    clearRuntimeSupabaseConfig();
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
+  }
 
   async function handleSendCode() {
     setEmailError(null);
@@ -115,6 +139,51 @@ export function LoginScreen() {
         </Pressable>
         <Text style={styles.providerHint}>{Platform.OS === "web" ? t("providerHintWeb") : t("providerHintMobile")}</Text>
       </View>
+
+      {Platform.OS === "web" && !configured && (
+        <View style={styles.runtimeCard}>
+          <Text style={styles.sectionTitle}>{t("runtimeConfigTitle")}</Text>
+          <Text style={styles.sectionText}>{t("runtimeConfigSubtitle")}</Text>
+          <Text style={styles.inputLabel}>{t("runtimeConfigUrlLabel")}</Text>
+          <TextInput
+            value={runtimeUrl}
+            onChangeText={setRuntimeUrl}
+            placeholder={t("runtimeConfigUrlPlaceholder")}
+            placeholderTextColor="#9b8571"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.input}
+          />
+          <Text style={styles.inputLabel}>{t("runtimeConfigKeyLabel")}</Text>
+          <TextInput
+            value={runtimeKey}
+            onChangeText={setRuntimeKey}
+            placeholder={t("runtimeConfigKeyPlaceholder")}
+            placeholderTextColor="#9b8571"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.input}
+          />
+          <Pressable
+            style={{...styles.primaryButton, ...(!runtimeUrl.trim() || !runtimeKey.trim() ? styles.disabledButton : {})}}
+            onPress={handleSaveRuntimeConfig}
+            disabled={!runtimeUrl.trim() || !runtimeKey.trim()}
+          >
+            <Text style={styles.primaryButtonText}>{t("runtimeConfigSave")}</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {Platform.OS === "web" && isRuntimeConfigured && (
+        <View style={styles.runtimeBadgeRow}>
+          <View style={styles.runtimeBadge}>
+            <Text style={styles.runtimeBadgeText}>{t("runtimeConfiguredBadge")}</Text>
+          </View>
+          <Pressable style={styles.clearRuntimeButton} onPress={handleClearRuntimeConfig}>
+            <Text style={styles.clearRuntimeText}>{t("runtimeConfigClear")}</Text>
+          </Pressable>
+        </View>
+      )}
     </Screen>
   );
 }
@@ -205,5 +274,51 @@ const styles = StyleSheet.create({
   providerHint: {
     color: "#856d5a",
     lineHeight: 21,
+  },
+  runtimeCard: {
+    borderRadius: 28,
+    padding: 20,
+    gap: 12,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#c8b99a",
+  },
+  inputLabel: {
+    color: "#5a4030",
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: -4,
+  },
+  runtimeBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  runtimeBadge: {
+    borderRadius: 999,
+    backgroundColor: "#f0e6d3",
+    borderWidth: 1,
+    borderColor: "#c8a87a",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  runtimeBadgeText: {
+    color: "#5a3b1a",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  clearRuntimeButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#d9a0a0",
+    backgroundColor: "#fff3f3",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  clearRuntimeText: {
+    color: "#8d2b2b",
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

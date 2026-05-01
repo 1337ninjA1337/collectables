@@ -429,6 +429,16 @@ const en = {
   premiumConfirmCancelTitle: "Cancel premium?",
   premiumConfirmCancelText:
     "You'll lose unlimited listings and your premium badge. The free cap returns immediately.",
+  runtimeConfigTitle: "Connect your Supabase project",
+  runtimeConfigSubtitle:
+    "Paste your project URL and publishable key. They will be saved in this browser only.",
+  runtimeConfigUrlLabel: "Project URL",
+  runtimeConfigUrlPlaceholder: "https://your-project.supabase.co",
+  runtimeConfigKeyLabel: "Publishable key (anon key)",
+  runtimeConfigKeyPlaceholder: "eyJ…",
+  runtimeConfigSave: "Save and reload",
+  runtimeConfiguredBadge: "Configured by you in this browser",
+  runtimeConfigClear: "Clear runtime credentials",
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -866,6 +876,16 @@ const ru: TranslationMap = {
   premiumConfirmCancelTitle: "Отменить премиум?",
   premiumConfirmCancelText:
     "Вы потеряете неограниченные объявления и премиум-значок. Бесплатный лимит вернётся сразу.",
+  runtimeConfigTitle: "Подключить проект Supabase",
+  runtimeConfigSubtitle:
+    "Вставьте URL проекта и ключ. Они сохранятся только в этом браузере.",
+  runtimeConfigUrlLabel: "URL проекта",
+  runtimeConfigUrlPlaceholder: "https://your-project.supabase.co",
+  runtimeConfigKeyLabel: "Публичный ключ (anon key)",
+  runtimeConfigKeyPlaceholder: "eyJ…",
+  runtimeConfigSave: "Сохранить и перезагрузить",
+  runtimeConfiguredBadge: "Настроено вами в этом браузере",
+  runtimeConfigClear: "Сбросить runtime-учётные данные",
 };
 
 const be: TranslationMap = {
