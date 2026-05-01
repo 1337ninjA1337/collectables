@@ -43,6 +43,18 @@ jobs:
       EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME }}
       EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
     steps:
+      - name: Validate required secrets
+        run: |
+          if [ -z "$EXPO_PUBLIC_SUPABASE_URL" ]; then
+            echo "ERROR: EXPO_PUBLIC_SUPABASE_URL secret is not set" >&2
+            exit 1
+          fi
+          if [ -z "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "ERROR: EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY secret is not set" >&2
+            exit 1
+          fi
+          echo "Secrets validated OK"
+
       - name: Checkout
         uses: actions/checkout@v4
 

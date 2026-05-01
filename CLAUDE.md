@@ -6,7 +6,7 @@ NEVER ADD a small "configured by you in this browser" badge plus a "Clear runtim
 - push all changes ONLY into main branch.
 - IN CASE THERE ARE ANY REQ CHANGES INTO DB (supabase sql commands) ADD EVERYTHING THAT I NEED TO IMPLEMENT MANUALLY IN MANUAL-TASKS.MD 
 - NEVER push any credentials into git (if there are any creds in commit than just replace them with *paste your creds*) 
-- deploy every changes into github pages by yourself
+- deploy every changes into github pages by yourself — push to main, GitHub Actions deploys with secrets automatically (DO NOT run `npx gh-pages` locally — it builds without secrets and breaks the app)
 - don't explain enything except when i ask to explain
 - allow all the edits 
 - after each change push those changes into git (main branch) with minimized commit name (just task name)
