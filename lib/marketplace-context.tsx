@@ -13,6 +13,7 @@ import {
 } from "@/lib/marketplace-helpers";
 import {
   cloudAddListing,
+  cloudFetchListingById,
   cloudFetchListings,
   cloudMarkSold,
   cloudRemoveListing,
@@ -39,6 +40,7 @@ type MarketplaceContextValue = {
   canCreateListing: (isPremium?: boolean) => boolean;
   findListingByItemId: (itemId: string) => MarketplaceListing | undefined;
   getListingById: (id: string) => MarketplaceListing | undefined;
+  fetchListingById: (id: string) => Promise<MarketplaceListing | null>;
   addListing: (input: DraftListingInput) => MarketplaceListing | null;
   removeListing: (id: string) => void;
   markListingSold: (id: string) => void;
@@ -162,6 +164,17 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
     [listings],
   );
 
+  const fetchListingById = useCallback(
+    async (id: string): Promise<MarketplaceListing | null> => {
+      const local = listings.find((l) => l.id === id);
+      if (local) return local;
+      const remote = await cloudFetchListingById(id);
+      if (remote) setListings((prev) => upsertListing(prev, remote));
+      return remote;
+    },
+    [listings],
+  );
+
   const value = useMemo<MarketplaceContextValue>(
     () => ({
       ready,
@@ -172,6 +185,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       canCreateListing,
       findListingByItemId: findByItemId,
       getListingById,
+      fetchListingById,
       addListing,
       removeListing,
       markListingSold,
@@ -185,6 +199,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       canCreateListing,
       findByItemId,
       getListingById,
+      fetchListingById,
       addListing,
       removeListing,
       markListingSold,

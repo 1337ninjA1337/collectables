@@ -1,5 +1,5 @@
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
@@ -18,12 +18,19 @@ export default function ListingDetailScreen() {
   const listingId = params.id ?? "";
   const { t } = useI18n();
   const { user } = useAuth();
-  const { getListingById, listings } = useMarketplace();
+  const { getListingById, fetchListingById, listings } = useMarketplace();
   const { getItemById } = useCollections();
   const { getProfileById, ensureProfilesLoaded } = useSocial();
   const { ensureChatWith, canMessage } = useChat();
+  const [fetchingRemote, setFetchingRemote] = useState(false);
 
   const listing = getListingById(listingId);
+
+  useEffect(() => {
+    if (listing || !listingId || fetchingRemote) return;
+    setFetchingRemote(true);
+    fetchListingById(listingId).finally(() => setFetchingRemote(false));
+  }, [listing, listingId, fetchListingById, fetchingRemote]);
 
   const item = listing ? getItemById(listing.itemId) : undefined;
   const owner = listing ? getProfileById(listing.ownerUserId) : undefined;
@@ -39,10 +46,10 @@ export default function ListingDetailScreen() {
         <Stack.Screen options={{ title: t("marketplaceTitle") }} />
         <EmptyState
           icon="🪧"
-          title={t("marketplaceListingNotFound")}
-          hint={t("marketplaceListingNotFoundHint")}
-          actionLabel={t("marketplaceTitle")}
-          onAction={() => router.replace("/marketplace")}
+          title={fetchingRemote ? "..." : t("marketplaceListingNotFound")}
+          hint={fetchingRemote ? "" : t("marketplaceListingNotFoundHint")}
+          actionLabel={fetchingRemote ? undefined : t("marketplaceTitle")}
+          onAction={fetchingRemote ? undefined : () => router.replace("/marketplace")}
         />
       </Screen>
     );

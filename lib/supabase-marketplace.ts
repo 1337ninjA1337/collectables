@@ -8,6 +8,7 @@ import {
   buildMarketplaceReadHeaders,
   buildMarketplaceWriteHeaders,
   deleteListingUrl,
+  fetchListingByIdUrl,
   fetchListingsUrl,
   insertListingUrl,
   listingToInsertPayload,
@@ -76,6 +77,24 @@ export async function cloudRemoveListing(
     headers: buildMarketplaceReadHeaders(supabasePublishableKey!, token),
   });
   return res.ok;
+}
+
+export async function cloudFetchListingById(
+  id: string,
+  {
+    fetcher = fetch as FetchFn,
+    tokenProvider = getAccessToken,
+  }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
+): Promise<MarketplaceListing | null> {
+  if (!isSupabaseConfigured) return null;
+  const token = await tokenProvider();
+  const res = await fetcher(fetchListingByIdUrl(supabaseUrl!, id), {
+    headers: buildMarketplaceReadHeaders(supabasePublishableKey!, token),
+  });
+  if (!res.ok) return null;
+  const rows = (await res.json()) as MarketplaceRow[];
+  if (!rows.length) return null;
+  return rowToListing(rows[0]);
 }
 
 export async function cloudMarkSold(
