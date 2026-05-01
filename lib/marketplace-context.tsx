@@ -11,6 +11,12 @@ import {
   removeListingById,
   upsertListing,
 } from "@/lib/marketplace-helpers";
+import {
+  cloudAddListing,
+  cloudFetchListings,
+  cloudMarkSold,
+  cloudRemoveListing,
+} from "@/lib/supabase-marketplace";
 import { MarketplaceListing, MarketplaceMode } from "@/lib/types";
 
 const STORAGE_KEY = "collectables-marketplace-v1";
@@ -53,6 +59,15 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
     let cancelled = false;
     (async () => {
       try {
+        // Try cloud first; fall back to local cache.
+        const cloud = await cloudFetchListings();
+        if (!cancelled) {
+          if (cloud.length > 0) {
+            setListings(cloud);
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cloud)).catch(() => undefined);
+            return;
+          }
+        }
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (cancelled) return;
         if (raw) {
@@ -115,6 +130,8 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         soldAt: null,
       };
       setListings((prev) => upsertListing(prev, next));
+      // Best-effort cloud sync (fire-and-forget).
+      void cloudAddListing(next);
       return next;
     },
     [listings, user],
@@ -122,14 +139,17 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
 
   const removeListing = useCallback((id: string) => {
     setListings((prev) => removeListingById(prev, id));
+    void cloudRemoveListing(id);
   }, []);
 
   const markListingSold = useCallback((id: string) => {
+    const soldAt = new Date().toISOString();
     setListings((prev) => {
       const target = prev.find((l) => l.id === id);
       if (!target || target.soldAt) return prev;
-      return upsertListing(prev, { ...target, soldAt: new Date().toISOString() });
+      return upsertListing(prev, { ...target, soldAt });
     });
+    void cloudMarkSold(id, soldAt);
   }, []);
 
   const findByItemId = useCallback(
