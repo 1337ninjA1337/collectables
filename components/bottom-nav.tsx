@@ -285,6 +285,7 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 10,
     fontWeight: "800",
+    fontFamily: "DMSans-ExtraBold",
   },
   plusButton: {
     width: 50,
@@ -336,6 +337,7 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: "DMSans-ExtraBold",
   },
   modalSecondaryButton: {
     borderRadius: 22,
@@ -347,6 +349,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: "DMSans-ExtraBold",
   },
   modalCancelButton: {
     borderRadius: 22,
@@ -360,5 +363,6 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: "DMSans-ExtraBold",
   },
 });

@@ -980,6 +980,7 @@ const styles = StyleSheet.create({
     color: "#fff4e8",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   deleteButton: {
     borderRadius: 22,
@@ -994,6 +995,7 @@ const styles = StyleSheet.create({
     color: "#8d2b2b",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   unfollowButton: {
     borderRadius: 22,
@@ -1008,16 +1010,19 @@ const styles = StyleSheet.create({
     color: "#2a1d15",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   listTitle: {
     color: "#2d2117",
     fontSize: 22,
     fontWeight: "800",
+    fontFamily: 'Syne-ExtraBold',
   },
   emptyTitle: {
     fontSize: 24,
     fontWeight: "700",
     color: "#2d2117",
+    fontFamily: 'DMSans-Bold',
   },
   selectButton: {
     borderRadius: 22,
@@ -1032,6 +1037,7 @@ const styles = StyleSheet.create({
     color: "#2a1d15",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   selectList: {
     gap: 12,
@@ -1074,6 +1080,7 @@ const styles = StyleSheet.create({
     color: "#ffd7ab",
     fontSize: 14,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   bulkBarButtons: {
     flexDirection: "row",
@@ -1105,6 +1112,7 @@ const styles = StyleSheet.create({
     color: "#fff4e8",
     fontSize: 13,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   bulkBarButtonDangerText: {
     color: "#ffe6e0",
@@ -1130,6 +1138,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: "#2d2117",
+    fontFamily: 'DMSans-ExtraBold',
   },
   modalList: {
     gap: 8,
@@ -1147,6 +1156,7 @@ const styles = StyleSheet.create({
     color: "#2a1d15",
     fontSize: 15,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   modalCancel: {
     alignSelf: "flex-end",
@@ -1157,6 +1167,7 @@ const styles = StyleSheet.create({
     color: "#6a4d35",
     fontSize: 14,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   editCollectionButton: {
     borderRadius: 22,
@@ -1171,6 +1182,7 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   editModalCard: {
     width: "100%",
@@ -1191,10 +1203,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.5,
     textTransform: "uppercase",
+    fontFamily: 'DMSans-ExtraBold',
   },
   editFieldRequired: {
     color: "#d92f2f",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   editFieldInput: {
     borderRadius: 16,
@@ -1205,6 +1219,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: "#2f2318",
     fontSize: 15,
+    fontFamily: 'DMSans-Regular',
   },
   editFieldInputMultiline: {
     minHeight: 90,
@@ -1219,6 +1234,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 14,
+    fontFamily: 'DMSans-ExtraBold',
   },
   editCoverPreview: {
     width: "100%",
@@ -1246,6 +1262,7 @@ const styles = StyleSheet.create({
     color: "#6b5647",
     fontSize: 14,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   editVisibilityChipTextSelected: {
     color: "#fff7ef",
@@ -1254,6 +1271,7 @@ const styles = StyleSheet.create({
     color: "#7a6453",
     fontSize: 12,
     lineHeight: 18,
+    fontFamily: 'DMSans-Regular',
   },
   shareScrollView: {
     gap: 12,
@@ -1266,11 +1284,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     color: "#2f2318",
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareFriendsHint: {
     color: "#6b5647",
     fontSize: 13,
     lineHeight: 18,
+    fontFamily: 'DMSans-Regular',
   },
   shareFriendRow: {
     flexDirection: "row",
@@ -1296,6 +1316,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     flex: 1,
+    fontFamily: 'DMSans-Bold',
   },
   shareFriendButton: {
     borderRadius: 999,
@@ -1310,6 +1331,7 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontSize: 13,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareFriendButtonTextActive: {
     color: "#fff",
@@ -1322,6 +1344,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     marginTop: 4,
+    fontFamily: 'DMSans-Regular',
   },
   editSaveButton: {
     borderRadius: 18,
@@ -1336,5 +1359,6 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
 });

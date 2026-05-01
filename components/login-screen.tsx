@@ -137,17 +137,20 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
+    fontFamily: "DMSans-ExtraBold",
   },
   title: {
     color: "#fff8ef",
     fontSize: 30,
     lineHeight: 38,
     fontWeight: "800",
+    fontFamily: "Syne-ExtraBold",
   },
   subtitle: {
     color: "#ead8c3",
     fontSize: 15,
     lineHeight: 23,
+    fontFamily: "DMSans-Regular",
   },
   card: {
     borderRadius: 28,
@@ -161,10 +164,12 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 22,
     fontWeight: "800",
+    fontFamily: "Syne-ExtraBold",
   },
   sectionText: {
     color: "#6f5c4d",
     lineHeight: 22,
+    fontFamily: "DMSans-Regular",
   },
   input: {
     borderRadius: 22,
@@ -186,6 +191,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: "DMSans-ExtraBold",
   },
   secondaryButton: {
     borderRadius: 22,
@@ -197,6 +203,7 @@ const styles = StyleSheet.create({
     color: "#fff4e8",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: "DMSans-ExtraBold",
   },
   disabledButton: {
     opacity: 0.65,
