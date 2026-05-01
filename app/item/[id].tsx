@@ -3,6 +3,7 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { CurrencyInput, parseCurrencyValue } from "@/components/currency-input";
 import { SkeletonItemDetail } from "@/components/skeleton";
 
 import { PhotoPreview } from "@/components/photo-preview";
@@ -72,6 +73,7 @@ export default function ItemDetailsScreen() {
   const [listingSheetOpen, setListingSheetOpen] = useState(false);
   const [listingMode, setListingMode] = useState<MarketplaceMode>("trade");
   const [listingPrice, setListingPrice] = useState("");
+  const [listingCurrency, setListingCurrency] = useState("USD");
   const [listingNotes, setListingNotes] = useState("");
 
   useEffect(() => {
@@ -191,6 +193,7 @@ export default function ItemDetailsScreen() {
   function openListingSheet() {
     setListingMode("trade");
     setListingPrice("");
+    setListingCurrency("USD");
     setListingNotes("");
     setListingSheetOpen(true);
   }
@@ -201,15 +204,19 @@ export default function ItemDetailsScreen() {
 
   function handleSubmitListing() {
     if (overFreeCap) return;
-    const parsed = listingMode === "sell" ? Number(listingPrice.replace(",", ".")) : null;
-    const finalPrice =
-      listingMode === "sell" && typeof parsed === "number" && !Number.isNaN(parsed)
-        ? parsed
-        : null;
+    let finalPrice: number | null = null;
+    if (listingMode === "sell") {
+      finalPrice = parseCurrencyValue(listingPrice);
+      if (finalPrice === null) {
+        toast.error(t("marketplacePriceInvalid"), t("marketplacePriceLabel"));
+        return;
+      }
+    }
     const result = addListing({
       itemId: activeItem.id,
       mode: listingMode,
       askingPrice: finalPrice,
+      currency: listingCurrency,
       notes: listingNotes,
       isPremium,
     });
@@ -491,13 +498,12 @@ export default function ItemDetailsScreen() {
             {listingMode === "sell" ? (
               <View style={styles.editFieldGroup}>
                 <Text style={styles.editLabel}>{t("marketplacePriceLabel")}</Text>
-                <TextInput
+                <CurrencyInput
                   value={listingPrice}
-                  onChangeText={setListingPrice}
+                  currency={listingCurrency}
+                  onChangeValue={setListingPrice}
+                  onChangeCurrency={setListingCurrency}
                   placeholder={t("marketplacePricePlaceholder")}
-                  placeholderTextColor="#9b8571"
-                  keyboardType="numeric"
-                  style={styles.editInput}
                 />
               </View>
             ) : null}

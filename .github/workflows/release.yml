@@ -33,3 +33,25 @@ jobs:
 
       - name: Web build
         run: npm run build
+
+      - name: Bundle smoke check
+        run: |
+          BUNDLE=$(ls dist/_expo/static/js/web/*.js 2>/dev/null | head -1)
+          if [ -z "$BUNDLE" ]; then
+            echo "ERROR: no web bundle found in dist/_expo/static/js/web/" >&2
+            exit 1
+          fi
+          echo "Checking bundle: $BUNDLE"
+          for KEY in marketplaceListOnMarketplace marketplaceTitle addItem createCollection signOut; do
+            if ! grep -q "$KEY" "$BUNDLE"; then
+              echo "ERROR: expected key '$KEY' not found in bundle" >&2
+              exit 1
+            fi
+          done
+          for PROVIDER in MarketplaceProvider CollectionsProvider SocialProvider AuthProvider; do
+            if ! grep -q "$PROVIDER" "$BUNDLE"; then
+              echo "ERROR: expected provider '$PROVIDER' not found in bundle" >&2
+              exit 1
+            fi
+          done
+          echo "Bundle smoke check passed."
