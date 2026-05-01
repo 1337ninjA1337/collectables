@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -111,6 +112,32 @@ export default function ChatDetailScreen() {
       sub.unsubscribe();
     };
   }, [chatId, user, allowed]);
+
+  // Clear typing presence when the user backgrounds the app or blurs the tab,
+  // so the other side stops seeing "is typing..." after ~1s instead of ~30s.
+  useEffect(() => {
+    function clearTyping() {
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = null;
+      }
+      typingSubRef.current?.setTyping(false);
+    }
+
+    if (Platform.OS === "web") {
+      if (typeof document === "undefined") return;
+      function onVisibilityChange() {
+        if (document.hidden) clearTyping();
+      }
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+    }
+
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "background" || state === "inactive") clearTyping();
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
