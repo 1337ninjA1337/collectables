@@ -58,9 +58,9 @@ export function clearRuntimeSupabaseConfig(): void {
 const runtimeConfig = parseRuntimeConfig();
 export const isRuntimeConfigured = runtimeConfig !== null;
 
-export const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? runtimeConfig?.url;
+export const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || runtimeConfig?.url;
 export const supabasePublishableKey =
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? runtimeConfig?.key;
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || runtimeConfig?.key;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublishableKey);
 

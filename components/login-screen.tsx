@@ -8,7 +8,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
 
 export function LoginScreen() {
-  const { configured, pending, sendEmailOtp, verifyEmailOtp, signInWithProvider } = useAuth();
+  const { pending, sendEmailOtp, verifyEmailOtp, signInWithProvider } = useAuth();
   const { t } = useI18n();
   const toast = useToast();
   const [email, setEmail] = useState("");
@@ -94,15 +94,15 @@ export function LoginScreen() {
               maxLength={6}
               style={styles.input}
             />
-            <Pressable style={{...styles.primaryButton, ...(pending || !configured ? styles.disabledButton : {})}} onPress={handleVerifyCode} disabled={pending || !configured}>
+            <Pressable style={{...styles.primaryButton, ...(pending ? styles.disabledButton : {})}} onPress={handleVerifyCode} disabled={pending}>
               <Text style={styles.primaryButtonText}>{t("confirmCode")}</Text>
             </Pressable>
-            <Pressable style={{...styles.secondaryButton, ...(pending || !configured ? styles.disabledButton : {})}} onPress={handleSendCode} disabled={pending || !configured}>
+            <Pressable style={{...styles.secondaryButton, ...(pending ? styles.disabledButton : {})}} onPress={handleSendCode} disabled={pending}>
               <Text style={styles.secondaryButtonText}>{t("resendCode")}</Text>
             </Pressable>
           </>
         ) : (
-          <Pressable style={{...styles.primaryButton, ...(pending || !configured ? styles.disabledButton : {})}} onPress={handleSendCode} disabled={pending || !configured}>
+          <Pressable style={{...styles.primaryButton, ...(pending ? styles.disabledButton : {})}} onPress={handleSendCode} disabled={pending}>
             <Text style={styles.primaryButtonText}>{t("getCode")}</Text>
           </Pressable>
         )}
@@ -112,10 +112,10 @@ export function LoginScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{t("quickLoginTitle")}</Text>
         <Text style={styles.sectionText}>{t("quickLoginSubtitle")}</Text>
-        <Pressable style={{...styles.secondaryButton, ...(pending ? styles.disabledButton : {})}} onPress={() => handleProviderLogin("google")} disabled={pending || !configured}>
+        <Pressable style={{...styles.secondaryButton, ...(pending ? styles.disabledButton : {})}} onPress={() => handleProviderLogin("google")} disabled={pending}>
           <Text style={styles.secondaryButtonText}>{t("continueGoogle")}</Text>
         </Pressable>
-        <Pressable style={{...styles.secondaryButton, ...(pending ? styles.disabledButton : {})}} onPress={() => handleProviderLogin("apple")} disabled={pending || !configured}>
+        <Pressable style={{...styles.secondaryButton, ...(pending ? styles.disabledButton : {})}} onPress={() => handleProviderLogin("apple")} disabled={pending}>
           <Text style={styles.secondaryButtonText}>{t("continueApple")}</Text>
         </Pressable>
         <Text style={styles.providerHint}>{Platform.OS === "web" ? t("providerHintWeb") : t("providerHintMobile")}</Text>
