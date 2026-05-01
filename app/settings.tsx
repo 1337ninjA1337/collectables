@@ -10,7 +10,7 @@ import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
 
 export default function SettingsScreen() {
-  const { t, language, setLanguage, languageOptions } = useI18n();
+  const { t, language, setLanguage, languageOptions, formatRelativeDate } = useI18n();
   const { signOut, deleteAccount, pending } = useAuth();
   const { ready: premiumReady, isPremium, activatedAt, expiresAt, activatePremium, cancelPremium } = usePremium();
   const toast = useToast();
@@ -130,7 +130,7 @@ export default function SettingsScreen() {
           </View>
           <Text style={isPremium ? styles.premiumSubtitleActive : styles.premiumSubtitle}>
             {isPremium && activatedAt
-              ? t("premiumActiveSince", { date: activatedAt.slice(0, 10) })
+              ? t("premiumActiveSince", { date: formatRelativeDate(activatedAt) })
               : t("premiumSubtitle")}
           </Text>
           {isPremium && expiresAt ? (

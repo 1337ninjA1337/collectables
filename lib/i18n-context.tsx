@@ -1409,11 +1409,45 @@ const languageOptions: { code: AppLanguage; label: string }[] = [
   { code: "es", label: "Español" },
 ];
 
+const LOCALE_MAP: Record<AppLanguage, string> = {
+  en: "en",
+  ru: "ru",
+  be: "be",
+  pl: "pl",
+  de: "de",
+  es: "es",
+};
+
+export function formatRelativeDate(iso: string, locale: AppLanguage | string = "en"): string {
+  const then = Date.parse(iso);
+  if (!Number.isFinite(then)) return iso;
+  const diffMs = then - Date.now();
+  const diffSec = Math.round(diffMs / 1000);
+  const diffMin = Math.round(diffSec / 60);
+  const diffHr = Math.round(diffMin / 60);
+  const diffDay = Math.round(diffHr / 24);
+  const diffWk = Math.round(diffDay / 7);
+  const diffMo = Math.round(diffDay / 30);
+  const diffYr = Math.round(diffDay / 365);
+
+  const bcp47 = LOCALE_MAP[locale as AppLanguage] ?? locale;
+  const rtf = new Intl.RelativeTimeFormat(bcp47, { numeric: "auto" });
+
+  if (Math.abs(diffSec) < 60) return rtf.format(diffSec, "second");
+  if (Math.abs(diffMin) < 60) return rtf.format(diffMin, "minute");
+  if (Math.abs(diffHr) < 24) return rtf.format(diffHr, "hour");
+  if (Math.abs(diffDay) < 7) return rtf.format(diffDay, "day");
+  if (Math.abs(diffWk) < 5) return rtf.format(diffWk, "week");
+  if (Math.abs(diffMo) < 12) return rtf.format(diffMo, "month");
+  return rtf.format(diffYr, "year");
+}
+
 const I18nContext = createContext<{
   language: AppLanguage;
   ready: boolean;
   setLanguage: (language: AppLanguage) => Promise<void>;
   t: (key: TranslationKey, params?: TranslationParams) => string;
+  formatRelativeDate: (iso: string) => string;
   languageOptions: { code: AppLanguage; label: string }[];
 } | null>(null);
 
@@ -1456,6 +1490,7 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
         const entry = translations[language][key] ?? translations.en[key];
         return typeof entry === "function" ? entry(params) : entry;
       },
+      formatRelativeDate: (iso: string) => formatRelativeDate(iso, language),
       languageOptions,
     }),
     [language, ready],
