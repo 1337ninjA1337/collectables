@@ -1,5 +1,23 @@
 # Manual Tasks
 
+## Add SUPABASE_DB_URL secret to GitHub repository (for automated migrations)
+
+The deploy workflow now includes a `migrate` job that runs `supabase db push`
+automatically on every push to main. To activate it:
+
+1. Get your database connection URL from the Supabase dashboard:
+   - Project Settings → Database → Connection string (URI format)
+   - Use the **Transaction** or **Direct** connection string (not Pooler)
+2. In GitHub: Settings → Secrets and variables → Actions → New repository secret
+3. Name: `SUPABASE_DB_URL`
+4. Value: your connection string (e.g. `postgresql://postgres:[password]@[host]:5432/postgres`)
+
+Once set, every push to `main` will automatically apply any new migrations in
+`supabase/migrations/` before the static site is deployed.
+
+Without this secret, the `migrate` job is skipped and migrations must be applied
+manually as described below.
+
 ## Apply chat_messages migration (if not yet applied)
 
 If chat messages are not delivered to the second account, the
