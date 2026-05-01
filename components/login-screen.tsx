@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -60,11 +61,16 @@ export function LoginScreen() {
 
   return (
     <Screen>
-      <View style={styles.hero}>
+      <LinearGradient
+        colors={["#3d2810", "#261b14", "#1e140e"]}
+        start={{ x: 0.2, y: 0.6 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.hero}
+      >
         <Text style={styles.eyebrow}>{t("authAccount")}</Text>
         <Text style={styles.title}>{t("authTitle")}</Text>
         <Text style={styles.subtitle}>{t("authSubtitle")}</Text>
-      </View>
+      </LinearGradient>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{t("emailLoginTitle")}</Text>
@@ -121,7 +127,6 @@ export function LoginScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: "#261b14",
     borderRadius: 32,
     padding: 24,
     gap: 12,

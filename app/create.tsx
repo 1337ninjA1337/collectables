@@ -469,10 +469,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: "#2b2017",
     fontWeight: "800",
+    fontFamily: 'Syne-ExtraBold',
   },
   heroText: {
     color: "#6b5543",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   fieldGroup: {
     gap: 10,
@@ -483,6 +485,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.5,
     textTransform: "uppercase",
+    fontFamily: 'DMSans-ExtraBold',
   },
   input: {
     borderRadius: 22,
@@ -493,6 +496,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: "#2f2318",
     fontSize: 16,
+    fontFamily: 'DMSans-Regular',
   },
   inputMultiline: {
     minHeight: 132,
@@ -504,6 +508,7 @@ const styles = StyleSheet.create({
   required: {
     color: "#d92f2f",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   selectorButton: {
     flexDirection: "row",
@@ -531,11 +536,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     flex: 1,
+    fontFamily: 'DMSans-Bold',
   },
   selectorPlaceholder: {
     color: "#9b8571",
     fontSize: 16,
     flex: 1,
+    fontFamily: 'DMSans-Regular',
   },
   sheetBackdrop: {
     flex: 1,
@@ -564,6 +571,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#2d2117",
+    fontFamily: 'DMSans-ExtraBold',
   },
   sheetSearchRow: {
     flexDirection: "row",
@@ -581,6 +589,7 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 15,
     fontWeight: "600",
+    fontFamily: 'DMSans-SemiBold',
   },
   sheetList: {
     maxHeight: 340,
@@ -590,6 +599,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: 20,
     fontSize: 14,
+    fontFamily: 'DMSans-Regular',
   },
   sheetRow: {
     flexDirection: "row",
@@ -633,6 +643,7 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 15,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   sheetRowNameSelected: {
     color: "#d89c5b",
@@ -640,6 +651,7 @@ const styles = StyleSheet.create({
   sheetRowDesc: {
     color: "#8f6947",
     fontSize: 13,
+    fontFamily: 'DMSans-Regular',
   },
   sheetCloseButton: {
     borderRadius: 22,
@@ -653,6 +665,7 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   photoButton: {
     borderRadius: 20,
@@ -675,11 +688,13 @@ const styles = StyleSheet.create({
     color: "#2a1d15",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: 'DMSans-ExtraBold',
   },
   photoButtonText: {
     color: "#241912",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: 'DMSans-ExtraBold',
   },
   tagsRow: {
     flexDirection: "row",
@@ -698,11 +713,13 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 13,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   tagChipRemove: {
     color: "rgba(255,255,255,0.7)",
     fontSize: 13,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   tagInputRow: {
     flexDirection: "row",
@@ -718,6 +735,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: "#2f2318",
     fontSize: 15,
+    fontFamily: 'DMSans-Regular',
   },
   tagAddButton: {
     borderRadius: 22,
@@ -733,6 +751,7 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 14,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   conditionRow: {
     flexDirection: "row",
@@ -755,6 +774,7 @@ const styles = StyleSheet.create({
     color: "#6b5647",
     fontSize: 14,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   conditionChipTextSelected: {
     color: "#fff7ef",
@@ -772,5 +792,6 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
 });

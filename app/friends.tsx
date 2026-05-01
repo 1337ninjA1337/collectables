@@ -222,16 +222,19 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   title: {
     color: "#fff8ef",
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 36,
+    fontFamily: 'Syne-ExtraBold',
   },
   subtitle: {
     color: "#ead8c3",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   chatsLink: {
     flexDirection: "row",
@@ -261,11 +264,13 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   chatsLinkSubtitle: {
     color: "#8f6947",
     fontSize: 12,
     fontWeight: "600",
+    fontFamily: 'DMSans-SemiBold',
   },
   chatsBadge: {
     minWidth: 24,
@@ -280,6 +285,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   sectionLabel: {
     color: "#624a35",
@@ -288,6 +294,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
     marginTop: 4,
+    fontFamily: 'DMSans-ExtraBold',
   },
   card: {
     borderRadius: 28,
@@ -315,14 +322,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#2f2318",
+    fontFamily: 'Syne-Bold',
   },
   username: {
     color: "#8f6947",
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   bio: {
     color: "#6b5647",
     lineHeight: 21,
+    fontFamily: 'DMSans-Regular',
   },
   actions: {
     flexDirection: "row",
@@ -338,6 +348,7 @@ const styles = StyleSheet.create({
   primaryActionText: {
     color: "#fff4e8",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   secondaryAction: {
     borderRadius: 999,
@@ -350,5 +361,6 @@ const styles = StyleSheet.create({
   secondaryActionText: {
     color: "#2a1d15",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
 });

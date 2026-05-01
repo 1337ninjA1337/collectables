@@ -191,14 +191,15 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       >
         {leftItems.map((item) => (
           <Pressable key={item.key} style={styles.item} onPress={item.onPress}>
-            <View>
+            <View style={styles.iconWrap}>
               <Ionicons
                 name={item.active ? item.iconActive : item.icon}
-                size={26}
-                color={item.active ? "#261b14" : "#8a6e54"}
+                size={22}
+                color={item.active ? "#261b14" : "#bbb0a6"}
               />
               {renderBadge(item.badge)}
             </View>
+            {item.active ? <View style={styles.activeDot} /> : <View style={styles.activeDotPlaceholder} />}
           </Pressable>
         ))}
         <View style={styles.item}>
@@ -208,14 +209,15 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
         </View>
         {rightItems.map((item) => (
           <Pressable key={item.key} style={styles.item} onPress={item.onPress}>
-            <View>
+            <View style={styles.iconWrap}>
               <Ionicons
                 name={item.active ? item.iconActive : item.icon}
-                size={26}
-                color={item.active ? "#261b14" : "#8a6e54"}
+                size={22}
+                color={item.active ? "#261b14" : "#bbb0a6"}
               />
               {renderBadge(item.badge)}
             </View>
+            {item.active ? <View style={styles.activeDot} /> : <View style={styles.activeDotPlaceholder} />}
           </Pressable>
         ))}
       </View>
@@ -285,15 +287,31 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   plusButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: "#261b14",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -22,
-    borderWidth: 4,
+    marginTop: -18,
+    borderWidth: 3,
     borderColor: "#fff7ef",
+  },
+  iconWrap: {
+    position: "relative",
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#261b14",
+    marginTop: 3,
+    alignSelf: "center",
+  },
+  activeDotPlaceholder: {
+    width: 4,
+    height: 4,
+    marginTop: 3,
   },
   modalBackdrop: {
     flex: 1,

@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { Stack, router } from "expo-router";
 import { useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
@@ -87,10 +88,15 @@ export default function SettingsScreen() {
     <Screen>
       <Stack.Screen options={{ title: t("settings") }} />
 
-      <View style={styles.hero}>
+      <LinearGradient
+        colors={["#3d2810", "#261b14", "#1e140e"]}
+        start={{ x: 0.2, y: 0.6 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.hero}
+      >
         <Text style={styles.eyebrow}>{t("settings")}</Text>
         <Text style={styles.title}>{t("settingsTitle")}</Text>
-      </View>
+      </LinearGradient>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{t("language")}</Text>
@@ -188,7 +194,6 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: "#261b14",
     borderRadius: 32,
     padding: 24,
     gap: 10,
@@ -199,11 +204,13 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   title: {
     color: "#fff8ef",
     fontSize: 28,
     fontWeight: "800",
+    fontFamily: 'Syne-ExtraBold',
     lineHeight: 36,
   },
   card: {
@@ -218,10 +225,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
     color: "#2f2318",
+    fontFamily: 'Syne-ExtraBold',
   },
   sectionText: {
     color: "#6b5647",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   languageRow: {
     flexDirection: "row",
@@ -243,6 +252,7 @@ const styles = StyleSheet.create({
   languageChipText: {
     color: "#2a1d15",
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   languageChipTextActive: {
     color: "#fff4e8",
@@ -263,6 +273,7 @@ const styles = StyleSheet.create({
     color: "#8d2b2b",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   dangerZone: {
     borderRadius: 24,
@@ -276,10 +287,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#7a2020",
+    fontFamily: 'DMSans-ExtraBold',
   },
   dangerText: {
     color: "#8d4444",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   deleteButton: {
     alignSelf: "flex-start",
@@ -295,6 +308,7 @@ const styles = StyleSheet.create({
     color: "#fff4e8",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   premiumCard: {
     borderRadius: 24,
@@ -322,11 +336,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
     color: "#2f2318",
+    fontFamily: 'Syne-ExtraBold',
   },
   premiumSectionTitleActive: {
     fontSize: 22,
     fontWeight: "800",
     color: "#fff8ef",
+    fontFamily: 'Syne-ExtraBold',
   },
   premiumBadge: {
     borderRadius: 999,
@@ -338,21 +354,25 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontSize: 12,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
     textTransform: "uppercase",
     letterSpacing: 0.7,
   },
   premiumSubtitle: {
     color: "#6b5647",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   premiumSubtitleActive: {
     color: "#ead8c3",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   premiumRenewsLine: {
     color: "#f5c99a",
     fontSize: 13,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
     marginTop: -4,
   },
   premiumBenefits: {
@@ -368,17 +388,20 @@ const styles = StyleSheet.create({
     color: "#d89c5b",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
     lineHeight: 22,
   },
   premiumBenefitText: {
     flex: 1,
     color: "#2f2318",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   premiumBenefitTextActive: {
     flex: 1,
     color: "#fff7ef",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   premiumActivateButton: {
     borderRadius: 999,
@@ -391,6 +414,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   premiumCancelButton: {
     borderRadius: 999,
@@ -405,6 +429,7 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 14,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   premiumCardSkeleton: {
     borderRadius: 24,
