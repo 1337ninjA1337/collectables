@@ -5,9 +5,29 @@ import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { CollectableItem } from "@/lib/types";
 
-export function ItemCard({ item }: { item: CollectableItem }) {
+type ItemCardProps = { item: CollectableItem; compact?: boolean };
+
+export function ItemCard({ item, compact }: ItemCardProps) {
   const { t } = useI18n();
   const hasPhoto = item.photos.length > 0 && Boolean(item.photos[0]);
+
+  if (compact) {
+    return (
+      <Link href={`/item/${item.id}`} asChild>
+        <Pressable style={styles.compactCard}>
+          {hasPhoto ? (
+            <Image source={{ uri: item.photos[0] }} style={styles.compactImage} />
+          ) : (
+            <View style={[styles.compactImage, { backgroundColor: placeholderColor(item.id) }]} />
+          )}
+          <Text style={styles.compactTitle} numberOfLines={2}>{item.title}</Text>
+          {typeof item.cost === "number" ? (
+            <Text style={styles.compactCost}>{t("costLabel")}: {item.cost}</Text>
+          ) : null}
+        </Pressable>
+      </Link>
+    );
+  }
 
   return (
     <Link href={`/item/${item.id}`} asChild>
@@ -79,10 +99,12 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: "700",
     color: "#312218",
+    fontFamily: "Syne-Bold",
   },
   description: {
     color: "#6a5647",
     lineHeight: 20,
+    fontFamily: "DMSans-Regular",
   },
   metaRow: {
     flexDirection: "row",
@@ -93,6 +115,7 @@ const styles = StyleSheet.create({
     color: "#8d6c4a",
     fontSize: 13,
     fontWeight: "600",
+    fontFamily: "DMSans-SemiBold",
   },
   tagsRow: {
     flexDirection: "row",
@@ -108,6 +131,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 10,
     fontWeight: "700",
+    fontFamily: "DMSans-Bold",
   },
   conditionBadge: {
     borderRadius: 999,
@@ -119,5 +143,35 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 11,
     fontWeight: "700",
+    fontFamily: "DMSans-Bold",
+  },
+  compactCard: {
+    borderRadius: 18,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+    overflow: "hidden",
+    gap: 8,
+    paddingBottom: 10,
+  },
+  compactImage: {
+    width: "100%",
+    height: 110,
+    borderRadius: 16,
+    backgroundColor: "#d8c7b1",
+  },
+  compactTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#312218",
+    paddingHorizontal: 10,
+    fontFamily: "Syne-Bold",
+  },
+  compactCost: {
+    fontSize: 12,
+    color: "#8d6c4a",
+    fontWeight: "600",
+    paddingHorizontal: 10,
+    fontFamily: "DMSans-SemiBold",
   },
 });

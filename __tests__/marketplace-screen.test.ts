@@ -58,11 +58,11 @@ describe("bottom-nav marketplace tab", () => {
     assert.ok(mpIndex < frIndex, "marketplace should be declared before friends");
   });
 
-  it("keeps the plus button centered by adding a spacer cell", () => {
+  it("keeps the plus button centered with equal left/right item counts", () => {
     const src = read("components/bottom-nav.tsx");
-    // The implementation pads the row with an aria-hidden spacer cell so the
-    // 7-cell layout (2 left + spacer + plus + 3 right) re-centers the plus.
-    assert.match(src, /aria-hidden/);
+    // 3 left + plus + 3 right = 7 equal-flex cells keeps the plus centered.
+    assert.match(src, /items\.slice\(0,\s*3\)/);
+    assert.match(src, /items\.slice\(3\)/);
   });
 });
 

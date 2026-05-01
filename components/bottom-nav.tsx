@@ -54,6 +54,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const myProfile = getMyProfile();
   const onHome = pathname === "/";
   const onSearch = pathname === "/people" || pathname.startsWith("/people");
+  const onChats = pathname === "/chats" || pathname.startsWith("/chat");
   const onFriends = pathname === "/friends" || pathname.startsWith("/friends");
   const onChats = pathname === "/chats" || pathname.startsWith("/chat");
   const onMarketplace = pathname === "/marketplace" || pathname.startsWith("/marketplace") || pathname.startsWith("/listing");
@@ -193,17 +194,17 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       >
         {leftItems.map((item) => (
           <Pressable key={item.key} style={styles.item} onPress={item.onPress}>
-            <View>
+            <View style={styles.iconWrap}>
               <Ionicons
                 name={item.active ? item.iconActive : item.icon}
-                size={26}
-                color={item.active ? "#261b14" : "#8a6e54"}
+                size={22}
+                color={item.active ? "#261b14" : "#bbb0a6"}
               />
               {renderBadge(item.badge)}
             </View>
+            {item.active ? <View style={styles.activeDot} /> : <View style={styles.activeDotPlaceholder} />}
           </Pressable>
         ))}
-        <View style={styles.item} aria-hidden />
         <View style={styles.item}>
           <Pressable style={styles.plusButton} onPress={openCreate} accessibilityLabel={t("addItem")}>
             <Ionicons name="add" size={30} color="#fff5ea" />
@@ -211,14 +212,15 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
         </View>
         {rightItems.map((item) => (
           <Pressable key={item.key} style={styles.item} onPress={item.onPress}>
-            <View>
+            <View style={styles.iconWrap}>
               <Ionicons
                 name={item.active ? item.iconActive : item.icon}
-                size={26}
-                color={item.active ? "#261b14" : "#8a6e54"}
+                size={22}
+                color={item.active ? "#261b14" : "#bbb0a6"}
               />
               {renderBadge(item.badge)}
             </View>
+            {item.active ? <View style={styles.activeDot} /> : <View style={styles.activeDotPlaceholder} />}
           </Pressable>
         ))}
       </View>
@@ -286,17 +288,34 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 10,
     fontWeight: "800",
+    fontFamily: "DMSans-ExtraBold",
   },
   plusButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: "#261b14",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -22,
-    borderWidth: 4,
+    marginTop: -18,
+    borderWidth: 3,
     borderColor: "#fff7ef",
+  },
+  iconWrap: {
+    position: "relative",
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#261b14",
+    marginTop: 3,
+    alignSelf: "center",
+  },
+  activeDotPlaceholder: {
+    width: 4,
+    height: 4,
+    marginTop: 3,
   },
   modalBackdrop: {
     flex: 1,
@@ -321,6 +340,7 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: "DMSans-ExtraBold",
   },
   modalSecondaryButton: {
     borderRadius: 22,
@@ -332,6 +352,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: "DMSans-ExtraBold",
   },
   modalCancelButton: {
     borderRadius: 22,
@@ -345,5 +366,6 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: "DMSans-ExtraBold",
   },
 });

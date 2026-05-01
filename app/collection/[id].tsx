@@ -511,7 +511,14 @@ export default function CollectionDetailsScreen() {
             ))}
           </View>
         ) : (
-          items.map((item) => <ItemCard key={item.id} item={item} />)
+          <View style={styles.masonryGrid}>
+            <View style={styles.masonryCol}>
+              {items.filter((_, i) => i % 2 === 0).map((item) => <ItemCard key={item.id} item={item} compact />)}
+            </View>
+            <View style={[styles.masonryCol, styles.masonryColOffset]}>
+              {items.filter((_, i) => i % 2 === 1).map((item) => <ItemCard key={item.id} item={item} compact />)}
+            </View>
+          </View>
         )}
       </View>
 
@@ -786,16 +793,19 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 30,
     fontWeight: "800",
+    fontFamily: 'Syne-ExtraBold',
   },
   heroText: {
     color: "#f8eee3",
     lineHeight: 22,
     fontSize: 15,
+    fontFamily: 'DMSans-Regular',
   },
   heroMeta: {
     color: "#ffd7ab",
     fontWeight: "700",
     fontSize: 14,
+    fontFamily: 'DMSans-Bold',
   },
   summaryRow: {
     flexDirection: "row",
@@ -814,10 +824,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     color: "#2d2117",
+    fontFamily: 'DMSans-ExtraBold',
   },
   summaryLabel: {
     color: "#715d4d",
     lineHeight: 21,
+    fontFamily: 'DMSans-Regular',
   },
   listWrap: {
     gap: 12,
@@ -844,6 +856,7 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareButton: {
     borderRadius: 22,
@@ -858,6 +871,7 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareBackdrop: {
     flex: 1,
@@ -884,11 +898,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#2f2318",
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareHint: {
     color: "#6b5647",
     fontSize: 14,
     lineHeight: 20,
+    fontFamily: 'DMSans-Regular',
   },
   shareLinkBox: {
     borderRadius: 16,
@@ -921,6 +937,7 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareCopyButtonTextDone: {
     color: "#fff",
@@ -936,6 +953,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareCancelButton: {
     borderRadius: 999,
@@ -949,6 +967,7 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontWeight: "800",
     fontSize: 14,
+    fontFamily: 'DMSans-ExtraBold',
   },
   addButton: {
     borderRadius: 22,
@@ -961,6 +980,7 @@ const styles = StyleSheet.create({
     color: "#fff4e8",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   deleteButton: {
     borderRadius: 22,
@@ -975,6 +995,7 @@ const styles = StyleSheet.create({
     color: "#8d2b2b",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   unfollowButton: {
     borderRadius: 22,
@@ -989,16 +1010,19 @@ const styles = StyleSheet.create({
     color: "#2a1d15",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   listTitle: {
     color: "#2d2117",
     fontSize: 22,
     fontWeight: "800",
+    fontFamily: 'Syne-ExtraBold',
   },
   emptyTitle: {
     fontSize: 24,
     fontWeight: "700",
     color: "#2d2117",
+    fontFamily: 'DMSans-Bold',
   },
   selectButton: {
     borderRadius: 22,
@@ -1013,9 +1037,21 @@ const styles = StyleSheet.create({
     color: "#2a1d15",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   selectList: {
     gap: 12,
+  },
+  masonryGrid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  masonryCol: {
+    flex: 1,
+    gap: 10,
+  },
+  masonryColOffset: {
+    marginTop: 24,
   },
   bulkBarSpacer: {
     height: 120,
@@ -1044,6 +1080,7 @@ const styles = StyleSheet.create({
     color: "#ffd7ab",
     fontSize: 14,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   bulkBarButtons: {
     flexDirection: "row",
@@ -1075,6 +1112,7 @@ const styles = StyleSheet.create({
     color: "#fff4e8",
     fontSize: 13,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   bulkBarButtonDangerText: {
     color: "#ffe6e0",
@@ -1100,6 +1138,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: "#2d2117",
+    fontFamily: 'DMSans-ExtraBold',
   },
   modalList: {
     gap: 8,
@@ -1117,6 +1156,7 @@ const styles = StyleSheet.create({
     color: "#2a1d15",
     fontSize: 15,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   modalCancel: {
     alignSelf: "flex-end",
@@ -1127,6 +1167,7 @@ const styles = StyleSheet.create({
     color: "#6a4d35",
     fontSize: 14,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   editCollectionButton: {
     borderRadius: 22,
@@ -1141,6 +1182,7 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   editModalCard: {
     width: "100%",
@@ -1161,10 +1203,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.5,
     textTransform: "uppercase",
+    fontFamily: 'DMSans-ExtraBold',
   },
   editFieldRequired: {
     color: "#d92f2f",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   editFieldInput: {
     borderRadius: 16,
@@ -1175,6 +1219,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: "#2f2318",
     fontSize: 15,
+    fontFamily: 'DMSans-Regular',
   },
   editFieldInputMultiline: {
     minHeight: 90,
@@ -1189,6 +1234,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 14,
+    fontFamily: 'DMSans-ExtraBold',
   },
   editCoverPreview: {
     width: "100%",
@@ -1216,6 +1262,7 @@ const styles = StyleSheet.create({
     color: "#6b5647",
     fontSize: 14,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   editVisibilityChipTextSelected: {
     color: "#fff7ef",
@@ -1224,6 +1271,7 @@ const styles = StyleSheet.create({
     color: "#7a6453",
     fontSize: 12,
     lineHeight: 18,
+    fontFamily: 'DMSans-Regular',
   },
   shareScrollView: {
     gap: 12,
@@ -1236,11 +1284,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     color: "#2f2318",
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareFriendsHint: {
     color: "#6b5647",
     fontSize: 13,
     lineHeight: 18,
+    fontFamily: 'DMSans-Regular',
   },
   shareFriendRow: {
     flexDirection: "row",
@@ -1266,6 +1316,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     flex: 1,
+    fontFamily: 'DMSans-Bold',
   },
   shareFriendButton: {
     borderRadius: 999,
@@ -1280,6 +1331,7 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontSize: 13,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareFriendButtonTextActive: {
     color: "#fff",
@@ -1292,6 +1344,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     marginTop: 4,
+    fontFamily: 'DMSans-Regular',
   },
   editSaveButton: {
     borderRadius: 18,
@@ -1306,5 +1359,6 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
 });

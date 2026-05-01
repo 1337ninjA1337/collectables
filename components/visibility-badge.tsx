@@ -118,15 +118,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#6b5647",
+    fontFamily: "DMSans-Bold",
   },
   badgeTextHero: {
     color: "#fff7ef",
     fontSize: 12,
+    fontFamily: "DMSans-Bold",
   },
   badgeTextViewer: {
     color: "#4a7c59",
+    fontFamily: "DMSans-Bold",
   },
   badgeTextShared: {
     color: "#8a6520",
+    fontFamily: "DMSans-Bold",
   },
 });

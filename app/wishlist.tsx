@@ -347,11 +347,13 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "800",
     color: "#2f2318",
+    fontFamily: 'Syne-ExtraBold',
   },
   subtitle: {
     color: "#735f50",
     marginTop: 4,
     lineHeight: 20,
+    fontFamily: 'DMSans-Regular',
   },
   addButton: {
     flexDirection: "row",
@@ -366,6 +368,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 14,
+    fontFamily: 'DMSans-ExtraBold',
   },
   list: {
     gap: 14,
@@ -393,11 +396,13 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 17,
     fontWeight: "800",
+    fontFamily: 'Syne-ExtraBold',
   },
   cardDescription: {
     color: "#6b5647",
     fontSize: 13,
     lineHeight: 18,
+    fontFamily: 'DMSans-Regular',
   },
   metaRow: {
     flexDirection: "row",
@@ -414,6 +419,7 @@ const styles = StyleSheet.create({
     color: "#6b5647",
     fontSize: 12,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   actionsRow: {
     flexDirection: "row",
@@ -434,6 +440,7 @@ const styles = StyleSheet.create({
     color: "#fff7ea",
     fontWeight: "800",
     fontSize: 13,
+    fontFamily: 'DMSans-ExtraBold',
   },
   deleteButton: {
     borderRadius: 999,
@@ -470,6 +477,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#2f2318",
     marginBottom: 10,
+    fontFamily: 'DMSans-ExtraBold',
   },
   sheetScroll: {
     gap: 10,
@@ -482,6 +490,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
     marginTop: 4,
+    fontFamily: 'DMSans-ExtraBold',
   },
   input: {
     borderRadius: 14,
@@ -492,6 +501,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: "#2f2318",
     fontSize: 15,
+    fontFamily: 'DMSans-Regular',
   },
   multiline: {
     minHeight: 80,
@@ -513,6 +523,7 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontWeight: "800",
     fontSize: 13,
+    fontFamily: 'DMSans-ExtraBold',
   },
   sheetActions: {
     flexDirection: "row",
@@ -532,6 +543,7 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontWeight: "800",
     fontSize: 14,
+    fontFamily: 'DMSans-ExtraBold',
   },
   saveButton: {
     flex: 1,
@@ -547,6 +559,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 14,
+    fontFamily: 'DMSans-ExtraBold',
   },
   promoteSheet: {
     margin: 20,
@@ -571,5 +584,6 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 15,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
 });

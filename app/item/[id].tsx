@@ -649,6 +649,7 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   deleteButton: {
     borderRadius: 20,
@@ -670,6 +671,7 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareBackdrop: {
     flex: 1,
@@ -696,11 +698,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#2f2318",
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareHint: {
     color: "#6b5647",
     fontSize: 14,
     lineHeight: 20,
+    fontFamily: 'DMSans-Regular',
   },
   shareLinkBox: {
     borderRadius: 16,
@@ -733,6 +737,7 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareCopyButtonTextDone: {
     color: "#fff",
@@ -748,6 +753,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: 'DMSans-ExtraBold',
   },
   shareCancelButton: {
     borderRadius: 999,
@@ -761,21 +767,25 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontWeight: "800",
     fontSize: 14,
+    fontFamily: 'DMSans-ExtraBold',
   },
   deleteButtonText: {
     color: "#8a2727",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   itemTitle: {
     color: "#fff7ed",
     fontSize: 29,
     fontWeight: "800",
+    fontFamily: 'Syne-ExtraBold',
   },
   itemMeta: {
     color: "#dfc8b2",
     fontSize: 14,
     lineHeight: 21,
+    fontFamily: 'DMSans-Regular',
   },
   sheet: {
     borderRadius: 24,
@@ -791,11 +801,13 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   sheetValue: {
     color: "#2f2318",
     fontSize: 16,
     lineHeight: 24,
+    fontFamily: 'DMSans-Regular',
   },
   tagsRow: {
     flexDirection: "row",
@@ -811,6 +823,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 13,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   conditionBadgeRow: {
     flexDirection: "row",
@@ -825,11 +838,13 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 14,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   emptyTitle: {
     fontSize: 24,
     fontWeight: "700",
     color: "#2d2117",
+    fontFamily: 'DMSans-Bold',
   },
   hero: {
     backgroundColor: "#f0e2cf",
@@ -841,6 +856,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: "#2b2017",
     fontWeight: "800",
+    fontFamily: 'Syne-ExtraBold',
   },
   editFieldGroup: {
     gap: 10,
@@ -851,10 +867,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.5,
     textTransform: "uppercase",
+    fontFamily: 'DMSans-ExtraBold',
   },
   editRequired: {
     color: "#d92f2f",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   editInput: {
     borderRadius: 22,
@@ -865,6 +883,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: "#2f2318",
     fontSize: 16,
+    fontFamily: 'DMSans-Regular',
   },
   editInputMultiline: {
     minHeight: 100,
@@ -890,6 +909,7 @@ const styles = StyleSheet.create({
     color: "#6b5647",
     fontSize: 14,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   conditionChipTextSelected: {
     color: "#fff7ef",
@@ -906,11 +926,13 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 13,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   editTagChipRemove: {
     color: "rgba(255,255,255,0.7)",
     fontSize: 13,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   tagInputRow: {
     flexDirection: "row",
@@ -926,6 +948,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: "#2f2318",
     fontSize: 15,
+    fontFamily: 'DMSans-Regular',
   },
   tagAddButton: {
     borderRadius: 22,
@@ -938,6 +961,7 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 14,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   photoButton: {
     borderRadius: 20,
@@ -949,6 +973,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: 'DMSans-ExtraBold',
   },
   saveButton: {
     borderRadius: 24,
@@ -963,6 +988,7 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   cancelButton: {
     borderRadius: 22,
@@ -976,6 +1002,7 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   listingStatusGroup: {
     gap: 8,
@@ -993,12 +1020,14 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   listingHint: {
     color: "#8a5a2b",
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 18,
+    fontFamily: 'DMSans-SemiBold',
   },
   listingStatusBadge: {
     borderRadius: 999,
@@ -1013,6 +1042,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.5,
+    fontFamily: 'DMSans-ExtraBold',
   },
   listingRemoveButton: {
     borderRadius: 20,
@@ -1026,5 +1056,6 @@ const styles = StyleSheet.create({
     color: "#8a2727",
     fontSize: 15,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
 });

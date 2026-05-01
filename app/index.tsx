@@ -1,12 +1,14 @@
 import { Link, router } from "expo-router";
 import { Stack } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NestableDraggableFlatList, ScaleDecorator, RenderItemParams } from "../components/DraggableList";
 
 import { CollectionCard } from "@/components/collection-card";
 import { EmptyState } from "@/components/empty-state";
 import { Screen, useResponsive } from "@/components/screen";
+import { Skeleton } from "@/components/skeleton";
 import { SwipeTabs } from "@/components/swipe-tabs";
 import { useAuth } from "@/lib/auth-context";
 import { useCollections } from "@/lib/collections-context";
@@ -57,11 +59,12 @@ export default function HomeScreen() {
 
   if (!ready) {
     return (
-      <Screen scroll={false}>
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#8a5a2b" />
-          <Text style={styles.loadingText}>{t("loadingCollections")}</Text>
-        </View>
+      <Screen>
+        <Skeleton style={{ height: 200, borderRadius: 32 }} />
+        <Skeleton style={{ height: 60, borderRadius: 20 }} />
+        <Skeleton style={{ height: 20, width: 160, borderRadius: 8 }} />
+        <Skeleton style={{ height: 130, borderRadius: 28 }} />
+        <Skeleton style={{ height: 130, borderRadius: 28 }} />
       </Screen>
     );
   }
@@ -90,7 +93,12 @@ export default function HomeScreen() {
     <Screen nestable refreshing={refreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: "Collectables" }} />
       {isPhone ? null : (
-      <View style={styles.hero}>
+      <LinearGradient
+        colors={["#3d2810", "#261b14", "#1e140e"]}
+        start={{ x: 0.2, y: 0.6 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.hero}
+      >
         <Text style={styles.eyebrow}>{t("appName")}</Text>
         <View style={styles.profileRow}>
           {myProfile ? (
@@ -145,7 +153,7 @@ export default function HomeScreen() {
             </Pressable>
           </Link>
         </View>
-      </View>
+      </LinearGradient>
       )}
 
       {!isPhone && (
@@ -339,7 +347,6 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: "#261b14",
     borderRadius: 32,
     padding: 24,
     gap: 12,
@@ -355,12 +362,14 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   title: {
     color: "#fff8ef",
     fontSize: 31,
     lineHeight: 39,
     fontWeight: "800",
+    fontFamily: 'Syne-ExtraBold',
   },
   profileRow: {
     flexDirection: "row",
@@ -382,6 +391,7 @@ const styles = StyleSheet.create({
     color: "#f5c99a",
     fontSize: 11,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
@@ -389,6 +399,7 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 14,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   headerButtons: {
     flexDirection: "row",
@@ -406,6 +417,7 @@ const styles = StyleSheet.create({
     color: "#f8e7d1",
     fontSize: 14,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   signOutButton: {
     borderRadius: 999,
@@ -421,11 +433,13 @@ const styles = StyleSheet.create({
     color: "#f8e7d1",
     fontSize: 14,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   subtitle: {
     color: "#ead8c3",
     fontSize: 15,
     lineHeight: 23,
+    fontFamily: 'DMSans-Regular',
   },
   actionsRow: {
     flexDirection: "row",
@@ -443,6 +457,7 @@ const styles = StyleSheet.create({
   ctaText: {
     color: "#241912",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
     fontSize: 15,
   },
   secondaryCta: {
@@ -457,6 +472,7 @@ const styles = StyleSheet.create({
   secondaryCtaText: {
     color: "#2a1d15",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
     fontSize: 15,
   },
   peopleCta: {
@@ -471,6 +487,7 @@ const styles = StyleSheet.create({
   peopleCtaText: {
     color: "#fff3e4",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
     fontSize: 15,
   },
   section: {
@@ -497,10 +514,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
     color: "#2f2318",
+    fontFamily: 'Syne-ExtraBold',
   },
   sectionDescription: {
     color: "#735f50",
     lineHeight: 21,
+    fontFamily: 'DMSans-Regular',
   },
   inlineAction: {
     borderRadius: 999,
@@ -511,6 +530,7 @@ const styles = StyleSheet.create({
   inlineActionText: {
     color: "#fff3e4",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
     fontSize: 14,
   },
   socialSummary: {
@@ -530,10 +550,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     color: "#2d2117",
+    fontFamily: 'DMSans-ExtraBold',
   },
   summaryLabel: {
     color: "#715d4d",
     lineHeight: 21,
+    fontFamily: 'DMSans-Regular',
   },
   socialList: {
     gap: 10,
@@ -550,10 +572,12 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 18,
     fontWeight: "800",
+    fontFamily: 'Syne-Bold',
   },
   personMeta: {
     color: "#8f6947",
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   emptyCard: {
     borderRadius: 24,
@@ -565,16 +589,7 @@ const styles = StyleSheet.create({
   emptyCardText: {
     color: "#6b5647",
     lineHeight: 22,
-  },
-  loadingWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  loadingText: {
-    color: "#6d5645",
-    fontSize: 15,
+    fontFamily: 'DMSans-Regular',
   },
   recentRow: {
     gap: 12,
@@ -606,6 +621,7 @@ const styles = StyleSheet.create({
     color: "#fff7ea",
     fontSize: 10,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
     letterSpacing: 0.6,
   },
   recentTextWrap: {
@@ -616,10 +632,12 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 14,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   recentMeta: {
     color: "#8f6947",
     fontSize: 12,
+    fontFamily: 'DMSans-Regular',
   },
   wishlistBanner: {
     flexDirection: "row",
@@ -643,21 +661,25 @@ const styles = StyleSheet.create({
     color: "#fff7ea",
     fontSize: 22,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   wishlistBannerTitle: {
     color: "#2f2318",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   wishlistBannerHint: {
     color: "#8f6947",
     fontSize: 13,
     marginTop: 2,
+    fontFamily: 'DMSans-Regular',
   },
   wishlistBannerArrow: {
     color: "#8f6947",
     fontSize: 28,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   statsBanner: {
     flexDirection: "row",
@@ -681,20 +703,24 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 20,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   statsBannerTitle: {
     color: "#2f2318",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   statsBannerHint: {
     color: "#8f6947",
     fontSize: 13,
     marginTop: 2,
+    fontFamily: 'DMSans-Regular',
   },
   statsBannerArrow: {
     color: "#8f6947",
     fontSize: 28,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
 });

@@ -78,25 +78,30 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.8,
+    fontFamily: "DMSans-Bold",
   },
   count: {
     color: "#f5ebdf",
     fontSize: 13,
     fontWeight: "600",
+    fontFamily: "DMSans-SemiBold",
   },
   title: {
     color: "#ffffff",
     fontSize: 28,
     fontWeight: "800",
+    fontFamily: "Syne-ExtraBold",
   },
   description: {
     color: "#f3eee7",
     fontSize: 15,
     lineHeight: 22,
+    fontFamily: "DMSans-Regular",
   },
   meta: {
     color: "#f8dfc5",
     fontSize: 14,
     fontWeight: "600",
+    fontFamily: "DMSans-SemiBold",
   },
 });

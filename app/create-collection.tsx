@@ -221,15 +221,18 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: "#2b2017",
     fontWeight: "800",
+    fontFamily: 'Syne-ExtraBold',
   },
   heroText: {
     color: "#6b5543",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   templateHint: {
     color: "#7a6453",
     lineHeight: 20,
     fontSize: 13,
+    fontFamily: 'DMSans-Regular',
   },
   templateRow: {
     gap: 10,
@@ -258,6 +261,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#624a35",
+    fontFamily: 'DMSans-Bold',
   },
   templateNameActive: {
     color: "#261b14",
@@ -271,6 +275,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.5,
     textTransform: "uppercase",
+    fontFamily: 'DMSans-ExtraBold',
   },
   input: {
     borderRadius: 22,
@@ -281,6 +286,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: "#2f2318",
     fontSize: 16,
+    fontFamily: 'DMSans-Regular',
   },
   inputMultiline: {
     minHeight: 132,
@@ -292,6 +298,7 @@ const styles = StyleSheet.create({
   required: {
     color: "#d92f2f",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   photoButton: {
     borderRadius: 20,
@@ -303,6 +310,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: 'DMSans-ExtraBold',
   },
   previewImage: {
     width: "100%",
@@ -313,6 +321,7 @@ const styles = StyleSheet.create({
   photoHint: {
     color: "#7a6453",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   visibilityRow: {
     flexDirection: "row",
@@ -334,6 +343,7 @@ const styles = StyleSheet.create({
     color: "#6b5647",
     fontSize: 14,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   visibilityChipTextSelected: {
     color: "#fff7ef",
@@ -342,6 +352,7 @@ const styles = StyleSheet.create({
     color: "#7a6453",
     fontSize: 13,
     lineHeight: 20,
+    fontFamily: 'DMSans-Regular',
   },
   saveButton: {
     borderRadius: 24,
@@ -356,5 +367,6 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontSize: 16,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
 });

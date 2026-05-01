@@ -202,16 +202,19 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   title: {
     color: "#fff8ef",
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 36,
+    fontFamily: 'Syne-ExtraBold',
   },
   subtitle: {
     color: "#ead8c3",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   searchCard: {
     borderRadius: 24,
@@ -227,6 +230,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.5,
     textTransform: "uppercase",
+    fontFamily: 'DMSans-ExtraBold',
   },
   searchInput: {
     borderRadius: 20,
@@ -237,6 +241,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: "#2f2318",
     fontSize: 15,
+    fontFamily: 'DMSans-Regular',
   },
   card: {
     borderRadius: 28,
@@ -264,14 +269,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#2f2318",
+    fontFamily: 'Syne-Bold',
   },
   username: {
     color: "#8f6947",
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   bio: {
     color: "#6b5647",
     lineHeight: 21,
+    fontFamily: 'DMSans-Regular',
   },
   actions: {
     flexDirection: "row",
@@ -287,6 +295,7 @@ const styles = StyleSheet.create({
   primaryActionText: {
     color: "#fff4e8",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   secondaryAction: {
     borderRadius: 999,
@@ -299,6 +308,7 @@ const styles = StyleSheet.create({
   secondaryActionText: {
     color: "#2a1d15",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   statusBadge: {
     borderRadius: 999,
@@ -311,6 +321,7 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     color: "#6b5543",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   pagination: {
     flexDirection: "row",
@@ -330,6 +341,7 @@ const styles = StyleSheet.create({
   pageButtonText: {
     color: "#fff4e8",
     fontWeight: "800",
+    fontFamily: 'DMSans-ExtraBold',
   },
   pageButtonTextDisabled: {
     color: "#a89480",
@@ -338,5 +350,6 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontWeight: "700",
     fontSize: 14,
+    fontFamily: 'DMSans-Bold',
   },
 });

@@ -1,6 +1,7 @@
 import "react-native-gesture-handler";
 
 import { Ionicons } from "@expo/vector-icons";
+import { useFonts } from "expo-font";
 import { Stack, router, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
@@ -23,6 +24,17 @@ import { ToastProvider } from "@/lib/toast-context";
 import { Screen, useResponsive } from "@/components/screen";
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    "Syne-Bold": require("../assets/fonts/Syne/static/Syne-Bold.ttf"),
+    "Syne-ExtraBold": require("../assets/fonts/Syne/static/Syne-ExtraBold.ttf"),
+    "DMSans-Regular": require("../assets/fonts/DM_Sans/static/DMSans-Regular.ttf"),
+    "DMSans-SemiBold": require("../assets/fonts/DM_Sans/static/DMSans-SemiBold.ttf"),
+    "DMSans-Bold": require("../assets/fonts/DM_Sans/static/DMSans-Bold.ttf"),
+    "DMSans-ExtraBold": require("../assets/fonts/DM_Sans/static/DMSans-ExtraBold.ttf"),
+  });
+
+  if (!fontsLoaded) return null;
+
   return (
     <I18nProvider>
       <ToastProvider>

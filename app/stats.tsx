@@ -106,10 +106,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: "#fff7ef",
     fontWeight: "800",
+    fontFamily: 'Syne-ExtraBold',
   },
   heroText: {
     color: "#dfc8b2",
     lineHeight: 22,
+    fontFamily: 'DMSans-Regular',
   },
   summaryRow: {
     flexDirection: "row",
@@ -129,12 +131,14 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "800",
     color: "#2d2117",
+    fontFamily: 'DMSans-ExtraBold',
   },
   summaryLabel: {
     color: "#715d4d",
     fontSize: 12,
     textAlign: "center",
     fontWeight: "600",
+    fontFamily: 'DMSans-SemiBold',
   },
   section: {
     gap: 14,
@@ -143,12 +147,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#2f2318",
+    fontFamily: 'Syne-ExtraBold',
   },
   emptyText: {
     color: "#6b5647",
     lineHeight: 22,
     textAlign: "center",
     paddingVertical: 20,
+    fontFamily: 'DMSans-Regular',
   },
   chart: {
     flexDirection: "row",
@@ -170,6 +176,7 @@ const styles = StyleSheet.create({
     color: "#8f6947",
     fontSize: 11,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
   barTrack: {
     flex: 1,
@@ -189,5 +196,6 @@ const styles = StyleSheet.create({
     color: "#8f6947",
     fontSize: 10,
     fontWeight: "700",
+    fontFamily: 'DMSans-Bold',
   },
 });

@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -84,11 +85,16 @@ export function LoginScreen() {
 
   return (
     <Screen>
-      <View style={styles.hero}>
+      <LinearGradient
+        colors={["#3d2810", "#261b14", "#1e140e"]}
+        start={{ x: 0.2, y: 0.6 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.hero}
+      >
         <Text style={styles.eyebrow}>{t("authAccount")}</Text>
         <Text style={styles.title}>{t("authTitle")}</Text>
         <Text style={styles.subtitle}>{t("authSubtitle")}</Text>
-      </View>
+      </LinearGradient>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{t("emailLoginTitle")}</Text>
@@ -190,7 +196,6 @@ export function LoginScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: "#261b14",
     borderRadius: 32,
     padding: 24,
     gap: 12,
@@ -201,17 +206,20 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
+    fontFamily: "DMSans-ExtraBold",
   },
   title: {
     color: "#fff8ef",
     fontSize: 30,
     lineHeight: 38,
     fontWeight: "800",
+    fontFamily: "Syne-ExtraBold",
   },
   subtitle: {
     color: "#ead8c3",
     fontSize: 15,
     lineHeight: 23,
+    fontFamily: "DMSans-Regular",
   },
   card: {
     borderRadius: 28,
@@ -225,10 +233,12 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 22,
     fontWeight: "800",
+    fontFamily: "Syne-ExtraBold",
   },
   sectionText: {
     color: "#6f5c4d",
     lineHeight: 22,
+    fontFamily: "DMSans-Regular",
   },
   input: {
     borderRadius: 22,
@@ -239,6 +249,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: "#2f2318",
     fontSize: 16,
+    fontFamily: 'DMSans-Regular',
   },
   primaryButton: {
     borderRadius: 22,
@@ -250,6 +261,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: "DMSans-ExtraBold",
   },
   secondaryButton: {
     borderRadius: 22,
@@ -261,6 +273,7 @@ const styles = StyleSheet.create({
     color: "#fff4e8",
     fontWeight: "800",
     fontSize: 15,
+    fontFamily: "DMSans-ExtraBold",
   },
   disabledButton: {
     opacity: 0.65,
@@ -270,10 +283,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontSize: 14,
     fontWeight: "600",
+    fontFamily: 'DMSans-SemiBold',
   },
   providerHint: {
     color: "#856d5a",
     lineHeight: 21,
+    fontFamily: 'DMSans-Regular',
   },
   runtimeCard: {
     borderRadius: 28,

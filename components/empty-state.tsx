@@ -93,6 +93,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#261b14",
     textAlign: "center",
+    fontFamily: "Syne-ExtraBold",
   },
   hint: {
     fontSize: 13,
@@ -100,6 +101,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 19,
     maxWidth: 320,
+    fontFamily: "DMSans-Regular",
   },
   action: {
     marginTop: 10,
@@ -112,5 +114,6 @@ const styles = StyleSheet.create({
     color: "#fff7ea",
     fontWeight: "800",
     fontSize: 14,
+    fontFamily: "DMSans-ExtraBold",
   },
 });
