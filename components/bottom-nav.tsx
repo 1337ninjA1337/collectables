@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "@/components/screen";
 import { useChat } from "@/lib/chat-context";
 import {
-  chooseFriendsTabBadge,
   FriendsTabBadge,
   formatBadgeCount,
 } from "@/lib/chat-helpers";
@@ -56,6 +55,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const onHome = pathname === "/";
   const onSearch = pathname === "/people" || pathname.startsWith("/people");
   const onFriends = pathname === "/friends" || pathname.startsWith("/friends");
+  const onChats = pathname === "/chats" || pathname.startsWith("/chat");
   const onMarketplace = pathname === "/marketplace" || pathname.startsWith("/marketplace") || pathname.startsWith("/listing");
   const onProfile = pathname.startsWith("/profile");
 
@@ -63,20 +63,23 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const friendsActive = onFriends;
   const searchActive = onSearch && !onFriends;
   const marketplaceActive = onMarketplace;
+  const chatsActive = onChats;
 
   // Tab order indices for direction-aware transitions
-  // 0: home, 1: search, 2: marketplace, 3: friends, 4: profile
+  // 0: home, 1: search, 2: marketplace, 3: chats, 4: friends, 5: profile
   const currentTabIndex = onHome
     ? 0
     : searchActive
       ? 1
       : marketplaceActive
         ? 2
-        : friendsActive
+        : chatsActive
           ? 3
-          : onProfile
+          : friendsActive
             ? 4
-            : -1;
+            : onProfile
+              ? 5
+              : -1;
 
   function applyAnimation(targetIndex: number) {
     if (currentTabIndex < 0 || targetIndex === currentTabIndex) {
@@ -98,6 +101,9 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     applyAnimation(0);
     setTimeout(() => router.replace("/"), 0);
   }
+
+  const chatsBadge: FriendsTabBadge = unreadTotal > 0 ? { kind: "count", value: unreadTotal } : { kind: "none" };
+  const friendsBadge: FriendsTabBadge = incomingRequestUserIds.length > 0 ? { kind: "dot" } : { kind: "none" };
 
   const items: NavItem[] = [
     {
@@ -122,12 +128,20 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       onPress: () => navTo("/marketplace", marketplaceActive, 2),
     },
     {
+      key: "chats",
+      icon: "chatbubbles-outline",
+      iconActive: "chatbubbles",
+      active: chatsActive,
+      badge: chatsBadge,
+      onPress: () => navTo("/chats", chatsActive, 3),
+    },
+    {
       key: "friends",
       icon: "people-outline",
       iconActive: "people",
       active: friendsActive,
-      badge: chooseFriendsTabBadge(unreadTotal, incomingRequestUserIds.length),
-      onPress: () => navTo("/friends", friendsActive, 3),
+      badge: friendsBadge,
+      onPress: () => navTo("/friends", friendsActive, 4),
     },
     {
       key: "profile",
@@ -138,16 +152,16 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
         if (!myProfile) return;
         const target = `/profile/${myProfile.id}`;
         if (pathname === target) return;
-        applyAnimation(4);
+        applyAnimation(5);
         setTimeout(() => router.push(target as never), 0);
       },
     },
   ];
 
-  // Split into 2 left + 3 right and pad the left with a spacer cell so the
-  // plus button sits in the exact horizontal center (7 equal-flex cells).
-  const leftItems = items.slice(0, 2);
-  const rightItems = items.slice(2);
+  // Split into 3 left + 3 right and pad the left with a spacer cell so the
+  // plus button sits in the exact horizontal center (8 equal-flex cells).
+  const leftItems = items.slice(0, 3);
+  const rightItems = items.slice(3);
 
   function openCreate() {
     setCreateOpen(true);
