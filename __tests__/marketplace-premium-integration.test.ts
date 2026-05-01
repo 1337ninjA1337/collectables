@@ -60,11 +60,11 @@ describe("item detail wires premium into the cap and addListing", () => {
   });
 
   it("destructures isPremium from usePremium", () => {
-    assert.match(src, /const\s+\{\s*isPremium\s*\}\s*=\s*usePremium\(\)/);
+    assert.match(src, /const\s+\{[^}]*isPremium[^}]*\}\s*=\s*usePremium\(\)/);
   });
 
   it("disables the cap-block path when isPremium is true", () => {
-    assert.match(src, /overFreeCap\s*=\s*!isPremium\s*&&/);
+    assert.match(src, /overFreeCap\s*=\s*(?:premiumReady\s*&&\s*)?!isPremium\s*&&/);
   });
 
   it("forwards isPremium into addListing", () => {
