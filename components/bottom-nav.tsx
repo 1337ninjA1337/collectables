@@ -12,6 +12,7 @@ import {
 } from "@/lib/chat-helpers";
 import { useI18n } from "@/lib/i18n-context";
 import { useNavAnimation } from "@/lib/nav-animation-context";
+import { usePremium } from "@/lib/premium-context";
 import { useSocial } from "@/lib/social-context";
 
 export const BOTTOM_NAV_HEIGHT = 58;
@@ -33,6 +34,7 @@ type NavItem = {
   onPress: () => void;
   active: boolean;
   badge?: FriendsTabBadge;
+  premiumBadge?: boolean;
 };
 
 type NavRowProps = {
@@ -52,6 +54,7 @@ function NavTab({ item }: { item: NavItem }) {
           color={item.active ? "#261b14" : "#bbb0a6"}
         />
         {renderBadge(item.badge)}
+        {item.premiumBadge ? <View style={styles.premiumDot} /> : null}
       </View>
       {item.active ? <View style={styles.activeDot} /> : <View style={styles.activeDotPlaceholder} />}
     </Pressable>
@@ -95,6 +98,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const pathname = usePathname();
   const { getMyProfile, incomingRequestUserIds } = useSocial();
   const { unreadTotal } = useChat();
+  const { isPremium } = usePremium();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { setAnimation } = useNavAnimation();
@@ -200,6 +204,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       icon: "person-outline",
       iconActive: "person",
       active: onProfile,
+      premiumBadge: isPremium,
       onPress: () => {
         if (!myProfile) return;
         const target = `/profile/${myProfile.id}`;
@@ -329,6 +334,17 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     position: "relative",
+  },
+  premiumDot: {
+    position: "absolute",
+    bottom: -2,
+    right: -4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#d89c5b",
+    borderWidth: 1.5,
+    borderColor: "#fff7ef",
   },
   activeDot: {
     width: 4,
