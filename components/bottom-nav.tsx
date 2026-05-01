@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useResponsive } from "@/components/screen";
 import { useChat } from "@/lib/chat-context";
 import {
-  chooseFriendsTabBadge,
   FriendsTabBadge,
   formatBadgeCount,
 } from "@/lib/chat-helpers";
@@ -57,6 +56,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const onSearch = pathname === "/people" || pathname.startsWith("/people");
   const onChats = pathname === "/chats" || pathname.startsWith("/chat");
   const onFriends = pathname === "/friends" || pathname.startsWith("/friends");
+  const onChats = pathname === "/chats" || pathname.startsWith("/chat");
   const onMarketplace = pathname === "/marketplace" || pathname.startsWith("/marketplace") || pathname.startsWith("/listing");
   const onProfile = pathname.startsWith("/profile");
 
@@ -103,6 +103,9 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     setTimeout(() => router.replace("/"), 0);
   }
 
+  const chatsBadge: FriendsTabBadge = unreadTotal > 0 ? { kind: "count", value: unreadTotal } : { kind: "none" };
+  const friendsBadge: FriendsTabBadge = incomingRequestUserIds.length > 0 ? { kind: "dot" } : { kind: "none" };
+
   const items: NavItem[] = [
     {
       key: "home",
@@ -127,10 +130,10 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     },
     {
       key: "chats",
-      icon: "chatbubble-outline",
-      iconActive: "chatbubble",
+      icon: "chatbubbles-outline",
+      iconActive: "chatbubbles",
       active: chatsActive,
-      badge: unreadTotal > 0 ? { kind: "count" as const, value: unreadTotal } : undefined,
+      badge: chatsBadge,
       onPress: () => navTo("/chats", chatsActive, 3),
     },
     {
@@ -138,7 +141,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       icon: "people-outline",
       iconActive: "people",
       active: friendsActive,
-      badge: chooseFriendsTabBadge(0, incomingRequestUserIds.length),
+      badge: friendsBadge,
       onPress: () => navTo("/friends", friendsActive, 4),
     },
     {
@@ -156,8 +159,8 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     },
   ];
 
-  // Split into 3 left + 3 right. With 3+1(plus)+3 = 7 equal-flex cells the
-  // plus button sits at the exact horizontal center with no spacer needed.
+  // Split into 3 left + 3 right and pad the left with a spacer cell so the
+  // plus button sits in the exact horizontal center (8 equal-flex cells).
   const leftItems = items.slice(0, 3);
   const rightItems = items.slice(3);
 

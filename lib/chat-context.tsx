@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -12,9 +12,11 @@ import {
 } from "@/lib/chat-helpers";
 import { useSocial } from "@/lib/social-context";
 import {
+  fetchChatReads,
   fetchMessagesForChat as cloudFetchMessagesForChat,
   sendMessage as cloudSendMessage,
   subscribeToInbox,
+  upsertChatRead,
 } from "@/lib/supabase-chat";
 import { ChatMessage } from "@/lib/types";
 
@@ -23,12 +25,14 @@ const CHAT_STORAGE_KEY = "collectables-chats-v1";
 type ChatStore = {
   messagesByChat: Record<string, ChatMessage[]>;
   lastReadByChat: Record<string, string>;
+  pendingByChatId: Record<string, ChatMessage[]>;
 };
 
 type ChatContextValue = {
   ready: boolean;
   previews: ChatPreview[];
   unreadTotal: number;
+  realtimeOnline: boolean;
   getMessages: (chatId: string) => ChatMessage[];
   canMessage: (otherUserId: string) => boolean;
   ensureChatWith: (otherUserId: string) => string | null;
@@ -47,14 +51,16 @@ function generateMessageId(): string {
 export function ChatProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
   const { friends } = useSocial();
-  const [store, setStore] = useState<ChatStore>({ messagesByChat: {}, lastReadByChat: {} });
+  const [store, setStore] = useState<ChatStore>({ messagesByChat: {}, lastReadByChat: {}, pendingByChatId: {} });
   const [ready, setReady] = useState(false);
+  const [realtimeOnline, setRealtimeOnline] = useState(false);
+  const pendingRef = useRef<Record<string, ChatMessage[]>>({});
 
   const storageKey = user ? `${CHAT_STORAGE_KEY}-${user.id}` : null;
 
   useEffect(() => {
     if (!storageKey) {
-      setStore({ messagesByChat: {}, lastReadByChat: {} });
+      setStore({ messagesByChat: {}, lastReadByChat: {}, pendingByChatId: {} });
       setReady(false);
       return;
     }
@@ -70,9 +76,10 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
           setStore({
             messagesByChat: parsed.messagesByChat ?? {},
             lastReadByChat: parsed.lastReadByChat ?? {},
+            pendingByChatId: parsed.pendingByChatId ?? {},
           });
         } else {
-          setStore({ messagesByChat: {}, lastReadByChat: {} });
+          setStore({ messagesByChat: {}, lastReadByChat: {}, pendingByChatId: {} });
         }
       } finally {
         if (active) setReady(true);
@@ -90,6 +97,12 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     if (!ready || !storageKey) return;
     AsyncStorage.setItem(storageKey, JSON.stringify(store)).catch(() => undefined);
   }, [ready, storageKey, store]);
+
+  // Keep a ref in sync with the latest pending queue so flushPending can read
+  // it without re-creating refreshFromCloud on every store change.
+  useEffect(() => {
+    pendingRef.current = store.pendingByChatId;
+  }, [store.pendingByChatId]);
 
   const mergeCloudMessages = useCallback(
     (results: readonly { chatId: string; messages: ChatMessage[] }[]) => {
@@ -118,6 +131,40 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     [],
   );
 
+  const flushPending = useCallback(
+    async (pending: Record<string, ChatMessage[]>) => {
+      if (!user) return;
+      const flushed: string[] = [];
+      for (const [chatId, msgs] of Object.entries(pending)) {
+        if (!msgs || msgs.length === 0) continue;
+        let allSent = true;
+        for (const msg of msgs) {
+          const sent = await cloudSendMessage({
+            chatId: msg.chatId,
+            fromUserId: msg.fromUserId,
+            toUserId: msg.toUserId,
+            text: msg.text,
+            id: msg.id,
+            createdAt: msg.createdAt,
+          });
+          if (!sent) {
+            allSent = false;
+            break;
+          }
+        }
+        if (allSent) flushed.push(chatId);
+      }
+      if (flushed.length > 0) {
+        setStore((prev) => {
+          const nextPending = { ...prev.pendingByChatId };
+          for (const chatId of flushed) delete nextPending[chatId];
+          return { ...prev, pendingByChatId: nextPending };
+        });
+      }
+    },
+    [user],
+  );
+
   const refreshFromCloud = useCallback(
     async (otherUserIds?: readonly string[]) => {
       if (!user) return;
@@ -131,8 +178,9 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
         }),
       );
       mergeCloudMessages(results);
+      void flushPending(pendingRef.current);
     },
-    [friends, mergeCloudMessages, user],
+    [friends, flushPending, mergeCloudMessages, user],
   );
 
   // Pull cloud messages for every confirmed-friend chat once we have a user
@@ -161,6 +209,36 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     };
   }, [ready, user, friends, mergeCloudMessages]);
 
+  // Hydrate server-side last-read timestamps so the unread badge is consistent
+  // across devices. Server wins for any chat where it has a later timestamp.
+  useEffect(() => {
+    if (!ready || !user) return;
+    let cancelled = false;
+    void (async () => {
+      const cloudReads = await fetchChatReads(user.id);
+      if (cancelled || Object.keys(cloudReads).length === 0) return;
+      setStore((prev) => {
+        let touched = false;
+        let nextRead = prev.lastReadByChat;
+        for (const [chatId, cloudAt] of Object.entries(cloudReads)) {
+          const localAt = prev.lastReadByChat[chatId] ?? "";
+          if (cloudAt > localAt) {
+            if (!touched) {
+              nextRead = { ...nextRead };
+              touched = true;
+            }
+            nextRead[chatId] = cloudAt;
+          }
+        }
+        if (!touched) return prev;
+        return { ...prev, lastReadByChat: nextRead };
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, user]);
+
   // Realtime inbox: any INSERT on chat_messages where to_user_id = me is
   // pushed straight into local state so other-device messages show up
   // without a poll. RLS already restricts what the channel can deliver, so
@@ -168,19 +246,24 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   useEffect(() => {
     if (!ready || !user) return;
 
-    const subscription = subscribeToInbox(user.id, (incoming) => {
-      setStore((prev) => {
-        const existing = prev.messagesByChat[incoming.chatId] ?? [];
-        const merged = appendMessage(existing, incoming);
-        if (merged === existing) return prev;
-        return {
-          ...prev,
-          messagesByChat: { ...prev.messagesByChat, [incoming.chatId]: merged },
-        };
-      });
-    });
+    const subscription = subscribeToInbox(
+      user.id,
+      (incoming) => {
+        setStore((prev) => {
+          const existing = prev.messagesByChat[incoming.chatId] ?? [];
+          const merged = appendMessage(existing, incoming);
+          if (merged === existing) return prev;
+          return {
+            ...prev,
+            messagesByChat: { ...prev.messagesByChat, [incoming.chatId]: merged },
+          };
+        });
+      },
+      (connected) => setRealtimeOnline(connected),
+    );
 
     return () => {
+      setRealtimeOnline(false);
       subscription.unsubscribe();
     };
   }, [ready, user]);
@@ -235,37 +318,51 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
         createdAt: new Date().toISOString(),
       };
 
-      setStore((prev) => ({
-        messagesByChat: {
-          ...prev.messagesByChat,
-          [chatId]: appendMessage(prev.messagesByChat[chatId] ?? [], message),
-        },
-        lastReadByChat: {
-          ...prev.lastReadByChat,
-          [chatId]: message.createdAt,
-        },
-      }));
+      setStore((prev) => {
+        const next: ChatStore = {
+          ...prev,
+          messagesByChat: {
+            ...prev.messagesByChat,
+            [chatId]: appendMessage(prev.messagesByChat[chatId] ?? [], message),
+          },
+          lastReadByChat: {
+            ...prev.lastReadByChat,
+            [chatId]: message.createdAt,
+          },
+        };
+        if (!cloudMessage) {
+          next.pendingByChatId = {
+            ...prev.pendingByChatId,
+            [chatId]: [...(prev.pendingByChatId[chatId] ?? []), message],
+          };
+        }
+        return next;
+      });
 
       return message;
     },
     [canMessage, user],
   );
 
-  const markRead = useCallback((chatId: string) => {
-    setStore((prev) => {
-      const msgs = prev.messagesByChat[chatId] ?? [];
-      if (msgs.length === 0) return prev;
-      const latest = msgs.reduce(
-        (acc, m) => (m.createdAt > acc ? m.createdAt : acc),
-        prev.lastReadByChat[chatId] ?? "",
-      );
-      if (latest === prev.lastReadByChat[chatId]) return prev;
-      return {
-        ...prev,
-        lastReadByChat: { ...prev.lastReadByChat, [chatId]: latest },
-      };
-    });
-  }, []);
+  const markRead = useCallback(
+    (chatId: string) => {
+      setStore((prev) => {
+        const msgs = prev.messagesByChat[chatId] ?? [];
+        if (msgs.length === 0) return prev;
+        const latest = msgs.reduce(
+          (acc, m) => (m.createdAt > acc ? m.createdAt : acc),
+          prev.lastReadByChat[chatId] ?? "",
+        );
+        if (latest === prev.lastReadByChat[chatId]) return prev;
+        if (user) void upsertChatRead(user.id, chatId, latest);
+        return {
+          ...prev,
+          lastReadByChat: { ...prev.lastReadByChat, [chatId]: latest },
+        };
+      });
+    },
+    [user],
+  );
 
   const clearChat = useCallback((chatId: string) => {
     setStore((prev) => {
@@ -276,7 +373,9 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       delete nextMessages[chatId];
       const nextRead = { ...prev.lastReadByChat };
       delete nextRead[chatId];
-      return { messagesByChat: nextMessages, lastReadByChat: nextRead };
+      const nextPending = { ...prev.pendingByChatId };
+      delete nextPending[chatId];
+      return { messagesByChat: nextMessages, lastReadByChat: nextRead, pendingByChatId: nextPending };
     });
   }, []);
 
@@ -293,6 +392,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       ready,
       previews,
       unreadTotal,
+      realtimeOnline,
       getMessages,
       canMessage,
       ensureChatWith,
@@ -305,6 +405,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       ready,
       previews,
       unreadTotal,
+      realtimeOnline,
       getMessages,
       canMessage,
       ensureChatWith,
