@@ -12,9 +12,11 @@ import {
 } from "@/lib/chat-helpers";
 import { useSocial } from "@/lib/social-context";
 import {
+  fetchChatReads,
   fetchMessagesForChat as cloudFetchMessagesForChat,
   sendMessage as cloudSendMessage,
   subscribeToInbox,
+  upsertChatRead,
 } from "@/lib/supabase-chat";
 import { ChatMessage } from "@/lib/types";
 
@@ -207,6 +209,36 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     };
   }, [ready, user, friends, mergeCloudMessages]);
 
+  // Hydrate server-side last-read timestamps so the unread badge is consistent
+  // across devices. Server wins for any chat where it has a later timestamp.
+  useEffect(() => {
+    if (!ready || !user) return;
+    let cancelled = false;
+    void (async () => {
+      const cloudReads = await fetchChatReads(user.id);
+      if (cancelled || Object.keys(cloudReads).length === 0) return;
+      setStore((prev) => {
+        let touched = false;
+        let nextRead = prev.lastReadByChat;
+        for (const [chatId, cloudAt] of Object.entries(cloudReads)) {
+          const localAt = prev.lastReadByChat[chatId] ?? "";
+          if (cloudAt > localAt) {
+            if (!touched) {
+              nextRead = { ...nextRead };
+              touched = true;
+            }
+            nextRead[chatId] = cloudAt;
+          }
+        }
+        if (!touched) return prev;
+        return { ...prev, lastReadByChat: nextRead };
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, user]);
+
   // Realtime inbox: any INSERT on chat_messages where to_user_id = me is
   // pushed straight into local state so other-device messages show up
   // without a poll. RLS already restricts what the channel can deliver, so
@@ -312,21 +344,25 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     [canMessage, user],
   );
 
-  const markRead = useCallback((chatId: string) => {
-    setStore((prev) => {
-      const msgs = prev.messagesByChat[chatId] ?? [];
-      if (msgs.length === 0) return prev;
-      const latest = msgs.reduce(
-        (acc, m) => (m.createdAt > acc ? m.createdAt : acc),
-        prev.lastReadByChat[chatId] ?? "",
-      );
-      if (latest === prev.lastReadByChat[chatId]) return prev;
-      return {
-        ...prev,
-        lastReadByChat: { ...prev.lastReadByChat, [chatId]: latest },
-      };
-    });
-  }, []);
+  const markRead = useCallback(
+    (chatId: string) => {
+      setStore((prev) => {
+        const msgs = prev.messagesByChat[chatId] ?? [];
+        if (msgs.length === 0) return prev;
+        const latest = msgs.reduce(
+          (acc, m) => (m.createdAt > acc ? m.createdAt : acc),
+          prev.lastReadByChat[chatId] ?? "",
+        );
+        if (latest === prev.lastReadByChat[chatId]) return prev;
+        if (user) void upsertChatRead(user.id, chatId, latest);
+        return {
+          ...prev,
+          lastReadByChat: { ...prev.lastReadByChat, [chatId]: latest },
+        };
+      });
+    },
+    [user],
+  );
 
   const clearChat = useCallback((chatId: string) => {
     setStore((prev) => {

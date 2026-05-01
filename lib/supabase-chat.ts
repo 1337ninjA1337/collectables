@@ -14,7 +14,12 @@ import {
 } from "@/lib/supabase";
 import {
   buildAuthHeaders,
+  buildChatReadUpsertHeaders,
   buildSendMessageHeaders,
+  chatReadUpsertBody,
+  ChatReadRow,
+  chatReadsUrl,
+  chatReadsUpsertUrl,
   ChatRow,
   chatRowToMessage,
   extractTypingUserIds,
@@ -258,4 +263,42 @@ export async function isMutualFriend(
 
   const [a, b] = await Promise.all([r1.json(), r2.json()]);
   return isMutualFriendFromResponses(a, b);
+}
+
+/**
+ * Fetch the server-side last-read timestamps for all chats belonging to
+ * `userId`. Returns a Record<chatId, lastReadAt> or empty when unconfigured.
+ */
+export async function fetchChatReads(
+  userId: string,
+): Promise<Record<string, string>> {
+  if (!isSupabaseConfigured || !userId) return {};
+
+  const token = await getAccessToken();
+  const res = await fetch(chatReadsUrl(supabaseUrl!, userId), {
+    headers: buildAuthHeaders(supabasePublishableKey!, token),
+  });
+  if (!res.ok) return {};
+
+  const rows = (await res.json()) as ChatReadRow[];
+  return Object.fromEntries(rows.map((r) => [r.chat_id, r.last_read_at]));
+}
+
+/**
+ * Persist the last-read timestamp for a single chat to the server so other
+ * devices can pick it up on next hydration. No-op when unconfigured.
+ */
+export async function upsertChatRead(
+  userId: string,
+  chatId: string,
+  lastReadAt: string,
+): Promise<void> {
+  if (!isSupabaseConfigured || !userId || !chatId || !lastReadAt) return;
+
+  const token = await getAccessToken();
+  await fetch(chatReadsUpsertUrl(supabaseUrl!), {
+    method: "POST",
+    headers: buildChatReadUpsertHeaders(supabasePublishableKey!, token),
+    body: JSON.stringify(chatReadUpsertBody(userId, chatId, lastReadAt)),
+  });
 }

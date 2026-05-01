@@ -18,6 +18,17 @@ Once set, every push to `main` will automatically apply any new migrations in
 Without this secret, the `migrate` job is skipped and migrations must be applied
 manually as described below.
 
+## Apply chat_reads migration (cross-device unread sync)
+
+Run `supabase/migrations/20260501_chat_reads.sql` against your Supabase project
+to create the `chat_reads` table that persists per-user last-read timestamps.
+Without this table the unread badge resets on each new device/browser.
+
+```sql
+-- paste the contents of supabase/migrations/20260501_chat_reads.sql
+-- into the Supabase SQL editor and run it.
+```
+
 ## Apply chat_messages migration (if not yet applied)
 
 If chat messages are not delivered to the second account, the
