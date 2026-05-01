@@ -83,12 +83,12 @@ export default function ChatDetailScreen() {
   // single refresh cycle instead of waiting for the next reload.
   useEffect(() => {
     if (!otherUserId || !allowed) return;
-    void refreshChat(otherUserId);
+    void refreshFromCloud([otherUserId]);
     const handle = setInterval(() => {
-      void refreshChat(otherUserId);
+      void refreshFromCloud([otherUserId]);
     }, REFRESH_INTERVAL_MS);
     return () => clearInterval(handle);
-  }, [otherUserId, allowed, refreshChat]);
+  }, [otherUserId, allowed, refreshFromCloud]);
 
   // Presence-based typing indicator. We open one channel per chat, keyed by
   // selfId, so each side sees the other's `{ typing: boolean }` payload.

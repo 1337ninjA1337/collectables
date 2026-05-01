@@ -53,7 +53,6 @@ function AppShell() {
   const { unreadTotal } = useChat();
   const pathname = usePathname();
   const { isMobile } = useResponsive();
-  const { unreadTotal } = useChat();
   const [searchOpen, setSearchOpen] = useState(false);
 
   if (!ready || !i18nReady) {
