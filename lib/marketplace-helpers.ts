@@ -90,15 +90,37 @@ export function listingsForUser(
 }
 
 /**
+ * Common collectible edition/condition words that distinguish the same card
+ * from a collector's perspective but vary so widely in listing titles that
+ * including them in the Dice comparison drives similarity below the threshold.
+ * Gated as a constant so unit tests can verify deterministic behaviour.
+ */
+export const COLLECTIBLE_STOPWORDS = new Set([
+  "holo", "holographic", "foil", "prism", "reverse",
+  "rare", "uncommon", "common", "ultra", "secret",
+  "edition", "1st", "first", "second", "third", "limited", "special",
+  "shadowless", "unlimited", "reprint",
+  "psa", "bgs", "cgc", "graded", "mint", "nm", "lp", "mp", "hp", "dmg",
+]);
+
+/**
  * Lowercase + collapse whitespace + drop punctuation so titles like
  * "Pokémon — Charizard, holo!" and "pokemon charizard holo" compare equal.
+ * Also strips common collectible stopwords so "Charizard Holo 1st Edition"
+ * and "Charizard" converge to the same normalised form.
  */
 export function normalizeTitle(title: string): string {
-  return title
+  const base = title
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return base
+    .split(" ")
+    .filter((w) => !COLLECTIBLE_STOPWORDS.has(w))
+    .join(" ")
     .replace(/\s+/g, " ")
     .trim();
 }

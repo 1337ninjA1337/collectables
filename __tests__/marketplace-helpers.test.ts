@@ -130,8 +130,13 @@ describe("listingsForUser", () => {
 });
 
 describe("normalizeTitle", () => {
-  it("strips diacritics, lowercases, and collapses whitespace", () => {
-    assert.equal(normalizeTitle("  Pokémon — Charizard, holo!  "), "pokemon charizard holo");
+  it("strips diacritics, lowercases, collapses whitespace, and removes stopwords", () => {
+    // "holo" is in COLLECTIBLE_STOPWORDS so it is stripped.
+    assert.equal(normalizeTitle("  Pokémon — Charizard, holo!  "), "pokemon charizard");
+  });
+
+  it("strips multiple stopwords from a title", () => {
+    assert.equal(normalizeTitle("Charizard Holo 1st Edition"), "charizard");
   });
 
   it("returns empty string for empty/whitespace input", () => {
