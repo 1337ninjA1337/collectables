@@ -18,9 +18,8 @@ import {
   subscribeToInbox,
   upsertChatRead,
 } from "@/lib/supabase-chat";
+import { chatCacheKey } from "@/lib/storage-keys";
 import { ChatMessage } from "@/lib/types";
-
-const CHAT_STORAGE_KEY = "collectables-chats-v1";
 
 type ChatStore = {
   messagesByChat: Record<string, ChatMessage[]>;
@@ -56,7 +55,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   const [realtimeOnline, setRealtimeOnline] = useState(false);
   const pendingRef = useRef<Record<string, ChatMessage[]>>({});
 
-  const storageKey = user ? `${CHAT_STORAGE_KEY}-${user.id}` : null;
+  const storageKey = user ? chatCacheKey(user.id) : null;
 
   useEffect(() => {
     if (!storageKey) {

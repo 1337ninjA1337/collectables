@@ -4,10 +4,9 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 import { AuthChangeEvent, Session, User } from "@supabase/auth-js";
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import { deleteCloudinaryImages } from "@/lib/cloudinary";
 import { authClient, isSupabaseConfigured } from "@/lib/supabase";
+import { clearAllUserData } from "@/lib/storage-keys";
 import { deleteAccountViaEdgeFunction, fetchAllUserImageUrls } from "@/lib/supabase-profiles";
 import { getAppBaseUrl } from "@/lib/env";
 
@@ -183,13 +182,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
             return { error };
           }
 
-          const keys = await AsyncStorage.getAllKeys();
-          const userKeys = keys.filter(
-            (k) => k.includes(userId) || k.startsWith("collectables-"),
-          );
-          if (userKeys.length > 0) {
-            await AsyncStorage.multiRemove(userKeys);
-          }
+          await clearAllUserData(userId);
 
           await authClient.signOut();
           return {};

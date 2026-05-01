@@ -26,11 +26,8 @@ import {
   removeViewerFromSharedIds,
   shouldAutoSaveSharedCollection,
 } from "@/lib/share-access";
+import { collectionsKey, itemsKey, followedCollectionsKey } from "@/lib/storage-keys";
 import { Collection, CollectableItem, ItemCondition, ItemTag } from "@/lib/types";
-
-const ITEMS_STORAGE_KEY = "collectables-items-v1";
-const COLLECTIONS_STORAGE_KEY = "collectables-collections-v1";
-const FOLLOWED_COLLECTIONS_STORAGE_KEY = "collectables-followed-collections-v1";
 
 type DraftItemInput = {
   collectionId: string;
@@ -130,9 +127,9 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     async function hydrate() {
       try {
         const [rawCollections, rawItems, rawFollowed, remoteFollowedIds, remoteWishlist] = await Promise.all([
-          AsyncStorage.getItem(`${COLLECTIONS_STORAGE_KEY}-${activeUser.id}`),
-          AsyncStorage.getItem(`${ITEMS_STORAGE_KEY}-${activeUser.id}`),
-          AsyncStorage.getItem(`${FOLLOWED_COLLECTIONS_STORAGE_KEY}-${activeUser.id}`),
+          AsyncStorage.getItem(collectionsKey(activeUser.id)),
+          AsyncStorage.getItem(itemsKey(activeUser.id)),
+          AsyncStorage.getItem(followedCollectionsKey(activeUser.id)),
           fetchFollowedCollectionIds(activeUser.id),
           fetchWishlistItemsByUserId(activeUser.id),
         ]);
@@ -191,9 +188,9 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     }
 
     Promise.all([
-      AsyncStorage.setItem(`${COLLECTIONS_STORAGE_KEY}-${user.id}`, JSON.stringify(localCollections)),
-      AsyncStorage.setItem(`${ITEMS_STORAGE_KEY}-${user.id}`, JSON.stringify(localItems)),
-      AsyncStorage.setItem(`${FOLLOWED_COLLECTIONS_STORAGE_KEY}-${user.id}`, JSON.stringify(followedCollectionIds)),
+      AsyncStorage.setItem(collectionsKey(user.id), JSON.stringify(localCollections)),
+      AsyncStorage.setItem(itemsKey(user.id), JSON.stringify(localItems)),
+      AsyncStorage.setItem(followedCollectionsKey(user.id), JSON.stringify(followedCollectionIds)),
     ]).catch(() => undefined);
   }, [localCollections, localItems, followedCollectionIds, ready, user]);
 

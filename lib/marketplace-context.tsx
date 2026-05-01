@@ -18,9 +18,8 @@ import {
   cloudMarkSold,
   cloudRemoveListing,
 } from "@/lib/supabase-marketplace";
+import { MARKETPLACE_KEY } from "@/lib/storage-keys";
 import { MarketplaceListing, MarketplaceMode } from "@/lib/types";
-
-const STORAGE_KEY = "collectables-marketplace-v1";
 
 type DraftListingInput = {
   itemId: string;
@@ -66,11 +65,11 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         if (!cancelled) {
           if (cloud.length > 0) {
             setListings(cloud);
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cloud)).catch(() => undefined);
+            await AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(cloud)).catch(() => undefined);
             return;
           }
         }
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        const raw = await AsyncStorage.getItem(MARKETPLACE_KEY);
         if (cancelled) return;
         if (raw) {
           const parsed = JSON.parse(raw) as MarketplaceListing[];
@@ -89,7 +88,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     if (!ready) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(listings)).catch(() => undefined);
+    AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(listings)).catch(() => undefined);
   }, [ready, listings]);
 
   const myListings = useMemo(

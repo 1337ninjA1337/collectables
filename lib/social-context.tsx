@@ -11,10 +11,8 @@ import {
   fetchProfileById,
   RemoteFriendRequest,
 } from "@/lib/supabase-profiles";
+import { SOCIAL_GRAPH_KEY, socialCacheKey } from "@/lib/storage-keys";
 import { Collection, CollectableItem, ProfileRelationship, UserProfile } from "@/lib/types";
-
-const SOCIAL_STORAGE_KEY = "collectables-social-v1";
-const SOCIAL_GRAPH_STORAGE_KEY = "collectables-social-graph-v1";
 
 type SocialStore = {
   following: string[];
@@ -160,8 +158,8 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     async function hydrate() {
       try {
         const [rawPersonal, rawGraph, remoteRequests] = await Promise.all([
-          AsyncStorage.getItem(`${SOCIAL_STORAGE_KEY}-${activeUser.id}`),
-          AsyncStorage.getItem(SOCIAL_GRAPH_STORAGE_KEY),
+          AsyncStorage.getItem(socialCacheKey(activeUser.id)),
+          AsyncStorage.getItem(SOCIAL_GRAPH_KEY),
           fetchFriendRequests(activeUser.id),
         ]);
 
@@ -250,7 +248,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     }
 
     AsyncStorage.setItem(
-      `${SOCIAL_STORAGE_KEY}-${user.id}`,
+      socialCacheKey(user.id),
       JSON.stringify({
         following,
         myProfile: myProfileOverride ? normalizeProfile(myProfileOverride) : null,
@@ -264,7 +262,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     }
 
     AsyncStorage.setItem(
-      SOCIAL_GRAPH_STORAGE_KEY,
+      SOCIAL_GRAPH_KEY,
       JSON.stringify({
         friendRequests,
         deletedProfileIds,

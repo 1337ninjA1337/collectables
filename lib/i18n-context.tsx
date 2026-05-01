@@ -1,12 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
+import { LANGUAGE_KEY } from "@/lib/storage-keys";
+
 export type AppLanguage = "ru" | "en" | "be" | "pl" | "de" | "es";
 
 type TranslationParams = Record<string, string | number>;
 type TranslationValue = string | ((params?: TranslationParams) => string);
-
-const STORAGE_KEY = "collectables-language-v1";
 
 const en = {
   checkingSession: "Checking your session...",
@@ -1424,7 +1424,7 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
   useEffect(() => {
     let active = true;
 
-    AsyncStorage.getItem(STORAGE_KEY)
+    AsyncStorage.getItem(LANGUAGE_KEY)
       .then((value) => {
         if (!active) {
           return;
@@ -1450,7 +1450,7 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
       ready,
       setLanguage: async (nextLanguage: AppLanguage) => {
         setLanguageState(nextLanguage);
-        await AsyncStorage.setItem(STORAGE_KEY, nextLanguage);
+        await AsyncStorage.setItem(LANGUAGE_KEY, nextLanguage);
       },
       t: (key: TranslationKey, params?: TranslationParams) => {
         const entry = translations[language][key] ?? translations.en[key];
