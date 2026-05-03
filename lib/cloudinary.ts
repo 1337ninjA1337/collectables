@@ -1,15 +1,10 @@
 import { Platform } from "react-native";
 
-import { extractPublicId, resolveCloudinaryApiBase } from "@/lib/cloudinary-url";
+import { cloudinaryConfig } from "@/lib/cloudinary-config";
+import { extractPublicId } from "@/lib/cloudinary-url";
 
-const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || "dt57phtma";
-const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "collectables";
-const CLOUDINARY_API_BASE = resolveCloudinaryApiBase(
-  process.env.EXPO_PUBLIC_CLOUDINARY_URL,
-  CLOUD_NAME,
-);
-const UPLOAD_URL = `${CLOUDINARY_API_BASE}/image/upload`;
-const DESTROY_URL = `${CLOUDINARY_API_BASE}/image/destroy`;
+const UPLOAD_URL = `${cloudinaryConfig.apiBase}/image/upload`;
+const DESTROY_URL = `${cloudinaryConfig.apiBase}/image/destroy`;
 
 async function uriToBlob(uri: string): Promise<Blob> {
   const res = await fetch(uri);
@@ -33,7 +28,7 @@ export async function uploadImage(localUri: string): Promise<string> {
     form.append("file", file);
   }
 
-  form.append("upload_preset", UPLOAD_PRESET);
+  form.append("upload_preset", cloudinaryConfig.uploadPreset);
 
   const res = await fetch(UPLOAD_URL, {
     method: "POST",

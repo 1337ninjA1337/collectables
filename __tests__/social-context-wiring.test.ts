@@ -18,8 +18,14 @@ const SOURCE = readFileSync(path.join(ROOT, "lib", "social-context.tsx"), "utf8"
 
 describe("social-context.tsx viewer-profile cache", () => {
   it("declares the centralised viewerProfiles map and an in-flight ref", () => {
-    assert.match(SOURCE, /useState<Record<string,\s*UserProfile>>\(\{\}\)/);
+    assert.match(SOURCE, /useState<Record<string,\s*\{\s*profile:\s*UserProfile;\s*cachedAt:\s*number\s*\}>>\(\{\}\)/);
     assert.match(SOURCE, /inFlightProfileIdsRef[\s\S]*useRef<Set<string>>/);
+  });
+
+  it("stamps each cached entry with cachedAt for TTL-based expiry", () => {
+    assert.match(SOURCE, /cachedAt:\s*Date\.now\(\)/);
+    assert.match(SOURCE, /VIEWER_PROFILE_TTL_MS/);
+    assert.match(SOURCE, /cached\.cachedAt/);
   });
 
   it("exposes ensureProfilesLoaded via the context value", () => {
@@ -27,10 +33,10 @@ describe("social-context.tsx viewer-profile cache", () => {
     assert.match(SOURCE, /ensureProfilesLoaded,/);
   });
 
-  it("getProfileById falls back to the viewerProfiles cache", () => {
+  it("getProfileById falls back to the viewerProfiles cache (.profile unwrap)", () => {
     assert.match(
       SOURCE,
-      /getProfileById:\s*\(id\)\s*=>\s*profileById\.get\(id\)\s*\?\?\s*viewerProfiles\[id\]/,
+      /getProfileById:\s*\(id\)\s*=>\s*profileById\.get\(id\)\s*\?\?\s*viewerProfiles\[id\]\?\.profile/,
     );
   });
 

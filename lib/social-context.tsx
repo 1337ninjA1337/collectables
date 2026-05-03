@@ -126,6 +126,8 @@ function hasRequest(friendRequests: FriendRequest[], fromUserId: string, toUserI
   return friendRequests.some((request) => request.fromUserId === fromUserId && request.toUserId === toUserId);
 }
 
+const VIEWER_PROFILE_TTL_MS = 10 * 60 * 1000;
+
 export function SocialProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
   const [following, setFollowing] = useState<string[]>([]);
@@ -137,7 +139,8 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   // Cache of profiles fetched on demand (e.g. non-friend collection viewers,
   // chat counterparts). Lives at the provider level so every screen shares one
   // source of truth instead of refetching the same id locally.
-  const [viewerProfiles, setViewerProfiles] = useState<Record<string, UserProfile>>({});
+  // Each entry is stamped with cachedAt so stale entries (>10 min) are refetched.
+  const [viewerProfiles, setViewerProfiles] = useState<Record<string, { profile: UserProfile; cachedAt: number }>>({});
   const inFlightProfileIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -146,7 +149,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       setMyProfileOverride(prev => prev === null ? prev : null);
       setFriendRequests(prev => prev.length === 0 ? prev : []);
       setDeletedProfileIds(prev => prev.length === 0 ? prev : []);
-      setViewerProfiles((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      setViewerProfiles((prev) => (Object.keys(prev).length === 0 ? prev : {} as Record<string, { profile: UserProfile; cachedAt: number }>));
       inFlightProfileIdsRef.current.clear();
       setReady(false);
       return;
@@ -331,13 +334,13 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   const ensureProfilesLoaded = useCallback(
     async (ids: readonly string[]) => {
       const inFlight = inFlightProfileIdsRef.current;
-      const missing = ids.filter(
-        (id) =>
-          id &&
-          !profileById.has(id) &&
-          !viewerProfiles[id] &&
-          !inFlight.has(id),
-      );
+      const now = Date.now();
+      const missing = ids.filter((id) => {
+        if (!id || profileById.has(id) || inFlight.has(id)) return false;
+        const cached = viewerProfiles[id];
+        if (!cached) return true;
+        return now - cached.cachedAt > VIEWER_PROFILE_TTL_MS;
+      });
       if (missing.length === 0) return;
       missing.forEach((id) => inFlight.add(id));
       try {
@@ -348,10 +351,10 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
               .catch(() => [id, null] as const),
           ),
         );
-        const next: Record<string, UserProfile> = {};
+        const next: Record<string, { profile: UserProfile; cachedAt: number }> = {};
         for (const [id, profile] of results) {
           inFlight.delete(id);
-          if (profile) next[profile.id] = profile;
+          if (profile) next[profile.id] = { profile, cachedAt: Date.now() };
         }
         if (Object.keys(next).length > 0) {
           setViewerProfiles((prev) => ({ ...prev, ...next }));
@@ -372,7 +375,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       incomingRequestUserIds,
       following,
       getMyProfile: () => (user ? profileById.get(user.id) : undefined),
-      getProfileById: (id) => profileById.get(id) ?? viewerProfiles[id],
+      getProfileById: (id) => profileById.get(id) ?? viewerProfiles[id]?.profile,
       ensureProfilesLoaded,
       getRelationship: (profileId) => {
         if (user?.id === profileId) {

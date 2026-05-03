@@ -10,6 +10,7 @@ import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectionVisibility } from "@/lib/types";
+import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 const FALLBACK_COVER = "";
 
@@ -221,18 +222,18 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: "#2b2017",
     fontWeight: "800",
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   heroText: {
     color: "#6b5543",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   templateHint: {
     color: "#7a6453",
     lineHeight: 20,
     fontSize: 13,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   templateRow: {
     gap: 10,
@@ -261,7 +262,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#624a35",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   templateNameActive: {
     color: "#261b14",
@@ -275,7 +276,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.5,
     textTransform: "uppercase",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   input: {
     borderRadius: 22,
@@ -286,7 +287,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: "#2f2318",
     fontSize: 16,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   inputMultiline: {
     minHeight: 132,
@@ -298,7 +299,7 @@ const styles = StyleSheet.create({
   required: {
     color: "#d92f2f",
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   photoButton: {
     borderRadius: 20,
@@ -310,7 +311,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 15,
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   previewImage: {
     width: "100%",
@@ -321,7 +322,7 @@ const styles = StyleSheet.create({
   photoHint: {
     color: "#7a6453",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   visibilityRow: {
     flexDirection: "row",
@@ -343,7 +344,7 @@ const styles = StyleSheet.create({
     color: "#6b5647",
     fontSize: 14,
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   visibilityChipTextSelected: {
     color: "#fff7ef",
@@ -352,7 +353,7 @@ const styles = StyleSheet.create({
     color: "#7a6453",
     fontSize: 13,
     lineHeight: 20,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   saveButton: {
     borderRadius: 24,
@@ -367,6 +368,6 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontSize: 16,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
 });

@@ -16,6 +16,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
 import { Collection } from "@/lib/types";
+import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 type CollectionsTab = "mine" | "friends" | "subscribed";
 
@@ -362,14 +363,14 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   title: {
     color: "#fff8ef",
     fontSize: 31,
     lineHeight: 39,
     fontWeight: "800",
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   profileRow: {
     flexDirection: "row",
@@ -391,7 +392,7 @@ const styles = StyleSheet.create({
     color: "#f5c99a",
     fontSize: 11,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
@@ -399,7 +400,7 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 14,
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   headerButtons: {
     flexDirection: "row",
@@ -417,7 +418,7 @@ const styles = StyleSheet.create({
     color: "#f8e7d1",
     fontSize: 14,
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   signOutButton: {
     borderRadius: 999,
@@ -433,13 +434,13 @@ const styles = StyleSheet.create({
     color: "#f8e7d1",
     fontSize: 14,
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   subtitle: {
     color: "#ead8c3",
     fontSize: 15,
     lineHeight: 23,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   actionsRow: {
     flexDirection: "row",
@@ -457,7 +458,7 @@ const styles = StyleSheet.create({
   ctaText: {
     color: "#241912",
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
     fontSize: 15,
   },
   secondaryCta: {
@@ -472,7 +473,7 @@ const styles = StyleSheet.create({
   secondaryCtaText: {
     color: "#2a1d15",
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
     fontSize: 15,
   },
   peopleCta: {
@@ -487,7 +488,7 @@ const styles = StyleSheet.create({
   peopleCtaText: {
     color: "#fff3e4",
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
     fontSize: 15,
   },
   section: {
@@ -514,12 +515,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
     color: "#2f2318",
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   sectionDescription: {
     color: "#735f50",
     lineHeight: 21,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   inlineAction: {
     borderRadius: 999,
@@ -530,7 +531,7 @@ const styles = StyleSheet.create({
   inlineActionText: {
     color: "#fff3e4",
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
     fontSize: 14,
   },
   socialSummary: {
@@ -550,12 +551,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     color: "#2d2117",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   summaryLabel: {
     color: "#715d4d",
     lineHeight: 21,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   socialList: {
     gap: 10,
@@ -572,12 +573,12 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 18,
     fontWeight: "800",
-    fontFamily: 'Syne-Bold',
+    fontFamily: FONT_DISPLAY_BOLD,
   },
   personMeta: {
     color: "#8f6947",
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   emptyCard: {
     borderRadius: 24,
@@ -589,7 +590,7 @@ const styles = StyleSheet.create({
   emptyCardText: {
     color: "#6b5647",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   recentRow: {
     gap: 12,
@@ -621,7 +622,7 @@ const styles = StyleSheet.create({
     color: "#fff7ea",
     fontSize: 10,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
     letterSpacing: 0.6,
   },
   recentTextWrap: {
@@ -632,12 +633,12 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 14,
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   recentMeta: {
     color: "#8f6947",
     fontSize: 12,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   wishlistBanner: {
     flexDirection: "row",
@@ -661,25 +662,25 @@ const styles = StyleSheet.create({
     color: "#fff7ea",
     fontSize: 22,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   wishlistBannerTitle: {
     color: "#2f2318",
     fontSize: 16,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   wishlistBannerHint: {
     color: "#8f6947",
     fontSize: 13,
     marginTop: 2,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   wishlistBannerArrow: {
     color: "#8f6947",
     fontSize: 28,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   statsBanner: {
     flexDirection: "row",
@@ -703,24 +704,24 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 20,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   statsBannerTitle: {
     color: "#2f2318",
     fontSize: 16,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   statsBannerHint: {
     color: "#8f6947",
     fontSize: 13,
     marginTop: 2,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   statsBannerArrow: {
     color: "#8f6947",
     fontSize: 28,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
 });

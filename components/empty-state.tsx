@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { FONT_DISPLAY, FONT_BODY, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 type EmptyStateProps = {
   icon?: string;
@@ -93,7 +94,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#261b14",
     textAlign: "center",
-    fontFamily: "Syne-ExtraBold",
+    fontFamily: FONT_DISPLAY,
   },
   hint: {
     fontSize: 13,
@@ -101,7 +102,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 19,
     maxWidth: 320,
-    fontFamily: "DMSans-Regular",
+    fontFamily: FONT_BODY,
   },
   action: {
     marginTop: 10,
@@ -114,6 +115,6 @@ const styles = StyleSheet.create({
     color: "#fff7ea",
     fontWeight: "800",
     fontSize: 14,
-    fontFamily: "DMSans-ExtraBold",
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
 });

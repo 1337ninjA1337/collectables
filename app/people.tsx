@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { fetchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
+import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 const PAGE_SIZE = 25;
 
@@ -202,19 +203,19 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   title: {
     color: "#fff8ef",
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 36,
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   subtitle: {
     color: "#ead8c3",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   searchCard: {
     borderRadius: 24,
@@ -230,7 +231,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.5,
     textTransform: "uppercase",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   searchInput: {
     borderRadius: 20,
@@ -241,7 +242,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: "#2f2318",
     fontSize: 15,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   card: {
     borderRadius: 28,
@@ -269,17 +270,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#2f2318",
-    fontFamily: 'Syne-Bold',
+    fontFamily: FONT_DISPLAY_BOLD,
   },
   username: {
     color: "#8f6947",
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   bio: {
     color: "#6b5647",
     lineHeight: 21,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   actions: {
     flexDirection: "row",
@@ -295,7 +296,7 @@ const styles = StyleSheet.create({
   primaryActionText: {
     color: "#fff4e8",
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   secondaryAction: {
     borderRadius: 999,
@@ -308,7 +309,7 @@ const styles = StyleSheet.create({
   secondaryActionText: {
     color: "#2a1d15",
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   statusBadge: {
     borderRadius: 999,
@@ -321,7 +322,7 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     color: "#6b5543",
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   pagination: {
     flexDirection: "row",
@@ -341,7 +342,7 @@ const styles = StyleSheet.create({
   pageButtonText: {
     color: "#fff4e8",
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   pageButtonTextDisabled: {
     color: "#a89480",
@@ -350,6 +351,6 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontWeight: "700",
     fontSize: 14,
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
 });

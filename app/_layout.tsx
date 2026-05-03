@@ -22,15 +22,16 @@ import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-conte
 import { SocialProvider } from "@/lib/social-context";
 import { ToastProvider } from "@/lib/toast-context";
 import { Screen, useResponsive } from "@/components/screen";
+import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    "Syne-Bold": require("../assets/fonts/Syne/static/Syne-Bold.ttf"),
-    "Syne-ExtraBold": require("../assets/fonts/Syne/static/Syne-ExtraBold.ttf"),
-    "DMSans-Regular": require("../assets/fonts/DM_Sans/static/DMSans-Regular.ttf"),
-    "DMSans-SemiBold": require("../assets/fonts/DM_Sans/static/DMSans-SemiBold.ttf"),
-    "DMSans-Bold": require("../assets/fonts/DM_Sans/static/DMSans-Bold.ttf"),
-    "DMSans-ExtraBold": require("../assets/fonts/DM_Sans/static/DMSans-ExtraBold.ttf"),
+    [FONT_DISPLAY_BOLD]: require("../assets/fonts/Syne/static/Syne-Bold.ttf"),
+    [FONT_DISPLAY]: require("../assets/fonts/Syne/static/Syne-ExtraBold.ttf"),
+    [FONT_BODY]: require("../assets/fonts/DM_Sans/static/DMSans-Regular.ttf"),
+    [FONT_BODY_SEMIBOLD]: require("../assets/fonts/DM_Sans/static/DMSans-SemiBold.ttf"),
+    [FONT_BODY_BOLD]: require("../assets/fonts/DM_Sans/static/DMSans-Bold.ttf"),
+    [FONT_BODY_EXTRABOLD]: require("../assets/fonts/DM_Sans/static/DMSans-ExtraBold.ttf"),
   });
 
   if (!fontsLoaded) return null;
@@ -62,7 +63,7 @@ function AppShell() {
   const { ready, session } = useAuth();
   const { ready: i18nReady, t } = useI18n();
   const { animation } = useNavAnimation();
-  const { unreadTotal } = useChat();
+  const { unreadTotal, realtimeOnline } = useChat();
   const pathname = usePathname();
   const { isMobile } = useResponsive();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -134,6 +135,7 @@ function AppShell() {
                       accessibilityLabel={t("chatsTitle")}
                     >
                       <Ionicons name="chatbubbles-outline" size={18} color="#2a1d15" />
+                      <View style={[styles.realtimeDot, realtimeOnline ? styles.realtimeDotOnline : styles.realtimeDotOffline]} />
                       {unreadTotal > 0 ? (
                         <View style={styles.headerBadge}>
                           <Text style={styles.headerBadgeText}>{formatBadgeCount(unreadTotal)}</Text>
@@ -155,6 +157,7 @@ function AppShell() {
                       accessibilityLabel={t("chatsTitle")}
                     >
                       <Ionicons name="chatbubbles-outline" size={18} color="#2a1d15" />
+                      <View style={[styles.realtimeDot, realtimeOnline ? styles.realtimeDotOnline : styles.realtimeDotOffline]} />
                       {unreadTotal > 0 ? (
                         <View style={styles.headerBadge}>
                           <Text style={styles.headerBadgeText}>{formatBadgeCount(unreadTotal)}</Text>
@@ -220,6 +223,22 @@ const styles = StyleSheet.create({
     height: 34,
     alignItems: "center",
     justifyContent: "center",
+  },
+  realtimeDot: {
+    position: "absolute",
+    bottom: 3,
+    right: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: "#fff7ef",
+  },
+  realtimeDotOnline: {
+    backgroundColor: "#22c55e",
+  },
+  realtimeDotOffline: {
+    backgroundColor: "#eab308",
   },
   headerBadge: {
     position: "absolute",

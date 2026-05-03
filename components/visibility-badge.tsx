@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { useI18n } from "@/lib/i18n-context";
 import { Collection } from "@/lib/types";
+import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
 
 type Variant = "card" | "hero";
 
@@ -118,19 +119,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#6b5647",
-    fontFamily: "DMSans-Bold",
+    fontFamily: FONT_BODY_BOLD,
   },
   badgeTextHero: {
     color: "#fff7ef",
     fontSize: 12,
-    fontFamily: "DMSans-Bold",
+    fontFamily: FONT_BODY_BOLD,
   },
   badgeTextViewer: {
     color: "#4a7c59",
-    fontFamily: "DMSans-Bold",
+    fontFamily: FONT_BODY_BOLD,
   },
   badgeTextShared: {
     color: "#8a6520",
-    fontFamily: "DMSans-Bold",
+    fontFamily: FONT_BODY_BOLD,
   },
 });

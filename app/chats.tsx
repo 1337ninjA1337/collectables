@@ -7,6 +7,7 @@ import { Screen } from "@/components/screen";
 import { useChat } from "@/lib/chat-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
+import { useVisibilityRefresh } from "@/lib/use-visibility-refresh";
 
 function formatWhen(isoDate: string, locale: string | undefined): string {
   const date = new Date(isoDate);
@@ -39,12 +40,8 @@ export default function ChatsScreen() {
     ensureProfilesLoaded(otherIds);
   }, [otherIds, ensureProfilesLoaded]);
 
-  // Force a cloud refetch whenever the chats list mounts so the receiver sees
-  // any messages that arrived while the realtime channel was disconnected
-  // (e.g. publication not wired, transient network drop).
-  useEffect(() => {
-    void refreshFromCloud();
-  }, [refreshFromCloud]);
+  // Refresh on mount and on a recurring interval, pausing when backgrounded.
+  useVisibilityRefresh(() => { void refreshFromCloud(); }, CHATS_REFRESH_INTERVAL_MS);
 
   return (
     <Screen>

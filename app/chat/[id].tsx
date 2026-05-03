@@ -22,6 +22,7 @@ import { buildChatId } from "@/lib/chat-helpers";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { subscribeToTyping } from "@/lib/supabase-chat";
+import { useVisibilityRefresh } from "@/lib/use-visibility-refresh";
 
 const TYPING_DEBOUNCE_MS = 1000;
 const REFRESH_INTERVAL_MS = 8000;
@@ -79,17 +80,11 @@ export default function ChatDetailScreen() {
   }, [chatId, messages.length, markRead]);
 
   // Belt-and-braces fallback for realtime: pull fresh messages on mount and
-  // every few seconds while the chat is open, so a missed INSERT push (e.g.
-  // a websocket hiccup or unconfigured realtime) still reconciles within a
-  // single refresh cycle instead of waiting for the next reload.
-  useEffect(() => {
-    if (!otherUserId || !allowed) return;
-    void refreshFromCloud([otherUserId]);
-    const handle = setInterval(() => {
-      void refreshFromCloud([otherUserId]);
-    }, REFRESH_INTERVAL_MS);
-    return () => clearInterval(handle);
-  }, [otherUserId, allowed, refreshFromCloud]);
+  // every few seconds while the chat is open, pausing when backgrounded.
+  useVisibilityRefresh(
+    () => { if (otherUserId && allowed) void refreshFromCloud([otherUserId]); },
+    REFRESH_INTERVAL_MS,
+  );
 
   // Presence-based typing indicator. We open one channel per chat, keyed by
   // selfId, so each side sees the other's `{ typing: boolean }` payload.
