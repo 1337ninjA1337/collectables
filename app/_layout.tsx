@@ -22,15 +22,16 @@ import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-conte
 import { SocialProvider } from "@/lib/social-context";
 import { ToastProvider } from "@/lib/toast-context";
 import { Screen, useResponsive } from "@/components/screen";
+import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    "Syne-Bold": require("../assets/fonts/Syne/static/Syne-Bold.ttf"),
-    "Syne-ExtraBold": require("../assets/fonts/Syne/static/Syne-ExtraBold.ttf"),
-    "DMSans-Regular": require("../assets/fonts/DM_Sans/static/DMSans-Regular.ttf"),
-    "DMSans-SemiBold": require("../assets/fonts/DM_Sans/static/DMSans-SemiBold.ttf"),
-    "DMSans-Bold": require("../assets/fonts/DM_Sans/static/DMSans-Bold.ttf"),
-    "DMSans-ExtraBold": require("../assets/fonts/DM_Sans/static/DMSans-ExtraBold.ttf"),
+    [FONT_DISPLAY_BOLD]: require("../assets/fonts/Syne/static/Syne-Bold.ttf"),
+    [FONT_DISPLAY]: require("../assets/fonts/Syne/static/Syne-ExtraBold.ttf"),
+    [FONT_BODY]: require("../assets/fonts/DM_Sans/static/DMSans-Regular.ttf"),
+    [FONT_BODY_SEMIBOLD]: require("../assets/fonts/DM_Sans/static/DMSans-SemiBold.ttf"),
+    [FONT_BODY_BOLD]: require("../assets/fonts/DM_Sans/static/DMSans-Bold.ttf"),
+    [FONT_BODY_EXTRABOLD]: require("../assets/fonts/DM_Sans/static/DMSans-ExtraBold.ttf"),
   });
 
   if (!fontsLoaded) return null;

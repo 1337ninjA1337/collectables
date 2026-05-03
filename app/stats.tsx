@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Screen } from "@/components/screen";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
+import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 type MonthBucket = { label: string; count: number };
 
@@ -106,12 +107,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: "#fff7ef",
     fontWeight: "800",
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   heroText: {
     color: "#dfc8b2",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   summaryRow: {
     flexDirection: "row",
@@ -131,14 +132,14 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "800",
     color: "#2d2117",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   summaryLabel: {
     color: "#715d4d",
     fontSize: 12,
     textAlign: "center",
     fontWeight: "600",
-    fontFamily: 'DMSans-SemiBold',
+    fontFamily: FONT_BODY_SEMIBOLD,
   },
   section: {
     gap: 14,
@@ -147,14 +148,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#2f2318",
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   emptyText: {
     color: "#6b5647",
     lineHeight: 22,
     textAlign: "center",
     paddingVertical: 20,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   chart: {
     flexDirection: "row",
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
     color: "#8f6947",
     fontSize: 11,
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   barTrack: {
     flex: 1,
@@ -196,6 +197,6 @@ const styles = StyleSheet.create({
     color: "#8f6947",
     fontSize: 10,
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
 });

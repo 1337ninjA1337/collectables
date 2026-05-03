@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "RUB", "BYN", "PLN", "UAH", "CHF", "JPY", "CNY"];
 
@@ -88,13 +89,13 @@ const styles = StyleSheet.create({
     color: "#5a4030",
     fontSize: 15,
     fontWeight: "700",
-    fontFamily: "DMSans-Bold",
+    fontFamily: FONT_BODY_BOLD,
   },
   input: {
     flex: 1,
     color: "#2f2318",
     fontSize: 16,
-    fontFamily: "DMSans-Regular",
+    fontFamily: FONT_BODY,
     padding: 0,
   },
   chips: {
@@ -117,7 +118,7 @@ const styles = StyleSheet.create({
     color: "#5a4030",
     fontSize: 12,
     fontWeight: "700",
-    fontFamily: "DMSans-Bold",
+    fontFamily: FONT_BODY_BOLD,
   },
   chipTextActive: {
     color: "#fff5ea",

@@ -5,6 +5,7 @@ import { VisibilityBadge } from "@/components/visibility-badge";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { Collection } from "@/lib/types";
+import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD } from "@/lib/fonts";
 
 export function CollectionCard({
   collection,
@@ -78,30 +79,30 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.8,
-    fontFamily: "DMSans-Bold",
+    fontFamily: FONT_BODY_BOLD,
   },
   count: {
     color: "#f5ebdf",
     fontSize: 13,
     fontWeight: "600",
-    fontFamily: "DMSans-SemiBold",
+    fontFamily: FONT_BODY_SEMIBOLD,
   },
   title: {
     color: "#ffffff",
     fontSize: 28,
     fontWeight: "800",
-    fontFamily: "Syne-ExtraBold",
+    fontFamily: FONT_DISPLAY,
   },
   description: {
     color: "#f3eee7",
     fontSize: 15,
     lineHeight: 22,
-    fontFamily: "DMSans-Regular",
+    fontFamily: FONT_BODY,
   },
   meta: {
     color: "#f8dfc5",
     fontSize: 14,
     fontWeight: "600",
-    fontFamily: "DMSans-SemiBold",
+    fontFamily: FONT_BODY_SEMIBOLD,
   },
 });

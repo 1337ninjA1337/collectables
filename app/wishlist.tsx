@@ -25,6 +25,7 @@ import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
+import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export default function WishlistScreen() {
   const { t } = useI18n();
@@ -347,13 +348,13 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "800",
     color: "#2f2318",
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   subtitle: {
     color: "#735f50",
     marginTop: 4,
     lineHeight: 20,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   addButton: {
     flexDirection: "row",
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 14,
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   list: {
     gap: 14,
@@ -396,13 +397,13 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 17,
     fontWeight: "800",
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   cardDescription: {
     color: "#6b5647",
     fontSize: 13,
     lineHeight: 18,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   metaRow: {
     flexDirection: "row",
@@ -419,7 +420,7 @@ const styles = StyleSheet.create({
     color: "#6b5647",
     fontSize: 12,
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   actionsRow: {
     flexDirection: "row",
@@ -440,7 +441,7 @@ const styles = StyleSheet.create({
     color: "#fff7ea",
     fontWeight: "800",
     fontSize: 13,
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   deleteButton: {
     borderRadius: 999,
@@ -477,7 +478,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#2f2318",
     marginBottom: 10,
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   sheetScroll: {
     gap: 10,
@@ -490,7 +491,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
     marginTop: 4,
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   input: {
     borderRadius: 14,
@@ -501,7 +502,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: "#2f2318",
     fontSize: 15,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   multiline: {
     minHeight: 80,
@@ -523,7 +524,7 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontWeight: "800",
     fontSize: 13,
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   sheetActions: {
     flexDirection: "row",
@@ -543,7 +544,7 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontWeight: "800",
     fontSize: 14,
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   saveButton: {
     flex: 1,
@@ -559,7 +560,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 14,
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   promoteSheet: {
     margin: 20,
@@ -584,6 +585,6 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 15,
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
 });

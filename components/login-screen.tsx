@@ -6,6 +6,7 @@ import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
+import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export function LoginScreen() {
   const { pending, sendEmailOtp, verifyEmailOtp, signInWithProvider } = useAuth();
@@ -137,20 +138,20 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
-    fontFamily: "DMSans-ExtraBold",
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   title: {
     color: "#fff8ef",
     fontSize: 30,
     lineHeight: 38,
     fontWeight: "800",
-    fontFamily: "Syne-ExtraBold",
+    fontFamily: FONT_DISPLAY,
   },
   subtitle: {
     color: "#ead8c3",
     fontSize: 15,
     lineHeight: 23,
-    fontFamily: "DMSans-Regular",
+    fontFamily: FONT_BODY,
   },
   card: {
     borderRadius: 28,
@@ -164,12 +165,12 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 22,
     fontWeight: "800",
-    fontFamily: "Syne-ExtraBold",
+    fontFamily: FONT_DISPLAY,
   },
   sectionText: {
     color: "#6f5c4d",
     lineHeight: 22,
-    fontFamily: "DMSans-Regular",
+    fontFamily: FONT_BODY,
   },
   input: {
     borderRadius: 22,
@@ -180,7 +181,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: "#2f2318",
     fontSize: 16,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   primaryButton: {
     borderRadius: 22,
@@ -192,7 +193,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontWeight: "800",
     fontSize: 15,
-    fontFamily: "DMSans-ExtraBold",
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   secondaryButton: {
     borderRadius: 22,
@@ -204,7 +205,7 @@ const styles = StyleSheet.create({
     color: "#fff4e8",
     fontWeight: "800",
     fontSize: 15,
-    fontFamily: "DMSans-ExtraBold",
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   disabledButton: {
     opacity: 0.65,
@@ -214,11 +215,11 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontSize: 14,
     fontWeight: "600",
-    fontFamily: 'DMSans-SemiBold',
+    fontFamily: FONT_BODY_SEMIBOLD,
   },
   providerHint: {
     color: "#856d5a",
     lineHeight: 21,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
 });

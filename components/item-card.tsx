@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { CollectableItem } from "@/lib/types";
+import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD } from "@/lib/fonts";
 
 type ItemCardProps = { item: CollectableItem; compact?: boolean };
 
@@ -99,12 +100,12 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: "700",
     color: "#312218",
-    fontFamily: "Syne-Bold",
+    fontFamily: FONT_DISPLAY_BOLD,
   },
   description: {
     color: "#6a5647",
     lineHeight: 20,
-    fontFamily: "DMSans-Regular",
+    fontFamily: FONT_BODY,
   },
   metaRow: {
     flexDirection: "row",
@@ -115,7 +116,7 @@ const styles = StyleSheet.create({
     color: "#8d6c4a",
     fontSize: 13,
     fontWeight: "600",
-    fontFamily: "DMSans-SemiBold",
+    fontFamily: FONT_BODY_SEMIBOLD,
   },
   tagsRow: {
     flexDirection: "row",
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 10,
     fontWeight: "700",
-    fontFamily: "DMSans-Bold",
+    fontFamily: FONT_BODY_BOLD,
   },
   conditionBadge: {
     borderRadius: 999,
@@ -143,7 +144,7 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 11,
     fontWeight: "700",
-    fontFamily: "DMSans-Bold",
+    fontFamily: FONT_BODY_BOLD,
   },
   compactCard: {
     borderRadius: 18,
@@ -165,13 +166,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#312218",
     paddingHorizontal: 10,
-    fontFamily: "Syne-Bold",
+    fontFamily: FONT_DISPLAY_BOLD,
   },
   compactCost: {
     fontSize: 12,
     color: "#8d6c4a",
     fontWeight: "600",
     paddingHorizontal: 10,
-    fontFamily: "DMSans-SemiBold",
+    fontFamily: FONT_BODY_SEMIBOLD,
   },
 });

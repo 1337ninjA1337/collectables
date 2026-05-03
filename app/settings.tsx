@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
 import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
+import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export default function SettingsScreen() {
   const { t, language, setLanguage, languageOptions, formatRelativeDate } = useI18n();
@@ -204,13 +205,13 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   title: {
     color: "#fff8ef",
     fontSize: 28,
     fontWeight: "800",
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
     lineHeight: 36,
   },
   card: {
@@ -225,12 +226,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
     color: "#2f2318",
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   sectionText: {
     color: "#6b5647",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   languageRow: {
     flexDirection: "row",
@@ -252,7 +253,7 @@ const styles = StyleSheet.create({
   languageChipText: {
     color: "#2a1d15",
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   languageChipTextActive: {
     color: "#fff4e8",
@@ -273,7 +274,7 @@ const styles = StyleSheet.create({
     color: "#8d2b2b",
     fontSize: 15,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   dangerZone: {
     borderRadius: 24,
@@ -287,12 +288,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#7a2020",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   dangerText: {
     color: "#8d4444",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   deleteButton: {
     alignSelf: "flex-start",
@@ -308,7 +309,7 @@ const styles = StyleSheet.create({
     color: "#fff4e8",
     fontSize: 15,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   premiumCard: {
     borderRadius: 24,
@@ -336,13 +337,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
     color: "#2f2318",
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   premiumSectionTitleActive: {
     fontSize: 22,
     fontWeight: "800",
     color: "#fff8ef",
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   premiumBadge: {
     borderRadius: 999,
@@ -354,25 +355,25 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontSize: 12,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
     textTransform: "uppercase",
     letterSpacing: 0.7,
   },
   premiumSubtitle: {
     color: "#6b5647",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   premiumSubtitleActive: {
     color: "#ead8c3",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   premiumRenewsLine: {
     color: "#f5c99a",
     fontSize: 13,
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
     marginTop: -4,
   },
   premiumBenefits: {
@@ -388,20 +389,20 @@ const styles = StyleSheet.create({
     color: "#d89c5b",
     fontSize: 16,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
     lineHeight: 22,
   },
   premiumBenefitText: {
     flex: 1,
     color: "#2f2318",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   premiumBenefitTextActive: {
     flex: 1,
     color: "#fff7ef",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   premiumActivateButton: {
     borderRadius: 999,
@@ -414,7 +415,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontSize: 15,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   premiumCancelButton: {
     borderRadius: 999,
@@ -429,7 +430,7 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 14,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   premiumCardSkeleton: {
     borderRadius: 24,

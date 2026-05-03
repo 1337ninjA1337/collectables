@@ -14,6 +14,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { useNavAnimation } from "@/lib/nav-animation-context";
 import { usePremium } from "@/lib/premium-context";
 import { useSocial } from "@/lib/social-context";
+import { FONT_BODY, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export const BOTTOM_NAV_HEIGHT = 58;
 
@@ -319,7 +320,7 @@ const styles = StyleSheet.create({
     color: "#fff7ef",
     fontSize: 10,
     fontWeight: "800",
-    fontFamily: "DMSans-ExtraBold",
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   plusButton: {
     width: 50,
@@ -382,7 +383,7 @@ const styles = StyleSheet.create({
     color: "#fff5ea",
     fontSize: 16,
     fontWeight: "800",
-    fontFamily: "DMSans-ExtraBold",
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   modalSecondaryButton: {
     borderRadius: 22,
@@ -394,7 +395,7 @@ const styles = StyleSheet.create({
     color: "#241912",
     fontSize: 16,
     fontWeight: "800",
-    fontFamily: "DMSans-ExtraBold",
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   modalCancelButton: {
     borderRadius: 22,
@@ -408,6 +409,6 @@ const styles = StyleSheet.create({
     color: "#5f4734",
     fontSize: 15,
     fontWeight: "800",
-    fontFamily: "DMSans-ExtraBold",
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
 });

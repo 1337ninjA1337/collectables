@@ -13,6 +13,7 @@ import { useChat } from "@/lib/chat-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { UserProfile } from "@/lib/types";
+import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 type Tab = "friends" | "following";
 
@@ -222,19 +223,19 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   title: {
     color: "#fff8ef",
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 36,
-    fontFamily: 'Syne-ExtraBold',
+    fontFamily: FONT_DISPLAY,
   },
   subtitle: {
     color: "#ead8c3",
     lineHeight: 22,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   chatsLink: {
     flexDirection: "row",
@@ -264,13 +265,13 @@ const styles = StyleSheet.create({
     color: "#2f2318",
     fontSize: 15,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   chatsLinkSubtitle: {
     color: "#8f6947",
     fontSize: 12,
     fontWeight: "600",
-    fontFamily: 'DMSans-SemiBold',
+    fontFamily: FONT_BODY_SEMIBOLD,
   },
   chatsBadge: {
     minWidth: 24,
@@ -285,7 +286,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   sectionLabel: {
     color: "#624a35",
@@ -294,7 +295,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.6,
     marginTop: 4,
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   card: {
     borderRadius: 28,
@@ -322,17 +323,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: "#2f2318",
-    fontFamily: 'Syne-Bold',
+    fontFamily: FONT_DISPLAY_BOLD,
   },
   username: {
     color: "#8f6947",
     fontWeight: "700",
-    fontFamily: 'DMSans-Bold',
+    fontFamily: FONT_BODY_BOLD,
   },
   bio: {
     color: "#6b5647",
     lineHeight: 21,
-    fontFamily: 'DMSans-Regular',
+    fontFamily: FONT_BODY,
   },
   actions: {
     flexDirection: "row",
@@ -348,7 +349,7 @@ const styles = StyleSheet.create({
   primaryActionText: {
     color: "#fff4e8",
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   secondaryAction: {
     borderRadius: 999,
@@ -361,6 +362,6 @@ const styles = StyleSheet.create({
   secondaryActionText: {
     color: "#2a1d15",
     fontWeight: "800",
-    fontFamily: 'DMSans-ExtraBold',
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
 });
