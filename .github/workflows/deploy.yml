@@ -1,87 +1,42 @@
 name: Deploy to GitHub Pages
-
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
   pages: write
   id-token: write
-
 concurrency:
-  group: pages-deploy
-  cancel-in-progress: true
-
+  group: pages
+  cancel-in-progress: false
 jobs:
-  migrate:
+  build:
     runs-on: ubuntu-latest
-    if: ${{ secrets.SUPABASE_DB_URL != '' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          version: latest
-
-      - name: Apply database migrations
-        run: supabase db push --db-url "$SUPABASE_DB_URL"
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Build web
+        run: npx expo export --platform web
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-
-  build-and-deploy:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      - name: Add SPA fallback
+        run: cp dist/index.html dist/404.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+  deploy:
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    env:
-      EXPO_PUBLIC_APP_URL: https://1337ninja1337.github.io/collectables
-      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-      EXPO_PUBLIC_CLOUDINARY_URL: ${{ secrets.EXPO_PUBLIC_CLOUDINARY_URL }}
-      EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME }}
-      EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
     steps:
-      - name: Validate required secrets
-        run: |
-          if [ -z "$EXPO_PUBLIC_SUPABASE_URL" ]; then
-            echo "ERROR: EXPO_PUBLIC_SUPABASE_URL secret is not set" >&2
-            exit 1
-          fi
-          if [ -z "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" ]; then
-            echo "ERROR: EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY secret is not set" >&2
-            exit 1
-          fi
-          echo "Secrets validated OK"
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Export web build
-        run: npx expo export --platform web --clear
-
-      - name: Prepare dist for GitHub Pages
-        run: |
-          cp dist/index.html dist/404.html
-          touch dist/.nojekyll
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
+      - id: deployment
         uses: actions/deploy-pages@v4
