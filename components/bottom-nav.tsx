@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -12,6 +12,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { useNavAnimation } from "@/lib/nav-animation-context";
 import { usePremium } from "@/lib/premium-context";
 import { useSocial } from "@/lib/social-context";
+import { useToast } from "@/lib/toast-context";
 import { FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export const BOTTOM_NAV_HEIGHT = 58;
@@ -64,9 +65,18 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { setAnimation } = useNavAnimation();
+  const toast = useToast();
   const [createOpen, setCreateOpen] = useState(false);
-
   const { isMobile } = useResponsive();
+
+  const prevIsPremium = useRef(isPremium);
+  useEffect(() => {
+    if (!prevIsPremium.current && isPremium) {
+      toast.success(t("premiumActive"));
+    }
+    prevIsPremium.current = isPremium;
+  }, [isPremium, t, toast]);
+
   if (!isMobile) return null;
 
   const myProfile = getMyProfile();
