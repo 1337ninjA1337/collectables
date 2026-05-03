@@ -17,6 +17,7 @@ import {
   cloudFetchListings,
   cloudMarkSold,
   cloudRemoveListing,
+  subscribeToListings,
 } from "@/lib/supabase-marketplace";
 import { MARKETPLACE_KEY } from "@/lib/storage-keys";
 import { MarketplaceListing, MarketplaceMode } from "@/lib/types";
@@ -90,6 +91,16 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
     if (!ready) return;
     AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(listings)).catch(() => undefined);
   }, [ready, listings]);
+
+  useEffect(() => {
+    const sub = subscribeToListings((newListing) => {
+      setListings((prev) => {
+        if (prev.some((l) => l.id === newListing.id)) return prev;
+        return [newListing, ...prev];
+      });
+    });
+    return () => sub.unsubscribe();
+  }, []);
 
   const myListings = useMemo(
     () => (user ? listingsForUser(listings, user.id) : []),
