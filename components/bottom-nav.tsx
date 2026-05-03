@@ -4,39 +4,17 @@ import { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { NavTab, NavItem } from "@/components/nav-tab";
 import { useResponsive } from "@/components/screen";
 import { useChat } from "@/lib/chat-context";
-import {
-  FriendsTabBadge,
-  formatBadgeCount,
-} from "@/lib/chat-helpers";
+import { FriendsTabBadge } from "@/lib/chat-helpers";
 import { useI18n } from "@/lib/i18n-context";
 import { useNavAnimation } from "@/lib/nav-animation-context";
 import { usePremium } from "@/lib/premium-context";
 import { useSocial } from "@/lib/social-context";
-import { FONT_BODY, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export const BOTTOM_NAV_HEIGHT = 58;
-
-function renderBadge(badge: FriendsTabBadge | undefined) {
-  if (!badge || badge.kind === "none") return null;
-  if (badge.kind === "dot") return <View style={styles.badge} />;
-  return (
-    <View style={styles.badgeCount}>
-      <Text style={styles.badgeCountText}>{formatBadgeCount(badge.value)}</Text>
-    </View>
-  );
-}
-
-type NavItem = {
-  key: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  iconActive: keyof typeof Ionicons.glyphMap;
-  onPress: () => void;
-  active: boolean;
-  badge?: FriendsTabBadge;
-  premiumBadge?: boolean;
-};
 
 type NavRowProps = {
   leftItems: NavItem[];
@@ -44,23 +22,6 @@ type NavRowProps = {
   onPlusPress: () => void;
   plusLabel: string;
 };
-
-function NavTab({ item }: { item: NavItem }) {
-  return (
-    <Pressable style={styles.item} onPress={item.onPress}>
-      <View style={styles.iconWrap}>
-        <Ionicons
-          name={item.active ? item.iconActive : item.icon}
-          size={22}
-          color={item.active ? "#261b14" : "#bbb0a6"}
-        />
-        {renderBadge(item.badge)}
-        {item.premiumBadge ? <View style={styles.premiumDot} /> : null}
-      </View>
-      {item.active ? <View style={styles.activeDot} /> : <View style={styles.activeDotPlaceholder} />}
-    </Pressable>
-  );
-}
 
 function NavRow({ leftItems, rightItems, onPlusPress, plusLabel }: NavRowProps) {
   const slots = Math.max(leftItems.length, rightItems.length);
@@ -291,37 +252,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 6,
   },
-  badge: {
-    position: "absolute",
-    top: -2,
-    right: -4,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#d92f2f",
-    borderWidth: 1.5,
-    borderColor: "#fff7ef",
-  },
-  badgeCount: {
-    position: "absolute",
-    top: -6,
-    right: -10,
-    minWidth: 18,
-    height: 18,
-    paddingHorizontal: 5,
-    borderRadius: 9,
-    backgroundColor: "#d92f2f",
-    borderWidth: 1.5,
-    borderColor: "#fff7ef",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badgeCountText: {
-    color: "#fff7ef",
-    fontSize: 10,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
   plusButton: {
     width: 50,
     height: 50,
@@ -332,33 +262,6 @@ const styles = StyleSheet.create({
     marginTop: -18,
     borderWidth: 3,
     borderColor: "#fff7ef",
-  },
-  iconWrap: {
-    position: "relative",
-  },
-  premiumDot: {
-    position: "absolute",
-    bottom: -2,
-    right: -4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#d89c5b",
-    borderWidth: 1.5,
-    borderColor: "#fff7ef",
-  },
-  activeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#261b14",
-    marginTop: 3,
-    alignSelf: "center",
-  },
-  activeDotPlaceholder: {
-    width: 4,
-    height: 4,
-    marginTop: 3,
   },
   modalBackdrop: {
     flex: 1,
