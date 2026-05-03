@@ -3,6 +3,19 @@ import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "RUB", "BYN", "PLN", "UAH", "CHF", "JPY", "CNY"];
 
+const LANGUAGE_CURRENCY: Record<string, string> = {
+  ru: "RUB",
+  be: "BYN",
+  de: "EUR",
+  pl: "PLN",
+  es: "EUR",
+  en: "USD",
+};
+
+export function getDefaultCurrencyForLanguage(language: string): string {
+  return LANGUAGE_CURRENCY[language] ?? "USD";
+}
+
 type CurrencyInputProps = {
   value: string;
   currency: string;
