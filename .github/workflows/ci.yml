@@ -18,6 +18,15 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Cache Expo/Metro build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.expo
+            node_modules/.cache
+          key: expo-metro-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: expo-metro-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm ci
 
