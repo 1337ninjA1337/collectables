@@ -62,7 +62,7 @@ function AppShell() {
   const { ready, session } = useAuth();
   const { ready: i18nReady, t } = useI18n();
   const { animation } = useNavAnimation();
-  const { unreadTotal } = useChat();
+  const { unreadTotal, realtimeOnline } = useChat();
   const pathname = usePathname();
   const { isMobile } = useResponsive();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -134,6 +134,7 @@ function AppShell() {
                       accessibilityLabel={t("chatsTitle")}
                     >
                       <Ionicons name="chatbubbles-outline" size={18} color="#2a1d15" />
+                      <View style={[styles.realtimeDot, realtimeOnline ? styles.realtimeDotOnline : styles.realtimeDotOffline]} />
                       {unreadTotal > 0 ? (
                         <View style={styles.headerBadge}>
                           <Text style={styles.headerBadgeText}>{formatBadgeCount(unreadTotal)}</Text>
@@ -155,6 +156,7 @@ function AppShell() {
                       accessibilityLabel={t("chatsTitle")}
                     >
                       <Ionicons name="chatbubbles-outline" size={18} color="#2a1d15" />
+                      <View style={[styles.realtimeDot, realtimeOnline ? styles.realtimeDotOnline : styles.realtimeDotOffline]} />
                       {unreadTotal > 0 ? (
                         <View style={styles.headerBadge}>
                           <Text style={styles.headerBadgeText}>{formatBadgeCount(unreadTotal)}</Text>
@@ -220,6 +222,22 @@ const styles = StyleSheet.create({
     height: 34,
     alignItems: "center",
     justifyContent: "center",
+  },
+  realtimeDot: {
+    position: "absolute",
+    bottom: 3,
+    right: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: "#fff7ef",
+  },
+  realtimeDotOnline: {
+    backgroundColor: "#22c55e",
+  },
+  realtimeDotOffline: {
+    backgroundColor: "#eab308",
   },
   headerBadge: {
     position: "absolute",
