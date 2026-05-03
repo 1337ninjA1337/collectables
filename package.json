@@ -10,6 +10,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "tsx --test __tests__/*.test.ts",
+    "lint:ci": "npx tsc --noEmit && npm test",
+    "postinstall": "npx expo install --check",
     "build": "npx expo export --platform web && cp dist/index.html dist/404.html",
     "deploy": "cross-env-shell 'set -a && [ -f .env ] && . ./.env; set +a && EXPO_PUBLIC_APP_URL=https://1337ninja1337.github.io/collectables npx expo export --platform web --clear && cp dist/index.html dist/404.html && touch dist/.nojekyll && echo > dist/.gitignore && npx gh-pages -d dist --dotfiles'"
   },
