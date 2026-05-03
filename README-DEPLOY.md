@@ -4,7 +4,7 @@ The web build for this app is deployed automatically by
 `.github/workflows/deploy.yml`. Every push to `main` builds the Expo web bundle
 with `npx expo export --platform web`, copies `index.html` to `404.html`
 (so client-side routes survive a refresh), and publishes the result to the
-`gh-pages` branch via `peaceiris/actions-gh-pages`.
+`main` branch via `peaceiris/actions-gh-pages`.
 
 The workflow needs runtime credentials at build time. Without them the
 deployed site renders disabled login buttons because
@@ -35,7 +35,3 @@ deep links resolve correctly even when shared from a sub-route.
 If you change a secret, trigger a new deploy by either pushing a no-op commit
 to `main` or by going to **Actions → Deploy to GitHub Pages → Run workflow**.
 
-The published `gh-pages` branch must only be written by this workflow so the
-bundle always carries the correct GitHub-secret-backed env. Do not run
-`npx gh-pages -d dist` from a local machine — it would publish a bundle built
-without the secrets and break login on the live site.
