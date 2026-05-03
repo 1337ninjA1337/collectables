@@ -1,9 +1,18 @@
 import {
+  RealtimeChannel,
+  RealtimeClient,
+  REALTIME_LISTEN_TYPES,
+  REALTIME_POSTGRES_CHANGES_LISTEN_EVENT,
+  REALTIME_SUBSCRIBE_STATES,
+} from "@supabase/realtime-js";
+
+import {
   authClient,
   isSupabaseConfigured,
   supabasePublishableKey,
   supabaseUrl,
 } from "@/lib/supabase";
+import { realtimeEndpoint } from "@/lib/supabase-chat-shapes";
 import {
   buildMarketplaceReadHeaders,
   buildMarketplaceWriteHeaders,
@@ -113,4 +122,60 @@ export async function cloudMarkSold(
     body: JSON.stringify({ sold_at: soldAt }),
   });
   return res.ok;
+}
+
+let marketplaceRealtimeClient: RealtimeClient | null = null;
+
+function getMarketplaceRealtimeClient(): RealtimeClient | null {
+  if (!isSupabaseConfigured) return null;
+  if (marketplaceRealtimeClient) return marketplaceRealtimeClient;
+  marketplaceRealtimeClient = new RealtimeClient(realtimeEndpoint(supabaseUrl!), {
+    params: { apikey: supabasePublishableKey! },
+    accessToken: () => getAccessToken(),
+  });
+  return marketplaceRealtimeClient;
+}
+
+export type ListingsSubscription = { unsubscribe: () => void };
+
+export function subscribeToListings(
+  onListing: (listing: MarketplaceListing) => void,
+): ListingsSubscription {
+  const client = getMarketplaceRealtimeClient();
+  if (!client) return { unsubscribe: () => undefined };
+
+  let channel: RealtimeChannel | null = client.channel("marketplace-listings-inserts");
+  channel
+    .on(
+      REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
+      {
+        event: REALTIME_POSTGRES_CHANGES_LISTEN_EVENT.INSERT,
+        schema: "public",
+        table: "marketplace_listings",
+        filter: "sold_at=is.null",
+      },
+      (payload) => {
+        const row = payload.new as MarketplaceRow | undefined;
+        if (!row || !row.id) return;
+        try {
+          onListing(rowToListing(row));
+        } catch {
+          // Ignore handler errors so a buggy listener can't kill the socket.
+        }
+      },
+    )
+    .subscribe((_status) => undefined);
+
+  return {
+    unsubscribe: () => {
+      if (!channel) return;
+      const ch = channel;
+      channel = null;
+      try {
+        void client.removeChannel(ch);
+      } catch {
+        // Best-effort cleanup; the socket may already be closed.
+      }
+    },
+  };
 }

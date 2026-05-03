@@ -61,4 +61,11 @@ jobs:
               exit 1
             fi
           done
+          # Verify all six i18n language translation maps are present (catches tree-shaking regressions)
+          for LANG in '"ru"' '"en"' '"be"' '"pl"' '"de"' '"es"'; do
+            if ! grep -q "$LANG" "$BUNDLE"; then
+              echo "ERROR: i18n language code $LANG not found in bundle" >&2
+              exit 1
+            fi
+          done
           echo "Bundle smoke check passed."

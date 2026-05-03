@@ -109,7 +109,10 @@ export const COLLECTIBLE_STOPWORDS = new Set([
  * Also strips common collectible stopwords so "Charizard Holo 1st Edition"
  * and "Charizard" converge to the same normalised form.
  */
-export function normalizeTitle(title: string): string {
+export function normalizeTitle(title: string, stopwordsOverride?: string[]): string {
+  const stopwords = stopwordsOverride
+    ? new Set(stopwordsOverride.map((w) => w.toLowerCase()))
+    : COLLECTIBLE_STOPWORDS;
   const base = title
     .toLowerCase()
     .normalize("NFKD")
@@ -119,7 +122,7 @@ export function normalizeTitle(title: string): string {
     .trim();
   return base
     .split(" ")
-    .filter((w) => !COLLECTIBLE_STOPWORDS.has(w))
+    .filter((w) => !stopwords.has(w))
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();

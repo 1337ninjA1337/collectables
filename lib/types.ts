@@ -86,4 +86,5 @@ export type Collection = {
   role: CollectionRole;
   sortOrder?: number;
   visibility: CollectionVisibility;
+  stopwords?: string[];
 };

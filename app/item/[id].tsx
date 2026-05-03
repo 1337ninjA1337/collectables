@@ -3,7 +3,7 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { CurrencyInput, parseCurrencyValue } from "@/components/currency-input";
+import { CurrencyInput, getDefaultCurrencyForLanguage, parseCurrencyValue } from "@/components/currency-input";
 import { SkeletonItemDetail } from "@/components/skeleton";
 
 import { PhotoPreview } from "@/components/photo-preview";
@@ -31,7 +31,7 @@ export default function ItemDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const { getItemById, getCollectionById, deleteItem, updateItem, refresh } = useCollections();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
   const {
     findListingByItemId,
@@ -74,7 +74,7 @@ export default function ItemDetailsScreen() {
   const [listingSheetOpen, setListingSheetOpen] = useState(false);
   const [listingMode, setListingMode] = useState<MarketplaceMode>("trade");
   const [listingPrice, setListingPrice] = useState("");
-  const [listingCurrency, setListingCurrency] = useState("USD");
+  const [listingCurrency, setListingCurrency] = useState(() => getDefaultCurrencyForLanguage(language));
   const [listingNotes, setListingNotes] = useState("");
 
   useEffect(() => {

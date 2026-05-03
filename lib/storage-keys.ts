@@ -28,6 +28,17 @@ export function premiumKey(userId: string): string {
   return `collectables-premium-v1-${userId}`;
 }
 
+export async function migrateStorageKey(oldKey: string, newKey: string): Promise<void> {
+  try {
+    const value = await AsyncStorage.getItem(oldKey);
+    if (value === null) return;
+    await AsyncStorage.setItem(newKey, value);
+    await AsyncStorage.removeItem(oldKey);
+  } catch {
+    // Best-effort: migration failure must not crash context boot.
+  }
+}
+
 export async function clearAllUserData(userId: string): Promise<void> {
   const keys = [
     collectionsKey(userId),
