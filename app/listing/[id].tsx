@@ -4,6 +4,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
+import { SkeletonItemDetail } from "@/components/skeleton";
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
 import { useCollections } from "@/lib/collections-context";
@@ -41,15 +42,23 @@ export default function ListingDetailScreen() {
   }, [listing, ensureProfilesLoaded]);
 
   if (!listing) {
+    if (fetchingRemote) {
+      return (
+        <Screen>
+          <Stack.Screen options={{ title: t("marketplaceTitle") }} />
+          <SkeletonItemDetail />
+        </Screen>
+      );
+    }
     return (
       <Screen>
         <Stack.Screen options={{ title: t("marketplaceTitle") }} />
         <EmptyState
           icon="🪧"
-          title={fetchingRemote ? "..." : t("marketplaceListingNotFound")}
-          hint={fetchingRemote ? "" : t("marketplaceListingNotFoundHint")}
-          actionLabel={fetchingRemote ? undefined : t("marketplaceTitle")}
-          onAction={fetchingRemote ? undefined : () => router.replace("/marketplace")}
+          title={t("marketplaceListingNotFound")}
+          hint={t("marketplaceListingNotFoundHint")}
+          actionLabel={t("marketplaceTitle")}
+          onAction={() => router.replace("/marketplace")}
         />
       </Screen>
     );
