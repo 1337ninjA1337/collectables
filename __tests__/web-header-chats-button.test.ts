@@ -34,7 +34,7 @@ describe("web header chats button", () => {
   });
 
   it("calls useChat() inside AppShell and reads unreadTotal", () => {
-    assert.match(LAYOUT_SRC, /const\s*\{\s*unreadTotal\s*\}\s*=\s*useChat\(\)/);
+    assert.match(LAYOUT_SRC, /const\s*\{[^}]*\bunreadTotal\b[^}]*\}\s*=\s*useChat\(\)/);
   });
 
   it("renders a chatbubbles icon button that pushes /chats", () => {
