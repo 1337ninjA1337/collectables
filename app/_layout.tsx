@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { Stack, router, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
@@ -15,16 +15,30 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ChatProvider, useChat } from "@/lib/chat-context";
 import { formatBadgeCount } from "@/lib/chat-helpers";
 import { CollectionsProvider } from "@/lib/collections-context";
+import { isDevEnvironment, loadDevMenuModule, registerDevMenu } from "@/lib/dev-menu";
 import { I18nProvider, useI18n } from "@/lib/i18n-context";
 import { MarketplaceProvider } from "@/lib/marketplace-context";
 import { PremiumProvider } from "@/lib/premium-context";
 import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-context";
 import { SocialProvider } from "@/lib/social-context";
+import { clearRuntimeSupabaseConfig } from "@/lib/supabase";
 import { ToastProvider } from "@/lib/toast-context";
 import { Screen, useResponsive } from "@/components/screen";
 import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export default function RootLayout() {
+  useEffect(() => {
+    if (!isDevEnvironment()) return;
+    registerDevMenu({
+      isDev: true,
+      globalScope: globalThis as unknown as Record<string, unknown>,
+      devMenu: loadDevMenuModule(),
+      actions: {
+        clearRuntimeSupabaseConfig,
+      },
+    });
+  }, []);
+
   const [fontsLoaded] = useFonts({
     [FONT_DISPLAY_BOLD]: require("../assets/fonts/Syne/static/Syne-Bold.ttf"),
     [FONT_DISPLAY]: require("../assets/fonts/Syne/static/Syne-ExtraBold.ttf"),
