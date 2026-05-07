@@ -126,7 +126,17 @@ function hasRequest(friendRequests: FriendRequest[], fromUserId: string, toUserI
   return friendRequests.some((request) => request.fromUserId === fromUserId && request.toUserId === toUserId);
 }
 
-const VIEWER_PROFILE_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_VIEWER_PROFILE_TTL_MS = 10 * 60 * 1000;
+
+function resolveViewerProfileTtlMs(): number {
+  const raw = process.env.EXPO_PUBLIC_PROFILE_CACHE_TTL_MS;
+  if (!raw) return DEFAULT_VIEWER_PROFILE_TTL_MS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_VIEWER_PROFILE_TTL_MS;
+  return parsed;
+}
+
+const VIEWER_PROFILE_TTL_MS = resolveViewerProfileTtlMs();
 
 export function SocialProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
