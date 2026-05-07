@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildMarketplaceReadHeaders,
   buildMarketplaceWriteHeaders,
+  buildMarkSoldPayload,
   deleteListingUrl,
   fetchListingsUrl,
   fetchListingByIdUrl,
@@ -27,6 +28,7 @@ const row = {
   notes: "mint condition",
   created_at: "2026-05-01T10:00:00.000Z",
   sold_at: null,
+  buyer_user_id: null,
 };
 
 const listing: MarketplaceListing = {
@@ -130,5 +132,26 @@ describe("supabase-marketplace-shapes", () => {
   it("buildMarketplaceReadHeaders falls back to apikey when token is null", () => {
     const h = buildMarketplaceReadHeaders("key123", null);
     assert.ok(h.Authorization.includes("key123"));
+  });
+
+  it("rowToListing maps buyer_user_id to buyerUserId", () => {
+    const result = rowToListing({ ...row, buyer_user_id: "buyer-42" });
+    assert.equal(result.buyerUserId, "buyer-42");
+  });
+
+  it("rowToListing defaults buyerUserId to null when buyer_user_id is missing", () => {
+    const result = rowToListing(row);
+    assert.equal(result.buyerUserId, null);
+  });
+
+  it("buildMarkSoldPayload includes both sold_at and buyer_user_id", () => {
+    const payload = buildMarkSoldPayload("2026-05-07T00:00:00.000Z", "buyer-42");
+    assert.equal(payload.sold_at, "2026-05-07T00:00:00.000Z");
+    assert.equal(payload.buyer_user_id, "buyer-42");
+  });
+
+  it("buildMarkSoldPayload allows null buyer for legacy 'just mark sold'", () => {
+    const payload = buildMarkSoldPayload("2026-05-07T00:00:00.000Z", null);
+    assert.equal(payload.buyer_user_id, null);
   });
 });

@@ -54,6 +54,13 @@ function generateListingId(): string {
   return `listing-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function normalizeListing(raw: MarketplaceListing): MarketplaceListing {
+  return {
+    ...raw,
+    buyerUserId: raw.buyerUserId ?? null,
+  };
+}
+
 export function MarketplaceProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
@@ -67,7 +74,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         const cloud = await cloudFetchListings();
         if (!cancelled) {
           if (cloud.length > 0) {
-            setListings(cloud);
+            setListings(cloud.map(normalizeListing));
             await AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(cloud)).catch(() => undefined);
             return;
           }
@@ -76,7 +83,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         if (cancelled) return;
         if (raw) {
           const parsed = JSON.parse(raw) as MarketplaceListing[];
-          if (Array.isArray(parsed)) setListings(parsed);
+          if (Array.isArray(parsed)) setListings(parsed.map(normalizeListing));
         }
       } catch {
         // Corrupt cache: start fresh rather than crashing the provider.

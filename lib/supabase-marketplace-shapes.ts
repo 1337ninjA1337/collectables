@@ -35,6 +35,11 @@ export type MarketplaceMarkSoldPayload = {
   buyer_user_id: string | null;
 };
 
+/**
+ * Backwards-compatible alias kept for the original PR's import path.
+ */
+export type MarkSoldPayload = MarketplaceMarkSoldPayload;
+
 export function rowToListing(row: MarketplaceRow): MarketplaceListing {
   return {
     id: row.id,
@@ -67,6 +72,13 @@ export function listingToInsertPayload(listing: MarketplaceListing): Marketplace
     currency: listing.currency,
     notes: listing.notes,
     created_at: listing.createdAt,
+  };
+}
+
+export function buildMarkSoldPayload(soldAt: string, buyerUserId: string | null): MarkSoldPayload {
+  return {
+    sold_at: soldAt,
+    buyer_user_id: buyerUserId,
   };
 }
 
