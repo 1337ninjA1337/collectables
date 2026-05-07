@@ -34,6 +34,24 @@ jobs:
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      - name: Report optional Sentry secret status
+        # Prints [set] or [missing] for each Sentry secret so a missing secret
+        # is debuggable from the deploy log without leaking the value itself.
+        run: |
+          for VAR in EXPO_PUBLIC_SENTRY_DSN EXPO_PUBLIC_SENTRY_ENV SENTRY_AUTH_TOKEN SENTRY_ORG SENTRY_PROJECT; do
+            VAL=$(printenv "$VAR" || true)
+            if [ -n "$VAL" ]; then
+              echo "$VAR: [set] (length=${#VAL})"
+            else
+              echo "$VAR: [missing]"
+            fi
+          done
+        env:
+          EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
+          EXPO_PUBLIC_SENTRY_ENV: ${{ secrets.EXPO_PUBLIC_SENTRY_ENV }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
       - name: Build web
         run: npx expo export --platform web --source-maps
         env:
