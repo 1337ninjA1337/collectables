@@ -17,7 +17,7 @@ import { useSocial } from "@/lib/social-context";
 export default function ListingDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const listingId = params.id ?? "";
-  const { t } = useI18n();
+  const { t, formatRelativeDate } = useI18n();
   const { user } = useAuth();
   const { getListingById, fetchListingById, listings, markListingSold } = useMarketplace();
   const { getItemById, transferItemToBuyer } = useCollections();
@@ -180,6 +180,9 @@ export default function ListingDetailScreen() {
           </View>
           {priceLabel ? <Text style={styles.priceText}>{priceLabel}</Text> : null}
         </View>
+        <Text style={styles.listedAt}>
+          {t("marketplaceListedAt", { when: formatRelativeDate(listing.createdAt) })}
+        </Text>
       </View>
 
       <Link href={`/profile/${listing.ownerUserId}` as never} asChild>
@@ -237,7 +240,7 @@ export default function ListingDetailScreen() {
             {priceHistory.map((entry) => (
               <View key={entry.listingId} style={styles.priceHistoryRow}>
                 <Text style={styles.priceHistoryDate}>
-                  {entry.recordedAt.slice(0, 10)}
+                  {formatRelativeDate(entry.recordedAt)}
                 </Text>
                 <Text style={styles.priceHistoryPrice}>
                   {entry.price} {entry.currency}
@@ -350,6 +353,12 @@ const styles = StyleSheet.create({
     color: "#fff7ed",
     fontSize: 18,
     fontWeight: "800",
+  },
+  listedAt: {
+    color: "#ead8c3",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 2,
   },
   ownerChip: {
     flexDirection: "row",

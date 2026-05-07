@@ -9,28 +9,10 @@ import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { useVisibilityRefresh } from "@/lib/use-visibility-refresh";
 
-function formatWhen(isoDate: string, locale: string | undefined): string {
-  const date = new Date(isoDate);
-  if (Number.isNaN(date.getTime())) return "";
-  const now = new Date();
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  try {
-    if (sameDay) {
-      return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
-    }
-    return date.toLocaleDateString(locale, { month: "short", day: "numeric" });
-  } catch {
-    return date.toISOString().slice(0, 10);
-  }
-}
-
 const CHATS_REFRESH_INTERVAL_MS = 15000;
 
 export default function ChatsScreen() {
-  const { t, language } = useI18n();
+  const { t, formatRelativeDate } = useI18n();
   const { previews, refreshFromCloud } = useChat();
   const { getProfileById, ensureProfilesLoaded, friends } = useSocial();
 
@@ -86,7 +68,7 @@ export default function ChatsScreen() {
                     <Text style={styles.name} numberOfLines={1}>
                       {displayName}
                     </Text>
-                    <Text style={styles.when}>{formatWhen(preview.lastMessageAt, language)}</Text>
+                    <Text style={styles.when}>{formatRelativeDate(preview.lastMessageAt)}</Text>
                   </View>
                   <View style={styles.rowFooter}>
                     <Text
