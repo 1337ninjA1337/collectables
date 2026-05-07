@@ -16,6 +16,7 @@ import { realtimeEndpoint } from "@/lib/supabase-chat-shapes";
 import {
   buildMarketplaceReadHeaders,
   buildMarketplaceWriteHeaders,
+  buildMarkSoldPayload,
   deleteListingUrl,
   fetchListingByIdUrl,
   fetchListingsUrl,
@@ -109,6 +110,7 @@ export async function cloudFetchListingById(
 export async function cloudMarkSold(
   id: string,
   soldAt: string,
+  buyerUserId: string | null,
   {
     fetcher = fetch as FetchFn,
     tokenProvider = getAccessToken,
@@ -119,7 +121,7 @@ export async function cloudMarkSold(
   const res = await fetcher(markSoldUrl(supabaseUrl!, id), {
     method: "PATCH",
     headers: buildMarketplaceWriteHeaders(supabasePublishableKey!, token),
-    body: JSON.stringify({ sold_at: soldAt }),
+    body: JSON.stringify(buildMarkSoldPayload(soldAt, buyerUserId)),
   });
   return res.ok;
 }

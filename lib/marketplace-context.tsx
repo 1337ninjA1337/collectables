@@ -43,13 +43,20 @@ type MarketplaceContextValue = {
   fetchListingById: (id: string) => Promise<MarketplaceListing | null>;
   addListing: (input: DraftListingInput) => MarketplaceListing | null;
   removeListing: (id: string) => void;
-  markListingSold: (id: string) => void;
+  markListingSold: (id: string, buyerUserId?: string | null) => void;
 };
 
 const MarketplaceContext = createContext<MarketplaceContextValue | null>(null);
 
 function generateListingId(): string {
   return `listing-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeListing(raw: MarketplaceListing): MarketplaceListing {
+  return {
+    ...raw,
+    buyerUserId: raw.buyerUserId ?? null,
+  };
 }
 
 export function MarketplaceProvider({ children }: React.PropsWithChildren) {
@@ -65,7 +72,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         const cloud = await cloudFetchListings();
         if (!cancelled) {
           if (cloud.length > 0) {
-            setListings(cloud);
+            setListings(cloud.map(normalizeListing));
             await AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(cloud)).catch(() => undefined);
             return;
           }
@@ -74,7 +81,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         if (cancelled) return;
         if (raw) {
           const parsed = JSON.parse(raw) as MarketplaceListing[];
-          if (Array.isArray(parsed)) setListings(parsed);
+          if (Array.isArray(parsed)) setListings(parsed.map(normalizeListing));
         }
       } catch {
         // Corrupt cache: start fresh rather than crashing the provider.
@@ -140,6 +147,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         notes: (input.notes ?? "").trim(),
         createdAt: new Date().toISOString(),
         soldAt: null,
+        buyerUserId: null,
       };
       setListings((prev) => upsertListing(prev, next));
       // Best-effort cloud sync (fire-and-forget).
@@ -154,14 +162,14 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
     void cloudRemoveListing(id);
   }, []);
 
-  const markListingSold = useCallback((id: string) => {
+  const markListingSold = useCallback((id: string, buyerUserId: string | null = null) => {
     const soldAt = new Date().toISOString();
     setListings((prev) => {
       const target = prev.find((l) => l.id === id);
       if (!target || target.soldAt) return prev;
-      return upsertListing(prev, { ...target, soldAt });
+      return upsertListing(prev, { ...target, soldAt, buyerUserId });
     });
-    void cloudMarkSold(id, soldAt);
+    void cloudMarkSold(id, soldAt, buyerUserId);
   }, []);
 
   const findByItemId = useCallback(
