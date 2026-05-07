@@ -8,6 +8,7 @@ import {
   countActiveListingsForUser,
   findListingByItemId,
   listingsForUser,
+  purchasesForUser,
   removeListingById,
   upsertListing,
 } from "@/lib/marketplace-helpers";
@@ -36,6 +37,7 @@ type MarketplaceContextValue = {
   listings: MarketplaceListing[];
   activeListings: MarketplaceListing[];
   myListings: MarketplaceListing[];
+  myPurchases: MarketplaceListing[];
   myActiveListingCount: number;
   canCreateListing: (isPremium?: boolean) => boolean;
   findListingByItemId: (itemId: string) => MarketplaceListing | undefined;
@@ -114,6 +116,11 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
     [listings, user],
   );
 
+  const myPurchases = useMemo(
+    () => (user ? purchasesForUser(listings, user.id) : []),
+    [listings, user],
+  );
+
   const myActiveListingCount = useMemo(
     () => (user ? countActiveListingsForUser(listings, user.id) : 0),
     [listings, user],
@@ -162,15 +169,18 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
     void cloudRemoveListing(id);
   }, []);
 
-  const markListingSold = useCallback((id: string, buyerUserId: string | null = null) => {
-    const soldAt = new Date().toISOString();
-    setListings((prev) => {
-      const target = prev.find((l) => l.id === id);
-      if (!target || target.soldAt) return prev;
-      return upsertListing(prev, { ...target, soldAt, buyerUserId });
-    });
-    void cloudMarkSold(id, soldAt, buyerUserId);
-  }, []);
+  const markListingSold = useCallback(
+    (id: string, buyerUserId: string | null = null) => {
+      const soldAt = new Date().toISOString();
+      setListings((prev) => {
+        const target = prev.find((l) => l.id === id);
+        if (!target || target.soldAt) return prev;
+        return upsertListing(prev, { ...target, soldAt, buyerUserId });
+      });
+      void cloudMarkSold(id, soldAt, buyerUserId);
+    },
+    [],
+  );
 
   const findByItemId = useCallback(
     (itemId: string) => findListingByItemId(listings, itemId),
@@ -199,6 +209,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       listings,
       activeListings: sortedActive,
       myListings,
+      myPurchases,
       myActiveListingCount,
       canCreateListing,
       findListingByItemId: findByItemId,
@@ -213,6 +224,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       listings,
       sortedActive,
       myListings,
+      myPurchases,
       myActiveListingCount,
       canCreateListing,
       findByItemId,

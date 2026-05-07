@@ -1,6 +1,6 @@
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
@@ -19,11 +19,12 @@ export default function ListingDetailScreen() {
   const listingId = params.id ?? "";
   const { t } = useI18n();
   const { user } = useAuth();
-  const { getListingById, fetchListingById, listings } = useMarketplace();
-  const { getItemById } = useCollections();
+  const { getListingById, fetchListingById, listings, markListingSold } = useMarketplace();
+  const { getItemById, transferItemToBuyer } = useCollections();
   const { getProfileById, ensureProfilesLoaded } = useSocial();
   const { ensureChatWith, canMessage } = useChat();
   const [fetchingRemote, setFetchingRemote] = useState(false);
+  const [claiming, setClaiming] = useState(false);
 
   const listing = getListingById(listingId);
 
@@ -38,7 +39,9 @@ export default function ListingDetailScreen() {
 
   useEffect(() => {
     if (!listing) return;
-    ensureProfilesLoaded([listing.ownerUserId]);
+    const ids = [listing.ownerUserId];
+    if (listing.buyerUserId) ids.push(listing.buyerUserId);
+    ensureProfilesLoaded(ids);
   }, [listing, ensureProfilesLoaded]);
 
   if (!listing) {
@@ -67,6 +70,11 @@ export default function ListingDetailScreen() {
   const ownerName = owner?.displayName ?? t("unknownUser");
   const isSelf = user?.id === listing.ownerUserId;
   const friendsOnly = !isSelf && !canMessage(listing.ownerUserId);
+  const isSold = listing.soldAt !== null;
+  const buyer = listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined;
+  const buyerName = buyer?.username
+    ? `@${buyer.username}`
+    : buyer?.displayName ?? t("unknownUser");
 
   const referenceTitle = item?.title ?? "";
   const priceHistory = useMemo(
@@ -96,6 +104,57 @@ export default function ListingDetailScreen() {
     const chatId = ensureChatWith(listing.ownerUserId);
     if (!chatId) return;
     router.push(`/chat/${listing.ownerUserId}` as never);
+  }
+
+  const performClaim = useCallback(async () => {
+    if (!listing || !user) return;
+    setClaiming(true);
+    try {
+      const sourceItem = getItemById(listing.itemId);
+      const fallbackTitle = sourceItem?.title ?? t("marketplaceUnknownItem");
+      await transferItemToBuyer(
+        {
+          title: fallbackTitle,
+          photos: sourceItem?.photos ?? [],
+          description: sourceItem?.description ?? listing.notes,
+          variants: sourceItem?.variants,
+          cost:
+            listing.mode === "sell" && typeof listing.askingPrice === "number"
+              ? listing.askingPrice
+              : sourceItem?.cost ?? null,
+          acquiredFrom: t("marketplaceTitle"),
+          condition: sourceItem?.condition,
+          tags: sourceItem?.tags,
+        },
+        {
+          collectionName: t("marketplaceAcquiredCollection"),
+          collectionDescription: t("marketplaceAcquiredCollectionDescription"),
+        },
+      );
+      markListingSold(listing.id, user.id);
+    } finally {
+      setClaiming(false);
+    }
+  }, [listing, user, markListingSold, getItemById, transferItemToBuyer, t]);
+
+  function handleClaimPress() {
+    if (!listing || !user || claiming) return;
+    const title = t("marketplaceConfirmBuyTitle");
+    const text =
+      listing.mode === "trade"
+        ? t("marketplaceConfirmTradeText")
+        : t("marketplaceConfirmBuyText");
+    if (Platform.OS === "web") {
+      const ok = typeof window !== "undefined" && window.confirm
+        ? window.confirm(`${title}\n\n${text}`)
+        : true;
+      if (ok) void performClaim();
+      return;
+    }
+    Alert.alert(title, text, [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("marketplaceClaim"), style: "default", onPress: () => void performClaim() },
+    ]);
   }
 
   return (
@@ -201,6 +260,17 @@ export default function ListingDetailScreen() {
         </View>
       ) : null}
 
+      {isSold ? (
+        <View style={styles.soldBanner}>
+          <Text style={styles.soldBannerLabel}>{t("marketplaceSoldBanner")}</Text>
+          {listing.buyerUserId ? (
+            <Text style={styles.soldBannerBuyer}>
+              {t("marketplaceSoldTo", { name: buyerName })}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {isSelf ? (
         <View style={styles.selfHint}>
           <Text style={styles.selfHintText}>{t("marketplaceSelfHint")}</Text>
@@ -214,9 +284,28 @@ export default function ListingDetailScreen() {
           onAction={() => router.push(`/profile/${listing.ownerUserId}` as never)}
         />
       ) : (
-        <Pressable style={styles.messageButton} onPress={handleMessageOwner}>
-          <Text style={styles.messageButtonText}>{t("marketplaceMessageOwner")}</Text>
-        </Pressable>
+        <View style={styles.actionsColumn}>
+          {!isSold ? (
+            <Pressable
+              style={{
+                ...styles.claimButton,
+                backgroundColor: listing.mode === "sell" ? "#d89c5b" : "#3a7d4f",
+                opacity: claiming ? 0.6 : 1,
+              }}
+              onPress={handleClaimPress}
+              disabled={claiming}
+            >
+              <Text style={styles.claimButtonText}>
+                {listing.mode === "sell"
+                  ? t("marketplaceBuyNow")
+                  : t("marketplaceTradeRequest")}
+              </Text>
+            </Pressable>
+          ) : null}
+          <Pressable style={styles.messageButton} onPress={handleMessageOwner}>
+            <Text style={styles.messageButtonText}>{t("marketplaceMessageOwner")}</Text>
+          </Pressable>
+        </View>
       )}
     </Screen>
   );
@@ -338,6 +427,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
+  actionsColumn: {
+    gap: 10,
+  },
+  claimButton: {
+    borderRadius: 22,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  claimButtonText: {
+    color: "#fff5ea",
+    fontSize: 15,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   messageButton: {
     borderRadius: 22,
     backgroundColor: "#261b14",
@@ -346,6 +450,25 @@ const styles = StyleSheet.create({
   },
   messageButtonText: {
     color: "#fff5ea",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  soldBanner: {
+    borderRadius: 22,
+    padding: 14,
+    backgroundColor: "#3a2716",
+    gap: 4,
+    alignItems: "center",
+  },
+  soldBannerLabel: {
+    color: "#f5c99a",
+    fontSize: 11,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 1.2,
+  },
+  soldBannerBuyer: {
+    color: "#fff7ef",
     fontSize: 15,
     fontWeight: "800",
   },

@@ -30,10 +30,15 @@ export type MarketplaceInsertPayload = {
   created_at: string;
 };
 
-export type MarkSoldPayload = {
+export type MarketplaceMarkSoldPayload = {
   sold_at: string;
   buyer_user_id: string | null;
 };
+
+/**
+ * Backwards-compatible alias kept for the original PR's import path.
+ */
+export type MarkSoldPayload = MarketplaceMarkSoldPayload;
 
 export function rowToListing(row: MarketplaceRow): MarketplaceListing {
   return {
@@ -48,6 +53,13 @@ export function rowToListing(row: MarketplaceRow): MarketplaceListing {
     soldAt: row.sold_at,
     buyerUserId: row.buyer_user_id ?? null,
   };
+}
+
+export function markSoldPayload(
+  soldAt: string,
+  buyerUserId: string | null,
+): MarketplaceMarkSoldPayload {
+  return { sold_at: soldAt, buyer_user_id: buyerUserId };
 }
 
 export function listingToInsertPayload(listing: MarketplaceListing): MarketplaceInsertPayload {

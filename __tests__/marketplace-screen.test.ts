@@ -33,6 +33,14 @@ describe("marketplace screen", () => {
     // Sell mode should render askingPrice + currency
     assert.match(src, /askingPrice/);
   });
+
+  it("renders a 'My purchases' section sourced from useMarketplace().myPurchases", () => {
+    const src = read("app/marketplace.tsx");
+    assert.match(src, /myPurchases/);
+    assert.match(src, /marketplaceMyPurchasesTitle/);
+    // Section is hidden when no purchases — must guard on length.
+    assert.match(src, /purchases\.length\s*>\s*0/);
+  });
 });
 
 describe("bottom-nav marketplace tab", () => {
@@ -78,6 +86,8 @@ describe("marketplace translations", () => {
       "marketplaceModeTrade",
       "marketplaceModeSell",
       "marketplaceUnknownItem",
+      "marketplaceMyPurchasesTitle",
+      "marketplaceMyPurchasesEmpty",
     ];
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
       // Match `const <lang>: TranslationMap = {` (or the en literal) until the

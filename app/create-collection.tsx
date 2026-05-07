@@ -8,6 +8,7 @@ import { collectionTemplates } from "@/data/collection-templates";
 import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
+import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectionVisibility } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -17,6 +18,7 @@ const FALLBACK_COVER = "";
 export default function CreateCollectionScreen() {
   const { addCollection } = useCollections();
   const { t } = useI18n();
+  const { isPremium } = usePremium();
   const toast = useToast();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -24,7 +26,9 @@ export default function CreateCollectionScreen() {
   const [saving, setSaving] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [visibility, setVisibility] = useState<CollectionVisibility>("private");
+  const [visibility, setVisibility] = useState<CollectionVisibility>(
+    isPremium ? "private" : "public",
+  );
 
   function applyTemplate(templateId: string) {
     const tpl = collectionTemplates.find((t) => t.id === templateId);
@@ -100,11 +104,12 @@ export default function CreateCollectionScreen() {
     try {
       const uploadedCover = coverPhoto ? await uploadImage(coverPhoto) : "";
 
+      const finalVisibility: CollectionVisibility = isPremium ? visibility : "public";
       const id = await addCollection({
         name,
         description: description.trim() || t("defaultCollectionDescription"),
         coverPhoto: uploadedCover,
-        visibility,
+        visibility: finalVisibility,
       });
 
       router.replace(`/collection/${id}`);
@@ -186,21 +191,37 @@ export default function CreateCollectionScreen() {
         <View style={styles.visibilityRow}>
           {(["private", "public"] as const).map((v) => {
             const selected = visibility === v;
+            const locked = v === "private" && !isPremium;
             return (
               <Pressable
                 key={v}
-                style={{...styles.visibilityChip, ...(selected ? styles.visibilityChipSelected : {})}}
-                onPress={() => setVisibility(v)}
+                style={{
+                  ...styles.visibilityChip,
+                  ...(selected ? styles.visibilityChipSelected : {}),
+                  ...(locked ? styles.visibilityChipLocked : {}),
+                }}
+                onPress={() => {
+                  if (locked) {
+                    toast.error(t("visibilityPrivatePremiumOnly"), t("premiumTitle"));
+                    return;
+                  }
+                  setVisibility(v);
+                }}
               >
                 <Text style={{...styles.visibilityChipText, ...(selected ? styles.visibilityChipTextSelected : {})}}>
                   {t(v === "public" ? "visibilityPublic" : "visibilityPrivate")}
+                  {locked ? " 🔒" : ""}
                 </Text>
               </Pressable>
             );
           })}
         </View>
         <Text style={styles.visibilityHint}>
-          {visibility === "public" ? t("visibilityPublicHint") : t("visibilityPrivateHint")}
+          {!isPremium && visibility === "private"
+            ? t("visibilityPrivatePremiumOnly")
+            : visibility === "public"
+              ? t("visibilityPublicHint")
+              : t("visibilityPrivateHint")}
         </Text>
       </View>
 
@@ -339,6 +360,9 @@ const styles = StyleSheet.create({
   visibilityChipSelected: {
     backgroundColor: "#261b14",
     borderColor: "#261b14",
+  },
+  visibilityChipLocked: {
+    opacity: 0.55,
   },
   visibilityChipText: {
     color: "#6b5647",

@@ -14,17 +14,15 @@ Run `supabase/migrations/20260502_marketplace_listings.sql` against your Supabas
 
 Either apply it via the Supabase SQL editor, or add the `SUPABASE_DB_URL` secret to GitHub and the deploy workflow will run `supabase db push` automatically.
 
-## 20260507_marketplace_buyer.sql
+## 20260507_marketplace_buyer_user_id.sql
 
-Run `supabase/migrations/20260507_marketplace_buyer.sql` against your Supabase project:
+Run `supabase/migrations/20260507_marketplace_buyer_user_id.sql` against your Supabase project to enable buyer-driven marketplace transfers (full trading cycle):
 
 ```sql
--- Adds the nullable buyer_user_id column on marketplace_listings so a sold
--- listing remembers who acquired the item (foundation for the full
--- trade cycle: transfer history, profile transfers section, etc.).
-ALTER TABLE public.marketplace_listings
-  ADD COLUMN IF NOT EXISTS buyer_user_id uuid NULL
-    REFERENCES auth.users (id) ON DELETE SET NULL;
+-- Adds public.marketplace_listings.buyer_user_id column (nullable, FK -> auth.users)
+-- and an index on it.
+-- Adds an UPDATE RLS policy so an authenticated non-owner can mark an active
+-- listing as sold by setting (buyer_user_id = auth.uid(), sold_at = now()).
 ```
 
-Apply it via the Supabase SQL editor, or rely on the `supabase db push` CI step.
+Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.

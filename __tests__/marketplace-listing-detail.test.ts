@@ -51,6 +51,67 @@ describe("listing detail screen", () => {
     const src = read("app/listing/[id].tsx");
     assert.match(src, /marketplaceListingNotFound/);
   });
+
+  it("renders a Buy now / Trade request button for non-self viewers on active listings", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /marketplaceBuyNow/);
+    assert.match(src, /marketplaceTradeRequest/);
+    // The button mounts only when the listing is not yet sold.
+    assert.match(src, /!isSold\s*\?/);
+  });
+
+  it("threads the viewer's user.id into markListingSold when claiming", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /markListingSold\(listing\.id,\s*user\.id\)/);
+  });
+
+  it("confirms purchase via Alert.alert on native and window.confirm on web", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /Alert\.alert\(/);
+    assert.match(src, /window\.confirm/);
+    assert.match(src, /marketplaceConfirmBuyTitle/);
+  });
+
+  it("renders a 'Sold' banner with buyer name on sold listings", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /isSold\s*=\s*listing\.soldAt\s*!==\s*null/);
+    assert.match(src, /marketplaceSoldBanner/);
+    assert.match(src, /marketplaceSoldTo/);
+  });
+
+  it("ensures buyer profile is loaded so the banner can display the buyer's name", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /listing\.buyerUserId/);
+    assert.match(src, /ensureProfilesLoaded/);
+  });
+
+  it("calls transferItemToBuyer with a snapshot of the source item before marking sold", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /transferItemToBuyer/);
+    assert.match(src, /getItemById\(listing\.itemId\)/);
+    // The transfer must run before markListingSold so a network/claim race
+    // can't leave a sold listing without a corresponding buyer-side item.
+    const transferIdx = src.indexOf("transferItemToBuyer(");
+    const markSoldIdx = src.indexOf("markListingSold(listing.id");
+    assert.ok(transferIdx > 0, "transferItemToBuyer not invoked");
+    assert.ok(markSoldIdx > 0, "markListingSold not invoked");
+    assert.ok(transferIdx < markSoldIdx, "transferItemToBuyer must run before markListingSold");
+  });
+});
+
+describe("collections context: transferItemToBuyer", () => {
+  it("exposes transferItemToBuyer on the context value", () => {
+    const src = read("lib/collections-context.tsx");
+    assert.match(src, /transferItemToBuyer:\s*\(/);
+    assert.match(src, /AcquiredItemSnapshot/);
+  });
+
+  it("creates an Acquired collection if missing and adds the item to it", () => {
+    const src = read("lib/collections-context.tsx");
+    assert.match(src, /ACQUIRED_COLLECTION_ID_SUFFIX/);
+    assert.match(src, /upsertCollection\(newCollection\)/);
+    assert.match(src, /upsertItem\(nextItem\)/);
+  });
 });
 
 describe("listing detail translations", () => {
@@ -62,6 +123,13 @@ describe("listing detail translations", () => {
       "marketplaceListingNotFound",
       "marketplaceListingNotFoundHint",
       "marketplaceSelfHint",
+      "marketplaceBuyNow",
+      "marketplaceTradeRequest",
+      "marketplaceConfirmBuyTitle",
+      "marketplaceConfirmBuyText",
+      "marketplaceConfirmTradeText",
+      "marketplaceSoldBanner",
+      "marketplaceSoldTo",
     ];
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
       const block =
