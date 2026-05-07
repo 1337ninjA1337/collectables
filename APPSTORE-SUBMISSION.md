@@ -152,19 +152,51 @@ on the current code:
 | Photos | **Yes** | Yes | No | Cloudinary uploads (`lib/cloudinary.ts`) |
 | Username / display name | **Yes** | Yes | No | `UserProfile` |
 | Chat messages | **Yes** | Yes | No | Supabase realtime (`lib/supabase-chat.ts`) |
-| Crash data / diagnostics | **No** | — | — | None — no Sentry/Crashlytics wired. |
+| Crash data / diagnostics | **Yes** | Yes | No | Sentry (`@sentry/react-native`, `lib/sentry.ts`); the user's Supabase UUID is attached so we can correlate crashes per account. PII (email, IP, cookies, Authorization header) is stripped before send by `scrubPII` (`lib/sentry.ts`). |
 | Advertising ID (IDFA) | **No** | — | — | No ads SDK present. |
 
 Because none of the data is used for tracking, you do **not** need
 `NSUserTrackingUsageDescription` and the App Tracking Transparency prompt.
+Sentry crash reports are diagnostic-only — Apple's "Used for tracking?"
+column is `No` as long as the data is not joined with third-party data
+sets for advertising or shared with data brokers, which Sentry's terms
+prohibit by default.
+
+The user can opt out of crash reporting at any time in **Settings →
+Diagnostics & crash reports** (persisted under
+`collectables-diagnostics-v1`). When opted out, `initSentry()` short-circuits,
+the SDK never loads, and any in-flight session is torn down via
+`shutdownSentry()`.
 
 A public privacy policy URL is required. Suggested location: a
 `PRIVACY.md` page hosted on GitHub Pages alongside the app. Include:
 
 1. What data is collected (mirror the table above).
-2. Where it is stored (Supabase, Cloudinary).
+2. Where it is stored (Supabase, Cloudinary, Sentry).
 3. How a user can request deletion (`mailto:` or in-app account deletion).
-4. Cookies / analytics: none.
+4. Crash reporting: **Sentry** is used as a sub-processor for diagnostics
+   (see paragraph below).
+
+### Suggested public privacy policy paragraph (Sentry sub-processor)
+
+Drop this paragraph (or its translated equivalent) into the public
+`PRIVACY.md` page so the disclosure matches the App Store Connect
+declaration:
+
+> **Crash reporting and diagnostics.** Collectables uses Sentry
+> (Functional Software, Inc., d/b/a Sentry — https://sentry.io) as a
+> data sub-processor to collect uncaught exceptions, stack traces, and
+> the device/OS context required to debug them. The crash payload
+> includes your Supabase user identifier so we can correlate reports
+> per account, but personally identifying fields (email address, IP
+> address, cookies, and `Authorization` headers) are stripped client-side
+> before transmission. Diagnostic data is retained by Sentry for up to
+> 90 days under their default retention policy and is never sold,
+> shared with data brokers, or used for advertising. You can disable
+> crash reporting at any time from **Settings → Diagnostics & crash
+> reports**; when disabled, no events leave the device. For Sentry's
+> own privacy practices and DPA, see https://sentry.io/privacy/ and
+> https://sentry.io/legal/dpa/.
 
 ---
 
