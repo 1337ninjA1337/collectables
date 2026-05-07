@@ -1,6 +1,7 @@
 import "react-native-gesture-handler";
 
 import { ErrorBoundary } from "@sentry/react-native";
+import * as Sentry from "@sentry/react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { Stack, router, usePathname } from "expo-router";
