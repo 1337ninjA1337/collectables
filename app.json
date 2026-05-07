@@ -7,8 +7,14 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "platforms": ["ios", "android", "web"],
-    "assetBundlePatterns": ["**/*"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.collectables.app",
@@ -32,7 +38,15 @@
           "photosPermission": "Allow Collectables to access your photos so you can save collection item images."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "collectables",
+          "organization": "anton-m3"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

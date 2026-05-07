@@ -53,3 +53,5 @@ ios/
 
 # Supabase local CLI cache (contains project ref, org IDs, pooler URLs)
 supabase/.temp/
+
+.env.local

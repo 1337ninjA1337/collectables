@@ -31,7 +31,7 @@ import { ToastProvider } from "@/lib/toast-context";
 import { Screen, useResponsive } from "@/components/screen";
 import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   useEffect(() => {
     // SDK init now happens inside DiagnosticsProvider after hydrating the
     // stored opt-in/opt-out flag, so the user's choice is honoured before
@@ -93,7 +93,7 @@ export default function RootLayout() {
       </I18nProvider>
     </ErrorBoundary>
   );
-}
+});
 
 function AppShell() {
   const { ready, session } = useAuth();
