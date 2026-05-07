@@ -76,6 +76,24 @@ export function addBreadcrumb(
   }
 }
 
+export type SentryUser = { id: string; email?: string | null } | null;
+
+export function setSentryUser(user: SentryUser): void {
+  if (!sdk || !activeConfig?.enabled || !sdk.setUser) return;
+  try {
+    if (user === null) {
+      sdk.setUser(null);
+    } else {
+      sdk.setUser({
+        id: user.id,
+        ...(user.email ? { email: user.email } : {}),
+      });
+    }
+  } catch {
+    /* never let identity tracking crash the host app */
+  }
+}
+
 export function isSentryReady(): boolean {
   return sdk !== null && (activeConfig?.enabled ?? false);
 }

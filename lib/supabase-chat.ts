@@ -11,6 +11,7 @@ import {
   supabasePublishableKey,
   supabaseUrl,
 } from "@/lib/supabase";
+import { captureException } from "@/lib/sentry";
 import { getSharedRealtimeClient } from "@/lib/supabase-realtime";
 import {
   buildAuthHeaders,
@@ -147,8 +148,9 @@ export function subscribeToInbox(
         if (!row || !row.id) return;
         try {
           onMessage(chatRowToMessage(row));
-        } catch {
+        } catch (err) {
           // Ignore handler errors so a buggy listener can't kill the socket.
+          captureException(err, { context: "supabase-chat.subscribeToInbox.handler" });
         }
       },
     )

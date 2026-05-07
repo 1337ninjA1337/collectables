@@ -5,6 +5,7 @@ import { Platform } from "react-native";
 import { AuthChangeEvent, Session, User } from "@supabase/auth-js";
 
 import { deleteCloudinaryImages } from "@/lib/cloudinary";
+import { setSentryUser } from "@/lib/sentry";
 import { authClient, isSupabaseConfigured } from "@/lib/supabase";
 import { clearAllUserData } from "@/lib/storage-keys";
 import { deleteAccountViaEdgeFunction, fetchAllUserImageUrls } from "@/lib/supabase-profiles";
@@ -70,6 +71,14 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (session?.user) {
+      setSentryUser({ id: session.user.id, email: session.user.email });
+    } else {
+      setSentryUser(null);
+    }
+  }, [session?.user?.id, session?.user?.email]);
 
   const value = useMemo<AuthContextValue>(() => {
     return {

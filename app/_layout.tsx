@@ -12,6 +12,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BottomNav } from "@/components/bottom-nav";
 import { CrashFallback } from "@/components/crash-fallback";
 import { LoginScreen } from "@/components/login-screen";
+import { NavigationBreadcrumbs } from "@/components/navigation-breadcrumbs";
 import { SearchOverlay } from "@/components/search-overlay";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ChatProvider, useChat } from "@/lib/chat-context";
@@ -131,6 +132,7 @@ function AppShell() {
     <GestureHandlerRootView style={styles.shell}>
     <View style={styles.shell}>
       <StatusBar style="dark" />
+      <NavigationBreadcrumbs />
       <View style={styles.stackWrap}>
         <Stack
           screenOptions={{

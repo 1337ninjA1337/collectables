@@ -10,6 +10,7 @@ import {
   supabasePublishableKey,
   supabaseUrl,
 } from "@/lib/supabase";
+import { captureException } from "@/lib/sentry";
 import { getSharedRealtimeClient } from "@/lib/supabase-realtime";
 import {
   buildMarketplaceReadHeaders,
@@ -149,8 +150,9 @@ export function subscribeToListings(
         if (!row || !row.id) return;
         try {
           onListing(rowToListing(row));
-        } catch {
+        } catch (err) {
           // Ignore handler errors so a buggy listener can't kill the socket.
+          captureException(err, { context: "supabase-marketplace.subscribeToListings.handler" });
         }
       },
     )

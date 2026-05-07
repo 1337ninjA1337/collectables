@@ -1,3 +1,4 @@
+import { captureException } from "@/lib/sentry";
 import {
   authClient,
   isSupabaseConfigured,
@@ -467,7 +468,8 @@ export async function fetchCollectionsSharedWithUser(userId: string): Promise<Co
     if (!res.ok) return [];
     const rows: DbCollection[] = await res.json();
     return rows.map(toCollection);
-  } catch {
+  } catch (err) {
+    captureException(err, { context: "supabase-profiles.fetchCollectionsSharedWithUser" });
     return [];
   }
 }
@@ -497,7 +499,8 @@ export async function registerSharedCollectionViewer(
     const next = [...existing, viewerUserId];
     await updateRemoteCollection(collectionId, { sharedWithUserIds: next });
     return { ...current, sharedWithUserIds: next };
-  } catch {
+  } catch (err) {
+    captureException(err, { context: "supabase-profiles.registerSharedCollectionViewer" });
     return null;
   }
 }
