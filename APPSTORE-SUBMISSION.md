@@ -336,7 +336,25 @@ eas secret:create --scope project --name EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET --
 eas secret:create --scope project --name EXPO_PUBLIC_APP_URL --value "https://1337ninja1337.github.io/collectables"
 eas secret:create --scope project --name EXPO_PUBLIC_SENTRY_DSN --value "..."           # optional, enables crash reporting
 eas secret:create --scope project --name EXPO_PUBLIC_SENTRY_ENV --value "production"     # optional, gates SDK init
+# Native + Hermes sourcemap upload (read by the @sentry/react-native/expo
+# config plugin during EAS Build's post-bundle step). Mirrors the GitHub
+# Actions sourcemap step in .github/workflows/deploy.yml.
+eas secret:create --scope project --name SENTRY_AUTH_TOKEN --value "..."                 # required for native sourcemap upload
+eas secret:create --scope project --name SENTRY_ORG --value "anton-m3"                   # Sentry org slug
+eas secret:create --scope project --name SENTRY_PROJECT --value "collectables"           # Sentry project slug
 ```
 
 Verify with `eas secret:list`. The values are encrypted at rest by Expo and
 injected into builds at compile time.
+
+The `@sentry/react-native/expo` config plugin (registered in `app.json`'s
+`expo.plugins`) reads `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT`
+during the EAS Build post-bundle step and uploads native iOS dSYM + Hermes
+JS sourcemaps automatically. The `expo.extra.sentry` block in `app.json`
+duplicates the org/project slugs for the `sentry-cli` (used by older
+toolchains) so both code paths see the same project.
+
+Without `SENTRY_AUTH_TOKEN` the upload step is skipped silently — the build
+still ships, but production stack traces are minified. See
+`.tasks/.sentry-setup.md` §3 for token-creation steps and §10 for common
+auth-token failure modes.

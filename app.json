@@ -51,6 +51,13 @@
     "experiments": {
       "typedRoutes": true,
       "baseUrl": "/collectables"
+    },
+    "extra": {
+      "sentry": {
+        "organization": "anton-m3",
+        "project": "collectables",
+        "url": "https://sentry.io/"
+      }
     }
   }
 }
