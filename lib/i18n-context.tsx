@@ -314,6 +314,7 @@ const en = {
   visibilityLabel: "Visibility",
   visibilityPublicHint: "Anyone can find and view this collection.",
   visibilityPrivateHint: "Only you and people you share with can see this collection.",
+  visibilityPrivatePremiumOnly: "Private collections are a premium feature.",
   filterTitle: "Filters",
   filterPriceFrom: "Price from",
   filterPriceTo: "Price to",
