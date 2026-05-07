@@ -20,7 +20,7 @@ export default function ListingDetailScreen() {
   const { t } = useI18n();
   const { user } = useAuth();
   const { getListingById, fetchListingById, listings, markListingSold } = useMarketplace();
-  const { getItemById } = useCollections();
+  const { getItemById, transferItemToBuyer } = useCollections();
   const { getProfileById, ensureProfilesLoaded } = useSocial();
   const { ensureChatWith, canMessage } = useChat();
   const [fetchingRemote, setFetchingRemote] = useState(false);
@@ -106,12 +106,36 @@ export default function ListingDetailScreen() {
     router.push(`/chat/${listing.ownerUserId}` as never);
   }
 
-  const performClaim = useCallback(() => {
+  const performClaim = useCallback(async () => {
     if (!listing || !user) return;
     setClaiming(true);
-    markListingSold(listing.id, user.id);
-    setClaiming(false);
-  }, [listing, user, markListingSold]);
+    try {
+      const sourceItem = getItemById(listing.itemId);
+      const fallbackTitle = sourceItem?.title ?? t("marketplaceUnknownItem");
+      await transferItemToBuyer(
+        {
+          title: fallbackTitle,
+          photos: sourceItem?.photos ?? [],
+          description: sourceItem?.description ?? listing.notes,
+          variants: sourceItem?.variants,
+          cost:
+            listing.mode === "sell" && typeof listing.askingPrice === "number"
+              ? listing.askingPrice
+              : sourceItem?.cost ?? null,
+          acquiredFrom: t("marketplaceTitle"),
+          condition: sourceItem?.condition,
+          tags: sourceItem?.tags,
+        },
+        {
+          collectionName: t("marketplaceAcquiredCollection"),
+          collectionDescription: t("marketplaceAcquiredCollectionDescription"),
+        },
+      );
+      markListingSold(listing.id, user.id);
+    } finally {
+      setClaiming(false);
+    }
+  }, [listing, user, markListingSold, getItemById, transferItemToBuyer, t]);
 
   function handleClaimPress() {
     if (!listing || !user || claiming) return;
@@ -124,12 +148,12 @@ export default function ListingDetailScreen() {
       const ok = typeof window !== "undefined" && window.confirm
         ? window.confirm(`${title}\n\n${text}`)
         : true;
-      if (ok) performClaim();
+      if (ok) void performClaim();
       return;
     }
     Alert.alert(title, text, [
       { text: t("cancel"), style: "cancel" },
-      { text: t("marketplaceClaim"), style: "default", onPress: performClaim },
+      { text: t("marketplaceClaim"), style: "default", onPress: () => void performClaim() },
     ]);
   }
 

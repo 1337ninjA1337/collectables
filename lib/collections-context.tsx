@@ -58,6 +58,19 @@ type DraftCollectionInput = {
   visibility?: "public" | "private";
 };
 
+export type AcquiredItemSnapshot = {
+  title: string;
+  photos: string[];
+  description?: string;
+  variants?: string;
+  cost?: number | null;
+  acquiredFrom?: string;
+  condition?: ItemCondition;
+  tags?: ItemTag[];
+};
+
+export const ACQUIRED_COLLECTION_ID_SUFFIX = "acquired-marketplace";
+
 type CollectionsContextValue = {
   collections: Collection[];
   items: CollectableItem[];
@@ -91,6 +104,10 @@ type CollectionsContextValue = {
   deleteUserContent: (userId: string) => Promise<void>;
   reorderOwnedCollections: (orderedIds: string[]) => void;
   reorderItemsInCollection: (collectionId: string, orderedIds: string[]) => void;
+  transferItemToBuyer: (
+    snapshot: AcquiredItemSnapshot,
+    options?: { collectionName?: string; collectionDescription?: string },
+  ) => Promise<{ itemId: string; collectionId: string } | null>;
   refresh: () => Promise<void>;
 };
 
@@ -608,6 +625,56 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           return reordered;
         });
         Promise.allSettled(updated.map((c) => updateRemoteCollection(c.id, { sortOrder: c.sortOrder }))).catch(() => undefined);
+      },
+      transferItemToBuyer: async (snapshot, options) => {
+        if (!user) return null;
+        const ownerName = user.email ?? "You";
+        const ownerUserId = user.id;
+        const collectionId = `${ownerUserId}-${ACQUIRED_COLLECTION_ID_SUFFIX}`;
+        const existing = localCollections.find((c) => c.id === collectionId);
+        if (!existing) {
+          const newCollection: Collection = {
+            id: collectionId,
+            name: options?.collectionName ?? "Acquired",
+            description: options?.collectionDescription ?? "",
+            coverPhoto: snapshot.photos[0] ?? "",
+            ownerName,
+            ownerUserId,
+            sharedWith: [],
+            sharedWithUserIds: [],
+            role: "owner",
+            visibility: "private",
+          };
+          setLocalCollections((current) => [newCollection, ...current]);
+          upsertCollection(newCollection).catch(() => undefined);
+        }
+        const slug =
+          snapshot.title
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "") || `acquired-${Date.now()}`;
+        const acquiredAt = new Date().toISOString().slice(0, 10);
+        const nextItem: CollectableItem = {
+          id: `acq-${slug}-${Date.now()}`,
+          collectionId,
+          title: snapshot.title.trim() || "Acquired item",
+          acquiredAt,
+          acquiredFrom: snapshot.acquiredFrom?.trim() ?? "",
+          description: snapshot.description?.trim() ?? "",
+          variants: snapshot.variants?.trim() ?? "",
+          photos: snapshot.photos,
+          createdBy: ownerName,
+          createdByUserId: ownerUserId,
+          createdAt: new Date().toISOString(),
+          cost: typeof snapshot.cost === "number" ? snapshot.cost : null,
+          isWishlist: false,
+          condition: snapshot.condition,
+          tags: snapshot.tags,
+        };
+        setLocalItems((current) => [nextItem, ...current]);
+        upsertItem(nextItem).catch(() => undefined);
+        return { itemId: nextItem.id, collectionId };
       },
       refresh: async () => {
         setRefreshTick((n) => n + 1);

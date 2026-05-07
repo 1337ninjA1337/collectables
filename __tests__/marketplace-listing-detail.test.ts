@@ -84,6 +84,34 @@ describe("listing detail screen", () => {
     assert.match(src, /listing\.buyerUserId/);
     assert.match(src, /ensureProfilesLoaded/);
   });
+
+  it("calls transferItemToBuyer with a snapshot of the source item before marking sold", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /transferItemToBuyer/);
+    assert.match(src, /getItemById\(listing\.itemId\)/);
+    // The transfer must run before markListingSold so a network/claim race
+    // can't leave a sold listing without a corresponding buyer-side item.
+    const transferIdx = src.indexOf("transferItemToBuyer(");
+    const markSoldIdx = src.indexOf("markListingSold(listing.id");
+    assert.ok(transferIdx > 0, "transferItemToBuyer not invoked");
+    assert.ok(markSoldIdx > 0, "markListingSold not invoked");
+    assert.ok(transferIdx < markSoldIdx, "transferItemToBuyer must run before markListingSold");
+  });
+});
+
+describe("collections context: transferItemToBuyer", () => {
+  it("exposes transferItemToBuyer on the context value", () => {
+    const src = read("lib/collections-context.tsx");
+    assert.match(src, /transferItemToBuyer:\s*\(/);
+    assert.match(src, /AcquiredItemSnapshot/);
+  });
+
+  it("creates an Acquired collection if missing and adds the item to it", () => {
+    const src = read("lib/collections-context.tsx");
+    assert.match(src, /ACQUIRED_COLLECTION_ID_SUFFIX/);
+    assert.match(src, /upsertCollection\(newCollection\)/);
+    assert.match(src, /upsertItem\(nextItem\)/);
+  });
 });
 
 describe("listing detail translations", () => {
