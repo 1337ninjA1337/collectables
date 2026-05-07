@@ -1,20 +1,10 @@
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
+import { getDefaultCurrencyForLanguage } from "@/lib/locale-helpers";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "RUB", "BYN", "PLN", "UAH", "CHF", "JPY", "CNY"];
 
-const LANGUAGE_CURRENCY: Record<string, string> = {
-  ru: "RUB",
-  be: "BYN",
-  de: "EUR",
-  pl: "PLN",
-  es: "EUR",
-  en: "USD",
-};
-
-export function getDefaultCurrencyForLanguage(language: string): string {
-  return LANGUAGE_CURRENCY[language] ?? "USD";
-}
+export { getDefaultCurrencyForLanguage };
 
 type CurrencyInputProps = {
   value: string;
