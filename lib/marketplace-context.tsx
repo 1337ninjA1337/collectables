@@ -43,7 +43,7 @@ type MarketplaceContextValue = {
   fetchListingById: (id: string) => Promise<MarketplaceListing | null>;
   addListing: (input: DraftListingInput) => MarketplaceListing | null;
   removeListing: (id: string) => void;
-  markListingSold: (id: string) => void;
+  markListingSold: (id: string, buyerUserId?: string | null) => void;
 };
 
 const MarketplaceContext = createContext<MarketplaceContextValue | null>(null);
@@ -140,6 +140,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         notes: (input.notes ?? "").trim(),
         createdAt: new Date().toISOString(),
         soldAt: null,
+        buyerUserId: null,
       };
       setListings((prev) => upsertListing(prev, next));
       // Best-effort cloud sync (fire-and-forget).
@@ -154,15 +155,18 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
     void cloudRemoveListing(id);
   }, []);
 
-  const markListingSold = useCallback((id: string) => {
-    const soldAt = new Date().toISOString();
-    setListings((prev) => {
-      const target = prev.find((l) => l.id === id);
-      if (!target || target.soldAt) return prev;
-      return upsertListing(prev, { ...target, soldAt });
-    });
-    void cloudMarkSold(id, soldAt);
-  }, []);
+  const markListingSold = useCallback(
+    (id: string, buyerUserId: string | null = null) => {
+      const soldAt = new Date().toISOString();
+      setListings((prev) => {
+        const target = prev.find((l) => l.id === id);
+        if (!target || target.soldAt) return prev;
+        return upsertListing(prev, { ...target, soldAt, buyerUserId });
+      });
+      void cloudMarkSold(id, soldAt, buyerUserId);
+    },
+    [],
+  );
 
   const findByItemId = useCallback(
     (itemId: string) => findListingByItemId(listings, itemId),

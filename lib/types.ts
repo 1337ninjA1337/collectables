@@ -72,6 +72,7 @@ export type MarketplaceListing = {
   notes: string;
   createdAt: string;
   soldAt: string | null;
+  buyerUserId: string | null;
 };
 
 export type Collection = {

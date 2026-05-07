@@ -16,6 +16,7 @@ export type MarketplaceRow = {
   notes: string;
   created_at: string;
   sold_at: string | null;
+  buyer_user_id?: string | null;
 };
 
 export type MarketplaceInsertPayload = {
@@ -29,6 +30,11 @@ export type MarketplaceInsertPayload = {
   created_at: string;
 };
 
+export type MarketplaceMarkSoldPayload = {
+  sold_at: string;
+  buyer_user_id: string | null;
+};
+
 export function rowToListing(row: MarketplaceRow): MarketplaceListing {
   return {
     id: row.id,
@@ -40,7 +46,15 @@ export function rowToListing(row: MarketplaceRow): MarketplaceListing {
     notes: row.notes,
     createdAt: row.created_at,
     soldAt: row.sold_at,
+    buyerUserId: row.buyer_user_id ?? null,
   };
+}
+
+export function markSoldPayload(
+  soldAt: string,
+  buyerUserId: string | null,
+): MarketplaceMarkSoldPayload {
+  return { sold_at: soldAt, buyer_user_id: buyerUserId };
 }
 
 export function listingToInsertPayload(listing: MarketplaceListing): MarketplaceInsertPayload {

@@ -25,6 +25,7 @@ function listing(overrides: Partial<MarketplaceListing> = {}): MarketplaceListin
     notes: "",
     createdAt: "2026-04-25T10:00:00.000Z",
     soldAt: null,
+    buyerUserId: null,
     ...overrides,
   };
 }

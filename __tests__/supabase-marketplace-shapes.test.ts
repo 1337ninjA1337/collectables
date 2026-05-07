@@ -9,6 +9,7 @@ import {
   fetchListingByIdUrl,
   insertListingUrl,
   listingToInsertPayload,
+  markSoldPayload,
   markSoldUrl,
   rowToListing,
 } from "@/lib/supabase-marketplace-shapes";
@@ -38,6 +39,7 @@ const listing: MarketplaceListing = {
   notes: "mint condition",
   createdAt: "2026-05-01T10:00:00.000Z",
   soldAt: null,
+  buyerUserId: null,
 };
 
 describe("supabase-marketplace-shapes", () => {
@@ -51,6 +53,28 @@ describe("supabase-marketplace-shapes", () => {
     assert.equal(result.currency, "USD");
     assert.equal(result.notes, "mint condition");
     assert.equal(result.soldAt, null);
+    assert.equal(result.buyerUserId, null);
+  });
+
+  it("rowToListing maps buyer_user_id to buyerUserId", () => {
+    const result = rowToListing({ ...row, buyer_user_id: "buyer-9" });
+    assert.equal(result.buyerUserId, "buyer-9");
+  });
+
+  it("rowToListing defaults buyerUserId to null when row omits buyer_user_id", () => {
+    const result = rowToListing({ ...row });
+    assert.equal(result.buyerUserId, null);
+  });
+
+  it("markSoldPayload bundles sold_at and buyer_user_id", () => {
+    const payload = markSoldPayload("2026-05-07T10:00:00.000Z", "buyer-7");
+    assert.equal(payload.sold_at, "2026-05-07T10:00:00.000Z");
+    assert.equal(payload.buyer_user_id, "buyer-7");
+  });
+
+  it("markSoldPayload accepts null buyer for legacy 'mark sold without buyer' path", () => {
+    const payload = markSoldPayload("2026-05-07T10:00:00.000Z", null);
+    assert.equal(payload.buyer_user_id, null);
   });
 
   it("listingToInsertPayload converts camelCase to snake_case", () => {
