@@ -37,6 +37,23 @@ export function resolveSentryConfig(
   return { dsn, environment, release, enabled };
 }
 
+/**
+ * Reads the Sentry env vars from `process.env` using *literal* member
+ * accesses. Expo's babel plugin (`babel-preset-expo`) only inlines
+ * `process.env.EXPO_PUBLIC_*` references when it sees them as direct member
+ * expressions in source — passing `process.env` whole to a helper bypasses
+ * inlining and the bundled code reads `undefined` at runtime. Keep every
+ * supported variable referenced literally below.
+ */
+export function readSentryEnvFromProcess(): Record<string, string | undefined> {
+  return {
+    EXPO_PUBLIC_SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    EXPO_PUBLIC_SENTRY_ENV: process.env.EXPO_PUBLIC_SENTRY_ENV,
+    EXPO_PUBLIC_SENTRY_RELEASE: process.env.EXPO_PUBLIC_SENTRY_RELEASE,
+    EXPO_PUBLIC_APP_VERSION: process.env.EXPO_PUBLIC_APP_VERSION,
+  };
+}
+
 export const sentryConfig: SentryConfig = resolveSentryConfig(
-  process.env as Record<string, string | undefined>,
+  readSentryEnvFromProcess(),
 );

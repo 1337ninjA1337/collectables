@@ -1,4 +1,5 @@
 import {
+  readSentryEnvFromProcess,
   resolveSentryConfig,
   type SentryConfig,
   type SentryEnvironment,
@@ -115,8 +116,10 @@ export async function initSentry(options: InitOptions = {}): Promise<void> {
     initialised = true;
     return;
   }
-  const env =
-    options.env ?? (process.env as Record<string, string | undefined>);
+  // Use the literal-access helper so Metro inlines EXPO_PUBLIC_* into the
+  // bundle. Passing `process.env` whole would leave the values undefined at
+  // runtime in the web bundle.
+  const env = options.env ?? readSentryEnvFromProcess();
   const config = resolveSentryConfig(env);
   activeConfig = config;
   if (!config.enabled) {
