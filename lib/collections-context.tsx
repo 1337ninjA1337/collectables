@@ -11,6 +11,7 @@ import {
   upsertItem,
   updateRemoteItem,
   deleteRemoteItem,
+  fetchCollectionsByUserId,
   fetchPublicCollectionsByUserId,
   fetchItemsByCollectionId,
   fetchCollectionById,
@@ -156,13 +157,61 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         }
 
         const parsedCollections = rawCollections ? (JSON.parse(rawCollections) as Collection[]) : seedCollections;
-        const visibleCollections = parsedCollections.filter(
+        let visibleCollections = parsedCollections.filter(
           (collection) =>
             collection.ownerUserId === activeUser.id || collection.sharedWithUserIds?.includes(activeUser.id),
         );
+
+        // Fresh sign-in / cleared storage / saved-empty path: when nothing in
+        // AsyncStorage matches the signed-in user, pull the user's own
+        // collections from Supabase so the home page's "My collections" block
+        // isn't empty just because the local cache is. toCollection() in
+        // supabase-profiles.ts hardcodes role: "viewer" for safety on
+        // shared/public reads — promote it back to "owner" here for rows
+        // where ownerUserId matches the signed-in user.
+        if (visibleCollections.length === 0) {
+          try {
+            const remote = await fetchCollectionsByUserId(activeUser.id);
+            if (active && remote.length > 0) {
+              visibleCollections = remote.map((collection) =>
+                collection.ownerUserId === activeUser.id
+                  ? { ...collection, role: "owner" }
+                  : collection,
+              );
+            }
+          } catch {
+            // Network/Supabase unavailable — fall through with the empty list
+            // so the home page renders the empty-state instead of crashing.
+          }
+        }
+
         const visibleCollectionIds = new Set(visibleCollections.map((collection) => collection.id));
         const parsedItems = rawItems ? (JSON.parse(rawItems) as CollectableItem[]) : seedItems;
         const visibleItems = parsedItems.filter((item) => visibleCollectionIds.has(item.collectionId) || item.isWishlist);
+
+        // After a remote-bootstrap, also pull each collection's items so the
+        // home page's "Recent items" + per-collection counts aren't empty.
+        if (visibleItems.length === 0 && visibleCollections.length > 0) {
+          try {
+            const itemResults = await Promise.all(
+              visibleCollections.map((c) => fetchItemsByCollectionId(c.id)),
+            );
+            if (active) {
+              const seen = new Set(visibleItems.map((i) => i.id));
+              for (const items of itemResults) {
+                for (const item of items) {
+                  if (!seen.has(item.id)) {
+                    visibleItems.push(item);
+                    seen.add(item.id);
+                  }
+                }
+              }
+            }
+          } catch {
+            // Items can lazy-load on next refresh; first paint of collection
+            // counts will show 0 until that happens.
+          }
+        }
 
         const seenIds = new Set(visibleItems.map((i) => i.id));
         for (const wi of remoteWishlist) {
