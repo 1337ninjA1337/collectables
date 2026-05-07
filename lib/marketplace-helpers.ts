@@ -90,6 +90,24 @@ export function listingsForUser(
 }
 
 /**
+ * Listings the user has bought (claimed via the marketplace transfer flow).
+ * Sorted by `soldAt` descending so the most recent purchases appear first.
+ */
+export function purchasesForUser(
+  listings: readonly MarketplaceListing[],
+  userId: string,
+): MarketplaceListing[] {
+  return listings
+    .filter((l) => l.buyerUserId === userId && l.soldAt)
+    .slice()
+    .sort((a, b) => {
+      const aAt = a.soldAt ?? a.createdAt;
+      const bAt = b.soldAt ?? b.createdAt;
+      return aAt < bAt ? 1 : -1;
+    });
+}
+
+/**
  * Common collectible edition/condition words that distinguish the same card
  * from a collector's perspective but vary so widely in listing titles that
  * including them in the Dice comparison drives similarity below the threshold.

@@ -19,7 +19,7 @@ type ResolvedListing = {
 
 export default function MarketplaceScreen() {
   const { t } = useI18n();
-  const { activeListings } = useMarketplace();
+  const { activeListings, myPurchases } = useMarketplace();
   const { getItemById } = useCollections();
   const { getProfileById } = useSocial();
   const { isDesktop, isTablet } = useResponsive();
@@ -32,6 +32,16 @@ export default function MarketplaceScreen() {
         owner: getProfileById(listing.ownerUserId),
       })),
     [activeListings, getItemById, getProfileById],
+  );
+
+  const purchases = useMemo<ResolvedListing[]>(
+    () =>
+      myPurchases.map((listing) => ({
+        listing,
+        item: getItemById(listing.itemId),
+        owner: getProfileById(listing.ownerUserId),
+      })),
+    [myPurchases, getItemById, getProfileById],
   );
 
   const columns = isDesktop ? 3 : isTablet ? 2 : 1;
@@ -63,6 +73,22 @@ export default function MarketplaceScreen() {
           ))}
         </View>
       )}
+
+      {purchases.length > 0 ? (
+        <View style={styles.purchasesSection}>
+          <Text style={styles.sectionTitle}>{t("marketplaceMyPurchasesTitle")}</Text>
+          <View style={styles.grid}>
+            {purchases.map(({ listing, item, owner }) => (
+              <View
+                key={listing.id}
+                style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
+              >
+                <ListingCard listing={listing} item={item} owner={owner} />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -195,5 +221,14 @@ const styles = StyleSheet.create({
     color: "#261b14",
     fontWeight: "800",
     fontSize: 14,
+  },
+  purchasesSection: {
+    marginTop: 24,
+    gap: 12,
+  },
+  sectionTitle: {
+    color: "#2f2318",
+    fontSize: 20,
+    fontWeight: "800",
   },
 });

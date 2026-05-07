@@ -10,6 +10,7 @@ import {
   normalizeTitle,
   PRICE_HISTORY_SIMILARITY_THRESHOLD,
   priceHistoryForTitle,
+  purchasesForUser,
   removeListingById,
   titleSimilarity,
   upsertListing,
@@ -117,6 +118,46 @@ describe("activeListings", () => {
       out.map((l) => l.id),
       ["3", "1"],
     );
+  });
+});
+
+describe("purchasesForUser", () => {
+  it("returns sold listings whose buyer is the user, newest-sold first", () => {
+    const ls = [
+      listing({
+        id: "1",
+        ownerUserId: "alice",
+        buyerUserId: "bob",
+        soldAt: "2026-04-25T10:00:00.000Z",
+      }),
+      listing({
+        id: "2",
+        ownerUserId: "carol",
+        buyerUserId: "bob",
+        soldAt: "2026-04-29T10:00:00.000Z",
+      }),
+      listing({ id: "3", ownerUserId: "alice", buyerUserId: null, soldAt: null }),
+      listing({
+        id: "4",
+        ownerUserId: "alice",
+        buyerUserId: "alice",
+        soldAt: "2026-04-26T10:00:00.000Z",
+      }),
+    ];
+    const out = purchasesForUser(ls, "bob");
+    assert.deepEqual(out.map((l) => l.id), ["2", "1"]);
+  });
+
+  it("excludes listings not yet marked sold even if buyer is the user", () => {
+    const ls = [
+      listing({ id: "1", buyerUserId: "bob", soldAt: null }),
+    ];
+    assert.deepEqual(purchasesForUser(ls, "bob"), []);
+  });
+
+  it("returns empty array when the user has no purchases", () => {
+    const ls = [listing({ buyerUserId: null })];
+    assert.deepEqual(purchasesForUser(ls, "bob"), []);
   });
 });
 

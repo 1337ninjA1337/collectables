@@ -8,6 +8,7 @@ import {
   countActiveListingsForUser,
   findListingByItemId,
   listingsForUser,
+  purchasesForUser,
   removeListingById,
   upsertListing,
 } from "@/lib/marketplace-helpers";
@@ -36,6 +37,7 @@ type MarketplaceContextValue = {
   listings: MarketplaceListing[];
   activeListings: MarketplaceListing[];
   myListings: MarketplaceListing[];
+  myPurchases: MarketplaceListing[];
   myActiveListingCount: number;
   canCreateListing: (isPremium?: boolean) => boolean;
   findListingByItemId: (itemId: string) => MarketplaceListing | undefined;
@@ -104,6 +106,11 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
 
   const myListings = useMemo(
     () => (user ? listingsForUser(listings, user.id) : []),
+    [listings, user],
+  );
+
+  const myPurchases = useMemo(
+    () => (user ? purchasesForUser(listings, user.id) : []),
     [listings, user],
   );
 
@@ -195,6 +202,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       listings,
       activeListings: sortedActive,
       myListings,
+      myPurchases,
       myActiveListingCount,
       canCreateListing,
       findListingByItemId: findByItemId,
@@ -209,6 +217,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       listings,
       sortedActive,
       myListings,
+      myPurchases,
       myActiveListingCount,
       canCreateListing,
       findByItemId,
