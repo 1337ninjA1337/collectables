@@ -51,6 +51,39 @@ describe("listing detail screen", () => {
     const src = read("app/listing/[id].tsx");
     assert.match(src, /marketplaceListingNotFound/);
   });
+
+  it("renders a Buy now / Trade request button for non-self viewers on active listings", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /marketplaceBuyNow/);
+    assert.match(src, /marketplaceTradeRequest/);
+    // The button mounts only when the listing is not yet sold.
+    assert.match(src, /!isSold\s*\?/);
+  });
+
+  it("threads the viewer's user.id into markListingSold when claiming", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /markListingSold\(listing\.id,\s*user\.id\)/);
+  });
+
+  it("confirms purchase via Alert.alert on native and window.confirm on web", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /Alert\.alert\(/);
+    assert.match(src, /window\.confirm/);
+    assert.match(src, /marketplaceConfirmBuyTitle/);
+  });
+
+  it("renders a 'Sold' banner with buyer name on sold listings", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /isSold\s*=\s*listing\.soldAt\s*!==\s*null/);
+    assert.match(src, /marketplaceSoldBanner/);
+    assert.match(src, /marketplaceSoldTo/);
+  });
+
+  it("ensures buyer profile is loaded so the banner can display the buyer's name", () => {
+    const src = read("app/listing/[id].tsx");
+    assert.match(src, /listing\.buyerUserId/);
+    assert.match(src, /ensureProfilesLoaded/);
+  });
 });
 
 describe("listing detail translations", () => {
@@ -62,6 +95,13 @@ describe("listing detail translations", () => {
       "marketplaceListingNotFound",
       "marketplaceListingNotFoundHint",
       "marketplaceSelfHint",
+      "marketplaceBuyNow",
+      "marketplaceTradeRequest",
+      "marketplaceConfirmBuyTitle",
+      "marketplaceConfirmBuyText",
+      "marketplaceConfirmTradeText",
+      "marketplaceSoldBanner",
+      "marketplaceSoldTo",
     ];
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
       const block =
