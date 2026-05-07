@@ -28,6 +28,9 @@ In the GitHub UI for this repository:
 | `EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET`       | `EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET`     | Optional. Falls back to the bundled default. |
 | `EXPO_PUBLIC_SENTRY_DSN`                     | `EXPO_PUBLIC_SENTRY_DSN`                   | Optional. Sentry crash-reporting DSN. When empty, the SDK skips initialisation and `captureException` becomes a no-op. |
 | `EXPO_PUBLIC_SENTRY_ENV`                     | `EXPO_PUBLIC_SENTRY_ENV`                   | Optional. One of `development`, `staging`, `production`. Defaults to `production` for the deploy workflow; `development` disables event reporting entirely. |
+| `EXPO_PUBLIC_POSTHOG_KEY`                    | `EXPO_PUBLIC_POSTHOG_KEY`                  | Optional. PostHog project API key (Settings → Project → Project API Key). When empty, analytics SDK skips initialisation. |
+| `EXPO_PUBLIC_POSTHOG_HOST`                   | `EXPO_PUBLIC_POSTHOG_HOST`                 | Optional. PostHog ingestion host. Defaults to `https://eu.posthog.com` (EU cloud). Override to `https://us.i.posthog.com` for US cloud or a self-hosted URL. |
+| `EXPO_PUBLIC_CLARITY_PROJECT_ID`             | `EXPO_PUBLIC_CLARITY_PROJECT_ID`           | Optional. Microsoft Clarity project ID for web-only session replay. When empty, the Clarity script is not injected. |
 
 The deploy workflow also pins `EXPO_PUBLIC_APP_URL` to the public site URL so
 deep links resolve correctly even when shared from a sub-route.
