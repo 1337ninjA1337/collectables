@@ -35,3 +35,11 @@ deep links resolve correctly even when shared from a sub-route.
 If you change a secret, trigger a new deploy by either pushing a no-op commit
 to `main` or by going to **Actions → Deploy to GitHub Pages → Run workflow**.
 
+## Native (iOS / App Store) deploys
+
+GitHub Pages only covers the web target. For an iOS App Store submission,
+follow the end-to-end checklist in [`APPSTORE-SUBMISSION.md`](./APPSTORE-SUBMISSION.md)
+— it covers Apple Developer enrolment, required `app.json` additions,
+visual assets, App Store Connect listing copy, EAS build/submit, and the
+TestFlight + review flow.
+
