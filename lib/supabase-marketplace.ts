@@ -1,9 +1,7 @@
 import {
   RealtimeChannel,
-  RealtimeClient,
   REALTIME_LISTEN_TYPES,
   REALTIME_POSTGRES_CHANGES_LISTEN_EVENT,
-  REALTIME_SUBSCRIBE_STATES,
 } from "@supabase/realtime-js";
 
 import {
@@ -12,7 +10,7 @@ import {
   supabasePublishableKey,
   supabaseUrl,
 } from "@/lib/supabase";
-import { realtimeEndpoint } from "@/lib/supabase-chat-shapes";
+import { getSharedRealtimeClient } from "@/lib/supabase-realtime";
 import {
   buildMarketplaceReadHeaders,
   buildMarketplaceWriteHeaders,
@@ -126,17 +124,7 @@ export async function cloudMarkSold(
   return res.ok;
 }
 
-let marketplaceRealtimeClient: RealtimeClient | null = null;
-
-function getMarketplaceRealtimeClient(): RealtimeClient | null {
-  if (!isSupabaseConfigured) return null;
-  if (marketplaceRealtimeClient) return marketplaceRealtimeClient;
-  marketplaceRealtimeClient = new RealtimeClient(realtimeEndpoint(supabaseUrl!), {
-    params: { apikey: supabasePublishableKey! },
-    accessToken: () => getAccessToken(),
-  });
-  return marketplaceRealtimeClient;
-}
+const getMarketplaceRealtimeClient = getSharedRealtimeClient;
 
 export type ListingsSubscription = { unsubscribe: () => void };
 

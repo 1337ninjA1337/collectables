@@ -32,7 +32,6 @@ describe("supabase-chat.ts wiring", () => {
       "inboxFilter",
       "isMutualFriendFromResponses",
       "messageToInsertPayload",
-      "realtimeEndpoint",
       "sendMessageUrl",
       "typingChannelTopic",
       "extractTypingUserIds",

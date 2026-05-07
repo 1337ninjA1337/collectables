@@ -1,6 +1,5 @@
 import {
   RealtimeChannel,
-  RealtimeClient,
   REALTIME_LISTEN_TYPES,
   REALTIME_POSTGRES_CHANGES_LISTEN_EVENT,
   REALTIME_SUBSCRIBE_STATES,
@@ -12,6 +11,7 @@ import {
   supabasePublishableKey,
   supabaseUrl,
 } from "@/lib/supabase";
+import { getSharedRealtimeClient } from "@/lib/supabase-realtime";
 import {
   buildAuthHeaders,
   buildChatReadUpsertHeaders,
@@ -29,7 +29,6 @@ import {
   inboxFilter,
   isMutualFriendFromResponses,
   messageToInsertPayload,
-  realtimeEndpoint,
   sendMessageUrl,
   SendMessageInput,
   typingChannelTopic,
@@ -107,17 +106,7 @@ export async function markRead(
   return;
 }
 
-let realtimeClient: RealtimeClient | null = null;
-
-function getRealtimeClient(): RealtimeClient | null {
-  if (!isSupabaseConfigured) return null;
-  if (realtimeClient) return realtimeClient;
-  realtimeClient = new RealtimeClient(realtimeEndpoint(supabaseUrl!), {
-    params: { apikey: supabasePublishableKey! },
-    accessToken: () => getAccessToken(),
-  });
-  return realtimeClient;
-}
+const getRealtimeClient = getSharedRealtimeClient;
 
 export type InboxSubscription = {
   unsubscribe: () => void;
