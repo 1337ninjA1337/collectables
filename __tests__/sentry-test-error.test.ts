@@ -104,7 +104,7 @@ describe("Crash #11/#12 — _layout.tsx exposes the test helper globally", () =>
   it("imports triggerSentryTestError", () => {
     assert.match(
       layoutSrc,
-      /import\s*\{\s*initSentry,\s*triggerSentryTestError\s*\}/,
+      /import\s*\{[^}]*triggerSentryTestError[^}]*\}\s*from\s*["']@\/lib\/sentry["']/,
     );
   });
 

@@ -83,8 +83,38 @@ export type InitOptions = {
   loader?: SentryLoader;
 };
 
+let userOptedOut = false;
+
+/**
+ * Honoured by initSentry — when set to true (e.g. user toggled the
+ * "Diagnostics & crash reports" switch off), the SDK never initialises.
+ * Wrappers also short-circuit when the flag flips after init.
+ */
+export function setSentryOptOut(optedOut: boolean): void {
+  userOptedOut = optedOut;
+}
+
+export function isSentryOptedOut(): boolean {
+  return userOptedOut;
+}
+
+/**
+ * Closes any active SDK and clears the cached references so the next call
+ * to initSentry can decide whether to boot again. Used when the user flips
+ * the diagnostics toggle off mid-session.
+ */
+export function shutdownSentry(): void {
+  sdk = null;
+  initialised = false;
+  activeConfig = null;
+}
+
 export async function initSentry(options: InitOptions = {}): Promise<void> {
   if (initialised) return;
+  if (userOptedOut) {
+    initialised = true;
+    return;
+  }
   const env =
     options.env ?? (process.env as Record<string, string | undefined>);
   const config = resolveSentryConfig(env);
@@ -117,6 +147,7 @@ export function captureException(
   error: unknown,
   context?: Record<string, unknown>,
 ): void {
+  if (userOptedOut) return;
   if (!sdk || !activeConfig?.enabled) return;
   if (!rateLimitAllow()) return;
   try {
@@ -130,6 +161,7 @@ export function addBreadcrumb(
   message: string,
   data?: Record<string, unknown>,
 ): void {
+  if (userOptedOut) return;
   if (!sdk || !activeConfig?.enabled) return;
   try {
     sdk.addBreadcrumb({ message, data, level: "info" });
@@ -141,6 +173,7 @@ export function addBreadcrumb(
 export type SentryUser = { id: string; email?: string | null } | null;
 
 export function setSentryUser(user: SentryUser): void {
+  if (userOptedOut) return;
   if (!sdk || !activeConfig?.enabled || !sdk.setUser) return;
   try {
     if (user === null) {
@@ -160,6 +193,53 @@ export function isSentryReady(): boolean {
   return sdk !== null && (activeConfig?.enabled ?? false);
 }
 
+export type SentryStatus = {
+  ready: boolean;
+  initialised: boolean;
+  optedOut: boolean;
+  dsnPresent: boolean;
+  environment: SentryEnvironment | null;
+  release: string | null;
+  reason:
+    | "ready"
+    | "not-initialised"
+    | "user-opted-out"
+    | "missing-dsn"
+    | "development-env"
+    | "init-failed";
+};
+
+/**
+ * Returns a structured snapshot of the Sentry wrapper state. Useful for
+ * debugging "not-ready" responses from `triggerSentryTestError` — surfaces
+ * exactly which gate (DSN missing, dev env, opt-out, init still pending,
+ * loader failed) is blocking event capture.
+ *
+ * Exposed on `globalThis.__sentryStatus()` from app/_layout.tsx.
+ */
+export function getSentryStatus(): SentryStatus {
+  const dsnPresent = !!activeConfig?.dsn;
+  const environment = activeConfig?.environment ?? null;
+  const release = activeConfig?.release ?? null;
+  const ready = isSentryReady();
+  let reason: SentryStatus["reason"];
+  if (ready) reason = "ready";
+  else if (userOptedOut) reason = "user-opted-out";
+  else if (!initialised) reason = "not-initialised";
+  else if (!dsnPresent) reason = "missing-dsn";
+  else if (environment === "development") reason = "development-env";
+  else reason = "init-failed";
+  return {
+    ready,
+    initialised,
+    optedOut: userOptedOut,
+    dsnPresent,
+    environment,
+    release,
+    reason,
+  };
+}
+
 /**
  * Fires a deliberate test event into Sentry so a deployed install can verify
  * its DSN + sourcemap wiring end-to-end. Returns one of:
@@ -174,7 +254,16 @@ export function isSentryReady(): boolean {
 export function triggerSentryTestError(
   message: string = "Sentry smoke test",
 ): "captured" | "not-ready" | "rate-limited" {
-  if (!sdk || !activeConfig?.enabled) return "not-ready";
+  if (!sdk || !activeConfig?.enabled) {
+    const status = getSentryStatus();
+    // Print a structured diagnostic to the devtools console so the operator
+    // can see which gate is blocking. Useful when the API returns
+    // "not-ready" but the user can't tell whether that's "DSN missing",
+    // "init still pending", or "user opted out".
+    // eslint-disable-next-line no-console
+    console.info("[sentry] smoke test blocked:", status);
+    return "not-ready";
+  }
   if (!rateLimitAllow()) return "rate-limited";
   try {
     sdk.captureException(new Error(message), {
@@ -191,6 +280,7 @@ export function __resetSentryForTests(): void {
   initialised = false;
   activeConfig = null;
   recentEvents = [];
+  userOptedOut = false;
 }
 
 export function __resetSentryRateLimitForTests(): void {

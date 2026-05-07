@@ -18,12 +18,13 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ChatProvider, useChat } from "@/lib/chat-context";
 import { formatBadgeCount } from "@/lib/chat-helpers";
 import { CollectionsProvider } from "@/lib/collections-context";
+import { DiagnosticsProvider } from "@/lib/diagnostics-context";
 import { isDevEnvironment, loadDevMenuModule, registerDevMenu } from "@/lib/dev-menu";
-import { I18nProvider, useI18n } from "@/lib/i18n-context";
+import { I18nProvider, useI18n, useOptionalI18n } from "@/lib/i18n-context";
 import { MarketplaceProvider } from "@/lib/marketplace-context";
 import { PremiumProvider } from "@/lib/premium-context";
 import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-context";
-import { initSentry, triggerSentryTestError } from "@/lib/sentry";
+import { getSentryStatus, triggerSentryTestError } from "@/lib/sentry";
 import { SocialProvider } from "@/lib/social-context";
 import { clearRuntimeSupabaseConfig } from "@/lib/supabase";
 import { ToastProvider } from "@/lib/toast-context";
@@ -32,11 +33,12 @@ import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BO
 
 export default function RootLayout() {
   useEffect(() => {
-    void initSentry();
-    // Expose a smoke-test trigger so a deployed install can verify Sentry
-    // end-to-end via devtools console: `__sendSentryTestError()`.
-    (globalThis as unknown as Record<string, unknown>).__sendSentryTestError =
-      triggerSentryTestError;
+    // SDK init now happens inside DiagnosticsProvider after hydrating the
+    // stored opt-in/opt-out flag, so the user's choice is honoured before
+    // any event is captured. We only register devtools globals here.
+    const scope = globalThis as unknown as Record<string, unknown>;
+    scope.__sendSentryTestError = triggerSentryTestError;
+    scope.__sentryStatus = getSentryStatus;
   }, []);
 
   useEffect(() => {
@@ -65,27 +67,29 @@ export default function RootLayout() {
   return (
     <ErrorBoundary
       fallback={({ error, resetError }) => (
-        <CrashFallback error={error} resetError={resetError} />
+        <LocalizedCrashFallback error={error} resetError={resetError} />
       )}
     >
       <I18nProvider>
-        <ToastProvider>
-          <AuthProvider>
-            <SocialProvider>
-              <CollectionsProvider>
-                <ChatProvider>
-                  <MarketplaceProvider>
-                    <PremiumProvider>
-                      <NavAnimationProvider>
-                        <AppShell />
-                      </NavAnimationProvider>
-                    </PremiumProvider>
-                  </MarketplaceProvider>
-                </ChatProvider>
-              </CollectionsProvider>
-            </SocialProvider>
-          </AuthProvider>
-        </ToastProvider>
+        <DiagnosticsProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <SocialProvider>
+                <CollectionsProvider>
+                  <ChatProvider>
+                    <MarketplaceProvider>
+                      <PremiumProvider>
+                        <NavAnimationProvider>
+                          <AppShell />
+                        </NavAnimationProvider>
+                      </PremiumProvider>
+                    </MarketplaceProvider>
+                  </ChatProvider>
+                </CollectionsProvider>
+              </SocialProvider>
+            </AuthProvider>
+          </ToastProvider>
+        </DiagnosticsProvider>
       </I18nProvider>
     </ErrorBoundary>
   );
@@ -213,6 +217,23 @@ function AppShell() {
     </View>
     </GestureHandlerRootView>
   );
+}
+
+function LocalizedCrashFallback({
+  error,
+  resetError,
+}: {
+  error: unknown;
+  resetError?: () => void;
+}) {
+  const i18n = useOptionalI18n();
+  const t = i18n
+    ? (key: string) => {
+        const result = (i18n.t as (k: string) => string)(key);
+        return typeof result === "string" ? result : key;
+      }
+    : undefined;
+  return <CrashFallback error={error} resetError={resetError} t={t} />;
 }
 
 const styles = StyleSheet.create({

@@ -14,19 +14,22 @@ const fallbackSrc = readFileSync(
 );
 
 describe("Crash #4 — Sentry provider wiring", () => {
-  it("imports initSentry from lib/sentry", () => {
+  it("mounts DiagnosticsProvider so it can hydrate the opt-out flag and initSentry()", () => {
     assert.match(
       layoutSrc,
-      /import\s*\{\s*initSentry[^}]*\}\s*from\s*["']@\/lib\/sentry["']/,
-      "_layout.tsx must import initSentry from @/lib/sentry",
+      /<DiagnosticsProvider>/,
+      "_layout.tsx must mount <DiagnosticsProvider> (which owns initSentry)",
+    );
+    assert.match(
+      layoutSrc,
+      /import\s*\{\s*DiagnosticsProvider\s*\}\s*from\s*["']@\/lib\/diagnostics-context["']/,
     );
   });
 
-  it("calls initSentry() inside a useEffect at the top of RootLayout", () => {
+  it("DiagnosticsProvider sits under I18nProvider so localised settings UI can read t()", () => {
     assert.match(
       layoutSrc,
-      /useEffect\(\s*\(\)\s*=>\s*\{[\s\S]*?void\s+initSentry\(\)[\s\S]*?\}\s*,\s*\[\]\s*\)/,
-      "_layout.tsx must call initSentry() inside a top-level useEffect with empty deps",
+      /<I18nProvider>[\s\S]*?<DiagnosticsProvider>[\s\S]*?<\/DiagnosticsProvider>[\s\S]*?<\/I18nProvider>/,
     );
   });
 
@@ -51,11 +54,11 @@ describe("Crash #4 — Sentry provider wiring", () => {
     );
   });
 
-  it("passes a fallback that renders CrashFallback with error + resetError", () => {
+  it("passes a fallback that renders the localised CrashFallback wrapper", () => {
     assert.match(
       layoutSrc,
-      /fallback=\{\(\{\s*error,\s*resetError\s*\}\)\s*=>\s*\(\s*<CrashFallback[\s\S]*?error=\{error\}[\s\S]*?resetError=\{resetError\}/,
-      "<ErrorBoundary> must pass error + resetError to <CrashFallback>",
+      /fallback=\{\(\{\s*error,\s*resetError\s*\}\)\s*=>\s*\(\s*<LocalizedCrashFallback[\s\S]*?error=\{error\}[\s\S]*?resetError=\{resetError\}/,
+      "<ErrorBoundary> must pass error + resetError to <LocalizedCrashFallback>",
     );
   });
 

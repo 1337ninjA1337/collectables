@@ -456,6 +456,15 @@ const en = {
   runtimeConfigSave: "Save and reload",
   runtimeConfiguredBadge: "Configured by you in this browser",
   runtimeConfigClear: "Clear runtime credentials",
+  crashFallbackTitle: "Something went wrong",
+  crashFallbackBody:
+    "An unexpected error occurred and we've logged it for review. Try again or restart the app.",
+  crashFallbackRetry: "Try again",
+  diagnosticsTitle: "Diagnostics & crash reports",
+  diagnosticsHint:
+    "When enabled, anonymous crash reports help us fix bugs faster. Toggle off to stop sending diagnostics.",
+  diagnosticsEnabled: "Sending diagnostics",
+  diagnosticsDisabled: "Diagnostics paused",
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -919,6 +928,10 @@ const ru: TranslationMap = {
   runtimeConfigSave: "Сохранить и перезагрузить",
   runtimeConfiguredBadge: "Настроено вами в этом браузере",
   runtimeConfigClear: "Сбросить runtime-учётные данные",
+  crashFallbackTitle: "Что-то пошло не так",
+  crashFallbackBody:
+    "Произошла непредвиденная ошибка, мы её записали. Попробуйте ещё раз или перезапустите приложение.",
+  crashFallbackRetry: "Попробовать ещё раз",
 };
 
 const be: TranslationMap = {
@@ -1069,6 +1082,10 @@ const be: TranslationMap = {
   premiumConfirmCancelTitle: "Адмяніць прэміум?",
   premiumConfirmCancelText:
     "Вы страціце неабмежаваныя аб'явы і прэміум-значок. Бясплатны ліміт вернецца адразу.",
+  crashFallbackTitle: "Нешта пайшло не так",
+  crashFallbackBody:
+    "Адбылася нечаканая памылка, мы яе запісалі. Паспрабуйце яшчэ раз ці перазапусціце прыкладанне.",
+  crashFallbackRetry: "Паспрабаваць яшчэ раз",
 };
 
 const pl: TranslationMap = {
@@ -1209,6 +1226,10 @@ const pl: TranslationMap = {
   premiumConfirmCancelTitle: "Anulować premium?",
   premiumConfirmCancelText:
     "Stracisz nieograniczone ogłoszenia i odznakę premium. Limit darmowy wraca natychmiast.",
+  crashFallbackTitle: "Coś poszło nie tak",
+  crashFallbackBody:
+    "Wystąpił nieoczekiwany błąd i został zapisany. Spróbuj ponownie lub uruchom aplikację jeszcze raz.",
+  crashFallbackRetry: "Spróbuj ponownie",
 };
 
 const de: TranslationMap = {
@@ -1345,6 +1366,10 @@ const de: TranslationMap = {
   premiumConfirmCancelTitle: "Premium kündigen?",
   premiumConfirmCancelText:
     "Du verlierst unbegrenzte Anzeigen und das Premium-Abzeichen. Das kostenlose Limit gilt sofort wieder.",
+  crashFallbackTitle: "Etwas ist schiefgelaufen",
+  crashFallbackBody:
+    "Ein unerwarteter Fehler ist aufgetreten und wurde protokolliert. Bitte erneut versuchen oder die App neu starten.",
+  crashFallbackRetry: "Erneut versuchen",
 };
 
 const es: TranslationMap = {
@@ -1481,6 +1506,10 @@ const es: TranslationMap = {
   premiumConfirmCancelTitle: "¿Cancelar premium?",
   premiumConfirmCancelText:
     "Perderás los anuncios ilimitados y la insignia premium. El límite gratuito vuelve de inmediato.",
+  crashFallbackTitle: "Algo salió mal",
+  crashFallbackBody:
+    "Se produjo un error inesperado y lo hemos registrado. Vuelve a intentarlo o reinicia la aplicación.",
+  crashFallbackRetry: "Intentar de nuevo",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };
@@ -1590,4 +1619,14 @@ export function useI18n() {
     throw new Error("useI18n must be used inside I18nProvider");
   }
   return context;
+}
+
+/**
+ * Variant of `useI18n` that returns `null` instead of throwing when invoked
+ * outside the `I18nProvider`. Used by the crash fallback so it can localise
+ * itself when the provider mounted, but not crash recursively if the boundary
+ * fires before/around the provider tree.
+ */
+export function useOptionalI18n() {
+  return useContext(I18nContext);
 }

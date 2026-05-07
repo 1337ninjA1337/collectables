@@ -5,6 +5,7 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native
 
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
+import { useDiagnostics } from "@/lib/diagnostics-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
 import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
@@ -14,6 +15,7 @@ export default function SettingsScreen() {
   const { t, language, setLanguage, languageOptions, formatRelativeDate } = useI18n();
   const { signOut, deleteAccount, pending } = useAuth();
   const { ready: premiumReady, isPremium, activatedAt, expiresAt, activatePremium, cancelPremium } = usePremium();
+  const { diagnosticsEnabled, setDiagnosticsEnabled } = useDiagnostics();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
 
@@ -168,6 +170,28 @@ export default function SettingsScreen() {
         </View>
       )}
 
+      <View style={styles.diagnosticsCard}>
+        <Text style={styles.diagnosticsTitle}>{t("diagnosticsTitle")}</Text>
+        <Text style={styles.diagnosticsHint}>{t("diagnosticsHint")}</Text>
+        <Pressable
+          style={[
+            styles.diagnosticsToggle,
+            diagnosticsEnabled
+              ? styles.diagnosticsToggleOn
+              : styles.diagnosticsToggleOff,
+          ]}
+          onPress={() => setDiagnosticsEnabled(!diagnosticsEnabled)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: diagnosticsEnabled }}
+        >
+          <Text style={styles.diagnosticsToggleText}>
+            {diagnosticsEnabled
+              ? t("diagnosticsEnabled")
+              : t("diagnosticsDisabled")}
+          </Text>
+        </Pressable>
+      </View>
+
       <Pressable
         style={{...styles.signOutButton, ...(pending ? styles.signOutButtonDisabled : {})}}
         onPress={() => void signOut()}
@@ -257,6 +281,46 @@ const styles = StyleSheet.create({
   },
   languageChipTextActive: {
     color: "#fff4e8",
+  },
+  diagnosticsCard: {
+    backgroundColor: "#fff7ef",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#f0d6a1",
+    padding: 16,
+    gap: 8,
+    marginVertical: 4,
+  },
+  diagnosticsTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#261b14",
+    fontFamily: FONT_DISPLAY,
+  },
+  diagnosticsHint: {
+    fontSize: 13,
+    color: "#6f5a44",
+    lineHeight: 18,
+    fontFamily: FONT_BODY,
+  },
+  diagnosticsToggle: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    marginTop: 4,
+  },
+  diagnosticsToggleOn: {
+    backgroundColor: "#22c55e",
+  },
+  diagnosticsToggleOff: {
+    backgroundColor: "#94a3b8",
+  },
+  diagnosticsToggleText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "800",
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   signOutButton: {
     borderRadius: 999,
