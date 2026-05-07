@@ -5,6 +5,19 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { EmptyState } from "@/components/empty-state";
 import { Screen, useResponsive } from "@/components/screen";
 import { useCollections } from "@/lib/collections-context";
+import {
+  AMBER_ACCENT,
+  AMBER_LIGHT,
+  BORDER,
+  CARD_BG,
+  HERO_DARK,
+  MUTED,
+  PAGE_BG,
+  SUCCESS_GREEN,
+  TEXT_DARK,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_SOFT,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useMarketplace } from "@/lib/marketplace-context";
 import { placeholderColor } from "@/lib/placeholder-color";
@@ -127,7 +140,7 @@ function ListingCard({
             <View
               style={{
                 ...styles.modeBadge,
-                backgroundColor: listing.mode === "sell" ? "#d89c5b" : "#3a7d4f",
+                backgroundColor: listing.mode === "sell" ? AMBER_ACCENT : SUCCESS_GREEN,
               }}
             >
               <Text style={styles.modeBadgeText}>{modeLabel}</Text>
@@ -142,26 +155,26 @@ function ListingCard({
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     borderRadius: 32,
     padding: 24,
     gap: 10,
   },
   eyebrow: {
-    color: "#f5c99a",
+    color: AMBER_LIGHT,
     fontSize: 12,
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
   },
   title: {
-    color: "#fff8ef",
+    color: PAGE_BG,
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 36,
   },
   subtitle: {
-    color: "#ead8c3",
+    color: TEXT_ON_DARK_SOFT,
     lineHeight: 22,
   },
   grid: {
@@ -174,9 +187,9 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 22,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     overflow: "hidden",
   },
   photo: {
@@ -191,10 +204,10 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
   },
   cardOwner: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 13,
     fontWeight: "700",
   },
@@ -211,14 +224,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   modeBadgeText: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 11,
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   cardPrice: {
-    color: "#261b14",
+    color: HERO_DARK,
     fontWeight: "800",
     fontSize: 14,
   },
@@ -227,7 +240,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sectionTitle: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 20,
     fontWeight: "800",
   },
