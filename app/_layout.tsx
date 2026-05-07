@@ -23,7 +23,7 @@ import { I18nProvider, useI18n } from "@/lib/i18n-context";
 import { MarketplaceProvider } from "@/lib/marketplace-context";
 import { PremiumProvider } from "@/lib/premium-context";
 import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-context";
-import { initSentry } from "@/lib/sentry";
+import { initSentry, triggerSentryTestError } from "@/lib/sentry";
 import { SocialProvider } from "@/lib/social-context";
 import { clearRuntimeSupabaseConfig } from "@/lib/supabase";
 import { ToastProvider } from "@/lib/toast-context";
@@ -33,6 +33,10 @@ import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BO
 export default function RootLayout() {
   useEffect(() => {
     void initSentry();
+    // Expose a smoke-test trigger so a deployed install can verify Sentry
+    // end-to-end via devtools console: `__sendSentryTestError()`.
+    (globalThis as unknown as Record<string, unknown>).__sendSentryTestError =
+      triggerSentryTestError;
   }, []);
 
   useEffect(() => {

@@ -35,12 +35,31 @@ jobs:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       - name: Build web
-        run: npx expo export --platform web
+        run: npx expo export --platform web --source-maps
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
+          EXPO_PUBLIC_SENTRY_ENV: ${{ secrets.EXPO_PUBLIC_SENTRY_ENV }}
+          EXPO_PUBLIC_SENTRY_RELEASE: collectables@${{ github.sha }}
+      - name: Upload sourcemaps to Sentry
+        if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        with:
+          environment: production
+          version: collectables@${{ github.sha }}
+          sourcemaps: ./dist
+          ignore_missing: true
+          ignore_empty: true
       - name: Add SPA fallback
         run: cp dist/index.html dist/404.html
+      - name: Strip sourcemap files from public artifact
+        # Sentry has the .map files; don't ship them to GitHub Pages.
+        run: find dist -name "*.map" -type f -delete
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

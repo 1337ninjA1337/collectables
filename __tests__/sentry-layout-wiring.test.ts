@@ -17,7 +17,7 @@ describe("Crash #4 — Sentry provider wiring", () => {
   it("imports initSentry from lib/sentry", () => {
     assert.match(
       layoutSrc,
-      /import\s*\{\s*initSentry\s*\}\s*from\s*["']@\/lib\/sentry["']/,
+      /import\s*\{\s*initSentry[^}]*\}\s*from\s*["']@\/lib\/sentry["']/,
       "_layout.tsx must import initSentry from @/lib/sentry",
     );
   });
@@ -25,7 +25,7 @@ describe("Crash #4 — Sentry provider wiring", () => {
   it("calls initSentry() inside a useEffect at the top of RootLayout", () => {
     assert.match(
       layoutSrc,
-      /useEffect\(\s*\(\)\s*=>\s*\{\s*void\s+initSentry\(\)\s*;?\s*\}\s*,\s*\[\]\s*\)/,
+      /useEffect\(\s*\(\)\s*=>\s*\{[\s\S]*?void\s+initSentry\(\)[\s\S]*?\}\s*,\s*\[\]\s*\)/,
       "_layout.tsx must call initSentry() inside a top-level useEffect with empty deps",
     );
   });
