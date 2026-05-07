@@ -305,8 +305,10 @@ Run through this list before each `eas submit`:
   (no native code change). Apple permits OTA updates as long as core
   functionality and policy compliance are unchanged.
 - **Rolling back**: in App Store Connect → Version → "Remove from sale".
-- **Crash reporting**: not currently wired. Consider Sentry (`sentry-expo`)
-  before scale.
+- **Crash reporting**: `@sentry/react-native` is in `dependencies`. Once
+  `EXPO_PUBLIC_SENTRY_DSN` is provisioned (see section 14) and the Sentry
+  init module lands (`Crash #2`+ tasks in `.tasks/.tasks.md`), every
+  uncaught exception is reported to your Sentry project automatically.
 
 ---
 
@@ -332,6 +334,8 @@ eas secret:create --scope project --name EXPO_PUBLIC_CLOUDINARY_URL --value "...
 eas secret:create --scope project --name EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME --value "..."
 eas secret:create --scope project --name EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET --value "..."
 eas secret:create --scope project --name EXPO_PUBLIC_APP_URL --value "https://1337ninja1337.github.io/collectables"
+eas secret:create --scope project --name EXPO_PUBLIC_SENTRY_DSN --value "..."           # optional, enables crash reporting
+eas secret:create --scope project --name EXPO_PUBLIC_SENTRY_ENV --value "production"     # optional, gates SDK init
 ```
 
 Verify with `eas secret:list`. The values are encrypted at rest by Expo and

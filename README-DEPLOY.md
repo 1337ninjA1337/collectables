@@ -26,6 +26,8 @@ In the GitHub UI for this repository:
 | `EXPO_PUBLIC_CLOUDINARY_URL`                 | `EXPO_PUBLIC_CLOUDINARY_URL`               | Optional. Full REST base, e.g. `https://api.cloudinary.com/v1_1/<cloud-name>`. If omitted, the cloud name below is used. |
 | `EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME`          | `EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME`        | Optional. Falls back to the bundled default. |
 | `EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET`       | `EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET`     | Optional. Falls back to the bundled default. |
+| `EXPO_PUBLIC_SENTRY_DSN`                     | `EXPO_PUBLIC_SENTRY_DSN`                   | Optional. Sentry crash-reporting DSN. When empty, the SDK skips initialisation and `captureException` becomes a no-op. |
+| `EXPO_PUBLIC_SENTRY_ENV`                     | `EXPO_PUBLIC_SENTRY_ENV`                   | Optional. One of `development`, `staging`, `production`. Defaults to `production` for the deploy workflow; `development` disables event reporting entirely. |
 
 The deploy workflow also pins `EXPO_PUBLIC_APP_URL` to the public site URL so
 deep links resolve correctly even when shared from a sub-route.
