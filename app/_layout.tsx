@@ -1,5 +1,6 @@
 import "react-native-gesture-handler";
 
+import { ErrorBoundary } from "@sentry/react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { Stack, router, usePathname } from "expo-router";
@@ -9,6 +10,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { BottomNav } from "@/components/bottom-nav";
+import { CrashFallback } from "@/components/crash-fallback";
 import { LoginScreen } from "@/components/login-screen";
 import { SearchOverlay } from "@/components/search-overlay";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
@@ -20,6 +22,7 @@ import { I18nProvider, useI18n } from "@/lib/i18n-context";
 import { MarketplaceProvider } from "@/lib/marketplace-context";
 import { PremiumProvider } from "@/lib/premium-context";
 import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-context";
+import { initSentry } from "@/lib/sentry";
 import { SocialProvider } from "@/lib/social-context";
 import { clearRuntimeSupabaseConfig } from "@/lib/supabase";
 import { ToastProvider } from "@/lib/toast-context";
@@ -27,6 +30,10 @@ import { Screen, useResponsive } from "@/components/screen";
 import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export default function RootLayout() {
+  useEffect(() => {
+    void initSentry();
+  }, []);
+
   useEffect(() => {
     if (!isDevEnvironment()) return;
     registerDevMenu({
@@ -51,25 +58,31 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <I18nProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <SocialProvider>
-            <CollectionsProvider>
-              <ChatProvider>
-                <MarketplaceProvider>
-                  <PremiumProvider>
-                    <NavAnimationProvider>
-                      <AppShell />
-                    </NavAnimationProvider>
-                  </PremiumProvider>
-                </MarketplaceProvider>
-              </ChatProvider>
-            </CollectionsProvider>
-          </SocialProvider>
-        </AuthProvider>
-      </ToastProvider>
-    </I18nProvider>
+    <ErrorBoundary
+      fallback={({ error, resetError }) => (
+        <CrashFallback error={error} resetError={resetError} />
+      )}
+    >
+      <I18nProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <SocialProvider>
+              <CollectionsProvider>
+                <ChatProvider>
+                  <MarketplaceProvider>
+                    <PremiumProvider>
+                      <NavAnimationProvider>
+                        <AppShell />
+                      </NavAnimationProvider>
+                    </PremiumProvider>
+                  </MarketplaceProvider>
+                </ChatProvider>
+              </CollectionsProvider>
+            </SocialProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </I18nProvider>
+    </ErrorBoundary>
   );
 }
 
