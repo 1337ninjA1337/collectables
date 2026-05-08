@@ -77,7 +77,29 @@ form fields by default. We must:
    profile, which is fine).
 3. Honour `navigator.doNotTrack === "1"` by skipping the script injection.
 
-These are enforced in the Analytics #11 task (Clarity wiring).
+### Implementation (Analytics #11)
+
+The Clarity tag loader lives in `lib/clarity.ts` and is invoked from
+`lib/diagnostics-context.tsx` so it inherits the same opt-in / opt-out
+toggle as PostHog and Sentry. `initClarity()` no-ops unless **all** of:
+
+- `typeof window !== "undefined" && typeof document !== "undefined"` —
+  Platform.OS === "web" equivalent that does not pull in `react-native`
+  (mirrors `lib/env.ts` pattern). Native bundles never load the tag.
+- `analyticsConfig.clarityId` is non-empty (sourced from the
+  `EXPO_PUBLIC_CLARITY_PROJECT_ID` GitHub Actions secret).
+- `analyticsConfig.enabled === true` — guarantees no replay in dev or when
+  the PostHog key is missing.
+- The user has not opted out of diagnostics (the `Diagnostics & analytics`
+  toggle stored at `collectables-diagnostics-v1`).
+- `navigator.doNotTrack !== "1"` (also `"yes"` and the legacy
+  `msDoNotTrack` are honoured for older Safari/IE).
+
+The injection itself follows the official Clarity snippet: it pre-creates
+the `window.clarity` queue stub so any tracker calls fired before the remote
+tag loads are buffered, then appends a `<script async src="…/tag/<id>">`
+into `<head>`. `shutdownClarity()` removes the script tag and clears the
+global stub when the user flips the diagnostics toggle off mid-session.
 
 ## Why Power BI Desktop
 

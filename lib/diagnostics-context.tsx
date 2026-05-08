@@ -7,6 +7,11 @@ import {
   shutdownAnalytics,
 } from "@/lib/analytics";
 import {
+  initClarity,
+  setClarityOptOut,
+  shutdownClarity,
+} from "@/lib/clarity";
+import {
   initSentry,
   setSentryOptOut,
   shutdownSentry,
@@ -48,9 +53,11 @@ export function DiagnosticsProvider({ children }: React.PropsWithChildren) {
         setEnabled(next);
         setSentryOptOut(!next);
         setAnalyticsOptOut(!next);
+        setClarityOptOut(!next);
         if (next) {
           void initSentry();
           void initAnalytics();
+          initClarity();
         }
         setReady(true);
       })
@@ -67,6 +74,7 @@ export function DiagnosticsProvider({ children }: React.PropsWithChildren) {
       setEnabled(next);
       setSentryOptOut(!next);
       setAnalyticsOptOut(!next);
+      setClarityOptOut(!next);
       AsyncStorage.setItem(
         DIAGNOSTICS_KEY,
         JSON.stringify({ enabled: next }),
@@ -74,9 +82,11 @@ export function DiagnosticsProvider({ children }: React.PropsWithChildren) {
       if (next) {
         void initSentry();
         void initAnalytics();
+        initClarity();
       } else {
         shutdownSentry();
         shutdownAnalytics();
+        shutdownClarity();
       }
     },
     [],
