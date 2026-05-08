@@ -15,7 +15,9 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/components/empty-state";
 import { PhotoPreview } from "@/components/photo-preview";
@@ -30,6 +32,12 @@ import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/
 export default function WishlistScreen() {
   const { t } = useI18n();
   const toast = useToast();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  // Cap the sheet at 90% of the *current* viewport height (re-evaluated on
+  // resize / Safari address-bar collapse), minus the bottom inset so the
+  // home-indicator area on iOS doesn't occlude the action row.
+  const sheetMaxHeight = Math.max(320, windowHeight * 0.9 - insets.bottom);
   const { wishlistItems, collections, addWishlistItem, deleteItem, promoteWishlistItem, refresh } = useCollections();
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = useCallback(async () => {
@@ -239,13 +247,24 @@ export default function WishlistScreen() {
       <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setAddOpen(false)}>
           <Animated.View
-            style={[styles.sheet, { transform: [{ translateY: sheetTranslateY }] }]}
+            style={[
+              styles.sheet,
+              {
+                maxHeight: sheetMaxHeight,
+                paddingBottom: 20 + insets.bottom,
+                transform: [{ translateY: sheetTranslateY }],
+              },
+            ]}
             {...sheetPanResponder.panHandlers}
           >
-            <Pressable onPress={(e) => e.stopPropagation()}>
+            <Pressable style={styles.sheetInner} onPress={(e) => e.stopPropagation()}>
               <View style={styles.sheetHandle} />
               <Text style={styles.sheetTitle}>{t("wishlistAdd")}</Text>
-              <ScrollView contentContainerStyle={styles.sheetScroll} scrollEnabled={scrollEnabled.current}>
+              <ScrollView
+                style={styles.sheetScrollView}
+                contentContainerStyle={styles.sheetScroll}
+                scrollEnabled={scrollEnabled.current}
+              >
                 <Text style={styles.label}>{t("itemTitleLabel")}</Text>
                 <TextInput
                   style={styles.input}
@@ -462,8 +481,17 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 20,
-    maxHeight: "90%",
+    // maxHeight + paddingBottom are applied inline so they can include the
+    // dynamic safe-area bottom inset (Safari home indicator) and a viewport-
+    // relative cap that survives the address-bar collapse on iOS.
+  },
+  sheetInner: {
+    flex: 1,
+    minHeight: 0,
+  },
+  sheetScrollView: {
+    flex: 1,
+    minHeight: 0,
   },
   sheetHandle: {
     alignSelf: "center",
