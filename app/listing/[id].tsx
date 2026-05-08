@@ -5,6 +5,7 @@ import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View }
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { SkeletonItemDetail } from "@/components/skeleton";
+import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
 import { useCollections } from "@/lib/collections-context";
@@ -21,7 +22,7 @@ export default function ListingDetailScreen() {
   const { user } = useAuth();
   const { getListingById, fetchListingById, listings, markListingSold } = useMarketplace();
   const { getItemById, transferItemToBuyer } = useCollections();
-  const { getProfileById, ensureProfilesLoaded } = useSocial();
+  const { getProfileById, ensureProfilesLoaded, getRelationship } = useSocial();
   const { ensureChatWith, canMessage } = useChat();
   const [fetchingRemote, setFetchingRemote] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -132,10 +133,14 @@ export default function ListingDetailScreen() {
         },
       );
       markListingSold(listing.id, user.id);
+      trackEvent("listing_claimed", {
+        mode: listing.mode,
+        sellerWasFriend: getRelationship(listing.ownerUserId) === "friend",
+      });
     } finally {
       setClaiming(false);
     }
-  }, [listing, user, markListingSold, getItemById, transferItemToBuyer, t]);
+  }, [listing, user, markListingSold, getItemById, transferItemToBuyer, getRelationship, t]);
 
   function handleClaimPress() {
     if (!listing || !user || claiming) return;

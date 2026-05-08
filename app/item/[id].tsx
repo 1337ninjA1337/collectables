@@ -233,6 +233,10 @@ export default function ItemDetailsScreen() {
       toast.error(t("marketplaceListingFailed"), t("marketplaceUpgradeHint"));
       return;
     }
+    trackEvent("listing_created", {
+      mode: listingMode,
+      hasPrice: finalPrice !== null,
+    });
     closeListingSheet();
     toast.success(t("marketplaceListingCreated"));
   }
