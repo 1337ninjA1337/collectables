@@ -3,6 +3,11 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 
 import { seedCollections, seedItems } from "@/data/seed";
 import { useAuth } from "@/lib/auth-context";
+import {
+  hasNewCloudEntries,
+  mergeCollectionsFromCloud,
+  mergeItemsFromCloud,
+} from "@/lib/collections-cloud-merge";
 import { useSocial } from "@/lib/social-context";
 import {
   upsertCollection,
@@ -259,6 +264,67 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       AsyncStorage.setItem(followedCollectionsKey(user.id), JSON.stringify(followedCollectionIds)),
     ]).catch(() => undefined);
   }, [localCollections, localItems, followedCollectionIds, ready, user]);
+
+  // Best-effort cloud refresh: after the local-first paint completes (`ready`),
+  // fetch the user's collections + items from Supabase and merge any new
+  // entries into local state. Handles the "added an item on mobile, not
+  // showing on PC" case — the previous gates only fetched cloud when local
+  // was *completely* empty, so cross-device additions were invisible until a
+  // full storage flush. Runs on user change and on `refreshTick` so the
+  // existing `refresh()` exposed by context callers reaches the user's own
+  // collections too (it previously only retriggered the friend / followed /
+  // shared effects). Cloud rows win on ID conflict; local-only entries are
+  // preserved so an offline write that hasn't synced yet doesn't disappear.
+  useEffect(() => {
+    if (!ready || !user) return;
+    void refreshTick;
+
+    const activeUser = user;
+    let cancelled = false;
+
+    async function syncFromCloud() {
+      try {
+        const remoteCollections = await fetchCollectionsByUserId(activeUser.id);
+        if (cancelled) return;
+        if (remoteCollections.length > 0) {
+          setLocalCollections((current) => {
+            const localIds = new Set(current.map((c) => c.id));
+            const cloudIds = remoteCollections.map((c) => c.id);
+            if (!hasNewCloudEntries(localIds, cloudIds)) return current;
+            return mergeCollectionsFromCloud(current, remoteCollections, activeUser.id);
+          });
+        }
+
+        // Pull items for every collection we now own/share into. Use the
+        // post-merge collection set rather than the stale closure value so
+        // newly-discovered cloud collections also have their items loaded.
+        const collectionsToScan = remoteCollections.length > 0
+          ? remoteCollections
+          : [];
+        if (collectionsToScan.length === 0) return;
+        const itemBatches = await Promise.all(
+          collectionsToScan.map((c) => fetchItemsByCollectionId(c.id)),
+        );
+        if (cancelled) return;
+        const flattened = itemBatches.flat();
+        if (flattened.length === 0) return;
+        setLocalItems((current) => {
+          const localIds = new Set(current.map((i) => i.id));
+          const cloudIds = flattened.map((i) => i.id);
+          if (!hasNewCloudEntries(localIds, cloudIds)) return current;
+          return mergeItemsFromCloud(current, flattened);
+        });
+      } catch {
+        // Network/Supabase unavailable — keep the local state intact.
+      }
+    }
+
+    void syncFromCloud();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, ready, refreshTick]);
 
   // Fetch subscribed collections from Supabase
   useEffect(() => {
