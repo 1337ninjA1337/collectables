@@ -9,6 +9,7 @@ import { SkeletonItemDetail } from "@/components/skeleton";
 import { PhotoPreview } from "@/components/photo-preview";
 import { ReactionBar } from "@/components/reaction-bar";
 import { Screen } from "@/components/screen";
+import { trackEvent } from "@/lib/analytics";
 import { buildDeepLink } from "@/lib/deep-link";
 import { useAuth } from "@/lib/auth-context";
 import { uploadImages } from "@/lib/cloudinary";
@@ -156,6 +157,7 @@ export default function ItemDetailsScreen() {
     }
     setSaving(true);
     try {
+      const hadPhotosBefore = activeItem.photos.length > 0;
       let finalPhotos = editPhotos;
       if (newLocalPhotos.length > 0) {
         finalPhotos = await uploadImages(newLocalPhotos);
@@ -172,6 +174,12 @@ export default function ItemDetailsScreen() {
         tags: editTags.length > 0 ? editTags : undefined,
         photos: finalPhotos,
       });
+      if (!hadPhotosBefore && finalPhotos.length > 0) {
+        trackEvent("item_photo_attached", {
+          itemId: activeItem.id,
+          collectionId: activeItem.collectionId,
+        });
+      }
       setEditing(false);
     } finally {
       setSaving(false);

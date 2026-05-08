@@ -5,6 +5,7 @@ import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextIn
 
 import { Screen } from "@/components/screen";
 import { collectionTemplates } from "@/data/collection-templates";
+import { trackEvent } from "@/lib/analytics";
 import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -110,6 +111,11 @@ export default function CreateCollectionScreen() {
         description: description.trim() || t("defaultCollectionDescription"),
         coverPhoto: uploadedCover,
         visibility: finalVisibility,
+      });
+
+      trackEvent("collection_created", {
+        visibility: finalVisibility,
+        isPremium,
       });
 
       router.replace(`/collection/${id}`);

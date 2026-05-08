@@ -7,6 +7,7 @@ import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text,
 import { PhotoPreview } from "@/components/photo-preview";
 import { Screen } from "@/components/screen";
 import { analyzeItemPhoto, isAiVisionConfigured } from "@/lib/ai-vision";
+import { trackEvent } from "@/lib/analytics";
 import { uploadImages } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -144,6 +145,11 @@ export default function CreateItemScreen() {
         cost: parsedCost !== null && !Number.isNaN(parsedCost) ? parsedCost : null,
         condition: condition || undefined,
         tags: tags.length > 0 ? tags : undefined,
+      });
+
+      trackEvent("item_added", {
+        collectionId,
+        hasPhoto: uploadedPhotos.length > 0,
       });
 
       router.replace(`/item/${id}`);
