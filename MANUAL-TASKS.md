@@ -26,3 +26,17 @@ Run `supabase/migrations/20260507_marketplace_buyer_user_id.sql` against your Su
 ```
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
+
+## 20260508_analytics_events.sql
+
+Run `supabase/migrations/20260508_analytics_events.sql` against your Supabase project to create the long-tail event store mirrored from PostHog (Analytics #12):
+
+```sql
+-- Creates public.analytics_events(id, occurred_at, user_id, name, properties jsonb).
+-- RLS is ENABLED with NO policies: neither anon nor authenticated callers can
+-- read or write rows. Inserts must be performed with the service_role key
+-- (used by the analytics-mirror Edge Function and by Power BI / SQL queries).
+-- Indexes: occurred_at DESC, (name, occurred_at DESC), (user_id, occurred_at DESC).
+```
+
+Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
