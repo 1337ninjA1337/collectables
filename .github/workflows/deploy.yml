@@ -62,6 +62,11 @@ jobs:
           EXPO_PUBLIC_SENTRY_RELEASE: collectables@${{ github.sha }}
       - name: Upload sourcemaps to Sentry
         if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
+        # Sentry sourcemap upload is best-effort — a token-scope / org-slug
+        # mismatch should not gate the GitHub Pages deploy, since the runtime
+        # Sentry SDK still works without uploaded sourcemaps (stack traces
+        # arrive minified). See .sentry-setup.md §10 for the common causes.
+        continue-on-error: true
         uses: getsentry/action-release@v1
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
