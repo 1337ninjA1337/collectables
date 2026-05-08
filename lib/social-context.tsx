@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { seedProfiles, seedSocialCollections, seedSocialItems } from "@/data/social-seed";
+import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import {
   upsertMyProfile,
@@ -437,6 +438,8 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
           return;
         }
 
+        const alreadyRequested = hasRequest(friendRequests, user.id, profileId);
+
         setFriendRequests((current) => {
           if (hasRequest(current, user.id, profileId)) {
             return current;
@@ -446,6 +449,12 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
 
         setFollowing((current) => (current.includes(profileId) ? current : [...current, profileId]));
         sendFriendRequest(user.id, profileId).catch(() => undefined);
+
+        if (!alreadyRequested) {
+          trackEvent("friend_requested", {
+            targetUserId: profileId,
+          });
+        }
       },
       removeFriend: async (profileId) => {
         if (!user) {

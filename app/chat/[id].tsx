@@ -16,6 +16,7 @@ import {
 
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
+import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
 import { buildChatId } from "@/lib/chat-helpers";
@@ -42,7 +43,7 @@ export default function ChatDetailScreen() {
   const otherUserId = params.id ?? "";
   const { user } = useAuth();
   const { t, language } = useI18n();
-  const { getProfileById, ensureProfilesLoaded } = useSocial();
+  const { getProfileById, ensureProfilesLoaded, getRelationship } = useSocial();
   const { getMessages, sendMessage, canMessage, markRead, clearChat, refreshFromCloud, realtimeOnline } = useChat();
 
   const [text, setText] = useState("");
@@ -78,6 +79,20 @@ export default function ChatDetailScreen() {
   useEffect(() => {
     if (chatId) markRead(chatId);
   }, [chatId, messages.length, markRead]);
+
+  // Fire chat_opened debounced — a 500ms dwell-time gate prevents a back/forth
+  // navigation flicker from double-counting the conversation. The cleanup
+  // clears the timer if the user leaves before the gate elapses.
+  useEffect(() => {
+    if (!chatId) return;
+    const timer = setTimeout(() => {
+      trackEvent("chat_opened", {
+        conversationId: chatId,
+        withFriend: getRelationship(otherUserId) === "friend",
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [chatId, otherUserId, getRelationship]);
 
   // Belt-and-braces fallback for realtime: pull fresh messages on mount and
   // every few seconds while the chat is open, pausing when backgrounded.

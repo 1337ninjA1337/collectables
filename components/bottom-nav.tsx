@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { NavTab, NavItem } from "@/components/nav-tab";
 import { useResponsive } from "@/components/screen";
+import { trackEvent } from "@/lib/analytics";
 import { useChat } from "@/lib/chat-context";
 import { FriendsTabBadge } from "@/lib/chat-helpers";
 import { useI18n } from "@/lib/i18n-context";
@@ -73,6 +74,9 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   useEffect(() => {
     if (!prevIsPremium.current && isPremium) {
       toast.success(t("premiumActive"));
+      trackEvent("premium_activated", {
+        source: "settings",
+      });
     }
     prevIsPremium.current = isPremium;
   }, [isPremium, t, toast]);
