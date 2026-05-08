@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 import { AuthChangeEvent, Session, User } from "@supabase/auth-js";
 
+import { trackEvent } from "@/lib/analytics";
+import { isFreshlyCreatedUser } from "@/lib/auth-helpers";
 import { deleteCloudinaryImages } from "@/lib/cloudinary";
 import { setSentryUser } from "@/lib/sentry";
 import { authClient, isSupabaseConfigured } from "@/lib/supabase";
@@ -111,11 +113,18 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
 
         setPending(true);
         try {
-          const { error } = await authClient.verifyOtp({
+          const { data, error } = await authClient.verifyOtp({
             email: email.trim(),
             token: token.trim(),
             type: "email",
           });
+
+          if (!error && isFreshlyCreatedUser(data?.user ?? null)) {
+            trackEvent("signup_completed", {
+              method: "otp",
+              provider: "email",
+            });
+          }
 
           return error ? { error: error.message } : {};
         } finally {

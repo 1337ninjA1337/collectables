@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
+import { trackEvent } from "@/lib/analytics";
 import { LANGUAGE_KEY } from "@/lib/storage-keys";
 
 export type AppLanguage = "ru" | "en" | "be" | "pl" | "de" | "es";
@@ -1597,6 +1598,12 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
       language,
       ready,
       setLanguage: async (nextLanguage: AppLanguage) => {
+        if (nextLanguage !== language) {
+          trackEvent("language_switched", {
+            language: nextLanguage,
+            previousLanguage: language,
+          });
+        }
         setLanguageState(nextLanguage);
         await AsyncStorage.setItem(LANGUAGE_KEY, nextLanguage);
       },
