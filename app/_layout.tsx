@@ -15,6 +15,7 @@ import { CrashFallback } from "@/components/crash-fallback";
 import { LoginScreen } from "@/components/login-screen";
 import { NavigationBreadcrumbs } from "@/components/navigation-breadcrumbs";
 import { SearchOverlay } from "@/components/search-overlay";
+import { AnalyticsProvider } from "@/lib/analytics-provider";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ChatProvider, useChat } from "@/lib/chat-context";
 import { formatBadgeCount } from "@/lib/chat-helpers";
@@ -80,9 +81,11 @@ export default Sentry.wrap(function RootLayout() {
                   <ChatProvider>
                     <MarketplaceProvider>
                       <PremiumProvider>
-                        <NavAnimationProvider>
-                          <AppShell />
-                        </NavAnimationProvider>
+                        <AnalyticsProvider>
+                          <NavAnimationProvider>
+                            <AppShell />
+                          </NavAnimationProvider>
+                        </AnalyticsProvider>
                       </PremiumProvider>
                     </MarketplaceProvider>
                   </ChatProvider>

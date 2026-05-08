@@ -2,6 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import {
+  initAnalytics,
+  setAnalyticsOptOut,
+  shutdownAnalytics,
+} from "@/lib/analytics";
+import {
   initSentry,
   setSentryOptOut,
   shutdownSentry,
@@ -42,7 +47,11 @@ export function DiagnosticsProvider({ children }: React.PropsWithChildren) {
         const next = parseStoredDiagnostics(raw);
         setEnabled(next);
         setSentryOptOut(!next);
-        if (next) void initSentry();
+        setAnalyticsOptOut(!next);
+        if (next) {
+          void initSentry();
+          void initAnalytics();
+        }
         setReady(true);
       })
       .catch(() => {
@@ -57,14 +66,17 @@ export function DiagnosticsProvider({ children }: React.PropsWithChildren) {
     () => (next: boolean) => {
       setEnabled(next);
       setSentryOptOut(!next);
+      setAnalyticsOptOut(!next);
       AsyncStorage.setItem(
         DIAGNOSTICS_KEY,
         JSON.stringify({ enabled: next }),
       ).catch(() => undefined);
       if (next) {
         void initSentry();
+        void initAnalytics();
       } else {
         shutdownSentry();
+        shutdownAnalytics();
       }
     },
     [],
