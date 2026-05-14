@@ -10,6 +10,7 @@ import {
   canChatWith,
   totalUnread,
 } from "@/lib/chat-helpers";
+import { captureException } from "@/lib/sentry";
 import { useSocial } from "@/lib/social-context";
 import {
   fetchChatReads,
@@ -191,16 +192,24 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     let cancelled = false;
 
     void (async () => {
-      const results = await Promise.all(
-        friends.map(async (friendId) => {
-          const chatId = buildChatId(user.id, friendId);
-          const messages = await cloudFetchMessagesForChat(chatId);
-          return { chatId, messages };
-        }),
-      );
+      try {
+        const results = await Promise.all(
+          friends.map(async (friendId) => {
+            const chatId = buildChatId(user.id, friendId);
+            const messages = await cloudFetchMessagesForChat(chatId);
+            return { chatId, messages };
+          }),
+        );
 
-      if (cancelled) return;
-      mergeCloudMessages(results);
+        if (cancelled) return;
+        mergeCloudMessages(results);
+      } catch (err) {
+        // Swallow + report — a transient cloud read failure (e.g. iOS Safari
+        // 18's intermittent "Load failed" fetch flake) must not surface as an
+        // unhandled rejection that the browser's unhandled-rejection handler
+        // can treat as a render crash.
+        captureException(err, { context: "chat-context.cloudFetchMessages" });
+      }
     })();
 
     return () => {
@@ -214,24 +223,28 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     if (!ready || !user) return;
     let cancelled = false;
     void (async () => {
-      const cloudReads = await fetchChatReads(user.id);
-      if (cancelled || Object.keys(cloudReads).length === 0) return;
-      setStore((prev) => {
-        let touched = false;
-        let nextRead = prev.lastReadByChat;
-        for (const [chatId, cloudAt] of Object.entries(cloudReads)) {
-          const localAt = prev.lastReadByChat[chatId] ?? "";
-          if (cloudAt > localAt) {
-            if (!touched) {
-              nextRead = { ...nextRead };
-              touched = true;
+      try {
+        const cloudReads = await fetchChatReads(user.id);
+        if (cancelled || Object.keys(cloudReads).length === 0) return;
+        setStore((prev) => {
+          let touched = false;
+          let nextRead = prev.lastReadByChat;
+          for (const [chatId, cloudAt] of Object.entries(cloudReads)) {
+            const localAt = prev.lastReadByChat[chatId] ?? "";
+            if (cloudAt > localAt) {
+              if (!touched) {
+                nextRead = { ...nextRead };
+                touched = true;
+              }
+              nextRead[chatId] = cloudAt;
             }
-            nextRead[chatId] = cloudAt;
           }
-        }
-        if (!touched) return prev;
-        return { ...prev, lastReadByChat: nextRead };
-      });
+          if (!touched) return prev;
+          return { ...prev, lastReadByChat: nextRead };
+        });
+      } catch (err) {
+        captureException(err, { context: "chat-context.fetchChatReads" });
+      }
     })();
     return () => {
       cancelled = true;
