@@ -1,4 +1,5 @@
 import { captureException } from "@/lib/sentry";
+import { fetchWithRetry } from "@/lib/fetch-retry";
 import {
   authClient,
   isSupabaseConfigured,
@@ -67,18 +68,23 @@ async function supabaseRest(
     ? pathOrUrl
     : `${supabaseUrl}/rest/v1${pathOrUrl}`;
   const token = await getAccessToken();
-  const res = await fetch(url, {
-    method: options.method ?? "GET",
-    headers: {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${token ?? supabaseKey}`,
-      "Content-Type": "application/json",
-      Prefer: options.method === "POST" ? "resolution=merge-duplicates,return=minimal" : "",
-      ...options.headers,
-    },
-    body: options.body,
-  });
-  return res;
+  const method = options.method ?? "GET";
+  // Build headers minimally. Sending `Content-Type` on a body-less GET and
+  // sending an empty `Prefer: ""` both expand the CORS preflight surface; iOS
+  // Safari 18 rejects the preflight more often than it should, surfacing as
+  // `TypeError: Load failed` for every Supabase call on the page.
+  const headers: Record<string, string> = {
+    apikey: supabaseKey,
+    Authorization: `Bearer ${token ?? supabaseKey}`,
+    ...options.headers,
+  };
+  if (options.body !== undefined) {
+    headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
+  }
+  if (method === "POST") {
+    headers["Prefer"] = headers["Prefer"] ?? "resolution=merge-duplicates,return=minimal";
+  }
+  return fetchWithRetry(url, { method, headers, body: options.body });
 }
 
 /** Upsert the current user's profile into the profiles table. */

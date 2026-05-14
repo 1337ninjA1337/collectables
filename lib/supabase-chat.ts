@@ -12,6 +12,7 @@ import {
   supabaseUrl,
 } from "@/lib/supabase";
 import { captureException } from "@/lib/sentry";
+import { fetchWithRetry } from "@/lib/fetch-retry";
 import { getSharedRealtimeClient } from "@/lib/supabase-realtime";
 import {
   buildAuthHeaders,
@@ -55,7 +56,7 @@ async function getAccessToken(): Promise<string | null> {
 export async function fetchMessagesForChat(
   chatId: string,
   {
-    fetcher = fetch as FetchFn,
+    fetcher = fetchWithRetry as FetchFn,
     tokenProvider = getAccessToken,
   }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
 ): Promise<ChatMessage[]> {
@@ -74,7 +75,7 @@ export async function fetchMessagesForChat(
 export async function sendMessage(
   input: SendMessageInput,
   {
-    fetcher = fetch as FetchFn,
+    fetcher = fetchWithRetry as FetchFn,
     tokenProvider = getAccessToken,
   }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
 ): Promise<ChatMessage | null> {
@@ -254,7 +255,7 @@ export async function isMutualFriend(
   userA: string,
   userB: string,
   {
-    fetcher = fetch as FetchFn,
+    fetcher = fetchWithRetry as FetchFn,
     tokenProvider = getAccessToken,
   }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
 ): Promise<boolean> {
@@ -280,7 +281,7 @@ export async function isMutualFriend(
 export async function fetchChatReads(
   userId: string,
   {
-    fetcher = fetch as FetchFn,
+    fetcher = fetchWithRetry as FetchFn,
     tokenProvider = getAccessToken,
   }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
 ): Promise<Record<string, string>> {
@@ -305,7 +306,7 @@ export async function upsertChatRead(
   chatId: string,
   lastReadAt: string,
   {
-    fetcher = fetch as FetchFn,
+    fetcher = fetchWithRetry as FetchFn,
     tokenProvider = getAccessToken,
   }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
 ): Promise<void> {
