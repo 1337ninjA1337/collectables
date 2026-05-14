@@ -23,8 +23,23 @@ export function getOtherParticipantId(chatId: string, selfId: string): string | 
 }
 
 export function appendMessage(messages: ChatMessage[], message: ChatMessage): ChatMessage[] {
+  // Dedupe by server id first (canonical, always present).
   if (messages.some((m) => m.id === message.id)) {
     return messages;
+  }
+  // Also dedupe by clientMessageId so an optimistic local insert and the
+  // matching realtime/cloud echo collapse onto a single bubble. When both
+  // are present, prefer the server-issued row (later in the stream) by
+  // swapping the existing entry in-place rather than appending a duplicate.
+  if (message.clientMessageId) {
+    const optimisticIdx = messages.findIndex(
+      (m) => m.clientMessageId === message.clientMessageId,
+    );
+    if (optimisticIdx >= 0) {
+      const next = [...messages];
+      next[optimisticIdx] = message;
+      return next.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+    }
   }
   return [...messages, message].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
 }

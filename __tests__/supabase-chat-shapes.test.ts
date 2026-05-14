@@ -6,8 +6,10 @@ import {
   buildSendMessageHeaders,
   chatRowToMessage,
   extractTypingUserIds,
+  fetchMessageByClientIdUrl,
   fetchMessagesUrl,
   friendCheckUrl,
+  generateClientMessageId,
   inboxChannelTopic,
   inboxFilter,
   isMutualFriendFromResponses,
@@ -80,6 +82,133 @@ describe("messageToInsertPayload", () => {
     });
     assert.ok(!("id" in withoutMeta));
     assert.ok(!("created_at" in withoutMeta));
+  });
+
+  it("forwards clientMessageId as snake-case client_message_id when provided", () => {
+    const body = messageToInsertPayload({
+      chatId: "chat-a-b",
+      fromUserId: "a",
+      toUserId: "b",
+      text: "hi",
+      clientMessageId: "11111111-2222-4333-8444-555555555555",
+    });
+    assert.equal(body.client_message_id, "11111111-2222-4333-8444-555555555555");
+  });
+
+  it("omits client_message_id when caller does not provide one (legacy callers)", () => {
+    const body = messageToInsertPayload({
+      chatId: "chat-a-b",
+      fromUserId: "a",
+      toUserId: "b",
+      text: "hi",
+    });
+    assert.ok(!("client_message_id" in body));
+  });
+});
+
+describe("fetchMessageByClientIdUrl", () => {
+  it("queries /rest/v1/chat_messages by (from_user_id, client_message_id) with limit 1", () => {
+    const url = fetchMessageByClientIdUrl(
+      BASE,
+      "alice",
+      "11111111-2222-4333-8444-555555555555",
+    );
+    assert.equal(
+      url,
+      `${BASE}/rest/v1/chat_messages?from_user_id=eq.alice&client_message_id=eq.11111111-2222-4333-8444-555555555555&select=*&limit=1`,
+    );
+  });
+
+  it("URI-encodes both parameters so injection can't escape the filter", () => {
+    const url = fetchMessageByClientIdUrl(
+      BASE,
+      "alice&x=1",
+      "id&y=2",
+    );
+    assert.ok(url.includes("from_user_id=eq.alice%26x%3D1"));
+    assert.ok(url.includes("client_message_id=eq.id%26y%3D2"));
+    assert.ok(!url.includes("&x=1"));
+    assert.ok(!url.includes("&y=2"));
+  });
+});
+
+describe("generateClientMessageId", () => {
+  it("uses crypto.randomUUID when available", () => {
+    let calls = 0;
+    const fake = {
+      randomUUID: () => {
+        calls++;
+        return "deterministic-uuid";
+      },
+    };
+    assert.equal(generateClientMessageId(fake), "deterministic-uuid");
+    assert.equal(calls, 1);
+  });
+
+  it("falls back to getRandomValues when randomUUID is unavailable, producing a valid v4 uuid", () => {
+    const fake = {
+      getRandomValues: <T extends ArrayBufferView | null>(array: T): T => {
+        if (array && "length" in array && "BYTES_PER_ELEMENT" in array) {
+          const bytes = array as unknown as Uint8Array;
+          for (let i = 0; i < bytes.length; i++) bytes[i] = 0xab;
+        }
+        return array;
+      },
+    };
+    const id = generateClientMessageId(fake);
+    // Format: 8-4-4-4-12 hex digits, version-4 nibble, RFC 4122 variant.
+    assert.match(
+      id,
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it("returns distinct uuids on consecutive crypto calls", () => {
+    let counter = 0;
+    const fake = {
+      randomUUID: () => `uuid-${counter++}`,
+    };
+    const a = generateClientMessageId(fake);
+    const b = generateClientMessageId(fake);
+    assert.notEqual(a, b);
+  });
+
+  it("still produces a valid uuid string without any crypto host (math.random fallback)", () => {
+    const id = generateClientMessageId({});
+    assert.match(
+      id,
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+  });
+});
+
+describe("chatRowToMessage with client_message_id", () => {
+  it("hoists client_message_id into clientMessageId when present", () => {
+    const row = {
+      id: "msg-1",
+      chat_id: "chat-a-b",
+      from_user_id: "a",
+      to_user_id: "b",
+      text: "hello",
+      created_at: "2026-04-25T10:00:00.000Z",
+      client_message_id: "cmi-1",
+    };
+    const msg = chatRowToMessage(row);
+    assert.equal(msg.clientMessageId, "cmi-1");
+  });
+
+  it("omits clientMessageId when the column is null (legacy rows)", () => {
+    const row = {
+      id: "msg-1",
+      chat_id: "chat-a-b",
+      from_user_id: "a",
+      to_user_id: "b",
+      text: "hello",
+      created_at: "2026-04-25T10:00:00.000Z",
+      client_message_id: null,
+    };
+    const msg = chatRowToMessage(row);
+    assert.ok(!("clientMessageId" in msg));
   });
 });
 

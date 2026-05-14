@@ -101,6 +101,37 @@ describe("appendMessage", () => {
       ["m-early", "m-late"],
     );
   });
+
+  it("collapses an optimistic-local insert onto its server-issued echo via clientMessageId", () => {
+    const optimistic = makeMessage({
+      id: "local-tmp-1",
+      createdAt: "2026-04-24T10:00:00.000Z",
+      clientMessageId: "cmi-1",
+    });
+    const serverEcho = makeMessage({
+      id: "server-uuid-1",
+      createdAt: "2026-04-24T10:00:00.500Z",
+      clientMessageId: "cmi-1",
+    });
+    const result = appendMessage([optimistic], serverEcho);
+    assert.equal(result.length, 1, "should not duplicate");
+    assert.equal(result[0].id, "server-uuid-1", "server row should win on collision");
+    assert.equal(result[0].clientMessageId, "cmi-1");
+  });
+
+  it("still dedupes by server id when clientMessageId is absent (back-compat)", () => {
+    const m = makeMessage({ id: "m1" });
+    assert.equal(m.clientMessageId, undefined);
+    const result = appendMessage([m], m);
+    assert.equal(result.length, 1);
+  });
+
+  it("does not collide on clientMessageId across different senders' local ids", () => {
+    const a = makeMessage({ id: "a", clientMessageId: "x" });
+    const b = makeMessage({ id: "b", clientMessageId: "y" });
+    const result = appendMessage([a], b);
+    assert.equal(result.length, 2);
+  });
 });
 
 describe("buildChatPreviews", () => {

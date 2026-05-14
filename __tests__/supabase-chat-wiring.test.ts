@@ -80,6 +80,20 @@ describe("supabase-chat.ts wiring", () => {
     assert.match(block, /method:\s*"POST"/);
   });
 
+  it("sendMessage turns a 409 conflict into a refetch by clientMessageId", () => {
+    const block = extractFunctionBlock(SOURCE, "sendMessage");
+    assert.match(block, /res\.status\s*===\s*409/);
+    assert.match(block, /input\.clientMessageId/);
+    assert.match(block, /fetchMessageByClientId\(/);
+  });
+
+  it("fetchMessageByClientId reads via fetchMessageByClientIdUrl + buildAuthHeaders", () => {
+    const block = extractFunctionBlock(SOURCE, "fetchMessageByClientId");
+    assert.match(block, /fetchMessageByClientIdUrl\(/);
+    assert.match(block, /buildAuthHeaders\(/);
+    assert.match(block, /chatRowToMessage/);
+  });
+
   it("isMutualFriend issues two friendCheckUrl requests and combines via isMutualFriendFromResponses", () => {
     const block = extractFunctionBlock(SOURCE, "isMutualFriend");
     assert.match(block, /friendCheckUrl\([^)]*userA[^)]*userB[^)]*\)/);

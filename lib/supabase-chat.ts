@@ -25,6 +25,7 @@ import {
   ChatRow,
   chatRowToMessage,
   extractTypingUserIds,
+  fetchMessageByClientIdUrl,
   fetchMessagesUrl,
   friendCheckUrl,
   inboxChannelTopic,
@@ -87,6 +88,47 @@ export async function sendMessage(
     headers: buildSendMessageHeaders(supabasePublishableKey!, token),
     body: JSON.stringify(messageToInsertPayload(input)),
   });
+
+  // Idempotent retry: when the partial UNIQUE index on
+  // (from_user_id, client_message_id) trips, postgrest returns 409 conflict.
+  // Re-fetch the canonical row by client_message_id so the caller can merge
+  // it into local state without producing a duplicate.
+  if (res.status === 409 && input.clientMessageId) {
+    return fetchMessageByClientId(
+      input.fromUserId,
+      input.clientMessageId,
+      { fetcher, tokenProvider },
+    );
+  }
+
+  if (!res.ok) return null;
+
+  const rows = (await res.json()) as ChatRow[];
+  if (!rows.length) return null;
+  return chatRowToMessage(rows[0]);
+}
+
+/**
+ * Read a single chat message by its `(from_user_id, client_message_id)` pair.
+ * Used as the fallback path when a retried INSERT conflicts on the unique
+ * index — fetching the canonical row keeps the local timeline in sync without
+ * inserting a duplicate.
+ */
+export async function fetchMessageByClientId(
+  fromUserId: string,
+  clientMessageId: string,
+  {
+    fetcher = fetchWithRetry as FetchFn,
+    tokenProvider = getAccessToken,
+  }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
+): Promise<ChatMessage | null> {
+  if (!isSupabaseConfigured || !fromUserId || !clientMessageId) return null;
+
+  const token = await tokenProvider();
+  const res = await fetcher(
+    fetchMessageByClientIdUrl(supabaseUrl!, fromUserId, clientMessageId),
+    { headers: buildAuthHeaders(supabasePublishableKey!, token) },
+  );
   if (!res.ok) return null;
 
   const rows = (await res.json()) as ChatRow[];

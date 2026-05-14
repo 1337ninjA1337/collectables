@@ -15,6 +15,7 @@ export type ChatRow = {
   to_user_id: string;
   text: string;
   created_at: string;
+  client_message_id?: string | null;
 };
 
 export type SendMessageInput = {
@@ -24,6 +25,13 @@ export type SendMessageInput = {
   text: string;
   id?: string;
   createdAt?: string;
+  /**
+   * Client-generated uuid that survives retries — the server enforces
+   * uniqueness via a partial UNIQUE index on `(from_user_id, client_message_id)`,
+   * so re-posting the same logical message returns a 23505 conflict instead
+   * of inserting a duplicate row.
+   */
+  clientMessageId?: string;
 };
 
 export type ChatInsertPayload = {
@@ -33,6 +41,7 @@ export type ChatInsertPayload = {
   text: string;
   id?: string;
   created_at?: string;
+  client_message_id?: string;
 };
 
 export function chatRowToMessage(row: ChatRow): ChatMessage {
@@ -43,6 +52,7 @@ export function chatRowToMessage(row: ChatRow): ChatMessage {
     toUserId: row.to_user_id,
     text: row.text,
     createdAt: row.created_at,
+    ...(row.client_message_id ? { clientMessageId: row.client_message_id } : {}),
   };
 }
 
@@ -55,7 +65,64 @@ export function messageToInsertPayload(input: SendMessageInput): ChatInsertPaylo
   };
   if (input.id) payload.id = input.id;
   if (input.createdAt) payload.created_at = input.createdAt;
+  if (input.clientMessageId) payload.client_message_id = input.clientMessageId;
   return payload;
+}
+
+/**
+ * REST URL that fetches the *existing* row for an idempotent retry. When a
+ * POST returns 23505 (or an empty representation because the server resolved
+ * the conflict silently), the client can hit this endpoint to retrieve the
+ * canonical row and merge it into local state without inserting a duplicate.
+ */
+export function fetchMessageByClientIdUrl(
+  baseUrl: string,
+  fromUserId: string,
+  clientMessageId: string,
+): string {
+  return (
+    `${baseUrl}/rest/v1/chat_messages?from_user_id=eq.${encodeURIComponent(fromUserId)}` +
+    `&client_message_id=eq.${encodeURIComponent(clientMessageId)}&select=*&limit=1`
+  );
+}
+
+/**
+ * RFC 4122 v4 uuid generator. Uses `crypto.randomUUID` when available
+ * (modern browsers, Node 14.17+, Hermes ≥0.74). Falls back to `crypto.getRandomValues`
+ * for older runtimes (e.g. React Native Hermes on legacy iOS without the
+ * `react-native-get-random-values` polyfill — the polyfill exposes it).
+ *
+ * Kept in this pure-shapes module so generation is testable without pulling
+ * in the supabase client or React Native peers.
+ */
+export function generateClientMessageId(
+  cryptoLike: { randomUUID?: () => string; getRandomValues?: <T extends ArrayBufferView | null>(array: T) => T } | undefined =
+    typeof globalThis !== "undefined"
+      ? (globalThis.crypto as { randomUUID?: () => string; getRandomValues?: <T extends ArrayBufferView | null>(array: T) => T } | undefined)
+      : undefined,
+): string {
+  if (cryptoLike?.randomUUID) {
+    return cryptoLike.randomUUID();
+  }
+  if (cryptoLike?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    cryptoLike.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10, 16).join("")}`;
+  }
+  // Last-resort pseudo-random uuid — non-cryptographic, but every supported
+  // runtime ships crypto so this branch is documentation more than a real path.
+  let id = "";
+  for (let i = 0; i < 32; i++) {
+    const r = Math.floor(Math.random() * 16);
+    if (i === 12) id += "4";
+    else if (i === 16) id += ((r & 0x3) | 0x8).toString(16);
+    else id += r.toString(16);
+    if (i === 7 || i === 11 || i === 15 || i === 19) id += "-";
+  }
+  return id;
 }
 
 export function fetchMessagesUrl(baseUrl: string, chatId: string): string {

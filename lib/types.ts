@@ -58,6 +58,7 @@ export type ChatMessage = {
   toUserId: string;
   text: string;
   createdAt: string;
+  clientMessageId?: string;
 };
 
 export type MarketplaceMode = "trade" | "sell";

@@ -19,6 +19,7 @@ import {
   subscribeToInbox,
   upsertChatRead,
 } from "@/lib/supabase-chat";
+import { generateClientMessageId } from "@/lib/supabase-chat-shapes";
 import { chatCacheKey } from "@/lib/storage-keys";
 import { ChatMessage } from "@/lib/types";
 
@@ -139,13 +140,18 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
         if (!msgs || msgs.length === 0) continue;
         let allSent = true;
         for (const msg of msgs) {
+          // Pass clientMessageId so the server's unique index drops the row
+          // if this pending entry was already accepted on a prior attempt
+          // (e.g. the previous response was lost mid-flight). The runtime
+          // wrapper turns 409 into a refetch, so we still get the canonical
+          // row without inserting a duplicate.
           const sent = await cloudSendMessage({
             chatId: msg.chatId,
             fromUserId: msg.fromUserId,
             toUserId: msg.toUserId,
             text: msg.text,
-            id: msg.id,
             createdAt: msg.createdAt,
+            clientMessageId: msg.clientMessageId,
           });
           if (!sent) {
             allSent = false;
@@ -309,6 +315,11 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       if (!canMessage(otherUserId)) return null;
 
       const chatId = buildChatId(user.id, otherUserId);
+      // Stamp every send with a client-generated uuid so retries (online queue
+      // flush, network flake, etc.) hit the partial UNIQUE index on
+      // (from_user_id, client_message_id) and the second POST returns 409
+      // instead of inserting a duplicate row.
+      const clientMessageId = generateClientMessageId();
 
       // Try cloud first so other devices see the message and the server-issued
       // uuid+timestamp win across clients. When the cloud send fails (offline,
@@ -319,6 +330,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
         fromUserId: user.id,
         toUserId: otherUserId,
         text: trimmed,
+        clientMessageId,
       });
 
       const message: ChatMessage = cloudMessage ?? {
@@ -328,6 +340,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
         toUserId: otherUserId,
         text: trimmed,
         createdAt: new Date().toISOString(),
+        clientMessageId,
       };
 
       setStore((prev) => {

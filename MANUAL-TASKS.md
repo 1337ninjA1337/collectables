@@ -27,6 +27,23 @@ Run `supabase/migrations/20260507_marketplace_buyer_user_id.sql` against your Su
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
 
+## 20260514_chat_messages_client_id.sql
+
+Run `supabase/migrations/20260514_chat_messages_client_id.sql` against your Supabase project to enable idempotent chat sends:
+
+```sql
+-- Adds nullable public.chat_messages.client_message_id (uuid) plus a
+-- partial UNIQUE index on (from_user_id, client_message_id) so retries
+-- of the same logical message (transient network flake, app backgrounded
+-- mid-flush, pending-queue replay) fail with 23505 instead of inserting
+-- a duplicate row. The runtime client turns the 409 conflict into a
+-- refetch of the canonical row.
+--
+-- Existing rows back-compat automatically (nullable column + partial index).
+```
+
+Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
+
 ## 20260508_analytics_events.sql
 
 Run `supabase/migrations/20260508_analytics_events.sql` against your Supabase project to create the long-tail event store mirrored from PostHog (Analytics #12):
