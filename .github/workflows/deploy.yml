@@ -78,8 +78,8 @@ jobs:
           sourcemaps: ./dist
           ignore_missing: true
           ignore_empty: true
-      - name: Add SPA fallback
-        run: cp dist/index.html dist/404.html
+      - name: Add SPA fallback (rafgraph pattern — 404.html redirects, index restores)
+        run: node scripts/build-spa-fallback.js
       - name: Strip sourcemap files from public artifact
         # Sentry has the .map files; don't ship them to GitHub Pages.
         run: find dist -name "*.map" -type f -delete
