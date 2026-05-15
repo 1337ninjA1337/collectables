@@ -41,6 +41,23 @@ Run `supabase/migrations/20260508_analytics_events.sql` against your Supabase pr
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
 
+## 20260515_chat_messages_integrity.sql
+
+Run `supabase/migrations/20260515_chat_messages_integrity.sql` against your Supabase project to harden the `chat_messages` table with DB-level data-integrity invariants:
+
+```sql
+-- Adds two idempotent CHECK constraints to public.chat_messages:
+--   * chat_messages_self_chat_chk          -- from_user_id <> to_user_id
+--   * chat_messages_chat_id_canonical_chk  -- chat_id must equal
+--       'chat-' || least(from,to)::text || '-' || greatest(from,to)::text
+-- This enforces the deterministic conversation key (previously only enforced
+-- in client buildChatId) at the DB layer, for every write path including
+-- service_role. Constraints are ADDed NOT VALID then VALIDATE'd. All existing
+-- rows were written via buildChatId so VALIDATE passes with no data fix-up.
+```
+
+Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
+
 ## analytics-mirror Edge Function (Analytics #13)
 
 Deploy the `supabase/functions/analytics-mirror/index.ts` Edge Function and configure PostHog to forward webhooks to it.
