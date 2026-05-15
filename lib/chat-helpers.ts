@@ -22,6 +22,24 @@ export function getOtherParticipantId(chatId: string, selfId: string): string | 
   return other || null;
 }
 
+/**
+ * Hard cap on a single chat message, mirroring the
+ * `CHECK (length(text) > 0 AND length(text) <= 4000)` in the
+ * chat_messages migration. A longer body is rejected by that DB CHECK on
+ * every send retry, so the client must enforce the same bound up front
+ * instead of queueing a message that can never flush.
+ */
+export const MAX_CHAT_MESSAGE_LENGTH = 4000;
+
+/**
+ * True when `text` is a non-empty message within the DB length bound,
+ * evaluated against its trimmed form (the value actually sent).
+ */
+export function isSendableMessageText(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.length > 0 && trimmed.length <= MAX_CHAT_MESSAGE_LENGTH;
+}
+
 export function appendMessage(messages: ChatMessage[], message: ChatMessage): ChatMessage[] {
   if (messages.some((m) => m.id === message.id)) {
     return messages;

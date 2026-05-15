@@ -68,8 +68,10 @@ export async function fetchMessagesForChat(
   });
   if (!res.ok) return [];
 
+  // The URL fetches the most recent page newest-first (bounded by
+  // DEFAULT_CHAT_PAGE_SIZE); reverse so callers still get ascending order.
   const rows = (await res.json()) as ChatRow[];
-  return rows.map(chatRowToMessage);
+  return rows.map(chatRowToMessage).reverse();
 }
 
 export async function sendMessage(

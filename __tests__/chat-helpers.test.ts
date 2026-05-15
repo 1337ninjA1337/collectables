@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  MAX_CHAT_MESSAGE_LENGTH,
   appendMessage,
   buildChatId,
   buildChatPreviews,
@@ -9,6 +10,7 @@ import {
   chooseFriendsTabBadge,
   formatBadgeCount,
   getOtherParticipantId,
+  isSendableMessageText,
   totalUnread,
 } from "@/lib/chat-helpers";
 import { ChatMessage } from "@/lib/types";
@@ -253,5 +255,33 @@ describe("formatBadgeCount", () => {
   it("caps anything above 99 at 99+", () => {
     assert.equal(formatBadgeCount(100), "99+");
     assert.equal(formatBadgeCount(2500), "99+");
+  });
+});
+
+describe("isSendableMessageText", () => {
+  it("mirrors the DB length cap of 4000 characters", () => {
+    assert.equal(MAX_CHAT_MESSAGE_LENGTH, 4000);
+  });
+
+  it("rejects empty or whitespace-only text", () => {
+    assert.equal(isSendableMessageText(""), false);
+    assert.equal(isSendableMessageText("   \n\t "), false);
+  });
+
+  it("accepts a normal message", () => {
+    assert.equal(isSendableMessageText("hello"), true);
+  });
+
+  it("accepts text exactly at the limit and rejects one over it", () => {
+    assert.equal(isSendableMessageText("a".repeat(MAX_CHAT_MESSAGE_LENGTH)), true);
+    assert.equal(
+      isSendableMessageText("a".repeat(MAX_CHAT_MESSAGE_LENGTH + 1)),
+      false,
+    );
+  });
+
+  it("evaluates the trimmed form so surrounding whitespace doesn't push it over", () => {
+    const padded = `  ${"a".repeat(MAX_CHAT_MESSAGE_LENGTH)}  `;
+    assert.equal(isSendableMessageText(padded), true);
   });
 });

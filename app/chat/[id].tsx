@@ -19,7 +19,7 @@ import { Screen } from "@/components/screen";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
-import { buildChatId } from "@/lib/chat-helpers";
+import { MAX_CHAT_MESSAGE_LENGTH, buildChatId } from "@/lib/chat-helpers";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { subscribeToTyping } from "@/lib/supabase-chat";
@@ -313,6 +313,7 @@ export default function ChatDetailScreen() {
             onChangeText={handleTextChange}
             onSubmitEditing={handleSend}
             returnKeyType="send"
+            maxLength={MAX_CHAT_MESSAGE_LENGTH}
             multiline
           />
           <Pressable

@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  DEFAULT_CHAT_PAGE_SIZE,
   buildAuthHeaders,
   buildSendMessageHeaders,
   chatRowToMessage,
@@ -23,12 +24,33 @@ const BASE = "https://demo.supabase.co";
 const KEY = "publishable-anon-key";
 
 describe("fetchMessagesUrl", () => {
-  it("targets /rest/v1/chat_messages filtered by chat_id and ordered by created_at asc", () => {
+  it("fetches the most recent page newest-first, bounded by the default page size", () => {
     const url = fetchMessagesUrl(BASE, "chat-alice-bob");
     assert.equal(
       url,
-      `${BASE}/rest/v1/chat_messages?chat_id=eq.chat-alice-bob&select=*&order=created_at.asc`,
+      `${BASE}/rest/v1/chat_messages?chat_id=eq.chat-alice-bob` +
+        `&select=*&order=created_at.desc&limit=${DEFAULT_CHAT_PAGE_SIZE}`,
     );
+  });
+
+  it("honours an explicit positive limit", () => {
+    const url = fetchMessagesUrl(BASE, "chat-alice-bob", 25);
+    assert.ok(url.endsWith("&order=created_at.desc&limit=25"));
+  });
+
+  it("floors a fractional limit to an integer", () => {
+    const url = fetchMessagesUrl(BASE, "chat-alice-bob", 12.9);
+    assert.ok(url.endsWith("&limit=12"));
+  });
+
+  it("falls back to the default page size for non-positive or non-finite limits", () => {
+    for (const bad of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const url = fetchMessagesUrl(BASE, "chat-alice-bob", bad);
+      assert.ok(
+        url.endsWith(`&limit=${DEFAULT_CHAT_PAGE_SIZE}`),
+        `expected default limit for ${String(bad)}`,
+      );
+    }
   });
 
   it("URI-encodes the chat id so a malicious id can't break out of the eq filter", () => {

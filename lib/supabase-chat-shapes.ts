@@ -58,8 +58,27 @@ export function messageToInsertPayload(input: SendMessageInput): ChatInsertPaylo
   return payload;
 }
 
-export function fetchMessagesUrl(baseUrl: string, chatId: string): string {
-  return `${baseUrl}/rest/v1/chat_messages?chat_id=eq.${encodeURIComponent(chatId)}&select=*&order=created_at.asc`;
+/**
+ * Default page size for an initial chat-history load. Best practice for
+ * chat storage is to never fetch an unbounded conversation: we pull the
+ * most recent N rows (newest-first) and rely on the local AsyncStorage
+ * cache + id-deduped merge in chat-context to keep older messages visible.
+ */
+export const DEFAULT_CHAT_PAGE_SIZE = 200;
+
+export function fetchMessagesUrl(
+  baseUrl: string,
+  chatId: string,
+  limit: number = DEFAULT_CHAT_PAGE_SIZE,
+): string {
+  const bounded =
+    Number.isFinite(limit) && limit > 0
+      ? Math.floor(limit)
+      : DEFAULT_CHAT_PAGE_SIZE;
+  return (
+    `${baseUrl}/rest/v1/chat_messages?chat_id=eq.${encodeURIComponent(chatId)}` +
+    `&select=*&order=created_at.desc&limit=${bounded}`
+  );
 }
 
 export function sendMessageUrl(baseUrl: string): string {

@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useAuth } from "@/lib/auth-context";
 import {
   ChatPreview,
+  MAX_CHAT_MESSAGE_LENGTH,
   appendMessage,
   buildChatId,
   buildChatPreviews,
@@ -306,6 +307,10 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       if (!user) return null;
       const trimmed = text.trim();
       if (!trimmed) return null;
+      // Reject over-length bodies up front: the chat_messages CHECK caps
+      // text at 4000 chars, so a longer message would fail the cloud
+      // insert and loop forever in the offline pending queue.
+      if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) return null;
       if (!canMessage(otherUserId)) return null;
 
       const chatId = buildChatId(user.id, otherUserId);
