@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { randomUUID } from "expo-crypto";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
@@ -44,8 +45,14 @@ type ChatContextValue = {
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
+// A client-generated id must be an RFC-4122 UUID so an offline message can
+// later be flushed into the `chat_messages.id` uuid primary key. The old
+// `msg-<ts>-<rand>` format made that INSERT fail with "invalid input syntax
+// for type uuid", stranding every offline message in the pending queue
+// forever. A real uuid also round-trips through realtime/refetch so
+// `appendMessage`'s id-dedup keeps the message single across devices.
 function generateMessageId(): string {
-  return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return randomUUID();
 }
 
 export function ChatProvider({ children }: React.PropsWithChildren) {

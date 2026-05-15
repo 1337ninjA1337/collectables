@@ -58,6 +58,28 @@ export function messageToInsertPayload(input: SendMessageInput): ChatInsertPaylo
   return payload;
 }
 
+/**
+ * Reconstruct the stored ChatMessage from the input that produced it. Used
+ * for idempotent sends: when a retried offline flush hits a duplicate primary
+ * key (HTTP 409) the row is already in the DB with exactly these fields, so
+ * the send succeeded — we just rebuild the message instead of re-fetching.
+ *
+ * Returns null when the input carries no client id. Online sends let the
+ * server mint the uuid, so a 409 is impossible there and there is no stable
+ * id to reconstruct from.
+ */
+export function inputToSentMessage(input: SendMessageInput): ChatMessage | null {
+  if (!input.id) return null;
+  return {
+    id: input.id,
+    chatId: input.chatId,
+    fromUserId: input.fromUserId,
+    toUserId: input.toUserId,
+    text: input.text,
+    createdAt: input.createdAt ?? new Date().toISOString(),
+  };
+}
+
 export function fetchMessagesUrl(baseUrl: string, chatId: string): string {
   return `${baseUrl}/rest/v1/chat_messages?chat_id=eq.${encodeURIComponent(chatId)}&select=*&order=created_at.asc`;
 }

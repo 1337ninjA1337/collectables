@@ -29,6 +29,7 @@ import {
   friendCheckUrl,
   inboxChannelTopic,
   inboxFilter,
+  inputToSentMessage,
   isMutualFriendFromResponses,
   messageToInsertPayload,
   sendMessageUrl,
@@ -87,7 +88,14 @@ export async function sendMessage(
     headers: buildSendMessageHeaders(supabasePublishableKey!, token),
     body: JSON.stringify(messageToInsertPayload(input)),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // HTTP 409 = duplicate primary key: this exact message was already
+    // stored (a retried offline flush whose first insert succeeded but whose
+    // response was lost). Treat it as delivered so the pending queue drains
+    // instead of re-posting the same row forever.
+    if (res.status === 409) return inputToSentMessage(input);
+    return null;
+  }
 
   const rows = (await res.json()) as ChatRow[];
   if (!rows.length) return null;
