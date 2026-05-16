@@ -1,0 +1,66 @@
+// Collectables — starter DAX measures (Analytics #15a)
+//
+// In Power BI Desktop: Modeling → New measure → paste ONE measure block
+// (the `Name :=` line plus its expression), repeat per measure. These are
+// the exact measures documented in docs/powerbi-connection.md §5; keep the
+// two in sync. The data model is the `analytics_events` query (queries.m).
+
+// --- 5.1 DAU (Daily Active Users) -----------------------------------------
+// NOT ISBLANK excludes anonymous-distinct_id rows (user_id NULL) so the
+// metric lines up with the PostHog dashboard.
+
+DAU :=
+CALCULATE (
+    DISTINCTCOUNT ( analytics_events[user_id] ),
+    NOT ( ISBLANK ( analytics_events[user_id] ) )
+)
+
+// --- 5.2 Listing-creation funnel (item_added → listing_created) -----------
+// Denominator is *users who added an item*, not *items added*, so a power
+// user adding 50 items counts once.
+
+ItemsAdded :=
+CALCULATE (
+    DISTINCTCOUNT ( analytics_events[user_id] ),
+    analytics_events[name] = "item_added"
+)
+
+ListingsCreated :=
+CALCULATE (
+    DISTINCTCOUNT ( analytics_events[user_id] ),
+    analytics_events[name] = "listing_created"
+)
+
+ListingFunnelRate :=
+DIVIDE ( [ListingsCreated], [ItemsAdded] )
+
+// --- 5.3 Premium-conversion rate (signup → premium_activated, 7-day) ------
+// The 7-day window matches the PostHog "Premium funnel" report. For a
+// longitudinal cohort instead, drop the DATESINPERIOD on the numerator.
+
+SignupsLast7d :=
+CALCULATE (
+    DISTINCTCOUNT ( analytics_events[user_id] ),
+    analytics_events[name] = "signup_completed",
+    DATESINPERIOD (
+        analytics_events[occurred_at],
+        MAX ( analytics_events[occurred_at] ),
+        -7,
+        DAY
+    )
+)
+
+PremiumActivationsLast7d :=
+CALCULATE (
+    DISTINCTCOUNT ( analytics_events[user_id] ),
+    analytics_events[name] = "premium_activated",
+    DATESINPERIOD (
+        analytics_events[occurred_at],
+        MAX ( analytics_events[occurred_at] ),
+        -7,
+        DAY
+    )
+)
+
+PremiumConversionRate7d :=
+DIVIDE ( [PremiumActivationsLast7d], [SignupsLast7d] )
