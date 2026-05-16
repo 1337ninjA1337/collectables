@@ -23,11 +23,11 @@ const BASE = "https://demo.supabase.co";
 const KEY = "publishable-anon-key";
 
 describe("fetchMessagesUrl", () => {
-  it("targets /rest/v1/chat_messages filtered by chat_id and ordered by created_at asc", () => {
+  it("targets /rest/v1/chat_messages filtered by chat_id and ordered by (created_at, id) asc", () => {
     const url = fetchMessagesUrl(BASE, "chat-alice-bob");
     assert.equal(
       url,
-      `${BASE}/rest/v1/chat_messages?chat_id=eq.chat-alice-bob&select=*&order=created_at.asc`,
+      `${BASE}/rest/v1/chat_messages?chat_id=eq.chat-alice-bob&select=*&order=created_at.asc,id.asc`,
     );
   });
 
@@ -121,9 +121,9 @@ describe("buildAuthHeaders", () => {
 });
 
 describe("buildSendMessageHeaders", () => {
-  it("includes Prefer: return=representation so insert echoes the row back", () => {
+  it("echoes the row back and makes a duplicate id an idempotent no-op", () => {
     const headers = buildSendMessageHeaders(KEY, "tok");
-    assert.equal(headers.Prefer, "return=representation");
+    assert.equal(headers.Prefer, "return=representation,resolution=ignore-duplicates");
     assert.equal(headers.apikey, KEY);
     assert.equal(headers.Authorization, "Bearer tok");
     assert.equal(headers["Content-Type"], "application/json");

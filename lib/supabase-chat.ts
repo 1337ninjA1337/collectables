@@ -90,8 +90,24 @@ export async function sendMessage(
   if (!res.ok) return null;
 
   const rows = (await res.json()) as ChatRow[];
-  if (!rows.length) return null;
-  return chatRowToMessage(rows[0]);
+  if (rows.length) return chatRowToMessage(rows[0]);
+
+  // 2xx with no echoed row means resolution=ignore-duplicates suppressed the
+  // insert: a prior (offline) send carrying this client id already reached
+  // the server but its response was lost. Treat it as delivered — synthesised
+  // from the input we know — so the caller drains the pending queue instead
+  // of retrying the same id forever. Only the flush path supplies an id.
+  if (input.id) {
+    return {
+      id: input.id,
+      chatId: input.chatId,
+      fromUserId: input.fromUserId,
+      toUserId: input.toUserId,
+      text: input.text,
+      createdAt: input.createdAt ?? new Date().toISOString(),
+    };
+  }
+  return null;
 }
 
 /**

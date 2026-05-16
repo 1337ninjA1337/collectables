@@ -59,7 +59,7 @@ export function messageToInsertPayload(input: SendMessageInput): ChatInsertPaylo
 }
 
 export function fetchMessagesUrl(baseUrl: string, chatId: string): string {
-  return `${baseUrl}/rest/v1/chat_messages?chat_id=eq.${encodeURIComponent(chatId)}&select=*&order=created_at.asc`;
+  return `${baseUrl}/rest/v1/chat_messages?chat_id=eq.${encodeURIComponent(chatId)}&select=*&order=created_at.asc,id.asc`;
 }
 
 export function sendMessageUrl(baseUrl: string): string {
@@ -90,7 +90,12 @@ export function buildSendMessageHeaders(
 ): Record<string, string> {
   return {
     ...buildAuthHeaders(apiKey, token),
-    Prefer: "return=representation",
+    // resolution=ignore-duplicates makes a re-POST of the same client-supplied
+    // id an idempotent ON CONFLICT DO NOTHING (the offline-flush retry path)
+    // instead of a 409 that would strand the message in the pending queue
+    // forever. Normal sends omit the id so the server-generated uuid never
+    // collides and the row is still echoed back via return=representation.
+    Prefer: "return=representation,resolution=ignore-duplicates",
   };
 }
 

@@ -80,6 +80,17 @@ describe("supabase-chat.ts wiring", () => {
     assert.match(block, /method:\s*"POST"/);
   });
 
+  it("sendMessage treats a 2xx-with-no-row (ignore-duplicates) as an idempotent delivery synthesised from the input", () => {
+    const block = extractFunctionBlock(SOURCE, "sendMessage");
+    // Non-empty echo still wins.
+    assert.match(block, /if\s*\(rows\.length\)\s*return chatRowToMessage\(rows\[0\]\)/);
+    // Empty body + a client-supplied id => already delivered, rebuild the
+    // ChatMessage from the input so the pending queue drains.
+    assert.match(block, /if\s*\(input\.id\)/);
+    assert.match(block, /id:\s*input\.id/);
+    assert.match(block, /createdAt:\s*input\.createdAt\s*\?\?/);
+  });
+
   it("isMutualFriend issues two friendCheckUrl requests and combines via isMutualFriendFromResponses", () => {
     const block = extractFunctionBlock(SOURCE, "isMutualFriend");
     assert.match(block, /friendCheckUrl\([^)]*userA[^)]*userB[^)]*\)/);

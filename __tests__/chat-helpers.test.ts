@@ -7,6 +7,7 @@ import {
   buildChatPreviews,
   canChatWith,
   chooseFriendsTabBadge,
+  compareMessages,
   formatBadgeCount,
   getOtherParticipantId,
   totalUnread,
@@ -100,6 +101,42 @@ describe("appendMessage", () => {
       result.map((m) => m.id),
       ["m-early", "m-late"],
     );
+  });
+
+  it("breaks createdAt ties deterministically by id", () => {
+    const sameTime = "2026-04-24T09:00:00.000Z";
+    const b = makeMessage({ id: "m-b", createdAt: sameTime });
+    const a = makeMessage({ id: "m-a", createdAt: sameTime });
+    // Insertion order is b then a, but the stable sort must always put the
+    // lower id first regardless of arrival order.
+    assert.deepEqual(
+      appendMessage([b], a).map((m) => m.id),
+      ["m-a", "m-b"],
+    );
+    assert.deepEqual(
+      appendMessage([a], b).map((m) => m.id),
+      ["m-a", "m-b"],
+    );
+  });
+});
+
+describe("compareMessages", () => {
+  it("orders strictly by createdAt when timestamps differ", () => {
+    const early = makeMessage({ id: "z", createdAt: "2026-04-24T09:00:00.000Z" });
+    const late = makeMessage({ id: "a", createdAt: "2026-04-24T10:00:00.000Z" });
+    assert.ok(compareMessages(early, late) < 0);
+    assert.ok(compareMessages(late, early) > 0);
+  });
+
+  it("falls back to id ordering on equal timestamps", () => {
+    const t = "2026-04-24T09:00:00.000Z";
+    assert.ok(compareMessages(makeMessage({ id: "a", createdAt: t }), makeMessage({ id: "b", createdAt: t })) < 0);
+    assert.ok(compareMessages(makeMessage({ id: "b", createdAt: t }), makeMessage({ id: "a", createdAt: t })) > 0);
+  });
+
+  it("returns 0 for the same createdAt and id (stable)", () => {
+    const t = "2026-04-24T09:00:00.000Z";
+    assert.equal(compareMessages(makeMessage({ id: "x", createdAt: t }), makeMessage({ id: "x", createdAt: t })), 0);
   });
 });
 

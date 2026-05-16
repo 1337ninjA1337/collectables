@@ -22,11 +22,24 @@ export function getOtherParticipantId(chatId: string, selfId: string): string | 
   return other || null;
 }
 
+/**
+ * Stable total order for chat messages: createdAt ascending, tie-broken by
+ * id. Two messages that share an identical ISO timestamp (rapid sends, or an
+ * offline message flushed with a client-composed time) would otherwise sort
+ * non-deterministically and could swap places between renders or across
+ * devices; the id tiebreak gives every client the same sequence.
+ */
+export function compareMessages(a: ChatMessage, b: ChatMessage): number {
+  if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? -1 : 1;
+  if (a.id !== b.id) return a.id < b.id ? -1 : 1;
+  return 0;
+}
+
 export function appendMessage(messages: ChatMessage[], message: ChatMessage): ChatMessage[] {
   if (messages.some((m) => m.id === message.id)) {
     return messages;
   }
-  return [...messages, message].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+  return [...messages, message].sort(compareMessages);
 }
 
 /**
@@ -65,7 +78,7 @@ export function buildChatPreviews(
     const other = getOtherParticipantId(chatId, selfId);
     if (!other) continue;
 
-    const sorted = [...msgs].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+    const sorted = [...msgs].sort(compareMessages);
     const last = sorted[sorted.length - 1];
     const lastRead = lastReadByChat[chatId] ?? "";
     const unreadCount = sorted.filter((m) => m.fromUserId !== selfId && m.createdAt > lastRead).length;

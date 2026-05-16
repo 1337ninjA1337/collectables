@@ -87,3 +87,36 @@ The function returns:
 - `400` — invalid JSON / empty payload (no PostHog retry).
 - `401` — secret mismatch.
 - `500` — function not configured (missing env vars) or DB error.
+
+## 20260516_chat_messages_integrity.sql
+
+Run `supabase/migrations/20260516_chat_messages_integrity.sql` against your Supabase project to harden chat message storage:
+
+```sql
+-- Adds CHECK constraint chat_messages_chat_id_canonical_chk pinning chat_id
+-- to the canonical 'chat-<minUuid>-<maxUuid>' form (COLLATE "C" so it matches
+-- the client's buildChatId byte ordering) + a 1..200 length bound. Added
+-- NOT VALID so it enforces new rows without scanning/locking existing rows.
+-- Adds index chat_messages_chat_created_id_idx (chat_id, created_at, id)
+-- backing the app's stable (created_at, id) message ordering.
+```
+
+Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
+
+**Optional follow-up** — once you have confirmed no legacy rows violate the new rule, validate the constraint so the planner can rely on it and future rewrites stay safe:
+
+```sql
+-- 1. Find any pre-existing rows with a forged / non-canonical chat_id:
+SELECT id, chat_id, from_user_id, to_user_id
+FROM public.chat_messages
+WHERE chat_id COLLATE "C" <> (
+  'chat-'
+  || least(from_user_id::text COLLATE "C", to_user_id::text COLLATE "C")
+  || '-'
+  || greatest(from_user_id::text COLLATE "C", to_user_id::text COLLATE "C")
+);
+
+-- 2. Delete or repair those rows, then validate:
+ALTER TABLE public.chat_messages
+  VALIDATE CONSTRAINT chat_messages_chat_id_canonical_chk;
+```

@@ -8,6 +8,7 @@ import {
   buildChatId,
   buildChatPreviews,
   canChatWith,
+  compareMessages,
   totalUnread,
 } from "@/lib/chat-helpers";
 import { captureException } from "@/lib/sentry";
@@ -394,7 +395,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   const getMessages = useCallback(
     (chatId: string) => {
       const msgs = store.messagesByChat[chatId] ?? [];
-      return [...msgs].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+      return [...msgs].sort(compareMessages);
     },
     [store],
   );
