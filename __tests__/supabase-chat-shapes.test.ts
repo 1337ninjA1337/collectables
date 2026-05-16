@@ -6,6 +6,7 @@ import {
   buildSendMessageHeaders,
   chatRowToMessage,
   extractTypingUserIds,
+  fallbackSentMessage,
   fetchMessagesUrl,
   friendCheckUrl,
   inboxChannelTopic,
@@ -121,12 +122,51 @@ describe("buildAuthHeaders", () => {
 });
 
 describe("buildSendMessageHeaders", () => {
-  it("includes Prefer: return=representation so insert echoes the row back", () => {
+  it("echoes the row back and makes the insert idempotent (ignore-duplicates)", () => {
     const headers = buildSendMessageHeaders(KEY, "tok");
-    assert.equal(headers.Prefer, "return=representation");
+    assert.equal(
+      headers.Prefer,
+      "return=representation,resolution=ignore-duplicates",
+    );
     assert.equal(headers.apikey, KEY);
     assert.equal(headers.Authorization, "Bearer tok");
     assert.equal(headers["Content-Type"], "application/json");
+  });
+
+  it("never asks Postgres to UPDATE (messages stay immutable — no DO UPDATE)", () => {
+    const headers = buildSendMessageHeaders(KEY, null);
+    assert.ok(!/merge-duplicates/.test(headers.Prefer));
+  });
+});
+
+describe("fallbackSentMessage", () => {
+  it("reconstructs the sent message from an idempotency-keyed input", () => {
+    const msg = fallbackSentMessage({
+      chatId: "chat-a-b",
+      fromUserId: "a",
+      toUserId: "b",
+      text: "hi",
+      id: "11111111-1111-4111-8111-111111111111",
+      createdAt: "2026-05-16T10:00:00.000Z",
+    });
+    assert.deepEqual(msg, {
+      id: "11111111-1111-4111-8111-111111111111",
+      chatId: "chat-a-b",
+      fromUserId: "a",
+      toUserId: "b",
+      text: "hi",
+      createdAt: "2026-05-16T10:00:00.000Z",
+    });
+  });
+
+  it("returns null when the input lacks a client-minted id or timestamp", () => {
+    const base = { chatId: "chat-a-b", fromUserId: "a", toUserId: "b", text: "hi" };
+    assert.equal(fallbackSentMessage(base), null);
+    assert.equal(fallbackSentMessage({ ...base, id: "x" }), null);
+    assert.equal(
+      fallbackSentMessage({ ...base, createdAt: "2026-05-16T10:00:00.000Z" }),
+      null,
+    );
   });
 });
 

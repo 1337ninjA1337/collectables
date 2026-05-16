@@ -90,7 +90,34 @@ export function buildSendMessageHeaders(
 ): Record<string, string> {
   return {
     ...buildAuthHeaders(apiKey, token),
-    Prefer: "return=representation",
+    // `resolution=ignore-duplicates` makes the insert idempotent: PostgREST
+    // emits `INSERT ... ON CONFLICT DO NOTHING`, so a retried POST that
+    // carries the same client-minted `id` (lost-response retry, offline
+    // flush of an already-delivered message) is a no-op instead of a
+    // duplicate message. DO NOTHING (not DO UPDATE) is deliberate — there is
+    // no UPDATE policy on chat_messages, so messages stay immutable.
+    Prefer: "return=representation,resolution=ignore-duplicates",
+  };
+}
+
+/**
+ * Reconstruct the `ChatMessage` for a send whose server response was
+ * empty-but-OK. With `resolution=ignore-duplicates` a row that already
+ * exists (idempotent retry) returns HTTP 2xx with `[]` — that is success,
+ * not failure, so the caller must resolve the message it just sent rather
+ * than re-queue it. Requires the caller to have supplied `id` + `createdAt`
+ * (the client-minted idempotency key), which the chat-context send path
+ * always does.
+ */
+export function fallbackSentMessage(input: SendMessageInput): ChatMessage | null {
+  if (!input.id || !input.createdAt) return null;
+  return {
+    id: input.id,
+    chatId: input.chatId,
+    fromUserId: input.fromUserId,
+    toUserId: input.toUserId,
+    text: input.text,
+    createdAt: input.createdAt,
   };
 }
 

@@ -8,6 +8,7 @@ import {
   buildChatId,
   buildChatPreviews,
   canChatWith,
+  newMessageId,
   totalUnread,
 } from "@/lib/chat-helpers";
 import { captureException } from "@/lib/sentry";
@@ -43,10 +44,6 @@ type ChatContextValue = {
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
-
-function generateMessageId(): string {
-  return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
 
 export function ChatProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
@@ -139,14 +136,22 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
         if (!msgs || msgs.length === 0) continue;
         let allSent = true;
         for (const msg of msgs) {
-          const sent = await cloudSendMessage({
-            chatId: msg.chatId,
-            fromUserId: msg.fromUserId,
-            toUserId: msg.toUserId,
-            text: msg.text,
-            id: msg.id,
-            createdAt: msg.createdAt,
-          });
+          let sent: ChatMessage | null = null;
+          try {
+            sent = await cloudSendMessage({
+              chatId: msg.chatId,
+              fromUserId: msg.fromUserId,
+              toUserId: msg.toUserId,
+              text: msg.text,
+              id: msg.id,
+              createdAt: msg.createdAt,
+            });
+          } catch (err) {
+            // Still offline / transient network error — keep the queue
+            // intact and retry on the next refresh instead of letting an
+            // unhandled rejection bubble out of the void-called flush.
+            captureException(err, { context: "chat-context.flushPending" });
+          }
           if (!sent) {
             allSent = false;
             break;
@@ -310,24 +315,39 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
 
       const chatId = buildChatId(user.id, otherUserId);
 
-      // Try cloud first so other devices see the message and the server-issued
-      // uuid+timestamp win across clients. When the cloud send fails (offline,
-      // unconfigured, RLS reject), fall back to a locally-generated message so
-      // the UI still records the attempt; AsyncStorage caches it for re-reads.
-      const cloudMessage = await cloudSendMessage({
-        chatId,
-        fromUserId: user.id,
-        toUserId: otherUserId,
-        text: trimmed,
-      });
+      // Mint the id + timestamp client-side and send them as the idempotency
+      // key. The optimistic local row and the eventual server row then share
+      // the same primary key, so the realtime echo and any re-fetch dedupe
+      // by id, and a retried POST is a server-side no-op rather than a
+      // duplicate message. When the cloud send fails (offline, unconfigured,
+      // RLS reject, network throw) we keep the same id/timestamp for the
+      // local fallback so the queued pending copy flushes idempotently later.
+      const id = newMessageId();
+      const createdAt = new Date().toISOString();
+
+      let cloudMessage: ChatMessage | null = null;
+      try {
+        cloudMessage = await cloudSendMessage({
+          chatId,
+          fromUserId: user.id,
+          toUserId: otherUserId,
+          text: trimmed,
+          id,
+          createdAt,
+        });
+      } catch (err) {
+        // A thrown fetch (offline / iOS Safari "Load failed") must not lose
+        // the user's message — fall through to the local + pending path.
+        captureException(err, { context: "chat-context.sendMessage" });
+      }
 
       const message: ChatMessage = cloudMessage ?? {
-        id: generateMessageId(),
+        id,
         chatId,
         fromUserId: user.id,
         toUserId: otherUserId,
         text: trimmed,
-        createdAt: new Date().toISOString(),
+        createdAt,
       };
 
       setStore((prev) => {

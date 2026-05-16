@@ -1,6 +1,30 @@
 import { ChatMessage } from "@/lib/types";
 
 /**
+ * Generate a stable RFC-4122 v4 message id client-side.
+ *
+ * Best practice for chat storage: the client mints the message id and uses
+ * it as an idempotency key so (a) the optimistic local row and the eventual
+ * server row share the same primary key (dedupe by id on the realtime echo
+ * and on re-fetch) and (b) a retried/duplicated insert is a no-op instead of
+ * a duplicate message. The id MUST be a real uuid because `chat_messages.id`
+ * is a Postgres `uuid` column — a non-uuid string makes every insert fail
+ * with `invalid input syntax for type uuid`, which previously stranded every
+ * offline-composed message in the pending queue forever.
+ */
+export function newMessageId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (c && typeof c.randomUUID === "function") {
+    return c.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    const v = ch === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
  * Chat id is deterministic from the two participant user ids
  * (sorted + joined with a dash). Both sides can derive the same id
  * without coordination, which lets us persist messages in per-user

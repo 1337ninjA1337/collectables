@@ -9,6 +9,7 @@ import {
   chooseFriendsTabBadge,
   formatBadgeCount,
   getOtherParticipantId,
+  newMessageId,
   totalUnread,
 } from "@/lib/chat-helpers";
 import { ChatMessage } from "@/lib/types";
@@ -24,6 +25,36 @@ function makeMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
     ...overrides,
   };
 }
+
+describe("newMessageId", () => {
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  it("returns an RFC-4122 v4 uuid so the Postgres uuid column accepts it", () => {
+    assert.match(newMessageId(), UUID_RE);
+  });
+
+  it("is unique across calls (idempotency key must not collide)", () => {
+    const ids = new Set(Array.from({ length: 200 }, () => newMessageId()));
+    assert.equal(ids.size, 200);
+  });
+
+  it("falls back to a valid v4 uuid when crypto.randomUUID is unavailable", () => {
+    const original = (globalThis as { crypto?: unknown }).crypto;
+    try {
+      Object.defineProperty(globalThis, "crypto", {
+        value: {},
+        configurable: true,
+      });
+      assert.match(newMessageId(), UUID_RE);
+    } finally {
+      Object.defineProperty(globalThis, "crypto", {
+        value: original,
+        configurable: true,
+      });
+    }
+  });
+});
 
 describe("buildChatId", () => {
   it("returns the same id regardless of argument order", () => {

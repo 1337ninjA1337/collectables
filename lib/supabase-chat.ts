@@ -25,6 +25,7 @@ import {
   ChatRow,
   chatRowToMessage,
   extractTypingUserIds,
+  fallbackSentMessage,
   fetchMessagesUrl,
   friendCheckUrl,
   inboxChannelTopic,
@@ -90,7 +91,12 @@ export async function sendMessage(
   if (!res.ok) return null;
 
   const rows = (await res.json()) as ChatRow[];
-  if (!rows.length) return null;
+  if (!rows.length) {
+    // Empty-but-OK = the row already existed (idempotent `ON CONFLICT DO
+    // NOTHING`). That is success: resolve the message we just sent so the
+    // caller doesn't treat a delivered message as failed and re-queue it.
+    return fallbackSentMessage(input);
+  }
   return chatRowToMessage(rows[0]);
 }
 
