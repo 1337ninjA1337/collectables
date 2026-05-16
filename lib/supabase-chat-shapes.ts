@@ -90,7 +90,30 @@ export function buildSendMessageHeaders(
 ): Record<string, string> {
   return {
     ...buildAuthHeaders(apiKey, token),
-    Prefer: "return=representation",
+    // `resolution=ignore-duplicates` makes the INSERT idempotent on the
+    // primary key: a retried offline-flush of a message the server already
+    // stored becomes a no-op (ON CONFLICT DO NOTHING) instead of a 409 that
+    // would wedge the pending queue forever. `return=representation` still
+    // echoes back freshly-inserted rows so the client picks up the
+    // server-authoritative `created_at`.
+    Prefer: "resolution=ignore-duplicates,return=representation",
+  };
+}
+
+/**
+ * Reconstruct a `ChatMessage` from the send input. Used when an idempotent
+ * insert was ignored as a duplicate (PostgREST returns an empty body for
+ * `resolution=ignore-duplicates` conflicts) so the caller can treat the send
+ * as a success — the row is already on the server with this exact id.
+ */
+export function synthesizeMessageFromInput(input: SendMessageInput): ChatMessage {
+  return {
+    id: input.id ?? "",
+    chatId: input.chatId,
+    fromUserId: input.fromUserId,
+    toUserId: input.toUserId,
+    text: input.text,
+    createdAt: input.createdAt ?? new Date().toISOString(),
   };
 }
 

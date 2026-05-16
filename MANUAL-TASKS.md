@@ -41,6 +41,32 @@ Run `supabase/migrations/20260508_analytics_events.sql` against your Supabase pr
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
 
+## 20260516_chat_id_integrity.sql
+
+Run `supabase/migrations/20260516_chat_id_integrity.sql` against your Supabase project to enforce chat-message conversation-key integrity:
+
+```sql
+-- Adds a CHECK constraint (chat_messages_chat_id_matches_participants, NOT VALID)
+-- so chat_id MUST equal 'chat-' || least(from,to) || '-' || greatest(from,to).
+-- Enforced for every new INSERT; pre-existing rows are not re-checked so the
+-- migration is safe to apply to a live DB.
+```
+
+Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
+
+Optional hardening — after confirming no historical row violates the rule:
+
+```sql
+SELECT id, chat_id FROM public.chat_messages
+WHERE chat_id <> 'chat-'
+  || least(from_user_id::text COLLATE "C", to_user_id::text COLLATE "C")
+  || '-'
+  || greatest(from_user_id::text COLLATE "C", to_user_id::text COLLATE "C");
+-- If the above returns 0 rows, extend the guarantee to all rows:
+ALTER TABLE public.chat_messages
+  VALIDATE CONSTRAINT chat_messages_chat_id_matches_participants;
+```
+
 ## analytics-mirror Edge Function (Analytics #13)
 
 Deploy the `supabase/functions/analytics-mirror/index.ts` Edge Function and configure PostHog to forward webhooks to it.

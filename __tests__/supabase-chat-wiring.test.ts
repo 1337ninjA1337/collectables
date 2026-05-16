@@ -33,6 +33,7 @@ describe("supabase-chat.ts wiring", () => {
       "isMutualFriendFromResponses",
       "messageToInsertPayload",
       "sendMessageUrl",
+      "synthesizeMessageFromInput",
       "typingChannelTopic",
       "extractTypingUserIds",
     ];
@@ -78,6 +79,16 @@ describe("supabase-chat.ts wiring", () => {
     assert.match(block, /buildSendMessageHeaders\(/);
     assert.match(block, /messageToInsertPayload\(/);
     assert.match(block, /method:\s*"POST"/);
+  });
+
+  it("sendMessage treats an empty idempotent-duplicate response (with id) as success", () => {
+    const block = extractFunctionBlock(SOURCE, "sendMessage");
+    // When the row body is empty (ON CONFLICT DO NOTHING) but an id was sent,
+    // reconstruct the message instead of returning null (which would re-queue
+    // it as pending forever).
+    assert.match(block, /!rows\.length/);
+    assert.match(block, /input\.id/);
+    assert.match(block, /synthesizeMessageFromInput\(input\)/);
   });
 
   it("isMutualFriend issues two friendCheckUrl requests and combines via isMutualFriendFromResponses", () => {

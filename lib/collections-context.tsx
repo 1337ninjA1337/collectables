@@ -34,6 +34,7 @@ import {
 } from "@/lib/share-access";
 import { collectionsKey, itemsKey, followedCollectionsKey } from "@/lib/storage-keys";
 import { Collection, CollectableItem, ItemCondition, ItemTag } from "@/lib/types";
+import { generateUuidV4 } from "@/lib/uuid";
 
 type DraftItemInput = {
   collectionId: string;
@@ -651,15 +652,13 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         return nextItem.id;
       },
       addCollection: async (input) => {
-        const slug =
-          input.name
-            .trim()
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, "") || `collection-${Date.now()}`;
-
+        // Use a random uuid as the primary key. Deriving the id from the
+        // (mutable, non-unique) name slug meant two same-named collections —
+        // e.g. two "Hot Wheels" — collided, and the dedupe-by-id cloud merge
+        // (mergeCollectionsFromCloud) silently collapsed them into one,
+        // losing data. A uuid also matches the cloud `collections.id` column.
         const nextCollection: Collection = {
-          id: `${slug}-${Date.now()}`,
+          id: generateUuidV4(),
           name: input.name.trim(),
           description: input.description.trim(),
           coverPhoto: input.coverPhoto,

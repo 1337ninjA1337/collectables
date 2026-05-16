@@ -33,6 +33,7 @@ import {
   messageToInsertPayload,
   sendMessageUrl,
   SendMessageInput,
+  synthesizeMessageFromInput,
   typingChannelTopic,
 } from "@/lib/supabase-chat-shapes";
 import { ChatMessage } from "@/lib/types";
@@ -90,7 +91,14 @@ export async function sendMessage(
   if (!res.ok) return null;
 
   const rows = (await res.json()) as ChatRow[];
-  if (!rows.length) return null;
+  if (!rows.length) {
+    // Idempotent insert (resolution=ignore-duplicates) returns an empty body
+    // when the row already existed. The send still succeeded — the message is
+    // on the server under this id — so reconstruct it from the input instead
+    // of reporting failure (which would re-queue it as pending forever).
+    if (input.id) return synthesizeMessageFromInput(input);
+    return null;
+  }
   return chatRowToMessage(rows[0]);
 }
 
