@@ -113,3 +113,18 @@ The function returns:
 - `400` — invalid JSON / empty payload (no PostHog retry).
 - `401` — secret mismatch.
 - `500` — function not configured (missing env vars) or DB error.
+
+## 20260516_items_cost_currency.sql
+
+Run `supabase/migrations/20260516_items_cost_currency.sql` against your Supabase project to store the currency selected next to an item's cost in the create-item form:
+
+```sql
+-- Adds public.items.cost_currency (text, nullable).
+-- Holds the ISO 4217 code (e.g. "USD", "EUR") chosen in the currency
+-- selector. Nullable so legacy items / items without a cost stay NULL
+-- and render unchanged.
+ALTER TABLE public.items
+  ADD COLUMN IF NOT EXISTS cost_currency text NULL;
+```
+
+Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow (the deploy workflow runs `supabase db push` automatically when `SUPABASE_DB_URL` is set, so a normal deploy applies this). The app keeps working either way: items always persist locally via AsyncStorage and the cloud upsert is best-effort (its failure is swallowed). Apply the migration so item cloud sync — which now sends `cost_currency` — keeps succeeding.

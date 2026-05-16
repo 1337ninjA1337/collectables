@@ -96,6 +96,7 @@ export function upsertItemBody(item: CollectableItem, collectionId: string): Rec
     created_by_user_id: item.createdByUserId || "",
     created_at: item.createdAt || new Date().toISOString(),
     cost: item.cost ?? null,
+    cost_currency: item.costCurrency ?? null,
     sort_order: item.sortOrder ?? null,
     is_wishlist: item.isWishlist ?? false,
     condition: item.condition ?? null,

@@ -470,7 +470,9 @@ export default function ItemDetailsScreen() {
       {typeof activeItem.cost === "number" ? (
         <View style={styles.sheet}>
           <Text style={styles.sheetLabel}>{t("costLabel")}</Text>
-          <Text style={styles.sheetValue}>{activeItem.cost}</Text>
+          <Text style={styles.sheetValue}>
+            {activeItem.cost}{activeItem.costCurrency ? ` ${activeItem.costCurrency}` : ""}
+          </Text>
         </View>
       ) : null}
 

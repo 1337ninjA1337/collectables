@@ -10,7 +10,9 @@ import { analyzeItemPhoto, isAiVisionConfigured } from "@/lib/ai-vision";
 import { trackEvent } from "@/lib/analytics";
 import { uploadImages } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
+import { CURRENCIES } from "@/lib/currencies";
 import { useI18n } from "@/lib/i18n-context";
+import { getDefaultCurrencyForLanguage } from "@/lib/locale-helpers";
 import { useToast } from "@/lib/toast-context";
 import { ItemCondition, ItemTag } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -40,6 +42,9 @@ export default function CreateItemScreen() {
   const [description, setDescription] = useState("");
   const [variants, setVariants] = useState("");
   const [cost, setCost] = useState("");
+  const [currency, setCurrency] = useState(() => getDefaultCurrencyForLanguage(language));
+  const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
+  const [currencyQuery, setCurrencyQuery] = useState("");
   const [condition, setCondition] = useState<ItemCondition | "">("");
   const [tags, setTags] = useState<ItemTag[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -143,6 +148,7 @@ export default function CreateItemScreen() {
         variants,
         photos: uploadedPhotos,
         cost: parsedCost !== null && !Number.isNaN(parsedCost) ? parsedCost : null,
+        costCurrency: parsedCost !== null && !Number.isNaN(parsedCost) ? currency : null,
         condition: condition || undefined,
         tags: tags.length > 0 ? tags : undefined,
       });
@@ -220,13 +226,28 @@ export default function CreateItemScreen() {
         placeholder={t("variantsPlaceholder")}
         multiline
       />
-      <Field
-        label={t("costLabel")}
-        value={cost}
-        onChangeText={setCost}
-        placeholder={t("costPlaceholder")}
-        keyboardType="numeric"
-      />
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>{t("costLabel")}</Text>
+        <View style={styles.costRow}>
+          <TextInput
+            value={cost}
+            onChangeText={setCost}
+            placeholder={t("costPlaceholder")}
+            placeholderTextColor="#9b8571"
+            keyboardType="numeric"
+            style={{ ...styles.input, ...styles.costInput }}
+          />
+          <Pressable
+            style={styles.currencySelector}
+            onPress={() => { setCurrencyQuery(""); setCurrencySheetOpen(true); }}
+            accessibilityRole="button"
+            accessibilityLabel={t("currencyLabel")}
+          >
+            <Text style={styles.currencySelectorText}>{currency}</Text>
+            <Ionicons name="chevron-down" size={16} color="#9b8571" />
+          </Pressable>
+        </View>
+      </View>
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>{t("conditionLabel")}</Text>
@@ -317,6 +338,15 @@ export default function CreateItemScreen() {
         onQueryChange={setSheetQuery}
         onSelect={(id) => { setCollectionId(id); setSheetOpen(false); }}
         onClose={() => setSheetOpen(false)}
+      />
+
+      <CurrencySheet
+        visible={currencySheetOpen}
+        selectedCode={currency}
+        query={currencyQuery}
+        onQueryChange={setCurrencyQuery}
+        onSelect={(code) => { setCurrency(code); setCurrencySheetOpen(false); }}
+        onClose={() => setCurrencySheetOpen(false)}
       />
     </Screen>
   );
@@ -465,6 +495,95 @@ function CollectionSheet({
   );
 }
 
+function CurrencySheet({
+  visible,
+  selectedCode,
+  query,
+  onQueryChange,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  selectedCode: string;
+  query: string;
+  onQueryChange: (q: string) => void;
+  onSelect: (code: string) => void;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return CURRENCIES;
+    return CURRENCIES.filter(
+      (c) => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q),
+    );
+  }, [query]);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <Pressable style={styles.sheetContainer} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>{t("currencySelectTitle")}</Text>
+
+          <View style={styles.sheetSearchRow}>
+            <Ionicons name="search" size={18} color="#8a6e54" />
+            <TextInput
+              style={styles.sheetSearchInput}
+              value={query}
+              onChangeText={onQueryChange}
+              placeholder={t("searchPlaceholder")}
+              placeholderTextColor="#9b8571"
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            {query.length > 0 ? (
+              <Pressable onPress={() => onQueryChange("")} hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color="#b8a08a" />
+              </Pressable>
+            ) : null}
+          </View>
+
+          <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
+            {filtered.length === 0 ? (
+              <Text style={styles.sheetEmpty}>{t("searchNoResults")}</Text>
+            ) : (
+              filtered.map((c) => {
+                const isSelected = c.code === selectedCode;
+                return (
+                  <Pressable
+                    key={c.code}
+                    style={[styles.sheetRow, isSelected && styles.sheetRowSelected]}
+                    onPress={() => onSelect(c.code)}
+                  >
+                    <View style={styles.currencyRowText}>
+                      <Text
+                        style={[styles.currencyRowCode, isSelected && styles.sheetRowNameSelected]}
+                      >
+                        {c.code}
+                      </Text>
+                      <Text style={styles.sheetRowDesc} numberOfLines={1}>
+                        {c.name}
+                      </Text>
+                    </View>
+                    {isSelected ? (
+                      <Ionicons name="checkmark-circle" size={22} color="#d89c5b" />
+                    ) : null}
+                  </Pressable>
+                );
+              })
+            )}
+          </ScrollView>
+
+          <Pressable style={styles.sheetCloseButton} onPress={onClose}>
+            <Text style={styles.sheetCloseText}>{t("cancel")}</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   hero: {
     backgroundColor: "#f0e2cf",
@@ -511,6 +630,45 @@ const styles = StyleSheet.create({
   inputInvalid: {
     borderColor: "#d92f2f",
     borderWidth: 2,
+  },
+  costRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 10,
+  },
+  costInput: {
+    flex: 1,
+  },
+  currencySelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 22,
+    backgroundColor: "#fffaf3",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+    paddingHorizontal: 16,
+    minWidth: 96,
+  },
+  currencySelectorText: {
+    color: "#2b2017",
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
+  },
+  currencyRowText: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  currencyRowCode: {
+    color: "#2f2318",
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
+    minWidth: 52,
   },
   required: {
     color: "#d92f2f",

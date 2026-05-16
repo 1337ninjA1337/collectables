@@ -45,6 +45,7 @@ type DraftItemInput = {
   variants: string;
   photos: string[];
   cost?: number | null;
+  costCurrency?: string | null;
   isWishlist?: boolean;
   condition?: ItemCondition;
   tags?: ItemTag[];
@@ -642,6 +643,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           createdByUserId: user?.id ?? "unknown-user",
           createdAt: new Date().toISOString(),
           cost: input.cost ?? null,
+          costCurrency: input.costCurrency ?? null,
           isWishlist: input.isWishlist ?? false,
           condition: input.condition,
           tags: input.tags,

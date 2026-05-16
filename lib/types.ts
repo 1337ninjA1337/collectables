@@ -31,6 +31,7 @@ export type CollectableItem = {
   createdByUserId: string;
   createdAt: string;
   cost?: number | null;
+  costCurrency?: string | null;
   sortOrder?: number;
   isWishlist?: boolean;
   condition?: ItemCondition;

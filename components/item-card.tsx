@@ -23,7 +23,9 @@ export function ItemCard({ item, compact }: ItemCardProps) {
           )}
           <Text style={styles.compactTitle} numberOfLines={2}>{item.title}</Text>
           {typeof item.cost === "number" ? (
-            <Text style={styles.compactCost}>{t("costLabel")}: {item.cost}</Text>
+            <Text style={styles.compactCost}>
+              {t("costLabel")}: {item.cost}{item.costCurrency ? ` ${item.costCurrency}` : ""}
+            </Text>
           ) : null}
         </Pressable>
       </Link>
@@ -65,7 +67,9 @@ export function ItemCard({ item, compact }: ItemCardProps) {
               </View>
             ) : null}
             {typeof item.cost === "number" ? (
-              <Text style={styles.meta}>{t("costLabel")}: {item.cost}</Text>
+              <Text style={styles.meta}>
+                {t("costLabel")}: {item.cost}{item.costCurrency ? ` ${item.costCurrency}` : ""}
+              </Text>
             ) : null}
           </View>
         </View>

@@ -172,6 +172,8 @@ const en = {
   friendsSubtitle: "Browse your friends and the profiles you follow.",
   costLabel: "Cost",
   costPlaceholder: "Optional",
+  currencyLabel: "Currency",
+  currencySelectTitle: "Select currency",
   conditionLabel: "Condition",
   conditionNew: "New",
   conditionExcellent: "Excellent",
@@ -682,6 +684,8 @@ const ru: TranslationMap = {
   friendsSubtitle: "Смотрите ваших друзей и профили на которые вы подписаны.",
   costLabel: "Стоимость",
   costPlaceholder: "Необязательно",
+  currencyLabel: "Валюта",
+  currencySelectTitle: "Выберите валюту",
   conditionLabel: "Состояние",
   conditionNew: "Новое",
   conditionExcellent: "Отличное",
@@ -937,6 +941,8 @@ const ru: TranslationMap = {
 
 const be: TranslationMap = {
   ...en,
+  currencyLabel: "Валюта",
+  currencySelectTitle: "Выберыце валюту",
   templatePickerTitle: "Пачніце з шаблону",
   templatePickerHint: "Абярыце катэгорыю для прадзапаўнення назвы і апісання або пачніце з нуля.",
   templateHotWheelsName: "Hot Wheels",
@@ -1091,6 +1097,8 @@ const be: TranslationMap = {
 
 const pl: TranslationMap = {
   ...en,
+  currencyLabel: "Waluta",
+  currencySelectTitle: "Wybierz walutę",
   templatePickerTitle: "Zacznij od szablonu",
   templatePickerHint: "Wybierz kategorię, aby wstępnie wypełnić nazwę i opis, lub zacznij od zera.",
   templateHotWheelsName: "Hot Wheels",
@@ -1235,6 +1243,8 @@ const pl: TranslationMap = {
 
 const de: TranslationMap = {
   ...en,
+  currencyLabel: "Währung",
+  currencySelectTitle: "Währung auswählen",
   templatePickerTitle: "Mit einer Vorlage starten",
   templatePickerHint: "Wählen Sie eine Kategorie, um Name und Beschreibung vorzufüllen, oder starten Sie leer.",
   templateHotWheelsName: "Hot Wheels",
@@ -1375,6 +1385,8 @@ const de: TranslationMap = {
 
 const es: TranslationMap = {
   ...en,
+  currencyLabel: "Moneda",
+  currencySelectTitle: "Seleccionar moneda",
   templatePickerTitle: "Empieza con una plantilla",
   templatePickerHint: "Elige una categoría para rellenar el nombre y la descripción, o empieza de cero.",
   templateHotWheelsName: "Hot Wheels",

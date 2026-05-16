@@ -237,6 +237,7 @@ type DbItem = {
   created_by_user_id: string;
   created_at: string;
   cost?: number | null;
+  cost_currency?: string | null;
   sort_order?: number | null;
   is_wishlist?: boolean;
   condition?: string | null;
@@ -257,6 +258,7 @@ function toItem(row: DbItem): CollectableItem {
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at,
     cost: row.cost ?? null,
+    costCurrency: row.cost_currency ?? undefined,
     sortOrder: row.sort_order ?? undefined,
     isWishlist: row.is_wishlist ?? false,
     condition: (row.condition as CollectableItem["condition"]) ?? undefined,
@@ -320,6 +322,7 @@ export async function upsertItem(item: CollectableItem): Promise<void> {
       created_by_user_id: item.createdByUserId || "",
       created_at: item.createdAt || new Date().toISOString(),
       cost: item.cost ?? null,
+      cost_currency: item.costCurrency ?? null,
       sort_order: item.sortOrder ?? null,
       is_wishlist: item.isWishlist ?? false,
       condition: item.condition ?? null,
@@ -339,6 +342,7 @@ export async function updateRemoteItem(id: string, updates: Partial<CollectableI
   if ("variants" in updates) body.variants = updates.variants;
   if ("photos" in updates) body.photos = updates.photos;
   if ("cost" in updates) body.cost = updates.cost ?? null;
+  if ("costCurrency" in updates) body.cost_currency = updates.costCurrency ?? null;
   if ("collectionId" in updates && updates.collectionId) body.collection_id = updates.collectionId;
   if ("sortOrder" in updates) body.sort_order = updates.sortOrder ?? null;
   if ("isWishlist" in updates) body.is_wishlist = updates.isWishlist;
