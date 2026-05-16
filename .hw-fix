@@ -1,0 +1,106 @@
+# .hw-fix — Hot Wheels collection error + open-PR situation
+
+Date: 2026-05-16
+Branch: claude/kind-pascal-MbZYw (PR #26)
+
+## 1. Hot Wheels collection "merge" error — root cause + code fix (DONE)
+
+### Root cause
+`lib/collections-context.tsx:addCollection` generated the collection
+primary key by slugifying the **name**:
+
+```
+id = `${slug}-${Date.now()}`   // "Hot Wheels" -> "hot-wheels-<ts>"
+```
+
+Two problems, both surface exactly as a broken "Hot Wheels collection
+merge":
+
+1. **Slug collision -> dedupe-by-id data loss.** `mergeCollectionsFromCloud`
+   / `mergeItemsFromCloud` (lib/collections-cloud-merge.ts) dedupe by `id`
+   with "cloud wins". Two collections that slugify to the same base (e.g.
+   two "Hot Wheels", or the same name re-created) can produce colliding
+   ids; the merge then collapses them into one and silently drops the
+   other's data on the next cloud pull.
+2. **Slug id vs uuid column.** The cloud `collections.id` column type is
+   not defined by any migration in this repo (no `supabase/migrations/*collection*`
+   file exists). If that column is `uuid` (the chat `chat_messages.id`
+   column already is), then `upsertCollection(...)` POSTing
+   `hot-wheels-<ts>` is rejected by Postgres — and the error is swallowed
+   by `.catch(() => undefined)`, so a created Hot Wheels collection never
+   reaches the cloud and looks "lost"/"un-merged" on a second device.
+
+### Fix applied (this branch)
+`addCollection` now mints a random uuid (`generateUuidV4()` from
+`lib/uuid.ts`) instead of a name-derived slug. This removes the collision
+path entirely and makes the id compatible with a `uuid` cloud column.
+Existing collections keep their current ids (ids are stable once created);
+only newly-created collections get uuids — no data migration needed for
+local state.
+
+`npx tsc --noEmit` clean · `npm test` 898/898 · `npm run build` OK.
+
+## 2. MANUAL steps required (cannot be done from this environment)
+
+These need DB / dashboard access and your decision — do them by hand:
+
+- [ ] **Confirm the cloud `collections.id` column type** in Supabase
+      (SQL editor: `\d public.collections` or check the table editor).
+      - If it is `text`: the fix above is sufficient; nothing else needed.
+      - If it is `uuid`: also check `items.collection_id` /
+        `items.id` types. Pre-fix Hot Wheels (and any slug-id)
+        collections created on this account never synced — they exist
+        only in that device's AsyncStorage. Recover them by exporting
+        from the device (or re-create them) — there is no server copy to
+        backfill from.
+- [ ] **De-dupe any already-collapsed collections.** If a user already
+      hit the collision, two logical collections may now share one row.
+      Inspect: `SELECT id, name, owner_user_id, count(*) FROM collections
+      GROUP BY 1,2,3 HAVING count(*) > 1;` and split/rename as needed.
+      This is data surgery — do it manually, there is no safe automated
+      fix.
+- [ ] **Add a `collections` table migration to the repo.** The schema
+      currently lives only in the live DB. Capture it as
+      `supabase/migrations/<date>_collections.sql` so the id column type
+      is reviewable and this class of bug can't recur silently. (Left as
+      a manual task because the authoritative live schema is not visible
+      from here.)
+
+## 3. Open pull requests — why they were NOT all merged
+
+Request was "merge all prs". There are **7 open draft PRs (#20–#26)** and
+they are **all independent, parallel re-implementations of the SAME
+"chat DB best practices" task** from different sessions — none of them
+touch the Hot Wheels / collections code:
+
+| PR | Branch | Adds migration |
+|----|--------|----------------|
+| #20 | kind-pascal-nDMg6 | 20260514_chat_messages_client_id.sql |
+| #21 | kind-pascal-Lgbjh | 20260515_chat_messages_integrity.sql |
+| #22 | kind-pascal-yu0ZY | (no migration) |
+| #23 | kind-pascal-9WyZc | 20260515_chat_messages_integrity.sql |
+| #24 | kind-pascal-JEuky | (no migration) |
+| #25 | kind-pascal-7GqE6 | 20260516_chat_messages_integrity.sql |
+| #26 | kind-pascal-MbZYw | 20260516_chat_id_integrity.sql (this branch) |
+
+Merging all of them would be **destructive**: they edit the same files
+(`lib/chat-context.tsx`, `lib/supabase-chat-shapes.ts`,
+`lib/supabase-chat.ts`, the shared test files) in mutually incompatible
+ways and ship 5+ overlapping/duplicate chat migrations. A blind
+"merge all" produces a broken `main` (conflicting logic + duplicate
+DDL) and triggers an auto-deploy + `supabase db push` of that broken
+state. That is the opposite of "resolve this issue", so it was not done
+automatically — this is the manual decision flagged here per your
+".hw-fix" instruction.
+
+### Recommendation (needs your call)
+Pick **exactly one** chat-DB PR, merge it, and close the other six as
+duplicates:
+- **#26 (this branch)** — most complete: uuid message ids + idempotent
+  insert + chat_id integrity (`NOT VALID`, safe on a live DB) + 898
+  tests. Recommended.
+- #25 and #23 are close seconds (also add ordering tie-break / bounded
+  reads respectively) — cherry-pick those extra ideas later if wanted.
+
+Do NOT merge #20–#25 together. After choosing, the loser branches can be
+deleted.
