@@ -14,6 +14,7 @@ import {
   messageToInsertPayload,
   realtimeEndpoint,
   sendMessageUrl,
+  synthesizeMessageFromInput,
   typingChannelTopic,
   unreadCountForChat,
 } from "@/lib/supabase-chat-shapes";
@@ -121,12 +122,49 @@ describe("buildAuthHeaders", () => {
 });
 
 describe("buildSendMessageHeaders", () => {
-  it("includes Prefer: return=representation so insert echoes the row back", () => {
+  it("makes the insert idempotent (ignore-duplicates) and echoes the row back", () => {
     const headers = buildSendMessageHeaders(KEY, "tok");
-    assert.equal(headers.Prefer, "return=representation");
+    assert.equal(
+      headers.Prefer,
+      "resolution=ignore-duplicates,return=representation",
+    );
     assert.equal(headers.apikey, KEY);
     assert.equal(headers.Authorization, "Bearer tok");
     assert.equal(headers["Content-Type"], "application/json");
+  });
+});
+
+describe("synthesizeMessageFromInput", () => {
+  it("reconstructs a ChatMessage from a full send input (idempotent-duplicate path)", () => {
+    const msg = synthesizeMessageFromInput({
+      chatId: "chat-a-b",
+      fromUserId: "a",
+      toUserId: "b",
+      text: "hi",
+      id: "11111111-1111-4111-8111-111111111111",
+      createdAt: "2026-05-16T10:00:00.000Z",
+    });
+    assert.deepEqual(msg, {
+      id: "11111111-1111-4111-8111-111111111111",
+      chatId: "chat-a-b",
+      fromUserId: "a",
+      toUserId: "b",
+      text: "hi",
+      createdAt: "2026-05-16T10:00:00.000Z",
+    });
+  });
+
+  it("falls back to an empty id and a fresh timestamp when not supplied", () => {
+    const before = Date.now();
+    const msg = synthesizeMessageFromInput({
+      chatId: "chat-a-b",
+      fromUserId: "a",
+      toUserId: "b",
+      text: "hi",
+    });
+    assert.equal(msg.id, "");
+    assert.ok(!Number.isNaN(Date.parse(msg.createdAt)));
+    assert.ok(Date.parse(msg.createdAt) >= before);
   });
 });
 

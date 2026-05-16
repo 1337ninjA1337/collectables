@@ -21,6 +21,7 @@ import {
 } from "@/lib/supabase-chat";
 import { chatCacheKey } from "@/lib/storage-keys";
 import { ChatMessage } from "@/lib/types";
+import { generateUuidV4, isUuidV4 } from "@/lib/uuid";
 
 type ChatStore = {
   messagesByChat: Record<string, ChatMessage[]>;
@@ -43,10 +44,6 @@ type ChatContextValue = {
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
-
-function generateMessageId(): string {
-  return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
 
 export function ChatProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
@@ -134,33 +131,70 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   const flushPending = useCallback(
     async (pending: Record<string, ChatMessage[]>) => {
       if (!user) return;
-      const flushed: string[] = [];
+      // Track every message that reached the server so it can be dropped from
+      // the pending queue individually (not whole-chat): a partial flush must
+      // not re-send already-delivered messages on the next attempt. Legacy
+      // rows cached before the uuid fix carry a `msg-…` id the uuid
+      // `chat_messages.id` column rejects, so they are remapped to a real
+      // uuid; `newId` lets the local cache (and any realtime echo / refetch
+      // keyed on the server id) stay deduped.
+      const sent: { chatId: string; oldId: string; newId: string }[] = [];
       for (const [chatId, msgs] of Object.entries(pending)) {
         if (!msgs || msgs.length === 0) continue;
-        let allSent = true;
         for (const msg of msgs) {
-          const sent = await cloudSendMessage({
+          const outId = isUuidV4(msg.id) ? msg.id : generateUuidV4();
+          const delivered = await cloudSendMessage({
             chatId: msg.chatId,
             fromUserId: msg.fromUserId,
             toUserId: msg.toUserId,
             text: msg.text,
-            id: msg.id,
+            id: outId,
             createdAt: msg.createdAt,
           });
-          if (!sent) {
-            allSent = false;
-            break;
+          // Stop at the first failure in this chat to preserve send order;
+          // the rest stay queued for the next flush.
+          if (!delivered) break;
+          sent.push({ chatId, oldId: msg.id, newId: outId });
+        }
+      }
+      if (sent.length === 0) return;
+
+      const sentByChat = new Map<string, Set<string>>();
+      for (const { chatId, oldId } of sent) {
+        const set = sentByChat.get(chatId) ?? new Set<string>();
+        set.add(oldId);
+        sentByChat.set(chatId, set);
+      }
+
+      setStore((prev) => {
+        const nextPending: Record<string, ChatMessage[]> = {};
+        for (const [chatId, msgs] of Object.entries(prev.pendingByChatId)) {
+          const sentIds = sentByChat.get(chatId);
+          const remaining = sentIds
+            ? msgs.filter((m) => !sentIds.has(m.id))
+            : msgs;
+          if (remaining.length > 0) nextPending[chatId] = remaining;
+        }
+
+        let nextMessages = prev.messagesByChat;
+        const remaps = sent.filter((s) => s.oldId !== s.newId);
+        if (remaps.length > 0) {
+          nextMessages = { ...nextMessages };
+          for (const { chatId, oldId, newId } of remaps) {
+            const list = nextMessages[chatId];
+            if (!list) continue;
+            nextMessages[chatId] = list.map((m) =>
+              m.id === oldId ? { ...m, id: newId } : m,
+            );
           }
         }
-        if (allSent) flushed.push(chatId);
-      }
-      if (flushed.length > 0) {
-        setStore((prev) => {
-          const nextPending = { ...prev.pendingByChatId };
-          for (const chatId of flushed) delete nextPending[chatId];
-          return { ...prev, pendingByChatId: nextPending };
-        });
-      }
+
+        return {
+          ...prev,
+          pendingByChatId: nextPending,
+          messagesByChat: nextMessages,
+        };
+      });
     },
     [user],
   );
@@ -310,24 +344,35 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
 
       const chatId = buildChatId(user.id, otherUserId);
 
-      // Try cloud first so other devices see the message and the server-issued
-      // uuid+timestamp win across clients. When the cloud send fails (offline,
-      // unconfigured, RLS reject), fall back to a locally-generated message so
-      // the UI still records the attempt; AsyncStorage caches it for re-reads.
+      // Generate the message id client-side so it is stable from composition
+      // onward: the same uuid is used for the cloud insert, the local cache,
+      // and any later offline-flush retry. Because the server primary key is
+      // exactly this id, a retry after a lost response is an idempotent no-op
+      // (ON CONFLICT DO NOTHING) rather than a duplicate row. `created_at` is
+      // left for the server to set so message ordering stays consistent
+      // across clients with skewed clocks.
+      const id = generateUuidV4();
+      const createdAt = new Date().toISOString();
+
+      // Try cloud first so other devices see the message. When the cloud send
+      // fails (offline, unconfigured, RLS reject), fall back to the locally
+      // composed message (same id) so the UI records the attempt and the
+      // pending queue can flush it later; AsyncStorage caches it for re-reads.
       const cloudMessage = await cloudSendMessage({
         chatId,
         fromUserId: user.id,
         toUserId: otherUserId,
         text: trimmed,
+        id,
       });
 
       const message: ChatMessage = cloudMessage ?? {
-        id: generateMessageId(),
+        id,
         chatId,
         fromUserId: user.id,
         toUserId: otherUserId,
         text: trimmed,
-        createdAt: new Date().toISOString(),
+        createdAt,
       };
 
       setStore((prev) => {
