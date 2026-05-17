@@ -60,6 +60,25 @@ export function isAnalyticsOptedOut(): boolean {
   return userOptedOut;
 }
 
+// Rate-limit trackEvent to MAX_ANALYTICS_EVENTS_PER_WINDOW within
+// ANALYTICS_RATE_LIMIT_WINDOW_MS so a runaway useEffect loop or a debounce
+// regression cannot burn through the PostHog free-tier (1M events/mo) in
+// minutes. Mirrors the Sentry limiter (Crash #11); the cap is higher because
+// product analytics are intentionally chattier than crash reports.
+const ANALYTICS_RATE_LIMIT_WINDOW_MS = 60_000;
+const MAX_ANALYTICS_EVENTS_PER_WINDOW = 200;
+let recentAnalyticsEvents: number[] = [];
+
+function analyticsRateLimitAllow(now: number = Date.now()): boolean {
+  const cutoff = now - ANALYTICS_RATE_LIMIT_WINDOW_MS;
+  recentAnalyticsEvents = recentAnalyticsEvents.filter((ts) => ts > cutoff);
+  if (recentAnalyticsEvents.length >= MAX_ANALYTICS_EVENTS_PER_WINDOW) {
+    return false;
+  }
+  recentAnalyticsEvents.push(now);
+  return true;
+}
+
 const defaultLoader: AnalyticsLoader = async () => {
   const mod = (await import("posthog-react-native")) as unknown as {
     default: PostHogConstructor;
@@ -128,6 +147,7 @@ export function trackEvent(
 ): void {
   if (userOptedOut) return;
   if (!sdk || !activeConfig?.enabled) return;
+  if (!analyticsRateLimitAllow()) return;
   try {
     sdk.capture(name, props);
   } catch {
@@ -164,4 +184,9 @@ export function __resetAnalyticsForTests(): void {
   initialised = false;
   activeConfig = null;
   userOptedOut = false;
+  recentAnalyticsEvents = [];
+}
+
+export function __resetAnalyticsRateLimitForTests(): void {
+  recentAnalyticsEvents = [];
 }
