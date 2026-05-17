@@ -41,6 +41,28 @@ Run `supabase/migrations/20260508_analytics_events.sql` against your Supabase pr
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
 
+### Verify the RLS posture (Analytics #16)
+
+`analytics_events` holds the full event history; a stray SELECT policy
+would leak it to every logged-in (or logged-out) user. After applying the
+migration, run the leakage test and confirm no row is readable by end-user
+roles:
+
+1. Open the **Supabase SQL editor** (it connects as a RLS-bypassing role).
+2. Paste and run the entire contents of
+   [`supabase/tests/analytics_events_rls.sql`](supabase/tests/analytics_events_rls.sql).
+3. Confirm the output is **exactly** these three notices, then a successful
+   `ROLLBACK` (the probe row is discarded — the test is side-effect free):
+   - `OK: anon SELECT denied (insufficient_privilege)`
+   - `OK: authenticated SELECT denied (insufficient_privilege)`
+   - `OK: service_role can read public.analytics_events (1 probe row(s))`
+4. If you instead see a `SECURITY FAIL: …` exception, **stop** — the event
+   store is leaking. The likely cause is a later migration that added a
+   `CREATE POLICY` or `GRANT … TO anon/authenticated` on the table; revert
+   it and re-run the test before shipping.
+
+Re-run this whenever a migration touches `analytics_events` or its grants.
+
 ## 20260516_chat_id_integrity.sql
 
 Run `supabase/migrations/20260516_chat_id_integrity.sql` against your Supabase project to enforce chat-message conversation-key integrity:
