@@ -41,6 +41,48 @@ Run `supabase/migrations/20260508_analytics_events.sql` against your Supabase pr
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
 
+### Verify the RLS lock-down (Analytics #16)
+
+After applying the migration, run this in the **Supabase SQL editor** to
+confirm that anonymous + authenticated callers cannot read event history and
+that only the `service_role` (the role Power BI authenticates as) can. The
+SQL editor connects as the table owner, so we `SET ROLE` to impersonate each
+end-user role:
+
+```sql
+-- 1. anon (logged-out) must NOT be able to read events:
+SET ROLE anon;
+SELECT count(*) FROM public.analytics_events;   -- EXPECT: ERROR permission denied for table analytics_events
+RESET ROLE;
+
+-- 2. authenticated (logged-in end user) must NOT be able to read events:
+SET ROLE authenticated;
+SELECT count(*) FROM public.analytics_events;   -- EXPECT: ERROR permission denied for table analytics_events
+RESET ROLE;
+
+-- 3. service_role (Power BI / analytics-mirror) MUST be able to read events:
+SET ROLE service_role;
+SELECT count(*) FROM public.analytics_events;   -- EXPECT: a row count, no error
+RESET ROLE;
+```
+
+Checklist — the migration is correctly locked down iff **all** of:
+
+- [ ] Step 1 errors with `permission denied for table analytics_events`.
+- [ ] Step 2 errors with `permission denied for table analytics_events`.
+- [ ] Step 3 returns a count with no error.
+
+If step 1 or 2 returns a number instead of erroring, a permissive `GRANT`
+or `CREATE POLICY` has leaked onto `public.analytics_events` (a regression of
+the Analytics #12 default-deny posture) and the full event history is exposed
+to end users — revoke it immediately:
+
+```sql
+REVOKE ALL ON public.analytics_events FROM anon, authenticated;
+-- and drop any policy that referenced the table:
+-- DROP POLICY <name> ON public.analytics_events;
+```
+
 ## 20260516_chat_id_integrity.sql
 
 Run `supabase/migrations/20260516_chat_id_integrity.sql` against your Supabase project to enforce chat-message conversation-key integrity:
