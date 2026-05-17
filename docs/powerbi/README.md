@@ -3,11 +3,14 @@
 Importable assets that get **DAU + the listing funnel + premium conversion**
 running over the live `analytics_events` store with no DAX/M authoring.
 
-A binary `.pbit` template is generated separately (Analytics #15b,
-`scripts/build-powerbi-template.ts`) because a hand-authored `.pbit` cannot
-be validated in CI without Power BI Desktop. These text assets are the
-verifiable source the `.pbit` is built from — and a copy-paste fallback if
-the template fails to open in your Power BI version.
+The binary template **[`Collectables-Starter.pbit`](./Collectables-Starter.pbit)**
+ships in this folder — double-click it (or **File → Import → Power BI
+template**), fill the four Supabase parameter prompts, authenticate as the
+`service_role`, and the DAU/funnel/premium-conversion report loads with no
+DAX/M authoring. It is generated from the text assets below by
+`scripts/build-powerbi-template.ts` (`npm run build:powerbi`), so the binary
+and the copy-paste fallback can never drift. Use the manual steps below if
+the `.pbit` fails to open in your Power BI version.
 
 ## Files
 

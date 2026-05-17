@@ -197,11 +197,33 @@ this with:
   connections to 4.
 - Visual-level **Top N** filters to keep `analytics_events` queries bounded.
 
-## 7. Screenshots
+## 7. Starter template (`.pbit`)
 
-> Dashboard screenshots will be added here once the first build of
-> `docs/powerbi/Collectables-Starter.pbit` (Analytics #15) lands. Until then,
-> the DAX above renders directly inside Power BI Desktop without a template.
+A prebuilt **`docs/powerbi/Collectables-Starter.pbit`** ships in the repo so
+you don't have to hand-author the model:
+
+1. Double-click `docs/powerbi/Collectables-Starter.pbit` (or **File → Import
+   → Power BI template** in Power BI Desktop).
+2. Power BI prompts for the four parameters — fill them from your
+   **session pooler** values (§2): `SupabaseHost`
+   (`aws-0-<region>.pooler.supabase.com`), `SupabasePort` (`5432`),
+   `SupabaseDb` (`postgres`), `SupabaseSchema` (`public`).
+3. When asked for credentials, pick the **Database** tab and authenticate as
+   `postgres.<project-ref>` with the **service-role** key (RLS denies
+   `anon`/`authenticated` — §2).
+4. The model loads `public.analytics_events`, all seven measures from §5
+   (`DAU`, the `ItemsAdded`/`ListingsCreated`/`ListingFunnelRate` funnel,
+   `SignupsLast7d`/`PremiumActivationsLast7d`/`PremiumConversionRate7d`), and
+   a one-page report with the DAU card, the funnel column chart, and the
+   premium-conversion card.
+
+The template is generated from the committed text assets
+([`docs/powerbi/measures.dax`](./powerbi/measures.dax) +
+[`docs/powerbi/queries.m`](./powerbi/queries.m)) by
+`scripts/build-powerbi-template.ts` (`npm run build:powerbi`), so the binary
+and the copy-paste fallback can never drift. If the `.pbit` fails to open in
+your Power BI build, follow [`docs/powerbi/README.md`](./powerbi/README.md)
+to paste the same query + measures by hand.
 
 ## 8. Related docs
 

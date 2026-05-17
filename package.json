@@ -13,6 +13,7 @@
     "lint:ci": "npx tsc --noEmit && npm test",
     "postinstall": "npx expo install --check || true",
     "build": "npx expo export --platform web && tsx scripts/build-spa-fallback.ts",
+    "build:powerbi": "tsx scripts/build-powerbi-template.ts",
     "deploy": "cross-env-shell 'set -a && [ -f .env ] && . ./.env; set +a && EXPO_PUBLIC_APP_URL=https://1337ninja1337.github.io/collectables npx expo export --platform web --clear && tsx scripts/build-spa-fallback.ts && touch dist/.nojekyll && echo > dist/.gitignore && npx gh-pages -d dist --dotfiles'"
   },
   "dependencies": {
