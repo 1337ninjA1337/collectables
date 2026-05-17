@@ -41,6 +41,55 @@ Run `supabase/migrations/20260508_analytics_events.sql` against your Supabase pr
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
 
+### Verify the RLS lock-down (Analytics #16)
+
+`analytics_events` holds the full event history, so confirm that **only**
+`service_role` can read it before pointing Power BI / PostHog at the project.
+The `__tests__/analytics-events-migration.test.ts` structural test already
+proves the migration ships RLS-enabled with **no** policies and `REVOKE ALL`
+on `anon`/`authenticated`; the steps below verify the *live* database matches.
+
+**A. In the Supabase SQL editor** (runs as `postgres`, so impersonate the
+client roles explicitly):
+
+```sql
+-- anon must be denied (REVOKE ALL → hard error, not an empty result):
+SET ROLE anon;
+SELECT count(*) FROM public.analytics_events;     -- expect: ERROR  permission denied for table analytics_events
+RESET ROLE;
+
+-- authenticated must be denied the same way:
+SET ROLE authenticated;
+SELECT count(*) FROM public.analytics_events;     -- expect: ERROR  permission denied for table analytics_events
+RESET ROLE;
+
+-- the privileged role (what Power BI uses) can read:
+SELECT count(*) FROM public.analytics_events;     -- expect: a row count, no error
+```
+
+If either `SET ROLE` block returns a count instead of `permission denied`, a
+later migration accidentally granted a policy/privilege — revoke it before
+shipping.
+
+**B. Over the REST API** (catches a misconfigured PostgREST exposure even if
+SQL-level grants are correct). Replace `<PROJECT>` and the keys:
+
+```bash
+# anon key → expect HTTP 401 (or [] with 0 rows), never event data:
+curl -s -o /dev/null -w '%{http_code}\n' \
+  "https://<PROJECT>.supabase.co/rest/v1/analytics_events?select=id&limit=1" \
+  -H "apikey: <ANON_KEY>" -H "Authorization: Bearer <ANON_KEY>"
+
+# service_role key → expect HTTP 200 with rows (this is the Power BI path):
+curl -s -o /dev/null -w '%{http_code}\n' \
+  "https://<PROJECT>.supabase.co/rest/v1/analytics_events?select=id&limit=1" \
+  -H "apikey: <SERVICE_ROLE_KEY>" -H "Authorization: Bearer <SERVICE_ROLE_KEY>"
+```
+
+Expected: the anon call returns `401` (or an empty array — never populated
+rows); the service-role call returns `200`. Run this again after every future
+migration that touches `analytics_events`.
+
 ## 20260516_chat_id_integrity.sql
 
 Run `supabase/migrations/20260516_chat_id_integrity.sql` against your Supabase project to enforce chat-message conversation-key integrity:
