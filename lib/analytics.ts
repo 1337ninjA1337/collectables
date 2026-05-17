@@ -47,6 +47,27 @@ let activeConfig: AnalyticsConfig | null = null;
 
 let userOptedOut = false;
 
+// Rate-limit trackEvent to ANALYTICS_MAX_EVENTS_PER_WINDOW within
+// ANALYTICS_RATE_LIMIT_WINDOW_MS so a runaway useEffect loop or a chatty
+// screen cannot burn through the PostHog free-tier (1M events/mo) budget in
+// seconds. Mirrors the Sentry rate limiter (Crash #11); only trackEvent is
+// bounded — identify/reset are low-volume lifecycle calls.
+const ANALYTICS_RATE_LIMIT_WINDOW_MS = 60_000;
+const ANALYTICS_MAX_EVENTS_PER_WINDOW = 200;
+let recentEvents: number[] = [];
+
+function analyticsRateLimitAllow(now: number = Date.now()): boolean {
+  const cutoff = now - ANALYTICS_RATE_LIMIT_WINDOW_MS;
+  recentEvents = recentEvents.filter((ts) => ts > cutoff);
+  if (recentEvents.length >= ANALYTICS_MAX_EVENTS_PER_WINDOW) return false;
+  recentEvents.push(now);
+  return true;
+}
+
+export function __resetAnalyticsRateLimitForTests(): void {
+  recentEvents = [];
+}
+
 /**
  * Honoured by initAnalytics — when set to true (e.g. user toggled the
  * "Diagnostics & analytics" switch off), the SDK never initialises.
@@ -128,6 +149,7 @@ export function trackEvent(
 ): void {
   if (userOptedOut) return;
   if (!sdk || !activeConfig?.enabled) return;
+  if (!analyticsRateLimitAllow()) return;
   try {
     sdk.capture(name, props);
   } catch {
@@ -164,4 +186,5 @@ export function __resetAnalyticsForTests(): void {
   initialised = false;
   activeConfig = null;
   userOptedOut = false;
+  recentEvents = [];
 }
