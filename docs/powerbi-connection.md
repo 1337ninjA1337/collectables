@@ -197,11 +197,26 @@ this with:
   connections to 4.
 - Visual-level **Top N** filters to keep `analytics_events` queries bounded.
 
-## 7. Screenshots
+## 7. Starter template (`.pbit`) and screenshots
 
-> Dashboard screenshots will be added here once the first build of
-> `docs/powerbi/Collectables-Starter.pbit` (Analytics #15) lands. Until then,
-> the DAX above renders directly inside Power BI Desktop without a template.
+A pre-built template now ships at
+[`docs/powerbi/Collectables-Starter.pbit`](./powerbi/Collectables-Starter.pbit).
+It carries the `analytics_events` model and all seven measures from §5, with
+the Supabase connection exposed as four parameters (`SupabaseHost`,
+`SupabasePort`, `SupabaseDb`, `SupabaseSchema`). To use it: double-click the
+`.pbit`, fill the four parameter prompts with your **session pooler** values,
+and authenticate as the `service_role` (Database password) — `analytics_events`
+RLS denies `anon`/`authenticated`.
+
+The template is generated deterministically from the verifiable text assets
+by `npm run build:pbit` (`scripts/build-powerbi-template.ts` →
+`lib/pbit-template.ts`); the committed binary is byte-stable so rebuilds don't
+churn git. If a given Power BI Desktop build refuses to open the `.pbit`, the
+copy-paste fallback in [`docs/powerbi/README.md`](./powerbi/README.md)
+(`queries.m` + `measures.dax`) reproduces the same model by hand.
+
+> Dashboard screenshots will be added here once the first author publishes a
+> rendered report from `Collectables-Starter.pbit` (Analytics #15).
 
 ## 8. Related docs
 
