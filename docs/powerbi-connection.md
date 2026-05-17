@@ -197,11 +197,23 @@ this with:
   connections to 4.
 - Visual-level **Top N** filters to keep `analytics_events` queries bounded.
 
-## 7. Screenshots
+## 7. Starter template & screenshots
 
-> Dashboard screenshots will be added here once the first build of
-> `docs/powerbi/Collectables-Starter.pbit` (Analytics #15) lands. Until then,
-> the DAX above renders directly inside Power BI Desktop without a template.
+A pre-built template now ships at
+[`docs/powerbi/Collectables-Starter.pbit`](./powerbi/Collectables-Starter.pbit)
+(Analytics #15). Open it in Power BI Desktop, paste your **session pooler**
+host + port (and db/schema) into the parameter prompt, authenticate as the
+`service_role`, and you get the **DAU** page and the **listing-funnel +
+premium-conversion** page without authoring any DAX or M.
+
+> The `.pbit` is generated deterministically by
+> `scripts/build-powerbi-template.ts` from CI-verifiable source, but Power BI
+> Desktop is Windows-only so it cannot be opened in CI. If your Power BI
+> build rejects the template, the copy-paste fallback in
+> [`docs/powerbi/`](./powerbi/) (`queries.m` + `measures.dax`) reproduces the
+> exact same model in ~2 minutes. Recommended once it opens: **File → Save**
+> to re-serialise it for your Power BI version, then add dashboard
+> screenshots here.
 
 ## 8. Related docs
 
