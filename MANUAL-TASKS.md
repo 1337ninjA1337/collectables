@@ -41,6 +41,35 @@ Run `supabase/migrations/20260508_analytics_events.sql` against your Supabase pr
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
 
+### Verify the deny-all posture (Analytics #16)
+
+After applying the migration, prove the long-tail event store cannot leak to
+end users. Run the verification script:
+
+```bash
+psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 \
+  -f supabase/tests/analytics_events_rls_test.sql
+```
+
+(or paste `supabase/tests/analytics_events_rls_test.sql` into the Supabase SQL
+editor). It RAISEs an exception — failing the run loudly — unless **all** of
+the following hold, and prints `analytics_events RLS test PASSED` otherwise:
+
+- [ ] `public.analytics_events` exists.
+- [ ] Row level security is **enabled** on the table.
+- [ ] **Zero** RLS policies exist on the table (RLS + no policy = deny-all).
+- [ ] The `anon` role holds **no** SELECT/INSERT/UPDATE/DELETE privilege.
+- [ ] The `authenticated` role holds **no** SELECT/INSERT/UPDATE/DELETE privilege.
+- [ ] A `SELECT` executed `AS anon` is denied (`insufficient_privilege`).
+- [ ] A `SELECT` executed `AS authenticated` is denied (`insufficient_privilege`).
+- [ ] A `SELECT` as the `service_role`/superuser **succeeds** (the Power BI /
+      `analytics-mirror` read path must keep working).
+
+Re-run this whenever a migration touches `analytics_events` or its grants —
+it's the regression guard that a future permissive policy can't silently
+expose the full event history (the structural counterpart lives in
+`__tests__/analytics-events-migration.test.ts`).
+
 ## 20260516_chat_id_integrity.sql
 
 Run `supabase/migrations/20260516_chat_id_integrity.sql` against your Supabase project to enforce chat-message conversation-key integrity:
