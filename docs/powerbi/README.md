@@ -3,20 +3,35 @@
 Importable assets that get **DAU + the listing funnel + premium conversion**
 running over the live `analytics_events` store with no DAX/M authoring.
 
-A binary `.pbit` template is generated separately (Analytics #15b,
-`scripts/build-powerbi-template.ts`) because a hand-authored `.pbit` cannot
-be validated in CI without Power BI Desktop. These text assets are the
-verifiable source the `.pbit` is built from — and a copy-paste fallback if
-the template fails to open in your Power BI version.
+The binary [`Collectables-Starter.pbit`](./Collectables-Starter.pbit)
+template ships next to these files. It is **generated** from `queries.m` +
+`measures.dax` by `scripts/build-powerbi-template.ts` (run
+`tsx scripts/build-powerbi-template.ts` after editing either source; a CI
+test fails if the committed `.pbit` is stale). Power BI Desktop is
+Windows-only and cannot be run in CI, so the template's *contract* (valid
+OPC ZIP, parameters surfaced, every measure embedded) is what the tests
+verify — these text assets remain the guaranteed copy-paste fallback if the
+template fails to open in your Power BI version.
 
 ## Files
 
-| File | Paste into |
+| File | Use |
 | --- | --- |
-| [`queries.m`](./queries.m) | Home → Transform data → New Query → Blank Query → Advanced Editor (replace all) |
-| [`measures.dax`](./measures.dax) | Modeling → New measure (one `Name :=` block at a time) |
+| [`Collectables-Starter.pbit`](./Collectables-Starter.pbit) | Double-click → Power BI prompts for the four Supabase params → Load |
+| [`queries.m`](./queries.m) | Fallback: Home → Transform data → New Query → Blank Query → Advanced Editor (replace all) |
+| [`measures.dax`](./measures.dax) | Fallback: Modeling → New measure (one `Name :=` block at a time) |
 
-## Steps
+## Quick start (template)
+
+1. Open **`Collectables-Starter.pbit`**. Power BI prompts for
+   `SupabaseHost` / `SupabasePort` / `SupabaseDb` / `SupabaseSchema` — paste
+   your **session pooler** values and authenticate as the `service_role`
+   (`analytics_events` RLS denies `anon`/`authenticated`).
+2. The `analytics_events` table + all seven measures (`DAU`,
+   `ListingFunnelRate`, `PremiumConversionRate7d`, …) load ready to drop on
+   a canvas.
+
+## Fallback (manual paste)
 
 1. Open **Power BI Desktop** → blank report.
 2. **Home → Transform data → New Query → Blank Query**, open the **Advanced

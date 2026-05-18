@@ -197,11 +197,18 @@ this with:
   connections to 4.
 - Visual-level **Top N** filters to keep `analytics_events` queries bounded.
 
-## 7. Screenshots
+## 7. Starter template & screenshots
 
-> Dashboard screenshots will be added here once the first build of
-> `docs/powerbi/Collectables-Starter.pbit` (Analytics #15) lands. Until then,
-> the DAX above renders directly inside Power BI Desktop without a template.
+`docs/powerbi/Collectables-Starter.pbit` (Analytics #15) has landed —
+double-click it instead of doing steps 3–5 by hand: Power BI prompts for the
+four session-pooler parameters, then loads the `analytics_events` table with
+all seven measures pre-built. The `.pbit` is regenerated from the text
+assets by `scripts/build-powerbi-template.ts`; see
+[`docs/powerbi/README.md`](./powerbi/README.md).
+
+> Dashboard screenshots will be added here once a maintainer captures them
+> from the rendered `.pbit`; the DAX above also renders directly inside
+> Power BI Desktop without the template.
 
 ## 8. Related docs
 
