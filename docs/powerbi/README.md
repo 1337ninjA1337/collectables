@@ -3,18 +3,22 @@
 Importable assets that get **DAU + the listing funnel + premium conversion**
 running over the live `analytics_events` store with no DAX/M authoring.
 
-A binary `.pbit` template is generated separately (Analytics #15b,
-`scripts/build-powerbi-template.ts`) because a hand-authored `.pbit` cannot
-be validated in CI without Power BI Desktop. These text assets are the
-verifiable source the `.pbit` is built from — and a copy-paste fallback if
-the template fails to open in your Power BI version.
+A binary [`Collectables-Starter.pbit`](./Collectables-Starter.pbit) template
+is **generated from these text assets** by
+`scripts/build-powerbi-template.ts` (run `npm run powerbi:template`). Open it
+in Power BI Desktop and it prompts for the four `Supabase*` parameters, then
+loads `analytics_events` with the seven starter measures pre-defined. Because
+a hand-authored `.pbit` cannot be validated in CI without Power BI Desktop,
+these text assets remain the **verifiable source of truth** and a guaranteed
+copy-paste fallback if the template fails to open in your Power BI version.
 
 ## Files
 
-| File | Paste into |
+| File | Use |
 | --- | --- |
-| [`queries.m`](./queries.m) | Home → Transform data → New Query → Blank Query → Advanced Editor (replace all) |
-| [`measures.dax`](./measures.dax) | Modeling → New measure (one `Name :=` block at a time) |
+| [`Collectables-Starter.pbit`](./Collectables-Starter.pbit) | Power BI Desktop → **File → Open** → enter the four Supabase params when prompted |
+| [`queries.m`](./queries.m) | Fallback: Home → Transform data → New Query → Blank Query → Advanced Editor (replace all) |
+| [`measures.dax`](./measures.dax) | Fallback: Modeling → New measure (one `Name :=` block at a time) |
 
 ## Steps
 

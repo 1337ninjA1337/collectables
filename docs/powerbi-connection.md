@@ -197,11 +197,19 @@ this with:
   connections to 4.
 - Visual-level **Top N** filters to keep `analytics_events` queries bounded.
 
-## 7. Screenshots
+## 7. Starter template (`.pbit`)
 
-> Dashboard screenshots will be added here once the first build of
-> `docs/powerbi/Collectables-Starter.pbit` (Analytics #15) lands. Until then,
-> the DAX above renders directly inside Power BI Desktop without a template.
+[`docs/powerbi/Collectables-Starter.pbit`](./powerbi/Collectables-Starter.pbit)
+is a one-click starter: **File → Open** it in Power BI Desktop and it prompts
+for the four `Supabase*` parameters (host, port, db, schema — see step 2),
+then loads `analytics_events` with all seven measures from §5 pre-defined. It
+is generated from [`docs/powerbi/queries.m`](./powerbi/queries.m) +
+[`docs/powerbi/measures.dax`](./powerbi/measures.dax) by
+`npm run powerbi:template`, so the template can never drift from the
+copy-paste fallback. If your Power BI build rejects the template, fall back to
+pasting those two files (see [`docs/powerbi/README.md`](./powerbi/README.md)).
+Dashboard screenshots will be added here after the first authored visuals
+land.
 
 ## 8. Related docs
 
