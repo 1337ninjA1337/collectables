@@ -199,9 +199,14 @@ this with:
 
 ## 7. Screenshots
 
-> Dashboard screenshots will be added here once the first build of
-> `docs/powerbi/Collectables-Starter.pbit` (Analytics #15) lands. Until then,
-> the DAX above renders directly inside Power BI Desktop without a template.
+> The starter template `docs/powerbi/Collectables-Starter.pbit` (Analytics
+> #15) now ships in the repo — double-click it, paste the four Supabase
+> session-pooler parameters, and the DAU / funnel / premium-conversion
+> measures load with no DAX authoring. Dashboard screenshots will be added
+> here after the one-time Power BI Desktop smoke-test
+> ([`MANUAL-TASKS.md`](../MANUAL-TASKS.md) → "Collectables-Starter.pbit");
+> until a screenshot lands the DAX above also renders directly without the
+> template.
 
 ## 8. Related docs
 

@@ -128,3 +128,14 @@ ALTER TABLE public.items
 ```
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow (the deploy workflow runs `supabase db push` automatically when `SUPABASE_DB_URL` is set, so a normal deploy applies this). The app keeps working either way: items always persist locally via AsyncStorage and the cloud upsert is best-effort (its failure is swallowed). Apply the migration so item cloud sync — which now sends `cost_currency` — keeps succeeding.
+
+## Collectables-Starter.pbit smoke-test (Analytics #15b)
+
+`docs/powerbi/Collectables-Starter.pbit` is generated programmatically by `scripts/build-powerbi-template.ts` (`npm run build:powerbi`) from the verifiable text sources `docs/powerbi/queries.m` + `docs/powerbi/measures.dax`. The binary OPC/[MS-QDEFF] structure is built per public spec and unit-tested in `__tests__/powerbi-template.test.ts`, **but CI has no Power BI Desktop to actually open it**. One human must verify the template once after a Power Query / model change:
+
+1. Double-click `docs/powerbi/Collectables-Starter.pbit` in **Power BI Desktop** (Windows; Mac/Linux via VM/Parallels per `docs/powerbi-connection.md` §1).
+2. Confirm it prompts for `SupabaseHost` / `SupabasePort` / `SupabaseDb` / `SupabaseSchema`. Enter your **session pooler** values.
+3. Authenticate as the `service_role` (Database password) — `analytics_events` RLS denies `anon`/`authenticated`.
+4. Confirm the `analytics_events` table loads and the `DAU` / `ItemsAdded` / `ListingsCreated` / `ListingFunnelRate` / `SignupsLast7d` / `PremiumActivationsLast7d` / `PremiumConversionRate7d` measures evaluate.
+
+If Power BI rejects the binary on your version, use the copy-paste fallback documented in `docs/powerbi/README.md` (paste `queries.m` + `measures.dax` manually) and open an issue noting the Power BI Desktop version so the generator's `Version`/`compatibilityLevel`/`DataMashup` constants can be adjusted. Do not hand-edit the `.pbit`; fix `queries.m`/`measures.dax` or the generator and re-run `npm run build:powerbi`.
