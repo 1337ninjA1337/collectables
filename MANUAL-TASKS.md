@@ -41,6 +41,38 @@ Run `supabase/migrations/20260508_analytics_events.sql` against your Supabase pr
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
 
+### RLS leak check (Analytics #16)
+
+After applying the migration, paste this into the Supabase SQL editor to prove
+the long-tail event store is **not** readable by end users. `analytics_events`
+has `REVOKE ALL` from `anon`/`authenticated` **and** RLS-with-no-policy, so both
+roles must be rejected — only the `service_role` (Power BI / SQL editor) reads
+it:
+
+```sql
+-- 1. Anonymous (logged-out) caller — MUST raise:
+--    ERROR: permission denied for table analytics_events
+SET ROLE anon;
+SELECT count(*) FROM public.analytics_events;
+RESET ROLE;
+
+-- 2. Authenticated (logged-in end user) — MUST raise the same
+--    permission-denied error:
+SET ROLE authenticated;
+SELECT count(*) FROM public.analytics_events;
+RESET ROLE;
+
+-- 3. service_role bypasses RLS and DOES see rows (sanity, expect a count):
+SET ROLE service_role;
+SELECT count(*) AS service_role_visible_rows FROM public.analytics_events;
+RESET ROLE;
+```
+
+Pass criteria: steps 1 and 2 each fail with `permission denied for table
+analytics_events` (SQLSTATE `42501`); step 3 returns a row count. If step 1 or 2
+returns a number instead of erroring, a later migration has wrongly granted a
+policy/privilege — treat it as a data-leak regression and revert it.
+
 ## 20260516_chat_id_integrity.sql
 
 Run `supabase/migrations/20260516_chat_id_integrity.sql` against your Supabase project to enforce chat-message conversation-key integrity:

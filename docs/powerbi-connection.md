@@ -197,11 +197,19 @@ this with:
   connections to 4.
 - Visual-level **Top N** filters to keep `analytics_events` queries bounded.
 
-## 7. Screenshots
+## 7. Starter template
 
-> Dashboard screenshots will be added here once the first build of
-> `docs/powerbi/Collectables-Starter.pbit` (Analytics #15) lands. Until then,
-> the DAX above renders directly inside Power BI Desktop without a template.
+`docs/powerbi/Collectables-Starter.pbit` (Analytics #15) now ships in the
+repo. Open it in Power BI Desktop, fill the `Supabase*` parameter prompt with
+your session-pooler values, and the `analytics_events` model plus all seven
+measures from §5 are pre-wired — no DAX/M authoring. Regenerate it after
+editing the text assets with `npm run build:powerbi`. See
+[`docs/powerbi/README.md`](./powerbi/README.md) for the open walkthrough and
+the copy-paste fallback.
+
+> Dashboard screenshots will be added here once a reference report layout is
+> committed; the current `.pbit` opens to a blank canvas with the model and
+> measures ready to drop onto visuals.
 
 ## 8. Related docs
 
