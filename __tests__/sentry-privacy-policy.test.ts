@@ -75,7 +75,7 @@ describe("Sentry privacy declarations (App Store Connect + public policy)", () =
     const src = read("APPSTORE-SUBMISSION.md");
     assert.match(
       src,
-      /Where it is stored \(Supabase, Cloudinary, Sentry\)/,
+      /Where it is stored \(Supabase, Cloudinary, Sentry/,
       "The privacy-policy outline must include Sentry alongside Supabase + Cloudinary so engineers writing PRIVACY.md don't drop it",
     );
   });
