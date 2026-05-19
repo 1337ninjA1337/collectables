@@ -5,15 +5,13 @@ import * as path from "node:path";
 
 import {
   SERVICE_WORKER_FILENAME,
-  SPA_REDIRECT_STORAGE_KEY,
-  SPA_RESTORE_SCRIPT_MARKER,
   SPA_SW_REGISTER_MARKER,
-  build404Html,
   buildServiceWorker,
   injectServiceWorkerRegistration,
-  injectSpaRestoreScript,
   normalizeSpaBaseUrl,
 } from "@/lib/spa-fallback";
+
+const repoRoot = path.join(__dirname, "..");
 
 describe("normalizeSpaBaseUrl", () => {
   it("returns '/' for empty input", () => {
@@ -38,149 +36,16 @@ describe("normalizeSpaBaseUrl", () => {
   });
 });
 
-describe("build404Html", () => {
-  it("renders a location.replace to the normalized baseUrl", () => {
-    const html = build404Html("/collectables");
-    assert.match(html, /location\.replace\("\/collectables\/"\)/);
-  });
-
-  it("stores the original pathname under the canonical sessionStorage key", () => {
-    const html = build404Html("/collectables");
-    assert.ok(
-      html.includes(`sessionStorage.setItem("${SPA_REDIRECT_STORAGE_KEY}"`),
-      "html should reference the canonical storage key",
+describe("expo web config (GitHub Pages SPA)", () => {
+  it("uses output:single so one route-agnostic shell renders every route", () => {
+    const appJson = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "app.json"), "utf8"),
+    ) as { expo: { web?: { output?: string } } };
+    assert.equal(
+      appJson.expo.web?.output,
+      "single",
+      "output must be 'single' — 'static' prerenders per-route HTML and dynamic deep links reload-loop",
     );
-    assert.match(html, /location\.pathname \+ location\.search \+ location\.hash/);
-  });
-
-  it("includes a meta-refresh fallback for JS-disabled clients", () => {
-    const html = build404Html("/collectables");
-    assert.match(html, /<meta http-equiv="refresh" content="0; url=\/collectables\/">/);
-  });
-
-  it("wraps the redirect in try/catch so a storage exception still redirects", () => {
-    const html = build404Html("/collectables");
-    const tryIdx = html.indexOf("try");
-    const replaceIdx = html.indexOf("location.replace");
-    assert.ok(tryIdx >= 0 && replaceIdx > tryIdx, "redirect must follow the try/catch");
-  });
-
-  it("handles a root baseUrl ('/')", () => {
-    const html = build404Html("/");
-    assert.match(html, /location\.replace\("\/"\)/);
-    assert.match(html, /<meta http-equiv="refresh" content="0; url=\/">/);
-  });
-
-  it("emits valid utf-8 HTML5 doctype and charset", () => {
-    const html = build404Html("/collectables");
-    assert.ok(html.startsWith("<!DOCTYPE html>"));
-    assert.match(html, /<meta charset="utf-8">/);
-  });
-});
-
-describe("injectSpaRestoreScript", () => {
-  const baseHtml =
-    '<!DOCTYPE html><html><head><title>x</title></head><body><div id="root"></div></body></html>';
-
-  it("inserts the restore script before </head>", () => {
-    const patched = injectSpaRestoreScript(baseHtml);
-    assert.notEqual(patched, baseHtml);
-    assert.ok(patched.includes(SPA_RESTORE_SCRIPT_MARKER));
-    assert.ok(
-      patched.indexOf(SPA_RESTORE_SCRIPT_MARKER) < patched.indexOf("</head>"),
-      "script must appear before </head>",
-    );
-  });
-
-  it("reads from the canonical sessionStorage key and clears it after restore", () => {
-    const patched = injectSpaRestoreScript(baseHtml);
-    assert.ok(patched.includes(`sessionStorage.getItem(key)`));
-    assert.ok(patched.includes(`sessionStorage.removeItem(key)`));
-    assert.ok(patched.includes(`"${SPA_REDIRECT_STORAGE_KEY}"`));
-  });
-
-  it("calls history.replaceState only when stored path differs from current URL", () => {
-    const patched = injectSpaRestoreScript(baseHtml);
-    assert.match(patched, /redirect !== current/);
-    assert.match(patched, /history\.replaceState/);
-  });
-
-  it("guards against absolute external URLs (only restores paths starting with '/')", () => {
-    const patched = injectSpaRestoreScript(baseHtml);
-    assert.match(patched, /redirect\.charAt\(0\) === "\/"/);
-  });
-
-  it("is idempotent — applying twice is a no-op", () => {
-    const once = injectSpaRestoreScript(baseHtml);
-    const twice = injectSpaRestoreScript(once);
-    assert.equal(once, twice);
-  });
-
-  it("falls back to prepending when </head> is missing", () => {
-    const noHead = "<html><body></body></html>";
-    const patched = injectSpaRestoreScript(noHead);
-    assert.ok(patched.startsWith("<script"));
-    assert.ok(patched.includes(SPA_RESTORE_SCRIPT_MARKER));
-    assert.ok(patched.endsWith(noHead));
-  });
-
-  it("wraps the body in a try/catch so a broken sessionStorage can never crash the SPA boot", () => {
-    const patched = injectSpaRestoreScript(baseHtml);
-    const tryIdx = patched.indexOf("try");
-    const catchIdx = patched.indexOf("catch (e)");
-    assert.ok(tryIdx >= 0 && catchIdx > tryIdx);
-  });
-});
-
-describe("build-spa-fallback script wiring", () => {
-  const repoRoot = path.join(__dirname, "..");
-
-  it("ships scripts/build-spa-fallback.ts", () => {
-    const scriptPath = path.join(repoRoot, "scripts", "build-spa-fallback.ts");
-    assert.ok(fs.existsSync(scriptPath), "scripts/build-spa-fallback.ts must exist");
-  });
-
-  it("reads baseUrl from app.json so the redirect target matches the deployed prefix", () => {
-    const scriptPath = path.join(repoRoot, "scripts", "build-spa-fallback.ts");
-    const source = fs.readFileSync(scriptPath, "utf8");
-    assert.match(source, /app\.json/);
-    assert.match(source, /expo\?\.experiments\?\.baseUrl/);
-    assert.match(source, /process\.env\.EXPO_BASE_URL/);
-  });
-
-  it("imports build404Html + injectSpaRestoreScript from lib/spa-fallback", () => {
-    const scriptPath = path.join(repoRoot, "scripts", "build-spa-fallback.ts");
-    const source = fs.readFileSync(scriptPath, "utf8");
-    assert.match(source, /build404Html/);
-    assert.match(source, /injectSpaRestoreScript/);
-    assert.match(source, /lib\/spa-fallback/);
-  });
-
-  it("package.json build + deploy scripts invoke the post-build helper instead of `cp`", () => {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"),
-    ) as { scripts: Record<string, string> };
-    assert.match(pkg.scripts.build, /tsx scripts\/build-spa-fallback\.ts/);
-    assert.match(pkg.scripts.deploy, /tsx scripts\/build-spa-fallback\.ts/);
-    assert.doesNotMatch(pkg.scripts.build, /cp dist\/index\.html dist\/404\.html/);
-    assert.doesNotMatch(pkg.scripts.deploy, /cp dist\/index\.html dist\/404\.html/);
-  });
-
-  it("deploy.yml runs the post-build helper instead of `cp`", () => {
-    const workflowPath = path.join(repoRoot, ".github", "workflows", "deploy.yml");
-    const source = fs.readFileSync(workflowPath, "utf8");
-    assert.match(source, /scripts\/build-spa-fallback\.ts/);
-    assert.doesNotMatch(source, /cp dist\/index\.html dist\/404\.html/);
-  });
-
-  it("writes dist/sw.js and injects the SW registration into index.html", () => {
-    const scriptPath = path.join(repoRoot, "scripts", "build-spa-fallback.ts");
-    const source = fs.readFileSync(scriptPath, "utf8");
-    assert.match(source, /buildServiceWorker/);
-    assert.match(source, /injectServiceWorkerRegistration/);
-    // SW cache key is a hash of the *patched* shell so a redeploy busts it.
-    assert.match(source, /createHash\(\s*["']sha1["']\s*\)/);
-    assert.match(source, /\.update\(patched\)/);
   });
 });
 
@@ -195,14 +60,15 @@ describe("buildServiceWorker", () => {
     );
   });
 
-  it("targets the normalized base + index.html as the cached shell", () => {
+  it("uses the normalized base itself as the SPA shell", () => {
     assert.match(SW, /var BASE = "\/collectables\/";/);
-    assert.match(SW, /var SHELL = "\/collectables\/index\.html";/);
+    assert.match(SW, /var SHELL = BASE;/);
   });
 
-  it("serves the cached shell when GitHub Pages returns a 404", () => {
+  it("on a 404 fetches the FRESH shell (never a possibly-stale cache)", () => {
     assert.match(SW, /res\.status === 404/);
-    assert.match(SW, /caches\.match\(SHELL\)/);
+    assert.match(SW, /function freshShell\(\)/);
+    assert.match(SW, /fetch\(new Request\(SHELL, \{ cache: "reload" \}\)\)/);
   });
 
   it("only intercepts same-origin GET navigations under the base", () => {
@@ -212,7 +78,7 @@ describe("buildServiceWorker", () => {
     assert.match(SW, /url\.pathname\.indexOf\(BASE\) !== 0/);
   });
 
-  it("is network-first (only falls back to cache on 404 / offline)", () => {
+  it("is network-first (only falls back to cache when offline)", () => {
     assert.match(SW, /fetch\(req\)\.then/);
     assert.match(SW, /\.catch\(function \(\) \{\s*return caches\.match\(SHELL\)/);
   });
@@ -223,7 +89,7 @@ describe("buildServiceWorker", () => {
     assert.match(SW, /caches\.delete\(k\)/);
   });
 
-  it("refreshes the cached shell only when the base itself loads 200", () => {
+  it("refreshes the cached shell when the base itself loads 200", () => {
     assert.match(SW, /res\.ok && url\.pathname === BASE/);
     assert.match(SW, /cache\.put\(SHELL, copy\)/);
   });
@@ -235,7 +101,10 @@ describe("injectServiceWorkerRegistration", () => {
   it("registers sw.js at the base scope on load", () => {
     const out = injectServiceWorkerRegistration(html, "/collectables");
     assert.match(out, new RegExp(SPA_SW_REGISTER_MARKER));
-    assert.match(out, /navigator\.serviceWorker\.register\("\/collectables\/sw\.js", \{ scope: "\/collectables\/" \}\)/);
+    assert.match(
+      out,
+      /navigator\.serviceWorker\.register\("\/collectables\/sw\.js", \{ scope: "\/collectables\/" \}\)/,
+    );
     assert.match(out, /window\.addEventListener\("load"/);
   });
 
@@ -259,21 +128,75 @@ describe("injectServiceWorkerRegistration", () => {
 
   it("injects before </head> when present, else prepends", () => {
     const withHead = injectServiceWorkerRegistration(html, "/collectables");
-    assert.ok(withHead.indexOf(SPA_SW_REGISTER_MARKER) < withHead.indexOf("</head>"));
+    assert.ok(
+      withHead.indexOf(SPA_SW_REGISTER_MARKER) < withHead.indexOf("</head>"),
+    );
     const noHead = injectServiceWorkerRegistration("<body>hi</body>", "/collectables");
     assert.ok(noHead.startsWith("<script"));
   });
 
-  it("co-exists with the SPA restore script (both land in <head>)", () => {
-    const out = injectServiceWorkerRegistration(
-      injectSpaRestoreScript(html),
-      "/collectables",
-    );
-    assert.match(out, new RegExp(SPA_RESTORE_SCRIPT_MARKER));
-    assert.match(out, new RegExp(SPA_SW_REGISTER_MARKER));
-  });
-
   it("uses the exported service-worker filename constant", () => {
     assert.equal(SERVICE_WORKER_FILENAME, "sw.js");
+  });
+});
+
+describe("build-spa-fallback script wiring", () => {
+  const scriptPath = path.join(repoRoot, "scripts", "build-spa-fallback.ts");
+  const source = fs.readFileSync(scriptPath, "utf8");
+
+  it("ships scripts/build-spa-fallback.ts", () => {
+    assert.ok(fs.existsSync(scriptPath), "scripts/build-spa-fallback.ts must exist");
+  });
+
+  it("reads baseUrl from app.json (overridable via EXPO_BASE_URL)", () => {
+    assert.match(source, /app\.json/);
+    assert.match(source, /expo\?\.experiments\?\.baseUrl/);
+    assert.match(source, /process\.env\.EXPO_BASE_URL/);
+  });
+
+  it("imports the SW helpers (no redirect/restore machinery anymore)", () => {
+    assert.match(source, /buildServiceWorker/);
+    assert.match(source, /injectServiceWorkerRegistration/);
+    assert.match(source, /lib\/spa-fallback/);
+    assert.doesNotMatch(source, /build404Html/);
+    assert.doesNotMatch(source, /injectSpaRestoreScript/);
+  });
+
+  it("writes dist/404.html as a copy of the patched SPA shell", () => {
+    assert.match(source, /FALLBACK_HTML\s*=\s*path\.join\(DIST_DIR, "404\.html"\)/);
+    assert.match(source, /writeFileSync\(FALLBACK_HTML, patched\)/);
+  });
+
+  it("derives the SW cache key from a hash of the patched shell", () => {
+    assert.match(source, /createHash\(\s*["']sha1["']\s*\)/);
+    assert.match(source, /\.update\(patched\)/);
+  });
+
+  it("lib/spa-fallback no longer exports the redirect/restore API", () => {
+    const lib = fs.readFileSync(
+      path.join(repoRoot, "lib", "spa-fallback.ts"),
+      "utf8",
+    );
+    assert.doesNotMatch(lib, /export function build404Html/);
+    assert.doesNotMatch(lib, /export function injectSpaRestoreScript/);
+  });
+
+  it("package.json build + deploy invoke the helper instead of `cp`", () => {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"),
+    ) as { scripts: Record<string, string> };
+    assert.match(pkg.scripts.build, /tsx scripts\/build-spa-fallback\.ts/);
+    assert.match(pkg.scripts.deploy, /tsx scripts\/build-spa-fallback\.ts/);
+    assert.doesNotMatch(pkg.scripts.build, /cp dist\/index\.html dist\/404\.html/);
+    assert.doesNotMatch(pkg.scripts.deploy, /cp dist\/index\.html dist\/404\.html/);
+  });
+
+  it("deploy.yml runs the post-build helper instead of `cp`", () => {
+    const workflow = fs.readFileSync(
+      path.join(repoRoot, ".github", "workflows", "deploy.yml"),
+      "utf8",
+    );
+    assert.match(workflow, /scripts\/build-spa-fallback\.ts/);
+    assert.doesNotMatch(workflow, /cp dist\/index\.html dist\/404\.html/);
   });
 });

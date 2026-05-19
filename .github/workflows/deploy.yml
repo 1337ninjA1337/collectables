@@ -79,12 +79,12 @@ jobs:
           ignore_missing: true
           ignore_empty: true
       - name: Add SPA fallback
-        # Generates dist/404.html (cold-start redirect via sessionStorage) and
-        # dist/sw.js (a service worker that, once installed, serves the cached
-        # app shell with HTTP 200 when GitHub Pages 404s a dynamic Expo Router
-        # route on reload). Also injects the restore + SW-registration scripts
-        # into index.html. Without this, iOS Safari shows "A problem
-        # repeatedly occurred" on deep-link reloads (e.g. /collection/<id>).
+        # With expo.web.output=single, dist/index.html is a route-agnostic SPA
+        # shell. This copies it to dist/404.html so GitHub Pages serves the app
+        # for every unresolved dynamic route (no redirect/replaceState — that
+        # chain is what made iOS Safari reload-loop into "a problem repeatedly
+        # occurred"), and writes dist/sw.js so warm deep-link reloads get the
+        # fresh shell with HTTP 200 instead of a 404.
         run: npx tsx scripts/build-spa-fallback.ts
       - name: Strip sourcemap files from public artifact
         # Sentry has the .map files; don't ship them to GitHub Pages.
