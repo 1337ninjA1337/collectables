@@ -47,6 +47,23 @@ let activeConfig: AnalyticsConfig | null = null;
 
 let userOptedOut = false;
 
+// Rate-limit trackEvent to MAX_EVENTS_PER_WINDOW within RATE_LIMIT_WINDOW_MS
+// so a runaway useEffect loop or a list render that fires capture() per row
+// cannot exhaust the PostHog free-tier (1M events/mo) in seconds. Mirrors the
+// Sentry captureException limiter (Crash #11); 200/min/user is generous for
+// real interaction yet caps a hot loop at ~288k/day instead of unbounded.
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const MAX_EVENTS_PER_WINDOW = 200;
+let recentEvents: number[] = [];
+
+function rateLimitAllow(now: number = Date.now()): boolean {
+  const cutoff = now - RATE_LIMIT_WINDOW_MS;
+  recentEvents = recentEvents.filter((ts) => ts > cutoff);
+  if (recentEvents.length >= MAX_EVENTS_PER_WINDOW) return false;
+  recentEvents.push(now);
+  return true;
+}
+
 /**
  * Honoured by initAnalytics — when set to true (e.g. user toggled the
  * "Diagnostics & analytics" switch off), the SDK never initialises.
@@ -128,6 +145,7 @@ export function trackEvent(
 ): void {
   if (userOptedOut) return;
   if (!sdk || !activeConfig?.enabled) return;
+  if (!rateLimitAllow()) return;
   try {
     sdk.capture(name, props);
   } catch {
@@ -164,4 +182,9 @@ export function __resetAnalyticsForTests(): void {
   initialised = false;
   activeConfig = null;
   userOptedOut = false;
+  recentEvents = [];
+}
+
+export function __resetAnalyticsRateLimitForTests(): void {
+  recentEvents = [];
 }

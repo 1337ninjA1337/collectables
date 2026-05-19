@@ -153,33 +153,43 @@ on the current code:
 | Username / display name | **Yes** | Yes | No | `UserProfile` |
 | Chat messages | **Yes** | Yes | No | Supabase realtime (`lib/supabase-chat.ts`) |
 | Crash data / diagnostics | **Yes** | Yes | No | Sentry (`@sentry/react-native`, `lib/sentry.ts`); the user's Supabase UUID is attached so we can correlate crashes per account. PII (email, IP, cookies, Authorization header) is stripped before send by `scrubPII` (`lib/sentry.ts`). |
+| Product analytics events | **Yes** | Yes | No | PostHog (`posthog-react-native`, `lib/analytics.ts`); a closed set of interaction events (`signup_completed`, `item_added`, …). Events are linked to the Supabase UUID via `identifyUser`. EU host (`eu.posthog.com`) by default. Diagnostics-toggle gated; rate-limited to 200/min/user. |
+| Session replay / heatmaps | **Yes** | No | No | Microsoft Clarity (web-only, runtime `<script>` tag, `lib/clarity.ts`); anonymous interaction recordings, not linked to the user ID. Loads only when `navigator.doNotTrack !== "1"` **and** the diagnostics toggle is on. |
+| Reporting / BI | **No (in app)** | — | — | Power BI Desktop (`docs/powerbi/`); no SDK ships in the app. It is an operator-side tool that connects directly to the Supabase Postgres `analytics_events` table — no additional data is collected from the device. |
 | Advertising ID (IDFA) | **No** | — | — | No ads SDK present. |
 
 Because none of the data is used for tracking, you do **not** need
 `NSUserTrackingUsageDescription` and the App Tracking Transparency prompt.
-Sentry crash reports are diagnostic-only — Apple's "Used for tracking?"
-column is `No` as long as the data is not joined with third-party data
-sets for advertising or shared with data brokers, which Sentry's terms
-prohibit by default.
+Sentry crash reports and PostHog analytics are diagnostic/product-analytics
+only — Apple's "Used for tracking?" column is `No` as long as the data is
+not joined with third-party data sets for advertising or shared with data
+brokers, which Sentry's, PostHog's, and Microsoft Clarity's terms prohibit
+by default.
 
-The user can opt out of crash reporting at any time in **Settings →
-Diagnostics & crash reports** (persisted under
-`collectables-diagnostics-v1`). When opted out, `initSentry()` short-circuits,
-the SDK never loads, and any in-flight session is torn down via
-`shutdownSentry()`.
+The user can opt out of crash reporting **and** analytics/session-replay at
+any time with the single **Settings → Diagnostics & crash reports** toggle
+(persisted under `collectables-diagnostics-v1`). When opted out,
+`initSentry()` / `initAnalytics()` short-circuit, neither SDK loads, the
+Clarity tag is never injected, and any in-flight session is torn down via
+`shutdownSentry()` / `shutdownAnalytics()` / `shutdownClarity()`. On web,
+the browser `navigator.doNotTrack === "1"` signal additionally defaults the
+toggle off unless the user has made an explicit choice.
 
 A public privacy policy URL is required. Suggested location: a
 `PRIVACY.md` page hosted on GitHub Pages alongside the app. Include:
 
 1. What data is collected (mirror the table above).
-2. Where it is stored (Supabase, Cloudinary, Sentry).
+2. Where it is stored (Supabase, Cloudinary, Sentry, PostHog, Microsoft
+   Clarity).
 3. How a user can request deletion (`mailto:` or in-app account deletion).
-4. Crash reporting: **Sentry** is used as a sub-processor for diagnostics
-   (see paragraph below).
+4. Sub-processors: **Sentry** (crash diagnostics), **PostHog** (product
+   analytics), and **Microsoft Clarity** (web session replay) — see the
+   paragraphs below. **Power BI** is an operator-side reporting tool that
+   reads from Supabase and is not a device-side sub-processor.
 
-### Suggested public privacy policy paragraph (Sentry sub-processor)
+### Suggested public privacy policy paragraphs (sub-processors)
 
-Drop this paragraph (or its translated equivalent) into the public
+Drop these paragraphs (or their translated equivalent) into the public
 `PRIVACY.md` page so the disclosure matches the App Store Connect
 declaration:
 
@@ -197,6 +207,37 @@ declaration:
 > reports**; when disabled, no events leave the device. For Sentry's
 > own privacy practices and DPA, see https://sentry.io/privacy/ and
 > https://sentry.io/legal/dpa/.
+
+> **Product analytics.** Collectables uses PostHog (PostHog, Inc. —
+> https://posthog.com) as a data sub-processor to understand which
+> features are used. We send a fixed, closed set of interaction events
+> (for example: an item was added, a listing was created, a language was
+> switched) associated with your Supabase user identifier so usage can be
+> understood per account. We do **not** send free-text content, photos,
+> chat messages, email addresses, or advertising identifiers, and the
+> data is never sold or used for cross-app advertising. Events are sent to
+> PostHog's EU region (`eu.posthog.com`) by default and are rate-limited
+> client-side. You can disable analytics at any time with the same
+> **Settings → Diagnostics & crash reports** toggle; when disabled, no
+> events leave the device. For PostHog's privacy practices and DPA, see
+> https://posthog.com/privacy and https://posthog.com/dpa.
+
+> **Web session replay.** On the web version only, Collectables uses
+> Microsoft Clarity (Microsoft Corporation — https://clarity.microsoft.com)
+> to record anonymous interaction sessions and heatmaps that help us find
+> usability problems. Clarity recordings are **not** linked to your
+> account identifier, and Clarity masks input fields by default. The
+> Clarity script is never loaded if your browser sends a
+> `Do Not Track` (`navigator.doNotTrack`) signal or if you have disabled
+> diagnostics in **Settings → Diagnostics & crash reports**. Clarity is
+> not used on the iOS or Android app. For Microsoft's privacy practices,
+> see https://privacy.microsoft.com/privacystatement.
+
+> **Reporting.** Aggregated product-analytics data is reviewed internally
+> using Microsoft Power BI Desktop. Power BI is an operator-side tool that
+> connects directly to our Supabase database; no Power BI software is
+> included in the app and no additional data is collected from your device
+> for reporting.
 
 ---
 
