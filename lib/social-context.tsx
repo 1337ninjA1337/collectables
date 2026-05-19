@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { seedProfiles, seedSocialCollections, seedSocialItems } from "@/data/social-seed";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
+import { resolveNumericEnv } from "@/lib/env";
 import {
   upsertMyProfile,
   fetchFriendRequests,
@@ -129,15 +130,10 @@ function hasRequest(friendRequests: FriendRequest[], fromUserId: string, toUserI
 
 const DEFAULT_VIEWER_PROFILE_TTL_MS = 10 * 60 * 1000;
 
-function resolveViewerProfileTtlMs(): number {
-  const raw = process.env.EXPO_PUBLIC_PROFILE_CACHE_TTL_MS;
-  if (!raw) return DEFAULT_VIEWER_PROFILE_TTL_MS;
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_VIEWER_PROFILE_TTL_MS;
-  return parsed;
-}
-
-const VIEWER_PROFILE_TTL_MS = resolveViewerProfileTtlMs();
+const VIEWER_PROFILE_TTL_MS = resolveNumericEnv(
+  process.env.EXPO_PUBLIC_PROFILE_CACHE_TTL_MS,
+  DEFAULT_VIEWER_PROFILE_TTL_MS,
+);
 
 export function SocialProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();

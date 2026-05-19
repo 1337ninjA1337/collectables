@@ -14,16 +14,25 @@ describe("VIEWER_PROFILE_TTL_MS env override", () => {
     assert.match(src, /DEFAULT_VIEWER_PROFILE_TTL_MS\s*=\s*10\s*\*\s*60\s*\*\s*1000/);
   });
 
-  it("reads the EXPO_PUBLIC_PROFILE_CACHE_TTL_MS env var to override", () => {
+  it("reads the EXPO_PUBLIC_PROFILE_CACHE_TTL_MS env var via a literal member access", () => {
+    // Must stay a literal `process.env.EXPO_PUBLIC_*` so Metro/babel inlines it
+    // into the web bundle. A computed lookup would read undefined in production.
     assert.match(src, /process\.env\.EXPO_PUBLIC_PROFILE_CACHE_TTL_MS/);
   });
 
-  it("falls back to the default for non-numeric / non-positive overrides", () => {
-    assert.match(src, /Number\.isFinite\(parsed\)/);
-    assert.match(src, /parsed\s*<=\s*0/);
+  it("derives VIEWER_PROFILE_TTL_MS via the shared resolveNumericEnv helper", () => {
+    assert.match(
+      src,
+      /VIEWER_PROFILE_TTL_MS\s*=\s*resolveNumericEnv\(\s*process\.env\.EXPO_PUBLIC_PROFILE_CACHE_TTL_MS\s*,\s*DEFAULT_VIEWER_PROFILE_TTL_MS\s*,?\s*\)/,
+    );
   });
 
-  it("derives VIEWER_PROFILE_TTL_MS via the resolver helper", () => {
-    assert.match(src, /VIEWER_PROFILE_TTL_MS\s*=\s*resolveViewerProfileTtlMs\(\)/);
+  it("imports resolveNumericEnv from the centralised env helper", () => {
+    assert.match(src, /import\s*\{\s*resolveNumericEnv\s*\}\s*from\s*"@\/lib\/env"/);
+  });
+
+  it("no longer re-implements the parse-and-guard dance locally", () => {
+    assert.doesNotMatch(src, /function\s+resolveViewerProfileTtlMs/);
+    assert.doesNotMatch(src, /Number\.isFinite/);
   });
 });

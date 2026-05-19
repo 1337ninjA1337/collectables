@@ -12,3 +12,13 @@ export function getAppBaseUrl(): string {
     isWeb ? window.location.pathname : null,
   );
 }
+
+// Callers must pass the raw value via a *literal* `process.env.EXPO_PUBLIC_X`
+// access (not the var name) — Metro/babel only inlines literal member accesses,
+// so a computed env index lookup would read undefined in the web bundle.
+export function resolveNumericEnv(rawValue: string | undefined, defaultValue: number): number {
+  if (!rawValue) return defaultValue;
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed <= 0) return defaultValue;
+  return parsed;
+}
