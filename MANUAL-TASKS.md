@@ -160,3 +160,60 @@ ALTER TABLE public.items
 ```
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow (the deploy workflow runs `supabase db push` automatically when `SUPABASE_DB_URL` is set, so a normal deploy applies this). The app keeps working either way: items always persist locally via AsyncStorage and the cloud upsert is best-effort (its failure is swallowed). Apply the migration so item cloud sync — which now sends `cost_currency` — keeps succeeding.
+
+## delete-image Edge Function (SEC-1) — REQUIRED, security-critical
+
+**Why:** the old client-side delete path read `EXPO_PUBLIC_CLOUDINARY_API_SECRET`,
+which Metro inlines into the public JS bundle. The Cloudinary **account API
+secret has therefore shipped in every deployed build and must be treated as
+compromised.** Deletion now goes through the `delete-image` Edge Function,
+which holds the secret server-side and verifies the caller's Supabase session.
+
+### 1. Rotate the compromised Cloudinary secret (do this first)
+
+In the Cloudinary console → **Settings → Security → Access Keys**: generate a
+new API key/secret pair and **disable/delete the old one**. Until you do this,
+the leaked secret in past bundles stays usable by anyone.
+
+### 2. Remove the secret from the client build config
+
+Delete these from **GitHub Secrets** and **EAS secrets** (they must never be
+`EXPO_PUBLIC_*` again — that is what leaked them):
+
+- `EXPO_PUBLIC_CLOUDINARY_API_SECRET`
+- `EXPO_PUBLIC_CLOUDINARY_API_KEY`
+
+(`EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME` / `_UPLOAD_PRESET` stay — they are public
+by design.)
+
+### 3. Deploy the function
+
+```bash
+supabase functions deploy delete-image --project-ref <your-project-ref>
+```
+
+### 4. Set the function secrets (server-side only)
+
+```bash
+supabase secrets set --project-ref <your-project-ref> \
+  CLOUDINARY_CLOUD_NAME=<your cloud name> \
+  CLOUDINARY_API_KEY=<the NEW api key from step 1> \
+  CLOUDINARY_API_SECRET=<the NEW api secret from step 1>
+# SUPABASE_URL and SUPABASE_ANON_KEY are auto-injected by Supabase.
+```
+
+**Never commit these values** — set them only via the Supabase dashboard/CLI.
+
+### 5. Verify
+
+Trigger an account deletion (or any flow calling `deleteCloudinaryImages`)
+while signed in; the asset disappears from Cloudinary and the function returns
+`200 { success: true, deleted: N }`. An unauthenticated `POST` to
+`/functions/v1/delete-image` must return `401`.
+
+> Follow-up (tracked in `.tasks/.security-upgrade.md`): the function currently
+> authorizes *any* valid session. Per-asset ownership (only delete assets the
+> caller owns) requires a DB asset→owner mapping and is a separate hardening
+> step; today's only caller deletes the signed-in user's own images during
+> account deletion, so authenticated-session gating closes the secret-leak
+> hole without it.
