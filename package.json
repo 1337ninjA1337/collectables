@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "tsx --test __tests__/*.test.ts",
+    "build:powerbi": "tsx scripts/build-powerbi-template.ts",
     "lint:ci": "npx tsc --noEmit && npm test",
     "postinstall": "npx expo install --check || true",
     "build": "npx expo export --platform web && tsx scripts/build-spa-fallback.ts",
