@@ -41,6 +41,25 @@ Run `supabase/migrations/20260508_analytics_events.sql` against your Supabase pr
 
 Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
 
+### Verify the RLS posture (Analytics #16)
+
+After applying the migration, prove that end users cannot read or write the
+long-tail event store. Run the verification script as the `postgres` role
+(the Supabase SQL editor, or `psql` with the service-role database password —
+both can `SET ROLE` to `anon`/`authenticated`):
+
+```bash
+psql "$SUPABASE_DB_URL" -f supabase/tests/analytics_events_rls.sql
+```
+
+Or paste the contents of `supabase/tests/analytics_events_rls.sql` into the
+Supabase SQL editor and run it. It checks both defence layers (the `REVOKE`
+and the RLS default-deny) for `anon` and `authenticated`, blocks forged
+writes, and includes a positive control. Expected: a `PASS:` notice per
+check ending with `ALL ANALYTICS_EVENTS RLS CHECKS PASSED`. Any leak raises
+an exception. The script runs inside a transaction that is `ROLLBACK`-ed, so
+the probe row is never persisted — re-run it any time after schema changes.
+
 ## 20260516_chat_id_integrity.sql
 
 Run `supabase/migrations/20260516_chat_id_integrity.sql` against your Supabase project to enforce chat-message conversation-key integrity:

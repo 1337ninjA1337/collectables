@@ -89,9 +89,9 @@ describe("docs/powerbi-connection.md (Analytics #14)", () => {
     assert.match(src, /analytics-platform\.md/);
   });
 
-  it("notes screenshots are pending the Analytics #15 .pbit template", () => {
+  it("points at the generated Analytics #15b .pbit starter template", () => {
     const src = readFileSync(join(ROOT, DOC), "utf8");
-    assert.match(src, /screenshots/i);
-    assert.match(src, /pbit|Analytics #15/);
+    assert.match(src, /Collectables-Starter\.pbit/);
+    assert.match(src, /Edit Parameters|build:powerbi/);
   });
 });
