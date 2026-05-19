@@ -90,6 +90,29 @@ describe("AnalyticsProvider — provider tree wiring", () => {
     assert.ok(authOpen < analyticsOpen, "<AnalyticsProvider> must mount inside <AuthProvider>");
     assert.ok(i18nOpen < analyticsOpen, "<AnalyticsProvider> must mount inside <I18nProvider>");
   });
+
+  it("delegates SDK init to DiagnosticsProvider (no direct initSentry/initAnalytics in _layout)", () => {
+    // Analytics #20: the layout must NOT call initSentry()/initAnalytics()
+    // itself — the ordered, opt-out-gated init lives in DiagnosticsProvider's
+    // hydrate effect. A direct call here would bypass the diagnostics toggle
+    // and the initSentry→initAnalytics ordering guaranteed by
+    // analytics-provider-wiring's hydration-path test.
+    assert.doesNotMatch(
+      layoutSrc,
+      /\binitSentry\s*\(/,
+      "app/_layout.tsx must not call initSentry() directly — DiagnosticsProvider owns it",
+    );
+    assert.doesNotMatch(
+      layoutSrc,
+      /\binitAnalytics\s*\(/,
+      "app/_layout.tsx must not call initAnalytics() directly — DiagnosticsProvider owns it",
+    );
+    assert.match(
+      layoutSrc,
+      /<DiagnosticsProvider>/,
+      "app/_layout.tsx must mount <DiagnosticsProvider> as the SDK-init owner",
+    );
+  });
 });
 
 describe("AnalyticsProvider — hook usage + identify/reset behaviour", () => {
