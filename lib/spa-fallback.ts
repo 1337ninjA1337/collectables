@@ -1,24 +1,22 @@
-// Helpers that generate the GitHub-Pages SPA fallback artefacts. Pure module —
-// no `react-native` or DOM imports — so it can be unit-tested from plain Node.
+// Helpers for the GitHub-Pages SPA fallback. Pure module — no `react-native`
+// or DOM imports — so it can be unit-tested from plain Node.
 //
-// Why this exists: GitHub Pages serves `404.html` with HTTP status 404 for any
-// path it cannot resolve to a real file. Dynamic Expo Router routes like
-// `/collection/[id]` never resolve, so a deep link returns 404 even though the
-// shipped HTML boots the SPA correctly. iOS Safari reacts to that 404 status
-// by retrying the page; after three retries it gives up with "A problem
-// repeatedly occurred". The redirect dance below sends the browser to the
-// baseUrl (which serves with 200) and restores the URL on the next page load.
+// Why this exists: the app is a client-only SPA (`expo.web.output: "single"`),
+// so `expo export` emits ONE route-agnostic `index.html` that renders every
+// route on the client. GitHub Pages is a static host: a request for a path
+// with no matching file (every dynamic route, e.g. `/collection/<id>`) is
+// answered with `404.html`. The canonical fix is to make `404.html` a byte
+// copy of the SPA shell so the deep link boots the app directly — one
+// document, one navigation, NO redirect/replaceState dance (that dance, plus
+// the old `output: "static"` per-route prerender, is what made iOS Safari
+// reload-loop into "a problem repeatedly occurred").
 //
-// The redirect is the *cold-start* path (no service worker yet). Once the
-// service worker from `buildServiceWorker` is installed it intercepts every
-// in-app navigation: a deep-link reload like `/collection/<id>` returns the
-// GitHub-Pages 404, the SW swallows that and serves the cached app shell with
-// HTTP 200 instead — so the 404 status never reaches iOS Safari and there is
-// no redirect flash on reload. Network-first keeps online users on fresh
-// content; the cached shell is only used to rescue the 404/offline case.
+// GitHub Pages still serves that shell with HTTP status 404. A static 404
+// *body* that renders and stays put does not trip Safari's loop detector
+// (only redirect/reload chains do), but the service worker below upgrades it
+// anyway: once installed it answers a deep-link navigation by fetching the
+// fresh shell and returning it with 200, so warm reloads never surface a 404.
 
-export const SPA_REDIRECT_STORAGE_KEY = "collectables:spa-redirect";
-export const SPA_RESTORE_SCRIPT_MARKER = "data-spa-restore";
 export const SPA_SW_REGISTER_MARKER = "data-spa-sw";
 export const SERVICE_WORKER_FILENAME = "sw.js";
 
@@ -30,78 +28,29 @@ export function normalizeSpaBaseUrl(baseUrl: string): string {
   return b;
 }
 
-export function build404Html(baseUrl: string): string {
-  const base = normalizeSpaBaseUrl(baseUrl);
-  const storageKey = JSON.stringify(SPA_REDIRECT_STORAGE_KEY);
-  const target = JSON.stringify(base);
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Collectables</title>
-<meta http-equiv="refresh" content="0; url=${base}">
-<script>
-(function () {
-  try {
-    sessionStorage.setItem(${storageKey}, location.pathname + location.search + location.hash);
-  } catch (e) {}
-  location.replace(${target});
-})();
-</script>
-</head>
-<body></body>
-</html>
-`;
-}
-
-export function injectSpaRestoreScript(html: string): string {
-  if (html.includes(SPA_RESTORE_SCRIPT_MARKER)) return html;
-  const storageKey = JSON.stringify(SPA_REDIRECT_STORAGE_KEY);
-  const script = `<script ${SPA_RESTORE_SCRIPT_MARKER}>
-(function () {
-  try {
-    var key = ${storageKey};
-    var redirect = sessionStorage.getItem(key);
-    if (!redirect) return;
-    sessionStorage.removeItem(key);
-    var current = location.pathname + location.search + location.hash;
-    if (redirect !== current && redirect.charAt(0) === "/") {
-      history.replaceState(null, "", redirect);
-    }
-  } catch (e) {}
-})();
-</script>`;
-  if (html.includes("</head>")) {
-    return html.replace("</head>", `${script}</head>`);
-  }
-  return script + html;
-}
-
 /**
  * Service-worker source. `version` should change whenever the deployed bundle
  * changes (the build script passes a hash of the patched index.html) so a
- * redeploy busts the cached shell and the fallback never points at stale,
- * since-deleted hashed JS chunks.
+ * redeploy installs a fresh SW and evicts the old offline cache.
  *
- * Strategy: only same-origin GET navigations are intercepted, network-first.
- * - 2xx  → return it; refresh the cached shell when it's the app shell itself.
- * - 404  → GitHub Pages couldn't resolve a dynamic route; serve the cached
- *          shell with 200 so Safari never sees the 404 (the actual fix).
+ * Only same-origin GET navigations under the base are intercepted, and the
+ * strategy is network-first so online users always get current content:
+ * - 2xx  → return it; refresh the offline shell when it's the shell itself.
+ * - 404  → a dynamic route GitHub Pages can't resolve: fetch the *fresh*
+ *          canonical shell (BASE) and return that with 200 — never a cached,
+ *          possibly-stale shell, so it can't reference since-deleted JS
+ *          chunks and loop. Cached shell is the offline-only last resort.
  * - throw → offline; serve the cached shell if we have one.
- * Asset requests are left untouched (pass straight through to the network).
+ * Asset requests pass straight through to the network (not intercepted).
  */
 export function buildServiceWorker(baseUrl: string, version: string): string {
   const base = normalizeSpaBaseUrl(baseUrl);
-  const shell = JSON.stringify(base + "index.html");
   const baseLiteral = JSON.stringify(base);
-  const cacheName = JSON.stringify(
-    "collectables-spa-" + (version || "dev"),
-  );
+  const cacheName = JSON.stringify("collectables-spa-" + (version || "dev"));
   return `// Generated by scripts/build-spa-fallback.ts — do not edit by hand.
 var CACHE = ${cacheName};
 var BASE = ${baseLiteral};
-var SHELL = ${shell};
+var SHELL = BASE;
 
 self.addEventListener("install", function (event) {
   self.skipWaiting();
@@ -126,6 +75,21 @@ self.addEventListener("activate", function (event) {
   );
 });
 
+function freshShell() {
+  return fetch(new Request(SHELL, { cache: "reload" })).then(function (res) {
+    if (res && res.ok) {
+      var copy = res.clone();
+      caches.open(CACHE).then(function (cache) {
+        cache.put(SHELL, copy);
+      }).catch(function () {});
+      return res;
+    }
+    return caches.match(SHELL);
+  }).catch(function () {
+    return caches.match(SHELL);
+  });
+}
+
 self.addEventListener("fetch", function (event) {
   var req = event.request;
   if (req.method !== "GET") return;
@@ -137,8 +101,8 @@ self.addEventListener("fetch", function (event) {
   event.respondWith(
     fetch(req).then(function (res) {
       if (res && res.status === 404) {
-        return caches.match(SHELL).then(function (cached) {
-          return cached || res;
+        return freshShell().then(function (shell) {
+          return shell || res;
         });
       }
       if (res && res.ok && url.pathname === BASE) {
@@ -150,8 +114,7 @@ self.addEventListener("fetch", function (event) {
       return res;
     }).catch(function () {
       return caches.match(SHELL).then(function (cached) {
-        if (cached) return cached;
-        return Response.error();
+        return cached || Response.error();
       });
     })
   );

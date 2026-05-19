@@ -4,10 +4,8 @@ import * as path from "node:path";
 
 import {
   SERVICE_WORKER_FILENAME,
-  build404Html,
   buildServiceWorker,
   injectServiceWorkerRegistration,
-  injectSpaRestoreScript,
 } from "../lib/spa-fallback";
 
 const REPO_ROOT = path.join(__dirname, "..");
@@ -36,23 +34,25 @@ function main(): void {
   }
   const baseUrl = process.env.EXPO_BASE_URL ?? readBaseUrlFromAppJson();
   const index = fs.readFileSync(INDEX_HTML, "utf8");
-  const patched = injectServiceWorkerRegistration(
-    injectSpaRestoreScript(index),
-    baseUrl,
-  );
+  const patched = injectServiceWorkerRegistration(index, baseUrl);
   if (patched !== index) {
     fs.writeFileSync(INDEX_HTML, patched);
     console.log(
-      "[build-spa-fallback] patched dist/index.html with SPA restore + service-worker registration",
+      "[build-spa-fallback] patched dist/index.html with service-worker registration",
     );
   } else {
     console.log("[build-spa-fallback] dist/index.html already patched — skipping");
   }
-  fs.writeFileSync(FALLBACK_HTML, build404Html(baseUrl));
-  console.log(`[build-spa-fallback] wrote dist/404.html (baseUrl=${baseUrl})`);
 
-  // Hash the *final* patched shell so the SW cache key changes whenever the
-  // deployed bundle changes — a redeploy then evicts the stale fallback shell.
+  // 404.html IS the SPA shell — GitHub Pages serves it for every unresolved
+  // dynamic route, the client router then renders the deep link directly.
+  // No redirect / sessionStorage / replaceState (that chain is what made iOS
+  // Safari reload-loop).
+  fs.writeFileSync(FALLBACK_HTML, patched);
+  console.log("[build-spa-fallback] wrote dist/404.html (copy of SPA shell)");
+
+  // Hash the final shell so the SW cache key changes whenever the deployed
+  // bundle changes — a redeploy then installs a fresh SW + drops stale cache.
   const version = crypto
     .createHash("sha1")
     .update(patched)
