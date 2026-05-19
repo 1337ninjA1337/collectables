@@ -4,9 +4,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
+  SERVICE_WORKER_FILENAME,
   SPA_REDIRECT_STORAGE_KEY,
   SPA_RESTORE_SCRIPT_MARKER,
+  SPA_SW_REGISTER_MARKER,
   build404Html,
+  buildServiceWorker,
+  injectServiceWorkerRegistration,
   injectSpaRestoreScript,
   normalizeSpaBaseUrl,
 } from "@/lib/spa-fallback";
@@ -167,5 +171,109 @@ describe("build-spa-fallback script wiring", () => {
     const source = fs.readFileSync(workflowPath, "utf8");
     assert.match(source, /scripts\/build-spa-fallback\.ts/);
     assert.doesNotMatch(source, /cp dist\/index\.html dist\/404\.html/);
+  });
+
+  it("writes dist/sw.js and injects the SW registration into index.html", () => {
+    const scriptPath = path.join(repoRoot, "scripts", "build-spa-fallback.ts");
+    const source = fs.readFileSync(scriptPath, "utf8");
+    assert.match(source, /buildServiceWorker/);
+    assert.match(source, /injectServiceWorkerRegistration/);
+    // SW cache key is a hash of the *patched* shell so a redeploy busts it.
+    assert.match(source, /createHash\(\s*["']sha1["']\s*\)/);
+    assert.match(source, /\.update\(patched\)/);
+  });
+});
+
+describe("buildServiceWorker", () => {
+  const SW = buildServiceWorker("/collectables", "abc123");
+
+  it("scopes the cache key to the version so a redeploy busts stale shells", () => {
+    assert.match(SW, /var CACHE = "collectables-spa-abc123";/);
+    assert.notEqual(
+      buildServiceWorker("/collectables", "abc123"),
+      buildServiceWorker("/collectables", "def456"),
+    );
+  });
+
+  it("targets the normalized base + index.html as the cached shell", () => {
+    assert.match(SW, /var BASE = "\/collectables\/";/);
+    assert.match(SW, /var SHELL = "\/collectables\/index\.html";/);
+  });
+
+  it("serves the cached shell when GitHub Pages returns a 404", () => {
+    assert.match(SW, /res\.status === 404/);
+    assert.match(SW, /caches\.match\(SHELL\)/);
+  });
+
+  it("only intercepts same-origin GET navigations under the base", () => {
+    assert.match(SW, /req\.method !== "GET"/);
+    assert.match(SW, /req\.mode !== "navigate"/);
+    assert.match(SW, /url\.origin !== self\.location\.origin/);
+    assert.match(SW, /url\.pathname\.indexOf\(BASE\) !== 0/);
+  });
+
+  it("is network-first (only falls back to cache on 404 / offline)", () => {
+    assert.match(SW, /fetch\(req\)\.then/);
+    assert.match(SW, /\.catch\(function \(\) \{\s*return caches\.match\(SHELL\)/);
+  });
+
+  it("activates immediately and evicts old caches", () => {
+    assert.match(SW, /self\.skipWaiting\(\)/);
+    assert.match(SW, /self\.clients\.claim\(\)/);
+    assert.match(SW, /caches\.delete\(k\)/);
+  });
+
+  it("refreshes the cached shell only when the base itself loads 200", () => {
+    assert.match(SW, /res\.ok && url\.pathname === BASE/);
+    assert.match(SW, /cache\.put\(SHELL, copy\)/);
+  });
+});
+
+describe("injectServiceWorkerRegistration", () => {
+  const html = "<html><head><title>x</title></head><body></body></html>";
+
+  it("registers sw.js at the base scope on load", () => {
+    const out = injectServiceWorkerRegistration(html, "/collectables");
+    assert.match(out, new RegExp(SPA_SW_REGISTER_MARKER));
+    assert.match(out, /navigator\.serviceWorker\.register\("\/collectables\/sw\.js", \{ scope: "\/collectables\/" \}\)/);
+    assert.match(out, /window\.addEventListener\("load"/);
+  });
+
+  it("is idempotent — re-running does not double-inject", () => {
+    const once = injectServiceWorkerRegistration(html, "/collectables");
+    const twice = injectServiceWorkerRegistration(once, "/collectables");
+    assert.equal(once, twice);
+    assert.equal(
+      twice.split(SPA_SW_REGISTER_MARKER).length - 1,
+      1,
+      "registration script must appear exactly once",
+    );
+  });
+
+  it("guards on serviceWorker support and a secure context", () => {
+    const out = injectServiceWorkerRegistration(html, "/collectables");
+    assert.match(out, /"serviceWorker" in navigator/);
+    assert.match(out, /location\.protocol === "https:"/);
+    assert.match(out, /=== "localhost"/);
+  });
+
+  it("injects before </head> when present, else prepends", () => {
+    const withHead = injectServiceWorkerRegistration(html, "/collectables");
+    assert.ok(withHead.indexOf(SPA_SW_REGISTER_MARKER) < withHead.indexOf("</head>"));
+    const noHead = injectServiceWorkerRegistration("<body>hi</body>", "/collectables");
+    assert.ok(noHead.startsWith("<script"));
+  });
+
+  it("co-exists with the SPA restore script (both land in <head>)", () => {
+    const out = injectServiceWorkerRegistration(
+      injectSpaRestoreScript(html),
+      "/collectables",
+    );
+    assert.match(out, new RegExp(SPA_RESTORE_SCRIPT_MARKER));
+    assert.match(out, new RegExp(SPA_SW_REGISTER_MARKER));
+  });
+
+  it("uses the exported service-worker filename constant", () => {
+    assert.equal(SERVICE_WORKER_FILENAME, "sw.js");
   });
 });
