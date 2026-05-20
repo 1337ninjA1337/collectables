@@ -25,7 +25,24 @@ async function defaultGetAccessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
+// Incident-response kill-switch: when EXPO_PUBLIC_REALTIME_DISABLED is set to
+// a truthy literal ("1", "true", "yes"), getSharedRealtimeClient returns null
+// regardless of whether Supabase is otherwise configured. Lets operators drop
+// all WebSocket traffic without redeploying and makes offline-only QA possible.
+// The literal `process.env.EXPO_PUBLIC_REALTIME_DISABLED` access is required for
+// Metro/babel to inline the value into the web bundle — a dynamic env-name
+// lookup would read undefined in production (same foot-gun guarded for
+// resolveNumericEnv).
+export function isRealtimeDisabledByEnv(rawValue: string | undefined): boolean {
+  if (!rawValue) return false;
+  const normalised = rawValue.trim().toLowerCase();
+  return normalised === "1" || normalised === "true" || normalised === "yes";
+}
+
+const REALTIME_DISABLED = isRealtimeDisabledByEnv(process.env.EXPO_PUBLIC_REALTIME_DISABLED);
+
 export function getSharedRealtimeClient(): RealtimeClient | null {
+  if (REALTIME_DISABLED) return null;
   if (!isSupabaseConfigured) return null;
   if (sharedRealtimeClient) return sharedRealtimeClient;
   sharedRealtimeClient = new RealtimeClient(realtimeEndpoint(supabaseUrl!), {

@@ -32,6 +32,7 @@ In the GitHub UI for this repository:
 | `EXPO_PUBLIC_POSTHOG_HOST`                   | `EXPO_PUBLIC_POSTHOG_HOST`                 | Optional. PostHog ingestion host. Defaults to `https://eu.posthog.com` (EU cloud). Override to `https://us.i.posthog.com` for US cloud or a self-hosted URL. |
 | `EXPO_PUBLIC_CLARITY_PROJECT_ID`             | `EXPO_PUBLIC_CLARITY_PROJECT_ID`           | Optional. Microsoft Clarity project ID for web-only session replay. When empty, the Clarity script is not injected. |
 | `EXPO_PUBLIC_PROFILE_CACHE_TTL_MS`           | `EXPO_PUBLIC_PROFILE_CACHE_TTL_MS`         | Optional. Viewer-profile cache TTL in milliseconds. Defaults to `600000` (10 min). Values below `30000` (30 s) trigger a one-shot in-app warning toast because aggressive overrides hammer Supabase free-tier rate limits. |
+| `EXPO_PUBLIC_REALTIME_DISABLED`              | `EXPO_PUBLIC_REALTIME_DISABLED`            | Optional. Set to `1`, `true`, or `yes` to make `getSharedRealtimeClient()` return `null` regardless of whether Supabase is configured — drops all realtime WebSocket traffic (chat inbox, marketplace updates) without redeploying. Useful for incident response and offline-only QA. |
 
 The deploy workflow also pins `EXPO_PUBLIC_APP_URL` to the public site URL so
 deep links resolve correctly even when shared from a sub-route.
