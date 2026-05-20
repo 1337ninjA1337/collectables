@@ -4,13 +4,59 @@
  * so it can be unit-tested in isolation.
  */
 
-const LANGUAGE_CURRENCY: Record<string, string> = {
+/**
+ * Canonical compile-time defaults. Frozen so consumers (and tests) can rely
+ * on them being immutable — the runtime `LANGUAGE_CURRENCY` is a *merge* of
+ * these defaults with any env override, so an override only flips per-language
+ * defaults; unmentioned languages still resolve to their canonical currency.
+ */
+export const DEFAULT_LANGUAGE_CURRENCY: Readonly<Record<string, string>> = Object.freeze({
   ru: "RUB",
   be: "BYN",
   de: "EUR",
   pl: "PLN",
   es: "EUR",
   en: "USD",
+});
+
+/**
+ * Parse the `EXPO_PUBLIC_LANGUAGE_CURRENCY` override format
+ * `lang:CODE,lang:CODE` (e.g. `"ru:RUB,en:EUR"`) into a partial record. Lets
+ * QA flip per-region defaults for localized launches without a code change.
+ *
+ * Validation is lenient by design — invalid tokens (missing colon, empty key,
+ * non-ISO-4217 currency shape) are silently dropped so a typo in the env var
+ * never crashes the app or blocks the rest of the override from applying.
+ * Language codes are lower-cased + trimmed; currency codes are upper-cased
+ * (so `ru:eur` becomes `EUR`). On duplicate language keys, the last one wins.
+ *
+ * Callers must pass the raw value via a *literal* `process.env.EXPO_PUBLIC_X`
+ * member access (not the var name) — Metro/babel only inlines literal
+ * accesses, so a computed env index lookup would read undefined in the
+ * production web bundle (same foot-gun guarded for `resolveNumericEnv`).
+ */
+export function parseLanguageCurrencyOverride(
+  rawValue: string | undefined,
+): Record<string, string> {
+  if (!rawValue) return {};
+  const out: Record<string, string> = {};
+  for (const raw of rawValue.split(",")) {
+    const token = raw.trim();
+    if (!token) continue;
+    const colon = token.indexOf(":");
+    if (colon <= 0 || colon === token.length - 1) continue;
+    const language = token.slice(0, colon).trim().toLowerCase();
+    const currency = token.slice(colon + 1).trim().toUpperCase();
+    if (!language) continue;
+    if (!/^[A-Z]{3}$/.test(currency)) continue;
+    out[language] = currency;
+  }
+  return out;
+}
+
+const LANGUAGE_CURRENCY: Record<string, string> = {
+  ...DEFAULT_LANGUAGE_CURRENCY,
+  ...parseLanguageCurrencyOverride(process.env.EXPO_PUBLIC_LANGUAGE_CURRENCY),
 };
 
 /**
