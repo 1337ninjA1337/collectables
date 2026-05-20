@@ -49,3 +49,32 @@ export const CURRENCY_CHIPS = [
 ] as const;
 
 export type CurrencyChipCode = (typeof CURRENCY_CHIPS)[number];
+
+/**
+ * BCP-47 locale tags keyed by `AppLanguage` (mirrors `LANGUAGE_CURRENCY`'s
+ * key set). Tags carry the region so `Intl.NumberFormat` / `DateTimeFormat`
+ * picks the right currency display, thousands separators, and date order
+ * (e.g. ru-RU shows `1 234,56 ₽`; ru alone falls back to Intl's default
+ * which can drop the region-specific formatting).
+ */
+const LANGUAGE_LOCALE: Record<string, string> = {
+  ru: "ru-RU",
+  be: "be-BY",
+  de: "de-DE",
+  pl: "pl-PL",
+  es: "es-ES",
+  en: "en-US",
+};
+
+/**
+ * Map an i18n language code to a BCP-47 locale tag. Falls back to the
+ * input string for unrecognised codes — `Intl.*` constructors accept
+ * raw language tags and degrade gracefully, so the picker / formatter
+ * still works even when a new language hasn't been mapped yet.
+ */
+export function getDefaultLocaleForLanguage(language: string): string {
+  return LANGUAGE_LOCALE[language] ?? language;
+}
+
+/** Read-only view of the language→BCP-47 map for tests / future UI. */
+export const languageLocaleMap: Readonly<Record<string, string>> = LANGUAGE_LOCALE;

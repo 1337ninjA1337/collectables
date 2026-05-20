@@ -6,7 +6,9 @@ import path from "node:path";
 import {
   CURRENCY_CHIPS,
   getDefaultCurrencyForLanguage,
+  getDefaultLocaleForLanguage,
   languageCurrencyMap,
+  languageLocaleMap,
 } from "@/lib/locale-helpers";
 
 function read(rel: string): string {
@@ -39,6 +41,54 @@ describe("currency-input keeps re-exporting the helper for legacy callers", () =
     const src = read("components/currency-input.tsx");
     assert.match(src, /from\s+"@\/lib\/locale-helpers"/);
     assert.match(src, /export\s*\{\s*getDefaultCurrencyForLanguage\s*\}/);
+  });
+});
+
+describe("getDefaultLocaleForLanguage", () => {
+  it("maps each supported language to a BCP-47 region-tagged locale", () => {
+    assert.equal(getDefaultLocaleForLanguage("ru"), "ru-RU");
+    assert.equal(getDefaultLocaleForLanguage("be"), "be-BY");
+    assert.equal(getDefaultLocaleForLanguage("de"), "de-DE");
+    assert.equal(getDefaultLocaleForLanguage("pl"), "pl-PL");
+    assert.equal(getDefaultLocaleForLanguage("es"), "es-ES");
+    assert.equal(getDefaultLocaleForLanguage("en"), "en-US");
+  });
+
+  it("returns the input unchanged for unknown codes (Intl degrades gracefully)", () => {
+    assert.equal(getDefaultLocaleForLanguage("ja"), "ja");
+    assert.equal(getDefaultLocaleForLanguage(""), "");
+  });
+
+  it("languageLocaleMap exposes the same data for direct iteration", () => {
+    assert.equal(languageLocaleMap.ru, "ru-RU");
+    assert.equal(languageLocaleMap.en, "en-US");
+  });
+
+  it("every BCP-47 tag in languageLocaleMap matches the ll-CC shape", () => {
+    for (const tag of Object.values(languageLocaleMap)) {
+      assert.match(tag, /^[a-z]{2}-[A-Z]{2}$/);
+    }
+  });
+
+  it("languageCurrencyMap and languageLocaleMap cover the same key set", () => {
+    // If a language gains a currency default it should also gain a locale
+    // default, otherwise number/currency formatting silently degrades.
+    const currencyKeys = Object.keys(languageCurrencyMap).sort();
+    const localeKeys = Object.keys(languageLocaleMap).sort();
+    assert.deepEqual(localeKeys, currencyKeys);
+  });
+
+  it("i18n-context.tsx delegates to getDefaultLocaleForLanguage (no local LOCALE_MAP)", () => {
+    const src = read("lib/i18n-context.tsx");
+    assert.match(
+      src,
+      /import\s*\{\s*getDefaultLocaleForLanguage\s*\}\s*from\s*"@\/lib\/locale-helpers"/,
+    );
+    // The bespoke `LOCALE_MAP` literal should be gone — the migration's whole
+    // point is to centralise it next to the currency map.
+    assert.doesNotMatch(src, /const\s+LOCALE_MAP\s*:/);
+    // And `formatRelativeDate` must use the new helper instead of the local map.
+    assert.match(src, /getDefaultLocaleForLanguage\(\s*locale\s*\)/);
   });
 });
 

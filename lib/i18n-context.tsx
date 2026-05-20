@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { trackEvent } from "@/lib/analytics";
+import { getDefaultLocaleForLanguage } from "@/lib/locale-helpers";
 import { LANGUAGE_KEY } from "@/lib/storage-keys";
 
 export type AppLanguage = "ru" | "en" | "be" | "pl" | "de" | "es";
@@ -1554,15 +1555,6 @@ const languageOptions: { code: AppLanguage; label: string }[] = [
   { code: "es", label: "Español" },
 ];
 
-const LOCALE_MAP: Record<AppLanguage, string> = {
-  en: "en",
-  ru: "ru",
-  be: "be",
-  pl: "pl",
-  de: "de",
-  es: "es",
-};
-
 export function formatRelativeDate(iso: string, locale: AppLanguage | string = "en"): string {
   const then = Date.parse(iso);
   if (!Number.isFinite(then)) return iso;
@@ -1575,7 +1567,7 @@ export function formatRelativeDate(iso: string, locale: AppLanguage | string = "
   const diffMo = Math.round(diffDay / 30);
   const diffYr = Math.round(diffDay / 365);
 
-  const bcp47 = LOCALE_MAP[locale as AppLanguage] ?? locale;
+  const bcp47 = getDefaultLocaleForLanguage(locale);
   const rtf = new Intl.RelativeTimeFormat(bcp47, { numeric: "auto" });
 
   if (Math.abs(diffSec) < 60) return rtf.format(diffSec, "second");
