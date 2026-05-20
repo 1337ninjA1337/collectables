@@ -31,9 +31,14 @@ In the GitHub UI for this repository:
 | `EXPO_PUBLIC_POSTHOG_KEY`                    | `EXPO_PUBLIC_POSTHOG_KEY`                  | Optional. PostHog project API key (Settings → Project → Project API Key). When empty, analytics SDK skips initialisation. |
 | `EXPO_PUBLIC_POSTHOG_HOST`                   | `EXPO_PUBLIC_POSTHOG_HOST`                 | Optional. PostHog ingestion host. Defaults to `https://eu.posthog.com` (EU cloud). Override to `https://us.i.posthog.com` for US cloud or a self-hosted URL. |
 | `EXPO_PUBLIC_CLARITY_PROJECT_ID`             | `EXPO_PUBLIC_CLARITY_PROJECT_ID`           | Optional. Microsoft Clarity project ID for web-only session replay. When empty, the Clarity script is not injected. |
+| `EXPO_PUBLIC_PROFILE_CACHE_TTL_MS`           | `EXPO_PUBLIC_PROFILE_CACHE_TTL_MS`         | Optional. Viewer-profile cache TTL in milliseconds. Defaults to `600000` (10 min). Values below `30000` (30 s) trigger a one-shot in-app warning toast because aggressive overrides hammer Supabase free-tier rate limits. |
 
 The deploy workflow also pins `EXPO_PUBLIC_APP_URL` to the public site URL so
 deep links resolve correctly even when shared from a sub-route.
+
+A tracked [`.env.example`](./.env.example) ships at the repo root with the same
+list of variables as placeholders — copy it to `.env` and fill in real values
+to run the app locally.
 
 ## Manual rerun
 
