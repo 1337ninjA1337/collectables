@@ -1,7 +1,14 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { CURRENCY_KEY } from "@/lib/storage-keys";
+
 /**
  * Locale-derived helpers shared across UI forms (currency pickers, future
- * sell/trade flows, etc.). Keep this module pure (no React Native imports)
- * so it can be unit-tested in isolation.
+ * sell/trade flows, etc.). The pure helpers below (parsers, maps, default
+ * lookups) carry no React Native dependency and can be exercised by node
+ * tests directly. The persistence helpers at the bottom of the file pair
+ * with the `CURRENCY_KEY` AsyncStorage slot and live here because the
+ * locale/currency domain is the natural home for the read/write pair.
  */
 
 /**
@@ -124,3 +131,48 @@ export function getDefaultLocaleForLanguage(language: string): string {
 
 /** Read-only view of the language→BCP-47 map for tests / future UI. */
 export const languageLocaleMap: Readonly<Record<string, string>> = LANGUAGE_LOCALE;
+
+/**
+ * Validate a persisted currency string. Accepts only ISO 4217 alphabetic
+ * shape (three uppercase letters); returns null on any malformed/empty
+ * input so a corrupted AsyncStorage payload falls back to the language
+ * default instead of rendering a junk symbol. Pure so node tests can hit
+ * it without standing up AsyncStorage.
+ */
+export function parseStoredCurrency(raw: string | null | undefined): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+/**
+ * Read the user's last-picked currency from AsyncStorage. Returns null
+ * when nothing is stored, when storage throws, or when the stored value
+ * fails ISO 4217 validation — the caller should then fall back to the
+ * language default via `getDefaultCurrencyForLanguage`.
+ */
+export async function getUserPreferredCurrency(): Promise<string | null> {
+  try {
+    const raw = await AsyncStorage.getItem(CURRENCY_KEY);
+    return parseStoredCurrency(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persist the user's currency choice so a power user who picked JPY once
+ * doesn't have to re-pick on the next listing form. Silently no-ops on
+ * malformed input (avoids polluting storage with junk) and on storage
+ * failure (best-effort; matches how `marketplace-context` writes through).
+ */
+export async function setUserPreferredCurrency(currency: string): Promise<void> {
+  const validated = parseStoredCurrency(currency);
+  if (!validated) return;
+  try {
+    await AsyncStorage.setItem(CURRENCY_KEY, validated);
+  } catch {
+    // Best-effort: persistence failure must not crash the form submit.
+  }
+}
