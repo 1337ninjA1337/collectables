@@ -468,6 +468,9 @@ const en = {
     "When enabled, anonymous crash reports help us fix bugs faster. Toggle off to stop sending diagnostics.",
   diagnosticsEnabled: "Sending diagnostics",
   diagnosticsDisabled: "Diagnostics paused",
+  profileCacheTtlLowTitle: "Profile cache TTL too low",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS is set below 30 seconds. Aggressive overrides can hammer Supabase rate limits.",
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -937,6 +940,9 @@ const ru: TranslationMap = {
   crashFallbackBody:
     "Произошла непредвиденная ошибка, мы её записали. Попробуйте ещё раз или перезапустите приложение.",
   crashFallbackRetry: "Попробовать ещё раз",
+  profileCacheTtlLowTitle: "Слишком короткий TTL кэша профилей",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS установлен ниже 30 секунд. Слишком агрессивные значения нагружают лимиты Supabase.",
 };
 
 const be: TranslationMap = {
@@ -1093,6 +1099,9 @@ const be: TranslationMap = {
   crashFallbackBody:
     "Адбылася нечаканая памылка, мы яе запісалі. Паспрабуйце яшчэ раз ці перазапусціце прыкладанне.",
   crashFallbackRetry: "Паспрабаваць яшчэ раз",
+  profileCacheTtlLowTitle: "Занадта малы TTL кэша профіляў",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS усталяваны ніжэй за 30 секунд. Занадта агрэсіўныя значэнні нагружаюць ліміты Supabase.",
 };
 
 const pl: TranslationMap = {
@@ -1239,6 +1248,9 @@ const pl: TranslationMap = {
   crashFallbackBody:
     "Wystąpił nieoczekiwany błąd i został zapisany. Spróbuj ponownie lub uruchom aplikację jeszcze raz.",
   crashFallbackRetry: "Spróbuj ponownie",
+  profileCacheTtlLowTitle: "Za niski TTL pamięci podręcznej profili",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS jest ustawiony poniżej 30 sekund. Zbyt agresywne wartości obciążają limity Supabase.",
 };
 
 const de: TranslationMap = {
@@ -1381,6 +1393,9 @@ const de: TranslationMap = {
   crashFallbackBody:
     "Ein unerwarteter Fehler ist aufgetreten und wurde protokolliert. Bitte erneut versuchen oder die App neu starten.",
   crashFallbackRetry: "Erneut versuchen",
+  profileCacheTtlLowTitle: "Profil-Cache-TTL zu niedrig",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS ist auf unter 30 Sekunden gesetzt. Zu aggressive Werte belasten die Supabase-Limits.",
 };
 
 const es: TranslationMap = {
@@ -1523,6 +1538,9 @@ const es: TranslationMap = {
   crashFallbackBody:
     "Se produjo un error inesperado y lo hemos registrado. Vuelve a intentarlo o reinicia la aplicación.",
   crashFallbackRetry: "Intentar de nuevo",
+  profileCacheTtlLowTitle: "TTL de caché de perfiles demasiado bajo",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS está por debajo de 30 segundos. Valores demasiado agresivos saturan los límites de Supabase.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };

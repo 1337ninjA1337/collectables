@@ -28,7 +28,10 @@ describe("VIEWER_PROFILE_TTL_MS env override", () => {
   });
 
   it("imports resolveNumericEnv from the centralised env helper", () => {
-    assert.match(src, /import\s*\{\s*resolveNumericEnv\s*\}\s*from\s*"@\/lib\/env"/);
+    // Allow other named imports in the same `import` block (e.g. the
+    // low-TTL helper that the Social context now also pulls in) by matching
+    // any named-import list that mentions resolveNumericEnv.
+    assert.match(src, /import\s*\{[^}]*\bresolveNumericEnv\b[^}]*\}\s*from\s*"@\/lib\/env"/);
   });
 
   it("no longer re-implements the parse-and-guard dance locally", () => {
