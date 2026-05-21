@@ -56,3 +56,25 @@ export function getSharedRealtimeClient(): RealtimeClient | null {
 export function __resetSharedRealtimeClientForTests(): void {
   sharedRealtimeClient = null;
 }
+
+/**
+ * Release the shared WebSocket promptly on sign-out so a logged-out client
+ * doesn't keep an authenticated socket open for the rest of the JS realm's
+ * lifetime. Without this, the socket lingers until the page unloads / the
+ * process exits — wasting battery on mobile and leaking the previous user's
+ * authenticated channel after they leave the device.
+ *
+ * Mirrors `clearRuntimeSupabaseConfig`'s "reset local state on auth change"
+ * stance. Best-effort: any error from `disconnect()` is swallowed so the
+ * sign-out flow can never be blocked by a flaky network teardown.
+ */
+export async function closeSharedRealtimeClient(): Promise<void> {
+  const client = sharedRealtimeClient;
+  if (!client) return;
+  sharedRealtimeClient = null;
+  try {
+    await client.disconnect();
+  } catch {
+    // Best-effort: a failed disconnect must not break sign-out.
+  }
+}

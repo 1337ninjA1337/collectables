@@ -11,6 +11,7 @@ import { setSentryUser } from "@/lib/sentry";
 import { authClient, isSupabaseConfigured } from "@/lib/supabase";
 import { clearAllUserData } from "@/lib/storage-keys";
 import { deleteAccountViaEdgeFunction, fetchAllUserImageUrls } from "@/lib/supabase-profiles";
+import { closeSharedRealtimeClient } from "@/lib/supabase-realtime";
 import { getAppBaseUrl } from "@/lib/env";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -179,6 +180,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
         setPending(true);
         try {
           await authClient.signOut();
+          await closeSharedRealtimeClient();
         } finally {
           setPending(false);
         }
@@ -203,6 +205,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
           await clearAllUserData(userId);
 
           await authClient.signOut();
+          await closeSharedRealtimeClient();
           return {};
         } finally {
           setPending(false);
