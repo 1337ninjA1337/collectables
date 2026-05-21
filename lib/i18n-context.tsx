@@ -1555,6 +1555,22 @@ const languageOptions: { code: AppLanguage; label: string }[] = [
   { code: "es", label: "Español" },
 ];
 
+// Memoise the Intl.RelativeTimeFormat instance per BCP-47 tag. Without the
+// cache, a list view rendering N timestamps (chats, price history) news up
+// N formatters per paint — fine for one-off labels, wasteful for long lists.
+// Keyed by the resolved BCP-47 tag (after `getDefaultLocaleForLanguage`) so
+// callers passing the same `AppLanguage` and callers passing the same raw
+// locale string both hit the same cache slot.
+const relativeTimeFormatCache = new Map<string, Intl.RelativeTimeFormat>();
+
+function getRelativeTimeFormat(bcp47: string): Intl.RelativeTimeFormat {
+  const cached = relativeTimeFormatCache.get(bcp47);
+  if (cached) return cached;
+  const formatter = new Intl.RelativeTimeFormat(bcp47, { numeric: "auto" });
+  relativeTimeFormatCache.set(bcp47, formatter);
+  return formatter;
+}
+
 export function formatRelativeDate(iso: string, locale: AppLanguage | string = "en"): string {
   const then = Date.parse(iso);
   if (!Number.isFinite(then)) return iso;
@@ -1568,7 +1584,7 @@ export function formatRelativeDate(iso: string, locale: AppLanguage | string = "
   const diffYr = Math.round(diffDay / 365);
 
   const bcp47 = getDefaultLocaleForLanguage(locale);
-  const rtf = new Intl.RelativeTimeFormat(bcp47, { numeric: "auto" });
+  const rtf = getRelativeTimeFormat(bcp47);
 
   if (Math.abs(diffSec) < 60) return rtf.format(diffSec, "second");
   if (Math.abs(diffMin) < 60) return rtf.format(diffMin, "minute");
