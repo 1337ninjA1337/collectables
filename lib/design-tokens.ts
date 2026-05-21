@@ -31,10 +31,12 @@ export const BORDER_2 = "#f0e2cf";
 export const TEXT_DARK = "#2f2318";
 export const TEXT_DARK_2 = "#241912";
 export const TEXT_ON_DARK = "#fff7ef";
+export const TEXT_ON_DARK_2 = "#fff5ea";
 export const TEXT_ON_DARK_SOFT = "#ead8c3";
 
 export const MUTED = "#8f6947";
 export const MUTED_2 = "#6b5647";
+export const MUTED_3 = "#5f4734";
 export const PLACEHOLDER = "#9b8571";
 
 export const DANGER = "#d92f2f";
@@ -57,9 +59,11 @@ export const designTokens = Object.freeze({
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_ON_DARK,
+  TEXT_ON_DARK_2,
   TEXT_ON_DARK_SOFT,
   MUTED,
   MUTED_2,
+  MUTED_3,
   PLACEHOLDER,
   DANGER,
   SUCCESS_GREEN,

@@ -12,10 +12,12 @@ import {
   designTokens,
   HERO_DARK,
   MUTED,
+  MUTED_3,
   PAGE_BG,
   SUCCESS_GREEN,
   TEXT_DARK,
   TEXT_ON_DARK,
+  TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
 
 function read(rel: string): string {
@@ -46,6 +48,17 @@ describe("design-tokens module", () => {
     assert.equal(BORDER, "#eadbc8");
   });
 
+  it("exposes the additional cream / muted-brown variants shipped for the bottom-nav migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(TEXT_ON_DARK_2, hex);
+    assert.match(MUTED_3, hex);
+    assert.equal(TEXT_ON_DARK_2, "#fff5ea");
+    assert.equal(MUTED_3, "#5f4734");
+    // Frozen palette includes both new keys.
+    assert.equal(designTokens.TEXT_ON_DARK_2, "#fff5ea");
+    assert.equal(designTokens.MUTED_3, "#5f4734");
+  });
+
   it("freezes the designTokens object so accidental mutation is rejected", () => {
     assert.equal(Object.isFrozen(designTokens), true);
     assert.throws(() => {
@@ -61,5 +74,24 @@ describe("design-tokens adoption", () => {
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /HERO_DARK/);
     assert.match(src, /AMBER_ACCENT/);
+  });
+
+  it("components/bottom-nav.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/bottom-nav.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    // Every hex literal that previously lived inline now maps to a named token.
+    assert.match(src, /HERO_DARK/);
+    assert.match(src, /AMBER_ACCENT/);
+    assert.match(src, /AMBER_SOFT/);
+    assert.match(src, /BORDER/);
+    assert.match(src, /CARD_BG_2/);
+    assert.match(src, /CARD_BG_3/);
+    assert.match(src, /MUTED_3/);
+    assert.match(src, /TEXT_DARK_2/);
+    assert.match(src, /TEXT_ON_DARK_2/);
+    // No raw 6-digit hex literals should remain in the migrated file.
+    // (The semi-transparent backdrop is an rgba(), not a hex literal.)
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
 });
