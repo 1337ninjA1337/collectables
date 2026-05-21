@@ -1,5 +1,4 @@
 import {
-  RealtimeChannel,
   REALTIME_LISTEN_TYPES,
   REALTIME_POSTGRES_CHANGES_LISTEN_EVENT,
 } from "@supabase/realtime-js";
@@ -11,6 +10,7 @@ import {
   supabaseUrl,
 } from "@/lib/supabase";
 import { captureException } from "@/lib/sentry";
+import { subscribeShared } from "@/lib/realtime-channel-registry";
 import { getSharedRealtimeClient } from "@/lib/supabase-realtime";
 import {
   buildMarketplaceReadHeaders,
@@ -135,39 +135,32 @@ export function subscribeToListings(
   const client = getMarketplaceRealtimeClient();
   if (!client) return { unsubscribe: () => undefined };
 
-  let channel: RealtimeChannel | null = client.channel("marketplace-listings-inserts");
-  channel
-    .on(
-      REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
-      {
-        event: REALTIME_POSTGRES_CHANGES_LISTEN_EVENT.INSERT,
-        schema: "public",
-        table: "marketplace_listings",
-        filter: "sold_at=is.null",
-      },
-      (payload) => {
-        const row = payload.new as MarketplaceRow | undefined;
-        if (!row || !row.id) return;
-        try {
-          onListing(rowToListing(row));
-        } catch (err) {
-          // Ignore handler errors so a buggy listener can't kill the socket.
-          captureException(err, { context: "supabase-marketplace.subscribeToListings.handler" });
-        }
-      },
-    )
-    .subscribe((_status) => undefined);
-
-  return {
-    unsubscribe: () => {
-      if (!channel) return;
-      const ch = channel;
-      channel = null;
+  return subscribeShared<MarketplaceRow>(
+    client,
+    "marketplace-listings-inserts",
+    (channel, emit) => {
+      channel.on(
+        REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
+        {
+          event: REALTIME_POSTGRES_CHANGES_LISTEN_EVENT.INSERT,
+          schema: "public",
+          table: "marketplace_listings",
+          filter: "sold_at=is.null",
+        },
+        (payload) => {
+          const row = payload.new as MarketplaceRow | undefined;
+          if (!row || !row.id) return;
+          emit(row);
+        },
+      );
+    },
+    (row) => {
       try {
-        void client.removeChannel(ch);
-      } catch {
-        // Best-effort cleanup; the socket may already be closed.
+        onListing(rowToListing(row));
+      } catch (err) {
+        // Ignore handler errors so a buggy listener can't kill the socket.
+        captureException(err, { context: "supabase-marketplace.subscribeToListings.handler" });
       }
     },
-  };
+  );
 }
