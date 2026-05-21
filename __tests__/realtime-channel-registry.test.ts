@@ -5,6 +5,8 @@ import path from "node:path";
 
 import {
   subscribeShared,
+  subscribeRegistryStatus,
+  getRegistryStatusSnapshot,
   __resetChannelRegistryForTests,
 } from "@/lib/realtime-channel-registry";
 
@@ -314,6 +316,125 @@ describe("subscribeShared — fan-out subscriber registry", () => {
       () => undefined,
     );
     assert.doesNotThrow(() => handle.unsubscribe());
+  });
+});
+
+describe("subscribeRegistryStatus — aggregate status fan-out", () => {
+  beforeEach(() => {
+    __resetChannelRegistryForTests();
+  });
+
+  it("emits the current snapshot immediately on subscribe", () => {
+    const received: ReadonlyMap<string, boolean>[] = [];
+    const off = subscribeRegistryStatus((snap) => received.push(snap));
+    assert.equal(received.length, 1, "listener must receive the initial snapshot");
+    assert.equal(received[0].size, 0);
+    off();
+  });
+
+  it("emits when a new topic is created (initial connected=false)", () => {
+    const client = createFakeClient();
+    const received: ReadonlyMap<string, boolean>[] = [];
+    subscribeRegistryStatus((snap) => received.push(snap));
+    // received[0] is the empty initial snapshot.
+    subscribeShared(client as never, "topic-new", () => undefined, () => undefined);
+    const last = received[received.length - 1];
+    assert.equal(last.get("topic-new"), false, "new topic should be tracked as connecting");
+  });
+
+  it("emits when channel.subscribe transitions to SUBSCRIBED", () => {
+    const client = createFakeClient();
+    const received: ReadonlyMap<string, boolean>[] = [];
+    subscribeRegistryStatus((snap) => received.push(snap));
+    subscribeShared(client as never, "topic-online", () => undefined, () => undefined);
+    client.__channels[0].__statusCb?.("SUBSCRIBED");
+    const last = received[received.length - 1];
+    assert.equal(last.get("topic-online"), true);
+  });
+
+  it("drops the topic from the snapshot when the last subscriber unsubscribes", () => {
+    const client = createFakeClient();
+    const received: ReadonlyMap<string, boolean>[] = [];
+    subscribeRegistryStatus((snap) => received.push(snap));
+    const h = subscribeShared(client as never, "topic-gone", () => undefined, () => undefined);
+    client.__channels[0].__statusCb?.("SUBSCRIBED");
+    h.unsubscribe();
+    const last = received[received.length - 1];
+    assert.equal(last.has("topic-gone"), false, "released topics must be removed");
+    assert.equal(last.size, 0);
+  });
+
+  it("unsubscribe stops further status events for that listener", () => {
+    const client = createFakeClient();
+    const received: ReadonlyMap<string, boolean>[] = [];
+    const off = subscribeRegistryStatus((snap) => received.push(snap));
+    off();
+    const countBefore = received.length;
+    subscribeShared(client as never, "topic-after-off", () => undefined, () => undefined);
+    assert.equal(received.length, countBefore, "no events after unsubscribe");
+  });
+
+  it("idempotent unsubscribe — calling the returned fn twice is safe", () => {
+    const off = subscribeRegistryStatus(() => undefined);
+    assert.doesNotThrow(() => {
+      off();
+      off();
+    });
+  });
+
+  it("a buggy status listener does not block the rest of the fan-out", () => {
+    const client = createFakeClient();
+    const seenA: ReadonlyMap<string, boolean>[] = [];
+    const seenB: ReadonlyMap<string, boolean>[] = [];
+    subscribeRegistryStatus(() => {
+      throw new Error("boom");
+    });
+    subscribeRegistryStatus((snap) => seenA.push(snap));
+    subscribeRegistryStatus((snap) => seenB.push(snap));
+    subscribeShared(client as never, "topic-iso", () => undefined, () => undefined);
+    assert.ok(seenA.length >= 1);
+    assert.ok(seenB.length >= 1);
+  });
+
+  it("getRegistryStatusSnapshot returns the live topic map", () => {
+    const client = createFakeClient();
+    subscribeShared(client as never, "topic-snap", () => undefined, () => undefined);
+    let snap = getRegistryStatusSnapshot();
+    assert.equal(snap.get("topic-snap"), false);
+    client.__channels[0].__statusCb?.("SUBSCRIBED");
+    snap = getRegistryStatusSnapshot();
+    assert.equal(snap.get("topic-snap"), true);
+  });
+
+  it("snapshot passed to listeners is a fresh copy (later mutations don't leak)", () => {
+    const client = createFakeClient();
+    const captured: ReadonlyMap<string, boolean>[] = [];
+    subscribeRegistryStatus((snap) => {
+      captured.push(snap);
+    });
+    subscribeShared(client as never, "topic-frozen", () => undefined, () => undefined);
+    // captured[0] is the initial empty snapshot; the later create must NOT
+    // retroactively appear inside captured[0] if a consumer stashed it.
+    assert.ok(captured.length >= 1, "first snapshot captured");
+    assert.equal(captured[0].has("topic-frozen"), false);
+  });
+
+  it("repeated subscribers for the same topic don't double-emit a duplicate snapshot", () => {
+    const client = createFakeClient();
+    const received: ReadonlyMap<string, boolean>[] = [];
+    subscribeRegistryStatus((snap) => received.push(snap));
+    const initialEmits = received.length;
+    subscribeShared(client as never, "topic-once", () => undefined, () => undefined);
+    const afterFirst = received.length;
+    // Second subscriber on the same topic must NOT trigger another snapshot
+    // event because no underlying status changed.
+    subscribeShared(client as never, "topic-once", () => undefined, () => undefined);
+    assert.equal(
+      received.length,
+      afterFirst,
+      "repeat subscribers on the same topic must not re-emit status",
+    );
+    assert.equal(received.length - initialEmits, 1);
   });
 });
 

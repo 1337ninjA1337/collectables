@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
+import { RealtimeStatusPill } from "@/components/realtime-status-pill";
 import { Screen, useResponsive } from "@/components/screen";
 import { useCollections } from "@/lib/collections-context";
 import {
@@ -67,6 +68,8 @@ export default function MarketplaceScreen() {
         <Text style={styles.title}>{t("marketplaceTitle")}</Text>
         <Text style={styles.subtitle}>{t("marketplaceSubtitle")}</Text>
       </View>
+
+      <RealtimeStatusPill />
 
       {resolved.length === 0 ? (
         <EmptyState

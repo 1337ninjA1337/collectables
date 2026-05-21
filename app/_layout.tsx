@@ -26,6 +26,7 @@ import { I18nProvider, useI18n, useOptionalI18n } from "@/lib/i18n-context";
 import { MarketplaceProvider } from "@/lib/marketplace-context";
 import { PremiumProvider } from "@/lib/premium-context";
 import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-context";
+import { RealtimeStatusProvider } from "@/lib/realtime-status-context";
 import { getSentryStatus, triggerSentryTestError } from "@/lib/sentry";
 import { SocialProvider } from "@/lib/social-context";
 import { clearRuntimeSupabaseConfig } from "@/lib/supabase";
@@ -75,23 +76,25 @@ export default Sentry.wrap(function RootLayout() {
       <I18nProvider>
         <DiagnosticsProvider>
           <ToastProvider>
-            <AuthProvider>
-              <SocialProvider>
-                <CollectionsProvider>
-                  <ChatProvider>
-                    <MarketplaceProvider>
-                      <PremiumProvider>
-                        <AnalyticsProvider>
-                          <NavAnimationProvider>
-                            <AppShell />
-                          </NavAnimationProvider>
-                        </AnalyticsProvider>
-                      </PremiumProvider>
-                    </MarketplaceProvider>
-                  </ChatProvider>
-                </CollectionsProvider>
-              </SocialProvider>
-            </AuthProvider>
+            <RealtimeStatusProvider>
+              <AuthProvider>
+                <SocialProvider>
+                  <CollectionsProvider>
+                    <ChatProvider>
+                      <MarketplaceProvider>
+                        <PremiumProvider>
+                          <AnalyticsProvider>
+                            <NavAnimationProvider>
+                              <AppShell />
+                            </NavAnimationProvider>
+                          </AnalyticsProvider>
+                        </PremiumProvider>
+                      </MarketplaceProvider>
+                    </ChatProvider>
+                  </CollectionsProvider>
+                </SocialProvider>
+              </AuthProvider>
+            </RealtimeStatusProvider>
           </ToastProvider>
         </DiagnosticsProvider>
       </I18nProvider>
