@@ -48,6 +48,68 @@ function getRegistryFor(client: RealtimeClient): Map<string, Entry<unknown>> {
 }
 
 /**
+ * Module-level aggregate status snapshot keyed by topic, plus a fan-out of
+ * status events to global listeners (e.g. `RealtimeStatusProvider`). The
+ * snapshot is a single Map<string, boolean> because the app uses one shared
+ * RealtimeClient — see `lib/supabase-realtime.ts`. Per-client isolation still
+ * holds for channel construction; the snapshot only collapses topic names.
+ *
+ * Listeners receive a snapshot on every change so they can recompute the
+ * derived "online" / "connecting" state in one place instead of patching
+ * their own Map. Per-listener try/catch isolates buggy consumers.
+ */
+export type RegistryStatusSnapshot = ReadonlyMap<string, boolean>;
+export type RegistryStatusListener = (snapshot: RegistryStatusSnapshot) => void;
+
+let statusSnapshot: Map<string, boolean> = new Map();
+let statusListeners: Set<RegistryStatusListener> = new Set();
+
+function emitStatusChange(): void {
+  if (statusListeners.size === 0) return;
+  // Pass a fresh shallow copy so a listener that stashes the reference doesn't
+  // observe later mutations as silent state shifts.
+  const frozen: RegistryStatusSnapshot = new Map(statusSnapshot);
+  for (const listener of statusListeners) {
+    try {
+      listener(frozen);
+    } catch {
+      // Isolated per listener — one buggy consumer must not block the rest.
+    }
+  }
+}
+
+/**
+ * Subscribe to aggregate channel status changes across every topic currently
+ * tracked by the registry. The listener fires:
+ *  - when a new topic is first subscribed (initial `false`)
+ *  - when a topic transitions between SUBSCRIBED and not
+ *  - when a topic is fully released (entry dropped from the snapshot)
+ * The first invocation passes the current snapshot immediately so late
+ * joiners don't have to wait for the next transition.
+ */
+export function subscribeRegistryStatus(
+  listener: RegistryStatusListener,
+): () => void {
+  statusListeners.add(listener);
+  try {
+    listener(new Map(statusSnapshot));
+  } catch {
+    // Isolated per listener.
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    statusListeners.delete(listener);
+  };
+}
+
+/** Current snapshot of `topic -> connected` for every tracked entry. */
+export function getRegistryStatusSnapshot(): RegistryStatusSnapshot {
+  return new Map(statusSnapshot);
+}
+
+/**
  * Subscribe to a shared channel by topic. The first subscriber for `topic`
  * triggers `configure(channel, emit)` to wire `.on(...)` listeners and a
  * single `.subscribe(...)` call; subsequent subscribers for the same topic
@@ -89,6 +151,7 @@ export function subscribeShared<TPayload>(
     configure(channel, emit);
     channel.subscribe((status: string) => {
       const connected = status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED;
+      const changed = created.connected !== connected;
       created.connected = connected;
       for (const handler of statusHandlers) {
         try {
@@ -97,9 +160,17 @@ export function subscribeShared<TPayload>(
           // Isolated per handler.
         }
       }
+      if (changed) {
+        statusSnapshot.set(topic, connected);
+        emitStatusChange();
+      }
     });
     entry = created;
     registry.set(topic, created as Entry<unknown>);
+    // New topic enters the snapshot as `false`; emit so a consumer can show
+    // a "connecting" pill before SUBSCRIBED fires.
+    statusSnapshot.set(topic, false);
+    emitStatusChange();
   }
   const acquired = entry;
   acquired.payloadHandlers.add(onPayload);
@@ -126,6 +197,8 @@ export function subscribeShared<TPayload>(
         acquired.statusHandlers.size === 0
       ) {
         registry.delete(topic);
+        statusSnapshot.delete(topic);
+        emitStatusChange();
         try {
           const maybePromise = client.removeChannel(acquired.channel) as
             | Promise<unknown>
@@ -146,4 +219,6 @@ export function subscribeShared<TPayload>(
 /** Test-only: drop every cached entry across all clients. */
 export function __resetChannelRegistryForTests(): void {
   registries = new WeakMap();
+  statusSnapshot = new Map();
+  statusListeners = new Set();
 }
