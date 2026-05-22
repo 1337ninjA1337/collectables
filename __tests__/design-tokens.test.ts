@@ -26,6 +26,7 @@ import {
   MUTED_7,
   MUTED_8,
   MUTED_9,
+  MUTED_10,
   PAGE_BG,
   PAGE_BG_2,
   PURE_WHITE,
@@ -167,6 +168,13 @@ describe("design-tokens module", () => {
     assert.equal(designTokens.BORDER_3, "#f0e4d0");
   });
 
+  it("exposes the MUTED_10 sectionLabel variant shipped for the friends migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(MUTED_10, hex);
+    assert.equal(MUTED_10, "#624a35");
+    assert.equal(designTokens.MUTED_10, "#624a35");
+  });
+
   it("freezes the designTokens object so accidental mutation is rejected", () => {
     assert.equal(Object.isFrozen(designTokens), true);
     assert.throws(() => {
@@ -295,6 +303,30 @@ describe("design-tokens adoption", () => {
     assert.match(src, /PLACEHOLDER/);
     assert.match(src, /PURE_WHITE/);
     assert.match(src, /DANGER_DEEP/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("app/friends.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("app/friends.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /HERO_DARK\b/);
+    assert.match(src, /HERO_DARK_2/);
+    assert.match(src, /HERO_DARK_3/);
+    assert.match(src, /AMBER_LIGHT/);
+    assert.match(src, /AMBER_MUTED/);
+    assert.match(src, /AMBER_SOFT/);
+    assert.match(src, /BORDER\b/);
+    assert.match(src, /CARD_BG\b/);
+    assert.match(src, /CARD_BG_3/);
+    assert.match(src, /DANGER\b/);
+    assert.match(src, /MUTED\b/);
+    assert.match(src, /MUTED_2/);
+    assert.match(src, /MUTED_10/);
+    assert.match(src, /TEXT_DARK\b/);
+    assert.match(src, /TEXT_ON_DARK_3/);
+    assert.match(src, /TEXT_ON_DARK_4/);
+    assert.match(src, /TEXT_ON_DARK_SOFT/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

@@ -14,6 +14,25 @@ import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { UserProfile } from "@/lib/types";
 import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import {
+  AMBER_LIGHT,
+  AMBER_MUTED,
+  AMBER_SOFT,
+  BORDER,
+  CARD_BG,
+  CARD_BG_3,
+  DANGER,
+  HERO_DARK,
+  HERO_DARK_2,
+  HERO_DARK_3,
+  MUTED,
+  MUTED_2,
+  MUTED_10,
+  TEXT_DARK,
+  TEXT_ON_DARK_3,
+  TEXT_ON_DARK_4,
+  TEXT_ON_DARK_SOFT,
+} from "@/lib/design-tokens";
 
 type Tab = "friends" | "following";
 
@@ -125,7 +144,7 @@ export default function FriendsScreen() {
 
       <Pressable style={styles.chatsLink} onPress={() => router.push("/chats")}>
         <View style={styles.chatsLinkIcon}>
-          <Ionicons name="chatbubbles-outline" size={22} color="#3a2716" />
+          <Ionicons name="chatbubbles-outline" size={22} color={HERO_DARK_3} />
         </View>
         <View style={styles.chatsLinkBody}>
           <Text style={styles.chatsLinkTitle}>{t("chatsTitle")}</Text>
@@ -136,7 +155,7 @@ export default function FriendsScreen() {
             <Text style={styles.chatsBadgeText}>{unreadTotal}</Text>
           </View>
         ) : (
-          <Ionicons name="chevron-forward" size={20} color="#8f6947" />
+          <Ionicons name="chevron-forward" size={20} color={MUTED} />
         )}
       </Pressable>
 
@@ -209,7 +228,7 @@ export default function FriendsScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     borderRadius: 32,
     padding: 24,
     gap: 10,
@@ -218,7 +237,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   eyebrow: {
-    color: "#f5c99a",
+    color: AMBER_LIGHT,
     fontSize: 12,
     textTransform: "uppercase",
     letterSpacing: 1.2,
@@ -226,14 +245,14 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   title: {
-    color: "#fff8ef",
+    color: TEXT_ON_DARK_3,
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 36,
     fontFamily: FONT_DISPLAY,
   },
   subtitle: {
-    color: "#ead8c3",
+    color: TEXT_ON_DARK_SOFT,
     lineHeight: 22,
     fontFamily: FONT_BODY,
   },
@@ -243,17 +262,17 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 14,
     borderRadius: 22,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   chatsLinkIcon: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -262,13 +281,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   chatsLinkTitle: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   chatsLinkSubtitle: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 12,
     fontWeight: "600",
     fontFamily: FONT_BODY_SEMIBOLD,
@@ -278,7 +297,7 @@ const styles = StyleSheet.create({
     height: 24,
     paddingHorizontal: 8,
     borderRadius: 12,
-    backgroundColor: "#d92f2f",
+    backgroundColor: DANGER,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -289,7 +308,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   sectionLabel: {
-    color: "#624a35",
+    color: MUTED_10,
     fontWeight: "800",
     fontSize: 13,
     textTransform: "uppercase",
@@ -299,9 +318,9 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 28,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     padding: 18,
     gap: 16,
   },
@@ -313,7 +332,7 @@ const styles = StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 24,
-    backgroundColor: "#d9c2a8",
+    backgroundColor: AMBER_MUTED,
   },
   profileMeta: {
     flex: 1,
@@ -322,16 +341,16 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontFamily: FONT_DISPLAY_BOLD,
   },
   username: {
-    color: "#8f6947",
+    color: MUTED,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
   bio: {
-    color: "#6b5647",
+    color: MUTED_2,
     lineHeight: 21,
     fontFamily: FONT_BODY,
   },
@@ -342,25 +361,25 @@ const styles = StyleSheet.create({
   },
   primaryAction: {
     borderRadius: 999,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   primaryActionText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   secondaryAction: {
     borderRadius: 999,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   secondaryActionText: {
-    color: "#2a1d15",
+    color: HERO_DARK_2,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
