@@ -389,14 +389,18 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t("profileCollections")}</Text>
         {profileCollections.length > 0 ? (
-          profileCollections.map((collection) => (
-            <CollectionCard
-              key={collection.id}
-              collection={collection}
-              count={getItemsForCollection(collection.id).length || remoteItemCounts[collection.id] || 0}
-              totalCost={getCollectionTotalCost(collection.id)}
-            />
-          ))
+          profileCollections.map((collection) => {
+            const total = getCollectionTotalCost(collection.id);
+            return (
+              <CollectionCard
+                key={collection.id}
+                collection={collection}
+                count={getItemsForCollection(collection.id).length || remoteItemCounts[collection.id] || 0}
+                totalCost={total.amount}
+                totalCostCurrency={total.currency}
+              />
+            );
+          })
         ) : (
           <EmptyState
             icon="🔒"

@@ -84,7 +84,8 @@ export default function HomeScreen() {
         <CollectionCard
           collection={collection}
           count={getItemsForCollection(collection.id).length}
-          totalCost={getCollectionTotalCost(collection.id)}
+          totalCost={getCollectionTotalCost(collection.id).amount}
+          totalCostCurrency={getCollectionTotalCost(collection.id).currency}
         />
       </Pressable>
     </ScaleDecorator>
@@ -306,9 +307,12 @@ export default function HomeScreen() {
                 <View style={styles.tabPanel}>
                   <Text style={styles.sectionDescription}>{t("friendCollectionsSubtitle")}</Text>
                   {friendCollections.length > 0 ? (
-                    friendCollections.map((collection) => (
-                      <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={getCollectionTotalCost(collection.id)} />
-                    ))
+                    friendCollections.map((collection) => {
+                      const total = getCollectionTotalCost(collection.id);
+                      return (
+                        <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={total.amount} totalCostCurrency={total.currency} />
+                      );
+                    })
                   ) : (
                     <EmptyState
                       icon="🤝"
@@ -325,9 +329,12 @@ export default function HomeScreen() {
               <View style={styles.tabPanel}>
                 <Text style={styles.sectionDescription}>{t("collectionsFeedSubtitle")}</Text>
                 {subscribedCollections.length > 0 ? (
-                  subscribedCollections.map((collection) => (
-                    <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={getCollectionTotalCost(collection.id)} />
-                  ))
+                  subscribedCollections.map((collection) => {
+                    const total = getCollectionTotalCost(collection.id);
+                    return (
+                      <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={total.amount} totalCostCurrency={total.currency} />
+                    );
+                  })
                 ) : (
                   <EmptyState
                     icon="🔖"

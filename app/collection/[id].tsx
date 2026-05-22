@@ -19,6 +19,7 @@ import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
+import { formatCostAmount } from "@/lib/format-cost";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
@@ -34,6 +35,7 @@ export default function CollectionDetailsScreen() {
     collections,
     getCollectionById,
     getItemsForCollection,
+    getCollectionTotalCost,
     deleteCollection,
     deleteItems,
     moveItems,
@@ -417,13 +419,10 @@ export default function CollectionDetailsScreen() {
       </View>
 
       {(() => {
-        const total = allItems.reduce(
-          (sum, item) => sum + (typeof item.cost === "number" ? item.cost : 0),
-          0,
-        );
-        return total > 0 ? (
+        const total = getCollectionTotalCost(activeCollection.id);
+        return total.amount > 0 ? (
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryNumber}>{total}</Text>
+            <Text style={styles.summaryNumber}>{formatCostAmount(total.amount)} {total.currency}</Text>
             <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
           </View>
         ) : null;

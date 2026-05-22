@@ -5,6 +5,7 @@ export const SOCIAL_GRAPH_KEY = "collectables-social-graph-v1";
 export const MARKETPLACE_KEY = "collectables-marketplace-v1";
 export const DIAGNOSTICS_KEY = "collectables-diagnostics-v1";
 export const CURRENCY_KEY = "collectables-currency-v1";
+export const CURRENCY_RATES_KEY = "collectables-currency-rates-v1";
 
 export function collectionsKey(userId: string): string {
   return `collectables-collections-v1-${userId}`;
@@ -53,6 +54,7 @@ export async function clearAllUserData(userId: string): Promise<void> {
     LANGUAGE_KEY,
     MARKETPLACE_KEY,
     CURRENCY_KEY,
+    CURRENCY_RATES_KEY,
   ];
   await AsyncStorage.multiRemove(keys);
 }

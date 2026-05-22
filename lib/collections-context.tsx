@@ -4,6 +4,16 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 import { seedCollections, seedItems } from "@/data/seed";
 import { useAuth } from "@/lib/auth-context";
 import {
+  loadCurrencyRates,
+  sumConverted,
+  type UsdRates,
+} from "@/lib/currency-rates";
+import { useI18n } from "@/lib/i18n-context";
+import {
+  getDefaultCurrencyForLanguage,
+  getUserPreferredCurrency,
+} from "@/lib/locale-helpers";
+import {
   hasNewCloudEntries,
   mergeCollectionsFromCloud,
   mergeItemsFromCloud,
@@ -79,6 +89,17 @@ export type AcquiredItemSnapshot = {
 
 export const ACQUIRED_COLLECTION_ID_SUFFIX = "acquired-marketplace";
 
+export type CollectionTotalCost = {
+  /** Sum of all item costs, converted to `currency`. */
+  amount: number;
+  /** Currency the amount is expressed in (the user's preferred display currency). */
+  currency: string;
+  /** Number of items whose cost was successfully converted. */
+  converted: number;
+  /** Number of items whose cost couldn't be converted (missing rate). */
+  skipped: number;
+};
+
 type CollectionsContextValue = {
   collections: Collection[];
   items: CollectableItem[];
@@ -96,7 +117,9 @@ type CollectionsContextValue = {
   saveSharedCollection: (collection: Collection) => Promise<Collection | null>;
   getCollectionById: (id: string) => Collection | undefined;
   getItemsForCollection: (collectionId: string) => CollectableItem[];
-  getCollectionTotalCost: (collectionId: string) => number;
+  getCollectionTotalCost: (collectionId: string) => CollectionTotalCost;
+  displayCurrency: string;
+  refreshCurrencyRates: () => Promise<void>;
   getItemById: (itemId: string) => CollectableItem | undefined;
   wishlistItems: CollectableItem[];
   addWishlistItem: (input: DraftWishlistInput) => Promise<string>;
@@ -123,7 +146,12 @@ const CollectionsContext = createContext<CollectionsContextValue | null>(null);
 
 export function CollectionsProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
+  const { language } = useI18n();
   const { getVisibleCollections, getVisibleItems, friends } = useSocial();
+  const [currencyRates, setCurrencyRates] = useState<UsdRates | null>(null);
+  const [displayCurrency, setDisplayCurrency] = useState<string>(() =>
+    getDefaultCurrencyForLanguage(language),
+  );
   const [localCollections, setLocalCollections] = useState<Collection[]>([]);
   const [localItems, setLocalItems] = useState<CollectableItem[]>([]);
   const [friendCollections, setFriendCollections] = useState<Collection[]>([]);
@@ -135,6 +163,39 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   const [sharedWithMeItems, setSharedWithMeItems] = useState<CollectableItem[]>([]);
   const [ready, setReady] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const stored = await getUserPreferredCurrency();
+      if (cancelled) return;
+      if (stored) {
+        setDisplayCurrency(stored);
+      } else {
+        setDisplayCurrency(getDefaultCurrencyForLanguage(language));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [language]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const payload = await loadCurrencyRates();
+      if (cancelled || !payload) return;
+      setCurrencyRates(payload.rates);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function refreshCurrencyRates(): Promise<void> {
+    const payload = await loadCurrencyRates({ forceRefresh: true });
+    if (payload) setCurrencyRates(payload.rates);
+  }
 
   useEffect(() => {
     if (!user) {
@@ -567,10 +628,26 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
             if (bHas) return 1;
             return a.createdAt < b.createdAt ? 1 : -1;
           }),
-      getCollectionTotalCost: (collectionId) =>
-        items
+      getCollectionTotalCost: (collectionId) => {
+        const entries = items
           .filter((item) => item.collectionId === collectionId && !item.isWishlist)
-          .reduce((sum, item) => sum + (typeof item.cost === "number" ? item.cost : 0), 0),
+          .filter((item): item is typeof item & { cost: number } => typeof item.cost === "number")
+          .map((item) => ({
+            amount: item.cost,
+            currency: item.costCurrency ?? displayCurrency,
+          }));
+        if (currencyRates) {
+          const { total, converted, skipped } = sumConverted(entries, displayCurrency, currencyRates);
+          return { amount: total, currency: displayCurrency, converted, skipped };
+        }
+        // No rates yet: sum raw amounts (assume each item is already in the
+        // user's preferred currency). Better than crashing the UI; once rates
+        // load the totals re-render with real conversion.
+        const amount = entries.reduce((sum, e) => sum + e.amount, 0);
+        return { amount, currency: displayCurrency, converted: entries.length, skipped: 0 };
+      },
+      displayCurrency,
+      refreshCurrencyRates,
       getItemById: (itemId) => items.find((item) => item.id === itemId),
       wishlistItems: localItems
         .filter((item) => item.isWishlist)
@@ -821,7 +898,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         );
       },
     }),
-    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections],
+    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;

@@ -82,14 +82,18 @@ export default function CollectionsFeedScreen() {
           }
           return (
             <View style={styles.tabPanel}>
-              {cols.map((collection) => (
-                <CollectionCard
-                  key={collection.id}
-                  collection={collection}
-                  count={getItemsForCollection(collection.id).length || itemCounts[collection.id] || 0}
-                  totalCost={getCollectionTotalCost(collection.id)}
-                />
-              ))}
+              {cols.map((collection) => {
+                const total = getCollectionTotalCost(collection.id);
+                return (
+                  <CollectionCard
+                    key={collection.id}
+                    collection={collection}
+                    count={getItemsForCollection(collection.id).length || itemCounts[collection.id] || 0}
+                    totalCost={total.amount}
+                    totalCostCurrency={total.currency}
+                  />
+                );
+              })}
             </View>
           );
         }}

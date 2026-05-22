@@ -2,6 +2,7 @@ import { Link } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VisibilityBadge } from "@/components/visibility-badge";
+import { formatCostAmount } from "@/lib/format-cost";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { Collection } from "@/lib/types";
@@ -11,10 +12,12 @@ export function CollectionCard({
   collection,
   count,
   totalCost,
+  totalCostCurrency,
 }: {
   collection: Collection;
   count: number;
   totalCost?: number;
+  totalCostCurrency?: string;
 }) {
   const { t } = useI18n();
   const hasCover = Boolean(collection.coverPhoto);
@@ -41,7 +44,10 @@ export function CollectionCard({
             </Text>
           ) : null}
           {typeof totalCost === "number" && totalCost > 0 ? (
-            <Text style={styles.meta}>{t("totalCost")}: {totalCost}</Text>
+            <Text style={styles.meta}>
+              {t("totalCost")}: {formatCostAmount(totalCost)}
+              {totalCostCurrency ? ` ${totalCostCurrency}` : ""}
+            </Text>
           ) : null}
         </View>
       </Pressable>
