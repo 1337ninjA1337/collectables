@@ -33,6 +33,7 @@ import {
   MUTED_12,
   MUTED_13,
   MUTED_14,
+  MUTED_15,
   PAGE_BG,
   PAGE_BG_2,
   PURE_WHITE,
@@ -180,6 +181,13 @@ describe("design-tokens module", () => {
     assert.match(MUTED_10, hex);
     assert.equal(MUTED_10, "#624a35");
     assert.equal(designTokens.MUTED_10, "#624a35");
+  });
+
+  it("exposes the MUTED_15 clear-icon variant shipped for the search-overlay migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(MUTED_15, hex);
+    assert.equal(MUTED_15, "#b8a08a");
+    assert.equal(designTokens.MUTED_15, "#b8a08a");
   });
 
   it("exposes the AMBER_SOFT_2 + CARD_BG_4 + TEXT_ON_DARK_5 + MUTED_11/12/13/14 variants shipped for the chat-detail migration", () => {
@@ -335,6 +343,32 @@ describe("design-tokens adoption", () => {
     assert.match(src, /PLACEHOLDER/);
     assert.match(src, /PURE_WHITE/);
     assert.match(src, /DANGER_DEEP/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/search-overlay.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/search-overlay.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /AMBER_ACCENT/);
+    assert.match(src, /AMBER_MUTED/);
+    assert.match(src, /AMBER_SOFT\b/);
+    assert.match(src, /BORDER\b/);
+    assert.match(src, /BORDER_3/);
+    assert.match(src, /CARD_BG\b/);
+    assert.match(src, /CARD_BG_3/);
+    assert.match(src, /HERO_DARK\b/);
+    assert.match(src, /MUTED\b/);
+    assert.match(src, /MUTED_2/);
+    assert.match(src, /MUTED_3/);
+    assert.match(src, /MUTED_10/);
+    assert.match(src, /MUTED_13/);
+    assert.match(src, /MUTED_15/);
+    assert.match(src, /PAGE_BG_2/);
+    assert.match(src, /PLACEHOLDER/);
+    assert.match(src, /TEXT_DARK\b/);
+    assert.match(src, /TEXT_ON_DARK_4/);
+    assert.match(src, /TEXT_ON_DARK_5/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

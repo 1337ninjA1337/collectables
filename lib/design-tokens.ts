@@ -62,6 +62,7 @@ export const MUTED_11 = "#6f5a44";
 export const MUTED_12 = "#7a4f1a";
 export const MUTED_13 = "#8a6e54";
 export const MUTED_14 = "#a08970";
+export const MUTED_15 = "#b8a08a";
 export const PLACEHOLDER = "#9b8571";
 
 export const PURE_WHITE = "#ffffff";
@@ -119,6 +120,7 @@ export const designTokens = Object.freeze({
   MUTED_12,
   MUTED_13,
   MUTED_14,
+  MUTED_15,
   PLACEHOLDER,
   PURE_WHITE,
   DANGER,
