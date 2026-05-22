@@ -83,7 +83,7 @@ describe("subscribeShared — fan-out subscriber registry", () => {
       "topic-a",
       (channel, _emit) => {
         configureCalls += 1;
-        channel.on("postgres_changes", {}, () => undefined);
+        (channel as { on: (...args: unknown[]) => unknown }).on("postgres_changes", {}, () => undefined);
       },
       () => undefined,
     );
@@ -101,7 +101,7 @@ describe("subscribeShared — fan-out subscriber registry", () => {
         "topic-shared",
         (channel, _emit) => {
           configureCalls += 1;
-          channel.on("postgres_changes", {}, () => undefined);
+          (channel as { on: (...args: unknown[]) => unknown }).on("postgres_changes", {}, () => undefined);
         },
         () => undefined,
       );
@@ -124,7 +124,7 @@ describe("subscribeShared — fan-out subscriber registry", () => {
       "topic-fan",
       (channel, emit) => {
         capturedEmit = emit;
-        channel.on("postgres_changes", {}, () => undefined);
+        (channel as { on: (...args: unknown[]) => unknown }).on("postgres_changes", {}, () => undefined);
       },
       (p) => received.push({ owner: "alice", payload: p }),
     );
@@ -143,7 +143,7 @@ describe("subscribeShared — fan-out subscriber registry", () => {
       (p) => received.push({ owner: "carol", payload: p }),
     );
     assert.ok(capturedEmit, "emit must be captured during configure");
-    capturedEmit!({ id: "row-1" });
+    (capturedEmit as (p: { id: string }) => void)({ id: "row-1" });
     assert.deepEqual(received, [
       { owner: "alice", payload: { id: "row-1" } },
       { owner: "bob", payload: { id: "row-1" } },
