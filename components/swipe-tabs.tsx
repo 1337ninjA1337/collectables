@@ -10,6 +10,21 @@ import {
   View,
 } from "react-native";
 
+import {
+  AMBER_ACCENT,
+  AMBER_SOFT,
+  BORDER,
+  CARD_BG,
+  CARD_BG_3,
+  DANGER,
+  HERO_DARK,
+  MUTED_3,
+  MUTED_8,
+  TEXT_DARK,
+  TEXT_DARK_2,
+  TEXT_ON_DARK_4,
+} from "@/lib/design-tokens";
+
 export type SwipeTab = { key: string; label: string };
 
 type Props = {
@@ -283,13 +298,13 @@ const styles = StyleSheet.create({
   headerLabel: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
     flex: 1,
   },
   subHeaderLabel: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#5f4734",
+    color: MUTED_3,
     flex: 1,
   },
   dots: {
@@ -301,19 +316,19 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#e4c29a",
+    backgroundColor: AMBER_SOFT,
   },
   dotActive: {
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     width: 22,
   },
   subDotActive: {
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     width: 18,
   },
   dotHighlight: {
     borderWidth: 2,
-    borderColor: "#d92f2f",
+    borderColor: DANGER,
   },
   tabRow: {
     flexDirection: "row",
@@ -324,22 +339,22 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 14,
     alignItems: "center",
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
   },
   tabActive: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
+    backgroundColor: HERO_DARK,
+    borderColor: HERO_DARK,
   },
   tabText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontWeight: "800",
     fontSize: 14,
     textAlign: "center",
   },
   tabTextActive: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
   },
   subTabRow: {
     flexDirection: "row",
@@ -350,20 +365,20 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 12,
     alignItems: "center",
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   subTabActive: {
-    backgroundColor: "#d89c5b",
-    borderColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
+    borderColor: AMBER_ACCENT,
   },
   subTabText: {
-    color: "#6b5543",
+    color: MUTED_8,
     fontWeight: "700",
     fontSize: 14,
   },
   subTabTextActive: {
-    color: "#241912",
+    color: TEXT_DARK_2,
   },
 });

@@ -4,6 +4,26 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-na
 
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
+import {
+  AMBER_ACCENT,
+  AMBER_LIGHT,
+  BORDER,
+  CARD_BG,
+  DANGER_DEEP,
+  HERO_DARK,
+  HERO_DARK_4,
+  HERO_DARK_5,
+  HERO_DARK_6,
+  MUTED_6,
+  MUTED_7,
+  PLACEHOLDER,
+  PURE_WHITE,
+  TEXT_DARK,
+  TEXT_DARK_2,
+  TEXT_ON_DARK_3,
+  TEXT_ON_DARK_4,
+  TEXT_ON_DARK_SOFT,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -62,7 +82,7 @@ export function LoginScreen() {
   return (
     <Screen>
       <LinearGradient
-        colors={["#3d2810", "#261b14", "#1e140e"]}
+        colors={[HERO_DARK_4, HERO_DARK, HERO_DARK_5]}
         start={{ x: 0.2, y: 0.6 }}
         end={{ x: 1, y: 0 }}
         style={styles.hero}
@@ -79,7 +99,7 @@ export function LoginScreen() {
           value={email}
           onChangeText={setEmail}
           placeholder={t("emailPlaceholder")}
-          placeholderTextColor="#9b8571"
+          placeholderTextColor={PLACEHOLDER}
           autoCapitalize="none"
           keyboardType="email-address"
           style={styles.input}
@@ -90,7 +110,7 @@ export function LoginScreen() {
               value={code}
               onChangeText={setCode}
               placeholder={t("codePlaceholder")}
-              placeholderTextColor="#9b8571"
+              placeholderTextColor={PLACEHOLDER}
               keyboardType="number-pad"
               maxLength={6}
               style={styles.input}
@@ -133,7 +153,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   eyebrow: {
-    color: "#f5c99a",
+    color: AMBER_LIGHT,
     fontSize: 12,
     textTransform: "uppercase",
     letterSpacing: 1.2,
@@ -141,14 +161,14 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   title: {
-    color: "#fff8ef",
+    color: TEXT_ON_DARK_3,
     fontSize: 30,
     lineHeight: 38,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY,
   },
   subtitle: {
-    color: "#ead8c3",
+    color: TEXT_ON_DARK_SOFT,
     fontSize: 15,
     lineHeight: 23,
     fontFamily: FONT_BODY,
@@ -157,52 +177,52 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     padding: 20,
     gap: 12,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   sectionTitle: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 22,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY,
   },
   sectionText: {
-    color: "#6f5c4d",
+    color: MUTED_6,
     lineHeight: 22,
     fontFamily: FONT_BODY,
   },
   input: {
     borderRadius: 22,
-    backgroundColor: "#ffffff",
+    backgroundColor: PURE_WHITE,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 16,
     fontFamily: FONT_BODY,
   },
   primaryButton: {
     borderRadius: 22,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingVertical: 16,
     alignItems: "center",
   },
   primaryButtonText: {
-    color: "#241912",
+    color: TEXT_DARK_2,
     fontWeight: "800",
     fontSize: 15,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   secondaryButton: {
     borderRadius: 22,
-    backgroundColor: "#2c2017",
+    backgroundColor: HERO_DARK_6,
     paddingVertical: 16,
     alignItems: "center",
   },
   secondaryButtonText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontWeight: "800",
     fontSize: 15,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -211,14 +231,14 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
   errorText: {
-    color: "#a13434",
+    color: DANGER_DEEP,
     lineHeight: 22,
     fontSize: 14,
     fontWeight: "600",
     fontFamily: FONT_BODY_SEMIBOLD,
   },
   providerHint: {
-    color: "#856d5a",
+    color: MUTED_7,
     lineHeight: 21,
     fontFamily: FONT_BODY,
   },

@@ -9,7 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "tsx --test __tests__/*.test.ts",
+    "test": "tsx --import ./__tests__/test-globals.ts --test __tests__/*.test.ts",
     "build:powerbi": "tsx scripts/build-powerbi-template.ts",
     "lint:ci": "npx tsc --noEmit && npm test",
     "postinstall": "npx expo install --check || true",

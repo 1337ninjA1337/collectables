@@ -12,3 +12,28 @@ export function getAppBaseUrl(): string {
     isWeb ? window.location.pathname : null,
   );
 }
+
+// Callers must pass the raw value via a *literal* `process.env.EXPO_PUBLIC_X`
+// access (not the var name) — Metro/babel only inlines literal member accesses,
+// so a computed env index lookup would read undefined in the web bundle.
+export function resolveNumericEnv(rawValue: string | undefined, defaultValue: number): number {
+  if (!rawValue) return defaultValue;
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed <= 0) return defaultValue;
+  return parsed;
+}
+
+// Soft floor for cache TTL overrides — values below this hammer Supabase free-tier
+// rate limits. `resolveNumericEnv` still accepts any positive number; this helper
+// only flags aggressive overrides so callers can warn the operator.
+export const MINIMUM_RECOMMENDED_PROFILE_CACHE_TTL_MS = 30_000;
+
+export function isBelowRecommendedNumericEnv(
+  rawValue: string | undefined,
+  minimum: number,
+): boolean {
+  if (!rawValue) return false;
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed <= 0) return false;
+  return parsed < minimum;
+}

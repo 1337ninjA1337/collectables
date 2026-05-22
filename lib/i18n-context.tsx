@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { trackEvent } from "@/lib/analytics";
+import { getDefaultLocaleForLanguage } from "@/lib/locale-helpers";
 import { LANGUAGE_KEY } from "@/lib/storage-keys";
 
 export type AppLanguage = "ru" | "en" | "be" | "pl" | "de" | "es";
@@ -468,6 +469,9 @@ const en = {
     "When enabled, anonymous crash reports help us fix bugs faster. Toggle off to stop sending diagnostics.",
   diagnosticsEnabled: "Sending diagnostics",
   diagnosticsDisabled: "Diagnostics paused",
+  profileCacheTtlLowTitle: "Profile cache TTL too low",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS is set below 30 seconds. Aggressive overrides can hammer Supabase rate limits.",
 } as const;
 
 type TranslationKey = keyof typeof en;
@@ -937,6 +941,9 @@ const ru: TranslationMap = {
   crashFallbackBody:
     "Произошла непредвиденная ошибка, мы её записали. Попробуйте ещё раз или перезапустите приложение.",
   crashFallbackRetry: "Попробовать ещё раз",
+  profileCacheTtlLowTitle: "Слишком короткий TTL кэша профилей",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS установлен ниже 30 секунд. Слишком агрессивные значения нагружают лимиты Supabase.",
 };
 
 const be: TranslationMap = {
@@ -1093,6 +1100,9 @@ const be: TranslationMap = {
   crashFallbackBody:
     "Адбылася нечаканая памылка, мы яе запісалі. Паспрабуйце яшчэ раз ці перазапусціце прыкладанне.",
   crashFallbackRetry: "Паспрабаваць яшчэ раз",
+  profileCacheTtlLowTitle: "Занадта малы TTL кэша профіляў",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS усталяваны ніжэй за 30 секунд. Занадта агрэсіўныя значэнні нагружаюць ліміты Supabase.",
 };
 
 const pl: TranslationMap = {
@@ -1239,6 +1249,9 @@ const pl: TranslationMap = {
   crashFallbackBody:
     "Wystąpił nieoczekiwany błąd i został zapisany. Spróbuj ponownie lub uruchom aplikację jeszcze raz.",
   crashFallbackRetry: "Spróbuj ponownie",
+  profileCacheTtlLowTitle: "Za niski TTL pamięci podręcznej profili",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS jest ustawiony poniżej 30 sekund. Zbyt agresywne wartości obciążają limity Supabase.",
 };
 
 const de: TranslationMap = {
@@ -1381,6 +1394,9 @@ const de: TranslationMap = {
   crashFallbackBody:
     "Ein unerwarteter Fehler ist aufgetreten und wurde protokolliert. Bitte erneut versuchen oder die App neu starten.",
   crashFallbackRetry: "Erneut versuchen",
+  profileCacheTtlLowTitle: "Profil-Cache-TTL zu niedrig",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS ist auf unter 30 Sekunden gesetzt. Zu aggressive Werte belasten die Supabase-Limits.",
 };
 
 const es: TranslationMap = {
@@ -1523,6 +1539,9 @@ const es: TranslationMap = {
   crashFallbackBody:
     "Se produjo un error inesperado y lo hemos registrado. Vuelve a intentarlo o reinicia la aplicación.",
   crashFallbackRetry: "Intentar de nuevo",
+  profileCacheTtlLowTitle: "TTL de caché de perfiles demasiado bajo",
+  profileCacheTtlLowMessage:
+    "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS está por debajo de 30 segundos. Valores demasiado agresivos saturan los límites de Supabase.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };
@@ -1536,14 +1555,21 @@ const languageOptions: { code: AppLanguage; label: string }[] = [
   { code: "es", label: "Español" },
 ];
 
-const LOCALE_MAP: Record<AppLanguage, string> = {
-  en: "en",
-  ru: "ru",
-  be: "be",
-  pl: "pl",
-  de: "de",
-  es: "es",
-};
+// Memoise the Intl.RelativeTimeFormat instance per BCP-47 tag. Without the
+// cache, a list view rendering N timestamps (chats, price history) news up
+// N formatters per paint — fine for one-off labels, wasteful for long lists.
+// Keyed by the resolved BCP-47 tag (after `getDefaultLocaleForLanguage`) so
+// callers passing the same `AppLanguage` and callers passing the same raw
+// locale string both hit the same cache slot.
+const relativeTimeFormatCache = new Map<string, Intl.RelativeTimeFormat>();
+
+function getRelativeTimeFormat(bcp47: string): Intl.RelativeTimeFormat {
+  const cached = relativeTimeFormatCache.get(bcp47);
+  if (cached) return cached;
+  const formatter = new Intl.RelativeTimeFormat(bcp47, { numeric: "auto" });
+  relativeTimeFormatCache.set(bcp47, formatter);
+  return formatter;
+}
 
 export function formatRelativeDate(iso: string, locale: AppLanguage | string = "en"): string {
   const then = Date.parse(iso);
@@ -1557,8 +1583,8 @@ export function formatRelativeDate(iso: string, locale: AppLanguage | string = "
   const diffMo = Math.round(diffDay / 30);
   const diffYr = Math.round(diffDay / 365);
 
-  const bcp47 = LOCALE_MAP[locale as AppLanguage] ?? locale;
-  const rtf = new Intl.RelativeTimeFormat(bcp47, { numeric: "auto" });
+  const bcp47 = getDefaultLocaleForLanguage(locale);
+  const rtf = getRelativeTimeFormat(bcp47);
 
   if (Math.abs(diffSec) < 60) return rtf.format(diffSec, "second");
   if (Math.abs(diffMin) < 60) return rtf.format(diffMin, "minute");

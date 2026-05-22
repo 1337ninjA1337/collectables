@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { CurrencyInput, getDefaultCurrencyForLanguage, parseCurrencyValue } from "@/components/currency-input";
+import { getUserPreferredCurrency, setUserPreferredCurrency } from "@/lib/locale-helpers";
 import { SkeletonItemDetail } from "@/components/skeleton";
 
 import { PhotoPreview } from "@/components/photo-preview";
@@ -75,7 +76,21 @@ export default function ItemDetailsScreen() {
   const [listingSheetOpen, setListingSheetOpen] = useState(false);
   const [listingMode, setListingMode] = useState<MarketplaceMode>("trade");
   const [listingPrice, setListingPrice] = useState("");
-  const [listingCurrency, setListingCurrency] = useState(() => getDefaultCurrencyForLanguage(language));
+  const [listingCurrency, setListingCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
+  function setListingCurrency(next: string) {
+    setListingCurrencyState(next);
+    void setUserPreferredCurrency(next);
+  }
+  useEffect(() => {
+    let cancelled = false;
+    void getUserPreferredCurrency().then((stored) => {
+      if (cancelled || !stored) return;
+      setListingCurrencyState(stored);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [listingNotes, setListingNotes] = useState("");
 
   useEffect(() => {

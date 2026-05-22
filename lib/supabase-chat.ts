@@ -13,6 +13,7 @@ import {
 } from "@/lib/supabase";
 import { captureException } from "@/lib/sentry";
 import { fetchWithRetry } from "@/lib/fetch-retry";
+import { subscribeShared } from "@/lib/realtime-channel-registry";
 import { getSharedRealtimeClient } from "@/lib/supabase-realtime";
 import {
   buildAuthHeaders,
@@ -142,44 +143,35 @@ export function subscribeToInbox(
     return { unsubscribe: () => undefined };
   }
 
-  let channel: RealtimeChannel | null = client.channel(inboxChannelTopic(userId));
-  channel
-    .on(
-      REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
-      {
-        event: REALTIME_POSTGRES_CHANGES_LISTEN_EVENT.INSERT,
-        schema: "public",
-        table: "chat_messages",
-        filter: inboxFilter(userId),
-      },
-      (payload) => {
-        const row = payload.new as ChatRow | undefined;
-        if (!row || !row.id) return;
-        try {
-          onMessage(chatRowToMessage(row));
-        } catch (err) {
-          // Ignore handler errors so a buggy listener can't kill the socket.
-          captureException(err, { context: "supabase-chat.subscribeToInbox.handler" });
-        }
-      },
-    )
-    .subscribe((status) => {
-      const connected = status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED;
-      onStatusChange?.(connected);
-    });
-
-  return {
-    unsubscribe: () => {
-      if (!channel) return;
-      const ch = channel;
-      channel = null;
+  return subscribeShared<ChatRow>(
+    client,
+    inboxChannelTopic(userId),
+    (channel, emit) => {
+      channel.on(
+        REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
+        {
+          event: REALTIME_POSTGRES_CHANGES_LISTEN_EVENT.INSERT,
+          schema: "public",
+          table: "chat_messages",
+          filter: inboxFilter(userId),
+        },
+        (payload) => {
+          const row = payload.new as ChatRow | undefined;
+          if (!row || !row.id) return;
+          emit(row);
+        },
+      );
+    },
+    (row) => {
       try {
-        void client.removeChannel(ch);
-      } catch {
-        // Best-effort cleanup; the socket may already be closed.
+        onMessage(chatRowToMessage(row));
+      } catch (err) {
+        // Ignore handler errors so a buggy listener can't kill the socket.
+        captureException(err, { context: "supabase-chat.subscribeToInbox.handler" });
       }
     },
-  };
+    onStatusChange,
+  );
 }
 
 export type TypingSubscription = {

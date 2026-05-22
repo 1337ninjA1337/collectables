@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { PhotoPreview } from "@/components/photo-preview";
@@ -12,7 +12,11 @@ import { uploadImages } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { CURRENCIES } from "@/lib/currencies";
 import { useI18n } from "@/lib/i18n-context";
-import { getDefaultCurrencyForLanguage } from "@/lib/locale-helpers";
+import {
+  getDefaultCurrencyForLanguage,
+  getUserPreferredCurrency,
+  setUserPreferredCurrency,
+} from "@/lib/locale-helpers";
 import { useToast } from "@/lib/toast-context";
 import { ItemCondition, ItemTag } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -42,9 +46,25 @@ export default function CreateItemScreen() {
   const [description, setDescription] = useState("");
   const [variants, setVariants] = useState("");
   const [cost, setCost] = useState("");
-  const [currency, setCurrency] = useState(() => getDefaultCurrencyForLanguage(language));
+  const [currency, setCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
   const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [currencyQuery, setCurrencyQuery] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    void getUserPreferredCurrency().then((stored) => {
+      if (cancelled || !stored) return;
+      setCurrencyState(stored);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function setCurrency(next: string) {
+    setCurrencyState(next);
+    void setUserPreferredCurrency(next);
+  }
   const [condition, setCondition] = useState<ItemCondition | "">("");
   const [tags, setTags] = useState<ItemTag[]>([]);
   const [tagInput, setTagInput] = useState("");

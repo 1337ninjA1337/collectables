@@ -1,8 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
-import { getDefaultCurrencyForLanguage } from "@/lib/locale-helpers";
-
-const CURRENCIES = ["USD", "EUR", "GBP", "RUB", "BYN", "PLN", "UAH", "CHF", "JPY", "CNY"];
+import { CURRENCY_CHIPS, getDefaultCurrencyForLanguage } from "@/lib/locale-helpers";
 
 export { getDefaultCurrencyForLanguage };
 
@@ -46,7 +44,7 @@ export function CurrencyInput({
         />
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
-        {CURRENCIES.map((c) => {
+        {CURRENCY_CHIPS.map((c) => {
           const active = c === currency;
           return (
             <Pressable

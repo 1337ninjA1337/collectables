@@ -5,6 +5,13 @@ import { seedProfiles, seedSocialCollections, seedSocialItems } from "@/data/soc
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import {
+  isBelowRecommendedNumericEnv,
+  MINIMUM_RECOMMENDED_PROFILE_CACHE_TTL_MS,
+  resolveNumericEnv,
+} from "@/lib/env";
+import { useI18n } from "@/lib/i18n-context";
+import { useToast } from "@/lib/toast-context";
+import {
   upsertMyProfile,
   fetchFriendRequests,
   sendFriendRequest,
@@ -129,18 +136,31 @@ function hasRequest(friendRequests: FriendRequest[], fromUserId: string, toUserI
 
 const DEFAULT_VIEWER_PROFILE_TTL_MS = 10 * 60 * 1000;
 
-function resolveViewerProfileTtlMs(): number {
-  const raw = process.env.EXPO_PUBLIC_PROFILE_CACHE_TTL_MS;
-  if (!raw) return DEFAULT_VIEWER_PROFILE_TTL_MS;
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_VIEWER_PROFILE_TTL_MS;
-  return parsed;
-}
+const VIEWER_PROFILE_TTL_MS = resolveNumericEnv(
+  process.env.EXPO_PUBLIC_PROFILE_CACHE_TTL_MS,
+  DEFAULT_VIEWER_PROFILE_TTL_MS,
+);
 
-const VIEWER_PROFILE_TTL_MS = resolveViewerProfileTtlMs();
+// A positive override below the soft floor risks hammering Supabase's free-tier
+// rate limits. The validator (resolveNumericEnv) still accepts the value; we
+// only surface a one-shot toast warning to the operator.
+const LOW_PROFILE_CACHE_TTL_OVERRIDE = isBelowRecommendedNumericEnv(
+  process.env.EXPO_PUBLIC_PROFILE_CACHE_TTL_MS,
+  MINIMUM_RECOMMENDED_PROFILE_CACHE_TTL_MS,
+);
+
+// Module-scope flag so the warning fires exactly once per JS-realm lifetime,
+// even under React Strict-Mode double-mount or repeated provider remounts.
+let lowProfileCacheTtlWarningShown = false;
+
+export function __resetLowProfileCacheTtlWarningForTests() {
+  lowProfileCacheTtlWarningShown = false;
+}
 
 export function SocialProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
+  const toast = useToast();
+  const { t } = useI18n();
   const [following, setFollowing] = useState<string[]>([]);
   const [myProfileOverride, setMyProfileOverride] = useState<UserProfile | null>(null);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
@@ -153,6 +173,12 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   // Each entry is stamped with cachedAt so stale entries (>10 min) are refetched.
   const [viewerProfiles, setViewerProfiles] = useState<Record<string, { profile: UserProfile; cachedAt: number }>>({});
   const inFlightProfileIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!LOW_PROFILE_CACHE_TTL_OVERRIDE || lowProfileCacheTtlWarningShown) return;
+    lowProfileCacheTtlWarningShown = true;
+    toast.info(t("profileCacheTtlLowMessage"), t("profileCacheTtlLowTitle"));
+  }, [toast, t]);
 
   useEffect(() => {
     if (!user) {

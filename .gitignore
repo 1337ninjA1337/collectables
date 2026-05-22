@@ -32,7 +32,6 @@ expo-web.out.log
 
 # Local env files
 .env
-.env.example
 .env*.local
 
 # Typescript

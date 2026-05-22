@@ -9,6 +9,17 @@ import { useResponsive } from "@/components/screen";
 import { trackEvent } from "@/lib/analytics";
 import { useChat } from "@/lib/chat-context";
 import { FriendsTabBadge } from "@/lib/chat-helpers";
+import {
+  AMBER_ACCENT,
+  AMBER_SOFT,
+  BORDER,
+  CARD_BG_2,
+  CARD_BG_3,
+  HERO_DARK,
+  MUTED_3,
+  TEXT_DARK_2,
+  TEXT_ON_DARK_2,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useNavAnimation } from "@/lib/nav-animation-context";
 import { usePremium } from "@/lib/premium-context";
@@ -40,7 +51,7 @@ function NavRow({ leftItems, rightItems, onPlusPress, plusLabel }: NavRowProps) 
       )}
       <View style={styles.item}>
         <Pressable style={styles.plusButton} onPress={onPlusPress} accessibilityLabel={plusLabel}>
-          <Ionicons name="add" size={30} color="#fff5ea" />
+          <Ionicons name="add" size={30} color={TEXT_ON_DARK_2} />
         </Pressable>
       </View>
       {paddedRight.map((item, i) =>
@@ -254,9 +265,9 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: "row",
-    backgroundColor: "#fff7ef",
+    backgroundColor: CARD_BG_2,
     borderTopWidth: 1,
-    borderTopColor: "#eadbc8",
+    borderTopColor: BORDER,
     paddingTop: 10,
     paddingHorizontal: 8,
   },
@@ -270,12 +281,12 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     alignItems: "center",
     justifyContent: "center",
     marginTop: -18,
     borderWidth: 3,
-    borderColor: "#fff7ef",
+    borderColor: CARD_BG_2,
   },
   modalBackdrop: {
     flex: 1,
@@ -283,7 +294,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   modalSheet: {
-    backgroundColor: "#fff7ef",
+    backgroundColor: CARD_BG_2,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 22,
@@ -292,38 +303,38 @@ const styles = StyleSheet.create({
   },
   modalPrimaryButton: {
     borderRadius: 22,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingVertical: 16,
     alignItems: "center",
   },
   modalPrimaryText: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
     fontSize: 16,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   modalSecondaryButton: {
     borderRadius: 22,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingVertical: 16,
     alignItems: "center",
   },
   modalSecondaryText: {
-    color: "#241912",
+    color: TEXT_DARK_2,
     fontSize: 16,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   modalCancelButton: {
     borderRadius: 22,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingVertical: 14,
     alignItems: "center",
   },
   modalCancelText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
