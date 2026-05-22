@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
@@ -16,6 +16,7 @@ import { Screen } from "@/components/screen";
 import { SelectableItemRow } from "@/components/selectable-item-row";
 import { useAuth } from "@/lib/auth-context";
 import { uploadImage } from "@/lib/cloudinary";
+import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { useI18n } from "@/lib/i18n-context";
@@ -87,9 +88,17 @@ export default function CollectionDetailsScreen() {
 
   // When a user opens a private collection via a shared link, persist them as
   // a viewer so the collection appears alongside their friends' collections.
+  // Gated by a per-id ref so an unrelated re-render (e.g. a parent context
+  // re-creating `t` / `toast` / `saveSharedCollection`) cannot re-fire the save
+  // — that was the iOS Safari crash path: each attempt mounted a toast and
+  // queued a network write, blowing the memory budget until Safari aborted
+  // with "A problem repeatedly occurred". One attempt per opened collection.
+  const hasAttemptedShareSaveRef = useRef<string | null>(null);
   useEffect(() => {
     if (!user || !remoteCollection) return;
     if (localCollection) return;
+    if (hasAttemptedShareSaveRef.current === params.id) return;
+    hasAttemptedShareSaveRef.current = params.id;
     let cancelled = false;
     void saveSharedCollection(remoteCollection).then((saved) => {
       if (!cancelled && saved) {
@@ -100,7 +109,7 @@ export default function CollectionDetailsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [user, remoteCollection, localCollection, saveSharedCollection, toast, t]);
+  }, [user, remoteCollection, localCollection, params.id, saveSharedCollection, toast, t]);
 
   const collection = localCollection ?? remoteCollection;
   const localItems = getItemsForCollection(params.id);
@@ -109,7 +118,13 @@ export default function CollectionDetailsScreen() {
 
   // Resolve profile details for every viewer listed on the collection so the
   // share sheet can show non-friends (link-granted viewers) alongside friends.
-  const sharedWithUserIds = collection?.sharedWithUserIds ?? [];
+  // Memoised so the `?? []` fallback returns the SAME array reference between
+  // renders when `collection?.sharedWithUserIds` is undefined — otherwise the
+  // dependency array sees a new `[]` every render and the effect re-fires.
+  const sharedWithUserIds = useMemo(
+    () => collection?.sharedWithUserIds ?? [],
+    [collection?.sharedWithUserIds],
+  );
   useEffect(() => {
     if (!shareOpen || sharedWithUserIds.length === 0) return;
     ensureProfilesLoaded(sharedWithUserIds);
@@ -367,7 +382,12 @@ export default function CollectionDetailsScreen() {
     <Screen nestable refreshing={refreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: activeCollection.name }} />
       <View style={{...styles.hero, ...(!activeCollection.coverPhoto ? { backgroundColor: placeholderColor(activeCollection.id) } : {})}}>
-        {activeCollection.coverPhoto ? <Image source={{ uri: activeCollection.coverPhoto }} style={styles.heroImage} /> : null}
+        {activeCollection.coverPhoto ? (
+          <Image
+            source={{ uri: withCloudinaryThumbUrl(activeCollection.coverPhoto, { width: 1200, height: 900, mode: "fill" }) }}
+            style={styles.heroImage}
+          />
+        ) : null}
         <View style={styles.heroOverlay} />
         <View style={styles.heroContent}>
           <VisibilityBadge collection={activeCollection} variant="hero" />
