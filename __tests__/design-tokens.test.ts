@@ -23,6 +23,7 @@ import {
   MUTED_5,
   MUTED_6,
   MUTED_7,
+  MUTED_8,
   PAGE_BG,
   PURE_WHITE,
   SUCCESS_GREEN,
@@ -89,6 +90,13 @@ describe("design-tokens module", () => {
     assert.equal(TEXT_ON_DARK_3, "#fff8ef");
     assert.equal(designTokens.AMBER_MUTED, "#d9c2a8");
     assert.equal(designTokens.TEXT_ON_DARK_3, "#fff8ef");
+  });
+
+  it("exposes the MUTED_8 variant shipped for the swipe-tabs migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(MUTED_8, hex);
+    assert.equal(MUTED_8, "#6b5543");
+    assert.equal(designTokens.MUTED_8, "#6b5543");
   });
 
   it("exposes the HERO_DARK_4/5/6 + MUTED_6/7 + TEXT_ON_DARK_4 + PURE_WHITE + DANGER_DEEP variants shipped for the login-screen migration", () => {
@@ -199,6 +207,25 @@ describe("design-tokens adoption", () => {
     assert.match(src, /MUTED/);
     assert.match(src, /MUTED_2/);
     assert.match(src, /DANGER/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/swipe-tabs.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/swipe-tabs.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /HERO_DARK\b/);
+    assert.match(src, /AMBER_ACCENT/);
+    assert.match(src, /AMBER_SOFT/);
+    assert.match(src, /BORDER\b/);
+    assert.match(src, /CARD_BG\b/);
+    assert.match(src, /CARD_BG_3/);
+    assert.match(src, /DANGER\b/);
+    assert.match(src, /TEXT_DARK\b/);
+    assert.match(src, /TEXT_DARK_2/);
+    assert.match(src, /TEXT_ON_DARK_4/);
+    assert.match(src, /MUTED_3/);
+    assert.match(src, /MUTED_8/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
