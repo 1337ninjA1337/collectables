@@ -36,6 +36,7 @@ export const PAGE_BG_2 = "#fffaf4";
 export const BORDER = "#eadbc8";
 export const BORDER_2 = "#f0e2cf";
 export const BORDER_3 = "#f0e4d0";
+export const BORDER_4 = "#e4d5c4";
 
 export const TEXT_DARK = "#2f2318";
 export const TEXT_DARK_2 = "#241912";
@@ -63,6 +64,7 @@ export const MUTED_12 = "#7a4f1a";
 export const MUTED_13 = "#8a6e54";
 export const MUTED_14 = "#a08970";
 export const MUTED_15 = "#b8a08a";
+export const MUTED_16 = "#a89480";
 export const PLACEHOLDER = "#9b8571";
 
 export const PURE_WHITE = "#ffffff";
@@ -96,6 +98,7 @@ export const designTokens = Object.freeze({
   BORDER,
   BORDER_2,
   BORDER_3,
+  BORDER_4,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_DARK_3,
@@ -121,6 +124,7 @@ export const designTokens = Object.freeze({
   MUTED_13,
   MUTED_14,
   MUTED_15,
+  MUTED_16,
   PLACEHOLDER,
   PURE_WHITE,
   DANGER,

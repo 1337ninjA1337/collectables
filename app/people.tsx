@@ -5,6 +5,30 @@ import { Image, Pressable, StyleSheet, Text, TextInput, View } from "react-nativ
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { SkeletonProfileList } from "@/components/skeleton";
+import {
+  AMBER_LIGHT,
+  AMBER_MUTED,
+  AMBER_SOFT,
+  BORDER,
+  BORDER_2,
+  BORDER_4,
+  CARD_BG,
+  CARD_BG_3,
+  HERO_DARK,
+  HERO_DARK_2,
+  MUTED,
+  MUTED_2,
+  MUTED_3,
+  MUTED_8,
+  MUTED_10,
+  MUTED_16,
+  PLACEHOLDER,
+  PURE_WHITE,
+  TEXT_DARK,
+  TEXT_ON_DARK_3,
+  TEXT_ON_DARK_4,
+  TEXT_ON_DARK_SOFT,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { fetchProfiles } from "@/lib/supabase-profiles";
@@ -145,7 +169,7 @@ export default function PeopleScreen() {
           value={query}
           onChangeText={setQuery}
           placeholder={t("searchByProfileIdPlaceholder")}
-          placeholderTextColor="#9b8571"
+          placeholderTextColor={PLACEHOLDER}
           autoCapitalize="none"
           style={styles.searchInput}
         />
@@ -192,13 +216,13 @@ export default function PeopleScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     borderRadius: 32,
     padding: 24,
     gap: 10,
   },
   eyebrow: {
-    color: "#f5c99a",
+    color: AMBER_LIGHT,
     fontSize: 12,
     textTransform: "uppercase",
     letterSpacing: 1.2,
@@ -206,27 +230,27 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   title: {
-    color: "#fff8ef",
+    color: TEXT_ON_DARK_3,
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 36,
     fontFamily: FONT_DISPLAY,
   },
   subtitle: {
-    color: "#ead8c3",
+    color: TEXT_ON_DARK_SOFT,
     lineHeight: 22,
     fontFamily: FONT_BODY,
   },
   searchCard: {
     borderRadius: 24,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     padding: 18,
     gap: 10,
   },
   searchLabel: {
-    color: "#624a35",
+    color: MUTED_10,
     fontWeight: "800",
     fontSize: 13,
     letterSpacing: 0.5,
@@ -235,20 +259,20 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     borderRadius: 20,
-    backgroundColor: "#ffffff",
+    backgroundColor: PURE_WHITE,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontFamily: FONT_BODY,
   },
   card: {
     borderRadius: 28,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     padding: 18,
     gap: 16,
   },
@@ -260,7 +284,7 @@ const styles = StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 24,
-    backgroundColor: "#d9c2a8",
+    backgroundColor: AMBER_MUTED,
   },
   profileMeta: {
     flex: 1,
@@ -269,16 +293,16 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontFamily: FONT_DISPLAY_BOLD,
   },
   username: {
-    color: "#8f6947",
+    color: MUTED,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
   bio: {
-    color: "#6b5647",
+    color: MUTED_2,
     lineHeight: 21,
     fontFamily: FONT_BODY,
   },
@@ -289,38 +313,38 @@ const styles = StyleSheet.create({
   },
   primaryAction: {
     borderRadius: 999,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   primaryActionText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   secondaryAction: {
     borderRadius: 999,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   secondaryActionText: {
-    color: "#2a1d15",
+    color: HERO_DARK_2,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   statusBadge: {
     borderRadius: 999,
-    backgroundColor: "#f0e2cf",
+    backgroundColor: BORDER_2,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   statusBadgeText: {
-    color: "#6b5543",
+    color: MUTED_8,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
@@ -332,23 +356,23 @@ const styles = StyleSheet.create({
   },
   pageButton: {
     borderRadius: 999,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingHorizontal: 18,
     paddingVertical: 12,
   },
   pageButtonDisabled: {
-    backgroundColor: "#e4d5c4",
+    backgroundColor: BORDER_4,
   },
   pageButtonText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   pageButtonTextDisabled: {
-    color: "#a89480",
+    color: MUTED_16,
   },
   pageInfo: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontWeight: "700",
     fontSize: 14,
     fontFamily: FONT_BODY_BOLD,
