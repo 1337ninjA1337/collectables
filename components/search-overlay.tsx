@@ -14,6 +14,27 @@ import {
 //
 import { EmptyState } from "@/components/empty-state";
 import { useCollections } from "@/lib/collections-context";
+import {
+  AMBER_ACCENT,
+  AMBER_MUTED,
+  AMBER_SOFT,
+  BORDER,
+  BORDER_3,
+  CARD_BG,
+  CARD_BG_3,
+  HERO_DARK,
+  MUTED,
+  MUTED_2,
+  MUTED_3,
+  MUTED_10,
+  MUTED_13,
+  MUTED_15,
+  PAGE_BG_2,
+  PLACEHOLDER,
+  TEXT_DARK,
+  TEXT_ON_DARK_4,
+  TEXT_ON_DARK_5,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { fetchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
@@ -141,12 +162,12 @@ export function SearchOverlay({ visible, onClose }: Props) {
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           {/* Search input */}
           <View style={styles.inputRow}>
-            <Ionicons name="search" size={20} color="#8a6e54" />
+            <Ionicons name="search" size={20} color={MUTED_13} />
             <TextInput
               value={query}
               onChangeText={setQuery}
               placeholder={t("searchPlaceholder")}
-              placeholderTextColor="#9b8571"
+              placeholderTextColor={PLACEHOLDER}
               style={styles.input}
               autoFocus
               autoCapitalize="none"
@@ -154,11 +175,11 @@ export function SearchOverlay({ visible, onClose }: Props) {
             />
             {query.length > 0 ? (
               <Pressable onPress={() => setQuery("")} style={styles.clearBtn} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color="#b8a08a" />
+                <Ionicons name="close-circle" size={18} color={MUTED_15} />
               </Pressable>
             ) : null}
             <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={8}>
-              <Ionicons name="close" size={22} color="#8a6e54" />
+              <Ionicons name="close" size={22} color={MUTED_13} />
             </Pressable>
           </View>
 
@@ -367,7 +388,7 @@ const styles = StyleSheet.create({
     paddingTop: 72,
   },
   sheet: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: PAGE_BG_2,
     borderRadius: 24,
     padding: 16,
     maxHeight: "85%",
@@ -385,16 +406,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
   },
   input: {
     flex: 1,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -413,21 +434,21 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
   },
   filterChipActive: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
+    backgroundColor: HERO_DARK,
+    borderColor: HERO_DARK,
   },
   filterChipText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontWeight: "700",
     fontSize: 13,
   },
   filterChipTextActive: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
   },
   ownerRow: {
     flexDirection: "row",
@@ -438,27 +459,27 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   ownerChipActive: {
-    backgroundColor: "#d89c5b",
-    borderColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
+    borderColor: AMBER_ACCENT,
   },
   ownerChipText: {
-    color: "#6b5647",
+    color: MUTED_2,
     fontWeight: "700",
     fontSize: 12,
   },
   ownerChipTextActive: {
-    color: "#fff7ea",
+    color: TEXT_ON_DARK_5,
   },
   results: {
     maxHeight: 440,
   },
   sectionLabel: {
-    color: "#624a35",
+    color: MUTED_10,
     fontWeight: "800",
     fontSize: 12,
     textTransform: "uppercase",
@@ -471,7 +492,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0e4d0",
+    borderBottomColor: BORDER_3,
   },
   rowContent: {
     flexDirection: "row",
@@ -482,14 +503,14 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: "#eadbc8",
+    backgroundColor: BORDER,
   },
   rowThumbEmpty: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
   },
   rowThumbEmoji: {
     fontSize: 18,
@@ -498,26 +519,26 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#d9c2a8",
+    backgroundColor: AMBER_MUTED,
   },
   rowAvatarEmpty: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
   },
   rowText: {
     flex: 1,
     gap: 2,
   },
   rowTitle: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontWeight: "700",
   },
   rowMeta: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 13,
   },
 });
