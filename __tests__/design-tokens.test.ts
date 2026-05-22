@@ -13,6 +13,7 @@ import {
   HERO_DARK,
   MUTED,
   MUTED_3,
+  MUTED_4,
   PAGE_BG,
   SUCCESS_GREEN,
   TEXT_DARK,
@@ -59,6 +60,13 @@ describe("design-tokens module", () => {
     assert.equal(designTokens.MUTED_3, "#5f4734");
   });
 
+  it("exposes the MUTED_4 inactive-nav-icon variant shipped for the nav-tab migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(MUTED_4, hex);
+    assert.equal(MUTED_4, "#bbb0a6");
+    assert.equal(designTokens.MUTED_4, "#bbb0a6");
+  });
+
   it("freezes the designTokens object so accidental mutation is rejected", () => {
     assert.equal(Object.isFrozen(designTokens), true);
     assert.throws(() => {
@@ -91,6 +99,19 @@ describe("design-tokens adoption", () => {
     assert.match(src, /TEXT_ON_DARK_2/);
     // No raw 6-digit hex literals should remain in the migrated file.
     // (The semi-transparent backdrop is an rgba(), not a hex literal.)
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/nav-tab.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/nav-tab.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    // Every hex literal that previously lived inline now maps to a named token.
+    assert.match(src, /HERO_DARK/);
+    assert.match(src, /MUTED_4/);
+    assert.match(src, /DANGER/);
+    assert.match(src, /TEXT_ON_DARK/);
+    assert.match(src, /AMBER_ACCENT/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

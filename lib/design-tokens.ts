@@ -37,6 +37,7 @@ export const TEXT_ON_DARK_SOFT = "#ead8c3";
 export const MUTED = "#8f6947";
 export const MUTED_2 = "#6b5647";
 export const MUTED_3 = "#5f4734";
+export const MUTED_4 = "#bbb0a6";
 export const PLACEHOLDER = "#9b8571";
 
 export const DANGER = "#d92f2f";
@@ -64,6 +65,7 @@ export const designTokens = Object.freeze({
   MUTED,
   MUTED_2,
   MUTED_3,
+  MUTED_4,
   PLACEHOLDER,
   DANGER,
   SUCCESS_GREEN,
