@@ -17,6 +17,24 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { trackEvent } from "@/lib/analytics";
+import {
+  AMBER_MUTED,
+  AMBER_SOFT,
+  AMBER_SOFT_2,
+  BORDER,
+  CARD_BG,
+  CARD_BG_3,
+  CARD_BG_4,
+  HERO_DARK,
+  HERO_DARK_3,
+  MUTED,
+  MUTED_11,
+  MUTED_12,
+  MUTED_13,
+  MUTED_14,
+  TEXT_DARK,
+  TEXT_ON_DARK_5,
+} from "@/lib/design-tokens";
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
 import { buildChatId } from "@/lib/chat-helpers";
@@ -254,7 +272,7 @@ export default function ChatDetailScreen() {
           </Pressable>
           {messages.length > 0 ? (
             <Pressable style={styles.headerAction} onPress={handleClear} accessibilityLabel={t("chatClear")}>
-              <Ionicons name="trash-outline" size={18} color="#8f6947" />
+              <Ionicons name="trash-outline" size={18} color={MUTED} />
             </Pressable>
           ) : null}
         </View>
@@ -308,7 +326,7 @@ export default function ChatDetailScreen() {
           <TextInput
             style={styles.input}
             placeholder={t("chatInputPlaceholder")}
-            placeholderTextColor="#a08970"
+            placeholderTextColor={MUTED_14}
             value={text}
             onChangeText={handleTextChange}
             onSubmitEditing={handleSend}
@@ -321,7 +339,7 @@ export default function ChatDetailScreen() {
             disabled={!text.trim()}
             accessibilityLabel={t("chatSend")}
           >
-            <Ionicons name="send" size={18} color={text.trim() ? "#fff7ea" : "#d9c2a8"} />
+            <Ionicons name="send" size={18} color={text.trim() ? TEXT_ON_DARK_5 : AMBER_MUTED} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -339,7 +357,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#eadbc8",
+    borderBottomColor: BORDER,
   },
   headerLeft: {
     flexDirection: "row",
@@ -351,14 +369,14 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 16,
-    backgroundColor: "#d9c2a8",
+    backgroundColor: AMBER_MUTED,
   },
   headerAvatarFallback: {
     alignItems: "center",
     justifyContent: "center",
   },
   headerAvatarText: {
-    color: "#3a2716",
+    color: HERO_DARK_3,
     fontWeight: "800",
     fontSize: 18,
   },
@@ -366,12 +384,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerName: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 17,
     fontWeight: "800",
   },
   headerHandle: {
-    color: "#8f6947",
+    color: MUTED,
     fontWeight: "700",
     fontSize: 12,
   },
@@ -379,9 +397,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -400,10 +418,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
   },
   emptyHint: {
-    color: "#6f5a44",
+    color: MUTED_11,
     textAlign: "center",
     lineHeight: 20,
     maxWidth: 280,
@@ -426,43 +444,43 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   bubbleMine: {
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     borderBottomRightRadius: 6,
   },
   bubbleTheirs: {
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     borderBottomLeftRadius: 6,
   },
   bubbleTextMine: {
-    color: "#fff7ea",
+    color: TEXT_ON_DARK_5,
     fontSize: 15,
     lineHeight: 21,
   },
   bubbleTextTheirs: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     lineHeight: 21,
   },
   bubbleTime: {
     fontSize: 11,
-    color: "#a08970",
+    color: MUTED_14,
     paddingHorizontal: 4,
   },
   offlinePill: {
     alignSelf: "center",
-    backgroundColor: "#fff0d6",
+    backgroundColor: CARD_BG_4,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#e0b87a",
+    borderColor: AMBER_SOFT_2,
     paddingHorizontal: 14,
     paddingVertical: 4,
     marginBottom: 4,
   },
   offlinePillText: {
     fontSize: 12,
-    color: "#7a4f1a",
+    color: MUTED_12,
     fontWeight: "600",
   },
   typingRow: {
@@ -471,7 +489,7 @@ const styles = StyleSheet.create({
   },
   typingText: {
     fontSize: 12,
-    color: "#8f6947",
+    color: MUTED,
     fontStyle: "italic",
   },
   composer: {
@@ -480,7 +498,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: "#eadbc8",
+    borderTopColor: BORDER,
   },
   input: {
     flex: 1,
@@ -489,22 +507,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 22,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
-    color: "#2f2318",
+    borderColor: BORDER,
+    color: TEXT_DARK,
     fontSize: 15,
   },
   sendButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     alignItems: "center",
     justifyContent: "center",
   },
   sendButtonDisabled: {
-    backgroundColor: "#8a6e54",
+    backgroundColor: MUTED_13,
     opacity: 0.6,
   },
 });

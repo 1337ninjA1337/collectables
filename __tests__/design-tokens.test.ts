@@ -8,9 +8,11 @@ import {
   AMBER_ACCENT,
   AMBER_LIGHT,
   AMBER_MUTED,
+  AMBER_SOFT_2,
   BORDER,
   BORDER_3,
   CARD_BG,
+  CARD_BG_4,
   DANGER,
   DANGER_DEEP,
   designTokens,
@@ -27,6 +29,10 @@ import {
   MUTED_8,
   MUTED_9,
   MUTED_10,
+  MUTED_11,
+  MUTED_12,
+  MUTED_13,
+  MUTED_14,
   PAGE_BG,
   PAGE_BG_2,
   PURE_WHITE,
@@ -39,6 +45,7 @@ import {
   TEXT_ON_DARK_2,
   TEXT_ON_DARK_3,
   TEXT_ON_DARK_4,
+  TEXT_ON_DARK_5,
   TEXT_ON_DARK_MUTED,
 } from "@/lib/design-tokens";
 
@@ -175,6 +182,31 @@ describe("design-tokens module", () => {
     assert.equal(designTokens.MUTED_10, "#624a35");
   });
 
+  it("exposes the AMBER_SOFT_2 + CARD_BG_4 + TEXT_ON_DARK_5 + MUTED_11/12/13/14 variants shipped for the chat-detail migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(AMBER_SOFT_2, hex);
+    assert.match(CARD_BG_4, hex);
+    assert.match(TEXT_ON_DARK_5, hex);
+    assert.match(MUTED_11, hex);
+    assert.match(MUTED_12, hex);
+    assert.match(MUTED_13, hex);
+    assert.match(MUTED_14, hex);
+    assert.equal(AMBER_SOFT_2, "#e0b87a");
+    assert.equal(CARD_BG_4, "#fff0d6");
+    assert.equal(TEXT_ON_DARK_5, "#fff7ea");
+    assert.equal(MUTED_11, "#6f5a44");
+    assert.equal(MUTED_12, "#7a4f1a");
+    assert.equal(MUTED_13, "#8a6e54");
+    assert.equal(MUTED_14, "#a08970");
+    assert.equal(designTokens.AMBER_SOFT_2, "#e0b87a");
+    assert.equal(designTokens.CARD_BG_4, "#fff0d6");
+    assert.equal(designTokens.TEXT_ON_DARK_5, "#fff7ea");
+    assert.equal(designTokens.MUTED_11, "#6f5a44");
+    assert.equal(designTokens.MUTED_12, "#7a4f1a");
+    assert.equal(designTokens.MUTED_13, "#8a6e54");
+    assert.equal(designTokens.MUTED_14, "#a08970");
+  });
+
   it("freezes the designTokens object so accidental mutation is rejected", () => {
     assert.equal(Object.isFrozen(designTokens), true);
     assert.throws(() => {
@@ -303,6 +335,29 @@ describe("design-tokens adoption", () => {
     assert.match(src, /PLACEHOLDER/);
     assert.match(src, /PURE_WHITE/);
     assert.match(src, /DANGER_DEEP/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("app/chat/[id].tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("app/chat/[id].tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /HERO_DARK\b/);
+    assert.match(src, /HERO_DARK_3/);
+    assert.match(src, /AMBER_MUTED/);
+    assert.match(src, /AMBER_SOFT\b/);
+    assert.match(src, /AMBER_SOFT_2/);
+    assert.match(src, /BORDER\b/);
+    assert.match(src, /CARD_BG\b/);
+    assert.match(src, /CARD_BG_3/);
+    assert.match(src, /CARD_BG_4/);
+    assert.match(src, /TEXT_DARK\b/);
+    assert.match(src, /TEXT_ON_DARK_5/);
+    assert.match(src, /MUTED\b/);
+    assert.match(src, /MUTED_11/);
+    assert.match(src, /MUTED_12/);
+    assert.match(src, /MUTED_13/);
+    assert.match(src, /MUTED_14/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
