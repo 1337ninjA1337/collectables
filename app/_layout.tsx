@@ -20,6 +20,21 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ChatProvider, useChat } from "@/lib/chat-context";
 import { formatBadgeCount } from "@/lib/chat-helpers";
 import { CollectionsProvider } from "@/lib/collections-context";
+import {
+  ACCENT_DEEP,
+  AMBER_SOFT,
+  CARD_BG_3,
+  DANGER,
+  HERO_DARK,
+  HERO_DARK_2,
+  MUTED_9,
+  PAGE_BG_2,
+  STATUS_OFFLINE,
+  STATUS_ONLINE,
+  TEXT_DARK,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_4,
+} from "@/lib/design-tokens";
 import { DiagnosticsProvider } from "@/lib/diagnostics-context";
 import { isDevEnvironment, loadDevMenuModule, registerDevMenu } from "@/lib/dev-menu";
 import { I18nProvider, useI18n, useOptionalI18n } from "@/lib/i18n-context";
@@ -116,7 +131,7 @@ function AppShell() {
       <Screen scroll={false}>
         <StatusBar style="dark" />
         <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#8a5a2b" />
+          <ActivityIndicator size="large" color={ACCENT_DEEP} />
           <Text style={styles.loadingText}>{t("checkingSession")}</Text>
         </View>
       </Screen>
@@ -155,11 +170,11 @@ function AppShell() {
             headerBackVisible: !showMobileNav,
             headerShadowVisible: false,
             headerStyle: {
-              backgroundColor: "#fff7ef",
+              backgroundColor: TEXT_ON_DARK,
             },
-            headerTintColor: "#2f2318",
+            headerTintColor: TEXT_DARK,
             contentStyle: {
-              backgroundColor: "#fffaf4",
+              backgroundColor: PAGE_BG_2,
             },
             headerTitleStyle: {
               fontWeight: "700",
@@ -178,7 +193,7 @@ function AppShell() {
                       onPress={() => router.push("/chats")}
                       accessibilityLabel={t("chatsTitle")}
                     >
-                      <Ionicons name="chatbubbles-outline" size={18} color="#2a1d15" />
+                      <Ionicons name="chatbubbles-outline" size={18} color={HERO_DARK_2} />
                       <View style={[styles.realtimeDot, realtimeOnline ? styles.realtimeDotOnline : styles.realtimeDotOffline]} />
                       {unreadTotal > 0 ? (
                         <View style={styles.headerBadge}>
@@ -192,7 +207,7 @@ function AppShell() {
                     onPress={() => setSearchOpen(true)}
                     accessibilityLabel={t("searchPlaceholder")}
                   >
-                    <Ionicons name="search" size={18} color="#2a1d15" />
+                    <Ionicons name="search" size={18} color={HERO_DARK_2} />
                   </Pressable>
                   {pathname !== "/chats" ? (
                     <Pressable
@@ -200,7 +215,7 @@ function AppShell() {
                       onPress={() => router.push("/chats")}
                       accessibilityLabel={t("chatsTitle")}
                     >
-                      <Ionicons name="chatbubbles-outline" size={18} color="#2a1d15" />
+                      <Ionicons name="chatbubbles-outline" size={18} color={HERO_DARK_2} />
                       <View style={[styles.realtimeDot, realtimeOnline ? styles.realtimeDotOnline : styles.realtimeDotOffline]} />
                       {unreadTotal > 0 ? (
                         <View style={styles.headerBadge}>
@@ -246,7 +261,7 @@ function LocalizedCrashFallback({
 const styles = StyleSheet.create({
   shell: {
     flex: 1,
-    backgroundColor: "#fffaf4",
+    backgroundColor: PAGE_BG_2,
   },
   stackWrap: {
     flex: 1,
@@ -258,7 +273,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: "#6d5645",
+    color: MUTED_9,
     fontSize: 15,
   },
   headerRightRow: {
@@ -269,17 +284,17 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     borderRadius: 999,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   headerIconButton: {
     borderRadius: 999,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     width: 34,
     height: 34,
     alignItems: "center",
@@ -293,13 +308,13 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     borderWidth: 1.5,
-    borderColor: "#fff7ef",
+    borderColor: TEXT_ON_DARK,
   },
   realtimeDotOnline: {
-    backgroundColor: "#22c55e",
+    backgroundColor: STATUS_ONLINE,
   },
   realtimeDotOffline: {
-    backgroundColor: "#eab308",
+    backgroundColor: STATUS_OFFLINE,
   },
   headerBadge: {
     position: "absolute",
@@ -309,30 +324,30 @@ const styles = StyleSheet.create({
     height: 18,
     paddingHorizontal: 5,
     borderRadius: 9,
-    backgroundColor: "#d92f2f",
+    backgroundColor: DANGER,
     borderWidth: 1.5,
-    borderColor: "#fff7ef",
+    borderColor: TEXT_ON_DARK,
     alignItems: "center",
     justifyContent: "center",
   },
   headerBadgeText: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 10,
     fontWeight: "800",
   },
   headerButtonText: {
-    color: "#2a1d15",
+    color: HERO_DARK_2,
     fontSize: 13,
     fontWeight: "800",
   },
   homeButton: {
     borderRadius: 999,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
   homeButtonText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontSize: 13,
     fontWeight: "800",
   },

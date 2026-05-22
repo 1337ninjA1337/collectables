@@ -23,11 +23,13 @@ export const AMBER_ACCENT = "#d89c5b";
 export const AMBER_LIGHT = "#f5c99a";
 export const AMBER_SOFT = "#e4c29a";
 export const AMBER_MUTED = "#d9c2a8";
+export const ACCENT_DEEP = "#8a5a2b";
 
 export const CARD_BG = "#fffaf3";
 export const CARD_BG_2 = "#fff7ef";
 export const CARD_BG_3 = "#fff1df";
 export const PAGE_BG = "#fff8ef";
+export const PAGE_BG_2 = "#fffaf4";
 
 export const BORDER = "#eadbc8";
 export const BORDER_2 = "#f0e2cf";
@@ -51,6 +53,7 @@ export const MUTED_5 = "#715d4d";
 export const MUTED_6 = "#6f5c4d";
 export const MUTED_7 = "#856d5a";
 export const MUTED_8 = "#6b5543";
+export const MUTED_9 = "#6d5645";
 export const PLACEHOLDER = "#9b8571";
 
 export const PURE_WHITE = "#ffffff";
@@ -58,6 +61,8 @@ export const PURE_WHITE = "#ffffff";
 export const DANGER = "#d92f2f";
 export const DANGER_DEEP = "#a13434";
 export const SUCCESS_GREEN = "#3a7d4f";
+export const STATUS_ONLINE = "#22c55e";
+export const STATUS_OFFLINE = "#eab308";
 
 /** Frozen palette for runtime introspection (e.g. tests, theming UI). */
 export const designTokens = Object.freeze({
@@ -71,10 +76,12 @@ export const designTokens = Object.freeze({
   AMBER_LIGHT,
   AMBER_SOFT,
   AMBER_MUTED,
+  ACCENT_DEEP,
   CARD_BG,
   CARD_BG_2,
   CARD_BG_3,
   PAGE_BG,
+  PAGE_BG_2,
   BORDER,
   BORDER_2,
   BORDER_3,
@@ -95,11 +102,14 @@ export const designTokens = Object.freeze({
   MUTED_6,
   MUTED_7,
   MUTED_8,
+  MUTED_9,
   PLACEHOLDER,
   PURE_WHITE,
   DANGER,
   DANGER_DEEP,
   SUCCESS_GREEN,
+  STATUS_ONLINE,
+  STATUS_OFFLINE,
 });
 
 export type DesignToken = keyof typeof designTokens;
