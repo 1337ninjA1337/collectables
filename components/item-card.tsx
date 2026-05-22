@@ -1,6 +1,7 @@
 import { Link } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { CollectableItem } from "@/lib/types";
@@ -17,7 +18,10 @@ export function ItemCard({ item, compact }: ItemCardProps) {
       <Link href={`/item/${item.id}`} asChild>
         <Pressable style={styles.compactCard}>
           {hasPhoto ? (
-            <Image source={{ uri: item.photos[0] }} style={styles.compactImage} />
+            <Image
+              source={{ uri: withCloudinaryThumbUrl(item.photos[0], { width: 480, height: 360, mode: "fill" }) }}
+              style={styles.compactImage}
+            />
           ) : (
             <View style={[styles.compactImage, { backgroundColor: placeholderColor(item.id) }]} />
           )}
@@ -36,7 +40,10 @@ export function ItemCard({ item, compact }: ItemCardProps) {
     <Link href={`/item/${item.id}`} asChild>
       <Pressable style={styles.card}>
         {hasPhoto ? (
-          <Image source={{ uri: item.photos[0] }} style={styles.image} />
+          <Image
+            source={{ uri: withCloudinaryThumbUrl(item.photos[0], { width: 320, height: 320, mode: "fill" }) }}
+            style={styles.image}
+          />
         ) : (
           <View style={{...styles.image, backgroundColor: placeholderColor(item.id)}} />
         )}

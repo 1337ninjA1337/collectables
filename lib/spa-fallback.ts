@@ -98,22 +98,35 @@ self.addEventListener("fetch", function (event) {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.indexOf(BASE) !== 0) return;
 
-  event.respondWith(
-    fetch(req).then(function (res) {
-      if (res && res.status === 404) {
-        return freshShell().then(function (shell) {
-          return shell || res;
+  // For the shell itself: network-first, refresh the cached copy on success.
+  if (url.pathname === BASE) {
+    event.respondWith(
+      fetch(req).then(function (res) {
+        if (res && res.ok) {
+          var copy = res.clone();
+          caches.open(CACHE).then(function (cache) {
+            cache.put(SHELL, copy);
+          }).catch(function () {});
+        }
+        return res;
+      }).catch(function () {
+        return caches.match(SHELL).then(function (cached) {
+          return cached || Response.error();
         });
-      }
-      if (res && res.ok && url.pathname === BASE) {
-        var copy = res.clone();
-        caches.open(CACHE).then(function (cache) {
-          cache.put(SHELL, copy);
-        }).catch(function () {});
-      }
-      return res;
-    }).catch(function () {
-      return caches.match(SHELL).then(function (cached) {
+      })
+    );
+    return;
+  }
+
+  // For every deep-link navigation under BASE: serve the shell directly. Never
+  // probe the dynamic route — GitHub Pages can't resolve it and we'd just get
+  // a 404 back. The probe was producing a "phantom" failed network row per
+  // navigation in DevTools and adding latency; iOS Safari counted the 404 as
+  // a navigation problem and could trip the "A problem repeatedly occurred"
+  // detector on warm reloads.
+  event.respondWith(
+    freshShell().then(function (shell) {
+      return shell || caches.match(SHELL).then(function (cached) {
         return cached || Response.error();
       });
     })

@@ -65,10 +65,16 @@ describe("buildServiceWorker", () => {
     assert.match(SW, /var SHELL = BASE;/);
   });
 
-  it("on a 404 fetches the FRESH shell (never a possibly-stale cache)", () => {
-    assert.match(SW, /res\.status === 404/);
+  it("serves the FRESH shell for deep links without probing the dynamic route", () => {
+    // Probing the dynamic route would return 404 from GitHub Pages and surface
+    // a duplicate failed-request row per navigation in DevTools; iOS Safari
+    // also counted the 404 as a navigation problem and could trip the "A
+    // problem repeatedly occurred" detector. The deep-link branch returns the
+    // shell straight from freshShell().
     assert.match(SW, /function freshShell\(\)/);
     assert.match(SW, /fetch\(new Request\(SHELL, \{ cache: "reload" \}\)\)/);
+    // No `fetch(req)` on the deep-link branch.
+    assert.doesNotMatch(SW, /res\.status === 404/);
   });
 
   it("only intercepts same-origin GET navigations under the base", () => {
@@ -78,9 +84,16 @@ describe("buildServiceWorker", () => {
     assert.match(SW, /url\.pathname\.indexOf\(BASE\) !== 0/);
   });
 
-  it("is network-first (only falls back to cache when offline)", () => {
+  it("is network-first for the shell itself (only falls back to cache when offline)", () => {
     assert.match(SW, /fetch\(req\)\.then/);
     assert.match(SW, /\.catch\(function \(\) \{\s*return caches\.match\(SHELL\)/);
+  });
+
+  it("branches on the shell URL vs deep links and serves each correctly", () => {
+    // The base/shell URL gets a network-first fetch with cache refresh.
+    assert.match(SW, /if \(url\.pathname === BASE\)/);
+    // Deep-link branch is the freshShell-fallback shape — no fetch(req).
+    assert.match(SW, /event\.respondWith\(\s*freshShell\(\)\.then/);
   });
 
   it("activates immediately and evicts old caches", () => {
@@ -90,7 +103,7 @@ describe("buildServiceWorker", () => {
   });
 
   it("refreshes the cached shell when the base itself loads 200", () => {
-    assert.match(SW, /res\.ok && url\.pathname === BASE/);
+    assert.match(SW, /res\.ok/);
     assert.match(SW, /cache\.put\(SHELL, copy\)/);
   });
 });
