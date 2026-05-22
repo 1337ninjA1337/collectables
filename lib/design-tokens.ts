@@ -15,6 +15,9 @@
 export const HERO_DARK = "#261b14";
 export const HERO_DARK_2 = "#2a1d15";
 export const HERO_DARK_3 = "#3a2716";
+export const HERO_DARK_4 = "#3d2810";
+export const HERO_DARK_5 = "#1e140e";
+export const HERO_DARK_6 = "#2c2017";
 
 export const AMBER_ACCENT = "#d89c5b";
 export const AMBER_LIGHT = "#f5c99a";
@@ -36,6 +39,7 @@ export const TEXT_DARK_3 = "#2d2117";
 export const TEXT_ON_DARK = "#fff7ef";
 export const TEXT_ON_DARK_2 = "#fff5ea";
 export const TEXT_ON_DARK_3 = "#fff8ef";
+export const TEXT_ON_DARK_4 = "#fff4e8";
 export const TEXT_ON_DARK_SOFT = "#ead8c3";
 export const TEXT_ON_DARK_MUTED = "#dfc8b2";
 
@@ -44,9 +48,14 @@ export const MUTED_2 = "#6b5647";
 export const MUTED_3 = "#5f4734";
 export const MUTED_4 = "#bbb0a6";
 export const MUTED_5 = "#715d4d";
+export const MUTED_6 = "#6f5c4d";
+export const MUTED_7 = "#856d5a";
 export const PLACEHOLDER = "#9b8571";
 
+export const PURE_WHITE = "#ffffff";
+
 export const DANGER = "#d92f2f";
+export const DANGER_DEEP = "#a13434";
 export const SUCCESS_GREEN = "#3a7d4f";
 
 /** Frozen palette for runtime introspection (e.g. tests, theming UI). */
@@ -54,6 +63,9 @@ export const designTokens = Object.freeze({
   HERO_DARK,
   HERO_DARK_2,
   HERO_DARK_3,
+  HERO_DARK_4,
+  HERO_DARK_5,
+  HERO_DARK_6,
   AMBER_ACCENT,
   AMBER_LIGHT,
   AMBER_SOFT,
@@ -71,6 +83,7 @@ export const designTokens = Object.freeze({
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
   TEXT_ON_DARK_3,
+  TEXT_ON_DARK_4,
   TEXT_ON_DARK_SOFT,
   TEXT_ON_DARK_MUTED,
   MUTED,
@@ -78,8 +91,12 @@ export const designTokens = Object.freeze({
   MUTED_3,
   MUTED_4,
   MUTED_5,
+  MUTED_6,
+  MUTED_7,
   PLACEHOLDER,
+  PURE_WHITE,
   DANGER,
+  DANGER_DEEP,
   SUCCESS_GREEN,
 });
 

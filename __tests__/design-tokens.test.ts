@@ -11,19 +11,27 @@ import {
   BORDER_3,
   CARD_BG,
   DANGER,
+  DANGER_DEEP,
   designTokens,
   HERO_DARK,
+  HERO_DARK_4,
+  HERO_DARK_5,
+  HERO_DARK_6,
   MUTED,
   MUTED_3,
   MUTED_4,
   MUTED_5,
+  MUTED_6,
+  MUTED_7,
   PAGE_BG,
+  PURE_WHITE,
   SUCCESS_GREEN,
   TEXT_DARK,
   TEXT_DARK_3,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
   TEXT_ON_DARK_3,
+  TEXT_ON_DARK_4,
   TEXT_ON_DARK_MUTED,
 } from "@/lib/design-tokens";
 
@@ -81,6 +89,34 @@ describe("design-tokens module", () => {
     assert.equal(TEXT_ON_DARK_3, "#fff8ef");
     assert.equal(designTokens.AMBER_MUTED, "#d9c2a8");
     assert.equal(designTokens.TEXT_ON_DARK_3, "#fff8ef");
+  });
+
+  it("exposes the HERO_DARK_4/5/6 + MUTED_6/7 + TEXT_ON_DARK_4 + PURE_WHITE + DANGER_DEEP variants shipped for the login-screen migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(HERO_DARK_4, hex);
+    assert.match(HERO_DARK_5, hex);
+    assert.match(HERO_DARK_6, hex);
+    assert.match(MUTED_6, hex);
+    assert.match(MUTED_7, hex);
+    assert.match(TEXT_ON_DARK_4, hex);
+    assert.match(PURE_WHITE, hex);
+    assert.match(DANGER_DEEP, hex);
+    assert.equal(HERO_DARK_4, "#3d2810");
+    assert.equal(HERO_DARK_5, "#1e140e");
+    assert.equal(HERO_DARK_6, "#2c2017");
+    assert.equal(MUTED_6, "#6f5c4d");
+    assert.equal(MUTED_7, "#856d5a");
+    assert.equal(TEXT_ON_DARK_4, "#fff4e8");
+    assert.equal(PURE_WHITE, "#ffffff");
+    assert.equal(DANGER_DEEP, "#a13434");
+    assert.equal(designTokens.HERO_DARK_4, "#3d2810");
+    assert.equal(designTokens.HERO_DARK_5, "#1e140e");
+    assert.equal(designTokens.HERO_DARK_6, "#2c2017");
+    assert.equal(designTokens.MUTED_6, "#6f5c4d");
+    assert.equal(designTokens.MUTED_7, "#856d5a");
+    assert.equal(designTokens.TEXT_ON_DARK_4, "#fff4e8");
+    assert.equal(designTokens.PURE_WHITE, "#ffffff");
+    assert.equal(designTokens.DANGER_DEEP, "#a13434");
   });
 
   it("exposes the TEXT_DARK_3 + MUTED_5 + TEXT_ON_DARK_MUTED + BORDER_3 variants shipped for the stats migration", () => {
@@ -163,6 +199,31 @@ describe("design-tokens adoption", () => {
     assert.match(src, /MUTED/);
     assert.match(src, /MUTED_2/);
     assert.match(src, /DANGER/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/login-screen.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/login-screen.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /HERO_DARK\b/);
+    assert.match(src, /HERO_DARK_4/);
+    assert.match(src, /HERO_DARK_5/);
+    assert.match(src, /HERO_DARK_6/);
+    assert.match(src, /AMBER_ACCENT/);
+    assert.match(src, /AMBER_LIGHT/);
+    assert.match(src, /CARD_BG\b/);
+    assert.match(src, /BORDER\b/);
+    assert.match(src, /TEXT_DARK\b/);
+    assert.match(src, /TEXT_DARK_2/);
+    assert.match(src, /TEXT_ON_DARK_3/);
+    assert.match(src, /TEXT_ON_DARK_4/);
+    assert.match(src, /TEXT_ON_DARK_SOFT/);
+    assert.match(src, /MUTED_6/);
+    assert.match(src, /MUTED_7/);
+    assert.match(src, /PLACEHOLDER/);
+    assert.match(src, /PURE_WHITE/);
+    assert.match(src, /DANGER_DEEP/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
