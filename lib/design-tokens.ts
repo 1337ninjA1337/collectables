@@ -19,6 +19,7 @@ export const HERO_DARK_3 = "#3a2716";
 export const AMBER_ACCENT = "#d89c5b";
 export const AMBER_LIGHT = "#f5c99a";
 export const AMBER_SOFT = "#e4c29a";
+export const AMBER_MUTED = "#d9c2a8";
 
 export const CARD_BG = "#fffaf3";
 export const CARD_BG_2 = "#fff7ef";
@@ -32,6 +33,7 @@ export const TEXT_DARK = "#2f2318";
 export const TEXT_DARK_2 = "#241912";
 export const TEXT_ON_DARK = "#fff7ef";
 export const TEXT_ON_DARK_2 = "#fff5ea";
+export const TEXT_ON_DARK_3 = "#fff8ef";
 export const TEXT_ON_DARK_SOFT = "#ead8c3";
 
 export const MUTED = "#8f6947";
@@ -51,6 +53,7 @@ export const designTokens = Object.freeze({
   AMBER_ACCENT,
   AMBER_LIGHT,
   AMBER_SOFT,
+  AMBER_MUTED,
   CARD_BG,
   CARD_BG_2,
   CARD_BG_3,
@@ -61,6 +64,7 @@ export const designTokens = Object.freeze({
   TEXT_DARK_2,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
+  TEXT_ON_DARK_3,
   TEXT_ON_DARK_SOFT,
   MUTED,
   MUTED_2,

@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   AMBER_ACCENT,
   AMBER_LIGHT,
+  AMBER_MUTED,
   BORDER,
   CARD_BG,
   DANGER,
@@ -19,6 +20,7 @@ import {
   TEXT_DARK,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
+  TEXT_ON_DARK_3,
 } from "@/lib/design-tokens";
 
 function read(rel: string): string {
@@ -67,6 +69,16 @@ describe("design-tokens module", () => {
     assert.equal(designTokens.MUTED_4, "#bbb0a6");
   });
 
+  it("exposes the AMBER_MUTED + TEXT_ON_DARK_3 variants shipped for the chats migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(AMBER_MUTED, hex);
+    assert.match(TEXT_ON_DARK_3, hex);
+    assert.equal(AMBER_MUTED, "#d9c2a8");
+    assert.equal(TEXT_ON_DARK_3, "#fff8ef");
+    assert.equal(designTokens.AMBER_MUTED, "#d9c2a8");
+    assert.equal(designTokens.TEXT_ON_DARK_3, "#fff8ef");
+  });
+
   it("freezes the designTokens object so accidental mutation is rejected", () => {
     assert.equal(Object.isFrozen(designTokens), true);
     assert.throws(() => {
@@ -112,6 +124,25 @@ describe("design-tokens adoption", () => {
     assert.match(src, /DANGER/);
     assert.match(src, /TEXT_ON_DARK/);
     assert.match(src, /AMBER_ACCENT/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("app/chats.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("app/chats.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /HERO_DARK/);
+    assert.match(src, /HERO_DARK_3/);
+    assert.match(src, /AMBER_LIGHT/);
+    assert.match(src, /AMBER_MUTED/);
+    assert.match(src, /TEXT_ON_DARK_3/);
+    assert.match(src, /TEXT_ON_DARK_SOFT/);
+    assert.match(src, /CARD_BG/);
+    assert.match(src, /BORDER/);
+    assert.match(src, /TEXT_DARK/);
+    assert.match(src, /MUTED/);
+    assert.match(src, /MUTED_2/);
+    assert.match(src, /DANGER/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
