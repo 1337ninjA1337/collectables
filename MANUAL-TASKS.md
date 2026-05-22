@@ -146,9 +146,9 @@ The function returns:
 - `401` — secret mismatch.
 - `500` — function not configured (missing env vars) or DB error.
 
-## 20260516_items_cost_currency.sql
+## 20260517_items_cost_currency.sql
 
-Run `supabase/migrations/20260516_items_cost_currency.sql` against your Supabase project to store the currency selected next to an item's cost in the create-item form:
+Run `supabase/migrations/20260517_items_cost_currency.sql` against your Supabase project to store the currency selected next to an item's cost in the create-item form:
 
 ```sql
 -- Adds public.items.cost_currency (text, nullable).

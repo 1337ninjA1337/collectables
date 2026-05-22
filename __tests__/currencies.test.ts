@@ -65,9 +65,9 @@ describe("currency selector is wired into the create-item flow", () => {
 
   it("a migration + manual task document the new column", () => {
     assert.match(
-      read("supabase/migrations/20260516_items_cost_currency.sql"),
+      read("supabase/migrations/20260517_items_cost_currency.sql"),
       /ADD COLUMN IF NOT EXISTS cost_currency text/i,
     );
-    assert.match(read("MANUAL-TASKS.md"), /20260516_items_cost_currency\.sql/);
+    assert.match(read("MANUAL-TASKS.md"), /20260517_items_cost_currency\.sql/);
   });
 });
