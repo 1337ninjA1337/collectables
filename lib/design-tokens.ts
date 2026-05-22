@@ -28,18 +28,22 @@ export const PAGE_BG = "#fff8ef";
 
 export const BORDER = "#eadbc8";
 export const BORDER_2 = "#f0e2cf";
+export const BORDER_3 = "#f0e4d0";
 
 export const TEXT_DARK = "#2f2318";
 export const TEXT_DARK_2 = "#241912";
+export const TEXT_DARK_3 = "#2d2117";
 export const TEXT_ON_DARK = "#fff7ef";
 export const TEXT_ON_DARK_2 = "#fff5ea";
 export const TEXT_ON_DARK_3 = "#fff8ef";
 export const TEXT_ON_DARK_SOFT = "#ead8c3";
+export const TEXT_ON_DARK_MUTED = "#dfc8b2";
 
 export const MUTED = "#8f6947";
 export const MUTED_2 = "#6b5647";
 export const MUTED_3 = "#5f4734";
 export const MUTED_4 = "#bbb0a6";
+export const MUTED_5 = "#715d4d";
 export const PLACEHOLDER = "#9b8571";
 
 export const DANGER = "#d92f2f";
@@ -60,16 +64,20 @@ export const designTokens = Object.freeze({
   PAGE_BG,
   BORDER,
   BORDER_2,
+  BORDER_3,
   TEXT_DARK,
   TEXT_DARK_2,
+  TEXT_DARK_3,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
   TEXT_ON_DARK_3,
   TEXT_ON_DARK_SOFT,
+  TEXT_ON_DARK_MUTED,
   MUTED,
   MUTED_2,
   MUTED_3,
   MUTED_4,
+  MUTED_5,
   PLACEHOLDER,
   DANGER,
   SUCCESS_GREEN,

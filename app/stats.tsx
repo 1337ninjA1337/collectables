@@ -4,6 +4,20 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/screen";
 import { useCollections } from "@/lib/collections-context";
+import {
+  AMBER_ACCENT,
+  BORDER,
+  BORDER_3,
+  CARD_BG,
+  HERO_DARK,
+  MUTED,
+  MUTED_2,
+  MUTED_5,
+  TEXT_DARK,
+  TEXT_DARK_3,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_MUTED,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
@@ -98,19 +112,19 @@ export default function StatsScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     borderRadius: 28,
     padding: 20,
     gap: 8,
   },
   heroTitle: {
     fontSize: 28,
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY,
   },
   heroText: {
-    color: "#dfc8b2",
+    color: TEXT_ON_DARK_MUTED,
     lineHeight: 22,
     fontFamily: FONT_BODY,
   },
@@ -122,20 +136,20 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 24,
     padding: 16,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     gap: 6,
     alignItems: "center",
   },
   summaryNumber: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#2d2117",
+    color: TEXT_DARK_3,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   summaryLabel: {
-    color: "#715d4d",
+    color: MUTED_5,
     fontSize: 12,
     textAlign: "center",
     fontWeight: "600",
@@ -147,11 +161,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontFamily: FONT_DISPLAY,
   },
   emptyText: {
-    color: "#6b5647",
+    color: MUTED_2,
     lineHeight: 22,
     textAlign: "center",
     paddingVertical: 20,
@@ -164,9 +178,9 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 24,
     padding: 16,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   barColumn: {
     flex: 1,
@@ -174,7 +188,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   barCount: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 11,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
@@ -184,17 +198,17 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 32,
     borderRadius: 8,
-    backgroundColor: "#f0e4d0",
+    backgroundColor: BORDER_3,
     justifyContent: "flex-end",
     overflow: "hidden",
   },
   barFill: {
     width: "100%",
     borderRadius: 8,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
   },
   barLabel: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 10,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
