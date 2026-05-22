@@ -642,3 +642,40 @@ export async function deleteAccountViaEdgeFunction(): Promise<{ error?: string }
 
   return {};
 }
+
+/**
+ * SEC-1: deletes Cloudinary assets via the `delete-image` Edge Function so
+ * the Cloudinary API secret never ships in the client bundle. Best-effort —
+ * the caller treats failure as non-fatal (an orphaned asset is not a user
+ * data-loss bug). Returns the number reported deleted, 0 when unconfigured
+ * or no session.
+ */
+export async function deleteImagesViaEdgeFunction(
+  publicIds: readonly string[],
+): Promise<{ deleted: number; error?: string }> {
+  if (!isSupabaseConfigured) return { deleted: 0, error: "Not configured" };
+  if (publicIds.length === 0) return { deleted: 0 };
+
+  const token = await getAccessToken();
+  if (!token) return { deleted: 0, error: "No session" };
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/delete-image`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        apikey: supabaseKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ publicIds }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: "Unknown error" }));
+      return { deleted: 0, error: data.error ?? "Deletion failed" };
+    }
+    const data = (await res.json().catch(() => ({}))) as { deleted?: number };
+    return { deleted: typeof data.deleted === "number" ? data.deleted : 0 };
+  } catch (err) {
+    return { deleted: 0, error: (err as Error).message };
+  }
+}
