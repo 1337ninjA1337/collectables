@@ -2,6 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { FriendsTabBadge, formatBadgeCount } from "@/lib/chat-helpers";
+import {
+  AMBER_ACCENT,
+  DANGER,
+  HERO_DARK,
+  MUTED_4,
+  TEXT_ON_DARK,
+} from "@/lib/design-tokens";
 import { FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export type NavItem = {
@@ -31,7 +38,7 @@ export function NavTab({ item }: { item: NavItem }) {
         <Ionicons
           name={item.active ? item.iconActive : item.icon}
           size={22}
-          color={item.active ? "#261b14" : "#bbb0a6"}
+          color={item.active ? HERO_DARK : MUTED_4}
         />
         {renderBadge(item.badge)}
         {item.premiumBadge ? <View style={styles.premiumDot} /> : null}
@@ -55,9 +62,9 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#d92f2f",
+    backgroundColor: DANGER,
     borderWidth: 1.5,
-    borderColor: "#fff7ef",
+    borderColor: TEXT_ON_DARK,
   },
   badgeCount: {
     position: "absolute",
@@ -67,14 +74,14 @@ const styles = StyleSheet.create({
     height: 18,
     paddingHorizontal: 5,
     borderRadius: 9,
-    backgroundColor: "#d92f2f",
+    backgroundColor: DANGER,
     borderWidth: 1.5,
-    borderColor: "#fff7ef",
+    borderColor: TEXT_ON_DARK,
     alignItems: "center",
     justifyContent: "center",
   },
   badgeCountText: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 10,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -89,15 +96,15 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     borderWidth: 1.5,
-    borderColor: "#fff7ef",
+    borderColor: TEXT_ON_DARK,
   },
   activeDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     marginTop: 3,
     alignSelf: "center",
   },
