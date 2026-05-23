@@ -8,6 +8,26 @@ import { collectionTemplates } from "@/data/collection-templates";
 import { trackEvent } from "@/lib/analytics";
 import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
+import {
+  AMBER_ACCENT,
+  AMBER_MUTED_2,
+  BORDER,
+  CARD_BG,
+  CARD_BG_5,
+  CARD_BG_6,
+  DANGER,
+  HERO_DARK,
+  MUTED_2,
+  MUTED_8,
+  MUTED_10,
+  MUTED_17,
+  PLACEHOLDER,
+  TEXT_DARK,
+  TEXT_DARK_2,
+  TEXT_DARK_4,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_2,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
@@ -162,7 +182,7 @@ export default function CreateCollectionScreen() {
           value={name}
           onChangeText={setName}
           placeholder={t("collectionNamePlaceholder")}
-          placeholderTextColor="#9b8571"
+          placeholderTextColor={PLACEHOLDER}
           style={{...styles.input, ...(nameMissing ? styles.inputInvalid : {})}}
         />
       </View>
@@ -173,7 +193,7 @@ export default function CreateCollectionScreen() {
           value={description}
           onChangeText={setDescription}
           placeholder={t("collectionDescriptionPlaceholder")}
-          placeholderTextColor="#9b8571"
+          placeholderTextColor={PLACEHOLDER}
           multiline
           textAlignVertical="top"
           style={{...styles.input, ...styles.inputMultiline}}
@@ -240,24 +260,24 @@ export default function CreateCollectionScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: "#efe1cf",
+    backgroundColor: CARD_BG_5,
     borderRadius: 28,
     padding: 20,
     gap: 8,
   },
   heroTitle: {
     fontSize: 28,
-    color: "#2b2017",
+    color: TEXT_DARK_4,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY,
   },
   heroText: {
-    color: "#6b5543",
+    color: MUTED_8,
     lineHeight: 22,
     fontFamily: FONT_BODY,
   },
   templateHint: {
-    color: "#7a6453",
+    color: MUTED_17,
     lineHeight: 20,
     fontSize: 13,
     fontFamily: FONT_BODY,
@@ -267,10 +287,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   templateCard: {
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingVertical: 10,
     paddingHorizontal: 14,
     alignItems: "center",
@@ -278,9 +298,9 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   templateCardActive: {
-    borderColor: "#d89c5b",
+    borderColor: AMBER_ACCENT,
     borderWidth: 2,
-    backgroundColor: "#fff3e0",
+    backgroundColor: CARD_BG_6,
   },
   templateIcon: {
     fontSize: 24,
@@ -288,17 +308,17 @@ const styles = StyleSheet.create({
   templateName: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#624a35",
+    color: MUTED_10,
     fontFamily: FONT_BODY_BOLD,
   },
   templateNameActive: {
-    color: "#261b14",
+    color: HERO_DARK,
   },
   fieldGroup: {
     gap: 10,
   },
   label: {
-    color: "#624a35",
+    color: MUTED_10,
     fontWeight: "800",
     fontSize: 13,
     letterSpacing: 0.5,
@@ -307,12 +327,12 @@ const styles = StyleSheet.create({
   },
   input: {
     borderRadius: 22,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 16,
     fontFamily: FONT_BODY,
   },
@@ -320,22 +340,22 @@ const styles = StyleSheet.create({
     minHeight: 132,
   },
   inputInvalid: {
-    borderColor: "#d92f2f",
+    borderColor: DANGER,
     borderWidth: 2,
   },
   required: {
-    color: "#d92f2f",
+    color: DANGER,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   photoButton: {
     borderRadius: 20,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingVertical: 14,
     alignItems: "center",
   },
   photoButtonText: {
-    color: "#241912",
+    color: TEXT_DARK_2,
     fontWeight: "800",
     fontSize: 15,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -344,10 +364,10 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 220,
     borderRadius: 24,
-    backgroundColor: "#dbc7ae",
+    backgroundColor: AMBER_MUTED_2,
   },
   photoHint: {
-    color: "#7a6453",
+    color: MUTED_17,
     lineHeight: 22,
     fontFamily: FONT_BODY,
   },
@@ -359,28 +379,28 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 10,
     paddingHorizontal: 18,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   visibilityChipSelected: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
+    backgroundColor: HERO_DARK,
+    borderColor: HERO_DARK,
   },
   visibilityChipLocked: {
     opacity: 0.55,
   },
   visibilityChipText: {
-    color: "#6b5647",
+    color: MUTED_2,
     fontSize: 14,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
   visibilityChipTextSelected: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
   },
   visibilityHint: {
-    color: "#7a6453",
+    color: MUTED_17,
     fontSize: 13,
     lineHeight: 20,
     fontFamily: FONT_BODY,
@@ -389,13 +409,13 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingVertical: 18,
     alignItems: "center",
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
   },
   saveButtonDisabled: {
     opacity: 0.75,
   },
   saveButtonText: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
     fontSize: 16,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
