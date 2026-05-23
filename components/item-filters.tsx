@@ -124,6 +124,25 @@ export function ItemFilterBar({ filters, onChange }: Props) {
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.sheetTitle}>{t("filterTitle")}</Text>
 
+            {/* Search by title */}
+            <View style={styles.sheetSearchRow}>
+              <Ionicons name="search" size={18} color={MUTED_15} />
+              <TextInput
+                style={styles.sheetSearchInput}
+                value={draft.query}
+                onChangeText={(v) => setDraft({ ...draft, query: v })}
+                placeholder={t("searchInCollectionPlaceholder")}
+                placeholderTextColor={PLACEHOLDER}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {draft.query.length > 0 ? (
+                <Pressable onPress={() => setDraft({ ...draft, query: "" })} hitSlop={8}>
+                  <Ionicons name="close-circle" size={18} color={MUTED_15} />
+                </Pressable>
+              ) : null}
+            </View>
+
             {/* Price range */}
             <View style={styles.fieldRow}>
               <View style={styles.fieldHalf}>
@@ -301,6 +320,23 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: TEXT_DARK_3,
+  },
+  sheetSearchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: CARD_BG_3,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: AMBER_SOFT,
+  },
+  sheetSearchInput: {
+    flex: 1,
+    color: TEXT_DARK,
+    fontSize: 14,
+    fontWeight: "600",
   },
   fieldRow: {
     flexDirection: "row",
