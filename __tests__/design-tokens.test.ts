@@ -21,9 +21,14 @@ import {
   CARD_BG_4,
   CARD_BG_5,
   CARD_BG_6,
+  CARD_BG_7,
+  CARD_BG_8,
+  CARD_BG_9,
   DANGER,
   DANGER_DEEP,
   DANGER_DEEP_2,
+  DANGER_DEEP_3,
+  DANGER_SOFT,
   designTokens,
   HERO_DARK,
   HERO_DARK_4,
@@ -48,6 +53,8 @@ import {
   MUTED_17,
   MUTED_18,
   MUTED_19,
+  MUTED_20,
+  MUTED_21,
   PAGE_BG,
   PAGE_BG_2,
   PURE_WHITE,
@@ -214,6 +221,31 @@ describe("design-tokens module", () => {
     assert.equal(MUTED_16, "#a89480");
     assert.equal(designTokens.BORDER_4, "#e4d5c4");
     assert.equal(designTokens.MUTED_16, "#a89480");
+  });
+
+  it("exposes the CARD_BG_7/8/9 + MUTED_20/21 + DANGER_DEEP_3 + DANGER_SOFT variants shipped for the wishlist migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(CARD_BG_7, hex);
+    assert.match(CARD_BG_8, hex);
+    assert.match(CARD_BG_9, hex);
+    assert.match(MUTED_20, hex);
+    assert.match(MUTED_21, hex);
+    assert.match(DANGER_DEEP_3, hex);
+    assert.match(DANGER_SOFT, hex);
+    assert.equal(CARD_BG_7, "#f4ecdf");
+    assert.equal(CARD_BG_8, "#fdf0eb");
+    assert.equal(CARD_BG_9, "#fff4e5");
+    assert.equal(MUTED_20, "#735f50");
+    assert.equal(MUTED_21, "#b59a80");
+    assert.equal(DANGER_DEEP_3, "#a5402d");
+    assert.equal(DANGER_SOFT, "#e0bcb3");
+    assert.equal(designTokens.CARD_BG_7, "#f4ecdf");
+    assert.equal(designTokens.CARD_BG_8, "#fdf0eb");
+    assert.equal(designTokens.CARD_BG_9, "#fff4e5");
+    assert.equal(designTokens.MUTED_20, "#735f50");
+    assert.equal(designTokens.MUTED_21, "#b59a80");
+    assert.equal(designTokens.DANGER_DEEP_3, "#a5402d");
+    assert.equal(designTokens.DANGER_SOFT, "#e0bcb3");
   });
 
   it("exposes the AMBER_MUTED_5 + MUTED_18/19 + DANGER_DEEP_2 variants shipped for the profile-detail migration", () => {
@@ -522,6 +554,30 @@ describe("design-tokens adoption", () => {
     assert.match(src, /TEXT_ON_DARK_3/);
     assert.match(src, /TEXT_ON_DARK_4/);
     assert.match(src, /TEXT_ON_DARK_SOFT/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("app/wishlist.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("app/wishlist.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /AMBER_ACCENT/);
+    assert.match(src, /AMBER_MUTED_2/);
+    assert.match(src, /AMBER_SOFT/);
+    assert.match(src, /BORDER\b/);
+    assert.match(src, /CARD_BG\b/);
+    assert.match(src, /CARD_BG_7/);
+    assert.match(src, /CARD_BG_8/);
+    assert.match(src, /CARD_BG_9/);
+    assert.match(src, /DANGER_DEEP_3/);
+    assert.match(src, /DANGER_SOFT/);
+    assert.match(src, /MUTED\b/);
+    assert.match(src, /MUTED_2\b/);
+    assert.match(src, /MUTED_20/);
+    assert.match(src, /MUTED_21/);
+    assert.match(src, /TEXT_DARK\b/);
+    assert.match(src, /TEXT_DARK_2/);
+    assert.match(src, /TEXT_ON_DARK_5/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

@@ -24,6 +24,25 @@ import { PhotoPreview } from "@/components/photo-preview";
 import { Screen } from "@/components/screen";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useCollections } from "@/lib/collections-context";
+import {
+  AMBER_ACCENT,
+  AMBER_MUTED_2,
+  AMBER_SOFT,
+  BORDER,
+  CARD_BG,
+  CARD_BG_7,
+  CARD_BG_8,
+  CARD_BG_9,
+  DANGER_DEEP_3,
+  DANGER_SOFT,
+  MUTED,
+  MUTED_2,
+  MUTED_20,
+  MUTED_21,
+  TEXT_DARK,
+  TEXT_DARK_2,
+  TEXT_ON_DARK_5,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
@@ -181,7 +200,7 @@ export default function WishlistScreen() {
           <Text style={styles.subtitle}>{t("wishlistHint")}</Text>
         </View>
         <Pressable style={styles.addButton} onPress={() => setAddOpen(true)}>
-          <Ionicons name="add" size={20} color="#241912" />
+          <Ionicons name="add" size={20} color={TEXT_DARK_2} />
           <Text style={styles.addButtonText}>{t("wishlistAdd")}</Text>
         </Pressable>
       </View>
@@ -230,11 +249,11 @@ export default function WishlistScreen() {
                       onPress={() => setPromoteFor(item)}
                       disabled={ownedCollections.length === 0}
                     >
-                      <Ionicons name="arrow-forward" size={16} color="#fff7ea" />
+                      <Ionicons name="arrow-forward" size={16} color={TEXT_ON_DARK_5} />
                       <Text style={styles.promoteButtonText}>{t("wishlistPromote")}</Text>
                     </Pressable>
                     <Pressable style={styles.deleteButton} onPress={() => confirmDelete(item)}>
-                      <Ionicons name="trash-outline" size={16} color="#a5402d" />
+                      <Ionicons name="trash-outline" size={16} color={DANGER_DEEP_3} />
                     </Pressable>
                   </View>
                 </View>
@@ -271,7 +290,7 @@ export default function WishlistScreen() {
                   value={title}
                   onChangeText={setTitle}
                   placeholder={t("itemTitlePlaceholder")}
-                  placeholderTextColor="#b59a80"
+                  placeholderTextColor={MUTED_21}
                 />
 
                 <Text style={styles.label}>{t("descriptionLabel")}</Text>
@@ -280,7 +299,7 @@ export default function WishlistScreen() {
                   value={description}
                   onChangeText={setDescription}
                   placeholder={t("descriptionPlaceholder")}
-                  placeholderTextColor="#b59a80"
+                  placeholderTextColor={MUTED_21}
                   multiline
                 />
 
@@ -290,7 +309,7 @@ export default function WishlistScreen() {
                   value={acquiredFrom}
                   onChangeText={setAcquiredFrom}
                   placeholder={t("wishlistSourcePlaceholder")}
-                  placeholderTextColor="#b59a80"
+                  placeholderTextColor={MUTED_21}
                 />
 
                 <Text style={styles.label}>{t("costLabel")}</Text>
@@ -299,13 +318,13 @@ export default function WishlistScreen() {
                   value={cost}
                   onChangeText={setCost}
                   placeholder="0"
-                  placeholderTextColor="#b59a80"
+                  placeholderTextColor={MUTED_21}
                   keyboardType="numeric"
                 />
 
                 <Text style={styles.label}>{t("photosLabel")}</Text>
                 <Pressable style={styles.pickButton} onPress={pickImages}>
-                  <Ionicons name="images-outline" size={18} color="#2f2318" />
+                  <Ionicons name="images-outline" size={18} color={TEXT_DARK} />
                   <Text style={styles.pickButtonText}>{t("pickFromGallery")}</Text>
                 </Pressable>
                 {photos.length > 0 ? (
@@ -343,7 +362,7 @@ export default function WishlistScreen() {
               {ownedCollections.map((c) => (
                 <Pressable key={c.id} style={styles.collectionRow} onPress={() => void handlePromote(c.id)}>
                   <Text style={styles.collectionRowText}>{c.name}</Text>
-                  <Ionicons name="chevron-forward" size={18} color="#8f6947" />
+                  <Ionicons name="chevron-forward" size={18} color={MUTED} />
                 </Pressable>
               ))}
             </ScrollView>
@@ -366,11 +385,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontFamily: FONT_DISPLAY,
   },
   subtitle: {
-    color: "#735f50",
+    color: MUTED_20,
     marginTop: 4,
     lineHeight: 20,
     fontFamily: FONT_BODY,
@@ -379,13 +398,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
   },
   addButtonText: {
-    color: "#241912",
+    color: TEXT_DARK_2,
     fontWeight: "800",
     fontSize: 14,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -397,29 +416,29 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 14,
     borderRadius: 20,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     padding: 12,
   },
   cardImage: {
     width: 96,
     height: 96,
     borderRadius: 14,
-    backgroundColor: "#dbc7ae",
+    backgroundColor: AMBER_MUTED_2,
   },
   cardBody: {
     flex: 1,
     gap: 6,
   },
   cardTitle: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 17,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY,
   },
   cardDescription: {
-    color: "#6b5647",
+    color: MUTED_2,
     fontSize: 13,
     lineHeight: 18,
     fontFamily: FONT_BODY,
@@ -431,12 +450,12 @@ const styles = StyleSheet.create({
   },
   metaChip: {
     borderRadius: 999,
-    backgroundColor: "#f4ecdf",
+    backgroundColor: CARD_BG_7,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   metaChipText: {
-    color: "#6b5647",
+    color: MUTED_2,
     fontSize: 12,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
@@ -451,13 +470,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#2f2318",
+    backgroundColor: TEXT_DARK,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
   },
   promoteButtonText: {
-    color: "#fff7ea",
+    color: TEXT_ON_DARK_5,
     fontWeight: "800",
     fontSize: 13,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -465,10 +484,10 @@ const styles = StyleSheet.create({
   deleteButton: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#e0bcb3",
+    borderColor: DANGER_SOFT,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: "#fdf0eb",
+    backgroundColor: CARD_BG_8,
   },
   sheetBackdrop: {
     flex: 1,
@@ -476,7 +495,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -498,13 +517,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#e4c29a",
+    backgroundColor: AMBER_SOFT,
     marginBottom: 10,
   },
   sheetTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
     marginBottom: 10,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
@@ -514,7 +533,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    color: "#8f6947",
+    color: MUTED,
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.6,
@@ -524,11 +543,11 @@ const styles = StyleSheet.create({
   input: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     backgroundColor: "#fff",
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontFamily: FONT_BODY,
   },
@@ -543,13 +562,13 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#e4c29a",
-    backgroundColor: "#fff4e5",
+    borderColor: AMBER_SOFT,
+    backgroundColor: CARD_BG_9,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   pickButtonText: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontWeight: "800",
     fontSize: 13,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -563,13 +582,13 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingVertical: 14,
     alignItems: "center",
     backgroundColor: "#fff",
   },
   cancelButtonText: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontWeight: "800",
     fontSize: 14,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -577,7 +596,7 @@ const styles = StyleSheet.create({
   saveButton: {
     flex: 1,
     borderRadius: 999,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingVertical: 14,
     alignItems: "center",
   },
@@ -585,7 +604,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveButtonText: {
-    color: "#241912",
+    color: TEXT_DARK_2,
     fontWeight: "800",
     fontSize: 14,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -593,7 +612,7 @@ const styles = StyleSheet.create({
   promoteSheet: {
     margin: 20,
     borderRadius: 24,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     padding: 20,
     gap: 10,
   },
@@ -605,12 +624,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     backgroundColor: "#fff",
     marginBottom: 8,
   },
   collectionRowText: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,

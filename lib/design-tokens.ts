@@ -37,6 +37,9 @@ export const CARD_BG_3 = "#fff1df";
 export const CARD_BG_4 = "#fff0d6";
 export const CARD_BG_5 = "#efe1cf";
 export const CARD_BG_6 = "#fff3e0";
+export const CARD_BG_7 = "#f4ecdf";
+export const CARD_BG_8 = "#fdf0eb";
+export const CARD_BG_9 = "#fff4e5";
 export const PAGE_BG = "#fff8ef";
 export const PAGE_BG_2 = "#fffaf4";
 
@@ -77,6 +80,8 @@ export const MUTED_16 = "#a89480";
 export const MUTED_17 = "#7a6453";
 export const MUTED_18 = "#6e5541";
 export const MUTED_19 = "#c7b19b";
+export const MUTED_20 = "#735f50";
+export const MUTED_21 = "#b59a80";
 export const PLACEHOLDER = "#9b8571";
 
 export const PURE_WHITE = "#ffffff";
@@ -84,6 +89,8 @@ export const PURE_WHITE = "#ffffff";
 export const DANGER = "#d92f2f";
 export const DANGER_DEEP = "#a13434";
 export const DANGER_DEEP_2 = "#922a2a";
+export const DANGER_DEEP_3 = "#a5402d";
+export const DANGER_SOFT = "#e0bcb3";
 export const SUCCESS_GREEN = "#3a7d4f";
 export const STATUS_ONLINE = "#22c55e";
 export const STATUS_OFFLINE = "#eab308";
@@ -113,6 +120,9 @@ export const designTokens = Object.freeze({
   CARD_BG_4,
   CARD_BG_5,
   CARD_BG_6,
+  CARD_BG_7,
+  CARD_BG_8,
+  CARD_BG_9,
   PAGE_BG,
   PAGE_BG_2,
   BORDER,
@@ -150,11 +160,15 @@ export const designTokens = Object.freeze({
   MUTED_17,
   MUTED_18,
   MUTED_19,
+  MUTED_20,
+  MUTED_21,
   PLACEHOLDER,
   PURE_WHITE,
   DANGER,
   DANGER_DEEP,
   DANGER_DEEP_2,
+  DANGER_DEEP_3,
+  DANGER_SOFT,
   SUCCESS_GREEN,
   STATUS_ONLINE,
   STATUS_OFFLINE,
