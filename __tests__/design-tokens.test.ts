@@ -13,10 +13,13 @@ import {
   AMBER_MUTED_4,
   AMBER_MUTED_5,
   AMBER_SOFT_2,
+  AMBER_SOFT_3,
   BORDER,
   BORDER_2,
   BORDER_3,
   BORDER_4,
+  BORDER_5,
+  BORDER_6,
   CARD_BG,
   CARD_BG_4,
   CARD_BG_5,
@@ -25,13 +28,18 @@ import {
   CARD_BG_8,
   CARD_BG_9,
   CARD_BG_10,
+  CARD_BG_11,
+  COOL_GRAY,
   DANGER,
   DANGER_DEEP,
   DANGER_DEEP_2,
   DANGER_DEEP_3,
   DANGER_DEEP_4,
+  DANGER_DEEP_5,
+  DANGER_MEDIUM,
   DANGER_SOFT,
   DANGER_SOFT_2,
+  DANGER_SOFT_3,
   designTokens,
   HERO_DARK,
   HERO_DARK_4,
@@ -224,6 +232,34 @@ describe("design-tokens module", () => {
     assert.equal(MUTED_16, "#a89480");
     assert.equal(designTokens.BORDER_4, "#e4d5c4");
     assert.equal(designTokens.MUTED_16, "#a89480");
+  });
+
+  it("exposes the AMBER_SOFT_3 + BORDER_5/6 + CARD_BG_11 + COOL_GRAY + DANGER_DEEP_5 + DANGER_MEDIUM + DANGER_SOFT_3 variants shipped for the settings migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(AMBER_SOFT_3, hex);
+    assert.match(BORDER_5, hex);
+    assert.match(BORDER_6, hex);
+    assert.match(CARD_BG_11, hex);
+    assert.match(COOL_GRAY, hex);
+    assert.match(DANGER_DEEP_5, hex);
+    assert.match(DANGER_MEDIUM, hex);
+    assert.match(DANGER_SOFT_3, hex);
+    assert.equal(AMBER_SOFT_3, "#f0d6a1");
+    assert.equal(BORDER_5, "#f1e3d0");
+    assert.equal(BORDER_6, "#f5ead8");
+    assert.equal(CARD_BG_11, "#fff5f5");
+    assert.equal(COOL_GRAY, "#94a3b8");
+    assert.equal(DANGER_DEEP_5, "#7a2020");
+    assert.equal(DANGER_MEDIUM, "#8d4444");
+    assert.equal(DANGER_SOFT_3, "#e8b4b4");
+    assert.equal(designTokens.AMBER_SOFT_3, "#f0d6a1");
+    assert.equal(designTokens.BORDER_5, "#f1e3d0");
+    assert.equal(designTokens.BORDER_6, "#f5ead8");
+    assert.equal(designTokens.CARD_BG_11, "#fff5f5");
+    assert.equal(designTokens.COOL_GRAY, "#94a3b8");
+    assert.equal(designTokens.DANGER_DEEP_5, "#7a2020");
+    assert.equal(designTokens.DANGER_MEDIUM, "#8d4444");
+    assert.equal(designTokens.DANGER_SOFT_3, "#e8b4b4");
   });
 
   it("exposes the CARD_BG_10 + DANGER_DEEP_4 + DANGER_SOFT_2 variants shipped for the item-filters migration", () => {
@@ -567,6 +603,45 @@ describe("design-tokens adoption", () => {
     assert.match(src, /MUTED_2/);
     assert.match(src, /MUTED_10/);
     assert.match(src, /TEXT_DARK\b/);
+    assert.match(src, /TEXT_ON_DARK_3/);
+    assert.match(src, /TEXT_ON_DARK_4/);
+    assert.match(src, /TEXT_ON_DARK_SOFT/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("app/settings.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("app/settings.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /AMBER_ACCENT/);
+    assert.match(src, /AMBER_LIGHT/);
+    assert.match(src, /AMBER_SOFT\b/);
+    assert.match(src, /AMBER_SOFT_3/);
+    assert.match(src, /BORDER\b/);
+    assert.match(src, /BORDER_5/);
+    assert.match(src, /BORDER_6/);
+    assert.match(src, /CARD_BG\b/);
+    assert.match(src, /CARD_BG_3/);
+    assert.match(src, /CARD_BG_10/);
+    assert.match(src, /CARD_BG_11/);
+    assert.match(src, /COOL_GRAY/);
+    assert.match(src, /DANGER_DEEP_2/);
+    assert.match(src, /DANGER_DEEP_4/);
+    assert.match(src, /DANGER_DEEP_5/);
+    assert.match(src, /DANGER_MEDIUM/);
+    assert.match(src, /DANGER_SOFT_2/);
+    assert.match(src, /DANGER_SOFT_3/);
+    assert.match(src, /HERO_DARK\b/);
+    assert.match(src, /HERO_DARK_2/);
+    assert.match(src, /HERO_DARK_4/);
+    assert.match(src, /HERO_DARK_5/);
+    assert.match(src, /HERO_DARK_7/);
+    assert.match(src, /MUTED_2\b/);
+    assert.match(src, /MUTED_11/);
+    assert.match(src, /STATUS_ONLINE/);
+    assert.match(src, /TEXT_DARK\b/);
+    assert.match(src, /TEXT_DARK_2/);
+    assert.match(src, /TEXT_ON_DARK\b/);
     assert.match(src, /TEXT_ON_DARK_3/);
     assert.match(src, /TEXT_ON_DARK_4/);
     assert.match(src, /TEXT_ON_DARK_SOFT/);
