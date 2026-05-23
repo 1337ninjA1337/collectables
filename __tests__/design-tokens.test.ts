@@ -11,6 +11,7 @@ import {
   AMBER_MUTED_2,
   AMBER_MUTED_3,
   AMBER_MUTED_4,
+  AMBER_MUTED_5,
   AMBER_SOFT_2,
   BORDER,
   BORDER_2,
@@ -22,6 +23,7 @@ import {
   CARD_BG_6,
   DANGER,
   DANGER_DEEP,
+  DANGER_DEEP_2,
   designTokens,
   HERO_DARK,
   HERO_DARK_4,
@@ -44,6 +46,8 @@ import {
   MUTED_15,
   MUTED_16,
   MUTED_17,
+  MUTED_18,
+  MUTED_19,
   PAGE_BG,
   PAGE_BG_2,
   PURE_WHITE,
@@ -210,6 +214,22 @@ describe("design-tokens module", () => {
     assert.equal(MUTED_16, "#a89480");
     assert.equal(designTokens.BORDER_4, "#e4d5c4");
     assert.equal(designTokens.MUTED_16, "#a89480");
+  });
+
+  it("exposes the AMBER_MUTED_5 + MUTED_18/19 + DANGER_DEEP_2 variants shipped for the profile-detail migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(AMBER_MUTED_5, hex);
+    assert.match(MUTED_18, hex);
+    assert.match(MUTED_19, hex);
+    assert.match(DANGER_DEEP_2, hex);
+    assert.equal(AMBER_MUTED_5, "#d2b89a");
+    assert.equal(MUTED_18, "#6e5541");
+    assert.equal(MUTED_19, "#c7b19b");
+    assert.equal(DANGER_DEEP_2, "#922a2a");
+    assert.equal(designTokens.AMBER_MUTED_5, "#d2b89a");
+    assert.equal(designTokens.MUTED_18, "#6e5541");
+    assert.equal(designTokens.MUTED_19, "#c7b19b");
+    assert.equal(designTokens.DANGER_DEEP_2, "#922a2a");
   });
 
   it("exposes the HERO_DARK_7 + AMBER_MUTED_3/4 + TEXT_ON_DARK_6 variants shipped for the listing-detail migration", () => {
@@ -500,6 +520,34 @@ describe("design-tokens adoption", () => {
     assert.match(src, /MUTED_10/);
     assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_ON_DARK_3/);
+    assert.match(src, /TEXT_ON_DARK_4/);
+    assert.match(src, /TEXT_ON_DARK_SOFT/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("app/profile/[id].tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("app/profile/[id].tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /AMBER_LIGHT/);
+    assert.match(src, /AMBER_MUTED_5/);
+    assert.match(src, /AMBER_SOFT/);
+    assert.match(src, /BORDER\b/);
+    assert.match(src, /BORDER_2/);
+    assert.match(src, /CARD_BG\b/);
+    assert.match(src, /CARD_BG_3/);
+    assert.match(src, /DANGER_DEEP_2/);
+    assert.match(src, /HERO_DARK\b/);
+    assert.match(src, /HERO_DARK_2/);
+    assert.match(src, /MUTED_2\b/);
+    assert.match(src, /MUTED_8\b/);
+    assert.match(src, /MUTED_18/);
+    assert.match(src, /MUTED_19/);
+    assert.match(src, /PLACEHOLDER/);
+    assert.match(src, /PURE_WHITE/);
+    assert.match(src, /TEXT_DARK\b/);
+    assert.match(src, /TEXT_DARK_3/);
+    assert.match(src, /TEXT_ON_DARK\b/);
     assert.match(src, /TEXT_ON_DARK_4/);
     assert.match(src, /TEXT_ON_DARK_SOFT/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];

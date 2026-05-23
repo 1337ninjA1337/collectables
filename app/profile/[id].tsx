@@ -11,6 +11,29 @@ import { CollectionCard } from "@/components/collection-card";
 import { Screen } from "@/components/screen";
 import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
+import {
+  AMBER_LIGHT,
+  AMBER_MUTED_5,
+  AMBER_SOFT,
+  BORDER,
+  BORDER_2,
+  CARD_BG,
+  CARD_BG_3,
+  DANGER_DEEP_2,
+  HERO_DARK,
+  HERO_DARK_2,
+  MUTED_2,
+  MUTED_8,
+  MUTED_18,
+  MUTED_19,
+  PLACEHOLDER,
+  PURE_WHITE,
+  TEXT_DARK,
+  TEXT_DARK_3,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_4,
+  TEXT_ON_DARK_SOFT,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
@@ -264,7 +287,7 @@ export default function ProfileScreen() {
             onPress={() => router.push("/settings")}
             accessibilityLabel={t("settings")}
           >
-            <Ionicons name="settings-outline" size={22} color="#fff4e8" />
+            <Ionicons name="settings-outline" size={22} color={TEXT_ON_DARK_4} />
           </Pressable>
         ) : null}
         <Image source={{ uri: activeProfile.avatar }} style={styles.avatar} />
@@ -282,7 +305,7 @@ export default function ProfileScreen() {
                 value={profileIdDraft}
                 onChangeText={setProfileIdDraft}
                 placeholder={t("profileIdPlaceholder")}
-                placeholderTextColor="#c7b19b"
+                placeholderTextColor={MUTED_19}
                 autoCapitalize="none"
                 style={styles.handleInput}
               />
@@ -313,7 +336,7 @@ export default function ProfileScreen() {
               value={bioDraft}
               onChangeText={setBioDraft}
               placeholder={t("descriptionPlaceholder")}
-              placeholderTextColor="#9b8571"
+              placeholderTextColor={PLACEHOLDER}
               multiline
               textAlignVertical="top"
               style={styles.bioInput}
@@ -449,7 +472,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   hero: {
     borderRadius: 32,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     padding: 24,
     alignItems: "center",
     gap: 8,
@@ -466,34 +489,34 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(255, 244, 229, 0.12)",
     borderWidth: 1,
-    borderColor: "#6e5541",
+    borderColor: MUTED_18,
     zIndex: 2,
   },
   avatar: {
     width: 104,
     height: 104,
     borderRadius: 32,
-    backgroundColor: "#d2b89a",
+    backgroundColor: AMBER_MUTED_5,
   },
   editAvatarButton: {
     borderRadius: 999,
     backgroundColor: "rgba(255, 244, 229, 0.12)",
     borderWidth: 1,
-    borderColor: "#6e5541",
+    borderColor: MUTED_18,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   editAvatarButtonText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontWeight: "800",
   },
   name: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 28,
     fontWeight: "800",
   },
   username: {
-    color: "#f5c99a",
+    color: AMBER_LIGHT,
     fontWeight: "700",
   },
   handleRow: {
@@ -502,7 +525,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   handlePrefix: {
-    color: "#f5c99a",
+    color: AMBER_LIGHT,
     fontWeight: "700",
     fontSize: 16,
   },
@@ -511,35 +534,35 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.12)",
     borderWidth: 1,
-    borderColor: "#6e5541",
+    borderColor: MUTED_18,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 15,
     fontWeight: "700",
   },
   handleAction: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#6e5541",
+    borderColor: MUTED_18,
     backgroundColor: "rgba(255,255,255,0.08)",
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   handleActionText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontWeight: "800",
   },
   bio: {
-    color: "#ead8c3",
+    color: TEXT_ON_DARK_SOFT,
     lineHeight: 22,
     textAlign: "center",
   },
   languageCard: {
     borderRadius: 24,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     padding: 18,
     gap: 12,
   },
@@ -553,46 +576,46 @@ const styles = StyleSheet.create({
   },
   primaryAction: {
     borderRadius: 999,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   primaryActionText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontWeight: "800",
   },
   secondaryAction: {
     borderRadius: 999,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   secondaryActionText: {
-    color: "#2a1d15",
+    color: HERO_DARK_2,
     fontWeight: "800",
   },
   statusBadge: {
     borderRadius: 999,
-    backgroundColor: "#f0e2cf",
+    backgroundColor: BORDER_2,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   statusBadgeText: {
-    color: "#6b5543",
+    color: MUTED_8,
     fontWeight: "800",
   },
   adminAction: {
     borderRadius: 999,
-    backgroundColor: "#922a2a",
+    backgroundColor: DANGER_DEEP_2,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   adminActionText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontWeight: "800",
   },
   section: {
@@ -601,48 +624,48 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
   },
   sectionText: {
-    color: "#6b5647",
+    color: MUTED_2,
     lineHeight: 22,
   },
   bioInput: {
     minHeight: 120,
     borderRadius: 20,
-    backgroundColor: "#ffffff",
+    backgroundColor: PURE_WHITE,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     lineHeight: 22,
   },
   saveBioButton: {
     alignSelf: "flex-start",
     borderRadius: 999,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   saveBioButtonText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontWeight: "800",
   },
   emptyTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#2d2117",
+    color: TEXT_DARK_3,
   },
   wishlistCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     borderRadius: 16,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     padding: 12,
   },
   wishlistThumb: {
@@ -657,11 +680,11 @@ const styles = StyleSheet.create({
   wishlistName: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#2f2318",
+    color: TEXT_DARK,
   },
   wishlistDesc: {
     fontSize: 13,
-    color: "#6b5647",
+    color: MUTED_2,
     lineHeight: 18,
   },
 });
