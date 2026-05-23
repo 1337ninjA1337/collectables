@@ -9,6 +9,29 @@ import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
 import { useCollections } from "@/lib/collections-context";
+import {
+  AMBER_ACCENT,
+  AMBER_LIGHT,
+  AMBER_MUTED,
+  AMBER_MUTED_3,
+  AMBER_MUTED_4,
+  AMBER_SOFT,
+  BORDER,
+  BORDER_2,
+  CARD_BG,
+  CARD_BG_3,
+  HERO_DARK,
+  HERO_DARK_3,
+  HERO_DARK_7,
+  MUTED,
+  MUTED_3,
+  SUCCESS_GREEN,
+  TEXT_DARK,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_2,
+  TEXT_ON_DARK_6,
+  TEXT_ON_DARK_SOFT,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useMarketplace } from "@/lib/marketplace-context";
 import { priceHistoryForTitle } from "@/lib/marketplace-helpers";
@@ -178,7 +201,7 @@ export default function ListingDetailScreen() {
           <View
             style={{
               ...styles.modeBadge,
-              backgroundColor: listing.mode === "sell" ? "#d89c5b" : "#3a7d4f",
+              backgroundColor: listing.mode === "sell" ? AMBER_ACCENT : SUCCESS_GREEN,
             }}
           >
             <Text style={styles.modeBadgeText}>{modeLabel}</Text>
@@ -253,7 +276,7 @@ export default function ListingDetailScreen() {
                 <View
                   style={{
                     ...styles.priceHistoryModeBadge,
-                    backgroundColor: entry.mode === "sell" ? "#d89c5b" : "#3a7d4f",
+                    backgroundColor: entry.mode === "sell" ? AMBER_ACCENT : SUCCESS_GREEN,
                   }}
                 >
                   <Text style={styles.priceHistoryModeText}>
@@ -297,7 +320,7 @@ export default function ListingDetailScreen() {
             <Pressable
               style={{
                 ...styles.claimButton,
-                backgroundColor: listing.mode === "sell" ? "#d89c5b" : "#3a7d4f",
+                backgroundColor: listing.mode === "sell" ? AMBER_ACCENT : SUCCESS_GREEN,
                 opacity: claiming ? 0.6 : 1,
               }}
               onPress={handleClaimPress}
@@ -324,16 +347,16 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 280,
     borderRadius: 24,
-    backgroundColor: "#d8c7b1",
+    backgroundColor: AMBER_MUTED_3,
   },
   headerCard: {
     borderRadius: 24,
     padding: 18,
-    backgroundColor: "#2a1e17",
+    backgroundColor: HERO_DARK_7,
     gap: 10,
   },
   itemTitle: {
-    color: "#fff7ed",
+    color: TEXT_ON_DARK_6,
     fontSize: 26,
     fontWeight: "800",
   },
@@ -348,19 +371,19 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   modeBadgeText: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 12,
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   priceText: {
-    color: "#fff7ed",
+    color: TEXT_ON_DARK_6,
     fontSize: 18,
     fontWeight: "800",
   },
   listedAt: {
-    color: "#ead8c3",
+    color: TEXT_ON_DARK_SOFT,
     fontSize: 13,
     fontWeight: "600",
     marginTop: 2,
@@ -370,23 +393,23 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 14,
     borderRadius: 22,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     alignItems: "center",
   },
   ownerAvatar: {
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: "#d9c2a8",
+    backgroundColor: AMBER_MUTED,
   },
   ownerAvatarFallback: {
     alignItems: "center",
     justifyContent: "center",
   },
   ownerAvatarText: {
-    color: "#3a2716",
+    color: HERO_DARK_3,
     fontWeight: "800",
     fontSize: 22,
   },
@@ -395,7 +418,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   ownerLabel: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 11,
     fontWeight: "800",
     textTransform: "uppercase",
@@ -404,10 +427,10 @@ const styles = StyleSheet.create({
   ownerName: {
     fontSize: 17,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
   },
   ownerHandle: {
-    color: "#8f6947",
+    color: MUTED,
     fontWeight: "600",
     fontSize: 13,
   },
@@ -419,25 +442,25 @@ const styles = StyleSheet.create({
     width: 180,
     height: 220,
     borderRadius: 18,
-    backgroundColor: "#ddc9af",
+    backgroundColor: AMBER_MUTED_4,
   },
   sheet: {
     borderRadius: 22,
     padding: 16,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     gap: 6,
   },
   sheetLabel: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 12,
     textTransform: "uppercase",
     letterSpacing: 1,
     fontWeight: "800",
   },
   sheetValue: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     lineHeight: 22,
   },
@@ -450,7 +473,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   claimButtonText: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
     fontSize: 15,
     fontWeight: "800",
     textTransform: "uppercase",
@@ -458,48 +481,48 @@ const styles = StyleSheet.create({
   },
   messageButton: {
     borderRadius: 22,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingVertical: 16,
     alignItems: "center",
   },
   messageButtonText: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
     fontSize: 15,
     fontWeight: "800",
   },
   soldBanner: {
     borderRadius: 22,
     padding: 14,
-    backgroundColor: "#3a2716",
+    backgroundColor: HERO_DARK_3,
     gap: 4,
     alignItems: "center",
   },
   soldBannerLabel: {
-    color: "#f5c99a",
+    color: AMBER_LIGHT,
     fontSize: 11,
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 1.2,
   },
   soldBannerBuyer: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 15,
     fontWeight: "800",
   },
   selfHint: {
     borderRadius: 22,
     padding: 16,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
   },
   selfHintText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontSize: 14,
     lineHeight: 20,
   },
   priceHistoryHint: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 13,
     lineHeight: 19,
   },
@@ -513,16 +536,16 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0e2cf",
+    borderBottomColor: BORDER_2,
   },
   priceHistoryDate: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 13,
     fontWeight: "700",
     minWidth: 90,
   },
   priceHistoryPrice: {
-    color: "#261b14",
+    color: HERO_DARK,
     fontSize: 16,
     fontWeight: "800",
     flex: 1,
@@ -533,7 +556,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   priceHistoryModeText: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 11,
     fontWeight: "800",
     textTransform: "uppercase",
