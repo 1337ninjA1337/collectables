@@ -40,6 +40,7 @@ export const CARD_BG_6 = "#fff3e0";
 export const CARD_BG_7 = "#f4ecdf";
 export const CARD_BG_8 = "#fdf0eb";
 export const CARD_BG_9 = "#fff4e5";
+export const CARD_BG_10 = "#fff3f3";
 export const PAGE_BG = "#fff8ef";
 export const PAGE_BG_2 = "#fffaf4";
 
@@ -90,7 +91,9 @@ export const DANGER = "#d92f2f";
 export const DANGER_DEEP = "#a13434";
 export const DANGER_DEEP_2 = "#922a2a";
 export const DANGER_DEEP_3 = "#a5402d";
+export const DANGER_DEEP_4 = "#8d2b2b";
 export const DANGER_SOFT = "#e0bcb3";
+export const DANGER_SOFT_2 = "#d9a0a0";
 export const SUCCESS_GREEN = "#3a7d4f";
 export const STATUS_ONLINE = "#22c55e";
 export const STATUS_OFFLINE = "#eab308";
@@ -123,6 +126,7 @@ export const designTokens = Object.freeze({
   CARD_BG_7,
   CARD_BG_8,
   CARD_BG_9,
+  CARD_BG_10,
   PAGE_BG,
   PAGE_BG_2,
   BORDER,
@@ -168,7 +172,9 @@ export const designTokens = Object.freeze({
   DANGER_DEEP,
   DANGER_DEEP_2,
   DANGER_DEEP_3,
+  DANGER_DEEP_4,
   DANGER_SOFT,
+  DANGER_SOFT_2,
   SUCCESS_GREEN,
   STATUS_ONLINE,
   STATUS_OFFLINE,

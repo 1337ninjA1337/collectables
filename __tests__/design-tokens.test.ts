@@ -24,11 +24,14 @@ import {
   CARD_BG_7,
   CARD_BG_8,
   CARD_BG_9,
+  CARD_BG_10,
   DANGER,
   DANGER_DEEP,
   DANGER_DEEP_2,
   DANGER_DEEP_3,
+  DANGER_DEEP_4,
   DANGER_SOFT,
+  DANGER_SOFT_2,
   designTokens,
   HERO_DARK,
   HERO_DARK_4,
@@ -221,6 +224,19 @@ describe("design-tokens module", () => {
     assert.equal(MUTED_16, "#a89480");
     assert.equal(designTokens.BORDER_4, "#e4d5c4");
     assert.equal(designTokens.MUTED_16, "#a89480");
+  });
+
+  it("exposes the CARD_BG_10 + DANGER_DEEP_4 + DANGER_SOFT_2 variants shipped for the item-filters migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(CARD_BG_10, hex);
+    assert.match(DANGER_DEEP_4, hex);
+    assert.match(DANGER_SOFT_2, hex);
+    assert.equal(CARD_BG_10, "#fff3f3");
+    assert.equal(DANGER_DEEP_4, "#8d2b2b");
+    assert.equal(DANGER_SOFT_2, "#d9a0a0");
+    assert.equal(designTokens.CARD_BG_10, "#fff3f3");
+    assert.equal(designTokens.DANGER_DEEP_4, "#8d2b2b");
+    assert.equal(designTokens.DANGER_SOFT_2, "#d9a0a0");
   });
 
   it("exposes the CARD_BG_7/8/9 + MUTED_20/21 + DANGER_DEEP_3 + DANGER_SOFT variants shipped for the wishlist migration", () => {
@@ -554,6 +570,33 @@ describe("design-tokens adoption", () => {
     assert.match(src, /TEXT_ON_DARK_3/);
     assert.match(src, /TEXT_ON_DARK_4/);
     assert.match(src, /TEXT_ON_DARK_SOFT/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/item-filters.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/item-filters.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /AMBER_ACCENT/);
+    assert.match(src, /AMBER_SOFT/);
+    assert.match(src, /BORDER\b/);
+    assert.match(src, /CARD_BG\b/);
+    assert.match(src, /CARD_BG_3/);
+    assert.match(src, /CARD_BG_10/);
+    assert.match(src, /DANGER_DEEP_4/);
+    assert.match(src, /DANGER_SOFT_2/);
+    assert.match(src, /HERO_DARK/);
+    assert.match(src, /MUTED_2\b/);
+    assert.match(src, /MUTED_3\b/);
+    assert.match(src, /MUTED_10/);
+    assert.match(src, /MUTED_15/);
+    assert.match(src, /PLACEHOLDER/);
+    assert.match(src, /PURE_WHITE/);
+    assert.match(src, /TEXT_DARK\b/);
+    assert.match(src, /TEXT_DARK_3/);
+    assert.match(src, /TEXT_ON_DARK\b/);
+    assert.match(src, /TEXT_ON_DARK_4/);
+    assert.match(src, /TEXT_ON_DARK_5/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

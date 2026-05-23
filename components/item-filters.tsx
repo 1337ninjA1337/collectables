@@ -2,6 +2,28 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import {
+  AMBER_ACCENT,
+  AMBER_SOFT,
+  BORDER,
+  CARD_BG,
+  CARD_BG_3,
+  CARD_BG_10,
+  DANGER_DEEP_4,
+  DANGER_SOFT_2,
+  HERO_DARK,
+  MUTED_2,
+  MUTED_3,
+  MUTED_10,
+  MUTED_15,
+  PLACEHOLDER,
+  PURE_WHITE,
+  TEXT_DARK,
+  TEXT_DARK_3,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_4,
+  TEXT_ON_DARK_5,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { CollectableItem } from "@/lib/types";
 
@@ -115,7 +137,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
           <Ionicons
             name="options-outline"
             size={16}
-            color={activeCount > 0 ? "#fff7ea" : "#5f4734"}
+            color={activeCount > 0 ? TEXT_ON_DARK_5 : MUTED_3}
           />
           <Text style={[styles.filterButtonText, activeCount > 0 && styles.filterButtonTextActive]}>
             {activeCount > 0 ? t("filterActive", { count: activeCount }) : t("filterTitle")}
@@ -136,7 +158,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
 
         {activeCount > 0 ? (
           <Pressable style={styles.resetChip} onPress={reset}>
-            <Ionicons name="close-circle" size={14} color="#8d2b2b" />
+            <Ionicons name="close-circle" size={14} color={DANGER_DEEP_4} />
             <Text style={styles.resetChipText}>{t("filterReset")}</Text>
           </Pressable>
         ) : null}
@@ -157,7 +179,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
                   onChangeText={(v) => setDraft({ ...draft, priceFrom: v })}
                   keyboardType="numeric"
                   placeholder="0"
-                  placeholderTextColor="#b8a08a"
+                  placeholderTextColor={MUTED_15}
                 />
               </View>
               <View style={styles.fieldHalf}>
@@ -168,7 +190,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
                   onChangeText={(v) => setDraft({ ...draft, priceTo: v })}
                   keyboardType="numeric"
                   placeholder="∞"
-                  placeholderTextColor="#b8a08a"
+                  placeholderTextColor={MUTED_15}
                 />
               </View>
             </View>
@@ -182,7 +204,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
                   value={draft.dateFrom}
                   onChangeText={(v) => setDraft({ ...draft, dateFrom: v })}
                   placeholder="2024-01-01"
-                  placeholderTextColor="#b8a08a"
+                  placeholderTextColor={MUTED_15}
                 />
               </View>
               <View style={styles.fieldHalf}>
@@ -192,7 +214,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
                   value={draft.dateTo}
                   onChangeText={(v) => setDraft({ ...draft, dateTo: v })}
                   placeholder="2026-12-31"
-                  placeholderTextColor="#b8a08a"
+                  placeholderTextColor={MUTED_15}
                 />
               </View>
             </View>
@@ -205,7 +227,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
                 value={draft.source}
                 onChangeText={(v) => setDraft({ ...draft, source: v })}
                 placeholder={t("filterSourcePlaceholder")}
-                placeholderTextColor="#b8a08a"
+                placeholderTextColor={MUTED_15}
               />
             </View>
 
@@ -217,7 +239,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               <Ionicons
                 name={draft.hasPhotos ? "checkbox" : "square-outline"}
                 size={22}
-                color={draft.hasPhotos ? "#d89c5b" : "#9b8571"}
+                color={draft.hasPhotos ? AMBER_ACCENT : PLACEHOLDER}
               />
               <Text style={styles.toggleLabel}>{t("filterHasPhotos")}</Text>
             </Pressable>
@@ -253,41 +275,41 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
   },
   filterButtonActive: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
+    backgroundColor: HERO_DARK,
+    borderColor: HERO_DARK,
   },
   filterButtonText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontWeight: "700",
     fontSize: 13,
   },
   filterButtonTextActive: {
-    color: "#fff7ea",
+    color: TEXT_ON_DARK_5,
   },
   chip: {
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   chipActive: {
-    backgroundColor: "#d89c5b",
-    borderColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
+    borderColor: AMBER_ACCENT,
   },
   chipText: {
-    color: "#6b5647",
+    color: MUTED_2,
     fontWeight: "700",
     fontSize: 12,
   },
   chipTextActive: {
-    color: "#fff7ea",
+    color: TEXT_ON_DARK_5,
   },
   resetChip: {
     flexDirection: "row",
@@ -296,12 +318,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#fff3f3",
+    backgroundColor: CARD_BG_10,
     borderWidth: 1,
-    borderColor: "#d9a0a0",
+    borderColor: DANGER_SOFT_2,
   },
   resetChipText: {
-    color: "#8d2b2b",
+    color: DANGER_DEEP_4,
     fontWeight: "700",
     fontSize: 12,
   },
@@ -315,17 +337,17 @@ const styles = StyleSheet.create({
   sheet: {
     width: "100%",
     maxWidth: 420,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderRadius: 24,
     padding: 22,
     gap: 16,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   sheetTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#2d2117",
+    color: TEXT_DARK_3,
   },
   fieldRow: {
     flexDirection: "row",
@@ -339,7 +361,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   fieldLabel: {
-    color: "#624a35",
+    color: MUTED_10,
     fontWeight: "700",
     fontSize: 12,
     textTransform: "uppercase",
@@ -347,12 +369,12 @@ const styles = StyleSheet.create({
   },
   fieldInput: {
     borderRadius: 14,
-    backgroundColor: "#ffffff",
+    backgroundColor: PURE_WHITE,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 14,
   },
   toggleRow: {
@@ -362,16 +384,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    backgroundColor: "#fff7ef",
+    backgroundColor: TEXT_ON_DARK,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   toggleRowActive: {
-    backgroundColor: "#fff1df",
-    borderColor: "#d89c5b",
+    backgroundColor: CARD_BG_3,
+    borderColor: AMBER_ACCENT,
   },
   toggleLabel: {
-    color: "#2d2117",
+    color: TEXT_DARK_3,
     fontWeight: "700",
     fontSize: 14,
   },
@@ -383,26 +405,26 @@ const styles = StyleSheet.create({
   applyButton: {
     flex: 1,
     borderRadius: 18,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingVertical: 14,
     alignItems: "center",
   },
   applyButtonText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontWeight: "800",
     fontSize: 15,
   },
   resetButton: {
     borderRadius: 18,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingVertical: 14,
     paddingHorizontal: 20,
     alignItems: "center",
   },
   resetButtonText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontWeight: "800",
     fontSize: 15,
   },
