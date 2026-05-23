@@ -31,6 +31,7 @@ export const AMBER_MUTED_3 = "#d8c7b1";
 export const AMBER_MUTED_4 = "#ddc9af";
 export const AMBER_MUTED_5 = "#d2b89a";
 export const AMBER_MUTED_6 = "#d9c8b4";
+export const AMBER_MUTED_7 = "#c4a87a";
 export const ACCENT_DEEP = "#8a5a2b";
 
 export const CARD_BG = "#fffaf3";
@@ -44,6 +45,7 @@ export const CARD_BG_8 = "#fdf0eb";
 export const CARD_BG_9 = "#fff4e5";
 export const CARD_BG_10 = "#fff3f3";
 export const CARD_BG_11 = "#fff5f5";
+export const CARD_BG_12 = "#fff1f1";
 export const PAGE_BG = "#fff8ef";
 export const PAGE_BG_2 = "#fffaf4";
 
@@ -100,12 +102,15 @@ export const DANGER_DEEP_2 = "#922a2a";
 export const DANGER_DEEP_3 = "#a5402d";
 export const DANGER_DEEP_4 = "#8d2b2b";
 export const DANGER_DEEP_5 = "#7a2020";
+export const DANGER_DEEP_6 = "#8a2727";
 export const DANGER_MEDIUM = "#8d4444";
 export const DANGER_SOFT = "#e0bcb3";
 export const DANGER_SOFT_2 = "#d9a0a0";
 export const DANGER_SOFT_3 = "#e8b4b4";
+export const DANGER_SOFT_4 = "#d99393";
 export const COOL_GRAY = "#94a3b8";
 export const SUCCESS_GREEN = "#3a7d4f";
+export const SUCCESS_GREEN_2 = "#4a7c59";
 export const STATUS_ONLINE = "#22c55e";
 export const STATUS_OFFLINE = "#eab308";
 
@@ -144,6 +149,7 @@ export const designTokens = Object.freeze({
   AMBER_MUTED_4,
   AMBER_MUTED_5,
   AMBER_MUTED_6,
+  AMBER_MUTED_7,
   ACCENT_DEEP,
   CARD_BG,
   CARD_BG_2,
@@ -156,6 +162,7 @@ export const designTokens = Object.freeze({
   CARD_BG_9,
   CARD_BG_10,
   CARD_BG_11,
+  CARD_BG_12,
   PAGE_BG,
   PAGE_BG_2,
   BORDER,
@@ -207,12 +214,15 @@ export const designTokens = Object.freeze({
   DANGER_DEEP_3,
   DANGER_DEEP_4,
   DANGER_DEEP_5,
+  DANGER_DEEP_6,
   DANGER_MEDIUM,
   DANGER_SOFT,
   DANGER_SOFT_2,
   DANGER_SOFT_3,
+  DANGER_SOFT_4,
   COOL_GRAY,
   SUCCESS_GREEN,
+  SUCCESS_GREEN_2,
   STATUS_ONLINE,
   STATUS_OFFLINE,
   TAG_RUST,

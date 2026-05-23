@@ -23,10 +23,52 @@ import { fetchItemById } from "@/lib/supabase-profiles";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import {
+  ACCENT_DEEP,
+  AMBER_ACCENT,
+  AMBER_MUTED_4,
+  AMBER_MUTED_7,
+  AMBER_SOFT,
+  BORDER,
+  BORDER_2,
+  CARD_BG,
+  CARD_BG_3,
+  CARD_BG_9,
+  CARD_BG_12,
+  DANGER,
+  DANGER_DEEP_6,
+  DANGER_SOFT_4,
+  HERO_DARK,
+  HERO_DARK_7,
+  MUTED,
+  MUTED_2,
+  MUTED_3,
+  MUTED_10,
+  PLACEHOLDER,
+  SUCCESS_GREEN,
+  SUCCESS_GREEN_2,
+  TAG_BLUE,
+  TAG_BROWN,
+  TAG_CYAN,
+  TAG_GOLD,
+  TAG_PURPLE,
+  TAG_RUST,
+  TAG_SAGE,
+  TAG_TEAL,
+  TAG_TERRACOTTA,
+  TEXT_DARK,
+  TEXT_DARK_2,
+  TEXT_DARK_3,
+  TEXT_DARK_4,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_2,
+  TEXT_ON_DARK_6,
+  TEXT_ON_DARK_MUTED,
+} from "@/lib/design-tokens";
 
 const TAG_COLORS = [
-  "#d89c5b", "#c47a5a", "#7a9e7e", "#5b8fd8", "#9b7ec8",
-  "#d4765b", "#5bbbd8", "#c4a35b", "#8b6b5b", "#6b8f8f",
+  AMBER_ACCENT, TAG_RUST, TAG_SAGE, TAG_BLUE, TAG_PURPLE,
+  TAG_TERRACOTTA, TAG_CYAN, TAG_GOLD, TAG_BROWN, TAG_TEAL,
 ];
 
 export default function ItemDetailsScreen() {
@@ -337,7 +379,7 @@ export default function ItemDetailsScreen() {
               value={editTagInput}
               onChangeText={setEditTagInput}
               placeholder={t("tagsPlaceholder")}
-              placeholderTextColor="#9b8571"
+              placeholderTextColor={PLACEHOLDER}
               onSubmitEditing={addTag}
             />
             <Pressable
@@ -544,7 +586,7 @@ export default function ItemDetailsScreen() {
                 value={listingNotes}
                 onChangeText={setListingNotes}
                 placeholder={t("marketplaceNotesPlaceholder")}
-                placeholderTextColor="#9b8571"
+                placeholderTextColor={PLACEHOLDER}
                 multiline
                 textAlignVertical="top"
                 style={{ ...styles.editInput, ...styles.editInputMultiline }}
@@ -643,7 +685,7 @@ function EditField({
       <TextInput
         value={value}
         onChangeText={onChangeText}
-        placeholderTextColor="#9b8571"
+        placeholderTextColor={PLACEHOLDER}
         multiline={multiline}
         keyboardType={keyboardType ?? "default"}
         textAlignVertical={multiline ? "top" : "center"}
@@ -665,24 +707,24 @@ const styles = StyleSheet.create({
     width: 280,
     height: 320,
     borderRadius: 28,
-    backgroundColor: "#ddc9af",
+    backgroundColor: AMBER_MUTED_4,
   },
   headerCard: {
     borderRadius: 28,
     padding: 20,
-    backgroundColor: "#2a1e17",
+    backgroundColor: HERO_DARK_7,
     gap: 6,
   },
   editButton: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#c4a87a",
-    backgroundColor: "#fff4e5",
+    borderColor: AMBER_MUTED_7,
+    backgroundColor: CARD_BG_9,
     paddingVertical: 16,
     alignItems: "center",
   },
   editButtonText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -690,21 +732,21 @@ const styles = StyleSheet.create({
   deleteButton: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#d99393",
-    backgroundColor: "#fff1f1",
+    borderColor: DANGER_SOFT_4,
+    backgroundColor: CARD_BG_12,
     paddingVertical: 16,
     alignItems: "center",
   },
   shareButton: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#c4a87a",
-    backgroundColor: "#fff4e5",
+    borderColor: AMBER_MUTED_7,
+    backgroundColor: CARD_BG_9,
     paddingVertical: 16,
     alignItems: "center",
   },
   shareButtonText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -715,7 +757,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   shareSheet: {
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -728,16 +770,16 @@ const styles = StyleSheet.create({
     width: 44,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#e4c29a",
+    backgroundColor: AMBER_SOFT,
   },
   shareTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   shareHint: {
-    color: "#6b5647",
+    color: MUTED_2,
     fontSize: 14,
     lineHeight: 20,
     fontFamily: FONT_BODY,
@@ -746,12 +788,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
   shareLinkText: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 14,
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
@@ -762,15 +804,15 @@ const styles = StyleSheet.create({
   shareCopyButton: {
     flex: 1,
     borderRadius: 999,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingVertical: 14,
     alignItems: "center",
   },
   shareCopyButtonDone: {
-    backgroundColor: "#4a7c59",
+    backgroundColor: SUCCESS_GREEN_2,
   },
   shareCopyButtonText: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
     fontWeight: "800",
     fontSize: 15,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -781,12 +823,12 @@ const styles = StyleSheet.create({
   shareNativeButton: {
     flex: 1,
     borderRadius: 999,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingVertical: 14,
     alignItems: "center",
   },
   shareNativeButtonText: {
-    color: "#241912",
+    color: TEXT_DARK_2,
     fontWeight: "800",
     fontSize: 15,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -794,31 +836,31 @@ const styles = StyleSheet.create({
   shareCancelButton: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingVertical: 14,
     alignItems: "center",
     backgroundColor: "#fff",
   },
   shareCancelText: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontWeight: "800",
     fontSize: 14,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   deleteButtonText: {
-    color: "#8a2727",
+    color: DANGER_DEEP_6,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   itemTitle: {
-    color: "#fff7ed",
+    color: TEXT_ON_DARK_6,
     fontSize: 29,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY,
   },
   itemMeta: {
-    color: "#dfc8b2",
+    color: TEXT_ON_DARK_MUTED,
     fontSize: 14,
     lineHeight: 21,
     fontFamily: FONT_BODY,
@@ -826,13 +868,13 @@ const styles = StyleSheet.create({
   sheet: {
     borderRadius: 24,
     padding: 18,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     gap: 8,
   },
   sheetLabel: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 12,
     textTransform: "uppercase",
     letterSpacing: 1,
@@ -840,7 +882,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   sheetValue: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 16,
     lineHeight: 24,
     fontFamily: FONT_BODY,
@@ -868,10 +910,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 14,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
   },
   conditionBadgeText: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 14,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
@@ -879,18 +921,18 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#2d2117",
+    color: TEXT_DARK_3,
     fontFamily: FONT_BODY_BOLD,
   },
   hero: {
-    backgroundColor: "#f0e2cf",
+    backgroundColor: BORDER_2,
     borderRadius: 28,
     padding: 20,
     gap: 8,
   },
   heroTitle: {
     fontSize: 28,
-    color: "#2b2017",
+    color: TEXT_DARK_4,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY,
   },
@@ -898,7 +940,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   editLabel: {
-    color: "#624a35",
+    color: MUTED_10,
     fontWeight: "800",
     fontSize: 13,
     letterSpacing: 0.5,
@@ -906,18 +948,18 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   editRequired: {
-    color: "#d92f2f",
+    color: DANGER,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   editInput: {
     borderRadius: 22,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 16,
     fontFamily: FONT_BODY,
   },
@@ -933,22 +975,22 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 10,
     paddingHorizontal: 18,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   conditionChipSelected: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
+    backgroundColor: HERO_DARK,
+    borderColor: HERO_DARK,
   },
   conditionChipText: {
-    color: "#6b5647",
+    color: MUTED_2,
     fontSize: 14,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
   conditionChipTextSelected: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
   },
   editTagChip: {
     flexDirection: "row",
@@ -977,36 +1019,36 @@ const styles = StyleSheet.create({
   tagInput: {
     flex: 1,
     borderRadius: 22,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontFamily: FONT_BODY,
   },
   tagAddButton: {
     borderRadius: 22,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingHorizontal: 18,
     paddingVertical: 12,
     justifyContent: "center",
   },
   tagAddButtonText: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 14,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   photoButton: {
     borderRadius: 20,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingVertical: 14,
     alignItems: "center",
   },
   photoButtonText: {
-    color: "#241912",
+    color: TEXT_DARK_2,
     fontWeight: "800",
     fontSize: 15,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1015,27 +1057,27 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingVertical: 18,
     alignItems: "center",
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
   },
   saveButtonDisabled: {
     opacity: 0.75,
   },
   saveButtonText: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
     fontSize: 16,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   cancelButton: {
     borderRadius: 22,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingVertical: 14,
     alignItems: "center",
   },
   cancelButtonText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1045,7 +1087,7 @@ const styles = StyleSheet.create({
   },
   listingButton: {
     borderRadius: 20,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingVertical: 16,
     alignItems: "center",
   },
@@ -1053,13 +1095,13 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   listingButtonText: {
-    color: "#241912",
+    color: TEXT_DARK_2,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   listingHint: {
-    color: "#8a5a2b",
+    color: ACCENT_DEEP,
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 18,
@@ -1067,13 +1109,13 @@ const styles = StyleSheet.create({
   },
   listingStatusBadge: {
     borderRadius: 999,
-    backgroundColor: "#3a7d4f",
+    backgroundColor: SUCCESS_GREEN,
     paddingHorizontal: 14,
     paddingVertical: 8,
     alignSelf: "flex-start",
   },
   listingStatusText: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 13,
     fontWeight: "800",
     textTransform: "uppercase",
@@ -1083,13 +1125,13 @@ const styles = StyleSheet.create({
   listingRemoveButton: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#d99393",
-    backgroundColor: "#fff1f1",
+    borderColor: DANGER_SOFT_4,
+    backgroundColor: CARD_BG_12,
     paddingVertical: 14,
     alignItems: "center",
   },
   listingRemoveText: {
-    color: "#8a2727",
+    color: DANGER_DEEP_6,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
