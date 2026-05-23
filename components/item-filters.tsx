@@ -220,6 +220,34 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               <Text style={styles.toggleLabel}>{t("filterHasPhotos")}</Text>
             </Pressable>
 
+            {/* Sort mode */}
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>{t("sortLabel")}</Text>
+              <View style={styles.sortRow}>
+                {(
+                  [
+                    { mode: "default" as ItemSortMode, label: t("sortDefault") },
+                    { mode: "name-asc" as ItemSortMode, label: t("sortNameAsc") },
+                    { mode: "name-desc" as ItemSortMode, label: t("sortNameDesc") },
+                  ]
+                ).map((opt) => {
+                  const active = draft.sort === opt.mode;
+                  return (
+                    <Pressable
+                      key={opt.mode}
+                      accessibilityRole="button"
+                      style={[styles.sortChip, active && styles.sortChipActive]}
+                      onPress={() => setDraft({ ...draft, sort: opt.mode })}
+                    >
+                      <Text style={[styles.sortChipText, active && styles.sortChipTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
             {/* Actions */}
             <View style={styles.sheetActions}>
               <Pressable style={styles.applyButton} onPress={apply}>
@@ -418,5 +446,33 @@ const styles = StyleSheet.create({
     color: MUTED_3,
     fontWeight: "800",
     fontSize: 15,
+  },
+  sortRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  sortChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: CARD_BG_3,
+    borderWidth: 1,
+    borderColor: AMBER_SOFT,
+  },
+  sortChipActive: {
+    backgroundColor: HERO_DARK,
+    borderColor: HERO_DARK,
+  },
+  sortChipText: {
+    color: MUTED_3,
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  sortChipTextActive: {
+    color: TEXT_ON_DARK_5,
   },
 });

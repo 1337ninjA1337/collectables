@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
-import { applyItemFilters, EMPTY_FILTERS, ItemFilterBar, type ItemFilters } from "@/components/item-filters";
+import { applyItemFilters, applySortMode, EMPTY_FILTERS, ItemFilterBar, type ItemFilters } from "@/components/item-filters";
 import { buildDeepLink } from "@/lib/deep-link";
 import { VisibilityBadge } from "@/components/visibility-badge";
 import { SkeletonCollectionDetail } from "@/components/skeleton";
@@ -134,11 +134,20 @@ export default function CollectionDetailsScreen() {
     [getItemsForCollection, params.id],
   );
   const allItems = localItems.length > 0 ? localItems : remoteItems;
-  const items = useMemo(() => applyItemFilters(allItems, itemFilters), [allItems, itemFilters]);
+  const filteredItems = useMemo(() => applyItemFilters(allItems, itemFilters), [allItems, itemFilters]);
+  // applySortMode runs AFTER the price/date/source/query filter pass so the
+  // alphabetical sort applies to the already-narrowed result set. Memoized
+  // on [filteredItems, itemFilters.sort] so a sort-mode change reuses the
+  // existing filtered slice without re-running the filter predicate.
+  const items = useMemo(
+    () => applySortMode(filteredItems, itemFilters.sort),
+    [filteredItems, itemFilters.sort],
+  );
   // Chunked rendering: mount only the first page of item cards (~20) up-front
   // so iOS RAM stays bounded as the collection grows. `useChunkedList` resets
-  // its window automatically when the `items` reference changes (filter swap)
-  // because `items` is memoized on `[allItems, itemFilters]` above.
+  // its window automatically when the `items` reference changes (filter or
+  // sort swap) because `items` is memoized on `[filteredItems, itemFilters.sort]`
+  // above and `filteredItems` is memoized on `[allItems, itemFilters]`.
   const { visibleItems, hasMore, loadMore } = useChunkedList(items);
 
   // Resolve profile details for every viewer listed on the collection so the
@@ -556,7 +565,13 @@ export default function CollectionDetailsScreen() {
             onAction={() => setItemFilters(EMPTY_FILTERS)}
             compact
           />
-        ) : isOwner && !selectionMode ? (
+        ) : isOwner && !selectionMode && itemFilters.sort === "default" ? (
+          // Drag-mode is gated on `itemFilters.sort === "default"` so the user
+          // can never drag while alphabetically sorted — otherwise onDragEnd
+          // would re-write `sortOrder` based on the visible (alphabetical)
+          // order and silently corrupt the manual drag order. When the gate
+          // falls through (any non-default sort), we fall back to the masonry
+          // branch below so owners still see their collection.
           <NestableDraggableFlatList
             data={visibleItems}
             keyExtractor={(item) => item.id}
