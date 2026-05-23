@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth-context";
 import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
+import { useChunkedList } from "@/lib/use-chunked-list";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { formatCostAmount } from "@/lib/format-cost";
 import { useI18n } from "@/lib/i18n-context";
@@ -117,6 +118,11 @@ export default function CollectionDetailsScreen() {
   const localItems = getItemsForCollection(params.id);
   const allItems = localItems.length > 0 ? localItems : remoteItems;
   const items = useMemo(() => applyItemFilters(allItems, itemFilters), [allItems, itemFilters]);
+  // Chunked rendering: mount only the first page of item cards (~20) up-front
+  // so iOS RAM stays bounded as the collection grows. `useChunkedList` resets
+  // its window automatically when the `items` reference changes (filter swap)
+  // because `items` is memoized on `[allItems, itemFilters]` above.
+  const { visibleItems, hasMore, loadMore } = useChunkedList(items);
 
   // Resolve profile details for every viewer listed on the collection so the
   // share sheet can show non-friends (link-granted viewers) alongside friends.
@@ -511,17 +517,24 @@ export default function CollectionDetailsScreen() {
           />
         ) : isOwner && !selectionMode ? (
           <NestableDraggableFlatList
-            data={items}
+            data={visibleItems}
             keyExtractor={(item) => item.id}
             renderItem={renderItemRow}
-            onDragEnd={({ data }) =>
-              reorderItemsInCollection(activeCollection.id, data.map((i) => i.id))
-            }
+            onDragEnd={({ data }) => {
+              // Drag-reorder must operate on the full filtered list, not just
+              // the visible window — otherwise items below the page boundary
+              // would be re-sortOrdered to 0..N-1 alongside the visible slice
+              // and shuffle relative to each other. Append the unrendered
+              // tail in its existing order so only the visible slice moves.
+              const visibleIds = new Set(visibleItems.map((i) => i.id));
+              const tail = items.filter((i) => !visibleIds.has(i.id));
+              reorderItemsInCollection(activeCollection.id, [...data, ...tail].map((i) => i.id));
+            }}
             contentContainerStyle={styles.draggableList}
           />
         ) : isOwner && selectionMode ? (
           <View style={styles.selectList}>
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <SelectableItemRow
                 key={item.id}
                 item={item}
@@ -533,13 +546,26 @@ export default function CollectionDetailsScreen() {
         ) : (
           <View style={styles.masonryGrid}>
             <View style={styles.masonryCol}>
-              {items.filter((_, i) => i % 2 === 0).map((item) => <ItemCard key={item.id} item={item} compact />)}
+              {visibleItems.filter((_, i) => i % 2 === 0).map((item) => <ItemCard key={item.id} item={item} compact />)}
             </View>
             <View style={[styles.masonryCol, styles.masonryColOffset]}>
-              {items.filter((_, i) => i % 2 === 1).map((item) => <ItemCard key={item.id} item={item} compact />)}
+              {visibleItems.filter((_, i) => i % 2 === 1).map((item) => <ItemCard key={item.id} item={item} compact />)}
             </View>
           </View>
         )}
+        {hasMore ? (
+          <Pressable
+            style={styles.loadMore}
+            onPress={loadMore}
+            accessibilityRole="button"
+            accessibilityLabel={t("loadMoreItemsA11y", { count: items.length - visibleItems.length })}
+            accessibilityHint={t("loadMoreItemsHint")}
+          >
+            <Text style={styles.loadMoreText}>
+              {t("loadMoreItems", { count: items.length - visibleItems.length })}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {selectionMode ? (
@@ -856,6 +882,22 @@ const styles = StyleSheet.create({
   },
   draggableList: {
     gap: 12,
+  },
+  loadMore: {
+    borderRadius: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: "#e4c29a",
+    backgroundColor: "#fff1df",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  loadMoreText: {
+    color: "#5f4734",
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
   },
   ownerActions: {
     gap: 12,

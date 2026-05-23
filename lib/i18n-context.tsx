@@ -275,6 +275,9 @@ const en = {
   emptyPeopleHint: "Check the public ID or try a different search query.",
   emptySearchTitle: "Nothing matched",
   emptySearchHint: "Try a different word — search looks at collection and item names.",
+  loadMoreItems: (params?: TranslationParams) => `Load more (${params?.count ?? 0} remaining)`,
+  loadMoreItemsA11y: (params?: TranslationParams) => `Load more items — ${params?.count ?? 0} remaining`,
+  loadMoreItemsHint: "Mounts the next page of items so iOS memory stays bounded.",
   emptyFeedTitle: "Feed is empty",
   emptyFeedHint: "Follow profiles from the Discover tab — their public collections will land here.",
   emptyProfileCollectionsTitle: "Collections are private",
@@ -622,6 +625,9 @@ const ru: TranslationMap = {
   emptyPeopleHint: "Проверьте публичный ID или попробуйте другой запрос.",
   emptySearchTitle: "Ничего не найдено",
   emptySearchHint: "Попробуйте другое слово — поиск смотрит названия коллекций и предметов.",
+  loadMoreItems: (params?: TranslationParams) => `Загрузить ещё (осталось ${params?.count ?? 0})`,
+  loadMoreItemsA11y: (params?: TranslationParams) => `Загрузить ещё предметы — осталось ${params?.count ?? 0}`,
+  loadMoreItemsHint: "Подгружает следующую страницу, чтобы память на iOS не росла бесконечно.",
   emptyFeedTitle: "Лента пуста",
   emptyFeedHint: "Подпишитесь на людей из вкладки Предложка — их публичные коллекции появятся здесь.",
   emptyProfileCollectionsTitle: "Коллекции скрыты",
@@ -948,6 +954,9 @@ const ru: TranslationMap = {
 
 const be: TranslationMap = {
   ...en,
+  loadMoreItems: (params?: TranslationParams) => `Загрузіць яшчэ (засталося ${params?.count ?? 0})`,
+  loadMoreItemsA11y: (params?: TranslationParams) => `Загрузіць яшчэ прадметы — засталося ${params?.count ?? 0}`,
+  loadMoreItemsHint: "Падгружае наступную старонку, каб памяць на iOS не расла бясконца.",
   currencyLabel: "Валюта",
   currencySelectTitle: "Выберыце валюту",
   templatePickerTitle: "Пачніце з шаблону",
@@ -1107,6 +1116,9 @@ const be: TranslationMap = {
 
 const pl: TranslationMap = {
   ...en,
+  loadMoreItems: (params?: TranslationParams) => `Załaduj więcej (zostało ${params?.count ?? 0})`,
+  loadMoreItemsA11y: (params?: TranslationParams) => `Załaduj więcej przedmiotów — zostało ${params?.count ?? 0}`,
+  loadMoreItemsHint: "Doładowuje kolejną stronę, żeby pamięć na iOS nie rosła w nieskończoność.",
   currencyLabel: "Waluta",
   currencySelectTitle: "Wybierz walutę",
   templatePickerTitle: "Zacznij od szablonu",
@@ -1256,6 +1268,9 @@ const pl: TranslationMap = {
 
 const de: TranslationMap = {
   ...en,
+  loadMoreItems: (params?: TranslationParams) => `Mehr laden (noch ${params?.count ?? 0})`,
+  loadMoreItemsA11y: (params?: TranslationParams) => `Weitere Objekte laden — noch ${params?.count ?? 0}`,
+  loadMoreItemsHint: "Lädt die nächste Seite, damit der iOS-Speicher nicht unbegrenzt wächst.",
   currencyLabel: "Währung",
   currencySelectTitle: "Währung auswählen",
   templatePickerTitle: "Mit einer Vorlage starten",
@@ -1401,6 +1416,9 @@ const de: TranslationMap = {
 
 const es: TranslationMap = {
   ...en,
+  loadMoreItems: (params?: TranslationParams) => `Cargar más (${params?.count ?? 0} restantes)`,
+  loadMoreItemsA11y: (params?: TranslationParams) => `Cargar más objetos — ${params?.count ?? 0} restantes`,
+  loadMoreItemsHint: "Carga la siguiente página para que la memoria de iOS no crezca sin control.",
   currencyLabel: "Moneda",
   currencySelectTitle: "Seleccionar moneda",
   templatePickerTitle: "Empieza con una plantilla",
