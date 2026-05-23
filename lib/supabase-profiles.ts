@@ -140,6 +140,7 @@ type DbCollection = {
   sort_order?: number | null;
   visibility?: string | null;
   shared_with_user_ids?: string[] | null;
+  currency?: string | null;
 };
 
 function toCollection(row: DbCollection): Collection {
@@ -155,6 +156,7 @@ function toCollection(row: DbCollection): Collection {
     role: "viewer",
     sortOrder: row.sort_order ?? undefined,
     visibility: (row.visibility as CollectionVisibility) ?? "private",
+    currency: row.currency ?? null,
   };
 }
 
@@ -179,6 +181,7 @@ export async function updateRemoteCollection(id: string, updates: Partial<Collec
   if ("sortOrder" in updates) body.sort_order = updates.sortOrder ?? null;
   if ("visibility" in updates) body.visibility = updates.visibility;
   if ("sharedWithUserIds" in updates) body.shared_with_user_ids = updates.sharedWithUserIds ?? [];
+  if ("currency" in updates) body.currency = updates.currency ?? null;
 
   if (Object.keys(body).length === 0) return;
 

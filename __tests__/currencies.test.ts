@@ -47,11 +47,18 @@ describe("CURRENCIES list", () => {
 describe("currency selector is wired into the create-item flow", () => {
   it("create.tsx renders a currency selector next to cost and sends costCurrency", () => {
     const src = read("app/create.tsx");
-    assert.match(src, /from\s+"@\/lib\/currencies"/);
+    // The CURRENCIES list was hoisted into `components/currency-sheet.tsx`
+    // when the picker was extracted for reuse on the collection-edit page;
+    // create.tsx now imports the shared <CurrencySheet/> instead.
+    assert.match(src, /from\s+"@\/components\/currency-sheet"/);
     assert.match(src, /getDefaultCurrencyForLanguage/);
     assert.match(src, /currencySheetOpen/);
     assert.match(src, /<CurrencySheet/);
     assert.match(src, /costCurrency:/);
+  });
+
+  it("CurrencySheet (extracted) still consumes the canonical CURRENCIES list", () => {
+    assert.match(read("components/currency-sheet.tsx"), /from\s+"@\/lib\/currencies"/);
   });
 
   it("CollectableItem type and cloud shapes carry cost_currency", () => {

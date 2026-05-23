@@ -12,6 +12,7 @@ import { NestableDraggableFlatList, RenderItemParams, ScaleDecorator } from "../
 
 import { ItemCard } from "@/components/item-card";
 import { ReactionBar } from "@/components/reaction-bar";
+import { CurrencySheet } from "@/components/currency-sheet";
 import { Screen } from "@/components/screen";
 import { SelectableItemRow } from "@/components/selectable-item-row";
 import { useAuth } from "@/lib/auth-context";
@@ -67,7 +68,15 @@ export default function CollectionDetailsScreen() {
   const [editCoverUri, setEditCoverUri] = useState("");
   const [editCoverChanged, setEditCoverChanged] = useState(false);
   const [editVisibility, setEditVisibility] = useState<CollectionVisibility>("private");
+  const [editCurrency, setEditCurrency] = useState<string>("");
   const [editSaving, setEditSaving] = useState(false);
+  const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
+  const [currencyQuery, setCurrencyQuery] = useState("");
+  // Tracks how the currency sheet was opened so the same `onSelect` handler
+  // can pick the right persistence path: "edit" defers the save until the
+  // edit-modal submit (so Cancel still works), "quick" saves on the spot for
+  // the tap-to-swap chip on the total-cost summary card.
+  const [currencySheetMode, setCurrencySheetMode] = useState<"edit" | "quick">("edit");
   const localCollection = getCollectionById(params.id);
   const [remoteCollection, setRemoteCollection] = useState<Collection | null>(null);
   const [remoteItems, setRemoteItems] = useState<CollectableItem[]>([]);
@@ -305,6 +314,7 @@ export default function CollectionDetailsScreen() {
     setEditCoverUri(activeCollection.coverPhoto);
     setEditCoverChanged(false);
     setEditVisibility(activeCollection.visibility ?? "private");
+    setEditCurrency(activeCollection.currency ?? "");
     setEditModalOpen(true);
   }
 
@@ -375,6 +385,9 @@ export default function CollectionDetailsScreen() {
         description: editDescription.trim(),
         coverPhoto: finalCover,
         visibility: editVisibility,
+        // Empty picker selection = clear the override and fall back to the
+        // user's app-wide displayCurrency in `getCollectionTotalCost`.
+        currency: editCurrency.trim() || null,
       });
       setEditModalOpen(false);
     } finally {
@@ -434,12 +447,32 @@ export default function CollectionDetailsScreen() {
 
       {(() => {
         const total = getCollectionTotalCost(activeCollection.id);
-        return total.amount > 0 ? (
+        if (total.amount <= 0) return null;
+        // Owners get tap-to-swap on the total card — opens the currency sheet
+        // pre-seeded with the active currency. Saves on the spot, no need to
+        // dig into the 3-dot edit modal. Non-owners see a plain View.
+        const openCurrencyPicker = () => {
+          setEditCurrency(activeCollection.currency ?? total.currency);
+          setCurrencyQuery("");
+          setCurrencySheetMode("quick");
+          setCurrencySheetOpen(true);
+        };
+        return isOwner ? (
+          <Pressable
+            style={styles.summaryCard}
+            onPress={openCurrencyPicker}
+            accessibilityRole="button"
+            accessibilityLabel={t("collectionCurrencyA11y", { currency: total.currency })}
+          >
+            <Text style={styles.summaryNumber}>{formatCostAmount(total.amount)} {total.currency}</Text>
+            <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
+          </Pressable>
+        ) : (
           <View style={styles.summaryCard}>
             <Text style={styles.summaryNumber}>{formatCostAmount(total.amount)} {total.currency}</Text>
             <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
           </View>
-        ) : null;
+        );
       })()}
 
       <ReactionBar targetType="collection" targetId={activeCollection.id} />
@@ -807,6 +840,21 @@ export default function CollectionDetailsScreen() {
               </Text>
             </View>
 
+            <View style={styles.editFieldGroup}>
+              <Text style={styles.editFieldLabel}>{t("currencyLabel")}</Text>
+              <Pressable
+                style={styles.editCurrencyButton}
+                onPress={() => { setCurrencyQuery(""); setCurrencySheetMode("edit"); setCurrencySheetOpen(true); }}
+                accessibilityRole="button"
+                accessibilityLabel={t("currencyLabel")}
+              >
+                <Text style={editCurrency ? styles.editCurrencyButtonText : styles.editCurrencyButtonPlaceholder}>
+                  {editCurrency || t("collectionCurrencyAuto")}
+                </Text>
+              </Pressable>
+              <Text style={styles.editVisibilityHint}>{t("collectionCurrencyHint")}</Text>
+            </View>
+
             <Pressable
               style={{...styles.editSaveButton, ...(editSaving ? styles.editSaveButtonDisabled : {})}}
               onPress={() => void handleSaveEdit()}
@@ -820,6 +868,23 @@ export default function CollectionDetailsScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <CurrencySheet
+        visible={currencySheetOpen}
+        selectedCode={editCurrency}
+        query={currencyQuery}
+        onQueryChange={setCurrencyQuery}
+        onSelect={(code) => {
+          setEditCurrency(code);
+          setCurrencySheetOpen(false);
+          // Quick-swap path: persist on the spot so the total card re-renders
+          // in the new currency without a follow-up modal save.
+          if (currencySheetMode === "quick") {
+            void updateCollection(activeCollection.id, { currency: code });
+          }
+        }}
+        onClose={() => setCurrencySheetOpen(false)}
+      />
     </Screen>
   );
 }
@@ -1293,6 +1358,25 @@ const styles = StyleSheet.create({
   },
   editFieldInputMultiline: {
     minHeight: 90,
+  },
+  editCurrencyButton: {
+    borderRadius: 16,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#eadbc8",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  editCurrencyButtonText: {
+    color: "#2f2318",
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
+  },
+  editCurrencyButtonPlaceholder: {
+    color: "#9b8571",
+    fontSize: 15,
+    fontFamily: FONT_BODY,
   },
   editCoverButton: {
     borderRadius: 16,

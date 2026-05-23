@@ -270,7 +270,13 @@ describe("CollectionsContext currency wiring", () => {
       src,
       /getCollectionTotalCost:\s*\(collectionId\)\s*=>\s*\{[\s\S]*sumConverted\(/,
     );
-    assert.match(src, /amount:\s*total,\s*currency:\s*displayCurrency/);
+    // `target` resolves to `collection.currency ?? displayCurrency` — the
+    // per-collection override added on 2026-05-23 lets the user pick a
+    // display currency just for one collection without changing the
+    // app-wide default. Pre-override, this assertion checked for
+    // `displayCurrency` directly.
+    assert.match(src, /amount:\s*total,\s*currency:\s*target/);
+    assert.match(src, /const\s+target\s*=\s*collection\?\.currency\s*\?\?\s*displayCurrency/);
   });
 
   it("falls back to a raw sum when rates are not yet loaded (no crash on first paint)", () => {

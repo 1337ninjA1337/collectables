@@ -88,5 +88,13 @@ export type Collection = {
   role: CollectionRole;
   sortOrder?: number;
   visibility: CollectionVisibility;
+  /**
+   * ISO 4217 currency code (e.g. "USD") to display this collection's
+   * aggregated totals in. When `null` / `undefined`, totals fall back to the
+   * user's app-wide `displayCurrency`. Per-collection override so a user
+   * with USD as their default can still view a "Vinyl, bought in Europe"
+   * collection in EUR.
+   */
+  currency?: string | null;
   stopwords?: string[];
 };

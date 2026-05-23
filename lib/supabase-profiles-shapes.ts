@@ -69,6 +69,7 @@ export function upsertCollectionBody(collection: Collection): Record<string, unk
     sort_order: collection.sortOrder ?? null,
     visibility: collection.visibility ?? "private",
     shared_with_user_ids: collection.sharedWithUserIds ?? [],
+    currency: collection.currency ?? null,
   };
 }
 

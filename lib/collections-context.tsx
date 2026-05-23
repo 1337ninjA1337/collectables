@@ -629,22 +629,28 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
             return a.createdAt < b.createdAt ? 1 : -1;
           }),
       getCollectionTotalCost: (collectionId) => {
+        // A per-collection `currency` override (set via the edit modal or the
+        // tap-to-swap chip on the summary card) wins over the user's app-wide
+        // `displayCurrency`. Falls back when null/undefined so legacy
+        // collections without the column keep working unchanged.
+        const collection = collections.find((c) => c.id === collectionId);
+        const target = collection?.currency ?? displayCurrency;
         const entries = items
           .filter((item) => item.collectionId === collectionId && !item.isWishlist)
           .filter((item): item is typeof item & { cost: number } => typeof item.cost === "number")
           .map((item) => ({
             amount: item.cost,
-            currency: item.costCurrency ?? displayCurrency,
+            currency: item.costCurrency ?? target,
           }));
         if (currencyRates) {
-          const { total, converted, skipped } = sumConverted(entries, displayCurrency, currencyRates);
-          return { amount: total, currency: displayCurrency, converted, skipped };
+          const { total, converted, skipped } = sumConverted(entries, target, currencyRates);
+          return { amount: total, currency: target, converted, skipped };
         }
         // No rates yet: sum raw amounts (assume each item is already in the
-        // user's preferred currency). Better than crashing the UI; once rates
-        // load the totals re-render with real conversion.
+        // target currency). Better than crashing the UI; once rates load the
+        // totals re-render with real conversion.
         const amount = entries.reduce((sum, e) => sum + e.amount, 0);
-        return { amount, currency: displayCurrency, converted: entries.length, skipped: 0 };
+        return { amount, currency: target, converted: entries.length, skipped: 0 };
       },
       displayCurrency,
       refreshCurrencyRates,

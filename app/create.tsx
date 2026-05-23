@@ -4,13 +4,13 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { CurrencySheet } from "@/components/currency-sheet";
 import { PhotoPreview } from "@/components/photo-preview";
 import { Screen } from "@/components/screen";
 import { analyzeItemPhoto, isAiVisionConfigured } from "@/lib/ai-vision";
 import { trackEvent } from "@/lib/analytics";
 import { uploadImages } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
-import { CURRENCIES } from "@/lib/currencies";
 import { useI18n } from "@/lib/i18n-context";
 import {
   getDefaultCurrencyForLanguage,
@@ -552,94 +552,11 @@ function CollectionSheet({
   );
 }
 
-function CurrencySheet({
-  visible,
-  selectedCode,
-  query,
-  onQueryChange,
-  onSelect,
-  onClose,
-}: {
-  visible: boolean;
-  selectedCode: string;
-  query: string;
-  onQueryChange: (q: string) => void;
-  onSelect: (code: string) => void;
-  onClose: () => void;
-}) {
-  const { t } = useI18n();
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return CURRENCIES;
-    return CURRENCIES.filter(
-      (c) => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q),
-    );
-  }, [query]);
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
-        <Pressable style={styles.sheetContainer} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>{t("currencySelectTitle")}</Text>
-
-          <View style={styles.sheetSearchRow}>
-            <Ionicons name="search" size={18} color={MUTED_13} />
-            <TextInput
-              style={styles.sheetSearchInput}
-              value={query}
-              onChangeText={onQueryChange}
-              placeholder={t("searchPlaceholder")}
-              placeholderTextColor={PLACEHOLDER}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-            {query.length > 0 ? (
-              <Pressable onPress={() => onQueryChange("")} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color={MUTED_15} />
-              </Pressable>
-            ) : null}
-          </View>
-
-          <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
-            {filtered.length === 0 ? (
-              <Text style={styles.sheetEmpty}>{t("searchNoResults")}</Text>
-            ) : (
-              filtered.map((c) => {
-                const isSelected = c.code === selectedCode;
-                return (
-                  <Pressable
-                    key={c.code}
-                    style={[styles.sheetRow, isSelected && styles.sheetRowSelected]}
-                    onPress={() => onSelect(c.code)}
-                  >
-                    <View style={styles.currencyRowText}>
-                      <Text
-                        style={[styles.currencyRowCode, isSelected && styles.sheetRowNameSelected]}
-                      >
-                        {c.code}
-                      </Text>
-                      <Text style={styles.sheetRowDesc} numberOfLines={1}>
-                        {c.name}
-                      </Text>
-                    </View>
-                    {isSelected ? (
-                      <Ionicons name="checkmark-circle" size={22} color={AMBER_ACCENT} />
-                    ) : null}
-                  </Pressable>
-                );
-              })
-            )}
-          </ScrollView>
-
-          <Pressable style={styles.sheetCloseButton} onPress={onClose}>
-            <Text style={styles.sheetCloseText}>{t("cancel")}</Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
+// CurrencySheet was extracted to `components/currency-sheet.tsx` so the
+// collection-page edit modal can reuse the same picker; this screen now
+// imports `CurrencySheet` from there. The local copy was identical to the
+// shared one — keeping a copy would mean every styling tweak has to be
+// done in two places.
 
 const styles = StyleSheet.create({
   hero: {

@@ -217,3 +217,20 @@ while signed in; the asset disappears from Cloudinary and the function returns
 > step; today's only caller deletes the signed-in user's own images during
 > account deletion, so authenticated-session gating closes the secret-leak
 > hole without it.
+
+
+## 20260523_collection_currency.sql
+
+Run `supabase/migrations/20260523_collection_currency.sql` against your Supabase project:
+
+```sql
+-- Adds public.collections.currency column (nullable text).
+-- Carries the per-collection ISO 4217 currency override picked via the edit
+-- modal or the tap-to-swap chip on the total-cost summary card. NULL means
+-- 'fall back to the user's app-wide displayCurrency' — legacy rows keep
+-- NULL and render unchanged.
+ALTER TABLE public.collections
+  ADD COLUMN IF NOT EXISTS currency text NULL;
+```
+
+Apply via the Supabase SQL editor or the `supabase db push` workflow.

@@ -162,6 +162,27 @@ describe("upsertCollectionBody", () => {
     assert.equal(body.sort_order, 3);
     assert.equal(body.visibility, "public");
     assert.deepEqual(body.shared_with_user_ids, []);
+    // Currency override: null when not set (collection falls back to the
+    // user's app-wide displayCurrency in `getCollectionTotalCost`).
+    assert.equal(body.currency, null);
+  });
+
+  it("forwards the per-collection currency override when present", () => {
+    const col: Collection = {
+      id: "c3",
+      name: "Eurail tickets",
+      coverPhoto: "",
+      description: "Bought in Europe",
+      ownerName: "Alice",
+      ownerUserId: "u1",
+      sharedWith: [],
+      sharedWithUserIds: [],
+      role: "owner",
+      visibility: "private",
+      currency: "EUR",
+    };
+    const body = upsertCollectionBody(col);
+    assert.equal(body.currency, "EUR");
   });
 
   it("falls back to 'private' visibility when visibility is null-ish", () => {
