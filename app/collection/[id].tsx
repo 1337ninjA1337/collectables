@@ -115,7 +115,15 @@ export default function CollectionDetailsScreen() {
   }, [user, remoteCollection, localCollection, params.id, saveSharedCollection, toast, t]);
 
   const collection = localCollection ?? remoteCollection;
-  const localItems = getItemsForCollection(params.id);
+  // `getItemsForCollection` builds a fresh `.filter().sort()` array on every
+  // call — without memoizing here, `localItems` (and therefore `allItems` and
+  // the `applyItemFilters` memo below) gets a new reference on every render,
+  // which would re-trigger the `useChunkedList` identity-reset effect after
+  // every `loadMore` press and snap the visible window back to one page.
+  const localItems = useMemo(
+    () => getItemsForCollection(params.id),
+    [getItemsForCollection, params.id],
+  );
   const allItems = localItems.length > 0 ? localItems : remoteItems;
   const items = useMemo(() => applyItemFilters(allItems, itemFilters), [allItems, itemFilters]);
   // Chunked rendering: mount only the first page of item cards (~20) up-front

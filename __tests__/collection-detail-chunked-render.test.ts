@@ -29,6 +29,22 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     assert.match(src, /useChunkedList\(\s*items\s*\)/);
   });
 
+  it("memoizes getItemsForCollection so localItems reference is stable across renders", () => {
+    // The bug this pin catches: `getItemsForCollection(id)` returns a
+    // fresh `.filter().sort()` array on every call. Without useMemo
+    // around it, `localItems` (and therefore `allItems` and the `items`
+    // useMemo that depends on `allItems`) get a new reference every
+    // render. That re-triggers the `useChunkedList` identity-reset
+    // effect after every `loadMore` press — count goes 20 → 40 → 20,
+    // visibly nothing changes BUT the 20 newly-mounted item cards kick
+    // off image fetches before being unmounted by the reset. Symptom
+    // is "Load more does nothing but I see network traffic each press".
+    assert.match(
+      src,
+      /const\s+localItems\s*=\s*useMemo\([\s\S]*?getItemsForCollection\(\s*params\.id\s*\)[\s\S]*?\[\s*getItemsForCollection\s*,\s*params\.id\s*\]\s*,?\s*\)/,
+    );
+  });
+
   it("destructures visibleItems + hasMore + loadMore from the hook", () => {
     assert.match(
       src,
