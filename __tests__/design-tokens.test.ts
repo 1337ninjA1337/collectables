@@ -12,6 +12,7 @@ import {
   AMBER_MUTED_3,
   AMBER_MUTED_4,
   AMBER_MUTED_5,
+  AMBER_MUTED_6,
   AMBER_SOFT_2,
   AMBER_SOFT_3,
   BORDER,
@@ -72,6 +73,15 @@ import {
   STATUS_OFFLINE,
   STATUS_ONLINE,
   SUCCESS_GREEN,
+  TAG_BLUE,
+  TAG_BROWN,
+  TAG_CYAN,
+  TAG_GOLD,
+  TAG_PURPLE,
+  TAG_RUST,
+  TAG_SAGE,
+  TAG_TEAL,
+  TAG_TERRACOTTA,
   TEXT_DARK,
   TEXT_DARK_3,
   TEXT_DARK_4,
@@ -386,6 +396,45 @@ describe("design-tokens module", () => {
     assert.equal(designTokens.MUTED_12, "#7a4f1a");
     assert.equal(designTokens.MUTED_13, "#8a6e54");
     assert.equal(designTokens.MUTED_14, "#a08970");
+  });
+
+  it("exposes the AMBER_MUTED_6 + TAG_* categorical palette shipped for the create-item migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(AMBER_MUTED_6, hex);
+    assert.match(TAG_RUST, hex);
+    assert.match(TAG_SAGE, hex);
+    assert.match(TAG_BLUE, hex);
+    assert.match(TAG_PURPLE, hex);
+    assert.match(TAG_TERRACOTTA, hex);
+    assert.match(TAG_CYAN, hex);
+    assert.match(TAG_GOLD, hex);
+    assert.match(TAG_BROWN, hex);
+    assert.match(TAG_TEAL, hex);
+    assert.equal(AMBER_MUTED_6, "#d9c8b4");
+    assert.equal(TAG_RUST, "#c47a5a");
+    assert.equal(TAG_SAGE, "#7a9e7e");
+    assert.equal(TAG_BLUE, "#5b8fd8");
+    assert.equal(TAG_PURPLE, "#9b7ec8");
+    assert.equal(TAG_TERRACOTTA, "#d4765b");
+    assert.equal(TAG_CYAN, "#5bbbd8");
+    assert.equal(TAG_GOLD, "#c4a35b");
+    assert.equal(TAG_BROWN, "#8b6b5b");
+    assert.equal(TAG_TEAL, "#6b8f8f");
+    assert.equal(designTokens.AMBER_MUTED_6, "#d9c8b4");
+    assert.equal(designTokens.TAG_RUST, "#c47a5a");
+    assert.equal(designTokens.TAG_SAGE, "#7a9e7e");
+    assert.equal(designTokens.TAG_BLUE, "#5b8fd8");
+    assert.equal(designTokens.TAG_PURPLE, "#9b7ec8");
+    assert.equal(designTokens.TAG_TERRACOTTA, "#d4765b");
+    assert.equal(designTokens.TAG_CYAN, "#5bbbd8");
+    assert.equal(designTokens.TAG_GOLD, "#c4a35b");
+    assert.equal(designTokens.TAG_BROWN, "#8b6b5b");
+    assert.equal(designTokens.TAG_TEAL, "#6b8f8f");
+    const tagValues = [
+      TAG_RUST, TAG_SAGE, TAG_BLUE, TAG_PURPLE, TAG_TERRACOTTA,
+      TAG_CYAN, TAG_GOLD, TAG_BROWN, TAG_TEAL,
+    ];
+    assert.equal(new Set(tagValues).size, tagValues.length, "TAG_* palette must be a set of distinct hues");
   });
 
   it("freezes the designTokens object so accidental mutation is rejected", () => {
@@ -840,6 +889,48 @@ describe("design-tokens adoption", () => {
     assert.match(src, /MUTED\b/);
     assert.match(src, /MUTED_2/);
     assert.match(src, /MUTED_5/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("app/create.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("app/create.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /AMBER_ACCENT/);
+    assert.match(src, /AMBER_MUTED_6/);
+    assert.match(src, /AMBER_SOFT\b/);
+    assert.match(src, /BORDER\b/);
+    assert.match(src, /BORDER_2\b/);
+    assert.match(src, /BORDER_3\b/);
+    assert.match(src, /CARD_BG\b/);
+    assert.match(src, /CARD_BG_3\b/);
+    assert.match(src, /DANGER\b/);
+    assert.match(src, /HERO_DARK\b/);
+    assert.match(src, /HERO_DARK_2/);
+    assert.match(src, /MUTED\b/);
+    assert.match(src, /MUTED_2\b/);
+    assert.match(src, /MUTED_3\b/);
+    assert.match(src, /MUTED_8\b/);
+    assert.match(src, /MUTED_10\b/);
+    assert.match(src, /MUTED_13\b/);
+    assert.match(src, /MUTED_15\b/);
+    assert.match(src, /PAGE_BG_2/);
+    assert.match(src, /PLACEHOLDER/);
+    assert.match(src, /TAG_BLUE/);
+    assert.match(src, /TAG_BROWN/);
+    assert.match(src, /TAG_CYAN/);
+    assert.match(src, /TAG_GOLD/);
+    assert.match(src, /TAG_PURPLE/);
+    assert.match(src, /TAG_RUST/);
+    assert.match(src, /TAG_SAGE/);
+    assert.match(src, /TAG_TEAL/);
+    assert.match(src, /TAG_TERRACOTTA/);
+    assert.match(src, /TEXT_DARK\b/);
+    assert.match(src, /TEXT_DARK_2\b/);
+    assert.match(src, /TEXT_DARK_3\b/);
+    assert.match(src, /TEXT_DARK_4\b/);
+    assert.match(src, /TEXT_ON_DARK\b/);
+    assert.match(src, /TEXT_ON_DARK_2/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

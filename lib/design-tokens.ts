@@ -30,6 +30,7 @@ export const AMBER_MUTED_2 = "#dbc7ae";
 export const AMBER_MUTED_3 = "#d8c7b1";
 export const AMBER_MUTED_4 = "#ddc9af";
 export const AMBER_MUTED_5 = "#d2b89a";
+export const AMBER_MUTED_6 = "#d9c8b4";
 export const ACCENT_DEEP = "#8a5a2b";
 
 export const CARD_BG = "#fffaf3";
@@ -108,6 +109,21 @@ export const SUCCESS_GREEN = "#3a7d4f";
 export const STATUS_ONLINE = "#22c55e";
 export const STATUS_OFFLINE = "#eab308";
 
+/**
+ * Categorical tag palette — used to color user-defined tags by rotating through
+ * the array. The first slot reuses `AMBER_ACCENT` (the brand accent) so adding
+ * a new tag colour here means picking a hue that contrasts with the others.
+ */
+export const TAG_RUST = "#c47a5a";
+export const TAG_SAGE = "#7a9e7e";
+export const TAG_BLUE = "#5b8fd8";
+export const TAG_PURPLE = "#9b7ec8";
+export const TAG_TERRACOTTA = "#d4765b";
+export const TAG_CYAN = "#5bbbd8";
+export const TAG_GOLD = "#c4a35b";
+export const TAG_BROWN = "#8b6b5b";
+export const TAG_TEAL = "#6b8f8f";
+
 /** Frozen palette for runtime introspection (e.g. tests, theming UI). */
 export const designTokens = Object.freeze({
   HERO_DARK,
@@ -127,6 +143,7 @@ export const designTokens = Object.freeze({
   AMBER_MUTED_3,
   AMBER_MUTED_4,
   AMBER_MUTED_5,
+  AMBER_MUTED_6,
   ACCENT_DEEP,
   CARD_BG,
   CARD_BG_2,
@@ -198,6 +215,15 @@ export const designTokens = Object.freeze({
   SUCCESS_GREEN,
   STATUS_ONLINE,
   STATUS_OFFLINE,
+  TAG_RUST,
+  TAG_SAGE,
+  TAG_BLUE,
+  TAG_PURPLE,
+  TAG_TERRACOTTA,
+  TAG_CYAN,
+  TAG_GOLD,
+  TAG_BROWN,
+  TAG_TEAL,
 });
 
 export type DesignToken = keyof typeof designTokens;

@@ -20,10 +20,47 @@ import {
 import { useToast } from "@/lib/toast-context";
 import { ItemCondition, ItemTag } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import {
+  AMBER_ACCENT,
+  AMBER_MUTED_6,
+  AMBER_SOFT,
+  BORDER,
+  BORDER_2,
+  BORDER_3,
+  CARD_BG,
+  CARD_BG_3,
+  DANGER,
+  HERO_DARK,
+  HERO_DARK_2,
+  MUTED,
+  MUTED_2,
+  MUTED_3,
+  MUTED_8,
+  MUTED_10,
+  MUTED_13,
+  MUTED_15,
+  PAGE_BG_2,
+  PLACEHOLDER,
+  TAG_BLUE,
+  TAG_BROWN,
+  TAG_CYAN,
+  TAG_GOLD,
+  TAG_PURPLE,
+  TAG_RUST,
+  TAG_SAGE,
+  TAG_TEAL,
+  TAG_TERRACOTTA,
+  TEXT_DARK,
+  TEXT_DARK_2,
+  TEXT_DARK_3,
+  TEXT_DARK_4,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_2,
+} from "@/lib/design-tokens";
 
 const TAG_COLORS = [
-  "#d89c5b", "#c47a5a", "#7a9e7e", "#5b8fd8", "#9b7ec8",
-  "#d4765b", "#5bbbd8", "#c4a35b", "#8b6b5b", "#6b8f8f",
+  AMBER_ACCENT, TAG_RUST, TAG_SAGE, TAG_BLUE, TAG_PURPLE,
+  TAG_TERRACOTTA, TAG_CYAN, TAG_GOLD, TAG_BROWN, TAG_TEAL,
 ];
 
 export default function CreateItemScreen() {
@@ -201,14 +238,14 @@ export default function CreateItemScreen() {
           onPress={() => { setSheetQuery(""); setSheetOpen(true); }}
         >
           <View style={styles.selectorContent}>
-            <Ionicons name="folder-outline" size={20} color={collectionId ? "#2b2017" : "#9b8571"} />
+            <Ionicons name="folder-outline" size={20} color={collectionId ? TEXT_DARK_4 : PLACEHOLDER} />
             <Text style={collectionId ? styles.selectorText : styles.selectorPlaceholder} numberOfLines={1}>
               {collectionId
                 ? ownedCollections.find((c) => c.id === collectionId)?.name ?? t("collectionFieldLabel")
                 : t("collectionFieldLabel")}
             </Text>
           </View>
-          <Ionicons name="chevron-down" size={18} color="#9b8571" />
+          <Ionicons name="chevron-down" size={18} color={PLACEHOLDER} />
         </Pressable>
       </View>
 
@@ -253,7 +290,7 @@ export default function CreateItemScreen() {
             value={cost}
             onChangeText={setCost}
             placeholder={t("costPlaceholder")}
-            placeholderTextColor="#9b8571"
+            placeholderTextColor={PLACEHOLDER}
             keyboardType="numeric"
             style={{ ...styles.input, ...styles.costInput }}
           />
@@ -264,7 +301,7 @@ export default function CreateItemScreen() {
             accessibilityLabel={t("currencyLabel")}
           >
             <Text style={styles.currencySelectorText}>{currency}</Text>
-            <Ionicons name="chevron-down" size={16} color="#9b8571" />
+            <Ionicons name="chevron-down" size={16} color={PLACEHOLDER} />
           </Pressable>
         </View>
       </View>
@@ -307,7 +344,7 @@ export default function CreateItemScreen() {
             value={tagInput}
             onChangeText={setTagInput}
             placeholder={t("tagsPlaceholder")}
-            placeholderTextColor="#9b8571"
+            placeholderTextColor={PLACEHOLDER}
             onSubmitEditing={() => {
               const label = tagInput.trim();
               if (label && !tags.some((t) => t.label.toLowerCase() === label.toLowerCase())) {
@@ -401,7 +438,7 @@ function Field({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#9b8571"
+        placeholderTextColor={PLACEHOLDER}
         multiline={multiline}
         keyboardType={keyboardType ?? "default"}
         textAlignVertical={multiline ? "top" : "center"}
@@ -451,19 +488,19 @@ function CollectionSheet({
           <Text style={styles.sheetTitle}>{t("collectionFieldLabel")}</Text>
 
           <View style={styles.sheetSearchRow}>
-            <Ionicons name="search" size={18} color="#8a6e54" />
+            <Ionicons name="search" size={18} color={MUTED_13} />
             <TextInput
               style={styles.sheetSearchInput}
               value={query}
               onChangeText={onQueryChange}
               placeholder={t("searchPlaceholder")}
-              placeholderTextColor="#9b8571"
+              placeholderTextColor={PLACEHOLDER}
               autoCapitalize="none"
               autoCorrect={false}
             />
             {query.length > 0 ? (
               <Pressable onPress={() => onQueryChange("")} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color="#b8a08a" />
+                <Ionicons name="close-circle" size={18} color={MUTED_15} />
               </Pressable>
             ) : null}
           </View>
@@ -485,7 +522,7 @@ function CollectionSheet({
                         <Image source={{ uri: c.coverPhoto }} style={styles.sheetRowThumb} />
                       ) : (
                         <View style={[styles.sheetRowThumb, styles.sheetRowThumbEmpty]}>
-                          <Ionicons name="folder-outline" size={18} color="#9b8571" />
+                          <Ionicons name="folder-outline" size={18} color={PLACEHOLDER} />
                         </View>
                       )}
                       <View style={styles.sheetRowText}>
@@ -498,7 +535,7 @@ function CollectionSheet({
                       </View>
                     </View>
                     {isSelected ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#d89c5b" />
+                      <Ionicons name="checkmark-circle" size={22} color={AMBER_ACCENT} />
                     ) : null}
                   </Pressable>
                 );
@@ -547,19 +584,19 @@ function CurrencySheet({
           <Text style={styles.sheetTitle}>{t("currencySelectTitle")}</Text>
 
           <View style={styles.sheetSearchRow}>
-            <Ionicons name="search" size={18} color="#8a6e54" />
+            <Ionicons name="search" size={18} color={MUTED_13} />
             <TextInput
               style={styles.sheetSearchInput}
               value={query}
               onChangeText={onQueryChange}
               placeholder={t("searchPlaceholder")}
-              placeholderTextColor="#9b8571"
+              placeholderTextColor={PLACEHOLDER}
               autoCapitalize="characters"
               autoCorrect={false}
             />
             {query.length > 0 ? (
               <Pressable onPress={() => onQueryChange("")} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color="#b8a08a" />
+                <Ionicons name="close-circle" size={18} color={MUTED_15} />
               </Pressable>
             ) : null}
           </View>
@@ -587,7 +624,7 @@ function CurrencySheet({
                       </Text>
                     </View>
                     {isSelected ? (
-                      <Ionicons name="checkmark-circle" size={22} color="#d89c5b" />
+                      <Ionicons name="checkmark-circle" size={22} color={AMBER_ACCENT} />
                     ) : null}
                   </Pressable>
                 );
@@ -606,19 +643,19 @@ function CurrencySheet({
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: "#f0e2cf",
+    backgroundColor: BORDER_2,
     borderRadius: 28,
     padding: 20,
     gap: 8,
   },
   heroTitle: {
     fontSize: 28,
-    color: "#2b2017",
+    color: TEXT_DARK_4,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY,
   },
   heroText: {
-    color: "#6b5543",
+    color: MUTED_8,
     lineHeight: 22,
     fontFamily: FONT_BODY,
   },
@@ -626,7 +663,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   label: {
-    color: "#624a35",
+    color: MUTED_10,
     fontWeight: "800",
     fontSize: 13,
     letterSpacing: 0.5,
@@ -635,12 +672,12 @@ const styles = StyleSheet.create({
   },
   input: {
     borderRadius: 22,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 16,
     fontFamily: FONT_BODY,
   },
@@ -648,7 +685,7 @@ const styles = StyleSheet.create({
     minHeight: 132,
   },
   inputInvalid: {
-    borderColor: "#d92f2f",
+    borderColor: DANGER,
     borderWidth: 2,
   },
   costRow: {
@@ -665,14 +702,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     borderRadius: 22,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 16,
     minWidth: 96,
   },
   currencySelectorText: {
-    color: "#2b2017",
+    color: TEXT_DARK_4,
     fontSize: 16,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
@@ -684,14 +721,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   currencyRowCode: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
     minWidth: 52,
   },
   required: {
-    color: "#d92f2f",
+    color: DANGER,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
@@ -700,14 +737,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderRadius: 22,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
   selectorButtonInvalid: {
-    borderColor: "#d92f2f",
+    borderColor: DANGER,
     borderWidth: 2,
   },
   selectorContent: {
@@ -717,14 +754,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   selectorText: {
-    color: "#2b2017",
+    color: TEXT_DARK_4,
     fontSize: 16,
     fontWeight: "700",
     flex: 1,
     fontFamily: FONT_BODY_BOLD,
   },
   selectorPlaceholder: {
-    color: "#9b8571",
+    color: PLACEHOLDER,
     fontSize: 16,
     flex: 1,
     fontFamily: FONT_BODY,
@@ -735,7 +772,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheetContainer: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: PAGE_BG_2,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -748,30 +785,30 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#d9c8b4",
+    backgroundColor: AMBER_MUTED_6,
     alignSelf: "center",
     marginBottom: 4,
   },
   sheetTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#2d2117",
+    color: TEXT_DARK_3,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   sheetSearchRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
   },
   sheetSearchInput: {
     flex: 1,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontWeight: "600",
     fontFamily: FONT_BODY_SEMIBOLD,
@@ -780,7 +817,7 @@ const styles = StyleSheet.create({
     maxHeight: 340,
   },
   sheetEmpty: {
-    color: "#6b5647",
+    color: MUTED_2,
     textAlign: "center",
     paddingVertical: 20,
     fontSize: 14,
@@ -794,11 +831,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0e4d0",
+    borderBottomColor: BORDER_3,
     gap: 10,
   },
   sheetRowSelected: {
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderBottomColor: "transparent",
   },
   sheetRowContent: {
@@ -811,58 +848,58 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: "#eadbc8",
+    backgroundColor: BORDER,
   },
   sheetRowThumbEmpty: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
   },
   sheetRowText: {
     flex: 1,
     gap: 2,
   },
   sheetRowName: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
   sheetRowNameSelected: {
-    color: "#d89c5b",
+    color: AMBER_ACCENT,
   },
   sheetRowDesc: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 13,
     fontFamily: FONT_BODY,
   },
   sheetCloseButton: {
     borderRadius: 22,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingVertical: 14,
     alignItems: "center",
   },
   sheetCloseText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   photoButton: {
     borderRadius: 20,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingVertical: 14,
     alignItems: "center",
   },
   aiButton: {
     borderRadius: 20,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingVertical: 14,
     alignItems: "center",
   },
@@ -870,13 +907,13 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   aiButtonText: {
-    color: "#2a1d15",
+    color: HERO_DARK_2,
     fontWeight: "800",
     fontSize: 15,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   photoButtonText: {
-    color: "#241912",
+    color: TEXT_DARK_2,
     fontWeight: "800",
     fontSize: 15,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -913,18 +950,18 @@ const styles = StyleSheet.create({
   tagInput: {
     flex: 1,
     borderRadius: 22,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontFamily: FONT_BODY,
   },
   tagAddButton: {
     borderRadius: 22,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingHorizontal: 18,
     paddingVertical: 12,
     justifyContent: "center",
@@ -933,7 +970,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   tagAddButtonText: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 14,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -947,34 +984,34 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 10,
     paddingHorizontal: 18,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   conditionChipSelected: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
+    backgroundColor: HERO_DARK,
+    borderColor: HERO_DARK,
   },
   conditionChipText: {
-    color: "#6b5647",
+    color: MUTED_2,
     fontSize: 14,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
   conditionChipTextSelected: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
   },
   saveButton: {
     borderRadius: 24,
     paddingVertical: 18,
     alignItems: "center",
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
   },
   saveButtonDisabled: {
     opacity: 0.75,
   },
   saveButtonText: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
     fontSize: 16,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
