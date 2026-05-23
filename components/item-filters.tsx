@@ -25,63 +25,18 @@ import {
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
-import { CollectableItem } from "@/lib/types";
+import {
+  applyItemFilters,
+  countActiveFilters,
+  EMPTY_FILTERS,
+  type ItemFilters,
+} from "@/lib/item-filters";
 
-export type ItemFilters = {
-  priceFrom: string;
-  priceTo: string;
-  dateFrom: string;
-  dateTo: string;
-  source: string;
-  hasPhotos: boolean;
-};
-
-const EMPTY_FILTERS: ItemFilters = {
-  priceFrom: "",
-  priceTo: "",
-  dateFrom: "",
-  dateTo: "",
-  source: "",
-  hasPhotos: false,
-};
-
-function countActiveFilters(f: ItemFilters): number {
-  let n = 0;
-  if (f.priceFrom) n++;
-  if (f.priceTo) n++;
-  if (f.dateFrom) n++;
-  if (f.dateTo) n++;
-  if (f.source) n++;
-  if (f.hasPhotos) n++;
-  return n;
-}
-
-export function applyItemFilters(items: CollectableItem[], filters: ItemFilters): CollectableItem[] {
-  return items.filter((item) => {
-    if (filters.priceFrom) {
-      const min = parseFloat(filters.priceFrom);
-      if (!isNaN(min) && (typeof item.cost !== "number" || item.cost < min)) return false;
-    }
-    if (filters.priceTo) {
-      const max = parseFloat(filters.priceTo);
-      if (!isNaN(max) && (typeof item.cost !== "number" || item.cost > max)) return false;
-    }
-    if (filters.dateFrom) {
-      if (!item.acquiredAt || item.acquiredAt < filters.dateFrom) return false;
-    }
-    if (filters.dateTo) {
-      if (!item.acquiredAt || item.acquiredAt > filters.dateTo) return false;
-    }
-    if (filters.source) {
-      const needle = filters.source.toLowerCase();
-      if (!item.acquiredFrom.toLowerCase().includes(needle)) return false;
-    }
-    if (filters.hasPhotos) {
-      if (!item.photos || item.photos.length === 0) return false;
-    }
-    return true;
-  });
-}
+// Re-export the pure filter helpers + type so existing call sites that
+// import from `@/components/item-filters` (where this used to live before
+// the lib/ extraction) keep working unchanged.
+export { applyItemFilters, EMPTY_FILTERS };
+export type { ItemFilters };
 
 type Props = {
   filters: ItemFilters;
@@ -259,8 +214,6 @@ export function ItemFilterBar({ filters, onChange }: Props) {
     </>
   );
 }
-
-export { EMPTY_FILTERS };
 
 const styles = StyleSheet.create({
   bar: {
