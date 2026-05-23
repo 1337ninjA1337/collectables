@@ -63,6 +63,8 @@ export const TEXT_ON_DARK_3 = "#fff8ef";
 export const TEXT_ON_DARK_4 = "#fff4e8";
 export const TEXT_ON_DARK_5 = "#fff7ea";
 export const TEXT_ON_DARK_6 = "#fff7ed";
+export const TEXT_ON_DARK_7 = "#f8e7d1";
+export const TEXT_ON_DARK_8 = "#fff3e4";
 export const TEXT_ON_DARK_SOFT = "#ead8c3";
 export const TEXT_ON_DARK_MUTED = "#dfc8b2";
 
@@ -155,6 +157,8 @@ export const designTokens = Object.freeze({
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_5,
   TEXT_ON_DARK_6,
+  TEXT_ON_DARK_7,
+  TEXT_ON_DARK_8,
   TEXT_ON_DARK_SOFT,
   TEXT_ON_DARK_MUTED,
   MUTED,
