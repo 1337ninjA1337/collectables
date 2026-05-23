@@ -10,6 +10,8 @@ import type { CollectableItem } from "@/lib/types";
  * types so existing callers (`@/components/item-filters`) keep working.
  */
 
+export type ItemSortMode = "default" | "name-asc" | "name-desc";
+
 export type ItemFilters = {
   priceFrom: string;
   priceTo: string;
@@ -19,6 +21,12 @@ export type ItemFilters = {
   hasPhotos: boolean;
   /** Free-text needle matched case-insensitively against `item.title`. */
   query: string;
+  /**
+   * Alphabetical sort applied AFTER `applyItemFilters` via `applySortMode`.
+   * `"default"` preserves the existing `sortOrder` → `createdAt` ordering
+   * coming out of `getItemsForCollection` (i.e. user-managed drag order).
+   */
+  sort: ItemSortMode;
 };
 
 export const EMPTY_FILTERS: ItemFilters = {
@@ -29,6 +37,7 @@ export const EMPTY_FILTERS: ItemFilters = {
   source: "",
   hasPhotos: false,
   query: "",
+  sort: "default",
 };
 
 export function countActiveFilters(f: ItemFilters): number {
@@ -42,7 +51,33 @@ export function countActiveFilters(f: ItemFilters): number {
   // Trim before counting so a whitespace-only query (which `applyItemFilters`
   // treats as a no-op) doesn't inflate the filter badge.
   if (f.query.trim()) n++;
+  if (f.sort !== "default") n++;
   return n;
+}
+
+/**
+ * Pure alphabetical sort applied AFTER `applyItemFilters`. Kept separate so
+ * the comparator stays composable and unit-testable in isolation.
+ *
+ * `"default"` returns the input array unchanged (same reference) so the
+ * user-managed drag ordering coming out of `getItemsForCollection` is
+ * preserved without an unnecessary allocation.
+ *
+ * The comparator uses `localeCompare(_, undefined, { sensitivity: "base",
+ * numeric: true })` so accented characters collate next to their base
+ * letter (matters for ru/be/pl/de/es users) and "Item 2" sorts before
+ * "Item 10" (natural numeric ordering, not lexicographic).
+ */
+export function applySortMode(
+  items: CollectableItem[],
+  sort: ItemSortMode,
+): CollectableItem[] {
+  if (sort === "default") return items;
+  const sorted = [...items].sort((a, b) =>
+    a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }),
+  );
+  if (sort === "name-desc") sorted.reverse();
+  return sorted;
 }
 
 export function applyItemFilters(items: CollectableItem[], filters: ItemFilters): CollectableItem[] {

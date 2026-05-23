@@ -27,16 +27,18 @@ import {
 import { useI18n } from "@/lib/i18n-context";
 import {
   applyItemFilters,
+  applySortMode,
   countActiveFilters,
   EMPTY_FILTERS,
   type ItemFilters,
+  type ItemSortMode,
 } from "@/lib/item-filters";
 
 // Re-export the pure filter helpers + type so existing call sites that
 // import from `@/components/item-filters` (where this used to live before
 // the lib/ extraction) keep working unchanged.
-export { applyItemFilters, EMPTY_FILTERS };
-export type { ItemFilters };
+export { applyItemFilters, applySortMode, EMPTY_FILTERS };
+export type { ItemFilters, ItemSortMode };
 
 type Props = {
   filters: ItemFilters;
