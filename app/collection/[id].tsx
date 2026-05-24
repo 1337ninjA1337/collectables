@@ -20,6 +20,7 @@ import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
 import { useChunkedList } from "@/lib/use-chunked-list";
+import { distributeIntoMasonryColumns } from "@/lib/masonry";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { formatCostAmount } from "@/lib/format-cost";
 import { useI18n } from "@/lib/i18n-context";
@@ -149,6 +150,16 @@ export default function CollectionDetailsScreen() {
   // sort swap) because `items` is memoized on `[filteredItems, itemFilters.sort]`
   // above and `filteredItems` is memoized on `[allItems, itemFilters]`.
   const { visibleItems, hasMore, loadMore } = useChunkedList(items);
+
+  // Round-robin the visible slice into the two-column masonry layout via the
+  // pure helper so the inline `.filter((_, i) => i % 2 === N)` pair below is
+  // expressed once instead of twice and a future N-column / responsive
+  // breakpoint upgrade only changes the column count, not the modulo math.
+  // Memoized on `visibleItems` so the column arrays keep stable references
+  // when the visible window doesn't change (ItemCard is memo-equality
+  // sensitive — re-allocating the columns each render would needlessly
+  // invalidate downstream memoization).
+  const masonryColumns = useMemo(() => distributeIntoMasonryColumns(visibleItems, 2), [visibleItems]);
 
   // Resolve profile details for every viewer listed on the collection so the
   // share sheet can show non-friends (link-granted viewers) alongside friends.
@@ -602,10 +613,10 @@ export default function CollectionDetailsScreen() {
         ) : (
           <View style={styles.masonryGrid}>
             <View style={styles.masonryCol}>
-              {visibleItems.filter((_, i) => i % 2 === 0).map((item) => <ItemCard key={item.id} item={item} compact />)}
+              {masonryColumns[0].map((item) => <ItemCard key={item.id} item={item} compact />)}
             </View>
             <View style={[styles.masonryCol, styles.masonryColOffset]}>
-              {visibleItems.filter((_, i) => i % 2 === 1).map((item) => <ItemCard key={item.id} item={item} compact />)}
+              {masonryColumns[1].map((item) => <ItemCard key={item.id} item={item} compact />)}
             </View>
           </View>
         )}

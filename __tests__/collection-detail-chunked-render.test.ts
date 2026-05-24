@@ -79,10 +79,19 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
   });
 
   it("masonry branch splits visibleItems across the two columns (not items)", () => {
-    // Both columns use visibleItems — if only one column switched, the
-    // even/odd split would silently produce a half-empty grid.
-    const matches = src.match(/visibleItems\.filter\(\(_,\s*i\)\s*=>\s*i\s*%\s*2\s*===\s*[01]\)\.map/g) ?? [];
-    assert.equal(matches.length, 2, `expected 2 masonry-column maps over visibleItems, got ${matches.length}`);
+    // Post VM-B the round-robin lives inside `distributeIntoMasonryColumns`
+    // and the JSX renders `masonryColumns[0]` / `masonryColumns[1]`. Both
+    // columns must read from the helper output (driven by visibleItems via
+    // the `useMemo([visibleItems])` dep array) — if only one column
+    // switched, the even/odd split would silently produce a half-empty
+    // grid. Pin both the dep on `visibleItems` and that exactly two columns
+    // are rendered.
+    assert.match(
+      src,
+      /useMemo\(\s*\(\)\s*=>\s*distributeIntoMasonryColumns\(\s*visibleItems\s*,\s*2\s*\)\s*,\s*\[\s*visibleItems\s*\]\s*\)/,
+    );
+    const matches = src.match(/masonryColumns\[[01]\]\.map\(\(item\)\s*=>/g) ?? [];
+    assert.equal(matches.length, 2, `expected 2 masonryColumns[N].map renderers, got ${matches.length}`);
   });
 
   it("EmptyState branches still gate off items.length / allItems.length — NOT visibleItems.length", () => {
