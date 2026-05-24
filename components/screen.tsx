@@ -31,6 +31,12 @@ export function Screen({ children, scroll = true, nestable = false, refreshing, 
     ? { ...styles.scrollContent, maxWidth: contentMaxWidth, width: "100%" as const, alignSelf: "center" as const }
     : styles.scrollContent;
 
+  // When scroll=false the inner View must fill the SafeAreaView so a
+  // virtualized list (FlatList/SectionList) inside can size its viewport and
+  // recycle off-screen rows. Without `flex: 1` the View would shrink to its
+  // intrinsic size and the nested FlatList would have height 0.
+  const staticInnerStyle = [innerStyle, styles.fillContent];
+
   const content = nestable ? (
     <NestableScrollContainer contentContainerStyle={innerStyle} refreshControl={refreshControl}>
       {children}
@@ -40,7 +46,7 @@ export function Screen({ children, scroll = true, nestable = false, refreshing, 
       {children}
     </ScrollView>
   ) : (
-    <View style={innerStyle}>{children}</View>
+    <View style={staticInnerStyle}>{children}</View>
   );
 
   return (
@@ -61,5 +67,8 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 32,
     gap: 18,
+  },
+  fillContent: {
+    flex: 1,
   },
 });

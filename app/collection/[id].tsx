@@ -1,7 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, FlatList, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, FlatList, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { applyItemFilters, applySortMode, EMPTY_FILTERS, ItemFilterBar, type ItemFilters } from "@/components/item-filters";
@@ -416,9 +416,24 @@ export default function CollectionDetailsScreen() {
     </ScaleDecorator>
   );
 
-  return (
-    <Screen nestable refreshing={refreshing} onRefresh={handleRefresh}>
-      <Stack.Screen options={{ title: activeCollection.name }} />
+  // VM-D: When the viewer/read-only branch (the FlatList numColumns=2 case)
+  // is active, hoist the outer scroll INTO the FlatList itself so iOS can
+  // recycle off-screen rows. Pre-VM-D the inner FlatList lived inside a
+  // ScrollView with its scrolling disabled and every item card mounted up-
+  // front — virtualization can't kick in unless the FlatList owns the scroll. The
+  // drag-mode and selection-mode branches stay on `<Screen nestable>` since
+  // drag needs `NestableScrollContainer`'s gesture coordination and selection
+  // renders a non-virtualized vertical list (VM-E migrates selection too).
+  const isViewerFlatListBranch =
+    items.length > 0 && (!isOwner || (!selectionMode && itemFilters.sort !== "default"));
+
+  // Hero + summary + total + reactions + owner-actions — the JSX that sits
+  // above the items list in BOTH render paths. Wrapped in a single View with
+  // a vertical gap so the viewer-FlatList path (where ListHeaderComponent
+  // doesn't get the outer ScrollView's `gap: 18`) keeps the original visual
+  // rhythm.
+  const pageHeader = (
+    <View style={styles.pageHeader}>
       <View style={{...styles.hero, ...(!activeCollection.coverPhoto ? { backgroundColor: placeholderColor(activeCollection.id) } : {})}}>
         {activeCollection.coverPhoto ? (
           <Image
@@ -542,132 +557,34 @@ export default function CollectionDetailsScreen() {
           </Pressable>
         </View>
       )}
+    </View>
+  );
 
-      <View style={styles.listWrap}>
-        <Text style={styles.listTitle}>{t("collectionItems")}</Text>
-        {allItems.length > 0 ? (
-          <ItemFilterBar filters={itemFilters} onChange={setItemFilters} />
-        ) : null}
-        {allItems.length === 0 ? (
-          <EmptyState
-            icon="✨"
-            title={t("emptyItemsTitle")}
-            hint={t("emptyItemsHint")}
-            actionLabel={isOwner ? t("emptyItemsCta") : undefined}
-            onAction={isOwner ? () => router.push({ pathname: "/create", params: { collectionId: activeCollection.id } }) : undefined}
-          />
-        ) : items.length === 0 ? (
-          <EmptyState
-            icon="🔎"
-            title={t("emptySearchTitle")}
-            hint={t("emptySearchHint")}
-            actionLabel={t("filterReset")}
-            onAction={() => setItemFilters(EMPTY_FILTERS)}
-            compact
-          />
-        ) : isOwner && !selectionMode && itemFilters.sort === "default" ? (
-          // Drag-mode is gated on `itemFilters.sort === "default"` so the user
-          // can never drag while alphabetically sorted — otherwise onDragEnd
-          // would re-write `sortOrder` based on the visible (alphabetical)
-          // order and silently corrupt the manual drag order. When the gate
-          // falls through (any non-default sort), we fall back to the masonry
-          // branch below so owners still see their collection.
-          <NestableDraggableFlatList
-            data={visibleItems}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItemRow}
-            onDragEnd={({ data }) => {
-              // Drag-reorder must operate on the full filtered list, not just
-              // the visible window — otherwise items below the page boundary
-              // would be re-sortOrdered to 0..N-1 alongside the visible slice
-              // and shuffle relative to each other. Append the unrendered
-              // tail in its existing order so only the visible slice moves.
-              const visibleIds = new Set(visibleItems.map((i) => i.id));
-              const tail = items.filter((i) => !visibleIds.has(i.id));
-              reorderItemsInCollection(activeCollection.id, [...data, ...tail].map((i) => i.id));
-            }}
-            contentContainerStyle={styles.draggableList}
-          />
-        ) : isOwner && selectionMode ? (
-          <View style={styles.selectList}>
-            {visibleItems.map((item) => (
-              <SelectableItemRow
-                key={item.id}
-                item={item}
-                selected={selectedIds.has(item.id)}
-                onToggle={toggleSelect}
-              />
-            ))}
-          </View>
-        ) : (
-          // FlatList numColumns={2} replaces the prior two-column <View>
-          // masonry pair — FlatList itself distributes items across the
-          // columns, so the round-robin helper is no longer needed here.
-          // Row heights are uniform (compact ItemCard has a fixed image
-          // height), so the staggered masonry offset is intentionally
-          // dropped. `scrollEnabled={false}` because the outer <Screen
-          // nestable> ScrollView owns scrolling until VM-D hoists the
-          // outer scroll into this FlatList directly.
-          <FlatList
-            data={visibleItems}
-            numColumns={2}
-            scrollEnabled={false}
-            keyExtractor={(item) => item.id}
-            columnWrapperStyle={styles.masonryRow}
-            contentContainerStyle={styles.masonryList}
-            renderItem={({ item }) => (
-              <View style={styles.masonryItem}>
-                <ItemCard item={item} compact />
-              </View>
-            )}
-          />
-        )}
-        {hasMore ? (
-          <Pressable
-            style={styles.loadMore}
-            onPress={loadMore}
-            accessibilityRole="button"
-            accessibilityLabel={t("loadMoreItemsA11y", { count: items.length - visibleItems.length })}
-            accessibilityHint={t("loadMoreItemsHint")}
-          >
-            <Text style={styles.loadMoreText}>
-              {t("loadMoreItems", { count: items.length - visibleItems.length })}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      {selectionMode ? (
-        <View style={styles.bulkBarSpacer} />
+  const listTitleAndFilters = (
+    <>
+      <Text style={styles.listTitle}>{t("collectionItems")}</Text>
+      {allItems.length > 0 ? (
+        <ItemFilterBar filters={itemFilters} onChange={setItemFilters} />
       ) : null}
+    </>
+  );
 
-      {selectionMode ? (
-        <View style={styles.bulkBar} pointerEvents="box-none">
-          <View style={styles.bulkBarInner}>
-            <Text style={styles.bulkBarCount}>{t("selectedCount", { count: selectedIds.size })}</Text>
-            <View style={styles.bulkBarButtons}>
-              <Pressable
-                style={{...styles.bulkBarButton, ...(selectedIds.size === 0 ? styles.bulkBarButtonDisabled : {})}}
-                disabled={selectedIds.size === 0}
-                onPress={handleOpenMove}
-              >
-                <Text style={styles.bulkBarButtonText}>{t("moveToCollection")}</Text>
-              </Pressable>
-              <Pressable
-                style={{...styles.bulkBarButton, ...styles.bulkBarButtonDanger, ...(selectedIds.size === 0 ? styles.bulkBarButtonDisabled : {})}}
-                disabled={selectedIds.size === 0}
-                onPress={handleBulkDelete}
-              >
-                <Text style={{...styles.bulkBarButtonText, ...styles.bulkBarButtonDangerText}}>{t("delete")}</Text>
-              </Pressable>
-              <Pressable style={{...styles.bulkBarButton, ...styles.bulkBarButtonGhost}} onPress={exitSelectionMode}>
-                <Text style={styles.bulkBarButtonText}>{t("cancel")}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      ) : null}
+  const loadMoreCta = hasMore ? (
+    <Pressable
+      style={styles.loadMore}
+      onPress={loadMore}
+      accessibilityRole="button"
+      accessibilityLabel={t("loadMoreItemsA11y", { count: items.length - visibleItems.length })}
+      accessibilityHint={t("loadMoreItemsHint")}
+    >
+      <Text style={styles.loadMoreText}>
+        {t("loadMoreItems", { count: items.length - visibleItems.length })}
+      </Text>
+    </Pressable>
+  ) : null;
 
+  const modalsBlock = (
+    <>
       <Modal visible={moveModalOpen} transparent animationType="fade" onRequestClose={() => setMoveModalOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setMoveModalOpen(false)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
@@ -913,6 +830,144 @@ export default function CollectionDetailsScreen() {
         }}
         onClose={() => setCurrencySheetOpen(false)}
       />
+    </>
+  );
+
+  if (isViewerFlatListBranch) {
+    return (
+      <Screen scroll={false}>
+        <Stack.Screen options={{ title: activeCollection.name }} />
+        <FlatList
+          data={visibleItems}
+          numColumns={2}
+          keyExtractor={(item) => item.id}
+          columnWrapperStyle={styles.masonryRow}
+          contentContainerStyle={styles.viewerFlatListContent}
+          ListHeaderComponent={
+            <View style={styles.viewerListHeader}>
+              {pageHeader}
+              <View style={styles.listWrap}>{listTitleAndFilters}</View>
+            </View>
+          }
+          ListFooterComponent={loadMoreCta}
+          renderItem={({ item }) => (
+            <View style={styles.masonryItem}>
+              <ItemCard item={item} compact />
+            </View>
+          )}
+          initialNumToRender={10}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === "ios"}
+          refreshControl={
+            <RefreshControl
+              refreshing={!!refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#8a5a2b"
+              colors={["#8a5a2b"]}
+            />
+          }
+          style={styles.viewerFlatList}
+        />
+        {modalsBlock}
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen nestable refreshing={refreshing} onRefresh={handleRefresh}>
+      <Stack.Screen options={{ title: activeCollection.name }} />
+      {pageHeader}
+
+      <View style={styles.listWrap}>
+        {listTitleAndFilters}
+        {allItems.length === 0 ? (
+          <EmptyState
+            icon="✨"
+            title={t("emptyItemsTitle")}
+            hint={t("emptyItemsHint")}
+            actionLabel={isOwner ? t("emptyItemsCta") : undefined}
+            onAction={isOwner ? () => router.push({ pathname: "/create", params: { collectionId: activeCollection.id } }) : undefined}
+          />
+        ) : items.length === 0 ? (
+          <EmptyState
+            icon="🔎"
+            title={t("emptySearchTitle")}
+            hint={t("emptySearchHint")}
+            actionLabel={t("filterReset")}
+            onAction={() => setItemFilters(EMPTY_FILTERS)}
+            compact
+          />
+        ) : isOwner && !selectionMode && itemFilters.sort === "default" ? (
+          // Drag-mode is gated on `itemFilters.sort === "default"` so the user
+          // can never drag while alphabetically sorted — otherwise onDragEnd
+          // would re-write `sortOrder` based on the visible (alphabetical)
+          // order and silently corrupt the manual drag order. When the gate
+          // falls through (any non-default sort), the early-return above hands
+          // owners back to the viewer-FlatList branch.
+          <NestableDraggableFlatList
+            data={visibleItems}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItemRow}
+            onDragEnd={({ data }) => {
+              // Drag-reorder must operate on the full filtered list, not just
+              // the visible window — otherwise items below the page boundary
+              // would be re-sortOrdered to 0..N-1 alongside the visible slice
+              // and shuffle relative to each other. Append the unrendered
+              // tail in its existing order so only the visible slice moves.
+              const visibleIds = new Set(visibleItems.map((i) => i.id));
+              const tail = items.filter((i) => !visibleIds.has(i.id));
+              reorderItemsInCollection(activeCollection.id, [...data, ...tail].map((i) => i.id));
+            }}
+            contentContainerStyle={styles.draggableList}
+          />
+        ) : isOwner && selectionMode ? (
+          <View style={styles.selectList}>
+            {visibleItems.map((item) => (
+              <SelectableItemRow
+                key={item.id}
+                item={item}
+                selected={selectedIds.has(item.id)}
+                onToggle={toggleSelect}
+              />
+            ))}
+          </View>
+        ) : null}
+        {loadMoreCta}
+      </View>
+
+      {selectionMode ? (
+        <View style={styles.bulkBarSpacer} />
+      ) : null}
+
+      {selectionMode ? (
+        <View style={styles.bulkBar} pointerEvents="box-none">
+          <View style={styles.bulkBarInner}>
+            <Text style={styles.bulkBarCount}>{t("selectedCount", { count: selectedIds.size })}</Text>
+            <View style={styles.bulkBarButtons}>
+              <Pressable
+                style={{...styles.bulkBarButton, ...(selectedIds.size === 0 ? styles.bulkBarButtonDisabled : {})}}
+                disabled={selectedIds.size === 0}
+                onPress={handleOpenMove}
+              >
+                <Text style={styles.bulkBarButtonText}>{t("moveToCollection")}</Text>
+              </Pressable>
+              <Pressable
+                style={{...styles.bulkBarButton, ...styles.bulkBarButtonDanger, ...(selectedIds.size === 0 ? styles.bulkBarButtonDisabled : {})}}
+                disabled={selectedIds.size === 0}
+                onPress={handleBulkDelete}
+              >
+                <Text style={{...styles.bulkBarButtonText, ...styles.bulkBarButtonDangerText}}>{t("delete")}</Text>
+              </Pressable>
+              <Pressable style={{...styles.bulkBarButton, ...styles.bulkBarButtonGhost}} onPress={exitSelectionMode}>
+                <Text style={styles.bulkBarButtonText}>{t("cancel")}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {modalsBlock}
     </Screen>
   );
 }
@@ -1213,6 +1268,32 @@ const styles = StyleSheet.create({
   },
   masonryItem: {
     flex: 1,
+  },
+  // VM-D: pageHeader is the View wrapper around hero/summary/total/reactions/
+  // owner-actions. Its `gap: 18` matches the outer scroll content gap so the
+  // viewer-FlatList path (where ListHeaderComponent doesn't get the outer
+  // ScrollView's gap) keeps the same vertical rhythm as the nestable path.
+  pageHeader: {
+    gap: 18,
+  },
+  // VM-D: wrap inside ListHeaderComponent so pageHeader + listWrap (title +
+  // filters) have the original 18px gap between them inside the FlatList
+  // header slot (the FlatList contentContainerStyle gap controls row gaps,
+  // not in-header gaps).
+  viewerListHeader: {
+    gap: 18,
+  },
+  // VM-D: FlatList itself owns the scroll in the viewer branch — flex:1 so it
+  // fills the Screen's inner View vertically.
+  viewerFlatList: {
+    flex: 1,
+  },
+  // VM-D: the Screen's inner View (scroll=false) already pads 20px / 32 on
+  // bottom around the FlatList, so contentContainerStyle adds only the row
+  // gap that previously lived on `masonryList`. Mirrors the 10px row gap of
+  // the pre-VM-D inline masonry FlatList so the visual rhythm is preserved.
+  viewerFlatListContent: {
+    gap: 10,
   },
   bulkBarSpacer: {
     height: 120,
