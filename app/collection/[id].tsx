@@ -922,16 +922,33 @@ export default function CollectionDetailsScreen() {
             contentContainerStyle={styles.draggableList}
           />
         ) : isOwner && selectionMode ? (
-          <View style={styles.selectList}>
-            {visibleItems.map((item) => (
+          // VM-E: selection-mode now renders via `<FlatList>` so the same
+          // chunked-window mount discipline that VM-A/B/C/D applies to the
+          // viewer branch also bounds selection mode. `scrollEnabled={false}`
+          // because the outer `<Screen nestable>` ScrollView owns scrolling
+          // — selection mode keeps the bulk-bar pinned at the bottom of the
+          // viewport so it can't be hoisted into the FlatList without losing
+          // the bulk-bar UX. FlatList still limits the initial mount via
+          // `initialNumToRender` and React.memo, so the per-row image fetch
+          // cost in selection mode no longer scales linearly with collection
+          // size.
+          <FlatList
+            data={visibleItems}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
               <SelectableItemRow
-                key={item.id}
                 item={item}
                 selected={selectedIds.has(item.id)}
                 onToggle={toggleSelect}
               />
-            ))}
-          </View>
+            )}
+            scrollEnabled={false}
+            contentContainerStyle={styles.selectList}
+            initialNumToRender={10}
+            maxToRenderPerBatch={8}
+            windowSize={5}
+            removeClippedSubviews={Platform.OS === "ios"}
+          />
         ) : null}
         {loadMoreCta}
       </View>

@@ -185,7 +185,14 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // block lived inside the listWrap's ternary chain. VM-D removes it
     // because the viewer-FlatList branch handles all those cases via the
     // early-return — leaving it would be dead code AND would mismatch the
-    // scrollEnabled={false} test pin.
-    assert.doesNotMatch(src, /scrollEnabled=\{\s*false\s*\}/);
+    // scrollEnabled={false} test pin. The viewer FlatList (the one that
+    // OWNS the outer scroll post-VM-D) is identified by `numColumns={2}`,
+    // and that block must NOT carry scrollEnabled={false}. The selection-
+    // mode FlatList from VM-E lives in a different branch and intentionally
+    // keeps scrollEnabled={false} because the outer ScrollView still owns
+    // scroll for selection mode.
+    const viewerFlatListBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?\/>/);
+    assert.ok(viewerFlatListBlock, "viewer FlatList (numColumns={2}) not found");
+    assert.doesNotMatch(viewerFlatListBlock[0], /scrollEnabled=\{\s*false\s*\}/);
   });
 });

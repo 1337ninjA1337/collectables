@@ -78,10 +78,13 @@ describe("app/collection/[id].tsx — FlatList viewer-masonry migration (VM-C)",
     const src = readSrc();
     // VM-D hoists the outer scroll INTO the viewer-branch FlatList itself,
     // so the FlatList is now the scrollable surface (not nested inside a
-    // ScrollView). The pre-VM-D `scrollEnabled={false}` gate is gone —
-    // without it iOS can recycle off-screen rows. The only `<FlatList ... />`
-    // in this file is the viewer-branch one (drag uses NestableDraggableFlatList).
-    assert.doesNotMatch(src, /<FlatList[\s\S]*?scrollEnabled=\{\s*false\s*\}[\s\S]*?\/>/);
+    // ScrollView). The viewer FlatList is identified by `numColumns={2}` —
+    // the selection-mode FlatList (VM-E) is a different list with NO
+    // numColumns prop and intentionally keeps scrollEnabled={false}
+    // because the outer ScrollView still owns scroll for selection mode.
+    const viewerFlatListBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?\/>/);
+    assert.ok(viewerFlatListBlock, "viewer FlatList (numColumns={2}) not found");
+    assert.doesNotMatch(viewerFlatListBlock[0], /scrollEnabled=\{\s*false\s*\}/);
   });
 
   it("declares masonryList / masonryRow / masonryItem styles for the FlatList", () => {

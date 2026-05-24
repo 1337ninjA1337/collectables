@@ -71,10 +71,21 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     );
   });
 
-  it("selection-mode branch maps over visibleItems (not items)", () => {
+  it("selection-mode branch feeds visibleItems into a FlatList (VM-E — not items, not a .map)", () => {
+    // Post VM-E the owner+selection-mode branch renders a `<FlatList>` with
+    // `data={visibleItems}` (NOT `data={items}` — the chunked-window mount
+    // bound from VM-A/B must still apply). The pre-VM-E `.map()` over
+    // visibleItems is gone — FlatList's renderItem handles the iteration
+    // and React.memo can actually skip unchanged rows. The data source
+    // MUST stay on `visibleItems` so the chunked window still bounds the
+    // mount count in selection mode too.
+    assert.match(src, /<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}[\s\S]*?renderItem=\{[\s\S]*?<SelectableItemRow[\s\S]*?\/>/);
+    // The selection-mode FlatList lives inside the ternary `: isOwner && selectionMode ?`
+    // branch — pin the structural shape so a regression that swaps `data`
+    // back to `items` fails loudly.
     assert.match(
       src,
-      /selectList[\s\S]*?\{\s*visibleItems\.map\(\(item\)\s*=>\s*\(\s*\n\s*<SelectableItemRow/,
+      /isOwner\s*&&\s*selectionMode\s*\?[\s\S]*?<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}[\s\S]*?<SelectableItemRow/,
     );
   });
 
