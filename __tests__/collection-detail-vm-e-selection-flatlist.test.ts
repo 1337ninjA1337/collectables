@@ -26,11 +26,19 @@ describe("app/collection/[id].tsx — VM-E selection-mode FlatList migration", (
     const src = readSrc();
     // The structural pin: inside `isOwner && selectionMode ?` the renderer
     // is now `<FlatList data={visibleItems}>` with a SelectableItemRow
-    // renderItem. A regression where someone reverts to .map would fail.
+    // renderItem (post VM-F the row is rendered via a hoisted
+    // `renderSelectableRow` useCallback — the FlatList still owns the path,
+    // we just check the FlatList + visibleItems shape here and let the VM-F
+    // test file pin the useCallback contract). A regression where someone
+    // reverts to .map would still fail.
     assert.match(
       src,
-      /isOwner\s*&&\s*selectionMode\s*\?\s*\([\s\S]*?<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}[\s\S]*?renderItem=\{[\s\S]*?<SelectableItemRow/,
+      /isOwner\s*&&\s*selectionMode\s*\?\s*\([\s\S]*?<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}/,
     );
+    // And the SelectableItemRow JSX still exists somewhere in the file
+    // (either inline pre-VM-F, or inside the renderSelectableRow useCallback
+    // post-VM-F).
+    assert.match(src, /<SelectableItemRow/);
   });
 
   it("selection-mode FlatList keyExtractor returns item.id (so React keys survive re-renders)", () => {

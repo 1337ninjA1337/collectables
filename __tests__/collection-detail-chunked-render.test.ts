@@ -78,14 +78,18 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     // visibleItems is gone — FlatList's renderItem handles the iteration
     // and React.memo can actually skip unchanged rows. The data source
     // MUST stay on `visibleItems` so the chunked window still bounds the
-    // mount count in selection mode too.
-    assert.match(src, /<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}[\s\S]*?renderItem=\{[\s\S]*?<SelectableItemRow[\s\S]*?\/>/);
+    // mount count in selection mode too. Post VM-F the renderItem is the
+    // hoisted `renderSelectableRow` useCallback (the `<SelectableItemRow>`
+    // JSX lives inside that callback rather than inline) — both shapes are
+    // valid; the file just has to reference SelectableItemRow somewhere.
+    assert.match(src, /<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}/);
+    assert.match(src, /<SelectableItemRow/);
     // The selection-mode FlatList lives inside the ternary `: isOwner && selectionMode ?`
     // branch — pin the structural shape so a regression that swaps `data`
     // back to `items` fails loudly.
     assert.match(
       src,
-      /isOwner\s*&&\s*selectionMode\s*\?[\s\S]*?<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}[\s\S]*?<SelectableItemRow/,
+      /isOwner\s*&&\s*selectionMode\s*\?[\s\S]*?<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}/,
     );
   });
 

@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, FlatList, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
@@ -232,14 +232,17 @@ export default function CollectionDetailsScreen() {
     (c) => c.role === "owner" && c.id !== activeCollection.id,
   );
 
-  function toggleSelect(id: string) {
+  // VM-F: stable `useCallback` (empty deps — `setSelectedIds` is React-stable)
+  // so `<SelectableItemRow>`'s `onToggle` prop is referentially equal across
+  // renders, letting the row's React.memo wrapper skip re-render work.
+  const toggleSelect = useCallback((id: string) => {
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  }
+  }, []);
 
   function enterSelectionMode() {
     setSelectionMode(true);
@@ -414,6 +417,29 @@ export default function CollectionDetailsScreen() {
         <ItemCard item={item} />
       </Pressable>
     </ScaleDecorator>
+  );
+
+  // VM-F: hoist the selection-mode FlatList renderItem into a `useCallback`
+  // so React.memo on `<SelectableItemRow>` (the row-component memo) can
+  // actually skip re-render work for rows whose `selected` flag didn't
+  // change between toggles. Pre-VM-F the inline arrow `({ item }) => (...)`
+  // allocated a fresh closure every parent render, defeating the row memo.
+  // The dep list intentionally carries `selectedIds` (each toggle produces a
+  // new Set reference) so `<SelectableItemRow>`'s `selected` boolean prop is
+  // recomputed; the row memo then compares props and skips for rows whose
+  // boolean didn't change. Pair with `extraData={selectedIds}` on the
+  // FlatList so virtualization knows to consider re-rendering when the
+  // selection set mutates even though `data={visibleItems}` reference is
+  // stable across a single toggle.
+  const renderSelectableRow = useCallback(
+    ({ item }: { item: CollectableItem }) => (
+      <SelectableItemRow
+        item={item}
+        selected={selectedIds.has(item.id)}
+        onToggle={toggleSelect}
+      />
+    ),
+    [selectedIds, toggleSelect],
   );
 
   // VM-D: When the viewer/read-only branch (the FlatList numColumns=2 case)
@@ -935,13 +961,8 @@ export default function CollectionDetailsScreen() {
           <FlatList
             data={visibleItems}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <SelectableItemRow
-                item={item}
-                selected={selectedIds.has(item.id)}
-                onToggle={toggleSelect}
-              />
-            )}
+            renderItem={renderSelectableRow}
+            extraData={selectedIds}
             scrollEnabled={false}
             contentContainerStyle={styles.selectList}
             initialNumToRender={10}
