@@ -1,7 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, FlatList, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { applyItemFilters, applySortMode, EMPTY_FILTERS, ItemFilterBar, type ItemFilters } from "@/components/item-filters";
@@ -20,7 +20,6 @@ import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
 import { useChunkedList } from "@/lib/use-chunked-list";
-import { distributeIntoMasonryColumns } from "@/lib/masonry";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { formatCostAmount } from "@/lib/format-cost";
 import { useI18n } from "@/lib/i18n-context";
@@ -150,16 +149,6 @@ export default function CollectionDetailsScreen() {
   // sort swap) because `items` is memoized on `[filteredItems, itemFilters.sort]`
   // above and `filteredItems` is memoized on `[allItems, itemFilters]`.
   const { visibleItems, hasMore, loadMore } = useChunkedList(items);
-
-  // Round-robin the visible slice into the two-column masonry layout via the
-  // pure helper so the inline `.filter((_, i) => i % 2 === N)` pair below is
-  // expressed once instead of twice and a future N-column / responsive
-  // breakpoint upgrade only changes the column count, not the modulo math.
-  // Memoized on `visibleItems` so the column arrays keep stable references
-  // when the visible window doesn't change (ItemCard is memo-equality
-  // sensitive — re-allocating the columns each render would needlessly
-  // invalidate downstream memoization).
-  const masonryColumns = useMemo(() => distributeIntoMasonryColumns(visibleItems, 2), [visibleItems]);
 
   // Resolve profile details for every viewer listed on the collection so the
   // share sheet can show non-friends (link-granted viewers) alongside friends.
@@ -611,14 +600,27 @@ export default function CollectionDetailsScreen() {
             ))}
           </View>
         ) : (
-          <View style={styles.masonryGrid}>
-            <View style={styles.masonryCol}>
-              {masonryColumns[0].map((item) => <ItemCard key={item.id} item={item} compact />)}
-            </View>
-            <View style={[styles.masonryCol, styles.masonryColOffset]}>
-              {masonryColumns[1].map((item) => <ItemCard key={item.id} item={item} compact />)}
-            </View>
-          </View>
+          // FlatList numColumns={2} replaces the prior two-column <View>
+          // masonry pair — FlatList itself distributes items across the
+          // columns, so the round-robin helper is no longer needed here.
+          // Row heights are uniform (compact ItemCard has a fixed image
+          // height), so the staggered masonry offset is intentionally
+          // dropped. `scrollEnabled={false}` because the outer <Screen
+          // nestable> ScrollView owns scrolling until VM-D hoists the
+          // outer scroll into this FlatList directly.
+          <FlatList
+            data={visibleItems}
+            numColumns={2}
+            scrollEnabled={false}
+            keyExtractor={(item) => item.id}
+            columnWrapperStyle={styles.masonryRow}
+            contentContainerStyle={styles.masonryList}
+            renderItem={({ item }) => (
+              <View style={styles.masonryItem}>
+                <ItemCard item={item} compact />
+              </View>
+            )}
+          />
         )}
         {hasMore ? (
           <Pressable
@@ -1203,16 +1205,14 @@ const styles = StyleSheet.create({
   selectList: {
     gap: 12,
   },
-  masonryGrid: {
-    flexDirection: "row",
+  masonryList: {
     gap: 10,
   },
-  masonryCol: {
+  masonryRow: {
+    gap: 10,
+  },
+  masonryItem: {
     flex: 1,
-    gap: 10,
-  },
-  masonryColOffset: {
-    marginTop: 24,
   },
   bulkBarSpacer: {
     height: 120,

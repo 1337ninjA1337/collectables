@@ -78,20 +78,17 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     );
   });
 
-  it("masonry branch splits visibleItems across the two columns (not items)", () => {
-    // Post VM-B the round-robin lives inside `distributeIntoMasonryColumns`
-    // and the JSX renders `masonryColumns[0]` / `masonryColumns[1]`. Both
-    // columns must read from the helper output (driven by visibleItems via
-    // the `useMemo([visibleItems])` dep array) — if only one column
-    // switched, the even/odd split would silently produce a half-empty
-    // grid. Pin both the dep on `visibleItems` and that exactly two columns
-    // are rendered.
-    assert.match(
-      src,
-      /useMemo\(\s*\(\)\s*=>\s*distributeIntoMasonryColumns\(\s*visibleItems\s*,\s*2\s*\)\s*,\s*\[\s*visibleItems\s*\]\s*\)/,
-    );
-    const matches = src.match(/masonryColumns\[[01]\]\.map\(\(item\)\s*=>/g) ?? [];
-    assert.equal(matches.length, 2, `expected 2 masonryColumns[N].map renderers, got ${matches.length}`);
+  it("masonry branch feeds visibleItems into a FlatList numColumns={2} (VM-C)", () => {
+    // Post VM-C the viewer/read-only branch renders a `<FlatList>` with
+    // `numColumns={2}` and `data={visibleItems}` — FlatList itself handles
+    // the column distribution, so the previous `distributeIntoMasonryColumns`
+    // helper + inline modulo split are gone. The data source MUST stay on
+    // `visibleItems` (not `items`) so the chunked window still bounds the
+    // mount count, and `numColumns={2}` MUST be a literal so a typo can't
+    // silently collapse the grid to a single column.
+    assert.match(src, /<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}[\s\S]*?\/>/);
+    assert.match(src, /<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?\/>/);
+    assert.match(src, /<FlatList[\s\S]*?keyExtractor=\{\s*\(item\)\s*=>\s*item\.id\s*\}[\s\S]*?\/>/);
   });
 
   it("EmptyState branches still gate off items.length / allItems.length — NOT visibleItems.length", () => {
