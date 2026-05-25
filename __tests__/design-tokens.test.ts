@@ -87,6 +87,7 @@ import {
   MUTED_24,
   MUTED_25,
   MUTED_26,
+  MUTED_27,
   PAGE_BG,
   PAGE_BG_2,
   PAGE_BG_3,
@@ -1316,6 +1317,28 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bHERO_DARK\b/);
     assert.match(src, /\bMUTED_11\b/);
     assert.match(src, /\bTEXT_ON_DARK_5\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("exposes the MUTED_27 variant shipped for the currency-input migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(MUTED_27, hex);
+    assert.equal(MUTED_27, "#5a4030");
+    assert.equal(designTokens.MUTED_27, "#5a4030");
+  });
+
+  it("components/currency-input.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/currency-input.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bBORDER\b/);
+    assert.match(src, /\bCARD_BG_2\b/);
+    assert.match(src, /\bHERO_DARK\b/);
+    assert.match(src, /\bMUTED_27\b/);
+    assert.match(src, /\bPLACEHOLDER\b/);
+    assert.match(src, /\bPURE_WHITE\b/);
+    assert.match(src, /\bTEXT_DARK\b/);
+    assert.match(src, /\bTEXT_ON_DARK_2\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

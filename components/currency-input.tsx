@@ -1,4 +1,14 @@
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  BORDER,
+  CARD_BG_2,
+  HERO_DARK,
+  MUTED_27,
+  PLACEHOLDER,
+  PURE_WHITE,
+  TEXT_DARK,
+  TEXT_ON_DARK_2,
+} from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
 import { CURRENCY_CHIPS, getDefaultCurrencyForLanguage } from "@/lib/locale-helpers";
 
@@ -37,7 +47,7 @@ export function CurrencyInput({
           value={value}
           onChangeText={(raw) => onChangeValue(sanitize(raw))}
           placeholder={placeholder}
-          placeholderTextColor="#9b8571"
+          placeholderTextColor={PLACEHOLDER}
           keyboardType="decimal-pad"
           style={styles.input}
           returnKeyType="done"
@@ -79,22 +89,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 22,
-    backgroundColor: "#ffffff",
+    backgroundColor: PURE_WHITE,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 16,
     paddingVertical: 14,
     gap: 8,
   },
   currencySymbol: {
-    color: "#5a4030",
+    color: MUTED_27,
     fontSize: 15,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
   input: {
     flex: 1,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 16,
     fontFamily: FONT_BODY,
     padding: 0,
@@ -105,23 +115,23 @@ const styles = StyleSheet.create({
   chip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#eadbc8",
-    backgroundColor: "#fff7ef",
+    borderColor: BORDER,
+    backgroundColor: CARD_BG_2,
     paddingHorizontal: 12,
     paddingVertical: 5,
     marginRight: 6,
   },
   chipActive: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
+    backgroundColor: HERO_DARK,
+    borderColor: HERO_DARK,
   },
   chipText: {
-    color: "#5a4030",
+    color: MUTED_27,
     fontSize: 12,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
   chipTextActive: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
   },
 });
