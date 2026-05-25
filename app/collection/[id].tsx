@@ -29,6 +29,48 @@ import { fetchCollectionById, fetchItemsByCollectionId } from "@/lib/supabase-pr
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem, Collection, CollectionVisibility } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import {
+  ACCENT_DEEP,
+  AMBER_ACCENT,
+  AMBER_LIGHT_2,
+  AMBER_MUTED_2,
+  AMBER_MUTED_7,
+  AMBER_MUTED_8,
+  AMBER_SOFT,
+  BORDER,
+  BORDER_7,
+  CARD_BG,
+  CARD_BG_3,
+  CARD_BG_9,
+  CARD_BG_10,
+  CARD_BG_13,
+  DANGER,
+  DANGER_DEEP_4,
+  DANGER_SOFT_2,
+  DANGER_SOFT_5,
+  HERO_DARK,
+  HERO_DARK_2,
+  HERO_DARK_8,
+  HERO_DARK_9,
+  MUTED,
+  MUTED_2,
+  MUTED_3,
+  MUTED_5,
+  MUTED_10,
+  MUTED_17,
+  MUTED_22,
+  MUTED_23,
+  PLACEHOLDER,
+  PURE_WHITE,
+  SUCCESS_GREEN_2,
+  TEXT_DARK,
+  TEXT_DARK_2,
+  TEXT_DARK_3,
+  TEXT_ON_DARK,
+  TEXT_ON_DARK_2,
+  TEXT_ON_DARK_4,
+  TEXT_ON_DARK_9,
+} from "@/lib/design-tokens";
 
 export default function CollectionDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -760,7 +802,7 @@ export default function CollectionDetailsScreen() {
                 value={editName}
                 onChangeText={setEditName}
                 placeholder={t("collectionNamePlaceholder")}
-                placeholderTextColor="#9b8571"
+                placeholderTextColor={PLACEHOLDER}
                 style={styles.editFieldInput}
               />
             </View>
@@ -771,7 +813,7 @@ export default function CollectionDetailsScreen() {
                 value={editDescription}
                 onChangeText={setEditDescription}
                 placeholder={t("collectionDescriptionPlaceholder")}
-                placeholderTextColor="#9b8571"
+                placeholderTextColor={PLACEHOLDER}
                 multiline
                 textAlignVertical="top"
                 style={{...styles.editFieldInput, ...styles.editFieldInputMultiline}}
@@ -889,8 +931,8 @@ export default function CollectionDetailsScreen() {
             <RefreshControl
               refreshing={!!refreshing}
               onRefresh={handleRefresh}
-              tintColor="#8a5a2b"
-              colors={["#8a5a2b"]}
+              tintColor={ACCENT_DEEP}
+              colors={[ACCENT_DEEP]}
             />
           }
           style={styles.viewerFlatList}
@@ -1016,7 +1058,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     justifyContent: "flex-end",
-    backgroundColor: "#cfb394",
+    backgroundColor: AMBER_MUTED_8,
   },
   heroImage: {
     ...StyleSheet.absoluteFillObject,
@@ -1030,19 +1072,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   heroTitle: {
-    color: "#ffffff",
+    color: PURE_WHITE,
     fontSize: 30,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY,
   },
   heroText: {
-    color: "#f8eee3",
+    color: TEXT_ON_DARK_9,
     lineHeight: 22,
     fontSize: 15,
     fontFamily: FONT_BODY,
   },
   heroMeta: {
-    color: "#ffd7ab",
+    color: AMBER_LIGHT_2,
     fontWeight: "700",
     fontSize: 14,
     fontFamily: FONT_BODY_BOLD,
@@ -1055,19 +1097,19 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 24,
     padding: 18,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     gap: 6,
   },
   summaryNumber: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#2d2117",
+    color: TEXT_DARK_3,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   summaryLabel: {
-    color: "#715d4d",
+    color: MUTED_5,
     lineHeight: 21,
     fontFamily: FONT_BODY,
   },
@@ -1082,13 +1124,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: "#e4c29a",
-    backgroundColor: "#fff1df",
+    borderColor: AMBER_SOFT,
+    backgroundColor: CARD_BG_3,
     alignItems: "center",
     marginTop: 4,
   },
   loadMoreText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontSize: 15,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
@@ -1101,15 +1143,15 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: "#c4a87a",
-    backgroundColor: "#fff8ee",
+    borderColor: AMBER_MUTED_7,
+    backgroundColor: CARD_BG_13,
     alignItems: "center",
   },
   exportButtonDisabled: {
     opacity: 0.6,
   },
   exportButtonText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1119,12 +1161,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: "#c4a87a",
-    backgroundColor: "#fff4e5",
+    borderColor: AMBER_MUTED_7,
+    backgroundColor: CARD_BG_9,
     alignItems: "center",
   },
   shareButtonText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1135,7 +1177,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   shareSheet: {
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -1148,16 +1190,16 @@ const styles = StyleSheet.create({
     width: 44,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#e4c29a",
+    backgroundColor: AMBER_SOFT,
   },
   shareTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   shareHint: {
-    color: "#6b5647",
+    color: MUTED_2,
     fontSize: 14,
     lineHeight: 20,
     fontFamily: FONT_BODY,
@@ -1166,12 +1208,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
   shareLinkText: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 14,
     fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
@@ -1182,15 +1224,15 @@ const styles = StyleSheet.create({
   shareCopyButton: {
     flex: 1,
     borderRadius: 999,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingVertical: 14,
     alignItems: "center",
   },
   shareCopyButtonDone: {
-    backgroundColor: "#4a7c59",
+    backgroundColor: SUCCESS_GREEN_2,
   },
   shareCopyButtonText: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
     fontWeight: "800",
     fontSize: 15,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1201,12 +1243,12 @@ const styles = StyleSheet.create({
   shareNativeButton: {
     flex: 1,
     borderRadius: 999,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingVertical: 14,
     alignItems: "center",
   },
   shareNativeButtonText: {
-    color: "#241912",
+    color: TEXT_DARK_2,
     fontWeight: "800",
     fontSize: 15,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1214,13 +1256,13 @@ const styles = StyleSheet.create({
   shareCancelButton: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
     paddingVertical: 14,
     alignItems: "center",
     backgroundColor: "#fff",
   },
   shareCancelText: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontWeight: "800",
     fontSize: 14,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1229,11 +1271,11 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     paddingVertical: 18,
     paddingHorizontal: 18,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     alignItems: "center",
   },
   addButtonText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontSize: 16,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1243,12 +1285,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: "#d9a0a0",
-    backgroundColor: "#fff3f3",
+    borderColor: DANGER_SOFT_2,
+    backgroundColor: CARD_BG_10,
     alignItems: "center",
   },
   deleteButtonText: {
-    color: "#8d2b2b",
+    color: DANGER_DEEP_4,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1258,18 +1300,18 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: "#e4c29a",
-    backgroundColor: "#fff1df",
+    borderColor: AMBER_SOFT,
+    backgroundColor: CARD_BG_3,
     alignItems: "center",
   },
   unfollowButtonText: {
-    color: "#2a1d15",
+    color: HERO_DARK_2,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   listTitle: {
-    color: "#2d2117",
+    color: TEXT_DARK_3,
     fontSize: 22,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY,
@@ -1277,7 +1319,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#2d2117",
+    color: TEXT_DARK_3,
     fontFamily: FONT_BODY_BOLD,
   },
   selectButton: {
@@ -1285,12 +1327,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: "#e4c29a",
-    backgroundColor: "#fff1df",
+    borderColor: AMBER_SOFT,
+    backgroundColor: CARD_BG_3,
     alignItems: "center",
   },
   selectButtonText: {
-    color: "#2a1d15",
+    color: HERO_DARK_2,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1346,18 +1388,18 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   bulkBarInner: {
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     borderRadius: 22,
     padding: 14,
     gap: 12,
-    shadowColor: "#1a0e06",
+    shadowColor: HERO_DARK_9,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 18,
     elevation: 10,
   },
   bulkBarCount: {
-    color: "#ffd7ab",
+    color: AMBER_LIGHT_2,
     fontSize: 14,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1374,28 +1416,28 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    backgroundColor: "#3d2c1f",
+    backgroundColor: HERO_DARK_8,
     alignItems: "center",
   },
   bulkBarButtonDisabled: {
     opacity: 0.45,
   },
   bulkBarButtonDanger: {
-    backgroundColor: "#8d2b2b",
+    backgroundColor: DANGER_DEEP_4,
   },
   bulkBarButtonGhost: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "#6b4d35",
+    borderColor: MUTED_22,
   },
   bulkBarButtonText: {
-    color: "#fff4e8",
+    color: TEXT_ON_DARK_4,
     fontSize: 13,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   bulkBarButtonDangerText: {
-    color: "#ffe6e0",
+    color: DANGER_SOFT_5,
   },
   modalBackdrop: {
     flex: 1,
@@ -1407,17 +1449,17 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "100%",
     maxWidth: 420,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderRadius: 22,
     padding: 20,
     gap: 14,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#2d2117",
+    color: TEXT_DARK_3,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   modalList: {
@@ -1428,12 +1470,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
   },
   modalRowText: {
-    color: "#2a1d15",
+    color: HERO_DARK_2,
     fontSize: 15,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
@@ -1444,7 +1486,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   modalCancelText: {
-    color: "#6a4d35",
+    color: MUTED_23,
     fontSize: 14,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1454,12 +1496,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
-    borderColor: "#c4a87a",
-    backgroundColor: "#fff4e5",
+    borderColor: AMBER_MUTED_7,
+    backgroundColor: CARD_BG_9,
     alignItems: "center",
   },
   editCollectionButtonText: {
-    color: "#5f4734",
+    color: MUTED_3,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1467,18 +1509,18 @@ const styles = StyleSheet.create({
   editModalCard: {
     width: "100%",
     maxWidth: 420,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderRadius: 22,
     padding: 20,
     gap: 16,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   editFieldGroup: {
     gap: 8,
   },
   editFieldLabel: {
-    color: "#624a35",
+    color: MUTED_10,
     fontWeight: "800",
     fontSize: 13,
     letterSpacing: 0.5,
@@ -1486,7 +1528,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   editFieldRequired: {
-    color: "#d92f2f",
+    color: DANGER,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
@@ -1494,10 +1536,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontFamily: FONT_BODY,
   },
@@ -1508,29 +1550,29 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   editCurrencyButtonText: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
   editCurrencyButtonPlaceholder: {
-    color: "#9b8571",
+    color: PLACEHOLDER,
     fontSize: 15,
     fontFamily: FONT_BODY,
   },
   editCoverButton: {
     borderRadius: 16,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingVertical: 12,
     alignItems: "center",
   },
   editCoverButtonText: {
-    color: "#241912",
+    color: TEXT_DARK_2,
     fontWeight: "800",
     fontSize: 14,
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1539,7 +1581,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 160,
     borderRadius: 16,
-    backgroundColor: "#dbc7ae",
+    backgroundColor: AMBER_MUTED_2,
   },
   editVisibilityRow: {
     flexDirection: "row",
@@ -1549,25 +1591,25 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   editVisibilityChipSelected: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
+    backgroundColor: HERO_DARK,
+    borderColor: HERO_DARK,
   },
   editVisibilityChipText: {
-    color: "#6b5647",
+    color: MUTED_2,
     fontSize: 14,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
   editVisibilityChipTextSelected: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
   },
   editVisibilityHint: {
-    color: "#7a6453",
+    color: MUTED_17,
     fontSize: 12,
     lineHeight: 18,
     fontFamily: FONT_BODY,
@@ -1582,11 +1624,11 @@ const styles = StyleSheet.create({
   shareFriendsTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   shareFriendsHint: {
-    color: "#6b5647",
+    color: MUTED_2,
     fontSize: 13,
     lineHeight: 18,
     fontFamily: FONT_BODY,
@@ -1597,7 +1639,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0e4d4",
+    borderBottomColor: BORDER_7,
   },
   shareFriendInfo: {
     flexDirection: "row",
@@ -1611,7 +1653,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   shareFriendName: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 15,
     fontWeight: "700",
     flex: 1,
@@ -1621,13 +1663,13 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
   },
   shareFriendButtonActive: {
-    backgroundColor: "#4a7c59",
+    backgroundColor: SUCCESS_GREEN_2,
   },
   shareFriendButtonText: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
     fontSize: 13,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -1639,7 +1681,7 @@ const styles = StyleSheet.create({
     maxHeight: 228,
   },
   shareFriendsEmpty: {
-    color: "#7a6453",
+    color: MUTED_17,
     fontSize: 13,
     lineHeight: 20,
     marginTop: 4,
@@ -1649,13 +1691,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     paddingVertical: 16,
     alignItems: "center",
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
   },
   editSaveButtonDisabled: {
     opacity: 0.75,
   },
   editSaveButtonText: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
