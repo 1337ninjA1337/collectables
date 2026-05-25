@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
+import { ACCENT_DEEP, HERO_DARK, MUTED_9, TEXT_DARK, TEXT_ON_DARK_2 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { authClient } from "@/lib/supabase";
 
@@ -89,7 +90,7 @@ export default function AuthCallbackScreen() {
   return (
     <Screen scroll={false}>
       <View style={styles.wrap}>
-        {error ? null : <ActivityIndicator size="large" color="#8a5a2b" />}
+        {error ? null : <ActivityIndicator size="large" color={ACCENT_DEEP} />}
         <Text style={styles.title}>{error ? t("authCallbackBadLink") : t("authCallbackWorking")}</Text>
         <Text style={styles.subtitle}>{error ?? t("authCallbackBackSoon")}</Text>
         {error ? (
@@ -110,12 +111,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
-    color: "#2f2318",
+    color: TEXT_DARK,
     fontSize: 22,
     fontWeight: "800",
   },
   subtitle: {
-    color: "#6d5645",
+    color: MUTED_9,
     fontSize: 15,
     textAlign: "center",
     maxWidth: 420,
@@ -124,12 +125,12 @@ const styles = StyleSheet.create({
   retryButton: {
     marginTop: 8,
     borderRadius: 22,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     paddingHorizontal: 18,
     paddingVertical: 14,
   },
   retryButtonText: {
-    color: "#fff5ea",
+    color: TEXT_ON_DARK_2,
     fontSize: 15,
     fontWeight: "800",
   },
