@@ -2,6 +2,7 @@ import { Link } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VisibilityBadge } from "@/components/visibility-badge";
+import { MUTED_26, PURE_WHITE, TEXT_ON_DARK_10, TEXT_ON_DARK_11, TEXT_ON_DARK_12, TEXT_ON_DARK_13 } from "@/lib/design-tokens";
 import { formatCostAmount } from "@/lib/format-cost";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
@@ -61,7 +62,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     overflow: "hidden",
     justifyContent: "flex-end",
-    backgroundColor: "#c8b8a4",
+    backgroundColor: MUTED_26,
   },
   image: {
     ...StyleSheet.absoluteFillObject,
@@ -80,7 +81,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   role: {
-    color: "#fff1de",
+    color: TEXT_ON_DARK_10,
     fontSize: 12,
     fontWeight: "700",
     textTransform: "uppercase",
@@ -88,25 +89,25 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_BOLD,
   },
   count: {
-    color: "#f5ebdf",
+    color: TEXT_ON_DARK_11,
     fontSize: 13,
     fontWeight: "600",
     fontFamily: FONT_BODY_SEMIBOLD,
   },
   title: {
-    color: "#ffffff",
+    color: PURE_WHITE,
     fontSize: 28,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY,
   },
   description: {
-    color: "#f3eee7",
+    color: TEXT_ON_DARK_12,
     fontSize: 15,
     lineHeight: 22,
     fontFamily: FONT_BODY,
   },
   meta: {
-    color: "#f8dfc5",
+    color: TEXT_ON_DARK_13,
     fontSize: 14,
     fontWeight: "600",
     fontFamily: FONT_BODY_SEMIBOLD,
