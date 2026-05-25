@@ -1,6 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
+import {
+  AMBER_MUTED_2,
+  BORDER,
+  CARD_BG,
+  MUTED_17,
+  PLACEHOLDER,
+  PURE_WHITE,
+  TEXT_ON_DARK,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 
 type Props = {
@@ -46,7 +55,7 @@ export function PhotoPreview({ photos, onChange, maxPhotos = 5 }: Props) {
             hitSlop={6}
             accessibilityLabel={t("delete")}
           >
-            <Ionicons name="close" size={14} color="#fff" />
+            <Ionicons name="close" size={14} color={PURE_WHITE} />
           </Pressable>
 
           {/* Move arrows */}
@@ -57,7 +66,7 @@ export function PhotoPreview({ photos, onChange, maxPhotos = 5 }: Props) {
                 onPress={() => movePhoto(index, index - 1)}
                 hitSlop={4}
               >
-                <Ionicons name="chevron-back" size={14} color="#fff7ef" />
+                <Ionicons name="chevron-back" size={14} color={TEXT_ON_DARK} />
               </Pressable>
             ) : (
               <View style={styles.moveButtonPlaceholder} />
@@ -68,7 +77,7 @@ export function PhotoPreview({ photos, onChange, maxPhotos = 5 }: Props) {
                 onPress={() => movePhoto(index, index + 1)}
                 hitSlop={4}
               >
-                <Ionicons name="chevron-forward" size={14} color="#fff7ef" />
+                <Ionicons name="chevron-forward" size={14} color={TEXT_ON_DARK} />
               </Pressable>
             ) : (
               <View style={styles.moveButtonPlaceholder} />
@@ -95,7 +104,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   hint: {
-    color: "#7a6453",
+    color: MUTED_17,
     lineHeight: 22,
   },
   item: {
@@ -109,7 +118,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     borderRadius: 18,
-    backgroundColor: "#dbc7ae",
+    backgroundColor: AMBER_MUTED_2,
   },
   orderBadge: {
     position: "absolute",
@@ -123,7 +132,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   orderText: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 11,
     fontWeight: "800",
   },
@@ -163,14 +172,14 @@ const styles = StyleSheet.create({
     height: 104,
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     borderStyle: "dashed",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
   },
   counterText: {
-    color: "#9b8571",
+    color: PLACEHOLDER,
     fontSize: 14,
     fontWeight: "700",
   },
