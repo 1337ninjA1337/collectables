@@ -38,6 +38,7 @@ export const AMBER_MUTED_6 = "#d9c8b4";
 export const AMBER_MUTED_7 = "#c4a87a";
 export const AMBER_MUTED_8 = "#cfb394";
 export const ACCENT_DEEP = "#8a5a2b";
+export const ACCENT_DEEP_2 = "#8a6520";
 
 export const CARD_BG = "#fffaf3";
 export const CARD_BG_2 = "#fff7ef";
@@ -175,6 +176,7 @@ export const designTokens = Object.freeze({
   AMBER_MUTED_7,
   AMBER_MUTED_8,
   ACCENT_DEEP,
+  ACCENT_DEEP_2,
   CARD_BG,
   CARD_BG_2,
   CARD_BG_3,

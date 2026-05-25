@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
+import { ACCENT_DEEP_2, MUTED_2, SUCCESS_GREEN_2, TEXT_ON_DARK } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { Collection } from "@/lib/types";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
@@ -50,12 +51,12 @@ export function VisibilityBadge({
         size={isHero ? 14 : 12}
         color={
           isHero
-            ? "#fff7ef"
+            ? TEXT_ON_DARK
             : isViewer
-              ? "#4a7c59"
+              ? SUCCESS_GREEN_2
               : isShared
-                ? "#8a6520"
-                : "#6b5647"
+                ? ACCENT_DEEP_2
+                : MUTED_2
         }
       />
       <Text
@@ -118,20 +119,20 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#6b5647",
+    color: MUTED_2,
     fontFamily: FONT_BODY_BOLD,
   },
   badgeTextHero: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 12,
     fontFamily: FONT_BODY_BOLD,
   },
   badgeTextViewer: {
-    color: "#4a7c59",
+    color: SUCCESS_GREEN_2,
     fontFamily: FONT_BODY_BOLD,
   },
   badgeTextShared: {
-    color: "#8a6520",
+    color: ACCENT_DEEP_2,
     fontFamily: FONT_BODY_BOLD,
   },
 });

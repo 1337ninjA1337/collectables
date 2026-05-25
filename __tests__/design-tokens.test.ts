@@ -5,6 +5,7 @@ import path from "node:path";
 
 import {
   ACCENT_DEEP,
+  ACCENT_DEEP_2,
   AMBER_ACCENT,
   AMBER_LIGHT,
   AMBER_LIGHT_2,
@@ -1267,6 +1268,24 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bMUTED_17\b/);
     assert.match(src, /\bPLACEHOLDER\b/);
     assert.match(src, /\bPURE_WHITE\b/);
+    assert.match(src, /\bTEXT_ON_DARK\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("exposes the ACCENT_DEEP_2 variant shipped for the visibility-badge migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(ACCENT_DEEP_2, hex);
+    assert.equal(ACCENT_DEEP_2, "#8a6520");
+    assert.equal(designTokens.ACCENT_DEEP_2, "#8a6520");
+  });
+
+  it("components/visibility-badge.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/visibility-badge.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bACCENT_DEEP_2\b/);
+    assert.match(src, /\bMUTED_2\b/);
+    assert.match(src, /\bSUCCESS_GREEN_2\b/);
     assert.match(src, /\bTEXT_ON_DARK\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
