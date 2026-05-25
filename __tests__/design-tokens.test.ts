@@ -20,6 +20,7 @@ import {
   AMBER_SOFT_2,
   AMBER_SOFT_3,
   AMBER_SOFT_4,
+  AMBER_SOFT_5,
   BORDER,
   BORDER_2,
   BORDER_3,
@@ -38,6 +39,7 @@ import {
   CARD_BG_11,
   CARD_BG_12,
   CARD_BG_13,
+  CARD_BG_14,
   COOL_GRAY,
   DANGER,
   DANGER_DEEP,
@@ -1287,6 +1289,33 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bMUTED_2\b/);
     assert.match(src, /\bSUCCESS_GREEN_2\b/);
     assert.match(src, /\bTEXT_ON_DARK\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("exposes the AMBER_SOFT_5 + CARD_BG_14 variants shipped for the empty-state migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(AMBER_SOFT_5, hex);
+    assert.equal(AMBER_SOFT_5, "#eed4a0");
+    assert.equal(designTokens.AMBER_SOFT_5, "#eed4a0");
+    assert.match(CARD_BG_14, hex);
+    assert.equal(CARD_BG_14, "#ffe8c7");
+    assert.equal(designTokens.CARD_BG_14, "#ffe8c7");
+  });
+
+  it("components/empty-state.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/empty-state.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bAMBER_ACCENT\b/);
+    assert.match(src, /\bAMBER_SOFT_3\b/);
+    assert.match(src, /\bAMBER_SOFT_5\b/);
+    assert.match(src, /\bCARD_BG\b/);
+    assert.match(src, /\bCARD_BG_2\b/);
+    assert.match(src, /\bCARD_BG_3\b/);
+    assert.match(src, /\bCARD_BG_14\b/);
+    assert.match(src, /\bHERO_DARK\b/);
+    assert.match(src, /\bMUTED_11\b/);
+    assert.match(src, /\bTEXT_ON_DARK_5\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

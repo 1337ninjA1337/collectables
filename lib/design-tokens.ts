@@ -29,6 +29,7 @@ export const AMBER_SOFT = "#e4c29a";
 export const AMBER_SOFT_2 = "#e0b87a";
 export const AMBER_SOFT_3 = "#f0d6a1";
 export const AMBER_SOFT_4 = "#fde7c2";
+export const AMBER_SOFT_5 = "#eed4a0";
 export const AMBER_MUTED = "#d9c2a8";
 export const AMBER_MUTED_2 = "#dbc7ae";
 export const AMBER_MUTED_3 = "#d8c7b1";
@@ -53,6 +54,7 @@ export const CARD_BG_10 = "#fff3f3";
 export const CARD_BG_11 = "#fff5f5";
 export const CARD_BG_12 = "#fff1f1";
 export const CARD_BG_13 = "#fff8ee";
+export const CARD_BG_14 = "#ffe8c7";
 export const PAGE_BG = "#fff8ef";
 export const PAGE_BG_2 = "#fffaf4";
 export const PAGE_BG_3 = "#f4f1ea";
@@ -167,6 +169,7 @@ export const designTokens = Object.freeze({
   AMBER_SOFT_2,
   AMBER_SOFT_3,
   AMBER_SOFT_4,
+  AMBER_SOFT_5,
   AMBER_MUTED,
   AMBER_MUTED_2,
   AMBER_MUTED_3,
@@ -190,6 +193,7 @@ export const designTokens = Object.freeze({
   CARD_BG_11,
   CARD_BG_12,
   CARD_BG_13,
+  CARD_BG_14,
   PAGE_BG,
   PAGE_BG_2,
   PAGE_BG_3,

@@ -1,5 +1,17 @@
 import { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  AMBER_ACCENT,
+  AMBER_SOFT_3,
+  AMBER_SOFT_5,
+  CARD_BG,
+  CARD_BG_2,
+  CARD_BG_3,
+  CARD_BG_14,
+  HERO_DARK,
+  MUTED_11,
+  TEXT_ON_DARK_5,
+} from "@/lib/design-tokens";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 type EmptyStateProps = {
@@ -48,10 +60,10 @@ const styles = StyleSheet.create({
     paddingVertical: 36,
     paddingHorizontal: 24,
     gap: 12,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: "#f0d6a1",
+    borderColor: AMBER_SOFT_3,
     borderStyle: "dashed",
   },
   wrapCompact: {
@@ -61,9 +73,9 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: "#fff7ef",
+    backgroundColor: CARD_BG_2,
     borderWidth: 1,
-    borderColor: "#f0d6a1",
+    borderColor: AMBER_SOFT_3,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,
@@ -72,9 +84,9 @@ const styles = StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: "#fff1df",
+    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: "#eed4a0",
+    borderColor: AMBER_SOFT_5,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -82,7 +94,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#ffe8c7",
+    backgroundColor: CARD_BG_14,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -92,13 +104,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: "800",
-    color: "#261b14",
+    color: HERO_DARK,
     textAlign: "center",
     fontFamily: FONT_DISPLAY,
   },
   hint: {
     fontSize: 13,
-    color: "#6f5a44",
+    color: MUTED_11,
     textAlign: "center",
     lineHeight: 19,
     maxWidth: 320,
@@ -106,13 +118,13 @@ const styles = StyleSheet.create({
   },
   action: {
     marginTop: 10,
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
     paddingHorizontal: 22,
     paddingVertical: 12,
     borderRadius: 999,
   },
   actionText: {
-    color: "#fff7ea",
+    color: TEXT_ON_DARK_5,
     fontWeight: "800",
     fontSize: 14,
     fontFamily: FONT_BODY_EXTRABOLD,
