@@ -1173,4 +1173,15 @@ describe("design-tokens adoption", () => {
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
+
+  it("app/collections-feed.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("app/collections-feed.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bAMBER_LIGHT\b/);
+    assert.match(src, /\bHERO_DARK\b/);
+    assert.match(src, /\bTEXT_ON_DARK_3\b/);
+    assert.match(src, /\bTEXT_ON_DARK_SOFT\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
 });

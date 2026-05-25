@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { SwipeTabs } from "@/components/swipe-tabs";
 import { useCollections } from "@/lib/collections-context";
+import { AMBER_LIGHT, HERO_DARK, TEXT_ON_DARK_3, TEXT_ON_DARK_SOFT } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { fetchItemsByCollectionId } from "@/lib/supabase-profiles";
 import { Collection } from "@/lib/types";
@@ -104,26 +105,26 @@ export default function CollectionsFeedScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
     borderRadius: 32,
     padding: 24,
     gap: 10,
   },
   eyebrow: {
-    color: "#f5c99a",
+    color: AMBER_LIGHT,
     fontSize: 12,
     textTransform: "uppercase",
     letterSpacing: 1.2,
     fontWeight: "800",
   },
   title: {
-    color: "#fff8ef",
+    color: TEXT_ON_DARK_3,
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 36,
   },
   subtitle: {
-    color: "#ead8c3",
+    color: TEXT_ON_DARK_SOFT,
     lineHeight: 22,
   },
   tabPanel: {
