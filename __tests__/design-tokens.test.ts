@@ -18,6 +18,7 @@ import {
   AMBER_MUTED_8,
   AMBER_SOFT_2,
   AMBER_SOFT_3,
+  AMBER_SOFT_4,
   BORDER,
   BORDER_2,
   BORDER_3,
@@ -81,6 +82,7 @@ import {
   MUTED_22,
   MUTED_23,
   MUTED_24,
+  MUTED_25,
   PAGE_BG,
   PAGE_BG_2,
   PAGE_BG_3,
@@ -505,6 +507,16 @@ describe("design-tokens module", () => {
     assert.equal(designTokens.MUTED_22, "#6b4d35");
     assert.equal(designTokens.MUTED_23, "#6a4d35");
     assert.equal(designTokens.TEXT_ON_DARK_9, "#f8eee3");
+  });
+
+  it("exposes the AMBER_SOFT_4 + MUTED_25 variants shipped for the realtime-status-pill migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(AMBER_SOFT_4, hex);
+    assert.match(MUTED_25, hex);
+    assert.equal(AMBER_SOFT_4, "#fde7c2");
+    assert.equal(MUTED_25, "#7a4d18");
+    assert.equal(designTokens.AMBER_SOFT_4, "#fde7c2");
+    assert.equal(designTokens.MUTED_25, "#7a4d18");
   });
 
   it("exposes the PAGE_BG_3 variant shipped for the screen.tsx migration", () => {
@@ -1109,6 +1121,16 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bTEXT_ON_DARK_2\b/);
     assert.match(src, /\bTEXT_ON_DARK_4\b/);
     assert.match(src, /\bTEXT_ON_DARK_9\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/realtime-status-pill.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/realtime-status-pill.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bAMBER_SOFT\b/);
+    assert.match(src, /\bAMBER_SOFT_4\b/);
+    assert.match(src, /\bMUTED_25\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

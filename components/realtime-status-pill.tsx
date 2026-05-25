@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { AMBER_SOFT, AMBER_SOFT_4, MUTED_25 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useOptionalRealtimeStatus } from "@/lib/realtime-status-context";
 
@@ -34,12 +35,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "#fde7c2",
+    backgroundColor: AMBER_SOFT_4,
     borderWidth: 1,
-    borderColor: "#e4c29a",
+    borderColor: AMBER_SOFT,
   },
   pillText: {
-    color: "#7a4d18",
+    color: MUTED_25,
     fontSize: 12,
     fontWeight: "700",
   },
