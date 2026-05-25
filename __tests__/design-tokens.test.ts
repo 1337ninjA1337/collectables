@@ -1233,4 +1233,15 @@ describe("design-tokens adoption", () => {
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
+
+  it("components/selectable-item-row.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/selectable-item-row.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bAMBER_ACCENT\b/);
+    assert.match(src, /\bCARD_BG\b/);
+    assert.match(src, /\bCARD_BG_3\b/);
+    assert.match(src, /\bTEXT_ON_DARK_5\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
 });

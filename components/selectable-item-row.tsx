@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ItemCard } from "@/components/item-card";
+import { AMBER_ACCENT, CARD_BG, CARD_BG_3, TEXT_ON_DARK_5 } from "@/lib/design-tokens";
 import { CollectableItem } from "@/lib/types";
 
 type Props = {
@@ -37,8 +38,8 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   wrapSelected: {
-    borderColor: "#d89c5b",
-    backgroundColor: "#fff1df",
+    borderColor: AMBER_ACCENT,
+    backgroundColor: CARD_BG_3,
   },
   checkbox: {
     position: "absolute",
@@ -48,16 +49,16 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: "#d89c5b",
-    backgroundColor: "#fffaf3",
+    borderColor: AMBER_ACCENT,
+    backgroundColor: CARD_BG,
     alignItems: "center",
     justifyContent: "center",
   },
   checkboxOn: {
-    backgroundColor: "#d89c5b",
+    backgroundColor: AMBER_ACCENT,
   },
   check: {
-    color: "#fff7ea",
+    color: TEXT_ON_DARK_5,
     fontSize: 16,
     fontWeight: "900",
     lineHeight: 18,
