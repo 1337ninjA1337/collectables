@@ -80,6 +80,7 @@ import {
   MUTED_21,
   MUTED_22,
   MUTED_23,
+  MUTED_24,
   PAGE_BG,
   PAGE_BG_2,
   PURE_WHITE,
@@ -503,6 +504,13 @@ describe("design-tokens module", () => {
     assert.equal(designTokens.MUTED_22, "#6b4d35");
     assert.equal(designTokens.MUTED_23, "#6a4d35");
     assert.equal(designTokens.TEXT_ON_DARK_9, "#f8eee3");
+  });
+
+  it("exposes the MUTED_24 variant shipped for the crash-fallback migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(MUTED_24, hex);
+    assert.equal(MUTED_24, "#8a705a");
+    assert.equal(designTokens.MUTED_24, "#8a705a");
   });
 
   it("freezes the designTokens object so accidental mutation is rejected", () => {
@@ -1093,6 +1101,15 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bTEXT_ON_DARK_2\b/);
     assert.match(src, /\bTEXT_ON_DARK_4\b/);
     assert.match(src, /\bTEXT_ON_DARK_9\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/crash-fallback.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/crash-fallback.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bMUTED_24\b/);
+    assert.match(src, /\bPAGE_BG_2\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

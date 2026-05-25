@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
+import { MUTED_24, PAGE_BG_2 } from "@/lib/design-tokens";
 import { FONT_BODY } from "@/lib/fonts";
 
 export type CrashFallbackProps = {
@@ -56,14 +57,14 @@ export function CrashFallback({ error, resetError, t }: CrashFallbackProps) {
 const styles = StyleSheet.create({
   wrap: {
     flex: 1,
-    backgroundColor: "#fffaf4",
+    backgroundColor: PAGE_BG_2,
     paddingHorizontal: 24,
     paddingVertical: 48,
     gap: 16,
     justifyContent: "center",
   },
   detail: {
-    color: "#8a705a",
+    color: MUTED_24,
     fontSize: 12,
     fontFamily: FONT_BODY,
     textAlign: "center",
