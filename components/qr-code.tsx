@@ -2,6 +2,8 @@ import QRCode from "qrcode";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 
+import { HERO_DARK, PURE_WHITE } from "@/lib/design-tokens";
+
 type QrCodeProps = {
   value: string;
   size?: number;
@@ -14,7 +16,7 @@ type QrCodeProps = {
  * then draws it with nested Views. No native dependency required — works on
  * iOS, Android and Web alike.
  */
-export function QrCode({ value, size = 240, color = "#261b14", background = "#ffffff" }: QrCodeProps) {
+export function QrCode({ value, size = 240, color = HERO_DARK, background = PURE_WHITE }: QrCodeProps) {
   const matrix = useMemo(() => {
     try {
       const qr = QRCode.create(value, { errorCorrectionLevel: "M" });

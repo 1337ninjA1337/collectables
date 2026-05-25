@@ -1096,4 +1096,13 @@ describe("design-tokens adoption", () => {
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
+
+  it("components/qr-code.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/qr-code.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bHERO_DARK\b/);
+    assert.match(src, /\bPURE_WHITE\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
 });
