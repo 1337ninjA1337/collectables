@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { BORDER, CARD_BG, HERO_DARK, MUTED, MUTED_2, TEXT_ON_DARK } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { REACTION_EMOJIS, useReactions } from "@/lib/use-reactions";
 import { ReactionTargetType } from "@/lib/types";
@@ -49,7 +50,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   label: {
-    color: "#8f6947",
+    color: MUTED,
     fontSize: 12,
     textTransform: "uppercase",
     letterSpacing: 1,
@@ -67,13 +68,13 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   chipActive: {
-    backgroundColor: "#261b14",
-    borderColor: "#261b14",
+    backgroundColor: HERO_DARK,
+    borderColor: HERO_DARK,
   },
   chipWithCount: {
     paddingHorizontal: 14,
@@ -84,9 +85,9 @@ const styles = StyleSheet.create({
   count: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#6b5647",
+    color: MUTED_2,
   },
   countActive: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
   },
 });
