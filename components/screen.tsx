@@ -3,6 +3,8 @@ import { PropsWithChildren } from "react";
 import { Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { NestableScrollContainer } from "./DraggableList";
 
+import { ACCENT_DEEP, CARD_BG_7, PAGE_BG_2, PAGE_BG_3 } from "@/lib/design-tokens";
+
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;
   nestable?: boolean;
@@ -24,7 +26,7 @@ export function Screen({ children, scroll = true, nestable = false, refreshing, 
   const { contentMaxWidth } = useResponsive();
 
   const refreshControl = onRefresh ? (
-    <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor="#8a5a2b" colors={["#8a5a2b"]} />
+    <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={ACCENT_DEEP} colors={[ACCENT_DEEP]} />
   ) : undefined;
 
   const innerStyle = contentMaxWidth
@@ -50,7 +52,7 @@ export function Screen({ children, scroll = true, nestable = false, refreshing, 
   );
 
   return (
-    <LinearGradient colors={["#f4ecdf", "#fffaf4", "#f4f1ea"]} style={styles.gradient}>
+    <LinearGradient colors={[CARD_BG_7, PAGE_BG_2, PAGE_BG_3]} style={styles.gradient}>
       <SafeAreaView style={styles.safeArea}>{content}</SafeAreaView>
     </LinearGradient>
   );

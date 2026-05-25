@@ -83,6 +83,7 @@ import {
   MUTED_24,
   PAGE_BG,
   PAGE_BG_2,
+  PAGE_BG_3,
   PURE_WHITE,
   STATUS_OFFLINE,
   STATUS_ONLINE,
@@ -504,6 +505,13 @@ describe("design-tokens module", () => {
     assert.equal(designTokens.MUTED_22, "#6b4d35");
     assert.equal(designTokens.MUTED_23, "#6a4d35");
     assert.equal(designTokens.TEXT_ON_DARK_9, "#f8eee3");
+  });
+
+  it("exposes the PAGE_BG_3 variant shipped for the screen.tsx migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(PAGE_BG_3, hex);
+    assert.equal(PAGE_BG_3, "#f4f1ea");
+    assert.equal(designTokens.PAGE_BG_3, "#f4f1ea");
   });
 
   it("exposes the MUTED_24 variant shipped for the crash-fallback migration", () => {
@@ -1101,6 +1109,17 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bTEXT_ON_DARK_2\b/);
     assert.match(src, /\bTEXT_ON_DARK_4\b/);
     assert.match(src, /\bTEXT_ON_DARK_9\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/screen.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/screen.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bACCENT_DEEP\b/);
+    assert.match(src, /\bCARD_BG_7\b/);
+    assert.match(src, /\bPAGE_BG_2\b/);
+    assert.match(src, /\bPAGE_BG_3\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

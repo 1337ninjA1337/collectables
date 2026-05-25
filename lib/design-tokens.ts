@@ -53,6 +53,7 @@ export const CARD_BG_12 = "#fff1f1";
 export const CARD_BG_13 = "#fff8ee";
 export const PAGE_BG = "#fff8ef";
 export const PAGE_BG_2 = "#fffaf4";
+export const PAGE_BG_3 = "#f4f1ea";
 
 export const BORDER = "#eadbc8";
 export const BORDER_2 = "#f0e2cf";
@@ -181,6 +182,7 @@ export const designTokens = Object.freeze({
   CARD_BG_13,
   PAGE_BG,
   PAGE_BG_2,
+  PAGE_BG_3,
   BORDER,
   BORDER_2,
   BORDER_3,
