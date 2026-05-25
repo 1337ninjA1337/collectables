@@ -155,6 +155,43 @@ export const TAG_GOLD = "#c4a35b";
 export const TAG_BROWN = "#8b6b5b";
 export const TAG_TEAL = "#6b8f8f";
 
+/**
+ * Semantic radius tokens — keep card / pill / chip geometry one-line tunable.
+ * Names map to the most common usage today (counts from a repo-wide scan):
+ *   RADIUS_PILL = 999 (71×) — fully rounded pills, chips, badges
+ *   RADIUS_CARD = 22 (48×) — primary card surfaces (item cards, hero cards)
+ *   RADIUS_CARD_LG = 24 (25×) — larger card surfaces (modals, sheet wrappers)
+ *   RADIUS_CARD_SM = 20 (22×) — smaller card surfaces (chip-grouped rows)
+ *   RADIUS_INPUT = 16 (16×) — text inputs, search rows
+ *   RADIUS_AVATAR_LG = 28 (13×) — large avatar / icon rings
+ *   RADIUS_AVATAR = 18 (12×) — default avatar / thumbnail corners
+ */
+export const RADIUS_PILL = 999;
+export const RADIUS_CARD = 22;
+export const RADIUS_CARD_LG = 24;
+export const RADIUS_CARD_SM = 20;
+export const RADIUS_INPUT = 16;
+export const RADIUS_AVATAR_LG = 28;
+export const RADIUS_AVATAR = 18;
+
+/**
+ * Semantic spacing tokens — match the `gap:` values that recur 30+ times
+ * across the StyleSheet corpus today. Use them inside `gap` / `padding` /
+ * `margin` declarations to keep vertical rhythm consistent.
+ *   SPACING_LIST = 10 (57×) — gap between list rows
+ *   SPACING_CARD = 12 (43×) — gap inside cards / between sibling cards
+ *   SPACING_INLINE = 8 (38×) — gap between sibling inline elements
+ *   SPACING_SECTION = 14 (24×) — gap between sibling sections
+ *   SPACING_TIGHT = 6 (20×) — gap between tightly-coupled elements (chip+icon)
+ *   SPACING_MICRO = 4 (12×) — gap between adjacent text fragments
+ */
+export const SPACING_MICRO = 4;
+export const SPACING_TIGHT = 6;
+export const SPACING_INLINE = 8;
+export const SPACING_LIST = 10;
+export const SPACING_CARD = 12;
+export const SPACING_SECTION = 14;
+
 /** Frozen palette for runtime introspection (e.g. tests, theming UI). */
 export const designTokens = Object.freeze({
   HERO_DARK,
@@ -286,6 +323,19 @@ export const designTokens = Object.freeze({
   TAG_GOLD,
   TAG_BROWN,
   TAG_TEAL,
+  RADIUS_PILL,
+  RADIUS_CARD,
+  RADIUS_CARD_LG,
+  RADIUS_CARD_SM,
+  RADIUS_INPUT,
+  RADIUS_AVATAR_LG,
+  RADIUS_AVATAR,
+  SPACING_MICRO,
+  SPACING_TIGHT,
+  SPACING_INLINE,
+  SPACING_LIST,
+  SPACING_CARD,
+  SPACING_SECTION,
 });
 
 export type DesignToken = keyof typeof designTokens;

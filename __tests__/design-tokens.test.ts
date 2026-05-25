@@ -125,6 +125,19 @@ import {
   TEXT_ON_DARK_12,
   TEXT_ON_DARK_13,
   TEXT_ON_DARK_MUTED,
+  RADIUS_PILL,
+  RADIUS_CARD,
+  RADIUS_CARD_LG,
+  RADIUS_CARD_SM,
+  RADIUS_INPUT,
+  RADIUS_AVATAR_LG,
+  RADIUS_AVATAR,
+  SPACING_MICRO,
+  SPACING_TIGHT,
+  SPACING_INLINE,
+  SPACING_LIST,
+  SPACING_CARD,
+  SPACING_SECTION,
 } from "@/lib/design-tokens";
 
 function read(rel: string): string {
@@ -1372,5 +1385,51 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bTEXT_ON_DARK\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("exposes semantic RADIUS_* tokens shipped for the geometry-tokens migration", () => {
+    assert.equal(RADIUS_PILL, 999);
+    assert.equal(RADIUS_CARD, 22);
+    assert.equal(RADIUS_CARD_LG, 24);
+    assert.equal(RADIUS_CARD_SM, 20);
+    assert.equal(RADIUS_INPUT, 16);
+    assert.equal(RADIUS_AVATAR_LG, 28);
+    assert.equal(RADIUS_AVATAR, 18);
+    assert.equal(designTokens.RADIUS_PILL, 999);
+    assert.equal(designTokens.RADIUS_CARD, 22);
+    assert.equal(designTokens.RADIUS_CARD_LG, 24);
+    assert.equal(designTokens.RADIUS_CARD_SM, 20);
+    assert.equal(designTokens.RADIUS_INPUT, 16);
+    assert.equal(designTokens.RADIUS_AVATAR_LG, 28);
+    assert.equal(designTokens.RADIUS_AVATAR, 18);
+  });
+
+  it("exposes semantic SPACING_* tokens shipped for the geometry-tokens migration", () => {
+    assert.equal(SPACING_MICRO, 4);
+    assert.equal(SPACING_TIGHT, 6);
+    assert.equal(SPACING_INLINE, 8);
+    assert.equal(SPACING_LIST, 10);
+    assert.equal(SPACING_CARD, 12);
+    assert.equal(SPACING_SECTION, 14);
+    assert.equal(designTokens.SPACING_MICRO, 4);
+    assert.equal(designTokens.SPACING_TIGHT, 6);
+    assert.equal(designTokens.SPACING_INLINE, 8);
+    assert.equal(designTokens.SPACING_LIST, 10);
+    assert.equal(designTokens.SPACING_CARD, 12);
+    assert.equal(designTokens.SPACING_SECTION, 14);
+  });
+
+  it("RADIUS_* and SPACING_* tokens are ascending within their families", () => {
+    // Pins the ordering convention so a future "add RADIUS_MEDIUM=21" insertion
+    // forces a re-ordering rather than silently breaking the visual rhythm.
+    assert.ok(RADIUS_CARD_SM < RADIUS_CARD, "CARD_SM < CARD");
+    assert.ok(RADIUS_CARD < RADIUS_CARD_LG, "CARD < CARD_LG");
+    assert.ok(RADIUS_AVATAR < RADIUS_AVATAR_LG, "AVATAR < AVATAR_LG");
+    assert.ok(RADIUS_INPUT < RADIUS_CARD_SM, "INPUT < CARD_SM");
+    assert.ok(SPACING_MICRO < SPACING_TIGHT, "MICRO < TIGHT");
+    assert.ok(SPACING_TIGHT < SPACING_INLINE, "TIGHT < INLINE");
+    assert.ok(SPACING_INLINE < SPACING_LIST, "INLINE < LIST");
+    assert.ok(SPACING_LIST < SPACING_CARD, "LIST < CARD");
+    assert.ok(SPACING_CARD < SPACING_SECTION, "CARD < SECTION");
   });
 });
