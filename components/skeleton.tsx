@@ -2,6 +2,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import { Animated, DimensionValue, Easing, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 
+import { BORDER_2, PAGE_BG_2, TEXT_ON_DARK_SOFT } from "@/lib/design-tokens";
+
 type SkeletonProps = {
   width?: DimensionValue;
   height?: DimensionValue;
@@ -9,7 +11,7 @@ type SkeletonProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-const BASE_COLOR = "#ead8c3";
+const BASE_COLOR = TEXT_ON_DARK_SOFT;
 const HIGHLIGHT = "rgba(255, 250, 244, 0.9)";
 
 export function Skeleton({ width = "100%", height = 16, borderRadius = 8, style }: SkeletonProps) {
@@ -154,12 +156,12 @@ export function SkeletonProfile() {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#fffaf4",
+    backgroundColor: PAGE_BG_2,
     borderRadius: 20,
     padding: 18,
     gap: 12,
     borderWidth: 1,
-    borderColor: "#f0e2cf",
+    borderColor: BORDER_2,
   },
   row: {
     flexDirection: "row",
