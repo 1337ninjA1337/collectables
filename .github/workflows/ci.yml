@@ -33,6 +33,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: No inline hex literals
+        run: npm run lint:hex
+
       - name: Run tests
         run: npm test
 

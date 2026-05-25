@@ -9,6 +9,7 @@ import { useCollections } from "@/lib/collections-context";
 import {
   AMBER_ACCENT,
   AMBER_LIGHT,
+  AMBER_MUTED_3,
   BORDER,
   CARD_BG,
   HERO_DARK,
@@ -198,7 +199,7 @@ const styles = StyleSheet.create({
   photo: {
     width: "100%",
     height: 180,
-    backgroundColor: "#d8c7b1",
+    backgroundColor: AMBER_MUTED_3,
   },
   cardBody: {
     padding: 14,
