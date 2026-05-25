@@ -71,6 +71,7 @@ export const TEXT_DARK = "#2f2318";
 export const TEXT_DARK_2 = "#241912";
 export const TEXT_DARK_3 = "#2d2117";
 export const TEXT_DARK_4 = "#2b2017";
+export const TEXT_DARK_5 = "#312218";
 export const TEXT_ON_DARK = "#fff7ef";
 export const TEXT_ON_DARK_2 = "#fff5ea";
 export const TEXT_ON_DARK_3 = "#fff8ef";
@@ -114,6 +115,8 @@ export const MUTED_24 = "#8a705a";
 export const MUTED_25 = "#7a4d18";
 export const MUTED_26 = "#c8b8a4";
 export const MUTED_27 = "#5a4030";
+export const MUTED_28 = "#6a5647";
+export const MUTED_29 = "#8d6c4a";
 export const PLACEHOLDER = "#9b8571";
 
 export const PURE_WHITE = "#ffffff";
@@ -209,6 +212,7 @@ export const designTokens = Object.freeze({
   TEXT_DARK_2,
   TEXT_DARK_3,
   TEXT_DARK_4,
+  TEXT_DARK_5,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
   TEXT_ON_DARK_3,
@@ -251,6 +255,8 @@ export const designTokens = Object.freeze({
   MUTED_25,
   MUTED_26,
   MUTED_27,
+  MUTED_28,
+  MUTED_29,
   PLACEHOLDER,
   PURE_WHITE,
   DANGER,

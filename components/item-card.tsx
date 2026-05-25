@@ -2,6 +2,16 @@ import { Link } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
+import {
+  AMBER_MUTED_3,
+  BORDER,
+  CARD_BG,
+  HERO_DARK,
+  MUTED_28,
+  MUTED_29,
+  TEXT_DARK_5,
+  TEXT_ON_DARK,
+} from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { CollectableItem } from "@/lib/types";
@@ -91,16 +101,16 @@ const styles = StyleSheet.create({
     gap: 14,
     alignItems: "stretch",
     borderRadius: 24,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
   },
   image: {
     width: 104,
     height: 104,
     borderRadius: 18,
-    backgroundColor: "#d8c7b1",
+    backgroundColor: AMBER_MUTED_3,
   },
   textWrap: {
     flex: 1,
@@ -110,11 +120,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 19,
     fontWeight: "700",
-    color: "#312218",
+    color: TEXT_DARK_5,
     fontFamily: FONT_DISPLAY_BOLD,
   },
   description: {
-    color: "#6a5647",
+    color: MUTED_28,
     lineHeight: 20,
     fontFamily: FONT_BODY,
   },
@@ -124,7 +134,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   meta: {
-    color: "#8d6c4a",
+    color: MUTED_29,
     fontSize: 13,
     fontWeight: "600",
     fontFamily: FONT_BODY_SEMIBOLD,
@@ -149,19 +159,19 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 3,
     paddingHorizontal: 10,
-    backgroundColor: "#261b14",
+    backgroundColor: HERO_DARK,
   },
   conditionBadgeText: {
-    color: "#fff7ef",
+    color: TEXT_ON_DARK,
     fontSize: 11,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
   compactCard: {
     borderRadius: 18,
-    backgroundColor: "#fffaf3",
+    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: "#eadbc8",
+    borderColor: BORDER,
     overflow: "hidden",
     gap: 8,
     paddingBottom: 10,
@@ -170,18 +180,18 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 110,
     borderRadius: 16,
-    backgroundColor: "#d8c7b1",
+    backgroundColor: AMBER_MUTED_3,
   },
   compactTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#312218",
+    color: TEXT_DARK_5,
     paddingHorizontal: 10,
     fontFamily: FONT_DISPLAY_BOLD,
   },
   compactCost: {
     fontSize: 12,
-    color: "#8d6c4a",
+    color: MUTED_29,
     fontWeight: "600",
     paddingHorizontal: 10,
     fontFamily: FONT_BODY_SEMIBOLD,

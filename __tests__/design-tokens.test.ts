@@ -88,6 +88,8 @@ import {
   MUTED_25,
   MUTED_26,
   MUTED_27,
+  MUTED_28,
+  MUTED_29,
   PAGE_BG,
   PAGE_BG_2,
   PAGE_BG_3,
@@ -108,6 +110,7 @@ import {
   TEXT_DARK,
   TEXT_DARK_3,
   TEXT_DARK_4,
+  TEXT_DARK_5,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
   TEXT_ON_DARK_3,
@@ -1339,6 +1342,34 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bPURE_WHITE\b/);
     assert.match(src, /\bTEXT_DARK\b/);
     assert.match(src, /\bTEXT_ON_DARK_2\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("exposes the TEXT_DARK_5 + MUTED_28 + MUTED_29 variants shipped for the item-card migration", () => {
+    const hex = /^#[0-9a-f]{6}$/;
+    assert.match(TEXT_DARK_5, hex);
+    assert.match(MUTED_28, hex);
+    assert.match(MUTED_29, hex);
+    assert.equal(TEXT_DARK_5, "#312218");
+    assert.equal(MUTED_28, "#6a5647");
+    assert.equal(MUTED_29, "#8d6c4a");
+    assert.equal(designTokens.TEXT_DARK_5, "#312218");
+    assert.equal(designTokens.MUTED_28, "#6a5647");
+    assert.equal(designTokens.MUTED_29, "#8d6c4a");
+  });
+
+  it("components/item-card.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/item-card.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bAMBER_MUTED_3\b/);
+    assert.match(src, /\bBORDER\b/);
+    assert.match(src, /\bCARD_BG\b/);
+    assert.match(src, /\bHERO_DARK\b/);
+    assert.match(src, /\bMUTED_28\b/);
+    assert.match(src, /\bMUTED_29\b/);
+    assert.match(src, /\bTEXT_DARK_5\b/);
+    assert.match(src, /\bTEXT_ON_DARK\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
