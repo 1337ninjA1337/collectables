@@ -339,3 +339,41 @@ export const designTokens = Object.freeze({
 });
 
 export type DesignToken = keyof typeof designTokens;
+
+/**
+ * Names of every color-valued token in the palette (excludes numeric
+ * spacing/radius tokens). Computed by filtering `designTokens` for entries
+ * whose value is a `string` — keeps in sync automatically when new tokens
+ * are added without touching this declaration.
+ */
+export type ColorTokenName = {
+  [K in keyof typeof designTokens]: typeof designTokens[K] extends string ? K : never;
+}[keyof typeof designTokens];
+
+/**
+ * Hex string value of every color-valued token, used as the autocomplete
+ * surface for `ColorValue` / `BackgroundColorValue`.
+ */
+export type ColorTokenValue = (typeof designTokens)[ColorTokenName];
+
+/**
+ * Color prop type for shared components. Accepts any string (so one-off
+ * hex literals still type-check), but surfaces the named palette values
+ * in IntelliSense. The `(string & {})` intersection is the TypeScript
+ * trick that keeps a `T | string` union from collapsing to plain `string`
+ * and losing autocomplete.
+ *
+ * @example
+ *   import { HERO_DARK, type ColorValue } from "@/lib/design-tokens";
+ *   type Props = { color?: ColorValue };
+ *   <MyComponent color={HERO_DARK} />        // typed, autocompletes
+ *   <MyComponent color="#abcabc" />          // also fine
+ */
+export type ColorValue = ColorTokenValue | (string & {});
+
+/**
+ * Alias of `ColorValue` for prop names that describe a fill / surface
+ * (e.g. `background`, `backgroundColor`, `tint`). Keeping a dedicated
+ * alias lets the reader see the prop's role at a glance.
+ */
+export type BackgroundColorValue = ColorValue;
