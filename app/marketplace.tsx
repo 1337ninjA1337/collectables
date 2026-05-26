@@ -128,6 +128,7 @@ function ListingCard({
     listing.mode === "sell" && typeof listing.askingPrice === "number"
       ? `${listing.askingPrice} ${listing.currency}`
       : null;
+  const isTransferred = listing.soldAt !== null && listing.buyerUserId !== null;
 
   return (
     <Link href={`/listing/${listing.id}` as never} asChild>
@@ -137,6 +138,13 @@ function ListingCard({
         ) : (
           <View style={{ ...styles.photo, backgroundColor: placeholderColor(listing.id) }} />
         )}
+        {isTransferred ? (
+          <View style={styles.transferredBadge}>
+            <Text style={styles.transferredBadgeText}>
+              {t("marketplaceTransferredBadge")}
+            </Text>
+          </View>
+        ) : null}
         <View style={styles.cardBody}>
           <Text style={styles.cardTitle} numberOfLines={2}>{title}</Text>
           <Text style={styles.cardOwner} numberOfLines={1}>{ownerName}</Text>
@@ -238,6 +246,22 @@ const styles = StyleSheet.create({
     color: HERO_DARK,
     fontWeight: "800",
     fontSize: 14,
+  },
+  transferredBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: SUCCESS_GREEN,
+  },
+  transferredBadgeText: {
+    color: TEXT_ON_DARK,
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
   purchasesSection: {
     marginTop: 24,

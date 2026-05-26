@@ -305,9 +305,16 @@ export default function ListingDetailScreen() {
         <View style={styles.soldBanner}>
           <Text style={styles.soldBannerLabel}>{t("marketplaceSoldBanner")}</Text>
           {listing.buyerUserId ? (
-            <Text style={styles.soldBannerBuyer}>
-              {t("marketplaceSoldTo", { name: buyerName })}
-            </Text>
+            <>
+              <Text style={styles.soldBannerBuyer}>
+                {t("marketplaceSoldTo", { name: buyerName })}
+              </Text>
+              <View style={styles.transferredBadge}>
+                <Text style={styles.transferredBadgeText}>
+                  {t("marketplaceTransferredBadge")}
+                </Text>
+              </View>
+            </>
           ) : null}
         </View>
       ) : null}
@@ -518,6 +525,20 @@ const styles = StyleSheet.create({
     color: TEXT_ON_DARK,
     fontSize: 15,
     fontWeight: "800",
+  },
+  transferredBadge: {
+    marginTop: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: SUCCESS_GREEN,
+  },
+  transferredBadgeText: {
+    color: TEXT_ON_DARK,
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
   selfHint: {
     borderRadius: 22,
