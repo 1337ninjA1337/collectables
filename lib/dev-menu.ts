@@ -69,12 +69,39 @@ export function isDevEnvironment(): boolean {
   return typeof __DEV__ === "boolean" ? __DEV__ : false;
 }
 
+/**
+ * Shape of the real `expo-dev-menu` package: a `registerDevMenuItems(items)`
+ * function where each item is `{ name, callback, shouldCollapse? }`. We adapt
+ * it to the simpler `{ addDevMenuItems(Record<string, () => void>) }` shape
+ * consumed by `registerDevMenu` so the existing call sites are unchanged.
+ */
+export interface ExpoDevMenuPackage {
+  registerDevMenuItems?: (
+    items: Array<{ name: string; callback: () => void; shouldCollapse?: boolean }>,
+  ) => unknown;
+}
+
+export function adaptExpoDevMenu(mod: ExpoDevMenuPackage | null | undefined): DevMenuModule | null {
+  if (!mod || typeof mod.registerDevMenuItems !== "function") return null;
+  const register = mod.registerDevMenuItems.bind(mod);
+  return {
+    addDevMenuItems(items) {
+      const list = Object.entries(items).map(([name, callback]) => ({ name, callback }));
+      register(list);
+    },
+  };
+}
+
 export function loadDevMenuModule(): DevMenuModule | null {
   try {
     const req = (globalThis as { require?: (id: string) => unknown }).require;
     if (typeof req !== "function") return null;
-    const mod = req("expo-dev-menu") as DevMenuModule;
-    return mod ?? null;
+    const mod = req("expo-dev-menu") as ExpoDevMenuPackage & DevMenuModule;
+    if (!mod) return null;
+    // Prefer the legacy `addDevMenuItems` shape if a future SDK exposes it
+    // directly; otherwise adapt the canonical `registerDevMenuItems` API.
+    if (typeof mod.addDevMenuItems === "function") return mod;
+    return adaptExpoDevMenu(mod);
   } catch {
     return null;
   }
