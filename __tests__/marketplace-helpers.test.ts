@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import {
   activeListings,
   canCreateAnotherListing,
+  coerceListing,
+  coerceListings,
   countActiveListingsForUser,
   findListingByItemId,
   listingsAcquiredByUser,
@@ -388,5 +390,108 @@ describe("normalizeListing", () => {
     const once = normalizeListing(raw);
     const twice = normalizeListing(once);
     assert.deepEqual(twice, once);
+  });
+});
+
+describe("coerceListing", () => {
+  function validRaw(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      id: "l-1",
+      itemId: "item-1",
+      ownerUserId: "alice",
+      mode: "sell",
+      askingPrice: 100,
+      currency: "USD",
+      notes: "",
+      createdAt: "2026-04-25T10:00:00.000Z",
+      soldAt: null,
+      buyerUserId: null,
+      ...overrides,
+    };
+  }
+
+  it("returns a normalized listing on a valid row", () => {
+    const result = coerceListing(validRaw());
+    assert.ok(result);
+    assert.equal(result!.id, "l-1");
+    assert.equal(result!.mode, "sell");
+    assert.equal(result!.askingPrice, 100);
+    assert.equal(result!.buyerUserId, null);
+  });
+
+  it("accepts mode='trade' and askingPrice=null", () => {
+    const result = coerceListing(validRaw({ mode: "trade", askingPrice: null }));
+    assert.ok(result);
+    assert.equal(result!.mode, "trade");
+    assert.equal(result!.askingPrice, null);
+  });
+
+  it("coerces a missing buyerUserId to null without rejecting", () => {
+    const raw = validRaw();
+    delete raw.buyerUserId;
+    const result = coerceListing(raw);
+    assert.ok(result, "missing buyerUserId is a legacy shape, not corruption");
+    assert.equal(result!.buyerUserId, null);
+  });
+
+  it("rejects rows missing required fields", () => {
+    assert.equal(coerceListing(null), null);
+    assert.equal(coerceListing(undefined), null);
+    assert.equal(coerceListing("not an object"), null);
+    assert.equal(coerceListing(42), null);
+    assert.equal(coerceListing({}), null, "empty object is missing every field");
+    assert.equal(coerceListing(validRaw({ id: undefined })), null);
+    assert.equal(coerceListing(validRaw({ id: "" })), null, "empty id is not a valid id");
+    assert.equal(coerceListing(validRaw({ itemId: undefined })), null);
+    assert.equal(coerceListing(validRaw({ ownerUserId: undefined })), null);
+    assert.equal(coerceListing(validRaw({ createdAt: undefined })), null);
+  });
+
+  it("rejects rows with an invalid mode (the exact crash vector the task targets)", () => {
+    assert.equal(coerceListing(validRaw({ mode: undefined })), null);
+    assert.equal(coerceListing(validRaw({ mode: "auction" })), null);
+    assert.equal(coerceListing(validRaw({ mode: 42 })), null);
+  });
+
+  it("rejects rows with a malformed askingPrice", () => {
+    assert.equal(coerceListing(validRaw({ askingPrice: "10" })), null);
+    assert.equal(coerceListing(validRaw({ askingPrice: { v: 10 } })), null);
+  });
+
+  it("rejects rows with a malformed soldAt or buyerUserId", () => {
+    assert.equal(coerceListing(validRaw({ soldAt: 1700000000 })), null);
+    assert.equal(coerceListing(validRaw({ buyerUserId: 42 })), null);
+  });
+});
+
+describe("coerceListings", () => {
+  it("returns [] for non-array input", () => {
+    assert.deepEqual(coerceListings(null), []);
+    assert.deepEqual(coerceListings(undefined), []);
+    assert.deepEqual(coerceListings("oops"), []);
+    assert.deepEqual(coerceListings({}), []);
+  });
+
+  it("filters out corrupt entries while keeping the valid ones", () => {
+    const raw = [
+      {
+        id: "l-1",
+        itemId: "item-1",
+        ownerUserId: "alice",
+        mode: "sell",
+        askingPrice: 100,
+        currency: "USD",
+        notes: "",
+        createdAt: "2026-04-25T10:00:00.000Z",
+        soldAt: null,
+      },
+      { id: "l-2" /* missing everything else */ },
+      null,
+      "not an object",
+    ];
+    const out = coerceListings(raw);
+    assert.equal(out.length, 1);
+    assert.equal(out[0].id, "l-1");
+    assert.equal(out[0].buyerUserId, null, "valid row must also be normalized");
   });
 });

@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   activeListings,
   canCreateAnotherListing,
+  coerceListings,
   countActiveListingsForUser,
   findListingByItemId,
   listingsForUser,
@@ -76,8 +77,9 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         const raw = await AsyncStorage.getItem(MARKETPLACE_KEY);
         if (cancelled) return;
         if (raw) {
-          const parsed = JSON.parse(raw) as MarketplaceListing[];
-          if (Array.isArray(parsed)) setListings(parsed.map(normalizeListing));
+          // Drop malformed entries (missing `id` / `mode` / etc.) so a
+          // corrupt cache can't crash downstream rendering on first paint.
+          setListings(coerceListings(JSON.parse(raw)));
         }
       } catch {
         // Corrupt cache: start fresh rather than crashing the provider.
