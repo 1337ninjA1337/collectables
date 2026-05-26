@@ -26,7 +26,7 @@ import { useVisibilityRefresh } from "@/lib/use-visibility-refresh";
 const CHATS_REFRESH_INTERVAL_MS = 15000;
 
 export default function ChatsScreen() {
-  const { t, formatRelativeDate } = useI18n();
+  const { t, formatChatPreviewTimestamp } = useI18n();
   const { previews, refreshFromCloud } = useChat();
   const { getProfileById, ensureProfilesLoaded, friends } = useSocial();
 
@@ -82,7 +82,7 @@ export default function ChatsScreen() {
                     <Text style={styles.name} numberOfLines={1}>
                       {displayName}
                     </Text>
-                    <Text style={styles.when}>{formatRelativeDate(preview.lastMessageAt)}</Text>
+                    <Text style={styles.when}>{formatChatPreviewTimestamp(preview.lastMessageAt)}</Text>
                   </View>
                   <View style={styles.rowFooter}>
                     <Text

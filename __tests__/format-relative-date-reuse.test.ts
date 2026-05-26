@@ -8,10 +8,10 @@ function read(rel: string): string {
 }
 
 describe("formatRelativeDate reuse", () => {
-  it("chats screen renders preview.lastMessageAt via formatRelativeDate from useI18n", () => {
+  it("chats screen renders preview.lastMessageAt via formatChatPreviewTimestamp from useI18n", () => {
     const src = read("app/chats.tsx");
-    assert.match(src, /formatRelativeDate\s*\}\s*=\s*useI18n\(\)/);
-    assert.match(src, /formatRelativeDate\(preview\.lastMessageAt\)/);
+    assert.match(src, /formatChatPreviewTimestamp\s*\}\s*=\s*useI18n\(\)/);
+    assert.match(src, /formatChatPreviewTimestamp\(preview\.lastMessageAt\)/);
     // The bespoke formatWhen helper should be gone now.
     assert.doesNotMatch(src, /function\s+formatWhen\s*\(/);
   });

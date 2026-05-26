@@ -1682,12 +1682,40 @@ export function formatRelativeDate(iso: string, locale: AppLanguage | string = "
   return rtf.format(diffYr, "year");
 }
 
+const CHAT_PREVIEW_ABSOLUTE_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Chat-preview timestamp formatter that mirrors how mainstream chat apps
+ * surface fresh activity: messages from the last hour render as an absolute
+ * `HH:mm` clock value (locale-aware via `toLocaleTimeString`), and anything
+ * older falls back to `formatRelativeDate`. Future timestamps (clock skew,
+ * device clocks behind the server) also fall through to the relative branch.
+ */
+export function formatChatPreviewTimestamp(
+  iso: string,
+  locale: AppLanguage | string = "en",
+): string {
+  const then = Date.parse(iso);
+  if (!Number.isFinite(then)) return iso;
+  const diffMs = Date.now() - then;
+  if (diffMs >= 0 && diffMs < CHAT_PREVIEW_ABSOLUTE_WINDOW_MS) {
+    const bcp47 = getDefaultLocaleForLanguage(locale);
+    return new Date(then).toLocaleTimeString(bcp47, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  }
+  return formatRelativeDate(iso, locale);
+}
+
 const I18nContext = createContext<{
   language: AppLanguage;
   ready: boolean;
   setLanguage: (language: AppLanguage) => Promise<void>;
   t: (key: TranslationKey, params?: TranslationParams) => string;
   formatRelativeDate: (iso: string) => string;
+  formatChatPreviewTimestamp: (iso: string) => string;
   relativeDateLabel: (prefix: string, when: string) => string;
   languageOptions: { code: AppLanguage; label: string }[];
 } | null>(null);
@@ -1738,6 +1766,7 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
         return typeof entry === "function" ? entry(params) : entry;
       },
       formatRelativeDate: (iso: string) => formatRelativeDate(iso, language),
+      formatChatPreviewTimestamp: (iso: string) => formatChatPreviewTimestamp(iso, language),
       relativeDateLabel,
       languageOptions,
     }),
