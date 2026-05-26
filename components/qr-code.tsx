@@ -2,13 +2,13 @@ import QRCode from "qrcode";
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 
-import { HERO_DARK, PURE_WHITE } from "@/lib/design-tokens";
+import { HERO_DARK, PURE_WHITE, type BackgroundColorValue, type ColorValue } from "@/lib/design-tokens";
 
 type QrCodeProps = {
   value: string;
   size?: number;
-  color?: string;
-  background?: string;
+  color?: ColorValue;
+  background?: BackgroundColorValue;
 };
 
 /**
