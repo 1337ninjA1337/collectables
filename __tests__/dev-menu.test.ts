@@ -88,4 +88,80 @@ describe("registerDevMenu", () => {
     assert.equal(result.devMenuRegistered, true);
     assert.deepEqual(result.globalsAttached, []);
   });
+
+  it("uses a per-action label when actions are { label, run } pairs", () => {
+    const scope: Record<string, unknown> = {};
+    let registered: Record<string, () => void> | null = null;
+    let invoked = 0;
+    const run = () => { invoked += 1; };
+
+    const result = registerDevMenu({
+      isDev: true,
+      globalScope: scope,
+      devMenu: { addDevMenuItems: (items) => { registered = items; } },
+      actions: {
+        clearRuntimeSupabaseConfig: {
+          label: "Clear runtime Supabase config",
+          run,
+        },
+      },
+    });
+
+    assert.equal(result.devMenuRegistered, true);
+    assert.ok(registered, "expected DevMenu to be registered");
+    // The DevMenu sees the human label, not the camelCase identifier.
+    assert.deepEqual(
+      Object.keys(registered!),
+      ["Clear runtime Supabase config"],
+      "DevMenu must surface the explicit label, not the action key",
+    );
+    // The global helper still uses the original key + prefix.
+    assert.deepEqual(result.globalsAttached, ["__clearRuntimeSupabaseConfig"]);
+    assert.equal(typeof scope.__clearRuntimeSupabaseConfig, "function");
+    // The label key on the DevMenu and the global both point to the same `run`.
+    (scope.__clearRuntimeSupabaseConfig as () => void)();
+    assert.equal(invoked, 1);
+    registered!["Clear runtime Supabase config"]();
+    assert.equal(invoked, 2);
+  });
+
+  it("supports a mixed actions map (bare fn + labelled pair) in the same call", () => {
+    let registered: Record<string, () => void> | null = null;
+    const result = registerDevMenu({
+      isDev: true,
+      globalScope: null,
+      devMenu: { addDevMenuItems: (items) => { registered = items; } },
+      actions: {
+        ping: () => {},
+        pong: { label: "Send Pong", run: () => {} },
+      },
+    });
+
+    assert.equal(result.devMenuRegistered, true);
+    assert.ok(registered);
+    // Bare fn falls back to its key; pair uses the label.
+    assert.deepEqual(
+      Object.keys(registered!).sort(),
+      ["Send Pong", "ping"].sort(),
+    );
+  });
+
+  it("ignores a labelled pair's label when binding the globalThis helper", () => {
+    const scope: Record<string, unknown> = {};
+    registerDevMenu({
+      isDev: true,
+      globalScope: scope,
+      devMenu: null,
+      actions: {
+        clearRuntimeSupabaseConfig: {
+          label: "Clear runtime Supabase config",
+          run: () => {},
+        },
+      },
+    });
+    // The label "Clear runtime Supabase config" must not become a globalThis
+    // key — only the original action map key (with prefix) does.
+    assert.equal(scope["__Clear runtime Supabase config"], undefined);
+    assert.equal(typeof scope.__clearRuntimeSupabaseConfig, "function");
+  });
 });

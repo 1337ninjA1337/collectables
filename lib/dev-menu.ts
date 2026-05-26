@@ -2,11 +2,21 @@ export interface DevMenuModule {
   addDevMenuItems?: (items: Record<string, () => void>) => void;
 }
 
+/**
+ * A DevMenu action can be either a bare `() => void` (in which case the
+ * action's *key* in the action map doubles as the DevMenu label) or an
+ * `{ label, run }` pair where `label` is the user-facing string surfaced
+ * by `addDevMenuItems` and `run` is the side-effect to fire. The
+ * `globalThis.__<name>` helper always uses the action's *key*, so the
+ * existing console-fallback contract is unchanged.
+ */
+export type DevMenuAction = (() => void) | { label: string; run: () => void };
+
 export interface RegisterDevMenuOptions {
   isDev: boolean;
   globalScope?: Record<string, unknown> | null;
   devMenu?: DevMenuModule | null;
-  actions: Record<string, () => void>;
+  actions: Record<string, DevMenuAction>;
   globalPrefix?: string;
 }
 
@@ -15,14 +25,24 @@ export interface RegisterDevMenuResult {
   globalsAttached: string[];
 }
 
+function resolveAction(action: DevMenuAction): { label: string | null; run: () => void } {
+  if (typeof action === "function") return { label: null, run: action };
+  return { label: action.label, run: action.run };
+}
+
 export function registerDevMenu(options: RegisterDevMenuOptions): RegisterDevMenuResult {
   const { isDev, globalScope, devMenu, actions, globalPrefix = "__" } = options;
   if (!isDev) return { devMenuRegistered: false, globalsAttached: [] };
 
   let devMenuRegistered = false;
   if (devMenu && typeof devMenu.addDevMenuItems === "function") {
+    const items: Record<string, () => void> = {};
+    for (const [name, action] of Object.entries(actions)) {
+      const { label, run } = resolveAction(action);
+      items[label ?? name] = run;
+    }
     try {
-      devMenu.addDevMenuItems(actions);
+      devMenu.addDevMenuItems(items);
       devMenuRegistered = true;
     } catch {
       // expo-dev-menu may be installed but not active at runtime; ignore.
@@ -31,9 +51,10 @@ export function registerDevMenu(options: RegisterDevMenuOptions): RegisterDevMen
 
   const globalsAttached: string[] = [];
   if (globalScope) {
-    for (const [name, fn] of Object.entries(actions)) {
+    for (const [name, action] of Object.entries(actions)) {
+      const { run } = resolveAction(action);
       const key = `${globalPrefix}${name}`;
-      globalScope[key] = fn;
+      globalScope[key] = run;
       globalsAttached.push(key);
     }
   }

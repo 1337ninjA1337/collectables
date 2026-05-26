@@ -66,7 +66,10 @@ export default Sentry.wrap(function RootLayout() {
       globalScope: globalThis as unknown as Record<string, unknown>,
       devMenu: loadDevMenuModule(),
       actions: {
-        clearRuntimeSupabaseConfig,
+        clearRuntimeSupabaseConfig: {
+          label: "Clear runtime Supabase config",
+          run: clearRuntimeSupabaseConfig,
+        },
       },
     });
   }, []);
