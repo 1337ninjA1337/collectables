@@ -6,6 +6,7 @@ import {
   canCreateAnotherListing,
   countActiveListingsForUser,
   findListingByItemId,
+  listingsAcquiredByUser,
   listingsForUser,
   normalizeListing,
   normalizeTitle,
@@ -283,6 +284,53 @@ describe("priceHistoryForTitle", () => {
     const titles = withItemTitles({ i: "Same" });
     const out = priceHistoryForTitle("Same", ls, titles);
     assert.equal(out[0].recordedAt, "2026-04-25T10:00:00Z");
+  });
+});
+
+describe("listingsAcquiredByUser", () => {
+  it("returns sold listings claimed by the user, sorted by createdAt desc", () => {
+    const ls = [
+      listing({ id: "old", buyerUserId: "buyer", soldAt: "2026-04-25T11:00:00.000Z", createdAt: "2026-04-20T09:00:00.000Z" }),
+      listing({ id: "new", buyerUserId: "buyer", soldAt: "2026-04-26T11:00:00.000Z", createdAt: "2026-04-26T09:00:00.000Z" }),
+      listing({ id: "mid", buyerUserId: "buyer", soldAt: "2026-04-27T11:00:00.000Z", createdAt: "2026-04-22T09:00:00.000Z" }),
+    ];
+    const out = listingsAcquiredByUser(ls, "buyer");
+    assert.deepEqual(
+      out.map((l) => l.id),
+      ["new", "mid", "old"],
+      "must mirror listingsForUser's createdAt-desc ordering, not purchasesForUser's soldAt-desc",
+    );
+  });
+
+  it("excludes listings still listed (soldAt == null) and those bought by someone else", () => {
+    const ls = [
+      listing({ id: "1", buyerUserId: "buyer", soldAt: null }),
+      listing({ id: "2", buyerUserId: "other", soldAt: "2026-04-26T11:00:00.000Z" }),
+      listing({ id: "3", buyerUserId: "buyer", soldAt: "2026-04-26T11:00:00.000Z" }),
+    ];
+    const out = listingsAcquiredByUser(ls, "buyer");
+    assert.deepEqual(out.map((l) => l.id), ["3"]);
+  });
+
+  it("returns [] when nothing matches", () => {
+    const ls = [listing({ buyerUserId: "alice", soldAt: "2026-04-26T11:00:00.000Z" })];
+    assert.deepEqual(listingsAcquiredByUser(ls, "bob"), []);
+  });
+
+  it("does not mutate the input listings array", () => {
+    const ls = [
+      listing({ id: "a", buyerUserId: "buyer", soldAt: "2026-04-26T11:00:00.000Z" }),
+      listing({ id: "b", buyerUserId: "buyer", soldAt: "2026-04-25T11:00:00.000Z" }),
+    ];
+    const before = ls.map((l) => l.id);
+    listingsAcquiredByUser(ls, "buyer");
+    assert.deepEqual(ls.map((l) => l.id), before);
+  });
+
+  it("treats buyerUserId === null as not-acquired even when soldAt is set", () => {
+    // Sold without a buyer is a legacy "mark sold" without a transfer record.
+    const ls = [listing({ buyerUserId: null, soldAt: "2026-04-26T11:00:00.000Z" })];
+    assert.deepEqual(listingsAcquiredByUser(ls, "anyone"), []);
   });
 });
 
