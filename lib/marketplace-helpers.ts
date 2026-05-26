@@ -26,6 +26,57 @@ export function normalizeListing(raw: MarketplaceListing): MarketplaceListing {
 }
 
 /**
+ * Validates an arbitrary value against the `MarketplaceListing` shape and
+ * returns a normalized listing or `null` on any structural mismatch. Use to
+ * harden any JSON-hydration path (AsyncStorage cache, push payload,
+ * deep-link preview) against corrupt rows that would otherwise crash
+ * downstream rendering when fields like `mode` come back undefined.
+ */
+export function coerceListing(raw: unknown): MarketplaceListing | null {
+  if (raw === null || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.id !== "string" || r.id === "") return null;
+  if (typeof r.itemId !== "string" || r.itemId === "") return null;
+  if (typeof r.ownerUserId !== "string" || r.ownerUserId === "") return null;
+  if (r.mode !== "trade" && r.mode !== "sell") return null;
+  if (r.askingPrice !== null && typeof r.askingPrice !== "number") return null;
+  if (typeof r.currency !== "string") return null;
+  if (typeof r.notes !== "string") return null;
+  if (typeof r.createdAt !== "string") return null;
+  if (r.soldAt !== null && typeof r.soldAt !== "string") return null;
+  if (r.buyerUserId !== undefined && r.buyerUserId !== null && typeof r.buyerUserId !== "string") {
+    return null;
+  }
+  return normalizeListing({
+    id: r.id,
+    itemId: r.itemId,
+    ownerUserId: r.ownerUserId,
+    mode: r.mode,
+    askingPrice: (r.askingPrice ?? null) as number | null,
+    currency: r.currency,
+    notes: r.notes,
+    createdAt: r.createdAt,
+    soldAt: (r.soldAt ?? null) as string | null,
+    buyerUserId: (r.buyerUserId ?? null) as string | null,
+  });
+}
+
+/**
+ * Validate + filter a JSON-hydrated array of listings. Drops malformed
+ * entries silently — the caller can compare lengths if they want to surface
+ * "we dropped N corrupt rows" telemetry.
+ */
+export function coerceListings(raw: unknown): MarketplaceListing[] {
+  if (!Array.isArray(raw)) return [];
+  const out: MarketplaceListing[] = [];
+  for (const entry of raw) {
+    const coerced = coerceListing(entry);
+    if (coerced) out.push(coerced);
+  }
+  return out;
+}
+
+/**
  * Free-tier users may have at most one *active* listing at a time. Sold
  * listings (with a non-null `soldAt`) don't count against the cap.
  */
