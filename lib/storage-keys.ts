@@ -42,6 +42,29 @@ export async function migrateStorageKey(oldKey: string, newKey: string): Promise
   }
 }
 
+export const COLLECTABLES_STORAGE_PREFIX = "collectables-";
+
+/**
+ * Returns every AsyncStorage key currently owned by the app (anything matching
+ * `collectables-*`). Exposed so a dev-only escape hatch can wipe onboarding
+ * state without enumerating every keyspace by hand.
+ */
+export async function getAllCollectablesKeys(): Promise<string[]> {
+  const all = await AsyncStorage.getAllKeys();
+  return all.filter((k) => k.startsWith(COLLECTABLES_STORAGE_PREFIX));
+}
+
+/**
+ * Wipes every AsyncStorage key matching `collectables-*`. Intended as a
+ * dev-only reset (exposed via `__resetCollectablesStorage` and the DevMenu);
+ * production code paths should use the per-user reset helper instead.
+ */
+export async function clearAllCollectablesStorage(): Promise<void> {
+  const keys = await getAllCollectablesKeys();
+  if (keys.length === 0) return;
+  await AsyncStorage.multiRemove(keys);
+}
+
 export async function clearAllUserData(userId: string): Promise<void> {
   const keys = [
     collectionsKey(userId),
