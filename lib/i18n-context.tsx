@@ -1637,6 +1637,27 @@ function getRelativeTimeFormat(bcp47: string): Intl.RelativeTimeFormat {
   return formatter;
 }
 
+/**
+ * Compose a "{prefix} {relative-date}" label without forcing every consumer
+ * to add a new translation entry per pattern. The six supported locales all
+ * share the `prefix + space + when` shape (English "Listed yesterday",
+ * Russian "Размещено вчера", German "Eingestellt gestern", etc.), so the
+ * helper just splices a single space between the translated prefix and the
+ * already-localised relative-time clause.
+ *
+ * @example
+ *   const { t, relativeDateLabel, formatRelativeDate } = useI18n();
+ *   relativeDateLabel(t("marketplaceListed"), formatRelativeDate(iso));
+ *   // → "Listed 5 hours ago"
+ */
+export function relativeDateLabel(prefix: string, when: string): string {
+  const head = prefix.trim();
+  const tail = when.trim();
+  if (!head) return tail;
+  if (!tail) return head;
+  return `${head} ${tail}`;
+}
+
 export function formatRelativeDate(iso: string, locale: AppLanguage | string = "en"): string {
   const then = Date.parse(iso);
   if (!Number.isFinite(then)) return iso;
@@ -1667,6 +1688,7 @@ const I18nContext = createContext<{
   setLanguage: (language: AppLanguage) => Promise<void>;
   t: (key: TranslationKey, params?: TranslationParams) => string;
   formatRelativeDate: (iso: string) => string;
+  relativeDateLabel: (prefix: string, when: string) => string;
   languageOptions: { code: AppLanguage; label: string }[];
 } | null>(null);
 
@@ -1716,6 +1738,7 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
         return typeof entry === "function" ? entry(params) : entry;
       },
       formatRelativeDate: (iso: string) => formatRelativeDate(iso, language),
+      relativeDateLabel,
       languageOptions,
     }),
     [language, ready],
