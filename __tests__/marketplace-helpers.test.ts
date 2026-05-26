@@ -15,6 +15,8 @@ import {
   PRICE_HISTORY_SIMILARITY_THRESHOLD,
   priceHistoryForTitle,
   purchasesForUser,
+  RECENTLY_SOLD_DEFAULT_LIMIT,
+  recentlySoldListings,
   removeListingById,
   titleSimilarity,
   upsertListing,
@@ -286,6 +288,69 @@ describe("priceHistoryForTitle", () => {
     const titles = withItemTitles({ i: "Same" });
     const out = priceHistoryForTitle("Same", ls, titles);
     assert.equal(out[0].recordedAt, "2026-04-25T10:00:00Z");
+  });
+});
+
+describe("recentlySoldListings", () => {
+  it("returns sold listings with a buyer, sorted by soldAt desc", () => {
+    const ls = [
+      listing({ id: "a", soldAt: "2026-04-26T11:00:00.000Z", buyerUserId: "buyer-a" }),
+      listing({ id: "b", soldAt: "2026-04-28T11:00:00.000Z", buyerUserId: "buyer-b" }),
+      listing({ id: "c", soldAt: "2026-04-25T11:00:00.000Z", buyerUserId: "buyer-c" }),
+    ];
+    const out = recentlySoldListings(ls);
+    assert.deepEqual(out.map((l) => l.id), ["b", "a", "c"]);
+  });
+
+  it("excludes active (unsold) listings", () => {
+    const ls = [
+      listing({ id: "active", soldAt: null }),
+      listing({ id: "sold", soldAt: "2026-04-26T11:00:00.000Z", buyerUserId: "buyer-a" }),
+    ];
+    assert.deepEqual(recentlySoldListings(ls).map((l) => l.id), ["sold"]);
+  });
+
+  it("excludes legacy 'mark sold' rows without a buyer", () => {
+    // Listings sold without a transfer aren't useful pricing context — they're
+    // just the seller flipping the flag manually. Excluded by design.
+    const ls = [
+      listing({ id: "legacy", soldAt: "2026-04-26T11:00:00.000Z", buyerUserId: null }),
+      listing({ id: "modern", soldAt: "2026-04-26T11:00:00.000Z", buyerUserId: "buyer" }),
+    ];
+    assert.deepEqual(recentlySoldListings(ls).map((l) => l.id), ["modern"]);
+  });
+
+  it("caps the result at the default limit", () => {
+    const ls = Array.from({ length: 20 }, (_, i) =>
+      listing({
+        id: `l-${i}`,
+        soldAt: `2026-04-${String(i + 1).padStart(2, "0")}T10:00:00.000Z`,
+        buyerUserId: "buyer",
+      }),
+    );
+    const out = recentlySoldListings(ls);
+    assert.equal(out.length, RECENTLY_SOLD_DEFAULT_LIMIT);
+  });
+
+  it("honours a caller-supplied limit", () => {
+    const ls = Array.from({ length: 5 }, (_, i) =>
+      listing({
+        id: `l-${i}`,
+        soldAt: `2026-04-${String(i + 1).padStart(2, "0")}T10:00:00.000Z`,
+        buyerUserId: "buyer",
+      }),
+    );
+    assert.equal(recentlySoldListings(ls, 2).length, 2);
+  });
+
+  it("does not mutate the input array", () => {
+    const ls = [
+      listing({ id: "a", soldAt: "2026-04-26T11:00:00.000Z", buyerUserId: "buyer" }),
+      listing({ id: "b", soldAt: "2026-04-25T11:00:00.000Z", buyerUserId: "buyer" }),
+    ];
+    const before = ls.map((l) => l.id);
+    recentlySoldListings(ls);
+    assert.deepEqual(ls.map((l) => l.id), before);
   });
 });
 

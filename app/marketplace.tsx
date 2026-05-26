@@ -22,6 +22,7 @@ import {
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useMarketplace } from "@/lib/marketplace-context";
+import { recentlySoldListings } from "@/lib/marketplace-helpers";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
 import { CollectableItem, MarketplaceListing, UserProfile } from "@/lib/types";
@@ -34,7 +35,7 @@ type ResolvedListing = {
 
 export default function MarketplaceScreen() {
   const { t } = useI18n();
-  const { activeListings, myPurchases } = useMarketplace();
+  const { activeListings, myPurchases, listings } = useMarketplace();
   const { getItemById } = useCollections();
   const { getProfileById } = useSocial();
   const { isDesktop, isTablet } = useResponsive();
@@ -57,6 +58,16 @@ export default function MarketplaceScreen() {
         owner: getProfileById(listing.ownerUserId),
       })),
     [myPurchases, getItemById, getProfileById],
+  );
+
+  const recentlySold = useMemo<ResolvedListing[]>(
+    () =>
+      recentlySoldListings(listings).map((listing) => ({
+        listing,
+        item: getItemById(listing.itemId),
+        owner: getProfileById(listing.ownerUserId),
+      })),
+    [listings, getItemById, getProfileById],
   );
 
   const columns = isDesktop ? 3 : isTablet ? 2 : 1;
@@ -106,6 +117,27 @@ export default function MarketplaceScreen() {
           </View>
         </View>
       ) : null}
+
+      {recentlySold.length > 0 ? (
+        <View style={styles.purchasesSection}>
+          <Text style={styles.sectionTitle}>{t("marketplaceRecentlySoldTitle")}</Text>
+          <View style={styles.grid}>
+            {recentlySold.map(({ listing, item, owner }) => (
+              <View
+                key={listing.id}
+                style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
+              >
+                <ListingCard
+                  listing={listing}
+                  item={item}
+                  owner={owner}
+                  buyer={listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -114,10 +146,12 @@ function ListingCard({
   listing,
   item,
   owner,
+  buyer,
 }: {
   listing: MarketplaceListing;
   item: CollectableItem | undefined;
   owner: UserProfile | undefined;
+  buyer?: UserProfile | undefined;
 }) {
   const { t } = useI18n();
   const photo = item?.photos?.find(Boolean);
@@ -129,6 +163,7 @@ function ListingCard({
       ? `${listing.askingPrice} ${listing.currency}`
       : null;
   const isTransferred = listing.soldAt !== null && listing.buyerUserId !== null;
+  const buyerHandle = buyer ? `@${buyer.username ?? buyer.publicId ?? buyer.id}` : null;
 
   return (
     <Link href={`/listing/${listing.id}` as never} asChild>
@@ -148,6 +183,13 @@ function ListingCard({
         <View style={styles.cardBody}>
           <Text style={styles.cardTitle} numberOfLines={2}>{title}</Text>
           <Text style={styles.cardOwner} numberOfLines={1}>{ownerName}</Text>
+          {buyerHandle ? (
+            <View style={styles.soldToPill}>
+              <Text style={styles.soldToPillText} numberOfLines={1}>
+                {t("marketplaceSoldTo", { name: buyerHandle })}
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.cardMetaRow}>
             <View
               style={{
@@ -262,6 +304,20 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.8,
+  },
+  soldToPill: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: AMBER_MUTED_3,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  soldToPillText: {
+    color: HERO_DARK,
+    fontSize: 12,
+    fontWeight: "700",
   },
   purchasesSection: {
     marginTop: 24,

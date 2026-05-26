@@ -159,6 +159,29 @@ export function listingsForUser(
 }
 
 /**
+ * Listings that have been sold AND transferred (have a buyer). Sorted by
+ * `soldAt` descending so the most recent sales appear first. Used by the
+ * marketplace "Recently sold" surface that gives sellers pricing context
+ * without exposing them in the active feed.
+ */
+export const RECENTLY_SOLD_DEFAULT_LIMIT = 12;
+
+export function recentlySoldListings(
+  listings: readonly MarketplaceListing[],
+  limit: number = RECENTLY_SOLD_DEFAULT_LIMIT,
+): MarketplaceListing[] {
+  return listings
+    .filter((l) => l.soldAt != null && l.buyerUserId != null)
+    .slice()
+    .sort((a, b) => {
+      const aAt = a.soldAt ?? a.createdAt;
+      const bAt = b.soldAt ?? b.createdAt;
+      return aAt < bAt ? 1 : -1;
+    })
+    .slice(0, limit);
+}
+
+/**
  * Listings the user has bought (claimed via the marketplace transfer flow).
  * Sorted by `soldAt` descending so the most recent purchases appear first.
  */
