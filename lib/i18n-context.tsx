@@ -1682,6 +1682,19 @@ export function formatRelativeDate(iso: string, locale: AppLanguage | string = "
   return rtf.format(diffYr, "year");
 }
 
+/**
+ * Render a locale-aware absolute date+time string for "power-user" timestamps
+ * (long-press tooltips, accessibility labels, etc.). Mirrors
+ * `formatRelativeDate`'s guard-clause-on-invalid-ISO behaviour so callers can
+ * pass through any persisted ISO string without pre-validating it.
+ */
+export function formatAbsoluteDate(iso: string, locale: AppLanguage | string = "en"): string {
+  const then = Date.parse(iso);
+  if (!Number.isFinite(then)) return iso;
+  const bcp47 = getDefaultLocaleForLanguage(locale);
+  return new Date(then).toLocaleString(bcp47, { dateStyle: "medium", timeStyle: "short" });
+}
+
 const CHAT_PREVIEW_ABSOLUTE_WINDOW_MS = 60 * 60 * 1000;
 
 /**
@@ -1716,6 +1729,7 @@ const I18nContext = createContext<{
   t: (key: TranslationKey, params?: TranslationParams) => string;
   formatRelativeDate: (iso: string) => string;
   formatChatPreviewTimestamp: (iso: string) => string;
+  formatAbsoluteDate: (iso: string) => string;
   relativeDateLabel: (prefix: string, when: string) => string;
   languageOptions: { code: AppLanguage; label: string }[];
 } | null>(null);
@@ -1767,6 +1781,7 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
       },
       formatRelativeDate: (iso: string) => formatRelativeDate(iso, language),
       formatChatPreviewTimestamp: (iso: string) => formatChatPreviewTimestamp(iso, language),
+      formatAbsoluteDate: (iso: string) => formatAbsoluteDate(iso, language),
       relativeDateLabel,
       languageOptions,
     }),

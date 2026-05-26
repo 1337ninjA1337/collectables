@@ -18,7 +18,7 @@ describe("formatRelativeDate reuse", () => {
 
   it("listing detail renders listing.createdAt as a localised 'Listed X ago' hint", () => {
     const src = read("app/listing/[id].tsx");
-    assert.match(src, /formatRelativeDate\s*\}\s*=\s*useI18n\(\)/);
+    assert.match(src, /formatRelativeDate[\s\S]*?\}\s*=\s*useI18n\(\)/);
     assert.match(src, /marketplaceListedAt/);
     assert.match(src, /formatRelativeDate\(listing\.createdAt\)/);
   });

@@ -37,11 +37,13 @@ import { useMarketplace } from "@/lib/marketplace-context";
 import { priceHistoryForTitle } from "@/lib/marketplace-helpers";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
+import { useToast } from "@/lib/toast-context";
 
 export default function ListingDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const listingId = params.id ?? "";
-  const { t, formatRelativeDate } = useI18n();
+  const { t, formatRelativeDate, formatAbsoluteDate } = useI18n();
+  const toast = useToast();
   const { user } = useAuth();
   const { getListingById, fetchListingById, listings, markListingSold } = useMarketplace();
   const { getItemById, transferItemToBuyer } = useCollections();
@@ -208,9 +210,17 @@ export default function ListingDetailScreen() {
           </View>
           {priceLabel ? <Text style={styles.priceText}>{priceLabel}</Text> : null}
         </View>
-        <Text style={styles.listedAt}>
-          {t("marketplaceListedAt", { when: formatRelativeDate(listing.createdAt) })}
-        </Text>
+        <Pressable
+          onLongPress={() => toast.info(formatAbsoluteDate(listing.createdAt))}
+          accessibilityLabel={formatAbsoluteDate(listing.createdAt)}
+          {...(Platform.OS === "web"
+            ? ({ title: formatAbsoluteDate(listing.createdAt) } as object)
+            : null)}
+        >
+          <Text style={styles.listedAt}>
+            {t("marketplaceListedAt", { when: formatRelativeDate(listing.createdAt) })}
+          </Text>
+        </Pressable>
       </View>
 
       <Link href={`/profile/${listing.ownerUserId}` as never} asChild>
