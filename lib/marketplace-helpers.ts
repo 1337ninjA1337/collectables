@@ -126,6 +126,23 @@ export function purchasesForUser(
 }
 
 /**
+ * Listings the user has *acquired* via the marketplace — same filter as
+ * {@link purchasesForUser} (`buyerUserId === userId && soldAt != null`) but
+ * sorted by `createdAt` to mirror the shape of {@link listingsForUser}. Use
+ * this in profile-screen "Trades & Transfers" surfaces where the chronology
+ * tracks when the listing first appeared, not when the sale closed.
+ */
+export function listingsAcquiredByUser(
+  listings: readonly MarketplaceListing[],
+  userId: string,
+): MarketplaceListing[] {
+  return listings
+    .filter((l) => l.buyerUserId === userId && l.soldAt != null)
+    .slice()
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+/**
  * Common collectible edition/condition words that distinguish the same card
  * from a collector's perspective but vary so widely in listing titles that
  * including them in the Dice comparison drives similarity below the threshold.
