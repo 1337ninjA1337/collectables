@@ -91,14 +91,14 @@ describe("registerDevMenu", () => {
 
   it("uses a per-action label when actions are { label, run } pairs", () => {
     const scope: Record<string, unknown> = {};
-    let registered: Record<string, () => void> | null = null;
+    const captured: Record<string, () => void>[] = [];
     let invoked = 0;
     const run = () => { invoked += 1; };
 
     const result = registerDevMenu({
       isDev: true,
       globalScope: scope,
-      devMenu: { addDevMenuItems: (items) => { registered = items; } },
+      devMenu: { addDevMenuItems: (items) => { captured.push(items); } },
       actions: {
         clearRuntimeSupabaseConfig: {
           label: "Clear runtime Supabase config",
@@ -108,10 +108,11 @@ describe("registerDevMenu", () => {
     });
 
     assert.equal(result.devMenuRegistered, true);
-    assert.ok(registered, "expected DevMenu to be registered");
+    assert.equal(captured.length, 1, "expected DevMenu to be registered");
+    const registered = captured[0];
     // The DevMenu sees the human label, not the camelCase identifier.
     assert.deepEqual(
-      Object.keys(registered!),
+      Object.keys(registered),
       ["Clear runtime Supabase config"],
       "DevMenu must surface the explicit label, not the action key",
     );
@@ -121,7 +122,7 @@ describe("registerDevMenu", () => {
     // The label key on the DevMenu and the global both point to the same `run`.
     (scope.__clearRuntimeSupabaseConfig as () => void)();
     assert.equal(invoked, 1);
-    registered!["Clear runtime Supabase config"]();
+    registered["Clear runtime Supabase config"]();
     assert.equal(invoked, 2);
   });
 

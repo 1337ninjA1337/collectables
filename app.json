@@ -39,6 +39,7 @@
         }
       ],
       "expo-web-browser",
+      "expo-dev-menu",
       [
         "@sentry/react-native/expo",
         {
