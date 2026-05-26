@@ -8,6 +8,7 @@ import {
   countActiveListingsForUser,
   findListingByItemId,
   listingsForUser,
+  normalizeListing,
   purchasesForUser,
   removeListingById,
   upsertListing,
@@ -52,13 +53,6 @@ const MarketplaceContext = createContext<MarketplaceContextValue | null>(null);
 
 function generateListingId(): string {
   return `listing-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function normalizeListing(raw: MarketplaceListing): MarketplaceListing {
-  return {
-    ...raw,
-    buyerUserId: raw.buyerUserId ?? null,
-  };
 }
 
 export function MarketplaceProvider({ children }: React.PropsWithChildren) {
