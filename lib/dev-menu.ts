@@ -42,8 +42,10 @@ export function registerDevMenu(options: RegisterDevMenuOptions): RegisterDevMen
 }
 
 export function isDevEnvironment(): boolean {
-  const flag = (globalThis as { __DEV__?: boolean }).__DEV__;
-  return typeof flag === "boolean" ? flag : false;
+  // `__DEV__` is declared globally in `types/globals.d.ts` (injected by
+  // Metro / React Native at bundle time). Guard with `typeof` so unit tests
+  // running under plain Node (where Metro hasn't defined it) still resolve.
+  return typeof __DEV__ === "boolean" ? __DEV__ : false;
 }
 
 export function loadDevMenuModule(): DevMenuModule | null {
