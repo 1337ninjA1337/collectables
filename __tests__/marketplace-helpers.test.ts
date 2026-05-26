@@ -7,6 +7,7 @@ import {
   countActiveListingsForUser,
   findListingByItemId,
   listingsForUser,
+  normalizeListing,
   normalizeTitle,
   PRICE_HISTORY_SIMILARITY_THRESHOLD,
   priceHistoryForTitle,
@@ -282,5 +283,62 @@ describe("priceHistoryForTitle", () => {
     const titles = withItemTitles({ i: "Same" });
     const out = priceHistoryForTitle("Same", ls, titles);
     assert.equal(out[0].recordedAt, "2026-04-25T10:00:00Z");
+  });
+});
+
+describe("normalizeListing", () => {
+  it("coerces a missing buyerUserId to null", () => {
+    // Simulate a legacy AsyncStorage payload that omits buyerUserId entirely.
+    const legacy = {
+      id: "l-1",
+      itemId: "item-1",
+      ownerUserId: "alice",
+      mode: "sell" as MarketplaceMode,
+      askingPrice: 100,
+      currency: "USD",
+      notes: "",
+      createdAt: "2026-04-25T10:00:00.000Z",
+      soldAt: null,
+    } as unknown as MarketplaceListing;
+
+    const result = normalizeListing(legacy);
+    assert.equal(result.buyerUserId, null);
+    // The rest of the listing must round-trip unchanged.
+    assert.equal(result.id, legacy.id);
+    assert.equal(result.itemId, legacy.itemId);
+    assert.equal(result.ownerUserId, legacy.ownerUserId);
+    assert.equal(result.askingPrice, legacy.askingPrice);
+  });
+
+  it("coerces an explicit undefined buyerUserId to null", () => {
+    const raw = listing({ buyerUserId: undefined as unknown as null });
+    const out = normalizeListing(raw);
+    assert.equal(out.buyerUserId, null);
+  });
+
+  it("preserves a non-null buyerUserId verbatim", () => {
+    const raw = listing({ buyerUserId: "bob" });
+    const out = normalizeListing(raw);
+    assert.equal(out.buyerUserId, "bob");
+  });
+
+  it("preserves an explicit null buyerUserId without re-coalescing", () => {
+    const raw = listing({ buyerUserId: null });
+    const out = normalizeListing(raw);
+    assert.equal(out.buyerUserId, null);
+  });
+
+  it("does not mutate the input listing", () => {
+    const raw = listing({ buyerUserId: undefined as unknown as null });
+    const before = { ...raw };
+    normalizeListing(raw);
+    assert.deepEqual(raw, before, "normalizeListing must be pure (no mutation)");
+  });
+
+  it("is safe to apply twice (idempotent)", () => {
+    const raw = listing({ buyerUserId: undefined as unknown as null });
+    const once = normalizeListing(raw);
+    const twice = normalizeListing(once);
+    assert.deepEqual(twice, once);
   });
 });

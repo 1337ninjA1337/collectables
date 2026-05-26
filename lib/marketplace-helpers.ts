@@ -8,6 +8,24 @@ import { MarketplaceListing, MarketplaceMode } from "@/lib/types";
 export const FREE_LISTING_CAP = 1;
 
 /**
+ * Ensures every `MarketplaceListing` shape has the optional `buyerUserId`
+ * field explicitly coalesced to `null`. Older AsyncStorage payloads (and
+ * legacy cloud rows) may omit the field entirely; downstream code that
+ * checks `listing.buyerUserId === userId` needs `null` rather than
+ * `undefined` to match the typed contract.
+ *
+ * Lives here (not inside `MarketplaceContext`) so any future code path that
+ * hydrates listings from JSON — push notifications, deep-link previews,
+ * server-rendered routes — can reuse the same defensive-default logic.
+ */
+export function normalizeListing(raw: MarketplaceListing): MarketplaceListing {
+  return {
+    ...raw,
+    buyerUserId: raw.buyerUserId ?? null,
+  };
+}
+
+/**
  * Free-tier users may have at most one *active* listing at a time. Sold
  * listings (with a non-null `soldAt`) don't count against the cap.
  */
