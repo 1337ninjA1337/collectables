@@ -44,6 +44,7 @@ import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-conte
 import { RealtimeStatusProvider } from "@/lib/realtime-status-context";
 import { getSentryStatus, triggerSentryTestError } from "@/lib/sentry";
 import { SocialProvider } from "@/lib/social-context";
+import { clearAllCollectablesStorage } from "@/lib/storage-keys";
 import { clearRuntimeSupabaseConfig } from "@/lib/supabase";
 import { ToastProvider } from "@/lib/toast-context";
 import { Screen, useResponsive } from "@/components/screen";
@@ -69,6 +70,12 @@ export default Sentry.wrap(function RootLayout() {
         clearRuntimeSupabaseConfig: {
           label: "Clear runtime Supabase config",
           run: clearRuntimeSupabaseConfig,
+        },
+        resetCollectablesStorage: {
+          label: "Reset Collectables storage",
+          run: () => {
+            void clearAllCollectablesStorage();
+          },
         },
       },
     });
