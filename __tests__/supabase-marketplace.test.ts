@@ -115,6 +115,40 @@ describe("cloudMarkSold — pure-helper composition", () => {
     assert.equal(parsedBody.sold_at, soldAt);
     assert.equal(parsedBody.buyer_user_id, buyerUserId);
   });
+
+  it("a mocked PATCH with buyerUserId=null still serialises buyer_user_id into the body", async () => {
+    // Strict integration: simulates cloudMarkSold(id, soldAt, null) end-to-end
+    // via the same composed pure helpers the wrapper uses. The null branch is
+    // the regression vector the task calls out — if a future refactor swaps
+    // markSoldPayload for an `if (buyerUserId) { body.buyer_user_id = ... }`
+    // pattern, the column silently stops being reset on existing rows.
+    const { calls, fetch: fakeFetch } = makeRecordingFetcher({ ok: true });
+    const baseUrl = "https://xyz.supabase.co";
+    const apiKey = "apikey-xyz";
+    const token = "token-abc";
+    const soldAt = "2026-05-07T10:00:00.000Z";
+
+    await fakeFetch(markSoldUrl(baseUrl, "l-null"), {
+      method: "PATCH",
+      headers: buildMarketplaceWriteHeaders(apiKey, token),
+      body: JSON.stringify(markSoldPayload(soldAt, null)),
+    });
+
+    assert.equal(calls.length, 1);
+    const call = calls[0];
+    assert.equal(call.init.method, "PATCH");
+    const parsedBody = JSON.parse(call.init.body as string) as Record<string, unknown>;
+    assert.equal(parsedBody.sold_at, soldAt);
+    assert.ok(
+      "buyer_user_id" in parsedBody,
+      "PATCH body must include buyer_user_id key even when null — otherwise existing rows keep their stale buyer",
+    );
+    assert.equal(parsedBody.buyer_user_id, null);
+    // Exactly two keys: catches a future regression that accidentally appends
+    // a third field (e.g. an unexpected `updated_at`) which would change the
+    // PATCH semantics from a targeted column write to a multi-column overwrite.
+    assert.deepEqual(Object.keys(parsedBody).sort(), ["buyer_user_id", "sold_at"]);
+  });
 });
 
 describe("cloudMarkSold — structural composition (lib/supabase-marketplace.ts)", () => {
