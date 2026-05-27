@@ -48,6 +48,8 @@ type MarketplaceContextValue = {
   addListing: (input: DraftListingInput) => MarketplaceListing | null;
   removeListing: (id: string) => void;
   markListingSold: (id: string, buyerUserId?: string | null) => void;
+  claimingListingId: string | null;
+  setClaimingListingId: (id: string | null) => void;
 };
 
 const MarketplaceContext = createContext<MarketplaceContextValue | null>(null);
@@ -60,6 +62,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [ready, setReady] = useState(false);
+  const [claimingListingId, setClaimingListingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -214,6 +217,8 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       addListing,
       removeListing,
       markListingSold,
+      claimingListingId,
+      setClaimingListingId,
     }),
     [
       ready,
@@ -229,6 +234,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       addListing,
       removeListing,
       markListingSold,
+      claimingListingId,
     ],
   );
 

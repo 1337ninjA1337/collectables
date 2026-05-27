@@ -108,6 +108,34 @@ describe("listing detail screen", () => {
     assert.match(src, /ensureProfilesLoaded/);
   });
 
+  it("threads claiming state through MarketplaceContext, not local useState", () => {
+    const src = read("app/listing/[id].tsx");
+    // The listing screen must NOT keep a local `useState<boolean>` for the
+    // claim spinner — that resets on navigation. Instead it reads
+    // `claimingListingId` off the context and derives `claiming` for *this*
+    // listing only, so a re-mount during a slow PATCH still shows the spinner.
+    assert.doesNotMatch(
+      src,
+      /\[claiming,\s*setClaiming\]\s*=\s*useState/,
+      "claim spinner must not live in local useState",
+    );
+    assert.match(src, /claimingListingId\s*,\s*setClaimingListingId/);
+    assert.match(src, /claiming\s*=\s*claimingListingId\s*===\s*listingId/);
+    assert.match(src, /setClaimingListingId\(listing\.id\)/);
+    assert.match(src, /setClaimingListingId\(null\)/);
+  });
+
+  it("MarketplaceContext exposes a global claimingListingId flag", () => {
+    const src = read("lib/marketplace-context.tsx");
+    assert.match(src, /claimingListingId:\s*string\s*\|\s*null/);
+    assert.match(src, /setClaimingListingId:\s*\(id:\s*string\s*\|\s*null\)\s*=>\s*void/);
+    assert.match(
+      src,
+      /useState<string\s*\|\s*null>\(null\)/,
+      "claimingListingId must be backed by a state slot in the provider",
+    );
+  });
+
   it("fires a success toast after a successful claim", () => {
     const src = read("app/listing/[id].tsx");
     // Pin the toast call so a future refactor that drops the user feedback is

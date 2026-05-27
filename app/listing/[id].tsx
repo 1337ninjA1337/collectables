@@ -45,12 +45,19 @@ export default function ListingDetailScreen() {
   const { t, formatRelativeDate, formatAbsoluteDate } = useI18n();
   const toast = useToast();
   const { user } = useAuth();
-  const { getListingById, fetchListingById, listings, markListingSold } = useMarketplace();
+  const {
+    getListingById,
+    fetchListingById,
+    listings,
+    markListingSold,
+    claimingListingId,
+    setClaimingListingId,
+  } = useMarketplace();
   const { getItemById, transferItemToBuyer } = useCollections();
   const { getProfileById, ensureProfilesLoaded, getRelationship } = useSocial();
   const { ensureChatWith, canMessage, sendMessage } = useChat();
   const [fetchingRemote, setFetchingRemote] = useState(false);
-  const [claiming, setClaiming] = useState(false);
+  const claiming = claimingListingId === listingId;
 
   const listing = getListingById(listingId);
 
@@ -134,7 +141,7 @@ export default function ListingDetailScreen() {
 
   const performClaim = useCallback(async () => {
     if (!listing || !user) return;
-    setClaiming(true);
+    setClaimingListingId(listing.id);
     try {
       const sourceItem = getItemById(listing.itemId);
       const fallbackTitle = sourceItem?.title ?? t("marketplaceUnknownItem");
@@ -178,9 +185,9 @@ export default function ListingDetailScreen() {
         sellerWasFriend: getRelationship(listing.ownerUserId) === "friend",
       });
     } finally {
-      setClaiming(false);
+      setClaimingListingId(null);
     }
-  }, [listing, user, markListingSold, getItemById, transferItemToBuyer, getRelationship, sendMessage, toast, t]);
+  }, [listing, user, markListingSold, setClaimingListingId, getItemById, transferItemToBuyer, getRelationship, sendMessage, toast, t]);
 
   function handleClaimPress() {
     if (!listing || !user || claiming) return;
