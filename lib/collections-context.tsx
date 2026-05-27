@@ -18,6 +18,7 @@ import {
   mergeCollectionsFromCloud,
   mergeItemsFromCloud,
 } from "@/lib/collections-cloud-merge";
+import { userScopedCollectionId } from "@/lib/collections-helpers";
 import { useSocial } from "@/lib/social-context";
 import {
   upsertCollection,
@@ -829,7 +830,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         if (!user) return null;
         const ownerName = user.email ?? "You";
         const ownerUserId = user.id;
-        const collectionId = `${ownerUserId}-${ACQUIRED_COLLECTION_ID_SUFFIX}`;
+        const collectionId = userScopedCollectionId(ownerUserId, ACQUIRED_COLLECTION_ID_SUFFIX);
         const existing = localCollections.find((c) => c.id === collectionId);
         if (!existing) {
           const newCollection: Collection = {
