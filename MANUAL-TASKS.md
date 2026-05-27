@@ -234,3 +234,28 @@ ALTER TABLE public.collections
 ```
 
 Apply via the Supabase SQL editor or the `supabase db push` workflow.
+
+## 20260527_marketplace_transfers.sql
+
+Run `supabase/migrations/20260527_marketplace_transfers.sql` against your Supabase project to create the append-only sale audit log:
+
+```sql
+-- Creates public.marketplace_transfers(id, listing_id, item_id, owner_user_id,
+-- buyer_user_id, mode, asking_price, currency, transferred_at).
+--
+-- listing_id is text-only (NOT a FK) so the audit row survives if the seller
+-- deletes their marketplace_listings row later. owner_user_id / buyer_user_id
+-- reference auth.users with ON DELETE SET NULL so account deletion scrubs PII
+-- but leaves the financial record intact.
+--
+-- Unique index on listing_id enforces "one sale per listing" (idempotent on
+-- retry). Per-party indexes on (buyer_user_id, transferred_at DESC) and
+-- (owner_user_id, transferred_at DESC).
+--
+-- RLS:
+--   * SELECT — restricted to the two parties (auth.uid() = buyer or owner).
+--   * INSERT — buyer recording their own claim (auth.uid() = buyer_user_id).
+--   * No UPDATE / DELETE policies — append-only by RLS. service_role bypasses.
+```
+
+Apply via the Supabase SQL editor or the `supabase db push` workflow.
