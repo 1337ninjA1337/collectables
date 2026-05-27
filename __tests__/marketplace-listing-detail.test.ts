@@ -108,6 +108,18 @@ describe("listing detail screen", () => {
     assert.match(src, /ensureProfilesLoaded/);
   });
 
+  it("fires a success toast after a successful claim", () => {
+    const src = read("app/listing/[id].tsx");
+    // Pin the toast call so a future refactor that drops the user feedback is
+    // caught. The toast must fire AFTER markListingSold so an early failure
+    // (e.g. cloud rejection) doesn't mislead the buyer with a green pill.
+    assert.match(src, /toast\.success\(t\("marketplaceClaimSuccess"\)\)/);
+    const markIdx = src.indexOf("markListingSold(listing.id");
+    const toastIdx = src.indexOf('toast.success(t("marketplaceClaimSuccess"))');
+    assert.ok(markIdx > 0 && toastIdx > 0, "markListingSold/toast.success not found");
+    assert.ok(markIdx < toastIdx, "toast.success must follow markListingSold");
+  });
+
   it("sends an auto-message to the seller after a successful claim", () => {
     const src = read("app/listing/[id].tsx");
     // Pulls sendMessage off the chat context...
@@ -175,6 +187,7 @@ describe("listing detail translations", () => {
       "marketplaceSoldTo",
       "marketplaceClaimAutoMessageBuy",
       "marketplaceClaimAutoMessageTrade",
+      "marketplaceClaimSuccess",
     ];
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
       const block =
