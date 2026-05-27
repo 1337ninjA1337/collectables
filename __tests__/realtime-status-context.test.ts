@@ -24,7 +24,7 @@ describe("deriveConnectionState — pure status reducer", () => {
   it("returns 'connecting' when topics exist but none are SUBSCRIBED", () => {
     const m = new Map<string, boolean>([
       ["chat:inbox:user-a", false],
-      ["marketplace-listings-inserts", false],
+      ["marketplace-listings-changes", false],
     ]);
     assert.equal(deriveConnectionState(m), "connecting");
   });
@@ -32,7 +32,7 @@ describe("deriveConnectionState — pure status reducer", () => {
   it("returns 'online' when at least one topic is SUBSCRIBED", () => {
     const m = new Map<string, boolean>([
       ["chat:inbox:user-a", false],
-      ["marketplace-listings-inserts", true],
+      ["marketplace-listings-changes", true],
     ]);
     assert.equal(deriveConnectionState(m), "online");
   });
