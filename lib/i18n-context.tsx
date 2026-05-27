@@ -436,6 +436,10 @@ const en = {
   marketplaceConfirmTradeText: "The seller will be notified and the listing will be closed in your favor.",
   marketplaceClaim: "Claim",
   marketplaceClaimSuccess: "Listing claimed",
+  marketplaceClaimAutoMessageBuy: (params?: TranslationParams) =>
+    `Bought your listing "${params?.title ?? ""}" for ${params?.price ?? ""} ${params?.currency ?? ""}.`,
+  marketplaceClaimAutoMessageTrade: (params?: TranslationParams) =>
+    `Claimed your trade listing "${params?.title ?? ""}".`,
   marketplaceSoldBanner: "Sold",
   marketplaceSoldTo: (params?: TranslationParams) => `Sold to ${params?.name ?? ""}`,
   marketplaceTransferredBadge: "Transferred",
@@ -931,6 +935,10 @@ const ru: TranslationMap = {
   marketplaceConfirmTradeText: "Владелец получит уведомление, объявление будет закрыто в вашу пользу.",
   marketplaceClaim: "Забрать",
   marketplaceClaimSuccess: "Объявление закреплено за вами",
+  marketplaceClaimAutoMessageBuy: (params?: TranslationParams) =>
+    `Купил(а) ваше объявление «${params?.title ?? ""}» за ${params?.price ?? ""} ${params?.currency ?? ""}.`,
+  marketplaceClaimAutoMessageTrade: (params?: TranslationParams) =>
+    `Принял(а) обмен по объявлению «${params?.title ?? ""}».`,
   marketplaceSoldBanner: "Продано",
   marketplaceSoldTo: (params?: TranslationParams) => `Продано пользователю ${params?.name ?? ""}`,
   marketplaceTransferredBadge: "Передано",
@@ -1119,6 +1127,10 @@ const be: TranslationMap = {
   marketplaceConfirmTradeText: "Уладальнік атрымае паведамленне, аб'ява будзе закрытая на вашу карысць.",
   marketplaceClaim: "Забраць",
   marketplaceClaimSuccess: "Аб'ява замацавана за вамі",
+  marketplaceClaimAutoMessageBuy: (params?: TranslationParams) =>
+    `Купіў(ла) вашу аб'яву «${params?.title ?? ""}» за ${params?.price ?? ""} ${params?.currency ?? ""}.`,
+  marketplaceClaimAutoMessageTrade: (params?: TranslationParams) =>
+    `Прыняў(ла) абмен па аб'яве «${params?.title ?? ""}».`,
   marketplaceSoldBanner: "Прададзена",
   marketplaceSoldTo: (params?: TranslationParams) => `Прададзена карыстальніку ${params?.name ?? ""}`,
   marketplaceTransferredBadge: "Перададзена",
@@ -1286,6 +1298,10 @@ const pl: TranslationMap = {
   marketplaceConfirmTradeText: "Właściciel zostanie powiadomiony, a ogłoszenie zostanie zamknięte na Twoją korzyść.",
   marketplaceClaim: "Odbierz",
   marketplaceClaimSuccess: "Ogłoszenie przypisane",
+  marketplaceClaimAutoMessageBuy: (params?: TranslationParams) =>
+    `Kupiłem/am twoje ogłoszenie „${params?.title ?? ""}" za ${params?.price ?? ""} ${params?.currency ?? ""}.`,
+  marketplaceClaimAutoMessageTrade: (params?: TranslationParams) =>
+    `Odebrałem/am twoją ofertę wymiany „${params?.title ?? ""}".`,
   marketplaceSoldBanner: "Sprzedane",
   marketplaceSoldTo: (params?: TranslationParams) => `Sprzedane użytkownikowi ${params?.name ?? ""}`,
   marketplaceTransferredBadge: "Przekazane",
@@ -1449,6 +1465,10 @@ const de: TranslationMap = {
   marketplaceConfirmTradeText: "Der Verkäufer wird benachrichtigt und die Anzeige wird zu deinen Gunsten geschlossen.",
   marketplaceClaim: "Übernehmen",
   marketplaceClaimSuccess: "Anzeige übernommen",
+  marketplaceClaimAutoMessageBuy: (params?: TranslationParams) =>
+    `Habe deine Anzeige „${params?.title ?? ""}" für ${params?.price ?? ""} ${params?.currency ?? ""} gekauft.`,
+  marketplaceClaimAutoMessageTrade: (params?: TranslationParams) =>
+    `Habe dein Tauschangebot „${params?.title ?? ""}" angenommen.`,
   marketplaceSoldBanner: "Verkauft",
   marketplaceSoldTo: (params?: TranslationParams) => `Verkauft an ${params?.name ?? ""}`,
   marketplaceTransferredBadge: "Übertragen",
@@ -1612,6 +1632,10 @@ const es: TranslationMap = {
   marketplaceConfirmTradeText: "Se notificará al vendedor y el anuncio se cerrará a tu favor.",
   marketplaceClaim: "Reclamar",
   marketplaceClaimSuccess: "Anuncio reclamado",
+  marketplaceClaimAutoMessageBuy: (params?: TranslationParams) =>
+    `He comprado tu anuncio "${params?.title ?? ""}" por ${params?.price ?? ""} ${params?.currency ?? ""}.`,
+  marketplaceClaimAutoMessageTrade: (params?: TranslationParams) =>
+    `He aceptado tu oferta de intercambio "${params?.title ?? ""}".`,
   marketplaceSoldBanner: "Vendido",
   marketplaceSoldTo: (params?: TranslationParams) => `Vendido a ${params?.name ?? ""}`,
   marketplaceTransferredBadge: "Transferido",

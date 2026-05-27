@@ -48,7 +48,7 @@ export default function ListingDetailScreen() {
   const { getListingById, fetchListingById, listings, markListingSold } = useMarketplace();
   const { getItemById, transferItemToBuyer } = useCollections();
   const { getProfileById, ensureProfilesLoaded, getRelationship } = useSocial();
-  const { ensureChatWith, canMessage } = useChat();
+  const { ensureChatWith, canMessage, sendMessage } = useChat();
   const [fetchingRemote, setFetchingRemote] = useState(false);
   const [claiming, setClaiming] = useState(false);
 
@@ -158,6 +158,20 @@ export default function ListingDetailScreen() {
         },
       );
       markListingSold(listing.id, user.id);
+      // Notify the seller in-app via chat so the buy/trade event has an
+      // explicit follow-up thread. Fire-and-forget: a chat failure (no
+      // friendship, RLS reject, offline) must not block the claim itself.
+      const messageBody =
+        listing.mode === "sell" && typeof listing.askingPrice === "number"
+          ? t("marketplaceClaimAutoMessageBuy", {
+              title: sourceItem?.title ?? fallbackTitle,
+              price: listing.askingPrice,
+              currency: listing.currency,
+            })
+          : t("marketplaceClaimAutoMessageTrade", {
+              title: sourceItem?.title ?? fallbackTitle,
+            });
+      void sendMessage(listing.ownerUserId, messageBody);
       trackEvent("listing_claimed", {
         mode: listing.mode,
         sellerWasFriend: getRelationship(listing.ownerUserId) === "friend",
@@ -165,7 +179,7 @@ export default function ListingDetailScreen() {
     } finally {
       setClaiming(false);
     }
-  }, [listing, user, markListingSold, getItemById, transferItemToBuyer, getRelationship, t]);
+  }, [listing, user, markListingSold, getItemById, transferItemToBuyer, getRelationship, sendMessage, t]);
 
   function handleClaimPress() {
     if (!listing || !user || claiming) return;

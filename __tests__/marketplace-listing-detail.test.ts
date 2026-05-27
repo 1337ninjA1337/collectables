@@ -108,6 +108,26 @@ describe("listing detail screen", () => {
     assert.match(src, /ensureProfilesLoaded/);
   });
 
+  it("sends an auto-message to the seller after a successful claim", () => {
+    const src = read("app/listing/[id].tsx");
+    // Pulls sendMessage off the chat context...
+    assert.match(src, /\{\s*ensureChatWith\s*,\s*canMessage\s*,\s*sendMessage\s*\}\s*=\s*useChat/);
+    // ...and invokes it inside performClaim with the seller's id + a
+    // templated body keyed on the listing mode.
+    assert.match(src, /sendMessage\(listing\.ownerUserId,\s*messageBody\)/);
+    assert.match(src, /marketplaceClaimAutoMessageBuy/);
+    assert.match(src, /marketplaceClaimAutoMessageTrade/);
+    // The chat send must run after markListingSold so a chat failure can't
+    // leave the listing un-flipped — fire-and-forget on chat is intentional.
+    const markIdx = src.indexOf("markListingSold(listing.id");
+    const sendIdx = src.indexOf("sendMessage(listing.ownerUserId");
+    assert.ok(markIdx > 0 && sendIdx > 0, "markListingSold/sendMessage not found");
+    assert.ok(markIdx < sendIdx, "sendMessage must follow markListingSold");
+    // void-call so a rejected promise doesn't bubble up and trigger the
+    // outer finally before the trackEvent fires.
+    assert.match(src, /void sendMessage\(listing\.ownerUserId/);
+  });
+
   it("calls transferItemToBuyer with a snapshot of the source item before marking sold", () => {
     const src = read("app/listing/[id].tsx");
     assert.match(src, /transferItemToBuyer/);
@@ -153,6 +173,8 @@ describe("listing detail translations", () => {
       "marketplaceConfirmTradeText",
       "marketplaceSoldBanner",
       "marketplaceSoldTo",
+      "marketplaceClaimAutoMessageBuy",
+      "marketplaceClaimAutoMessageTrade",
     ];
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
       const block =
