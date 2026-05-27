@@ -123,6 +123,26 @@ describe("marketplace_transfers migration", () => {
     );
   });
 
+  it("each CREATE POLICY is paired with a preceding DROP POLICY IF EXISTS for re-run safety", () => {
+    // PostgreSQL ≤16 has no `CREATE POLICY IF NOT EXISTS`. Supabase Preview
+    // re-runs migrations against branch DBs where the policies may already
+    // exist; without the DROP-then-CREATE pattern the apply step errors
+    // with SQLSTATE 42710 (duplicate_object) and the workflow turns red.
+    const createPolicyMatches = SOURCE.match(/CREATE POLICY\s+"([^"]+)"/g) ?? [];
+    assert.ok(createPolicyMatches.length > 0, "expected at least one CREATE POLICY in the migration");
+    for (const m of createPolicyMatches) {
+      const name = m.match(/"([^"]+)"/)![1];
+      const pattern = new RegExp(
+        `DROP POLICY IF EXISTS\\s+"${name}"\\s+ON public\\.marketplace_transfers[\\s\\S]*?CREATE POLICY\\s+"${name}"`,
+      );
+      assert.match(
+        SOURCE,
+        pattern,
+        `policy "${name}" must be guarded by a preceding DROP POLICY IF EXISTS on public.marketplace_transfers`,
+      );
+    }
+  });
+
   it("does NOT declare an UPDATE or DELETE policy (append-only by RLS)", () => {
     // Catches the regression where a future PR adds an UPDATE/DELETE policy
     // and accidentally lets users rewrite history.
