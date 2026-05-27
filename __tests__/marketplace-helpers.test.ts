@@ -18,6 +18,7 @@ import {
   RECENTLY_SOLD_DEFAULT_LIMIT,
   recentlySoldListings,
   removeListingById,
+  salesForUser,
   titleSimilarity,
   upsertListing,
 } from "@/lib/marketplace-helpers";
@@ -398,6 +399,47 @@ describe("listingsAcquiredByUser", () => {
     // Sold without a buyer is a legacy "mark sold" without a transfer record.
     const ls = [listing({ buyerUserId: null, soldAt: "2026-04-26T11:00:00.000Z" })];
     assert.deepEqual(listingsAcquiredByUser(ls, "anyone"), []);
+  });
+});
+
+describe("salesForUser", () => {
+  it("returns sold listings owned by the user, sorted by soldAt desc", () => {
+    const ls = [
+      listing({ id: "1", ownerUserId: "alice", soldAt: "2026-04-25T10:00:00.000Z", buyerUserId: "bob" }),
+      listing({ id: "2", ownerUserId: "alice", soldAt: "2026-04-29T10:00:00.000Z", buyerUserId: "carol" }),
+      listing({ id: "3", ownerUserId: "alice", soldAt: null, buyerUserId: null }),
+      listing({ id: "4", ownerUserId: "bob", soldAt: "2026-04-28T10:00:00.000Z", buyerUserId: "alice" }),
+    ];
+    const out = salesForUser(ls, "alice");
+    assert.deepEqual(out.map((l) => l.id), ["2", "1"]);
+  });
+
+  it("includes sales without a recorded buyer (legacy mark-sold rows)", () => {
+    const ls = [
+      listing({ id: "1", ownerUserId: "alice", soldAt: "2026-04-25T10:00:00.000Z", buyerUserId: null }),
+    ];
+    const out = salesForUser(ls, "alice");
+    assert.deepEqual(out.map((l) => l.id), ["1"]);
+  });
+
+  it("excludes active (un-sold) listings", () => {
+    const ls = [listing({ ownerUserId: "alice", soldAt: null })];
+    assert.deepEqual(salesForUser(ls, "alice"), []);
+  });
+
+  it("returns [] when the user has no sales", () => {
+    const ls = [listing({ ownerUserId: "bob", soldAt: "2026-04-25T10:00:00.000Z" })];
+    assert.deepEqual(salesForUser(ls, "alice"), []);
+  });
+
+  it("does not mutate the input listings array", () => {
+    const ls = [
+      listing({ id: "a", ownerUserId: "alice", soldAt: "2026-04-25T10:00:00.000Z" }),
+      listing({ id: "b", ownerUserId: "alice", soldAt: "2026-04-29T10:00:00.000Z" }),
+    ];
+    const before = ls.map((l) => l.id);
+    salesForUser(ls, "alice");
+    assert.deepEqual(ls.map((l) => l.id), before);
   });
 });
 

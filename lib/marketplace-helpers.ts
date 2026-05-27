@@ -217,6 +217,26 @@ export function listingsAcquiredByUser(
 }
 
 /**
+ * Listings the user has *sold* — `ownerUserId === userId && soldAt != null`.
+ * Sorted by `soldAt` descending so the most recent sales appear first. Pairs
+ * with {@link purchasesForUser} on the profile "Marketplace history" surface
+ * to give users a complete personal trading audit.
+ */
+export function salesForUser(
+  listings: readonly MarketplaceListing[],
+  userId: string,
+): MarketplaceListing[] {
+  return listings
+    .filter((l) => l.ownerUserId === userId && l.soldAt != null)
+    .slice()
+    .sort((a, b) => {
+      const aAt = a.soldAt ?? a.createdAt;
+      const bAt = b.soldAt ?? b.createdAt;
+      return aAt < bAt ? 1 : -1;
+    });
+}
+
+/**
  * Common collectible edition/condition words that distinguish the same card
  * from a collector's perspective but vary so widely in listing titles that
  * including them in the Dice comparison drives similarity below the threshold.
