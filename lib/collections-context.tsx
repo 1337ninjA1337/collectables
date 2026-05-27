@@ -19,6 +19,11 @@ import {
   mergeItemsFromCloud,
 } from "@/lib/collections-cloud-merge";
 import { userScopedCollectionId } from "@/lib/collections-helpers";
+import {
+  appendTransferLogEntry,
+  transferLogEntryId,
+  type MarketplaceTransferLogEntry,
+} from "@/lib/marketplace-transfer-log";
 import { useSocial } from "@/lib/social-context";
 import {
   upsertCollection,
@@ -44,7 +49,7 @@ import {
   shouldAutoSaveSharedCollection,
 } from "@/lib/share-access";
 import { collectionsKey, itemsKey, followedCollectionsKey } from "@/lib/storage-keys";
-import { Collection, CollectableItem, ItemCondition, ItemTag } from "@/lib/types";
+import { Collection, CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
 import { generateUuidV4 } from "@/lib/uuid";
 
 type DraftItemInput = {
@@ -145,7 +150,23 @@ type CollectionsContextValue = {
   reorderItemsInCollection: (collectionId: string, orderedIds: string[]) => void;
   transferItemToBuyer: (
     snapshot: AcquiredItemSnapshot,
-    options?: { collectionName?: string; collectionDescription?: string },
+    options?: {
+      collectionName?: string;
+      collectionDescription?: string;
+      /**
+       * Optional source-listing metadata. When provided, the transfer is
+       * persisted to a buyer-local audit log keyed by `${listingId}-${createdAt}`
+       * so provenance survives an upstream listing deletion.
+       */
+      source?: {
+        listingId: string;
+        listingCreatedAt: string;
+        sellerUserId: string;
+        mode: MarketplaceMode;
+        price: number | null;
+        currency: string;
+      };
+    },
   ) => Promise<{ itemId: string; collectionId: string } | null>;
   refresh: () => Promise<void>;
 };
@@ -901,6 +922,25 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         };
         setLocalItems((current) => [nextItem, ...current]);
         upsertItem(nextItem).catch(() => undefined);
+        if (options?.source) {
+          const { source } = options;
+          const entry: MarketplaceTransferLogEntry = {
+            id: transferLogEntryId(source.listingId, source.listingCreatedAt),
+            listingId: source.listingId,
+            listingCreatedAt: source.listingCreatedAt,
+            sellerUserId: source.sellerUserId,
+            itemId: nextItem.id,
+            collectionId,
+            title: nextItem.title,
+            photo: nextItem.photos[0] ?? null,
+            mode: source.mode,
+            price: source.price,
+            currency: source.currency,
+            acquiredFrom: nextItem.acquiredFrom,
+            acquiredAt: nextItem.createdAt,
+          };
+          appendTransferLogEntry(ownerUserId, entry).catch(() => undefined);
+        }
         return { itemId: nextItem.id, collectionId };
       },
       refresh: async () => {

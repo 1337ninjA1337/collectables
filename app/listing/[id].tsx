@@ -163,6 +163,17 @@ export default function ListingDetailScreen() {
         {
           collectionName: t("marketplaceAcquiredCollection"),
           collectionDescription: t("marketplaceAcquiredCollectionDescription"),
+          source: {
+            listingId: listing.id,
+            listingCreatedAt: listing.createdAt,
+            sellerUserId: listing.ownerUserId,
+            mode: listing.mode,
+            price:
+              listing.mode === "sell" && typeof listing.askingPrice === "number"
+                ? listing.askingPrice
+                : null,
+            currency: listing.currency,
+          },
         },
       );
       markListingSold(listing.id, user.id);

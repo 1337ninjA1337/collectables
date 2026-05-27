@@ -31,6 +31,10 @@ export function premiumKey(userId: string): string {
   return `collectables-premium-v1-${userId}`;
 }
 
+export function marketplaceTransferLogKey(userId: string): string {
+  return `collectables-marketplace-transfer-log-v1-${userId}`;
+}
+
 export async function migrateStorageKey(oldKey: string, newKey: string): Promise<void> {
   try {
     const value = await AsyncStorage.getItem(oldKey);
@@ -73,6 +77,7 @@ export async function clearAllUserData(userId: string): Promise<void> {
     chatCacheKey(userId),
     socialCacheKey(userId),
     premiumKey(userId),
+    marketplaceTransferLogKey(userId),
     SOCIAL_GRAPH_KEY,
     LANGUAGE_KEY,
     MARKETPLACE_KEY,
