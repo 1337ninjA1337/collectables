@@ -88,11 +88,15 @@ describe("listing detail screen", () => {
     assert.match(src, /markListingSold\(listing\.id,\s*user\.id\)/);
   });
 
-  it("confirms purchase via Alert.alert on native and window.confirm on web", () => {
+  it("confirms purchase via the shared confirmDialog helper", () => {
     const src = read("app/listing/[id].tsx");
-    assert.match(src, /Alert\.alert\(/);
-    assert.match(src, /window\.confirm/);
+    // The screen no longer forks on Platform.OS for the buy/trade confirmation —
+    // it delegates to `confirmDialog` which encapsulates both branches. Pin
+    // both the i18n key and the helper call so a future refactor that
+    // re-introduces the inline Alert.alert / window.confirm pair is caught.
+    assert.match(src, /confirmDialog\(/);
     assert.match(src, /marketplaceConfirmBuyTitle/);
+    assert.match(src, /title:\s*t\("marketplaceConfirmBuyTitle"\)/);
   });
 
   it("renders a 'Sold' banner with buyer name on sold listings", () => {
