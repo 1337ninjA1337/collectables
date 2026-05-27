@@ -158,6 +158,7 @@ export default function ListingDetailScreen() {
         },
       );
       markListingSold(listing.id, user.id);
+      toast.success(t("marketplaceClaimSuccess"));
       // Notify the seller in-app via chat so the buy/trade event has an
       // explicit follow-up thread. Fire-and-forget: a chat failure (no
       // friendship, RLS reject, offline) must not block the claim itself.
@@ -179,7 +180,7 @@ export default function ListingDetailScreen() {
     } finally {
       setClaiming(false);
     }
-  }, [listing, user, markListingSold, getItemById, transferItemToBuyer, getRelationship, sendMessage, t]);
+  }, [listing, user, markListingSold, getItemById, transferItemToBuyer, getRelationship, sendMessage, toast, t]);
 
   function handleClaimPress() {
     if (!listing || !user || claiming) return;
