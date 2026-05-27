@@ -1,6 +1,6 @@
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
@@ -9,6 +9,7 @@ import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
 import { useCollections } from "@/lib/collections-context";
+import { confirmDialog } from "@/lib/confirm-dialog";
 import {
   AMBER_ACCENT,
   AMBER_LIGHT,
@@ -189,24 +190,18 @@ export default function ListingDetailScreen() {
     }
   }, [listing, user, markListingSold, setClaimingListingId, getItemById, transferItemToBuyer, getRelationship, sendMessage, toast, t]);
 
-  function handleClaimPress() {
+  async function handleClaimPress() {
     if (!listing || !user || claiming) return;
-    const title = t("marketplaceConfirmBuyTitle");
-    const text =
-      listing.mode === "trade"
-        ? t("marketplaceConfirmTradeText")
-        : t("marketplaceConfirmBuyText");
-    if (Platform.OS === "web") {
-      const ok = typeof window !== "undefined" && window.confirm
-        ? window.confirm(`${title}\n\n${text}`)
-        : true;
-      if (ok) void performClaim();
-      return;
-    }
-    Alert.alert(title, text, [
-      { text: t("cancel"), style: "cancel" },
-      { text: t("marketplaceClaim"), style: "default", onPress: () => void performClaim() },
-    ]);
+    const ok = await confirmDialog({
+      title: t("marketplaceConfirmBuyTitle"),
+      body:
+        listing.mode === "trade"
+          ? t("marketplaceConfirmTradeText")
+          : t("marketplaceConfirmBuyText"),
+      confirmLabel: t("marketplaceClaim"),
+      cancelLabel: t("cancel"),
+    });
+    if (ok) void performClaim();
   }
 
   return (
