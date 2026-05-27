@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -8,6 +8,7 @@ import {
   coerceListings,
   countActiveListingsForUser,
   findListingByItemId,
+  isListingClaimedFromOwner,
   listingsForUser,
   normalizeListing,
   purchasesForUser,
@@ -50,6 +51,15 @@ type MarketplaceContextValue = {
   markListingSold: (id: string, buyerUserId?: string | null) => void;
   claimingListingId: string | null;
   setClaimingListingId: (id: string | null) => void;
+  /**
+   * Queue of listing ids that just transitioned to sold via realtime UPDATE
+   * and are owned by the current user. The shell renders a prompt for the
+   * head of the queue offering Archive / Delete / Keep for the underlying
+   * item; the consumer calls `dismissSellerNotification` after the user
+   * resolves the prompt.
+   */
+  sellerNotifications: string[];
+  dismissSellerNotification: (listingId: string) => void;
 };
 
 const MarketplaceContext = createContext<MarketplaceContextValue | null>(null);
@@ -63,6 +73,15 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [ready, setReady] = useState(false);
   const [claimingListingId, setClaimingListingId] = useState<string | null>(null);
+  const [sellerNotifications, setSellerNotifications] = useState<string[]>([]);
+  // Keep `user.id` accessible inside the realtime callback without
+  // re-subscribing on every sign-in/sign-out — the subscription itself is
+  // process-wide (subscribeShared ref-counts the channel) so swapping the
+  // user means swapping which sales become "mine".
+  const userIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    userIdRef.current = user?.id ?? null;
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,9 +124,29 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       // Upsert so realtime UPDATE events (buyer claim → sold_at/buyer_user_id)
       // propagate to other devices and the listing leaves `activeListings`
       // without waiting for a manual refresh. INSERTs hit the same path.
-      setListings((prev) => upsertListing(prev, normalizeListing(incoming)));
+      setListings((prev) => {
+        const normalized = normalizeListing(incoming);
+        const existing = prev.find((l) => l.id === normalized.id);
+        const me = userIdRef.current;
+        // If this is my listing transitioning from active → sold (someone
+        // else just claimed it), queue a Archive/Delete/Keep prompt so the
+        // seller can decide what to do with the original item in their
+        // collection. The buyer's own claim won't trigger this branch on
+        // their device because `markListingSold` already set `soldAt` in
+        // the local `prev` before the realtime echo arrives.
+        if (me && isListingClaimedFromOwner(existing, normalized, me)) {
+          setSellerNotifications((q) =>
+            q.includes(normalized.id) ? q : [...q, normalized.id],
+          );
+        }
+        return upsertListing(prev, normalized);
+      });
     });
     return () => sub.unsubscribe();
+  }, []);
+
+  const dismissSellerNotification = useCallback((listingId: string) => {
+    setSellerNotifications((q) => q.filter((id) => id !== listingId));
   }, []);
 
   const myListings = useMemo(
@@ -219,6 +258,8 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       markListingSold,
       claimingListingId,
       setClaimingListingId,
+      sellerNotifications,
+      dismissSellerNotification,
     }),
     [
       ready,
@@ -235,6 +276,8 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       removeListing,
       markListingSold,
       claimingListingId,
+      sellerNotifications,
+      dismissSellerNotification,
     ],
   );
 

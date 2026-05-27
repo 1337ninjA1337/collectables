@@ -2,6 +2,18 @@
 
 These DB changes must be applied manually to the Supabase project (or will be auto-applied via the `supabase db push` CI step if `SUPABASE_DB_URL` secret is set).
 
+## 20260527_items_archived_at.sql
+
+Run `supabase/migrations/20260527_items_archived_at.sql` against your Supabase project to support soft-archiving of items after a marketplace sale:
+
+```sql
+-- Adds public.items.archived_at column (timestamptz, nullable).
+-- Items with archived_at != NULL stop appearing in collection lists, totals,
+-- recent items and search — but remain in storage for stats / audit.
+```
+
+Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
+
 ## 20260502_marketplace_listings.sql
 
 Run `supabase/migrations/20260502_marketplace_listings.sql` against your Supabase project:

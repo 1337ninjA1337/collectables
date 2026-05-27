@@ -113,11 +113,30 @@ describe("MarketplaceProvider — upsert on realtime payload", () => {
     // The legacy callback skipped when the listing was already present, so an
     // UPDATE that flips soldAt/buyerUserId never reached state. Replacing it
     // with upsertListing is the contract we want to lock in.
-    assert.match(
-      src,
-      /subscribeToListings\(\(?[\s\S]*?upsertListing\(prev,\s*normalizeListing\(/,
+    //
+    // Accept both the original inline form `upsertListing(prev,
+    // normalizeListing(incoming))` and a hoisted-variable form like
+    // `const normalized = normalizeListing(incoming); ... upsertListing(prev,
+    // normalized)` — the seller-notification diff requires the latter.
+    const callbackBlock = src.match(
+      /subscribeToListings\([\s\S]*?upsertListing\(prev,\s*(\w+|normalizeListing\()/,
+    );
+    assert.ok(
+      callbackBlock,
       "the subscribeToListings callback must upsert (replace by id) so UPDATEs propagate",
     );
+    if (callbackBlock![1] !== "normalizeListing(") {
+      // Hoisted form: confirm the hoisted variable was sourced from normalizeListing.
+      const varName = callbackBlock![1];
+      const decl = new RegExp(
+        `const\\s+${varName}\\s*=\\s*normalizeListing\\(`,
+      );
+      assert.match(
+        src,
+        decl,
+        `hoisted upsert var "${varName}" must be sourced from normalizeListing(incoming)`,
+      );
+    }
   });
 
   it("does not skip-on-present (the regression we just fixed)", () => {

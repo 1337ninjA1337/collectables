@@ -102,6 +102,7 @@ export function upsertItemBody(item: CollectableItem, collectionId: string): Rec
     is_wishlist: item.isWishlist ?? false,
     condition: item.condition ?? null,
     tags: item.tags ?? null,
+    archived_at: item.archivedAt ?? null,
   };
 }
 

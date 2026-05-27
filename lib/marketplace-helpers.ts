@@ -125,6 +125,33 @@ export function upsertListing(
   return out;
 }
 
+/**
+ * Detect whether a realtime UPDATE payload represents the *moment* a buyer
+ * just claimed `userId`'s active listing. Returns `true` only when:
+ *   - the existing local row was previously unsold (`soldAt === null`),
+ *   - the incoming row is now sold (`soldAt !== null`) with a buyer set,
+ *   - the listing is owned by `userId`,
+ *   - and the buyer is someone other than `userId` (so the seller's own
+ *     edge-case `markListingSold` from another tab can't fire the prompt).
+ *
+ * Lives next to {@link upsertListing} so the MarketplaceProvider's realtime
+ * callback can reduce diff-detection to a single pure call and unit-test the
+ * boundary conditions exhaustively.
+ */
+export function isListingClaimedFromOwner(
+  existing: MarketplaceListing | undefined,
+  incoming: MarketplaceListing,
+  userId: string,
+): boolean {
+  if (!existing) return false;
+  if (existing.soldAt !== null) return false;
+  if (incoming.soldAt === null) return false;
+  if (!incoming.buyerUserId) return false;
+  if (incoming.ownerUserId !== userId) return false;
+  if (incoming.buyerUserId === userId) return false;
+  return true;
+}
+
 export function removeListingById(
   listings: readonly MarketplaceListing[],
   id: string,
