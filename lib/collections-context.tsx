@@ -131,6 +131,13 @@ type CollectionsContextValue = {
   updateCollection: (collectionId: string, updates: Partial<Collection>) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
   deleteItems: (itemIds: string[]) => Promise<void>;
+  /**
+   * Soft-archive an item: stamps `archivedAt` instead of removing it, so
+   * the item stops appearing in collection lists, totals, recent items and
+   * search but stays in storage for stats and audit history. Used by the
+   * seller-side prompt after a marketplace sale.
+   */
+  archiveItem: (itemId: string) => Promise<void>;
   moveItems: (itemIds: string[], targetCollectionId: string) => Promise<void>;
   deleteCollection: (collectionId: string) => Promise<void>;
   deleteUserContent: (userId: string) => Promise<void>;
@@ -620,7 +627,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       getCollectionById: (id) => collections.find((collection) => collection.id === id),
       getItemsForCollection: (collectionId) =>
         items
-          .filter((item) => item.collectionId === collectionId && !item.isWishlist)
+          .filter(
+            (item) =>
+              item.collectionId === collectionId &&
+              !item.isWishlist &&
+              !item.archivedAt,
+          )
           .sort((a, b) => {
             const aHas = typeof a.sortOrder === "number";
             const bHas = typeof b.sortOrder === "number";
@@ -637,7 +649,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         const collection = collections.find((c) => c.id === collectionId);
         const target = collection?.currency ?? displayCurrency;
         const entries = items
-          .filter((item) => item.collectionId === collectionId && !item.isWishlist)
+          .filter(
+            (item) =>
+              item.collectionId === collectionId &&
+              !item.isWishlist &&
+              !item.archivedAt,
+          )
           .filter((item): item is typeof item & { cost: number } => typeof item.cost === "number")
           .map((item) => ({
             amount: item.cost,
@@ -781,6 +798,16 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       deleteItem: async (itemId) => {
         setLocalItems((current) => current.filter((item) => item.id !== itemId));
         deleteRemoteItem(itemId).catch(() => undefined);
+      },
+      archiveItem: async (itemId) => {
+        const archivedAt = new Date().toISOString();
+        setLocalItems((current) =>
+          current.map((item) => {
+            if (item.id !== itemId) return item;
+            return { ...item, archivedAt };
+          }),
+        );
+        updateRemoteItem(itemId, { archivedAt }).catch(() => undefined);
       },
       deleteItems: async (itemIds) => {
         if (itemIds.length === 0) return;

@@ -8,6 +8,7 @@ import {
   coerceListings,
   countActiveListingsForUser,
   findListingByItemId,
+  isListingClaimedFromOwner,
   listingsAcquiredByUser,
   listingsForUser,
   normalizeListing,
@@ -600,5 +601,76 @@ describe("coerceListings", () => {
     assert.equal(out.length, 1);
     assert.equal(out[0].id, "l-1");
     assert.equal(out[0].buyerUserId, null, "valid row must also be normalized");
+  });
+});
+
+describe("isListingClaimedFromOwner", () => {
+  const ME = "alice";
+  const BUYER = "bob";
+
+  it("fires when an unsold listing transitions to sold by someone else", () => {
+    const before = listing({ id: "L", ownerUserId: ME, soldAt: null, buyerUserId: null });
+    const after = listing({
+      id: "L",
+      ownerUserId: ME,
+      soldAt: "2026-05-12T09:00:00Z",
+      buyerUserId: BUYER,
+    });
+    assert.equal(isListingClaimedFromOwner(before, after, ME), true);
+  });
+
+  it("skips when existing was already sold (deduped echo)", () => {
+    const before = listing({
+      id: "L",
+      ownerUserId: ME,
+      soldAt: "2026-05-12T09:00:00Z",
+      buyerUserId: BUYER,
+    });
+    const after = { ...before };
+    assert.equal(isListingClaimedFromOwner(before, after, ME), false);
+  });
+
+  it("skips when the listing is not owned by `me`", () => {
+    const before = listing({ id: "L", ownerUserId: "carol", soldAt: null });
+    const after = listing({
+      id: "L",
+      ownerUserId: "carol",
+      soldAt: "2026-05-12T09:00:00Z",
+      buyerUserId: BUYER,
+    });
+    assert.equal(isListingClaimedFromOwner(before, after, ME), false);
+  });
+
+  it("skips when the buyer is `me` (defensive: own-claim edge case)", () => {
+    const before = listing({ id: "L", ownerUserId: ME, soldAt: null });
+    const after = listing({
+      id: "L",
+      ownerUserId: ME,
+      soldAt: "2026-05-12T09:00:00Z",
+      buyerUserId: ME,
+    });
+    assert.equal(isListingClaimedFromOwner(before, after, ME), false);
+  });
+
+  it("skips when the incoming row carries no buyer", () => {
+    const before = listing({ id: "L", ownerUserId: ME, soldAt: null });
+    const after = listing({
+      id: "L",
+      ownerUserId: ME,
+      soldAt: "2026-05-12T09:00:00Z",
+      buyerUserId: null,
+    });
+    assert.equal(isListingClaimedFromOwner(before, after, ME), false);
+  });
+
+  it("skips when there is no prior row in local state", () => {
+    // A fresh INSERT shouldn't fire the prompt — only true claim transitions.
+    const after = listing({
+      id: "L",
+      ownerUserId: ME,
+      soldAt: "2026-05-12T09:00:00Z",
+      buyerUserId: BUYER,
+    });
+    assert.equal(isListingClaimedFromOwner(undefined, after, ME), false);
   });
 });

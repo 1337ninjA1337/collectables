@@ -245,6 +245,7 @@ type DbItem = {
   is_wishlist?: boolean;
   condition?: string | null;
   tags?: { label: string; color: string }[] | null;
+  archived_at?: string | null;
 };
 
 function toItem(row: DbItem): CollectableItem {
@@ -266,6 +267,7 @@ function toItem(row: DbItem): CollectableItem {
     isWishlist: row.is_wishlist ?? false,
     condition: (row.condition as CollectableItem["condition"]) ?? undefined,
     tags: row.tags ?? undefined,
+    archivedAt: row.archived_at ?? null,
   };
 }
 
@@ -330,6 +332,7 @@ export async function upsertItem(item: CollectableItem): Promise<void> {
       is_wishlist: item.isWishlist ?? false,
       condition: item.condition ?? null,
       tags: item.tags ?? null,
+      archived_at: item.archivedAt ?? null,
     }),
   });
 }
@@ -351,6 +354,7 @@ export async function updateRemoteItem(id: string, updates: Partial<CollectableI
   if ("isWishlist" in updates) body.is_wishlist = updates.isWishlist;
   if ("condition" in updates) body.condition = updates.condition ?? null;
   if ("tags" in updates) body.tags = updates.tags ?? null;
+  if ("archivedAt" in updates) body.archived_at = updates.archivedAt ?? null;
 
   if (Object.keys(body).length === 0) return;
 

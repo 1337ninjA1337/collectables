@@ -15,6 +15,7 @@ import { CrashFallback } from "@/components/crash-fallback";
 import { LoginScreen } from "@/components/login-screen";
 import { NavigationBreadcrumbs } from "@/components/navigation-breadcrumbs";
 import { SearchOverlay } from "@/components/search-overlay";
+import { SoldListingPrompt } from "@/components/sold-listing-prompt";
 import { AnalyticsProvider } from "@/lib/analytics-provider";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ChatProvider, useChat } from "@/lib/chat-context";
@@ -246,6 +247,7 @@ function AppShell() {
       </View>
       <BottomNav onSearchPress={() => setSearchOpen(true)} />
       <SearchOverlay visible={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SoldListingPrompt />
     </View>
     </GestureHandlerRootView>
   );

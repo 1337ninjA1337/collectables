@@ -80,7 +80,10 @@ export default function HomeScreen() {
       collections.filter((c) => c.role === "owner").map((c) => c.id),
     );
     return items
-      .filter((item) => !item.isWishlist && ownedIds.has(item.collectionId))
+      .filter(
+        (item) =>
+          !item.isWishlist && !item.archivedAt && ownedIds.has(item.collectionId),
+      )
       .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
       .slice(0, 10);
   }, [items, collections]);

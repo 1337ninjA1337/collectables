@@ -443,6 +443,23 @@ const en = {
   marketplaceSoldBanner: "Sold",
   marketplaceSoldTo: (params?: TranslationParams) => `Sold to ${params?.name ?? ""}`,
   marketplaceTransferredBadge: "Transferred",
+  marketplaceSoldPromptTitle: "Your listing was claimed",
+  marketplaceSoldPromptBody: (params?: TranslationParams) =>
+    `${params?.buyer ?? "Someone"} just claimed "${params?.title ?? "your item"}". What would you like to do with the original in your collection?`,
+  marketplaceSoldPromptArchive: "Archive item",
+  marketplaceSoldPromptArchiveHint:
+    "Hide from collection lists but keep for stats and audit history.",
+  marketplaceSoldPromptDelete: "Delete from collection",
+  marketplaceSoldPromptDeleteHint:
+    "Permanently remove the item from your collection.",
+  marketplaceSoldPromptKeep: "Keep as-is",
+  marketplaceSoldPromptKeepHint:
+    "Leave the item in your collection — useful for a sale audit trail.",
+  marketplaceSoldPromptConfirmDeleteTitle: "Delete item?",
+  marketplaceSoldPromptConfirmDeleteBody:
+    "This permanently removes the item from your collection. You can keep it archived instead.",
+  marketplaceSoldPromptItemArchived: "Item archived",
+  marketplaceSoldPromptItemDeleted: "Item deleted",
   marketplaceAcquiredCollection: "Acquired via marketplace",
   marketplaceAcquiredCollectionDescription: "Items you bought or traded for through the marketplace.",
   marketplaceMyPurchasesTitle: "My purchases",
@@ -942,6 +959,23 @@ const ru: TranslationMap = {
   marketplaceSoldBanner: "Продано",
   marketplaceSoldTo: (params?: TranslationParams) => `Продано пользователю ${params?.name ?? ""}`,
   marketplaceTransferredBadge: "Передано",
+  marketplaceSoldPromptTitle: "Ваше объявление забрали",
+  marketplaceSoldPromptBody: (params?: TranslationParams) =>
+    `${params?.buyer ?? "Кто-то"} забрал(а) «${params?.title ?? "ваш предмет"}». Что сделать с оригиналом в вашей коллекции?`,
+  marketplaceSoldPromptArchive: "Архивировать предмет",
+  marketplaceSoldPromptArchiveHint:
+    "Скрыть из списка коллекции, но сохранить для статистики и аудита.",
+  marketplaceSoldPromptDelete: "Удалить из коллекции",
+  marketplaceSoldPromptDeleteHint:
+    "Безвозвратно удалить предмет из коллекции.",
+  marketplaceSoldPromptKeep: "Оставить как есть",
+  marketplaceSoldPromptKeepHint:
+    "Оставить предмет в коллекции — пригодится для истории продаж.",
+  marketplaceSoldPromptConfirmDeleteTitle: "Удалить предмет?",
+  marketplaceSoldPromptConfirmDeleteBody:
+    "Это безвозвратно удалит предмет из коллекции. Можно вместо этого его архивировать.",
+  marketplaceSoldPromptItemArchived: "Предмет архивирован",
+  marketplaceSoldPromptItemDeleted: "Предмет удалён",
   marketplaceAcquiredCollection: "Получено через маркетплейс",
   marketplaceAcquiredCollectionDescription: "Предметы, которые вы купили или обменяли через маркетплейс.",
   marketplaceMyPurchasesTitle: "Мои покупки",

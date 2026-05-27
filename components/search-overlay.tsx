@@ -95,6 +95,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
     return items
       .filter((item) => {
         if (item.isWishlist) return false;
+        if (item.archivedAt) return false;
         const matchesQuery =
           item.title.toLowerCase().includes(q) ||
           item.description.toLowerCase().includes(q) ||

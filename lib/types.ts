@@ -36,6 +36,14 @@ export type CollectableItem = {
   isWishlist?: boolean;
   condition?: ItemCondition;
   tags?: ItemTag[];
+  /**
+   * ISO timestamp set when the seller archives an item after a marketplace
+   * sale (or other manual archive action). Archived items are excluded from
+   * collection listings, totals, recent items, and search — but remain in
+   * storage for stats and audit history. Nullable / undefined for legacy and
+   * non-archived items, mirroring the optional-field shape of `isWishlist`.
+   */
+  archivedAt?: string | null;
 };
 
 export type ReactionEmoji = "heart" | "fire" | "eyes" | "star" | "clap";
