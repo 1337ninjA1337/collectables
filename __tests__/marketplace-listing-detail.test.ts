@@ -41,6 +41,29 @@ describe("listing detail screen", () => {
     assert.match(src, /chatOnlyFriendsHint/);
   });
 
+  it("gates the Buy / Trade button behind the friendsOnly EmptyState", () => {
+    const src = read("app/listing/[id].tsx");
+    // The claim button must live AFTER the friendsOnly EmptyState fork, so a
+    // non-friend viewer never sees the claim CTA. If a future refactor pulls
+    // the claim button out of the `: friendsOnly ? <EmptyState/> : (...)`
+    // branch and renders it unconditionally, this assertion catches it.
+    const friendsOnlyIdx = src.indexOf("friendsOnly ?");
+    const claimIdx = src.indexOf("marketplaceBuyNow");
+    assert.ok(friendsOnlyIdx > 0, "friendsOnly ternary not found");
+    assert.ok(claimIdx > 0, "claim button label not found");
+    assert.ok(
+      friendsOnlyIdx < claimIdx,
+      "marketplaceBuyNow must render after the friendsOnly EmptyState fork",
+    );
+    // friendsOnly is derived from canMessage — pinning the predicate so a
+    // future refactor can't silently swap it for a weaker check (e.g. just
+    // !isSelf) that would re-open the claim button to non-friends.
+    assert.match(
+      src,
+      /friendsOnly\s*=\s*!isSelf\s*&&\s*!canMessage\(listing\.ownerUserId\)/,
+    );
+  });
+
   it("hides the message CTA on the owner's own listing", () => {
     const src = read("app/listing/[id].tsx");
     assert.match(src, /isSelf/);
