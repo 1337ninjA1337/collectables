@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
@@ -11,6 +11,8 @@ import { CollectionCard } from "@/components/collection-card";
 import { Screen } from "@/components/screen";
 import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
+import { useMarketplace } from "@/lib/marketplace-context";
+import { purchasesForUser, salesForUser } from "@/lib/marketplace-helpers";
 import {
   AMBER_LIGHT,
   AMBER_MUTED_5,
@@ -39,7 +41,7 @@ import { useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
 import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
 import { placeholderColor } from "@/lib/placeholder-color";
-import { CollectableItem, Collection } from "@/lib/types";
+import { CollectableItem, Collection, MarketplaceListing, UserProfile } from "@/lib/types";
 
 const DEFAULT_EN_PROFILE_BIO = "I collect things worth saving beautifully and sharing with friends.";
 
@@ -61,7 +63,8 @@ export default function ProfileScreen() {
     isAdmin,
     friends,
   } = useSocial();
-  const { collections, getItemsForCollection, getCollectionTotalCost, deleteUserContent, wishlistItems } = useCollections();
+  const { collections, getItemsForCollection, getCollectionTotalCost, deleteUserContent, wishlistItems, getItemById } = useCollections();
+  const { listings } = useMarketplace();
   const cachedProfile = getProfileById(params.id);
   const myProfile = getMyProfile();
   const [loadingRemote, setLoadingRemote] = useState(false);
@@ -148,6 +151,14 @@ export default function ProfileScreen() {
   // Use remote collections if no local ones found (other user's profile)
   const profileCollections = localProfileCollections.length > 0 ? localProfileCollections : remoteCollections;
   const visibleWishlist = isSelf ? wishlistItems : remoteWishlist;
+  const myPurchases = useMemo<MarketplaceListing[]>(
+    () => (isSelf && activeProfile ? purchasesForUser(listings, activeProfile.id) : []),
+    [isSelf, activeProfile, listings],
+  );
+  const mySales = useMemo<MarketplaceListing[]>(
+    () => (isSelf && activeProfile ? salesForUser(listings, activeProfile.id) : []),
+    [isSelf, activeProfile, listings],
+  );
   const localizedBio = activeProfile
     ? (activeProfile.bio === DEFAULT_EN_PROFILE_BIO ? t("defaultProfileBio") : activeProfile.bio)
     : "";
@@ -435,6 +446,44 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      {isSelf ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t("marketplaceHistoryTitle")}</Text>
+          {myPurchases.length === 0 && mySales.length === 0 ? (
+            <EmptyState icon="🛍️" title={t("marketplaceHistoryEmpty")} />
+          ) : (
+            <>
+              <Text style={styles.historyLabel}>{t("marketplaceHistoryPurchasesLabel")}</Text>
+              {myPurchases.length > 0 ? (
+                myPurchases.map((listing) => (
+                  <MarketplaceHistoryRow
+                    key={listing.id}
+                    listing={listing}
+                    item={getItemById(listing.itemId)}
+                    counterparty={getProfileById(listing.ownerUserId)}
+                  />
+                ))
+              ) : (
+                <Text style={styles.historyEmpty}>{t("marketplaceMyPurchasesEmpty")}</Text>
+              )}
+              <Text style={styles.historyLabel}>{t("marketplaceHistorySalesLabel")}</Text>
+              {mySales.length > 0 ? (
+                mySales.map((listing) => (
+                  <MarketplaceHistoryRow
+                    key={listing.id}
+                    listing={listing}
+                    item={getItemById(listing.itemId)}
+                    counterparty={listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined}
+                  />
+                ))
+              ) : (
+                <Text style={styles.historyEmpty}>{t("marketplaceMySalesEmpty")}</Text>
+              )}
+            </>
+          )}
+        </View>
+      ) : null}
+
       {(isSelf || isFriend) && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t("profileWishlist")}</Text>
@@ -466,6 +515,48 @@ export default function ProfileScreen() {
         </View>
       )}
     </Screen>
+  );
+}
+
+function MarketplaceHistoryRow({
+  listing,
+  item,
+  counterparty,
+}: {
+  listing: MarketplaceListing;
+  item: CollectableItem | undefined;
+  counterparty: UserProfile | undefined;
+}) {
+  const { t } = useI18n();
+  const photo = item?.photos?.find(Boolean);
+  const title = item?.title ?? t("marketplaceUnknownItem");
+  const counterpartyHandle = counterparty
+    ? `@${counterparty.username ?? counterparty.publicId ?? counterparty.id}`
+    : t("unknownUser");
+  const modeLabel = listing.mode === "trade" ? t("marketplaceModeTrade") : t("marketplaceModeSell");
+  const priceLabel =
+    listing.mode === "sell" && typeof listing.askingPrice === "number"
+      ? `${listing.askingPrice} ${listing.currency}`
+      : null;
+
+  return (
+    <Link href={`/listing/${listing.id}` as never} asChild>
+      <Pressable style={styles.wishlistCard}>
+        {photo ? (
+          <Image source={{ uri: photo }} style={styles.wishlistThumb} />
+        ) : (
+          <View style={[styles.wishlistThumb, { backgroundColor: placeholderColor(listing.id) }]} />
+        )}
+        <View style={styles.wishlistInfo}>
+          <Text style={styles.wishlistName} numberOfLines={1}>{title}</Text>
+          <Text style={styles.wishlistDesc} numberOfLines={1}>{counterpartyHandle}</Text>
+          <View style={styles.historyMetaRow}>
+            <Text style={styles.historyMode}>{modeLabel}</Text>
+            {priceLabel ? <Text style={styles.historyPrice}>{priceLabel}</Text> : null}
+          </View>
+        </View>
+      </Pressable>
+    </Link>
   );
 }
 
@@ -686,5 +777,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: MUTED_2,
     lineHeight: 18,
+  },
+  historyLabel: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: HERO_DARK_2,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginTop: 4,
+  },
+  historyEmpty: {
+    color: MUTED_2,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  historyMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+  },
+  historyMode: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: HERO_DARK_2,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  historyPrice: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: TEXT_DARK,
   },
 });
