@@ -467,7 +467,7 @@ describe("realtime-channel-registry wiring", () => {
     assert.match(marketplaceSource, /subscribeShared</);
     assert.doesNotMatch(
       marketplaceSource,
-      /client\.channel\("marketplace-listings-inserts"\)/,
+      /client\.channel\("marketplace-listings-(?:inserts|changes)"\)/,
       "subscribeToListings should no longer call client.channel directly",
     );
   });

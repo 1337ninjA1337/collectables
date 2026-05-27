@@ -98,11 +98,11 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
   }, [ready, listings]);
 
   useEffect(() => {
-    const sub = subscribeToListings((newListing) => {
-      setListings((prev) => {
-        if (prev.some((l) => l.id === newListing.id)) return prev;
-        return [newListing, ...prev];
-      });
+    const sub = subscribeToListings((incoming) => {
+      // Upsert so realtime UPDATE events (buyer claim → sold_at/buyer_user_id)
+      // propagate to other devices and the listing leaves `activeListings`
+      // without waiting for a manual refresh. INSERTs hit the same path.
+      setListings((prev) => upsertListing(prev, normalizeListing(incoming)));
     });
     return () => sub.unsubscribe();
   }, []);

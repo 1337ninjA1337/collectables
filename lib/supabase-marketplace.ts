@@ -137,8 +137,10 @@ export function subscribeToListings(
 
   return subscribeShared<MarketplaceRow>(
     client,
-    "marketplace-listings-inserts",
+    "marketplace-listings-changes",
     (channel, emit) => {
+      // INSERTs are filtered to fresh (un-sold) rows since that's the only
+      // shape `cloudAddListing` writes — keeps the wire chatter tight.
       channel.on(
         REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
         {
@@ -146,6 +148,22 @@ export function subscribeToListings(
           schema: "public",
           table: "marketplace_listings",
           filter: "sold_at=is.null",
+        },
+        (payload) => {
+          const row = payload.new as MarketplaceRow | undefined;
+          if (!row || !row.id) return;
+          emit(row);
+        },
+      );
+      // UPDATEs include the `sold_at`/`buyer_user_id` transitions that fire
+      // when another device claims a listing. No filter — we want every
+      // post-creation state change so consumers can drop or replace the row.
+      channel.on(
+        REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
+        {
+          event: REALTIME_POSTGRES_CHANGES_LISTEN_EVENT.UPDATE,
+          schema: "public",
+          table: "marketplace_listings",
         },
         (payload) => {
           const row = payload.new as MarketplaceRow | undefined;
