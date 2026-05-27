@@ -47,12 +47,17 @@ CREATE INDEX IF NOT EXISTS marketplace_transfers_owner_idx
 ALTER TABLE public.marketplace_transfers ENABLE ROW LEVEL SECURITY;
 
 -- Read: only the two parties involved.
+-- DROP-then-CREATE so re-runs against branch-preview DBs (where the policy
+-- survives from a prior apply) don't error with SQLSTATE 42710.
+-- PostgreSQL ≤16 has no `CREATE POLICY IF NOT EXISTS`.
+DROP POLICY IF EXISTS "marketplace_transfers_select_party" ON public.marketplace_transfers;
 CREATE POLICY "marketplace_transfers_select_party"
 ON public.marketplace_transfers
 FOR SELECT
 USING (auth.uid() = buyer_user_id OR auth.uid() = owner_user_id);
 
 -- Insert: the buyer recording their own claim.
+DROP POLICY IF EXISTS "marketplace_transfers_insert_buyer" ON public.marketplace_transfers;
 CREATE POLICY "marketplace_transfers_insert_buyer"
 ON public.marketplace_transfers
 FOR INSERT
