@@ -8,6 +8,7 @@ import {
   sumConverted,
   type UsdRates,
 } from "@/lib/currency-rates";
+import { convertItemCost, type ConvertedItemCost } from "@/lib/item-cost";
 import { useI18n } from "@/lib/i18n-context";
 import {
   getDefaultCurrencyForLanguage,
@@ -86,6 +87,7 @@ type DraftCollectionInput = {
 };
 
 export type { AcquiredItemSnapshot };
+export type { ConvertedItemCost };
 
 export { ACQUIRED_COLLECTION_ID_SUFFIX };
 
@@ -118,6 +120,13 @@ type CollectionsContextValue = {
   getCollectionById: (id: string) => Collection | undefined;
   getItemsForCollection: (collectionId: string) => CollectableItem[];
   getCollectionTotalCost: (collectionId: string) => CollectionTotalCost;
+  /**
+   * Convert a single item's cost into `targetCurrency` (defaults to the
+   * viewer's `displayCurrency`). Pass a collection's `currency` override as
+   * `targetCurrency` to keep in-collection values consistent with
+   * `getCollectionTotalCost`. See `convertItemCost` in `lib/item-cost.ts`.
+   */
+  convertItemCost: (item: CollectableItem, targetCurrency?: string) => ConvertedItemCost;
   displayCurrency: string;
   refreshCurrencyRates: () => Promise<void>;
   getItemById: (itemId: string) => CollectableItem | undefined;
@@ -685,6 +694,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         const amount = entries.reduce((sum, e) => sum + e.amount, 0);
         return { amount, currency: target, converted: entries.length, skipped: 0 };
       },
+      convertItemCost: (item, targetCurrency) =>
+        convertItemCost(item, targetCurrency ?? displayCurrency, currencyRates),
       displayCurrency,
       refreshCurrencyRates,
       getItemById: (itemId) => items.find((item) => item.id === itemId),
