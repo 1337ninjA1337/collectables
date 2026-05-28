@@ -15,7 +15,7 @@ const MIGRATION_PATH = path.join(
   process.cwd(),
   "supabase",
   "migrations",
-  "20260527023036_marketplace_transfers.sql",
+  "20260527_marketplace_transfers.sql",
 );
 
 const MANUAL_TASKS_PATH = path.join(process.cwd(), "MANUAL-TASKS.md");
@@ -161,7 +161,7 @@ describe("marketplace_transfers migration", () => {
 
 describe("MANUAL-TASKS.md", () => {
   it("documents the marketplace_transfers migration", () => {
-    assert.match(MANUAL_TASKS, /## 20260527023036_marketplace_transfers\.sql/);
+    assert.match(MANUAL_TASKS, /## 20260527_marketplace_transfers\.sql/);
     assert.match(MANUAL_TASKS, /marketplace_transfers/);
   });
 
@@ -170,7 +170,7 @@ describe("MANUAL-TASKS.md", () => {
     // a "tidy up" pass, they'd silently break the audit log. The MANUAL-
     // TASKS entry should explain the choice.
     const entry = MANUAL_TASKS.match(
-      /## 20260527023036_marketplace_transfers\.sql[\s\S]+?(?=\n##\s|$)/,
+      /## 20260527_marketplace_transfers\.sql[\s\S]+?(?=\n##\s|$)/,
     );
     assert.ok(entry, "could not locate marketplace_transfers section in MANUAL-TASKS.md");
     assert.match(entry![0], /append-only|No UPDATE|append/i);
