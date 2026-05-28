@@ -3,8 +3,10 @@ import { Stack, router } from "expo-router";
 import { useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { CurrencySheet } from "@/components/currency-sheet";
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
+import { useCollections } from "@/lib/collections-context";
 import {
   AMBER_ACCENT,
   AMBER_LIGHT,
@@ -50,8 +52,23 @@ export default function SettingsScreen() {
   const { signOut, deleteAccount, pending } = useAuth();
   const { ready: premiumReady, isPremium, activatedAt, expiresAt, activatePremium, cancelPremium } = usePremium();
   const { diagnosticsEnabled, setDiagnosticsEnabled } = useDiagnostics();
+  const { displayCurrency, setDisplayCurrency, refreshCurrencyRates, currencyRatesUpdatedAt } =
+    useCollections();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
+  const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
+  const [currencyQuery, setCurrencyQuery] = useState("");
+  const [refreshingRates, setRefreshingRates] = useState(false);
+
+  async function handleRefreshRates() {
+    if (refreshingRates) return;
+    setRefreshingRates(true);
+    try {
+      await refreshCurrencyRates();
+    } finally {
+      setRefreshingRates(false);
+    }
+  }
 
   function handleActivatePremium() {
     activatePremium();
@@ -152,6 +169,47 @@ export default function SettingsScreen() {
           ))}
         </View>
       </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{t("displayCurrencyTitle")}</Text>
+        <Text style={styles.sectionText}>{t("displayCurrencySubtitle")}</Text>
+        <Pressable
+          style={styles.currencyRow}
+          onPress={() => {
+            setCurrencyQuery("");
+            setCurrencySheetOpen(true);
+          }}
+          accessibilityLabel={t("displayCurrencyTitle")}
+        >
+          <Text style={styles.currencyValue}>{displayCurrency}</Text>
+          <Text style={styles.currencyChevron}>›</Text>
+        </Pressable>
+        {currencyRatesUpdatedAt != null ? (
+          <Pressable onPress={handleRefreshRates} disabled={refreshingRates}>
+            <Text style={styles.ratesHint}>
+              {t("currencyRatesUpdated", {
+                when: formatRelativeDate(new Date(currencyRatesUpdatedAt).toISOString()),
+              })}
+              {" · "}
+              {t("currencyRatesRefresh")}
+            </Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.ratesUnavailable}>{t("currencyRatesUnavailable")}</Text>
+        )}
+      </View>
+
+      <CurrencySheet
+        visible={currencySheetOpen}
+        selectedCode={displayCurrency}
+        query={currencyQuery}
+        onQueryChange={setCurrencyQuery}
+        onSelect={(code) => {
+          setDisplayCurrency(code);
+          setCurrencySheetOpen(false);
+        }}
+        onClose={() => setCurrencySheetOpen(false)}
+      />
 
       {premiumReady ? (
         <View style={isPremium ? styles.premiumCardActive : styles.premiumCard}>
@@ -315,6 +373,40 @@ const styles = StyleSheet.create({
   },
   languageChipTextActive: {
     color: TEXT_ON_DARK_4,
+  },
+  currencyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 14,
+    backgroundColor: CARD_BG_3,
+    borderWidth: 1,
+    borderColor: AMBER_SOFT,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  currencyValue: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: HERO_DARK,
+    fontFamily: FONT_BODY_EXTRABOLD,
+  },
+  currencyChevron: {
+    fontSize: 20,
+    color: AMBER_ACCENT,
+    fontWeight: "800",
+  },
+  ratesHint: {
+    fontSize: 13,
+    color: AMBER_ACCENT,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
+  },
+  ratesUnavailable: {
+    fontSize: 13,
+    color: MUTED_2,
+    fontStyle: "italic",
+    fontFamily: FONT_BODY,
   },
   diagnosticsCard: {
     backgroundColor: TEXT_ON_DARK,
