@@ -15,6 +15,7 @@ import { buildDeepLink } from "@/lib/deep-link";
 import { useAuth } from "@/lib/auth-context";
 import { uploadImages } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
+import { formatCostAmount } from "@/lib/item-cost";
 import { useI18n } from "@/lib/i18n-context";
 import { useMarketplace } from "@/lib/marketplace-context";
 import { placeholderColor } from "@/lib/placeholder-color";
@@ -74,7 +75,7 @@ const TAG_COLORS = [
 export default function ItemDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const { getItemById, getCollectionById, deleteItem, updateItem, refresh } = useCollections();
+  const { getItemById, getCollectionById, deleteItem, updateItem, refresh, convertItemCost } = useCollections();
   const { t, language } = useI18n();
   const toast = useToast();
   const {
@@ -543,14 +544,28 @@ export default function ItemDetailsScreen() {
         </View>
       ) : null}
 
-      {typeof activeItem.cost === "number" ? (
-        <View style={styles.sheet}>
-          <Text style={styles.sheetLabel}>{t("costLabel")}</Text>
-          <Text style={styles.sheetValue}>
-            {activeItem.cost}{activeItem.costCurrency ? ` ${activeItem.costCurrency}` : ""}
-          </Text>
-        </View>
-      ) : null}
+      {typeof activeItem.cost === "number" && Number.isFinite(activeItem.cost) ? (() => {
+        const conv = convertItemCost(activeItem, collection?.currency ?? undefined);
+        const amount = conv.amount ?? (activeItem.cost as number);
+        const isApprox =
+          conv.converted && activeItem.costCurrency != null && activeItem.costCurrency !== conv.currency;
+        const display = isApprox
+          ? t("itemValueApprox", { amount: formatCostAmount(amount), currency: conv.currency })
+          : `${formatCostAmount(amount)} ${conv.currency}`;
+        const original = `${formatCostAmount(activeItem.cost as number)}${activeItem.costCurrency ? ` ${activeItem.costCurrency}` : ""}`;
+        return (
+          <View style={styles.sheet}>
+            <Text style={styles.sheetLabel}>{t("costLabel")}</Text>
+            <Pressable
+              onLongPress={() => toast.info(original)}
+              accessibilityLabel={`${t("costLabel")}: ${original}`}
+              {...(Platform.OS === "web" ? ({ title: original } as object) : null)}
+            >
+              <Text style={styles.sheetValue}>{display}</Text>
+            </Pressable>
+          </View>
+        );
+      })() : null}
 
       <ReactionBar targetType="item" targetId={activeItem.id} />
 

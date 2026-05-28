@@ -53,3 +53,12 @@ export function convertItemCost(
   // the caller shows the original amount instead of a wrong/blank figure.
   return { amount: item.cost, currency: stored, converted: false };
 }
+
+/**
+ * Format a cost amount for display: whole numbers stay whole, fractional
+ * (typically a freshly-converted figure) shows two decimals. Keeps converted
+ * values from rendering 12-decimal float noise without padding integers.
+ */
+export function formatCostAmount(amount: number): string {
+  return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+}
