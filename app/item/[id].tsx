@@ -109,6 +109,7 @@ export default function ItemDetailsScreen() {
   const [editAcquiredAt, setEditAcquiredAt] = useState("");
   const [editVariants, setEditVariants] = useState("");
   const [editCost, setEditCost] = useState("");
+  const [editCurrency, setEditCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
   const [editCondition, setEditCondition] = useState<ItemCondition | "">("");
   const [editTags, setEditTags] = useState<ItemTag[]>([]);
   const [editTagInput, setEditTagInput] = useState("");
@@ -121,6 +122,10 @@ export default function ItemDetailsScreen() {
   const [listingCurrency, setListingCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
   function setListingCurrency(next: string) {
     setListingCurrencyState(next);
+    void setUserPreferredCurrency(next);
+  }
+  function setEditCurrency(next: string) {
+    setEditCurrencyState(next);
     void setUserPreferredCurrency(next);
   }
   useEffect(() => {
@@ -176,6 +181,10 @@ export default function ItemDetailsScreen() {
     setEditAcquiredAt(activeItem.acquiredAt);
     setEditVariants(activeItem.variants);
     setEditCost(typeof activeItem.cost === "number" ? String(activeItem.cost) : "");
+    setEditCurrencyState(activeItem.costCurrency ?? getDefaultCurrencyForLanguage(language));
+    void getUserPreferredCurrency().then((stored) => {
+      if (!activeItem.costCurrency && stored) setEditCurrencyState(stored);
+    });
     setEditCondition(activeItem.condition ?? "");
     setEditTags(activeItem.tags ?? []);
     setEditTagInput("");
@@ -227,6 +236,7 @@ export default function ItemDetailsScreen() {
         acquiredAt: editAcquiredAt.trim(),
         variants: editVariants.trim(),
         cost: parsedCost !== null && !Number.isNaN(parsedCost) ? parsedCost : null,
+        costCurrency: parsedCost !== null && !Number.isNaN(parsedCost) ? editCurrency : null,
         condition: editCondition || undefined,
         tags: editTags.length > 0 ? editTags : undefined,
         photos: finalPhotos,
@@ -339,7 +349,16 @@ export default function ItemDetailsScreen() {
         <EditField label={t("sourceLabel")} value={editAcquiredFrom} onChangeText={setEditAcquiredFrom} />
         <EditField label={t("descriptionLabel")} value={editDescription} onChangeText={setEditDescription} multiline />
         <EditField label={t("variantsLabel")} value={editVariants} onChangeText={setEditVariants} multiline />
-        <EditField label={t("costLabel")} value={editCost} onChangeText={setEditCost} keyboardType="numeric" />
+        <View style={styles.editFieldGroup}>
+          <Text style={styles.editLabel}>{t("costLabel")}</Text>
+          <CurrencyInput
+            value={editCost}
+            currency={editCurrency}
+            onChangeValue={setEditCost}
+            onChangeCurrency={setEditCurrency}
+            placeholder={t("costPlaceholder")}
+          />
+        </View>
 
         <View style={styles.editFieldGroup}>
           <Text style={styles.editLabel}>{t("conditionLabel")}</Text>
