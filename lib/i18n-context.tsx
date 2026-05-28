@@ -581,7 +581,7 @@ const ru: TranslationMap = {
   collectionsFeedTitle: "Коллекции друзей и отслеживаемые",
   collectionsFeedSubtitle: "Смотрите коллекции ваших друзей и коллекции, на которые вы подписались.",
   tabFriendCollections: "Друзей",
-  tabSubscribedCollections: "Отслеживаемые",
+  tabSubscribedCollections: "Подписки",
   noSubscribedCollections: "Вы еще не подписались ни на одну коллекцию.",
   followCollection: "Отслеживать коллекцию",
   unfollowCollection: "Перестать отслеживать",

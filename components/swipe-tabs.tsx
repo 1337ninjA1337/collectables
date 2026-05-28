@@ -258,6 +258,8 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
               >
                 <Text
                   style={{ ...styles.subTabText, ...(isActive ? styles.subTabTextActive : {}) }}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
                 >
                   {t.label}
                 </Text>
@@ -270,7 +272,11 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
               style={{ ...styles.tab, ...(isActive ? styles.tabActive : {}) }}
               onPress={() => jumpToKey(t.key)}
             >
-              <Text style={{ ...styles.tabText, ...(isActive ? styles.tabTextActive : {}) }}>
+              <Text
+                style={{ ...styles.tabText, ...(isActive ? styles.tabTextActive : {}) }}
+                numberOfLines={2}
+                adjustsFontSizeToFit
+              >
                 {t.label}
               </Text>
             </Pressable>
@@ -336,8 +342,13 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
+    // Allow the flex item to shrink below its content's intrinsic width so a
+    // long unbreakable label (e.g. ru "Отслеживаемые") can't push the row
+    // past the screen edge. Pairs with numberOfLines/adjustsFontSizeToFit.
+    minWidth: 0,
     borderRadius: 999,
     paddingVertical: 14,
+    paddingHorizontal: 8,
     alignItems: "center",
     backgroundColor: CARD_BG_3,
     borderWidth: 1,
@@ -362,8 +373,10 @@ const styles = StyleSheet.create({
   },
   subTab: {
     flex: 1,
+    minWidth: 0,
     borderRadius: 20,
     paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: "center",
     backgroundColor: CARD_BG,
     borderWidth: 1,
