@@ -41,6 +41,21 @@ describe("marketplace screen", () => {
     // Section is hidden when no purchases — must guard on length.
     assert.match(src, /purchases\.length\s*>\s*0/);
   });
+
+  it("extracts a single ListingGrid wrapper instead of duplicating the grid markup", () => {
+    const src = read("app/marketplace.tsx");
+    assert.match(src, /function\s+ListingGrid\(/, "ListingGrid component must exist");
+    // The flexBasis cardWrap spread should live in exactly one place now.
+    const flexBasisCount = src.split("flexBasis").length - 1;
+    assert.equal(
+      flexBasisCount,
+      1,
+      `flexBasis must appear once (inside ListingGrid), found ${flexBasisCount}`,
+    );
+    // All four surfaces route through ListingGrid (active + 3 sections).
+    const gridUses = src.split("<ListingGrid").length - 1;
+    assert.equal(gridUses, 4, `expected 4 <ListingGrid> call sites, found ${gridUses}`);
+  });
 });
 
 describe("bottom-nav marketplace tab", () => {

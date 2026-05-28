@@ -25,14 +25,14 @@ describe("marketplace screen — purchases 'From @seller' chip", () => {
     assert.match(src, /t\("marketplaceBoughtFrom",\s*\{\s*name:\s*sellerHandle\s*\}\)/);
   });
 
-  it("passes fromSeller into the ListingCard inside the My purchases section", () => {
+  it("passes fromSeller into the grid inside the My purchases section", () => {
     const purchasesIdx = src.indexOf("marketplaceMyPurchasesTitle");
     assert.ok(purchasesIdx >= 0, "purchases section title not found");
     const tail = src.slice(purchasesIdx, purchasesIdx + 800);
     assert.match(
       tail,
-      /<ListingCard[^>]*\bfromSeller\b/,
-      "purchases card must thread fromSeller into ListingCard for the 'From @seller' pill",
+      /<ListingGrid[^>]*\bfromSeller\b/,
+      "purchases grid must thread fromSeller into ListingGrid for the 'From @seller' pill",
     );
   });
 });
