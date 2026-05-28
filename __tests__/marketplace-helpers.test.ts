@@ -11,10 +11,12 @@ import {
   isListingClaimedFromOwner,
   listingsAcquiredByUser,
   listingsForUser,
+  markListingArrived,
   normalizeListing,
   normalizeTitle,
   PRICE_HISTORY_SIMILARITY_THRESHOLD,
   priceHistoryForTitle,
+  purchasesAwaitingArrival,
   purchasesForUser,
   RECENTLY_SOLD_DEFAULT_LIMIT,
   recentlySoldListings,
@@ -37,6 +39,7 @@ function listing(overrides: Partial<MarketplaceListing> = {}): MarketplaceListin
     createdAt: "2026-04-25T10:00:00.000Z",
     soldAt: null,
     buyerUserId: null,
+    arrivedAt: null,
     ...overrides,
   };
 }
@@ -184,6 +187,48 @@ describe("purchasesForUser", () => {
       listing({ id: "2", buyerUserId: "bob", soldAt: "2026-04-15T10:00:00.000Z" }),
     ];
     assert.deepEqual(purchasesForUser(ls, "bob").map((l) => l.id), ["2", "1"]);
+  });
+});
+
+describe("markListingArrived", () => {
+  it("stamps arrivedAt when the listing has not yet been received", () => {
+    const l = listing({ id: "1", buyerUserId: "bob", soldAt: "2026-04-15T10:00:00.000Z" });
+    const out = markListingArrived(l, "2026-04-20T09:00:00.000Z");
+    assert.equal(out.arrivedAt, "2026-04-20T09:00:00.000Z");
+  });
+
+  it("is idempotent — keeps the original confirmation timestamp on re-tap", () => {
+    const l = listing({ id: "1", arrivedAt: "2026-04-18T08:00:00.000Z" });
+    const out = markListingArrived(l, "2026-04-25T12:00:00.000Z");
+    assert.equal(out.arrivedAt, "2026-04-18T08:00:00.000Z");
+    assert.equal(out, l, "must return the same reference when already arrived");
+  });
+
+  it("does not mutate the input listing", () => {
+    const l = listing({ id: "1", arrivedAt: null });
+    const before = { ...l };
+    markListingArrived(l, "2026-04-20T09:00:00.000Z");
+    assert.deepEqual(l, before);
+  });
+});
+
+describe("purchasesAwaitingArrival", () => {
+  it("returns bought, sold, not-yet-arrived listings newest-sold first", () => {
+    const ls = [
+      listing({ id: "1", buyerUserId: "bob", soldAt: "2026-04-25T10:00:00.000Z", arrivedAt: null }),
+      listing({ id: "2", buyerUserId: "bob", soldAt: "2026-04-29T10:00:00.000Z", arrivedAt: null }),
+      listing({ id: "3", buyerUserId: "bob", soldAt: "2026-04-27T10:00:00.000Z", arrivedAt: "2026-04-28T00:00:00.000Z" }),
+      listing({ id: "4", buyerUserId: "carol", soldAt: "2026-04-30T10:00:00.000Z", arrivedAt: null }),
+      listing({ id: "5", buyerUserId: "bob", soldAt: null, arrivedAt: null }),
+    ];
+    assert.deepEqual(purchasesAwaitingArrival(ls, "bob").map((l) => l.id), ["2", "1"]);
+  });
+
+  it("returns empty when every purchase is already received", () => {
+    const ls = [
+      listing({ buyerUserId: "bob", soldAt: "2026-04-25T10:00:00.000Z", arrivedAt: "2026-04-26T00:00:00.000Z" }),
+    ];
+    assert.deepEqual(purchasesAwaitingArrival(ls, "bob"), []);
   });
 });
 
@@ -517,6 +562,16 @@ describe("normalizeListing", () => {
     const twice = normalizeListing(once);
     assert.deepEqual(twice, once);
   });
+
+  it("coerces a missing arrivedAt to null", () => {
+    const raw = listing({ arrivedAt: undefined as unknown as null });
+    assert.equal(normalizeListing(raw).arrivedAt, null);
+  });
+
+  it("preserves a non-null arrivedAt verbatim", () => {
+    const raw = listing({ arrivedAt: "2026-04-20T09:00:00.000Z" });
+    assert.equal(normalizeListing(raw).arrivedAt, "2026-04-20T09:00:00.000Z");
+  });
 });
 
 describe("coerceListing", () => {
@@ -587,6 +642,20 @@ describe("coerceListing", () => {
   it("rejects rows with a malformed soldAt or buyerUserId", () => {
     assert.equal(coerceListing(validRaw({ soldAt: 1700000000 })), null);
     assert.equal(coerceListing(validRaw({ buyerUserId: 42 })), null);
+  });
+
+  it("coerces a missing arrivedAt to null without rejecting", () => {
+    const raw = validRaw();
+    delete raw.arrivedAt;
+    const result = coerceListing(raw);
+    assert.ok(result, "missing arrivedAt is a legacy shape, not corruption");
+    assert.equal(result!.arrivedAt, null);
+  });
+
+  it("preserves a valid arrivedAt string and rejects a malformed one", () => {
+    const ok = coerceListing(validRaw({ arrivedAt: "2026-04-20T09:00:00.000Z" }));
+    assert.equal(ok!.arrivedAt, "2026-04-20T09:00:00.000Z");
+    assert.equal(coerceListing(validRaw({ arrivedAt: 42 })), null);
   });
 });
 
