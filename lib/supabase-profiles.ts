@@ -13,12 +13,14 @@ import {
   friendRequestsInsertUrl,
   friendRequestsUrl,
   profileByIdUrl,
+  profileUpdateUrl,
   profilesPageRangeHeader,
   profilesPageUrl,
   profilesUrl,
   publicCollectionsByUserUrl,
   removeFriendRequestUrl,
   sendFriendRequestBody,
+  updateProfileDisplayCurrencyBody,
   upsertCollectionBody,
   upsertProfileBody,
 } from "@/lib/supabase-profiles-shapes";
@@ -36,6 +38,7 @@ type DbProfile = {
   public_id: string;
   bio: string;
   avatar: string;
+  display_currency?: string | null;
 };
 
 function isHiddenProfile(row: DbProfile): boolean {
@@ -51,6 +54,7 @@ function toUserProfile(row: DbProfile): UserProfile {
     publicId: row.public_id,
     bio: row.bio,
     avatar: row.avatar,
+    displayCurrency: row.display_currency ?? null,
   };
 }
 
@@ -94,6 +98,23 @@ export async function upsertMyProfile(profile: UserProfile): Promise<void> {
   await supabaseRest(profilesUrl(supabaseUrl!), {
     method: "POST",
     body: JSON.stringify(upsertProfileBody(profile)),
+  });
+}
+
+/**
+ * Sync the signed-in user's app-wide display currency onto their profile row
+ * so the preference follows them across devices. Best-effort: a network/RLS
+ * failure leaves the device-local AsyncStorage value as the fallback.
+ */
+export async function updateMyProfileDisplayCurrency(
+  userId: string,
+  currency: string | null,
+): Promise<void> {
+  if (!isSupabaseConfigured) return;
+
+  await supabaseRest(profileUpdateUrl(supabaseUrl!, userId), {
+    method: "PATCH",
+    body: JSON.stringify(updateProfileDisplayCurrencyBody(currency)),
   });
 }
 

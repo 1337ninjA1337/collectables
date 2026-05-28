@@ -247,6 +247,21 @@ ALTER TABLE public.collections
 
 Apply via the Supabase SQL editor or the `supabase db push` workflow.
 
+## 20260528_profile_display_currency.sql
+
+Run `supabase/migrations/20260528_profile_display_currency.sql` against your Supabase project:
+
+```sql
+-- Adds public.profiles.display_currency column (nullable text).
+-- Syncs the user's app-wide display currency (ISO 4217) across devices.
+-- NULL means 'fall back to the device-local preference, then the language
+-- default' — existing rows keep NULL and behave exactly as before.
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS display_currency text NULL;
+```
+
+Apply via the Supabase SQL editor or the `supabase db push` workflow.
+
 ## 20260527_marketplace_transfers.sql
 
 Run `supabase/migrations/20260527_marketplace_transfers.sql` against your Supabase project to create the append-only sale audit log:

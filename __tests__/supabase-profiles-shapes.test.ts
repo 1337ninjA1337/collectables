@@ -10,12 +10,14 @@ import {
   friendRequestsInsertUrl,
   friendRequestsUrl,
   profileByIdUrl,
+  profileUpdateUrl,
   profilesPageRangeHeader,
   profilesPageUrl,
   profilesUrl,
   publicCollectionsByUserUrl,
   removeFriendRequestUrl,
   sendFriendRequestBody,
+  updateProfileDisplayCurrencyBody,
   upsertCollectionBody,
   upsertProfileBody,
 } from "@/lib/supabase-profiles-shapes";
@@ -93,6 +95,45 @@ describe("upsertProfileBody", () => {
     assert.equal(body.public_id, "alice-slug");
     assert.equal(body.bio, "collector");
     assert.equal(body.avatar, "https://img.example.com/a.jpg");
+    // display_currency is always present (null when the profile omits it) so an
+    // upsert never silently drops a previously-synced currency.
+    assert.equal(body.display_currency, null);
+  });
+
+  it("forwards a set displayCurrency as display_currency", () => {
+    const profile: UserProfile = {
+      id: "u1",
+      email: "a@b.com",
+      displayName: "Alice",
+      username: "alice",
+      publicId: "alice-slug",
+      bio: "",
+      avatar: "",
+      displayCurrency: "EUR",
+    };
+    assert.equal(upsertProfileBody(profile).display_currency, "EUR");
+  });
+});
+
+// --- profileUpdateUrl ---
+describe("profileUpdateUrl", () => {
+  it("builds an id-filtered row URL with no select clause (for PATCH)", () => {
+    assert.equal(profileUpdateUrl(BASE, "user-1"), `${BASE}/rest/v1/profiles?id=eq.user-1`);
+  });
+
+  it("encodes the id to avoid filter injection", () => {
+    assert.match(profileUpdateUrl(BASE, "user&evil=1"), /id=eq\.user%26evil%3D1/);
+  });
+});
+
+// --- updateProfileDisplayCurrencyBody ---
+describe("updateProfileDisplayCurrencyBody", () => {
+  it("patches only the display_currency column", () => {
+    assert.deepEqual(updateProfileDisplayCurrencyBody("USD"), { display_currency: "USD" });
+  });
+
+  it("forwards null to clear the synced preference", () => {
+    assert.deepEqual(updateProfileDisplayCurrencyBody(null), { display_currency: null });
   });
 });
 

@@ -16,6 +16,12 @@ export type UserProfile = {
   bio: string;
   avatar: string;
   isPremium?: boolean;
+  /**
+   * The user's app-wide display currency (ISO 4217), synced across devices via
+   * the profiles row. NULL/undefined → fall back to the device-local
+   * preference, then the language default. See bug-2c in collections-context.
+   */
+  displayCurrency?: string | null;
 };
 
 export type CollectableItem = {

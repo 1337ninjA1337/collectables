@@ -13,6 +13,8 @@ import { useI18n } from "@/lib/i18n-context";
 import {
   getDefaultCurrencyForLanguage,
   getUserPreferredCurrency,
+  parseStoredCurrency,
+  setUserPreferredCurrency,
 } from "@/lib/locale-helpers";
 import {
   hasNewCloudEntries,
@@ -46,6 +48,8 @@ import {
   fetchCollectionsSharedWithUser,
   fetchWishlistItemsByUserId,
   registerSharedCollectionViewer,
+  fetchProfileById,
+  updateMyProfileDisplayCurrency,
 } from "@/lib/supabase-profiles";
 import {
   addViewerToSharedIds,
@@ -128,6 +132,13 @@ type CollectionsContextValue = {
    */
   convertItemCost: (item: CollectableItem, targetCurrency?: string) => ConvertedItemCost;
   displayCurrency: string;
+  /**
+   * Set the user's app-wide display currency. Updates state, persists to the
+   * device-local AsyncStorage fallback, and (when signed in) syncs to the
+   * profile row so the choice follows the account across devices (bug-2c).
+   * No-ops on input that fails ISO 4217 validation.
+   */
+  setDisplayCurrency: (currency: string) => void;
   refreshCurrencyRates: () => Promise<void>;
   getItemById: (itemId: string) => CollectableItem | undefined;
   wishlistItems: CollectableItem[];
@@ -181,7 +192,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   const { language } = useI18n();
   const { getVisibleCollections, getVisibleItems, friends } = useSocial();
   const [currencyRates, setCurrencyRates] = useState<UsdRates | null>(null);
-  const [displayCurrency, setDisplayCurrency] = useState<string>(() =>
+  const [displayCurrency, setDisplayCurrencyState] = useState<string>(() =>
     getDefaultCurrencyForLanguage(language),
   );
   const [localCollections, setLocalCollections] = useState<Collection[]>([]);
@@ -202,15 +213,42 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       const stored = await getUserPreferredCurrency();
       if (cancelled) return;
       if (stored) {
-        setDisplayCurrency(stored);
+        setDisplayCurrencyState(stored);
       } else {
-        setDisplayCurrency(getDefaultCurrencyForLanguage(language));
+        setDisplayCurrencyState(getDefaultCurrencyForLanguage(language));
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [language]);
+
+  // Cross-device sync: the profile's display_currency wins over the
+  // device-local AsyncStorage preference. Runs on sign-in; if the profile
+  // carries a value we adopt it and mirror it back to device-local so the
+  // next cold start (offline) still shows the right currency. A fetch
+  // failure leaves the device-local/language value already applied above.
+  useEffect(() => {
+    if (!user) return;
+    const activeUser = user;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const profile = await fetchProfileById(activeUser.id);
+        if (cancelled) return;
+        const profileCurrency = parseStoredCurrency(profile?.displayCurrency ?? null);
+        if (profileCurrency) {
+          setDisplayCurrencyState(profileCurrency);
+          void setUserPreferredCurrency(profileCurrency);
+        }
+      } catch {
+        // offline / Supabase unavailable — keep the device-local preference
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -697,6 +735,15 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       convertItemCost: (item, targetCurrency) =>
         convertItemCost(item, targetCurrency ?? displayCurrency, currencyRates),
       displayCurrency,
+      setDisplayCurrency: (currency) => {
+        const normalized = parseStoredCurrency(currency);
+        if (!normalized) return;
+        setDisplayCurrencyState(normalized);
+        void setUserPreferredCurrency(normalized);
+        if (user) {
+          updateMyProfileDisplayCurrency(user.id, normalized).catch(() => undefined);
+        }
+      },
       refreshCurrencyRates,
       getItemById: (itemId) => items.find((item) => item.id === itemId),
       wishlistItems: localItems

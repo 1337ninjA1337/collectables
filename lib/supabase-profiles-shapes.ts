@@ -17,6 +17,11 @@ export function profileByIdUrl(baseUrl: string, id: string): string {
   return `${baseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(id)}&select=*`;
 }
 
+/** Row-filter URL (no select) for PATCHing the signed-in user's own profile. */
+export function profileUpdateUrl(baseUrl: string, id: string): string {
+  return `${baseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(id)}`;
+}
+
 export function profilesPageUrl(baseUrl: string, page: number, pageSize: number): string {
   const from = (page - 1) * pageSize;
   return `${baseUrl}/rest/v1/profiles?select=*&order=created_at.desc&offset=${from}&limit=${pageSize}`;
@@ -37,7 +42,15 @@ export function upsertProfileBody(profile: UserProfile): Record<string, unknown>
     public_id: profile.publicId,
     bio: profile.bio,
     avatar: profile.avatar,
+    display_currency: profile.displayCurrency ?? null,
   };
+}
+
+/** PATCH body that syncs only the user's app-wide display currency. */
+export function updateProfileDisplayCurrencyBody(
+  currency: string | null,
+): Record<string, unknown> {
+  return { display_currency: currency };
 }
 
 // --- Collections ---
