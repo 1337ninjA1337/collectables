@@ -262,9 +262,9 @@ ALTER TABLE public.profiles
 
 Apply via the Supabase SQL editor or the `supabase db push` workflow.
 
-## 20260527_marketplace_transfers.sql
+## 20260527023036_marketplace_transfers.sql
 
-Run `supabase/migrations/20260527_marketplace_transfers.sql` against your Supabase project to create the append-only sale audit log:
+Run `supabase/migrations/20260527023036_marketplace_transfers.sql` against your Supabase project to create the append-only sale audit log:
 
 ```sql
 -- Creates public.marketplace_transfers(id, listing_id, item_id, owner_user_id,
