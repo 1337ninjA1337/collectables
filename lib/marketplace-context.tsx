@@ -200,6 +200,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         createdAt: new Date().toISOString(),
         soldAt: null,
         buyerUserId: null,
+        arrivedAt: null,
       };
       setListings((prev) => upsertListing(prev, next));
       // Best-effort cloud sync (fire-and-forget).

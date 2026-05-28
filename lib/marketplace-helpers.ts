@@ -22,6 +22,7 @@ export function normalizeListing(raw: MarketplaceListing): MarketplaceListing {
   return {
     ...raw,
     buyerUserId: raw.buyerUserId ?? null,
+    arrivedAt: raw.arrivedAt ?? null,
   };
 }
 
@@ -47,6 +48,9 @@ export function coerceListing(raw: unknown): MarketplaceListing | null {
   if (r.buyerUserId !== undefined && r.buyerUserId !== null && typeof r.buyerUserId !== "string") {
     return null;
   }
+  if (r.arrivedAt !== undefined && r.arrivedAt !== null && typeof r.arrivedAt !== "string") {
+    return null;
+  }
   return normalizeListing({
     id: r.id,
     itemId: r.itemId,
@@ -58,6 +62,7 @@ export function coerceListing(raw: unknown): MarketplaceListing | null {
     createdAt: r.createdAt,
     soldAt: (r.soldAt ?? null) as string | null,
     buyerUserId: (r.buyerUserId ?? null) as string | null,
+    arrivedAt: (r.arrivedAt ?? null) as string | null,
   });
 }
 
@@ -232,6 +237,40 @@ export function purchasesForUser(
       }
       return true;
     })
+    .slice()
+    .sort((a, b) => {
+      const aAt = a.soldAt ?? a.createdAt;
+      const bAt = b.soldAt ?? b.createdAt;
+      return aAt < bAt ? 1 : -1;
+    });
+}
+
+/**
+ * Marks a purchased listing as physically received by stamping `arrivedAt`.
+ * Idempotent: once a listing carries an `arrivedAt`, the original confirmation
+ * timestamp is preserved (a re-tap doesn't reset the clock). Pure — returns a
+ * new listing object and never mutates the input.
+ */
+export function markListingArrived(
+  listing: MarketplaceListing,
+  when: string,
+): MarketplaceListing {
+  if (listing.arrivedAt) return listing;
+  return { ...listing, arrivedAt: when };
+}
+
+/**
+ * Purchases the user has made but not yet confirmed as received:
+ * `buyerUserId === userId && soldAt != null && arrivedAt == null`. Sorted by
+ * `soldAt` descending so the most recent (most likely in-transit) purchases
+ * surface first. Drives the "Mark as received" CTA list.
+ */
+export function purchasesAwaitingArrival(
+  listings: readonly MarketplaceListing[],
+  userId: string,
+): MarketplaceListing[] {
+  return listings
+    .filter((l) => l.buyerUserId === userId && l.soldAt != null && l.arrivedAt == null)
     .slice()
     .sort((a, b) => {
       const aAt = a.soldAt ?? a.createdAt;

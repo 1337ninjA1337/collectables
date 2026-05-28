@@ -42,6 +42,7 @@ const listing: MarketplaceListing = {
   createdAt: "2026-05-01T10:00:00.000Z",
   soldAt: null,
   buyerUserId: null,
+  arrivedAt: null,
 };
 
 describe("supabase-marketplace-shapes", () => {
@@ -66,6 +67,14 @@ describe("supabase-marketplace-shapes", () => {
   it("rowToListing defaults buyerUserId to null when row omits buyer_user_id", () => {
     const result = rowToListing({ ...row });
     assert.equal(result.buyerUserId, null);
+  });
+
+  it("rowToListing maps arrived_at to arrivedAt and defaults to null when omitted", () => {
+    assert.equal(rowToListing({ ...row }).arrivedAt, null);
+    assert.equal(
+      rowToListing({ ...row, arrived_at: "2026-05-09T10:00:00.000Z" }).arrivedAt,
+      "2026-05-09T10:00:00.000Z",
+    );
   });
 
   it("markSoldPayload bundles sold_at and buyer_user_id", () => {
