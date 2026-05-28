@@ -175,6 +175,20 @@ export const RADIUS_AVATAR_LG = 28;
 export const RADIUS_AVATAR = 18;
 
 /**
+ * Mixed-direction geometry — appended for the visual upgrade.
+ *   RADIUS_HERO_LG = 32 — softened hero / large surface radius
+ *   RADIUS_CARD_AIRY = 32 — softened card radius (was 22 via RADIUS_CARD)
+ *   RADIUS_ITEM_AIRY = 28 — softened item-card radius (was 24)
+ *   SPACING_GUTTER = 24 — screen horizontal padding (was 20)
+ *   SPACING_AIRY = 20 — generous between-section gap (was 14/18)
+ */
+export const RADIUS_HERO_LG = 32;
+export const RADIUS_CARD_AIRY = 32;
+export const RADIUS_ITEM_AIRY = 28;
+export const SPACING_GUTTER = 24;
+export const SPACING_AIRY = 20;
+
+/**
  * Semantic spacing tokens — match the `gap:` values that recur 30+ times
  * across the StyleSheet corpus today. Use them inside `gap` / `padding` /
  * `margin` declarations to keep vertical rhythm consistent.
@@ -191,6 +205,24 @@ export const SPACING_INLINE = 8;
 export const SPACING_LIST = 10;
 export const SPACING_CARD = 12;
 export const SPACING_SECTION = 14;
+
+/**
+ * Soft elevation used on cards in the Mixed direction. iOS shadow + Android
+ * elevation in one object — spread into a card style:
+ *   <View style={{ ...styles.card, ...SHADOW_SOFT }} />
+ *
+ * shadowColor uses HERO_DARK so it tints warm in the warm palette and
+ * disappears against the dark-mode page surface.
+ */
+export const SHADOW_SOFT = {
+  shadowColor: HERO_DARK,
+  shadowOpacity: 0.08,
+  shadowOffset: { width: 0, height: 6 },
+  shadowRadius: 18,
+  elevation: 4,
+} as const;
+
+export type Shadow = typeof SHADOW_SOFT;
 
 /** Frozen palette for runtime introspection (e.g. tests, theming UI). */
 export const designTokens = Object.freeze({
@@ -330,12 +362,17 @@ export const designTokens = Object.freeze({
   RADIUS_INPUT,
   RADIUS_AVATAR_LG,
   RADIUS_AVATAR,
+  RADIUS_HERO_LG,
+  RADIUS_CARD_AIRY,
+  RADIUS_ITEM_AIRY,
   SPACING_MICRO,
   SPACING_TIGHT,
   SPACING_INLINE,
   SPACING_LIST,
   SPACING_CARD,
   SPACING_SECTION,
+  SPACING_GUTTER,
+  SPACING_AIRY,
 });
 
 export type DesignToken = keyof typeof designTokens;
