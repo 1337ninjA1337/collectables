@@ -121,7 +121,7 @@ export default function MarketplaceScreen() {
                 key={listing.id}
                 style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
               >
-                <ListingCard listing={listing} item={item} owner={owner} />
+                <ListingCard listing={listing} item={item} owner={owner} fromSeller />
               </View>
             ))}
           </View>
@@ -178,11 +178,13 @@ function ListingCard({
   item,
   owner,
   buyer,
+  fromSeller,
 }: {
   listing: MarketplaceListing;
   item: CollectableItem | undefined;
   owner: UserProfile | undefined;
   buyer?: UserProfile | undefined;
+  fromSeller?: boolean;
 }) {
   const { t } = useI18n();
   const photo = item?.photos?.find(Boolean);
@@ -195,6 +197,8 @@ function ListingCard({
       : null;
   const isTransferred = listing.soldAt !== null && listing.buyerUserId !== null;
   const buyerHandle = buyer ? `@${buyer.username ?? buyer.publicId ?? buyer.id}` : null;
+  const sellerHandle =
+    fromSeller && owner ? `@${owner.username ?? owner.publicId ?? owner.id}` : null;
 
   return (
     <Link href={`/listing/${listing.id}` as never} asChild>
@@ -214,6 +218,13 @@ function ListingCard({
         <View style={styles.cardBody}>
           <Text style={styles.cardTitle} numberOfLines={2}>{title}</Text>
           <Text style={styles.cardOwner} numberOfLines={1}>{ownerName}</Text>
+          {sellerHandle ? (
+            <View style={styles.soldToPill}>
+              <Text style={styles.soldToPillText} numberOfLines={1}>
+                {t("marketplaceBoughtFrom", { name: sellerHandle })}
+              </Text>
+            </View>
+          ) : null}
           {buyerHandle ? (
             <View style={styles.soldToPill}>
               <Text style={styles.soldToPillText} numberOfLines={1}>
