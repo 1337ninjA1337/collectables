@@ -31,16 +31,17 @@ describe("marketplace screen — sales section", () => {
     assert.match(src, /marketplaceMySalesTitle/);
   });
 
-  it("passes the buyer prop into the ListingCard so the 'Sold to @buyer' pill renders", () => {
+  it("passes a resolveBuyer prop into the grid so the 'Sold to @buyer' pill renders", () => {
     // The sales surface mirrors the recently-sold section in shape — both
-    // pass `buyer` so the sold-to pill identifies the counterparty.
+    // hand the grid a `resolveBuyer` callback so the sold-to pill identifies
+    // the counterparty.
     const salesIdx = src.indexOf("marketplaceMySalesTitle");
     assert.ok(salesIdx >= 0, "sales section title not found");
     const tail = src.slice(salesIdx, salesIdx + 1500);
     assert.match(
       tail,
-      /buyer=\{listing\.buyerUserId\s*\?\s*getProfileById\(listing\.buyerUserId\)\s*:\s*undefined\}/,
-      "sales card must thread the buyer profile into ListingCard for the sold-to pill",
+      /resolveBuyer=\{[\s\S]*?getProfileById\(listing\.buyerUserId\)\s*:\s*undefined/,
+      "sales grid must thread a resolveBuyer callback into ListingGrid for the sold-to pill",
     );
   });
 

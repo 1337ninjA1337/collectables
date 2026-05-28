@@ -82,6 +82,7 @@ export type MarketplaceListing = {
   createdAt: string;
   soldAt: string | null;
   buyerUserId: string | null;
+  arrivedAt: string | null;
 };
 
 export type Collection = {

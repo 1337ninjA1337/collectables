@@ -1,6 +1,6 @@
 import { Link, Stack } from "expo-router";
 import { useMemo } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { DimensionValue, Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { RealtimeStatusPill } from "@/components/realtime-status-pill";
@@ -100,76 +100,74 @@ export default function MarketplaceScreen() {
           hint={t("marketplaceEmpty")}
         />
       ) : (
-        <View style={styles.grid}>
-          {resolved.map(({ listing, item, owner }) => (
-            <View
-              key={listing.id}
-              style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
-            >
-              <ListingCard listing={listing} item={item} owner={owner} />
-            </View>
-          ))}
-        </View>
+        <ListingGrid data={resolved} columns={columns} />
       )}
 
       {purchases.length > 0 ? (
         <View style={styles.purchasesSection}>
           <Text style={styles.sectionTitle}>{t("marketplaceMyPurchasesTitle")}</Text>
-          <View style={styles.grid}>
-            {purchases.map(({ listing, item, owner }) => (
-              <View
-                key={listing.id}
-                style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
-              >
-                <ListingCard listing={listing} item={item} owner={owner} />
-              </View>
-            ))}
-          </View>
+          <ListingGrid data={purchases} columns={columns} fromSeller />
         </View>
       ) : null}
 
       {sales.length > 0 ? (
         <View style={styles.purchasesSection}>
           <Text style={styles.sectionTitle}>{t("marketplaceMySalesTitle")}</Text>
-          <View style={styles.grid}>
-            {sales.map(({ listing, item, owner }) => (
-              <View
-                key={listing.id}
-                style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
-              >
-                <ListingCard
-                  listing={listing}
-                  item={item}
-                  owner={owner}
-                  buyer={listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined}
-                />
-              </View>
-            ))}
-          </View>
+          <ListingGrid
+            data={sales}
+            columns={columns}
+            resolveBuyer={(listing) =>
+              listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined
+            }
+          />
         </View>
       ) : null}
 
       {recentlySold.length > 0 ? (
         <View style={styles.purchasesSection}>
           <Text style={styles.sectionTitle}>{t("marketplaceRecentlySoldTitle")}</Text>
-          <View style={styles.grid}>
-            {recentlySold.map(({ listing, item, owner }) => (
-              <View
-                key={listing.id}
-                style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
-              >
-                <ListingCard
-                  listing={listing}
-                  item={item}
-                  owner={owner}
-                  buyer={listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined}
-                />
-              </View>
-            ))}
-          </View>
+          <ListingGrid
+            data={recentlySold}
+            columns={columns}
+            resolveBuyer={(listing) =>
+              listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined
+            }
+          />
         </View>
       ) : null}
     </Screen>
+  );
+}
+
+function ListingGrid({
+  data,
+  columns,
+  fromSeller,
+  resolveBuyer,
+}: {
+  data: ResolvedListing[];
+  columns: number;
+  fromSeller?: boolean;
+  resolveBuyer?: (listing: MarketplaceListing) => UserProfile | undefined;
+}) {
+  const cardWrapStyle = useMemo(
+    () => ({ ...styles.cardWrap, flexBasis: `${100 / columns}%` as DimensionValue }),
+    [columns],
+  );
+  return (
+    <View style={styles.grid}>
+      {data.map(({ listing, item, owner }) => (
+        <View key={listing.id} style={cardWrapStyle}>
+          <ListingCard
+            listing={listing}
+            item={item}
+            owner={owner}
+            fromSeller={fromSeller}
+            buyer={resolveBuyer ? resolveBuyer(listing) : undefined}
+          />
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -178,11 +176,13 @@ function ListingCard({
   item,
   owner,
   buyer,
+  fromSeller,
 }: {
   listing: MarketplaceListing;
   item: CollectableItem | undefined;
   owner: UserProfile | undefined;
   buyer?: UserProfile | undefined;
+  fromSeller?: boolean;
 }) {
   const { t } = useI18n();
   const photo = item?.photos?.find(Boolean);
@@ -195,6 +195,8 @@ function ListingCard({
       : null;
   const isTransferred = listing.soldAt !== null && listing.buyerUserId !== null;
   const buyerHandle = buyer ? `@${buyer.username ?? buyer.publicId ?? buyer.id}` : null;
+  const sellerHandle =
+    fromSeller && owner ? `@${owner.username ?? owner.publicId ?? owner.id}` : null;
 
   return (
     <Link href={`/listing/${listing.id}` as never} asChild>
@@ -214,6 +216,13 @@ function ListingCard({
         <View style={styles.cardBody}>
           <Text style={styles.cardTitle} numberOfLines={2}>{title}</Text>
           <Text style={styles.cardOwner} numberOfLines={1}>{ownerName}</Text>
+          {sellerHandle ? (
+            <View style={styles.soldToPill}>
+              <Text style={styles.soldToPillText} numberOfLines={1}>
+                {t("marketplaceBoughtFrom", { name: sellerHandle })}
+              </Text>
+            </View>
+          ) : null}
           {buyerHandle ? (
             <View style={styles.soldToPill}>
               <Text style={styles.soldToPillText} numberOfLines={1}>

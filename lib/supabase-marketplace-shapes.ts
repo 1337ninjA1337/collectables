@@ -17,6 +17,7 @@ export type MarketplaceRow = {
   created_at: string;
   sold_at: string | null;
   buyer_user_id?: string | null;
+  arrived_at?: string | null;
 };
 
 export type MarketplaceInsertPayload = {
@@ -52,6 +53,7 @@ export function rowToListing(row: MarketplaceRow): MarketplaceListing {
     createdAt: row.created_at,
     soldAt: row.sold_at,
     buyerUserId: row.buyer_user_id ?? null,
+    arrivedAt: row.arrived_at ?? null,
   };
 }
 
