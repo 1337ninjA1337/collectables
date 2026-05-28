@@ -1,6 +1,6 @@
 import { Link, Stack } from "expo-router";
 import { useMemo } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { DimensionValue, Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { RealtimeStatusPill } from "@/components/realtime-status-pill";
@@ -100,76 +100,74 @@ export default function MarketplaceScreen() {
           hint={t("marketplaceEmpty")}
         />
       ) : (
-        <View style={styles.grid}>
-          {resolved.map(({ listing, item, owner }) => (
-            <View
-              key={listing.id}
-              style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
-            >
-              <ListingCard listing={listing} item={item} owner={owner} />
-            </View>
-          ))}
-        </View>
+        <ListingGrid data={resolved} columns={columns} />
       )}
 
       {purchases.length > 0 ? (
         <View style={styles.purchasesSection}>
           <Text style={styles.sectionTitle}>{t("marketplaceMyPurchasesTitle")}</Text>
-          <View style={styles.grid}>
-            {purchases.map(({ listing, item, owner }) => (
-              <View
-                key={listing.id}
-                style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
-              >
-                <ListingCard listing={listing} item={item} owner={owner} fromSeller />
-              </View>
-            ))}
-          </View>
+          <ListingGrid data={purchases} columns={columns} fromSeller />
         </View>
       ) : null}
 
       {sales.length > 0 ? (
         <View style={styles.purchasesSection}>
           <Text style={styles.sectionTitle}>{t("marketplaceMySalesTitle")}</Text>
-          <View style={styles.grid}>
-            {sales.map(({ listing, item, owner }) => (
-              <View
-                key={listing.id}
-                style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
-              >
-                <ListingCard
-                  listing={listing}
-                  item={item}
-                  owner={owner}
-                  buyer={listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined}
-                />
-              </View>
-            ))}
-          </View>
+          <ListingGrid
+            data={sales}
+            columns={columns}
+            resolveBuyer={(listing) =>
+              listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined
+            }
+          />
         </View>
       ) : null}
 
       {recentlySold.length > 0 ? (
         <View style={styles.purchasesSection}>
           <Text style={styles.sectionTitle}>{t("marketplaceRecentlySoldTitle")}</Text>
-          <View style={styles.grid}>
-            {recentlySold.map(({ listing, item, owner }) => (
-              <View
-                key={listing.id}
-                style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
-              >
-                <ListingCard
-                  listing={listing}
-                  item={item}
-                  owner={owner}
-                  buyer={listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined}
-                />
-              </View>
-            ))}
-          </View>
+          <ListingGrid
+            data={recentlySold}
+            columns={columns}
+            resolveBuyer={(listing) =>
+              listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined
+            }
+          />
         </View>
       ) : null}
     </Screen>
+  );
+}
+
+function ListingGrid({
+  data,
+  columns,
+  fromSeller,
+  resolveBuyer,
+}: {
+  data: ResolvedListing[];
+  columns: number;
+  fromSeller?: boolean;
+  resolveBuyer?: (listing: MarketplaceListing) => UserProfile | undefined;
+}) {
+  const cardWrapStyle = useMemo(
+    () => ({ ...styles.cardWrap, flexBasis: `${100 / columns}%` as DimensionValue }),
+    [columns],
+  );
+  return (
+    <View style={styles.grid}>
+      {data.map(({ listing, item, owner }) => (
+        <View key={listing.id} style={cardWrapStyle}>
+          <ListingCard
+            listing={listing}
+            item={item}
+            owner={owner}
+            fromSeller={fromSeller}
+            buyer={resolveBuyer ? resolveBuyer(listing) : undefined}
+          />
+        </View>
+      ))}
+    </View>
   );
 }
 
