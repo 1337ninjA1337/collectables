@@ -2,9 +2,9 @@
 
 These DB changes must be applied manually to the Supabase project (or will be auto-applied via the `supabase db push` CI step if `SUPABASE_DB_URL` secret is set).
 
-## 20260527_items_archived_at.sql
+## 20260527142510_items_archived_at.sql
 
-Run `supabase/migrations/20260527_items_archived_at.sql` against your Supabase project to support soft-archiving of items after a marketplace sale:
+Run `supabase/migrations/20260527142510_items_archived_at.sql` against your Supabase project to support soft-archiving of items after a marketplace sale:
 
 ```sql
 -- Adds public.items.archived_at column (timestamptz, nullable).
@@ -262,9 +262,9 @@ ALTER TABLE public.profiles
 
 Apply via the Supabase SQL editor or the `supabase db push` workflow.
 
-## 20260527023036_marketplace_transfers.sql
+## 20260527_marketplace_transfers.sql
 
-Run `supabase/migrations/20260527023036_marketplace_transfers.sql` against your Supabase project to create the append-only sale audit log:
+Run `supabase/migrations/20260527_marketplace_transfers.sql` against your Supabase project to create the append-only sale audit log:
 
 ```sql
 -- Creates public.marketplace_transfers(id, listing_id, item_id, owner_user_id,
