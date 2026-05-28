@@ -35,7 +35,7 @@ type ResolvedListing = {
 
 export default function MarketplaceScreen() {
   const { t } = useI18n();
-  const { activeListings, myPurchases, listings } = useMarketplace();
+  const { activeListings, myPurchases, mySales, listings } = useMarketplace();
   const { getItemById } = useCollections();
   const { getProfileById } = useSocial();
   const { isDesktop, isTablet } = useResponsive();
@@ -58,6 +58,16 @@ export default function MarketplaceScreen() {
         owner: getProfileById(listing.ownerUserId),
       })),
     [myPurchases, getItemById, getProfileById],
+  );
+
+  const sales = useMemo<ResolvedListing[]>(
+    () =>
+      mySales.map((listing) => ({
+        listing,
+        item: getItemById(listing.itemId),
+        owner: getProfileById(listing.ownerUserId),
+      })),
+    [mySales, getItemById, getProfileById],
   );
 
   const recentlySold = useMemo<ResolvedListing[]>(
@@ -112,6 +122,27 @@ export default function MarketplaceScreen() {
                 style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
               >
                 <ListingCard listing={listing} item={item} owner={owner} />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {sales.length > 0 ? (
+        <View style={styles.purchasesSection}>
+          <Text style={styles.sectionTitle}>{t("marketplaceMySalesTitle")}</Text>
+          <View style={styles.grid}>
+            {sales.map(({ listing, item, owner }) => (
+              <View
+                key={listing.id}
+                style={{ ...styles.cardWrap, flexBasis: `${100 / columns}%` }}
+              >
+                <ListingCard
+                  listing={listing}
+                  item={item}
+                  owner={owner}
+                  buyer={listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined}
+                />
               </View>
             ))}
           </View>
