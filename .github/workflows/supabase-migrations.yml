@@ -1,0 +1,46 @@
+name: Supabase Migrations
+
+# Free, main-only alternative to Supabase Branching (a paid feature). On every
+# push to main that touches a migration, this applies pending migrations to the
+# single production database via `supabase db push`. It is opt-in: if the
+# SUPABASE_DB_URL secret is not set the job skips cleanly (stays green) so the
+# repo never has a red required check just because the secret is absent.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/workflows/supabase-migrations.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SUPABASE_DB_URL is configured
+        id: gate
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "SUPABASE_DB_URL secret not set — skipping automatic migration push."
+            echo "Add it under Settings → Secrets and variables → Actions to enable"
+            echo "free, main-only migration deploys (see MANUAL-TASKS.md)."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: supabase/setup-cli@v1
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          version: latest
+      - name: Push migrations to production
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: supabase db push --db-url "$SUPABASE_DB_URL"

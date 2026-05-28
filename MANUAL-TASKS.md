@@ -2,6 +2,35 @@
 
 These DB changes must be applied manually to the Supabase project (or will be auto-applied via the `supabase db push` CI step if `SUPABASE_DB_URL` secret is set).
 
+## Migrations: free, main-only setup (no Supabase Branching)
+
+Supabase **Branching** (the "Supabase Preview" check) is a paid feature. To stay
+on the free plan and use only the production database tied to `main`:
+
+1. **Disable Branching** so the paid "Supabase Preview" check stops running:
+   Supabase Dashboard → **Branches** → disable/turn off Branching (or disconnect
+   the GitHub Branching integration). This removes the red `Supabase / Supabase
+   Preview` check entirely; it does not touch your production database.
+
+2. **(Optional) Enable free automatic migrations on `main`.** The workflow
+   `.github/workflows/supabase-migrations.yml` runs `supabase db push` against
+   production whenever a migration changes on `main`. To turn it on, add one
+   GitHub Actions secret:
+   - **Name:** `SUPABASE_DB_URL`
+   - **Value:** your production Postgres connection string —
+     Dashboard → **Settings → Database → Connection string → URI** (use the
+     pooler/session URI and include the password). Format:
+     `postgresql://postgres:<password>@<host>:5432/postgres`
+   - Add it under **Settings → Secrets and variables → Actions** in GitHub.
+
+   The workflow is opt-in: with no secret it skips cleanly (stays green). With
+   the secret set, pending migrations apply to production automatically on every
+   push to `main`. **Never commit this connection string** — it lives only in
+   GitHub Secrets.
+
+   Until you add the secret (or instead of it), keep applying each migration's
+   SQL manually via the Supabase SQL editor as documented in the sections below.
+
 ## 20260527142510_items_archived_at.sql
 
 Run `supabase/migrations/20260527142510_items_archived_at.sql` against your Supabase project to support soft-archiving of items after a marketplace sale:
