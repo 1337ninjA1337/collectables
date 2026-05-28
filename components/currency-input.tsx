@@ -1,4 +1,7 @@
+import { Ionicons } from "@expo/vector-icons";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { CurrencySheet } from "@/components/currency-sheet";
 import {
   BORDER,
   CARD_BG_2,
@@ -39,6 +42,15 @@ export function CurrencyInput({
   onChangeCurrency,
   placeholder = "0.00",
 }: CurrencyInputProps) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  // Always show the active currency as a chip — even a non-shortlist pick (e.g.
+  // HUF chosen via the full picker) so the selection stays visible.
+  const chipCodes: string[] = (CURRENCY_CHIPS as readonly string[]).includes(currency)
+    ? [...CURRENCY_CHIPS]
+    : [currency, ...CURRENCY_CHIPS];
+
   return (
     <View style={styles.container}>
       <View style={styles.inputRow}>
@@ -54,7 +66,7 @@ export function CurrencyInput({
         />
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
-        {CURRENCY_CHIPS.map((c) => {
+        {chipCodes.map((c) => {
           const active = c === currency;
           return (
             <Pressable
@@ -66,7 +78,29 @@ export function CurrencyInput({
             </Pressable>
           );
         })}
+        <Pressable
+          style={[styles.chip, styles.moreChip]}
+          onPress={() => {
+            setQuery("");
+            setSheetOpen(true);
+          }}
+          accessibilityLabel="More currencies"
+        >
+          <Ionicons name="ellipsis-horizontal" size={14} color={MUTED_27} />
+        </Pressable>
       </ScrollView>
+
+      <CurrencySheet
+        visible={sheetOpen}
+        selectedCode={currency}
+        query={query}
+        onQueryChange={setQuery}
+        onSelect={(code) => {
+          onChangeCurrency(code);
+          setSheetOpen(false);
+        }}
+        onClose={() => setSheetOpen(false)}
+      />
     </View>
   );
 }
@@ -124,6 +158,11 @@ const styles = StyleSheet.create({
   chipActive: {
     backgroundColor: HERO_DARK,
     borderColor: HERO_DARK,
+  },
+  moreChip: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
   },
   chipText: {
     color: MUTED_27,
