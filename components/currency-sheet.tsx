@@ -78,7 +78,11 @@ export function CurrencySheet({
             ) : null}
           </View>
 
-          <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            style={styles.sheetList}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
             {filtered.length === 0 ? (
               <Text style={styles.sheetEmpty}>{t("searchNoResults")}</Text>
             ) : (

@@ -42,6 +42,37 @@ describe("CURRENCIES list", () => {
     assert.equal(findCurrency("ZZZ"), undefined);
     assert.equal(isCurrencyCode("ZZZ"), false);
   });
+
+  it("includes the Hungarian Forint (HUF) so it is selectable", () => {
+    assert.equal(isCurrencyCode("HUF"), true);
+    assert.equal(findCurrency("HUF")?.name, "Forint");
+  });
+});
+
+describe("CurrencyInput exposes the full picker (so any currency, e.g. HUF, is selectable)", () => {
+  const src = read("components/currency-input.tsx");
+
+  it("mounts the shared CurrencySheet and persists the pick via onChangeCurrency", () => {
+    assert.match(src, /import\s*\{\s*CurrencySheet\s*\}\s*from\s*"@\/components\/currency-sheet"/);
+    assert.match(src, /<CurrencySheet/);
+    assert.match(src, /onSelect=\{\(code\)\s*=>\s*\{\s*onChangeCurrency\(code\);/);
+  });
+
+  it("renders a 'more currencies' affordance that opens the sheet", () => {
+    assert.match(src, /accessibilityLabel="More currencies"/);
+    assert.match(src, /setSheetOpen\(true\)/);
+  });
+
+  it("keeps a non-shortlist selection (e.g. HUF) visible as an active chip", () => {
+    assert.match(src, /\(CURRENCY_CHIPS as readonly string\[\]\)\.includes\(currency\)/);
+    assert.match(src, /\[currency,\s*\.\.\.CURRENCY_CHIPS\]/);
+  });
+});
+
+describe("currency pickers hide the vertical scrollbar", () => {
+  it("CurrencySheet list sets showsVerticalScrollIndicator={false}", () => {
+    assert.match(read("components/currency-sheet.tsx"), /showsVerticalScrollIndicator=\{false\}/);
+  });
 });
 
 describe("currency selector is wired into the create-item flow", () => {
