@@ -10,6 +10,7 @@ import {
   findListingByItemId,
   isListingClaimedFromOwner,
   listingsForUser,
+  markListingArrived,
   normalizeListing,
   purchasesForUser,
   removeListingById,
@@ -51,6 +52,7 @@ type MarketplaceContextValue = {
   addListing: (input: DraftListingInput) => MarketplaceListing | null;
   removeListing: (id: string) => void;
   markListingSold: (id: string, buyerUserId?: string | null) => void;
+  markListingReceived: (id: string) => void;
   claimingListingId: string | null;
   setClaimingListingId: (id: string | null) => void;
   /**
@@ -228,6 +230,24 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
     [],
   );
 
+  const markListingReceived = useCallback(
+    (id: string) => {
+      const me = user?.id;
+      if (!me) return;
+      const when = new Date().toISOString();
+      setListings((prev) => {
+        const target = prev.find((l) => l.id === id);
+        // Only the buyer of a sold listing may confirm receipt; idempotent —
+        // an already-arrived listing is left untouched (keeps the first stamp).
+        if (!target || target.buyerUserId !== me || !target.soldAt || target.arrivedAt) {
+          return prev;
+        }
+        return upsertListing(prev, markListingArrived(target, when));
+      });
+    },
+    [user],
+  );
+
   const findByItemId = useCallback(
     (itemId: string) => findListingByItemId(listings, itemId),
     [listings],
@@ -265,6 +285,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       addListing,
       removeListing,
       markListingSold,
+      markListingReceived,
       claimingListingId,
       setClaimingListingId,
       sellerNotifications,
@@ -285,6 +306,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       addListing,
       removeListing,
       markListingSold,
+      markListingReceived,
       claimingListingId,
       sellerNotifications,
       dismissSellerNotification,
