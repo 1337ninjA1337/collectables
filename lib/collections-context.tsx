@@ -133,6 +133,12 @@ type CollectionsContextValue = {
   convertItemCost: (item: CollectableItem, targetCurrency?: string) => ConvertedItemCost;
   displayCurrency: string;
   /**
+   * Unix ms when the currency rate table was last fetched (cache or network),
+   * or `null` when no rates are available yet — the settings screen surfaces
+   * "rates updated {when}" vs a "conversion unavailable" hint off this.
+   */
+  currencyRatesUpdatedAt: number | null;
+  /**
    * Set the user's app-wide display currency. Updates state, persists to the
    * device-local AsyncStorage fallback, and (when signed in) syncs to the
    * profile row so the choice follows the account across devices (bug-2c).
@@ -192,6 +198,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   const { language } = useI18n();
   const { getVisibleCollections, getVisibleItems, friends } = useSocial();
   const [currencyRates, setCurrencyRates] = useState<UsdRates | null>(null);
+  const [ratesUpdatedAt, setRatesUpdatedAt] = useState<number | null>(null);
   const [displayCurrency, setDisplayCurrencyState] = useState<string>(() =>
     getDefaultCurrencyForLanguage(language),
   );
@@ -256,6 +263,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       const payload = await loadCurrencyRates();
       if (cancelled || !payload) return;
       setCurrencyRates(payload.rates);
+      setRatesUpdatedAt(payload.fetchedAt);
     })();
     return () => {
       cancelled = true;
@@ -264,7 +272,10 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
 
   async function refreshCurrencyRates(): Promise<void> {
     const payload = await loadCurrencyRates({ forceRefresh: true });
-    if (payload) setCurrencyRates(payload.rates);
+    if (payload) {
+      setCurrencyRates(payload.rates);
+      setRatesUpdatedAt(payload.fetchedAt);
+    }
   }
 
   useEffect(() => {
@@ -735,6 +746,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       convertItemCost: (item, targetCurrency) =>
         convertItemCost(item, targetCurrency ?? displayCurrency, currencyRates),
       displayCurrency,
+      currencyRatesUpdatedAt: ratesUpdatedAt,
       setDisplayCurrency: (currency) => {
         const normalized = parseStoredCurrency(currency);
         if (!normalized) return;
@@ -985,7 +997,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         );
       },
     }),
-    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency],
+    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;
