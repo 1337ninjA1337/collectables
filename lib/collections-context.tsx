@@ -21,9 +21,12 @@ import {
 import { userScopedCollectionId } from "@/lib/collections-helpers";
 import {
   appendTransferLogEntry,
-  transferLogEntryId,
-  type MarketplaceTransferLogEntry,
 } from "@/lib/marketplace-transfer-log";
+import {
+  ACQUIRED_COLLECTION_ID_SUFFIX,
+  planTransferItem,
+} from "@/lib/transfer-item-helpers";
+import type { AcquiredItemSnapshot } from "@/lib/transfer-item-types";
 import { useSocial } from "@/lib/social-context";
 import {
   upsertCollection,
@@ -82,18 +85,9 @@ type DraftCollectionInput = {
   visibility?: "public" | "private";
 };
 
-export type AcquiredItemSnapshot = {
-  title: string;
-  photos: string[];
-  description?: string;
-  variants?: string;
-  cost?: number | null;
-  acquiredFrom?: string;
-  condition?: ItemCondition;
-  tags?: ItemTag[];
-};
+export type { AcquiredItemSnapshot };
 
-export const ACQUIRED_COLLECTION_ID_SUFFIX = "acquired-marketplace";
+export { ACQUIRED_COLLECTION_ID_SUFFIX };
 
 export type CollectionTotalCost = {
   /** Sum of all item costs, converted to `currency`. */
@@ -878,70 +872,31 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         if (!user) return null;
         const ownerName = user.email ?? "You";
         const ownerUserId = user.id;
-        const collectionId = userScopedCollectionId(ownerUserId, ACQUIRED_COLLECTION_ID_SUFFIX);
-        const existing = localCollections.find((c) => c.id === collectionId);
-        if (!existing) {
-          const newCollection: Collection = {
-            id: collectionId,
-            name: options?.collectionName ?? "Acquired",
-            description: options?.collectionDescription ?? "",
-            coverPhoto: snapshot.photos[0] ?? "",
-            ownerName,
-            ownerUserId,
-            sharedWith: [],
-            sharedWithUserIds: [],
-            role: "owner",
-            visibility: "private",
-          };
+        const plan = planTransferItem({
+          snapshot,
+          options,
+          ownerUserId,
+          ownerName,
+          existingCollection: localCollections.find(
+            (c) => c.id === userScopedCollectionId(ownerUserId, ACQUIRED_COLLECTION_ID_SUFFIX),
+          ),
+          existingItems: localItems,
+          now: new Date(),
+        });
+        if (plan.newCollection) {
+          const { newCollection } = plan;
           setLocalCollections((current) => [newCollection, ...current]);
           upsertCollection(newCollection).catch(() => undefined);
         }
-        const slug =
-          snapshot.title
-            .trim()
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, "") || `acquired-${Date.now()}`;
-        const acquiredAt = new Date().toISOString().slice(0, 10);
-        const nextItem: CollectableItem = {
-          id: `acq-${slug}-${Date.now()}`,
-          collectionId,
-          title: snapshot.title.trim() || "Acquired item",
-          acquiredAt,
-          acquiredFrom: snapshot.acquiredFrom?.trim() ?? "",
-          description: snapshot.description?.trim() ?? "",
-          variants: snapshot.variants?.trim() ?? "",
-          photos: snapshot.photos,
-          createdBy: ownerName,
-          createdByUserId: ownerUserId,
-          createdAt: new Date().toISOString(),
-          cost: typeof snapshot.cost === "number" ? snapshot.cost : null,
-          isWishlist: false,
-          condition: snapshot.condition,
-          tags: snapshot.tags,
-        };
-        setLocalItems((current) => [nextItem, ...current]);
-        upsertItem(nextItem).catch(() => undefined);
-        if (options?.source) {
-          const { source } = options;
-          const entry: MarketplaceTransferLogEntry = {
-            id: transferLogEntryId(source.listingId, source.listingCreatedAt),
-            listingId: source.listingId,
-            listingCreatedAt: source.listingCreatedAt,
-            sellerUserId: source.sellerUserId,
-            itemId: nextItem.id,
-            collectionId,
-            title: nextItem.title,
-            photo: nextItem.photos[0] ?? null,
-            mode: source.mode,
-            price: source.price,
-            currency: source.currency,
-            acquiredFrom: nextItem.acquiredFrom,
-            acquiredAt: nextItem.createdAt,
-          };
-          appendTransferLogEntry(ownerUserId, entry).catch(() => undefined);
+        if (!plan.isDuplicate) {
+          const { item } = plan;
+          setLocalItems((current) => [item, ...current]);
+          upsertItem(item).catch(() => undefined);
         }
-        return { itemId: nextItem.id, collectionId };
+        if (plan.logEntry) {
+          appendTransferLogEntry(ownerUserId, plan.logEntry).catch(() => undefined);
+        }
+        return { itemId: plan.item.id, collectionId: plan.collectionId };
       },
       refresh: async () => {
         setRefreshTick((n) => n + 1);

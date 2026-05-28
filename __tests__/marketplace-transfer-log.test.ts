@@ -132,29 +132,45 @@ describe("transferItemToBuyer source plumbing (structural)", () => {
   // Pin the call-site so a future refactor can't silently strip the source
   // metadata, which would leave the buyer-side log empty for new claims.
   const ctxSrc = read("lib/collections-context.tsx");
+  const helperSrc = read("lib/transfer-item-helpers.ts");
   const listingSrc = read("app/listing/[id].tsx");
 
-  it("collections-context.tsx imports the transfer-log helper", () => {
+  it("collections-context.tsx imports the transfer-log writer", () => {
     assert.match(
       ctxSrc,
       /import\s+\{[\s\S]*?appendTransferLogEntry[\s\S]*?\}\s+from\s+"@\/lib\/marketplace-transfer-log"/,
     );
-    assert.match(
-      ctxSrc,
-      /import\s+\{[\s\S]*?transferLogEntryId[\s\S]*?\}\s+from\s+"@\/lib\/marketplace-transfer-log"/,
-    );
   });
 
-  it("transferItemToBuyer writes a log entry when options.source is provided", () => {
+  it("transfer-item-helpers.ts derives the log entry id via transferLogEntryId", () => {
+    // The id derivation moved into the pure planner so a node test can pin
+    // the idempotency invariant; the structural guard moves with it.
+    assert.match(
+      helperSrc,
+      /import\s+\{[\s\S]*?transferLogEntryId[\s\S]*?\}\s+from\s+"@\/lib\/marketplace-transfer-log"/,
+    );
+    assert.match(helperSrc, /transferLogEntryId\(/);
+  });
+
+  it("transferItemToBuyer writes a log entry when planTransferItem emits one", () => {
+    // The source-gating moved into planTransferItem — the context now just
+    // forwards the planner's result. `logEntry` is null when no source was
+    // supplied, so the if-guard structurally guarantees the same behaviour.
     assert.match(
       ctxSrc,
-      /if\s*\(\s*options\?\.source\s*\)/,
-      "must gate the log write on the optional source field",
+      /if\s*\(\s*plan\.logEntry\s*\)/,
+      "must gate the log write on the planner's emitted entry",
     );
     assert.match(
       ctxSrc,
-      /appendTransferLogEntry\(\s*ownerUserId\s*,/,
+      /appendTransferLogEntry\(\s*ownerUserId\s*,\s*plan\.logEntry\s*\)/,
       "must persist the entry under the buyer's userId",
+    );
+    // Planner-side gate: the entry is only built when options.source is set.
+    assert.match(
+      helperSrc,
+      /options\?\.source\s*\?[\s\S]*?:\s*null/,
+      "planTransferItem must short-circuit logEntry when source is missing",
     );
   });
 
