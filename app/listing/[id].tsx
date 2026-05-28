@@ -146,6 +146,9 @@ export default function ListingDetailScreen() {
     try {
       const sourceItem = getItemById(listing.itemId);
       const fallbackTitle = sourceItem?.title ?? t("marketplaceUnknownItem");
+      const sellerProvenance = owner?.username
+        ? `@${owner.username}`
+        : owner?.displayName ?? t("marketplaceTitle");
       await transferItemToBuyer(
         {
           title: fallbackTitle,
@@ -156,7 +159,7 @@ export default function ListingDetailScreen() {
             listing.mode === "sell" && typeof listing.askingPrice === "number"
               ? listing.askingPrice
               : sourceItem?.cost ?? null,
-          acquiredFrom: t("marketplaceTitle"),
+          acquiredFrom: sellerProvenance,
           condition: sourceItem?.condition,
           tags: sourceItem?.tags,
         },
@@ -199,7 +202,7 @@ export default function ListingDetailScreen() {
     } finally {
       setClaimingListingId(null);
     }
-  }, [listing, user, markListingSold, setClaimingListingId, getItemById, transferItemToBuyer, getRelationship, sendMessage, toast, t]);
+  }, [listing, user, markListingSold, setClaimingListingId, getItemById, transferItemToBuyer, getRelationship, sendMessage, toast, t, owner]);
 
   async function handleClaimPress() {
     if (!listing || !user || claiming) return;
