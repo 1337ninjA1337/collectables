@@ -167,6 +167,24 @@ describe("purchasesForUser", () => {
     const ls = [listing({ buyerUserId: null })];
     assert.deepEqual(purchasesForUser(ls, "bob"), []);
   });
+
+  it("caps to purchases closed on or after `since` (inclusive)", () => {
+    const ls = [
+      listing({ id: "old", buyerUserId: "bob", soldAt: "2026-03-31T23:59:59.000Z" }),
+      listing({ id: "edge", buyerUserId: "bob", soldAt: "2026-04-01T00:00:00.000Z" }),
+      listing({ id: "new", buyerUserId: "bob", soldAt: "2026-04-15T10:00:00.000Z" }),
+    ];
+    const out = purchasesForUser(ls, "bob", new Date("2026-04-01T00:00:00.000Z"));
+    assert.deepEqual(out.map((l) => l.id), ["new", "edge"]);
+  });
+
+  it("returns every purchase when `since` is omitted (back-compat)", () => {
+    const ls = [
+      listing({ id: "1", buyerUserId: "bob", soldAt: "2025-01-01T00:00:00.000Z" }),
+      listing({ id: "2", buyerUserId: "bob", soldAt: "2026-04-15T10:00:00.000Z" }),
+    ];
+    assert.deepEqual(purchasesForUser(ls, "bob").map((l) => l.id), ["2", "1"]);
+  });
 });
 
 describe("listingsForUser", () => {

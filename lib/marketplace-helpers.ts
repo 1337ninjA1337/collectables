@@ -211,13 +211,27 @@ export function recentlySoldListings(
 /**
  * Listings the user has bought (claimed via the marketplace transfer flow).
  * Sorted by `soldAt` descending so the most recent purchases appear first.
+ *
+ * Pass `since` to cap the result to purchases closed on or after that instant
+ * (e.g. "purchases this month") so callers don't re-filter the returned array.
+ * The bound is compared against each listing's `soldAt`; entries with an
+ * unparseable `soldAt` are dropped when `since` is supplied.
  */
 export function purchasesForUser(
   listings: readonly MarketplaceListing[],
   userId: string,
+  since?: Date,
 ): MarketplaceListing[] {
+  const sinceMs = since ? since.getTime() : null;
   return listings
-    .filter((l) => l.buyerUserId === userId && l.soldAt)
+    .filter((l) => {
+      if (l.buyerUserId !== userId || !l.soldAt) return false;
+      if (sinceMs !== null) {
+        const soldMs = Date.parse(l.soldAt);
+        if (Number.isNaN(soldMs) || soldMs < sinceMs) return false;
+      }
+      return true;
+    })
     .slice()
     .sort((a, b) => {
       const aAt = a.soldAt ?? a.createdAt;
