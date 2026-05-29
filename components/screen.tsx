@@ -1,9 +1,9 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { PropsWithChildren } from "react";
 import { Platform, RefreshControl, SafeAreaView, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { NestableScrollContainer } from "./DraggableList";
 
-import { ACCENT_DEEP, CARD_BG_7, PAGE_BG_2, PAGE_BG_3 } from "@/lib/design-tokens";
+import { useAppTheme } from "@/components/use-app-theme";
+import { ACCENT_DEEP, SPACING_AIRY, SPACING_GUTTER } from "@/lib/design-tokens";
 
 type ScreenProps = PropsWithChildren<{
   scroll?: boolean;
@@ -24,6 +24,7 @@ export function useResponsive() {
 
 export function Screen({ children, scroll = true, nestable = false, refreshing, onRefresh }: ScreenProps) {
   const { contentMaxWidth } = useResponsive();
+  const theme = useAppTheme();
 
   const refreshControl = onRefresh ? (
     <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={ACCENT_DEEP} colors={[ACCENT_DEEP]} />
@@ -52,9 +53,9 @@ export function Screen({ children, scroll = true, nestable = false, refreshing, 
   );
 
   return (
-    <LinearGradient colors={[CARD_BG_7, PAGE_BG_2, PAGE_BG_3]} style={styles.gradient}>
+    <View style={{ ...styles.gradient, backgroundColor: theme.page }}>
       <SafeAreaView style={styles.safeArea}>{content}</SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -66,9 +67,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
+    padding: SPACING_GUTTER,
     paddingBottom: 32,
-    gap: 18,
+    gap: SPACING_AIRY,
   },
   fillContent: {
     flex: 1,

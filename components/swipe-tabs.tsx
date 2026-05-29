@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 
+import { useAppTheme } from "@/components/use-app-theme";
 import {
   AMBER_ACCENT,
   AMBER_SOFT,
@@ -41,6 +42,7 @@ const ANIM_DURATION = 220;
 
 export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab, dotHighlight }: Props) {
   const isNative = Platform.OS !== "web";
+  const theme = useAppTheme();
 
   const [width, setWidth] = useState(0);
   const widthRef = useRef(0);
@@ -213,24 +215,34 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
 
   const header = (
     <View style={styles.header}>
-      <Text style={variant === "sub" ? styles.subHeaderLabel : styles.headerLabel}>
+      <Text
+        style={{
+          ...(variant === "sub" ? styles.subHeaderLabel : styles.headerLabel),
+          color: variant === "sub" ? theme.muted : theme.text,
+        }}
+      >
         {activeLabel}
       </Text>
       <View style={styles.dots}>
-        {tabs.map((t, i) => (
-          <View
-            key={t.key}
-            style={{
-              ...styles.dot,
-              ...(i === activeIndex
-                ? variant === "sub"
-                  ? styles.subDotActive
-                  : styles.dotActive
-                : {}),
-              ...(dotHighlight === t.key ? styles.dotHighlight : {}),
-            }}
-          />
-        ))}
+        {tabs.map((t, i) => {
+          const isActive = i === activeIndex;
+          const activeBg = variant === "sub" ? AMBER_ACCENT : theme.text;
+          return (
+            <View
+              key={t.key}
+              style={{
+                ...styles.dot,
+                ...(isActive
+                  ? variant === "sub"
+                    ? styles.subDotActive
+                    : styles.dotActive
+                  : {}),
+                backgroundColor: isActive ? activeBg : theme.cardElevated,
+                ...(dotHighlight === t.key ? styles.dotHighlight : {}),
+              }}
+            />
+          );
+        })}
       </View>
     </View>
   );
@@ -253,11 +265,20 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
             return (
               <Pressable
                 key={t.key}
-                style={{ ...styles.subTab, ...(isActive ? styles.subTabActive : {}) }}
+                style={{
+                  ...styles.subTab,
+                  ...(isActive ? styles.subTabActive : {}),
+                  backgroundColor: isActive ? AMBER_ACCENT : theme.cardElevated,
+                  borderColor: isActive ? AMBER_ACCENT : theme.border,
+                }}
                 onPress={() => jumpToKey(t.key)}
               >
                 <Text
-                  style={{ ...styles.subTabText, ...(isActive ? styles.subTabTextActive : {}) }}
+                  style={{
+                    ...styles.subTabText,
+                    ...(isActive ? styles.subTabTextActive : {}),
+                    color: isActive ? TEXT_DARK_2 : theme.muted,
+                  }}
                   numberOfLines={2}
                   adjustsFontSizeToFit
                 >
@@ -269,11 +290,20 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
           return (
             <Pressable
               key={t.key}
-              style={{ ...styles.tab, ...(isActive ? styles.tabActive : {}) }}
+              style={{
+                ...styles.tab,
+                ...(isActive ? styles.tabActive : {}),
+                backgroundColor: isActive ? theme.text : theme.cardElevated,
+                borderColor: isActive ? theme.text : theme.border,
+              }}
               onPress={() => jumpToKey(t.key)}
             >
               <Text
-                style={{ ...styles.tabText, ...(isActive ? styles.tabTextActive : {}) }}
+                style={{
+                  ...styles.tabText,
+                  ...(isActive ? styles.tabTextActive : {}),
+                  color: isActive ? theme.page : theme.muted,
+                }}
                 numberOfLines={2}
                 adjustsFontSizeToFit
               >

@@ -616,9 +616,10 @@ describe("design-tokens adoption", () => {
   it("components/nav-tab.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("components/nav-tab.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
-    // Every hex literal that previously lived inline now maps to a named token.
-    assert.match(src, /HERO_DARK/);
-    assert.match(src, /MUTED_4/);
+    // Active/inactive icon colors now come from useAppTheme (navIconActive /
+    // navIconInactive) so HERO_DARK / MUTED_4 are no longer imported here.
+    assert.match(src, /useAppTheme/);
+    assert.match(src, /navIconActive/);
     assert.match(src, /DANGER/);
     assert.match(src, /TEXT_ON_DARK/);
     assert.match(src, /AMBER_ACCENT/);
@@ -1183,9 +1184,11 @@ describe("design-tokens adoption", () => {
     const src = read("components/screen.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /\bACCENT_DEEP\b/);
-    assert.match(src, /\bCARD_BG_7\b/);
-    assert.match(src, /\bPAGE_BG_2\b/);
-    assert.match(src, /\bPAGE_BG_3\b/);
+    // Page background now comes from useAppTheme().page (flat surface, dark-mode
+    // aware) instead of the CARD_BG_7 → PAGE_BG_2 → PAGE_BG_3 gradient.
+    assert.match(src, /useAppTheme/);
+    assert.match(src, /\bSPACING_GUTTER\b/);
+    assert.match(src, /\bSPACING_AIRY\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -1352,9 +1355,10 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bHERO_DARK\b/);
     assert.match(src, /\bMUTED_27\b/);
     assert.match(src, /\bPLACEHOLDER\b/);
-    assert.match(src, /\bPURE_WHITE\b/);
-    assert.match(src, /\bTEXT_DARK\b/);
     assert.match(src, /\bTEXT_ON_DARK_2\b/);
+    // Input surface bg/border/text now come from useAppTheme (card/border/text)
+    // so PURE_WHITE / TEXT_DARK are no longer imported here.
+    assert.match(src, /useAppTheme/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -1376,13 +1380,15 @@ describe("design-tokens adoption", () => {
     const src = read("components/item-card.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /\bAMBER_MUTED_3\b/);
-    assert.match(src, /\bBORDER\b/);
-    assert.match(src, /\bCARD_BG\b/);
     assert.match(src, /\bHERO_DARK\b/);
-    assert.match(src, /\bMUTED_28\b/);
-    assert.match(src, /\bMUTED_29\b/);
-    assert.match(src, /\bTEXT_DARK_5\b/);
     assert.match(src, /\bTEXT_ON_DARK\b/);
+    // Card bg/border + title/description/meta colors now come from useAppTheme
+    // (card/border/text/muted/meta); geometry + elevation route through the new
+    // airy radius + soft-shadow tokens.
+    assert.match(src, /useAppTheme/);
+    assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
+    assert.match(src, /\bRADIUS_AVATAR\b/);
+    assert.match(src, /\bSHADOW_SOFT\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
