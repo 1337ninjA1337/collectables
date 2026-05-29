@@ -2,14 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { CurrencySheet } from "@/components/currency-sheet";
+import { useAppTheme } from "@/components/use-app-theme";
 import {
   BORDER,
   CARD_BG_2,
   HERO_DARK,
   MUTED_27,
   PLACEHOLDER,
-  PURE_WHITE,
-  TEXT_DARK,
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
@@ -44,6 +43,7 @@ export function CurrencyInput({
 }: CurrencyInputProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const theme = useAppTheme();
 
   // Always show the active currency as a chip — even a non-shortlist pick (e.g.
   // HUF chosen via the full picker) so the selection stays visible.
@@ -53,7 +53,7 @@ export function CurrencyInput({
 
   return (
     <View style={styles.container}>
-      <View style={styles.inputRow}>
+      <View style={{ ...styles.inputRow, backgroundColor: theme.card, borderColor: theme.border }}>
         <Text style={styles.currencySymbol}>{currency}</Text>
         <TextInput
           value={value}
@@ -61,7 +61,7 @@ export function CurrencyInput({
           placeholder={placeholder}
           placeholderTextColor={PLACEHOLDER}
           keyboardType="decimal-pad"
-          style={styles.input}
+          style={{ ...styles.input, color: theme.text }}
           returnKeyType="done"
         />
       </View>
@@ -123,9 +123,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 22,
-    backgroundColor: PURE_WHITE,
     borderWidth: 1,
-    borderColor: BORDER,
     paddingHorizontal: 16,
     paddingVertical: 14,
     gap: 8,
@@ -138,7 +136,6 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    color: TEXT_DARK,
     fontSize: 16,
     fontFamily: FONT_BODY,
     padding: 0,
