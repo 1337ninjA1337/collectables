@@ -4,15 +4,14 @@ import {
   AMBER_ACCENT,
   AMBER_SOFT_3,
   AMBER_SOFT_5,
-  CARD_BG,
   CARD_BG_2,
   CARD_BG_3,
   CARD_BG_14,
-  HERO_DARK,
-  MUTED_11,
+  RADIUS_CARD_AIRY,
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
-import { FONT_DISPLAY, FONT_BODY, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { useAppTheme } from "@/components/use-app-theme";
+import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 type EmptyStateProps = {
   icon?: string;
@@ -33,8 +32,9 @@ export function EmptyState({
   compact,
   children,
 }: EmptyStateProps) {
+  const theme = useAppTheme();
   return (
-    <View style={[styles.wrap, compact && styles.wrapCompact]}>
+    <View style={[styles.wrap, { backgroundColor: theme.card }, compact && styles.wrapCompact]}>
       <View style={styles.iconOuter}>
         <View style={styles.iconMiddle}>
           <View style={styles.iconInner}>
@@ -42,8 +42,8 @@ export function EmptyState({
           </View>
         </View>
       </View>
-      <Text style={styles.title}>{title}</Text>
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      <Text style={{ ...styles.title, color: theme.text }}>{title}</Text>
+      {hint ? <Text style={{ ...styles.hint, color: theme.meta }}>{hint}</Text> : null}
       {actionLabel && onAction ? (
         <Pressable style={styles.action} onPress={onAction} accessibilityRole="button">
           <Text style={styles.actionText}>{actionLabel}</Text>
@@ -60,8 +60,7 @@ const styles = StyleSheet.create({
     paddingVertical: 36,
     paddingHorizontal: 24,
     gap: 12,
-    backgroundColor: CARD_BG,
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD_AIRY,
     borderWidth: 1.5,
     borderColor: AMBER_SOFT_3,
     borderStyle: "dashed",
@@ -104,13 +103,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: "800",
-    color: HERO_DARK,
     textAlign: "center",
-    fontFamily: FONT_DISPLAY,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   hint: {
     fontSize: 13,
-    color: MUTED_11,
     textAlign: "center",
     lineHeight: 19,
     maxWidth: 320,
