@@ -6,13 +6,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { NavTab, NavItem } from "@/components/nav-tab";
 import { useResponsive } from "@/components/screen";
+import { useAppTheme } from "@/components/use-app-theme";
 import { trackEvent } from "@/lib/analytics";
 import { useChat } from "@/lib/chat-context";
 import { FriendsTabBadge } from "@/lib/chat-helpers";
 import {
   AMBER_ACCENT,
   AMBER_SOFT,
-  BORDER,
   CARD_BG_2,
   CARD_BG_3,
   HERO_DARK,
@@ -37,9 +37,14 @@ type NavRowProps = {
 };
 
 function NavRow({ leftItems, rightItems, onPlusPress, plusLabel }: NavRowProps) {
+  const theme = useAppTheme();
   const slots = Math.max(leftItems.length, rightItems.length);
   const paddedLeft = [...leftItems, ...Array(slots - leftItems.length).fill(null)];
   const paddedRight = [...rightItems, ...Array(slots - rightItems.length).fill(null)];
+  // Plus button: dark hero pill in light mode, amber pill in dark mode. The icon
+  // color inverts so it always reads against the pill.
+  const plusBg = theme.isDark ? AMBER_ACCENT : HERO_DARK;
+  const plusIcon = theme.isDark ? TEXT_DARK_2 : TEXT_ON_DARK_2;
   return (
     <>
       {paddedLeft.map((item, i) =>
@@ -50,8 +55,12 @@ function NavRow({ leftItems, rightItems, onPlusPress, plusLabel }: NavRowProps) 
         ),
       )}
       <View style={styles.item}>
-        <Pressable style={styles.plusButton} onPress={onPlusPress} accessibilityLabel={plusLabel}>
-          <Ionicons name="add" size={30} color={TEXT_ON_DARK_2} />
+        <Pressable
+          style={{ ...styles.plusButton, backgroundColor: plusBg, borderColor: theme.navBg }}
+          onPress={onPlusPress}
+          accessibilityLabel={plusLabel}
+        >
+          <Ionicons name="add" size={30} color={plusIcon} />
         </Pressable>
       </View>
       {paddedRight.map((item, i) =>
@@ -80,6 +89,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const toast = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const { isMobile } = useResponsive();
+  const theme = useAppTheme();
 
   const prevIsPremium = useRef(isPremium);
   useEffect(() => {
@@ -232,6 +242,8 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       <View
         style={{
           ...styles.wrap,
+          backgroundColor: theme.navBg,
+          borderTopColor: theme.border,
           paddingBottom: Math.max(insets.bottom, 8),
         }}
       >
@@ -265,9 +277,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: "row",
-    backgroundColor: CARD_BG_2,
     borderTopWidth: 1,
-    borderTopColor: BORDER,
     paddingTop: 10,
     paddingHorizontal: 8,
   },
@@ -281,12 +291,10 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: HERO_DARK,
     alignItems: "center",
     justifyContent: "center",
     marginTop: -18,
     borderWidth: 3,
-    borderColor: CARD_BG_2,
   },
   modalBackdrop: {
     flex: 1,

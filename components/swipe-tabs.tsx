@@ -10,19 +10,16 @@ import {
   View,
 } from "react-native";
 
+import { useAppTheme } from "@/components/use-app-theme";
 import {
   AMBER_ACCENT,
   AMBER_SOFT,
   BORDER,
   CARD_BG,
-  CARD_BG_3,
   DANGER,
-  HERO_DARK,
   MUTED_3,
   MUTED_8,
-  TEXT_DARK,
   TEXT_DARK_2,
-  TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
 
 export type SwipeTab = { key: string; label: string };
@@ -41,6 +38,7 @@ const ANIM_DURATION = 220;
 
 export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab, dotHighlight }: Props) {
   const isNative = Platform.OS !== "web";
+  const theme = useAppTheme();
 
   const [width, setWidth] = useState(0);
   const widthRef = useRef(0);
@@ -213,7 +211,13 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
 
   const header = (
     <View style={styles.header}>
-      <Text style={variant === "sub" ? styles.subHeaderLabel : styles.headerLabel}>
+      <Text
+        style={
+          variant === "sub"
+            ? styles.subHeaderLabel
+            : { ...styles.headerLabel, color: theme.text }
+        }
+      >
         {activeLabel}
       </Text>
       <View style={styles.dots}>
@@ -225,7 +229,7 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
               ...(i === activeIndex
                 ? variant === "sub"
                   ? styles.subDotActive
-                  : styles.dotActive
+                  : { ...styles.dotActive, backgroundColor: theme.text }
                 : {}),
               ...(dotHighlight === t.key ? styles.dotHighlight : {}),
             }}
@@ -269,11 +273,15 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
           return (
             <Pressable
               key={t.key}
-              style={{ ...styles.tab, ...(isActive ? styles.tabActive : {}) }}
+              style={{
+                ...styles.tab,
+                backgroundColor: isActive ? theme.text : theme.cardElevated,
+                borderColor: isActive ? theme.text : theme.border,
+              }}
               onPress={() => jumpToKey(t.key)}
             >
               <Text
-                style={{ ...styles.tabText, ...(isActive ? styles.tabTextActive : {}) }}
+                style={{ ...styles.tabText, color: isActive ? theme.page : theme.muted }}
                 numberOfLines={2}
                 adjustsFontSizeToFit
               >
@@ -304,7 +312,6 @@ const styles = StyleSheet.create({
   headerLabel: {
     fontSize: 20,
     fontWeight: "800",
-    color: TEXT_DARK,
     flex: 1,
   },
   subHeaderLabel: {
@@ -325,7 +332,6 @@ const styles = StyleSheet.create({
     backgroundColor: AMBER_SOFT,
   },
   dotActive: {
-    backgroundColor: HERO_DARK,
     width: 22,
   },
   subDotActive: {
@@ -350,22 +356,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 8,
     alignItems: "center",
-    backgroundColor: CARD_BG_3,
     borderWidth: 1,
-    borderColor: AMBER_SOFT,
-  },
-  tabActive: {
-    backgroundColor: HERO_DARK,
-    borderColor: HERO_DARK,
   },
   tabText: {
-    color: MUTED_3,
     fontWeight: "800",
     fontSize: 14,
     textAlign: "center",
-  },
-  tabTextActive: {
-    color: TEXT_ON_DARK_4,
   },
   subTabRow: {
     flexDirection: "row",

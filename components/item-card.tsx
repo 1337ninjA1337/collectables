@@ -4,25 +4,25 @@ import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
 import { formatCostAmount } from "@/lib/item-cost";
+import { useAppTheme } from "@/components/use-app-theme";
 import {
   AMBER_MUTED_3,
-  BORDER,
-  CARD_BG,
   HERO_DARK,
-  MUTED_28,
-  MUTED_29,
-  TEXT_DARK_5,
+  RADIUS_AVATAR,
+  RADIUS_ITEM_AIRY,
+  SHADOW_SOFT,
   TEXT_ON_DARK,
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { CollectableItem } from "@/lib/types";
-import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD } from "@/lib/fonts";
+import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD } from "@/lib/fonts";
 
 type ItemCardProps = { item: CollectableItem; compact?: boolean };
 
 export function ItemCard({ item, compact }: ItemCardProps) {
   const { t } = useI18n();
+  const theme = useAppTheme();
   const { convertItemCost, getCollectionById } = useCollections();
   const hasPhoto = item.photos.length > 0 && Boolean(item.photos[0]);
 
@@ -56,7 +56,7 @@ export function ItemCard({ item, compact }: ItemCardProps) {
   if (compact) {
     return (
       <Link href={`/item/${item.id}`} asChild>
-        <Pressable style={styles.compactCard}>
+        <Pressable style={{ ...styles.compactCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
           {hasPhoto ? (
             <Image
               source={{ uri: withCloudinaryThumbUrl(item.photos[0], { width: 480, height: 360, mode: "fill" }) }}
@@ -65,9 +65,9 @@ export function ItemCard({ item, compact }: ItemCardProps) {
           ) : (
             <View style={[styles.compactImage, { backgroundColor: placeholderColor(item.id) }]} />
           )}
-          <Text style={styles.compactTitle} numberOfLines={2}>{item.title}</Text>
+          <Text style={{ ...styles.compactTitle, color: theme.text }} numberOfLines={2}>{item.title}</Text>
           {cost ? (
-            <Text style={styles.compactCost} {...costTooltipProps}>
+            <Text style={{ ...styles.compactCost, color: theme.meta }} {...costTooltipProps}>
               {t("costLabel")}: {costDisplay}
             </Text>
           ) : null}
@@ -78,7 +78,7 @@ export function ItemCard({ item, compact }: ItemCardProps) {
 
   return (
     <Link href={`/item/${item.id}`} asChild>
-      <Pressable style={styles.card}>
+      <Pressable style={{ ...styles.card, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
         {hasPhoto ? (
           <Image
             source={{ uri: withCloudinaryThumbUrl(item.photos[0], { width: 320, height: 320, mode: "fill" }) }}
@@ -88,13 +88,13 @@ export function ItemCard({ item, compact }: ItemCardProps) {
           <View style={{...styles.image, backgroundColor: placeholderColor(item.id)}} />
         )}
         <View style={styles.textWrap}>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.description} numberOfLines={2}>
+          <Text style={{ ...styles.title, color: theme.text }}>{item.title}</Text>
+          <Text style={{ ...styles.description, color: theme.muted }} numberOfLines={2}>
             {item.description}
           </Text>
           <View style={styles.metaRow}>
-            <Text style={styles.meta}>{item.acquiredFrom}</Text>
-            <Text style={styles.meta}>{t("photosCount", { count: item.photos.length })}</Text>
+            <Text style={{ ...styles.meta, color: theme.meta }}>{item.acquiredFrom}</Text>
+            <Text style={{ ...styles.meta, color: theme.meta }}>{t("photosCount", { count: item.photos.length })}</Text>
           </View>
           {item.tags && item.tags.length > 0 ? (
             <View style={styles.tagsRow}>
@@ -114,7 +114,7 @@ export function ItemCard({ item, compact }: ItemCardProps) {
               </View>
             ) : null}
             {cost ? (
-              <Text style={styles.meta} {...costTooltipProps}>
+              <Text style={{ ...styles.meta, color: theme.meta }} {...costTooltipProps}>
                 {t("costLabel")}: {costDisplay}
               </Text>
             ) : null}
@@ -130,16 +130,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 14,
     alignItems: "stretch",
-    borderRadius: 24,
-    backgroundColor: CARD_BG,
+    borderRadius: RADIUS_ITEM_AIRY,
     padding: 12,
     borderWidth: 1,
-    borderColor: BORDER,
   },
   image: {
     width: 104,
     height: 104,
-    borderRadius: 18,
+    borderRadius: RADIUS_AVATAR,
     backgroundColor: AMBER_MUTED_3,
   },
   textWrap: {
@@ -150,12 +148,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 19,
     fontWeight: "700",
-    color: TEXT_DARK_5,
-    fontFamily: FONT_DISPLAY_BOLD,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   description: {
-    color: MUTED_28,
-    lineHeight: 20,
+    lineHeight: 22,
     fontFamily: FONT_BODY,
   },
   metaRow: {
@@ -164,7 +160,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   meta: {
-    color: MUTED_29,
     fontSize: 13,
     fontWeight: "600",
     fontFamily: FONT_BODY_SEMIBOLD,
@@ -198,10 +193,8 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_BOLD,
   },
   compactCard: {
-    borderRadius: 18,
-    backgroundColor: CARD_BG,
+    borderRadius: RADIUS_AVATAR,
     borderWidth: 1,
-    borderColor: BORDER,
     overflow: "hidden",
     gap: 8,
     paddingBottom: 10,
@@ -215,13 +208,11 @@ const styles = StyleSheet.create({
   compactTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: TEXT_DARK_5,
     paddingHorizontal: 10,
-    fontFamily: FONT_DISPLAY_BOLD,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   compactCost: {
     fontSize: 12,
-    color: MUTED_29,
     fontWeight: "600",
     paddingHorizontal: 10,
     fontFamily: FONT_BODY_SEMIBOLD,

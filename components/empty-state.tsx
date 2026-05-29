@@ -10,9 +10,10 @@ import {
   CARD_BG_14,
   HERO_DARK,
   MUTED_11,
+  RADIUS_CARD_AIRY,
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
-import { FONT_DISPLAY, FONT_BODY, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 type EmptyStateProps = {
   icon?: string;
@@ -61,7 +62,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     gap: 12,
     backgroundColor: CARD_BG,
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD_AIRY,
     borderWidth: 1.5,
     borderColor: AMBER_SOFT_3,
     borderStyle: "dashed",
@@ -106,7 +107,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: HERO_DARK,
     textAlign: "center",
-    fontFamily: FONT_DISPLAY,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   hint: {
     fontSize: 13,

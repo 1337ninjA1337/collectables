@@ -598,10 +598,10 @@ describe("design-tokens adoption", () => {
     const src = read("components/bottom-nav.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     // Every hex literal that previously lived inline now maps to a named token.
+    // (PR4 `shared-components` moved the nav surface border to theme.border.)
     assert.match(src, /HERO_DARK/);
     assert.match(src, /AMBER_ACCENT/);
     assert.match(src, /AMBER_SOFT/);
-    assert.match(src, /BORDER/);
     assert.match(src, /CARD_BG_2/);
     assert.match(src, /CARD_BG_3/);
     assert.match(src, /MUTED_3/);
@@ -617,11 +617,12 @@ describe("design-tokens adoption", () => {
     const src = read("components/nav-tab.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     // Every hex literal that previously lived inline now maps to a named token.
-    assert.match(src, /HERO_DARK/);
-    assert.match(src, /MUTED_4/);
+    // (PR4 `shared-components` moved the icon/active-dot colors to theme.navIcon*.)
     assert.match(src, /DANGER/);
     assert.match(src, /TEXT_ON_DARK/);
     assert.match(src, /AMBER_ACCENT/);
+    assert.match(src, /theme\.navIconActive/);
+    assert.match(src, /theme\.navIconInactive/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -668,18 +669,20 @@ describe("design-tokens adoption", () => {
   it("components/swipe-tabs.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("components/swipe-tabs.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
-    assert.match(src, /HERO_DARK\b/);
+    // PR4 `shared-components` moved the main tab pill colors to the theme hook
+    // (theme.text active pill over theme.cardElevated underlay, theme.muted
+    // labels); the sub variant + dot accents still use named tokens.
     assert.match(src, /AMBER_ACCENT/);
     assert.match(src, /AMBER_SOFT/);
     assert.match(src, /BORDER\b/);
     assert.match(src, /CARD_BG\b/);
-    assert.match(src, /CARD_BG_3/);
     assert.match(src, /DANGER\b/);
-    assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_DARK_2/);
-    assert.match(src, /TEXT_ON_DARK_4/);
     assert.match(src, /MUTED_3/);
     assert.match(src, /MUTED_8/);
+    assert.match(src, /theme\.cardElevated/);
+    assert.match(src, /theme\.text/);
+    assert.match(src, /theme\.muted/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -1182,10 +1185,12 @@ describe("design-tokens adoption", () => {
   it("components/screen.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("components/screen.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    // PR4 `shared-components` replaced the warm LinearGradient with a flat
+    // theme.page surface and adopted the new gutter/airy spacing tokens.
     assert.match(src, /\bACCENT_DEEP\b/);
-    assert.match(src, /\bCARD_BG_7\b/);
-    assert.match(src, /\bPAGE_BG_2\b/);
-    assert.match(src, /\bPAGE_BG_3\b/);
+    assert.match(src, /\bSPACING_GUTTER\b/);
+    assert.match(src, /\bSPACING_AIRY\b/);
+    assert.match(src, /backgroundColor:\s*theme\.page/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -1347,14 +1352,15 @@ describe("design-tokens adoption", () => {
   it("components/currency-input.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("components/currency-input.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    // PR4 `shared-components` moved the input field bg/border/text to the theme
+    // hook (theme.card / theme.border / theme.text); the chips keep named tokens.
     assert.match(src, /\bBORDER\b/);
     assert.match(src, /\bCARD_BG_2\b/);
     assert.match(src, /\bHERO_DARK\b/);
     assert.match(src, /\bMUTED_27\b/);
     assert.match(src, /\bPLACEHOLDER\b/);
-    assert.match(src, /\bPURE_WHITE\b/);
-    assert.match(src, /\bTEXT_DARK\b/);
     assert.match(src, /\bTEXT_ON_DARK_2\b/);
+    assert.match(src, /backgroundColor:\s*theme\.card/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -1375,14 +1381,14 @@ describe("design-tokens adoption", () => {
   it("components/item-card.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("components/item-card.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    // PR4 `shared-components` moved the card bg/border + title/meta text to the
+    // theme hook and adopted the new airy radius + soft shadow tokens.
     assert.match(src, /\bAMBER_MUTED_3\b/);
-    assert.match(src, /\bBORDER\b/);
-    assert.match(src, /\bCARD_BG\b/);
     assert.match(src, /\bHERO_DARK\b/);
-    assert.match(src, /\bMUTED_28\b/);
-    assert.match(src, /\bMUTED_29\b/);
-    assert.match(src, /\bTEXT_DARK_5\b/);
     assert.match(src, /\bTEXT_ON_DARK\b/);
+    assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
+    assert.match(src, /\bSHADOW_SOFT\b/);
+    assert.match(src, /backgroundColor:\s*theme\.card/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
