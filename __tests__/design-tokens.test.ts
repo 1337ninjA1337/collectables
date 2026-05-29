@@ -618,7 +618,11 @@ describe("design-tokens adoption", () => {
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     // Every hex literal that previously lived inline now maps to a named token.
     assert.match(src, /HERO_DARK/);
-    assert.match(src, /MUTED_4/);
+    // Visual-upgrade PR4: nav icon colors now come from the theme hook
+    // (theme.navIconActive / navIconInactive) instead of the static MUTED_4.
+    assert.match(src, /useAppTheme/);
+    assert.match(src, /navIconActive/);
+    assert.match(src, /navIconInactive/);
     assert.match(src, /DANGER/);
     assert.match(src, /TEXT_ON_DARK/);
     assert.match(src, /AMBER_ACCENT/);
@@ -1183,9 +1187,11 @@ describe("design-tokens adoption", () => {
     const src = read("components/screen.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /\bACCENT_DEEP\b/);
-    assert.match(src, /\bCARD_BG_7\b/);
-    assert.match(src, /\bPAGE_BG_2\b/);
-    assert.match(src, /\bPAGE_BG_3\b/);
+    // Visual-upgrade PR4: the page gradient was replaced by a flat
+    // theme.page surface, and padding/gap moved to the new spacing tokens.
+    assert.match(src, /useAppTheme/);
+    assert.match(src, /\bSPACING_GUTTER\b/);
+    assert.match(src, /\bSPACING_AIRY\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -1376,13 +1382,14 @@ describe("design-tokens adoption", () => {
     const src = read("components/item-card.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /\bAMBER_MUTED_3\b/);
-    assert.match(src, /\bBORDER\b/);
-    assert.match(src, /\bCARD_BG\b/);
     assert.match(src, /\bHERO_DARK\b/);
-    assert.match(src, /\bMUTED_28\b/);
-    assert.match(src, /\bMUTED_29\b/);
-    assert.match(src, /\bTEXT_DARK_5\b/);
     assert.match(src, /\bTEXT_ON_DARK\b/);
+    // Visual-upgrade PR4: card surface/text colors now come from the theme
+    // hook; geometry + soft shadow come from the new tokens.
+    assert.match(src, /useAppTheme/);
+    assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
+    assert.match(src, /\bRADIUS_AVATAR\b/);
+    assert.match(src, /\bSHADOW_SOFT\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

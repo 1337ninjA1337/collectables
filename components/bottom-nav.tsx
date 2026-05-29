@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { NavTab, NavItem } from "@/components/nav-tab";
 import { useResponsive } from "@/components/screen";
+import { useAppTheme } from "@/components/use-app-theme";
 import { trackEvent } from "@/lib/analytics";
 import { useChat } from "@/lib/chat-context";
 import { FriendsTabBadge } from "@/lib/chat-helpers";
@@ -37,9 +38,12 @@ type NavRowProps = {
 };
 
 function NavRow({ leftItems, rightItems, onPlusPress, plusLabel }: NavRowProps) {
+  const theme = useAppTheme();
   const slots = Math.max(leftItems.length, rightItems.length);
   const paddedLeft = [...leftItems, ...Array(slots - leftItems.length).fill(null)];
   const paddedRight = [...rightItems, ...Array(slots - rightItems.length).fill(null)];
+  const plusBg = theme.isDark ? AMBER_ACCENT : HERO_DARK;
+  const plusIconColor = theme.isDark ? HERO_DARK : TEXT_ON_DARK_2;
   return (
     <>
       {paddedLeft.map((item, i) =>
@@ -50,8 +54,12 @@ function NavRow({ leftItems, rightItems, onPlusPress, plusLabel }: NavRowProps) 
         ),
       )}
       <View style={styles.item}>
-        <Pressable style={styles.plusButton} onPress={onPlusPress} accessibilityLabel={plusLabel}>
-          <Ionicons name="add" size={30} color={TEXT_ON_DARK_2} />
+        <Pressable
+          style={{ ...styles.plusButton, backgroundColor: plusBg, borderColor: theme.navBg }}
+          onPress={onPlusPress}
+          accessibilityLabel={plusLabel}
+        >
+          <Ionicons name="add" size={30} color={plusIconColor} />
         </Pressable>
       </View>
       {paddedRight.map((item, i) =>
@@ -80,6 +88,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const toast = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const { isMobile } = useResponsive();
+  const theme = useAppTheme();
 
   const prevIsPremium = useRef(isPremium);
   useEffect(() => {
@@ -232,6 +241,8 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       <View
         style={{
           ...styles.wrap,
+          backgroundColor: theme.navBg,
+          borderTopColor: theme.border,
           paddingBottom: Math.max(insets.bottom, 8),
         }}
       >

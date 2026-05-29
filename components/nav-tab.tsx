@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { useAppTheme } from "@/components/use-app-theme";
 import { FriendsTabBadge, formatBadgeCount } from "@/lib/chat-helpers";
 import {
   AMBER_ACCENT,
   DANGER,
   HERO_DARK,
-  MUTED_4,
   TEXT_ON_DARK,
 } from "@/lib/design-tokens";
 import { FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -32,18 +32,23 @@ function renderBadge(badge: FriendsTabBadge | undefined) {
 }
 
 export function NavTab({ item }: { item: NavItem }) {
+  const theme = useAppTheme();
   return (
     <Pressable style={styles.item} onPress={item.onPress}>
       <View style={styles.iconWrap}>
         <Ionicons
           name={item.active ? item.iconActive : item.icon}
           size={22}
-          color={item.active ? HERO_DARK : MUTED_4}
+          color={item.active ? theme.navIconActive : theme.navIconInactive}
         />
         {renderBadge(item.badge)}
         {item.premiumBadge ? <View style={styles.premiumDot} /> : null}
       </View>
-      {item.active ? <View style={styles.activeDot} /> : <View style={styles.activeDotPlaceholder} />}
+      {item.active ? (
+        <View style={{ ...styles.activeDot, backgroundColor: theme.navIconActive }} />
+      ) : (
+        <View style={styles.activeDotPlaceholder} />
+      )}
     </Pressable>
   );
 }

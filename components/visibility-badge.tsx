@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
+import { useAppTheme } from "@/components/use-app-theme";
 import { ACCENT_DEEP_2, MUTED_2, SUCCESS_GREEN_2, TEXT_ON_DARK } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { Collection } from "@/lib/types";
@@ -16,6 +17,7 @@ export function VisibilityBadge({
   variant?: Variant;
 }) {
   const { t } = useI18n();
+  const theme = useAppTheme();
 
   const isViewer = collection.role === "viewer";
   const isPublic = collection.visibility === "public";
@@ -35,6 +37,11 @@ export function VisibilityBadge({
   const isShared = isPublic;
 
   const isHero = variant === "hero";
+
+  // Neutral (private, card) badge text/icon follows the OS theme so it stays
+  // legible on both light and dark page surfaces. Viewer/shared/hero keep
+  // their semantic colors (green / amber / on-image white).
+  const isNeutral = !isHero && !isViewer && !isShared;
 
   return (
     <View
@@ -56,7 +63,7 @@ export function VisibilityBadge({
               ? SUCCESS_GREEN_2
               : isShared
                 ? ACCENT_DEEP_2
-                : MUTED_2
+                : theme.text
         }
       />
       <Text
@@ -65,6 +72,7 @@ export function VisibilityBadge({
           isHero && styles.badgeTextHero,
           isViewer && !isHero && styles.badgeTextViewer,
           isShared && !isViewer && !isHero && styles.badgeTextShared,
+          isNeutral && { color: theme.text },
         ]}
       >
         {label}

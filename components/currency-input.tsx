@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { CurrencySheet } from "@/components/currency-sheet";
+import { useAppTheme } from "@/components/use-app-theme";
 import {
   BORDER,
   CARD_BG_2,
@@ -44,6 +45,7 @@ export function CurrencyInput({
 }: CurrencyInputProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const theme = useAppTheme();
 
   // Always show the active currency as a chip — even a non-shortlist pick (e.g.
   // HUF chosen via the full picker) so the selection stays visible.
@@ -53,15 +55,15 @@ export function CurrencyInput({
 
   return (
     <View style={styles.container}>
-      <View style={styles.inputRow}>
-        <Text style={styles.currencySymbol}>{currency}</Text>
+      <View style={{ ...styles.inputRow, backgroundColor: theme.card, borderColor: theme.border }}>
+        <Text style={{ ...styles.currencySymbol, color: theme.meta }}>{currency}</Text>
         <TextInput
           value={value}
           onChangeText={(raw) => onChangeValue(sanitize(raw))}
           placeholder={placeholder}
           placeholderTextColor={PLACEHOLDER}
           keyboardType="decimal-pad"
-          style={styles.input}
+          style={{ ...styles.input, color: theme.text }}
           returnKeyType="done"
         />
       </View>
@@ -71,22 +73,22 @@ export function CurrencyInput({
           return (
             <Pressable
               key={c}
-              style={[styles.chip, active && styles.chipActive]}
+              style={[styles.chip, { backgroundColor: theme.cardElevated, borderColor: theme.border }, active && styles.chipActive]}
               onPress={() => onChangeCurrency(c)}
             >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{c}</Text>
+              <Text style={[styles.chipText, { color: theme.meta }, active && styles.chipTextActive]}>{c}</Text>
             </Pressable>
           );
         })}
         <Pressable
-          style={[styles.chip, styles.moreChip]}
+          style={[styles.chip, { backgroundColor: theme.cardElevated, borderColor: theme.border }, styles.moreChip]}
           onPress={() => {
             setQuery("");
             setSheetOpen(true);
           }}
           accessibilityLabel="More currencies"
         >
-          <Ionicons name="ellipsis-horizontal" size={14} color={MUTED_27} />
+          <Ionicons name="ellipsis-horizontal" size={14} color={theme.meta} />
         </Pressable>
       </ScrollView>
 

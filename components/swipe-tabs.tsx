@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 
+import { useAppTheme } from "@/components/use-app-theme";
 import {
   AMBER_ACCENT,
   AMBER_SOFT,
@@ -41,6 +42,7 @@ const ANIM_DURATION = 220;
 
 export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab, dotHighlight }: Props) {
   const isNative = Platform.OS !== "web";
+  const theme = useAppTheme();
 
   const [width, setWidth] = useState(0);
   const widthRef = useRef(0);
@@ -213,7 +215,13 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
 
   const header = (
     <View style={styles.header}>
-      <Text style={variant === "sub" ? styles.subHeaderLabel : styles.headerLabel}>
+      <Text
+        style={
+          variant === "sub"
+            ? { ...styles.subHeaderLabel, color: theme.meta }
+            : { ...styles.headerLabel, color: theme.text }
+        }
+      >
         {activeLabel}
       </Text>
       <View style={styles.dots}>
@@ -269,11 +277,20 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
           return (
             <Pressable
               key={t.key}
-              style={{ ...styles.tab, ...(isActive ? styles.tabActive : {}) }}
+              style={{
+                ...styles.tab,
+                backgroundColor: theme.cardElevated,
+                borderColor: theme.border,
+                ...(isActive ? { ...styles.tabActive, backgroundColor: theme.text, borderColor: theme.text } : {}),
+              }}
               onPress={() => jumpToKey(t.key)}
             >
               <Text
-                style={{ ...styles.tabText, ...(isActive ? styles.tabTextActive : {}) }}
+                style={{
+                  ...styles.tabText,
+                  color: theme.muted,
+                  ...(isActive ? { ...styles.tabTextActive, color: theme.page } : {}),
+                }}
                 numberOfLines={2}
                 adjustsFontSizeToFit
               >
