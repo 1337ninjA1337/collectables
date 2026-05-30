@@ -822,18 +822,24 @@ describe("design-tokens adoption", () => {
     assert.match(src, /HERO_DARK_5/);
     assert.match(src, /MUTED\b/);
     assert.match(src, /MUTED_2\b/);
-    assert.match(src, /MUTED_5\b/);
     assert.match(src, /MUTED_18/);
-    assert.match(src, /MUTED_20/);
     assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_DARK_2/);
-    assert.match(src, /TEXT_DARK_3/);
     assert.match(src, /TEXT_ON_DARK\b/);
     assert.match(src, /TEXT_ON_DARK_3/);
     assert.match(src, /TEXT_ON_DARK_5/);
     assert.match(src, /TEXT_ON_DARK_7/);
     assert.match(src, /TEXT_ON_DARK_8/);
     assert.match(src, /TEXT_ON_DARK_SOFT/);
+    // PR5 redesign-home: light body surfaces now read from useAppTheme() and the
+    // new geometry/shadow tokens; the former MUTED_5/MUTED_20/TEXT_DARK_3 light
+    // colors moved onto the theme hook (theme.muted/meta/text).
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /useAppTheme\(\)/);
+    assert.match(src, /RADIUS_HERO_LG/);
+    assert.match(src, /RADIUS_ITEM_AIRY/);
+    assert.match(src, /SPACING_GUTTER/);
+    assert.match(src, /SHADOW_SOFT/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
