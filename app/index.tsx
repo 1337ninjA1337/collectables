@@ -29,6 +29,11 @@ import {
   MUTED_5,
   MUTED_18,
   MUTED_20,
+  RADIUS_AVATAR,
+  RADIUS_CARD_AIRY,
+  RADIUS_HERO_LG,
+  RADIUS_ITEM_AIRY,
+  SHADOW_SOFT,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_DARK_3,
@@ -39,11 +44,12 @@ import {
   TEXT_ON_DARK_8,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
+import { useAppTheme } from "@/components/use-app-theme";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
 import { Collection } from "@/lib/types";
-import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { FONT_DISPLAY_BOLD, FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 type CollectionsTab = "mine" | "friends" | "subscribed";
 
@@ -71,6 +77,7 @@ export default function HomeScreen() {
     }
   };
   const { t } = useI18n();
+  const theme = useAppTheme();
   const { friends, following, getMyProfile } = useSocial();
   const [collectionsTab, setCollectionsTab] = useState<CollectionsTab>("mine");
   const { isMobile } = useResponsive();
@@ -91,11 +98,11 @@ export default function HomeScreen() {
   if (!ready) {
     return (
       <Screen>
-        <Skeleton style={{ height: 200, borderRadius: 32 }} />
+        <Skeleton style={{ height: 200, borderRadius: RADIUS_HERO_LG }} />
         <Skeleton style={{ height: 60, borderRadius: 20 }} />
         <Skeleton style={{ height: 20, width: 160, borderRadius: 8 }} />
-        <Skeleton style={{ height: 130, borderRadius: 28 }} />
-        <Skeleton style={{ height: 130, borderRadius: 28 }} />
+        <Skeleton style={{ height: 130, borderRadius: RADIUS_CARD_AIRY }} />
+        <Skeleton style={{ height: 130, borderRadius: RADIUS_CARD_AIRY }} />
       </Screen>
     );
   }
@@ -192,8 +199,8 @@ export default function HomeScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderText}>
-            <Text style={styles.sectionTitle}>{t("myProfile")}</Text>
-            <Text style={styles.sectionDescription}>{t("myProfileSubtitle")}</Text>
+            <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("myProfile")}</Text>
+            <Text style={{ ...styles.sectionDescription, color: theme.muted }}>{t("myProfileSubtitle")}</Text>
           </View>
           {myProfile ? (
             <Link href={`/profile/${myProfile.id}` as never} asChild>
@@ -207,15 +214,15 @@ export default function HomeScreen() {
         {!isPhone && (
           <View style={styles.socialSummary}>
             <Link href={"/people?tab=friends" as never} asChild>
-              <Pressable style={styles.summaryCard}>
-                <Text style={styles.summaryNumber}>{friends.length}</Text>
-                <Text style={styles.summaryLabel}>{t("friends")}</Text>
+              <Pressable style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border }}>
+                <Text style={{ ...styles.summaryNumber, color: theme.text }}>{friends.length}</Text>
+                <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("friends")}</Text>
               </Pressable>
             </Link>
             <Link href={"/people?tab=following" as never} asChild>
-              <Pressable style={styles.summaryCard}>
-                <Text style={styles.summaryNumber}>{following.length}</Text>
-                <Text style={styles.summaryLabel}>{t("following")}</Text>
+              <Pressable style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border }}>
+                <Text style={{ ...styles.summaryNumber, color: theme.text }}>{following.length}</Text>
+                <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("following")}</Text>
               </Pressable>
             </Link>
           </View>
@@ -225,28 +232,28 @@ export default function HomeScreen() {
       )}
 
       <Link href="/wishlist" asChild>
-        <Pressable style={styles.wishlistBanner}>
+        <Pressable style={{ ...styles.wishlistBanner, backgroundColor: theme.bannerBg }}>
           <View style={styles.wishlistBannerIcon}>
             <Text style={styles.wishlistBannerIconText}>★</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.wishlistBannerTitle}>{t("wishlist")}</Text>
-            <Text style={styles.wishlistBannerHint}>{t("wishlistHint")}</Text>
+            <Text style={{ ...styles.wishlistBannerTitle, color: theme.text }}>{t("wishlist")}</Text>
+            <Text style={{ ...styles.wishlistBannerHint, color: theme.meta }}>{t("wishlistHint")}</Text>
           </View>
-          <Text style={styles.wishlistBannerArrow}>›</Text>
+          <Text style={{ ...styles.wishlistBannerArrow, color: theme.meta }}>›</Text>
         </Pressable>
       </Link>
 
       <Link href="/stats" asChild>
-        <Pressable style={styles.statsBanner}>
+        <Pressable style={{ ...styles.statsBanner, backgroundColor: theme.card, borderColor: theme.border }}>
           <View style={styles.statsBannerIcon}>
             <Text style={styles.statsBannerIconText}>⊞</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.statsBannerTitle}>{t("statsTitle")}</Text>
-            <Text style={styles.statsBannerHint}>{t("statsSubtitle")}</Text>
+            <Text style={{ ...styles.statsBannerTitle, color: theme.text }}>{t("statsTitle")}</Text>
+            <Text style={{ ...styles.statsBannerHint, color: theme.meta }}>{t("statsSubtitle")}</Text>
           </View>
-          <Text style={styles.statsBannerArrow}>›</Text>
+          <Text style={{ ...styles.statsBannerArrow, color: theme.meta }}>›</Text>
         </Pressable>
       </Link>
 
@@ -254,8 +261,8 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>{t("recentlyAdded")}</Text>
-              <Text style={styles.sectionDescription}>{t("recentlyAddedHint")}</Text>
+              <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("recentlyAdded")}</Text>
+              <Text style={{ ...styles.sectionDescription, color: theme.muted }}>{t("recentlyAddedHint")}</Text>
             </View>
           </View>
           <ScrollView
@@ -268,7 +275,7 @@ export default function HomeScreen() {
               const col = getCollectionById(item.collectionId);
               return (
                 <Link key={item.id} href={`/item/${item.id}`} asChild>
-                  <Pressable style={styles.recentCard}>
+                  <Pressable style={{ ...styles.recentCard, backgroundColor: theme.card, borderColor: theme.border }}>
                     {hasPhoto ? (
                       <Image source={{ uri: item.photos[0] }} style={styles.recentImage} />
                     ) : (
@@ -278,8 +285,8 @@ export default function HomeScreen() {
                       <Text style={styles.recentBadgeText}>NEW</Text>
                     </View>
                     <View style={styles.recentTextWrap}>
-                      <Text style={styles.recentTitle} numberOfLines={1}>{item.title}</Text>
-                      {col ? <Text style={styles.recentMeta} numberOfLines={1}>{col.name}</Text> : null}
+                      <Text style={{ ...styles.recentTitle, color: theme.text }} numberOfLines={1}>{item.title}</Text>
+                      {col ? <Text style={{ ...styles.recentMeta, color: theme.meta }} numberOfLines={1}>{col.name}</Text> : null}
                     </View>
                   </Pressable>
                 </Link>
@@ -304,7 +311,7 @@ export default function HomeScreen() {
                 <View style={styles.tabPanel}>
                   <View style={styles.sectionHeader}>
                     <View style={styles.sectionHeaderText}>
-                      <Text style={styles.sectionDescription}>{t("myCollectionsSubtitle")}</Text>
+                      <Text style={{ ...styles.sectionDescription, color: theme.muted }}>{t("myCollectionsSubtitle")}</Text>
                     </View>
                     <Link href="/create-collection" asChild>
                       <Pressable style={styles.inlineAction}>
@@ -335,7 +342,7 @@ export default function HomeScreen() {
             if (key === "friends") {
               return (
                 <View style={styles.tabPanel}>
-                  <Text style={styles.sectionDescription}>{t("friendCollectionsSubtitle")}</Text>
+                  <Text style={{ ...styles.sectionDescription, color: theme.muted }}>{t("friendCollectionsSubtitle")}</Text>
                   {friendCollections.length > 0 ? (
                     friendCollections.map((collection) => {
                       const total = getCollectionTotalCost(collection.id);
@@ -357,7 +364,7 @@ export default function HomeScreen() {
             }
             return (
               <View style={styles.tabPanel}>
-                <Text style={styles.sectionDescription}>{t("collectionsFeedSubtitle")}</Text>
+                <Text style={{ ...styles.sectionDescription, color: theme.muted }}>{t("collectionsFeedSubtitle")}</Text>
                 {subscribedCollections.length > 0 ? (
                   subscribedCollections.map((collection) => {
                     const total = getCollectionTotalCost(collection.id);
@@ -385,7 +392,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    borderRadius: 32,
+    borderRadius: RADIUS_HERO_LG,
     padding: 24,
     gap: 12,
   },
@@ -404,10 +411,10 @@ const styles = StyleSheet.create({
   },
   title: {
     color: TEXT_ON_DARK_3,
-    fontSize: 31,
-    lineHeight: 39,
-    fontWeight: "800",
-    fontFamily: FONT_DISPLAY,
+    fontSize: 32,
+    lineHeight: 38,
+    fontWeight: "700",
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   profileRow: {
     flexDirection: "row",
@@ -550,9 +557,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 24,
-    fontWeight: "800",
+    fontWeight: "600",
     color: TEXT_DARK,
-    fontFamily: FONT_DISPLAY,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   sectionDescription: {
     color: MUTED_20,
@@ -635,15 +642,17 @@ const styles = StyleSheet.create({
   },
   recentCard: {
     width: 140,
-    borderRadius: 20,
+    borderRadius: RADIUS_ITEM_AIRY,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
     overflow: "hidden",
+    ...SHADOW_SOFT,
   },
   recentImage: {
     width: 140,
     height: 120,
+    borderRadius: RADIUS_AVATAR,
     backgroundColor: AMBER_MUTED_2,
   },
   recentBadge: {
@@ -686,6 +695,7 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_BG_9,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
+    ...SHADOW_SOFT,
   },
   wishlistBannerIcon: {
     width: 44,
@@ -728,6 +738,7 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
+    ...SHADOW_SOFT,
   },
   statsBannerIcon: {
     width: 44,
