@@ -809,25 +809,30 @@ describe("design-tokens adoption", () => {
   it("app/index.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("app/index.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    // visual-upgrade PR5 (`redesign-home`): adaptive surface colors now read
+    // from useAppTheme(), so the per-surface BORDER/CARD_BG/MUTED_* tokens were
+    // replaced by theme.* reads. The hero (always-dark gradient) + accent chips
+    // keep their fixed tokens, and the geometry/shadow tokens are adopted.
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /useAppTheme\(\)/);
     assert.match(src, /AMBER_ACCENT/);
     assert.match(src, /AMBER_LIGHT/);
     assert.match(src, /AMBER_MUTED_2/);
     assert.match(src, /AMBER_SOFT\b/);
-    assert.match(src, /BORDER\b/);
-    assert.match(src, /CARD_BG\b/);
     assert.match(src, /CARD_BG_9/);
     assert.match(src, /HERO_DARK\b/);
     assert.match(src, /HERO_DARK_2/);
     assert.match(src, /HERO_DARK_4/);
     assert.match(src, /HERO_DARK_5/);
     assert.match(src, /MUTED\b/);
-    assert.match(src, /MUTED_2\b/);
-    assert.match(src, /MUTED_5\b/);
     assert.match(src, /MUTED_18/);
-    assert.match(src, /MUTED_20/);
+    assert.match(src, /RADIUS_HERO_LG/);
+    assert.match(src, /RADIUS_CARD_AIRY/);
+    assert.match(src, /RADIUS_ITEM_AIRY/);
+    assert.match(src, /RADIUS_AVATAR\b/);
+    assert.match(src, /SHADOW_SOFT/);
     assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_DARK_2/);
-    assert.match(src, /TEXT_DARK_3/);
     assert.match(src, /TEXT_ON_DARK\b/);
     assert.match(src, /TEXT_ON_DARK_3/);
     assert.match(src, /TEXT_ON_DARK_5/);
