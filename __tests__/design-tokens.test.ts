@@ -809,31 +809,34 @@ describe("design-tokens adoption", () => {
   it("app/index.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("app/index.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    // Light-surface colors now come from useAppTheme() (PR5 redesign-home).
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /useAppTheme\(\)/);
+    // Accent / hero-context / on-dark tokens still import directly.
     assert.match(src, /AMBER_ACCENT/);
     assert.match(src, /AMBER_LIGHT/);
     assert.match(src, /AMBER_MUTED_2/);
     assert.match(src, /AMBER_SOFT\b/);
-    assert.match(src, /BORDER\b/);
-    assert.match(src, /CARD_BG\b/);
     assert.match(src, /CARD_BG_9/);
     assert.match(src, /HERO_DARK\b/);
     assert.match(src, /HERO_DARK_2/);
     assert.match(src, /HERO_DARK_4/);
     assert.match(src, /HERO_DARK_5/);
-    assert.match(src, /MUTED\b/);
-    assert.match(src, /MUTED_2\b/);
-    assert.match(src, /MUTED_5\b/);
     assert.match(src, /MUTED_18/);
-    assert.match(src, /MUTED_20/);
-    assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_DARK_2/);
-    assert.match(src, /TEXT_DARK_3/);
     assert.match(src, /TEXT_ON_DARK\b/);
     assert.match(src, /TEXT_ON_DARK_3/);
     assert.match(src, /TEXT_ON_DARK_5/);
     assert.match(src, /TEXT_ON_DARK_7/);
     assert.match(src, /TEXT_ON_DARK_8/);
     assert.match(src, /TEXT_ON_DARK_SOFT/);
+    // New geometry / shadow tokens from the visual upgrade.
+    assert.match(src, /RADIUS_HERO_LG/);
+    assert.match(src, /RADIUS_CARD_AIRY/);
+    assert.match(src, /RADIUS_ITEM_AIRY/);
+    assert.match(src, /RADIUS_AVATAR/);
+    assert.match(src, /SPACING_GUTTER/);
+    assert.match(src, /SHADOW_SOFT/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
