@@ -1183,6 +1183,27 @@ describe("design-tokens adoption", () => {
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
 
+  // PR6 (visual-upgrade `redesign-collection-detail`): app/collection/[id].tsx
+  // adopts useAppTheme() for the summary cards + titles, RADIUS_HERO_LG on the
+  // cover hero, a LinearGradient overlay (mirroring the collection-card), the
+  // soft shadow on summary cards, the editorial display font on the hero/list
+  // titles, and SPACING_AIRY section gaps.
+  it("app/collection/[id].tsx adopts useAppTheme + airy geometry tokens for the detail redesign", () => {
+    const src = read("app/collection/[id].tsx");
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /useAppTheme\(\)/);
+    assert.match(src, /RADIUS_HERO_LG/);
+    assert.match(src, /SPACING_AIRY/);
+    assert.match(src, /SHADOW_SOFT/);
+    assert.match(src, /FONT_DISPLAY_EDITORIAL/);
+    assert.match(src, /LinearGradient/);
+    // summary cards + titles read their colors from the theme
+    assert.match(src, /backgroundColor:\s*theme\.card/);
+    assert.match(src, /borderColor:\s*theme\.border/);
+    assert.match(src, /color:\s*theme\.text\b/);
+    assert.match(src, /color:\s*theme\.meta\b/);
+  });
+
   it("components/realtime-status-pill.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("components/realtime-status-pill.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);

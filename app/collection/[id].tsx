@@ -1,4 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, FlatList, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
@@ -28,7 +29,8 @@ import { useSocial } from "@/lib/social-context";
 import { fetchCollectionById, fetchItemsByCollectionId } from "@/lib/supabase-profiles";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem, Collection, CollectionVisibility } from "@/lib/types";
-import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { useAppTheme } from "@/components/use-app-theme";
 import {
   ACCENT_DEEP,
   AMBER_ACCENT,
@@ -62,6 +64,9 @@ import {
   MUTED_23,
   PLACEHOLDER,
   PURE_WHITE,
+  RADIUS_HERO_LG,
+  SHADOW_SOFT,
+  SPACING_AIRY,
   SUCCESS_GREEN_2,
   TEXT_DARK,
   TEXT_DARK_2,
@@ -74,6 +79,7 @@ import {
 
 export default function CollectionDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
+  const theme = useAppTheme();
   const { user } = useAuth();
   const {
     collections,
@@ -515,7 +521,10 @@ export default function CollectionDetailsScreen() {
             style={styles.heroImage}
           />
         ) : null}
-        <View style={styles.heroOverlay} />
+        <LinearGradient
+          colors={["rgba(34, 24, 17, 0.08)", "rgba(34, 24, 17, 0.55)"]}
+          style={styles.heroOverlay}
+        />
         <View style={styles.heroContent}>
           <VisibilityBadge collection={activeCollection} variant="hero" />
           <Text style={styles.heroTitle}>{activeCollection.name}</Text>
@@ -533,13 +542,13 @@ export default function CollectionDetailsScreen() {
       </View>
 
       <View style={styles.summaryRow}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryNumber}>{allItems.length}</Text>
-          <Text style={styles.summaryLabel}>{t("itemsInside")}</Text>
+        <View style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+          <Text style={{ ...styles.summaryNumber, color: theme.text }}>{allItems.length}</Text>
+          <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("itemsInside")}</Text>
         </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryNumber}>{allItems.reduce((total, item) => total + item.photos.length, 0)}</Text>
-          <Text style={styles.summaryLabel}>{t("photosSaved")}</Text>
+        <View style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+          <Text style={{ ...styles.summaryNumber, color: theme.text }}>{allItems.reduce((total, item) => total + item.photos.length, 0)}</Text>
+          <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("photosSaved")}</Text>
         </View>
       </View>
 
@@ -557,18 +566,18 @@ export default function CollectionDetailsScreen() {
         };
         return isOwner ? (
           <Pressable
-            style={styles.summaryCard}
+            style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}
             onPress={openCurrencyPicker}
             accessibilityRole="button"
             accessibilityLabel={t("collectionCurrencyA11y", { currency: total.currency })}
           >
-            <Text style={styles.summaryNumber}>{formatCostAmount(total.amount)} {total.currency}</Text>
-            <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
+            <Text style={{ ...styles.summaryNumber, color: theme.text }}>{formatCostAmount(total.amount)} {total.currency}</Text>
+            <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("totalCost")}</Text>
           </Pressable>
         ) : (
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryNumber}>{formatCostAmount(total.amount)} {total.currency}</Text>
-            <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
+          <View style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+            <Text style={{ ...styles.summaryNumber, color: theme.text }}>{formatCostAmount(total.amount)} {total.currency}</Text>
+            <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("totalCost")}</Text>
           </View>
         );
       })()}
@@ -636,7 +645,7 @@ export default function CollectionDetailsScreen() {
 
   const listTitleAndFilters = (
     <>
-      <Text style={styles.listTitle}>{t("collectionItems")}</Text>
+      <Text style={{ ...styles.listTitle, color: theme.text }}>{t("collectionItems")}</Text>
       {allItems.length > 0 ? (
         <ItemFilterBar filters={itemFilters} onChange={setItemFilters} />
       ) : null}
@@ -1061,7 +1070,7 @@ export default function CollectionDetailsScreen() {
 const styles = StyleSheet.create({
   hero: {
     minHeight: 280,
-    borderRadius: 30,
+    borderRadius: RADIUS_HERO_LG,
     overflow: "hidden",
     justifyContent: "flex-end",
     backgroundColor: AMBER_MUTED_8,
@@ -1071,7 +1080,6 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(26, 18, 14, 0.35)",
   },
   heroContent: {
     padding: 20,
@@ -1079,9 +1087,9 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: PURE_WHITE,
-    fontSize: 30,
-    fontWeight: "800",
-    fontFamily: FONT_DISPLAY,
+    fontSize: 32,
+    fontWeight: "700",
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   heroText: {
     color: TEXT_ON_DARK_9,
@@ -1120,7 +1128,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   listWrap: {
-    gap: 12,
+    gap: SPACING_AIRY,
   },
   draggableList: {
     gap: 12,
@@ -1318,9 +1326,9 @@ const styles = StyleSheet.create({
   },
   listTitle: {
     color: TEXT_DARK_3,
-    fontSize: 22,
-    fontWeight: "800",
-    fontFamily: FONT_DISPLAY,
+    fontSize: 24,
+    fontWeight: "600",
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   emptyTitle: {
     fontSize: 24,
@@ -1360,14 +1368,14 @@ const styles = StyleSheet.create({
   // viewer-FlatList path (where ListHeaderComponent doesn't get the outer
   // ScrollView's gap) keeps the same vertical rhythm as the nestable path.
   pageHeader: {
-    gap: 18,
+    gap: SPACING_AIRY,
   },
   // VM-D: wrap inside ListHeaderComponent so pageHeader + listWrap (title +
   // filters) have the original 18px gap between them inside the FlatList
   // header slot (the FlatList contentContainerStyle gap controls row gaps,
   // not in-header gaps).
   viewerListHeader: {
-    gap: 18,
+    gap: SPACING_AIRY,
   },
   // VM-D: FlatList itself owns the scroll in the viewer branch — flex:1 so it
   // fills the Screen's inner View vertically.
