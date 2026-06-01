@@ -857,6 +857,29 @@ describe("design-tokens adoption", () => {
     assert.match(src, /color:\s*theme\.meta\b/);
   });
 
+  // PR6 (visual-upgrade `redesign-collection-detail`): app/collection/[id].tsx
+  // adopts useAppTheme() for the summary cards, RADIUS_HERO_LG on the cover
+  // hero, a LinearGradient overlay, RADIUS_ITEM_AIRY + SHADOW_SOFT on summary
+  // cards, SPACING_GUTTER hero padding, SPACING_AIRY list spacing, and the
+  // editorial display font on the collection name.
+  it("app/collection/[id].tsx adopts useAppTheme + airy geometry tokens for the collection-detail redesign", () => {
+    const src = read("app/collection/[id].tsx");
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /useAppTheme\(\)/);
+    assert.match(src, /from\s+"expo-linear-gradient"/);
+    assert.match(src, /RADIUS_HERO_LG/);
+    assert.match(src, /RADIUS_ITEM_AIRY/);
+    assert.match(src, /SPACING_GUTTER/);
+    assert.match(src, /SPACING_AIRY/);
+    assert.match(src, /SHADOW_SOFT/);
+    assert.match(src, /FONT_DISPLAY_EDITORIAL/);
+    // summary cards read their colors from the theme rather than fixed tokens
+    assert.match(src, /backgroundColor:\s*theme\.card/);
+    assert.match(src, /borderColor:\s*theme\.border/);
+    assert.match(src, /color:\s*theme\.text\b/);
+    assert.match(src, /color:\s*theme\.meta\b/);
+  });
+
   it("app/settings.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("app/settings.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);

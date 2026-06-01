@@ -28,7 +28,9 @@ import { useSocial } from "@/lib/social-context";
 import { fetchCollectionById, fetchItemsByCollectionId } from "@/lib/supabase-profiles";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem, Collection, CollectionVisibility } from "@/lib/types";
-import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { useAppTheme } from "@/components/use-app-theme";
+import { LinearGradient } from "expo-linear-gradient";
+import { FONT_DISPLAY, FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import {
   ACCENT_DEEP,
   AMBER_ACCENT,
@@ -62,6 +64,11 @@ import {
   MUTED_23,
   PLACEHOLDER,
   PURE_WHITE,
+  RADIUS_HERO_LG,
+  RADIUS_ITEM_AIRY,
+  SHADOW_SOFT,
+  SPACING_AIRY,
+  SPACING_GUTTER,
   SUCCESS_GREEN_2,
   TEXT_DARK,
   TEXT_DARK_2,
@@ -97,6 +104,7 @@ export default function CollectionDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { t } = useI18n();
   const toast = useToast();
+  const theme = useAppTheme();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [moveModalOpen, setMoveModalOpen] = useState(false);
@@ -515,7 +523,10 @@ export default function CollectionDetailsScreen() {
             style={styles.heroImage}
           />
         ) : null}
-        <View style={styles.heroOverlay} />
+        <LinearGradient
+          colors={["rgba(34, 24, 17, 0.08)", "rgba(34, 24, 17, 0.55)"]}
+          style={styles.heroOverlay}
+        />
         <View style={styles.heroContent}>
           <VisibilityBadge collection={activeCollection} variant="hero" />
           <Text style={styles.heroTitle}>{activeCollection.name}</Text>
@@ -533,13 +544,13 @@ export default function CollectionDetailsScreen() {
       </View>
 
       <View style={styles.summaryRow}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryNumber}>{allItems.length}</Text>
-          <Text style={styles.summaryLabel}>{t("itemsInside")}</Text>
+        <View style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+          <Text style={{ ...styles.summaryNumber, color: theme.text }}>{allItems.length}</Text>
+          <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("itemsInside")}</Text>
         </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryNumber}>{allItems.reduce((total, item) => total + item.photos.length, 0)}</Text>
-          <Text style={styles.summaryLabel}>{t("photosSaved")}</Text>
+        <View style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+          <Text style={{ ...styles.summaryNumber, color: theme.text }}>{allItems.reduce((total, item) => total + item.photos.length, 0)}</Text>
+          <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("photosSaved")}</Text>
         </View>
       </View>
 
@@ -1061,7 +1072,7 @@ export default function CollectionDetailsScreen() {
 const styles = StyleSheet.create({
   hero: {
     minHeight: 280,
-    borderRadius: 30,
+    borderRadius: RADIUS_HERO_LG,
     overflow: "hidden",
     justifyContent: "flex-end",
     backgroundColor: AMBER_MUTED_8,
@@ -1071,17 +1082,16 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(26, 18, 14, 0.35)",
   },
   heroContent: {
-    padding: 20,
+    padding: SPACING_GUTTER,
     gap: 8,
   },
   heroTitle: {
     color: PURE_WHITE,
-    fontSize: 30,
-    fontWeight: "800",
-    fontFamily: FONT_DISPLAY,
+    fontSize: 32,
+    fontWeight: "700",
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   heroText: {
     color: TEXT_ON_DARK_9,
@@ -1101,7 +1111,7 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     flex: 1,
-    borderRadius: 24,
+    borderRadius: RADIUS_ITEM_AIRY,
     padding: 18,
     backgroundColor: CARD_BG,
     borderWidth: 1,
@@ -1120,7 +1130,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   listWrap: {
-    gap: 12,
+    gap: SPACING_AIRY,
   },
   draggableList: {
     gap: 12,
