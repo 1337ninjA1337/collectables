@@ -822,12 +822,9 @@ describe("design-tokens adoption", () => {
     assert.match(src, /HERO_DARK_5/);
     assert.match(src, /MUTED\b/);
     assert.match(src, /MUTED_2\b/);
-    assert.match(src, /MUTED_5\b/);
     assert.match(src, /MUTED_18/);
-    assert.match(src, /MUTED_20/);
     assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_DARK_2/);
-    assert.match(src, /TEXT_DARK_3/);
     assert.match(src, /TEXT_ON_DARK\b/);
     assert.match(src, /TEXT_ON_DARK_3/);
     assert.match(src, /TEXT_ON_DARK_5/);
@@ -836,6 +833,28 @@ describe("design-tokens adoption", () => {
     assert.match(src, /TEXT_ON_DARK_SOFT/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  // PR5 (visual-upgrade `redesign-home`): app/index.tsx adopts useAppTheme()
+  // for body colors, the airy geometry tokens for hero/card radii, the soft
+  // shadow on banners + recent cards, and the editorial display font for the
+  // hero title and section headings.
+  it("app/index.tsx adopts useAppTheme + airy geometry tokens for the home redesign", () => {
+    const src = read("app/index.tsx");
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /useAppTheme\(\)/);
+    assert.match(src, /RADIUS_HERO_LG/);
+    assert.match(src, /RADIUS_CARD_AIRY/);
+    assert.match(src, /RADIUS_ITEM_AIRY/);
+    assert.match(src, /RADIUS_AVATAR\b/);
+    assert.match(src, /SPACING_GUTTER/);
+    assert.match(src, /SHADOW_SOFT/);
+    assert.match(src, /FONT_DISPLAY_EDITORIAL/);
+    // body surfaces read their colors from the theme rather than fixed tokens
+    assert.match(src, /backgroundColor:\s*theme\.card/);
+    assert.match(src, /backgroundColor:\s*theme\.bannerBg/);
+    assert.match(src, /color:\s*theme\.text\b/);
+    assert.match(src, /color:\s*theme\.meta\b/);
   });
 
   it("app/settings.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
