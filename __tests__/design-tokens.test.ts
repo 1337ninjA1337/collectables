@@ -1076,19 +1076,16 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bACCENT_DEEP\b/);
     assert.match(src, /\bAMBER_ACCENT\b/);
     assert.match(src, /\bAMBER_MUTED_4\b/);
-    assert.match(src, /\bAMBER_MUTED_7\b/);
     assert.match(src, /\bAMBER_SOFT\b/);
     assert.match(src, /\bBORDER\b/);
     assert.match(src, /\bBORDER_2\b/);
     assert.match(src, /\bCARD_BG\b/);
     assert.match(src, /\bCARD_BG_3\b/);
-    assert.match(src, /\bCARD_BG_9\b/);
     assert.match(src, /\bCARD_BG_12\b/);
     assert.match(src, /\bDANGER\b/);
     assert.match(src, /\bDANGER_DEEP_6\b/);
     assert.match(src, /\bDANGER_SOFT_4\b/);
     assert.match(src, /\bHERO_DARK\b/);
-    assert.match(src, /\bHERO_DARK_7\b/);
     assert.match(src, /\bMUTED\b/);
     assert.match(src, /\bMUTED_2\b/);
     assert.match(src, /\bMUTED_3\b/);
@@ -1111,8 +1108,19 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bTEXT_DARK_4\b/);
     assert.match(src, /\bTEXT_ON_DARK\b/);
     assert.match(src, /\bTEXT_ON_DARK_2\b/);
-    assert.match(src, /\bTEXT_ON_DARK_6\b/);
-    assert.match(src, /\bTEXT_ON_DARK_MUTED\b/);
+    // PR7 (visual-upgrade `redesign-item-detail`): edge-to-edge hero, editorial
+    // title, and a single themed meta card now drive the item screen.
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /useAppTheme\(\)/);
+    assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
+    assert.match(src, /\bSHADOW_SOFT\b/);
+    assert.match(src, /\bSPACING_GUTTER\b/);
+    assert.match(src, /\bFONT_DISPLAY_EDITORIAL\b/);
+    assert.match(src, /backgroundColor:\s*theme\.card/);
+    assert.match(src, /borderColor:\s*theme\.border/);
+    assert.match(src, /color:\s*theme\.text\b/);
+    assert.match(src, /color:\s*theme\.meta\b/);
+    assert.match(src, /color:\s*theme\.muted\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

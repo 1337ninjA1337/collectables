@@ -9,7 +9,8 @@ import { SkeletonItemDetail } from "@/components/skeleton";
 
 import { PhotoPreview } from "@/components/photo-preview";
 import { ReactionBar } from "@/components/reaction-bar";
-import { Screen } from "@/components/screen";
+import { Screen, useResponsive } from "@/components/screen";
+import { useAppTheme, type AppTheme } from "@/components/use-app-theme";
 import { trackEvent } from "@/lib/analytics";
 import { buildDeepLink } from "@/lib/deep-link";
 import { useAuth } from "@/lib/auth-context";
@@ -23,29 +24,29 @@ import { usePremium } from "@/lib/premium-context";
 import { fetchItemById } from "@/lib/supabase-profiles";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
-import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { FONT_DISPLAY, FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import {
   ACCENT_DEEP,
   AMBER_ACCENT,
   AMBER_MUTED_4,
-  AMBER_MUTED_7,
   AMBER_SOFT,
   BORDER,
   BORDER_2,
   CARD_BG,
   CARD_BG_3,
-  CARD_BG_9,
   CARD_BG_12,
   DANGER,
   DANGER_DEEP_6,
   DANGER_SOFT_4,
   HERO_DARK,
-  HERO_DARK_7,
   MUTED,
   MUTED_2,
   MUTED_3,
   MUTED_10,
   PLACEHOLDER,
+  RADIUS_ITEM_AIRY,
+  SHADOW_SOFT,
+  SPACING_GUTTER,
   SUCCESS_GREEN,
   SUCCESS_GREEN_2,
   TAG_BLUE,
@@ -63,8 +64,6 @@ import {
   TEXT_DARK_4,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
-  TEXT_ON_DARK_6,
-  TEXT_ON_DARK_MUTED,
 } from "@/lib/design-tokens";
 
 const TAG_COLORS = [
@@ -77,6 +76,11 @@ export default function ItemDetailsScreen() {
   const { user } = useAuth();
   const { getItemById, getCollectionById, deleteItem, updateItem, refresh, convertItemCost } = useCollections();
   const { t, language } = useI18n();
+  const theme = useAppTheme();
+  const { width, contentMaxWidth } = useResponsive();
+  // Edge-to-edge hero: fill the content column plus the screen gutters the
+  // Screen wrapper adds, capped at the device width so desktop doesn't overflow.
+  const heroWidth = Math.min(width, (contentMaxWidth ?? width) + SPACING_GUTTER * 2);
   const toast = useToast();
   const {
     findListingByItemId,
@@ -436,37 +440,52 @@ export default function ItemDetailsScreen() {
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: activeItem.title }} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.gallery}>
-        {activeItem.photos.length > 0 ? (
-          activeItem.photos.map((photo) => (
-            <Image key={photo} source={{ uri: photo }} style={styles.galleryImage} />
-          ))
-        ) : (
-          <View style={{...styles.galleryImage, backgroundColor: placeholderColor(activeItem.id)}} />
-        )}
-      </ScrollView>
-
-      <View style={styles.headerCard}>
-        <Text style={styles.itemTitle}>{activeItem.title}</Text>
-        <Text style={styles.itemMeta}>{t("collectionField", { name: collection?.name ?? t("collectionMissing") })}</Text>
-        <Text style={styles.itemMeta}>{t("addedBy", { name: activeItem.createdBy })}</Text>
+      <View style={styles.photoHero}>
+        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
+          {activeItem.photos.length > 0 ? (
+            activeItem.photos.map((photo) => (
+              <Image key={photo} source={{ uri: photo }} style={{ ...styles.heroImage, width: heroWidth }} />
+            ))
+          ) : (
+            <View style={{ ...styles.heroImage, width: heroWidth, backgroundColor: placeholderColor(activeItem.id) }} />
+          )}
+        </ScrollView>
+        {activeItem.condition ? (
+          <View style={styles.heroBadges}>
+            <View style={styles.conditionBadge}>
+              <Text style={styles.conditionBadgeText}>
+                {t(`condition${activeItem.condition[0].toUpperCase()}${activeItem.condition.slice(1)}` as "conditionNew" | "conditionExcellent" | "conditionGood" | "conditionFair")}
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </View>
 
-      {isOwner ? (
-        <Pressable style={styles.editButton} onPress={enterEditMode}>
-          <Text style={styles.editButtonText}>{t("editItem")}</Text>
-        </Pressable>
+      <View style={styles.titleBlock}>
+        <Text style={{ ...styles.itemTitle, color: theme.text }}>{activeItem.title}</Text>
+        <Text style={{ ...styles.itemMeta, color: theme.meta }}>{t("collectionField", { name: collection?.name ?? t("collectionMissing") })}</Text>
+        <Text style={{ ...styles.itemMeta, color: theme.meta }}>{t("addedBy", { name: activeItem.createdBy })}</Text>
+      </View>
+
+      {activeItem.description ? (
+        <Text style={{ ...styles.description, color: theme.muted }}>{activeItem.description}</Text>
       ) : null}
 
-      <Pressable style={styles.shareButton} onPress={() => setShareOpen(true)}>
-        <Text style={styles.shareButtonText}>{t("share")}</Text>
-      </Pressable>
-
-      {isOwner ? (
-        <Pressable style={styles.deleteButton} onPress={handleDelete}>
-          <Text style={styles.deleteButtonText}>{t("deleteItem")}</Text>
+      <View style={styles.actionsRow}>
+        {isOwner ? (
+          <Pressable style={styles.editButton} onPress={enterEditMode}>
+            <Text style={styles.editButtonText}>{t("editItem")}</Text>
+          </Pressable>
+        ) : null}
+        <Pressable style={{ ...styles.ghostButton, borderColor: theme.border }} onPress={() => setShareOpen(true)}>
+          <Text style={{ ...styles.ghostButtonText, color: theme.text }}>{t("share")}</Text>
         </Pressable>
-      ) : null}
+        {isOwner ? (
+          <Pressable style={styles.ghostDangerButton} onPress={handleDelete}>
+            <Text style={styles.ghostDangerText}>{t("deleteItem")}</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       {isOwner ? (
         existingListing ? (
@@ -498,29 +517,44 @@ export default function ItemDetailsScreen() {
         )
       ) : null}
 
-      <View style={styles.sheet}>
-        <Text style={styles.sheetLabel}>{t("acquiredHow")}</Text>
-        <Text style={styles.sheetValue}>{activeItem.acquiredFrom}</Text>
-      </View>
-
-      <View style={styles.sheet}>
-        <Text style={styles.sheetLabel}>{t("acquiredDate")}</Text>
-        <Text style={styles.sheetValue}>{activeItem.acquiredAt}</Text>
-      </View>
-
-      <View style={styles.sheet}>
-        <Text style={styles.sheetLabel}>{t("description")}</Text>
-        <Text style={styles.sheetValue}>{activeItem.description}</Text>
-      </View>
-
-      <View style={styles.sheet}>
-        <Text style={styles.sheetLabel}>{t("variants")}</Text>
-        <Text style={styles.sheetValue}>{activeItem.variants}</Text>
+      <View style={{ ...styles.metaCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+        {activeItem.acquiredFrom ? (
+          <MetaRow label={t("acquiredHow")} value={activeItem.acquiredFrom} theme={theme} />
+        ) : null}
+        {activeItem.acquiredAt ? (
+          <MetaRow label={t("acquiredDate")} value={activeItem.acquiredAt} theme={theme} />
+        ) : null}
+        {activeItem.variants ? (
+          <MetaRow label={t("variants")} value={activeItem.variants} theme={theme} />
+        ) : null}
+        {typeof activeItem.cost === "number" && Number.isFinite(activeItem.cost) ? (() => {
+          const conv = convertItemCost(activeItem, collection?.currency ?? undefined);
+          const amount = conv.amount ?? (activeItem.cost as number);
+          const isApprox =
+            conv.converted && activeItem.costCurrency != null && activeItem.costCurrency !== conv.currency;
+          const display = isApprox
+            ? t("itemValueApprox", { amount: formatCostAmount(amount), currency: conv.currency })
+            : `${formatCostAmount(amount)} ${conv.currency}`;
+          const original = `${formatCostAmount(activeItem.cost as number)}${activeItem.costCurrency ? ` ${activeItem.costCurrency}` : ""}`;
+          return (
+            <View style={styles.metaRow}>
+              <Text style={{ ...styles.metaRowLabel, color: theme.meta }}>{t("costLabel")}</Text>
+              <Pressable
+                onLongPress={() => toast.info(original)}
+                accessibilityLabel={`${t("costLabel")}: ${original}`}
+                {...(Platform.OS === "web" ? ({ title: original } as object) : null)}
+              >
+                <Text style={{ ...styles.metaRowValue, color: theme.text }}>{display}</Text>
+              </Pressable>
+            </View>
+          );
+        })() : null}
+        <MetaRow label={t("photosLabel")} value={String(activeItem.photos.length)} theme={theme} />
       </View>
 
       {activeItem.tags && activeItem.tags.length > 0 ? (
-        <View style={styles.sheet}>
-          <Text style={styles.sheetLabel}>{t("tagsLabel")}</Text>
+        <View style={{ ...styles.metaCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+          <Text style={{ ...styles.metaRowLabel, color: theme.meta }}>{t("tagsLabel")}</Text>
           <View style={styles.tagsRow}>
             {activeItem.tags.map((tag, i) => (
               <View key={i} style={{...styles.tagBadge, backgroundColor: tag.color}}>
@@ -530,42 +564,6 @@ export default function ItemDetailsScreen() {
           </View>
         </View>
       ) : null}
-
-      {activeItem.condition ? (
-        <View style={styles.sheet}>
-          <Text style={styles.sheetLabel}>{t("conditionLabel")}</Text>
-          <View style={styles.conditionBadgeRow}>
-            <View style={styles.conditionBadge}>
-              <Text style={styles.conditionBadgeText}>
-                {t(`condition${activeItem.condition[0].toUpperCase()}${activeItem.condition.slice(1)}` as "conditionNew" | "conditionExcellent" | "conditionGood" | "conditionFair")}
-              </Text>
-            </View>
-          </View>
-        </View>
-      ) : null}
-
-      {typeof activeItem.cost === "number" && Number.isFinite(activeItem.cost) ? (() => {
-        const conv = convertItemCost(activeItem, collection?.currency ?? undefined);
-        const amount = conv.amount ?? (activeItem.cost as number);
-        const isApprox =
-          conv.converted && activeItem.costCurrency != null && activeItem.costCurrency !== conv.currency;
-        const display = isApprox
-          ? t("itemValueApprox", { amount: formatCostAmount(amount), currency: conv.currency })
-          : `${formatCostAmount(amount)} ${conv.currency}`;
-        const original = `${formatCostAmount(activeItem.cost as number)}${activeItem.costCurrency ? ` ${activeItem.costCurrency}` : ""}`;
-        return (
-          <View style={styles.sheet}>
-            <Text style={styles.sheetLabel}>{t("costLabel")}</Text>
-            <Pressable
-              onLongPress={() => toast.info(original)}
-              accessibilityLabel={`${t("costLabel")}: ${original}`}
-              {...(Platform.OS === "web" ? ({ title: original } as object) : null)}
-            >
-              <Text style={styles.sheetValue}>{display}</Text>
-            </Pressable>
-          </View>
-        );
-      })() : null}
 
       <ReactionBar targetType="item" targetId={activeItem.id} />
 
@@ -695,6 +693,15 @@ export default function ItemDetailsScreen() {
   );
 }
 
+function MetaRow({ label, value, theme }: { label: string; value: string; theme: AppTheme }) {
+  return (
+    <View style={styles.metaRow}>
+      <Text style={{ ...styles.metaRowLabel, color: theme.meta }}>{label}</Text>
+      <Text style={{ ...styles.metaRowValue, color: theme.text }}>{value}</Text>
+    </View>
+  );
+}
+
 function EditField({
   label,
   value,
@@ -733,54 +740,72 @@ function EditField({
 }
 
 const styles = StyleSheet.create({
-  gallery: {
-    gap: 12,
-    paddingRight: 20,
-  },
-  galleryImage: {
-    width: 280,
-    height: 320,
-    borderRadius: 28,
+  photoHero: {
+    marginHorizontal: -SPACING_GUTTER,
+    height: 280,
+    overflow: "hidden",
     backgroundColor: AMBER_MUTED_4,
   },
-  headerCard: {
-    borderRadius: 28,
-    padding: 20,
-    backgroundColor: HERO_DARK_7,
+  heroImage: {
+    height: 280,
+    backgroundColor: AMBER_MUTED_4,
+  },
+  heroBadges: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    flexDirection: "row",
+    gap: 8,
+  },
+  titleBlock: {
     gap: 6,
   },
+  description: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontFamily: FONT_BODY,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
   editButton: {
+    flex: 1,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: AMBER_MUTED_7,
-    backgroundColor: CARD_BG_9,
+    backgroundColor: AMBER_ACCENT,
     paddingVertical: 16,
     alignItems: "center",
   },
   editButtonText: {
-    color: MUTED_3,
+    color: TEXT_DARK_2,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
-  deleteButton: {
+  ghostButton: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: "transparent",
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  ghostButtonText: {
+    fontSize: 15,
+    fontWeight: "800",
+    fontFamily: FONT_BODY_EXTRABOLD,
+  },
+  ghostDangerButton: {
+    flex: 1,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: DANGER_SOFT_4,
-    backgroundColor: CARD_BG_12,
+    backgroundColor: "transparent",
     paddingVertical: 16,
     alignItems: "center",
   },
-  shareButton: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: AMBER_MUTED_7,
-    backgroundColor: CARD_BG_9,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  shareButtonText: {
-    color: MUTED_3,
+  ghostDangerText: {
+    color: DANGER_DEEP_6,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
@@ -881,42 +906,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
-  deleteButtonText: {
-    color: DANGER_DEEP_6,
-    fontSize: 15,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
   itemTitle: {
-    color: TEXT_ON_DARK_6,
-    fontSize: 29,
-    fontWeight: "800",
-    fontFamily: FONT_DISPLAY,
+    fontSize: 32,
+    fontWeight: "700",
+    lineHeight: 38,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   itemMeta: {
-    color: TEXT_ON_DARK_MUTED,
     fontSize: 14,
     lineHeight: 21,
     fontFamily: FONT_BODY,
   },
-  sheet: {
-    borderRadius: 24,
+  metaCard: {
+    borderRadius: RADIUS_ITEM_AIRY,
     padding: 18,
-    backgroundColor: CARD_BG,
     borderWidth: 1,
-    borderColor: BORDER,
-    gap: 8,
+    gap: 14,
   },
-  sheetLabel: {
-    color: MUTED,
+  metaRow: {
+    gap: 4,
+  },
+  metaRowLabel: {
     fontSize: 12,
     textTransform: "uppercase",
     letterSpacing: 1,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
-  sheetValue: {
-    color: TEXT_DARK,
+  metaRowValue: {
     fontSize: 16,
     lineHeight: 24,
     fontFamily: FONT_BODY,
@@ -936,9 +953,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
-  },
-  conditionBadgeRow: {
-    flexDirection: "row",
   },
   conditionBadge: {
     borderRadius: 999,
