@@ -9,6 +9,7 @@ import { SkeletonProfile } from "@/components/skeleton";
 
 import { CollectionCard } from "@/components/collection-card";
 import { Screen } from "@/components/screen";
+import { useAppTheme } from "@/components/use-app-theme";
 import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useMarketplace } from "@/lib/marketplace-context";
@@ -30,12 +31,16 @@ import {
   MUTED_19,
   PLACEHOLDER,
   PURE_WHITE,
+  RADIUS_HERO_LG,
+  RADIUS_ITEM_AIRY,
+  SHADOW_SOFT,
   TEXT_DARK,
   TEXT_DARK_3,
   TEXT_ON_DARK,
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
+import { FONT_DISPLAY_EDITORIAL } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
@@ -48,6 +53,7 @@ const DEFAULT_EN_PROFILE_BIO = "I collect things worth saving beautifully and sh
 export default function ProfileScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const { t } = useI18n();
+  const theme = useAppTheme();
   const toast = useToast();
   const {
     getProfileById,
@@ -181,7 +187,7 @@ export default function ProfileScreen() {
   if (!activeProfile) {
     return (
       <Screen>
-        <Text style={styles.emptyTitle}>{t("profileNotFound")}</Text>
+        <Text style={{ ...styles.emptyTitle, color: theme.text }}>{t("profileNotFound")}</Text>
       </Screen>
     );
   }
@@ -340,9 +346,9 @@ export default function ProfileScreen() {
 
       {relationship === "self" ? (
         <View style={styles.selfTools}>
-          <View style={styles.languageCard}>
-            <Text style={styles.sectionTitle}>{t("descriptionLabel")}</Text>
-            <Text style={styles.sectionText}>{t("descriptionPlaceholder")}</Text>
+          <View style={{ ...styles.languageCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+            <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("descriptionLabel")}</Text>
+            <Text style={{ ...styles.sectionText, color: theme.meta }}>{t("descriptionPlaceholder")}</Text>
             <TextInput
               value={bioDraft}
               onChangeText={setBioDraft}
@@ -350,7 +356,7 @@ export default function ProfileScreen() {
               placeholderTextColor={PLACEHOLDER}
               multiline
               textAlignVertical="top"
-              style={styles.bioInput}
+              style={{ ...styles.bioInput, backgroundColor: theme.page, borderColor: theme.border, color: theme.text }}
             />
             <Pressable style={styles.saveBioButton} onPress={() => void handleSaveBio()}>
               <Text style={styles.saveBioButtonText}>{t("saveProfileDescription")}</Text>
@@ -421,7 +427,7 @@ export default function ProfileScreen() {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t("profileCollections")}</Text>
+        <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("profileCollections")}</Text>
         {profileCollections.length > 0 ? (
           profileCollections.map((collection) => {
             const total = getCollectionTotalCost(collection.id);
@@ -448,7 +454,7 @@ export default function ProfileScreen() {
 
       {isSelf ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("marketplaceHistoryTitle")}</Text>
+          <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("marketplaceHistoryTitle")}</Text>
           {myPurchases.length === 0 && mySales.length === 0 ? (
             <EmptyState icon="🛍️" title={t("marketplaceHistoryEmpty")} />
           ) : (
@@ -464,7 +470,7 @@ export default function ProfileScreen() {
                   />
                 ))
               ) : (
-                <Text style={styles.historyEmpty}>{t("marketplaceMyPurchasesEmpty")}</Text>
+                <Text style={{ ...styles.historyEmpty, color: theme.meta }}>{t("marketplaceMyPurchasesEmpty")}</Text>
               )}
               <Text style={styles.historyLabel}>{t("marketplaceHistorySalesLabel")}</Text>
               {mySales.length > 0 ? (
@@ -477,7 +483,7 @@ export default function ProfileScreen() {
                   />
                 ))
               ) : (
-                <Text style={styles.historyEmpty}>{t("marketplaceMySalesEmpty")}</Text>
+                <Text style={{ ...styles.historyEmpty, color: theme.meta }}>{t("marketplaceMySalesEmpty")}</Text>
               )}
             </>
           )}
@@ -486,20 +492,20 @@ export default function ProfileScreen() {
 
       {(isSelf || isFriend) && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("profileWishlist")}</Text>
+          <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("profileWishlist")}</Text>
           {visibleWishlist.length > 0 ? (
             visibleWishlist.map((item) => (
               <Link key={item.id} href={`/item/${item.id}`} asChild>
-                <Pressable style={styles.wishlistCard}>
+                <Pressable style={{ ...styles.wishlistCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
                   {item.photos?.[0] ? (
                     <Image source={{ uri: item.photos[0] }} style={styles.wishlistThumb} />
                   ) : (
                     <View style={[styles.wishlistThumb, { backgroundColor: placeholderColor(item.id) }]} />
                   )}
                   <View style={styles.wishlistInfo}>
-                    <Text style={styles.wishlistName} numberOfLines={1}>{item.title}</Text>
+                    <Text style={{ ...styles.wishlistName, color: theme.text }} numberOfLines={1}>{item.title}</Text>
                     {item.description ? (
-                      <Text style={styles.wishlistDesc} numberOfLines={2}>{item.description}</Text>
+                      <Text style={{ ...styles.wishlistDesc, color: theme.muted }} numberOfLines={2}>{item.description}</Text>
                     ) : null}
                   </View>
                 </Pressable>
@@ -528,6 +534,7 @@ function MarketplaceHistoryRow({
   counterparty: UserProfile | undefined;
 }) {
   const { t } = useI18n();
+  const theme = useAppTheme();
   const photo = item?.photos?.find(Boolean);
   const title = item?.title ?? t("marketplaceUnknownItem");
   const counterpartyHandle = counterparty
@@ -541,18 +548,18 @@ function MarketplaceHistoryRow({
 
   return (
     <Link href={`/listing/${listing.id}` as never} asChild>
-      <Pressable style={styles.wishlistCard}>
+      <Pressable style={{ ...styles.wishlistCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
         {photo ? (
           <Image source={{ uri: photo }} style={styles.wishlistThumb} />
         ) : (
           <View style={[styles.wishlistThumb, { backgroundColor: placeholderColor(listing.id) }]} />
         )}
         <View style={styles.wishlistInfo}>
-          <Text style={styles.wishlistName} numberOfLines={1}>{title}</Text>
-          <Text style={styles.wishlistDesc} numberOfLines={1}>{counterpartyHandle}</Text>
+          <Text style={{ ...styles.wishlistName, color: theme.text }} numberOfLines={1}>{title}</Text>
+          <Text style={{ ...styles.wishlistDesc, color: theme.muted }} numberOfLines={1}>{counterpartyHandle}</Text>
           <View style={styles.historyMetaRow}>
             <Text style={styles.historyMode}>{modeLabel}</Text>
-            {priceLabel ? <Text style={styles.historyPrice}>{priceLabel}</Text> : null}
+            {priceLabel ? <Text style={{ ...styles.historyPrice, color: theme.text }}>{priceLabel}</Text> : null}
           </View>
         </View>
       </Pressable>
@@ -562,7 +569,7 @@ function MarketplaceHistoryRow({
 
 const styles = StyleSheet.create({
   hero: {
-    borderRadius: 32,
+    borderRadius: RADIUS_HERO_LG,
     backgroundColor: HERO_DARK,
     padding: 24,
     alignItems: "center",
@@ -605,6 +612,7 @@ const styles = StyleSheet.create({
     color: TEXT_ON_DARK,
     fontSize: 28,
     fontWeight: "800",
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   username: {
     color: AMBER_LIGHT,
@@ -650,7 +658,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   languageCard: {
-    borderRadius: 24,
+    borderRadius: RADIUS_ITEM_AIRY,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
@@ -716,6 +724,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
     color: TEXT_DARK,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   sectionText: {
     color: MUTED_2,
@@ -748,6 +757,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     color: TEXT_DARK_3,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   wishlistCard: {
     flexDirection: "row",
