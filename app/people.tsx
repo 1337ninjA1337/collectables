@@ -5,6 +5,7 @@ import { Image, Pressable, StyleSheet, Text, TextInput, View } from "react-nativ
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { SkeletonProfileList } from "@/components/skeleton";
+import { useAppTheme } from "@/components/use-app-theme";
 import {
   AMBER_LIGHT,
   AMBER_MUTED,
@@ -24,6 +25,9 @@ import {
   MUTED_16,
   PLACEHOLDER,
   PURE_WHITE,
+  RADIUS_HERO_LG,
+  RADIUS_ITEM_AIRY,
+  SHADOW_SOFT,
   TEXT_DARK,
   TEXT_ON_DARK_3,
   TEXT_ON_DARK_4,
@@ -33,12 +37,13 @@ import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { fetchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
-import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 const PAGE_SIZE = 25;
 
 export default function PeopleScreen() {
   const { t } = useI18n();
+  const theme = useAppTheme();
   const {
     getMyProfile,
     getRelationship,
@@ -92,7 +97,7 @@ export default function PeopleScreen() {
   function renderProfileCard(profile: UserProfile) {
     const relationship = getRelationship(profile.id);
     return (
-      <View key={profile.id} style={styles.card}>
+      <View key={profile.id} style={{ ...styles.card, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
         <Link href={`/profile/${profile.id}` as never} asChild>
           <Pressable style={styles.profileRow}>
             {profile.avatar ? (
@@ -101,9 +106,9 @@ export default function PeopleScreen() {
               <View style={styles.avatar} />
             )}
             <View style={styles.profileMeta}>
-              <Text style={styles.name}>{profile.displayName}</Text>
-              <Text style={styles.username}>@{profile.username}</Text>
-              <Text style={styles.bio}>{profile.bio}</Text>
+              <Text style={{ ...styles.name, color: theme.text }}>{profile.displayName}</Text>
+              <Text style={{ ...styles.username, color: theme.meta }}>@{profile.username}</Text>
+              <Text style={{ ...styles.bio, color: theme.muted }}>{profile.bio}</Text>
             </View>
           </Pressable>
         </Link>
@@ -163,15 +168,15 @@ export default function PeopleScreen() {
         <Text style={styles.subtitle}>{t("searchSubtitle")}</Text>
       </View>
 
-      <View style={styles.searchCard}>
-        <Text style={styles.searchLabel}>{t("searchByProfileId")}</Text>
+      <View style={{ ...styles.searchCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+        <Text style={{ ...styles.searchLabel, color: theme.meta }}>{t("searchByProfileId")}</Text>
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder={t("searchByProfileIdPlaceholder")}
           placeholderTextColor={PLACEHOLDER}
           autoCapitalize="none"
-          style={styles.searchInput}
+          style={{ ...styles.searchInput, backgroundColor: theme.page, borderColor: theme.border, color: theme.text }}
         />
       </View>
 
@@ -198,7 +203,7 @@ export default function PeopleScreen() {
               {t("prevPage")}
             </Text>
           </Pressable>
-          <Text style={styles.pageInfo}>{t("pageOf", { page, total: totalPages })}</Text>
+          <Text style={{ ...styles.pageInfo, color: theme.meta }}>{t("pageOf", { page, total: totalPages })}</Text>
           <Pressable
             style={{...styles.pageButton, ...(page >= totalPages ? styles.pageButtonDisabled : {})}}
             onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
@@ -217,7 +222,7 @@ export default function PeopleScreen() {
 const styles = StyleSheet.create({
   hero: {
     backgroundColor: HERO_DARK,
-    borderRadius: 32,
+    borderRadius: RADIUS_HERO_LG,
     padding: 24,
     gap: 10,
   },
@@ -234,7 +239,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 36,
-    fontFamily: FONT_DISPLAY,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   subtitle: {
     color: TEXT_ON_DARK_SOFT,
@@ -242,7 +247,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   searchCard: {
-    borderRadius: 24,
+    borderRadius: RADIUS_ITEM_AIRY,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
@@ -269,7 +274,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   card: {
-    borderRadius: 28,
+    borderRadius: RADIUS_ITEM_AIRY,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
@@ -294,7 +299,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: TEXT_DARK,
-    fontFamily: FONT_DISPLAY_BOLD,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   username: {
     color: MUTED,
