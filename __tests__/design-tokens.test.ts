@@ -592,6 +592,18 @@ describe("design-tokens adoption", () => {
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /HERO_DARK/);
     assert.match(src, /AMBER_ACCENT/);
+    // PR8d (visual-upgrade `redesign-secondary`): the marketplace screen adopts
+    // the theme hook, airy hero/card radii + soft shadow, and the editorial font.
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /useAppTheme\(\)/);
+    assert.match(src, /\bRADIUS_HERO_LG\b/);
+    assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
+    assert.match(src, /\bSHADOW_SOFT\b/);
+    assert.match(src, /\bFONT_DISPLAY_EDITORIAL\b/);
+    assert.match(src, /backgroundColor:\s*theme\.card/);
+    assert.match(src, /borderColor:\s*theme\.border/);
+    assert.match(src, /color:\s*theme\.text\b/);
+    assert.match(src, /color:\s*theme\.meta\b/);
   });
 
   it("components/bottom-nav.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {

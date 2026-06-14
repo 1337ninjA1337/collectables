@@ -5,6 +5,7 @@ import { DimensionValue, Image, Pressable, StyleSheet, Text, View } from "react-
 import { EmptyState } from "@/components/empty-state";
 import { RealtimeStatusPill } from "@/components/realtime-status-pill";
 import { Screen, useResponsive } from "@/components/screen";
+import { useAppTheme } from "@/components/use-app-theme";
 import { useCollections } from "@/lib/collections-context";
 import {
   AMBER_ACCENT,
@@ -15,11 +16,15 @@ import {
   HERO_DARK,
   MUTED,
   PAGE_BG,
+  RADIUS_HERO_LG,
+  RADIUS_ITEM_AIRY,
+  SHADOW_SOFT,
   SUCCESS_GREEN,
   TEXT_DARK,
   TEXT_ON_DARK,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
+import { FONT_DISPLAY_EDITORIAL } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
 import { useMarketplace } from "@/lib/marketplace-context";
 import { recentlySoldListings } from "@/lib/marketplace-helpers";
@@ -35,6 +40,7 @@ type ResolvedListing = {
 
 export default function MarketplaceScreen() {
   const { t } = useI18n();
+  const theme = useAppTheme();
   const { activeListings, myPurchases, mySales, listings } = useMarketplace();
   const { getItemById } = useCollections();
   const { getProfileById } = useSocial();
@@ -105,14 +111,14 @@ export default function MarketplaceScreen() {
 
       {purchases.length > 0 ? (
         <View style={styles.purchasesSection}>
-          <Text style={styles.sectionTitle}>{t("marketplaceMyPurchasesTitle")}</Text>
+          <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("marketplaceMyPurchasesTitle")}</Text>
           <ListingGrid data={purchases} columns={columns} fromSeller />
         </View>
       ) : null}
 
       {sales.length > 0 ? (
         <View style={styles.purchasesSection}>
-          <Text style={styles.sectionTitle}>{t("marketplaceMySalesTitle")}</Text>
+          <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("marketplaceMySalesTitle")}</Text>
           <ListingGrid
             data={sales}
             columns={columns}
@@ -125,7 +131,7 @@ export default function MarketplaceScreen() {
 
       {recentlySold.length > 0 ? (
         <View style={styles.purchasesSection}>
-          <Text style={styles.sectionTitle}>{t("marketplaceRecentlySoldTitle")}</Text>
+          <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("marketplaceRecentlySoldTitle")}</Text>
           <ListingGrid
             data={recentlySold}
             columns={columns}
@@ -185,6 +191,7 @@ function ListingCard({
   fromSeller?: boolean;
 }) {
   const { t } = useI18n();
+  const theme = useAppTheme();
   const photo = item?.photos?.find(Boolean);
   const title = item?.title ?? t("marketplaceUnknownItem");
   const ownerName = owner?.displayName ?? t("unknownUser");
@@ -200,7 +207,7 @@ function ListingCard({
 
   return (
     <Link href={`/listing/${listing.id}` as never} asChild>
-      <Pressable style={styles.card}>
+      <Pressable style={{ ...styles.card, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
         {photo ? (
           <Image source={{ uri: photo }} style={styles.photo} />
         ) : (
@@ -214,8 +221,8 @@ function ListingCard({
           </View>
         ) : null}
         <View style={styles.cardBody}>
-          <Text style={styles.cardTitle} numberOfLines={2}>{title}</Text>
-          <Text style={styles.cardOwner} numberOfLines={1}>{ownerName}</Text>
+          <Text style={{ ...styles.cardTitle, color: theme.text }} numberOfLines={2}>{title}</Text>
+          <Text style={{ ...styles.cardOwner, color: theme.meta }} numberOfLines={1}>{ownerName}</Text>
           {sellerHandle ? (
             <View style={styles.soldToPill}>
               <Text style={styles.soldToPillText} numberOfLines={1}>
@@ -239,7 +246,7 @@ function ListingCard({
             >
               <Text style={styles.modeBadgeText}>{modeLabel}</Text>
             </View>
-            {priceLabel ? <Text style={styles.cardPrice}>{priceLabel}</Text> : null}
+            {priceLabel ? <Text style={{ ...styles.cardPrice, color: theme.text }}>{priceLabel}</Text> : null}
           </View>
         </View>
       </Pressable>
@@ -250,7 +257,7 @@ function ListingCard({
 const styles = StyleSheet.create({
   hero: {
     backgroundColor: HERO_DARK,
-    borderRadius: 32,
+    borderRadius: RADIUS_HERO_LG,
     padding: 24,
     gap: 10,
   },
@@ -266,6 +273,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 36,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   subtitle: {
     color: TEXT_ON_DARK_SOFT,
@@ -280,7 +288,7 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   card: {
-    borderRadius: 22,
+    borderRadius: RADIUS_ITEM_AIRY,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
@@ -367,5 +375,6 @@ const styles = StyleSheet.create({
     color: TEXT_DARK,
     fontSize: 20,
     fontWeight: "800",
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
 });
