@@ -966,6 +966,18 @@ describe("design-tokens adoption", () => {
     assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_DARK_2/);
     assert.match(src, /TEXT_ON_DARK_5/);
+    // PR8a (visual-upgrade `redesign-secondary`): the wishlist screen adopts the
+    // theme hook, airy card radius + soft shadow, and the editorial display font.
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /useAppTheme\(\)/);
+    assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
+    assert.match(src, /\bSHADOW_SOFT\b/);
+    assert.match(src, /\bFONT_DISPLAY_EDITORIAL\b/);
+    assert.match(src, /backgroundColor:\s*theme\.card/);
+    assert.match(src, /borderColor:\s*theme\.border/);
+    assert.match(src, /color:\s*theme\.text\b/);
+    assert.match(src, /color:\s*theme\.meta\b/);
+    assert.match(src, /color:\s*theme\.muted\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

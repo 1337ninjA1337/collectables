@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmptyState } from "@/components/empty-state";
 import { PhotoPreview } from "@/components/photo-preview";
 import { Screen } from "@/components/screen";
+import { useAppTheme } from "@/components/use-app-theme";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useCollections } from "@/lib/collections-context";
 import {
@@ -39,6 +40,8 @@ import {
   MUTED_2,
   MUTED_20,
   MUTED_21,
+  RADIUS_ITEM_AIRY,
+  SHADOW_SOFT,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_ON_DARK_5,
@@ -46,10 +49,11 @@ import {
 import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
-import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export default function WishlistScreen() {
   const { t } = useI18n();
+  const theme = useAppTheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -196,8 +200,8 @@ export default function WishlistScreen() {
       <Stack.Screen options={{ title: t("wishlist") }} />
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{t("wishlist")}</Text>
-          <Text style={styles.subtitle}>{t("wishlistHint")}</Text>
+          <Text style={{ ...styles.title, color: theme.text }}>{t("wishlist")}</Text>
+          <Text style={{ ...styles.subtitle, color: theme.meta }}>{t("wishlistHint")}</Text>
         </View>
         <Pressable style={styles.addButton} onPress={() => setAddOpen(true)}>
           <Ionicons name="add" size={20} color={TEXT_DARK_2} />
@@ -218,16 +222,16 @@ export default function WishlistScreen() {
           {wishlistItems.map((item) => {
             const hasPhoto = item.photos.length > 0 && Boolean(item.photos[0]);
             return (
-              <View key={item.id} style={styles.card}>
+              <View key={item.id} style={{ ...styles.card, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
                 {hasPhoto ? (
                   <Image source={{ uri: item.photos[0] }} style={styles.cardImage} />
                 ) : (
                   <View style={{ ...styles.cardImage, backgroundColor: placeholderColor(item.id) }} />
                 )}
                 <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle}>{item.title}</Text>
+                  <Text style={{ ...styles.cardTitle, color: theme.text }}>{item.title}</Text>
                   {item.description ? (
-                    <Text style={styles.cardDescription} numberOfLines={2}>
+                    <Text style={{ ...styles.cardDescription, color: theme.muted }} numberOfLines={2}>
                       {item.description}
                     </Text>
                   ) : null}
@@ -386,7 +390,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: "800",
     color: TEXT_DARK,
-    fontFamily: FONT_DISPLAY,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   subtitle: {
     color: MUTED_20,
@@ -415,7 +419,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     gap: 14,
-    borderRadius: 20,
+    borderRadius: RADIUS_ITEM_AIRY,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
@@ -435,7 +439,7 @@ const styles = StyleSheet.create({
     color: TEXT_DARK,
     fontSize: 17,
     fontWeight: "800",
-    fontFamily: FONT_DISPLAY,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   cardDescription: {
     color: MUTED_2,
@@ -611,7 +615,7 @@ const styles = StyleSheet.create({
   },
   promoteSheet: {
     margin: 20,
-    borderRadius: 24,
+    borderRadius: RADIUS_ITEM_AIRY,
     backgroundColor: CARD_BG,
     padding: 20,
     gap: 10,
