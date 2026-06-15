@@ -22,7 +22,7 @@ describe("settings screen gates the premium card on usePremium().ready", () => {
   it("renders the real premium card branch only when ready=true", () => {
     assert.match(
       src,
-      /\{premiumReady\s*\?\s*\(\s*<View\s+style=\{isPremium\s*\?\s*styles\.premiumCardActive\s*:\s*styles\.premiumCard\}/,
+      /\{premiumReady\s*\?\s*\(\s*<View\s+style=\{isPremium\s*\?\s*styles\.premiumCardActive\s*:\s*\[styles\.premiumCard\b/,
     );
   });
 

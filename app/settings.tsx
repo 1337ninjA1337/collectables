@@ -5,6 +5,7 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native
 
 import { CurrencySheet } from "@/components/currency-sheet";
 import { Screen } from "@/components/screen";
+import { useAppTheme } from "@/components/use-app-theme";
 import { useAuth } from "@/lib/auth-context";
 import { useCollections } from "@/lib/collections-context";
 import {
@@ -12,10 +13,8 @@ import {
   AMBER_LIGHT,
   AMBER_SOFT,
   AMBER_SOFT_3,
-  BORDER,
   BORDER_5,
   BORDER_6,
-  CARD_BG,
   CARD_BG_3,
   CARD_BG_10,
   CARD_BG_11,
@@ -33,8 +32,10 @@ import {
   HERO_DARK_7,
   MUTED_2,
   MUTED_11,
+  RADIUS_HERO_LG,
+  RADIUS_ITEM_AIRY,
+  SHADOW_SOFT,
   STATUS_ONLINE,
-  TEXT_DARK,
   TEXT_DARK_2,
   TEXT_ON_DARK,
   TEXT_ON_DARK_3,
@@ -45,9 +46,10 @@ import { useDiagnostics } from "@/lib/diagnostics-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
 import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
-import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { FONT_DISPLAY, FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export default function SettingsScreen() {
+  const theme = useAppTheme();
   const { t, language, setLanguage, languageOptions, formatRelativeDate } = useI18n();
   const { signOut, deleteAccount, pending } = useAuth();
   const { ready: premiumReady, isPremium, activatedAt, expiresAt, activatePremium, cancelPremium } = usePremium();
@@ -152,9 +154,9 @@ export default function SettingsScreen() {
         <Text style={styles.title}>{t("settingsTitle")}</Text>
       </LinearGradient>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>{t("language")}</Text>
-        <Text style={styles.sectionText}>{t("languageSubtitle")}</Text>
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t("language")}</Text>
+        <Text style={[styles.sectionText, { color: theme.meta }]}>{t("languageSubtitle")}</Text>
         <View style={styles.languageRow}>
           {languageOptions.map((option) => (
             <Pressable
@@ -170,9 +172,9 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>{t("displayCurrencyTitle")}</Text>
-        <Text style={styles.sectionText}>{t("displayCurrencySubtitle")}</Text>
+      <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t("displayCurrencyTitle")}</Text>
+        <Text style={[styles.sectionText, { color: theme.meta }]}>{t("displayCurrencySubtitle")}</Text>
         <Pressable
           style={styles.currencyRow}
           onPress={() => {
@@ -212,9 +214,9 @@ export default function SettingsScreen() {
       />
 
       {premiumReady ? (
-        <View style={isPremium ? styles.premiumCardActive : styles.premiumCard}>
+        <View style={isPremium ? styles.premiumCardActive : [styles.premiumCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={styles.premiumHeaderRow}>
-            <Text style={isPremium ? styles.premiumSectionTitleActive : styles.premiumSectionTitle}>
+            <Text style={isPremium ? styles.premiumSectionTitleActive : [styles.premiumSectionTitle, { color: theme.text }]}>
               {t("premiumTitle")}
             </Text>
             {isPremium ? (
@@ -223,7 +225,7 @@ export default function SettingsScreen() {
               </View>
             ) : null}
           </View>
-          <Text style={isPremium ? styles.premiumSubtitleActive : styles.premiumSubtitle}>
+          <Text style={isPremium ? styles.premiumSubtitleActive : [styles.premiumSubtitle, { color: theme.meta }]}>
             {isPremium && activatedAt
               ? t("premiumActiveSince", { date: formatRelativeDate(activatedAt) })
               : t("premiumSubtitle")}
@@ -237,7 +239,7 @@ export default function SettingsScreen() {
             {(["premiumBenefit1", "premiumBenefit2", "premiumBenefit3"] as const).map((key) => (
               <View key={key} style={styles.premiumBenefitRow}>
                 <Text style={styles.premiumBenefitDot}>✦</Text>
-                <Text style={isPremium ? styles.premiumBenefitTextActive : styles.premiumBenefitText}>
+                <Text style={isPremium ? styles.premiumBenefitTextActive : [styles.premiumBenefitText, { color: theme.text }]}>
                   {t(key)}
                 </Text>
               </View>
@@ -254,7 +256,7 @@ export default function SettingsScreen() {
           )}
         </View>
       ) : (
-        <View style={styles.premiumCardSkeleton} testID="premium-card-skeleton">
+        <View style={[styles.premiumCardSkeleton, { backgroundColor: theme.card, borderColor: theme.border }]} testID="premium-card-skeleton">
           <View style={styles.premiumSkeletonTitle} />
           <View style={styles.premiumSkeletonLine} />
           <View style={styles.premiumSkeletonLineShort} />
@@ -311,7 +313,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    borderRadius: 32,
+    borderRadius: RADIUS_HERO_LG,
     padding: 24,
     gap: 10,
   },
@@ -327,25 +329,22 @@ const styles = StyleSheet.create({
     color: TEXT_ON_DARK_3,
     fontSize: 28,
     fontWeight: "800",
-    fontFamily: FONT_DISPLAY,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
     lineHeight: 36,
   },
   card: {
-    borderRadius: 24,
-    backgroundColor: CARD_BG,
+    borderRadius: RADIUS_ITEM_AIRY,
     borderWidth: 1,
-    borderColor: BORDER,
     padding: 18,
     gap: 12,
+    ...SHADOW_SOFT,
   },
   sectionTitle: {
     fontSize: 24,
     fontWeight: "800",
-    color: TEXT_DARK,
-    fontFamily: FONT_DISPLAY,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   sectionText: {
-    color: MUTED_2,
     lineHeight: 22,
     fontFamily: FONT_BODY,
   },
@@ -410,7 +409,7 @@ const styles = StyleSheet.create({
   },
   diagnosticsCard: {
     backgroundColor: TEXT_ON_DARK,
-    borderRadius: 22,
+    borderRadius: RADIUS_ITEM_AIRY,
     borderWidth: 1,
     borderColor: AMBER_SOFT_3,
     padding: 16,
@@ -467,7 +466,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   dangerZone: {
-    borderRadius: 24,
+    borderRadius: RADIUS_ITEM_AIRY,
     backgroundColor: CARD_BG_11,
     borderWidth: 1,
     borderColor: DANGER_SOFT_3,
@@ -502,15 +501,14 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   premiumCard: {
-    borderRadius: 24,
-    backgroundColor: CARD_BG,
+    borderRadius: RADIUS_ITEM_AIRY,
     borderWidth: 1,
-    borderColor: BORDER,
     padding: 18,
     gap: 12,
+    ...SHADOW_SOFT,
   },
   premiumCardActive: {
-    borderRadius: 24,
+    borderRadius: RADIUS_ITEM_AIRY,
     backgroundColor: HERO_DARK_7,
     borderWidth: 1,
     borderColor: AMBER_ACCENT,
@@ -526,14 +524,13 @@ const styles = StyleSheet.create({
   premiumSectionTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: TEXT_DARK,
-    fontFamily: FONT_DISPLAY,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   premiumSectionTitleActive: {
     fontSize: 22,
     fontWeight: "800",
     color: TEXT_ON_DARK_3,
-    fontFamily: FONT_DISPLAY,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   premiumBadge: {
     borderRadius: 999,
@@ -550,7 +547,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
   },
   premiumSubtitle: {
-    color: MUTED_2,
     lineHeight: 22,
     fontFamily: FONT_BODY,
   },
@@ -584,7 +580,6 @@ const styles = StyleSheet.create({
   },
   premiumBenefitText: {
     flex: 1,
-    color: TEXT_DARK,
     lineHeight: 22,
     fontFamily: FONT_BODY,
   },
@@ -623,10 +618,8 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   premiumCardSkeleton: {
-    borderRadius: 24,
-    backgroundColor: CARD_BG,
+    borderRadius: RADIUS_ITEM_AIRY,
     borderWidth: 1,
-    borderColor: BORDER,
     padding: 18,
     gap: 12,
     minHeight: 220,
