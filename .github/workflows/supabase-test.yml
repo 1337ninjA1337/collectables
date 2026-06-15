@@ -37,6 +37,28 @@ jobs:
         with:
           version: latest
 
+      # config.toml is generated here, on the runner, rather than committed.
+      # The repo's live Supabase Branching integration treats a committed
+      # supabase/config.toml as the source of truth for the preview/production
+      # projects — a partial config would disable storage/edge functions and
+      # clobber dashboard-managed settings on merge. Generating it at runtime
+      # keeps the scratch-DB check self-contained while leaving Branching on
+      # its dashboard config. It is also git-ignored so `supabase db diff`/
+      # stop don't leave the tree dirty.
+      - name: Generate ephemeral CLI config
+        run: |
+          cat > supabase/config.toml <<'TOML'
+          project_id = "collectables-ci"
+
+          [db]
+          port = 54322
+          shadow_port = 54320
+          major_version = 15
+
+          [auth]
+          enabled = true
+          TOML
+
       - name: Start scratch database (applies all migrations from empty)
         run: supabase db start
 

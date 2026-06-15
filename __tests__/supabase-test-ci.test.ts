@@ -57,15 +57,33 @@ describe("BE-31 — Supabase Tests workflow", () => {
   });
 });
 
-describe("BE-31 — required CLI artifacts are committed", () => {
-  it("commits supabase/config.toml so `supabase db start` can run", () => {
-    const cfgPath = path.join(root, "supabase", "config.toml");
-    assert.ok(existsSync(cfgPath), "supabase/config.toml must exist");
-    const cfg = readFileSync(cfgPath, "utf8");
-    assert.match(cfg, /project_id\s*=/, "config.toml needs a project_id");
-    assert.match(cfg, /\[db\]/, "config.toml needs a [db] section");
+describe("BE-31 — config.toml is generated at runtime, never committed", () => {
+  // The live Supabase Branching integration treats a committed
+  // supabase/config.toml as the source of truth for the preview/production
+  // projects (a partial config disables undeclared edge functions/storage and
+  // clobbers dashboard settings on merge), so it must be generated on the
+  // runner instead and git-ignored.
+  it("does NOT commit supabase/config.toml", () => {
+    assert.ok(
+      !existsSync(path.join(root, "supabase", "config.toml")),
+      "supabase/config.toml must not be committed — it is generated at runtime",
+    );
+  });
+
+  it("git-ignores supabase/config.toml", () => {
+    const gitignore = readFileSync(path.join(root, ".gitignore"), "utf8");
+    assert.match(gitignore, /^supabase\/config\.toml\s*$/m);
+  });
+
+  it("the workflow generates config.toml with [db] + [auth] before db start", () => {
+    const genIdx = workflow.indexOf("cat > supabase/config.toml");
+    const startIdx = workflow.indexOf("run: supabase db start");
+    assert.ok(genIdx !== -1, "workflow must write supabase/config.toml at runtime");
+    assert.ok(startIdx !== -1 && genIdx < startIdx, "config must be written before db start");
+    assert.match(workflow, /project_id\s*=/);
+    assert.match(workflow, /\[db\]/);
     // The migrations' FKs reference auth.users, so the auth schema must boot.
-    assert.match(cfg, /\[auth\]\s*[\s\S]*enabled\s*=\s*true/);
+    assert.match(workflow, /\[auth\]\s*\n\s*enabled\s*=\s*true/);
   });
 
   it("ships at least one pgTAP test for `supabase test db` to run", () => {

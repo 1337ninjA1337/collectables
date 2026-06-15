@@ -74,10 +74,15 @@ To reproduce the PR check locally (needs Docker + the
 [Supabase CLI](https://supabase.com/docs/guides/cli)):
 
 ```bash
+supabase init       # generates a local supabase/config.toml (git-ignored)
 supabase db start   # applies supabase/migrations/* to a scratch local DB
 supabase test db    # runs supabase/tests/*.sql (pgTAP)
 supabase stop --no-backup
 ```
 
-`supabase/config.toml` is the local CLI config used by both — it only names a
-local Docker project and contains no secrets.
+> **Do not commit `supabase/config.toml`.** It is git-ignored on purpose: the
+> repo's Supabase Branching integration treats a committed `config.toml` as the
+> source of truth for the preview/production projects, so a partial one would
+> stop deploying undeclared edge functions and override dashboard-managed
+> settings on merge. The CI workflow generates a throwaway config on the runner
+> for exactly this reason.
