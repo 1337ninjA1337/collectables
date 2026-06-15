@@ -1,0 +1,53 @@
+# Supabase CLI project config.
+#
+# Until now the repo had no committed `config.toml`, so the only way to apply
+# the `supabase/migrations/*` files was against the live production database
+# (`supabase db push --db-url …` in supabase-migrations.yml) — there was no
+# from-empty, isolated replay in CI. This config lets `supabase db start`
+# spin up a throwaway local Postgres (with the `auth` schema the migrations'
+# FKs depend on) so the Supabase Tests workflow can apply every migration to a
+# scratch DB and run the pgTAP suite on each PR (BE-31). It is also the
+# bootstrap config a throwaway second project would use (BE-4).
+#
+# `project_id` is only the local Docker project name — it is NOT a secret and
+# does not point at any hosted project.
+project_id = "collectables"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+# Match the production Postgres major version. `gen_random_uuid()` and
+# `timestamptz` defaults used by the base schema are available on 15+.
+major_version = 15
+
+[db.pooler]
+enabled = false
+
+[studio]
+enabled = false
+
+[inbucket]
+enabled = false
+
+[storage]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false

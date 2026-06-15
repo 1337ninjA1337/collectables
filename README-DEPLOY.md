@@ -55,3 +55,29 @@ follow the end-to-end checklist in [`APPSTORE-SUBMISSION.md`](./APPSTORE-SUBMISS
 visual assets, App Store Connect listing copy, EAS build/submit, and the
 TestFlight + review flow.
 
+
+## Database migrations & local schema testing
+
+The committed `supabase/migrations/*` files are the authoritative schema. Two
+checks keep them honest:
+
+- **Supabase Tests** (`.github/workflows/supabase-test.yml`) runs on every PR
+  that touches `supabase/**`. It boots a throwaway local Postgres with
+  `supabase db start` (applying every migration from empty, in filename order,
+  against a real `auth` schema) and then runs the pgTAP suite in
+  `supabase/tests/*.sql` with `supabase test db`. No secrets — the database is
+  ephemeral and local to the runner.
+- **Supabase Migrations** (`.github/workflows/supabase-migrations.yml`) pushes
+  pending migrations to the live database on `main` (gated on `SUPABASE_DB_URL`).
+
+To reproduce the PR check locally (needs Docker + the
+[Supabase CLI](https://supabase.com/docs/guides/cli)):
+
+```bash
+supabase db start   # applies supabase/migrations/* to a scratch local DB
+supabase test db    # runs supabase/tests/*.sql (pgTAP)
+supabase stop --no-backup
+```
+
+`supabase/config.toml` is the local CLI config used by both — it only names a
+local Docker project and contains no secrets.
