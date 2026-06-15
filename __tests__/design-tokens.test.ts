@@ -920,10 +920,8 @@ describe("design-tokens adoption", () => {
     assert.match(src, /AMBER_LIGHT/);
     assert.match(src, /AMBER_SOFT\b/);
     assert.match(src, /AMBER_SOFT_3/);
-    assert.match(src, /BORDER\b/);
     assert.match(src, /BORDER_5/);
     assert.match(src, /BORDER_6/);
-    assert.match(src, /CARD_BG\b/);
     assert.match(src, /CARD_BG_3/);
     assert.match(src, /CARD_BG_10/);
     assert.match(src, /CARD_BG_11/);
@@ -942,12 +940,23 @@ describe("design-tokens adoption", () => {
     assert.match(src, /MUTED_2\b/);
     assert.match(src, /MUTED_11/);
     assert.match(src, /STATUS_ONLINE/);
-    assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_DARK_2/);
     assert.match(src, /TEXT_ON_DARK\b/);
     assert.match(src, /TEXT_ON_DARK_3/);
     assert.match(src, /TEXT_ON_DARK_4/);
     assert.match(src, /TEXT_ON_DARK_SOFT/);
+    // PR8f (visual-upgrade `redesign-secondary`): the settings screen adopts the
+    // theme hook, airy hero/card radii + soft shadow, and the editorial display font.
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /useAppTheme\(\)/);
+    assert.match(src, /\bRADIUS_HERO_LG\b/);
+    assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
+    assert.match(src, /\bSHADOW_SOFT\b/);
+    assert.match(src, /\bFONT_DISPLAY_EDITORIAL\b/);
+    assert.match(src, /backgroundColor:\s*theme\.card/);
+    assert.match(src, /borderColor:\s*theme\.border/);
+    assert.match(src, /color:\s*theme\.text\b/);
+    assert.match(src, /color:\s*theme\.meta\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
