@@ -60,6 +60,38 @@ Either apply it via the Supabase SQL editor, or push via the `supabase db push`
 workflow. RLS lockdown for these tables is a separate, later migration
 (BE-11/BE-12) — this one only establishes column shape, keys, and FKs.
 
+## 20260424_chat_messages.sql
+
+Run `supabase/migrations/20260424_chat_messages.sql` against your Supabase project to give direct chats a server-of-truth store (until this lands, messages live only in each device's AsyncStorage and never reach the recipient):
+
+```sql
+-- Creates public.chat_messages(id, chat_id, from_user_id, to_user_id, text,
+-- created_at) with RLS enabled:
+--   * SELECT: either participant (auth.uid() = from_user_id OR to_user_id)
+--   * INSERT: sender only (auth.uid() = from_user_id), recipient must be a
+--     confirmed mutual friend (both directions of friend_requests exist)
+--   * no UPDATE/DELETE policy → messages are immutable once stored
+-- Indexes on (chat_id, created_at) and (to_user_id, created_at).
+-- The table is added to the `supabase_realtime` publication so subscribed
+-- clients receive new rows. Apply AFTER 20260423_base_schema.sql — the INSERT
+-- policy references public.friend_requests.
+```
+
+Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
+
+## 20260501_chat_reads.sql
+
+Run `supabase/migrations/20260501_chat_reads.sql` against your Supabase project to sync the per-chat unread badge across devices:
+
+```sql
+-- Creates public.chat_reads(user_id, chat_id, last_read_at) with a composite
+-- primary key (user_id, chat_id) and RLS enabled. Each user can only
+-- SELECT/INSERT/UPDATE their own rows (auth.uid() = user_id). A missing row
+-- means "never read" (unread count = all messages); markRead upserts the row.
+```
+
+Either apply it via the Supabase SQL editor, or push via the `supabase db push` workflow.
+
 ## 20260527142510_items_archived_at.sql
 
 Run `supabase/migrations/20260527142510_items_archived_at.sql` against your Supabase project to support soft-archiving of items after a marketplace sale:
