@@ -31,6 +31,35 @@ on the free plan and use only the production database tied to `main`:
    Until you add the secret (or instead of it), keep applying each migration's
    SQL manually via the Supabase SQL editor as documented in the sections below.
 
+## 20260423_base_schema.sql
+
+Authoritative, idempotent definition of the four core tables (`profiles`,
+`collections`, `items`, `friend_requests`). It folds every earlier `ALTER`
+(`items.cost_currency`, `collections.currency`, `items.archived_at`,
+`profiles.display_currency`) into a single `CREATE TABLE … IF NOT EXISTS`
+definition so a **fresh** Supabase project can be bootstrapped from the
+committed migrations alone.
+
+```sql
+-- Creates public.profiles / collections / items / friend_requests with all
+-- columns, foreign keys (→ auth.users, items → collections), uniqueness on
+-- profiles.public_id / profiles.username, the friend_requests directed-pair
+-- unique index + no-self CHECK, and hot-path indexes. Every statement uses
+-- IF NOT EXISTS, so it is SAFE to apply on top of the existing live schema:
+-- pre-existing tables/columns are left untouched, missing ones are added.
+```
+
+- **Fresh project:** apply this migration first (it is dated `20260423`,
+  before the earliest dependent migration `20260424_chat_messages.sql` whose
+  RLS policy references `friend_requests`, so `supabase db push` runs it in
+  order and the from-empty replay succeeds).
+- **Existing project:** applying it is a no-op for anything already present;
+  the embedded `ADD COLUMN IF NOT EXISTS` guards re-assert the four ALTERs.
+
+Either apply it via the Supabase SQL editor, or push via the `supabase db push`
+workflow. RLS lockdown for these tables is a separate, later migration
+(BE-11/BE-12) — this one only establishes column shape, keys, and FKs.
+
 ## 20260527142510_items_archived_at.sql
 
 Run `supabase/migrations/20260527142510_items_archived_at.sql` against your Supabase project to support soft-archiving of items after a marketplace sale:
