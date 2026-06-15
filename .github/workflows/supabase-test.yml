@@ -1,0 +1,70 @@
+name: Supabase Tests
+
+# BE-31: on every PR (and on demand) apply ALL committed migrations to a
+# throwaway, from-empty local Postgres and run the pgTAP suite against it.
+#
+# `supabase db start` boots a local database container that includes the
+# `auth` schema the migrations' FKs reference, then replays
+# `supabase/migrations/*` in filename order — so a broken migration, a
+# duplicate version prefix, or a column the parity test missed fails the PR
+# instead of only surfacing on the live database. `supabase test db` then runs
+# every `supabase/tests/*.sql` pgTAP file (currently the schema smoke test;
+# RLS / FK-cascade coverage arrives with BE-12 / BE-36).
+#
+# This needs no secrets — the scratch DB is ephemeral and local to the runner.
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/supabase-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # config.toml is generated here, on the runner, rather than committed.
+      # The repo's live Supabase Branching integration treats a committed
+      # supabase/config.toml as the source of truth for the preview/production
+      # projects — a partial config would disable storage/edge functions and
+      # clobber dashboard-managed settings on merge. Generating it at runtime
+      # keeps the scratch-DB check self-contained while leaving Branching on
+      # its dashboard config. It is also git-ignored so `supabase db diff`/
+      # stop don't leave the tree dirty.
+      - name: Generate ephemeral CLI config
+        run: |
+          cat > supabase/config.toml <<'TOML'
+          project_id = "collectables-ci"
+
+          [db]
+          port = 54322
+          shadow_port = 54320
+          major_version = 15
+
+          [auth]
+          enabled = true
+          TOML
+
+      - name: Start scratch database (applies all migrations from empty)
+        run: supabase db start
+
+      - name: Run pgTAP tests
+        run: supabase test db
+
+      - name: Stop scratch database
+        if: always()
+        run: supabase stop --no-backup

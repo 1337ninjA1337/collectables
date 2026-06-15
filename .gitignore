@@ -53,4 +53,11 @@ ios/
 # Supabase local CLI cache (contains project ref, org IDs, pooler URLs)
 supabase/.temp/
 
+# Supabase CLI config is generated at runtime by the Supabase Tests workflow
+# and must NOT be committed — the live Supabase Branching integration treats a
+# committed supabase/config.toml as the source of truth for the preview/
+# production projects (it would disable undeclared edge functions/storage and
+# clobber dashboard-managed settings on merge). See .github/workflows/supabase-test.yml.
+supabase/config.toml
+
 .env.local
