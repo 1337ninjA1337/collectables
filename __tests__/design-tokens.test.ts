@@ -641,18 +641,26 @@ describe("design-tokens adoption", () => {
   it("app/chats.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("app/chats.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
-    assert.match(src, /HERO_DARK/);
+    assert.match(src, /HERO_DARK\b/);
     assert.match(src, /HERO_DARK_3/);
     assert.match(src, /AMBER_LIGHT/);
     assert.match(src, /AMBER_MUTED/);
     assert.match(src, /TEXT_ON_DARK_3/);
     assert.match(src, /TEXT_ON_DARK_SOFT/);
-    assert.match(src, /CARD_BG/);
-    assert.match(src, /BORDER/);
-    assert.match(src, /TEXT_DARK/);
-    assert.match(src, /MUTED/);
-    assert.match(src, /MUTED_2/);
     assert.match(src, /DANGER/);
+    // PR8e (visual-upgrade `redesign-secondary`): the chats screen adopts the
+    // theme hook, airy hero/card radii + soft shadow, and the editorial display font.
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /useAppTheme\(\)/);
+    assert.match(src, /\bRADIUS_HERO_LG\b/);
+    assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
+    assert.match(src, /\bSHADOW_SOFT\b/);
+    assert.match(src, /\bFONT_DISPLAY_EDITORIAL\b/);
+    assert.match(src, /backgroundColor:\s*theme\.card/);
+    assert.match(src, /borderColor:\s*theme\.border/);
+    assert.match(src, /color:\s*theme\.text\b/);
+    assert.match(src, /color:\s*theme\.meta\b/);
+    assert.match(src, /color:\s*theme\.muted\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

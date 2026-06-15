@@ -4,21 +4,21 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
+import { useAppTheme } from "@/components/use-app-theme";
 import { useChat } from "@/lib/chat-context";
 import {
   AMBER_LIGHT,
   AMBER_MUTED,
-  BORDER,
-  CARD_BG,
   DANGER,
   HERO_DARK,
   HERO_DARK_3,
-  MUTED,
-  MUTED_2,
-  TEXT_DARK,
+  RADIUS_HERO_LG,
+  RADIUS_ITEM_AIRY,
+  SHADOW_SOFT,
   TEXT_ON_DARK_3,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
+import { FONT_DISPLAY_EDITORIAL } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { useVisibilityRefresh } from "@/lib/use-visibility-refresh";
@@ -27,6 +27,7 @@ const CHATS_REFRESH_INTERVAL_MS = 15000;
 
 export default function ChatsScreen() {
   const { t, formatChatPreviewTimestamp } = useI18n();
+  const theme = useAppTheme();
   const { previews, refreshFromCloud } = useChat();
   const { getProfileById, ensureProfilesLoaded, friends } = useSocial();
 
@@ -65,7 +66,7 @@ export default function ChatsScreen() {
             return (
               <Pressable
                 key={preview.chatId}
-                style={styles.row}
+                style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]}
                 onPress={() => router.push(`/chat/${preview.otherUserId}` as never)}
               >
                 {profile?.avatar ? (
@@ -79,14 +80,14 @@ export default function ChatsScreen() {
                 )}
                 <View style={styles.rowBody}>
                   <View style={styles.rowHeader}>
-                    <Text style={styles.name} numberOfLines={1}>
+                    <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
                       {displayName}
                     </Text>
-                    <Text style={styles.when}>{formatChatPreviewTimestamp(preview.lastMessageAt)}</Text>
+                    <Text style={[styles.when, { color: theme.meta }]}>{formatChatPreviewTimestamp(preview.lastMessageAt)}</Text>
                   </View>
                   <View style={styles.rowFooter}>
                     <Text
-                      style={[styles.preview, unread && styles.previewUnread]}
+                      style={[styles.preview, { color: theme.muted }, unread && { color: theme.text, fontWeight: "700" }]}
                       numberOfLines={1}
                     >
                       {preview.lastMessage}
@@ -110,7 +111,7 @@ export default function ChatsScreen() {
 const styles = StyleSheet.create({
   hero: {
     backgroundColor: HERO_DARK,
-    borderRadius: 32,
+    borderRadius: RADIUS_HERO_LG,
     padding: 24,
     gap: 10,
   },
@@ -123,6 +124,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: TEXT_ON_DARK_3,
+    fontFamily: FONT_DISPLAY_EDITORIAL,
     fontSize: 28,
     fontWeight: "800",
     lineHeight: 36,
@@ -138,10 +140,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 14,
     padding: 14,
-    borderRadius: 22,
-    backgroundColor: CARD_BG,
+    borderRadius: RADIUS_ITEM_AIRY,
     borderWidth: 1,
-    borderColor: BORDER,
+    ...SHADOW_SOFT,
   },
   avatar: {
     width: 52,
@@ -175,24 +176,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   name: {
+    fontFamily: FONT_DISPLAY_EDITORIAL,
     fontSize: 16,
     fontWeight: "800",
-    color: TEXT_DARK,
     flex: 1,
   },
   when: {
-    color: MUTED,
     fontSize: 12,
     fontWeight: "700",
   },
   preview: {
-    color: MUTED_2,
     flex: 1,
     fontSize: 14,
-  },
-  previewUnread: {
-    color: HERO_DARK,
-    fontWeight: "700",
   },
   badge: {
     minWidth: 22,
