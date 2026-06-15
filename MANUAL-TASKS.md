@@ -31,7 +31,7 @@ on the free plan and use only the production database tied to `main`:
    Until you add the secret (or instead of it), keep applying each migration's
    SQL manually via the Supabase SQL editor as documented in the sections below.
 
-## 20260520_base_schema.sql
+## 20260423_base_schema.sql
 
 Authoritative, idempotent definition of the four core tables (`profiles`,
 `collections`, `items`, `friend_requests`). It folds every earlier `ALTER`
@@ -49,8 +49,10 @@ committed migrations alone.
 -- pre-existing tables/columns are left untouched, missing ones are added.
 ```
 
-- **Fresh project:** apply this migration first (it is dated `20260520`,
-  before the later per-feature ALTERs, so `supabase db push` runs it in order).
+- **Fresh project:** apply this migration first (it is dated `20260423`,
+  before the earliest dependent migration `20260424_chat_messages.sql` whose
+  RLS policy references `friend_requests`, so `supabase db push` runs it in
+  order and the from-empty replay succeeds).
 - **Existing project:** applying it is a no-op for anything already present;
   the embedded `ADD COLUMN IF NOT EXISTS` guards re-assert the four ALTERs.
 

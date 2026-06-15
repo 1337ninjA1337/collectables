@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 /**
@@ -18,7 +18,7 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 const MIGRATION = readFileSync(
-  path.join(ROOT, "supabase", "migrations", "20260520_base_schema.sql"),
+  path.join(ROOT, "supabase", "migrations", "20260423_base_schema.sql"),
   "utf8",
 );
 
@@ -110,5 +110,16 @@ describe("base schema migration (BE-1)", () => {
   it("guards against self friend requests and duplicate directed pairs", () => {
     assert.match(SQL, /from_user_id <> to_user_id/);
     assert.match(SQL, /friend_requests_pair_key/);
+  });
+
+  // Regression: a fresh DB applies migrations in filename order. Earlier
+  // migrations (e.g. 20260424_chat_messages.sql's RLS policy) reference these
+  // core tables, so the base schema MUST sort first or the replay fails with
+  // "relation does not exist".
+  it("sorts before every other migration so it applies first on a fresh DB", () => {
+    const files = readdirSync(path.join(ROOT, "supabase", "migrations"))
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+    assert.equal(files[0], "20260423_base_schema.sql");
   });
 });
