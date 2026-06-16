@@ -58,8 +58,15 @@ insert into public.friend_requests (from_user_id, to_user_id) values
 -- table-level UPDATE grant would otherwise re-enable writes to is_admin and
 -- mask the self-promotion deny test below).
 grant usage on schema public to authenticated;
-grant select, insert, update, delete on all tables in schema public to authenticated;
-revoke update (is_admin) on public.profiles from authenticated;
+grant select, insert, delete on all tables in schema public to authenticated;
+grant update on public.collections, public.items, public.friend_requests to authenticated;
+-- profiles.is_admin is protected by a column-level REVOKE in the RLS migration.
+-- A *table-level* UPDATE grant would cover every column and silently override
+-- that REVOKE (in PostgreSQL a table privilege satisfies the per-column check),
+-- so grant UPDATE per-column on profiles EXCLUDING is_admin to mirror the
+-- intended hardening — this is what makes the self-promotion deny below real.
+grant update (id, email, display_name, username, public_id, bio, avatar, display_currency, created_at)
+  on public.profiles to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 1–15: SECURITY DEFINER helper unit tests (definer-privileged, role-agnostic).
