@@ -20,7 +20,7 @@
 
 begin;
 
-select plan(38);
+select plan(39);
 
 -- ---------------------------------------------------------------------------
 -- Seed (runs as the privileged test session role — bypasses RLS).
@@ -224,6 +224,31 @@ savepoint sp_admin_del;
 with d as (delete from public.profiles where id = '00000000-0000-0000-0000-00000000a11c' returning 1)
 select is((select count(*)::int from d), 1, 'admin can delete another user profile');
 rollback to savepoint sp_admin_del;
+
+-- ---------------------------------------------------------------------------
+-- 39: SEC-ADMIN-1 defense-in-depth — even if a future Supabase bootstrap (or a
+-- careless `grant all`) re-adds a *table-level* UPDATE to authenticated, the
+-- 20260617 hardening (REVOKE UPDATE ON profiles + per-column re-grant excluding
+-- is_admin) must keep self-promotion denied. Simulate the bootstrap's broad
+-- grant, replay the hardening, and assert the self-promote still throws 42501.
+-- ---------------------------------------------------------------------------
+reset role;
+reset request.jwt.claims;
+
+grant update on public.profiles to authenticated; -- simulate Supabase bootstrap
+-- replay 20260617_profiles_admin_update_grant.sql
+revoke update on public.profiles from authenticated;
+revoke update on public.profiles from anon;
+grant update (id, email, display_name, username, public_id, bio, avatar, display_currency, created_at)
+  on public.profiles to authenticated;
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000a11c","role":"authenticated"}';
+select throws_ok(
+  $$ update public.profiles set is_admin = true where id = '00000000-0000-0000-0000-00000000a11c' $$,
+  '42501', null,
+  'self-promote stays denied after a table-level grant is replayed over the hardening'
+);
 
 reset role;
 reset request.jwt.claims;
