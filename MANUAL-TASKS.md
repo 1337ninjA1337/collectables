@@ -376,3 +376,54 @@ Run `supabase/migrations/20260527_marketplace_transfers.sql` against your Supaba
 ```
 
 Apply via the Supabase SQL editor or the `supabase db push` workflow.
+
+## 20260616_core_tables_rls.sql
+
+Run `supabase/migrations/20260616_core_tables_rls.sql` to enable Row Level
+Security on the four core tables (`profiles`, `collections`, `items`,
+`friend_requests`), which `20260423_base_schema.sql` intentionally left
+unprotected. chat / marketplace / analytics tables already ship their own RLS
+and are untouched.
+
+```sql
+-- Adds profiles.is_admin (boolean, default false) and REVOKEs UPDATE on that
+-- column from the authenticated + anon roles so a crafted PATCH on a caller's
+-- own profile row cannot self-promote to admin.
+--
+-- SECURITY DEFINER helpers (search_path pinned to public):
+--   is_friend(a, b)              — both directed friend_requests rows exist.
+--   is_visible_to(viewer, owner) — viewer = owner OR mutual friends.
+--   can_view_collection(viewer, cid) — owner / public / shared_with / friend.
+--   is_admin(uid)                — reads profiles.is_admin.
+--
+-- Policies (idempotent: DROP POLICY IF EXISTS before each CREATE):
+--   profiles  — SELECT any authenticated user; INSERT/UPDATE own row only;
+--               DELETE own row or any row when is_admin(auth.uid()).
+--   collections — SELECT can_view_collection(); INSERT/UPDATE/DELETE owner only.
+--   items     — SELECT follows parent collection visibility; INSERT/UPDATE/
+--               DELETE require owning the parent collection.
+--   friend_requests — SELECT/DELETE by either party; INSERT by sender only;
+--               no UPDATE (rows immutable, unfriend = DELETE).
+```
+
+To grant yourself admin after applying, run once in the SQL editor (uses the
+service_role / dashboard which bypasses the column REVOKE):
+
+```sql
+UPDATE public.profiles SET is_admin = true WHERE username = '1337antoxa';
+```
+
+Apply via the Supabase SQL editor or the `supabase db push` workflow.
+
+### RLS leak check (BE-11a)
+
+After applying, confirm an end-user role cannot escape its own data:
+
+```sql
+SET ROLE authenticated;
+-- with no auth.uid() set, every gated table returns zero rows:
+SELECT count(*) FROM public.collections;      -- expect 0 (no public + not owner)
+SELECT count(*) FROM public.items;            -- expect 0
+SELECT count(*) FROM public.friend_requests;  -- expect 0
+RESET ROLE;
+```
