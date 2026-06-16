@@ -427,3 +427,56 @@ SELECT count(*) FROM public.items;            -- expect 0
 SELECT count(*) FROM public.friend_requests;  -- expect 0
 RESET ROLE;
 ```
+
+## 20260617_profiles_admin_update_grant.sql
+
+SEC-ADMIN-1 — closes a privilege-escalation hole the column-level REVOKE in
+`20260616_core_tables_rls.sql` did not actually close. In PostgreSQL a
+*table-level* `UPDATE` grant covers every column and silently overrides a
+column-level `REVOKE UPDATE (is_admin)`. Supabase's default bootstrap usually
+runs `GRANT ALL … TO authenticated` (table-level), so the earlier REVOKE was a
+no-op and any authenticated user could PATCH their own row to `is_admin = true`,
+escalating to admin (then deleting any profile via `profiles_delete_own_or_admin`).
+
+**Before applying**, confirm what `authenticated` actually holds on
+`public.profiles` in the live project:
+
+```sql
+-- table-level vs column-level UPDATE grants held by the end-user roles:
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_schema = 'public' AND table_name = 'profiles'
+  AND grantee IN ('authenticated', 'anon');
+
+SELECT grantee, column_name, privilege_type
+FROM information_schema.role_column_grants
+WHERE table_schema = 'public' AND table_name = 'profiles'
+  AND grantee IN ('authenticated', 'anon');
+```
+
+If `authenticated` has a table-level `UPDATE` row above, the hole is open. Apply
+the migration to drop table-level UPDATE and re-grant per-column excluding
+`is_admin`:
+
+```sql
+REVOKE UPDATE ON public.profiles FROM authenticated;
+REVOKE UPDATE ON public.profiles FROM anon;
+GRANT UPDATE (id, email, display_name, username, public_id, bio, avatar,
+  display_currency, created_at) ON public.profiles TO authenticated;
+```
+
+After applying, verify self-promotion is denied (run as a normal user, NOT the
+dashboard/service_role which bypasses grants):
+
+```sql
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"<your-auth-uid>","role":"authenticated"}', true);
+UPDATE public.profiles SET is_admin = true WHERE id = '<your-auth-uid>';
+-- expect: ERROR  permission denied for table profiles  (SQLSTATE 42501)
+RESET ROLE;
+```
+
+`is_admin` stays a service-role-only column: grant admin via the SQL editor
+snippet under `20260616_core_tables_rls.sql`. If this column list ever drifts
+from the `profiles` schema, update both this snippet and the migration.
