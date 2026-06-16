@@ -141,6 +141,7 @@ below reproduce the production schema end-to-end on an empty project.
    20260527_marketplace_transfers.sql
    20260528_profile_display_currency.sql
    20260616_core_tables_rls.sql          RLS + helpers on the core tables
+   20260617_profiles_admin_update_grant.sql  hardens is_admin against self-promotion
    ```
 
    No CLI? Open each file in **SQL Editor** and run them top-to-bottom in the
