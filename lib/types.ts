@@ -17,6 +17,14 @@ export type UserProfile = {
   avatar: string;
   isPremium?: boolean;
   /**
+   * Server-authoritative admin flag, mirrored from `profiles.is_admin`. The
+   * client can read it but never writes it (the column REVOKEs UPDATE from
+   * authenticated/anon — see `20260616_core_tables_rls.sql`). NULL/undefined →
+   * not an admin; `social-context` falls back to the username/email allowlist
+   * for offline/seed profiles.
+   */
+  isAdmin?: boolean;
+  /**
    * The user's app-wide display currency (ISO 4217), synced across devices via
    * the profiles row. NULL/undefined → fall back to the device-local
    * preference, then the language default. See bug-2c in collections-context.
