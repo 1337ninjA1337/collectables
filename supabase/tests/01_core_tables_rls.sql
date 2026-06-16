@@ -50,6 +50,17 @@ insert into public.friend_requests (from_user_id, to_user_id) values
   ('00000000-0000-0000-0000-00000000b0b0', '00000000-0000-0000-0000-00000000a11c'), -- bob -> alice  (=> mutual)
   ('00000000-0000-0000-0000-00000000ca01', '00000000-0000-0000-0000-00000000a11c'); -- carol -> alice (one-way)
 
+-- The local scratch DB built by `supabase db start` does NOT run Supabase's
+-- hosted role bootstrap, so the `authenticated` role has no table privileges
+-- here — in production those come from `grant all ... to authenticated`. Grant
+-- them so these tests exercise RLS row-filtering rather than a missing GRANT,
+-- then re-apply the column-level REVOKE the RLS migration relies on (the fresh
+-- table-level UPDATE grant would otherwise re-enable writes to is_admin and
+-- mask the self-promotion deny test below).
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+revoke update (is_admin) on public.profiles from authenticated;
+
 -- ---------------------------------------------------------------------------
 -- 1–15: SECURITY DEFINER helper unit tests (definer-privileged, role-agnostic).
 -- ---------------------------------------------------------------------------
