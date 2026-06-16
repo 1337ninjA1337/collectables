@@ -118,16 +118,10 @@ select lives_ok(
 );
 rollback to savepoint sp_carol_ins_col;
 
-select is(
-  (with u as (update public.collections set name = 'hijacked' where id = '00000000-0000-0000-0000-0000000c0001' returning 1) select count(*)::int from u),
-  0,
-  'carol cannot update alice private collection (RLS filters the row)'
-);
-select is(
-  (with d as (delete from public.collections where id = '00000000-0000-0000-0000-0000000c0001' returning 1) select count(*)::int from d),
-  0,
-  'carol cannot delete alice private collection (RLS filters the row)'
-);
+with u as (update public.collections set name = 'hijacked' where id = '00000000-0000-0000-0000-0000000c0001' returning 1)
+select is((select count(*)::int from u), 0, 'carol cannot update alice private collection (RLS filters the row)');
+with d as (delete from public.collections where id = '00000000-0000-0000-0000-0000000c0001' returning 1)
+select is((select count(*)::int from d), 0, 'carol cannot delete alice private collection (RLS filters the row)');
 
 select throws_ok(
   $$ insert into public.items (id, collection_id, created_by_user_id, title) values ('00000000-0000-0000-0000-00000000eede', '00000000-0000-0000-0000-0000000c0001', '00000000-0000-0000-0000-00000000ca01', 'spoof item') $$,
@@ -153,11 +147,8 @@ select lives_ok(
 );
 rollback to savepoint sp_carol_ins_fr;
 
-select is(
-  (with d as (delete from public.friend_requests where from_user_id = '00000000-0000-0000-0000-00000000a11c' and to_user_id = '00000000-0000-0000-0000-00000000b0b0' returning 1) select count(*)::int from d),
-  0,
-  'carol cannot delete a friend_request she is not party to'
-);
+with d as (delete from public.friend_requests where from_user_id = '00000000-0000-0000-0000-00000000a11c' and to_user_id = '00000000-0000-0000-0000-00000000b0b0' returning 1)
+select is((select count(*)::int from d), 0, 'carol cannot delete a friend_request she is not party to');
 
 -- ---------------------------------------------------------------------------
 -- 17/20/34: RLS as bob (mutual friend of alice).
@@ -195,21 +186,15 @@ select is(
   1,
   'alice can read items in her own private collection'
 );
-select is(
-  (with u as (update public.profiles set bio = 'tampered' where id = '00000000-0000-0000-0000-00000000b0b0' returning 1) select count(*)::int from u),
-  0,
-  'alice cannot update another user profile'
-);
+with u as (update public.profiles set bio = 'tampered' where id = '00000000-0000-0000-0000-00000000b0b0' returning 1)
+select is((select count(*)::int from u), 0, 'alice cannot update another user profile');
 select throws_ok(
   $$ update public.profiles set is_admin = true where id = '00000000-0000-0000-0000-00000000a11c' $$,
   '42501', null,
   'alice cannot self-promote via the is_admin column (REVOKE UPDATE)'
 );
-select is(
-  (with d as (delete from public.profiles where id = '00000000-0000-0000-0000-00000000b0b0' returning 1) select count(*)::int from d),
-  0,
-  'alice cannot delete another user profile'
-);
+with d as (delete from public.profiles where id = '00000000-0000-0000-0000-00000000b0b0' returning 1)
+select is((select count(*)::int from d), 0, 'alice cannot delete another user profile');
 
 savepoint sp_alice_ins_item;
 select lives_ok(
@@ -219,11 +204,8 @@ select lives_ok(
 rollback to savepoint sp_alice_ins_item;
 
 savepoint sp_alice_del_fr;
-select is(
-  (with d as (delete from public.friend_requests where from_user_id = '00000000-0000-0000-0000-00000000a11c' and to_user_id = '00000000-0000-0000-0000-00000000b0b0' returning 1) select count(*)::int from d),
-  1,
-  'a party (sender) can delete their own friend_request'
-);
+with d as (delete from public.friend_requests where from_user_id = '00000000-0000-0000-0000-00000000a11c' and to_user_id = '00000000-0000-0000-0000-00000000b0b0' returning 1)
+select is((select count(*)::int from d), 1, 'a party (sender) can delete their own friend_request');
 rollback to savepoint sp_alice_del_fr;
 
 -- ---------------------------------------------------------------------------
@@ -232,11 +214,8 @@ rollback to savepoint sp_alice_del_fr;
 set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000ad311","role":"authenticated"}';
 
 savepoint sp_admin_del;
-select is(
-  (with d as (delete from public.profiles where id = '00000000-0000-0000-0000-00000000a11c' returning 1) select count(*)::int from d),
-  1,
-  'admin can delete another user profile'
-);
+with d as (delete from public.profiles where id = '00000000-0000-0000-0000-00000000a11c' returning 1)
+select is((select count(*)::int from d), 1, 'admin can delete another user profile');
 rollback to savepoint sp_admin_del;
 
 reset role;
