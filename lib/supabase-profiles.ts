@@ -39,6 +39,7 @@ type DbProfile = {
   bio: string;
   avatar: string;
   display_currency?: string | null;
+  is_admin?: boolean | null;
 };
 
 function isHiddenProfile(row: DbProfile): boolean {
@@ -55,6 +56,7 @@ function toUserProfile(row: DbProfile): UserProfile {
     bio: row.bio,
     avatar: row.avatar,
     displayCurrency: row.display_currency ?? null,
+    isAdmin: row.is_admin ?? false,
   };
 }
 

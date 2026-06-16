@@ -279,6 +279,12 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     }
 
     const selfProfile = profiles.find((profile) => profile.id === user.id);
+    // Server-authoritative flag (profiles.is_admin via RLS) wins; the
+    // username/email allowlist stays as an offline/seed fallback for profiles
+    // hydrated before the cloud row is read.
+    if (selfProfile?.isAdmin) {
+      return true;
+    }
     return selfProfile?.username === "1337antoxa" || selfProfile?.email === "1337.antoxa@gmail.com";
   }, [profiles, user]);
 

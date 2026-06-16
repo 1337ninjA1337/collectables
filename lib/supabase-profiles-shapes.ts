@@ -34,6 +34,10 @@ export function profilesPageRangeHeader(page: number, pageSize: number): string 
 }
 
 export function upsertProfileBody(profile: UserProfile): Record<string, unknown> {
+  // `is_admin` is intentionally omitted: the column REVOKEs UPDATE from
+  // authenticated/anon (see `20260616_core_tables_rls.sql`), so it is
+  // server-authoritative — the client reads it via `toUserProfile` but must
+  // never write it back, or the upsert would be rejected on the column grant.
   return {
     id: profile.id,
     email: profile.email,
