@@ -86,3 +86,93 @@ supabase stop --no-backup
 > stop deploying undeclared edge functions and override dashboard-managed
 > settings on merge. The CI workflow generates a throwaway config on the runner
 > for exactly this reason.
+
+## Bootstrapping a fresh Supabase project from committed migrations
+
+Use this to stand up a brand-new (or throwaway/staging) Supabase project from
+nothing but the files committed to this repo — no dashboard clicking through
+table editors, no hand-copied SQL beyond running the migrations in order. The
+committed `supabase/migrations/*` are the single source of truth; the steps
+below reproduce the production schema end-to-end on an empty project.
+
+> This needs a live Supabase login (project creation + connection string), so
+> it cannot be exercised from CI. The CI **Supabase Tests** job
+> (`supabase-test.yml`) already proves the same migrations replay cleanly from
+> empty against a local Postgres — this section is the human-driven equivalent
+> against a real hosted project.
+
+1. **Create the project.** Supabase Dashboard → **New project**. Pick a region
+   and a strong database password (store it in your password manager — you need
+   it for the connection string below). Wait for provisioning to finish.
+
+2. **Grab the credentials** from **Settings → API**:
+   - Project URL → `EXPO_PUBLIC_SUPABASE_URL`
+   - `anon` / publishable key → `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+
+   And the **session-pooler** connection string from **Settings → Database →
+   Connection string → URI** (include the password):
+   `postgresql://postgres:<password>@<host>:5432/postgres`.
+
+3. **Apply every migration, in filename order**, against the empty project.
+   Easiest with the Supabase CLI (Docker not required for a remote push):
+
+   ```bash
+   supabase link --project-ref <project-ref>   # from the project URL/Settings
+   supabase db push                            # applies supabase/migrations/* in order
+   ```
+
+   `supabase db push` walks the migrations lexicographically — which is exactly
+   their dependency order. The earliest, `20260423_base_schema.sql`, must run
+   before `20260424_chat_messages.sql` (whose RLS policy references
+   `friend_requests`); the filename dates already guarantee this. The full set,
+   in apply order, is:
+
+   ```text
+   20260423_base_schema.sql              core tables (profiles/collections/items/friend_requests)
+   20260424_chat_messages.sql            chat
+   20260501_chat_reads.sql               chat read receipts
+   20260502_marketplace_listings.sql     marketplace
+   20260507_marketplace_buyer_user_id.sql
+   20260508_analytics_events.sql         analytics sink
+   20260516_chat_id_integrity.sql
+   20260517_items_cost_currency.sql
+   20260523_collection_currency.sql
+   20260527142510_items_archived_at.sql
+   20260527_marketplace_transfers.sql
+   20260528_profile_display_currency.sql
+   20260616_core_tables_rls.sql          RLS + helpers on the core tables
+   ```
+
+   No CLI? Open each file in **SQL Editor** and run them top-to-bottom in the
+   order above — every migration is idempotent (`IF NOT EXISTS` / `DROP …
+   IF EXISTS` / `CREATE OR REPLACE`), so a re-run is safe. There is **no seed
+   step**: the app falls back to `data/seed.ts` locally and writes real rows
+   once a user signs in.
+
+4. **Deploy the Edge Functions** the app calls (each has setup notes in
+   [`MANUAL-TASKS.md`](./MANUAL-TASKS.md)):
+
+   ```bash
+   supabase functions deploy delete-account
+   supabase functions deploy delete-image      # SEC-1, security-critical
+   supabase functions deploy analytics-mirror
+   ```
+
+5. **Point a build at the new project.** For a throwaway/staging deploy, set
+   `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in your
+   local `.env` (see [Adding the required secrets](#adding-the-required-secrets)
+   for the full list) and run `npm run build`, or update the two GitHub Actions
+   secrets and let `deploy.yml` rebuild. The bundled JS reads
+   `process.env.EXPO_PUBLIC_*` at build time — there is nothing else to wire up.
+
+6. **Confirm end-to-end** against the fresh project:
+   - Sign in via the email-OTP flow (proves `auth` + the `profiles` upsert).
+   - Create a collection, then an item with a cost + currency (proves
+     `collections`/`items` writes and the currency columns).
+   - From a second account, send a friend request and accept it (proves
+     `friend_requests` + the RLS visibility helpers from
+     `20260616_core_tables_rls.sql`).
+   - Confirm a non-friend cannot see a private collection (RLS deny path).
+
+   If all four pass, the migrations reproduce the full schema and the build is
+   correctly pointed at the new project.
