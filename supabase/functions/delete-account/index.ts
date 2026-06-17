@@ -1,5 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import {
+  assertServiceRoleKey,
+  ServiceRoleClaimError,
+} from "../../../lib/service-role-claim.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -22,6 +27,22 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // BE-23: fail loudly if the service-role secret is missing or is actually
+    // the anon/publishable key — otherwise the admin deletes below silently
+    // run without RLS-bypass and fail in confusing ways.
+    try {
+      assertServiceRoleKey(serviceRoleKey, "delete-account");
+    } catch (configErr) {
+      if (configErr instanceof ServiceRoleClaimError) {
+        console.error(configErr.message);
+        return new Response(JSON.stringify({ error: "function misconfigured" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw configErr;
+    }
 
     const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },

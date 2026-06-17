@@ -43,6 +43,10 @@ import {
   type PostHogWebhookEvent,
   type AnalyticsEventRow,
 } from "../../../lib/analytics-mirror-payload.ts";
+import {
+  assertServiceRoleKey,
+  ServiceRoleClaimError,
+} from "../../../lib/service-role-claim.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -133,6 +137,18 @@ Deno.serve(async (req: Request) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse({ error: "function not configured" }, 500);
+  }
+
+  // BE-23: fail loudly if the service-role secret is actually the
+  // anon/publishable key — the insert below relies on RLS-bypass.
+  try {
+    assertServiceRoleKey(serviceRoleKey, "analytics-mirror");
+  } catch (configErr) {
+    if (configErr instanceof ServiceRoleClaimError) {
+      console.error(configErr.message);
+      return jsonResponse({ error: "function misconfigured" }, 500);
+    }
+    throw configErr;
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
