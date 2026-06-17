@@ -59,6 +59,7 @@ import {
 import { collectionsKey, itemsKey, followedCollectionsKey } from "@/lib/storage-keys";
 import { Collection, CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
 import { generateUuidV4 } from "@/lib/uuid";
+import { normalizeOwnItemIds } from "@/lib/item-id";
 
 type DraftItemInput = {
   collectionId: string;
@@ -370,8 +371,19 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           }
         }
 
+        // BE-5: rewrite any legacy non-uuid ids on the user's own cached items
+        // to real uuids so they reconcile to the uuid `items.id` column, then
+        // re-upsert the rewritten rows (the cloud rejected their old id).
+        const { items: normalizedItems, rewritten } = normalizeOwnItemIds(
+          visibleItems,
+          activeUser.id,
+        );
+
         setLocalCollections(visibleCollections);
-        setLocalItems(visibleItems);
+        setLocalItems(normalizedItems);
+        for (const item of rewritten) {
+          upsertItem(item).catch(() => undefined);
+        }
         // Prefer remote followed IDs; fall back to local cache
         if (remoteFollowedIds.length > 0) {
           setFollowedCollectionIds(remoteFollowedIds);
@@ -762,15 +774,10 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         .filter((item) => item.isWishlist)
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
       addWishlistItem: async (input) => {
-        const slug =
-          input.title
-            .trim()
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, "") || `wish-${Date.now()}`;
-
         const nextItem: CollectableItem = {
-          id: `wish-${slug}-${Date.now()}`,
+          // Server-keyed uuid (BE-5) so the row matches `items.id uuid` and
+          // reconciles to the cloud — the old `wish-<slug>-<ts>` id was rejected.
+          id: generateUuidV4(),
           collectionId: "",
           title: input.title.trim(),
           acquiredAt: "",
@@ -809,15 +816,10 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         }).catch(() => undefined);
       },
       addItem: async (input) => {
-        const slug =
-          input.title
-            .trim()
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, "") || `item-${Date.now()}`;
-
         const nextItem: CollectableItem = {
-          id: `${slug}-${Date.now()}`,
+          // Server-keyed uuid (BE-5) so the row matches `items.id uuid` and
+          // reconciles to the cloud — the old `<slug>-<ts>` id was rejected.
+          id: generateUuidV4(),
           collectionId: input.collectionId,
           title: input.title.trim(),
           acquiredAt: input.acquiredAt.trim(),
