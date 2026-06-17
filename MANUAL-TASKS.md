@@ -480,3 +480,43 @@ RESET ROLE;
 `is_admin` stays a service-role-only column: grant admin via the SQL editor
 snippet under `20260616_core_tables_rls.sql`. If this column list ever drifts
 from the `profiles` schema, update both this snippet and the migration.
+
+## 20260618_fk_on_delete_cascade.sql
+
+BE-6 — guarantees every cross-table foreign key carries an explicit
+`ON DELETE CASCADE`. The base schema already defines these FKs with CASCADE,
+but the live project's tables were created by hand in the dashboard, where the
+FKs may have been added with the PostgreSQL default `NO ACTION`. A `NO ACTION`
+FK makes the `delete-account` Edge Function fail with a `23503`
+foreign_key_violation (the account can't be deleted) and blocks deleting a
+collection that still has items.
+
+**Before applying**, check the current delete action of the six core FKs:
+
+```sql
+SELECT con.conrelid::regclass AS tbl, con.conname, con.confdeltype
+FROM pg_constraint con
+WHERE con.contype = 'f'
+  AND con.conrelid IN (
+    'public.profiles'::regclass, 'public.collections'::regclass,
+    'public.items'::regclass, 'public.friend_requests'::regclass);
+-- confdeltype: 'c' = CASCADE (desired), 'a' = NO ACTION, 'r' = RESTRICT.
+```
+
+If any of the FKs below show `confdeltype <> 'c'`, apply the migration. It drops
+each existing single-column FK (whatever its name) and re-adds a canonically
+named one with `ON DELETE CASCADE`:
+
+| table | column | references | on delete |
+| --- | --- | --- | --- |
+| profiles | id | auth.users(id) | CASCADE |
+| collections | owner_user_id | auth.users(id) | CASCADE |
+| items | collection_id | public.collections(id) | CASCADE |
+| items | created_by_user_id | auth.users(id) | CASCADE |
+| friend_requests | from_user_id | auth.users(id) | CASCADE |
+| friend_requests | to_user_id | auth.users(id) | CASCADE |
+
+The migration is idempotent (drop-then-add of the same CASCADE constraint), so
+re-applying it is a safe no-op. After applying, re-run the `confdeltype` query
+above and confirm every row reads `c`. The `02_fk_cascade.sql` pgTAP test
+exercises the full delete-account cascade on the from-empty CI database.
