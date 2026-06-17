@@ -8,7 +8,7 @@ import {
   assertAnonKey,
   decodeJwtRole,
   ServiceRoleClaimError,
-} from "../lib/service-role-claim.ts";
+} from "../lib/service-role-claim";
 
 /**
  * BE-23 — service_role-claim self-check.
