@@ -143,6 +143,7 @@ below reproduce the production schema end-to-end on an empty project.
    20260616_core_tables_rls.sql          RLS + helpers on the core tables
    20260617_profiles_admin_update_grant.sql  hardens is_admin against self-promotion
    20260618_fk_on_delete_cascade.sql     explicit ON DELETE CASCADE on the core FKs
+   20260619_integrity_checks.sql         backfill visibility/condition/no-self CHECKs + pair unique
    ```
 
    No CLI? Open each file in **SQL Editor** and run them top-to-bottom in the
