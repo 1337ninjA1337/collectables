@@ -1,5 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import {
+  assertAnonKey,
+  ServiceRoleClaimError,
+} from "../../../lib/service-role-claim.ts";
+
 // SEC-1: the Cloudinary API secret must NEVER reach the client bundle.
 // This function holds CLOUDINARY_API_SECRET in Supabase function secrets,
 // verifies the caller's Supabase session (mirrors delete-account), and
@@ -50,6 +55,19 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // BE-23: fail loudly if the anon secret is missing or is actually the
+    // service-role/secret key (a privileged key must never be wired to the
+    // user-Authorization client used for session verification).
+    try {
+      assertAnonKey(anonKey, "delete-image");
+    } catch (configErr) {
+      if (configErr instanceof ServiceRoleClaimError) {
+        console.error(configErr.message);
+        return json({ error: "function misconfigured" }, 500);
+      }
+      throw configErr;
+    }
 
     // Verify the caller has a valid Supabase session before doing anything.
     const userClient = createClient(supabaseUrl, anonKey, {
