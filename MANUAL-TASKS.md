@@ -520,3 +520,37 @@ The migration is idempotent (drop-then-add of the same CASCADE constraint), so
 re-applying it is a safe no-op. After applying, re-run the `confdeltype` query
 above and confirm every row reads `c`. The `02_fk_cascade.sql` pgTAP test
 exercises the full delete-account cascade on the from-empty CI database.
+
+## 20260619_integrity_checks.sql
+
+BE-7 — backfills the data-integrity CHECK constraints + the friend-request
+uniqueness onto the existing (hand-created) live tables. The base schema defines
+them inline, but `CREATE TABLE IF NOT EXISTS` can't add a missing CHECK/UNIQUE
+to a table that already exists (same gap class as BE-6's FKs).
+
+Constraints ensured (each guarded, so a re-run is a no-op):
+
+| table | constraint | rule |
+| --- | --- | --- |
+| collections | `collections_visibility_check` | `visibility IN ('public','private')` |
+| items | `items_condition_check` | `condition IN ('new','excellent','good','fair')` |
+| friend_requests | `friend_requests_no_self` | `from_user_id <> to_user_id` |
+| friend_requests | `friend_requests_pair_key` (unique idx) | directed `(from_user_id, to_user_id)` pair |
+
+**Before applying**, check whether the live table already enforces them:
+
+```sql
+SELECT conrelid::regclass AS tbl, conname, pg_get_constraintdef(oid) AS def
+FROM pg_constraint
+WHERE conrelid IN ('public.collections'::regclass, 'public.items'::regclass,
+                   'public.friend_requests'::regclass)
+  AND contype = 'c';
+```
+
+Adding a CHECK validates existing rows, so if a row violates it the `ALTER`
+fails — fix the offending data first (visibility/condition are app-controlled,
+so this is unlikely). Two parts of the original BE-7 note are intentionally
+**not** implemented: `collections.role` is not a DB column (it's derived
+client-side), and an *undirected* `least/greatest(from,to)` unique would break
+the mutual-friendship model (both directed rows must coexist) — the directed
+pair unique is the correct key.
