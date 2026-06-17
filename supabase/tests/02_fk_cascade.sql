@@ -53,13 +53,16 @@ insert into public.friend_requests (from_user_id, to_user_id) values
   ('00000000-0000-0000-0000-00000000da7e', '00000000-0000-0000-0000-0000000e7141'),
   ('00000000-0000-0000-0000-0000000e7141', '00000000-0000-0000-0000-00000000da7e');
 
+-- chat_id must satisfy chat_messages_chat_id_matches_participants:
+-- 'chat-' || least(a,b) || '-' || greatest(a,b) (C-collation text sort).
+-- dave (…da7e) sorts before erin (…e7141), so dave is `least`.
 insert into public.chat_messages (chat_id, from_user_id, to_user_id, text) values
-  ('dave:erin', '00000000-0000-0000-0000-00000000da7e', '00000000-0000-0000-0000-0000000e7141', 'hi erin'),
-  ('dave:erin', '00000000-0000-0000-0000-0000000e7141', '00000000-0000-0000-0000-00000000da7e', 'hi dave');
+  ('chat-00000000-0000-0000-0000-00000000da7e-00000000-0000-0000-0000-0000000e7141', '00000000-0000-0000-0000-00000000da7e', '00000000-0000-0000-0000-0000000e7141', 'hi erin'),
+  ('chat-00000000-0000-0000-0000-00000000da7e-00000000-0000-0000-0000-0000000e7141', '00000000-0000-0000-0000-0000000e7141', '00000000-0000-0000-0000-00000000da7e', 'hi dave');
 
 insert into public.chat_reads (user_id, chat_id) values
-  ('00000000-0000-0000-0000-00000000da7e', 'dave:erin'),
-  ('00000000-0000-0000-0000-0000000e7141', 'dave:erin');
+  ('00000000-0000-0000-0000-00000000da7e', 'chat-00000000-0000-0000-0000-00000000da7e-00000000-0000-0000-0000-0000000e7141'),
+  ('00000000-0000-0000-0000-0000000e7141', 'chat-00000000-0000-0000-0000-00000000da7e-00000000-0000-0000-0000-0000000e7141');
 
 -- Listing dave owns (CASCADE on delete) + listing erin owns that dave bought
 -- (buyer_user_id SET NULL on delete, row survives).
