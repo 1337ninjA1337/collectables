@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { seedCollections, seedItems } from "@/data/seed";
 import { useAuth } from "@/lib/auth-context";
@@ -56,10 +56,24 @@ import {
   removeViewerFromSharedIds,
   shouldAutoSaveSharedCollection,
 } from "@/lib/share-access";
-import { collectionsKey, itemsKey, followedCollectionsKey } from "@/lib/storage-keys";
+import {
+  collectionsKey,
+  itemsKey,
+  followedCollectionsKey,
+  pendingCollectionsKey,
+  pendingItemsKey,
+} from "@/lib/storage-keys";
 import { Collection, CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
 import { generateUuidV4 } from "@/lib/uuid";
 import { normalizeOwnItemIds } from "@/lib/item-id";
+import {
+  applyDeliveredUpserts,
+  dequeueUpsert,
+  enqueueUpsert,
+  flushPendingUpserts,
+  hasPendingUpserts,
+  type PendingUpsertQueue,
+} from "@/lib/pending-upserts";
 
 type DraftItemInput = {
   collectionId: string;
@@ -194,6 +208,10 @@ type CollectionsContextValue = {
 
 const CollectionsContext = createContext<CollectionsContextValue | null>(null);
 
+// Stable id accessors for the BE-13c pending-upsert queues.
+const collectionUpsertId = (collection: Collection): string => collection.id;
+const itemUpsertId = (item: CollectableItem): string => item.id;
+
 export function CollectionsProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
   const { language } = useI18n();
@@ -214,6 +232,105 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   const [sharedWithMeItems, setSharedWithMeItems] = useState<CollectableItem[]>([]);
   const [ready, setReady] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  // BE-13c: uuid-keyed pending-upsert queues. A failed cloud write (offline /
+  // Supabase unreachable) parks the full entity here; the flush effect below
+  // re-delivers it idempotently on the next reconnect/refresh.
+  const [pendingCollections, setPendingCollections] = useState<PendingUpsertQueue<Collection>>({});
+  const [pendingItems, setPendingItems] = useState<PendingUpsertQueue<CollectableItem>>({});
+
+  // Run the cloud write for `collection`; drop any queued copy on success, park
+  // the full entity for an idempotent retry on failure. `write` is the actual
+  // remote call (a full upsert for creates, a PATCH for updates) — either way a
+  // failure re-sends the whole row via `upsertCollection` on the next flush.
+  const syncCollection = useCallback(
+    (collection: Collection, write: () => Promise<void>) => {
+      write()
+        .then(() =>
+          setPendingCollections((q) => dequeueUpsert(q, collection.id, collectionUpsertId)),
+        )
+        .catch(() =>
+          setPendingCollections((q) => enqueueUpsert(q, collection, collectionUpsertId)),
+        );
+    },
+    [],
+  );
+
+  const syncItem = useCallback(
+    (item: CollectableItem, write: () => Promise<void>) => {
+      write()
+        .then(() => setPendingItems((q) => dequeueUpsert(q, item.id, itemUpsertId)))
+        .catch(() => setPendingItems((q) => enqueueUpsert(q, item, itemUpsertId)));
+    },
+    [],
+  );
+
+  // Mirror chat's `pendingRef`: keep the latest queues in refs so the flush
+  // effect can read them without re-subscribing on every queue change (which
+  // would loop the moment the flush mutates the queue).
+  const pendingCollectionsRef = useRef(pendingCollections);
+  const pendingItemsRef = useRef(pendingItems);
+  useEffect(() => {
+    pendingCollectionsRef.current = pendingCollections;
+  }, [pendingCollections]);
+  useEffect(() => {
+    pendingItemsRef.current = pendingItems;
+  }, [pendingItems]);
+
+  // Flush parked offline writes on reconnect/refresh. Collections go first so a
+  // queued item never hits its collection's FK before the parent row exists.
+  // Results are applied to the *current* queue (not the in-flight snapshot) so
+  // an offline write parked mid-flush isn't dropped.
+  useEffect(() => {
+    if (!ready || !user) return;
+    void refreshTick;
+    let cancelled = false;
+
+    void (async () => {
+      const collectionsQueue = pendingCollectionsRef.current;
+      if (hasPendingUpserts(collectionsQueue)) {
+        const { sent } = await flushPendingUpserts(
+          collectionsQueue,
+          collectionUpsertId,
+          async (collection) => {
+            try {
+              await upsertCollection(collection);
+              return true;
+            } catch {
+              return false;
+            }
+          },
+        );
+        if (cancelled) return;
+        if (sent.length > 0) {
+          setPendingCollections((q) => applyDeliveredUpserts(q, sent, collectionUpsertId));
+        }
+      }
+
+      const itemsQueue = pendingItemsRef.current;
+      if (hasPendingUpserts(itemsQueue)) {
+        const { sent } = await flushPendingUpserts(
+          itemsQueue,
+          itemUpsertId,
+          async (item) => {
+            try {
+              await upsertItem(item);
+              return true;
+            } catch {
+              return false;
+            }
+          },
+        );
+        if (cancelled) return;
+        if (sent.length > 0) {
+          setPendingItems((q) => applyDeliveredUpserts(q, sent, itemUpsertId));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, user, refreshTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -285,6 +402,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       setLocalItems(prev => prev.length === 0 ? prev : []);
       setFollowedCollectionIds(prev => prev.length === 0 ? prev : []);
       setSubscribedCollections(prev => prev.length === 0 ? prev : []);
+      setPendingCollections((prev) => (hasPendingUpserts(prev) ? {} : prev));
+      setPendingItems((prev) => (hasPendingUpserts(prev) ? {} : prev));
       setReady(false);
       return;
     }
@@ -294,10 +413,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
 
     async function hydrate() {
       try {
-        const [rawCollections, rawItems, rawFollowed, remoteFollowedIds, remoteWishlist] = await Promise.all([
+        const [rawCollections, rawItems, rawFollowed, rawPendingCollections, rawPendingItems, remoteFollowedIds, remoteWishlist] = await Promise.all([
           AsyncStorage.getItem(collectionsKey(activeUser.id)),
           AsyncStorage.getItem(itemsKey(activeUser.id)),
           AsyncStorage.getItem(followedCollectionsKey(activeUser.id)),
+          AsyncStorage.getItem(pendingCollectionsKey(activeUser.id)),
+          AsyncStorage.getItem(pendingItemsKey(activeUser.id)),
           fetchFollowedCollectionIds(activeUser.id),
           fetchWishlistItemsByUserId(activeUser.id),
         ]);
@@ -305,6 +426,19 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         if (!active) {
           return;
         }
+
+        // Rehydrate any offline writes parked before the last reload so the
+        // flush effect can re-deliver them once the network is back (BE-13c).
+        setPendingCollections(
+          rawPendingCollections
+            ? (JSON.parse(rawPendingCollections) as PendingUpsertQueue<Collection>)
+            : {},
+        );
+        setPendingItems(
+          rawPendingItems
+            ? (JSON.parse(rawPendingItems) as PendingUpsertQueue<CollectableItem>)
+            : {},
+        );
 
         const parsedCollections = rawCollections ? (JSON.parse(rawCollections) as Collection[]) : seedCollections;
         let visibleCollections = parsedCollections.filter(
@@ -418,8 +552,10 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       AsyncStorage.setItem(collectionsKey(user.id), JSON.stringify(localCollections)),
       AsyncStorage.setItem(itemsKey(user.id), JSON.stringify(localItems)),
       AsyncStorage.setItem(followedCollectionsKey(user.id), JSON.stringify(followedCollectionIds)),
+      AsyncStorage.setItem(pendingCollectionsKey(user.id), JSON.stringify(pendingCollections)),
+      AsyncStorage.setItem(pendingItemsKey(user.id), JSON.stringify(pendingItems)),
     ]).catch(() => undefined);
-  }, [localCollections, localItems, followedCollectionIds, ready, user]);
+  }, [localCollections, localItems, followedCollectionIds, pendingCollections, pendingItems, ready, user]);
 
   // Best-effort cloud refresh: after the local-first paint completes (`ready`),
   // fetch the user's collections + items from Supabase and merge any new
@@ -660,7 +796,9 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
             if (col.id !== collectionId) return col;
             if (col.sharedWithUserIds.includes(userId)) return col;
             const updated = { ...col, sharedWithUserIds: addViewerToSharedIds(col.sharedWithUserIds, userId) };
-            updateRemoteCollection(collectionId, { sharedWithUserIds: updated.sharedWithUserIds }).catch(() => undefined);
+            syncCollection(updated, () =>
+              updateRemoteCollection(collectionId, { sharedWithUserIds: updated.sharedWithUserIds }),
+            );
             return updated;
           }),
         );
@@ -671,7 +809,9 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           current.map((col) => {
             if (col.id !== collectionId) return col;
             const updated = { ...col, sharedWithUserIds: removeViewerFromSharedIds(col.sharedWithUserIds, userId) };
-            updateRemoteCollection(collectionId, { sharedWithUserIds: updated.sharedWithUserIds }).catch(() => undefined);
+            syncCollection(updated, () =>
+              updateRemoteCollection(collectionId, { sharedWithUserIds: updated.sharedWithUserIds }),
+            );
             return updated;
           }),
         );
@@ -793,27 +933,35 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         };
 
         setLocalItems((current) => [nextItem, ...current]);
-        upsertItem(nextItem).catch(() => undefined);
+        syncItem(nextItem, () => upsertItem(nextItem));
         return nextItem.id;
       },
       promoteWishlistItem: async (itemId, targetCollectionId) => {
         const acquiredAt = new Date().toISOString().slice(0, 10);
+        let promoted: CollectableItem | null = null;
         setLocalItems((current) =>
           current.map((item) => {
             if (item.id !== itemId) return item;
-            return {
+            const next = {
               ...item,
               collectionId: targetCollectionId,
               isWishlist: false,
               acquiredAt: item.acquiredAt || acquiredAt,
             };
+            promoted = next;
+            return next;
           }),
         );
-        updateRemoteItem(itemId, {
-          collectionId: targetCollectionId,
-          isWishlist: false,
-          acquiredAt: acquiredAt,
-        }).catch(() => undefined);
+        if (promoted) {
+          const updated = promoted;
+          syncItem(updated, () =>
+            updateRemoteItem(itemId, {
+              collectionId: targetCollectionId,
+              isWishlist: false,
+              acquiredAt: acquiredAt,
+            }),
+          );
+        }
       },
       addItem: async (input) => {
         const nextItem: CollectableItem = {
@@ -838,7 +986,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         };
 
         setLocalItems((current) => [nextItem, ...current]);
-        upsertItem(nextItem).catch(() => undefined);
+        syncItem(nextItem, () => upsertItem(nextItem));
         return nextItem.id;
       },
       addCollection: async (input) => {
@@ -861,45 +1009,66 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         };
 
         setLocalCollections((current) => [nextCollection, ...current]);
-        upsertCollection(nextCollection).catch(() => undefined);
+        syncCollection(nextCollection, () => upsertCollection(nextCollection));
         return nextCollection.id;
       },
       updateItem: async (itemId, updates) => {
+        let updated: CollectableItem | null = null;
         setLocalItems((current) =>
           current.map((item) => {
             if (item.id !== itemId) return item;
-            return { ...item, ...updates, id: item.id };
+            const next = { ...item, ...updates, id: item.id };
+            updated = next;
+            return next;
           }),
         );
-        updateRemoteItem(itemId, updates).catch(() => undefined);
+        if (updated) {
+          const entity = updated;
+          syncItem(entity, () => updateRemoteItem(itemId, updates));
+        }
       },
       updateCollection: async (collectionId, updates) => {
+        let updated: Collection | null = null;
         setLocalCollections((current) =>
           current.map((col) => {
             if (col.id !== collectionId) return col;
-            return { ...col, ...updates, id: col.id };
+            const next = { ...col, ...updates, id: col.id };
+            updated = next;
+            return next;
           }),
         );
-        updateRemoteCollection(collectionId, updates).catch(() => undefined);
+        if (updated) {
+          const entity = updated;
+          syncCollection(entity, () => updateRemoteCollection(collectionId, updates));
+        }
       },
       deleteItem: async (itemId) => {
         setLocalItems((current) => current.filter((item) => item.id !== itemId));
+        // Drop any parked upsert so a queued copy can't resurrect the row.
+        setPendingItems((q) => dequeueUpsert(q, itemId, itemUpsertId));
         deleteRemoteItem(itemId).catch(() => undefined);
       },
       archiveItem: async (itemId) => {
         const archivedAt = new Date().toISOString();
+        let archived: CollectableItem | null = null;
         setLocalItems((current) =>
           current.map((item) => {
             if (item.id !== itemId) return item;
-            return { ...item, archivedAt };
+            const next = { ...item, archivedAt };
+            archived = next;
+            return next;
           }),
         );
-        updateRemoteItem(itemId, { archivedAt }).catch(() => undefined);
+        if (archived) {
+          const entity = archived;
+          syncItem(entity, () => updateRemoteItem(itemId, { archivedAt }));
+        }
       },
       deleteItems: async (itemIds) => {
         if (itemIds.length === 0) return;
         const idSet = new Set(itemIds);
         setLocalItems((current) => current.filter((item) => !idSet.has(item.id)));
+        setPendingItems((q) => itemIds.reduce((acc, id) => dequeueUpsert(acc, id, itemUpsertId), q));
         await Promise.allSettled(itemIds.map((id) => deleteRemoteItem(id)));
       },
       moveItems: async (itemIds, targetCollectionId) => {
@@ -914,11 +1083,20 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
             return next;
           }),
         );
-        await Promise.allSettled(moved.map((item) => updateRemoteItem(item.id, { collectionId: item.collectionId, sortOrder: undefined })));
+        moved.forEach((item) =>
+          syncItem(item, () => updateRemoteItem(item.id, { collectionId: item.collectionId, sortOrder: undefined })),
+        );
       },
       deleteCollection: async (collectionId) => {
+        const removedItemIds = localItems
+          .filter((item) => item.collectionId === collectionId)
+          .map((item) => item.id);
         setLocalCollections((current) => current.filter((collection) => collection.id !== collectionId));
         setLocalItems((current) => current.filter((item) => item.collectionId !== collectionId));
+        // Drop the collection and its items from the pending queues so a parked
+        // upsert can't resurrect any of them after the delete.
+        setPendingCollections((q) => dequeueUpsert(q, collectionId, collectionUpsertId));
+        setPendingItems((q) => removedItemIds.reduce((acc, id) => dequeueUpsert(acc, id, itemUpsertId), q));
         deleteRemoteCollection(collectionId).catch(() => undefined);
       },
       reorderOwnedCollections: (orderedIds) => {
@@ -938,7 +1116,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           byId.forEach((c) => reordered.push(c));
           return reordered;
         });
-        Promise.allSettled(updated.map((c) => updateRemoteCollection(c.id, { sortOrder: c.sortOrder }))).catch(() => undefined);
+        updated.forEach((c) => syncCollection(c, () => updateRemoteCollection(c.id, { sortOrder: c.sortOrder })));
       },
       transferItemToBuyer: async (snapshot, options) => {
         if (!user) return null;
@@ -958,12 +1136,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         if (plan.newCollection) {
           const { newCollection } = plan;
           setLocalCollections((current) => [newCollection, ...current]);
-          upsertCollection(newCollection).catch(() => undefined);
+          syncCollection(newCollection, () => upsertCollection(newCollection));
         }
         if (!plan.isDuplicate) {
           const { item } = plan;
           setLocalItems((current) => [item, ...current]);
-          upsertItem(item).catch(() => undefined);
+          syncItem(item, () => upsertItem(item));
         }
         if (plan.logEntry) {
           appendTransferLogEntry(ownerUserId, plan.logEntry).catch(() => undefined);
@@ -975,18 +1153,19 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       },
       reorderItemsInCollection: (collectionId, orderedIds) => {
         const indexById = new Map(orderedIds.map((id, idx) => [id, idx]));
-        const reordered: { id: string; sortOrder: number }[] = [];
+        const reordered: CollectableItem[] = [];
         setLocalItems((current) =>
           current.map((item) => {
             if (item.collectionId === collectionId && indexById.has(item.id)) {
               const order = indexById.get(item.id)!;
-              reordered.push({ id: item.id, sortOrder: order });
-              return { ...item, sortOrder: order };
+              const next = { ...item, sortOrder: order };
+              reordered.push(next);
+              return next;
             }
             return item;
           }),
         );
-        Promise.allSettled(reordered.map((r) => updateRemoteItem(r.id, { sortOrder: r.sortOrder }))).catch(() => undefined);
+        reordered.forEach((item) => syncItem(item, () => updateRemoteItem(item.id, { sortOrder: item.sortOrder })));
       },
       deleteUserContent: async (userId) => {
         const ownedCollectionIds = new Set(
@@ -999,7 +1178,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         );
       },
     }),
-    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt],
+    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, syncCollection, syncItem],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;
