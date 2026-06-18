@@ -1178,7 +1178,9 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         );
       },
     }),
-    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, syncCollection, syncItem],
+    // syncCollection/syncItem are stable useCallback([]) refs, so they're
+    // intentionally omitted here (ratesUpdatedAt stays last in the deps list).
+    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;
