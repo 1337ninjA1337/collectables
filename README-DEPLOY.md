@@ -145,6 +145,7 @@ below reproduce the production schema end-to-end on an empty project.
    20260618_fk_on_delete_cascade.sql     explicit ON DELETE CASCADE on the core FKs
    20260619_integrity_checks.sql         backfill visibility/condition/no-self CHECKs + pair unique
    20260620_fk_index_coverage.sql        index the one unindexed FK (chat_messages.from_user_id)
+   20260621_updated_at_moddatetime.sql   updated_at + moddatetime auto-bump trigger on every table
    ```
 
    No CLI? Open each file in **SQL Editor** and run them top-to-bottom in the

@@ -584,3 +584,27 @@ WHERE c.contype = 'f'
 
 There is no `friend_requests.status` column (the app uses the directed-pair
 model), so the BE-8 `(to_user_id, status)` composite is intentionally not added.
+
+## 20260621_updated_at_moddatetime.sql
+
+BE-9 — uniform `updated_at` + `moddatetime` auto-bump trigger on every table,
+the per-row cursor that delta pulls (BE-14, `updated_at=gt.<cursor>`) need.
+
+Adds `updated_at timestamptz NOT NULL DEFAULT now()` to all nine tables
+(`profiles`, `collections`, `items`, `friend_requests`, `chat_messages`,
+`chat_reads`, `marketplace_listings`, `marketplace_transfers`,
+`analytics_events`) and a `BEFORE UPDATE` trigger `handle_updated_at` calling
+`extensions.moddatetime(updated_at)`. The trigger fires on every UPDATE,
+including the DO-UPDATE branch of the app's PostgREST upserts, so synced rows
+get a fresh cursor automatically without the client sending `updated_at`.
+
+`created_at` is **not** added to the three append-only audit/log tables — each
+already has an equivalent NOT NULL `... DEFAULT now()` creation timestamp
+(`analytics_events.occurred_at`, `marketplace_transfers.transferred_at`,
+`chat_reads.last_read_at`); the six core tables already have `created_at`.
+
+Idempotent (`ADD COLUMN IF NOT EXISTS` + `DROP TRIGGER IF EXISTS` before
+`CREATE TRIGGER`), so applying on an up-to-date project is a no-op. Requires the
+contrib `moddatetime` extension; the migration installs it into the
+`extensions` schema (`CREATE EXTENSION IF NOT EXISTS moddatetime WITH SCHEMA
+extensions`).
