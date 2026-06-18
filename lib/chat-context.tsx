@@ -20,8 +20,13 @@ import {
   upsertChatRead,
 } from "@/lib/supabase-chat";
 import { chatCacheKey } from "@/lib/storage-keys";
+import {
+  applyFlushToQueue,
+  flushPendingQueue,
+  remapsOnly,
+} from "@/lib/sync-engine";
 import { ChatMessage } from "@/lib/types";
-import { generateUuidV4, isUuidV4 } from "@/lib/uuid";
+import { generateUuidV4 } from "@/lib/uuid";
 
 type ChatStore = {
   messagesByChat: Record<string, ChatMessage[]>;
@@ -131,59 +136,47 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   const flushPending = useCallback(
     async (pending: Record<string, ChatMessage[]>) => {
       if (!user) return;
-      // Track every message that reached the server so it can be dropped from
-      // the pending queue individually (not whole-chat): a partial flush must
-      // not re-send already-delivered messages on the next attempt. Legacy
-      // rows cached before the uuid fix carry a `msg-…` id the uuid
-      // `chat_messages.id` column rejects, so they are remapped to a real
-      // uuid; `newId` lets the local cache (and any realtime echo / refetch
-      // keyed on the server id) stay deduped.
-      const sent: { chatId: string; oldId: string; newId: string }[] = [];
-      for (const [chatId, msgs] of Object.entries(pending)) {
-        if (!msgs || msgs.length === 0) continue;
-        for (const msg of msgs) {
-          const outId = isUuidV4(msg.id) ? msg.id : generateUuidV4();
-          const delivered = await cloudSendMessage({
+      // BE-13b: the uuid-keyed pending-queue flush is now the shared
+      // `sync-engine` core. `flushPendingQueue` walks the per-chat queue,
+      // mints a uuid idempotency key per message (legacy `msg-…` ids cached
+      // before the uuid fix are remapped to a real uuid the `chat_messages.id`
+      // column accepts), delivers each in order and stops at the first failure
+      // per chat. The `sent` entries (with id remaps) then drive the local
+      // bookkeeping below.
+      const { sent } = await flushPendingQueue<ChatMessage>(pending, {
+        getId: (msg) => msg.id,
+        deliver: async (msg, outId) =>
+          (await cloudSendMessage({
             chatId: msg.chatId,
             fromUserId: msg.fromUserId,
             toUserId: msg.toUserId,
             text: msg.text,
             id: outId,
             createdAt: msg.createdAt,
-          });
-          // Stop at the first failure in this chat to preserve send order;
-          // the rest stay queued for the next flush.
-          if (!delivered) break;
-          sent.push({ chatId, oldId: msg.id, newId: outId });
-        }
-      }
+          })) != null,
+      });
       if (sent.length === 0) return;
 
-      const sentByChat = new Map<string, Set<string>>();
-      for (const { chatId, oldId } of sent) {
-        const set = sentByChat.get(chatId) ?? new Set<string>();
-        set.add(oldId);
-        sentByChat.set(chatId, set);
-      }
-
       setStore((prev) => {
-        const nextPending: Record<string, ChatMessage[]> = {};
-        for (const [chatId, msgs] of Object.entries(prev.pendingByChatId)) {
-          const sentIds = sentByChat.get(chatId);
-          const remaining = sentIds
-            ? msgs.filter((m) => !sentIds.has(m.id))
-            : msgs;
-          if (remaining.length > 0) nextPending[chatId] = remaining;
-        }
+        // Drop every delivered message from the queue (matched per chat by its
+        // pre-flush id); a partial flush leaves the rest queued for next time.
+        const nextPending = applyFlushToQueue(
+          prev.pendingByChatId,
+          sent,
+          (m) => m.id,
+        );
 
+        // Rewrite the cache id of any message whose legacy id was healed to a
+        // uuid so a realtime echo / refetch keyed on the server id stays
+        // deduped. The group key is the chat id.
         let nextMessages = prev.messagesByChat;
-        const remaps = sent.filter((s) => s.oldId !== s.newId);
+        const remaps = remapsOnly(sent);
         if (remaps.length > 0) {
           nextMessages = { ...nextMessages };
-          for (const { chatId, oldId, newId } of remaps) {
-            const list = nextMessages[chatId];
+          for (const { groupKey, oldId, newId } of remaps) {
+            const list = nextMessages[groupKey];
             if (!list) continue;
-            nextMessages[chatId] = list.map((m) =>
+            nextMessages[groupKey] = list.map((m) =>
               m.id === oldId ? { ...m, id: newId } : m,
             );
           }

@@ -21,10 +21,16 @@ const SRC = readFileSync(
 );
 
 describe("chat-context uuid message identity", () => {
-  it("imports the uuid helpers", () => {
+  it("imports the uuid mint + the shared sync-engine (BE-13b)", () => {
+    // The id mint still lives here; the uuid-remap/idempotency logic moved into
+    // the sync-engine, so `isUuidV4` is no longer imported by the context.
     assert.match(
       SRC,
-      /import\s*\{[^}]*\bgenerateUuidV4\b[^}]*\bisUuidV4\b[^}]*\}\s*from\s*"@\/lib\/uuid"/,
+      /import\s*\{\s*generateUuidV4\s*\}\s*from\s*"@\/lib\/uuid"/,
+    );
+    assert.match(
+      SRC,
+      /import\s*\{[\s\S]*?\bflushPendingQueue\b[\s\S]*?\}\s*from\s*"@\/lib\/sync-engine"/,
     );
   });
 
@@ -47,18 +53,24 @@ describe("chat-context uuid message identity", () => {
     assert.doesNotMatch(call, /createdAt/);
   });
 
-  it("flushPending remaps a legacy non-uuid id to a fresh uuid before retrying", () => {
+  it("flushPending delegates the uuid-keyed flush to the sync-engine (BE-13b)", () => {
+    // The legacy-id remap + per-group stop-on-failure now live in
+    // `flushPendingQueue` (covered by sync-engine.test.ts). The context wires
+    // it with the message id as the queue key and the cloud send as `deliver`,
+    // passing the engine-minted `outId` through as the message id.
     assert.match(
       SRC,
-      /const outId = isUuidV4\(msg\.id\) \? msg\.id : generateUuidV4\(\);/,
+      /flushPendingQueue<ChatMessage>\(pending,\s*\{[\s\S]*?getId:\s*\(msg\)\s*=>\s*msg\.id/,
     );
+    assert.match(SRC, /deliver:\s*async\s*\(msg,\s*outId\)\s*=>/);
     assert.match(SRC, /id:\s*outId/);
-    assert.match(SRC, /sent\.push\(\{ chatId, oldId: msg\.id, newId: outId \}\)/);
   });
 
-  it("flushPending drops delivered messages individually (no whole-chat re-send)", () => {
-    assert.match(SRC, /if \(!delivered\) break;/);
-    assert.match(SRC, /msgs\.filter\(\(m\) => !sentIds\.has\(m\.id\)\)/);
+  it("flushPending drops delivered messages via applyFlushToQueue (no whole-chat re-send)", () => {
+    assert.match(
+      SRC,
+      /applyFlushToQueue\(\s*prev\.pendingByChatId,\s*sent,\s*\(m\) => m\.id/,
+    );
   });
 
   it("flushPending rewrites the cached message id when it remapped", () => {
