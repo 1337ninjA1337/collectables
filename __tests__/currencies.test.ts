@@ -97,7 +97,8 @@ describe("currency selector is wired into the create-item flow", () => {
     assert.match(read("lib/supabase-profiles-shapes.ts"), /cost_currency:\s*item\.costCurrency/);
     const profiles = read("lib/supabase-profiles.ts");
     assert.match(profiles, /cost_currency\?:\s*string\s*\|\s*null/);
-    assert.match(profiles, /costCurrency:\s*row\.cost_currency/);
+    // BE-10 moved the read-path mapping into the pure `coerceItemRow` validator.
+    assert.match(read("lib/supabase-row-coerce.ts"), /costCurrency:\s*typeof\s+r\.cost_currency\s*===\s*"string"\s*\?\s*r\.cost_currency\s*:\s*undefined,/);
     assert.match(profiles, /"costCurrency"\s+in\s+updates/);
   });
 

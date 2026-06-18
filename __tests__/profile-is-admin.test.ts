@@ -29,8 +29,10 @@ describe("DB shape — DbProfile + toUserProfile map is_admin", () => {
     assert.match(src, /type\s+DbProfile\s*=\s*\{[\s\S]*?is_admin\?:\s*boolean\s*\|\s*null;[\s\S]*?\};/);
   });
 
-  it("toUserProfile forwards row.is_admin onto isAdmin (false fallback)", () => {
-    assert.match(src, /isAdmin:\s*row\.is_admin\s*\?\?\s*false,/);
+  it("coerceProfileRow forwards row.is_admin onto isAdmin (false fallback)", () => {
+    // BE-10 moved the read-path mapping into the pure `coerceProfileRow` validator;
+    // only a literal `true` is admin (NULL/missing/non-bool → false).
+    assert.match(read("lib/supabase-row-coerce.ts"), /isAdmin:\s*r\.is_admin\s*===\s*true,/);
   });
 });
 
