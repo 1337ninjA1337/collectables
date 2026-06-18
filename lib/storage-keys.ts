@@ -19,6 +19,14 @@ export function followedCollectionsKey(userId: string): string {
   return `collectables-followed-collections-v1-${userId}`;
 }
 
+export function pendingCollectionsKey(userId: string): string {
+  return `collectables-pending-collections-v1-${userId}`;
+}
+
+export function pendingItemsKey(userId: string): string {
+  return `collectables-pending-items-v1-${userId}`;
+}
+
 export function chatCacheKey(userId: string): string {
   return `collectables-chats-v1-${userId}`;
 }
@@ -74,6 +82,8 @@ export async function clearAllUserData(userId: string): Promise<void> {
     collectionsKey(userId),
     itemsKey(userId),
     followedCollectionsKey(userId),
+    pendingCollectionsKey(userId),
+    pendingItemsKey(userId),
     chatCacheKey(userId),
     socialCacheKey(userId),
     premiumKey(userId),
