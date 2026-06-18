@@ -554,3 +554,33 @@ so this is unlikely). Two parts of the original BE-7 note are intentionally
 client-side), and an *undirected* `least/greatest(from,to)` unique would break
 the mutual-friendship model (both directed rows must coexist) — the directed
 pair unique is the correct key.
+
+## 20260620_fk_index_coverage.sql
+
+BE-8 — index coverage for every foreign key + hot read paths. Adds the single
+missing FK-backing index: `chat_messages.from_user_id` (its FK to
+`auth.users` had no leading-column index, so deleting a user seq-scanned
+chat_messages to cascade the sender's rows). Every other FK and every hot read
+path named in BE-8 — `items(collection_id)`, `collections(owner_user_id)`,
+`friend_requests(to_user_id)`, `profiles(public_id)`, `profiles(username)` —
+already has a leading-column index from an earlier migration.
+
+Idempotent (`CREATE INDEX IF NOT EXISTS`), so applying on an up-to-date project
+is a no-op. **Before applying** (optional) confirm which FKs lack a covering
+index on the live project:
+
+```sql
+SELECT c.conrelid::regclass AS tbl, a.attname AS fk_column
+FROM pg_constraint c
+JOIN unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum
+WHERE c.contype = 'f'
+  AND NOT EXISTS (
+    SELECT 1 FROM pg_index i
+    WHERE i.indrelid = c.conrelid
+      AND (i.indkey::int2[])[0] = a.attnum
+  );
+```
+
+There is no `friend_requests.status` column (the app uses the directed-pair
+model), so the BE-8 `(to_user_id, status)` composite is intentionally not added.
