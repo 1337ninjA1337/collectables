@@ -68,6 +68,14 @@ describe("not-null defaults migration (BE-10)", () => {
     assert.equal(rows.length, COLUMNS.length);
   });
 
+  it("tags the outer DO block distinctly from the inner $$ default literals", () => {
+    // A bare outer `DO $$` would be closed by the first inner `$$''$$`,
+    // truncating the block (CI: `syntax error at or near "::"`).
+    assert.match(MIGRATION, /DO \$do\$/);
+    assert.match(MIGRATION, /END \$do\$;/);
+    assert.doesNotMatch(MIGRATION, /DO \$\$/);
+  });
+
   it("repairs each column in three idempotent steps", () => {
     assert.match(SQL, /UPDATE public\.%I SET %I = %s WHERE %I IS NULL/i);
     assert.match(SQL, /ALTER TABLE public\.%I ALTER COLUMN %I SET DEFAULT %s/i);

@@ -26,7 +26,11 @@
 -- already NOT NULL DEFAULT) is a no-op — the backfill matches zero rows and the
 -- ALTERs restate the existing column shape.
 
-DO $$
+-- NB: the outer block is tagged `$do$` (not `$$`) because the per-column
+-- default literals below are themselves `$$…$$` dollar-quoted strings; an
+-- untagged outer `$$` would be closed by the first inner `$$`, truncating the
+-- block and surfacing as `syntax error at or near "::"`.
+DO $do$
 DECLARE
   r record;
 BEGIN
@@ -72,4 +76,4 @@ BEGIN
       r.tbl, r.col
     );
   END LOOP;
-END $$;
+END $do$;
