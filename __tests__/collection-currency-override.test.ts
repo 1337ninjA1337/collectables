@@ -23,13 +23,15 @@ describe("Collection type — currency override field", () => {
 
 describe("DB shape — DbCollection + toCollection map the currency column", () => {
   const src = read("lib/supabase-profiles.ts");
+  // BE-10 moved the read-path mapping into the pure `coerce*` validators.
+  const coerce = read("lib/supabase-row-coerce.ts");
 
   it("DbCollection row type carries the nullable `currency` column", () => {
     assert.match(src, /type\s+DbCollection\s*=\s*\{[\s\S]*?currency\?:\s*string\s*\|\s*null;[\s\S]*?\};/);
   });
 
-  it("toCollection() forwards row.currency onto Collection.currency (null fallback)", () => {
-    assert.match(src, /currency:\s*row\.currency\s*\?\?\s*null,/);
+  it("coerceCollectionRow() forwards row.currency onto Collection.currency (null fallback)", () => {
+    assert.match(coerce, /currency:\s*typeof\s+r\.currency\s*===\s*"string"\s*\?\s*r\.currency\s*:\s*null,/);
   });
 
   it("updateRemoteCollection() patches the currency column when the update carries it", () => {

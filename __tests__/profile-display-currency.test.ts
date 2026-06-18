@@ -27,8 +27,12 @@ describe("DB shape — DbProfile + toUserProfile map display_currency", () => {
     assert.match(src, /type\s+DbProfile\s*=\s*\{[\s\S]*?display_currency\?:\s*string\s*\|\s*null;[\s\S]*?\};/);
   });
 
-  it("toUserProfile forwards row.display_currency onto displayCurrency (null fallback)", () => {
-    assert.match(src, /displayCurrency:\s*row\.display_currency\s*\?\?\s*null,/);
+  it("coerceProfileRow forwards row.display_currency onto displayCurrency (null fallback)", () => {
+    // BE-10 moved the read-path mapping into the pure `coerceProfileRow` validator.
+    assert.match(
+      read("lib/supabase-row-coerce.ts"),
+      /displayCurrency:\s*typeof\s+r\.display_currency\s*===\s*"string"\s*\?\s*r\.display_currency\s*:\s*null,/,
+    );
   });
 
   it("updateMyProfileDisplayCurrency PATCHes the profile row", () => {

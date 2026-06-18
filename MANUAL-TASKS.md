@@ -608,3 +608,38 @@ Idempotent (`ADD COLUMN IF NOT EXISTS` + `DROP TRIGGER IF EXISTS` before
 contrib `moddatetime` extension; the migration installs it into the
 `extensions` schema (`CREATE EXTENSION IF NOT EXISTS moddatetime WITH SCHEMA
 extensions`).
+
+## 20260622_not_null_defaults.sql
+
+BE-10 — backfill `NOT NULL` + defaults on the columns the client always sends a
+concrete value for. `20260423_base_schema.sql` already DECLARES these columns as
+`NOT NULL DEFAULT <…>`, but the live tables were hand-created in the dashboard
+where a column may have been left nullable / without a default, and
+`CREATE TABLE IF NOT EXISTS` can't repair an existing column (same gap class as
+BE-6/BE-7/BE-8).
+
+Repairs each column in three idempotent steps — backfill any existing NULLs to
+the default, `SET DEFAULT`, then `SET NOT NULL`:
+
+- `profiles`: `email`, `display_name`, `username`, `public_id`, `bio`, `avatar`
+  → `''`
+- `collections`: `name`, `cover_photo`, `description`, `owner_name` → `''`;
+  `visibility` → `'private'`; `shared_with_user_ids` → `'{}'::uuid[]`;
+  `created_at` → `now()`
+- `items`: `title`, `acquired_at`, `acquired_from`, `description`, `variants`,
+  `created_by` → `''`; `photos` → `'{}'::text[]`; `is_wishlist` → `false`;
+  `created_at` → `now()`
+
+The uuid FK columns (`collections.owner_user_id`, `items.created_by_user_id`)
+are **not** touched — they have no sensible scalar default and their NOT
+NULL/FK integrity is owned by base_schema + BE-6
+(`20260618_fk_on_delete_cascade.sql`).
+
+Pairs with the app-side `coerce*` read-path validators
+(`lib/supabase-row-coerce.ts`): the DB guarantees the value, the validators are
+the belt-and-suspenders for any row predating this migration or fetched from a
+project where it hasn't been applied.
+
+Idempotent: applying on a base_schema/branch-preview DB where the columns are
+already `NOT NULL DEFAULT` is a no-op (the backfill matches zero rows; the
+ALTERs restate the existing shape). No pre-apply check required.

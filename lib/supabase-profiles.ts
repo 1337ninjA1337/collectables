@@ -24,7 +24,14 @@ import {
   upsertCollectionBody,
   upsertProfileBody,
 } from "@/lib/supabase-profiles-shapes";
-import { CollectableItem, Collection, CollectionVisibility, Reaction, ReactionEmoji, ReactionTargetType, UserProfile } from "@/lib/types";
+import {
+  coerceCollectionRow,
+  coerceItemRow,
+  coerceProfileRow,
+  coerceReactionRow,
+  coerceString,
+} from "@/lib/supabase-row-coerce";
+import { CollectableItem, Collection, Reaction, ReactionEmoji, ReactionTargetType, UserProfile } from "@/lib/types";
 
 const supabaseKey = supabasePublishableKey;
 
@@ -43,21 +50,11 @@ type DbProfile = {
 };
 
 function isHiddenProfile(row: DbProfile): boolean {
-  return HIDDEN_USERNAMES.includes(row.username.toLowerCase());
+  return HIDDEN_USERNAMES.includes(coerceString(row.username).toLowerCase());
 }
 
 function toUserProfile(row: DbProfile): UserProfile {
-  return {
-    id: row.id,
-    email: row.email,
-    displayName: row.display_name,
-    username: row.username,
-    publicId: row.public_id,
-    bio: row.bio,
-    avatar: row.avatar,
-    displayCurrency: row.display_currency ?? null,
-    isAdmin: row.is_admin ?? false,
-  };
+  return coerceProfileRow(row);
 }
 
 async function getAccessToken(): Promise<string | null> {
@@ -167,20 +164,7 @@ type DbCollection = {
 };
 
 function toCollection(row: DbCollection): Collection {
-  return {
-    id: row.id,
-    name: row.name,
-    coverPhoto: row.cover_photo,
-    description: row.description,
-    ownerName: row.owner_name,
-    ownerUserId: row.owner_user_id,
-    sharedWith: [],
-    sharedWithUserIds: row.shared_with_user_ids ?? [],
-    role: "viewer",
-    sortOrder: row.sort_order ?? undefined,
-    visibility: (row.visibility as CollectionVisibility) ?? "private",
-    currency: row.currency ?? null,
-  };
+  return coerceCollectionRow(row);
 }
 
 /** Upsert a collection to Supabase. */
@@ -272,26 +256,7 @@ type DbItem = {
 };
 
 function toItem(row: DbItem): CollectableItem {
-  return {
-    id: row.id,
-    collectionId: row.collection_id,
-    title: row.title,
-    acquiredAt: row.acquired_at,
-    acquiredFrom: row.acquired_from,
-    description: row.description,
-    variants: row.variants,
-    photos: row.photos ?? [],
-    createdBy: row.created_by,
-    createdByUserId: row.created_by_user_id,
-    createdAt: row.created_at,
-    cost: row.cost ?? null,
-    costCurrency: row.cost_currency ?? undefined,
-    sortOrder: row.sort_order ?? undefined,
-    isWishlist: row.is_wishlist ?? false,
-    condition: (row.condition as CollectableItem["condition"]) ?? undefined,
-    tags: row.tags ?? undefined,
-    archivedAt: row.archived_at ?? null,
-  };
+  return coerceItemRow(row);
 }
 
 const wishlistCollectionCache = new Map<string, string>();
@@ -557,14 +522,7 @@ type DbReaction = {
 };
 
 function toReaction(row: DbReaction): Reaction {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    targetType: row.target_type as ReactionTargetType,
-    targetId: row.target_id,
-    emoji: row.emoji as ReactionEmoji,
-    createdAt: row.created_at,
-  };
+  return coerceReactionRow(row);
 }
 
 export async function fetchReactions(targetType: ReactionTargetType, targetId: string): Promise<Reaction[]> {
