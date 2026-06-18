@@ -1,0 +1,36 @@
+-- BE-8 — index coverage for every foreign key + the hot read paths.
+--
+-- An unindexed foreign key forces a sequential scan on the *child* table
+-- whenever a referenced parent row is deleted (every `ON DELETE CASCADE` /
+-- `SET NULL`) and whenever the FK is used as a join/filter key. We audited all
+-- nine tables; almost every FK already has a leading-column index from the
+-- table's own migration:
+--
+--   profiles.id                       -> PRIMARY KEY
+--   collections.owner_user_id         -> collections_owner_user_id_idx
+--   items.collection_id               -> items_collection_id_idx
+--   items.created_by_user_id          -> items_wishlist_idx (leading column)
+--   friend_requests.from_user_id      -> friend_requests_from_idx
+--   friend_requests.to_user_id        -> friend_requests_to_idx
+--   chat_reads.user_id                -> PRIMARY KEY (user_id, chat_id)
+--   chat_messages.to_user_id          -> chat_messages_recipient_created_idx
+--   marketplace_listings.owner_user_id-> marketplace_listings_owner_idx
+--   marketplace_listings.buyer_user_id-> marketplace_listings_buyer_idx
+--   analytics_events.user_id          -> analytics_events_user_occurred_idx
+--   marketplace_transfers.owner_user_id-> marketplace_transfers_owner_idx
+--   marketplace_transfers.buyer_user_id-> marketplace_transfers_buyer_idx
+--
+-- The one gap is `chat_messages.from_user_id`: its FK references
+-- `auth.users(id) ON DELETE CASCADE`, but the table's only indexes lead with
+-- `chat_id` or `to_user_id`, so a user deletion (delete-account) seq-scans
+-- chat_messages to cascade the sender's rows. This migration closes that gap.
+--
+-- Idempotent (`CREATE INDEX IF NOT EXISTS`); safe on top of the live schema.
+-- The hot read paths named in BE-8 — items(collection_id),
+-- collections(owner_user_id), friend_requests(to_user_id), profiles(public_id),
+-- profiles(username) — already ship in 20260423_base_schema.sql; there is no
+-- friend_requests.status column (the app uses the directed-pair model), so no
+-- (to_user_id, status) composite is applicable.
+
+CREATE INDEX IF NOT EXISTS chat_messages_from_idx
+  ON public.chat_messages (from_user_id);
