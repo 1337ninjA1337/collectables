@@ -19,7 +19,17 @@ import {
   fetchProfileById,
   RemoteFriendRequest,
 } from "@/lib/supabase-profiles";
-import { SOCIAL_GRAPH_KEY, socialCacheKey } from "@/lib/storage-keys";
+import { SOCIAL_GRAPH_KEY, pendingSocialKey, socialCacheKey } from "@/lib/storage-keys";
+import {
+  applyDeliveredSocial,
+  dequeueSocialMutation,
+  enqueueSocialMutation,
+  flushPendingSocial,
+  hasPendingSocial,
+  makeSocialDeliver,
+  type PendingSocialQueue,
+  type SocialMutation,
+} from "@/lib/pending-social";
 import { Collection, CollectableItem, ProfileRelationship, UserProfile } from "@/lib/types";
 
 type SocialStore = {
@@ -173,6 +183,36 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   // Each entry is stamped with cachedAt so stale entries (>10 min) are refetched.
   const [viewerProfiles, setViewerProfiles] = useState<Record<string, { profile: UserProfile; cachedAt: number }>>({});
   const inFlightProfileIdsRef = useRef<Set<string>>(new Set());
+  // BE-13d: uuid/key-stable pending-mutation queue for social-graph writes
+  // (friend requests + own-profile sync). A failed cloud write (offline /
+  // Supabase unreachable) parks the mutation here; the flush effect below
+  // re-delivers it idempotently on the next reconnect.
+  const [pendingSocial, setPendingSocial] = useState<PendingSocialQueue>({});
+
+  // Stable deliver: dispatch a queued mutation to its cloud call. The fns are
+  // module-level imports, so the dependency list is empty.
+  const deliverSocial = useMemo(
+    () =>
+      makeSocialDeliver({
+        sendFriendRequest,
+        removeFriendRequest,
+        upsertMyProfile,
+      }),
+    [],
+  );
+
+  // Attempt a social write immediately; on success drop any parked copy, on
+  // failure park the full mutation for the next flush. Mirrors the BE-13c
+  // `syncCollection`/`syncItem` pattern.
+  const syncSocial = useCallback(
+    async (mutation: SocialMutation) => {
+      const ok = await deliverSocial(mutation);
+      setPendingSocial((q) =>
+        ok ? dequeueSocialMutation(q, mutation) : enqueueSocialMutation(q, mutation),
+      );
+    },
+    [deliverSocial],
+  );
 
   useEffect(() => {
     if (!LOW_PROFILE_CACHE_TTL_OVERRIDE || lowProfileCacheTtlWarningShown) return;
@@ -187,6 +227,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       setFriendRequests(prev => prev.length === 0 ? prev : []);
       setDeletedProfileIds(prev => prev.length === 0 ? prev : []);
       setViewerProfiles((prev) => (Object.keys(prev).length === 0 ? prev : {} as Record<string, { profile: UserProfile; cachedAt: number }>));
+      setPendingSocial((prev) => (hasPendingSocial(prev) ? {} : prev));
       inFlightProfileIdsRef.current.clear();
       setReady(false);
       return;
@@ -197,14 +238,21 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
 
     async function hydrate() {
       try {
-        const [rawPersonal, rawGraph, remoteRequests] = await Promise.all([
+        const [rawPersonal, rawGraph, rawPendingSocial, remoteRequests] = await Promise.all([
           AsyncStorage.getItem(socialCacheKey(activeUser.id)),
           AsyncStorage.getItem(SOCIAL_GRAPH_KEY),
+          AsyncStorage.getItem(pendingSocialKey(activeUser.id)),
           fetchFriendRequests(activeUser.id),
         ]);
 
         if (!active) {
           return;
+        }
+
+        if (rawPendingSocial) {
+          setPendingSocial(JSON.parse(rawPendingSocial) as PendingSocialQueue);
+        } else {
+          setPendingSocial({});
         }
 
         if (rawPersonal) {
@@ -316,14 +364,51 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     ).catch(() => undefined);
   }, [deletedProfileIds, friendRequests, ready]);
 
-  // Sync own profile to Supabase only when myProfileOverride changes
+  // BE-13d: persist the pending social-mutation queue so parked offline writes
+  // survive a reload and re-deliver on the next session.
+  useEffect(() => {
+    if (!user || !ready) return;
+    AsyncStorage.setItem(pendingSocialKey(user.id), JSON.stringify(pendingSocial)).catch(
+      () => undefined,
+    );
+  }, [pendingSocial, ready, user]);
+
+  // Sync own profile to Supabase only when myProfileOverride changes. Routed
+  // through the BE-13d queue so a failed upsert (offline) is retried on reconnect.
   useEffect(() => {
     if (!user || !ready) return;
     const selfProfile = myProfileOverride ?? (profiles.find((p) => p.id === user.id));
     if (selfProfile) {
-      upsertMyProfile(selfProfile).catch(() => undefined);
+      void syncSocial({ kind: "upsert-profile", profile: selfProfile });
     }
-  }, [myProfileOverride, ready, user]);
+  }, [myProfileOverride, ready, syncSocial, user]);
+
+  // Mirror chat's `pendingRef`: keep the latest queue in a ref so the flush
+  // effect reads it without re-subscribing on every queue change (which would
+  // loop the moment the flush mutates the queue).
+  const pendingSocialRef = useRef(pendingSocial);
+  useEffect(() => {
+    pendingSocialRef.current = pendingSocial;
+  }, [pendingSocial]);
+
+  // Flush parked offline social writes on reconnect/sign-in. Results are applied
+  // to the *current* queue so a mutation parked mid-flush isn't dropped.
+  useEffect(() => {
+    if (!ready || !user) return;
+    let cancelled = false;
+
+    void (async () => {
+      const queue = pendingSocialRef.current;
+      if (!hasPendingSocial(queue)) return;
+      const { sent } = await flushPendingSocial(queue, deliverSocial);
+      if (cancelled || sent.length === 0) return;
+      setPendingSocial((q) => applyDeliveredSocial(q, sent));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deliverSocial, ready, user]);
 
   const friends = useMemo(() => {
     if (!user) {
@@ -480,7 +565,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         });
 
         setFollowing((current) => (current.includes(profileId) ? current : [...current, profileId]));
-        sendFriendRequest(user.id, profileId).catch(() => undefined);
+        void syncSocial({ kind: "send-request", fromUserId: user.id, toUserId: profileId });
 
         if (!alreadyRequested) {
           trackEvent("friend_requested", {
@@ -502,7 +587,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
               ),
           ),
         );
-        removeFriendRequest(user.id, profileId).catch(() => undefined);
+        void syncSocial({ kind: "remove-request", userId: user.id, otherUserId: profileId });
       },
       followProfile: async (profileId) => {
         setFollowing((current) => (current.includes(profileId) ? current : [...current, profileId]));
@@ -545,7 +630,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         return seedSocialItems.filter((item) => visibleCollectionIds.has(item.collectionId));
       },
     }),
-    [deletedProfileIds, ensureProfilesLoaded, friendRequests, following, friends, incomingRequestUserIds, isAdmin, profileById, profiles, ready, user, viewerProfiles],
+    [deletedProfileIds, ensureProfilesLoaded, friendRequests, following, friends, incomingRequestUserIds, isAdmin, profileById, profiles, ready, syncSocial, user, viewerProfiles],
   );
 
   return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>;
