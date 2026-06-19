@@ -27,6 +27,7 @@ import {
   ownItemsSinceUrl,
 } from "@/lib/supabase-profiles-shapes";
 import { maxUpdatedAt } from "@/lib/sync-cursors";
+import { partitionByTombstone } from "@/lib/tombstones";
 import {
   coerceCollectionRow,
   coerceItemRow,
@@ -165,6 +166,7 @@ type DbCollection = {
   shared_with_user_ids?: string[] | null;
   currency?: string | null;
   updated_at?: string | null;
+  deleted_at?: string | null;
 };
 
 function toCollection(row: DbCollection): Collection {
@@ -202,11 +204,19 @@ export async function updateRemoteCollection(id: string, updates: Partial<Collec
   });
 }
 
-/** Delete a collection from Supabase. */
-export async function deleteRemoteCollection(id: string): Promise<void> {
+/**
+ * Soft-delete a collection (BE-15b): stamp `deleted_at` instead of a hard
+ * `DELETE`. A delta pull can only observe rows that still exist, so a tombstone
+ * is the only delete a peer can ever sync; the BE-9 moddatetime trigger bumps
+ * `updated_at` on this PATCH so the tombstone rides the normal delta pull.
+ */
+export async function softDeleteRemoteCollection(id: string): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  await supabaseRest(`/collections?id=eq.${id}`, { method: "DELETE" });
+  await supabaseRest(`/collections?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+  });
 }
 
 /** Fetch a single collection by ID. */
@@ -224,7 +234,9 @@ export async function fetchCollectionsByUserId(userId: string): Promise<Collecti
 
   const res = await supabaseRest(collectionsByUserUrl(supabaseUrl!, userId));
   const rows: DbCollection[] = await res.json();
-  return rows.map(toCollection);
+  // Drop soft-deleted rows so a cache-empty bootstrap can't resurrect a
+  // collection the user deleted on another device (BE-15b).
+  return rows.filter((row) => !row.deleted_at).map(toCollection);
 }
 
 /**
@@ -237,13 +249,21 @@ export async function fetchCollectionsByUserId(userId: string): Promise<Collecti
 export async function fetchOwnCollectionsSince(
   userId: string,
   since: string | null,
-): Promise<{ data: Collection[]; cursor: string | null }> {
-  if (!isSupabaseConfigured) return { data: [], cursor: since };
+): Promise<{ data: Collection[]; tombstonedIds: string[]; cursor: string | null }> {
+  if (!isSupabaseConfigured) return { data: [], tombstonedIds: [], cursor: since };
 
   const res = await supabaseRest(ownCollectionsSinceUrl(supabaseUrl!, userId, since));
-  if (!res.ok) return { data: [], cursor: since };
+  if (!res.ok) return { data: [], tombstonedIds: [], cursor: since };
   const rows: DbCollection[] = await res.json();
-  return { data: rows.map(toCollection), cursor: maxUpdatedAt(since, rows) };
+  // BE-15b: split soft-deleted rows out of the delta so the caller can drop
+  // them from the local cache instead of merging a tombstone back in as a live
+  // collection. The cursor still advances over *all* rows (tombstones included)
+  // so a soft delete isn't re-pulled on every refresh.
+  const { alive, tombstonedIds } = partitionByTombstone(rows, {
+    getId: (row) => row.id,
+    getDeletedAt: (row) => row.deleted_at,
+  });
+  return { data: alive.map(toCollection), tombstonedIds, cursor: maxUpdatedAt(since, rows) };
 }
 
 /**
@@ -253,13 +273,18 @@ export async function fetchOwnCollectionsSince(
 export async function fetchOwnItemsSince(
   userId: string,
   since: string | null,
-): Promise<{ data: CollectableItem[]; cursor: string | null }> {
-  if (!isSupabaseConfigured) return { data: [], cursor: since };
+): Promise<{ data: CollectableItem[]; tombstonedIds: string[]; cursor: string | null }> {
+  if (!isSupabaseConfigured) return { data: [], tombstonedIds: [], cursor: since };
 
   const res = await supabaseRest(ownItemsSinceUrl(supabaseUrl!, userId, since));
-  if (!res.ok) return { data: [], cursor: since };
+  if (!res.ok) return { data: [], tombstonedIds: [], cursor: since };
   const rows: DbItem[] = await res.json();
-  return { data: rows.map(toItem), cursor: maxUpdatedAt(since, rows) };
+  // BE-15b: see fetchOwnCollectionsSince — partition tombstones out of the delta.
+  const { alive, tombstonedIds } = partitionByTombstone(rows, {
+    getId: (row) => row.id,
+    getDeletedAt: (row) => row.deleted_at,
+  });
+  return { data: alive.map(toItem), tombstonedIds, cursor: maxUpdatedAt(since, rows) };
 }
 
 /** Fetch only public collections for a user (for non-owners viewing a profile). */
@@ -293,6 +318,7 @@ type DbItem = {
   tags?: { label: string; color: string }[] | null;
   archived_at?: string | null;
   updated_at?: string | null;
+  deleted_at?: string | null;
 };
 
 function toItem(row: DbItem): CollectableItem {
@@ -399,11 +425,15 @@ export async function updateRemoteItem(id: string, updates: Partial<CollectableI
   }
 }
 
-/** Delete an item from Supabase. */
-export async function deleteRemoteItem(id: string): Promise<void> {
+/** Soft-delete an item (BE-15b): stamp `deleted_at` so the tombstone rides the
+ * delta pull. See `softDeleteRemoteCollection`. */
+export async function softDeleteRemoteItem(id: string): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  await supabaseRest(`/items?id=eq.${id}`, { method: "DELETE" });
+  await supabaseRest(`/items?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ deleted_at: new Date().toISOString() }),
+  });
 }
 
 /** Fetch a single item by ID. */
@@ -421,7 +451,8 @@ export async function fetchItemsByCollectionId(collectionId: string): Promise<Co
 
   const res = await supabaseRest(`/items?collection_id=eq.${collectionId}&select=*&order=created_at.desc`);
   const rows: DbItem[] = await res.json();
-  return rows.map(toItem);
+  // Drop soft-deleted rows so a bootstrap pull can't resurrect a deleted item (BE-15b).
+  return rows.filter((row) => !row.deleted_at).map(toItem);
 }
 
 /** Fetch wishlist items for a specific user. */
@@ -433,7 +464,8 @@ export async function fetchWishlistItemsByUserId(userId: string): Promise<Collec
   );
   if (!res.ok) return [];
   const rows: DbItem[] = await res.json();
-  return rows.map(toItem);
+  // Drop soft-deleted wishlist items so a deleted wish doesn't reappear (BE-15b).
+  return rows.filter((row) => !row.deleted_at).map(toItem);
 }
 
 // --- Friend Requests ---
