@@ -234,25 +234,63 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
     );
   });
 
-  it("only merges when the delta pull returned rows + persists the advanced cursor", () => {
+  it("re-applies local state when the delta returned rows OR a tombstone changed + persists the advanced cursor", () => {
     const syncIdx = src.indexOf("syncFromCloud");
     const block = src.slice(syncIdx, syncIdx + 2500);
-    // A delta row is, by definition, newer than the cursor, so the merge is
-    // gated purely on a non-empty delta (no `hasNewCloudEntries` id check).
+    // A delta row is, by definition, newer than the cursor, so the merge fires
+    // on a non-empty delta (no `hasNewCloudEntries` id check). BE-15b also
+    // re-applies when the accumulated tombstone set grew, so a soft-deleted row
+    // is dropped from the cache even on a delta that carried only the tombstone.
     assert.match(
       block,
-      /if\s*\(\s*deltaCollections\.length\s*>\s*0\s*\)/,
-      "cloud-sync effect must merge collections only when the delta is non-empty",
+      /if\s*\(\s*deltaCollections\.length\s*>\s*0\s*\|\|\s*colTombstones\s*!==\s*prevColTombstones\s*\)/,
+      "cloud-sync effect must re-apply collections on a non-empty delta or a new tombstone",
     );
     assert.match(
       block,
-      /if\s*\(\s*deltaItems\.length\s*>\s*0\s*\)/,
-      "cloud-sync effect must merge items only when the delta is non-empty",
+      /if\s*\(\s*deltaItems\.length\s*>\s*0\s*\|\|\s*itemTombstones\s*!==\s*prevItemTombstones\s*\)/,
+      "cloud-sync effect must re-apply items on a non-empty delta or a new tombstone",
     );
     assert.match(
       block,
       /setSyncCursor\("collections", activeUser\.id, nextColCursor, colCursor\)/,
       "cloud-sync effect must persist the advanced collections cursor",
     );
+  });
+
+  it("partitions tombstones out of each delta and persists the accumulated set (BE-15b)", () => {
+    const syncIdx = src.indexOf("syncFromCloud");
+    const block = src.slice(syncIdx, syncIdx + 2500);
+    // The delta pull now surfaces tombstoned ids alongside the alive rows.
+    assert.match(
+      block,
+      /tombstonedIds:\s*colTombstoned/,
+      "cloud-sync effect must read the collections delta's tombstoned ids",
+    );
+    assert.match(
+      block,
+      /tombstonedIds:\s*itemTombstoned/,
+      "cloud-sync effect must read the items delta's tombstoned ids",
+    );
+    // The accumulated set is merged and dropped from the merged cache.
+    assert.match(block, /mergeTombstoneIds\(prevColTombstones, colTombstoned\)/);
+    assert.match(block, /mergeTombstoneIds\(prevItemTombstones, itemTombstoned\)/);
+    assert.match(block, /applyTombstones\(\s*\n?\s*mergeCollectionsFromCloud/);
+    assert.match(block, /applyTombstones\(mergeItemsFromCloud\(current, deltaItems\), itemTombstones/);
+    // The merged set is persisted for re-application on the next hydrate.
+    assert.match(block, /setTombstones\("collections", activeUser\.id, colTombstones, prevColTombstones\)/);
+    assert.match(block, /setTombstones\("items", activeUser\.id, itemTombstones, prevItemTombstones\)/);
+  });
+
+  it("soft-deletes owned collections/items and records local tombstones (BE-15b)", () => {
+    // Owned deletes must PATCH `deleted_at` (so a delta pull can observe the
+    // tombstone) and record it locally so a cache/seed row can't resurrect it.
+    assert.match(src, /softDeleteRemoteItem\(itemId\)\.catch/);
+    assert.match(src, /softDeleteRemoteCollection\(collectionId\)\.catch/);
+    assert.match(src, /recordTombstones\("items", \[itemId\]\)/);
+    assert.match(src, /recordTombstones\("collections", \[collectionId\]\)/);
+    // Hydrate re-applies the persisted set so deleted rows stay gone.
+    assert.match(src, /applyTombstones\(visibleCollections, colTombstones/);
+    assert.match(src, /applyTombstones\(normalizedItems, itemTombstones/);
   });
 });

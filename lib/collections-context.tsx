@@ -33,10 +33,10 @@ import { useSocial } from "@/lib/social-context";
 import {
   upsertCollection,
   updateRemoteCollection,
-  deleteRemoteCollection,
+  softDeleteRemoteCollection,
   upsertItem,
   updateRemoteItem,
-  deleteRemoteItem,
+  softDeleteRemoteItem,
   fetchCollectionsByUserId,
   fetchOwnCollectionsSince,
   fetchOwnItemsSince,
@@ -65,6 +65,12 @@ import {
   pendingItemsKey,
 } from "@/lib/storage-keys";
 import { getSyncCursor, setSyncCursor } from "@/lib/sync-cursors";
+import {
+  applyTombstones,
+  getTombstones,
+  mergeTombstoneIds,
+  setTombstones,
+} from "@/lib/tombstones";
 import { Collection, CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
 import { generateUuidV4 } from "@/lib/uuid";
 import { normalizeOwnItemIds } from "@/lib/item-id";
@@ -264,6 +270,20 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         .catch(() => setPendingItems((q) => enqueueUpsert(q, item, itemUpsertId)));
     },
     [],
+  );
+
+  // BE-15b: durably record a local soft-delete so the tombstone survives a
+  // reload even before the cloud PATCH round-trips (e.g. while offline) and a
+  // cached/seed row can't resurrect the entity on the next hydrate.
+  const recordTombstones = useCallback(
+    (entity: "collections" | "items", ids: string[]) => {
+      const activeUser = user;
+      if (!activeUser || ids.length === 0) return;
+      void getTombstones(entity, activeUser.id).then((prev) =>
+        setTombstones(entity, activeUser.id, mergeTombstoneIds(prev, ids), prev),
+      );
+    },
+    [user],
   );
 
   // Mirror chat's `pendingRef`: keep the latest queues in refs so the flush
@@ -515,8 +535,17 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           activeUser.id,
         );
 
-        setLocalCollections(visibleCollections);
-        setLocalItems(normalizedItems);
+        // BE-15b: re-apply the persisted tombstone set on hydrate so a cached or
+        // seed row for an entity deleted on another device doesn't reappear
+        // before the next cloud delta pull confirms the tombstone.
+        const [colTombstones, itemTombstones] = await Promise.all([
+          getTombstones("collections", activeUser.id),
+          getTombstones("items", activeUser.id),
+        ]);
+        if (!active) return;
+
+        setLocalCollections(applyTombstones(visibleCollections, colTombstones, (c) => c.id));
+        setLocalItems(applyTombstones(normalizedItems, itemTombstones, (i) => i.id));
         for (const item of rewritten) {
           upsertItem(item).catch(() => undefined);
         }
@@ -589,22 +618,37 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           getSyncCursor("items", activeUser.id),
         ]);
 
-        const { data: deltaCollections, cursor: nextColCursor } =
+        const { data: deltaCollections, tombstonedIds: colTombstoned, cursor: nextColCursor } =
           await fetchOwnCollectionsSince(activeUser.id, colCursor);
         if (cancelled) return;
-        if (deltaCollections.length > 0) {
+        // BE-15b: fold the delta's tombstones into the persisted set, then merge
+        // the alive rows and drop every tombstoned id — so a cached/seed copy of
+        // a remotely deleted collection can't survive the merge.
+        const prevColTombstones = await getTombstones("collections", activeUser.id);
+        const colTombstones = mergeTombstoneIds(prevColTombstones, colTombstoned);
+        if (deltaCollections.length > 0 || colTombstones !== prevColTombstones) {
           setLocalCollections((current) =>
-            mergeCollectionsFromCloud(current, deltaCollections, activeUser.id),
+            applyTombstones(
+              mergeCollectionsFromCloud(current, deltaCollections, activeUser.id),
+              colTombstones,
+              (c) => c.id,
+            ),
           );
         }
+        await setTombstones("collections", activeUser.id, colTombstones, prevColTombstones);
         await setSyncCursor("collections", activeUser.id, nextColCursor, colCursor);
 
-        const { data: deltaItems, cursor: nextItemCursor } =
+        const { data: deltaItems, tombstonedIds: itemTombstoned, cursor: nextItemCursor } =
           await fetchOwnItemsSince(activeUser.id, itemCursor);
         if (cancelled) return;
-        if (deltaItems.length > 0) {
-          setLocalItems((current) => mergeItemsFromCloud(current, deltaItems));
+        const prevItemTombstones = await getTombstones("items", activeUser.id);
+        const itemTombstones = mergeTombstoneIds(prevItemTombstones, itemTombstoned);
+        if (deltaItems.length > 0 || itemTombstones !== prevItemTombstones) {
+          setLocalItems((current) =>
+            applyTombstones(mergeItemsFromCloud(current, deltaItems), itemTombstones, (i) => i.id),
+          );
         }
+        await setTombstones("items", activeUser.id, itemTombstones, prevItemTombstones);
         await setSyncCursor("items", activeUser.id, nextItemCursor, itemCursor);
       } catch {
         // Network/Supabase unavailable — keep the local state intact.
@@ -1046,7 +1090,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         setLocalItems((current) => current.filter((item) => item.id !== itemId));
         // Drop any parked upsert so a queued copy can't resurrect the row.
         setPendingItems((q) => dequeueUpsert(q, itemId, itemUpsertId));
-        deleteRemoteItem(itemId).catch(() => undefined);
+        recordTombstones("items", [itemId]);
+        softDeleteRemoteItem(itemId).catch(() => undefined);
       },
       archiveItem: async (itemId) => {
         const archivedAt = new Date().toISOString();
@@ -1069,7 +1114,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         const idSet = new Set(itemIds);
         setLocalItems((current) => current.filter((item) => !idSet.has(item.id)));
         setPendingItems((q) => itemIds.reduce((acc, id) => dequeueUpsert(acc, id, itemUpsertId), q));
-        await Promise.allSettled(itemIds.map((id) => deleteRemoteItem(id)));
+        recordTombstones("items", itemIds);
+        await Promise.allSettled(itemIds.map((id) => softDeleteRemoteItem(id)));
       },
       moveItems: async (itemIds, targetCollectionId) => {
         if (itemIds.length === 0) return;
@@ -1097,7 +1143,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         // upsert can't resurrect any of them after the delete.
         setPendingCollections((q) => dequeueUpsert(q, collectionId, collectionUpsertId));
         setPendingItems((q) => removedItemIds.reduce((acc, id) => dequeueUpsert(acc, id, itemUpsertId), q));
-        deleteRemoteCollection(collectionId).catch(() => undefined);
+        recordTombstones("collections", [collectionId]);
+        recordTombstones("items", removedItemIds);
+        // Soft-delete the collection and each of its items: no FK cascade fires
+        // on a soft delete, so every child needs its own tombstone to propagate.
+        softDeleteRemoteCollection(collectionId).catch(() => undefined);
+        removedItemIds.forEach((id) => softDeleteRemoteItem(id).catch(() => undefined));
       },
       reorderOwnedCollections: (orderedIds) => {
         const updated: Collection[] = [];
