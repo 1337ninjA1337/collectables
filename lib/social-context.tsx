@@ -27,6 +27,7 @@ import {
   flushPendingSocial,
   hasPendingSocial,
   makeSocialDeliver,
+  socialMutationKey,
   type PendingSocialQueue,
   type SocialMutation,
 } from "@/lib/pending-social";
@@ -206,7 +207,9 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   // `syncCollection`/`syncItem` pattern.
   const syncSocial = useCallback(
     async (mutation: SocialMutation) => {
-      const ok = await deliverSocial(mutation);
+      // The cloud calls are pair/id-keyed and ignore `outId`; pass the stable
+      // mutation key to satisfy the engine `DeliverFn` signature.
+      const ok = await deliverSocial(mutation, socialMutationKey(mutation));
       setPendingSocial((q) =>
         ok ? dequeueSocialMutation(q, mutation) : enqueueSocialMutation(q, mutation),
       );
