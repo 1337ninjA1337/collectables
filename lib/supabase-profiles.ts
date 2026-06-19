@@ -23,7 +23,10 @@ import {
   updateProfileDisplayCurrencyBody,
   upsertCollectionBody,
   upsertProfileBody,
+  ownCollectionsSinceUrl,
+  ownItemsSinceUrl,
 } from "@/lib/supabase-profiles-shapes";
+import { maxUpdatedAt } from "@/lib/sync-cursors";
 import {
   coerceCollectionRow,
   coerceItemRow,
@@ -161,6 +164,7 @@ type DbCollection = {
   visibility?: string | null;
   shared_with_user_ids?: string[] | null;
   currency?: string | null;
+  updated_at?: string | null;
 };
 
 function toCollection(row: DbCollection): Collection {
@@ -223,6 +227,41 @@ export async function fetchCollectionsByUserId(userId: string): Promise<Collecti
   return rows.map(toCollection);
 }
 
+/**
+ * Delta pull (BE-14) of a user's own collections: only rows whose `updated_at`
+ * is newer than `since` come back, so a warm `refreshTick` no longer refetches
+ * the whole table. Returns the rows plus the advanced cursor (the max
+ * `updated_at` seen, or `since` unchanged when the delta was empty) for the
+ * caller to persist. A null `since` is a first/full pull.
+ */
+export async function fetchOwnCollectionsSince(
+  userId: string,
+  since: string | null,
+): Promise<{ data: Collection[]; cursor: string | null }> {
+  if (!isSupabaseConfigured) return { data: [], cursor: since };
+
+  const res = await supabaseRest(ownCollectionsSinceUrl(supabaseUrl!, userId, since));
+  if (!res.ok) return { data: [], cursor: since };
+  const rows: DbCollection[] = await res.json();
+  return { data: rows.map(toCollection), cursor: maxUpdatedAt(since, rows) };
+}
+
+/**
+ * Delta pull (BE-14) of every item a user authored, across all their
+ * collections, in a single query. Mirrors `fetchOwnCollectionsSince`.
+ */
+export async function fetchOwnItemsSince(
+  userId: string,
+  since: string | null,
+): Promise<{ data: CollectableItem[]; cursor: string | null }> {
+  if (!isSupabaseConfigured) return { data: [], cursor: since };
+
+  const res = await supabaseRest(ownItemsSinceUrl(supabaseUrl!, userId, since));
+  if (!res.ok) return { data: [], cursor: since };
+  const rows: DbItem[] = await res.json();
+  return { data: rows.map(toItem), cursor: maxUpdatedAt(since, rows) };
+}
+
 /** Fetch only public collections for a user (for non-owners viewing a profile). */
 export async function fetchPublicCollectionsByUserId(userId: string): Promise<Collection[]> {
   if (!isSupabaseConfigured) return [];
@@ -253,6 +292,7 @@ type DbItem = {
   condition?: string | null;
   tags?: { label: string; color: string }[] | null;
   archived_at?: string | null;
+  updated_at?: string | null;
 };
 
 function toItem(row: DbItem): CollectableItem {

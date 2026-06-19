@@ -20,10 +20,69 @@ import {
   updateProfileDisplayCurrencyBody,
   upsertCollectionBody,
   upsertProfileBody,
+  withUpdatedSince,
+  ownCollectionsSinceUrl,
+  ownItemsSinceUrl,
 } from "@/lib/supabase-profiles-shapes";
 import { Collection, UserProfile } from "@/lib/types";
 
 const BASE = "https://demo.supabase.co";
+
+// --- withUpdatedSince (BE-14 delta pulls) ---
+describe("withUpdatedSince", () => {
+  it("returns the URL unchanged for a null/empty cursor (full pull)", () => {
+    assert.equal(withUpdatedSince(`${BASE}/rest/v1/items?select=*`, null), `${BASE}/rest/v1/items?select=*`);
+    assert.equal(withUpdatedSince(`${BASE}/rest/v1/items`, ""), `${BASE}/rest/v1/items`);
+  });
+
+  it("appends with & when the URL already has a query string", () => {
+    assert.equal(
+      withUpdatedSince(`${BASE}/rest/v1/items?select=*`, "2026-06-19T00:00:00Z"),
+      `${BASE}/rest/v1/items?select=*&updated_at=gt.2026-06-19T00%3A00%3A00Z`,
+    );
+  });
+
+  it("appends with ? when the URL has no query string", () => {
+    assert.equal(
+      withUpdatedSince(`${BASE}/rest/v1/items`, "2026-06-19T00:00:00Z"),
+      `${BASE}/rest/v1/items?updated_at=gt.2026-06-19T00%3A00%3A00Z`,
+    );
+  });
+
+  it("percent-encodes a cursor carrying a +00:00 offset", () => {
+    assert.match(
+      withUpdatedSince(`${BASE}/rest/v1/items?select=*`, "2026-06-19T12:00:00.5+00:00"),
+      /updated_at=gt\.2026-06-19T12%3A00%3A00\.5%2B00%3A00$/,
+    );
+  });
+});
+
+describe("ownCollectionsSinceUrl", () => {
+  it("filters the user's non-wishlist collections plus the delta cursor", () => {
+    const url = ownCollectionsSinceUrl(BASE, "user-1", "2026-06-19T00:00:00Z");
+    assert.match(url, /owner_user_id=eq\.user-1/);
+    assert.match(url, /name=neq\.__wishlist__/);
+    assert.match(url, /updated_at=gt\./);
+  });
+
+  it("omits the delta filter on a first/full pull", () => {
+    const url = ownCollectionsSinceUrl(BASE, "user-1", null);
+    assert.doesNotMatch(url, /updated_at=gt\./);
+  });
+});
+
+describe("ownItemsSinceUrl", () => {
+  it("filters every item the user authored plus the delta cursor", () => {
+    const url = ownItemsSinceUrl(BASE, "user-1", "2026-06-19T00:00:00Z");
+    assert.match(url, /created_by_user_id=eq\.user-1/);
+    assert.match(url, /select=\*/);
+    assert.match(url, /updated_at=gt\./);
+  });
+
+  it("omits the delta filter on a first/full pull", () => {
+    assert.doesNotMatch(ownItemsSinceUrl(BASE, "user-1", null), /updated_at=gt\./);
+  });
+});
 
 // --- profilesUrl ---
 describe("profilesUrl", () => {

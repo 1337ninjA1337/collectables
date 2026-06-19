@@ -17,7 +17,6 @@ import {
   setUserPreferredCurrency,
 } from "@/lib/locale-helpers";
 import {
-  hasNewCloudEntries,
   mergeCollectionsFromCloud,
   mergeItemsFromCloud,
 } from "@/lib/collections-cloud-merge";
@@ -39,6 +38,8 @@ import {
   updateRemoteItem,
   deleteRemoteItem,
   fetchCollectionsByUserId,
+  fetchOwnCollectionsSince,
+  fetchOwnItemsSince,
   fetchPublicCollectionsByUserId,
   fetchItemsByCollectionId,
   fetchCollectionById,
@@ -63,6 +64,7 @@ import {
   pendingCollectionsKey,
   pendingItemsKey,
 } from "@/lib/storage-keys";
+import { getSyncCursor, setSyncCursor } from "@/lib/sync-cursors";
 import { Collection, CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
 import { generateUuidV4 } from "@/lib/uuid";
 import { normalizeOwnItemIds } from "@/lib/item-id";
@@ -576,36 +578,34 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
 
     async function syncFromCloud() {
       try {
-        const remoteCollections = await fetchCollectionsByUserId(activeUser.id);
-        if (cancelled) return;
-        if (remoteCollections.length > 0) {
-          setLocalCollections((current) => {
-            const localIds = new Set(current.map((c) => c.id));
-            const cloudIds = remoteCollections.map((c) => c.id);
-            if (!hasNewCloudEntries(localIds, cloudIds)) return current;
-            return mergeCollectionsFromCloud(current, remoteCollections, activeUser.id);
-          });
-        }
+        // Delta pull (BE-14): ask only for the user's own collections + items
+        // changed since the last cursor, instead of refetching both whole
+        // tables on every refreshTick. A delta row is — by definition — newer
+        // than what we have, so (unlike the cold-bootstrap path) we merge it
+        // unconditionally: this also propagates cross-device *edits* to rows we
+        // already hold, which the new-id-only `hasNewCloudEntries` gate misses.
+        const [colCursor, itemCursor] = await Promise.all([
+          getSyncCursor("collections", activeUser.id),
+          getSyncCursor("items", activeUser.id),
+        ]);
 
-        // Pull items for every collection we now own/share into. Use the
-        // post-merge collection set rather than the stale closure value so
-        // newly-discovered cloud collections also have their items loaded.
-        const collectionsToScan = remoteCollections.length > 0
-          ? remoteCollections
-          : [];
-        if (collectionsToScan.length === 0) return;
-        const itemBatches = await Promise.all(
-          collectionsToScan.map((c) => fetchItemsByCollectionId(c.id)),
-        );
+        const { data: deltaCollections, cursor: nextColCursor } =
+          await fetchOwnCollectionsSince(activeUser.id, colCursor);
         if (cancelled) return;
-        const flattened = itemBatches.flat();
-        if (flattened.length === 0) return;
-        setLocalItems((current) => {
-          const localIds = new Set(current.map((i) => i.id));
-          const cloudIds = flattened.map((i) => i.id);
-          if (!hasNewCloudEntries(localIds, cloudIds)) return current;
-          return mergeItemsFromCloud(current, flattened);
-        });
+        if (deltaCollections.length > 0) {
+          setLocalCollections((current) =>
+            mergeCollectionsFromCloud(current, deltaCollections, activeUser.id),
+          );
+        }
+        await setSyncCursor("collections", activeUser.id, nextColCursor, colCursor);
+
+        const { data: deltaItems, cursor: nextItemCursor } =
+          await fetchOwnItemsSince(activeUser.id, itemCursor);
+        if (cancelled) return;
+        if (deltaItems.length > 0) {
+          setLocalItems((current) => mergeItemsFromCloud(current, deltaItems));
+        }
+        await setSyncCursor("items", activeUser.id, nextItemCursor, itemCursor);
       } catch {
         // Network/Supabase unavailable — keep the local state intact.
       }

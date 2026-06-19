@@ -47,6 +47,15 @@ export function marketplaceTransferLogKey(userId: string): string {
   return `collectables-marketplace-transfer-log-v1-${userId}`;
 }
 
+/**
+ * Per-entity, per-user delta-pull cursor (BE-14). Stores the highest
+ * `updated_at` timestamp seen so far for a given entity so the next cloud pull
+ * can ask for `updated_at=gt.<cursor>` instead of refetching the whole table.
+ */
+export function syncCursorKey(entity: string, userId: string): string {
+  return `collectables-sync-cursor-v1-${entity}-${userId}`;
+}
+
 export async function migrateStorageKey(oldKey: string, newKey: string): Promise<void> {
   try {
     const value = await AsyncStorage.getItem(oldKey);
@@ -93,6 +102,8 @@ export async function clearAllUserData(userId: string): Promise<void> {
     socialCacheKey(userId),
     premiumKey(userId),
     marketplaceTransferLogKey(userId),
+    syncCursorKey("collections", userId),
+    syncCursorKey("items", userId),
     SOCIAL_GRAPH_KEY,
     LANGUAGE_KEY,
     MARKETPLACE_KEY,
