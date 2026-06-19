@@ -147,6 +147,7 @@ below reproduce the production schema end-to-end on an empty project.
    20260620_fk_index_coverage.sql        index the one unindexed FK (chat_messages.from_user_id)
    20260621_updated_at_moddatetime.sql   updated_at + moddatetime auto-bump trigger on every table
    20260622_not_null_defaults.sql        backfill NOT NULL + defaults on client-guaranteed columns
+   20260623_soft_delete_deleted_at.sql   nullable deleted_at + partial alive index on deletable tables
    ```
 
    No CLI? Open each file in **SQL Editor** and run them top-to-bottom in the

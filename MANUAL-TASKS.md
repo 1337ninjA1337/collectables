@@ -643,3 +643,33 @@ project where it hasn't been applied.
 Idempotent: applying on a base_schema/branch-preview DB where the columns are
 already `NOT NULL DEFAULT` is a no-op (the backfill matches zero rows; the
 ALTERs restate the existing shape). No pre-apply check required.
+
+## 20260623_soft_delete_deleted_at.sql
+
+BE-15a — soft-delete foundation for the LWW/tombstone conflict policy (see
+[`docs/CONFLICT-POLICY.md`](./docs/CONFLICT-POLICY.md)). A hard `DELETE` is
+invisible to the `updated_at=gt.<cursor>` delta pull (BE-14), so a peer that
+hasn't synced since can never learn a row was removed and its seed/cached copy
+resurrects. The fix is a soft delete: set `deleted_at` instead of removing the
+row — the BE-9 moddatetime trigger bumps `updated_at` on that same UPDATE, so
+the tombstone rides the normal delta pull to every peer.
+
+Adds a nullable `deleted_at timestamptz` (NULL = alive, non-null = the time it
+was tombstoned — no default) + a partial `<table>_alive_idx (deleted_at)
+WHERE deleted_at IS NULL` index to the four user-deletable tables:
+
+- `collections`, `items`, `profiles`, `friend_requests`
+
+The append-only audit/log tables (`analytics_events`, `marketplace_transfers`,
+`chat_reads`) are never user-deleted, so they get no column.
+
+Pairs with the app-side `lib/tombstones.ts` helper (generalising the social
+graph's `deletedProfileIds` set): a delta batch is split into still-alive rows
+vs tombstoned ids, which are dropped from the local cache and accumulated into a
+persisted per-entity tombstone set so a later full/seed load can't resurrect a
+remotely deleted entity.
+
+Idempotent: `ADD COLUMN IF NOT EXISTS` + `CREATE INDEX IF NOT EXISTS`, so a
+re-run (or applying on top of the live schema) is a no-op. No pre-apply check
+required. A future retention sweep (BE-27) can hard-purge rows whose
+`deleted_at` is older than the retention window.
