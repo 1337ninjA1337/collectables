@@ -160,7 +160,6 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
       "collections-context must import the merge helpers",
     );
     for (const symbol of [
-      "hasNewCloudEntries",
       "mergeCollectionsFromCloud",
       "mergeItemsFromCloud",
     ]) {
@@ -181,19 +180,26 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
     );
   });
 
-  it("calls fetchCollectionsByUserId AND fetchItemsByCollectionId in the cloud-sync effect", () => {
-    // Both functions are already imported; verify they're referenced in the
-    // syncFromCloud function (the second usage — first is the original
-    // empty-only bootstrap).
-    const calls = src.match(/fetchCollectionsByUserId\(/g) ?? [];
-    assert.ok(
-      calls.length >= 2,
-      "fetchCollectionsByUserId must appear in both the bootstrap path and the new cloud-sync effect",
+  it("delta-pulls own collections AND items in the cloud-sync effect (BE-14)", () => {
+    // The warm refresh path no longer refetches whole tables — it asks for the
+    // user's own rows changed since a per-entity cursor. The cold-bootstrap
+    // path still keeps the full `fetchCollectionsByUserId` pull.
+    const syncIdx = src.indexOf("syncFromCloud");
+    const block = src.slice(syncIdx, syncIdx + 2500);
+    assert.match(
+      block,
+      /fetchOwnCollectionsSince\(activeUser\.id, colCursor\)/,
+      "cloud-sync effect must delta-pull collections via fetchOwnCollectionsSince",
     );
-    const itemCalls = src.match(/fetchItemsByCollectionId\(/g) ?? [];
+    assert.match(
+      block,
+      /fetchOwnItemsSince\(activeUser\.id, itemCursor\)/,
+      "cloud-sync effect must delta-pull items via fetchOwnItemsSince",
+    );
+    // The cold-bootstrap full pull is still wired.
     assert.ok(
-      itemCalls.length >= 2,
-      "fetchItemsByCollectionId must appear in both the bootstrap and the cloud-sync paths",
+      (src.match(/fetchCollectionsByUserId\(/g) ?? []).length >= 1,
+      "fetchCollectionsByUserId must remain in the cold-bootstrap path",
     );
   });
 
@@ -228,13 +234,25 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
     );
   });
 
-  it("short-circuits the setState when no new cloud entries arrived (avoid storage write storm)", () => {
+  it("only merges when the delta pull returned rows + persists the advanced cursor", () => {
     const syncIdx = src.indexOf("syncFromCloud");
     const block = src.slice(syncIdx, syncIdx + 2500);
+    // A delta row is, by definition, newer than the cursor, so the merge is
+    // gated purely on a non-empty delta (no `hasNewCloudEntries` id check).
     assert.match(
       block,
-      /if\s*\(\s*!hasNewCloudEntries\(/,
-      "cloud-sync effect must early-return setState when nothing is new",
+      /if\s*\(\s*deltaCollections\.length\s*>\s*0\s*\)/,
+      "cloud-sync effect must merge collections only when the delta is non-empty",
+    );
+    assert.match(
+      block,
+      /if\s*\(\s*deltaItems\.length\s*>\s*0\s*\)/,
+      "cloud-sync effect must merge items only when the delta is non-empty",
+    );
+    assert.match(
+      block,
+      /setSyncCursor\("collections", activeUser\.id, nextColCursor, colCursor\)/,
+      "cloud-sync effect must persist the advanced collections cursor",
     );
   });
 });

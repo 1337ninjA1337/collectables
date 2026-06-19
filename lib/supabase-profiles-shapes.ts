@@ -7,6 +7,38 @@ import { Collection, CollectableItem, UserProfile } from "@/lib/types";
  * mocking `fetch` or the Supabase auth client.
  */
 
+/**
+ * Appends a delta-pull filter to an already-built PostgREST URL (BE-14): only
+ * rows with `updated_at` strictly greater than `cursor` come back. A null/empty
+ * cursor returns the URL unchanged (first sync = full pull). The `&` vs `?`
+ * separator is chosen from whether the URL already has a query string, and the
+ * cursor is percent-encoded so the `+00:00` offset survives transit.
+ */
+export function withUpdatedSince(url: string, cursor: string | null): string {
+  if (!cursor) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}updated_at=gt.${encodeURIComponent(cursor)}`;
+}
+
+/** Delta-pull URL for a user's own (non-wishlist) collections. */
+export function ownCollectionsSinceUrl(
+  baseUrl: string,
+  userId: string,
+  cursor: string | null,
+): string {
+  return withUpdatedSince(collectionsByUserUrl(baseUrl, userId), cursor);
+}
+
+/** Delta-pull URL for every item a user authored, across all collections. */
+export function ownItemsSinceUrl(
+  baseUrl: string,
+  userId: string,
+  cursor: string | null,
+): string {
+  const url = `${baseUrl}/rest/v1/items?created_by_user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc`;
+  return withUpdatedSince(url, cursor);
+}
+
 // --- Profiles ---
 
 export function profilesUrl(baseUrl: string): string {
