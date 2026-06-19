@@ -56,6 +56,16 @@ export function syncCursorKey(entity: string, userId: string): string {
   return `collectables-sync-cursor-v1-${entity}-${userId}`;
 }
 
+/**
+ * Per-entity, per-user soft-delete tombstone set (BE-15a). Stores the ids of
+ * rows the cloud reported as `deleted_at != null` so the client can keep
+ * dropping them locally even when a later full/seed load would otherwise
+ * resurrect them — generalising the social-graph `deletedProfileIds` set.
+ */
+export function tombstoneKey(entity: string, userId: string): string {
+  return `collectables-tombstones-v1-${entity}-${userId}`;
+}
+
 export async function migrateStorageKey(oldKey: string, newKey: string): Promise<void> {
   try {
     const value = await AsyncStorage.getItem(oldKey);
@@ -104,6 +114,8 @@ export async function clearAllUserData(userId: string): Promise<void> {
     marketplaceTransferLogKey(userId),
     syncCursorKey("collections", userId),
     syncCursorKey("items", userId),
+    tombstoneKey("collections", userId),
+    tombstoneKey("items", userId),
     SOCIAL_GRAPH_KEY,
     LANGUAGE_KEY,
     MARKETPLACE_KEY,
