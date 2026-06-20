@@ -28,7 +28,7 @@ describe("collections-context — rate freshness exposure", () => {
   });
 
   it("includes ratesUpdatedAt in the value useMemo deps", () => {
-    assert.match(src, /currencyRates,\s*displayCurrency,\s*ratesUpdatedAt\]/);
+    assert.match(src, /currencyRates,\s*displayCurrency,\s*ratesUpdatedAt[,\]]/);
   });
 });
 

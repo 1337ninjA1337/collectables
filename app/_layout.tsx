@@ -49,6 +49,7 @@ import { clearAllCollectablesStorage } from "@/lib/storage-keys";
 import { clearRuntimeSupabaseConfig } from "@/lib/supabase";
 import { ToastProvider } from "@/lib/toast-context";
 import { Screen, useResponsive } from "@/components/screen";
+import { SyncStatusPill } from "@/components/sync-status-pill";
 import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export default Sentry.wrap(function RootLayout() {
@@ -174,6 +175,7 @@ function AppShell() {
     <View style={styles.shell}>
       <StatusBar style="dark" />
       <NavigationBreadcrumbs />
+      <SyncStatusPill />
       <View style={styles.stackWrap}>
         <Stack
           screenOptions={{

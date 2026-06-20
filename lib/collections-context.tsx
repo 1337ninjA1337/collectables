@@ -76,6 +76,7 @@ import { generateUuidV4 } from "@/lib/uuid";
 import { normalizeOwnItemIds } from "@/lib/item-id";
 import {
   applyDeliveredUpserts,
+  countPendingUpserts,
   dequeueUpsert,
   enqueueUpsert,
   flushPendingUpserts,
@@ -211,6 +212,13 @@ type CollectionsContextValue = {
       };
     },
   ) => Promise<{ itemId: string; collectionId: string } | null>;
+  /**
+   * BE-16: number of owned collection/item writes parked in the pending-upsert
+   * queues awaiting (re)delivery to the cloud. > 0 while offline writes are
+   * queued; drops to 0 once the flush effect drains them. Drives the global
+   * "syncing…" pill alongside the social/chat pending counts.
+   */
+  pendingSyncCount: number;
   refresh: () => Promise<void>;
 };
 
@@ -1199,6 +1207,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         }
         return { itemId: plan.item.id, collectionId: plan.collectionId };
       },
+      pendingSyncCount: countPendingUpserts(pendingCollections) + countPendingUpserts(pendingItems),
       refresh: async () => {
         setRefreshTick((n) => n + 1);
       },
@@ -1231,7 +1240,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     }),
     // syncCollection/syncItem are stable useCallback([]) refs, so they're
     // intentionally omitted here (ratesUpdatedAt stays last in the deps list).
-    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt],
+    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;
