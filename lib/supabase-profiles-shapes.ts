@@ -174,3 +174,16 @@ export function removeFriendRequestUrl(baseUrl: string, userA: string, userB: st
     `${baseUrl}/rest/v1/friend_requests?or=(and(from_user_id.eq.${encodeURIComponent(userA)},to_user_id.eq.${encodeURIComponent(userB)}),and(from_user_id.eq.${encodeURIComponent(userB)},to_user_id.eq.${encodeURIComponent(userA)}))`
   );
 }
+
+// BE-21 — server-authoritative friend-request acceptance via Edge Function.
+export function acceptFriendRequestUrl(baseUrl: string): string {
+  return `${baseUrl}/functions/v1/accept-friend-request`;
+}
+
+export type AcceptFriendRequestPayload = {
+  fromUserId: string;
+};
+
+export function acceptFriendRequestPayload(fromUserId: string): AcceptFriendRequestPayload {
+  return { fromUserId };
+}

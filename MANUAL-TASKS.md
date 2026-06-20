@@ -715,3 +715,78 @@ Idempotent: `ADD COLUMN IF NOT EXISTS` + `CREATE INDEX IF NOT EXISTS`, so a
 re-run (or applying on top of the live schema) is a no-op. No pre-apply check
 required. A future retention sweep (BE-27) can hard-purge rows whose
 `deleted_at` is older than the retention window.
+
+
+## 20260624_accept_friend_request.sql
+
+BE-21 — the transactional core of the `accept-friend-request` Edge Function
+(see its section below). A friendship is mutual: it exists only when **both**
+directed `friend_requests` rows are present (sender→acceptor AND
+acceptor→sender). Accepting an incoming request is therefore inserting the
+reverse direction — but a naive client-side `INSERT` never checks that the
+inbound request still exists, so a concurrently-withdrawn request leaves a
+dangling one-way row that looks like a brand-new *outgoing* request.
+
+This migration adds the `accept_friend_request(p_from_user_id, p_to_user_id)`
+SQL function (`SECURITY DEFINER`, `search_path = public`). It locks the inbound
+sender→acceptor row `FOR UPDATE` (so a concurrent withdrawal blocks until the
+accept commits), raises `P0002` ("no pending friend request") if it is gone,
+then inserts the reverse direction idempotently — so both directions become
+present, or neither does, atomically. It returns the resulting directed rows.
+
+It is granted **only to `service_role`** (`REVOKE ALL … FROM PUBLIC` +
+`GRANT EXECUTE … TO service_role`): it trusts its `p_to_user_id` argument, so it
+must never be reachable by an anon/authenticated PostgREST session that could
+pass any id. The `accept-friend-request` Edge Function validates the caller via
+`auth.getUser()` and is the only intended caller.
+
+Run `supabase/migrations/20260624_accept_friend_request.sql` against your
+project. Idempotent: `CREATE OR REPLACE FUNCTION` + idempotent GRANT/REVOKE, so
+re-running is a no-op. No pre-apply check required.
+
+
+## accept-friend-request Edge Function (BE-21) — RECOMMENDED
+
+**Why:** accepting a friend request client-side (a plain `INSERT` of the
+acceptor→sender row) is not transactional — it never verifies the inbound
+request still exists, so if the sender withdraws it concurrently the acceptor is
+left with a dangling one-way row that reads as a *new* outgoing request. The
+`accept-friend-request` Edge Function runs the flip through the
+`accept_friend_request` SQL function (above) under the service-role key: it
+locks the inbound row, rejects with `409` if it is gone, and inserts the reverse
+direction idempotently — both directions flip to "friends" or neither does.
+
+The app still works without it: an unconfigured/failed accept falls back to the
+local optimistic update and the pending-social queue re-delivers it. Deploy the
+function (and apply the migration above) to make accepts race-safe.
+
+### 1. Apply the SQL function
+
+Apply `supabase/migrations/20260624_accept_friend_request.sql` (see its section
+above) — the function depends on it.
+
+### 2. Deploy the function
+
+```bash
+supabase functions deploy accept-friend-request --project-ref <your-project-ref>
+```
+
+### 3. Function secrets
+
+```bash
+supabase secrets set --project-ref <your-project-ref> \
+  SUPABASE_SERVICE_ROLE_KEY=<your service_role / sb_secret_… key>
+# SUPABASE_URL and SUPABASE_ANON_KEY are auto-injected by Supabase.
+```
+
+**Never commit the service-role key.** The function self-checks the key at
+invocation (BE-23) and returns `500 { error: "function misconfigured" }` if the
+anon/publishable key was pasted by mistake.
+
+### 4. Verify
+
+Have user B accept a pending request from user A — the function returns
+`200 { success: true, friendRequests: [...] }` and both directed rows now exist
+(`is_friend(A, B)` is true). Accepting a request that was withdrawn returns
+`409`; an unauthenticated `POST` to `/functions/v1/accept-friend-request`
+returns `401`; accepting "yourself" returns `400`.

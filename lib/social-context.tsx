@@ -15,6 +15,7 @@ import {
   upsertMyProfile,
   fetchFriendRequests,
   sendFriendRequest,
+  cloudAcceptFriendRequest,
   removeFriendRequest,
   fetchProfileById,
   RemoteFriendRequest,
@@ -202,6 +203,13 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     () =>
       makeSocialDeliver({
         sendFriendRequest,
+        // BE-21: route the accept through the server-authoritative Edge
+        // Function. It returns `false` only on a transient failure (so the
+        // mutation stays queued); throw so `makeSocialDeliver` keeps it.
+        acceptFriendRequest: async (_acceptorUserId, fromUserId) => {
+          const ok = await cloudAcceptFriendRequest(fromUserId);
+          if (!ok) throw new Error("accept-friend-request failed");
+        },
         removeFriendRequest,
         upsertMyProfile,
       }),
@@ -565,6 +573,9 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         }
 
         const alreadyRequested = hasRequest(friendRequests, user.id, profileId);
+        // An inbound request (them → me) makes this an *accept*: it flips both
+        // directions to friends. Otherwise it is a fresh outgoing request.
+        const isAccept = hasRequest(friendRequests, profileId, user.id);
 
         setFriendRequests((current) => {
           if (hasRequest(current, user.id, profileId)) {
@@ -574,7 +585,12 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         });
 
         setFollowing((current) => (current.includes(profileId) ? current : [...current, profileId]));
-        void syncSocial({ kind: "send-request", fromUserId: user.id, toUserId: profileId });
+        if (isAccept) {
+          // BE-21: server-authoritative, transactional accept.
+          void syncSocial({ kind: "accept-request", acceptorUserId: user.id, fromUserId: profileId });
+        } else {
+          void syncSocial({ kind: "send-request", fromUserId: user.id, toUserId: profileId });
+        }
 
         if (!alreadyRequested) {
           trackEvent("friend_requested", {
