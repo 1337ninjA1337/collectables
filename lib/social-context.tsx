@@ -22,6 +22,7 @@ import {
 import { SOCIAL_GRAPH_KEY, pendingSocialKey, socialCacheKey } from "@/lib/storage-keys";
 import {
   applyDeliveredSocial,
+  countPendingSocial,
   dequeueSocialMutation,
   enqueueSocialMutation,
   flushPendingSocial,
@@ -67,6 +68,11 @@ type SocialContextValue = {
   deleteProfile: (profileId: string) => Promise<void>;
   getVisibleCollections: () => Collection[];
   getVisibleItems: () => CollectableItem[];
+  /**
+   * BE-16: number of social-graph mutations (friend requests / profile syncs)
+   * parked offline awaiting (re)delivery. Feeds the global "syncing…" pill.
+   */
+  pendingSyncCount: number;
 };
 
 const SocialContext = createContext<SocialContextValue | null>(null);
@@ -632,8 +638,9 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         );
         return seedSocialItems.filter((item) => visibleCollectionIds.has(item.collectionId));
       },
+      pendingSyncCount: countPendingSocial(pendingSocial),
     }),
-    [deletedProfileIds, ensureProfilesLoaded, friendRequests, following, friends, incomingRequestUserIds, isAdmin, profileById, profiles, ready, syncSocial, user, viewerProfiles],
+    [deletedProfileIds, ensureProfilesLoaded, friendRequests, following, friends, incomingRequestUserIds, isAdmin, pendingSocial, profileById, profiles, ready, syncSocial, user, viewerProfiles],
   );
 
   return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>;

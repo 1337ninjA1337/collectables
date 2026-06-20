@@ -73,6 +73,20 @@ export function hasPendingUpserts<T>(queue: PendingUpsertQueue<T>): boolean {
 }
 
 /**
+ * Total number of entities awaiting (re)delivery across every group. Works for
+ * both the single-group collections/social queues and a multi-group queue (e.g.
+ * chat's per-`chatId` pending map), so the BE-16 "syncing…" pill can sum pending
+ * work from every context through one helper.
+ */
+export function countPendingUpserts<T>(queue: PendingUpsertQueue<T>): number {
+  let total = 0;
+  for (const group of Object.values(queue)) {
+    total += group.length;
+  }
+  return total;
+}
+
+/**
  * Flush the queue through the shared engine: re-deliver each entity in order,
  * stopping at the first failure. Returns both the `sent` entries and a `next`
  * queue with every delivered entity dropped (group pruned when it empties).

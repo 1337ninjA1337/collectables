@@ -1,6 +1,7 @@
 import {
   PENDING_UPSERT_GROUP,
   applyDeliveredUpserts,
+  countPendingUpserts,
   dequeueUpsert,
   flushPendingUpserts,
   hasPendingUpserts,
@@ -115,6 +116,11 @@ export function dequeueSocialMutation(
 /** True when the queue holds at least one pending mutation. */
 export function hasPendingSocial(queue: PendingSocialQueue): boolean {
   return hasPendingUpserts(queue);
+}
+
+/** Number of social mutations awaiting (re)delivery (BE-16 "syncing…" pill). */
+export function countPendingSocial(queue: PendingSocialQueue): number {
+  return countPendingUpserts(queue);
 }
 
 /** Drop every delivered mutation (`sent`) from the *current* queue. */

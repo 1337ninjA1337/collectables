@@ -20,6 +20,7 @@ import {
   upsertChatRead,
 } from "@/lib/supabase-chat";
 import { chatCacheKey } from "@/lib/storage-keys";
+import { countPendingUpserts } from "@/lib/pending-upserts";
 import {
   applyFlushToQueue,
   flushPendingQueue,
@@ -39,6 +40,11 @@ type ChatContextValue = {
   previews: ChatPreview[];
   unreadTotal: number;
   realtimeOnline: boolean;
+  /**
+   * BE-16: number of outbound chat messages parked in the per-chat pending
+   * queue awaiting (re)delivery. Feeds the global "syncing…" pill.
+   */
+  pendingSyncCount: number;
   getMessages: (chatId: string) => ChatMessage[];
   canMessage: (otherUserId: string) => boolean;
   ensureChatWith: (otherUserId: string) => string | null;
@@ -437,12 +443,18 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     [store],
   );
 
+  const pendingSyncCount = useMemo(
+    () => countPendingUpserts(store.pendingByChatId),
+    [store.pendingByChatId],
+  );
+
   const value = useMemo<ChatContextValue>(
     () => ({
       ready,
       previews,
       unreadTotal,
       realtimeOnline,
+      pendingSyncCount,
       getMessages,
       canMessage,
       ensureChatWith,
@@ -456,6 +468,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       previews,
       unreadTotal,
       realtimeOnline,
+      pendingSyncCount,
       getMessages,
       canMessage,
       ensureChatWith,
