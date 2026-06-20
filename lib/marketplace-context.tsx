@@ -19,6 +19,7 @@ import {
 } from "@/lib/marketplace-helpers";
 import {
   cloudAddListing,
+  cloudClaimListing,
   cloudFetchListingById,
   cloudFetchListings,
   cloudMarkSold,
@@ -225,7 +226,15 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         if (!target || target.soldAt) return prev;
         return upsertListing(prev, { ...target, soldAt, buyerUserId });
       });
-      void cloudMarkSold(id, soldAt, buyerUserId);
+      // A buyer claim (buyerUserId present) goes through the atomic
+      // `claim-listing` Edge Function (BE-20) so concurrent claims can't both
+      // win and a seller can't claim their own listing. A seller-driven
+      // "mark sold" (buyerUserId null) keeps the direct RLS-gated PATCH.
+      if (buyerUserId) {
+        void cloudClaimListing(id);
+      } else {
+        void cloudMarkSold(id, soldAt, null);
+      }
     },
     [],
   );

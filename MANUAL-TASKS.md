@@ -321,6 +321,48 @@ while signed in; the asset disappears from Cloudinary and the function returns
 > hole without it.
 
 
+## claim-listing Edge Function (BE-20) — RECOMMENDED
+
+**Why:** when a buyer claims a marketplace listing, doing it purely client-side
+via the `marketplace_listings_update_buyer_claim` RLS policy is **not atomic**
+— two buyers can both read `sold_at IS NULL` and both PATCH, so a listing can
+be "sold" to two people. It also can't stop a seller from buying their own
+listing. The `claim-listing` Edge Function runs the claim as a single
+conditional UPDATE (`WHERE sold_at IS NULL AND owner_user_id <> caller`) under
+the service-role key, so exactly one concurrent claim wins and a double-claim /
+self-claim is rejected with `409`.
+
+The app still works without it: an unconfigured/failed claim falls back to the
+local optimistic update, and the legacy RLS PATCH path (`cloudMarkSold`) remains
+for seller-driven "mark sold". Deploy the function to make buyer claims safe
+against races.
+
+### 1. Deploy the function
+
+```bash
+supabase functions deploy claim-listing --project-ref <your-project-ref>
+```
+
+### 2. Function secrets
+
+```bash
+supabase secrets set --project-ref <your-project-ref> \
+  SUPABASE_SERVICE_ROLE_KEY=<your service_role / sb_secret_… key>
+# SUPABASE_URL and SUPABASE_ANON_KEY are auto-injected by Supabase.
+```
+
+**Never commit the service-role key.** The function self-checks the key at
+invocation (BE-23) and returns `500 { error: "function misconfigured" }` if the
+anon/publishable key was pasted by mistake.
+
+### 3. Verify
+
+Sign in as a buyer and claim an active listing — the function returns
+`200 { success: true, listing }` and the row's `sold_at` / `buyer_user_id` are
+set. Re-claiming the same listing (or claiming your own) returns `409`; an
+unauthenticated `POST` to `/functions/v1/claim-listing` returns `401`.
+
+
 ## 20260523_collection_currency.sql
 
 Run `supabase/migrations/20260523_collection_currency.sql` against your Supabase project:

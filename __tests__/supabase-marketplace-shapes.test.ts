@@ -5,6 +5,8 @@ import {
   buildMarketplaceReadHeaders,
   buildMarketplaceWriteHeaders,
   buildMarkSoldPayload,
+  claimListingPayload,
+  claimListingUrl,
   deleteListingUrl,
   fetchListingsUrl,
   fetchListingByIdUrl,
@@ -162,5 +164,14 @@ describe("supabase-marketplace-shapes", () => {
   it("buildMarkSoldPayload allows null buyer for legacy 'just mark sold'", () => {
     const payload = buildMarkSoldPayload("2026-05-07T00:00:00.000Z", null);
     assert.equal(payload.buyer_user_id, null);
+  });
+
+  it("claimListingUrl points to the claim-listing Edge Function (BE-20)", () => {
+    assert.equal(claimListingUrl(BASE), `${BASE}/functions/v1/claim-listing`);
+  });
+
+  it("claimListingPayload bundles only the listing id", () => {
+    const payload = claimListingPayload("l-abc");
+    assert.deepEqual(payload, { id: "l-abc" });
   });
 });

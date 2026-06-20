@@ -214,3 +214,48 @@ describe("cloudMarkSold — structural composition (lib/supabase-marketplace.ts)
     );
   });
 });
+
+describe("cloudClaimListing — structural composition (BE-20)", () => {
+  it("declares cloudClaimListing(id, ...) returning Promise<boolean>", () => {
+    const src = readSrc();
+    assert.match(
+      src,
+      /export\s+async\s+function\s+cloudClaimListing\s*\(\s*\n?\s*id\s*:\s*string/,
+      "cloudClaimListing must accept the listing id",
+    );
+    assert.match(src, /cloudClaimListing[\s\S]*?Promise<boolean>/);
+  });
+
+  it("POSTs to the claim-listing Edge Function endpoint", () => {
+    const src = readSrc();
+    assert.match(src, /claimListingUrl\s*\(\s*supabaseUrl!\s*\)/);
+    assert.match(src, /cloudClaimListing[\s\S]*?method\s*:\s*["']POST["']/);
+    assert.match(src, /body\s*:\s*JSON\.stringify\s*\(\s*claimListingPayload\s*\(\s*id\s*\)\s*\)/);
+  });
+
+  it("requires a real user token — bails out (false) when none is available", () => {
+    const src = readSrc();
+    // The Edge Function calls auth.getUser(); the anon apikey fallback cannot
+    // satisfy it, so an absent token must short-circuit to false.
+    assert.match(src, /cloudClaimListing[\s\S]*?if\s*\(!token\)\s*return false/);
+  });
+
+  it("only reports success when the server confirms (res.ok)", () => {
+    const src = readSrc();
+    assert.match(src, /cloudClaimListing[\s\S]*?return res\.ok/);
+  });
+});
+
+describe("markListingSold routes buyer claims through the atomic Edge Function (BE-20)", () => {
+  const CONTEXT_PATH = path.join(process.cwd(), "lib", "marketplace-context.tsx");
+  const ctxSrc = readFileSync(CONTEXT_PATH, "utf8");
+
+  it("calls cloudClaimListing for a buyer claim and cloudMarkSold for a seller mark-sold", () => {
+    assert.match(ctxSrc, /if\s*\(buyerUserId\)\s*\{\s*\n?\s*void cloudClaimListing\(id\)/);
+    assert.match(ctxSrc, /void cloudMarkSold\(id,\s*soldAt,\s*null\)/);
+  });
+
+  it("imports cloudClaimListing from the cloud wrapper", () => {
+    assert.match(ctxSrc, /cloudClaimListing/);
+  });
+});
