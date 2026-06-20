@@ -31,6 +31,15 @@ export function pendingSocialKey(userId: string): string {
   return `collectables-pending-social-v1-${userId}`;
 }
 
+/**
+ * One-time local→cloud import flag (BE-17). Set the first time a user's locally
+ * held owned collections/items have been pushed to Supabase, so the import runs
+ * exactly once per user/device instead of on every authed load.
+ */
+export function cloudImportedKey(userId: string): string {
+  return `collectables-cloud-imported-v1-${userId}`;
+}
+
 export function chatCacheKey(userId: string): string {
   return `collectables-chats-v1-${userId}`;
 }
@@ -108,6 +117,7 @@ export async function clearAllUserData(userId: string): Promise<void> {
     pendingCollectionsKey(userId),
     pendingItemsKey(userId),
     pendingSocialKey(userId),
+    cloudImportedKey(userId),
     chatCacheKey(userId),
     socialCacheKey(userId),
     premiumKey(userId),
