@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
+  acceptFriendRequestPayload,
+  acceptFriendRequestUrl,
   collectionByIdUrl,
   collectionsUrl,
   collectionsByUserUrl,
@@ -351,6 +353,22 @@ describe("removeFriendRequestUrl", () => {
   });
 });
 
+// --- acceptFriendRequestUrl / acceptFriendRequestPayload (BE-21) ---
+describe("acceptFriendRequestUrl", () => {
+  it("targets the accept-friend-request Edge Function", () => {
+    assert.equal(
+      acceptFriendRequestUrl(BASE),
+      `${BASE}/functions/v1/accept-friend-request`,
+    );
+  });
+});
+
+describe("acceptFriendRequestPayload", () => {
+  it("wraps the sender id under fromUserId", () => {
+    assert.deepEqual(acceptFriendRequestPayload("alice"), { fromUserId: "alice" });
+  });
+});
+
 // --- Wiring: supabase-profiles.ts uses the shape helpers ---
 describe("supabase-profiles.ts wiring", () => {
   const SOURCE = readFileSync(
@@ -377,6 +395,8 @@ describe("supabase-profiles.ts wiring", () => {
     "friendRequestsInsertUrl",
     "sendFriendRequestBody",
     "removeFriendRequestUrl",
+    "acceptFriendRequestUrl",
+    "acceptFriendRequestPayload",
   ];
 
   for (const helper of helpers) {

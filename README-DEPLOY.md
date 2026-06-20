@@ -148,6 +148,7 @@ below reproduce the production schema end-to-end on an empty project.
    20260621_updated_at_moddatetime.sql   updated_at + moddatetime auto-bump trigger on every table
    20260622_not_null_defaults.sql        backfill NOT NULL + defaults on client-guaranteed columns
    20260623_soft_delete_deleted_at.sql   nullable deleted_at + partial alive index on deletable tables
+   20260624_accept_friend_request.sql    transactional accept_friend_request() fn (service_role-only)
    ```
 
    No CLI? Open each file in **SQL Editor** and run them top-to-bottom in the

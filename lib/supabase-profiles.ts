@@ -7,6 +7,8 @@ import {
   supabaseUrl,
 } from "@/lib/supabase";
 import {
+  acceptFriendRequestPayload,
+  acceptFriendRequestUrl,
   collectionByIdUrl,
   collectionsUrl,
   collectionsByUserUrl,
@@ -498,6 +500,38 @@ export async function removeFriendRequest(userA: string, userB: string): Promise
   if (!isSupabaseConfigured) return;
 
   await supabaseRest(removeFriendRequestUrl(supabaseUrl!, userA, userB), { method: "DELETE" });
+}
+
+/**
+ * BE-21 — accept an incoming friend request from `fromUserId` (the sender)
+ * through the server-authoritative `accept-friend-request` Edge Function, which
+ * flips both directions to "friends" transactionally. Returns `true` when the
+ * accept lands (200) or is permanently resolved (409 = the inbound request was
+ * withdrawn, so retrying is pointless), `false` on a transient failure so the
+ * pending-social queue re-delivers it. Bails `false` when there is no user
+ * token — the anon apikey can't satisfy `auth.getUser()` inside the function.
+ */
+export async function cloudAcceptFriendRequest(fromUserId: string): Promise<boolean> {
+  if (!isSupabaseConfigured) return false;
+
+  const token = await getAccessToken();
+  if (!token) return false;
+
+  try {
+    const res = await fetchWithRetry(acceptFriendRequestUrl(supabaseUrl!), {
+      method: "POST",
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(acceptFriendRequestPayload(fromUserId)),
+    });
+    return res.ok || res.status === 409;
+  } catch (err) {
+    captureException(err, { context: "supabase-profiles.cloudAcceptFriendRequest" });
+    return false;
+  }
 }
 
 // --- Collection Follows ---

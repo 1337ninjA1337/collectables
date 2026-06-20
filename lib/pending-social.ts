@@ -35,6 +35,7 @@ import type { UserProfile } from "@/lib/types";
 /** One queued social-graph write awaiting (re)delivery. */
 export type SocialMutation =
   | { kind: "send-request"; fromUserId: string; toUserId: string }
+  | { kind: "accept-request"; acceptorUserId: string; fromUserId: string }
   | { kind: "remove-request"; userId: string; otherUserId: string }
   | { kind: "upsert-profile"; profile: UserProfile };
 
@@ -56,6 +57,8 @@ export function socialMutationKey(mutation: SocialMutation): string {
   switch (mutation.kind) {
     case "send-request":
       return `send:${mutation.fromUserId}:${mutation.toUserId}`;
+    case "accept-request":
+      return `accept:${mutation.acceptorUserId}:${mutation.fromUserId}`;
     case "remove-request":
       return `remove:${pairKey(mutation.userId, mutation.otherUserId)}`;
     case "upsert-profile":
@@ -68,6 +71,8 @@ function friendPairOf(mutation: SocialMutation): string | null {
   switch (mutation.kind) {
     case "send-request":
       return pairKey(mutation.fromUserId, mutation.toUserId);
+    case "accept-request":
+      return pairKey(mutation.acceptorUserId, mutation.fromUserId);
     case "remove-request":
       return pairKey(mutation.userId, mutation.otherUserId);
     case "upsert-profile":
@@ -76,15 +81,19 @@ function friendPairOf(mutation: SocialMutation): string | null {
 }
 
 /**
- * True when two friend mutations on the same pair cancel out — a not-yet-sent
- * `send-request` is annulled by a `remove-request` (and vice versa). Profile
- * upserts never oppose anything.
+ * True when two friend mutations on the same pair cancel out: a still-pending
+ * *create* of the caller's directed row (`send-request` or `accept-request`) is
+ * annulled by a `remove-request` (and vice versa), so an offline add/accept
+ * then-remove never hits the network. Two creates (send + accept) don't oppose,
+ * two removes don't oppose, and profile upserts never oppose anything.
  */
 function isOpposing(a: SocialMutation, b: SocialMutation): boolean {
-  if (a.kind === "upsert-profile" || b.kind === "upsert-profile") return false;
-  if (a.kind === b.kind) return false;
   const pair = friendPairOf(a);
-  return pair !== null && pair === friendPairOf(b);
+  if (pair === null || pair !== friendPairOf(b)) return false;
+  const aRemove = a.kind === "remove-request";
+  const bRemove = b.kind === "remove-request";
+  // Exactly one of the two is a remove ⇒ a create vs. a remove on the same pair.
+  return aRemove !== bRemove;
 }
 
 /**
@@ -131,9 +140,10 @@ export function applyDeliveredSocial(
   return applyDeliveredUpserts(queue, sent, socialMutationKey);
 }
 
-/** The three cloud writes a social mutation can resolve to. */
+/** The cloud writes a social mutation can resolve to. */
 export interface SocialDeliverDeps {
   sendFriendRequest: (fromUserId: string, toUserId: string) => Promise<void>;
+  acceptFriendRequest: (acceptorUserId: string, fromUserId: string) => Promise<void>;
   removeFriendRequest: (userId: string, otherUserId: string) => Promise<void>;
   upsertMyProfile: (profile: UserProfile) => Promise<void>;
 }
@@ -149,6 +159,9 @@ export function makeSocialDeliver(deps: SocialDeliverDeps): DeliverFn<SocialMuta
       switch (mutation.kind) {
         case "send-request":
           await deps.sendFriendRequest(mutation.fromUserId, mutation.toUserId);
+          break;
+        case "accept-request":
+          await deps.acceptFriendRequest(mutation.acceptorUserId, mutation.fromUserId);
           break;
         case "remove-request":
           await deps.removeFriendRequest(mutation.userId, mutation.otherUserId);

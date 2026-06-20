@@ -34,6 +34,11 @@ const send = (from: string, to: string): SocialMutation => ({
   fromUserId: from,
   toUserId: to,
 });
+const accept = (acceptor: string, from: string): SocialMutation => ({
+  kind: "accept-request",
+  acceptorUserId: acceptor,
+  fromUserId: from,
+});
 const remove = (a: string, b: string): SocialMutation => ({
   kind: "remove-request",
   userId: a,
@@ -51,6 +56,12 @@ describe("socialMutationKey (BE-13d)", () => {
 
   it("is pair-symmetric for remove-request (delete clears both directions)", () => {
     assert.equal(socialMutationKey(remove(ALICE, BOB)), socialMutationKey(remove(BOB, ALICE)));
+  });
+
+  it("keys an accept-request by acceptor→sender direction (BE-21)", () => {
+    assert.equal(socialMutationKey(accept(BOB, ALICE)), `accept:${BOB}:${ALICE}`);
+    // An accept and the inbound send it answers are distinct mutations.
+    assert.notEqual(socialMutationKey(accept(BOB, ALICE)), socialMutationKey(send(ALICE, BOB)));
   });
 
   it("keys a profile upsert by profile id", () => {
@@ -92,6 +103,20 @@ describe("enqueueSocialMutation (BE-13d)", () => {
     q = enqueueSocialMutation(q, send(BOB, ALICE));
     q = enqueueSocialMutation(q, remove(ALICE, BOB));
     assert.deepEqual(group(q), [remove(ALICE, BOB)]);
+  });
+
+  it("annuls a still-pending accept when a remove for the same pair is queued (BE-21)", () => {
+    let q: PendingSocialQueue = {};
+    q = enqueueSocialMutation(q, accept(BOB, ALICE));
+    q = enqueueSocialMutation(q, remove(BOB, ALICE));
+    assert.deepEqual(group(q), [remove(BOB, ALICE)]);
+  });
+
+  it("does NOT treat a send and an accept on the same pair as opposing (both create) (BE-21)", () => {
+    let q: PendingSocialQueue = {};
+    q = enqueueSocialMutation(q, send(ALICE, BOB));
+    q = enqueueSocialMutation(q, accept(BOB, ALICE));
+    assert.equal(group(q).length, 2);
   });
 
   it("leaves friend ops on a different pair untouched", () => {
@@ -137,6 +162,9 @@ describe("makeSocialDeliver (BE-13d)", () => {
       sendFriendRequest: async (f, t) => {
         calls.push(`send:${f}:${t}`);
       },
+      acceptFriendRequest: async (a, f) => {
+        calls.push(`accept:${a}:${f}`);
+      },
       removeFriendRequest: async (a, b) => {
         calls.push(`remove:${a}:${b}`);
       },
@@ -146,9 +174,29 @@ describe("makeSocialDeliver (BE-13d)", () => {
     });
 
     assert.equal(await deliver(send(ALICE, BOB), "k1"), true);
-    assert.equal(await deliver(remove(ALICE, BOB), "k2"), true);
-    assert.equal(await deliver(upsert(profile(ALICE, "alice")), "k3"), true);
-    assert.deepEqual(calls, [`send:${ALICE}:${BOB}`, `remove:${ALICE}:${BOB}`, `profile:${ALICE}`]);
+    assert.equal(await deliver(accept(BOB, ALICE), "k2"), true);
+    assert.equal(await deliver(remove(ALICE, BOB), "k3"), true);
+    assert.equal(await deliver(upsert(profile(ALICE, "alice")), "k4"), true);
+    assert.deepEqual(calls, [
+      `send:${ALICE}:${BOB}`,
+      `accept:${BOB}:${ALICE}`,
+      `remove:${ALICE}:${BOB}`,
+      `profile:${ALICE}`,
+    ]);
+  });
+
+  it("routes accept-request to acceptFriendRequest (BE-21)", async () => {
+    let seen: [string, string] | null = null;
+    const deliver = makeSocialDeliver({
+      sendFriendRequest: async () => undefined,
+      acceptFriendRequest: async (acceptor, from) => {
+        seen = [acceptor, from];
+      },
+      removeFriendRequest: async () => undefined,
+      upsertMyProfile: async () => undefined,
+    });
+    assert.equal(await deliver(accept(BOB, ALICE), "k1"), true);
+    assert.deepEqual(seen, [BOB, ALICE]);
   });
 
   it("returns false (never throws) when the cloud call rejects", async () => {
@@ -156,10 +204,14 @@ describe("makeSocialDeliver (BE-13d)", () => {
       sendFriendRequest: async () => {
         throw new Error("offline");
       },
+      acceptFriendRequest: async () => {
+        throw new Error("offline");
+      },
       removeFriendRequest: async () => undefined,
       upsertMyProfile: async () => undefined,
     });
     assert.equal(await deliver(send(ALICE, BOB), "k1"), false);
+    assert.equal(await deliver(accept(BOB, ALICE), "k2"), false);
   });
 });
 

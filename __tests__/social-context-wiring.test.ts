@@ -53,6 +53,28 @@ describe("social-context.tsx viewer-profile cache", () => {
   });
 });
 
+describe("BE-21 — addFriend routes an accept through the Edge Function", () => {
+  it("imports the cloudAcceptFriendRequest wrapper", () => {
+    assert.match(SOURCE, /cloudAcceptFriendRequest/);
+    assert.match(SOURCE, /from "@\/lib\/supabase-profiles"/);
+  });
+
+  it("wires acceptFriendRequest into makeSocialDeliver (throws on transient false)", () => {
+    assert.match(SOURCE, /acceptFriendRequest:\s*async\s*\([^)]*\)\s*=>/);
+    assert.match(SOURCE, /await cloudAcceptFriendRequest\(fromUserId\)/);
+    assert.match(SOURCE, /if \(!ok\) throw new Error/);
+  });
+
+  it("detects an inbound request and dispatches accept-request instead of send-request", () => {
+    // The accept branch is keyed off an existing them→me request.
+    assert.match(SOURCE, /hasRequest\(friendRequests,\s*profileId,\s*user\.id\)/);
+    assert.match(
+      SOURCE,
+      /kind:\s*"accept-request",\s*acceptorUserId:\s*user\.id,\s*fromUserId:\s*profileId/,
+    );
+  });
+});
+
 describe("consumers route profile lookups through ensureProfilesLoaded", () => {
   const consumers = [
     "app/chats.tsx",
