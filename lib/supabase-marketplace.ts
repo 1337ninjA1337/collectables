@@ -15,6 +15,8 @@ import { getSharedRealtimeClient } from "@/lib/supabase-realtime";
 import {
   buildMarketplaceReadHeaders,
   buildMarketplaceWriteHeaders,
+  claimListingPayload,
+  claimListingUrl,
   deleteListingUrl,
   fetchListingByIdUrl,
   fetchListingsUrl,
@@ -123,6 +125,38 @@ export async function cloudMarkSold(
     body: JSON.stringify(markSoldPayload(soldAt, buyerUserId)),
   });
   return res.ok;
+}
+
+/**
+ * BE-20: atomically claim a listing as buyer via the `claim-listing` Edge
+ * Function (server enforces active + buyer≠seller + single-winner). Returns
+ * `true` only when the server confirms the claim — a double-claim, an
+ * own-listing claim, a missing session, or an offline failure returns
+ * `false` so the caller can surface a "no longer available" message. Unlike
+ * `cloudMarkSold`, this requires a real user access token (the function calls
+ * `auth.getUser()`); the anon apikey fallback cannot satisfy it.
+ */
+export async function cloudClaimListing(
+  id: string,
+  {
+    fetcher = fetch as FetchFn,
+    tokenProvider = getAccessToken,
+  }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
+): Promise<boolean> {
+  if (!isSupabaseConfigured) return false;
+  const token = await tokenProvider();
+  if (!token) return false;
+  try {
+    const res = await fetcher(claimListingUrl(supabaseUrl!), {
+      method: "POST",
+      headers: buildMarketplaceWriteHeaders(supabasePublishableKey!, token),
+      body: JSON.stringify(claimListingPayload(id)),
+    });
+    return res.ok;
+  } catch (err) {
+    captureException(err, { context: "supabase-marketplace.cloudClaimListing" });
+    return false;
+  }
 }
 
 const getMarketplaceRealtimeClient = getSharedRealtimeClient;

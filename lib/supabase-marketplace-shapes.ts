@@ -104,6 +104,19 @@ export function markSoldUrl(baseUrl: string, id: string): string {
   return `${baseUrl}/rest/v1/marketplace_listings?id=eq.${encodeURIComponent(id)}`;
 }
 
+/** BE-20: the `claim-listing` Edge Function endpoint (atomic buyer claim). */
+export function claimListingUrl(baseUrl: string): string {
+  return `${baseUrl}/functions/v1/claim-listing`;
+}
+
+export type ClaimListingPayload = {
+  id: string;
+};
+
+export function claimListingPayload(id: string): ClaimListingPayload {
+  return { id };
+}
+
 export function buildMarketplaceReadHeaders(
   apiKey: string,
   token: string | null,
