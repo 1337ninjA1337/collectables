@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 
 import { seedCollections, seedItems } from "@/data/seed";
 import { useAuth } from "@/lib/auth-context";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import {
   loadCurrencyRates,
   sumConverted,
@@ -83,6 +84,11 @@ import {
   hasPendingUpserts,
   type PendingUpsertQueue,
 } from "@/lib/pending-upserts";
+import {
+  hasCloudImported,
+  markCloudImported,
+  selectOwnedForImport,
+} from "@/lib/cloud-import";
 
 type DraftItemInput = {
   collectionId: string;
@@ -305,6 +311,71 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   useEffect(() => {
     pendingItemsRef.current = pendingItems;
   }, [pendingItems]);
+
+  // BE-17: keep the latest hydrated collections/items in refs so the one-time
+  // import effect can read the current snapshot without re-running (and thus
+  // re-uploading) every time local state mutates.
+  const localCollectionsRef = useRef(localCollections);
+  const localItemsRef = useRef(localItems);
+  useEffect(() => {
+    localCollectionsRef.current = localCollections;
+  }, [localCollections]);
+  useEffect(() => {
+    localItemsRef.current = localItems;
+  }, [localItems]);
+
+  // BE-17: one-time local→cloud import. The first time a user authenticates on
+  // a device, push their locally-held owned collections + items to Supabase so
+  // data created before sign-in (or before cloud sync existed) lands in the
+  // cloud. Gated by a per-user `collectables-cloud-imported-v1` flag so it runs
+  // once; the flag is only set after every write succeeds, so a failed/offline
+  // import retries on the next authed load. Collections go first so a queued
+  // item never hits its collection's FK before the parent row exists.
+  const cloudImportRunRef = useRef<string | null>(null);
+  useEffect(() => {
+    // No cloud configured → nothing to import, and we must NOT set the flag, so
+    // the import still runs once Supabase is later configured.
+    if (!ready || !user || !isSupabaseConfigured) return;
+    const activeUser = user;
+    // Guard so the import runs once per user even across re-renders; the flag
+    // check below is the durable cross-reload gate.
+    if (cloudImportRunRef.current === activeUser.id) return;
+    cloudImportRunRef.current = activeUser.id;
+
+    let cancelled = false;
+    void (async () => {
+      if (await hasCloudImported(activeUser.id)) return;
+      if (cancelled) return;
+
+      const { collections, items } = selectOwnedForImport(
+        localCollectionsRef.current,
+        localItemsRef.current,
+        activeUser.id,
+      );
+
+      try {
+        for (const collection of collections) {
+          if (cancelled) return;
+          await upsertCollection(collection);
+        }
+        for (const item of items) {
+          if (cancelled) return;
+          await upsertItem(item);
+        }
+        if (cancelled) return;
+        await markCloudImported(activeUser.id);
+      } catch {
+        // Offline / Supabase unavailable — leave the flag unset so the import
+        // retries on the next authed load, and clear the run guard so a refresh
+        // within this session can re-attempt.
+        cloudImportRunRef.current = null;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, user]);
 
   // Flush parked offline writes on reconnect/refresh. Collections go first so a
   // queued item never hits its collection's FK before the parent row exists.
