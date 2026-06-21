@@ -769,8 +769,60 @@ client can never mint or extend its own subscription via PostgREST.
 Run `supabase/migrations/20260625_subscriptions.sql` against your project.
 Idempotent: `CREATE TABLE/INDEX … IF NOT EXISTS` + `DROP TRIGGER/POLICY IF
 EXISTS` before each `CREATE`, so re-running is a no-op. No pre-apply check
-required. The `validate-premium` Edge Function (BE-22b) lands next and is the
-only writer of this table.
+required. The `validate-premium` Edge Function (BE-22b, below) is the only
+writer of this table.
+
+
+## validate-premium Edge Function (BE-22b) — RECOMMENDED
+
+**Why:** premium entitlement used to live purely in AsyncStorage, so any client
+could grant itself paid features by writing the local flag. The `subscriptions`
+table (migration above) is the server-authoritative source of truth, but RLS
+grants the end-user only SELECT on their own row — all writes are
+service_role-only. The `validate-premium` Edge Function is that writer: it
+validates the caller via `auth.getUser()`, reads their `subscriptions` row under
+the service-role key, lazily expires a lapsed `current_period_end`, and returns
+the server-validated `{ isPremium, activatedAt, expiresAt }` entitlement.
+BE-22c LWW-merges that server truth over the local cache so paid features gate
+on the server row, not local storage.
+
+The app still works without it: `cloudValidatePremium()` returns `null` when the
+function is unconfigured/unreachable, and the premium context keeps its local
+cache. Deploy the function (and apply the migration above) to make premium
+server-authoritative.
+
+### 1. Apply the migration
+
+Apply `supabase/migrations/20260625_subscriptions.sql` (see its section above) —
+the function reads and writes that table.
+
+### 2. Deploy the function
+
+```bash
+supabase functions deploy validate-premium --project-ref <your-project-ref>
+```
+
+### 3. Function secrets
+
+```bash
+supabase secrets set --project-ref <your-project-ref> \
+  SUPABASE_SERVICE_ROLE_KEY=<your service_role / sb_secret_… key>
+# SUPABASE_URL and SUPABASE_ANON_KEY are auto-injected by Supabase.
+```
+
+**Never commit the service-role key.** The function self-checks the key at
+invocation (BE-23) and returns `500 { error: "function misconfigured" }` if the
+anon/publishable key was pasted by mistake.
+
+### 4. Verify
+
+Sign in and `POST` `{ "action": "activate" }` to
+`/functions/v1/validate-premium` with the user token — it returns
+`200 { isPremium: true, activatedAt, expiresAt }` and a `subscriptions` row is
+written with `status='active'`. A subsequent `{ "action": "validate" }` (or an
+empty body) returns the same entitlement; once `current_period_end` has passed
+it flips the row to `status='expired'` and returns `isPremium: false`. An
+unauthenticated `POST` returns `401`; an unknown `action` returns `400`.
 
 
 ## accept-friend-request Edge Function (BE-21) — RECOMMENDED

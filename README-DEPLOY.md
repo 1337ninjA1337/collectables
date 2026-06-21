@@ -165,6 +165,9 @@ below reproduce the production schema end-to-end on an empty project.
    supabase functions deploy delete-account
    supabase functions deploy delete-image      # SEC-1, security-critical
    supabase functions deploy analytics-mirror
+   supabase functions deploy claim-listing          # BE-20, atomic buyer claim
+   supabase functions deploy accept-friend-request  # BE-21, transactional accept
+   supabase functions deploy validate-premium       # BE-22b, server-authoritative premium
    ```
 
 5. **Point a build at the new project.** For a throwaway/staging deploy, set
