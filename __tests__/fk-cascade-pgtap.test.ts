@@ -59,6 +59,7 @@ describe("BE-36 — FK / cascade pgTAP test", () => {
       "chat_messages",
       "chat_reads",
       "marketplace_listings",
+      "subscriptions",
     ]) {
       assert.match(
         sql,

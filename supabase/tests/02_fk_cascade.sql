@@ -19,14 +19,14 @@
 --   auth.users delete CASCADEs:  profiles.id, collections.owner_user_id,
 --     items.created_by_user_id, friend_requests.from/to_user_id,
 --     chat_messages.from/to_user_id, chat_reads.user_id,
---     marketplace_listings.owner_user_id
+--     marketplace_listings.owner_user_id, subscriptions.user_id
 --   auth.users delete SET NULLs: marketplace_listings.buyer_user_id,
 --     marketplace_transfers.owner/buyer_user_id, analytics_events.user_id
 --   collections delete CASCADEs:  items.collection_id
 
 begin;
 
-select plan(22);
+select plan(23);
 
 -- ---------------------------------------------------------------------------
 -- Seed. `dave` is the account we will delete; `erin` is a second user kept
@@ -77,6 +77,11 @@ insert into public.marketplace_transfers (listing_id, item_id, owner_user_id, bu
 
 insert into public.analytics_events (user_id, name) values
   ('00000000-0000-0000-0000-00000000da7e', 'app_open');
+
+-- Server-authoritative premium entitlement (BE-22a). One row per user, FK
+-- ON DELETE CASCADE so a deleted account's entitlement vanishes with it.
+insert into public.subscriptions (user_id, status) values
+  ('00000000-0000-0000-0000-00000000da7e', 'active');
 
 -- ---------------------------------------------------------------------------
 -- 1–5: orphan inserts are rejected (23503 = foreign_key_violation).
@@ -139,7 +144,7 @@ select is((select count(*)::int from public.chat_messages where from_user_id = '
 delete from auth.users where id = '00000000-0000-0000-0000-00000000da7e';
 
 -- ---------------------------------------------------------------------------
--- 12–18: every owned table CASCADE-deletes dave's rows.
+-- 12–19: every owned table CASCADE-deletes dave's rows.
 -- ---------------------------------------------------------------------------
 select is((select count(*)::int from public.profiles where id = '00000000-0000-0000-0000-00000000da7e'), 0, 'deleting the user cascades to profiles');
 select is((select count(*)::int from public.collections where owner_user_id = '00000000-0000-0000-0000-00000000da7e'), 0, 'deleting the user cascades to collections');
@@ -148,9 +153,10 @@ select is((select count(*)::int from public.friend_requests where from_user_id =
 select is((select count(*)::int from public.chat_messages where from_user_id = '00000000-0000-0000-0000-00000000da7e' or to_user_id = '00000000-0000-0000-0000-00000000da7e'), 0, 'deleting the user cascades to chat_messages (sent + received)');
 select is((select count(*)::int from public.chat_reads where user_id = '00000000-0000-0000-0000-00000000da7e'), 0, 'deleting the user cascades to chat_reads');
 select is((select count(*)::int from public.marketplace_listings where owner_user_id = '00000000-0000-0000-0000-00000000da7e'), 0, 'deleting the user cascades to owned marketplace_listings');
+select is((select count(*)::int from public.subscriptions where user_id = '00000000-0000-0000-0000-00000000da7e'), 0, 'deleting the user cascades to subscriptions');
 
 -- ---------------------------------------------------------------------------
--- 19–22: audit/analytics rows SURVIVE with the deleted user's id SET NULL.
+-- 20–23: audit/analytics rows SURVIVE with the deleted user's id SET NULL.
 -- ---------------------------------------------------------------------------
 select is(
   (select count(*)::int from public.marketplace_listings where id = 'listing-erin' and buyer_user_id is null),
