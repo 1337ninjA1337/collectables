@@ -745,6 +745,34 @@ project. Idempotent: `CREATE OR REPLACE FUNCTION` + idempotent GRANT/REVOKE, so
 re-running is a no-op. No pre-apply check required.
 
 
+## 20260625_subscriptions.sql
+
+BE-22a — the server-authoritative source of truth for premium entitlement.
+Until now "premium" lived purely in AsyncStorage, so any client could grant
+itself paid features by writing the local flag. This migration adds a
+`subscriptions` table (one row per user) that the `validate-premium` Edge
+Function (BE-22b) writes under the service-role key — never an end-user session.
+
+Columns: `user_id` (PK + FK→`auth.users` `ON DELETE CASCADE`, so a deleted
+account's entitlement vanishes with it), `status`
+(`active`/`inactive`/`expired`/`cancelled`, CHECK-constrained), `activated_at`,
+`current_period_end` (NULL = no known expiry), `created_at`/`updated_at` (the
+BE-9 moddatetime trigger auto-bumps `updated_at` so delta pulls carry the
+change), and a `deleted_at` soft-delete tombstone (BE-15) with a partial
+`subscriptions_alive_idx`.
+
+RLS is enabled with a single **SELECT-own** policy (`auth.uid() = user_id`) so a
+user can read their own cached entitlement, and **no INSERT/UPDATE/DELETE
+policy** — writes are service_role-only (which bypasses RLS), so a crafted
+client can never mint or extend its own subscription via PostgREST.
+
+Run `supabase/migrations/20260625_subscriptions.sql` against your project.
+Idempotent: `CREATE TABLE/INDEX … IF NOT EXISTS` + `DROP TRIGGER/POLICY IF
+EXISTS` before each `CREATE`, so re-running is a no-op. No pre-apply check
+required. The `validate-premium` Edge Function (BE-22b) lands next and is the
+only writer of this table.
+
+
 ## accept-friend-request Edge Function (BE-21) — RECOMMENDED
 
 **Why:** accepting a friend request client-side (a plain `INSERT` of the
