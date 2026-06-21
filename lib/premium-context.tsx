@@ -9,10 +9,13 @@ import {
   cancelPremiumState,
   isPremiumActive,
   isPremiumExpired,
+  mergePremiumState,
   parsePremiumState,
   premiumExpiresAt,
   premiumStorageKey,
 } from "@/lib/premium-helpers";
+import { validationToPremiumState } from "@/lib/subscriptions";
+import { cloudValidatePremium } from "@/lib/supabase-subscriptions";
 
 type PremiumContextValue = {
   ready: boolean;
@@ -52,6 +55,12 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
       } finally {
         if (!cancelled) setReady(true);
       }
+      // BE-22c: pull server-authoritative truth and LWW-merge it over the
+      // AsyncStorage cache (server wins). A transient failure returns null, so
+      // the cached entitlement is preserved rather than downgrading a payer.
+      const validation = await cloudValidatePremium("validate");
+      if (cancelled || !validation) return;
+      setState((prev) => mergePremiumState(prev, validationToPremiumState(validation)));
     })();
     return () => {
       cancelled = true;
