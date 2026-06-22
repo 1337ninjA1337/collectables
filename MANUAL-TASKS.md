@@ -916,3 +916,28 @@ Have user B accept a pending request from user A — the function returns
 (`is_friend(A, B)` is true). Accepting a request that was withdrawn returns
 `409`; an unauthenticated `POST` to `/functions/v1/accept-friend-request`
 returns `401`; accepting "yourself" returns `400`.
+
+## 20260626_realtime_replica_identity.sql
+
+BE-19 extends realtime to UPDATE/DELETE for collections, items and
+marketplace_listings (cross-device edits and removals now propagate without a
+manual refresh). Two server-side prerequisites are set by this migration:
+
+1. **Publication membership** — the three tables are added to the
+   `supabase_realtime` publication (only `chat_messages` was added explicitly
+   before; the rest were assumed enabled via the dashboard). Guarded by a
+   membership check so re-applying is a no-op.
+
+2. **`REPLICA IDENTITY FULL`** — a DELETE event (and a server-side-filtered
+   UPDATE) only carries the columns in the table's replica identity. The default
+   is the primary key, so a DELETE would expose only `id` and a filter like
+   `owner_user_id=eq.<uid>` could never match the old row — the event would be
+   dropped. `REPLICA IDENTITY FULL` records the full pre-image so filtered
+   DELETEs are delivered and consumers get a usable row.
+
+The migration is idempotent. If you applied it via `supabase db push` or the SQL
+editor, no further action is needed. If you previously enabled realtime for
+these tables only via the **Dashboard → Database → Replication** toggle, this
+migration is still safe to run — the publication ADD is skipped when the table
+is already a member, and it adds the `REPLICA IDENTITY FULL` the toggle does not
+set.

@@ -163,13 +163,17 @@ const getMarketplaceRealtimeClient = getSharedRealtimeClient;
 
 export type ListingsSubscription = { unsubscribe: () => void };
 
+/** A delete frame fans out the removed row tagged so the handler can branch. */
+type ListingRowEvent = MarketplaceRow & { __deleted?: boolean };
+
 export function subscribeToListings(
   onListing: (listing: MarketplaceListing) => void,
+  onRemoved?: (id: string) => void,
 ): ListingsSubscription {
   const client = getMarketplaceRealtimeClient();
   if (!client) return { unsubscribe: () => undefined };
 
-  return subscribeShared<MarketplaceRow>(
+  return subscribeShared<ListingRowEvent>(
     client,
     "marketplace-listings-changes",
     (channel, emit) => {
@@ -205,10 +209,30 @@ export function subscribeToListings(
           emit(row);
         },
       );
+      // DELETEs fire when a seller removes a still-listed item (cloudRemoveListing).
+      // The removed row arrives under `old`; we tag it so the handler drops it
+      // locally instead of treating it as an upsert.
+      channel.on(
+        REALTIME_LISTEN_TYPES.POSTGRES_CHANGES,
+        {
+          event: REALTIME_POSTGRES_CHANGES_LISTEN_EVENT.DELETE,
+          schema: "public",
+          table: "marketplace_listings",
+        },
+        (payload) => {
+          const row = payload.old as MarketplaceRow | undefined;
+          if (!row || !row.id) return;
+          emit({ ...row, __deleted: true });
+        },
+      );
     },
     (row) => {
       try {
-        onListing(rowToListing(row));
+        if (row.__deleted) {
+          onRemoved?.(String(row.id));
+        } else {
+          onListing(rowToListing(row));
+        }
       } catch (err) {
         // Ignore handler errors so a buggy listener can't kill the socket.
         captureException(err, { context: "supabase-marketplace.subscribeToListings.handler" });

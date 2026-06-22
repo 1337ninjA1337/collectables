@@ -65,14 +65,19 @@ describe("supabase-realtime-sync — wrapper structure", () => {
     );
   });
 
-  it("collections + items subscribe to INSERT events on their own rows", () => {
-    assert.match(src, /table:\s*"collections"/);
-    assert.match(src, /filter:\s*`owner_user_id=eq\.\$\{userId\}`/);
-    assert.match(src, /table:\s*"items"/);
-    assert.match(src, /filter:\s*`created_by_user_id=eq\.\$\{userId\}`/);
+  it("collections + items subscribe to their own rows via the shared row-events helper", () => {
+    // Both own-data helpers route through onRowChanges(channel, emit, table, filter).
+    assert.match(
+      src,
+      /onRowChanges\(channel,\s*emit,\s*"collections",\s*`owner_user_id=eq\.\$\{userId\}`\)/,
+    );
+    assert.match(
+      src,
+      /onRowChanges\(channel,\s*emit,\s*"items",\s*`created_by_user_id=eq\.\$\{userId\}`\)/,
+    );
     const inserts = src.match(/REALTIME_POSTGRES_CHANGES_LISTEN_EVENT\.INSERT/g) ?? [];
-    // collections (1) + items (1) + friend_requests (2 directions) = 4
-    assert.ok(inserts.length >= 4, `expected >=4 INSERT listeners, found ${inserts.length}`);
+    // SYNCED_ROW_EVENTS (1, shared by collections+items) + friend_requests (2) = 3
+    assert.ok(inserts.length >= 3, `expected >=3 INSERT references, found ${inserts.length}`);
   });
 
   it("friend_requests registers BOTH directions on one shared channel", () => {
@@ -90,9 +95,12 @@ describe("supabase-realtime-sync — wrapper structure", () => {
     assert.match(src, /`friend-requests-changes-\$\{userId\}`/);
   });
 
-  it("scope is INSERT-only (UPDATE/DELETE deferred to BE-19)", () => {
-    assert.doesNotMatch(src, /REALTIME_POSTGRES_CHANGES_LISTEN_EVENT\.UPDATE/);
-    assert.doesNotMatch(src, /REALTIME_POSTGRES_CHANGES_LISTEN_EVENT\.DELETE/);
+  it("BE-19: collections/items also propagate UPDATE and DELETE", () => {
+    // The shared SYNCED_ROW_EVENTS array covers all three postgres-changes types.
+    assert.match(src, /REALTIME_POSTGRES_CHANGES_LISTEN_EVENT\.UPDATE/);
+    assert.match(src, /REALTIME_POSTGRES_CHANGES_LISTEN_EVENT\.DELETE/);
+    // A DELETE delivers the removed row under `old`, so the helper reads new ?? old.
+    assert.match(src, /payload\.new\s*\?\?\s*payload\.old/);
   });
 
   it("coerces collection/item rows through the shared pure coercers", () => {
