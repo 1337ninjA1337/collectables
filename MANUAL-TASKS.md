@@ -825,6 +825,52 @@ it flips the row to `status='expired'` and returns `isPremium: false`. An
 unauthenticated `POST` returns `401`; an unknown `action` returns `400`.
 
 
+## export-data Edge Function (BE-26) — RECOMMENDED
+
+**Why:** GDPR Art. 20 (right to data portability) requires giving a user a
+machine-readable copy of everything we store about them. The `export-data` Edge
+Function assembles that bundle — the caller's `profiles` row, the `collections`
+they own, the `items` they authored, their `friend_requests` (both directions),
+their `chat_messages` (sent + received), and their `subscriptions` history —
+into a single downloadable JSON document (`Content-Disposition: attachment`).
+
+The caller is validated via `auth.getUser()` and the export is always scoped to
+that authenticated user (never a body-supplied id). Reads run under the
+service-role key so the export sees every row regardless of the end-user's RLS
+read scope, while still being filtered to the caller. The client wrapper
+`cloudExportData()` (`lib/supabase-data-export.ts`) returns the document or
+`null` when the function is unconfigured/unreachable.
+
+No migration — the function reads the existing core tables. There is nothing to
+apply; just deploy the function and set its secret.
+
+### 1. Deploy the function
+
+```bash
+supabase functions deploy export-data --project-ref <your-project-ref>
+```
+
+### 2. Function secrets
+
+```bash
+supabase secrets set --project-ref <your-project-ref> \
+  SUPABASE_SERVICE_ROLE_KEY=<your service_role / sb_secret_… key>
+# SUPABASE_URL and SUPABASE_ANON_KEY are auto-injected by Supabase.
+```
+
+**Never commit the service-role key.** The function self-checks the key at
+invocation (BE-23) and returns `500 { error: "function misconfigured" }` if the
+anon/publishable key was pasted by mistake.
+
+### 3. Verify
+
+Sign in and `POST` an empty body to `/functions/v1/export-data` with the user
+token — it returns `200` with a JSON document `{ version, exportedAt, userId,
+profile, collections, items, friendRequests, chatMessages, subscriptions }` and
+a `Content-Disposition: attachment` header. An unauthenticated `POST` returns
+`401`; a non-`POST` returns `405`.
+
+
 ## accept-friend-request Edge Function (BE-21) — RECOMMENDED
 
 **Why:** accepting a friend request client-side (a plain `INSERT` of the
