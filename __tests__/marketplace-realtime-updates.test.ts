@@ -106,6 +106,23 @@ describe("subscribeToListings — UPDATE event wiring (structural)", () => {
       `expected emit(row) in both INSERT and UPDATE branches, found ${emitCalls.length}`,
     );
   });
+
+  it("BE-19: ALSO registers a DELETE handler so seller removals propagate", () => {
+    assert.match(
+      src,
+      /event:\s*REALTIME_POSTGRES_CHANGES_LISTEN_EVENT\.DELETE/,
+      "subscribeToListings must add a DELETE listener for cloudRemoveListing removals",
+    );
+  });
+
+  it("the DELETE branch reads the removed row from `old` and tags it", () => {
+    // INSERT/UPDATE read payload.new; a DELETE only carries the pre-image under
+    // `old`. The branch tags the frame so the single fan-out handler can route
+    // it to onRemoved instead of treating it as an upsert.
+    assert.match(src, /payload\.old as MarketplaceRow/);
+    assert.match(src, /__deleted:\s*true/);
+    assert.match(src, /onRemoved\?\.\(/);
+  });
 });
 
 describe("MarketplaceProvider — upsert on realtime payload", () => {
@@ -138,6 +155,13 @@ describe("MarketplaceProvider — upsert on realtime payload", () => {
         `hoisted upsert var "${varName}" must be sourced from normalizeListing(incoming)`,
       );
     }
+  });
+
+  it("BE-19: removes a listing locally on a realtime DELETE", () => {
+    const src = readSrc(MARKETPLACE_CONTEXT_PATH);
+    // The DELETE callback (second arg to subscribeToListings) must drop the row
+    // by id so a seller's removal on device A clears device B without a refresh.
+    assert.match(src, /removeListingById\(prev,\s*removedId\)/);
   });
 
   it("does not skip-on-present (the regression we just fixed)", () => {

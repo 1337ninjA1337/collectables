@@ -150,6 +150,7 @@ below reproduce the production schema end-to-end on an empty project.
    20260623_soft_delete_deleted_at.sql   nullable deleted_at + partial alive index on deletable tables
    20260624_accept_friend_request.sql    transactional accept_friend_request() fn (service_role-only)
    20260625_subscriptions.sql            server-authoritative subscriptions table (service_role writes only)
+   20260626_realtime_replica_identity.sql  REPLICA IDENTITY FULL + realtime publication for collections/items/marketplace (UPDATE/DELETE events)
    ```
 
    No CLI? Open each file in **SQL Editor** and run them top-to-bottom in the

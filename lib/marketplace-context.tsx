@@ -146,6 +146,10 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         }
         return upsertListing(prev, normalized);
       });
+    }, (removedId) => {
+      // A seller removed a still-active listing on another device — drop it here
+      // too instead of waiting for the next cloudFetchListings refresh.
+      setListings((prev) => removeListingById(prev, removedId));
     });
     return () => sub.unsubscribe();
   }, []);
