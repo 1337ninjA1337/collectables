@@ -168,6 +168,7 @@ below reproduce the production schema end-to-end on an empty project.
    supabase functions deploy claim-listing          # BE-20, atomic buyer claim
    supabase functions deploy accept-friend-request  # BE-21, transactional accept
    supabase functions deploy validate-premium       # BE-22b, server-authoritative premium
+   supabase functions deploy export-data            # BE-26, GDPR data export
    ```
 
 5. **Point a build at the new project.** For a throwaway/staging deploy, set
