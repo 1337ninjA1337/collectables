@@ -20,6 +20,7 @@ import {
   fetchProfileById,
   RemoteFriendRequest,
 } from "@/lib/supabase-profiles";
+import { subscribeToFriendRequests } from "@/lib/supabase-realtime-sync";
 import { SOCIAL_GRAPH_KEY, pendingSocialKey, socialCacheKey } from "@/lib/storage-keys";
 import {
   applyDeliveredSocial,
@@ -305,6 +306,35 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
 
     return () => {
       active = false;
+    };
+  }, [user]);
+
+  // BE-18: realtime friend-requests. An incoming request (or an acceptance
+  // echo) on another device re-pulls the canonical list via `fetchFriendRequests`
+  // and re-maps it onto `friendRequests`, so the inbox badge updates without a
+  // manual refresh. Routed through the shared RealtimeClient + fan-out registry;
+  // the socket is released on sign-out by `closeSharedRealtimeClient()`.
+  useEffect(() => {
+    if (!user) return;
+    const activeUser = user;
+    let active = true;
+    const refetch = () => {
+      fetchFriendRequests(activeUser.id)
+        .then((remoteRequests) => {
+          if (!active) return;
+          setFriendRequests(
+            remoteRequests.map((r: RemoteFriendRequest) => ({
+              fromUserId: r.from_user_id,
+              toUserId: r.to_user_id,
+            })),
+          );
+        })
+        .catch(() => undefined);
+    };
+    const sub = subscribeToFriendRequests(activeUser.id, refetch);
+    return () => {
+      active = false;
+      sub.unsubscribe();
     };
   }, [user]);
 

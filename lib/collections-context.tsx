@@ -21,6 +21,10 @@ import {
   mergeCollectionsFromCloud,
   mergeItemsFromCloud,
 } from "@/lib/collections-cloud-merge";
+import {
+  subscribeToOwnCollections,
+  subscribeToOwnItems,
+} from "@/lib/supabase-realtime-sync";
 import { userScopedCollectionId } from "@/lib/collections-helpers";
 import {
   appendTransferLogEntry,
@@ -740,6 +744,24 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       cancelled = true;
     };
   }, [user, ready, refreshTick]);
+
+  // BE-18: realtime poke for the user's own collections + items. A cross-device
+  // INSERT (e.g. "added an item on mobile, not showing on PC") now bumps
+  // `refreshTick`, which re-runs the delta-pull above — reusing its tombstone /
+  // cursor / merge bookkeeping instead of duplicating the merge here, so a
+  // realtime echo and a polled row converge on the same path. Routes through
+  // the shared RealtimeClient + fan-out registry; the socket is torn down on
+  // sign-out by `closeSharedRealtimeClient()`.
+  useEffect(() => {
+    if (!ready || !user) return;
+    const poke = () => setRefreshTick((t) => t + 1);
+    const collectionsSub = subscribeToOwnCollections(user.id, poke);
+    const itemsSub = subscribeToOwnItems(user.id, poke);
+    return () => {
+      collectionsSub.unsubscribe();
+      itemsSub.unsubscribe();
+    };
+  }, [user, ready]);
 
   // Fetch subscribed collections from Supabase
   useEffect(() => {
