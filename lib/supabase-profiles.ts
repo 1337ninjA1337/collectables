@@ -28,7 +28,7 @@ import {
   ownCollectionsSinceUrl,
   ownItemsSinceUrl,
 } from "@/lib/supabase-profiles-shapes";
-import { withPageLimit } from "@/lib/supabase-pagination";
+import { collectKeysetPages, withKeysetBefore, withPageLimit } from "@/lib/supabase-pagination";
 import { maxUpdatedAt } from "@/lib/sync-cursors";
 import { partitionByTombstone } from "@/lib/tombstones";
 import {
@@ -168,6 +168,7 @@ type DbCollection = {
   visibility?: string | null;
   shared_with_user_ids?: string[] | null;
   currency?: string | null;
+  created_at?: string | null;
   updated_at?: string | null;
   deleted_at?: string | null;
 };
@@ -231,12 +232,37 @@ export async function fetchCollectionById(id: string): Promise<Collection | null
   return rows.length > 0 ? toCollection(rows[0]) : null;
 }
 
+/**
+ * Coerce a Supabase row's keyset cursor: the `created_at` we page on. Rows
+ * always carry it (NOT NULL in the schema), but the optional type guards
+ * against a malformed payload so the loop can't keyset on `undefined`.
+ */
+function rowCreatedAt(row: { created_at?: string | null }): string {
+  return row.created_at ?? "";
+}
+
+/**
+ * Fetch a page of `DbCollection` rows from a newest-first URL with the keyset
+ * cursor applied. A non-OK response yields an empty page so the loop stops
+ * cleanly instead of throwing mid-pagination.
+ */
+async function fetchCollectionsPage(url: string, cursor: string | null): Promise<DbCollection[]> {
+  const res = await supabaseRest(withKeysetBefore(url, cursor));
+  if (!res.ok) return [];
+  return res.json();
+}
+
 /** Fetch collections for a specific user. */
 export async function fetchCollectionsByUserId(userId: string): Promise<Collection[]> {
   if (!isSupabaseConfigured) return [];
 
-  const res = await supabaseRest(collectionsByUserUrl(supabaseUrl!, userId));
-  const rows: DbCollection[] = await res.json();
+  const url = collectionsByUserUrl(supabaseUrl!, userId);
+  // BE-28b: keyset-loop past LIST_PAGE_SIZE so a user with hundreds of
+  // collections doesn't silently lose everything past the first page.
+  const rows = await collectKeysetPages<DbCollection>((cursor) => fetchCollectionsPage(url, cursor), {
+    getCursor: rowCreatedAt,
+    getId: (row) => row.id,
+  });
   // Drop soft-deleted rows so a cache-empty bootstrap can't resurrect a
   // collection the user deleted on another device (BE-15b).
   return rows.filter((row) => !row.deleted_at).map(toCollection);
@@ -255,9 +281,13 @@ export async function fetchOwnCollectionsSince(
 ): Promise<{ data: Collection[]; tombstonedIds: string[]; cursor: string | null }> {
   if (!isSupabaseConfigured) return { data: [], tombstonedIds: [], cursor: since };
 
-  const res = await supabaseRest(ownCollectionsSinceUrl(supabaseUrl!, userId, since));
-  if (!res.ok) return { data: [], tombstonedIds: [], cursor: since };
-  const rows: DbCollection[] = await res.json();
+  const url = ownCollectionsSinceUrl(supabaseUrl!, userId, since);
+  // BE-28b: a single delta can exceed LIST_PAGE_SIZE (e.g. a first/full pull on
+  // a large account), so keyset-page through it rather than truncating.
+  const rows = await collectKeysetPages<DbCollection>((cursor) => fetchCollectionsPage(url, cursor), {
+    getCursor: rowCreatedAt,
+    getId: (row) => row.id,
+  });
   // BE-15b: split soft-deleted rows out of the delta so the caller can drop
   // them from the local cache instead of merging a tombstone back in as a live
   // collection. The cursor still advances over *all* rows (tombstones included)
@@ -279,9 +309,12 @@ export async function fetchOwnItemsSince(
 ): Promise<{ data: CollectableItem[]; tombstonedIds: string[]; cursor: string | null }> {
   if (!isSupabaseConfigured) return { data: [], tombstonedIds: [], cursor: since };
 
-  const res = await supabaseRest(ownItemsSinceUrl(supabaseUrl!, userId, since));
-  if (!res.ok) return { data: [], tombstonedIds: [], cursor: since };
-  const rows: DbItem[] = await res.json();
+  const url = ownItemsSinceUrl(supabaseUrl!, userId, since);
+  // BE-28b: keyset-page the delta so a large item set isn't capped at one page.
+  const rows = await collectKeysetPages<DbItem>((cursor) => fetchItemsPage(url, cursor), {
+    getCursor: rowCreatedAt,
+    getId: (row) => row.id,
+  });
   // BE-15b: see fetchOwnCollectionsSince — partition tombstones out of the delta.
   const { alive, tombstonedIds } = partitionByTombstone(rows, {
     getId: (row) => row.id,
@@ -294,9 +327,12 @@ export async function fetchOwnItemsSince(
 export async function fetchPublicCollectionsByUserId(userId: string): Promise<Collection[]> {
   if (!isSupabaseConfigured) return [];
 
-  const res = await supabaseRest(publicCollectionsByUserUrl(supabaseUrl!, userId));
-  const rows: DbCollection[] = await res.json();
-  return rows.map(toCollection);
+  const url = publicCollectionsByUserUrl(supabaseUrl!, userId);
+  const rows = await collectKeysetPages<DbCollection>((cursor) => fetchCollectionsPage(url, cursor), {
+    getCursor: rowCreatedAt,
+    getId: (row) => row.id,
+  });
+  return rows.filter((row) => !row.deleted_at).map(toCollection);
 }
 
 // --- Items ---
@@ -326,6 +362,16 @@ type DbItem = {
 
 function toItem(row: DbItem): CollectableItem {
   return coerceItemRow(row);
+}
+
+/**
+ * Fetch a page of `DbItem` rows from a newest-first URL with the keyset cursor
+ * applied. Mirrors `fetchCollectionsPage`; a non-OK response ends the loop.
+ */
+async function fetchItemsPage(url: string, cursor: string | null): Promise<DbItem[]> {
+  const res = await supabaseRest(withKeysetBefore(url, cursor));
+  if (!res.ok) return [];
+  return res.json();
 }
 
 const wishlistCollectionCache = new Map<string, string>();
@@ -452,10 +498,13 @@ export async function fetchItemById(id: string): Promise<CollectableItem | null>
 export async function fetchItemsByCollectionId(collectionId: string): Promise<CollectableItem[]> {
   if (!isSupabaseConfigured) return [];
 
-  const res = await supabaseRest(
-    withPageLimit(`/items?collection_id=eq.${collectionId}&select=*&order=created_at.desc`),
-  );
-  const rows: DbItem[] = await res.json();
+  const url = withPageLimit(`/items?collection_id=eq.${collectionId}&select=*&order=created_at.desc`);
+  // BE-28b: keyset-loop so a collection with more than LIST_PAGE_SIZE items
+  // isn't truncated to its newest page.
+  const rows = await collectKeysetPages<DbItem>((cursor) => fetchItemsPage(url, cursor), {
+    getCursor: rowCreatedAt,
+    getId: (row) => row.id,
+  });
   // Drop soft-deleted rows so a bootstrap pull can't resurrect a deleted item (BE-15b).
   return rows.filter((row) => !row.deleted_at).map(toItem);
 }
@@ -464,11 +513,13 @@ export async function fetchItemsByCollectionId(collectionId: string): Promise<Co
 export async function fetchWishlistItemsByUserId(userId: string): Promise<CollectableItem[]> {
   if (!isSupabaseConfigured) return [];
 
-  const res = await supabaseRest(
-    withPageLimit(`/items?created_by_user_id=eq.${userId}&is_wishlist=eq.true&select=*&order=created_at.desc`),
+  const url = withPageLimit(
+    `/items?created_by_user_id=eq.${userId}&is_wishlist=eq.true&select=*&order=created_at.desc`,
   );
-  if (!res.ok) return [];
-  const rows: DbItem[] = await res.json();
+  const rows = await collectKeysetPages<DbItem>((cursor) => fetchItemsPage(url, cursor), {
+    getCursor: rowCreatedAt,
+    getId: (row) => row.id,
+  });
   // Drop soft-deleted wishlist items so a deleted wish doesn't reappear (BE-15b).
   return rows.filter((row) => !row.deleted_at).map(toItem);
 }
@@ -576,12 +627,14 @@ export async function fetchCollectionsSharedWithUser(userId: string): Promise<Co
   if (!isSupabaseConfigured) return [];
 
   try {
-    const res = await supabaseRest(
-      withPageLimit(`/collections?shared_with_user_ids=cs.{${encodeURIComponent(userId)}}&select=*&order=created_at.desc`),
+    const url = withPageLimit(
+      `/collections?shared_with_user_ids=cs.{${encodeURIComponent(userId)}}&select=*&order=created_at.desc`,
     );
-    if (!res.ok) return [];
-    const rows: DbCollection[] = await res.json();
-    return rows.map(toCollection);
+    const rows = await collectKeysetPages<DbCollection>((cursor) => fetchCollectionsPage(url, cursor), {
+      getCursor: rowCreatedAt,
+      getId: (row) => row.id,
+    });
+    return rows.filter((row) => !row.deleted_at).map(toCollection);
   } catch (err) {
     captureException(err, { context: "supabase-profiles.fetchCollectionsSharedWithUser" });
     return [];

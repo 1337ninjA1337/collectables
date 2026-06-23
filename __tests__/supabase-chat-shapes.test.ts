@@ -18,17 +18,18 @@ import {
   typingChannelTopic,
   unreadCountForChat,
 } from "@/lib/supabase-chat-shapes";
+import { LIST_PAGE_SIZE } from "@/lib/supabase-pagination";
 import { ChatMessage } from "@/lib/types";
 
 const BASE = "https://demo.supabase.co";
 const KEY = "publishable-anon-key";
 
 describe("fetchMessagesUrl", () => {
-  it("targets /rest/v1/chat_messages filtered by chat_id and ordered by created_at asc", () => {
+  it("targets /rest/v1/chat_messages filtered by chat_id, newest-first and bounded (BE-28b)", () => {
     const url = fetchMessagesUrl(BASE, "chat-alice-bob");
     assert.equal(
       url,
-      `${BASE}/rest/v1/chat_messages?chat_id=eq.chat-alice-bob&select=*&order=created_at.asc`,
+      `${BASE}/rest/v1/chat_messages?chat_id=eq.chat-alice-bob&select=*&order=created_at.desc&limit=${LIST_PAGE_SIZE}`,
     );
   });
 
