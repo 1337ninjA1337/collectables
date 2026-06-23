@@ -941,3 +941,44 @@ these tables only via the **Dashboard → Database → Replication** toggle, thi
 migration is still safe to run — the publication ADD is skipped when the table
 is already a member, and it adds the `REPLICA IDENTITY FULL` the toggle does not
 set.
+
+## 20260627_retention_sweeps.sql
+
+BE-27 adds `pg_cron` retention sweeps so three classes of data don't grow
+forever. It ships a `service_role`-only `public.run_retention_sweeps()` function
+and schedules it daily at 03:00 UTC.
+
+**Retention windows** (keep in sync with the privacy policy paragraph in
+`APPSTORE-SUBMISSION.md` → "Server-side data retention"):
+
+1. **analytics_events — 13 months.** The server-side PostHog mirror keeps ~13
+   months for Power BI / SQL year-over-year reporting, then the long tail is
+   dropped.
+2. **abandoned anonymous analytics — 30 days.** `analytics_events` rows with
+   `user_id IS NULL` (PostHog anonymous distinct_ids that never resolved to an
+   account) carry no per-account value, so they get the most aggressive window.
+3. **soft-delete tombstones — 90 days.** `collections` / `items` / `profiles` /
+   `friend_requests` rows with a non-NULL `deleted_at` (20260623) are
+   hard-deleted once the 90-day grace passes — long enough for every offline
+   peer to delta-pull the deletion under the LWW conflict policy.
+
+**One-time prerequisite — enable pg_cron.** `pg_cron` is not enabled by default.
+In the Supabase dashboard go to **Database → Extensions**, search `pg_cron`, and
+enable it (or run `CREATE EXTENSION pg_cron;` in the SQL editor). The migration's
+scheduling block is guarded: if `pg_cron` is absent it is a no-op (the function
+and grants still apply), so **after enabling pg_cron, re-run this migration** to
+create the `retention-sweeps` cron job. Verify with:
+
+```sql
+SELECT jobname, schedule, command FROM cron.job WHERE jobname = 'retention-sweeps';
+```
+
+To run a sweep on demand (e.g. before verifying the windows):
+
+```sql
+SELECT public.run_retention_sweeps();
+```
+
+The migration is otherwise idempotent — `CREATE OR REPLACE FUNCTION`, idempotent
+GRANT/REVOKE, and the cron job is unscheduled-before-scheduled so re-applying
+never stacks duplicate jobs.
