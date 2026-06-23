@@ -15,6 +15,7 @@ import {
   markSoldPayload,
   markSoldUrl,
   rowToListing,
+  MARKETPLACE_COLUMNS,
 } from "@/lib/supabase-marketplace-shapes";
 import { MarketplaceListing } from "@/lib/types";
 
@@ -104,14 +105,35 @@ describe("supabase-marketplace-shapes", () => {
   it("fetchListingsUrl builds correct URL", () => {
     const url = fetchListingsUrl(BASE);
     assert.ok(url.startsWith(`${BASE}/rest/v1/marketplace_listings`));
-    assert.ok(url.includes("select=*"));
+    assert.ok(url.includes(`select=${MARKETPLACE_COLUMNS}`));
     assert.ok(url.includes("order=created_at.desc"));
   });
 
   it("fetchListingByIdUrl includes id filter", () => {
     const url = fetchListingByIdUrl(BASE, "l-abc");
     assert.ok(url.includes("id=eq.l-abc"));
-    assert.ok(url.includes("select=*"));
+    assert.ok(url.includes(`select=${MARKETPLACE_COLUMNS}`));
+  });
+
+  it("MARKETPLACE_COLUMNS covers exactly the fields rowToListing reads", () => {
+    const row = {
+      id: "l1",
+      item_id: "i1",
+      owner_user_id: "u1",
+      mode: "sell" as const,
+      asking_price: 5,
+      currency: "USD",
+      notes: "n",
+      created_at: "2026-01-01T00:00:00Z",
+      sold_at: null,
+      buyer_user_id: null,
+      arrived_at: null,
+    };
+    const cols = MARKETPLACE_COLUMNS.split(",");
+    for (const key of Object.keys(row)) {
+      assert.ok(cols.includes(key), `missing column ${key}`);
+    }
+    assert.ok(!MARKETPLACE_COLUMNS.includes("*"));
   });
 
   it("insertListingUrl points to table root", () => {

@@ -85,12 +85,22 @@ export function buildMarkSoldPayload(soldAt: string, buyerUserId: string | null)
   };
 }
 
+/**
+ * BE-28c — explicit projection matching every field `rowToListing` reads, plus
+ * no extra columns. Replaces `select=*` for narrower payloads + schema-drift
+ * safety.
+ */
+export const MARKETPLACE_COLUMNS =
+  "id,item_id,owner_user_id,mode,asking_price,currency,notes,created_at,sold_at,buyer_user_id,arrived_at";
+
 export function fetchListingsUrl(baseUrl: string): string {
-  return withPageLimit(`${baseUrl}/rest/v1/marketplace_listings?select=*&order=created_at.desc`);
+  return withPageLimit(
+    `${baseUrl}/rest/v1/marketplace_listings?select=${MARKETPLACE_COLUMNS}&order=created_at.desc`,
+  );
 }
 
 export function fetchListingByIdUrl(baseUrl: string, id: string): string {
-  return `${baseUrl}/rest/v1/marketplace_listings?id=eq.${encodeURIComponent(id)}&select=*`;
+  return `${baseUrl}/rest/v1/marketplace_listings?id=eq.${encodeURIComponent(id)}&select=${MARKETPLACE_COLUMNS}`;
 }
 
 export function insertListingUrl(baseUrl: string): string {

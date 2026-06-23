@@ -25,6 +25,10 @@ import {
   withUpdatedSince,
   ownCollectionsSinceUrl,
   ownItemsSinceUrl,
+  PROFILE_COLUMNS,
+  COLLECTION_COLUMNS,
+  ITEM_COLUMNS,
+  REACTION_COLUMNS,
 } from "@/lib/supabase-profiles-shapes";
 import { Collection, UserProfile } from "@/lib/types";
 
@@ -77,7 +81,7 @@ describe("ownItemsSinceUrl", () => {
   it("filters every item the user authored plus the delta cursor", () => {
     const url = ownItemsSinceUrl(BASE, "user-1", "2026-06-19T00:00:00Z");
     assert.match(url, /created_by_user_id=eq\.user-1/);
-    assert.match(url, /select=\*/);
+    assert.match(url, new RegExp(`select=${ITEM_COLUMNS}`));
     assert.match(url, /updated_at=gt\./);
   });
 
@@ -98,7 +102,7 @@ describe("profileByIdUrl", () => {
   it("filters by id and selects all", () => {
     assert.equal(
       profileByIdUrl(BASE, "user-1"),
-      `${BASE}/rest/v1/profiles?id=eq.user-1&select=*`,
+      `${BASE}/rest/v1/profiles?id=eq.user-1&select=${PROFILE_COLUMNS}`,
     );
   });
 
@@ -210,7 +214,7 @@ describe("collectionByIdUrl", () => {
   it("filters by id", () => {
     const url = collectionByIdUrl(BASE, "col-1");
     assert.ok(url.includes("id=eq.col-1"));
-    assert.ok(url.includes("select=*"));
+    assert.ok(url.includes(`select=${COLLECTION_COLUMNS}`));
   });
 
   it("URI-encodes the collection id", () => {
@@ -408,4 +412,62 @@ describe("supabase-profiles.ts wiring", () => {
       );
     });
   }
+});
+
+// --- BE-28c explicit column projections (no more select=*) ---
+describe("BE-28c column projections", () => {
+  const SOURCE = readFileSync(
+    path.join(process.cwd(), "lib", "supabase-profiles.ts"),
+    "utf8",
+  );
+
+  // Snake-case columns each coercer in supabase-row-coerce.ts reads, plus the
+  // sync-metadata columns the read paths depend on (created_at keyset cursor,
+  // updated_at delta cursor, deleted_at tombstone filter).
+  const cases: Record<string, { constant: string; required: string[] }> = {
+    PROFILE_COLUMNS: {
+      constant: PROFILE_COLUMNS,
+      required: [
+        "id", "email", "display_name", "username", "public_id", "bio",
+        "avatar", "display_currency", "is_admin",
+      ],
+    },
+    COLLECTION_COLUMNS: {
+      constant: COLLECTION_COLUMNS,
+      required: [
+        "id", "name", "cover_photo", "description", "owner_name",
+        "owner_user_id", "shared_with_user_ids", "sort_order", "visibility",
+        "currency", "created_at", "updated_at", "deleted_at",
+      ],
+    },
+    ITEM_COLUMNS: {
+      constant: ITEM_COLUMNS,
+      required: [
+        "id", "collection_id", "title", "acquired_at", "acquired_from",
+        "description", "variants", "photos", "created_by", "created_by_user_id",
+        "created_at", "cost", "cost_currency", "sort_order", "is_wishlist",
+        "condition", "tags", "archived_at", "updated_at", "deleted_at",
+      ],
+    },
+    REACTION_COLUMNS: {
+      constant: REACTION_COLUMNS,
+      required: ["id", "user_id", "target_type", "target_id", "emoji", "created_at"],
+    },
+  };
+
+  for (const [name, { constant, required }] of Object.entries(cases)) {
+    it(`${name} covers every column its coercer reads and uses no wildcard`, () => {
+      assert.ok(!constant.includes("*"), `${name} must not contain a wildcard`);
+      const cols = constant.split(",");
+      for (const col of required) {
+        assert.ok(cols.includes(col), `${name} is missing column "${col}"`);
+      }
+      // No accidental duplicates.
+      assert.equal(new Set(cols).size, cols.length, `${name} has duplicate columns`);
+    });
+  }
+
+  it("supabase-profiles.ts no longer issues a select=* read", () => {
+    assert.ok(!SOURCE.includes("select=*"), "expected no select=* projections to remain");
+  });
 });

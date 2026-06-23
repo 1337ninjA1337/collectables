@@ -12,6 +12,9 @@ import {
   collectionByIdUrl,
   collectionsUrl,
   collectionsByUserUrl,
+  COLLECTION_COLUMNS,
+  ITEM_COLUMNS,
+  REACTION_COLUMNS,
   friendRequestsInsertUrl,
   friendRequestsUrl,
   profileByIdUrl,
@@ -489,7 +492,7 @@ export async function softDeleteRemoteItem(id: string): Promise<void> {
 export async function fetchItemById(id: string): Promise<CollectableItem | null> {
   if (!isSupabaseConfigured) return null;
 
-  const res = await supabaseRest(`/items?id=eq.${id}&select=*`);
+  const res = await supabaseRest(`/items?id=eq.${id}&select=${ITEM_COLUMNS}`);
   const rows: DbItem[] = await res.json();
   return rows.length > 0 ? toItem(rows[0]) : null;
 }
@@ -498,7 +501,7 @@ export async function fetchItemById(id: string): Promise<CollectableItem | null>
 export async function fetchItemsByCollectionId(collectionId: string): Promise<CollectableItem[]> {
   if (!isSupabaseConfigured) return [];
 
-  const url = withPageLimit(`/items?collection_id=eq.${collectionId}&select=*&order=created_at.desc`);
+  const url = withPageLimit(`/items?collection_id=eq.${collectionId}&select=${ITEM_COLUMNS}&order=created_at.desc`);
   // BE-28b: keyset-loop so a collection with more than LIST_PAGE_SIZE items
   // isn't truncated to its newest page.
   const rows = await collectKeysetPages<DbItem>((cursor) => fetchItemsPage(url, cursor), {
@@ -514,7 +517,7 @@ export async function fetchWishlistItemsByUserId(userId: string): Promise<Collec
   if (!isSupabaseConfigured) return [];
 
   const url = withPageLimit(
-    `/items?created_by_user_id=eq.${userId}&is_wishlist=eq.true&select=*&order=created_at.desc`,
+    `/items?created_by_user_id=eq.${userId}&is_wishlist=eq.true&select=${ITEM_COLUMNS}&order=created_at.desc`,
   );
   const rows = await collectKeysetPages<DbItem>((cursor) => fetchItemsPage(url, cursor), {
     getCursor: rowCreatedAt,
@@ -628,7 +631,7 @@ export async function fetchCollectionsSharedWithUser(userId: string): Promise<Co
 
   try {
     const url = withPageLimit(
-      `/collections?shared_with_user_ids=cs.{${encodeURIComponent(userId)}}&select=*&order=created_at.desc`,
+      `/collections?shared_with_user_ids=cs.{${encodeURIComponent(userId)}}&select=${COLLECTION_COLUMNS}&order=created_at.desc`,
     );
     const rows = await collectKeysetPages<DbCollection>((cursor) => fetchCollectionsPage(url, cursor), {
       getCursor: rowCreatedAt,
@@ -691,7 +694,7 @@ export async function fetchReactions(targetType: ReactionTargetType, targetId: s
   if (!isSupabaseConfigured) return [];
 
   const res = await supabaseRest(
-    `/reactions?target_type=eq.${targetType}&target_id=eq.${encodeURIComponent(targetId)}&select=*`,
+    `/reactions?target_type=eq.${targetType}&target_id=eq.${encodeURIComponent(targetId)}&select=${REACTION_COLUMNS}`,
   );
   const rows: DbReaction[] = await res.json();
   return rows.map(toReaction);
