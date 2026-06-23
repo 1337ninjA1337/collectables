@@ -239,6 +239,17 @@ declaration:
 > included in the app and no additional data is collected from your device
 > for reporting.
 
+> **Server-side data retention.** Data we store in our own Supabase database
+> is pruned automatically on a daily schedule so it is not kept longer than
+> needed. Specifically: server-side product-analytics events are retained for
+> up to **13 months** and then deleted; analytics events that are not linked to
+> a signed-in account (anonymous) are deleted after **30 days**; and when you
+> delete a collection, item, profile, or friend connection, the record is
+> first hidden ("soft-deleted") so the change syncs to your other devices and
+> is then permanently removed after a **90-day** grace period. These windows
+> are enforced by a scheduled database job (`pg_cron`) and apply in addition to
+> the sub-processor retention policies described above.
+
 ---
 
 ## 7. Build with EAS (CODE + CLI)
