@@ -67,9 +67,15 @@ export function messageToInsertPayload(input: SendMessageInput): ChatInsertPaylo
  * back to ascending so the displayed order (and the merge in chat-context) is
  * unchanged. Older history beyond the window is intentionally not loaded.
  */
+/**
+ * BE-28c — explicit projection matching every field `chatRowToMessage` reads.
+ * Replaces `select=*` for narrower payloads + schema-drift safety.
+ */
+export const CHAT_MESSAGE_COLUMNS = "id,chat_id,from_user_id,to_user_id,text,created_at";
+
 export function fetchMessagesUrl(baseUrl: string, chatId: string): string {
   return withPageLimit(
-    `${baseUrl}/rest/v1/chat_messages?chat_id=eq.${encodeURIComponent(chatId)}&select=*&order=created_at.desc`,
+    `${baseUrl}/rest/v1/chat_messages?chat_id=eq.${encodeURIComponent(chatId)}&select=${CHAT_MESSAGE_COLUMNS}&order=created_at.desc`,
   );
 }
 

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -40,6 +40,23 @@ const MIGRATION = readFileSync(
 // strip `-- ...` comments so prose mentioning a column name can't satisfy an
 // assertion the executable SQL doesn't actually back.
 const SQL = MIGRATION.replace(/--.*$/gm, "");
+
+// BE-28c — the explicit `select=` projections now reference sync-metadata
+// columns the *base* schema never declared because they were added by later
+// migrations: `is_admin` (20260616_core_tables_rls), `updated_at`
+// (20260621_updated_at_moddatetime) and `deleted_at`
+// (20260623_soft_delete_deleted_at). Those two are added via a dynamic
+// `format('ALTER TABLE public.%I ADD COLUMN …')` loop over a table list, so
+// they can't be attributed to a single CREATE TABLE block. We therefore fall
+// back to "exists anywhere in the committed migrations" for any column the
+// base CREATE TABLE body doesn't already declare — still failing a builder
+// that references a column no migration backs at all.
+const ALL_MIGRATIONS_SQL = readdirSync(path.join(ROOT, "supabase", "migrations"))
+  .filter((f) => f.endsWith(".sql"))
+  .map((f) =>
+    readFileSync(path.join(ROOT, "supabase", "migrations", f), "utf8").replace(/--.*$/gm, ""),
+  )
+  .join("\n");
 
 const BASE = "https://demo.supabase.co";
 
@@ -168,10 +185,14 @@ describe("base schema column parity with the REST builders (BE-3)", () => {
       // a column is declared if `<name> ` appears at a line start (after the
       // opening paren / a comma) — `\b<name>\b` is enough given the body scope.
       for (const col of columns) {
+        const re = new RegExp(`\\b${col}\\b`);
+        // Fast path: the base CREATE TABLE block declares it (strong scoping).
+        if (re.test(body)) continue;
+        // Fallback: a later migration's ALTER … ADD COLUMN added it (BE-28c).
         assert.match(
-          body,
-          new RegExp(`\\b${col}\\b`),
-          `public.${table} is missing column "${col}" referenced by a *-shapes.ts builder`,
+          ALL_MIGRATIONS_SQL,
+          re,
+          `public.${table} is missing column "${col}" referenced by a *-shapes.ts builder (not in the base schema nor any later migration)`,
         );
       }
     });

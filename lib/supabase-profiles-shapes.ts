@@ -21,6 +21,30 @@ export function withUpdatedSince(url: string, cursor: string | null): string {
   return `${url}${sep}updated_at=gt.${encodeURIComponent(cursor)}`;
 }
 
+/**
+ * BE-28c — explicit column projections replacing the unbounded `select=*`.
+ *
+ * Each list is exactly the set of columns its row-coercer reads
+ * (`coerce*Row` in `lib/supabase-row-coerce.ts`) plus the sync-metadata columns
+ * the read paths depend on: `created_at` (keyset cursor), `updated_at` (delta
+ * cursor via `maxUpdatedAt`), and `deleted_at` (tombstone filter /
+ * `partitionByTombstone`). A narrow projection shrinks the payload (and the
+ * free-tier egress) and makes schema drift loud: if the DB ever drops a column
+ * the coercer needs, the read returns a missing field instead of `*` silently
+ * masking the change.
+ */
+export const PROFILE_COLUMNS =
+  "id,email,display_name,username,public_id,bio,avatar,display_currency,is_admin";
+
+export const COLLECTION_COLUMNS =
+  "id,name,cover_photo,description,owner_name,owner_user_id,sort_order,visibility,shared_with_user_ids,currency,created_at,updated_at,deleted_at";
+
+export const ITEM_COLUMNS =
+  "id,collection_id,title,acquired_at,acquired_from,description,variants,photos,created_by,created_by_user_id,created_at,cost,cost_currency,sort_order,is_wishlist,condition,tags,archived_at,updated_at,deleted_at";
+
+/** Columns read by `coerceReactionRow` (the `reactions` table has no shapes module). */
+export const REACTION_COLUMNS = "id,user_id,target_type,target_id,emoji,created_at";
+
 /** Delta-pull URL for a user's own (non-wishlist) collections. */
 export function ownCollectionsSinceUrl(
   baseUrl: string,
@@ -37,7 +61,7 @@ export function ownItemsSinceUrl(
   cursor: string | null,
 ): string {
   const url = withPageLimit(
-    `${baseUrl}/rest/v1/items?created_by_user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc`,
+    `${baseUrl}/rest/v1/items?created_by_user_id=eq.${encodeURIComponent(userId)}&select=${ITEM_COLUMNS}&order=created_at.desc`,
   );
   return withUpdatedSince(url, cursor);
 }
@@ -49,7 +73,7 @@ export function profilesUrl(baseUrl: string): string {
 }
 
 export function profileByIdUrl(baseUrl: string, id: string): string {
-  return `${baseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(id)}&select=*`;
+  return `${baseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(id)}&select=${PROFILE_COLUMNS}`;
 }
 
 /** Row-filter URL (no select) for PATCHing the signed-in user's own profile. */
@@ -59,7 +83,7 @@ export function profileUpdateUrl(baseUrl: string, id: string): string {
 
 export function profilesPageUrl(baseUrl: string, page: number, pageSize: number): string {
   const from = (page - 1) * pageSize;
-  return `${baseUrl}/rest/v1/profiles?select=*&order=created_at.desc&offset=${from}&limit=${pageSize}`;
+  return `${baseUrl}/rest/v1/profiles?select=${PROFILE_COLUMNS}&order=created_at.desc&offset=${from}&limit=${pageSize}`;
 }
 
 export function profilesPageRangeHeader(page: number, pageSize: number): string {
@@ -99,18 +123,18 @@ export function collectionsUrl(baseUrl: string): string {
 }
 
 export function collectionByIdUrl(baseUrl: string, id: string): string {
-  return `${baseUrl}/rest/v1/collections?id=eq.${encodeURIComponent(id)}&select=*`;
+  return `${baseUrl}/rest/v1/collections?id=eq.${encodeURIComponent(id)}&select=${COLLECTION_COLUMNS}`;
 }
 
 export function collectionsByUserUrl(baseUrl: string, userId: string): string {
   return withPageLimit(
-    `${baseUrl}/rest/v1/collections?owner_user_id=eq.${encodeURIComponent(userId)}&name=neq.__wishlist__&select=*&order=created_at.desc`,
+    `${baseUrl}/rest/v1/collections?owner_user_id=eq.${encodeURIComponent(userId)}&name=neq.__wishlist__&select=${COLLECTION_COLUMNS}&order=created_at.desc`,
   );
 }
 
 export function publicCollectionsByUserUrl(baseUrl: string, userId: string): string {
   return withPageLimit(
-    `${baseUrl}/rest/v1/collections?owner_user_id=eq.${encodeURIComponent(userId)}&visibility=eq.public&name=neq.__wishlist__&select=*&order=created_at.desc`,
+    `${baseUrl}/rest/v1/collections?owner_user_id=eq.${encodeURIComponent(userId)}&visibility=eq.public&name=neq.__wishlist__&select=${COLLECTION_COLUMNS}&order=created_at.desc`,
   );
 }
 
@@ -132,12 +156,12 @@ export function upsertCollectionBody(collection: Collection): Record<string, unk
 // --- Items ---
 
 export function itemByIdUrl(baseUrl: string, id: string): string {
-  return `${baseUrl}/rest/v1/items?id=eq.${encodeURIComponent(id)}&select=*`;
+  return `${baseUrl}/rest/v1/items?id=eq.${encodeURIComponent(id)}&select=${ITEM_COLUMNS}`;
 }
 
 export function itemsByCollectionUrl(baseUrl: string, collectionId: string): string {
   return withPageLimit(
-    `${baseUrl}/rest/v1/items?collection_id=eq.${encodeURIComponent(collectionId)}&select=*&order=created_at.desc`,
+    `${baseUrl}/rest/v1/items?collection_id=eq.${encodeURIComponent(collectionId)}&select=${ITEM_COLUMNS}&order=created_at.desc`,
   );
 }
 

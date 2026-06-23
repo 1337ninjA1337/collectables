@@ -5,6 +5,7 @@ import {
   buildAuthHeaders,
   buildSendMessageHeaders,
   chatRowToMessage,
+  CHAT_MESSAGE_COLUMNS,
   extractTypingUserIds,
   fetchMessagesUrl,
   friendCheckUrl,
@@ -29,7 +30,7 @@ describe("fetchMessagesUrl", () => {
     const url = fetchMessagesUrl(BASE, "chat-alice-bob");
     assert.equal(
       url,
-      `${BASE}/rest/v1/chat_messages?chat_id=eq.chat-alice-bob&select=*&order=created_at.desc&limit=${LIST_PAGE_SIZE}`,
+      `${BASE}/rest/v1/chat_messages?chat_id=eq.chat-alice-bob&select=${CHAT_MESSAGE_COLUMNS}&order=created_at.desc&limit=${LIST_PAGE_SIZE}`,
     );
   });
 
