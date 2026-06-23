@@ -27,6 +27,7 @@ import {
   MarketplaceRow,
   rowToListing,
 } from "@/lib/supabase-marketplace-shapes";
+import { collectKeysetPages, withKeysetBefore } from "@/lib/supabase-pagination";
 import { MarketplaceListing } from "@/lib/types";
 
 export type FetchFn = typeof fetch;
@@ -46,11 +47,18 @@ export async function cloudFetchListings(
 ): Promise<MarketplaceListing[]> {
   if (!isSupabaseConfigured) return [];
   const token = await tokenProvider();
-  const res = await fetcher(fetchListingsUrl(supabaseUrl!), {
-    headers: buildMarketplaceReadHeaders(supabasePublishableKey!, token),
-  });
-  if (!res.ok) return [];
-  const rows = (await res.json()) as MarketplaceRow[];
+  const headers = buildMarketplaceReadHeaders(supabasePublishableKey!, token);
+  const baseUrl = fetchListingsUrl(supabaseUrl!);
+  // BE-28b: keyset-loop past LIST_PAGE_SIZE so a busy marketplace doesn't drop
+  // every listing past the first (newest) page.
+  const rows = await collectKeysetPages<MarketplaceRow>(
+    async (cursor) => {
+      const res = await fetcher(withKeysetBefore(baseUrl, cursor), { headers });
+      if (!res.ok) return [];
+      return (await res.json()) as MarketplaceRow[];
+    },
+    { getCursor: (row) => row.created_at, getId: (row) => row.id },
+  );
   return rows.map(rowToListing);
 }
 

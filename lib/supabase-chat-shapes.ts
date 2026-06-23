@@ -1,3 +1,4 @@
+import { withPageLimit } from "@/lib/supabase-pagination";
 import { ChatMessage } from "@/lib/types";
 
 /**
@@ -58,8 +59,18 @@ export function messageToInsertPayload(input: SendMessageInput): ChatInsertPaylo
   return payload;
 }
 
+/**
+ * URL for the newest-window of a chat (BE-28b). A long-running chat can hold
+ * far more than `LIST_PAGE_SIZE` messages; an `asc` + `limit` query would pin
+ * to the OLDEST page and hide the most recent messages, so we order `desc` and
+ * cap, fetching the newest window. `fetchMessagesForChat` reverses the rows
+ * back to ascending so the displayed order (and the merge in chat-context) is
+ * unchanged. Older history beyond the window is intentionally not loaded.
+ */
 export function fetchMessagesUrl(baseUrl: string, chatId: string): string {
-  return `${baseUrl}/rest/v1/chat_messages?chat_id=eq.${encodeURIComponent(chatId)}&select=*&order=created_at.asc`;
+  return withPageLimit(
+    `${baseUrl}/rest/v1/chat_messages?chat_id=eq.${encodeURIComponent(chatId)}&select=*&order=created_at.desc`,
+  );
 }
 
 export function sendMessageUrl(baseUrl: string): string {

@@ -71,7 +71,10 @@ export async function fetchMessagesForChat(
   if (!res.ok) return [];
 
   const rows = (await res.json()) as ChatRow[];
-  return rows.map(chatRowToMessage);
+  // `fetchMessagesUrl` orders newest-first (so the bounded window is the most
+  // recent messages, not the oldest); reverse back to ascending so callers and
+  // the chat-context merge keep their oldest→newest contract.
+  return rows.map(chatRowToMessage).reverse();
 }
 
 export async function sendMessage(
