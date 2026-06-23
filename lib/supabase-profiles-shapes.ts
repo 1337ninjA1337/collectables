@@ -1,4 +1,5 @@
 import { Collection, CollectableItem, UserProfile } from "@/lib/types";
+import { withPageLimit } from "@/lib/supabase-pagination";
 
 /**
  * Pure URL/body/header builders for the Supabase REST API endpoints used by
@@ -35,7 +36,9 @@ export function ownItemsSinceUrl(
   userId: string,
   cursor: string | null,
 ): string {
-  const url = `${baseUrl}/rest/v1/items?created_by_user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc`;
+  const url = withPageLimit(
+    `${baseUrl}/rest/v1/items?created_by_user_id=eq.${encodeURIComponent(userId)}&select=*&order=created_at.desc`,
+  );
   return withUpdatedSince(url, cursor);
 }
 
@@ -100,11 +103,15 @@ export function collectionByIdUrl(baseUrl: string, id: string): string {
 }
 
 export function collectionsByUserUrl(baseUrl: string, userId: string): string {
-  return `${baseUrl}/rest/v1/collections?owner_user_id=eq.${encodeURIComponent(userId)}&name=neq.__wishlist__&select=*&order=created_at.desc`;
+  return withPageLimit(
+    `${baseUrl}/rest/v1/collections?owner_user_id=eq.${encodeURIComponent(userId)}&name=neq.__wishlist__&select=*&order=created_at.desc`,
+  );
 }
 
 export function publicCollectionsByUserUrl(baseUrl: string, userId: string): string {
-  return `${baseUrl}/rest/v1/collections?owner_user_id=eq.${encodeURIComponent(userId)}&visibility=eq.public&name=neq.__wishlist__&select=*&order=created_at.desc`;
+  return withPageLimit(
+    `${baseUrl}/rest/v1/collections?owner_user_id=eq.${encodeURIComponent(userId)}&visibility=eq.public&name=neq.__wishlist__&select=*&order=created_at.desc`,
+  );
 }
 
 export function upsertCollectionBody(collection: Collection): Record<string, unknown> {
@@ -129,7 +136,9 @@ export function itemByIdUrl(baseUrl: string, id: string): string {
 }
 
 export function itemsByCollectionUrl(baseUrl: string, collectionId: string): string {
-  return `${baseUrl}/rest/v1/items?collection_id=eq.${encodeURIComponent(collectionId)}&select=*&order=created_at.desc`;
+  return withPageLimit(
+    `${baseUrl}/rest/v1/items?collection_id=eq.${encodeURIComponent(collectionId)}&select=*&order=created_at.desc`,
+  );
 }
 
 export function upsertItemBody(item: CollectableItem, collectionId: string): Record<string, unknown> {

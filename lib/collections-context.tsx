@@ -21,6 +21,7 @@ import {
   mergeCollectionsFromCloud,
   mergeItemsFromCloud,
 } from "@/lib/collections-cloud-merge";
+import { dedupeItems } from "@/lib/dedupe-items";
 import {
   subscribeToOwnCollections,
   subscribeToOwnItems,
@@ -628,7 +629,10 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         if (!active) return;
 
         setLocalCollections(applyTombstones(visibleCollections, colTombstones, (c) => c.id));
-        setLocalItems(applyTombstones(normalizedItems, itemTombstones, (i) => i.id));
+        // Collapse any same-identity duplicates (legacy-id re-upsert dupes,
+        // see lib/dedupe-items.ts) so a cached/cloud-pulled double is cleaned
+        // out of local storage on hydrate, not just hidden at render.
+        setLocalItems(applyTombstones(dedupeItems(normalizedItems), itemTombstones, (i) => i.id));
         for (const item of rewritten) {
           upsertItem(item).catch(() => undefined);
         }
@@ -728,7 +732,11 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         const itemTombstones = mergeTombstoneIds(prevItemTombstones, itemTombstoned);
         if (deltaItems.length > 0 || itemTombstones !== prevItemTombstones) {
           setLocalItems((current) =>
-            applyTombstones(mergeItemsFromCloud(current, deltaItems), itemTombstones, (i) => i.id),
+            applyTombstones(
+              dedupeItems(mergeItemsFromCloud(current, deltaItems)),
+              itemTombstones,
+              (i) => i.id,
+            ),
           );
         }
         await setTombstones("items", activeUser.id, itemTombstones, prevItemTombstones);
@@ -898,18 +906,26 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   }, [getVisibleCollections, localCollections, friendCollections, subscribedCollections, sharedWithMeCollections]);
 
   const items = useMemo(() => {
+    // Mirror the `collections` memo: every non-local source is gated by `seen`
+    // so an item already present (own or from another source) is never pushed
+    // twice. Previously `getVisibleItems()` was spread in unconditionally and
+    // its ids were left out of `seen`, so an item returned by both the visible
+    // (followed) set and the friend/subscribed/shared set surfaced doubled.
     const seen = new Set(localItems.map((i) => i.id));
-    const merged = [...localItems, ...getVisibleItems()];
-    for (const item of friendItems) {
-      if (!seen.has(item.id)) { merged.push(item); seen.add(item.id); }
-    }
-    for (const item of subscribedItems) {
-      if (!seen.has(item.id)) { merged.push(item); seen.add(item.id); }
-    }
-    for (const item of sharedWithMeItems) {
-      if (!seen.has(item.id)) { merged.push(item); seen.add(item.id); }
-    }
-    return merged;
+    const merged: CollectableItem[] = [...localItems];
+    const addUnseen = (source: readonly CollectableItem[]) => {
+      for (const item of source) {
+        if (!seen.has(item.id)) { merged.push(item); seen.add(item.id); }
+      }
+    };
+    addUnseen(getVisibleItems());
+    addUnseen(friendItems);
+    addUnseen(subscribedItems);
+    addUnseen(sharedWithMeItems);
+    // Final safety net: collapse any same-identity duplicates (e.g. a legacy-id
+    // re-upsert that produced two cloud rows with different uuids) so the UI
+    // shows each item exactly once.
+    return dedupeItems(merged);
   }, [getVisibleItems, localItems, friendItems, subscribedItems, sharedWithMeItems]);
 
   const value = useMemo<CollectionsContextValue>(

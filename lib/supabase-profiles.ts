@@ -28,6 +28,7 @@ import {
   ownCollectionsSinceUrl,
   ownItemsSinceUrl,
 } from "@/lib/supabase-profiles-shapes";
+import { withPageLimit } from "@/lib/supabase-pagination";
 import { maxUpdatedAt } from "@/lib/sync-cursors";
 import { partitionByTombstone } from "@/lib/tombstones";
 import {
@@ -451,7 +452,9 @@ export async function fetchItemById(id: string): Promise<CollectableItem | null>
 export async function fetchItemsByCollectionId(collectionId: string): Promise<CollectableItem[]> {
   if (!isSupabaseConfigured) return [];
 
-  const res = await supabaseRest(`/items?collection_id=eq.${collectionId}&select=*&order=created_at.desc`);
+  const res = await supabaseRest(
+    withPageLimit(`/items?collection_id=eq.${collectionId}&select=*&order=created_at.desc`),
+  );
   const rows: DbItem[] = await res.json();
   // Drop soft-deleted rows so a bootstrap pull can't resurrect a deleted item (BE-15b).
   return rows.filter((row) => !row.deleted_at).map(toItem);
@@ -462,7 +465,7 @@ export async function fetchWishlistItemsByUserId(userId: string): Promise<Collec
   if (!isSupabaseConfigured) return [];
 
   const res = await supabaseRest(
-    `/items?created_by_user_id=eq.${userId}&is_wishlist=eq.true&select=*&order=created_at.desc`,
+    withPageLimit(`/items?created_by_user_id=eq.${userId}&is_wishlist=eq.true&select=*&order=created_at.desc`),
   );
   if (!res.ok) return [];
   const rows: DbItem[] = await res.json();
@@ -574,7 +577,7 @@ export async function fetchCollectionsSharedWithUser(userId: string): Promise<Co
 
   try {
     const res = await supabaseRest(
-      `/collections?shared_with_user_ids=cs.{${encodeURIComponent(userId)}}&select=*&order=created_at.desc`,
+      withPageLimit(`/collections?shared_with_user_ids=cs.{${encodeURIComponent(userId)}}&select=*&order=created_at.desc`),
     );
     if (!res.ok) return [];
     const rows: DbCollection[] = await res.json();
