@@ -1,4 +1,5 @@
 import { MarketplaceListing, MarketplaceMode } from "@/lib/types";
+import { withPageLimit } from "@/lib/supabase-pagination";
 
 /**
  * Pure request/response shape helpers for the `marketplace_listings` cloud table.
@@ -85,7 +86,7 @@ export function buildMarkSoldPayload(soldAt: string, buyerUserId: string | null)
 }
 
 export function fetchListingsUrl(baseUrl: string): string {
-  return `${baseUrl}/rest/v1/marketplace_listings?select=*&order=created_at.desc`;
+  return withPageLimit(`${baseUrl}/rest/v1/marketplace_listings?select=*&order=created_at.desc`);
 }
 
 export function fetchListingByIdUrl(baseUrl: string, id: string): string {
