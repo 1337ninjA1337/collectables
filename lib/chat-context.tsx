@@ -28,6 +28,7 @@ import {
 } from "@/lib/sync-engine";
 import { ChatMessage } from "@/lib/types";
 import { generateUuidV4 } from "@/lib/uuid";
+import { createRateLimitedDeliver } from "@/lib/write-rate-limit";
 
 type ChatStore = {
   messagesByChat: Record<string, ChatMessage[]>;
@@ -151,7 +152,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       // bookkeeping below.
       const { sent } = await flushPendingQueue<ChatMessage>(pending, {
         getId: (msg) => msg.id,
-        deliver: async (msg, outId) =>
+        deliver: createRateLimitedDeliver(async (msg, outId) =>
           (await cloudSendMessage({
             chatId: msg.chatId,
             fromUserId: msg.fromUserId,
@@ -160,6 +161,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
             id: outId,
             createdAt: msg.createdAt,
           })) != null,
+        ),
       });
       if (sent.length === 0) return;
 

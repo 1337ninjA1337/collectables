@@ -62,7 +62,12 @@ describe("chat-context uuid message identity", () => {
       SRC,
       /flushPendingQueue<ChatMessage>\(pending,\s*\{[\s\S]*?getId:\s*\(msg\)\s*=>\s*msg\.id/,
     );
-    assert.match(SRC, /deliver:\s*async\s*\(msg,\s*outId\)\s*=>/);
+    // BE-29: the cloud send is wrapped in createRateLimitedDeliver so a runaway
+    // client is throttled against the Supabase write quota.
+    assert.match(
+      SRC,
+      /deliver:\s*createRateLimitedDeliver\(async\s*\(msg,\s*outId\)\s*=>/,
+    );
     assert.match(SRC, /id:\s*outId/);
   });
 

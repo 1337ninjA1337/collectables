@@ -89,6 +89,7 @@ import {
   hasPendingUpserts,
   type PendingUpsertQueue,
 } from "@/lib/pending-upserts";
+import { createRateLimitedDeliver } from "@/lib/write-rate-limit";
 import {
   hasCloudImported,
   markCloudImported,
@@ -397,14 +398,14 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         const { sent } = await flushPendingUpserts(
           collectionsQueue,
           collectionUpsertId,
-          async (collection) => {
+          createRateLimitedDeliver(async (collection) => {
             try {
               await upsertCollection(collection);
               return true;
             } catch {
               return false;
             }
-          },
+          }),
         );
         if (cancelled) return;
         if (sent.length > 0) {
@@ -417,14 +418,14 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         const { sent } = await flushPendingUpserts(
           itemsQueue,
           itemUpsertId,
-          async (item) => {
+          createRateLimitedDeliver(async (item) => {
             try {
               await upsertItem(item);
               return true;
             } catch {
               return false;
             }
-          },
+          }),
         );
         if (cancelled) return;
         if (sent.length > 0) {

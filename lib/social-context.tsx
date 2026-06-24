@@ -34,6 +34,7 @@ import {
   type PendingSocialQueue,
   type SocialMutation,
 } from "@/lib/pending-social";
+import { createRateLimitedDeliver } from "@/lib/write-rate-limit";
 import { Collection, CollectableItem, ProfileRelationship, UserProfile } from "@/lib/types";
 
 type SocialStore = {
@@ -202,18 +203,23 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   // module-level imports, so the dependency list is empty.
   const deliverSocial = useMemo(
     () =>
-      makeSocialDeliver({
-        sendFriendRequest,
-        // BE-21: route the accept through the server-authoritative Edge
-        // Function. It returns `false` only on a transient failure (so the
-        // mutation stays queued); throw so `makeSocialDeliver` keeps it.
-        acceptFriendRequest: async (_acceptorUserId, fromUserId) => {
-          const ok = await cloudAcceptFriendRequest(fromUserId);
-          if (!ok) throw new Error("accept-friend-request failed");
-        },
-        removeFriendRequest,
-        upsertMyProfile,
-      }),
+      // BE-29: throttle social writes through the shared app-wide window so a
+      // runaway client can't exhaust the Supabase write quota; a throttled
+      // mutation returns `false` and simply re-delivers on the next flush.
+      createRateLimitedDeliver(
+        makeSocialDeliver({
+          sendFriendRequest,
+          // BE-21: route the accept through the server-authoritative Edge
+          // Function. It returns `false` only on a transient failure (so the
+          // mutation stays queued); throw so `makeSocialDeliver` keeps it.
+          acceptFriendRequest: async (_acceptorUserId, fromUserId) => {
+            const ok = await cloudAcceptFriendRequest(fromUserId);
+            if (!ok) throw new Error("accept-friend-request failed");
+          },
+          removeFriendRequest,
+          upsertMyProfile,
+        }),
+      ),
     [],
   );
 
