@@ -37,12 +37,30 @@ export interface SentEntry {
  */
 export type DeliverFn<T> = (entity: T, outId: string) => Promise<boolean>;
 
+/**
+ * Minimal gate the flush consults before each delivery. `allow()` returns
+ * `false` once the caller's write budget for the current window is spent, at
+ * which point the flush stops and leaves the rest queued — identical
+ * back-pressure to a failed delivery, so nothing is dropped. Satisfied by
+ * {@link createSlidingWindowLimiter}'s return value (BE-29).
+ */
+export interface FlushRateLimiter {
+  allow(now?: number): boolean;
+}
+
 export interface FlushOptions<T> {
   /** Read the entity's current local id (the idempotency key candidate). */
   getId: (entity: T) => string;
   deliver: DeliverFn<T>;
   /** Override the uuid mint (tests inject a deterministic generator). */
   newId?: () => string;
+  /**
+   * Optional app-level write rate limiter. When supplied, each entity must pass
+   * `limiter.allow()` before it is delivered; the first denial stops the whole
+   * flush (every group), leaving the undelivered entities queued for the next
+   * pass. Omit it (the default) to flush without a write budget.
+   */
+  limiter?: FlushRateLimiter;
 }
 
 /**
@@ -61,12 +79,20 @@ export async function flushPendingQueue<T>(
   pending: Record<string, readonly T[]>,
   options: FlushOptions<T>,
 ): Promise<{ sent: SentEntry[] }> {
-  const { getId, deliver, newId = generateUuidV4 } = options;
+  const { getId, deliver, newId = generateUuidV4, limiter } = options;
   const sent: SentEntry[] = [];
 
   for (const [groupKey, entities] of Object.entries(pending)) {
     if (!entities || entities.length === 0) continue;
+    let limited = false;
     for (const entity of entities) {
+      // App-level write rate limit (BE-29): once the window's write budget is
+      // spent, stop the whole flush and leave everything still queued. Checked
+      // before minting an id / delivering so a denied entity is untouched.
+      if (limiter && !limiter.allow()) {
+        limited = true;
+        break;
+      }
       const oldId = getId(entity);
       const outId = isUuidV4(oldId) ? oldId : newId();
       const delivered = await deliver(entity, outId);
@@ -75,6 +101,9 @@ export async function flushPendingQueue<T>(
       if (!delivered) break;
       sent.push({ groupKey, oldId, newId: outId });
     }
+    // A spent budget applies across every group, not just this one — stop here
+    // so a later group doesn't get a delivery the limiter already denied.
+    if (limited) break;
   }
 
   return { sent };

@@ -3,6 +3,7 @@ import {
   resolveAnalyticsConfig,
   type AnalyticsConfig,
 } from "@/lib/analytics-config";
+import { createSlidingWindowLimiter } from "@/lib/sliding-window-limiter";
 
 /**
  * Closed set of event names the analytics wrapper accepts. Defined here so
@@ -54,14 +55,13 @@ let userOptedOut = false;
 // real interaction yet caps a hot loop at ~288k/day instead of unbounded.
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_EVENTS_PER_WINDOW = 200;
-let recentEvents: number[] = [];
+const rateLimiter = createSlidingWindowLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: MAX_EVENTS_PER_WINDOW,
+});
 
 function rateLimitAllow(now: number = Date.now()): boolean {
-  const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  recentEvents = recentEvents.filter((ts) => ts > cutoff);
-  if (recentEvents.length >= MAX_EVENTS_PER_WINDOW) return false;
-  recentEvents.push(now);
-  return true;
+  return rateLimiter.allow(now);
 }
 
 /**
@@ -182,9 +182,9 @@ export function __resetAnalyticsForTests(): void {
   initialised = false;
   activeConfig = null;
   userOptedOut = false;
-  recentEvents = [];
+  rateLimiter.reset();
 }
 
 export function __resetAnalyticsRateLimitForTests(): void {
-  recentEvents = [];
+  rateLimiter.reset();
 }

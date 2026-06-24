@@ -28,6 +28,7 @@ import {
 } from "@/lib/sync-engine";
 import { ChatMessage } from "@/lib/types";
 import { generateUuidV4 } from "@/lib/uuid";
+import { writeRateLimiter } from "@/lib/write-rate-limiter";
 
 type ChatStore = {
   messagesByChat: Record<string, ChatMessage[]>;
@@ -160,6 +161,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
             id: outId,
             createdAt: msg.createdAt,
           })) != null,
+        limiter: writeRateLimiter,
       });
       if (sent.length === 0) return;
 

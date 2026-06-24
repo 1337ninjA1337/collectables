@@ -4,6 +4,7 @@ import {
   type SentryConfig,
   type SentryEnvironment,
 } from "@/lib/sentry-config";
+import { createSlidingWindowLimiter } from "@/lib/sliding-window-limiter";
 
 export type SentryEvent = {
   user?: { id?: string; email?: string | null; ip_address?: string };
@@ -61,17 +62,17 @@ let activeConfig: SentryConfig | null = null;
 
 // Rate-limit captureException to MAX_EVENTS_PER_WINDOW within RATE_LIMIT_WINDOW_MS
 // so a runaway useEffect loop or an exception in render cannot exhaust the
-// 5k/month free-tier quota in seconds.
+// 5k/month free-tier quota in seconds. The window mechanics live in the shared
+// BE-29 factory; this consumer only supplies the policy numbers.
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_EVENTS_PER_WINDOW = 50;
-let recentEvents: number[] = [];
+const rateLimiter = createSlidingWindowLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: MAX_EVENTS_PER_WINDOW,
+});
 
 function rateLimitAllow(now: number = Date.now()): boolean {
-  const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  recentEvents = recentEvents.filter((ts) => ts > cutoff);
-  if (recentEvents.length >= MAX_EVENTS_PER_WINDOW) return false;
-  recentEvents.push(now);
-  return true;
+  return rateLimiter.allow(now);
 }
 
 const defaultLoader: SentryLoader = async () => {
@@ -282,10 +283,10 @@ export function __resetSentryForTests(): void {
   sdk = null;
   initialised = false;
   activeConfig = null;
-  recentEvents = [];
+  rateLimiter.reset();
   userOptedOut = false;
 }
 
 export function __resetSentryRateLimitForTests(): void {
-  recentEvents = [];
+  rateLimiter.reset();
 }
