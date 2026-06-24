@@ -4,6 +4,7 @@ import {
   type SentryConfig,
   type SentryEnvironment,
 } from "@/lib/sentry-config";
+import { createSlidingWindowLimiter } from "@/lib/rate-limit";
 
 export type SentryEvent = {
   user?: { id?: string; email?: string | null; ip_address?: string };
@@ -64,14 +65,13 @@ let activeConfig: SentryConfig | null = null;
 // 5k/month free-tier quota in seconds.
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_EVENTS_PER_WINDOW = 50;
-let recentEvents: number[] = [];
+const rateLimiter = createSlidingWindowLimiter(
+  MAX_EVENTS_PER_WINDOW,
+  RATE_LIMIT_WINDOW_MS,
+);
 
 function rateLimitAllow(now: number = Date.now()): boolean {
-  const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  recentEvents = recentEvents.filter((ts) => ts > cutoff);
-  if (recentEvents.length >= MAX_EVENTS_PER_WINDOW) return false;
-  recentEvents.push(now);
-  return true;
+  return rateLimiter.allow(now);
 }
 
 const defaultLoader: SentryLoader = async () => {
@@ -282,10 +282,10 @@ export function __resetSentryForTests(): void {
   sdk = null;
   initialised = false;
   activeConfig = null;
-  recentEvents = [];
+  rateLimiter.reset();
   userOptedOut = false;
 }
 
 export function __resetSentryRateLimitForTests(): void {
-  recentEvents = [];
+  rateLimiter.reset();
 }
