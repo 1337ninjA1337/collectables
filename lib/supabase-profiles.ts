@@ -1,5 +1,6 @@
 import { captureException } from "@/lib/sentry";
 import { fetchWithRetry } from "@/lib/fetch-retry";
+import { createSlidingWindowLimiter } from "@/lib/rate-limit";
 import {
   authClient,
   isSupabaseConfigured,
@@ -73,6 +74,39 @@ async function getAccessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
+/**
+ * BE-29: app-level write rate limit. The public anon key plus no client-side
+ * throttle means a runaway loop or a script can hammer inserts/updates and
+ * exhaust the Supabase free tier (DB writes, egress) — a cheap DoS against our
+ * own backend and bill. Every collections/items/profiles/friend_requests write
+ * funnels through `supabaseRest`, so one shared sliding window here caps the
+ * whole mutation surface. The cap is generous (4 writes/sec sustained) so it
+ * never bites real interaction; a throttled write *throws* (it is not dropped),
+ * which surfaces to the caller exactly like an offline failure — the pending
+ * upsert/social queues re-deliver it on the next flush. This is a first line
+ * only; RLS + Edge Function checks remain the real server-side protection.
+ */
+const WRITE_RATE_LIMIT_WINDOW_MS = 60_000;
+const MAX_WRITES_PER_WINDOW = 240;
+const WRITE_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
+const writeRateLimiter = createSlidingWindowLimiter(
+  MAX_WRITES_PER_WINDOW,
+  WRITE_RATE_LIMIT_WINDOW_MS,
+);
+
+/** Thrown when a write is rejected by the client-side rate limiter. */
+export class RateLimitError extends Error {
+  constructor(message = "Write rate limit exceeded") {
+    super(message);
+    this.name = "RateLimitError";
+  }
+}
+
+/** Test hook: clear the recorded write timestamps. */
+export function __resetWriteRateLimitForTests(): void {
+  writeRateLimiter.reset();
+}
+
 async function supabaseRest(
   pathOrUrl: string,
   options: { method?: string; headers?: Record<string, string>; body?: string } = {},
@@ -80,8 +114,11 @@ async function supabaseRest(
   const url = pathOrUrl.startsWith("http")
     ? pathOrUrl
     : `${supabaseUrl}/rest/v1${pathOrUrl}`;
-  const token = await getAccessToken();
   const method = options.method ?? "GET";
+  if (WRITE_METHODS.has(method) && !writeRateLimiter.allow()) {
+    throw new RateLimitError();
+  }
+  const token = await getAccessToken();
   // Build headers minimally. Sending `Content-Type` on a body-less GET and
   // sending an empty `Prefer: ""` both expand the CORS preflight surface; iOS
   // Safari 18 rejects the preflight more often than it should, surfacing as
