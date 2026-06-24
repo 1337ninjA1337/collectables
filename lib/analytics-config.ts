@@ -16,6 +16,21 @@ function normaliseEnvironment(value: string | undefined): AnalyticsEnvironment {
   return "production";
 }
 
+/**
+ * Incident-response kill-switch parser. When `EXPO_PUBLIC_ANALYTICS_DISABLED`
+ * is a truthy literal ("1", "true", "yes"), all analytics — PostHog *and*
+ * Clarity, both gated by `AnalyticsConfig.enabled` — are forced off regardless
+ * of key/environment. Lets an operator drop third-party tracking by flipping a
+ * GitHub secret and re-running the deploy, with no code change. Mirrors
+ * `isRealtimeDisabledByEnv` in `lib/supabase-realtime.ts`; kept inline here so
+ * this module stays pure (no react-native import from `lib/env.ts`).
+ */
+export function isAnalyticsDisabledByEnv(rawValue: string | undefined): boolean {
+  if (!rawValue) return false;
+  const normalised = rawValue.trim().toLowerCase();
+  return normalised === "1" || normalised === "true" || normalised === "yes";
+}
+
 export function resolveAnalyticsConfig(
   env: Record<string, string | undefined>,
 ): AnalyticsConfig {
@@ -26,7 +41,8 @@ export function resolveAnalyticsConfig(
   const environment = normaliseEnvironment(
     env.EXPO_PUBLIC_ANALYTICS_ENV ?? env.EXPO_PUBLIC_SENTRY_ENV,
   );
-  const enabled = posthogKey.length > 0 && environment !== "development";
+  const killSwitch = isAnalyticsDisabledByEnv(env.EXPO_PUBLIC_ANALYTICS_DISABLED);
+  const enabled = !killSwitch && posthogKey.length > 0 && environment !== "development";
   return { posthogKey, posthogHost, clarityId, environment, enabled };
 }
 
@@ -47,6 +63,7 @@ export function readAnalyticsEnvFromProcess(): Record<
     EXPO_PUBLIC_CLARITY_PROJECT_ID: process.env.EXPO_PUBLIC_CLARITY_PROJECT_ID,
     EXPO_PUBLIC_ANALYTICS_ENV: process.env.EXPO_PUBLIC_ANALYTICS_ENV,
     EXPO_PUBLIC_SENTRY_ENV: process.env.EXPO_PUBLIC_SENTRY_ENV,
+    EXPO_PUBLIC_ANALYTICS_DISABLED: process.env.EXPO_PUBLIC_ANALYTICS_DISABLED,
   };
 }
 

@@ -106,6 +106,39 @@ describe("resolveAnalyticsConfig", () => {
   });
 });
 
+describe("resolveAnalyticsConfig — EXPO_PUBLIC_ANALYTICS_DISABLED kill-switch", () => {
+  for (const truthy of ["1", "true", "yes", "TRUE", " Yes ", "YES"]) {
+    it(`forces enabled=false when set to a truthy literal (${JSON.stringify(truthy)})`, () => {
+      const cfg = resolveAnalyticsConfig({
+        EXPO_PUBLIC_POSTHOG_KEY: "phc_prod",
+        EXPO_PUBLIC_ANALYTICS_ENV: "production",
+        EXPO_PUBLIC_ANALYTICS_DISABLED: truthy,
+      });
+      assert.equal(cfg.enabled, false);
+      // Key/host/clarity still resolve — only the enabled gate flips.
+      assert.equal(cfg.posthogKey, "phc_prod");
+    });
+  }
+
+  for (const falsy of ["", "0", "false", "no", "off", undefined]) {
+    it(`leaves analytics enabled when set to a non-truthy value (${JSON.stringify(falsy)})`, () => {
+      const cfg = resolveAnalyticsConfig({
+        EXPO_PUBLIC_POSTHOG_KEY: "phc_prod",
+        EXPO_PUBLIC_ANALYTICS_ENV: "production",
+        EXPO_PUBLIC_ANALYTICS_DISABLED: falsy,
+      });
+      assert.equal(cfg.enabled, true);
+    });
+  }
+
+  it("does not re-enable analytics when the kill-switch is off but the key is missing", () => {
+    const cfg = resolveAnalyticsConfig({
+      EXPO_PUBLIC_ANALYTICS_DISABLED: "0",
+    });
+    assert.equal(cfg.enabled, false);
+  });
+});
+
 describe("analytics-config — env inlining (Metro/babel)", () => {
   it("readAnalyticsEnvFromProcess references each EXPO_PUBLIC_* var literally", () => {
     const src = read("lib/analytics-config.ts");
@@ -135,12 +168,18 @@ describe("analytics-config — env inlining (Metro/babel)", () => {
     const env = readAnalyticsEnvFromProcess();
     const keys = Object.keys(env).sort();
     assert.deepStrictEqual(keys, [
+      "EXPO_PUBLIC_ANALYTICS_DISABLED",
       "EXPO_PUBLIC_ANALYTICS_ENV",
       "EXPO_PUBLIC_CLARITY_PROJECT_ID",
       "EXPO_PUBLIC_POSTHOG_HOST",
       "EXPO_PUBLIC_POSTHOG_KEY",
       "EXPO_PUBLIC_SENTRY_ENV",
     ]);
+  });
+
+  it("references EXPO_PUBLIC_ANALYTICS_DISABLED literally so Metro inlines it", () => {
+    const src = read("lib/analytics-config.ts");
+    assert.match(src, /process\.env\.EXPO_PUBLIC_ANALYTICS_DISABLED\b/);
   });
 });
 
