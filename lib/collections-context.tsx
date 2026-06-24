@@ -89,6 +89,7 @@ import {
   hasPendingUpserts,
   type PendingUpsertQueue,
 } from "@/lib/pending-upserts";
+import { writeRateLimiter } from "@/lib/write-rate-limiter";
 import {
   hasCloudImported,
   markCloudImported,
@@ -405,6 +406,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
               return false;
             }
           },
+          writeRateLimiter,
         );
         if (cancelled) return;
         if (sent.length > 0) {
@@ -425,6 +427,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
               return false;
             }
           },
+          writeRateLimiter,
         );
         if (cancelled) return;
         if (sent.length > 0) {

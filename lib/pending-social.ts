@@ -7,7 +7,11 @@ import {
   hasPendingUpserts,
   type PendingUpsertQueue,
 } from "@/lib/pending-upserts";
-import type { DeliverFn, SentEntry } from "@/lib/sync-engine";
+import type {
+  DeliverFn,
+  FlushRateLimiter,
+  SentEntry,
+} from "@/lib/sync-engine";
 import type { UserProfile } from "@/lib/types";
 
 /**
@@ -186,6 +190,7 @@ export function makeSocialDeliver(deps: SocialDeliverDeps): DeliverFn<SocialMuta
 export async function flushPendingSocial(
   queue: PendingSocialQueue,
   deliver: DeliverFn<SocialMutation>,
+  limiter?: FlushRateLimiter,
 ): Promise<{ sent: SentEntry[]; next: PendingSocialQueue }> {
-  return flushPendingUpserts(queue, socialMutationKey, deliver);
+  return flushPendingUpserts(queue, socialMutationKey, deliver, limiter);
 }

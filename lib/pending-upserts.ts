@@ -2,6 +2,7 @@ import {
   applyFlushToQueue,
   flushPendingQueue,
   type DeliverFn,
+  type FlushRateLimiter,
   type SentEntry,
 } from "@/lib/sync-engine";
 
@@ -102,8 +103,9 @@ export async function flushPendingUpserts<T>(
   queue: PendingUpsertQueue<T>,
   getId: (entity: T) => string,
   deliver: DeliverFn<T>,
+  limiter?: FlushRateLimiter,
 ): Promise<{ sent: SentEntry[]; next: PendingUpsertQueue<T> }> {
-  const { sent } = await flushPendingQueue<T>(queue, { getId, deliver });
+  const { sent } = await flushPendingQueue<T>(queue, { getId, deliver, limiter });
   const next = sent.length === 0 ? queue : applyFlushToQueue(queue, sent, getId);
   return { sent, next };
 }

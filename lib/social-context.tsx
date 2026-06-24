@@ -35,6 +35,7 @@ import {
   type SocialMutation,
 } from "@/lib/pending-social";
 import { Collection, CollectableItem, ProfileRelationship, UserProfile } from "@/lib/types";
+import { writeRateLimiter } from "@/lib/write-rate-limiter";
 
 type SocialStore = {
   following: string[];
@@ -447,7 +448,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     void (async () => {
       const queue = pendingSocialRef.current;
       if (!hasPendingSocial(queue)) return;
-      const { sent } = await flushPendingSocial(queue, deliverSocial);
+      const { sent } = await flushPendingSocial(queue, deliverSocial, writeRateLimiter);
       if (cancelled || sent.length === 0) return;
       setPendingSocial((q) => applyDeliveredSocial(q, sent));
     })();
