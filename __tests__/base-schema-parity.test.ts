@@ -19,38 +19,51 @@ import {
   upsertItemBody,
   upsertProfileBody,
 } from "@/lib/supabase-profiles-shapes";
-import type { CollectableItem, Collection, UserProfile } from "@/lib/types";
+import {
+  chatReadsUrl,
+  chatReadUpsertBody,
+  fetchMessagesUrl,
+  friendCheckUrl,
+  messageToInsertPayload,
+} from "@/lib/supabase-chat-shapes";
+import {
+  fetchListingByIdUrl,
+  fetchListingsUrl,
+  listingToInsertPayload,
+  markSoldPayload,
+  markSoldUrl,
+} from "@/lib/supabase-marketplace-shapes";
+import type {
+  CollectableItem,
+  Collection,
+  MarketplaceListing,
+  UserProfile,
+} from "@/lib/types";
 
 /**
- * BE-3 — schema-parity guard. Rather than hardcoding a column list (the BE-1
- * structural test does that), this derives the columns the client actually
- * reads/writes straight from the REST URL/body builders in
- * `lib/supabase-profiles-shapes.ts`, then asserts every one of them exists in
- * the base-schema migration. If a new field is added to a builder without a
- * matching column in the migration, this fails — closing the drift that
- * produces "column does not exist" prod errors. Mirrors the
- * builder-derived-expectation approach of supabase-profiles-shapes.test.ts.
+ * BE-3 / BE-37 — schema-parity guard across EVERY `*-shapes.ts` module.
+ *
+ * Rather than hardcoding a column list (the BE-1 structural test does that),
+ * this derives the columns the client actually reads/writes straight from the
+ * REST URL/body builders in `lib/supabase-*-shapes.ts`, then asserts every one
+ * of them exists in the committed migrations. If a new field is added to a
+ * builder without a matching column in a migration, this fails — closing the
+ * drift that produces "column does not exist" prod errors.
+ *
+ * BE-37 extends the original profiles-only coverage to the chat
+ * (`chat_messages`, `chat_reads`) and marketplace (`marketplace_listings`)
+ * builders, so the same guard now spans all three shape modules and all of
+ * their backing tables.
  */
 
 const ROOT = process.cwd();
-const MIGRATION = readFileSync(
-  path.join(ROOT, "supabase", "migrations", "20260423_base_schema.sql"),
-  "utf8",
-);
-// strip `-- ...` comments so prose mentioning a column name can't satisfy an
-// assertion the executable SQL doesn't actually back.
-const SQL = MIGRATION.replace(/--.*$/gm, "");
 
-// BE-28c — the explicit `select=` projections now reference sync-metadata
-// columns the *base* schema never declared because they were added by later
-// migrations: `is_admin` (20260616_core_tables_rls), `updated_at`
-// (20260621_updated_at_moddatetime) and `deleted_at`
-// (20260623_soft_delete_deleted_at). Those two are added via a dynamic
-// `format('ALTER TABLE public.%I ADD COLUMN …')` loop over a table list, so
-// they can't be attributed to a single CREATE TABLE block. We therefore fall
-// back to "exists anywhere in the committed migrations" for any column the
-// base CREATE TABLE body doesn't already declare — still failing a builder
-// that references a column no migration backs at all.
+// Every committed migration, comment-stripped so prose mentioning a column
+// name can't satisfy an assertion the executable SQL doesn't actually back.
+// Tables/columns live across many migration files (base schema, the chat /
+// marketplace creates, and later `ALTER … ADD COLUMN` additions like
+// `is_admin` / `updated_at` / `deleted_at` / `buyer_user_id`), so the parity
+// check works against the full concatenation rather than a single file.
 const ALL_MIGRATIONS_SQL = readdirSync(path.join(ROOT, "supabase", "migrations"))
   .filter((f) => f.endsWith(".sql"))
   .map((f) =>
@@ -109,6 +122,20 @@ const ITEM: CollectableItem = {
   archivedAt: "2026-02-01T00:00:00Z",
 };
 
+const LISTING: MarketplaceListing = {
+  id: "l1",
+  itemId: "i1",
+  ownerUserId: "u1",
+  mode: "sell",
+  askingPrice: 10,
+  currency: "USD",
+  notes: "mint",
+  createdAt: "2026-01-01T00:00:00Z",
+  soldAt: "2026-02-01T00:00:00Z",
+  buyerUserId: "u2",
+  arrivedAt: "2026-03-01T00:00:00Z",
+};
+
 /** Columns referenced in a REST URL via filters / order / select lists. */
 function columnsFromUrl(url: string): string[] {
   const cols = new Set<string>();
@@ -142,57 +169,102 @@ const TABLES: Record<string, { columns: Set<string> }> = {
   collections: { columns: new Set() },
   items: { columns: new Set() },
   friend_requests: { columns: new Set() },
+  chat_messages: { columns: new Set() },
+  chat_reads: { columns: new Set() },
+  marketplace_listings: { columns: new Set() },
 };
 
+const addBody = (table: string, body: Record<string, unknown>) => {
+  for (const k of Object.keys(body)) TABLES[table].columns.add(k);
+};
+const addUrl = (table: string, url: string) => {
+  for (const c of columnsFromUrl(url)) TABLES[table].columns.add(c);
+};
+
+// --- profiles-shapes.ts -----------------------------------------------------
 // Body builders → the columns the client writes.
-for (const k of Object.keys(upsertProfileBody(PROFILE))) TABLES.profiles.columns.add(k);
-for (const k of Object.keys(updateProfileDisplayCurrencyBody("USD"))) TABLES.profiles.columns.add(k);
-for (const k of Object.keys(upsertCollectionBody(COLLECTION))) TABLES.collections.columns.add(k);
-for (const k of Object.keys(upsertItemBody(ITEM, "c1"))) TABLES.items.columns.add(k);
-for (const k of Object.keys(sendFriendRequestBody("u1", "u2"))) TABLES.friend_requests.columns.add(k);
-
+addBody("profiles", upsertProfileBody(PROFILE));
+addBody("profiles", updateProfileDisplayCurrencyBody("USD"));
+addBody("collections", upsertCollectionBody(COLLECTION));
+addBody("items", upsertItemBody(ITEM, "c1"));
+addBody("friend_requests", sendFriendRequestBody("u1", "u2"));
 // URL builders → the columns the client filters / orders / selects on.
-for (const c of columnsFromUrl(profileByIdUrl(BASE, "u1"))) TABLES.profiles.columns.add(c);
-for (const c of columnsFromUrl(profilesPageUrl(BASE, 1, 10))) TABLES.profiles.columns.add(c);
-for (const c of columnsFromUrl(collectionByIdUrl(BASE, "c1"))) TABLES.collections.columns.add(c);
-for (const c of columnsFromUrl(collectionsByUserUrl(BASE, "u1"))) TABLES.collections.columns.add(c);
-for (const c of columnsFromUrl(publicCollectionsByUserUrl(BASE, "u1"))) TABLES.collections.columns.add(c);
-for (const c of columnsFromUrl(itemByIdUrl(BASE, "i1"))) TABLES.items.columns.add(c);
-for (const c of columnsFromUrl(itemsByCollectionUrl(BASE, "c1"))) TABLES.items.columns.add(c);
-for (const c of columnsFromUrl(friendRequestsUrl(BASE, "u1"))) TABLES.friend_requests.columns.add(c);
-for (const c of columnsFromUrl(removeFriendRequestUrl(BASE, "u1", "u2"))) TABLES.friend_requests.columns.add(c);
+addUrl("profiles", profileByIdUrl(BASE, "u1"));
+addUrl("profiles", profilesPageUrl(BASE, 1, 10));
+addUrl("collections", collectionByIdUrl(BASE, "c1"));
+addUrl("collections", collectionsByUserUrl(BASE, "u1"));
+addUrl("collections", publicCollectionsByUserUrl(BASE, "u1"));
+addUrl("items", itemByIdUrl(BASE, "i1"));
+addUrl("items", itemsByCollectionUrl(BASE, "c1"));
+addUrl("friend_requests", friendRequestsUrl(BASE, "u1"));
+addUrl("friend_requests", removeFriendRequestUrl(BASE, "u1", "u2"));
 
-/** Extract the body of a `CREATE TABLE public.<name> ( ... );` block. */
+// --- chat-shapes.ts (BE-37) -------------------------------------------------
+addBody(
+  "chat_messages",
+  messageToInsertPayload({
+    chatId: "c-1",
+    fromUserId: "u1",
+    toUserId: "u2",
+    text: "hi",
+    id: "m1",
+    createdAt: "2026-01-01T00:00:00Z",
+  }),
+);
+addBody("chat_reads", chatReadUpsertBody("u1", "c-1", "2026-01-01T00:00:00Z"));
+addUrl("chat_messages", fetchMessagesUrl(BASE, "c-1"));
+addUrl("chat_reads", chatReadsUrl(BASE, "u1"));
+// friendCheckUrl lives in chat-shapes but reads the friend_requests table.
+addUrl("friend_requests", friendCheckUrl(BASE, "u1", "u2"));
+
+// --- marketplace-shapes.ts (BE-37) ------------------------------------------
+addBody("marketplace_listings", listingToInsertPayload(LISTING));
+addBody("marketplace_listings", markSoldPayload("2026-02-01T00:00:00Z", "u2"));
+addUrl("marketplace_listings", fetchListingsUrl(BASE));
+addUrl("marketplace_listings", fetchListingByIdUrl(BASE, "l1"));
+addUrl("marketplace_listings", markSoldUrl(BASE, "l1"));
+
+/**
+ * Extract the body of a `CREATE TABLE [IF NOT EXISTS] public.<name> ( ... );`
+ * block from the concatenated migrations. Anchored on the CREATE TABLE keyword
+ * (not a bare `public.<name> (`) so an index/policy/ALTER line that also names
+ * the table can never be mistaken for its definition.
+ */
 function tableBody(name: string): string {
-  const start = SQL.indexOf(`public.${name} (`);
-  assert.notEqual(start, -1, `migration is missing CREATE TABLE public.${name}`);
-  const open = SQL.indexOf("(", start);
+  const re = new RegExp(
+    `create\\s+table\\s+(?:if\\s+not\\s+exists\\s+)?public\\.${name}\\s*\\(`,
+    "i",
+  );
+  const m = re.exec(ALL_MIGRATIONS_SQL);
+  assert.ok(m, `migrations are missing CREATE TABLE public.${name}`);
+  const open = ALL_MIGRATIONS_SQL.indexOf("(", m.index);
   let depth = 0;
-  for (let i = open; i < SQL.length; i++) {
-    if (SQL[i] === "(") depth++;
-    else if (SQL[i] === ")") {
+  for (let i = open; i < ALL_MIGRATIONS_SQL.length; i++) {
+    if (ALL_MIGRATIONS_SQL[i] === "(") depth++;
+    else if (ALL_MIGRATIONS_SQL[i] === ")") {
       depth--;
-      if (depth === 0) return SQL.slice(open + 1, i);
+      if (depth === 0) return ALL_MIGRATIONS_SQL.slice(open + 1, i);
     }
   }
   throw new Error(`unterminated CREATE TABLE for ${name}`);
 }
 
-describe("base schema column parity with the REST builders (BE-3)", () => {
+describe("schema column parity with the REST builders (BE-3 / BE-37)", () => {
   for (const [table, { columns }] of Object.entries(TABLES)) {
     it(`${table} defines every column its builders reference`, () => {
       const body = tableBody(table);
-      // a column is declared if `<name> ` appears at a line start (after the
-      // opening paren / a comma) — `\b<name>\b` is enough given the body scope.
+      // a column is declared if `\b<name>\b` appears in the table body — strong
+      // scoping given we already isolated the CREATE TABLE block.
       for (const col of columns) {
         const re = new RegExp(`\\b${col}\\b`);
-        // Fast path: the base CREATE TABLE block declares it (strong scoping).
+        // Fast path: the CREATE TABLE block declares it (strong scoping).
         if (re.test(body)) continue;
-        // Fallback: a later migration's ALTER … ADD COLUMN added it (BE-28c).
+        // Fallback: a later migration's ALTER … ADD COLUMN added it (e.g.
+        // is_admin / updated_at / deleted_at / buyer_user_id / arrived_at).
         assert.match(
           ALL_MIGRATIONS_SQL,
           re,
-          `public.${table} is missing column "${col}" referenced by a *-shapes.ts builder (not in the base schema nor any later migration)`,
+          `public.${table} is missing column "${col}" referenced by a *-shapes.ts builder (not in its CREATE TABLE nor any later migration)`,
         );
       }
     });
@@ -203,5 +275,11 @@ describe("base schema column parity with the REST builders (BE-3)", () => {
     assert.ok(TABLES.collections.columns.size >= 9, "too few collection columns derived");
     assert.ok(TABLES.items.columns.size >= 15, "too few item columns derived");
     assert.ok(TABLES.friend_requests.columns.size >= 2, "too few friend_request columns derived");
+    assert.ok(TABLES.chat_messages.columns.size >= 5, "too few chat_message columns derived");
+    assert.ok(TABLES.chat_reads.columns.size >= 3, "too few chat_read columns derived");
+    assert.ok(
+      TABLES.marketplace_listings.columns.size >= 10,
+      "too few marketplace_listing columns derived",
+    );
   });
 });
