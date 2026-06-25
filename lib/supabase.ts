@@ -2,6 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AuthClient, SupportedStorage } from "@supabase/auth-js";
 import { Platform } from "react-native";
 
+import { isRuntimeConfigOverrideAllowed } from "./runtime-config-gate";
+
 const RUNTIME_CONFIG_KEY = "collectables-supabase-runtime-config";
 
 function readLocalStorage(key: string): string | null {
@@ -14,6 +16,9 @@ function readLocalStorage(key: string): string | null {
 }
 
 function parseRuntimeConfig(): { url: string; key: string } | null {
+  // SEC-4: never honor the localStorage override in a production web build —
+  // an attacker-controlled config is a full account-takeover funnel.
+  if (!isRuntimeConfigOverrideAllowed()) return null;
   const raw = readLocalStorage(RUNTIME_CONFIG_KEY);
   if (!raw) return null;
   try {
