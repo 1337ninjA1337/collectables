@@ -153,6 +153,7 @@ below reproduce the production schema end-to-end on an empty project.
    20260625_subscriptions.sql            server-authoritative subscriptions table (service_role writes only)
    20260626_realtime_replica_identity.sql  REPLICA IDENTITY FULL + realtime publication for collections/items/marketplace (UPDATE/DELETE events)
    20260627_retention_sweeps.sql         pg_cron daily retention sweeps (analytics 13mo, anon 30d, tombstones 90d)
+   20260628_marketplace_arrived_at.sql   adds the missing marketplace_listings.arrived_at column (read-projection drift fix)
    ```
 
    No CLI? Open each file in **SQL Editor** and run them top-to-bottom in the

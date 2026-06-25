@@ -982,3 +982,25 @@ SELECT public.run_retention_sweeps();
 The migration is otherwise idempotent — `CREATE OR REPLACE FUNCTION`, idempotent
 GRANT/REVOKE, and the cron job is unscheduled-before-scheduled so re-applying
 never stacks duplicate jobs.
+
+## 20260628_marketplace_arrived_at.sql
+
+Run `supabase/migrations/20260628_marketplace_arrived_at.sql` against your
+Supabase project to add the missing `arrived_at` column to
+`marketplace_listings`:
+
+```sql
+ALTER TABLE public.marketplace_listings
+  ADD COLUMN IF NOT EXISTS arrived_at timestamptz NULL;
+```
+
+**Why it matters.** The client already requests `arrived_at` in its `select=`
+projection (`MARKETPLACE_COLUMNS` in `lib/supabase-marketplace-shapes.ts`) and
+`rowToListing` reads it, but no earlier migration created the column. Against a
+real project the listings fetch (`fetchListingsUrl` / `fetchListingByIdUrl`)
+returns `400 — column marketplace_listings.arrived_at does not exist`, which
+breaks the entire marketplace read path. Apply this migration before relying on
+cloud marketplace reads.
+
+Idempotent (`ADD COLUMN IF NOT EXISTS`) — safe to re-run. Apply via the Supabase
+SQL editor or the `supabase db push` workflow.
