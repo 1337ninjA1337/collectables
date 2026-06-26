@@ -1,9 +1,8 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 import {
-  assertAnonKey,
+  assertCaller,
+  CallerAuthError,
   ServiceRoleClaimError,
-} from "../../../lib/service-role-claim.ts";
+} from "../_shared/assert-caller.ts";
 
 // SEC-1: the Cloudinary API secret must NEVER reach the client bundle.
 // This function holds CLOUDINARY_API_SECRET in Supabase function secrets,
@@ -48,37 +47,20 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return json({ error: "Missing authorization" }, 401);
-    }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-
-    // BE-23: fail loudly if the anon secret is missing or is actually the
-    // service-role/secret key (a privileged key must never be wired to the
-    // user-Authorization client used for session verification).
+    // SEC-9: verify the caller holds a valid session before doing anything.
+    // assertCaller also runs the BE-23 anon-key self-check (a privileged key
+    // must never be wired to the user-Authorization client).
     try {
-      assertAnonKey(anonKey, "delete-image");
-    } catch (configErr) {
-      if (configErr instanceof ServiceRoleClaimError) {
-        console.error(configErr.message);
+      await assertCaller(req, "delete-image");
+    } catch (authErr) {
+      if (authErr instanceof CallerAuthError) {
+        return json({ error: authErr.message }, authErr.status);
+      }
+      if (authErr instanceof ServiceRoleClaimError) {
+        console.error(authErr.message);
         return json({ error: "function misconfigured" }, 500);
       }
-      throw configErr;
-    }
-
-    // Verify the caller has a valid Supabase session before doing anything.
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser();
-    if (userError || !user) {
-      return json({ error: "Invalid session" }, 401);
+      throw authErr;
     }
 
     const cloudName = Deno.env.get("CLOUDINARY_CLOUD_NAME");

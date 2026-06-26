@@ -138,8 +138,9 @@ describe("BE-25 — delete-account cascade coverage", () => {
     // pre-deletes above it are only a belt-and-braces fast path.
     assert.match(DELETE_ACCOUNT, /auth\.admin\.deleteUser\(userId\)/);
     // The subject is always the validated caller, never a body-supplied id.
-    assert.match(DELETE_ACCOUNT, /const userId = user\.id/);
-    assert.match(DELETE_ACCOUNT, /userClient\.auth\.getUser\(\)/);
+    // SEC-9: the caller is verified by the shared assertCaller gate.
+    assert.match(DELETE_ACCOUNT, /const userId = caller\.user\.id/);
+    assert.match(DELETE_ACCOUNT, /assertCaller\(req,\s*["']delete-account["']\)/);
   });
 
   it("the pgTAP plan count matches its assertions after adding subscriptions", () => {

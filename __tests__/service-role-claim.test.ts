@@ -137,12 +137,15 @@ describe("Edge Functions wire in the self-check (structural)", () => {
     );
   });
 
-  it("delete-image asserts the anon claim before verifying the session", () => {
+  it("delete-image asserts the anon claim via the shared assertCaller gate (SEC-9)", () => {
     const src = readFileSync(fn("delete-image"), "utf8");
-    assert.match(src, /assertAnonKey\(anonKey,\s*["']delete-image["']\)/);
+    // The anon-key self-check now lives inside assertCaller; delete-image gates
+    // on it before any Cloudinary work by delegating to the shared helper.
+    assert.match(src, /from ["']\.\.\/_shared\/assert-caller\.ts["']/);
+    assert.match(src, /assertCaller\(req,\s*["']delete-image["']\)/);
     assert.ok(
-      src.indexOf("assertAnonKey") < src.indexOf("userClient = createClient"),
-      "self-check must run before the user client is built",
+      src.indexOf("assertCaller") < src.indexOf("CLOUDINARY_API_SECRET"),
+      "caller gate must run before the Cloudinary secret is read",
     );
   });
 
