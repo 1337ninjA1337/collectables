@@ -81,21 +81,21 @@ describe("SEC-1 — delete-image Edge Function holds the secret server-side", ()
     );
   });
 
-  it("verifies the caller's session before acting (mirrors delete-account)", () => {
+  it("verifies the caller's session before acting via the shared assertCaller helper (SEC-9)", () => {
     assert.match(
       fn,
-      /req\.headers\.get\(\s*["']Authorization["']\s*\)/,
-      "must read the Authorization header",
+      /from ["']\.\.\/_shared\/assert-caller\.ts["']/,
+      "must import the shared caller-auth gate",
     );
     assert.match(
       fn,
-      /auth\.getUser\(\)/,
-      "must verify the caller via auth.getUser()",
+      /assertCaller\(req,\s*["']delete-image["']\)/,
+      "must delegate session verification to assertCaller before touching Cloudinary",
     );
     assert.match(
       fn,
-      /\b401\b/,
-      "must reject missing/invalid sessions with 401",
+      /authErr instanceof CallerAuthError/,
+      "must map a caller-auth failure to its carried HTTP status (401)",
     );
   });
 

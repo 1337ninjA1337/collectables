@@ -1,9 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { assertServiceRoleKey } from "../../../lib/service-role-claim.ts";
 import {
-  assertServiceRoleKey,
+  assertCaller,
+  CallerAuthError,
   ServiceRoleClaimError,
-} from "../../../lib/service-role-claim.ts";
+} from "../_shared/assert-caller.ts";
 
 /**
  * BE-26 — GDPR `export-data` Edge Function.
@@ -88,12 +90,22 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return json({ error: "Missing authorization" }, 401);
+    // SEC-9: verify the caller holds a valid session before any service-role op.
+    let caller;
+    try {
+      caller = await assertCaller(req, "export-data");
+    } catch (authErr) {
+      if (authErr instanceof CallerAuthError) {
+        return json({ error: authErr.message }, authErr.status);
+      }
+      if (authErr instanceof ServiceRoleClaimError) {
+        console.error(authErr.message);
+        return json({ error: "function misconfigured" }, 500);
+      }
+      throw authErr;
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseUrl = caller.supabaseUrl;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     // BE-23: fail loudly if the service-role secret is missing or is actually
@@ -109,17 +121,8 @@ Deno.serve(async (req) => {
       throw configErr;
     }
 
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-    if (userError || !user) {
-      return json({ error: "Invalid session" }, 401);
-    }
-
     // The subject is always the authenticated caller, never a body value.
-    const userId = user.id;
+    const userId = caller.user.id;
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     const [profile, collections, items, friendRequests, chatMessages, subscriptions] =

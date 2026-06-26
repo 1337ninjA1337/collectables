@@ -41,14 +41,17 @@ describe("validate-premium Edge Function", () => {
     assert.match(SOURCE, /405/);
   });
 
-  it("returns 401 when the Authorization header is missing", () => {
-    assert.match(SOURCE, /Missing authorization/);
-    assert.match(SOURCE, /401/);
+  it("delegates caller authentication to the shared assertCaller helper (SEC-9)", () => {
+    assert.match(SOURCE, /from ["']\.\.\/_shared\/assert-caller\.ts["']/);
+    assert.match(SOURCE, /assertCaller\(req,\s*["']validate-premium["']\)/);
   });
 
-  it("verifies the caller's session via auth.getUser()", () => {
-    assert.match(SOURCE, /auth\.getUser\(\)/);
-    assert.match(SOURCE, /Invalid session/);
+  it("maps a missing/invalid session to 401 and an anon-key misconfig to 500", () => {
+    // The literal "Missing authorization"/"Invalid session"/401 now live in the
+    // shared helper; the function maps CallerAuthError to its carried status.
+    assert.match(SOURCE, /authErr instanceof CallerAuthError/);
+    assert.match(SOURCE, /authErr\.status/);
+    assert.match(SOURCE, /function misconfigured/);
   });
 
   it("self-checks the service-role key before privileged writes (BE-23)", () => {
@@ -64,7 +67,7 @@ describe("validate-premium Edge Function", () => {
   });
 
   it("subjects the entitlement to the authenticated caller, never a body-supplied id", () => {
-    assert.match(SOURCE, /const userId = user\.id/);
+    assert.match(SOURCE, /const userId = caller\.user\.id/);
     // The user_id written must come from the session, not the payload.
     assert.doesNotMatch(SOURCE, /user_id:\s*payload/);
   });

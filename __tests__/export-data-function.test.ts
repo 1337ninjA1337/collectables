@@ -40,14 +40,17 @@ describe("export-data Edge Function (BE-26)", () => {
     assert.match(SOURCE, /405/);
   });
 
-  it("returns 401 when the Authorization header is missing", () => {
-    assert.match(SOURCE, /Missing authorization/);
-    assert.match(SOURCE, /401/);
+  it("delegates caller authentication to the shared assertCaller helper (SEC-9)", () => {
+    assert.match(SOURCE, /from ["']\.\.\/_shared\/assert-caller\.ts["']/);
+    assert.match(SOURCE, /assertCaller\(req,\s*["']export-data["']\)/);
   });
 
-  it("verifies the caller's session via auth.getUser()", () => {
-    assert.match(SOURCE, /auth\.getUser\(\)/);
-    assert.match(SOURCE, /Invalid session/);
+  it("maps a missing/invalid session to 401 and an anon-key misconfig to 500", () => {
+    // The literal "Missing authorization"/"Invalid session"/401 now live in the
+    // shared helper; the function maps CallerAuthError to its carried status.
+    assert.match(SOURCE, /authErr instanceof CallerAuthError/);
+    assert.match(SOURCE, /authErr\.status/);
+    assert.match(SOURCE, /function misconfigured/);
   });
 
   it("self-checks the service-role key before privileged reads (BE-23)", () => {
@@ -56,7 +59,7 @@ describe("export-data Edge Function (BE-26)", () => {
   });
 
   it("subjects the export to the authenticated caller, never a body-supplied id", () => {
-    assert.match(SOURCE, /const userId = user\.id/);
+    assert.match(SOURCE, /const userId = caller\.user\.id/);
     assert.doesNotMatch(SOURCE, /userId\s*=\s*payload/);
   });
 

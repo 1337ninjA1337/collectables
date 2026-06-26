@@ -1,9 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { assertServiceRoleKey } from "../../../lib/service-role-claim.ts";
 import {
-  assertServiceRoleKey,
+  assertCaller,
+  CallerAuthError,
   ServiceRoleClaimError,
-} from "../../../lib/service-role-claim.ts";
+} from "../_shared/assert-caller.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,15 +19,28 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // SEC-9: verify the caller holds a valid session before any service-role op.
+    let caller;
+    try {
+      caller = await assertCaller(req, "delete-account");
+    } catch (authErr) {
+      if (authErr instanceof CallerAuthError) {
+        return new Response(JSON.stringify({ error: authErr.message }), {
+          status: authErr.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (authErr instanceof ServiceRoleClaimError) {
+        console.error(authErr.message);
+        return new Response(JSON.stringify({ error: "function misconfigured" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw authErr;
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseUrl = caller.supabaseUrl;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     // BE-23: fail loudly if the service-role secret is missing or is actually
@@ -44,19 +59,7 @@ Deno.serve(async (req) => {
       throw configErr;
     }
 
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const userId = user.id;
+    const userId = caller.user.id;
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     await adminClient.from("reactions").delete().eq("user_id", userId);
