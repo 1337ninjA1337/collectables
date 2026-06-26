@@ -1004,3 +1004,26 @@ cloud marketplace reads.
 
 Idempotent (`ADD COLUMN IF NOT EXISTS`) — safe to re-run. Apply via the Supabase
 SQL editor or the `supabase db push` workflow.
+
+## ALLOWED_ORIGINS Edge Function secret (SEC-10) — OPTIONAL
+
+SEC-10 centralised every Edge Function's CORS in `supabase/functions/_shared/cors.ts`
+and replaced the old `Access-Control-Allow-Origin: *` wildcard with an allow-list.
+By default only the production web origin (`https://1337ninja1337.github.io`) and
+the `collectables://` deep link are accepted; a browser request from any other
+origin is rejected with `403 {"error":"origin not allowed"}`. Requests with no
+`Origin` header (native app fetches, the PostHog→analytics-mirror webhook, curl)
+are unaffected.
+
+You only need to act if you serve the web build from an **additional** origin
+(a custom domain, or `http://localhost:8081` while testing the web build against
+the live functions). Add them as a comma-separated `ALLOWED_ORIGINS` secret:
+
+```bash
+supabase secrets set --project-ref <your-project-ref> \
+  ALLOWED_ORIGINS="https://your-custom-domain.example,http://localhost:8081"
+```
+
+Leave it unset for the default GitHub Pages + deep-link allow-list. Origins are
+matched exactly on scheme+host (no trailing slash, no path). **Never commit the
+value** — set it in the Supabase dashboard / CLI only.
