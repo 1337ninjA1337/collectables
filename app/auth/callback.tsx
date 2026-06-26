@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/screen";
+import { scrubAuthParamsFromLocation } from "@/lib/auth-callback-scrub";
 import { useAuth } from "@/lib/auth-context";
 import { ACCENT_DEEP, HERO_DARK, MUTED_9, TEXT_DARK, TEXT_ON_DARK_2 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
@@ -32,6 +33,11 @@ export default function AuthCallbackScreen() {
       const authType = query.get("type") ?? hash.get("type");
       const errorCode = hash.get("error_code") ?? query.get("error_code");
       const errorDescription = hash.get("error_description") ?? query.get("error_description");
+
+      // SEC-7: scrub the tokens out of the address bar before doing anything
+      // else, so the credential-bearing hash/query never survives into
+      // history, the Referer header, or any reader of window.location.
+      scrubAuthParamsFromLocation(window);
 
       try {
         if (errorCode || errorDescription) {
