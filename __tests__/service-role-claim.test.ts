@@ -140,9 +140,11 @@ describe("Edge Functions wire in the self-check (structural)", () => {
   it("delete-image asserts the anon claim before verifying the session", () => {
     const src = readFileSync(fn("delete-image"), "utf8");
     assert.match(src, /assertAnonKey\(anonKey,\s*["']delete-image["']\)/);
+    // SEC-9: the session-verification client is now built inside the shared
+    // assertCaller gate; the anon-key self-check must still precede that gate.
     assert.ok(
-      src.indexOf("assertAnonKey") < src.indexOf("userClient = createClient"),
-      "self-check must run before the user client is built",
+      src.indexOf("assertAnonKey") < src.indexOf("assertCaller"),
+      "self-check must run before the caller gate verifies the session",
     );
   });
 

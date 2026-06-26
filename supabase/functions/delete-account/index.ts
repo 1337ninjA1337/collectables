@@ -4,6 +4,7 @@ import {
   assertServiceRoleKey,
   ServiceRoleClaimError,
 } from "../../../lib/service-role-claim.ts";
+import { assertCaller } from "../_shared/assert-caller.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,15 +18,17 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+
+    // SEC-9: verify the caller (Authorization header + auth.getUser()) BEFORE
+    // reading the service-role secret or running any privileged op.
+    const auth = await assertCaller(req, corsHeaders, (authHeader) =>
+      createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      }).auth.getUser(),
+    );
+    if (!auth.ok) return auth.response;
+
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     // BE-23: fail loudly if the service-role secret is missing or is actually
@@ -44,19 +47,7 @@ Deno.serve(async (req) => {
       throw configErr;
     }
 
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid session" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const userId = user.id;
+    const userId = auth.user.id;
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     await adminClient.from("reactions").delete().eq("user_id", userId);
