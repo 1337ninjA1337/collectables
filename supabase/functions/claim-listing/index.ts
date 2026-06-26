@@ -4,6 +4,7 @@ import {
   assertServiceRoleKey,
   ServiceRoleClaimError,
 } from "../../../lib/service-role-claim.ts";
+import { assertCaller } from "../_shared/assert-caller.ts";
 
 /**
  * BE-20 — `claim-listing` Edge Function.
@@ -54,12 +55,17 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return json({ error: "Missing authorization" }, 401);
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+
+    // SEC-9: verify the caller (Authorization header + auth.getUser()) BEFORE
+    // reading the service-role secret or running the atomic claim.
+    const auth = await assertCaller(req, corsHeaders, (authHeader) =>
+      createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      }).auth.getUser(),
+    );
+    if (!auth.ok) return auth.response;
+
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     // BE-23: fail loudly if the service-role secret is missing or is actually
@@ -75,14 +81,7 @@ Deno.serve(async (req) => {
       throw configErr;
     }
 
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-    if (userError || !user) {
-      return json({ error: "Invalid session" }, 401);
-    }
+    const user = auth.user;
 
     let payload: { id?: unknown };
     try {

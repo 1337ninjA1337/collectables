@@ -4,6 +4,7 @@ import {
   assertAnonKey,
   ServiceRoleClaimError,
 } from "../../../lib/service-role-claim.ts";
+import { assertCaller } from "../_shared/assert-caller.ts";
 
 // SEC-1: the Cloudinary API secret must NEVER reach the client bundle.
 // This function holds CLOUDINARY_API_SECRET in Supabase function secrets,
@@ -48,11 +49,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return json({ error: "Missing authorization" }, 401);
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
@@ -69,17 +65,14 @@ Deno.serve(async (req) => {
       throw configErr;
     }
 
-    // Verify the caller has a valid Supabase session before doing anything.
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser();
-    if (userError || !user) {
-      return json({ error: "Invalid session" }, 401);
-    }
+    // SEC-9: verify the caller (Authorization header + auth.getUser()) BEFORE
+    // signing any Cloudinary destroy with the server-only API secret.
+    const auth = await assertCaller(req, corsHeaders, (authHeader) =>
+      createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      }).auth.getUser(),
+    );
+    if (!auth.ok) return auth.response;
 
     const cloudName = Deno.env.get("CLOUDINARY_CLOUD_NAME");
     const apiKey = Deno.env.get("CLOUDINARY_API_KEY");
