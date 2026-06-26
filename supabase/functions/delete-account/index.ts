@@ -5,14 +5,15 @@ import {
   ServiceRoleClaimError,
 } from "../../../lib/service-role-claim.ts";
 import { assertCaller } from "../_shared/assert-caller.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { evaluateCors, forbiddenOriginResponse } from "../_shared/cors.ts";
 
 Deno.serve(async (req) => {
+  // SEC-10: centralised CORS — reflect only allow-listed origins, reject other
+  // browser origins outright before any work.
+  const cors = evaluateCors(req, { allowedOriginsEnv: Deno.env.get("ALLOWED_ORIGINS") });
+  const corsHeaders = cors.headers;
+  if (!cors.allowed) return forbiddenOriginResponse(corsHeaders);
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

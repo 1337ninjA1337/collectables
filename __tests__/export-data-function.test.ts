@@ -32,7 +32,8 @@ describe("export-data Edge Function (BE-26)", () => {
 
   it("handles CORS preflight (OPTIONS)", () => {
     assert.match(SOURCE, /req\.method\s*===\s*['"]OPTIONS['"]/);
-    assert.match(SOURCE, /Access-Control-Allow-Methods/);
+    // SEC-10: CORS now comes from the shared gate (no inline header literal).
+    assert.match(SOURCE, /evaluateCors\(\s*req,/);
   });
 
   it("rejects non-POST methods with 405", () => {

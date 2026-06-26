@@ -47,20 +47,7 @@ import {
   assertServiceRoleKey,
   ServiceRoleClaimError,
 } from "../../../lib/service-role-claim.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-posthog-webhook-secret",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function jsonResponse(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+import { evaluateCors, forbiddenOriginResponse } from "../_shared/cors.ts";
 
 /**
  * Constant-time string compare to defeat timing-channel probes against the
@@ -86,6 +73,22 @@ function extractEvents(payload: unknown): PostHogWebhookEvent[] {
 }
 
 Deno.serve(async (req: Request) => {
+  // SEC-10: centralised CORS — reflect only allow-listed origins (the webhook
+  // is server-to-server with no Origin, so it passes; a browser from a
+  // disallowed origin is rejected). The PostHog signature header is whitelisted.
+  const cors = evaluateCors(req, {
+    allowedOriginsEnv: Deno.env.get("ALLOWED_ORIGINS"),
+    extraAllowHeaders: ["x-posthog-webhook-secret"],
+  });
+  const corsHeaders = cors.headers;
+  if (!cors.allowed) return forbiddenOriginResponse(corsHeaders);
+
+  const jsonResponse = (body: unknown, status: number): Response =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

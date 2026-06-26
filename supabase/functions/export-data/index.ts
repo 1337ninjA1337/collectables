@@ -5,6 +5,7 @@ import {
   ServiceRoleClaimError,
 } from "../../../lib/service-role-claim.ts";
 import { assertCaller } from "../_shared/assert-caller.ts";
+import { evaluateCors, forbiddenOriginResponse } from "../_shared/cors.ts";
 
 /**
  * BE-26 — GDPR `export-data` Edge Function.
@@ -33,19 +34,6 @@ import { assertCaller } from "../_shared/assert-caller.ts";
  */
 
 const DATA_EXPORT_VERSION = 1;
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function json(body: unknown, status: number, extraHeaders: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json", ...extraHeaders },
-  });
-}
 
 type Row = Record<string, unknown>;
 
@@ -80,6 +68,22 @@ function buildDocument(parts: {
 }
 
 Deno.serve(async (req) => {
+  // SEC-10: centralised CORS — reflect only allow-listed origins, reject other
+  // browser origins outright before any work.
+  const cors = evaluateCors(req, { allowedOriginsEnv: Deno.env.get("ALLOWED_ORIGINS") });
+  const corsHeaders = cors.headers;
+  if (!cors.allowed) return forbiddenOriginResponse(corsHeaders);
+
+  const json = (
+    body: unknown,
+    status: number,
+    extraHeaders: Record<string, string> = {},
+  ): Response =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json", ...extraHeaders },
+    });
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
