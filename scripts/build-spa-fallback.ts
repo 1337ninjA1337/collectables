@@ -7,6 +7,29 @@ import {
   buildServiceWorker,
   injectServiceWorkerRegistration,
 } from "../lib/spa-fallback";
+import {
+  buildContentSecurityPolicy,
+  extractInlineScriptBodies,
+  injectSecurityMetaTags,
+} from "../lib/web-security-headers";
+
+/** Pre-quoted SHA-256 CSP hash-source for an inline script body. */
+function inlineScriptHash(body: string): string {
+  const digest = crypto.createHash("sha256").update(body, "utf8").digest("base64");
+  return `'sha256-${digest}'`;
+}
+
+/**
+ * Add the strict CSP + companion security meta tags. Inline-script hashes are
+ * derived from the document AFTER the SW-registration script is injected, so
+ * every inline script the build emits (Expo bootstrap + our SW registration) is
+ * admitted by `script-src`, while an injected/XSS inline script is not.
+ */
+function injectSecurityHeaders(html: string): string {
+  const hashes = extractInlineScriptBodies(html).map(inlineScriptHash);
+  const csp = buildContentSecurityPolicy({ scriptHashes: hashes });
+  return injectSecurityMetaTags(html, csp);
+}
 
 const REPO_ROOT = path.join(__dirname, "..");
 const DIST_DIR = path.join(REPO_ROOT, "dist");
@@ -34,11 +57,14 @@ function main(): void {
   }
   const baseUrl = process.env.EXPO_BASE_URL ?? readBaseUrlFromAppJson();
   const index = fs.readFileSync(INDEX_HTML, "utf8");
-  const patched = injectServiceWorkerRegistration(index, baseUrl);
+  // Order matters: inject the SW-registration script FIRST, then hash every
+  // inline script (incl. the one just added) into the CSP and inject the
+  // security meta tags as the head's first children.
+  const patched = injectSecurityHeaders(injectServiceWorkerRegistration(index, baseUrl));
   if (patched !== index) {
     fs.writeFileSync(INDEX_HTML, patched);
     console.log(
-      "[build-spa-fallback] patched dist/index.html with service-worker registration",
+      "[build-spa-fallback] patched dist/index.html with service-worker registration + CSP",
     );
   } else {
     console.log("[build-spa-fallback] dist/index.html already patched — skipping");
