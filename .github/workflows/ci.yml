@@ -6,6 +6,20 @@ on:
   pull_request:
 
 jobs:
+  gitleaks:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -39,11 +53,17 @@ jobs:
       - name: Migrations documented in MANUAL-TASKS.md
         run: npm run lint:migration-docs
 
+      - name: No committed secrets
+        run: npm run lint:secrets
+
       - name: Run tests
         run: npm test
 
       - name: Web build
         run: npm run build
+
+      - name: No secrets in web bundle
+        run: npm run lint:secrets:bundle
 
       - name: Bundle smoke check
         run: |
