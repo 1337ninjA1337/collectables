@@ -154,6 +154,41 @@ A single **Diagnostics & analytics** toggle in `app/settings.tsx`
 EU users have a one-tap opt-out per GDPR Art. 7 — required for App Store
 review on iOS 14.5+ even though we don't use ATT.
 
+### No PII in the event stream (SEC-13)
+
+Telemetry is **taxonomy-first and deny-by-default**. Every event's property
+keys are declared up-front in `lib/analytics-events.ts` (`props`), every
+`trackEvent` call site may only pass those declared keys, and the keys
+themselves may never be a free-text / PII shape (item `name`, chat
+`message`, user `email`, …). The deny rule lives in `lib/analytics-pii.ts`
+(`isPiiPropKey`) and is enforced mechanically by
+`__tests__/analytics-pii.test.ts`, which scans the real `trackEvent` /
+`addBreadcrumb` / `captureException` call sites. Net effect: only IDs, enums
+and booleans leave the device — a user-authored string can never reach
+PostHog or Sentry under any property key.
+
+Sentry crash breadcrumbs are limited to navigation routes (`from`/`to`
+pathnames) and a constant `context` label per `captureException` call — no
+request bodies, no form values.
+
+## Data retention
+
+Telemetry is retained only as long as it is useful for the funnel / crash
+work it was collected for. These are the retention windows per surface:
+
+| Surface | Store | Retention window | Notes |
+| --- | --- | --- | --- |
+| Product events | **PostHog** (EU cloud) | 7 days hot | Free-tier long-tail event retention is 7 days; older events live only in the Supabase mirror. |
+| Event mirror | **Supabase** `public.analytics_events` | 90 days | The durable analytics store Power BI reads. Prune rows older than 90 days (see `MANUAL-TASKS.md` retention job). |
+| Crash reports | **Sentry** | 90 days (errors) | Sentry's default error retention; breadcrumbs are scoped to the parent event. |
+| Session replays | **Microsoft Clarity** (web) | 30 days | Clarity's fixed retention; web-only, masks input text by default. |
+
+No raw event data is retained outside these windows. Because the stream
+carries no PII (see above), the retention windows bound *behavioural*
+analytics only — there is no personal-data erasure obligation tied to the
+event store beyond the user-id mapping, which the **Diagnostics &
+analytics** opt-out clears.
+
 ## Cost ceiling
 
 At $0/month free-tier limits we can support:
