@@ -1027,3 +1027,30 @@ supabase secrets set --project-ref <your-project-ref> \
 Leave it unset for the default GitHub Pages + deep-link allow-list. Origins are
 matched exactly on scheme+host (no trailing slash, no path). **Never commit the
 value** — set it in the Supabase dashboard / CLI only.
+
+## analytics_events retention prune (SEC-13) — RECOMMENDED
+
+`docs/analytics-platform.md` ("Data retention") sets a **90-day** window for the
+Supabase analytics mirror (`public.analytics_events`). Nothing prunes it
+automatically — schedule a daily job so the durable event store stays bounded
+(free-tier storage + GDPR data-minimisation).
+
+Option A — pg_cron (if enabled on your project):
+
+```sql
+-- Runs daily at 03:15 UTC, deletes events older than 90 days.
+select cron.schedule(
+  'analytics-events-prune',
+  '15 3 * * *',
+  $$delete from public.analytics_events where occurred_at < now() - interval '90 days'$$
+);
+```
+
+Option B — run the delete manually / from an external scheduler:
+
+```sql
+delete from public.analytics_events where occurred_at < now() - interval '90 days';
+```
+
+This touches data only (no schema change), so it is not a versioned migration.
+Adjust the interval if you change the documented retention window.
