@@ -1,5 +1,6 @@
 import { captureException } from "@/lib/sentry";
 import { fetchWithRetry } from "@/lib/fetch-retry";
+import { devLog } from "@/lib/safe-log";
 import {
   authClient,
   isSupabaseConfigured,
@@ -464,7 +465,9 @@ export async function updateRemoteItem(id: string, updates: Partial<CollectableI
 
   if (Object.keys(body).length === 0) return;
 
-  console.log("[updateRemoteItem] id:", id, "body:", JSON.stringify(body, null, 2));
+  // SEC-20: dev-only, redacted — `body` carries user PII (item name/note/tags/
+  // photos) that must never reach a production console.
+  devLog.debug("[updateRemoteItem] id:", id, "body:", body);
 
   const res = await supabaseRest(`/items?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -472,8 +475,10 @@ export async function updateRemoteItem(id: string, updates: Partial<CollectableI
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    console.error("[updateRemoteItem] FAILED", res.status, text);
+    // Keep the status visible for prod diagnostics; the response body (which can
+    // echo the submitted row) stays dev-only.
+    console.error("[updateRemoteItem] FAILED", res.status);
+    devLog.debug("[updateRemoteItem] response:", await res.text());
   }
 }
 
