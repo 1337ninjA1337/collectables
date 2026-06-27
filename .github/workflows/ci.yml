@@ -39,11 +39,17 @@ jobs:
       - name: Migrations documented in MANUAL-TASKS.md
         run: npm run lint:migration-docs
 
+      - name: Secret scan (committed source)
+        run: npm run lint:secrets
+
       - name: Run tests
         run: npm test
 
       - name: Web build
         run: npm run build
+
+      - name: Secret scan (built bundle)
+        run: npm run lint:secrets
 
       - name: Bundle smoke check
         run: |
