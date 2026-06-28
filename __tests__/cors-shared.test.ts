@@ -133,6 +133,7 @@ describe("cors — forbiddenOriginResponse", () => {
 const FUNCTIONS = [
   "delete-account",
   "delete-image",
+  "sign-upload",
   "claim-listing",
   "accept-friend-request",
   "validate-premium",

@@ -169,6 +169,7 @@ below reproduce the production schema end-to-end on an empty project.
    ```bash
    supabase functions deploy delete-account
    supabase functions deploy delete-image      # SEC-1, security-critical
+   supabase functions deploy sign-upload        # SEC-5, signed Cloudinary upload
    supabase functions deploy analytics-mirror
    supabase functions deploy claim-listing          # BE-20, atomic buyer claim
    supabase functions deploy accept-friend-request  # BE-21, transactional accept
