@@ -134,3 +134,29 @@ delete path in the `delete-image` Edge Function.
 
 See `README-DEPLOY.md` for the full secret inventory and how the deploy pipeline
 injects them.
+
+## Dependency advisories (`npm audit` triage)
+
+`npm audit --audit-level=high` runs as a **non-blocking** CI step (see
+`.github/workflows/ci.yml`) so new advisories surface on every PR without
+breaking the build. Below is the standing triage as of the last review
+(SEC-8). All five high/critical advisories are in **transitive** dependencies —
+none is a direct dependency in `package.json`, and the resolutions are gated on
+the Expo SDK / library maintainers bumping their pins (apply with
+`npm audit fix` in a deps-installed environment, then re-run the build/test
+suite).
+
+| Package | Severity | Pulled in via | Advisory class | Exposure assessment |
+| --- | --- | --- | --- | --- |
+| `shell-quote` | critical | Metro / Expo CLI build tooling | Argument-escaping bypass | **Build-time only** — never shipped to the client bundle; not reachable at runtime. |
+| `@xmldom/xmldom` | high | build/tooling transitive | XML DoS / injection on serialization | **Build-time only** — the app does not parse attacker-supplied XML at runtime. |
+| `protobufjs` | high | Sentry / Metro transitive | DoS via unbounded recursive descriptor expansion | **Build-time / SDK telemetry** — no attacker-controlled `.proto` descriptors are parsed in the shipped client. |
+| `undici` | high | Node/build tooling transitive | HTTP header injection / response-queue poisoning | **Build-time only** — the web bundle uses the browser-native `fetch`, not the `undici` package. |
+| `ws` | high | `@supabase/realtime-js`, `@react-native/dev-middleware`, `expo` | Uninitialized memory disclosure / fragment DoS | **Not in the shipped web runtime** — in the browser, `@supabase/realtime-js` uses the native `WebSocket` global; the `ws` Node package is only used by the dev server / native tooling. |
+
+**Accepted risk:** the remaining advisories are DoS- or parser-class issues that
+require attacker-controlled input to a surface the static, client-only GitHub
+Pages build does not expose. They are tracked here rather than force-fixed,
+because forcing a transitive bump ahead of the Expo SDK risks breaking the Metro
+build. Re-triage whenever the non-blocking CI audit reports a **new** package or
+a **direct**-dependency advisory — those should be fixed, not accepted.
