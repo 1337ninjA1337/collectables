@@ -10,7 +10,7 @@ import {
   SIGNED_UPLOAD_FOLDER_ROOT,
   signUploadUrl,
   uploadFolderForUser,
-} from "../lib/cloudinary-signed-upload.ts";
+} from "../lib/cloudinary-signed-upload";
 
 /**
  * SEC-5a — behavioural tests for the pure signed-upload helpers. These run the
