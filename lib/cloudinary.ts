@@ -1,20 +1,24 @@
 import { Platform } from "react-native";
 
 import { cloudinaryConfig } from "@/lib/cloudinary-config";
-import { extractPublicId } from "@/lib/cloudinary-url";
+import { extractPublicId, resolveCloudinaryApiBase } from "@/lib/cloudinary-url";
+import {
+  signedUploadFields,
+  SignedUploadParams,
+} from "@/lib/cloudinary-signed-upload";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { cloudSignUpload } from "@/lib/supabase-cloudinary";
 import { deleteImagesViaEdgeFunction } from "@/lib/supabase-profiles";
 
-const UPLOAD_URL = `${cloudinaryConfig.apiBase}/image/upload`;
+const UPLOAD_PATH = "/image/upload";
+const UNSIGNED_UPLOAD_URL = `${cloudinaryConfig.apiBase}${UPLOAD_PATH}`;
 
 async function uriToBlob(uri: string): Promise<Blob> {
   const res = await fetch(uri);
   return res.blob();
 }
 
-export async function uploadImage(localUri: string): Promise<string> {
-  const form = new FormData();
-
+async function appendFile(form: FormData, localUri: string): Promise<void> {
   if (Platform.OS === "web") {
     // On web, convert the blob/data URI to an actual Blob for FormData
     const blob = await uriToBlob(localUri);
@@ -28,10 +32,21 @@ export async function uploadImage(localUri: string): Promise<string> {
     } as unknown as Blob;
     form.append("file", file);
   }
+}
 
-  form.append("upload_preset", cloudinaryConfig.uploadPreset);
+// SEC-5b: target the cloud the server signed for. When it matches the
+// configured cloud we keep any custom apiBase host (region/staging); otherwise
+// fall back to the default Cloudinary host for that cloud name.
+function signedUploadUrl(params: SignedUploadParams): string {
+  const base =
+    params.cloudName === cloudinaryConfig.cloudName
+      ? cloudinaryConfig.apiBase
+      : resolveCloudinaryApiBase(undefined, params.cloudName);
+  return `${base}${UPLOAD_PATH}`;
+}
 
-  const res = await fetch(UPLOAD_URL, {
+async function postUpload(url: string, form: FormData): Promise<string> {
+  const res = await fetch(url, {
     method: "POST",
     body: form,
   });
@@ -43,6 +58,30 @@ export async function uploadImage(localUri: string): Promise<string> {
 
   const data = await res.json();
   return data.secure_url as string;
+}
+
+export async function uploadImage(localUri: string): Promise<string> {
+  // SEC-5b: prefer a JWT-checked signed upload (per-user folder, signature from
+  // the `sign-upload` Edge Function) over the open unsigned `upload_preset`.
+  // `cloudSignUpload` returns null when Supabase is unconfigured / there is no
+  // session / signing fails, in which case we fall back to the unsigned preset
+  // so image uploads never break.
+  const signed = await cloudSignUpload();
+
+  const form = new FormData();
+  await appendFile(form, localUri);
+
+  if (signed) {
+    const fields = signedUploadFields(signed);
+    for (const [key, value] of Object.entries(fields)) {
+      form.append(key, value);
+    }
+    return postUpload(signedUploadUrl(signed), form);
+  }
+
+  // Unsigned fallback: only reached without a Supabase session.
+  form.append("upload_preset", cloudinaryConfig.uploadPreset);
+  return postUpload(UNSIGNED_UPLOAD_URL, form);
 }
 
 export async function uploadImages(localUris: string[]): Promise<string[]> {
