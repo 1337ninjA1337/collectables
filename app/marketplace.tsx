@@ -1,11 +1,12 @@
 import { Link, Stack } from "expo-router";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { DimensionValue, Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { RealtimeStatusPill } from "@/components/realtime-status-pill";
 import { Screen, useResponsive } from "@/components/screen";
 import { useAppTheme } from "@/components/use-app-theme";
+import { useAuth } from "@/lib/auth-context";
 import { useCollections } from "@/lib/collections-context";
 import {
   AMBER_ACCENT,
@@ -30,6 +31,7 @@ import { useMarketplace } from "@/lib/marketplace-context";
 import { recentlySoldListings } from "@/lib/marketplace-helpers";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
+import { useToast } from "@/lib/toast-context";
 import { CollectableItem, MarketplaceListing, UserProfile } from "@/lib/types";
 
 type ResolvedListing = {
@@ -190,8 +192,11 @@ function ListingCard({
   buyer?: UserProfile | undefined;
   fromSeller?: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, formatRelativeDate } = useI18n();
   const theme = useAppTheme();
+  const { user } = useAuth();
+  const { markListingReceived } = useMarketplace();
+  const toast = useToast();
   const photo = item?.photos?.find(Boolean);
   const title = item?.title ?? t("marketplaceUnknownItem");
   const ownerName = owner?.displayName ?? t("unknownUser");
@@ -205,8 +210,20 @@ function ListingCard({
   const sellerHandle =
     fromSeller && owner ? `@${owner.username ?? owner.publicId ?? owner.id}` : null;
 
+  // Buyer receipt confirmation (only on the buyer's own purchase cards).
+  const isMyPurchase =
+    fromSeller && listing.soldAt != null && listing.buyerUserId === user?.id;
+  const canMarkReceived = isMyPurchase && listing.arrivedAt == null;
+  const receivedAt = isMyPurchase && listing.arrivedAt ? listing.arrivedAt : null;
+
+  const handleMarkReceived = useCallback(() => {
+    markListingReceived(listing.id);
+    toast.success(t("marketplaceMarkReceivedSuccess"));
+  }, [markListingReceived, listing.id, toast, t]);
+
   return (
-    <Link href={`/listing/${listing.id}` as never} asChild>
+    <View style={styles.cardOuter}>
+      <Link href={`/listing/${listing.id}` as never} asChild>
       <Pressable style={{ ...styles.card, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
         {photo ? (
           <Image source={{ uri: photo }} style={styles.photo} />
@@ -250,7 +267,23 @@ function ListingCard({
           </View>
         </View>
       </Pressable>
-    </Link>
+      </Link>
+      {canMarkReceived ? (
+        <Pressable
+          accessibilityRole="button"
+          style={{ ...styles.receiveButton, borderColor: theme.border }}
+          onPress={handleMarkReceived}
+        >
+          <Text style={styles.receiveButtonText}>{t("marketplaceMarkReceived")}</Text>
+        </Pressable>
+      ) : receivedAt ? (
+        <View style={styles.receivedPill}>
+          <Text style={styles.receivedPillText} numberOfLines={1}>
+            {t("marketplaceReceivedBadge", { when: formatRelativeDate(receivedAt) })}
+          </Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -376,5 +409,34 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY_EDITORIAL,
+  },
+  cardOuter: {
+    gap: 8,
+  },
+  receiveButton: {
+    alignItems: "center",
+    paddingVertical: 10,
+    borderRadius: RADIUS_ITEM_AIRY,
+    backgroundColor: SUCCESS_GREEN,
+    borderWidth: 1,
+  },
+  receiveButtonText: {
+    color: TEXT_ON_DARK,
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  receivedPill: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: AMBER_MUTED_3,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  receivedPillText: {
+    color: HERO_DARK,
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

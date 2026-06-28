@@ -51,6 +51,7 @@ export default function ListingDetailScreen() {
     fetchListingById,
     listings,
     markListingSold,
+    markListingReceived,
     claimingListingId,
     setClaimingListingId,
   } = useMarketplace();
@@ -105,6 +106,8 @@ export default function ListingDetailScreen() {
   const isSelf = user?.id === listing.ownerUserId;
   const friendsOnly = !isSelf && !canMessage(listing.ownerUserId);
   const isSold = listing.soldAt !== null;
+  const isBuyer = listing.buyerUserId != null && user?.id === listing.buyerUserId;
+  const canMarkReceived = isSold && isBuyer && listing.arrivedAt == null;
   const buyer = listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined;
   const buyerName = buyer?.username
     ? `@${buyer.username}`
@@ -350,6 +353,27 @@ export default function ListingDetailScreen() {
         </View>
       ) : null}
 
+      {canMarkReceived ? (
+        <Pressable
+          accessibilityRole="button"
+          style={{ ...styles.claimButton, backgroundColor: SUCCESS_GREEN }}
+          onPress={() => {
+            markListingReceived(listing.id);
+            toast.success(t("marketplaceMarkReceivedSuccess"));
+          }}
+        >
+          <Text style={styles.claimButtonText}>{t("marketplaceMarkReceived")}</Text>
+        </Pressable>
+      ) : isBuyer && listing.arrivedAt ? (
+        <View style={styles.receivedBanner}>
+          <Text style={styles.receivedBannerText}>
+            {t("marketplaceReceivedBadge", {
+              when: formatRelativeDate(listing.arrivedAt),
+            })}
+          </Text>
+        </View>
+      ) : null}
+
       {isSelf ? (
         <View style={styles.selfHint}>
           <Text style={styles.selfHintText}>{t("marketplaceSelfHint")}</Text>
@@ -544,6 +568,17 @@ const styles = StyleSheet.create({
     backgroundColor: HERO_DARK_3,
     gap: 4,
     alignItems: "center",
+  },
+  receivedBanner: {
+    borderRadius: 22,
+    padding: 14,
+    backgroundColor: AMBER_MUTED_3,
+    alignItems: "center",
+  },
+  receivedBannerText: {
+    color: HERO_DARK,
+    fontSize: 14,
+    fontWeight: "800",
   },
   soldBannerLabel: {
     color: AMBER_LIGHT,
