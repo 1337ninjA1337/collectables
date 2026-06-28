@@ -149,6 +149,7 @@ describe("assertCaller — behavioural (pure helper, runs under Node)", () => {
 const ADOPTERS = [
   "delete-account",
   "delete-image",
+  "sign-upload",
   "claim-listing",
   "accept-friend-request",
   "validate-premium",

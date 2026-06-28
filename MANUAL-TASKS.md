@@ -321,6 +321,52 @@ while signed in; the asset disappears from Cloudinary and the function returns
 > hole without it.
 
 
+## sign-upload Edge Function (SEC-5) — RECOMMENDED, security-critical
+
+**Why:** image uploads currently use an unsigned Cloudinary `upload_preset`
+(`lib/cloudinary.ts`). The preset + cloud name ship in the public bundle, so the
+upload endpoint is open: anyone can push arbitrary media (illegal content,
+malware hosting, free-tier CDN abuse) into the account. The `sign-upload` Edge
+Function closes this — it holds `CLOUDINARY_API_SECRET` server-side, verifies
+the caller's Supabase session (mirrors `delete-image`), and returns a
+short-lived signature scoped to the caller's **own** per-user folder
+(`collectables/users/<uid>`). The client (SEC-5b) then POSTs the signed upload
+directly to Cloudinary; the unsigned preset is only a fallback when Supabase is
+unconfigured.
+
+**Defense-in-depth (do this in the Cloudinary console regardless):** on the
+unsigned preset set *allowed formats = images only*, a max file size, and a
+folder lock, so even the fallback path can't be abused.
+
+### 1. Deploy the function
+
+```bash
+supabase functions deploy sign-upload --project-ref <your-project-ref>
+```
+
+### 2. Set the function secrets (server-side only)
+
+```bash
+supabase secrets set --project-ref <your-project-ref> \
+  CLOUDINARY_CLOUD_NAME=<your cloud name> \
+  CLOUDINARY_API_KEY=<your api key> \
+  CLOUDINARY_API_SECRET=<your api secret>
+# SUPABASE_URL and SUPABASE_ANON_KEY are auto-injected by Supabase.
+# These are the SAME server-side secrets the delete-image function already uses.
+```
+
+**Never commit these values.** The function self-checks the anon key at
+invocation (BE-23) and returns `500 { error: "function misconfigured" }` if a
+privileged key was pasted in by mistake.
+
+### 3. Verify
+
+Sign in and `POST` an empty body to `/functions/v1/sign-upload` with the user
+token — it returns `200 { cloudName, apiKey, timestamp, signature, folder }`
+where `folder` is `collectables/users/<your-uid>` and the API **secret is never
+in the response**. An unauthenticated `POST` must return `401`.
+
+
 ## claim-listing Edge Function (BE-20) — RECOMMENDED
 
 **Why:** when a buyer claims a marketplace listing, doing it purely client-side
