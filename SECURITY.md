@@ -134,3 +134,48 @@ delete path in the `delete-image` Edge Function.
 
 See `README-DEPLOY.md` for the full secret inventory and how the deploy pipeline
 injects them.
+
+---
+
+## Dependency advisory triage (`npm audit`)
+
+The supply chain is scanned two ways: a `gitleaks` full-history secret scan and
+an `npm audit --audit-level=high` step in **CI** (`.github/workflows/ci.yml`).
+The audit step is **non-blocking** (`continue-on-error: true`) — it surfaces new
+high/critical advisories on every PR for review without wedging the deploy when
+the only available fix is a breaking major bump of a build-time dependency.
+
+Re-run the triage with `npm audit` (full report) or `npm audit --audit-level=high`
+(the CI gate). When a new high/critical appears, prefer `npm audit fix` (no
+breaking changes); if the only fix is a major bump, record the decision below.
+
+### Resolved (SEC-8, 2026-06-28)
+
+`npm audit fix` (no breaking changes) cleared **all** high/critical advisories —
+1 critical + 4 high → **0**:
+
+| Package | Sev | Advisory | Reached the client? |
+| --- | --- | --- | --- |
+| `shell-quote` | critical | quote() newline escaping (GHSA — via `react-devtools-core`) | No — dev tooling only |
+| `@xmldom/xmldom` | high | XML serialization DoS / injection (via `@expo/plist`, iOS build) | No — build-time only |
+| `undici` | high | HTTP header injection / queue poisoning (via `@expo/cli`) | No — dev/build-time only |
+| `ws` | high | memory-disclosure / DoS (via `@supabase/realtime-js`, expo, metro, RN) | Patched in shipped `realtime-js` chain |
+| `protobufjs` | high | unbounded recursion DoS (via `posthog-js` → `@opentelemetry`) | Patched via `posthog-js` minor bump |
+
+### Accepted / unfixable (no breaking bump)
+
+The remaining advisories are all **moderate or low** and live entirely in
+**dev/build-time tooling** that never reaches the production web bundle's
+runtime attack surface. Their only `npm audit fix --force` path is a breaking
+major bump of `react-native` (→ 0.86) or `expo` (→ 56), which is out of scope
+for a security-patch task and is tracked separately as a framework-upgrade item.
+
+| Package | Sev | Source (dev/build only) | Why accepted |
+| --- | --- | --- | --- |
+| `js-yaml` | moderate | `@expo/xcpretty` (iOS build), `babel-jest` (test coverage) | Fix = react-native@0.86 (breaking); not on the runtime path |
+| `postcss` | moderate | `@expo/metro-config` (build-time CSS transform) | Fix = expo@56 (breaking); build-time only |
+| `uuid` | moderate | `@expo/ngrok`, `xcode` (tunnel / iOS tooling) | Fix = expo@56 (breaking); vulnerable v3/v5/v6 `buf` path unused |
+| `esbuild` | low | `tsx` (test runner) | Dev-server-only, Windows-only; not used in CI/deploy |
+
+These are revisited on each `expo` / `react-native` upgrade; if any is later
+shown to reach the deployed client at runtime, it is promoted to a blocking fix.

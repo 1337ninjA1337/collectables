@@ -44,6 +44,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # SEC-8: surface new high/critical dependency advisories on every PR.
+      # Non-blocking (continue-on-error) — the deploy isn't wedged when the only
+      # fix is a breaking major bump of a build-time dep. Triage in SECURITY.md.
+      - name: Dependency audit (high+)
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
       - name: Typecheck
         run: npx tsc --noEmit
 
