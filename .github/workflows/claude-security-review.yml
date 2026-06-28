@@ -1,0 +1,45 @@
+name: Claude Security Review
+
+# SEC-22 — automatic security pass for diffs that touch security-sensitive surfaces.
+# Mirrors claude-code-review.yml but is gated by `paths:` so it only runs (and only
+# spends a review) when the PR changes the Supabase client/auth, Edge Functions,
+# Cloudinary credentials, or the OAuth/auth paths. Keep these globs in sync with the
+# "Security review" section of .github/PULL_REQUEST_TEMPLATE.md.
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+    paths:
+      - "lib/supabase*.ts"
+      - "lib/supabase-**"
+      - "supabase/functions/**"
+      - "lib/cloudinary*.ts"
+      - "lib/auth-*.ts"
+      - "lib/auth-*.tsx"
+      - "app/auth/**"
+
+jobs:
+  claude-security-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Security Review
+        id: claude-security-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
+          plugins: 'security-review@claude-code-plugins'
+          prompt: '/security-review:security-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://code.claude.com/docs/en/cli-reference for available options
