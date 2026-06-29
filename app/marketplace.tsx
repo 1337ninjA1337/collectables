@@ -1,5 +1,5 @@
 import { Link, Stack } from "expo-router";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { DimensionValue, Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
@@ -30,6 +30,7 @@ import { useMarketplace } from "@/lib/marketplace-context";
 import { recentlySoldListings } from "@/lib/marketplace-helpers";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
+import { useToast } from "@/lib/toast-context";
 import { CollectableItem, MarketplaceListing, UserProfile } from "@/lib/types";
 
 type ResolvedListing = {
@@ -41,10 +42,19 @@ type ResolvedListing = {
 export default function MarketplaceScreen() {
   const { t } = useI18n();
   const theme = useAppTheme();
-  const { activeListings, myPurchases, mySales, listings } = useMarketplace();
+  const { activeListings, myPurchases, mySales, listings, markListingReceived } = useMarketplace();
   const { getItemById } = useCollections();
   const { getProfileById } = useSocial();
   const { isDesktop, isTablet } = useResponsive();
+  const toast = useToast();
+
+  const handleMarkReceived = useCallback(
+    (id: string) => {
+      markListingReceived(id);
+      toast.success(t("marketplaceMarkReceivedSuccess"));
+    },
+    [markListingReceived, toast, t],
+  );
 
   const resolved = useMemo<ResolvedListing[]>(
     () =>
@@ -112,7 +122,7 @@ export default function MarketplaceScreen() {
       {purchases.length > 0 ? (
         <View style={styles.purchasesSection}>
           <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("marketplaceMyPurchasesTitle")}</Text>
-          <ListingGrid data={purchases} columns={columns} fromSeller />
+          <ListingGrid data={purchases} columns={columns} fromSeller onMarkReceived={handleMarkReceived} />
         </View>
       ) : null}
 
@@ -150,12 +160,15 @@ function ListingGrid({
   columns,
   fromSeller,
   resolveBuyer,
+  onMarkReceived,
 }: {
   data: ResolvedListing[];
   columns: number;
   fromSeller?: boolean;
   resolveBuyer?: (listing: MarketplaceListing) => UserProfile | undefined;
+  onMarkReceived?: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const cardWrapStyle = useMemo(
     () => ({ ...styles.cardWrap, flexBasis: `${100 / columns}%` as DimensionValue }),
     [columns],
@@ -171,6 +184,26 @@ function ListingGrid({
             fromSeller={fromSeller}
             buyer={resolveBuyer ? resolveBuyer(listing) : undefined}
           />
+          {/* Buyer-only receipt affordance: a "Mark as received" button while
+              the purchase hasn't arrived, flipping to a "Received" badge once
+              `arrivedAt` is stamped. Rendered outside the card's Link so the
+              tap confirms receipt instead of navigating to the detail page. */}
+          {onMarkReceived ? (
+            listing.arrivedAt == null ? (
+              <Pressable
+                style={styles.receiveButton}
+                onPress={() => onMarkReceived(listing.id)}
+                accessibilityRole="button"
+                accessibilityLabel={t("marketplaceMarkReceived")}
+              >
+                <Text style={styles.receiveButtonText}>{t("marketplaceMarkReceived")}</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.receivedBadge}>
+                <Text style={styles.receivedBadgeText}>{t("marketplaceReceivedBadge")}</Text>
+              </View>
+            )
+          ) : null}
         </View>
       ))}
     </View>
@@ -376,5 +409,36 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     fontFamily: FONT_DISPLAY_EDITORIAL,
+  },
+  receiveButton: {
+    marginTop: 8,
+    borderRadius: RADIUS_ITEM_AIRY,
+    backgroundColor: AMBER_ACCENT,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  receiveButtonText: {
+    color: TEXT_ON_DARK,
+    fontSize: 13,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  receivedBadge: {
+    marginTop: 8,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: SUCCESS_GREEN,
+  },
+  receivedBadgeText: {
+    color: TEXT_ON_DARK,
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
 });

@@ -51,6 +51,7 @@ export default function ListingDetailScreen() {
     fetchListingById,
     listings,
     markListingSold,
+    markListingReceived,
     claimingListingId,
     setClaimingListingId,
   } = useMarketplace();
@@ -105,6 +106,8 @@ export default function ListingDetailScreen() {
   const isSelf = user?.id === listing.ownerUserId;
   const friendsOnly = !isSelf && !canMessage(listing.ownerUserId);
   const isSold = listing.soldAt !== null;
+  const isBuyer = !!user && listing.buyerUserId === user.id;
+  const hasArrived = listing.arrivedAt !== null;
   const buyer = listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined;
   const buyerName = buyer?.username
     ? `@${buyer.username}`
@@ -132,6 +135,12 @@ export default function ListingDetailScreen() {
     listing.mode === "sell" && typeof listing.askingPrice === "number"
       ? `${listing.askingPrice} ${listing.currency}`
       : null;
+
+  function handleMarkReceived() {
+    if (!listing) return;
+    markListingReceived(listing.id);
+    toast.success(t("marketplaceMarkReceivedSuccess"));
+  }
 
   function handleMessageOwner() {
     if (!listing) return;
@@ -348,6 +357,25 @@ export default function ListingDetailScreen() {
             </>
           ) : null}
         </View>
+      ) : null}
+
+      {/* Buyer-only receipt confirmation: stamp `arrivedAt` once the purchase
+          physically arrives, then flip to a "Received" banner. */}
+      {isBuyer && isSold ? (
+        hasArrived ? (
+          <View style={styles.receivedBanner}>
+            <Text style={styles.receivedBannerText}>{t("marketplaceReceivedBadge")}</Text>
+          </View>
+        ) : (
+          <Pressable
+            style={styles.receiveButton}
+            onPress={handleMarkReceived}
+            accessibilityRole="button"
+            accessibilityLabel={t("marketplaceMarkReceived")}
+          >
+            <Text style={styles.receiveButtonText}>{t("marketplaceMarkReceived")}</Text>
+          </Pressable>
+        )
       ) : null}
 
       {isSelf ? (
@@ -570,6 +598,32 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 1,
+  },
+  receiveButton: {
+    borderRadius: 22,
+    paddingVertical: 16,
+    alignItems: "center",
+    backgroundColor: AMBER_ACCENT,
+  },
+  receiveButtonText: {
+    color: TEXT_ON_DARK_2,
+    fontSize: 15,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  receivedBanner: {
+    borderRadius: 22,
+    padding: 14,
+    backgroundColor: SUCCESS_GREEN,
+    alignItems: "center",
+  },
+  receivedBannerText: {
+    color: TEXT_ON_DARK,
+    fontSize: 13,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 1.2,
   },
   selfHint: {
     borderRadius: 22,
