@@ -132,6 +132,8 @@ describe("BE-35 marketplace wrappers — request shape + idempotency headers", (
     assert.ok(call.url.includes("id=eq.listing-9"));
     assert.equal(call.init.method, "PATCH");
     assert.match(headersOf(call).Prefer ?? "", /return=representation/);
+    // idempotency: server only stamps the first confirmation
+    assert.ok(call.url.includes("arrived_at=is.null"));
     const body = bodyOf(call);
     assert.deepEqual(Object.keys(body), ["arrived_at"]);
     assert.equal(body.arrived_at, "2026-06-25T11:00:00.000Z");

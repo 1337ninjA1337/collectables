@@ -168,6 +168,13 @@ describe("supabase-marketplace-shapes", () => {
     assert.ok(url.includes("id=eq.a%2Fb%20c"));
   });
 
+  it("markReceivedUrl is idempotent via an arrived_at=is.null filter (first confirmation only)", () => {
+    const url = markReceivedUrl(BASE, "l-abc");
+    assert.ok(url.includes("arrived_at=is.null"));
+    // both filters present so a retry/double-tap on an already-stamped row matches zero rows
+    assert.ok(url.includes("id=eq.l-abc") && url.includes("&arrived_at=is.null"));
+  });
+
   it("buildMarketplaceReadHeaders includes apikey and Authorization", () => {
     const h = buildMarketplaceReadHeaders("key123", "tok456");
     assert.equal(h.apikey, "key123");

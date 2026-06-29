@@ -128,8 +128,15 @@ export function markSoldUrl(baseUrl: string, id: string): string {
   return `${baseUrl}/rest/v1/marketplace_listings?id=eq.${encodeURIComponent(id)}`;
 }
 
+/**
+ * The buyer-receipt PATCH endpoint. Scoped by id AND `arrived_at=is.null` so
+ * the server only stamps the *first* confirmation — a retried/duplicate or a
+ * racing double-tap matches zero rows and can't move the receipt timestamp
+ * forward (mirrors the local `target.arrivedAt` idempotency guard in
+ * marketplace-context).
+ */
 export function markReceivedUrl(baseUrl: string, id: string): string {
-  return `${baseUrl}/rest/v1/marketplace_listings?id=eq.${encodeURIComponent(id)}`;
+  return `${baseUrl}/rest/v1/marketplace_listings?id=eq.${encodeURIComponent(id)}&arrived_at=is.null`;
 }
 
 /** BE-20: the `claim-listing` Edge Function endpoint (atomic buyer claim). */
