@@ -120,6 +120,24 @@ describe("BE-35 marketplace wrappers — request shape + idempotency headers", (
     assert.equal(ok, true);
   });
 
+  it("cloudMarkReceived PATCHes the row by id and serialises only arrived_at", async () => {
+    const { calls, fetcher } = makeRecordingFetcher({ json: [] });
+    const ok = await market.cloudMarkReceived("listing-9", "2026-06-25T11:00:00.000Z", {
+      fetcher,
+      tokenProvider: fakeTokenProvider(TOKEN),
+    });
+
+    const call = soleCall(calls);
+    assert.ok(call.url.includes("/rest/v1/marketplace_listings"));
+    assert.ok(call.url.includes("id=eq.listing-9"));
+    assert.equal(call.init.method, "PATCH");
+    assert.match(headersOf(call).Prefer ?? "", /return=representation/);
+    const body = bodyOf(call);
+    assert.deepEqual(Object.keys(body), ["arrived_at"]);
+    assert.equal(body.arrived_at, "2026-06-25T11:00:00.000Z");
+    assert.equal(ok, true);
+  });
+
   it("cloudRemoveListing DELETEs the row by id with read headers", async () => {
     const { calls, fetcher } = makeRecordingFetcher();
     const ok = await market.cloudRemoveListing("listing-3", {
@@ -209,6 +227,15 @@ describe("BE-35 marketplace wrappers — error→requeue (non-ok response)", () 
   it("cloudRemoveListing returns false on a non-ok response", async () => {
     const { fetcher } = makeRecordingFetcher({ ok: false });
     const ok = await market.cloudRemoveListing("l", {
+      fetcher,
+      tokenProvider: fakeTokenProvider(TOKEN),
+    });
+    assert.equal(ok, false);
+  });
+
+  it("cloudMarkReceived returns false on a non-ok response", async () => {
+    const { fetcher } = makeRecordingFetcher({ ok: false });
+    const ok = await market.cloudMarkReceived("l", "2026-06-25T00:00:00.000Z", {
       fetcher,
       tokenProvider: fakeTokenProvider(TOKEN),
     });

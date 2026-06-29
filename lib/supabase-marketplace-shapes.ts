@@ -42,6 +42,10 @@ export type MarketplaceMarkSoldPayload = {
  */
 export type MarkSoldPayload = MarketplaceMarkSoldPayload;
 
+export type MarketplaceMarkReceivedPayload = {
+  arrived_at: string;
+};
+
 export function rowToListing(row: MarketplaceRow): MarketplaceListing {
   return {
     id: row.id,
@@ -63,6 +67,15 @@ export function markSoldPayload(
   buyerUserId: string | null,
 ): MarketplaceMarkSoldPayload {
   return { sold_at: soldAt, buyer_user_id: buyerUserId };
+}
+
+/**
+ * The PATCH body that stamps a buyer's receipt-confirmation timestamp onto a
+ * sold listing so "mark received" round-trips through the cloud (and via the
+ * realtime UPDATE path to the seller's device) instead of staying local-only.
+ */
+export function markReceivedPayload(arrivedAt: string): MarketplaceMarkReceivedPayload {
+  return { arrived_at: arrivedAt };
 }
 
 export function listingToInsertPayload(listing: MarketplaceListing): MarketplaceInsertPayload {
@@ -112,6 +125,10 @@ export function deleteListingUrl(baseUrl: string, id: string): string {
 }
 
 export function markSoldUrl(baseUrl: string, id: string): string {
+  return `${baseUrl}/rest/v1/marketplace_listings?id=eq.${encodeURIComponent(id)}`;
+}
+
+export function markReceivedUrl(baseUrl: string, id: string): string {
   return `${baseUrl}/rest/v1/marketplace_listings?id=eq.${encodeURIComponent(id)}`;
 }
 

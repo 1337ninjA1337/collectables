@@ -5,6 +5,8 @@ import path from "node:path";
 
 import {
   buildMarketplaceWriteHeaders,
+  markReceivedPayload,
+  markReceivedUrl,
   markSoldPayload,
   markSoldUrl,
 } from "@/lib/supabase-marketplace-shapes";
@@ -212,6 +214,89 @@ describe("cloudMarkSold — structural composition (lib/supabase-marketplace.ts)
       /cloudMarkSold[\s\S]*?fetcher\s*=\s*fetch\s+as\s+FetchFn[\s\S]*?tokenProvider\s*=\s*getAccessToken/,
       "cloudMarkSold must accept overridable fetcher + tokenProvider",
     );
+  });
+});
+
+describe("cloudMarkReceived — pure-helper composition", () => {
+  it("a mocked PATCH fired with the composed bits round-trips arrived_at", async () => {
+    const { calls, fetch: fakeFetch } = makeRecordingFetcher({ ok: true });
+    const baseUrl = "https://xyz.supabase.co";
+    const apiKey = "apikey-xyz";
+    const token = "token-abc";
+    const arrivedAt = "2026-05-09T10:00:00.000Z";
+
+    await fakeFetch(markReceivedUrl(baseUrl, "l-abc"), {
+      method: "PATCH",
+      headers: buildMarketplaceWriteHeaders(apiKey, token),
+      body: JSON.stringify(markReceivedPayload(arrivedAt)),
+    });
+
+    assert.equal(calls.length, 1);
+    const call = calls[0];
+    assert.ok(call.url.includes("id=eq.l-abc"));
+    assert.equal(call.init.method, "PATCH");
+    const headers = call.init.headers as Record<string, string>;
+    assert.equal(headers.apikey, apiKey);
+    assert.ok(headers.Authorization.includes(token));
+    const parsedBody = JSON.parse(call.init.body as string) as Record<string, unknown>;
+    // Exactly one key — a targeted column write, never a multi-column overwrite.
+    assert.deepEqual(Object.keys(parsedBody), ["arrived_at"]);
+    assert.equal(parsedBody.arrived_at, arrivedAt);
+  });
+});
+
+describe("cloudMarkReceived — structural composition (lib/supabase-marketplace.ts)", () => {
+  it("declares cloudMarkReceived(id, arrivedAt, ...) returning Promise<boolean>", () => {
+    const src = readSrc();
+    assert.match(
+      src,
+      /export\s+async\s+function\s+cloudMarkReceived\s*\(\s*\n?\s*id\s*:\s*string\s*,\s*\n?\s*arrivedAt\s*:\s*string/,
+      "cloudMarkReceived must accept the listing id and arrivedAt timestamp",
+    );
+    assert.match(src, /cloudMarkReceived[\s\S]*?Promise<boolean>/);
+  });
+
+  it("PATCHes through markReceivedUrl + markReceivedPayload + write headers", () => {
+    const src = readSrc();
+    assert.match(src, /cloudMarkReceived[\s\S]*?method\s*:\s*["']PATCH["']/);
+    assert.match(src, /markReceivedUrl\s*\(\s*supabaseUrl!\s*,\s*id\s*\)/);
+    assert.match(
+      src,
+      /body\s*:\s*JSON\.stringify\s*\(\s*markReceivedPayload\s*\(\s*arrivedAt\s*\)\s*\)/,
+    );
+    assert.match(src, /cloudMarkReceived[\s\S]*?buildMarketplaceWriteHeaders\s*\(/);
+  });
+
+  it("short-circuits to false when Supabase is unconfigured", () => {
+    const src = readSrc();
+    assert.match(src, /cloudMarkReceived[\s\S]*?if\s*\(!isSupabaseConfigured\)\s*return false/);
+  });
+
+  it("threads the optional fetcher + tokenProvider injection", () => {
+    const src = readSrc();
+    assert.match(
+      src,
+      /cloudMarkReceived[\s\S]*?fetcher\s*=\s*fetch\s+as\s+FetchFn[\s\S]*?tokenProvider\s*=\s*getAccessToken/,
+    );
+  });
+});
+
+describe("markListingReceived syncs the receipt stamp to the cloud", () => {
+  const CONTEXT_PATH = path.join(process.cwd(), "lib", "marketplace-context.tsx");
+  const ctxSrc = readFileSync(CONTEXT_PATH, "utf8");
+
+  it("imports cloudMarkReceived from the cloud wrapper", () => {
+    assert.match(ctxSrc, /cloudMarkReceived/);
+  });
+
+  it("fires cloudMarkReceived only when the local stamp actually applied", () => {
+    const idx = ctxSrc.indexOf("const markListingReceived");
+    assert.ok(idx >= 0, "markListingReceived not found");
+    const block = ctxSrc.slice(idx, idx + 1300);
+    // A `stamped` guard ensures a no-op (not the buyer / already received)
+    // never hits the network.
+    assert.match(block, /stamped\s*=\s*true/);
+    assert.match(block, /if\s*\(stamped\)\s*\{\s*\n?\s*void cloudMarkReceived\(id,\s*when\)/);
   });
 });
 

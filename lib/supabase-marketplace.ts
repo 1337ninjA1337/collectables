@@ -22,6 +22,8 @@ import {
   fetchListingsUrl,
   insertListingUrl,
   listingToInsertPayload,
+  markReceivedPayload,
+  markReceivedUrl,
   markSoldPayload,
   markSoldUrl,
   MarketplaceRow,
@@ -131,6 +133,31 @@ export async function cloudMarkSold(
     method: "PATCH",
     headers: buildMarketplaceWriteHeaders(supabasePublishableKey!, token),
     body: JSON.stringify(markSoldPayload(soldAt, buyerUserId)),
+  });
+  return res.ok;
+}
+
+/**
+ * Stamp a buyer's receipt confirmation (`arrived_at`) onto a sold listing via a
+ * direct RLS-gated PATCH, mirroring `cloudMarkSold`. Returns `true` only when
+ * the server accepts the write; an offline/unconfigured client keeps the local
+ * stamp and reconciles on the next `cloudFetchListings`. The realtime UPDATE
+ * path then propagates the change to the seller's device.
+ */
+export async function cloudMarkReceived(
+  id: string,
+  arrivedAt: string,
+  {
+    fetcher = fetch as FetchFn,
+    tokenProvider = getAccessToken,
+  }: { fetcher?: FetchFn; tokenProvider?: TokenProvider } = {},
+): Promise<boolean> {
+  if (!isSupabaseConfigured) return false;
+  const token = await tokenProvider();
+  const res = await fetcher(markReceivedUrl(supabaseUrl!, id), {
+    method: "PATCH",
+    headers: buildMarketplaceWriteHeaders(supabasePublishableKey!, token),
+    body: JSON.stringify(markReceivedPayload(arrivedAt)),
   });
   return res.ok;
 }
