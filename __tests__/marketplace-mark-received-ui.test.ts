@@ -64,6 +64,30 @@ describe("listing detail — buyer mark as received", () => {
   });
 });
 
+describe("marketplace sales — delivery confirmed indicator", () => {
+  const src = read("app/marketplace.tsx");
+
+  it("opts the My-sales grid into the seller-facing indicator", () => {
+    // Threaded through grid prop + destructure + type + card prop + card
+    // destructure + type + render guard.
+    const uses = src.split("showDeliveryConfirmed").length - 1;
+    assert.ok(uses >= 5, `expected showDeliveryConfirmed wired through, found ${uses}`);
+    assert.match(src, /showDeliveryConfirmed\s*\n\s*resolveBuyer=/);
+  });
+
+  it("renders the indicator only when arrivedAt is set, via relativeDateLabel", () => {
+    assert.match(src, /showDeliveryConfirmed\s*&&\s*listing\.arrivedAt/);
+    assert.match(
+      src,
+      /relativeDateLabel\(\s*\n?\s*t\("marketplaceDeliveryConfirmed"\),\s*\n?\s*formatRelativeDate\(listing\.arrivedAt\)/,
+    );
+  });
+
+  it("pulls formatRelativeDate + relativeDateLabel from the i18n hook", () => {
+    assert.match(src, /const\s*{\s*t,\s*formatRelativeDate,\s*relativeDateLabel\s*}\s*=\s*useI18n\(\)/);
+  });
+});
+
 describe("mark-received translations", () => {
   it("declares the new keys in every language map", () => {
     const src = read("lib/i18n-context.tsx");
@@ -71,6 +95,7 @@ describe("mark-received translations", () => {
       "marketplaceMarkReceived",
       "marketplaceReceivedBadge",
       "marketplaceMarkReceivedSuccess",
+      "marketplaceDeliveryConfirmed",
     ];
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
       const blockMatch =
