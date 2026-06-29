@@ -22,6 +22,7 @@ import {
   cloudClaimListing,
   cloudFetchListingById,
   cloudFetchListings,
+  cloudMarkReceived,
   cloudMarkSold,
   cloudRemoveListing,
   subscribeToListings,
@@ -248,6 +249,7 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       const me = user?.id;
       if (!me) return;
       const when = new Date().toISOString();
+      let stamped = false;
       setListings((prev) => {
         const target = prev.find((l) => l.id === id);
         // Only the buyer of a sold listing may confirm receipt; idempotent —
@@ -255,8 +257,15 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         if (!target || target.buyerUserId !== me || !target.soldAt || target.arrivedAt) {
           return prev;
         }
+        stamped = true;
         return upsertListing(prev, markListingArrived(target, when));
       });
+      // Best-effort cloud PATCH only when the local stamp actually applied, so a
+      // no-op (not the buyer / already received) never hits the network. The
+      // realtime UPDATE then echoes `arrived_at` to the seller's device.
+      if (stamped) {
+        void cloudMarkReceived(id, when);
+      }
     },
     [user],
   );

@@ -12,6 +12,8 @@ import {
   fetchListingByIdUrl,
   insertListingUrl,
   listingToInsertPayload,
+  markReceivedPayload,
+  markReceivedUrl,
   markSoldPayload,
   markSoldUrl,
   rowToListing,
@@ -148,6 +150,22 @@ describe("supabase-marketplace-shapes", () => {
   it("markSoldUrl includes id filter", () => {
     const url = markSoldUrl(BASE, "l-abc");
     assert.ok(url.includes("id=eq.l-abc"));
+  });
+
+  it("markReceivedPayload carries only the arrived_at timestamp", () => {
+    const payload = markReceivedPayload("2026-05-09T10:00:00.000Z");
+    assert.deepEqual(payload, { arrived_at: "2026-05-09T10:00:00.000Z" });
+  });
+
+  it("markReceivedUrl targets the listing row by id", () => {
+    const url = markReceivedUrl(BASE, "l-abc");
+    assert.ok(url.startsWith(`${BASE}/rest/v1/marketplace_listings`));
+    assert.ok(url.includes("id=eq.l-abc"));
+  });
+
+  it("markReceivedUrl percent-encodes the id", () => {
+    const url = markReceivedUrl(BASE, "a/b c");
+    assert.ok(url.includes("id=eq.a%2Fb%20c"));
   });
 
   it("buildMarketplaceReadHeaders includes apikey and Authorization", () => {
