@@ -132,6 +132,7 @@ export default function MarketplaceScreen() {
           <ListingGrid
             data={sales}
             columns={columns}
+            sellerView
             resolveBuyer={(listing) =>
               listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined
             }
@@ -159,12 +160,14 @@ function ListingGrid({
   data,
   columns,
   fromSeller,
+  sellerView,
   resolveBuyer,
   onMarkReceived,
 }: {
   data: ResolvedListing[];
   columns: number;
   fromSeller?: boolean;
+  sellerView?: boolean;
   resolveBuyer?: (listing: MarketplaceListing) => UserProfile | undefined;
   onMarkReceived?: (id: string) => void;
 }) {
@@ -182,6 +185,7 @@ function ListingGrid({
             item={item}
             owner={owner}
             fromSeller={fromSeller}
+            sellerView={sellerView}
             buyer={resolveBuyer ? resolveBuyer(listing) : undefined}
           />
           {/* Buyer-only receipt affordance: a "Mark as received" button while
@@ -216,15 +220,21 @@ function ListingCard({
   owner,
   buyer,
   fromSeller,
+  sellerView,
 }: {
   listing: MarketplaceListing;
   item: CollectableItem | undefined;
   owner: UserProfile | undefined;
   buyer?: UserProfile | undefined;
   fromSeller?: boolean;
+  sellerView?: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, formatRelativeDate, relativeDateLabel } = useI18n();
   const theme = useAppTheme();
+  const deliveryConfirmedLabel =
+    sellerView && listing.arrivedAt
+      ? relativeDateLabel(t("marketplaceDeliveryConfirmed"), formatRelativeDate(listing.arrivedAt))
+      : null;
   const photo = item?.photos?.find(Boolean);
   const title = item?.title ?? t("marketplaceUnknownItem");
   const ownerName = owner?.displayName ?? t("unknownUser");
@@ -267,6 +277,16 @@ function ListingCard({
             <View style={styles.soldToPill}>
               <Text style={styles.soldToPillText} numberOfLines={1}>
                 {t("marketplaceSoldTo", { name: buyerHandle })}
+              </Text>
+            </View>
+          ) : null}
+          {/* Seller-only "Delivery confirmed {when}" signal once the buyer has
+              stamped `arrivedAt` — gives the seller a delivery-confirmed cue and
+              unlocks dispute handling. Relative date via the shared helper. */}
+          {deliveryConfirmedLabel ? (
+            <View style={styles.deliveryConfirmedPill}>
+              <Text style={styles.deliveryConfirmedPillText} numberOfLines={1}>
+                {deliveryConfirmedLabel}
               </Text>
             </View>
           ) : null}
@@ -397,6 +417,20 @@ const styles = StyleSheet.create({
   },
   soldToPillText: {
     color: HERO_DARK,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  deliveryConfirmedPill: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: SUCCESS_GREEN,
+  },
+  deliveryConfirmedPillText: {
+    color: TEXT_ON_DARK,
     fontSize: 12,
     fontWeight: "700",
   },
