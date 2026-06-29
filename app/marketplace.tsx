@@ -132,6 +132,7 @@ export default function MarketplaceScreen() {
           <ListingGrid
             data={sales}
             columns={columns}
+            showDeliveryConfirmed
             resolveBuyer={(listing) =>
               listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined
             }
@@ -161,12 +162,14 @@ function ListingGrid({
   fromSeller,
   resolveBuyer,
   onMarkReceived,
+  showDeliveryConfirmed,
 }: {
   data: ResolvedListing[];
   columns: number;
   fromSeller?: boolean;
   resolveBuyer?: (listing: MarketplaceListing) => UserProfile | undefined;
   onMarkReceived?: (id: string) => void;
+  showDeliveryConfirmed?: boolean;
 }) {
   const { t } = useI18n();
   const cardWrapStyle = useMemo(
@@ -183,6 +186,7 @@ function ListingGrid({
             owner={owner}
             fromSeller={fromSeller}
             buyer={resolveBuyer ? resolveBuyer(listing) : undefined}
+            showDeliveryConfirmed={showDeliveryConfirmed}
           />
           {/* Buyer-only receipt affordance: a "Mark as received" button while
               the purchase hasn't arrived, flipping to a "Received" badge once
@@ -216,14 +220,16 @@ function ListingCard({
   owner,
   buyer,
   fromSeller,
+  showDeliveryConfirmed,
 }: {
   listing: MarketplaceListing;
   item: CollectableItem | undefined;
   owner: UserProfile | undefined;
   buyer?: UserProfile | undefined;
   fromSeller?: boolean;
+  showDeliveryConfirmed?: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, formatRelativeDate, relativeDateLabel } = useI18n();
   const theme = useAppTheme();
   const photo = item?.photos?.find(Boolean);
   const title = item?.title ?? t("marketplaceUnknownItem");
@@ -267,6 +273,19 @@ function ListingCard({
             <View style={styles.soldToPill}>
               <Text style={styles.soldToPillText} numberOfLines={1}>
                 {t("marketplaceSoldTo", { name: buyerHandle })}
+              </Text>
+            </View>
+          ) : null}
+          {/* Seller-facing delivery signal: once the buyer confirms receipt
+              (`arrivedAt` stamped), the My-sales card surfaces a relative-dated
+              "Delivery confirmed {when}" pill. */}
+          {showDeliveryConfirmed && listing.arrivedAt ? (
+            <View style={styles.deliveryConfirmedPill}>
+              <Text style={styles.deliveryConfirmedText} numberOfLines={1}>
+                {relativeDateLabel(
+                  t("marketplaceDeliveryConfirmed"),
+                  formatRelativeDate(listing.arrivedAt),
+                )}
               </Text>
             </View>
           ) : null}
@@ -433,6 +452,18 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     backgroundColor: SUCCESS_GREEN,
+  },
+  deliveryConfirmedPill: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: SUCCESS_GREEN,
+  },
+  deliveryConfirmedText: {
+    color: TEXT_ON_DARK,
+    fontSize: 12,
+    fontWeight: "700",
   },
   receivedBadgeText: {
     color: TEXT_ON_DARK,
