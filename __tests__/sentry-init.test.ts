@@ -213,6 +213,77 @@ describe("lib/sentry — enabled paths", () => {
   });
 });
 
+describe("lib/sentry — concurrent init dedup", () => {
+  beforeEach(() => __resetSentryForTests());
+
+  it("races of initSentry() handshake the native bridge exactly once", async () => {
+    const { sdk, calls } = makeFakeSdk();
+    let loaderCalls = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const env = {
+      EXPO_PUBLIC_SENTRY_DSN: "https://abc@o0.ingest.sentry.io/42",
+      EXPO_PUBLIC_SENTRY_ENV: "production",
+    };
+    const loader = async () => {
+      loaderCalls += 1;
+      await gate; // hold the first init in-flight while the second one races it
+      return sdk;
+    };
+    // Fire both before the loader resolves so neither has flipped `initialised`.
+    const first = initSentry({ env, loader });
+    const second = initSentry({ env, loader });
+    release();
+    await Promise.all([first, second]);
+    assert.equal(loaderCalls, 1, "loader (native bridge) must run once");
+    const initCalls = calls.filter((c) => c.method === "init");
+    assert.equal(initCalls.length, 1);
+    assert.equal(isSentryReady(), true);
+  });
+
+  it("the racing caller awaits real completion, not a premature no-op", async () => {
+    const { sdk } = makeFakeSdk();
+    let resolved = false;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const env = {
+      EXPO_PUBLIC_SENTRY_DSN: "https://abc@o0.ingest.sentry.io/42",
+      EXPO_PUBLIC_SENTRY_ENV: "production",
+    };
+    const loader = async () => {
+      await gate;
+      return sdk;
+    };
+    const first = initSentry({ env, loader });
+    const second = initSentry({ env, loader }).then(() => {
+      // When the racing call settles, init must already be ready — it awaited
+      // the in-flight promise instead of resolving immediately.
+      resolved = isSentryReady();
+    });
+    assert.equal(isSentryReady(), false);
+    release();
+    await Promise.all([first, second]);
+    assert.equal(resolved, true);
+  });
+
+  it("allows a fresh init after the in-flight promise settles", async () => {
+    const { sdk, calls } = makeFakeSdk();
+    const env = {
+      EXPO_PUBLIC_SENTRY_DSN: "https://abc@o0.ingest.sentry.io/42",
+      EXPO_PUBLIC_SENTRY_ENV: "production",
+    };
+    await initSentry({ env, loader: async () => sdk });
+    // Second sequential call hits the `initialised` fast-path, not `pending`.
+    await initSentry({ env, loader: async () => sdk });
+    const initCalls = calls.filter((c) => c.method === "init");
+    assert.equal(initCalls.length, 1);
+  });
+});
+
 describe("lib/sentry — module shape", () => {
   it("does not import @sentry/react-native at the top level", () => {
     const src = readFileSync(
