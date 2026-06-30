@@ -27,9 +27,17 @@ describe("create-collection screen: private collections require premium", () => 
     );
   });
 
-  it("locks the Private chip and toasts the premium-only hint when tapped by a non-premium user", () => {
+  it("locks the Private chip for a non-premium user", () => {
     assert.match(src, /locked\s*=\s*v\s*===\s*"private"\s*&&\s*!isPremium/);
     assert.match(src, /visibilityPrivatePremiumOnly/);
+  });
+
+  it("opens the premium upsell sheet (not a toast) when the locked Private chip is tapped", () => {
+    assert.match(src, /from\s+"@\/components\/premium-upsell-sheet"/);
+    assert.match(src, /if\s*\(locked\)\s*\{\s*setUpsellVisible\(true\)/);
+    assert.match(src, /<PremiumUpsellSheet/);
+    // On activation from the sheet, the visibility flips to private for the user.
+    assert.match(src, /onActivated=\{\(\)\s*=>\s*setVisibility\("private"\)\}/);
   });
 
   it("forces 'public' on save for non-premium users even if state somehow says 'private'", () => {
