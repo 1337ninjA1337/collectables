@@ -76,3 +76,38 @@ describe("i18n translations", () => {
     }
   });
 });
+
+describe("i18n premium-gate key coverage", () => {
+  // Slice each language's object literal body so a key can be attributed to a
+  // single language map. Declarations are sequential (en, then ru/be/pl/de/es),
+  // so each block runs from its `const <code> ... = {` to the next declaration.
+  function languageBlock(code: string): string {
+    const start = SOURCE.search(
+      new RegExp(`const\\s+${code}\\s*:?\\s*(?:TranslationMap)?\\s*=\\s*{`),
+    );
+    assert.ok(start >= 0, `could not locate translation map for '${code}'`);
+    const rest = SOURCE.slice(start + 1);
+    const nextDecl = rest.search(
+      /const\s+(?:ru|en|be|pl|de|es)\s*:?\s*(?:TranslationMap)?\s*=\s*{/,
+    );
+    return nextDecl >= 0 ? rest.slice(0, nextDecl) : rest;
+  }
+
+  it("English declares visibilityPrivatePremiumOnly directly", () => {
+    assert.match(languageBlock("en"), /visibilityPrivatePremiumOnly\s*:/);
+  });
+
+  it("every language either declares visibilityPrivatePremiumOnly or inherits it via ...en", () => {
+    // A regression here would silently render the English string for non-English
+    // users on the private-locked toast (create + edit collection screens).
+    for (const code of EXPECTED_LANGUAGES) {
+      const block = languageBlock(code);
+      const declares = /visibilityPrivatePremiumOnly\s*:/.test(block);
+      const inheritsEn = code === "en" ? true : /\.\.\.en\b/.test(block);
+      assert.ok(
+        declares || inheritsEn,
+        `language '${code}' neither declares visibilityPrivatePremiumOnly nor spreads ...en`,
+      );
+    }
+  });
+});
