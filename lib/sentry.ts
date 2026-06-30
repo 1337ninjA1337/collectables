@@ -59,6 +59,12 @@ export type SentryLoader = () => Promise<SentrySdk>;
 let sdk: SentrySdk | null = null;
 let initialised = false;
 let activeConfig: SentryConfig | null = null;
+// In-flight init promise. A second initSentry() call (e.g. on auth state
+// change) that races the first one returns this instead of kicking off a
+// second native-bridge handshake — the caller awaits the real completion
+// rather than getting a premature no-op from the `initialised` guard, which
+// only flips once the first call's loader has resolved.
+let pending: Promise<void> | null = null;
 
 // Rate-limit captureException to MAX_EVENTS_PER_WINDOW within RATE_LIMIT_WINDOW_MS
 // so a runaway useEffect loop or an exception in render cannot exhaust the
@@ -108,10 +114,23 @@ export function shutdownSentry(): void {
   sdk = null;
   initialised = false;
   activeConfig = null;
+  pending = null;
 }
 
 export async function initSentry(options: InitOptions = {}): Promise<void> {
   if (initialised) return;
+  // A concurrent call already started booting — await the same promise so the
+  // native bridge handshakes exactly once.
+  if (pending) return pending;
+  pending = runInit(options);
+  try {
+    await pending;
+  } finally {
+    pending = null;
+  }
+}
+
+async function runInit(options: InitOptions): Promise<void> {
   if (userOptedOut) {
     initialised = true;
     return;
@@ -282,6 +301,7 @@ export function __resetSentryForTests(): void {
   sdk = null;
   initialised = false;
   activeConfig = null;
+  pending = null;
   rateLimiter.reset();
   userOptedOut = false;
 }
