@@ -497,6 +497,10 @@ const en = {
   premiumCancel: "Cancel premium",
   premiumActivated: "Premium activated",
   premiumCanceled: "Premium canceled",
+  premiumUpsellPrivateTitle: "Private collections are premium",
+  premiumUpsellPrivateBody:
+    "Keep this collection just for you. Premium unlocks private collections — plus everything else below.",
+  premiumUpsellLater: "Maybe later",
   premiumConfirmCancelTitle: "Cancel premium?",
   premiumConfirmCancelText:
     "You'll lose unlimited listings and your premium badge. The free cap returns immediately.",
@@ -1029,6 +1033,10 @@ const ru: TranslationMap = {
   premiumCancel: "Отменить премиум",
   premiumActivated: "Премиум активирован",
   premiumCanceled: "Премиум отменён",
+  premiumUpsellPrivateTitle: "Приватные коллекции — это премиум",
+  premiumUpsellPrivateBody:
+    "Оставьте эту коллекцию только для себя. Премиум открывает приватные коллекции — и всё остальное ниже.",
+  premiumUpsellLater: "Может быть позже",
   premiumConfirmCancelTitle: "Отменить премиум?",
   premiumConfirmCancelText:
     "Вы потеряете неограниченные объявления и премиум-значок. Бесплатный лимит вернётся сразу.",
@@ -1237,6 +1245,10 @@ const be: TranslationMap = {
   premiumCancel: "Адмяніць прэміум",
   premiumActivated: "Прэміум актываваны",
   premiumCanceled: "Прэміум адменены",
+  premiumUpsellPrivateTitle: "Прыватныя калекцыі — гэта прэміум",
+  premiumUpsellPrivateBody:
+    "Пакіньце гэту калекцыю толькі для сябе. Прэміум адкрывае прыватныя калекцыі — і ўсё астатняе ніжэй.",
+  premiumUpsellLater: "Можа быць пазней",
   premiumConfirmCancelTitle: "Адмяніць прэміум?",
   premiumConfirmCancelText:
     "Вы страціце неабмежаваныя аб'явы і прэміум-значок. Бясплатны ліміт вернецца адразу.",
@@ -1420,6 +1432,10 @@ const pl: TranslationMap = {
   premiumCancel: "Anuluj premium",
   premiumActivated: "Premium aktywowane",
   premiumCanceled: "Premium anulowane",
+  premiumUpsellPrivateTitle: "Prywatne kolekcje to premium",
+  premiumUpsellPrivateBody:
+    "Zachowaj tę kolekcję tylko dla siebie. Premium odblokowuje prywatne kolekcje — oraz wszystko poniżej.",
+  premiumUpsellLater: "Może później",
   premiumConfirmCancelTitle: "Anulować premium?",
   premiumConfirmCancelText:
     "Stracisz nieograniczone ogłoszenia i odznakę premium. Limit darmowy wraca natychmiast.",
@@ -1599,6 +1615,10 @@ const de: TranslationMap = {
   premiumCancel: "Premium kündigen",
   premiumActivated: "Premium aktiviert",
   premiumCanceled: "Premium gekündigt",
+  premiumUpsellPrivateTitle: "Private Sammlungen sind Premium",
+  premiumUpsellPrivateBody:
+    "Behalte diese Sammlung nur für dich. Premium schaltet private Sammlungen frei — und alles Weitere unten.",
+  premiumUpsellLater: "Vielleicht später",
   premiumConfirmCancelTitle: "Premium kündigen?",
   premiumConfirmCancelText:
     "Du verlierst unbegrenzte Anzeigen und das Premium-Abzeichen. Das kostenlose Limit gilt sofort wieder.",
@@ -1778,6 +1798,10 @@ const es: TranslationMap = {
   premiumCancel: "Cancelar premium",
   premiumActivated: "Premium activado",
   premiumCanceled: "Premium cancelado",
+  premiumUpsellPrivateTitle: "Las colecciones privadas son premium",
+  premiumUpsellPrivateBody:
+    "Mantén esta colección solo para ti. Premium desbloquea las colecciones privadas — y todo lo demás de abajo.",
+  premiumUpsellLater: "Quizás más tarde",
   premiumConfirmCancelTitle: "¿Cancelar premium?",
   premiumConfirmCancelText:
     "Perderás los anuncios ilimitados y la insignia premium. El límite gratuito vuelve de inmediato.",

@@ -3,6 +3,7 @@ import { Stack, router } from "expo-router";
 import { useState } from "react";
 import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { PremiumUpsellSheet } from "@/components/premium-upsell-sheet";
 import { Screen } from "@/components/screen";
 import { collectionTemplates } from "@/data/collection-templates";
 import { trackEvent } from "@/lib/analytics";
@@ -51,6 +52,7 @@ export default function CreateCollectionScreen() {
   const [visibility, setVisibility] = useState<CollectionVisibility>(
     defaultCollectionVisibilityForUser(isPremium),
   );
+  const [upsellVisible, setUpsellVisible] = useState(false);
 
   function applyTemplate(templateId: string) {
     const tpl = collectionTemplates.find((t) => t.id === templateId);
@@ -229,7 +231,7 @@ export default function CreateCollectionScreen() {
                 }}
                 onPress={() => {
                   if (locked) {
-                    toast.error(t("visibilityPrivatePremiumOnly"), t("premiumTitle"));
+                    setUpsellVisible(true);
                     return;
                   }
                   setVisibility(v);
@@ -255,6 +257,14 @@ export default function CreateCollectionScreen() {
       <Pressable style={{...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {})}} onPress={handleSave} disabled={saving}>
         <Text style={styles.saveButtonText}>{saving ? t("creating") : t("saveCollection")}</Text>
       </Pressable>
+
+      <PremiumUpsellSheet
+        visible={upsellVisible}
+        onClose={() => setUpsellVisible(false)}
+        onActivated={() => setVisibility("private")}
+        title={t("premiumUpsellPrivateTitle")}
+        body={t("premiumUpsellPrivateBody")}
+      />
     </Screen>
   );
 }
