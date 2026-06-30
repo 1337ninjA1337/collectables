@@ -38,8 +38,11 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'security-review@claude-code-plugins'
-          prompt: '/security-review:security-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+          # CI-1: `/security-review` is a BUILT-IN Claude Code command bundled with the
+          # CLI the action runs — it does NOT live in the `claude-code-plugins`
+          # marketplace. The previous plugin reference failed plugin-install on every
+          # PR ("not found in marketplace") so the gate never ran. Invoke the built-in
+          # directly with no plugin install (see the regression guard in the wiring test).
+          prompt: '/security-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
