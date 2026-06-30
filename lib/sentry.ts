@@ -59,6 +59,12 @@ export type SentryLoader = () => Promise<SentrySdk>;
 let sdk: SentrySdk | null = null;
 let initialised = false;
 let activeConfig: SentryConfig | null = null;
+// Holds the in-flight initSentry() promise so concurrent callers (e.g. an
+// app-shell init racing an auth-state-change init) await the same native
+// bridge handshake instead of each triggering their own. Cleared once init
+// settles. Without this, two calls that both pass the `initialised` guard
+// before the first awaits the loader would call mod.init() twice.
+let pending: Promise<void> | null = null;
 
 // Rate-limit captureException to MAX_EVENTS_PER_WINDOW within RATE_LIMIT_WINDOW_MS
 // so a runaway useEffect loop or an exception in render cannot exhaust the
@@ -108,10 +114,14 @@ export function shutdownSentry(): void {
   sdk = null;
   initialised = false;
   activeConfig = null;
+  pending = null;
 }
 
 export async function initSentry(options: InitOptions = {}): Promise<void> {
   if (initialised) return;
+  // An init started by an earlier caller is still loading the SDK — await the
+  // same promise instead of starting a second native bridge handshake.
+  if (pending) return pending;
   if (userOptedOut) {
     initialised = true;
     return;
@@ -126,24 +136,30 @@ export async function initSentry(options: InitOptions = {}): Promise<void> {
     initialised = true;
     return;
   }
-  try {
-    const mod = await (options.loader ?? defaultLoader)();
-    mod.init({
-      dsn: config.dsn,
-      environment: config.environment,
-      release: config.release,
-      tracesSampleRate: 0.1,
-      enableNative: true,
-      beforeSend: makeBeforeSend(config.environment),
-    });
-    sdk = mod;
-  } catch (err) {
-    // SDK failed to load (native bridge missing, network init, etc.) — stay
-    // disabled so call sites keep no-oping instead of crashing the host app.
-    console.warn("[sentry] init failed", err);
-  } finally {
-    initialised = true;
-  }
+  // Cache the in-flight promise *before* the first await so a concurrent
+  // caller hits the `if (pending)` guard above rather than re-entering.
+  pending = (async () => {
+    try {
+      const mod = await (options.loader ?? defaultLoader)();
+      mod.init({
+        dsn: config.dsn,
+        environment: config.environment,
+        release: config.release,
+        tracesSampleRate: 0.1,
+        enableNative: true,
+        beforeSend: makeBeforeSend(config.environment),
+      });
+      sdk = mod;
+    } catch (err) {
+      // SDK failed to load (native bridge missing, network init, etc.) — stay
+      // disabled so call sites keep no-oping instead of crashing the host app.
+      console.warn("[sentry] init failed", err);
+    } finally {
+      initialised = true;
+      pending = null;
+    }
+  })();
+  return pending;
 }
 
 export function captureException(
@@ -282,6 +298,7 @@ export function __resetSentryForTests(): void {
   sdk = null;
   initialised = false;
   activeConfig = null;
+  pending = null;
   rateLimiter.reset();
   userOptedOut = false;
 }
