@@ -7,6 +7,7 @@ import {
   PremiumState,
   activatePremiumState,
   cancelPremiumState,
+  defaultCollectionVisibilityForUser,
   isPremiumActive,
   isPremiumExpired,
   mergePremiumState,
@@ -335,5 +336,15 @@ describe("mergePremiumState", () => {
     assert.equal(merged.isPremium, true);
     assert.equal(merged.activatedAt, "2026-04-01T00:00:00.000Z");
     assert.equal(merged.premiumActivatedAt, "2026-04-01T00:00:00.000Z");
+  });
+});
+
+describe("defaultCollectionVisibilityForUser", () => {
+  it("defaults premium users to 'private'", () => {
+    assert.equal(defaultCollectionVisibilityForUser(true), "private");
+  });
+
+  it("defaults free users to 'public'", () => {
+    assert.equal(defaultCollectionVisibilityForUser(false), "public");
   });
 });

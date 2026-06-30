@@ -19,8 +19,12 @@ describe("create-collection screen: private collections require premium", () => 
     assert.match(src, /const\s+\{[^}]*isPremium[^}]*\}\s*=\s*usePremium\(\)/);
   });
 
-  it("defaults visibility to 'public' for non-premium users", () => {
-    assert.match(src, /useState<CollectionVisibility>\(\s*isPremium\s*\?\s*"private"\s*:\s*"public",?\s*\)/);
+  it("defaults visibility via the shared defaultCollectionVisibilityForUser helper", () => {
+    assert.match(src, /from\s+"@\/lib\/premium-helpers"/);
+    assert.match(
+      src,
+      /useState<CollectionVisibility>\(\s*defaultCollectionVisibilityForUser\(isPremium\),?\s*\)/,
+    );
   });
 
   it("locks the Private chip and toasts the premium-only hint when tapped by a non-premium user", () => {
