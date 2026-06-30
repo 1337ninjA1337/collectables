@@ -1,8 +1,20 @@
+import { CollectionVisibility } from "@/lib/types";
+
 export type PremiumState = {
   isPremium: boolean;
   activatedAt: string | null;
   premiumActivatedAt: string | null;
 };
+
+/**
+ * The default visibility a new collection should start at for a given user.
+ * Premium users default to "private"; free users default to "public" (private
+ * collections are a premium-only feature). Lives next to the other
+ * premium-derived defaults so the rule is unit-testable without React.
+ */
+export function defaultCollectionVisibilityForUser(isPremium: boolean): CollectionVisibility {
+  return isPremium ? "private" : "public";
+}
 
 export const DEFAULT_PREMIUM_STATE: PremiumState = {
   isPremium: false,

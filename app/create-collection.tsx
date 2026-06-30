@@ -29,6 +29,7 @@ import {
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
+import { defaultCollectionVisibilityForUser } from "@/lib/premium-helpers";
 import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectionVisibility } from "@/lib/types";
@@ -48,7 +49,7 @@ export default function CreateCollectionScreen() {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<CollectionVisibility>(
-    isPremium ? "private" : "public",
+    defaultCollectionVisibilityForUser(isPremium),
   );
 
   function applyTemplate(templateId: string) {
