@@ -7,6 +7,7 @@ import {
   captureException,
   addBreadcrumb,
   isSentryReady,
+  shutdownSentry,
   __resetSentryForTests,
 } from "../lib/sentry";
 
@@ -191,6 +192,46 @@ describe("lib/sentry — enabled paths", () => {
     });
     const initCalls = calls.filter((c) => c.method === "init");
     assert.equal(initCalls.length, 1);
+  });
+
+  it("two concurrent initSentry() calls only init the SDK once (shared in-flight promise)", async () => {
+    const { sdk, calls } = makeFakeSdk();
+    let loaderCalls = 0;
+    // A loader that resolves on the next microtask so both initSentry() calls
+    // are in flight simultaneously before either awaits to completion.
+    const loader = async () => {
+      loaderCalls += 1;
+      await Promise.resolve();
+      return sdk;
+    };
+    const env = {
+      EXPO_PUBLIC_SENTRY_DSN: "https://abc@o0.ingest.sentry.io/42",
+      EXPO_PUBLIC_SENTRY_ENV: "production",
+    };
+    // Kick both off without awaiting the first — they race the `initialised`
+    // guard. Without the pending-promise cache both would load + init.
+    const a = initSentry({ env, loader });
+    const b = initSentry({ env, loader });
+    await Promise.all([a, b]);
+    assert.equal(loaderCalls, 1);
+    const initCalls = calls.filter((c) => c.method === "init");
+    assert.equal(initCalls.length, 1);
+    assert.equal(isSentryReady(), true);
+  });
+
+  it("a fresh initSentry() after shutdownSentry() can boot again", async () => {
+    const { sdk, calls } = makeFakeSdk();
+    const env = {
+      EXPO_PUBLIC_SENTRY_DSN: "https://abc@o0.ingest.sentry.io/42",
+      EXPO_PUBLIC_SENTRY_ENV: "production",
+    };
+    await initSentry({ env, loader: async () => sdk });
+    shutdownSentry();
+    assert.equal(isSentryReady(), false);
+    await initSentry({ env, loader: async () => sdk });
+    assert.equal(isSentryReady(), true);
+    const initCalls = calls.filter((c) => c.method === "init");
+    assert.equal(initCalls.length, 2);
   });
 
   it("captureException swallows SDK exceptions instead of rethrowing", async () => {
