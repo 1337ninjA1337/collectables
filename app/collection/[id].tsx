@@ -24,6 +24,7 @@ import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { formatCostAmount } from "@/lib/format-cost";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
+import { usePremium } from "@/lib/premium-context";
 import { useSocial } from "@/lib/social-context";
 import { fetchCollectionById, fetchItemsByCollectionId } from "@/lib/supabase-profiles";
 import { useToast } from "@/lib/toast-context";
@@ -104,6 +105,7 @@ export default function CollectionDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { t } = useI18n();
   const toast = useToast();
+  const { isPremium } = usePremium();
   const theme = useAppTheme();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -471,11 +473,20 @@ export default function CollectionDetailsScreen() {
       if (editCoverChanged && editCoverUri) {
         finalCover = await uploadImage(editCoverUri);
       }
+      // Defense-in-depth: even if the locked chip is bypassed, a non-premium
+      // user can never flip a public collection to private (matches the
+      // creation gate). An already-private collection is left untouched.
+      const finalVisibility: CollectionVisibility =
+        !isPremium &&
+        editVisibility === "private" &&
+        (activeCollection.visibility ?? "private") !== "private"
+          ? "public"
+          : editVisibility;
       await updateCollection(activeCollection.id, {
         name: editName.trim(),
         description: editDescription.trim(),
         coverPhoto: finalCover,
-        visibility: editVisibility,
+        visibility: finalVisibility,
         // Empty picker selection = clear the override and fall back to the
         // user's app-wide displayCurrency in `getCollectionTotalCost`.
         currency: editCurrency.trim() || null,
@@ -852,21 +863,45 @@ export default function CollectionDetailsScreen() {
               <View style={styles.editVisibilityRow}>
                 {(["private", "public"] as const).map((v) => {
                   const selected = editVisibility === v;
+                  // Block the public→private transition for non-premium users,
+                  // but never lock an already-private collection (so a lapsed
+                  // owner keeps it private without being forced to downgrade).
+                  const locked =
+                    v === "private" &&
+                    !isPremium &&
+                    (activeCollection.visibility ?? "private") !== "private";
                   return (
                     <Pressable
                       key={v}
-                      style={{...styles.editVisibilityChip, ...(selected ? styles.editVisibilityChipSelected : {})}}
-                      onPress={() => setEditVisibility(v)}
+                      style={{
+                        ...styles.editVisibilityChip,
+                        ...(selected ? styles.editVisibilityChipSelected : {}),
+                        ...(locked ? styles.editVisibilityChipLocked : {}),
+                      }}
+                      onPress={() => {
+                        if (locked) {
+                          toast.error(t("visibilityPrivatePremiumOnly"), t("premiumTitle"));
+                          return;
+                        }
+                        setEditVisibility(v);
+                      }}
                     >
                       <Text style={{...styles.editVisibilityChipText, ...(selected ? styles.editVisibilityChipTextSelected : {})}}>
                         {t(v === "public" ? "visibilityPublic" : "visibilityPrivate")}
+                        {locked ? " 🔒" : ""}
                       </Text>
                     </Pressable>
                   );
                 })}
               </View>
               <Text style={styles.editVisibilityHint}>
-                {editVisibility === "public" ? t("visibilityPublicHint") : t("visibilityPrivateHint")}
+                {!isPremium &&
+                editVisibility === "private" &&
+                (activeCollection.visibility ?? "private") !== "private"
+                  ? t("visibilityPrivatePremiumOnly")
+                  : editVisibility === "public"
+                    ? t("visibilityPublicHint")
+                    : t("visibilityPrivateHint")}
               </Text>
             </View>
 
@@ -1614,6 +1649,9 @@ const styles = StyleSheet.create({
   editVisibilityChipSelected: {
     backgroundColor: HERO_DARK,
     borderColor: HERO_DARK,
+  },
+  editVisibilityChipLocked: {
+    opacity: 0.55,
   },
   editVisibilityChipText: {
     color: MUTED_2,
