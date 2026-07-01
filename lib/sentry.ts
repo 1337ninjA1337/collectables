@@ -65,6 +65,13 @@ let activeConfig: SentryConfig | null = null;
 // rather than getting a premature no-op from the `initialised` guard, which
 // only flips once the first call's loader has resolved.
 let pending: Promise<void> | null = null;
+// The most recent loader/init failure (native bridge missing, network init,
+// etc.). Stored so a future `sentry-doctor` self-check can surface *why* init
+// failed instead of the failure being swallowed by a transient console line.
+let lastInitError: unknown = null;
+// One-shot guard: log the init failure exactly once via console.error rather
+// than re-warning on every retry, so the cause is visible but not spammy.
+let initErrorLogged = false;
 
 // Rate-limit captureException to MAX_EVENTS_PER_WINDOW within RATE_LIMIT_WINDOW_MS
 // so a runaway useEffect loop or an exception in render cannot exhaust the
@@ -159,7 +166,13 @@ async function runInit(options: InitOptions): Promise<void> {
   } catch (err) {
     // SDK failed to load (native bridge missing, network init, etc.) — stay
     // disabled so call sites keep no-oping instead of crashing the host app.
-    console.warn("[sentry] init failed", err);
+    // Store the cause for diagnostics and log it once (not on every retry) so
+    // it isn't silently masked.
+    lastInitError = err;
+    if (!initErrorLogged) {
+      initErrorLogged = true;
+      console.error("[sentry] init failed", err);
+    }
   } finally {
     initialised = true;
   }
@@ -221,6 +234,15 @@ export function setSentryUser(user: SentryUser): void {
 
 export function isSentryReady(): boolean {
   return sdk !== null && (activeConfig?.enabled ?? false);
+}
+
+/**
+ * The most recent Sentry init/loader failure, or null if init never failed.
+ * Consumed by diagnostics (e.g. a future `sentry-doctor` self-check) to explain
+ * a `reason: "init-failed"` status instead of leaving the cause in the console.
+ */
+export function getSentryLastInitError(): unknown {
+  return lastInitError;
 }
 
 export type SentryStatus = {
@@ -310,6 +332,8 @@ export function __resetSentryForTests(): void {
   initialised = false;
   activeConfig = null;
   pending = null;
+  lastInitError = null;
+  initErrorLogged = false;
   rateLimiter.reset();
   userOptedOut = false;
 }
