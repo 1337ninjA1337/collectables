@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -8,6 +8,7 @@ import {
   addBreadcrumb,
   isSentryReady,
   getSentryLastInitError,
+  __resetSentryForTests,
 } from "../lib/sentry";
 
 type Call = { method: string; args: unknown[] };
@@ -32,6 +33,8 @@ function makeFakeSdk() {
 }
 
 describe("lib/sentry — disabled paths", () => {
+  beforeEach(() => __resetSentryForTests());
+
   it("captureException is a no-op before initSentry()", () => {
     const { sdk, calls } = makeFakeSdk();
     sdk.captureException(new Error("guard"));
@@ -77,6 +80,8 @@ describe("lib/sentry — disabled paths", () => {
 });
 
 describe("lib/sentry — enabled paths", () => {
+  beforeEach(() => __resetSentryForTests());
+
   it("initSentry() loads the SDK and calls init() with resolved config", async () => {
     const { sdk, calls } = makeFakeSdk();
     await initSentry({
@@ -243,6 +248,8 @@ describe("lib/sentry — enabled paths", () => {
 });
 
 describe("lib/sentry — concurrent init dedup", () => {
+  beforeEach(() => __resetSentryForTests());
+
   it("races of initSentry() handshake the native bridge exactly once", async () => {
     const { sdk, calls } = makeFakeSdk();
     let loaderCalls = 0;
