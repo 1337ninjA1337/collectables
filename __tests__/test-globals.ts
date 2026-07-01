@@ -21,35 +21,50 @@ import path from "node:path";
  * "no test loaded the realtime path" case, automatic in the "did load" case.
  *
  * Add future module-cache resets here once they outgrow per-file `beforeEach`
- * (e.g. `__resetSentryForTests`, `__resetAnalyticsForTests`).
+ * (e.g. `__resetAnalyticsForTests`).
+ *
+ * `lib/sentry.ts` is the first such graduation: its module-scope `sdk` /
+ * `initialised` / `activeConfig` / rate-limiter cache leaked between suites
+ * unless every sentry test file re-declared `beforeEach(() =>
+ * __resetSentryForTests())`. It reaches its config via the `@/` alias, so —
+ * exactly like the realtime module — it can't be statically imported at
+ * preload time; we peek `require.cache` for its resolved path and invoke the
+ * exported reset only once a downstream test has loaded it (silent no-op
+ * otherwise, zero overhead for the non-sentry test files).
  */
 const require = createRequire(import.meta.url);
 
-const REALTIME_MODULE_PATH = path.join(
-  process.cwd(),
-  "lib",
-  "supabase-realtime.ts",
-);
-
-interface RealtimeModuleExports {
-  __resetSharedRealtimeClientForTests?: () => void;
-}
-
-function tryResetSharedRealtimeClient(): void {
+function tryInvokeCachedReset<K extends string>(
+  moduleRelPath: readonly string[],
+  exportName: K,
+): void {
+  const modulePath = path.join(process.cwd(), ...moduleRelPath);
   let cached: NodeJS.Require["cache"][string] | undefined;
   try {
-    cached = require.cache[REALTIME_MODULE_PATH];
+    cached = require.cache[modulePath];
   } catch {
     // require.cache can throw in unusual loader environments; skip silently.
     return;
   }
-  const reset = (cached?.exports as RealtimeModuleExports | undefined)
-    ?.__resetSharedRealtimeClientForTests;
+  const exports = cached?.exports as Record<K, unknown> | undefined;
+  const reset = exports?.[exportName];
   if (typeof reset === "function") {
     reset();
   }
 }
 
+function tryResetSharedRealtimeClient(): void {
+  tryInvokeCachedReset(
+    ["lib", "supabase-realtime.ts"],
+    "__resetSharedRealtimeClientForTests",
+  );
+}
+
+function tryResetSentry(): void {
+  tryInvokeCachedReset(["lib", "sentry.ts"], "__resetSentryForTests");
+}
+
 beforeEach(() => {
   tryResetSharedRealtimeClient();
+  tryResetSentry();
 });
