@@ -7,6 +7,7 @@ import {
   captureException,
   addBreadcrumb,
   isSentryReady,
+  getSentryLastInitError,
   __resetSentryForTests,
 } from "../lib/sentry";
 
@@ -152,8 +153,11 @@ describe("lib/sentry — enabled paths", () => {
   });
 
   it("survives a loader rejection by staying disabled", async () => {
-    const originalWarn = console.warn;
-    console.warn = () => {};
+    const originalError = console.error;
+    const errors: unknown[][] = [];
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
     try {
       await initSentry({
         env: {
@@ -168,8 +172,38 @@ describe("lib/sentry — enabled paths", () => {
       // wrappers must still be safe no-ops
       captureException(new Error("safe"));
       addBreadcrumb("safe");
+      // the cause is logged once via console.error and stored for diagnostics
+      assert.equal(errors.length, 1);
+      assert.match(String(errors[0][0]), /\[sentry\] init failed/);
+      assert.equal((getSentryLastInitError() as Error).message, "native bridge missing");
     } finally {
-      console.warn = originalWarn;
+      console.error = originalError;
+    }
+  });
+
+  it("logs the init failure only once across a shutdown + re-init", async () => {
+    const { shutdownSentry } = await import("../lib/sentry");
+    const originalError = console.error;
+    const errors: unknown[][] = [];
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    const failingLoader = async () => {
+      throw new Error("native bridge missing");
+    };
+    const env = {
+      EXPO_PUBLIC_SENTRY_DSN: "https://abc@o0.ingest.sentry.io/42",
+      EXPO_PUBLIC_SENTRY_ENV: "production",
+    };
+    try {
+      await initSentry({ env, loader: failingLoader });
+      shutdownSentry();
+      await initSentry({ env, loader: failingLoader });
+      // one-shot guard: the second failure is stored but not re-logged
+      assert.equal(errors.length, 1);
+      assert.equal((getSentryLastInitError() as Error).message, "native bridge missing");
+    } finally {
+      console.error = originalError;
     }
   });
 
