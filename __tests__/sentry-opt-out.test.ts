@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -11,7 +11,6 @@ import {
   isSentryOptedOut,
   shutdownSentry,
   getSentryStatus,
-  __resetSentryForTests,
 } from "../lib/sentry";
 import { parseStoredDiagnostics } from "../lib/diagnostics-context";
 import { DIAGNOSTICS_KEY } from "../lib/storage-keys";
@@ -34,8 +33,6 @@ function makeFakeSdk() {
 }
 
 describe("Crash #15 — setSentryOptOut", () => {
-  beforeEach(() => __resetSentryForTests());
-
   it("setSentryOptOut(true) before init prevents the SDK from loading", async () => {
     let loaderCalled = false;
     setSentryOptOut(true);
@@ -88,8 +85,6 @@ describe("Crash #15 — setSentryOptOut", () => {
 });
 
 describe("Crash #15 — getSentryStatus diagnostics", () => {
-  beforeEach(() => __resetSentryForTests());
-
   it("reports 'missing-dsn' when SDK booted but had no DSN", async () => {
     await initSentry({ env: {}, loader: async () => makeFakeSdk().sdk });
     const status = getSentryStatus();

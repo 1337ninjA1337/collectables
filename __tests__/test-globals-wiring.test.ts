@@ -83,4 +83,27 @@ describe("test-globals bootstrap (file contract)", () => {
     // that doesn't touch realtime.
     assert.match(src, /typeof\s+reset\s*===\s*"function"/);
   });
+
+  it("also resets the sentry module cache via require.cache (not a static import)", () => {
+    // `lib/sentry.ts` reaches `@/lib/sentry-config` via the `@/` alias, so a
+    // static import here would crash the preload the same way the realtime
+    // one would. The contract is the identical require.cache lookup keyed on
+    // the resolved `lib/sentry.ts` path, invoking `__resetSentryForTests`.
+    assert.doesNotMatch(src, /from\s*"@\/lib\/sentry"/);
+    assert.doesNotMatch(
+      src,
+      /import\s*\{[^}]*__resetSentryForTests[^}]*\}\s*from/,
+    );
+    assert.match(src, /sentry\.ts/);
+    assert.match(src, /__resetSentryForTests/);
+  });
+
+  it("invokes both resets from the root beforeEach", () => {
+    // Both module caches must be swept before every test; a beforeEach that
+    // reset only realtime would silently reintroduce the sentry cross-suite
+    // leak this task removed.
+    const body = src.slice(src.indexOf("\nbeforeEach("));
+    assert.match(body, /tryResetSharedRealtimeClient\(\)/);
+    assert.match(body, /tryResetSentry\(\)/);
+  });
 });

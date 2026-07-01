@@ -1,12 +1,10 @@
-import { describe, it, beforeEach } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   initSentry,
   triggerSentryTestError,
-  __resetSentryForTests,
-  __resetSentryRateLimitForTests,
 } from "../lib/sentry";
 
 type Call = { method: string; args: unknown[] };
@@ -27,11 +25,6 @@ function makeFakeSdk() {
 }
 
 describe("triggerSentryTestError", () => {
-  beforeEach(() => {
-    __resetSentryForTests();
-    __resetSentryRateLimitForTests();
-  });
-
   it("returns 'not-ready' before initSentry()", () => {
     assert.equal(triggerSentryTestError(), "not-ready");
   });
