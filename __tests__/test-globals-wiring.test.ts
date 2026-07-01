@@ -88,22 +88,28 @@ describe("test-globals bootstrap (file contract)", () => {
 describe("test-globals bootstrap (sentry reset promotion)", () => {
   const src = read("__tests__/test-globals.ts");
 
-  it("does NOT statically import lib/sentry (would eagerly load the SDK path)", () => {
+  it("statically imports __resetSentryForTests from lib/sentry", () => {
     // Every Sentry suite used to open with its own
     // `beforeEach(() => __resetSentryForTests())`. That reset now lives in the
-    // global bootstrap — but via the same `require.cache` peek as realtime, not
-    // a static import: `lib/sentry.ts` lazy-imports `@sentry/react-native`, so a
-    // static import here would tie the preload to a heavier module than the
-    // structural tests need.
-    assert.doesNotMatch(
+    // global bootstrap. Unlike realtime, `lib/sentry.ts` only *lazily* imports
+    // `@sentry/react-native` (inside initSentry), so its load-time graph is
+    // peer-dep-free and the reset can be imported + called DIRECTLY. A direct
+    // call always fires — the `require.cache` peek used for realtime silently
+    // no-ops when the loader doesn't populate `require.cache` (observed on CI's
+    // Node 24 + tsx), which would let stripped-per-suite Sentry state leak.
+    assert.match(
       src,
-      /import\s*\{[^}]*__resetSentryForTests[^}]*\}\s*from/,
+      /import\s*\{[^}]*__resetSentryForTests[^}]*\}\s*from\s*["'][^"']*lib\/sentry["']/,
     );
-    assert.doesNotMatch(src, /from\s*["'][^"']*lib\/sentry["']/);
   });
 
-  it("looks up lib/sentry via require.cache and invokes __resetSentryForTests", () => {
-    assert.match(src, /sentry\.ts/);
-    assert.match(src, /__resetSentryForTests/);
+  it("calls __resetSentryForTests directly (not via the require.cache peek)", () => {
+    // The direct invocation must appear inside the bootstrap body.
+    assert.match(src, /__resetSentryForTests\(\)/);
+  });
+
+  it("does NOT statically import the realtime module (would crash under tsx --test)", () => {
+    // Realtime stays on the require.cache peek — it pulls react-native peers.
+    assert.doesNotMatch(src, /from\s*["'][^"']*lib\/supabase-realtime["']/);
   });
 });
