@@ -179,14 +179,22 @@ export function captureException(
   }
 }
 
+/**
+ * Sentry breadcrumb severity. Maps onto Sentry's `level` field so non-info
+ * breadcrumbs (e.g. "user denied photo permission") render with the right
+ * colour/severity in the crash timeline instead of the default grey "info".
+ */
+export type SentryBreadcrumbLevel = "info" | "warning" | "error";
+
 export function addBreadcrumb(
   message: string,
   data?: Record<string, unknown>,
+  level: SentryBreadcrumbLevel = "info",
 ): void {
   if (userOptedOut) return;
   if (!sdk || !activeConfig?.enabled) return;
   try {
-    sdk.addBreadcrumb({ message, data, level: "info" });
+    sdk.addBreadcrumb({ message, data, level });
   } catch {
     /* ignore */
   }
