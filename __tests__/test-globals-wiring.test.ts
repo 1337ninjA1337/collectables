@@ -84,3 +84,32 @@ describe("test-globals bootstrap (file contract)", () => {
     assert.match(src, /typeof\s+reset\s*===\s*"function"/);
   });
 });
+
+describe("test-globals bootstrap (sentry reset promotion)", () => {
+  const src = read("__tests__/test-globals.ts");
+
+  it("statically imports __resetSentryForTests from lib/sentry", () => {
+    // Every Sentry suite used to open with its own
+    // `beforeEach(() => __resetSentryForTests())`. That reset now lives in the
+    // global bootstrap. Unlike realtime, `lib/sentry.ts` only *lazily* imports
+    // `@sentry/react-native` (inside initSentry), so its load-time graph is
+    // peer-dep-free and the reset can be imported + called DIRECTLY. A direct
+    // call always fires — the `require.cache` peek used for realtime silently
+    // no-ops when the loader doesn't populate `require.cache` (observed on CI's
+    // Node 24 + tsx), which would let stripped-per-suite Sentry state leak.
+    assert.match(
+      src,
+      /import\s*\{[^}]*__resetSentryForTests[^}]*\}\s*from\s*["'][^"']*lib\/sentry["']/,
+    );
+  });
+
+  it("calls __resetSentryForTests directly (not via the require.cache peek)", () => {
+    // The direct invocation must appear inside the bootstrap body.
+    assert.match(src, /__resetSentryForTests\(\)/);
+  });
+
+  it("does NOT statically import the realtime module (would crash under tsx --test)", () => {
+    // Realtime stays on the require.cache peek — it pulls react-native peers.
+    assert.doesNotMatch(src, /from\s*["'][^"']*lib\/supabase-realtime["']/);
+  });
+});

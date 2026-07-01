@@ -1,10 +1,9 @@
-import { describe, it, beforeEach } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   initSentry,
   addBreadcrumb,
   setSentryOptOut,
-  __resetSentryForTests,
 } from "../lib/sentry";
 
 type Call = { method: string; args: unknown[] };
@@ -43,7 +42,6 @@ function breadcrumbs(calls: Call[]) {
 }
 
 describe("addBreadcrumb — level parameter", () => {
-  beforeEach(() => __resetSentryForTests());
 
   it("defaults to level 'info' when no level is passed", async () => {
     const calls = await bootWithFakeSdk();
