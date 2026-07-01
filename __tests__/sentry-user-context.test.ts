@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -28,7 +28,6 @@ function makeFakeSdk() {
 }
 
 describe("setSentryUser — disabled paths", () => {
-  beforeEach(() => __resetSentryForTests());
 
   it("is a no-op before initSentry()", () => {
     assert.doesNotThrow(() =>
@@ -52,7 +51,6 @@ describe("setSentryUser — disabled paths", () => {
 });
 
 describe("setSentryUser — enabled paths", () => {
-  beforeEach(() => __resetSentryForTests());
 
   async function bootEnabled() {
     const fake = makeFakeSdk();

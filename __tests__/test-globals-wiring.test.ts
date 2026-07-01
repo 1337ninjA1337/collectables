@@ -84,3 +84,26 @@ describe("test-globals bootstrap (file contract)", () => {
     assert.match(src, /typeof\s+reset\s*===\s*"function"/);
   });
 });
+
+describe("test-globals bootstrap (sentry reset promotion)", () => {
+  const src = read("__tests__/test-globals.ts");
+
+  it("does NOT statically import lib/sentry (would eagerly load the SDK path)", () => {
+    // Every Sentry suite used to open with its own
+    // `beforeEach(() => __resetSentryForTests())`. That reset now lives in the
+    // global bootstrap — but via the same `require.cache` peek as realtime, not
+    // a static import: `lib/sentry.ts` lazy-imports `@sentry/react-native`, so a
+    // static import here would tie the preload to a heavier module than the
+    // structural tests need.
+    assert.doesNotMatch(
+      src,
+      /import\s*\{[^}]*__resetSentryForTests[^}]*\}\s*from/,
+    );
+    assert.doesNotMatch(src, /from\s*["'][^"']*lib\/sentry["']/);
+  });
+
+  it("looks up lib/sentry via require.cache and invokes __resetSentryForTests", () => {
+    assert.match(src, /sentry\.ts/);
+    assert.match(src, /__resetSentryForTests/);
+  });
+});
