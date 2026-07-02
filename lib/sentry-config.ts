@@ -1,6 +1,11 @@
+import {
+  normaliseDeploymentEnv,
+  type DeploymentEnvironment,
+} from "@/lib/deployment-env";
+
 import appJson from "../app.json";
 
-export type SentryEnvironment = "development" | "staging" | "production";
+export type SentryEnvironment = DeploymentEnvironment;
 
 export type SentryConfig = {
   dsn: string;
@@ -30,12 +35,6 @@ export function resolveTracesSampleRate(value: string | undefined): number {
   return parsed;
 }
 
-function normaliseEnvironment(value: string | undefined): SentryEnvironment {
-  if (value === "staging") return "staging";
-  if (value === "development") return "development";
-  return "production";
-}
-
 /**
  * Canonical Sentry DSN shape: `https://<publicKey>@<host>/<projectId>`.
  * Guards against an obviously-wrong secret (e.g. a Slack webhook URL pasted
@@ -61,7 +60,7 @@ export function resolveSentryConfig(
   options: { defaultRelease?: string } = {},
 ): SentryConfig {
   const dsn = (env.EXPO_PUBLIC_SENTRY_DSN ?? "").trim();
-  const environment = normaliseEnvironment(env.EXPO_PUBLIC_SENTRY_ENV);
+  const environment = normaliseDeploymentEnv(env.EXPO_PUBLIC_SENTRY_ENV);
   const explicitRelease = (env.EXPO_PUBLIC_SENTRY_RELEASE ?? "").trim();
   const explicitVersion = (env.EXPO_PUBLIC_APP_VERSION ?? "").trim();
   // Precedence: explicit SENTRY_RELEASE (CI sha) > APP_VERSION > options > app.json.
