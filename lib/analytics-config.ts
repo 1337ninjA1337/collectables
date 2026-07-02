@@ -1,4 +1,9 @@
-export type AnalyticsEnvironment = "development" | "staging" | "production";
+import {
+  normaliseDeploymentEnv,
+  type DeploymentEnvironment,
+} from "@/lib/deployment-env";
+
+export type AnalyticsEnvironment = DeploymentEnvironment;
 
 export type AnalyticsConfig = {
   posthogKey: string;
@@ -9,12 +14,6 @@ export type AnalyticsConfig = {
 };
 
 const DEFAULT_POSTHOG_HOST = "https://eu.posthog.com";
-
-function normaliseEnvironment(value: string | undefined): AnalyticsEnvironment {
-  if (value === "staging") return "staging";
-  if (value === "development") return "development";
-  return "production";
-}
 
 /**
  * Incident-response kill-switch parser. When `EXPO_PUBLIC_ANALYTICS_DISABLED`
@@ -38,7 +37,7 @@ export function resolveAnalyticsConfig(
   const posthogHostRaw = (env.EXPO_PUBLIC_POSTHOG_HOST ?? "").trim();
   const posthogHost = posthogHostRaw.length > 0 ? posthogHostRaw : DEFAULT_POSTHOG_HOST;
   const clarityId = (env.EXPO_PUBLIC_CLARITY_PROJECT_ID ?? "").trim();
-  const environment = normaliseEnvironment(
+  const environment = normaliseDeploymentEnv(
     env.EXPO_PUBLIC_ANALYTICS_ENV ?? env.EXPO_PUBLIC_SENTRY_ENV,
   );
   const killSwitch = isAnalyticsDisabledByEnv(env.EXPO_PUBLIC_ANALYTICS_DISABLED);
