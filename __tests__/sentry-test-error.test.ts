@@ -5,7 +5,6 @@ import path from "node:path";
 import {
   initSentry,
   triggerSentryTestError,
-  __resetSentryForTests,
   __resetSentryRateLimitForTests,
 } from "../lib/sentry";
 
@@ -28,7 +27,6 @@ function makeFakeSdk() {
 
 describe("triggerSentryTestError", () => {
   beforeEach(() => {
-    __resetSentryForTests();
     __resetSentryRateLimitForTests();
   });
 

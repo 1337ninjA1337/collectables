@@ -1,11 +1,10 @@
-import { describe, it, beforeEach } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   initSentry,
   setSentryUser,
-  __resetSentryForTests,
 } from "../lib/sentry";
 
 type Call = { method: string; args: unknown[] };
@@ -28,7 +27,6 @@ function makeFakeSdk() {
 }
 
 describe("setSentryUser — disabled paths", () => {
-  beforeEach(() => __resetSentryForTests());
 
   it("is a no-op before initSentry()", () => {
     assert.doesNotThrow(() =>
@@ -52,7 +50,6 @@ describe("setSentryUser — disabled paths", () => {
 });
 
 describe("setSentryUser — enabled paths", () => {
-  beforeEach(() => __resetSentryForTests());
 
   async function bootEnabled() {
     const fake = makeFakeSdk();
@@ -98,7 +95,6 @@ describe("setSentryUser — enabled paths", () => {
   });
 
   it("swallows SDK exceptions instead of rethrowing", async () => {
-    __resetSentryForTests();
     const sdk = {
       init: () => undefined,
       captureException: () => undefined,
