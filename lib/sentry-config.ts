@@ -7,10 +7,28 @@ export type SentryConfig = {
   environment: SentryEnvironment;
   release: string;
   enabled: boolean;
+  tracesSampleRate: number;
 };
 
 const APP_VERSION = (appJson as { expo: { version: string } }).expo.version;
 const DEFAULT_RELEASE = `collectables@${APP_VERSION}`;
+export const DEFAULT_TRACES_SAMPLE_RATE = 0.1;
+
+/**
+ * Parses `EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` into a performance sampling
+ * rate. Falls back to {@link DEFAULT_TRACES_SAMPLE_RATE} when the value is
+ * unset, non-numeric, or out of the valid `[0, 1]` range so an operator can't
+ * accidentally disable or over-sample tracing with a typo. Pure + exported.
+ */
+export function resolveTracesSampleRate(value: string | undefined): number {
+  const trimmed = (value ?? "").trim();
+  if (trimmed.length === 0) return DEFAULT_TRACES_SAMPLE_RATE;
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    return DEFAULT_TRACES_SAMPLE_RATE;
+  }
+  return parsed;
+}
 
 function normaliseEnvironment(value: string | undefined): SentryEnvironment {
   if (value === "staging") return "staging";
@@ -64,7 +82,10 @@ export function resolveSentryConfig(
     );
   }
   const enabled = dsn.length > 0 && dsnValid && environment !== "development";
-  return { dsn, environment, release, enabled };
+  const tracesSampleRate = resolveTracesSampleRate(
+    env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
+  );
+  return { dsn, environment, release, enabled, tracesSampleRate };
 }
 
 /**
@@ -81,6 +102,8 @@ export function readSentryEnvFromProcess(): Record<string, string | undefined> {
     EXPO_PUBLIC_SENTRY_ENV: process.env.EXPO_PUBLIC_SENTRY_ENV,
     EXPO_PUBLIC_SENTRY_RELEASE: process.env.EXPO_PUBLIC_SENTRY_RELEASE,
     EXPO_PUBLIC_APP_VERSION: process.env.EXPO_PUBLIC_APP_VERSION,
+    EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:
+      process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
   };
 }
 

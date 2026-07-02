@@ -5,6 +5,8 @@ import path from "node:path";
 import {
   resolveSentryConfig,
   isValidSentryDsn,
+  resolveTracesSampleRate,
+  DEFAULT_TRACES_SAMPLE_RATE,
   __resetSentryConfigWarningForTests,
 } from "../lib/sentry-config";
 
@@ -109,6 +111,43 @@ describe("resolveSentryConfig", () => {
       { defaultRelease: "collectables@override" },
     );
     assert.equal(cfg.release, "collectables@9.9.9");
+  });
+});
+
+describe("resolveTracesSampleRate", () => {
+  it("defaults when unset or empty", () => {
+    assert.equal(resolveTracesSampleRate(undefined), DEFAULT_TRACES_SAMPLE_RATE);
+    assert.equal(resolveTracesSampleRate("   "), DEFAULT_TRACES_SAMPLE_RATE);
+  });
+
+  it("parses a valid in-range value (incl. the 0 and 1 bounds)", () => {
+    assert.equal(resolveTracesSampleRate("0"), 0);
+    assert.equal(resolveTracesSampleRate("1"), 1);
+    assert.equal(resolveTracesSampleRate("0.25"), 0.25);
+    assert.equal(resolveTracesSampleRate("  0.5  "), 0.5);
+  });
+
+  it("falls back to the default for out-of-range or non-numeric values", () => {
+    assert.equal(resolveTracesSampleRate("-0.1"), DEFAULT_TRACES_SAMPLE_RATE);
+    assert.equal(resolveTracesSampleRate("1.5"), DEFAULT_TRACES_SAMPLE_RATE);
+    assert.equal(resolveTracesSampleRate("abc"), DEFAULT_TRACES_SAMPLE_RATE);
+    assert.equal(resolveTracesSampleRate("NaN"), DEFAULT_TRACES_SAMPLE_RATE);
+  });
+
+  it("is threaded onto SentryConfig.tracesSampleRate", () => {
+    assert.equal(resolveSentryConfig({}).tracesSampleRate, 0.1);
+    assert.equal(
+      resolveSentryConfig({
+        EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: "0.42",
+      }).tracesSampleRate,
+      0.42,
+    );
+    assert.equal(
+      resolveSentryConfig({
+        EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: "9",
+      }).tracesSampleRate,
+      0.1,
+    );
   });
 });
 

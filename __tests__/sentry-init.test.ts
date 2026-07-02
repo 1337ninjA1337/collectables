@@ -101,6 +101,20 @@ describe("lib/sentry — enabled paths", () => {
     assert.equal(initOptions.enableNative, true);
   });
 
+  it("threads a custom EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE into init", async () => {
+    const { sdk, calls } = makeFakeSdk();
+    await initSentry({
+      env: {
+        EXPO_PUBLIC_SENTRY_DSN: "https://abc@o0.ingest.sentry.io/42",
+        EXPO_PUBLIC_SENTRY_ENV: "production",
+        EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: "0.5",
+      },
+      loader: async () => sdk,
+    });
+    const initOptions = calls[0].args[0] as Record<string, unknown>;
+    assert.equal(initOptions.tracesSampleRate, 0.5);
+  });
+
   it("captureException forwards extra + maps scope to a tag", async () => {
     const { sdk, calls } = makeFakeSdk();
     await initSentry({

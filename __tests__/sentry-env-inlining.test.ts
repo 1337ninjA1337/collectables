@@ -24,6 +24,7 @@ describe("sentry env-var inlining (Metro/babel)", () => {
       "EXPO_PUBLIC_SENTRY_ENV",
       "EXPO_PUBLIC_SENTRY_RELEASE",
       "EXPO_PUBLIC_APP_VERSION",
+      "EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE",
     ]) {
       assert.match(
         src,
@@ -58,7 +59,7 @@ describe("sentry env-var inlining (Metro/babel)", () => {
     );
   });
 
-  it("readSentryEnvFromProcess returns the four supported keys", () => {
+  it("readSentryEnvFromProcess returns the five supported keys", () => {
     const env = readSentryEnvFromProcess();
     const keys = Object.keys(env).sort();
     assert.deepStrictEqual(keys, [
@@ -66,6 +67,7 @@ describe("sentry env-var inlining (Metro/babel)", () => {
       "EXPO_PUBLIC_SENTRY_DSN",
       "EXPO_PUBLIC_SENTRY_ENV",
       "EXPO_PUBLIC_SENTRY_RELEASE",
+      "EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE",
     ]);
   });
 

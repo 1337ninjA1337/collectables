@@ -158,7 +158,7 @@ async function runInit(options: InitOptions): Promise<void> {
       dsn: config.dsn,
       environment: config.environment,
       release: config.release,
-      tracesSampleRate: 0.1,
+      tracesSampleRate: config.tracesSampleRate,
       enableNative: true,
       beforeSend: makeBeforeSend(config.environment),
     });
