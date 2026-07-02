@@ -178,15 +178,44 @@ async function runInit(options: InitOptions): Promise<void> {
   }
 }
 
+/**
+ * Structured context for {@link captureException}. Narrowed from the previous
+ * loose `Record<string, unknown>` so call sites get IntelliSense on the two
+ * standard fields and can't drift into ad-hoc key names:
+ *   - `scope` — a dotted call-site identifier (e.g. "chat-context.fetchReads")
+ *     forwarded to Sentry as a filterable `scope` tag.
+ *   - `extra` — arbitrary structured data forwarded verbatim to Sentry's `extra`.
+ */
+export type CaptureContext = {
+  scope?: string;
+  extra?: Record<string, unknown>;
+};
+
+/**
+ * Maps our typed {@link CaptureContext} onto the loose object Sentry's SDK
+ * expects. Returns `undefined` when there is nothing to forward so we never
+ * send an empty `{}`. Pure + exported for unit testing.
+ */
+export function toSentryCaptureContext(
+  context?: CaptureContext,
+): { tags?: { scope: string }; extra?: Record<string, unknown> } | undefined {
+  if (!context) return undefined;
+  const payload: { tags?: { scope: string }; extra?: Record<string, unknown> } =
+    {};
+  if (context.scope) payload.tags = { scope: context.scope };
+  if (context.extra) payload.extra = context.extra;
+  return Object.keys(payload).length > 0 ? payload : undefined;
+}
+
 export function captureException(
   error: unknown,
-  context?: Record<string, unknown>,
+  context?: CaptureContext,
 ): void {
   if (userOptedOut) return;
   if (!sdk || !activeConfig?.enabled) return;
   if (!rateLimitAllow()) return;
   try {
-    sdk.captureException(error, context ? { extra: context } : undefined);
+    sdk.captureException(error, toSentryCaptureContext(context));
   } catch {
     /* never let telemetry crash the host app */
   }

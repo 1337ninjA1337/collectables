@@ -189,7 +189,7 @@ export async function cloudClaimListing(
     });
     return res.ok;
   } catch (err) {
-    captureException(err, { context: "supabase-marketplace.cloudClaimListing" });
+    captureException(err, { scope: "supabase-marketplace.cloudClaimListing" });
     return false;
   }
 }
@@ -270,7 +270,7 @@ export function subscribeToListings(
         }
       } catch (err) {
         // Ignore handler errors so a buggy listener can't kill the socket.
-        captureException(err, { context: "supabase-marketplace.subscribeToListings.handler" });
+        captureException(err, { scope: "supabase-marketplace.subscribeToListings.handler" });
       }
     },
   );

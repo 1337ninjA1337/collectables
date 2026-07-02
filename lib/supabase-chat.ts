@@ -170,7 +170,7 @@ export function subscribeToInbox(
         onMessage(chatRowToMessage(row));
       } catch (err) {
         // Ignore handler errors so a buggy listener can't kill the socket.
-        captureException(err, { context: "supabase-chat.subscribeToInbox.handler" });
+        captureException(err, { scope: "supabase-chat.subscribeToInbox.handler" });
       }
     },
     onStatusChange,

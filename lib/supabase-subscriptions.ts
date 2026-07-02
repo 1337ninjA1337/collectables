@@ -61,7 +61,7 @@ export async function cloudValidatePremium(
     if (!res.ok) return null;
     return parseValidation(await res.json());
   } catch (err) {
-    captureException(err, { context: "supabase-subscriptions.cloudValidatePremium" });
+    captureException(err, { scope: "supabase-subscriptions.cloudValidatePremium" });
     return null;
   }
 }

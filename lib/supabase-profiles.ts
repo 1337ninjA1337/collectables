@@ -591,7 +591,7 @@ export async function cloudAcceptFriendRequest(fromUserId: string): Promise<bool
     });
     return res.ok || res.status === 409;
   } catch (err) {
-    captureException(err, { context: "supabase-profiles.cloudAcceptFriendRequest" });
+    captureException(err, { scope: "supabase-profiles.cloudAcceptFriendRequest" });
     return false;
   }
 }
@@ -644,7 +644,7 @@ export async function fetchCollectionsSharedWithUser(userId: string): Promise<Co
     });
     return rows.filter((row) => !row.deleted_at).map(toCollection);
   } catch (err) {
-    captureException(err, { context: "supabase-profiles.fetchCollectionsSharedWithUser" });
+    captureException(err, { scope: "supabase-profiles.fetchCollectionsSharedWithUser" });
     return [];
   }
 }
@@ -675,7 +675,7 @@ export async function registerSharedCollectionViewer(
     await updateRemoteCollection(collectionId, { sharedWithUserIds: next });
     return { ...current, sharedWithUserIds: next };
   } catch (err) {
-    captureException(err, { context: "supabase-profiles.registerSharedCollectionViewer" });
+    captureException(err, { scope: "supabase-profiles.registerSharedCollectionViewer" });
     return null;
   }
 }

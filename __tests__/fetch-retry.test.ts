@@ -167,7 +167,7 @@ describe("chat-context unhandled rejection guards", () => {
 
   it("wraps both cloud-fetch async IIFEs in try/catch", () => {
     const source = fs.readFileSync(path.join(repoRoot, "lib", "chat-context.tsx"), "utf8");
-    const matches = source.match(/captureException\(err, \{ context: "chat-context\./g);
+    const matches = source.match(/captureException\(err, \{ scope: "chat-context\./g);
     assert.ok(matches && matches.length >= 2, "expected at least two captureException calls in chat-context");
   });
 });

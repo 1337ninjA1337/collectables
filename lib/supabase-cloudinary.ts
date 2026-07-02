@@ -57,7 +57,7 @@ export async function cloudSignUpload({
     if (!res.ok) return null;
     return parseSignedUpload(await res.json());
   } catch (err) {
-    captureException(err, { context: "supabase-cloudinary.cloudSignUpload" });
+    captureException(err, { scope: "supabase-cloudinary.cloudSignUpload" });
     return null;
   }
 }

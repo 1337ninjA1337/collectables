@@ -27,14 +27,14 @@ describe("Crash #7 — capture in supabase-profiles.ts", () => {
   it("captures fetchCollectionsSharedWithUser failures", () => {
     assert.match(
       profilesSrc,
-      /captureException\(err,\s*\{\s*context:\s*["']supabase-profiles\.fetchCollectionsSharedWithUser["']\s*\}\)/,
+      /captureException\(err,\s*\{\s*scope:\s*["']supabase-profiles\.fetchCollectionsSharedWithUser["']\s*\}\)/,
     );
   });
 
   it("captures registerSharedCollectionViewer failures", () => {
     assert.match(
       profilesSrc,
-      /captureException\(err,\s*\{\s*context:\s*["']supabase-profiles\.registerSharedCollectionViewer["']\s*\}\)/,
+      /captureException\(err,\s*\{\s*scope:\s*["']supabase-profiles\.registerSharedCollectionViewer["']\s*\}\)/,
     );
   });
 });
@@ -50,7 +50,7 @@ describe("Crash #7 — capture in supabase-chat.ts", () => {
   it("captures realtime inbox listener errors", () => {
     assert.match(
       chatSrc,
-      /captureException\(err,\s*\{\s*context:\s*["']supabase-chat\.subscribeToInbox\.handler["']\s*\}\)/,
+      /captureException\(err,\s*\{\s*scope:\s*["']supabase-chat\.subscribeToInbox\.handler["']\s*\}\)/,
     );
   });
 });
@@ -66,7 +66,7 @@ describe("Crash #7 — capture in supabase-marketplace.ts", () => {
   it("captures realtime listings listener errors", () => {
     assert.match(
       marketplaceSrc,
-      /captureException\(err,\s*\{\s*context:\s*["']supabase-marketplace\.subscribeToListings\.handler["']\s*\}\)/,
+      /captureException\(err,\s*\{\s*scope:\s*["']supabase-marketplace\.subscribeToListings\.handler["']\s*\}\)/,
     );
   });
 });

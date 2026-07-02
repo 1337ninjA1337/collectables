@@ -55,7 +55,7 @@ export async function cloudExportData({
     if (!res.ok) return null;
     return parseDataExport(await res.json());
   } catch (err) {
-    captureException(err, { context: "supabase-data-export.cloudExportData" });
+    captureException(err, { scope: "supabase-data-export.cloudExportData" });
     return null;
   }
 }

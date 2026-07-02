@@ -8,6 +8,7 @@ import {
   addBreadcrumb,
   isSentryReady,
   getSentryLastInitError,
+  toSentryCaptureContext,
 } from "../lib/sentry";
 
 type Call = { method: string; args: unknown[] };
@@ -100,7 +101,7 @@ describe("lib/sentry — enabled paths", () => {
     assert.equal(initOptions.enableNative, true);
   });
 
-  it("captureException delegates and packs context under 'extra'", async () => {
+  it("captureException forwards extra + maps scope to a tag", async () => {
     const { sdk, calls } = makeFakeSdk();
     await initSentry({
       env: {
@@ -109,10 +110,16 @@ describe("lib/sentry — enabled paths", () => {
       },
       loader: async () => sdk,
     });
-    captureException(new Error("boom"), { route: "/listing/42" });
+    captureException(new Error("boom"), {
+      scope: "listing.detail",
+      extra: { route: "/listing/42" },
+    });
     const last = calls[calls.length - 1];
     assert.equal(last.method, "captureException");
-    assert.deepEqual(last.args[1], { extra: { route: "/listing/42" } });
+    assert.deepEqual(last.args[1], {
+      tags: { scope: "listing.detail" },
+      extra: { route: "/listing/42" },
+    });
   });
 
   it("captureException without context omits the extra wrapper", async () => {
@@ -344,5 +351,40 @@ describe("lib/sentry — module shape", () => {
       guardCount >= 2,
       "captureException + addBreadcrumb must each gate on (sdk && enabled)",
     );
+  });
+});
+
+describe("lib/sentry — toSentryCaptureContext mapper", () => {
+  it("returns undefined for no context", () => {
+    assert.equal(toSentryCaptureContext(), undefined);
+    assert.equal(toSentryCaptureContext(undefined), undefined);
+  });
+
+  it("returns undefined for an empty context (no scope/extra)", () => {
+    assert.equal(toSentryCaptureContext({}), undefined);
+  });
+
+  it("maps scope onto a filterable tag", () => {
+    assert.deepEqual(toSentryCaptureContext({ scope: "chat.fetch" }), {
+      tags: { scope: "chat.fetch" },
+    });
+  });
+
+  it("forwards extra verbatim", () => {
+    assert.deepEqual(
+      toSentryCaptureContext({ extra: { route: "/x", id: 7 } }),
+      { extra: { route: "/x", id: 7 } },
+    );
+  });
+
+  it("combines scope + extra", () => {
+    assert.deepEqual(
+      toSentryCaptureContext({ scope: "a.b", extra: { k: "v" } }),
+      { tags: { scope: "a.b" }, extra: { k: "v" } },
+    );
+  });
+
+  it("ignores an empty-string scope", () => {
+    assert.equal(toSentryCaptureContext({ scope: "" }), undefined);
   });
 });

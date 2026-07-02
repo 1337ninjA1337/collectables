@@ -243,7 +243,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
         // 18's intermittent "Load failed" fetch flake) must not surface as an
         // unhandled rejection that the browser's unhandled-rejection handler
         // can treat as a render crash.
-        captureException(err, { context: "chat-context.cloudFetchMessages" });
+        captureException(err, { scope: "chat-context.cloudFetchMessages" });
       }
     })();
 
@@ -278,7 +278,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
           return { ...prev, lastReadByChat: nextRead };
         });
       } catch (err) {
-        captureException(err, { context: "chat-context.fetchChatReads" });
+        captureException(err, { scope: "chat-context.fetchChatReads" });
       }
     })();
     return () => {

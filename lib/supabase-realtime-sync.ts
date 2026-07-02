@@ -104,7 +104,7 @@ export function subscribeToOwnCollections(
       } catch (err) {
         // Ignore handler errors so a buggy listener can't kill the socket.
         captureException(err, {
-          context: "supabase-realtime-sync.subscribeToOwnCollections.handler",
+          scope: "supabase-realtime-sync.subscribeToOwnCollections.handler",
         });
       }
     },
@@ -134,7 +134,7 @@ export function subscribeToOwnItems(
         onItem(coerceItemRow(row));
       } catch (err) {
         captureException(err, {
-          context: "supabase-realtime-sync.subscribeToOwnItems.handler",
+          scope: "supabase-realtime-sync.subscribeToOwnItems.handler",
         });
       }
     },
@@ -197,7 +197,7 @@ export function subscribeToFriendRequests(
         });
       } catch (err) {
         captureException(err, {
-          context: "supabase-realtime-sync.subscribeToFriendRequests.handler",
+          scope: "supabase-realtime-sync.subscribeToFriendRequests.handler",
         });
       }
     },
