@@ -2,7 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { resolveSentryConfig } from "../lib/sentry-config";
+import {
+  resolveSentryConfig,
+  isValidSentryDsn,
+  __resetSentryConfigWarningForTests,
+} from "../lib/sentry-config";
 
 const appJson = JSON.parse(
   readFileSync(path.join(process.cwd(), "app.json"), "utf8"),
@@ -105,6 +109,97 @@ describe("resolveSentryConfig", () => {
       { defaultRelease: "collectables@override" },
     );
     assert.equal(cfg.release, "collectables@9.9.9");
+  });
+});
+
+describe("isValidSentryDsn", () => {
+  it("accepts a canonical https DSN", () => {
+    assert.equal(isValidSentryDsn("https://abc@o0.ingest.sentry.io/1"), true);
+  });
+
+  it("accepts a numeric-only project id and trims whitespace", () => {
+    assert.equal(isValidSentryDsn("  https://k@host/123456  "), true);
+  });
+
+  it("rejects a Slack webhook pasted into the DSN slot", () => {
+    assert.equal(
+      isValidSentryDsn("https://hooks.slack.com/services/T00/B00/xyz"),
+      false,
+    );
+  });
+
+  it("rejects a DSN with no public key", () => {
+    assert.equal(isValidSentryDsn("https://o0.ingest.sentry.io/1"), false);
+  });
+
+  it("rejects a DSN with a non-numeric project id", () => {
+    assert.equal(isValidSentryDsn("https://abc@host/project"), false);
+  });
+
+  it("rejects an empty string", () => {
+    assert.equal(isValidSentryDsn(""), false);
+  });
+});
+
+describe("resolveSentryConfig — DSN validation gate", () => {
+  it("disables the SDK when the DSN is present but malformed", () => {
+    __resetSentryConfigWarningForTests();
+    const original = console.error;
+    const errs: string[] = [];
+    console.error = (msg?: unknown) => {
+      errs.push(String(msg));
+    };
+    try {
+      const cfg = resolveSentryConfig({
+        EXPO_PUBLIC_SENTRY_DSN: "https://hooks.slack.com/services/T/B/x",
+        EXPO_PUBLIC_SENTRY_ENV: "production",
+      });
+      assert.equal(cfg.enabled, false);
+    } finally {
+      console.error = original;
+    }
+    assert.equal(errs.length, 1);
+    assert.match(errs[0], /malformed/i);
+  });
+
+  it("warns at most once across repeated malformed resolves", () => {
+    __resetSentryConfigWarningForTests();
+    const original = console.error;
+    let count = 0;
+    console.error = () => {
+      count += 1;
+    };
+    try {
+      const env = {
+        EXPO_PUBLIC_SENTRY_DSN: "not-a-dsn",
+        EXPO_PUBLIC_SENTRY_ENV: "production",
+      };
+      resolveSentryConfig(env);
+      resolveSentryConfig(env);
+      resolveSentryConfig(env);
+    } finally {
+      console.error = original;
+    }
+    assert.equal(count, 1);
+  });
+
+  it("still enables the SDK for a valid production DSN (no warning)", () => {
+    __resetSentryConfigWarningForTests();
+    const original = console.error;
+    let count = 0;
+    console.error = () => {
+      count += 1;
+    };
+    try {
+      const cfg = resolveSentryConfig({
+        EXPO_PUBLIC_SENTRY_DSN: "https://abc@o0.ingest.sentry.io/1",
+        EXPO_PUBLIC_SENTRY_ENV: "production",
+      });
+      assert.equal(cfg.enabled, true);
+    } finally {
+      console.error = original;
+    }
+    assert.equal(count, 0);
   });
 });
 

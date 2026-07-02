@@ -18,6 +18,26 @@ function normaliseEnvironment(value: string | undefined): SentryEnvironment {
   return "production";
 }
 
+/**
+ * Canonical Sentry DSN shape: `https://<publicKey>@<host>/<projectId>`.
+ * Guards against an obviously-wrong secret (e.g. a Slack webhook URL pasted
+ * into `EXPO_PUBLIC_SENTRY_DSN`) silently flipping `enabled` to true and then
+ * failing deep inside the native SDK at runtime. Pure + exported for testing.
+ */
+const SENTRY_DSN_PATTERN = /^https?:\/\/[^@/]+@[^/]+\/\d+$/;
+
+export function isValidSentryDsn(dsn: string): boolean {
+  return SENTRY_DSN_PATTERN.test(dsn.trim());
+}
+
+// One-shot guard so a malformed DSN surfaces exactly once in the console
+// rather than re-warning on every `resolveSentryConfig` call.
+let malformedDsnWarned = false;
+
+export function __resetSentryConfigWarningForTests(): void {
+  malformedDsnWarned = false;
+}
+
 export function resolveSentryConfig(
   env: Record<string, string | undefined>,
   options: { defaultRelease?: string } = {},
@@ -33,7 +53,17 @@ export function resolveSentryConfig(
       : explicitVersion.length > 0
         ? `collectables@${explicitVersion}`
         : (options.defaultRelease ?? DEFAULT_RELEASE);
-  const enabled = dsn.length > 0 && environment !== "development";
+  // A present-but-malformed DSN must NOT enable Sentry — the SDK would only
+  // fail at init time. Surface the misconfig once so the operator can fix the
+  // secret instead of silently shipping a broken telemetry pipeline.
+  const dsnValid = dsn.length === 0 || isValidSentryDsn(dsn);
+  if (dsn.length > 0 && !dsnValid && !malformedDsnWarned) {
+    malformedDsnWarned = true;
+    console.error(
+      "[sentry] EXPO_PUBLIC_SENTRY_DSN is malformed (expected https://<key>@<host>/<projectId>); telemetry stays disabled.",
+    );
+  }
+  const enabled = dsn.length > 0 && dsnValid && environment !== "development";
   return { dsn, environment, release, enabled };
 }
 
