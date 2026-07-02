@@ -283,6 +283,95 @@ describe("lib/analytics — enabled paths", () => {
   });
 });
 
+describe("lib/analytics — concurrent init dedup", () => {
+  beforeEach(() => __resetAnalyticsForTests());
+
+  const PROD_ENV = {
+    EXPO_PUBLIC_POSTHOG_KEY: "phc_race",
+    EXPO_PUBLIC_ANALYTICS_ENV: "production",
+  };
+
+  it("races of initAnalytics() construct the PostHog instance exactly once", async () => {
+    const fake = makeFakeSdk();
+    const { Ctor, ctorCalls } = makeFakeCtor(fake);
+    let loaderCalls = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const loader = async () => {
+      loaderCalls += 1;
+      await gate; // hold the first init in-flight while the second one races it
+      return Ctor as never;
+    };
+    // Fire both before the loader resolves so neither has flipped `initialised`.
+    const first = initAnalytics({ env: PROD_ENV, loader });
+    const second = initAnalytics({ env: PROD_ENV, loader });
+    release();
+    await Promise.all([first, second]);
+    assert.equal(loaderCalls, 1, "loader must run once");
+    assert.equal(ctorCalls.length, 1, "PostHog must be constructed once");
+    assert.equal(isAnalyticsReady(), true);
+  });
+
+  it("the racing caller awaits real completion, not a premature no-op", async () => {
+    const fake = makeFakeSdk();
+    const { Ctor } = makeFakeCtor(fake);
+    let resolved = false;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const loader = async () => {
+      await gate;
+      return Ctor as never;
+    };
+    const first = initAnalytics({ env: PROD_ENV, loader });
+    const second = initAnalytics({ env: PROD_ENV, loader }).then(() => {
+      // When the racing call settles, init must already be ready — it awaited
+      // the in-flight promise instead of resolving immediately.
+      resolved = isAnalyticsReady();
+    });
+    assert.equal(isAnalyticsReady(), false);
+    release();
+    await Promise.all([first, second]);
+    assert.equal(resolved, true);
+  });
+
+  it("allows a fresh init after the in-flight promise settles", async () => {
+    const fake = makeFakeSdk();
+    const { Ctor, ctorCalls } = makeFakeCtor(fake);
+    await initAnalytics({ env: PROD_ENV, loader: async () => Ctor as never });
+    // Second sequential call hits the `initialised` fast-path, not `pending`.
+    await initAnalytics({ env: PROD_ENV, loader: async () => Ctor as never });
+    assert.equal(ctorCalls.length, 1);
+  });
+
+  it("clears the in-flight promise on failure so a later init can retry", async () => {
+    const originalWarn = console.warn;
+    console.warn = () => {};
+    try {
+      await initAnalytics({
+        env: PROD_ENV,
+        loader: async () => {
+          throw new Error("native bridge missing");
+        },
+      });
+      assert.equal(isAnalyticsReady(), false);
+      // The failed run flipped `initialised`, so a retry needs a reset first —
+      // but the `pending` promise must not be left dangling either way.
+      __resetAnalyticsForTests();
+      const fake = makeFakeSdk();
+      const { Ctor, ctorCalls } = makeFakeCtor(fake);
+      await initAnalytics({ env: PROD_ENV, loader: async () => Ctor as never });
+      assert.equal(isAnalyticsReady(), true);
+      assert.equal(ctorCalls.length, 1);
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+});
+
 describe("lib/analytics — module shape", () => {
   it("does not import posthog-react-native at the top level", () => {
     const src = read("lib/analytics.ts");

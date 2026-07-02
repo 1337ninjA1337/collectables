@@ -45,6 +45,12 @@ export type AnalyticsLoader = () => Promise<PostHogConstructor>;
 let sdk: PostHogSdk | null = null;
 let initialised = false;
 let activeConfig: AnalyticsConfig | null = null;
+// In-flight init promise. A second initAnalytics() call (e.g. on auth state
+// change) that races the first one returns this instead of constructing a
+// second PostHog instance — the caller awaits the real completion rather than
+// slipping past the `initialised` guard, which only flips once the first call's
+// loader has resolved. Mirrors the Sentry initSentry() dedup.
+let pending: Promise<void> | null = null;
 
 let userOptedOut = false;
 
@@ -92,6 +98,18 @@ export type InitOptions = {
 
 export async function initAnalytics(options: InitOptions = {}): Promise<void> {
   if (initialised) return;
+  // A concurrent call already started booting — await the same promise so the
+  // PostHog instance is constructed exactly once.
+  if (pending) return pending;
+  pending = runInit(options);
+  try {
+    await pending;
+  } finally {
+    pending = null;
+  }
+}
+
+async function runInit(options: InitOptions): Promise<void> {
   if (userOptedOut) {
     initialised = true;
     return;
@@ -137,6 +155,7 @@ export function shutdownAnalytics(): void {
   sdk = null;
   initialised = false;
   activeConfig = null;
+  pending = null;
 }
 
 export function trackEvent(
@@ -181,6 +200,7 @@ export function __resetAnalyticsForTests(): void {
   sdk = null;
   initialised = false;
   activeConfig = null;
+  pending = null;
   userOptedOut = false;
   rateLimiter.reset();
 }
