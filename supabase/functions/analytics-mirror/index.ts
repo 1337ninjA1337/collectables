@@ -39,8 +39,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import {
   buildAnalyticsEventRow,
+  extractEvents,
   AnalyticsMirrorPayloadError,
-  type PostHogWebhookEvent,
   type AnalyticsEventRow,
 } from "../../../lib/analytics-mirror-payload.ts";
 import {
@@ -55,16 +55,6 @@ import {
   exceedsPayloadLimit,
   utf8ByteLength,
 } from "../_shared/payload-limit.ts";
-
-function extractEvents(payload: unknown): PostHogWebhookEvent[] {
-  if (payload && typeof payload === "object" && Array.isArray((payload as { batch?: unknown }).batch)) {
-    return (payload as { batch: PostHogWebhookEvent[] }).batch;
-  }
-  if (payload && typeof payload === "object") {
-    return [payload as PostHogWebhookEvent];
-  }
-  return [];
-}
 
 Deno.serve(async (req: Request) => {
   // SEC-10: centralised CORS — reflect only allow-listed origins (the webhook

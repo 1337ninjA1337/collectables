@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   AnalyticsMirrorPayloadError,
   buildAnalyticsEventRow,
+  extractEvents,
   isUuid,
   normaliseTimestamp,
   stripPosthogMeta,
@@ -182,6 +183,49 @@ describe("analytics-mirror payload transformer", () => {
         event: "a".repeat(200),
       });
       assert.equal(row.name.length, 200);
+    });
+  });
+
+  describe("extractEvents", () => {
+    it("wraps a single-event payload in a one-element array", () => {
+      const single = { event: "collection_created", properties: {} };
+      assert.deepEqual(extractEvents(single), [single]);
+    });
+
+    it("returns the batch array from a batch payload", () => {
+      const a = { event: "a" };
+      const b = { event: "b" };
+      assert.deepEqual(extractEvents({ batch: [a, b] }), [a, b]);
+    });
+
+    it("returns an empty batch as-is (empty-payload 400, not a bogus single)", () => {
+      assert.deepEqual(extractEvents({ batch: [] }), []);
+    });
+
+    it("treats a batch with one item as a batch, not a single event", () => {
+      const only = { event: "solo" };
+      assert.deepEqual(extractEvents({ batch: [only] }), [only]);
+    });
+
+    it("treats a non-array batch key as a single event (deeply nested non-batch)", () => {
+      const weird = { event: "x", batch: { nested: true } };
+      assert.deepEqual(extractEvents(weird), [weird]);
+    });
+
+    it("does not validate batch entries (per-row 207 handling is buildAnalyticsEventRow's job)", () => {
+      const bad = { nope: true } as Record<string, unknown>;
+      assert.deepEqual(extractEvents({ batch: [bad] }), [bad]);
+    });
+
+    it("yields no events for null, primitives, or a top-level array", () => {
+      assert.deepEqual(extractEvents(null), []);
+      assert.deepEqual(extractEvents(undefined), []);
+      assert.deepEqual(extractEvents("string"), []);
+      assert.deepEqual(extractEvents(42), []);
+      assert.deepEqual(extractEvents(true), []);
+      // A bare top-level array is not a documented PostHog shape; the old
+      // inline version wrapped the array itself as one (invalid) event.
+      assert.deepEqual(extractEvents([{ event: "x" }]), []);
     });
   });
 });

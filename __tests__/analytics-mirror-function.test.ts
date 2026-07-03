@@ -86,6 +86,11 @@ describe("analytics-mirror Edge Function", () => {
   it("accepts both single-event and batch payloads", () => {
     assert.match(SOURCE, /batch/);
     assert.match(SOURCE, /extractEvents/);
+    // The single-vs-batch detection lives in the typed transformer
+    // (`lib/analytics-mirror-payload.ts`) where it's unit-tested — the
+    // function must import it, not re-roll a local copy.
+    assert.match(SOURCE, /import\s*\{[\s\S]*?extractEvents[\s\S]*?\}\s*from/);
+    assert.doesNotMatch(SOURCE, /function extractEvents/);
   });
 
   it("handles CORS preflight (OPTIONS)", () => {
