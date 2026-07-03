@@ -1097,6 +1097,26 @@ the insert itself is not cancelled on timeout — PostgREST offers no abort —
 so a timed-out insert may still land; PostHog's retry will then be deduped by
 Postgres only if you add a uniqueness constraint (not done today).
 
+## SENTRY_DSN Edge Function secret — OPTIONAL
+
+The `analytics-mirror` function can cross-tag a partial success (`207` with
+rejected webhook events) into Sentry as a warning-level event
+(`supabase/functions/_shared/sentry-report.ts`), so a spike of malformed
+PostHog events surfaces in the crash dashboard instead of only in Edge
+Function logs. The report carries counts only — never event payloads — and a
+failed report never affects the webhook response.
+
+You only need to act to enable it. Reuse the same DSN the app uses
+(`EXPO_PUBLIC_SENTRY_DSN`'s value) or a dedicated Sentry project's DSN:
+
+```bash
+supabase secrets set --project-ref <your-project-ref> \
+  SENTRY_DSN="https://<key>@<org>.ingest.sentry.io/<project-id>"
+```
+
+Leave it unset to skip Sentry reporting entirely (the function no-ops).
+**Never commit the value** — set it in the Supabase dashboard / CLI only.
+
 ## analytics_events retention prune (SEC-13) — RECOMMENDED
 
 `docs/analytics-platform.md` ("Data retention") sets a **90-day** window for the

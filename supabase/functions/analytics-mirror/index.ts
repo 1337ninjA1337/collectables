@@ -59,6 +59,7 @@ import {
   resolveInsertTimeoutMs,
   withTimeout,
 } from "../_shared/insert-timeout.ts";
+import { reportMirrorAnomaly } from "../_shared/sentry-report.ts";
 
 Deno.serve(async (req: Request) => {
   // SEC-10: centralised CORS — reflect only allow-listed origins (the webhook
@@ -192,6 +193,18 @@ Deno.serve(async (req: Request) => {
     return jsonResponse(
       { error: insertError.message, inserted: 0, errors },
       500,
+    );
+  }
+
+  // Cross-tag a partial success into Sentry (optional SENTRY_DSN secret) so
+  // a spike of rejected webhook events surfaces in the crash dashboard
+  // instead of only in Edge Function logs. Fire-and-forget: counts only (no
+  // event payloads → no PII), and a failed report never breaks the response.
+  if (errors.length > 0) {
+    void reportMirrorAnomaly(
+      Deno.env.get("SENTRY_DSN"),
+      { status: 207, invalidCount: errors.length, insertedCount: rows.length },
+      fetch,
     );
   }
 
