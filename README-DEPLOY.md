@@ -61,6 +61,15 @@ follow the end-to-end checklist in [`APPSTORE-SUBMISSION.md`](./APPSTORE-SUBMISS
 visual assets, App Store Connect listing copy, EAS build/submit, and the
 TestFlight + review flow.
 
+Merges to `main` additionally queue an internal-distribution iOS build via
+`.github/workflows/eas-preview.yml` (fire-and-forget `eas build --platform ios
+--profile preview --non-interactive --no-wait`), so a fresh TestFlight-track
+binary is always available and native-only regressions surface within minutes
+of merge. The job needs an `EXPO_TOKEN` repository secret (an Expo access
+token from **expo.dev → Account settings → Access tokens**); while the secret
+is unset the job skips gracefully and costs no EAS build minutes. Build
+results appear in the Expo dashboard, not in GitHub Actions.
+
 
 ## Database migrations & local schema testing
 
