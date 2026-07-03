@@ -19,7 +19,10 @@ either.
   or <https://aka.ms/pbiSingleInstaller> (offline `.exe`).
 - **macOS / Linux**: Power BI Desktop is Windows-only. On a Mac, use
   [Parallels](https://www.parallels.com/) or a Windows VM (UTM, VirtualBox).
-  On Linux, run it under [Bottles](https://usebottles.com/) or a Windows VM.
+  On Linux, run it under [Bottles](https://usebottles.com/) or a Windows VM —
+  or skip the VM entirely and use the free cross-platform fallback:
+  [`docs/metabase-connection.md`](./metabase-connection.md) (same table, same
+  measures as SQL).
 - **Browser fallback**: <https://app.powerbi.com> renders existing reports but
   cannot author against a custom Postgres connection without a Pro license.
 
@@ -229,6 +232,8 @@ the copy-paste fallback.
 
 ## 8. Related docs
 
+- [`docs/metabase-connection.md`](./metabase-connection.md) — free
+  cross-platform fallback (same connection, measures as plain SQL).
 - [`docs/analytics-platform.md`](./analytics-platform.md) — why this stack.
 - [`MANUAL-TASKS.md`](../MANUAL-TASKS.md) — `analytics-mirror` Edge Function
   deployment + PostHog webhook configuration.
