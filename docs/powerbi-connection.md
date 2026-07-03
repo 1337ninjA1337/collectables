@@ -206,7 +206,8 @@ For **Import** mode:
    the credentials are saved.
 2. **Refresh** manually for now. Scheduled refresh requires **Power BI Pro**
    (\$10/user/month); for a single-author dashboard, a daily manual refresh is
-   usually fine.
+   usually fine. See [`docs/powerbi-cost-projection.md`](./powerbi-cost-projection.md)
+   for exactly when (and what) to budget.
 3. If the dataset grows past a few hundred MB, switch the model to
    **Incremental refresh** keyed on `occurred_at` so only new days are pulled.
 
@@ -234,6 +235,8 @@ the copy-paste fallback.
 
 - [`docs/metabase-connection.md`](./metabase-connection.md) — free
   cross-platform fallback (same connection, measures as plain SQL).
+- [`docs/powerbi-cost-projection.md`](./powerbi-cost-projection.md) — when
+  the free tier stops being enough and what each tier costs.
 - [`docs/analytics-platform.md`](./analytics-platform.md) — why this stack.
 - [`MANUAL-TASKS.md`](../MANUAL-TASKS.md) — `analytics-mirror` Edge Function
   deployment + PostHog webhook configuration.
