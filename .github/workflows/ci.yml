@@ -63,6 +63,9 @@ jobs:
       - name: No committed secrets
         run: npm run lint:secrets
 
+      - name: App Store config pre-flight
+        run: npm run lint:appstore
+
       - name: Run tests
         run: npm test
 
