@@ -48,19 +48,9 @@ import {
   ServiceRoleClaimError,
 } from "../../../lib/service-role-claim.ts";
 import { evaluateCors, forbiddenOriginResponse } from "../_shared/cors.ts";
-
-/**
- * Constant-time string compare to defeat timing-channel probes against the
- * shared webhook secret. Branches only on length (already-known public info).
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
-}
+// Constant-time compare over UTF-8 bytes (defeats timing-channel probes
+// against the shared webhook secret) — shared, node-tested helper.
+import { timingSafeEqual } from "../../../lib/timing-safe-equal.ts";
 
 function extractEvents(payload: unknown): PostHogWebhookEvent[] {
   if (payload && typeof payload === "object" && Array.isArray((payload as { batch?: unknown }).batch)) {

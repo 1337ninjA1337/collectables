@@ -54,21 +54,18 @@ describe("analytics-mirror Edge Function", () => {
     );
   });
 
-  it("compares the secret in constant time (XOR-accumulator over every char)", () => {
-    assert.match(SOURCE, /timingSafeEqual/);
-    const fnBlock = SOURCE.match(/function timingSafeEqual[\s\S]*?\n}/);
-    assert.ok(fnBlock, "timingSafeEqual function not found");
-    const body = fnBlock![0];
-    // XOR-accumulator pattern means no early break inside the loop.
-    assert.match(body, /diff\s*\|=/);
-    // The only `return false` allowed is the length-mismatch guard before
-    // the loop. Confirm no `return false` appears between `for (` and the
-    // closing `}` of the function (simple substring slice check).
-    const forIdx = body.indexOf("for (");
-    if (forIdx >= 0) {
-      const loopAndAfter = body.slice(forIdx);
-      assert.doesNotMatch(loopAndAfter, /return false/);
-    }
+  it("compares the secret via the shared constant-time helper", () => {
+    // The XOR-accumulator implementation lives in lib/timing-safe-equal.ts
+    // (structurally + behaviourally covered by timing-safe-equal.test.ts);
+    // here we only assert the function imports it instead of re-rolling a
+    // per-character compare inline.
+    assert.match(
+      SOURCE,
+      /import\s*\{\s*timingSafeEqual\s*\}\s*from\s+['"][^'"]*lib\/timing-safe-equal\.ts['"]/,
+    );
+    assert.match(SOURCE, /timingSafeEqual\(providedSecret, expectedSecret\)/);
+    assert.doesNotMatch(SOURCE, /function timingSafeEqual/);
+    assert.doesNotMatch(SOURCE, /charCodeAt/);
   });
 
   it("inserts via the service_role key (bypassing analytics_events RLS)", () => {
