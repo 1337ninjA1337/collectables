@@ -1,0 +1,50 @@
+name: EAS iOS preview build
+# Fires an internal-distribution iOS build on every merge to main so a fresh
+# TestFlight-track binary always exists and native-only regressions (Hermes /
+# Reanimated worklet failures) surface within minutes of merge instead of at
+# submission time. Fire-and-forget: --no-wait queues the build on EAS and the
+# job ends — build minutes are spent on Expo's side, results live in the Expo
+# dashboard.
+#
+# Requires the EXPO_TOKEN repository secret (an Expo access token from
+# https://expo.dev/accounts/[account]/settings/access-tokens). When the secret
+# is absent the job skips gracefully instead of failing, so forks and
+# minute-frugal periods cost nothing.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  # One queued preview build at a time; a newer merge supersedes the queue.
+  group: eas-preview
+  cancel-in-progress: true
+jobs:
+  ios-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Check EXPO_TOKEN presence
+        id: token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -n "$EXPO_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "EXPO_TOKEN secret not configured — skipping EAS build (see README-DEPLOY.md 'Native (iOS / App Store) deploys')."
+          fi
+      - name: Install dependencies
+        if: steps.token.outputs.present == 'true'
+        run: npm ci
+      - name: Queue EAS iOS preview build
+        if: steps.token.outputs.present == 'true'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx eas-cli@latest build --platform ios --profile preview --non-interactive --no-wait
