@@ -33,6 +33,11 @@ Supabase exposes the underlying Postgres via a connection pooler (PgBouncer).
 For BI tools we want the **session pooler** because Power BI keeps a
 long-lived connection during query refresh.
 
+> Quick start: `npm run powerbi:conn` derives the values below from your
+> `.env` (project ref, pooler username, database, ready-to-paste Postgres URI —
+> with a placeholder for the service-role secret, which never leaves the
+> dashboard). Only the `<region>` part still needs step 1 below.
+
 1. In the Supabase dashboard → **Project settings** → **Database** →
    **Connection string** → tab **Session pooler**.
 2. Copy the host (`aws-0-<region>.pooler.supabase.com`), port (`5432`),
