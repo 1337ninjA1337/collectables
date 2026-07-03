@@ -19,6 +19,7 @@
     "lint:sentry-version": "tsx scripts/check-sentry-version.ts",
     "privacy:generate": "tsx scripts/generate-privacy-manifest.ts",
     "powerbi:schema-doc": "tsx scripts/generate-powerbi-schema-doc.ts",
+    "powerbi:conn": "tsx scripts/print-powerbi-conn.ts",
     "lint:powerbi-doc": "tsx scripts/generate-powerbi-schema-doc.ts --check",
     "sentry:check": "tsx scripts/sentry-doctor.ts",
     "lint:ci": "npx tsc --noEmit && npm run lint:hex && npm run lint:migration-docs && npm run lint:secrets && npm run lint:appstore && npm run lint:sentry-version && npm run lint:powerbi-doc && npm test",
