@@ -142,7 +142,11 @@ In App Store Connect, **App Information** and **Version → 1.0 Prepare for Subm
 
 ## 6. Privacy declarations (MANUAL — App Store Connect → App Privacy)
 
-Apple requires every app to declare what data it collects and how. Based
+Apple requires every app to declare what data it collects and how. The
+table below is generated from `lib/privacy-manifest.ts` (run
+`npm run privacy:generate` after changing the module and paste the printed
+table here — `__tests__/privacy-manifest.test.ts` fails when they drift; the
+same module emits the committed `PrivacyInfo.xcprivacy`). Based
 on the current code:
 
 | Data type | Collected? | Linked to user? | Used for tracking? | Source |

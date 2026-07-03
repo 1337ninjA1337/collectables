@@ -16,6 +16,7 @@
     "lint:secrets": "tsx scripts/check-secrets.ts",
     "lint:secrets:bundle": "tsx scripts/check-bundle-secrets.ts",
     "lint:appstore": "tsx scripts/check-appstore-config.ts",
+    "privacy:generate": "tsx scripts/generate-privacy-manifest.ts",
     "lint:ci": "npx tsc --noEmit && npm run lint:hex && npm run lint:migration-docs && npm run lint:secrets && npm run lint:appstore && npm test",
     "postinstall": "npx expo install --check || true",
     "build": "npx expo export --platform web && tsx scripts/build-spa-fallback.ts",
