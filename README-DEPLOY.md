@@ -53,6 +53,16 @@ to run the app locally.
 If you change a secret, trigger a new deploy by either pushing a no-op commit
 to `main` or by going to **Actions → Deploy to GitHub Pages → Run workflow**.
 
+## Sentry self-check
+
+`npm run sentry:check` validates the crash-reporting wiring without opening
+the Sentry UI: it probes the DSN's ingest endpoint, confirms the most recent
+release was tagged, and checks that release has uploaded sourcemap artifacts.
+Source your `.env` (or export `EXPO_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`,
+`SENTRY_ORG`, `SENTRY_PROJECT`) first — checks whose inputs are missing are
+skipped rather than failed, and the script exits non-zero only on a hard
+failure (unreachable DSN, untagged release, missing sourcemaps).
+
 ## Native (iOS / App Store) deploys
 
 GitHub Pages only covers the web target. For an iOS App Store submission,
