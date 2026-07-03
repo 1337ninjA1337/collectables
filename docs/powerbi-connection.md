@@ -89,18 +89,29 @@ Indexes available to the planner:
 ### Expanding `properties` (jsonb)
 
 Power Query: select the `properties` column → **Transform** → **Parse** →
-**JSON** → expand the columns you need. A typical expansion:
+**JSON** → expand the columns you need. Property keys per event:
 
-| Event              | Useful property keys              |
-| ------------------ | --------------------------------- |
-| `signup_completed` | `method`, `provider`, `language`  |
-| `listing_created`  | `mode`, `hasPrice`                |
-| `premium_activated`| `source`                          |
-| `chat_opened`      | `conversationId`, `withFriend`    |
+<!-- powerbi-schema-table:begin -->
+<!-- Generated from lib/analytics-events.ts by scripts/generate-powerbi-schema-doc.ts — do not edit by hand; run `npm run powerbi:schema-doc`. -->
+| Event | Property keys | Description |
+| ----- | ------------- | ----------- |
+| `chat_opened` | `conversationId`, `withFriend` | Fired from `app/chat/[id].tsx` `useEffect`, debounced so navigating in/out doesn't double-count. `withFriend` distinguishes mutual-follow chats. |
+| `collection_created` | `visibility`, `isPremium` | Fired after a successful save in `app/create-collection.tsx`. Lets us track public-vs-private adoption and whether premium users behave differently. |
+| `friend_requested` | `targetUserId` | Fired from the request-send action in `lib/social-context.tsx`. `targetUserId` lets us spot reciprocal-follow loops. |
+| `item_added` | `collectionId`, `hasPhoto` | Fired after a successful save in `app/create.tsx`. Slice by `collectionId` to find the most-active collections; `hasPhoto` measures the first-photo conversion funnel. |
+| `item_photo_attached` | `itemId`, `collectionId` | Fired the first time an existing item gets a photo (post-create photo upload). Distinct from `item_added` so we can attribute photo conversions independently. |
+| `language_switched` | `language`, `previousLanguage` | Fired from `lib/i18n-context.tsx:setLanguage()` whenever the user picks a new language. Used to size the i18n test surface per locale. |
+| `listing_claimed` | `mode`, `sellerWasFriend` | Fired from `app/listing/[id].tsx` after the buy/trade flow completes. `sellerWasFriend` measures the social-graph contribution to marketplace velocity. |
+| `listing_created` | `mode`, `hasPrice` | Fired from `app/item/[id].tsx` after a marketplace listing is published. `mode` = sale/trade/swap; `hasPrice` flags whether the listing carries a numeric price. |
+| `premium_activated` | `source` | Fired from the premium false→true transition hook in `components/bottom-nav.tsx`. `source` carries which screen triggered the upgrade. |
+| `signup_completed` | `method`, `provider`, `language` | Fired when a freshly-created user finishes the OTP/OAuth flow (detected by `created_at` within the last 5 minutes). |
+<!-- powerbi-schema-table:end -->
 
 The single source of truth for property shapes lives in
-[`lib/analytics-events.ts`](../lib/analytics-events.ts) — keep this table in
-sync when new props are added.
+[`lib/analytics-events.ts`](../lib/analytics-events.ts). The table above is
+**generated** from it — after adding or changing an event, run
+`npm run powerbi:schema-doc` and commit the result (`lint:ci` fails when the
+doc drifts).
 
 ## 5. Three starter DAX measures
 
