@@ -1074,6 +1074,29 @@ Leave it unset for the default GitHub Pages + deep-link allow-list. Origins are
 matched exactly on scheme+host (no trailing slash, no path). **Never commit the
 value** — set it in the Supabase dashboard / CLI only.
 
+## POSTHOG_WEBHOOK_TIMEOUT_MS Edge Function secret — OPTIONAL
+
+The `analytics-mirror` function bounds its `analytics_events` insert with a
+self-imposed timeout (`supabase/functions/_shared/insert-timeout.ts`, default
+**5000 ms**) and answers `504 {"error":"insert timeout"}` when Postgres is too
+slow — so a hung connection frees the function early and PostHog retries with
+its standard exponential backoff instead of waiting for the platform's hard
+timeout.
+
+You only need to act to tune that ceiling (e.g. a busier database or a huge
+but legitimate batch). Set a positive integer of milliseconds:
+
+```bash
+supabase secrets set --project-ref <your-project-ref> \
+  POSTHOG_WEBHOOK_TIMEOUT_MS=10000
+```
+
+Leave it unset for the 5 s default. Blank/malformed/zero/negative values fall
+back to the default (a misconfigured knob can never disable the bound). Note
+the insert itself is not cancelled on timeout — PostgREST offers no abort —
+so a timed-out insert may still land; PostHog's retry will then be deduped by
+Postgres only if you add a uniqueness constraint (not done today).
+
 ## analytics_events retention prune (SEC-13) — RECOMMENDED
 
 `docs/analytics-platform.md` ("Data retention") sets a **90-day** window for the

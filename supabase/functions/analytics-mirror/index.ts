@@ -55,6 +55,10 @@ import {
   exceedsPayloadLimit,
   utf8ByteLength,
 } from "../_shared/payload-limit.ts";
+import {
+  resolveInsertTimeoutMs,
+  withTimeout,
+} from "../_shared/insert-timeout.ts";
 
 Deno.serve(async (req: Request) => {
   // SEC-10: centralised CORS — reflect only allow-listed origins (the webhook
@@ -164,10 +168,25 @@ Deno.serve(async (req: Request) => {
     throw configErr;
   }
 
+  // Bound the insert so a slow/hung Postgres connection can't tie up the
+  // function until the platform's hard timeout — a 504 lets PostHog retry
+  // sooner with its standard exponential backoff. Tunable per-deploy via the
+  // optional POSTHOG_WEBHOOK_TIMEOUT_MS secret (default 5s).
+  const insertTimeoutMs = resolveInsertTimeoutMs(
+    Deno.env.get("POSTHOG_WEBHOOK_TIMEOUT_MS"),
+  );
   const adminClient = createClient(supabaseUrl, serviceRoleKey);
-  const { error: insertError } = await adminClient
-    .from("analytics_events")
-    .insert(rows);
+  const insertResult = await withTimeout(
+    adminClient.from("analytics_events").insert(rows),
+    insertTimeoutMs,
+  );
+  if (insertResult.timedOut) {
+    return jsonResponse(
+      { error: "insert timeout", timeoutMs: insertTimeoutMs, errors },
+      504,
+    );
+  }
+  const { error: insertError } = insertResult.value;
 
   if (insertError) {
     return jsonResponse(
