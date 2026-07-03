@@ -105,3 +105,26 @@ export function buildAnalyticsEventRow(
     properties: stripPosthogMeta(event.properties),
   };
 }
+
+/**
+ * Single-vs-batch detection over a parsed webhook payload. PostHog sends one
+ * event per POST (`{event, ...}`), but a destination can also be configured
+ * to batch (`{batch: [{event, ...}, ...]}`). Both are accepted; anything
+ * non-object (null, arrays at the top level, primitives) yields no events —
+ * the function's "empty payload" 400 path. Individual entries are NOT
+ * validated here; that's `buildAnalyticsEventRow`'s job so a bad entry in a
+ * batch fails per-row (207) instead of rejecting the whole payload.
+ */
+export function extractEvents(payload: unknown): PostHogWebhookEvent[] {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    Array.isArray((payload as { batch?: unknown }).batch)
+  ) {
+    return (payload as { batch: PostHogWebhookEvent[] }).batch;
+  }
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return [payload as PostHogWebhookEvent];
+  }
+  return [];
+}
