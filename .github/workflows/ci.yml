@@ -66,6 +66,9 @@ jobs:
       - name: App Store config pre-flight
         run: npm run lint:appstore
 
+      - name: Sentry SDK major pinned
+        run: npm run lint:sentry-version
+
       - name: Run tests
         run: npm test
 
