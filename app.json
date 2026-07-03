@@ -18,7 +18,25 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.collectables.app",
-      "buildNumber": "1.0.0"
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Collectables needs access to your photos so you can attach images to collection items.",
+        "NSPhotoLibraryAddUsageDescription": "Collectables saves shared images back to your photo library.",
+        "NSCameraUsageDescription": "Collectables uses the camera to capture photos of collection items.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDevelopmentRegion": "en",
+        "CFBundleLocalizations": [
+          "en",
+          "ru",
+          "be",
+          "pl",
+          "de",
+          "es"
+        ]
+      },
+      "associatedDomains": [
+        "applinks:1337ninja1337.github.io"
+      ]
     },
     "android": {
       "adaptiveIcon": {
