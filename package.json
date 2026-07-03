@@ -18,6 +18,7 @@
     "lint:appstore": "tsx scripts/check-appstore-config.ts",
     "lint:sentry-version": "tsx scripts/check-sentry-version.ts",
     "privacy:generate": "tsx scripts/generate-privacy-manifest.ts",
+    "sentry:check": "tsx scripts/sentry-doctor.ts",
     "lint:ci": "npx tsc --noEmit && npm run lint:hex && npm run lint:migration-docs && npm run lint:secrets && npm run lint:appstore && npm run lint:sentry-version && npm test",
     "postinstall": "npx expo install --check || true",
     "build": "npx expo export --platform web && tsx scripts/build-spa-fallback.ts",
