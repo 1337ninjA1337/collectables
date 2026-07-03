@@ -49,6 +49,12 @@ import {
 } from "../../../lib/service-role-claim.ts";
 import { evaluateCors, forbiddenOriginResponse } from "../_shared/cors.ts";
 import { timingSafeEqualStrings } from "../_shared/timing-safe-equal.ts";
+import {
+  MAX_PAYLOAD_BYTES,
+  declaredContentLength,
+  exceedsPayloadLimit,
+  utf8ByteLength,
+} from "../_shared/payload-limit.ts";
 
 function extractEvents(payload: unknown): PostHogWebhookEvent[] {
   if (payload && typeof payload === "object" && Array.isArray((payload as { batch?: unknown }).batch)) {
@@ -94,9 +100,35 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "unauthorized" }, 401);
   }
 
+  // Bound the body at 256KB so a misconfigured PostHog destination batching
+  // hundreds of events can't push a giant insert at Postgres. The declared
+  // Content-Length rejects cheaply before the body is read; the byte length
+  // of the read body is the authoritative check (the header is
+  // client-controlled and absent on chunked encoding).
+  const declaredBytes = declaredContentLength(req.headers.get("content-length"));
+  if (declaredBytes !== null && exceedsPayloadLimit(declaredBytes)) {
+    return jsonResponse(
+      { error: "payload too large", maxBytes: MAX_PAYLOAD_BYTES },
+      413,
+    );
+  }
+
+  let bodyText: string;
+  try {
+    bodyText = await req.text();
+  } catch {
+    return jsonResponse({ error: "invalid json" }, 400);
+  }
+  if (exceedsPayloadLimit(utf8ByteLength(bodyText))) {
+    return jsonResponse(
+      { error: "payload too large", maxBytes: MAX_PAYLOAD_BYTES },
+      413,
+    );
+  }
+
   let payload: unknown;
   try {
-    payload = await req.json();
+    payload = JSON.parse(bodyText);
   } catch {
     return jsonResponse({ error: "invalid json" }, 400);
   }
