@@ -48,19 +48,7 @@ import {
   ServiceRoleClaimError,
 } from "../../../lib/service-role-claim.ts";
 import { evaluateCors, forbiddenOriginResponse } from "../_shared/cors.ts";
-
-/**
- * Constant-time string compare to defeat timing-channel probes against the
- * shared webhook secret. Branches only on length (already-known public info).
- */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
-}
+import { timingSafeEqualStrings } from "../_shared/timing-safe-equal.ts";
 
 function extractEvents(payload: unknown): PostHogWebhookEvent[] {
   if (payload && typeof payload === "object" && Array.isArray((payload as { batch?: unknown }).batch)) {
@@ -102,7 +90,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const providedSecret = req.headers.get("x-posthog-webhook-secret") ?? "";
-  if (!timingSafeEqual(providedSecret, expectedSecret)) {
+  if (!timingSafeEqualStrings(providedSecret, expectedSecret)) {
     return jsonResponse({ error: "unauthorized" }, 401);
   }
 
