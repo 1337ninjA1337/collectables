@@ -14,6 +14,7 @@ import {
   shutdownClarity,
   type ClarityRuntime,
 } from "../lib/clarity";
+import { setupFakeDom } from "./helpers/fake-dom";
 
 const ROOT = path.join(__dirname, "..");
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
@@ -26,96 +27,6 @@ const enabledRuntime = (overrides?: Partial<ClarityRuntime>): ClarityRuntime => 
   ...overrides,
 });
 
-type FakeNode = { id?: string; parentNode?: FakeParent | null; tagName?: string };
-type FakeParent = {
-  removed: FakeNode[];
-  inserted: { node: FakeNode; before: FakeNode | null }[];
-  appended: FakeNode[];
-  removeChild: (node: FakeNode) => void;
-  insertBefore: (node: FakeNode, ref: FakeNode | null) => void;
-  appendChild: (node: FakeNode) => void;
-};
-
-function setupFakeDom(opts?: { hasFirstScript?: boolean; doNotTrack?: unknown }) {
-  const head: FakeParent = {
-    removed: [],
-    inserted: [],
-    appended: [],
-    removeChild(node) {
-      this.removed.push(node);
-      node.parentNode = null;
-    },
-    insertBefore(node, ref) {
-      this.inserted.push({ node, before: ref });
-      node.parentNode = this;
-    },
-    appendChild(node) {
-      this.appended.push(node);
-      node.parentNode = this;
-    },
-  };
-  const firstScript: FakeNode | null = opts?.hasFirstScript === false
-    ? null
-    : { tagName: "SCRIPT", parentNode: head };
-  const created: FakeNode[] = [];
-  const byId: Record<string, FakeNode | null> = {};
-
-  const fakeDocument = {
-    head,
-    getElementById(id: string) {
-      return byId[id] ?? null;
-    },
-    getElementsByTagName(_: string) {
-      return firstScript ? [firstScript] : [];
-    },
-    createElement(_: string) {
-      const node: FakeNode & {
-        id?: string;
-        async?: boolean;
-        src?: string;
-      } = {};
-      created.push(node);
-      // Simulate the side-effect of setting id: register it in the byId map.
-      Object.defineProperty(node, "id", {
-        configurable: true,
-        get() {
-          return (this as { _id?: string })._id;
-        },
-        set(value: string) {
-          (this as { _id?: string })._id = value;
-          byId[value] = node as FakeNode;
-        },
-      });
-      return node;
-    },
-  };
-
-  const fakeWindow: Record<string, unknown> = {
-    navigator: { doNotTrack: opts?.doNotTrack ?? "0" },
-  };
-
-  const g = globalThis as unknown as {
-    window?: unknown;
-    document?: unknown;
-  };
-  const prevWindow = g.window;
-  const prevDocument = g.document;
-  g.window = fakeWindow;
-  g.document = fakeDocument;
-
-  return {
-    head,
-    created,
-    byId,
-    fakeWindow,
-    restore() {
-      if (prevWindow === undefined) delete g.window;
-      else g.window = prevWindow;
-      if (prevDocument === undefined) delete g.document;
-      else g.document = prevDocument;
-    },
-  };
-}
 
 describe("lib/clarity — shouldLoadClarity gates", () => {
   beforeEach(() => __resetClarityForTests());
