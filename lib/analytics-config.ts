@@ -11,6 +11,7 @@ export type AnalyticsConfig = {
   clarityId: string;
   environment: AnalyticsEnvironment;
   enabled: boolean;
+  mirrorDisabled: boolean;
 };
 
 const DEFAULT_POSTHOG_HOST = "https://eu.posthog.com";
@@ -42,7 +43,15 @@ export function resolveAnalyticsConfig(
   );
   const killSwitch = isAnalyticsDisabledByEnv(env.EXPO_PUBLIC_ANALYTICS_DISABLED);
   const enabled = !killSwitch && posthogKey.length > 0 && environment !== "development";
-  return { posthogKey, posthogHost, clarityId, environment, enabled };
+  // Narrower kill-switch for the analytics-mirror long-tail store: when set
+  // (same truthy literals), any client-side wiring that would configure or
+  // advertise the PostHog→Supabase mirror webhook must treat the mirror as
+  // off, while PostHog/Clarity themselves stay live. The full kill-switch
+  // implies it — a mirror of a disabled stream is meaningless.
+  const mirrorDisabled =
+    !enabled ||
+    isAnalyticsDisabledByEnv(env.EXPO_PUBLIC_ANALYTICS_MIRROR_DISABLED);
+  return { posthogKey, posthogHost, clarityId, environment, enabled, mirrorDisabled };
 }
 
 /**
@@ -63,6 +72,8 @@ export function readAnalyticsEnvFromProcess(): Record<
     EXPO_PUBLIC_ANALYTICS_ENV: process.env.EXPO_PUBLIC_ANALYTICS_ENV,
     EXPO_PUBLIC_SENTRY_ENV: process.env.EXPO_PUBLIC_SENTRY_ENV,
     EXPO_PUBLIC_ANALYTICS_DISABLED: process.env.EXPO_PUBLIC_ANALYTICS_DISABLED,
+    EXPO_PUBLIC_ANALYTICS_MIRROR_DISABLED:
+      process.env.EXPO_PUBLIC_ANALYTICS_MIRROR_DISABLED,
   };
 }
 
