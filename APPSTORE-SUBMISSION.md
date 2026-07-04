@@ -424,6 +424,7 @@ eas secret:create --scope project --name EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET --
 eas secret:create --scope project --name EXPO_PUBLIC_APP_URL --value "https://1337ninja1337.github.io/collectables"
 eas secret:create --scope project --name EXPO_PUBLIC_SENTRY_DSN --value "..."           # optional, enables crash reporting
 eas secret:create --scope project --name EXPO_PUBLIC_SENTRY_ENV --value "production"     # optional, gates SDK init
+eas secret:create --scope project --name EXPO_PUBLIC_ANALYTICS_ENV --value "production"  # optional, overrides EXPO_PUBLIC_SENTRY_ENV for analytics only; `development` disables analytics
 eas secret:create --scope project --name EXPO_PUBLIC_POSTHOG_KEY --value "..."           # optional, enables PostHog analytics
 eas secret:create --scope project --name EXPO_PUBLIC_POSTHOG_HOST --value "https://eu.posthog.com"  # optional, defaults to EU cloud
 eas secret:create --scope project --name EXPO_PUBLIC_CLARITY_PROJECT_ID --value "..."    # optional, web-only session replay (not injected on iOS)
