@@ -87,6 +87,11 @@ jobs:
       - name: No secrets in web bundle
         run: npm run lint:secrets:bundle
 
+      # Regression tripwire for a statically-imported analytics SDK or a
+      # duplicated chunk — budget rationale lives in lib/check-bundle-size.ts.
+      - name: Bundle size budget
+        run: npm run lint:bundle-size
+
       - name: Bundle smoke check
         run: |
           BUNDLE=$(ls dist/_expo/static/js/web/*.js 2>/dev/null | head -1)
