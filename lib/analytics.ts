@@ -22,6 +22,7 @@ export type AnalyticsEventName =
   | "chat_opened"
   | "friend_requested"
   | "premium_activated"
+  | "premium_upsell_shown"
   | "language_switched";
 
 export type AnalyticsProps = Record<string, string | number | boolean | null>;

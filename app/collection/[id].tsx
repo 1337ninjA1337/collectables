@@ -16,6 +16,7 @@ import { ReactionBar } from "@/components/reaction-bar";
 import { CurrencySheet } from "@/components/currency-sheet";
 import { Screen } from "@/components/screen";
 import { SelectableItemRow } from "@/components/selectable-item-row";
+import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
@@ -881,6 +882,10 @@ export default function CollectionDetailsScreen() {
                       }}
                       onPress={() => {
                         if (locked) {
+                          trackEvent("premium_upsell_shown", {
+                            feature: "private_collection",
+                            source: "collection_edit",
+                          });
                           toast.error(t("visibilityPrivatePremiumOnly"), t("premiumTitle"));
                           return;
                         }

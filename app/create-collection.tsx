@@ -232,6 +232,10 @@ export default function CreateCollectionScreen() {
                 }}
                 onPress={() => {
                   if (locked) {
+                    trackEvent("premium_upsell_shown", {
+                      feature: "private_collection",
+                      source: "create_collection",
+                    });
                     setUpsellVisible(true);
                     return;
                   }
