@@ -51,6 +51,12 @@ jobs:
         continue-on-error: true
         run: npm audit --audit-level=high
 
+      # Fails only on drift in the watched posthog-* packages (pinned
+      # manually because the dev sandbox can't reach the Expo registry);
+      # other expo-managed drift is advisory, registry outage is a skip.
+      - name: Expo-recommended versions (posthog-* watched)
+        run: npm run lint:expo-install
+
       - name: Typecheck
         run: npx tsc --noEmit
 
