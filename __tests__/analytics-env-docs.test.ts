@@ -10,6 +10,7 @@ const POSTHOG_VARS = [
   "EXPO_PUBLIC_POSTHOG_KEY",
   "EXPO_PUBLIC_POSTHOG_HOST",
   "EXPO_PUBLIC_CLARITY_PROJECT_ID",
+  "EXPO_PUBLIC_ANALYTICS_ENV",
 ];
 
 describe("Analytics #2 — deps + env wiring", () => {
