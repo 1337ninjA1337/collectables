@@ -60,6 +60,9 @@ jobs:
       - name: Migrations documented in MANUAL-TASKS.md
         run: npm run lint:migration-docs
 
+      - name: Migration filenames follow convention
+        run: npm run lint:migration-naming
+
       - name: No committed secrets
         run: npm run lint:secrets
 
