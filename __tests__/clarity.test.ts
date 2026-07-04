@@ -5,6 +5,7 @@ import { describe, it, beforeEach, afterEach } from "node:test";
 
 import {
   __resetClarityForTests,
+  addClarityCustomTag,
   detectBrowserRuntime,
   initClarity,
   isClarityOptedOut,
@@ -346,5 +347,72 @@ describe("docs/analytics-platform.md — Clarity implementation note", () => {
       /EXPO_PUBLIC_CLARITY_PROJECT_ID/,
       "Doc must name the env var so secret-rotation runbooks can find it",
     );
+  });
+});
+
+describe("lib/clarity — addClarityCustomTag", () => {
+  let fake: ReturnType<typeof setupFakeDom> | null = null;
+
+  beforeEach(() => __resetClarityForTests());
+  afterEach(() => {
+    if (fake) {
+      fake.restore();
+      fake = null;
+    }
+  });
+
+  const clarityStub = () =>
+    (fake!.fakeWindow as {
+      clarity?: { (...args: unknown[]): void; q?: unknown[][] };
+    }).clarity;
+
+  it("forwards ('set', key, value) into the queue shim after init", () => {
+    fake = setupFakeDom();
+    initClarity({ runtime: enabledRuntime() });
+    const ok = addClarityCustomTag("isPremium", "true");
+    assert.equal(ok, true);
+    assert.deepEqual(clarityStub()!.q?.[0], ["set", "isPremium", "true"]);
+  });
+
+  it("trims the key and passes the value through untouched", () => {
+    fake = setupFakeDom();
+    initClarity({ runtime: enabledRuntime() });
+    assert.equal(addClarityCustomTag("  language ", "ru"), true);
+    assert.deepEqual(clarityStub()!.q?.[0], ["set", "language", "ru"]);
+  });
+
+  it("returns false before init — nothing is queued", () => {
+    fake = setupFakeDom();
+    assert.equal(addClarityCustomTag("isPremium", "true"), false);
+    assert.equal(clarityStub(), undefined);
+  });
+
+  it("returns false for an empty / whitespace-only key", () => {
+    fake = setupFakeDom();
+    initClarity({ runtime: enabledRuntime() });
+    assert.equal(addClarityCustomTag("", "x"), false);
+    assert.equal(addClarityCustomTag("   ", "x"), false);
+    assert.equal(clarityStub()!.q?.length, 0);
+  });
+
+  it("returns false after opt-out and after shutdown", () => {
+    fake = setupFakeDom();
+    initClarity({ runtime: enabledRuntime() });
+    setClarityOptOut(true);
+    assert.equal(addClarityCustomTag("isPremium", "true"), false);
+    setClarityOptOut(false);
+
+    initClarity({ runtime: enabledRuntime() });
+    shutdownClarity();
+    assert.equal(addClarityCustomTag("isPremium", "true"), false);
+  });
+
+  it("survives a throwing tracker without propagating", () => {
+    fake = setupFakeDom();
+    initClarity({ runtime: enabledRuntime() });
+    (fake.fakeWindow as { clarity?: unknown }).clarity = () => {
+      throw new Error("tracker exploded");
+    };
+    assert.equal(addClarityCustomTag("isPremium", "true"), false);
   });
 });
