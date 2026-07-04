@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 import { CurrencySheet } from "@/components/currency-sheet";
 import { useAppTheme } from "@/components/use-app-theme";
 import {
@@ -55,7 +56,7 @@ export function CurrencyInput({
     <View style={styles.container}>
       <View style={{ ...styles.inputRow, backgroundColor: theme.card, borderColor: theme.border }}>
         <Text style={styles.currencySymbol}>{currency}</Text>
-        <TextInput
+        <MaskedTextInput
           value={value}
           onChangeText={(raw) => onChangeValue(sanitize(raw))}
           placeholder={placeholder}

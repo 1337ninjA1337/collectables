@@ -10,9 +10,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
@@ -323,7 +323,7 @@ export default function ChatDetailScreen() {
         ) : null}
 
         <View style={styles.composer}>
-          <TextInput
+          <MaskedTextInput
             style={styles.input}
             placeholder={t("chatInputPlaceholder")}
             placeholderTextColor={MUTED_14}

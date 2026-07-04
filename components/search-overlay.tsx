@@ -8,9 +8,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 //
 import { EmptyState } from "@/components/empty-state";
 import { useCollections } from "@/lib/collections-context";
@@ -164,7 +164,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
           {/* Search input */}
           <View style={styles.inputRow}>
             <Ionicons name="search" size={20} color={MUTED_13} />
-            <TextInput
+            <MaskedTextInput
               value={query}
               onChangeText={setQuery}
               placeholder={t("searchPlaceholder")}

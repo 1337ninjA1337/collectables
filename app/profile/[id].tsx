@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { EmptyState } from "@/components/empty-state";
 import { SkeletonProfile } from "@/components/skeleton";
@@ -318,7 +319,7 @@ export default function ProfileScreen() {
           {editingHandle && relationship === "self" ? (
             <>
               <Text style={styles.handlePrefix}>@</Text>
-              <TextInput
+              <MaskedTextInput
                 value={profileIdDraft}
                 onChangeText={setProfileIdDraft}
                 placeholder={t("profileIdPlaceholder")}
@@ -349,7 +350,7 @@ export default function ProfileScreen() {
           <View style={{ ...styles.languageCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
             <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("descriptionLabel")}</Text>
             <Text style={{ ...styles.sectionText, color: theme.meta }}>{t("descriptionPlaceholder")}</Text>
-            <TextInput
+            <MaskedTextInput
               value={bioDraft}
               onChangeText={setBioDraft}
               placeholder={t("descriptionPlaceholder")}

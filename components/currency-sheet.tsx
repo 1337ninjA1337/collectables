@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { CURRENCIES } from "@/lib/currencies";
 import {
@@ -62,7 +63,7 @@ export function CurrencySheet({
 
           <View style={styles.sheetSearchRow}>
             <Ionicons name="search" size={18} color={MUTED_13} />
-            <TextInput
+            <MaskedTextInput
               style={styles.sheetSearchInput}
               value={query}
               onChangeText={onQueryChange}

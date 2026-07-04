@@ -13,10 +13,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useWindowDimensions,
 } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/components/empty-state";
@@ -289,7 +289,7 @@ export default function WishlistScreen() {
                 scrollEnabled={scrollEnabled.current}
               >
                 <Text style={styles.label}>{t("itemTitleLabel")}</Text>
-                <TextInput
+                <MaskedTextInput
                   style={styles.input}
                   value={title}
                   onChangeText={setTitle}
@@ -298,7 +298,7 @@ export default function WishlistScreen() {
                 />
 
                 <Text style={styles.label}>{t("descriptionLabel")}</Text>
-                <TextInput
+                <MaskedTextInput
                   style={{ ...styles.input, ...styles.multiline }}
                   value={description}
                   onChangeText={setDescription}
@@ -308,7 +308,7 @@ export default function WishlistScreen() {
                 />
 
                 <Text style={styles.label}>{t("wishlistSource")}</Text>
-                <TextInput
+                <MaskedTextInput
                   style={styles.input}
                   value={acquiredFrom}
                   onChangeText={setAcquiredFrom}
@@ -317,7 +317,7 @@ export default function WishlistScreen() {
                 />
 
                 <Text style={styles.label}>{t("costLabel")}</Text>
-                <TextInput
+                <MaskedTextInput
                   style={styles.input}
                   value={cost}
                   onChangeText={setCost}

@@ -1,7 +1,8 @@
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { CurrencyInput, getDefaultCurrencyForLanguage, parseCurrencyValue } from "@/components/currency-input";
 import { getUserPreferredCurrency, setUserPreferredCurrency } from "@/lib/locale-helpers";
@@ -398,7 +399,7 @@ export default function ItemDetailsScreen() {
             </View>
           ) : null}
           <View style={styles.tagInputRow}>
-            <TextInput
+            <MaskedTextInput
               style={styles.tagInput}
               value={editTagInput}
               onChangeText={setEditTagInput}
@@ -614,7 +615,7 @@ export default function ItemDetailsScreen() {
 
             <View style={styles.editFieldGroup}>
               <Text style={styles.editLabel}>{t("marketplaceNotesLabel")}</Text>
-              <TextInput
+              <MaskedTextInput
                 value={listingNotes}
                 onChangeText={setListingNotes}
                 placeholder={t("marketplaceNotesPlaceholder")}
@@ -723,7 +724,7 @@ function EditField({
         {label}
         {required ? <Text style={styles.editRequired}> *</Text> : null}
       </Text>
-      <TextInput
+      <MaskedTextInput
         value={value}
         onChangeText={onChangeText}
         placeholderTextColor={PLACEHOLDER}
