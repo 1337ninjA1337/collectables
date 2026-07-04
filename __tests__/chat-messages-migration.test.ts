@@ -1,7 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import {
+  assertColumns,
+  assertCreatesTable,
+  assertIndex,
+  assertRlsEnabled,
+  loadMigrationSource,
+} from "./helpers/sql-migration-asserts";
 
 /**
  * Structural assertions over the chat_messages migration. The actual SQL is
@@ -10,33 +16,19 @@ import path from "node:path";
  * removing the realtime publication).
  */
 
-const SOURCE = readFileSync(
-  path.join(
-    process.cwd(),
-    "supabase",
-    "migrations",
-    "20260424_chat_messages.sql",
-  ),
-  "utf8",
-);
+const SOURCE = loadMigrationSource("20260424_chat_messages.sql");
 
 describe("chat_messages migration", () => {
   it("creates the chat_messages table with the documented columns", () => {
-    assert.match(SOURCE, /CREATE TABLE IF NOT EXISTS public\.chat_messages/);
-    for (const column of [
+    assertCreatesTable(SOURCE, "chat_messages");
+    assertColumns(SOURCE, [
       "id",
       "chat_id",
       "from_user_id",
       "to_user_id",
       "text",
       "created_at",
-    ]) {
-      assert.match(
-        SOURCE,
-        new RegExp(`\\b${column}\\b`),
-        `missing column declaration for '${column}'`,
-      );
-    }
+    ]);
   });
 
   it("enforces a non-empty bounded message body", () => {
@@ -44,12 +36,16 @@ describe("chat_messages migration", () => {
   });
 
   it("indexes by chat_id+created_at and by recipient+created_at", () => {
-    assert.match(SOURCE, /CREATE INDEX IF NOT EXISTS chat_messages_chat_created_idx[\s\S]*chat_id, created_at/);
-    assert.match(SOURCE, /CREATE INDEX IF NOT EXISTS chat_messages_recipient_created_idx[\s\S]*to_user_id, created_at/);
+    assertIndex(SOURCE, "chat_messages_chat_created_idx", "chat_id, created_at");
+    assertIndex(
+      SOURCE,
+      "chat_messages_recipient_created_idx",
+      "to_user_id, created_at",
+    );
   });
 
   it("enables row level security", () => {
-    assert.match(SOURCE, /ALTER TABLE public\.chat_messages ENABLE ROW LEVEL SECURITY/);
+    assertRlsEnabled(SOURCE, "chat_messages");
   });
 
   it("grants SELECT to either participant", () => {

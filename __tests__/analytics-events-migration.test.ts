@@ -1,7 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import {
+  assertColumns,
+  assertCreatesTable,
+  assertIndex,
+  assertManualTasksDocuments,
+  assertNoPolicies,
+  assertRlsEnabled,
+  loadMigrationSource,
+} from "./helpers/sql-migration-asserts";
 
 /**
  * Structural assertions over the analytics_events migration. The actual SQL is
@@ -10,31 +18,18 @@ import path from "node:path";
  * policy that would expose the long-tail event store to end users).
  */
 
-const MIGRATION_PATH = path.join(
-  process.cwd(),
-  "supabase",
-  "migrations",
-  "20260508_analytics_events.sql",
-);
-
-const SOURCE = readFileSync(MIGRATION_PATH, "utf8");
+const SOURCE = loadMigrationSource("20260508_analytics_events.sql");
 
 describe("analytics_events migration", () => {
   it("creates the analytics_events table with the documented columns", () => {
-    assert.match(SOURCE, /CREATE TABLE IF NOT EXISTS public\.analytics_events/);
-    for (const column of [
+    assertCreatesTable(SOURCE, "analytics_events");
+    assertColumns(SOURCE, [
       "id",
       "occurred_at",
       "user_id",
       "name",
       "properties",
-    ]) {
-      assert.match(
-        SOURCE,
-        new RegExp(`\\b${column}\\b`),
-        `missing column declaration for '${column}'`,
-      );
-    }
+    ]);
   });
 
   it("uses jsonb for the properties column", () => {
@@ -64,25 +59,21 @@ describe("analytics_events migration", () => {
   });
 
   it("indexes by occurred_at, by name+occurred_at, and by user_id+occurred_at", () => {
-    assert.match(
+    assertIndex(SOURCE, "analytics_events_occurred_at_idx", "occurred_at DESC");
+    assertIndex(
       SOURCE,
-      /CREATE INDEX IF NOT EXISTS analytics_events_occurred_at_idx[\s\S]*occurred_at DESC/,
+      "analytics_events_name_occurred_idx",
+      "name, occurred_at DESC",
     );
-    assert.match(
+    assertIndex(
       SOURCE,
-      /CREATE INDEX IF NOT EXISTS analytics_events_name_occurred_idx[\s\S]*name, occurred_at DESC/,
-    );
-    assert.match(
-      SOURCE,
-      /CREATE INDEX IF NOT EXISTS analytics_events_user_occurred_idx[\s\S]*user_id, occurred_at DESC/,
+      "analytics_events_user_occurred_idx",
+      "user_id, occurred_at DESC",
     );
   });
 
   it("enables row level security", () => {
-    assert.match(
-      SOURCE,
-      /ALTER TABLE public\.analytics_events ENABLE ROW LEVEL SECURITY/,
-    );
+    assertRlsEnabled(SOURCE, "analytics_events");
   });
 
   it("revokes ALL privileges from anon and authenticated roles", () => {
@@ -94,7 +85,7 @@ describe("analytics_events migration", () => {
   });
 
   it("does not expose any policy on analytics_events (RLS-default-deny)", () => {
-    assert.doesNotMatch(SOURCE, /CREATE POLICY[^"]*"[^"]*analytics_events[^"]*"/);
+    assertNoPolicies(SOURCE, "analytics_events");
   });
 
   it("does not add the table to the supabase_realtime publication", () => {
@@ -106,11 +97,8 @@ describe("analytics_events migration", () => {
   });
 
   it("is documented in MANUAL-TASKS.md per CLAUDE.md DB-change rule", () => {
-    const manualTasks = readFileSync(
-      path.join(process.cwd(), "MANUAL-TASKS.md"),
-      "utf8",
-    );
-    assert.match(manualTasks, /20260508_analytics_events\.sql/);
-    assert.match(manualTasks, /analytics_events/);
+    assertManualTasksDocuments("20260508_analytics_events.sql", [
+      "analytics_events",
+    ]);
   });
 });
