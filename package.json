@@ -17,6 +17,7 @@
     "lint:migration-naming": "tsx scripts/check-supabase-migration-naming.ts",
     "lint:secrets": "tsx scripts/check-secrets.ts",
     "lint:secrets:bundle": "tsx scripts/check-bundle-secrets.ts",
+    "lint:bundle-size": "tsx scripts/check-bundle-size.ts",
     "lint:appstore": "tsx scripts/check-appstore-config.ts",
     "lint:sentry-version": "tsx scripts/check-sentry-version.ts",
     "lint:expo-install": "tsx scripts/check-expo-install.ts",
