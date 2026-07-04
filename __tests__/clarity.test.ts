@@ -199,6 +199,56 @@ describe("lib/clarity — initClarity injection behaviour", () => {
   });
 });
 
+describe("lib/clarity — disabled-with-clarityId one-time warning", () => {
+  let warnings: unknown[][] = [];
+  const originalWarn = console.warn;
+
+  beforeEach(() => {
+    __resetClarityForTests();
+    warnings = [];
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args);
+    };
+  });
+
+  afterEach(() => {
+    console.warn = originalWarn;
+  });
+
+  it("warns once when clarityId is set but analytics is disabled", () => {
+    const ok = initClarity({ runtime: enabledRuntime({ enabled: false }) });
+    assert.equal(ok, false);
+    assert.equal(warnings.length, 1);
+    assert.match(String(warnings[0][0]), /clarityId is set but analytics is disabled/);
+  });
+
+  it("does not repeat the warning on subsequent init calls", () => {
+    initClarity({ runtime: enabledRuntime({ enabled: false }) });
+    initClarity({ runtime: enabledRuntime({ enabled: false }) });
+    initClarity({ runtime: enabledRuntime({ enabled: false }) });
+    assert.equal(warnings.length, 1);
+  });
+
+  it("stays silent when clarityId is empty or whitespace", () => {
+    initClarity({ runtime: enabledRuntime({ enabled: false, clarityId: "" }) });
+    initClarity({ runtime: enabledRuntime({ enabled: false, clarityId: "  " }) });
+    assert.equal(warnings.length, 0);
+  });
+
+  it("stays silent when analytics is enabled (whatever the other gates say)", () => {
+    initClarity({ runtime: enabledRuntime({ doNotTrack: true }) });
+    initClarity({ runtime: enabledRuntime({ isBrowser: false }) });
+    assert.equal(warnings.length, 0);
+  });
+
+  it("__resetClarityForTests re-arms the warning", () => {
+    initClarity({ runtime: enabledRuntime({ enabled: false }) });
+    __resetClarityForTests();
+    initClarity({ runtime: enabledRuntime({ enabled: false }) });
+    assert.equal(warnings.length, 2);
+  });
+});
+
 describe("lib/clarity — opt-out + shutdown", () => {
   let fake: ReturnType<typeof setupFakeDom> | null = null;
 

@@ -27,6 +27,7 @@ const CLARITY_TAG_BASE_URL = "https://www.clarity.ms/tag/";
 
 let injected = false;
 let optedOut = false;
+let warnedDisabledWithId = false;
 
 export type ClarityRuntime = {
   isBrowser: boolean;
@@ -105,7 +106,23 @@ export function initClarity(options?: {
     clarityId: analyticsConfig.clarityId,
     enabled: analyticsConfig.enabled,
   };
-  if (!shouldLoadClarity(runtime)) return false;
+  if (!shouldLoadClarity(runtime)) {
+    // A project ID with analytics disabled is almost always a dev-mode
+    // operator who pasted EXPO_PUBLIC_CLARITY_PROJECT_ID into .env and is
+    // now staring at an empty Clarity dashboard — say so once instead of
+    // silently no-oping.
+    if (
+      !warnedDisabledWithId &&
+      !runtime.enabled &&
+      runtime.clarityId.trim().length > 0
+    ) {
+      warnedDisabledWithId = true;
+      console.warn(
+        "[clarity] clarityId is set but analytics is disabled (dev environment or missing PostHog key) — the replay tag will not load.",
+      );
+    }
+    return false;
+  }
   try {
     const ok = injectScript(runtime.clarityId);
     if (ok) injected = true;
@@ -176,4 +193,5 @@ export function shutdownClarity(): void {
 export function __resetClarityForTests(): void {
   injected = false;
   optedOut = false;
+  warnedDisabledWithId = false;
 }
