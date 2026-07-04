@@ -128,6 +128,33 @@ export function isClarityReady(): boolean {
   return injected;
 }
 
+/**
+ * Attach a custom segmentation tag to the active Clarity replay session via
+ * Clarity's `clarity("set", key, value)` API (e.g. `("isPremium", "true")`,
+ * `("language", "ru")`). Calls are buffered by the queue shim when the remote
+ * tag hasn't finished downloading yet, so this is safe immediately after
+ * `initClarity()` succeeds. No-ops (returns false) unless the tracker was
+ * actually injected and the user hasn't opted out — the same gates that
+ * loaded the script keep guarding what we send to it. Keep values to coarse,
+ * non-PII traits (see docs/analytics-platform.md).
+ */
+export function addClarityCustomTag(key: string, value: string): boolean {
+  if (!injected || optedOut) return false;
+  if (typeof window === "undefined") return false;
+  const trimmedKey = key.trim();
+  if (trimmedKey.length === 0) return false;
+  const w = window as unknown as {
+    clarity?: (...args: unknown[]) => void;
+  };
+  if (typeof w.clarity !== "function") return false;
+  try {
+    w.clarity("set", trimmedKey, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function shutdownClarity(): void {
   if (typeof document !== "undefined") {
     const existing = document.getElementById(CLARITY_SCRIPT_ID);
