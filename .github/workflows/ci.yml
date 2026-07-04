@@ -20,6 +20,33 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # The structural guard (lint:peer-dep-free) proves no *static* import of
+  # @sentry/react-native in the sentry test surface; this job proves the
+  # stronger runtime property — the whole @sentry scope can be absent from
+  # node_modules (catching a transitive import via e.g. @sentry/core).
+  # The --import setup file is load-bearing: without the global beforeEach
+  # reset, module state leaks between suites and produces false failures.
+  sentry-sdk-absent:
+    name: Sentry tests with SDK absent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Delete the @sentry scope and run the sentry test surface
+        run: |
+          rm -rf node_modules/@sentry
+          npx tsx --import ./__tests__/test-globals.ts --test __tests__/sentry-*.test.ts
+
   test:
     runs-on: ubuntu-latest
     steps:
