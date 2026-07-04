@@ -178,7 +178,15 @@ describe("PII guard — trackEvent call sites stay within the taxonomy", () => {
 });
 
 describe("PII guard — breadcrumb call sites carry no user input", () => {
-  const BREADCRUMB_ALLOWED_DATA_KEYS = new Set(["from", "to"]);
+  // "from"/"to" are route names (navigation breadcrumbs); "clarityId" is the
+  // public Clarity project ID and "doNotTrack" a boolean — none carry user
+  // input (the "clarity loaded" breadcrumb in lib/clarity.ts).
+  const BREADCRUMB_ALLOWED_DATA_KEYS = new Set([
+    "from",
+    "to",
+    "clarityId",
+    "doNotTrack",
+  ]);
 
   it("addBreadcrumb data objects only use route allow-listed keys", () => {
     let calls = 0;
@@ -193,7 +201,7 @@ describe("PII guard — breadcrumb call sites carry no user input", () => {
         for (const key of extractObjectKeys(m[1])) {
           assert.ok(
             BREADCRUMB_ALLOWED_DATA_KEYS.has(key),
-            `${rel}: addBreadcrumb passes non-allow-listed data key "${key}" (allowed: from, to)`,
+            `${rel}: addBreadcrumb passes non-allow-listed data key "${key}" (allowed: ${[...BREADCRUMB_ALLOWED_DATA_KEYS].join(", ")})`,
           );
           assert.equal(
             isPiiPropKey(key),

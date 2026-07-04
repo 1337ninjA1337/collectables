@@ -15,6 +15,7 @@ import {
   shutdownClarity,
   type ClarityRuntime,
 } from "../lib/clarity";
+import { __resetSentryForTests, initSentry } from "../lib/sentry";
 import { setupFakeDom } from "./helpers/fake-dom";
 
 const ROOT = path.join(__dirname, "..");
@@ -196,6 +197,81 @@ describe("lib/clarity — initClarity injection behaviour", () => {
     assert.equal(typeof stub, "function");
     stub!("track", "evt");
     assert.deepEqual(stub!.q?.[0], ["track", "evt"]);
+  });
+});
+
+describe("lib/clarity — 'clarity loaded' Sentry breadcrumb", () => {
+  let fake: ReturnType<typeof setupFakeDom> | null = null;
+  let sentryCalls: { method: string; args: unknown[] }[] = [];
+
+  beforeEach(async () => {
+    __resetClarityForTests();
+    __resetSentryForTests();
+    sentryCalls = [];
+    await initSentry({
+      env: {
+        EXPO_PUBLIC_SENTRY_DSN: "https://abc@o0.ingest.sentry.io/42",
+        EXPO_PUBLIC_SENTRY_ENV: "production",
+      },
+      loader: async () => ({
+        init: (...args: unknown[]) => {
+          sentryCalls.push({ method: "init", args });
+        },
+        captureException: (...args: unknown[]) => {
+          sentryCalls.push({ method: "captureException", args });
+        },
+        addBreadcrumb: (...args: unknown[]) => {
+          sentryCalls.push({ method: "addBreadcrumb", args });
+        },
+      }),
+    });
+  });
+
+  afterEach(() => {
+    __resetSentryForTests();
+    if (fake) {
+      fake.restore();
+      fake = null;
+    }
+  });
+
+  const breadcrumbs = () =>
+    sentryCalls.filter((c) => c.method === "addBreadcrumb");
+
+  it("records a breadcrumb with clarityId + doNotTrack on first successful init", () => {
+    fake = setupFakeDom();
+    const ok = initClarity({ runtime: enabledRuntime({ clarityId: "proj-9" }) });
+    assert.equal(ok, true);
+    assert.equal(breadcrumbs().length, 1);
+    const crumb = breadcrumbs()[0].args[0] as {
+      message?: string;
+      data?: Record<string, unknown>;
+    };
+    assert.equal(crumb.message, "clarity loaded");
+    assert.deepEqual(crumb.data, { clarityId: "proj-9", doNotTrack: false });
+  });
+
+  it("does not record a second breadcrumb on repeat init calls", () => {
+    fake = setupFakeDom();
+    initClarity({ runtime: enabledRuntime() });
+    initClarity({ runtime: enabledRuntime() });
+    assert.equal(breadcrumbs().length, 1);
+  });
+
+  it("records nothing when the gates block injection", () => {
+    fake = setupFakeDom();
+    initClarity({ runtime: enabledRuntime({ enabled: false }) });
+    initClarity({ runtime: enabledRuntime({ doNotTrack: true }) });
+    initClarity({ runtime: enabledRuntime({ clarityId: " " }) });
+    assert.equal(breadcrumbs().length, 0);
+  });
+
+  it("still succeeds when Sentry never initialised (breadcrumb is a no-op)", () => {
+    __resetSentryForTests(); // sdk gone — addBreadcrumb must silently no-op
+    fake = setupFakeDom();
+    const ok = initClarity({ runtime: enabledRuntime() });
+    assert.equal(ok, true);
+    assert.equal(isClarityReady(), true);
   });
 });
 
