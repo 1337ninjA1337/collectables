@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -18,24 +18,12 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
  * the same invariant on the source module.
  */
 
-const SENTRY_TEST_FILES = [
-  "__tests__/sentry-init.test.ts",
-  "__tests__/sentry-rate-limit.test.ts",
-  "__tests__/sentry-scrubber.test.ts",
-  "__tests__/sentry-layout-wiring.test.ts",
-  "__tests__/sentry-config.test.ts",
-  "__tests__/sentry-env-docs.test.ts",
-  "__tests__/sentry-env-inlining.test.ts",
-  "__tests__/sentry-eas-config.test.ts",
-  "__tests__/sentry-deploy-workflow.test.ts",
-  "__tests__/sentry-capture-wiring.test.ts",
-  "__tests__/sentry-user-context.test.ts",
-  "__tests__/sentry-navigation-breadcrumbs.test.ts",
-  "__tests__/sentry-fallback-i18n.test.ts",
-  "__tests__/sentry-opt-out.test.ts",
-  "__tests__/sentry-test-error.test.ts",
-  "__tests__/sentry-privacy-policy.test.ts",
-];
+// Fail-closed glob: every __tests__/sentry-*.test.ts file is guarded
+// automatically, so a new Sentry test can't be forgotten off a hand list.
+const SENTRY_TEST_FILES = readdirSync(join(ROOT, "__tests__"))
+  .filter((name) => /^sentry-.*\.test\.ts$/.test(name))
+  .sort()
+  .map((name) => `__tests__/${name}`);
 
 describe("lint:peer-dep-free wiring", () => {
   it("package.json exposes a script that runs ONLY this test file", () => {
@@ -45,6 +33,28 @@ describe("lint:peer-dep-free wiring", () => {
       "tsx --test __tests__/sentry-tests-peer-dep-free.test.ts",
       "lint:peer-dep-free must run only this file so a pre-push hook can verify the SDK-isolation invariant in well under a second",
     );
+  });
+});
+
+describe("SENTRY_TEST_FILES glob", () => {
+  it("discovers the full sentry test surface (no hand-maintained list to forget)", () => {
+    // 21 files at promotion time (2026-07-04) — the old hand list had 16,
+    // silently leaving breadcrumb-level/doctor/lazy-import/report unguarded.
+    assert.ok(
+      SENTRY_TEST_FILES.length >= 21,
+      `glob found only ${SENTRY_TEST_FILES.length} sentry test files — expected at least 21`,
+    );
+    for (const previouslyUnguarded of [
+      "__tests__/sentry-breadcrumb-level.test.ts",
+      "__tests__/sentry-doctor.test.ts",
+      "__tests__/sentry-lazy-import.test.ts",
+      "__tests__/sentry-report.test.ts",
+    ]) {
+      assert.ok(
+        SENTRY_TEST_FILES.includes(previouslyUnguarded),
+        `${previouslyUnguarded} must be picked up by the glob`,
+      );
+    }
   });
 });
 
