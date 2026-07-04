@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 
 import {
   AMBER_ACCENT,
@@ -129,7 +130,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             {/* Search by title */}
             <View style={styles.sheetSearchRow}>
               <Ionicons name="search" size={18} color={MUTED_15} />
-              <TextInput
+              <MaskedTextInput
                 style={styles.sheetSearchInput}
                 value={draft.query}
                 onChangeText={(v) => setDraft({ ...draft, query: v })}
@@ -149,7 +150,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             <View style={styles.fieldRow}>
               <View style={styles.fieldHalf}>
                 <Text style={styles.fieldLabel}>{t("filterPriceFrom")}</Text>
-                <TextInput
+                <MaskedTextInput
                   style={styles.fieldInput}
                   value={draft.priceFrom}
                   onChangeText={(v) => setDraft({ ...draft, priceFrom: v })}
@@ -160,7 +161,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               </View>
               <View style={styles.fieldHalf}>
                 <Text style={styles.fieldLabel}>{t("filterPriceTo")}</Text>
-                <TextInput
+                <MaskedTextInput
                   style={styles.fieldInput}
                   value={draft.priceTo}
                   onChangeText={(v) => setDraft({ ...draft, priceTo: v })}
@@ -175,7 +176,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             <View style={styles.fieldRow}>
               <View style={styles.fieldHalf}>
                 <Text style={styles.fieldLabel}>{t("filterDateFrom")}</Text>
-                <TextInput
+                <MaskedTextInput
                   style={styles.fieldInput}
                   value={draft.dateFrom}
                   onChangeText={(v) => setDraft({ ...draft, dateFrom: v })}
@@ -185,7 +186,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               </View>
               <View style={styles.fieldHalf}>
                 <Text style={styles.fieldLabel}>{t("filterDateTo")}</Text>
-                <TextInput
+                <MaskedTextInput
                   style={styles.fieldInput}
                   value={draft.dateTo}
                   onChangeText={(v) => setDraft({ ...draft, dateTo: v })}
@@ -198,7 +199,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             {/* Source */}
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>{t("filterSource")}</Text>
-              <TextInput
+              <MaskedTextInput
                 style={styles.fieldInput}
                 value={draft.source}
                 onChangeText={(v) => setDraft({ ...draft, source: v })}

@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { CurrencySheet } from "@/components/currency-sheet";
 import { PhotoPreview } from "@/components/photo-preview";
@@ -286,7 +287,7 @@ export default function CreateItemScreen() {
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>{t("costLabel")}</Text>
         <View style={styles.costRow}>
-          <TextInput
+          <MaskedTextInput
             value={cost}
             onChangeText={setCost}
             placeholder={t("costPlaceholder")}
@@ -339,7 +340,7 @@ export default function CreateItemScreen() {
           </View>
         ) : null}
         <View style={styles.tagInputRow}>
-          <TextInput
+          <MaskedTextInput
             style={styles.tagInput}
             value={tagInput}
             onChangeText={setTagInput}
@@ -434,7 +435,7 @@ function Field({
         {label}
         {required ? <Text style={styles.required}> *</Text> : null}
       </Text>
-      <TextInput
+      <MaskedTextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -489,7 +490,7 @@ function CollectionSheet({
 
           <View style={styles.sheetSearchRow}>
             <Ionicons name="search" size={18} color={MUTED_13} />
-            <TextInput
+            <MaskedTextInput
               style={styles.sheetSearchInput}
               value={query}
               onChangeText={onQueryChange}

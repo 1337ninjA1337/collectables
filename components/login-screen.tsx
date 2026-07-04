@@ -1,6 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
@@ -95,7 +96,7 @@ export function LoginScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{t("emailLoginTitle")}</Text>
         <Text style={styles.sectionText}>{t("emailLoginSubtitle")}</Text>
-        <TextInput
+        <MaskedTextInput
           value={email}
           onChangeText={setEmail}
           placeholder={t("emailPlaceholder")}
@@ -106,7 +107,7 @@ export function LoginScreen() {
         />
         {awaitingCode ? (
           <>
-            <TextInput
+            <MaskedTextInput
               value={code}
               onChangeText={setCode}
               placeholder={t("codePlaceholder")}

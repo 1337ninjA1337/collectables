@@ -1,7 +1,8 @@
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router } from "expo-router";
 import { useState } from "react";
-import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { PremiumUpsellSheet } from "@/components/premium-upsell-sheet";
 import { Screen } from "@/components/screen";
@@ -181,7 +182,7 @@ export default function CreateCollectionScreen() {
         <Text style={styles.label}>
           {t("collectionNameLabel")}<Text style={styles.required}> *</Text>
         </Text>
-        <TextInput
+        <MaskedTextInput
           value={name}
           onChangeText={setName}
           placeholder={t("collectionNamePlaceholder")}
@@ -192,7 +193,7 @@ export default function CreateCollectionScreen() {
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>{t("collectionDescriptionLabel")}</Text>
-        <TextInput
+        <MaskedTextInput
           value={description}
           onChangeText={setDescription}
           placeholder={t("collectionDescriptionPlaceholder")}

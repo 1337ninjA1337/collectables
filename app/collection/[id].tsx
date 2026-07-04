@@ -1,7 +1,8 @@
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, FlatList, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, FlatList, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { EmptyState } from "@/components/empty-state";
 import { applyItemFilters, applySortMode, EMPTY_FILTERS, ItemFilterBar, type ItemFilters } from "@/components/item-filters";
@@ -826,7 +827,7 @@ export default function CollectionDetailsScreen() {
               <Text style={styles.editFieldLabel}>
                 {t("collectionNameLabel")}<Text style={styles.editFieldRequired}> *</Text>
               </Text>
-              <TextInput
+              <MaskedTextInput
                 value={editName}
                 onChangeText={setEditName}
                 placeholder={t("collectionNamePlaceholder")}
@@ -837,7 +838,7 @@ export default function CollectionDetailsScreen() {
 
             <View style={styles.editFieldGroup}>
               <Text style={styles.editFieldLabel}>{t("collectionDescriptionLabel")}</Text>
-              <TextInput
+              <MaskedTextInput
                 value={editDescription}
                 onChangeText={setEditDescription}
                 placeholder={t("collectionDescriptionPlaceholder")}
