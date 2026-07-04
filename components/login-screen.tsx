@@ -27,6 +27,7 @@ import {
 import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 
 export function LoginScreen() {
   const { pending, sendEmailOtp, verifyEmailOtp, signInWithProvider } = useAuth();
@@ -96,6 +97,7 @@ export function LoginScreen() {
         <Text style={styles.sectionTitle}>{t("emailLoginTitle")}</Text>
         <Text style={styles.sectionText}>{t("emailLoginSubtitle")}</Text>
         <TextInput
+          {...CLARITY_MASK_PROPS}
           value={email}
           onChangeText={setEmail}
           placeholder={t("emailPlaceholder")}
@@ -107,6 +109,7 @@ export function LoginScreen() {
         {awaitingCode ? (
           <>
             <TextInput
+              {...CLARITY_MASK_PROPS}
               value={code}
               onChangeText={setCode}
               placeholder={t("codePlaceholder")}

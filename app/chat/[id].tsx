@@ -42,6 +42,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { subscribeToTyping } from "@/lib/supabase-chat";
 import { useVisibilityRefresh } from "@/lib/use-visibility-refresh";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 
 const TYPING_DEBOUNCE_MS = 1000;
 const REFRESH_INTERVAL_MS = 8000;
@@ -324,6 +325,7 @@ export default function ChatDetailScreen() {
 
         <View style={styles.composer}>
           <TextInput
+            {...CLARITY_MASK_PROPS}
             style={styles.input}
             placeholder={t("chatInputPlaceholder")}
             placeholderTextColor={MUTED_14}

@@ -71,7 +71,13 @@ Clarity is **web-only** because:
 **Privacy implications**: Clarity records the DOM, including text inside
 form fields by default. We must:
 1. Add `data-clarity-mask="True"` (or `class="ms-clarity-mask"`) to every
-   `<input>` rendered by `react-native-web`.
+   `<input>` rendered by `react-native-web`. Enforced mechanically: every
+   `<TextInput` spreads `CLARITY_MASK_PROPS` from `lib/clarity-mask.ts`
+   (react-native-web renders its `dataSet.clarityMask` entry as the
+   `data-clarity-mask` attribute; native ignores it), and
+   `npm run lint:clarity-mask` (`scripts/check-clarity-mask.ts`, part of
+   `lint:ci` and a dedicated CI step) fails on any unmasked `<TextInput`
+   or raw `<input` under `app/`/`components/`.
 2. Ensure no PII is shown in plain text outside form fields (we already do —
    email is only shown in `app/settings.tsx` as part of the user's own
    profile, which is fine).

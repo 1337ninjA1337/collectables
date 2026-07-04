@@ -35,6 +35,7 @@ import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectionVisibility } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 
 const FALLBACK_COVER = "";
 
@@ -182,6 +183,7 @@ export default function CreateCollectionScreen() {
           {t("collectionNameLabel")}<Text style={styles.required}> *</Text>
         </Text>
         <TextInput
+          {...CLARITY_MASK_PROPS}
           value={name}
           onChangeText={setName}
           placeholder={t("collectionNamePlaceholder")}
@@ -193,6 +195,7 @@ export default function CreateCollectionScreen() {
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>{t("collectionDescriptionLabel")}</Text>
         <TextInput
+          {...CLARITY_MASK_PROPS}
           value={description}
           onChangeText={setDescription}
           placeholder={t("collectionDescriptionPlaceholder")}

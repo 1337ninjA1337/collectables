@@ -47,6 +47,7 @@ import { useToast } from "@/lib/toast-context";
 import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { CollectableItem, Collection, MarketplaceListing, UserProfile } from "@/lib/types";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 
 const DEFAULT_EN_PROFILE_BIO = "I collect things worth saving beautifully and sharing with friends.";
 
@@ -319,6 +320,7 @@ export default function ProfileScreen() {
             <>
               <Text style={styles.handlePrefix}>@</Text>
               <TextInput
+                {...CLARITY_MASK_PROPS}
                 value={profileIdDraft}
                 onChangeText={setProfileIdDraft}
                 placeholder={t("profileIdPlaceholder")}
@@ -350,6 +352,7 @@ export default function ProfileScreen() {
             <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("descriptionLabel")}</Text>
             <Text style={{ ...styles.sectionText, color: theme.meta }}>{t("descriptionPlaceholder")}</Text>
             <TextInput
+              {...CLARITY_MASK_PROPS}
               value={bioDraft}
               onChangeText={setBioDraft}
               placeholder={t("descriptionPlaceholder")}

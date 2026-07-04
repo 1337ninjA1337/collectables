@@ -21,6 +21,7 @@ import {
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD, FONT_BODY_SEMIBOLD } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 
 type CurrencySheetProps = {
   visible: boolean;
@@ -63,6 +64,7 @@ export function CurrencySheet({
           <View style={styles.sheetSearchRow}>
             <Ionicons name="search" size={18} color={MUTED_13} />
             <TextInput
+              {...CLARITY_MASK_PROPS}
               style={styles.sheetSearchInput}
               value={query}
               onChangeText={onQueryChange}

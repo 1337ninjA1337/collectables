@@ -25,6 +25,7 @@ import {
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 import {
   applyItemFilters,
   applySortMode,
@@ -130,6 +131,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             <View style={styles.sheetSearchRow}>
               <Ionicons name="search" size={18} color={MUTED_15} />
               <TextInput
+                {...CLARITY_MASK_PROPS}
                 style={styles.sheetSearchInput}
                 value={draft.query}
                 onChangeText={(v) => setDraft({ ...draft, query: v })}
@@ -150,6 +152,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               <View style={styles.fieldHalf}>
                 <Text style={styles.fieldLabel}>{t("filterPriceFrom")}</Text>
                 <TextInput
+                  {...CLARITY_MASK_PROPS}
                   style={styles.fieldInput}
                   value={draft.priceFrom}
                   onChangeText={(v) => setDraft({ ...draft, priceFrom: v })}
@@ -161,6 +164,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               <View style={styles.fieldHalf}>
                 <Text style={styles.fieldLabel}>{t("filterPriceTo")}</Text>
                 <TextInput
+                  {...CLARITY_MASK_PROPS}
                   style={styles.fieldInput}
                   value={draft.priceTo}
                   onChangeText={(v) => setDraft({ ...draft, priceTo: v })}
@@ -176,6 +180,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               <View style={styles.fieldHalf}>
                 <Text style={styles.fieldLabel}>{t("filterDateFrom")}</Text>
                 <TextInput
+                  {...CLARITY_MASK_PROPS}
                   style={styles.fieldInput}
                   value={draft.dateFrom}
                   onChangeText={(v) => setDraft({ ...draft, dateFrom: v })}
@@ -186,6 +191,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               <View style={styles.fieldHalf}>
                 <Text style={styles.fieldLabel}>{t("filterDateTo")}</Text>
                 <TextInput
+                  {...CLARITY_MASK_PROPS}
                   style={styles.fieldInput}
                   value={draft.dateTo}
                   onChangeText={(v) => setDraft({ ...draft, dateTo: v })}
@@ -199,6 +205,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>{t("filterSource")}</Text>
               <TextInput
+                {...CLARITY_MASK_PROPS}
                 style={styles.fieldInput}
                 value={draft.source}
                 onChangeText={(v) => setDraft({ ...draft, source: v })}

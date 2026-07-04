@@ -25,6 +25,7 @@ import { fetchItemById } from "@/lib/supabase-profiles";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
 import { FONT_DISPLAY, FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 import {
   ACCENT_DEEP,
   AMBER_ACCENT,
@@ -399,6 +400,7 @@ export default function ItemDetailsScreen() {
           ) : null}
           <View style={styles.tagInputRow}>
             <TextInput
+              {...CLARITY_MASK_PROPS}
               style={styles.tagInput}
               value={editTagInput}
               onChangeText={setEditTagInput}
@@ -615,6 +617,7 @@ export default function ItemDetailsScreen() {
             <View style={styles.editFieldGroup}>
               <Text style={styles.editLabel}>{t("marketplaceNotesLabel")}</Text>
               <TextInput
+                {...CLARITY_MASK_PROPS}
                 value={listingNotes}
                 onChangeText={setListingNotes}
                 placeholder={t("marketplaceNotesPlaceholder")}
@@ -724,6 +727,7 @@ function EditField({
         {required ? <Text style={styles.editRequired}> *</Text> : null}
       </Text>
       <TextInput
+        {...CLARITY_MASK_PROPS}
         value={value}
         onChangeText={onChangeText}
         placeholderTextColor={PLACEHOLDER}

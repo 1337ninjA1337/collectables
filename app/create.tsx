@@ -20,6 +20,7 @@ import {
 import { useToast } from "@/lib/toast-context";
 import { ItemCondition, ItemTag } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 import {
   AMBER_ACCENT,
   AMBER_MUTED_6,
@@ -287,6 +288,7 @@ export default function CreateItemScreen() {
         <Text style={styles.label}>{t("costLabel")}</Text>
         <View style={styles.costRow}>
           <TextInput
+            {...CLARITY_MASK_PROPS}
             value={cost}
             onChangeText={setCost}
             placeholder={t("costPlaceholder")}
@@ -340,6 +342,7 @@ export default function CreateItemScreen() {
         ) : null}
         <View style={styles.tagInputRow}>
           <TextInput
+            {...CLARITY_MASK_PROPS}
             style={styles.tagInput}
             value={tagInput}
             onChangeText={setTagInput}
@@ -435,6 +438,7 @@ function Field({
         {required ? <Text style={styles.required}> *</Text> : null}
       </Text>
       <TextInput
+        {...CLARITY_MASK_PROPS}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -490,6 +494,7 @@ function CollectionSheet({
           <View style={styles.sheetSearchRow}>
             <Ionicons name="search" size={18} color={MUTED_13} />
             <TextInput
+              {...CLARITY_MASK_PROPS}
               style={styles.sheetSearchInput}
               value={query}
               onChangeText={onQueryChange}

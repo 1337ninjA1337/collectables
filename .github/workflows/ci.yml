@@ -57,6 +57,9 @@ jobs:
       - name: No inline hex literals
         run: npm run lint:hex
 
+      - name: Text inputs carry Clarity mask
+        run: npm run lint:clarity-mask
+
       - name: Migrations documented in MANUAL-TASKS.md
         run: npm run lint:migration-docs
 

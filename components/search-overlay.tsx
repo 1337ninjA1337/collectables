@@ -38,6 +38,7 @@ import {
 import { useI18n } from "@/lib/i18n-context";
 import { fetchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 
 type Props = {
   visible: boolean;
@@ -165,6 +166,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
           <View style={styles.inputRow}>
             <Ionicons name="search" size={20} color={MUTED_13} />
             <TextInput
+              {...CLARITY_MASK_PROPS}
               value={query}
               onChangeText={setQuery}
               placeholder={t("searchPlaceholder")}

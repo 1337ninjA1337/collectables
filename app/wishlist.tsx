@@ -50,6 +50,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 
 export default function WishlistScreen() {
   const { t } = useI18n();
@@ -290,6 +291,7 @@ export default function WishlistScreen() {
               >
                 <Text style={styles.label}>{t("itemTitleLabel")}</Text>
                 <TextInput
+                  {...CLARITY_MASK_PROPS}
                   style={styles.input}
                   value={title}
                   onChangeText={setTitle}
@@ -299,6 +301,7 @@ export default function WishlistScreen() {
 
                 <Text style={styles.label}>{t("descriptionLabel")}</Text>
                 <TextInput
+                  {...CLARITY_MASK_PROPS}
                   style={{ ...styles.input, ...styles.multiline }}
                   value={description}
                   onChangeText={setDescription}
@@ -309,6 +312,7 @@ export default function WishlistScreen() {
 
                 <Text style={styles.label}>{t("wishlistSource")}</Text>
                 <TextInput
+                  {...CLARITY_MASK_PROPS}
                   style={styles.input}
                   value={acquiredFrom}
                   onChangeText={setAcquiredFrom}
@@ -318,6 +322,7 @@ export default function WishlistScreen() {
 
                 <Text style={styles.label}>{t("costLabel")}</Text>
                 <TextInput
+                  {...CLARITY_MASK_PROPS}
                   style={styles.input}
                   value={cost}
                   onChangeText={setCost}

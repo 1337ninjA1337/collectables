@@ -13,6 +13,7 @@ import {
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
 import { CURRENCY_CHIPS, getDefaultCurrencyForLanguage } from "@/lib/locale-helpers";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 
 export { getDefaultCurrencyForLanguage };
 
@@ -56,6 +57,7 @@ export function CurrencyInput({
       <View style={{ ...styles.inputRow, backgroundColor: theme.card, borderColor: theme.border }}>
         <Text style={styles.currencySymbol}>{currency}</Text>
         <TextInput
+          {...CLARITY_MASK_PROPS}
           value={value}
           onChangeText={(raw) => onChangeValue(sanitize(raw))}
           placeholder={placeholder}

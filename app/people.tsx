@@ -38,6 +38,7 @@ import { useSocial } from "@/lib/social-context";
 import { fetchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 
 const PAGE_SIZE = 25;
 
@@ -171,6 +172,7 @@ export default function PeopleScreen() {
       <View style={{ ...styles.searchCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
         <Text style={{ ...styles.searchLabel, color: theme.meta }}>{t("searchByProfileId")}</Text>
         <TextInput
+          {...CLARITY_MASK_PROPS}
           value={query}
           onChangeText={setQuery}
           placeholder={t("searchByProfileIdPlaceholder")}

@@ -32,6 +32,7 @@ import { CollectableItem, Collection, CollectionVisibility } from "@/lib/types";
 import { useAppTheme } from "@/components/use-app-theme";
 import { LinearGradient } from "expo-linear-gradient";
 import { FONT_DISPLAY, FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { CLARITY_MASK_PROPS } from "@/lib/clarity-mask";
 import {
   ACCENT_DEEP,
   AMBER_ACCENT,
@@ -827,6 +828,7 @@ export default function CollectionDetailsScreen() {
                 {t("collectionNameLabel")}<Text style={styles.editFieldRequired}> *</Text>
               </Text>
               <TextInput
+                {...CLARITY_MASK_PROPS}
                 value={editName}
                 onChangeText={setEditName}
                 placeholder={t("collectionNamePlaceholder")}
@@ -838,6 +840,7 @@ export default function CollectionDetailsScreen() {
             <View style={styles.editFieldGroup}>
               <Text style={styles.editFieldLabel}>{t("collectionDescriptionLabel")}</Text>
               <TextInput
+                {...CLARITY_MASK_PROPS}
                 value={editDescription}
                 onChangeText={setEditDescription}
                 placeholder={t("collectionDescriptionPlaceholder")}
