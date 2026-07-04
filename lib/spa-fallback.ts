@@ -98,6 +98,16 @@ self.addEventListener("fetch", function (event) {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.indexOf(BASE) !== 0) return;
 
+  // Real static pages that exist on GitHub Pages next to the SPA (the
+  // privacy policy) must never be answered with the app shell — let the
+  // network serve them, even on warm clients with the SW installed.
+  if (
+    url.pathname === BASE + "privacy" ||
+    url.pathname.indexOf(BASE + "privacy/") === 0
+  ) {
+    return;
+  }
+
   // For the shell itself: network-first, refresh the cached copy on success.
   if (url.pathname === BASE) {
     event.respondWith(
