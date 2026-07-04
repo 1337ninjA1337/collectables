@@ -12,6 +12,7 @@ import {
   extractInlineScriptBodies,
   injectSecurityMetaTags,
 } from "../lib/web-security-headers";
+import { renderPrivacyPage } from "../lib/privacy-page";
 
 /** Pre-quoted SHA-256 CSP hash-source for an inline script body. */
 function inlineScriptHash(body: string): string {
@@ -88,6 +89,23 @@ function main(): void {
   console.log(
     `[build-spa-fallback] wrote dist/${SERVICE_WORKER_FILENAME} (version=${version})`,
   );
+
+  // Static privacy-policy page at /privacy — App Store review needs a public
+  // URL, and shipping it with every deploy keeps it in lockstep with the
+  // tracked PRIVACY.md (drift-guarded by __tests__/privacy-policy.test.ts).
+  const privacyMd = path.join(REPO_ROOT, "PRIVACY.md");
+  if (fs.existsSync(privacyMd)) {
+    const privacyDir = path.join(DIST_DIR, "privacy");
+    fs.mkdirSync(privacyDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(privacyDir, "index.html"),
+      renderPrivacyPage(fs.readFileSync(privacyMd, "utf8")),
+    );
+    console.log("[build-spa-fallback] wrote dist/privacy/index.html (from PRIVACY.md)");
+  } else {
+    console.error("[build-spa-fallback] PRIVACY.md not found — /privacy page NOT emitted");
+    process.exit(1);
+  }
 }
 
 main();
