@@ -170,6 +170,7 @@ describe("analytics-config — env inlining (Metro/babel)", () => {
     assert.deepStrictEqual(keys, [
       "EXPO_PUBLIC_ANALYTICS_DISABLED",
       "EXPO_PUBLIC_ANALYTICS_ENV",
+      "EXPO_PUBLIC_ANALYTICS_MIRROR_DISABLED",
       "EXPO_PUBLIC_CLARITY_PROJECT_ID",
       "EXPO_PUBLIC_POSTHOG_HOST",
       "EXPO_PUBLIC_POSTHOG_KEY",
@@ -180,6 +181,62 @@ describe("analytics-config — env inlining (Metro/babel)", () => {
   it("references EXPO_PUBLIC_ANALYTICS_DISABLED literally so Metro inlines it", () => {
     const src = read("lib/analytics-config.ts");
     assert.match(src, /process\.env\.EXPO_PUBLIC_ANALYTICS_DISABLED\b/);
+    assert.match(src, /process\.env\.EXPO_PUBLIC_ANALYTICS_MIRROR_DISABLED\b/);
+  });
+});
+
+describe("resolveAnalyticsConfig — EXPO_PUBLIC_ANALYTICS_MIRROR_DISABLED kill-switch", () => {
+  const LIVE_ENV = {
+    EXPO_PUBLIC_POSTHOG_KEY: "phc_prod",
+    EXPO_PUBLIC_ANALYTICS_ENV: "production",
+  };
+
+  it("defaults to mirror enabled when analytics are live and the switch is unset", () => {
+    const cfg = resolveAnalyticsConfig(LIVE_ENV);
+    assert.equal(cfg.enabled, true);
+    assert.equal(cfg.mirrorDisabled, false);
+  });
+
+  for (const truthy of ["1", "true", "yes", " TRUE "]) {
+    it(`marks the mirror off (${JSON.stringify(truthy)}) while analytics stay live`, () => {
+      const cfg = resolveAnalyticsConfig({
+        ...LIVE_ENV,
+        EXPO_PUBLIC_ANALYTICS_MIRROR_DISABLED: truthy,
+      });
+      assert.equal(cfg.mirrorDisabled, true);
+      // Narrower switch: PostHog/Clarity themselves are untouched.
+      assert.equal(cfg.enabled, true);
+    });
+  }
+
+  for (const falsy of ["", "0", "false", "no", undefined]) {
+    it(`keeps the mirror on for non-truthy value ${JSON.stringify(falsy)}`, () => {
+      const cfg = resolveAnalyticsConfig({
+        ...LIVE_ENV,
+        EXPO_PUBLIC_ANALYTICS_MIRROR_DISABLED: falsy,
+      });
+      assert.equal(cfg.mirrorDisabled, false);
+    });
+  }
+
+  it("the full analytics kill-switch implies mirrorDisabled", () => {
+    const cfg = resolveAnalyticsConfig({
+      ...LIVE_ENV,
+      EXPO_PUBLIC_ANALYTICS_DISABLED: "1",
+    });
+    assert.equal(cfg.enabled, false);
+    assert.equal(cfg.mirrorDisabled, true);
+  });
+
+  it("disabled analytics (no key / dev env) also imply mirrorDisabled", () => {
+    assert.equal(resolveAnalyticsConfig({}).mirrorDisabled, true);
+    assert.equal(
+      resolveAnalyticsConfig({
+        EXPO_PUBLIC_POSTHOG_KEY: "phc_dev",
+        EXPO_PUBLIC_ANALYTICS_ENV: "development",
+      }).mirrorDisabled,
+      true,
+    );
   });
 });
 
