@@ -87,6 +87,12 @@ jobs:
       - name: No secrets in web bundle
         run: npm run lint:secrets:bundle
 
+      # Fails when the exported JS bundle exceeds the 4.5 MiB budget — catches
+      # a heavy SDK (posthog-js, replay tooling) accidentally becoming a static
+      # import instead of a lazy import(). Override via BUNDLE_SIZE_BUDGET_BYTES.
+      - name: Bundle size within budget
+        run: npm run lint:bundle-size
+
       - name: Bundle smoke check
         run: |
           BUNDLE=$(ls dist/_expo/static/js/web/*.js 2>/dev/null | head -1)
