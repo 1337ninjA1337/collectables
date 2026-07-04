@@ -37,6 +37,17 @@ const SENTRY_TEST_FILES = [
   "__tests__/sentry-privacy-policy.test.ts",
 ];
 
+describe("lint:peer-dep-free wiring", () => {
+  it("package.json exposes a script that runs ONLY this test file", () => {
+    const pkg = JSON.parse(read("package.json"));
+    assert.equal(
+      pkg.scripts["lint:peer-dep-free"],
+      "tsx --test __tests__/sentry-tests-peer-dep-free.test.ts",
+      "lint:peer-dep-free must run only this file so a pre-push hook can verify the SDK-isolation invariant in well under a second",
+    );
+  });
+});
+
 describe("Sentry test suite stays peer-dep free", () => {
   for (const rel of SENTRY_TEST_FILES) {
     it(`${rel} does not statically import @sentry/react-native`, () => {
