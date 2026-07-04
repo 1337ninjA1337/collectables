@@ -34,7 +34,10 @@ describe("create-collection screen: private collections require premium", () => 
 
   it("opens the premium upsell sheet (not a toast) when the locked Private chip is tapped", () => {
     assert.match(src, /from\s+"@\/components\/premium-upsell-sheet"/);
-    assert.match(src, /if\s*\(locked\)\s*\{\s*setUpsellVisible\(true\)/);
+    assert.match(
+      src,
+      /if\s*\(locked\)\s*\{(?:(?!\}\s*setVisibility)[\s\S])*?setUpsellVisible\(true\)/,
+    );
     assert.match(src, /<PremiumUpsellSheet/);
     // On activation from the sheet, the visibility flips to private for the user.
     assert.match(src, /onActivated=\{\(\)\s*=>\s*setVisibility\("private"\)\}/);

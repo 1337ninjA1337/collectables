@@ -72,6 +72,11 @@ export const ANALYTICS_EVENTS: Readonly<
       "Fired from the premium false→true transition hook in `components/bottom-nav.tsx`. `source` carries which screen triggered the upgrade.",
     props: ["source"],
   },
+  premium_upsell_shown: {
+    description:
+      "Fired when a free user hits a premium gate (e.g. taps the locked Private visibility chip). `feature` names the gated capability, `source` the screen. Zero events for a feature over a long window is the evidence needed to hide its locked affordance entirely.",
+    props: ["feature", "source"],
+  },
   language_switched: {
     description:
       "Fired from `lib/i18n-context.tsx:setLanguage()` whenever the user picks a new language. Used to size the i18n test surface per locale.",

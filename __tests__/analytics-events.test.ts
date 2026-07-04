@@ -23,6 +23,7 @@ const EXPECTED_NAMES: readonly AnalyticsEventName[] = [
   "chat_opened",
   "friend_requested",
   "premium_activated",
+  "premium_upsell_shown",
   "language_switched",
 ];
 

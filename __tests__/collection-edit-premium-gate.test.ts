@@ -25,7 +25,10 @@ describe("collection detail screen: editing visibility public→private requires
   });
 
   it("toasts the premium-only hint when a locked edit chip is tapped", () => {
-    assert.match(src, /if\s*\(locked\)\s*\{\s*toast\.error\(t\("visibilityPrivatePremiumOnly"\)/);
+    assert.match(
+      src,
+      /if\s*\(locked\)\s*\{(?:(?!\}\s*setEditVisibility)[\s\S])*?toast\.error\(t\("visibilityPrivatePremiumOnly"\)/,
+    );
   });
 
   it("forces 'public' on save when a non-premium user tries to make a public collection private", () => {
