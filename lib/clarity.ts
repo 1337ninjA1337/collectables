@@ -1,4 +1,5 @@
 import { analyticsConfig } from "@/lib/analytics-config";
+import { addBreadcrumb } from "@/lib/sentry";
 
 /**
  * Microsoft Clarity (web-only) session-replay loader.
@@ -125,7 +126,15 @@ export function initClarity(options?: {
   }
   try {
     const ok = injectScript(runtime.clarityId);
-    if (ok) injected = true;
+    if (ok) {
+      injected = true;
+      // Cross-tag the crash-reporting timeline: a future Sentry event can
+      // then answer "was the replay tag active?" without opening Clarity.
+      addBreadcrumb("clarity loaded", {
+        clarityId: runtime.clarityId,
+        doNotTrack: runtime.doNotTrack,
+      });
+    }
     return ok;
   } catch {
     return false;
