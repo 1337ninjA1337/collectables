@@ -19,6 +19,7 @@
     "lint:secrets:bundle": "tsx scripts/check-bundle-secrets.ts",
     "lint:appstore": "tsx scripts/check-appstore-config.ts",
     "lint:sentry-version": "tsx scripts/check-sentry-version.ts",
+    "lint:expo-install": "tsx scripts/check-expo-install.ts",
     "privacy:generate": "tsx scripts/generate-privacy-manifest.ts",
     "powerbi:schema-doc": "tsx scripts/generate-powerbi-schema-doc.ts",
     "powerbi:conn": "tsx scripts/print-powerbi-conn.ts",
