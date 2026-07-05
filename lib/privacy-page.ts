@@ -149,6 +149,47 @@ export function renderMarkdownBody(markdown: string): string {
   return blocks.join("\n");
 }
 
+export type PrivacyPageLanguage = { code: string; label: string };
+
+/**
+ * Languages the /privacy page is offered in. Mirrors `languageOptions` in
+ * `lib/i18n-context.tsx` (drift-guarded by `__tests__/privacy-page-i18n.test.ts`)
+ * but is declared locally: this module is imported by node build scripts,
+ * which cannot load the React/AsyncStorage-importing i18n context. English is
+ * the canonical full policy at `/privacy/`; every other code is a translated
+ * Sentry-disclosure page (`PRIVACY.md.<code>`) served at `/privacy/<code>/`.
+ */
+export const PRIVACY_PAGE_LANGUAGES: readonly PrivacyPageLanguage[] = [
+  { code: "en", label: "English" },
+  { code: "ru", label: "Русский" },
+  { code: "be", label: "Беларуская" },
+  { code: "pl", label: "Polski" },
+  { code: "de", label: "Deutsch" },
+  { code: "es", label: "Español" },
+];
+
+export const PRIVACY_DEFAULT_LANGUAGE = "en";
+
+/**
+ * Script-free language picker (the page CSP forbids scripts, so plain links).
+ * Hrefs are relative so the picker works under any GitHub Pages baseUrl: the
+ * English page lives at `/privacy/`, translations one level deeper.
+ */
+export function renderLanguagePicker(activeCode: string): string {
+  const fromRoot = activeCode === PRIVACY_DEFAULT_LANGUAGE;
+  const links = PRIVACY_PAGE_LANGUAGES.map(({ code, label }) => {
+    if (code === activeCode) {
+      return `<span aria-current="page">${escapeHtml(label)}</span>`;
+    }
+    const href =
+      code === PRIVACY_DEFAULT_LANGUAGE
+        ? "../"
+        : `${fromRoot ? "" : "../"}${code}/`;
+    return `<a href="${href}" lang="${code}" hreflang="${code}">${escapeHtml(label)}</a>`;
+  });
+  return `<nav class="lang" aria-label="Language">\n${links.join("\n")}\n</nav>`;
+}
+
 /** Strict CSP for the static policy page: no scripts, inline style only. */
 export const PRIVACY_PAGE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'";
@@ -175,12 +216,22 @@ const PAGE_STYLE = `
   table { border-collapse: collapse; width: 100%; margin: 1em 0; }
   th, td { border: 1px solid #e4cdb0; padding: 6px 10px; text-align: left; }
   th { background: #fffaf4; }
+  nav.lang {
+    display: flex; flex-wrap: wrap; gap: 4px 14px;
+    padding-bottom: 12px; border-bottom: 1px solid #e4cdb0;
+    font-size: 14px;
+  }
+  nav.lang span[aria-current] { font-weight: 600; }
 `;
 
-export function renderPrivacyPage(markdown: string): string {
+export function renderPrivacyPage(
+  markdown: string,
+  lang: string = PRIVACY_DEFAULT_LANGUAGE,
+): string {
   const body = renderMarkdownBody(markdown);
+  const picker = renderLanguagePicker(lang);
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${PRIVACY_PAGE_CSP}">
@@ -190,6 +241,7 @@ export function renderPrivacyPage(markdown: string): string {
 <style>${PAGE_STYLE}</style>
 </head>
 <body>
+${picker}
 ${body}
 </body>
 </html>

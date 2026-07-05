@@ -1,0 +1,26 @@
+# Collectables — Datenschutzerklärung
+
+_Gültig ab: 2026-07-04_
+
+Dies ist die Übersetzung des Abschnitts „Absturzberichte und Diagnose"
+(Sentry) der öffentlichen Datenschutzerklärung von Collectables,
+bereitgestellt gemäß Art. 12 DSGVO. Die vollständige Erklärung ist auf
+Englisch verfügbar — nutzen Sie die Sprachauswahl oben auf der Seite.
+
+## Absturzberichte und Diagnose
+
+> **Absturzberichte und Diagnose.** Collectables verwendet Sentry
+> (Functional Software, Inc., d/b/a Sentry — https://sentry.io) als
+> Unterauftragsverarbeiter, um nicht abgefangene Ausnahmen, Stacktraces
+> und den zur Fehlersuche erforderlichen Geräte-/Betriebssystemkontext zu
+> erfassen. Der Absturzbericht enthält Ihre Supabase-Benutzerkennung,
+> damit wir Berichte pro Konto zuordnen können; personenbezogene Felder
+> (E-Mail-Adresse, IP-Adresse, Cookies und `Authorization`-Header) werden
+> jedoch clientseitig vor der Übertragung entfernt. Diagnosedaten werden
+> von Sentry gemäß deren Standard-Aufbewahrungsrichtlinie bis zu 90 Tage
+> gespeichert und niemals verkauft, an Datenhändler weitergegeben oder
+> für Werbung verwendet. Sie können Absturzberichte jederzeit unter
+> **Einstellungen → Diagnose & Absturzberichte** deaktivieren; ist die
+> Funktion deaktiviert, verlässt kein Ereignis das Gerät. Die
+> Datenschutzpraktiken von Sentry und deren DPA finden Sie unter
+> https://sentry.io/privacy/ und https://sentry.io/legal/dpa/.
