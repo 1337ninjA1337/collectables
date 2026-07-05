@@ -86,6 +86,19 @@ jobs:
         # occurred"), and writes dist/sw.js so warm deep-link reloads get the
         # fresh shell with HTTP 200 instead of a 404.
         run: npx tsx scripts/build-spa-fallback.ts
+      - name: Privacy page smoke check
+        # The /privacy URL is the public policy page App Store review links to;
+        # catch a renderPrivacyPage regression before the artifact is published.
+        run: |
+          if [ ! -f dist/privacy/index.html ]; then
+            echo "ERROR: dist/privacy/index.html missing — /privacy page not emitted" >&2
+            exit 1
+          fi
+          if ! grep -q "Privacy Policy" dist/privacy/index.html; then
+            echo "ERROR: dist/privacy/index.html does not contain 'Privacy Policy'" >&2
+            exit 1
+          fi
+          echo "Privacy page smoke check passed."
       - name: Strip sourcemap files from public artifact
         # Sentry has the .map files; don't ship them to GitHub Pages.
         run: find dist -name "*.map" -type f -delete
