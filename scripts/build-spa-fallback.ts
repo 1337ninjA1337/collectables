@@ -12,7 +12,11 @@ import {
   extractInlineScriptBodies,
   injectSecurityMetaTags,
 } from "../lib/web-security-headers";
-import { renderPrivacyPage } from "../lib/privacy-page";
+import {
+  PRIVACY_DEFAULT_LANGUAGE,
+  PRIVACY_PAGE_LANGUAGES,
+  renderPrivacyPage,
+} from "../lib/privacy-page";
 
 /** Pre-quoted SHA-256 CSP hash-source for an inline script body. */
 function inlineScriptHash(body: string): string {
@@ -102,6 +106,27 @@ function main(): void {
       renderPrivacyPage(fs.readFileSync(privacyMd, "utf8")),
     );
     console.log("[build-spa-fallback] wrote dist/privacy/index.html (from PRIVACY.md)");
+    // Translated Sentry-disclosure pages (GDPR Art. 12) at /privacy/<lang>/,
+    // one per non-English entry of the app's language list.
+    for (const { code } of PRIVACY_PAGE_LANGUAGES) {
+      if (code === PRIVACY_DEFAULT_LANGUAGE) continue;
+      const translatedMd = path.join(REPO_ROOT, `PRIVACY.md.${code}`);
+      if (!fs.existsSync(translatedMd)) {
+        console.error(
+          `[build-spa-fallback] PRIVACY.md.${code} not found — /privacy/${code} page NOT emitted`,
+        );
+        process.exit(1);
+      }
+      const langDir = path.join(privacyDir, code);
+      fs.mkdirSync(langDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(langDir, "index.html"),
+        renderPrivacyPage(fs.readFileSync(translatedMd, "utf8"), code),
+      );
+      console.log(
+        `[build-spa-fallback] wrote dist/privacy/${code}/index.html (from PRIVACY.md.${code})`,
+      );
+    }
   } else {
     console.error("[build-spa-fallback] PRIVACY.md not found — /privacy page NOT emitted");
     process.exit(1);
