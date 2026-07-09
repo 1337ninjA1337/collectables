@@ -7,12 +7,28 @@ import appJson from "../app.json";
 
 export type SentryEnvironment = DeploymentEnvironment;
 
+/**
+ * INVARIANT — `SENTRY_AUTH_TOKEN` is never required for runtime capture.
+ *
+ * The auth token (with `SENTRY_ORG`/`SENTRY_PROJECT`) is a CI-only secret
+ * consumed by the deploy workflow's "Upload sourcemaps to Sentry" step; the
+ * shipped bundle needs nothing beyond the public DSN for events to flow.
+ * Without the token the pipeline still works end-to-end — stack traces just
+ * arrive minified. That gap ("runtime works" vs "debugging works") is
+ * surfaced at runtime via `sourcemapsExpected`: the deploy workflow inlines
+ * `EXPO_PUBLIC_SENTRY_SOURCEMAPS=1` when (and only when) the token was
+ * present at build time, so diagnostics can show "events flowing but stack
+ * traces minified — add SENTRY_AUTH_TOKEN" without a new secret-validation
+ * pass. Never gate `enabled` on this flag.
+ */
 export type SentryConfig = {
   dsn: string;
   environment: SentryEnvironment;
   release: string;
   enabled: boolean;
   tracesSampleRate: number;
+  /** True when the deploy that produced this bundle ran the sourcemap-upload step. */
+  sourcemapsExpected: boolean;
 };
 
 const APP_VERSION = (appJson as { expo: { version: string } }).expo.version;
@@ -84,7 +100,29 @@ export function resolveSentryConfig(
   const tracesSampleRate = resolveTracesSampleRate(
     env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
   );
-  return { dsn, environment, release, enabled, tracesSampleRate };
+  const sourcemapsExpected = resolveSourcemapsExpected(
+    env.EXPO_PUBLIC_SENTRY_SOURCEMAPS,
+  );
+  return {
+    dsn,
+    environment,
+    release,
+    enabled,
+    tracesSampleRate,
+    sourcemapsExpected,
+  };
+}
+
+/**
+ * Parses `EXPO_PUBLIC_SENTRY_SOURCEMAPS` (inlined by the deploy workflow when
+ * `SENTRY_AUTH_TOKEN` was present at build time — see the invariant note on
+ * {@link SentryConfig}). Accepts "1"/"true" (any case); everything else —
+ * including unset, local dev builds, and CI runs without the token — is
+ * false. Pure + exported for testing.
+ */
+export function resolveSourcemapsExpected(value: string | undefined): boolean {
+  const trimmed = (value ?? "").trim().toLowerCase();
+  return trimmed === "1" || trimmed === "true";
 }
 
 /**
@@ -103,6 +141,7 @@ export function readSentryEnvFromProcess(): Record<string, string | undefined> {
     EXPO_PUBLIC_APP_VERSION: process.env.EXPO_PUBLIC_APP_VERSION,
     EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:
       process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
+    EXPO_PUBLIC_SENTRY_SOURCEMAPS: process.env.EXPO_PUBLIC_SENTRY_SOURCEMAPS,
   };
 }
 

@@ -33,6 +33,10 @@ const EAS_EXEMPT: Record<string, string> = {
   EXPO_PUBLIC_SENTRY_RELEASE:
     "workflow-derived (collectables@${{ github.sha }}), not a secret; on EAS " +
     "the @sentry/react-native/expo plugin derives the release itself",
+  EXPO_PUBLIC_SENTRY_SOURCEMAPS:
+    "workflow-derived (SENTRY_AUTH_TOKEN != '' gate), not a secret; on EAS " +
+    "the @sentry/react-native/expo plugin uploads sourcemaps itself, so the " +
+    "web-only diagnostics flag has no EAS counterpart",
 };
 
 function unique(values: string[]): string[] {

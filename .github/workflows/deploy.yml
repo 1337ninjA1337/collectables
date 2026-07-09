@@ -60,6 +60,11 @@ jobs:
           EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
           EXPO_PUBLIC_SENTRY_ENV: ${{ secrets.EXPO_PUBLIC_SENTRY_ENV }}
           EXPO_PUBLIC_SENTRY_RELEASE: collectables@${{ github.sha }}
+          # Mirrors the "Upload sourcemaps to Sentry" step's gate below so the
+          # bundle knows whether readable stack traces are expected for this
+          # build. Runtime capture never needs SENTRY_AUTH_TOKEN — this flag
+          # only powers the diagnostics hint when sourcemaps were skipped.
+          EXPO_PUBLIC_SENTRY_SOURCEMAPS: ${{ secrets.SENTRY_AUTH_TOKEN != '' && '1' || '' }}
       - name: Upload sourcemaps to Sentry
         if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
         # Sentry sourcemap upload is best-effort — a token-scope / org-slug
