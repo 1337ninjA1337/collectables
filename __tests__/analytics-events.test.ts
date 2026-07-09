@@ -7,6 +7,7 @@ import {
   ANALYTICS_EVENTS,
   ANALYTICS_EVENT_NAMES,
   type AnalyticsEventDefinition,
+  type AnalyticsEventProps,
 } from "../lib/analytics-events";
 import type { AnalyticsEventName } from "../lib/analytics";
 
@@ -148,5 +149,23 @@ describe("lib/analytics-events — purity", () => {
       /import\s+type\s*\{\s*AnalyticsEventName\s*\}\s*from\s*["']@\/lib\/analytics["']/,
       "lib/analytics-events.ts must use a type-only import for AnalyticsEventName",
     );
+  });
+});
+
+describe("per-event prop literal typing (compile-time, checked by tsc)", () => {
+  it("props survive as literal tuples at runtime", () => {
+    assert.deepStrictEqual(ANALYTICS_EVENTS.collection_created.props, [
+      "visibility",
+      "isPremium",
+    ]);
+  });
+
+  it("AnalyticsEventProps narrows to the event's own keys", () => {
+    // Type-level assertions — tsc (run in lint:ci) is the real test here.
+    const ok: AnalyticsEventProps<"collection_created"> = "visibility";
+    // @ts-expect-error "language" belongs to language_switched, not collection_created
+    const wrong: AnalyticsEventProps<"collection_created"> = "language";
+    assert.equal(ok, "visibility");
+    assert.equal(wrong, "language");
   });
 });
