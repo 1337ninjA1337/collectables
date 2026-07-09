@@ -42,9 +42,11 @@ import {
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
+import { isDevEnvironment } from "@/lib/dev-menu";
 import { useDiagnostics } from "@/lib/diagnostics-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
 import { getSentryStatus } from "@/lib/sentry";
+import { useSocial } from "@/lib/social-context";
 import { useNow } from "@/lib/use-now";
 import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
@@ -56,6 +58,7 @@ export default function SettingsScreen() {
   const { signOut, deleteAccount, pending } = useAuth();
   const { ready: premiumReady, isPremium, activatedAt, expiresAt, activatePremium, cancelPremium } = usePremium();
   const { diagnosticsEnabled, setDiagnosticsEnabled } = useDiagnostics();
+  const { isAdmin } = useSocial();
   const { displayCurrency, setDisplayCurrency, refreshCurrencyRates, currencyRatesUpdatedAt } =
     useCollections();
   const toast = useToast();
@@ -72,6 +75,10 @@ export default function SettingsScreen() {
           formatRelativeDate(sentryStatus.lastEventSentAt),
         )
       : t("diagnosticsCrashFooterNoneSent");
+  // Internal-only row: lets a tester verify their build was produced by a CI
+  // run that inlined the Sentry secret, without opening devtools. Hidden from
+  // regular production users (dev builds + admins only).
+  const showDsnInlinedRow = isDevEnvironment() || isAdmin;
   const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [currencyQuery, setCurrencyQuery] = useState("");
   const [refreshingRates, setRefreshingRates] = useState(false);
@@ -301,6 +308,11 @@ export default function SettingsScreen() {
         <Text style={styles.diagnosticsFooter} testID="diagnostics-crash-footer">
           {crashFooter}
         </Text>
+        {showDsnInlinedRow && (
+          <Text style={styles.diagnosticsFooter} testID="diagnostics-dsn-inlined">
+            {`${t("diagnosticsDsnInlined")}: ${sentryStatus.dsnPresent ? "✅" : "❌"}`}
+          </Text>
+        )}
       </View>
 
       <Pressable
