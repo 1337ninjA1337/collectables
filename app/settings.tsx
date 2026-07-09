@@ -44,13 +44,15 @@ import {
 } from "@/lib/design-tokens";
 import { useDiagnostics } from "@/lib/diagnostics-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
+import { getSentryStatus } from "@/lib/sentry";
+import { useNow } from "@/lib/use-now";
 import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
 import { FONT_DISPLAY, FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export default function SettingsScreen() {
   const theme = useAppTheme();
-  const { t, language, setLanguage, languageOptions, formatRelativeDate } = useI18n();
+  const { t, language, setLanguage, languageOptions, formatRelativeDate, relativeDateLabel } = useI18n();
   const { signOut, deleteAccount, pending } = useAuth();
   const { ready: premiumReady, isPremium, activatedAt, expiresAt, activatePremium, cancelPremium } = usePremium();
   const { diagnosticsEnabled, setDiagnosticsEnabled } = useDiagnostics();
@@ -58,6 +60,18 @@ export default function SettingsScreen() {
     useCollections();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
+  // Minute tick so the "last sent N minutes ago" footer rolls over without
+  // any other state change re-rendering the screen.
+  useNow();
+  const sentryStatus = getSentryStatus();
+  const crashFooter = !diagnosticsEnabled
+    ? t("diagnosticsCrashFooterDisabled")
+    : sentryStatus.lastEventSentAt
+      ? relativeDateLabel(
+          t("diagnosticsCrashFooterLastSent"),
+          formatRelativeDate(sentryStatus.lastEventSentAt),
+        )
+      : t("diagnosticsCrashFooterNoneSent");
   const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [currencyQuery, setCurrencyQuery] = useState("");
   const [refreshingRates, setRefreshingRates] = useState(false);
@@ -284,6 +298,9 @@ export default function SettingsScreen() {
               : t("diagnosticsDisabled")}
           </Text>
         </Pressable>
+        <Text style={styles.diagnosticsFooter} testID="diagnostics-crash-footer">
+          {crashFooter}
+        </Text>
       </View>
 
       <Pressable
@@ -427,6 +444,13 @@ const styles = StyleSheet.create({
     color: MUTED_11,
     lineHeight: 18,
     fontFamily: FONT_BODY,
+  },
+  diagnosticsFooter: {
+    fontSize: 12,
+    color: MUTED_11,
+    fontStyle: "italic",
+    fontFamily: FONT_BODY,
+    marginTop: 2,
   },
   diagnosticsToggle: {
     alignSelf: "flex-start",

@@ -72,6 +72,10 @@ let lastInitError: unknown = null;
 // One-shot guard: log the init failure exactly once via console.error rather
 // than re-warning on every retry, so the cause is visible but not spammy.
 let initErrorLogged = false;
+// ISO timestamp of the last event handed to the SDK (crash capture or smoke
+// test). Session-scoped by design — it answers "is anything actually leaving
+// this device right now", so it must not persist across restarts.
+let lastEventSentAt: string | null = null;
 
 // Rate-limit captureException to MAX_EVENTS_PER_WINDOW within RATE_LIMIT_WINDOW_MS
 // so a runaway useEffect loop or an exception in render cannot exhaust the
@@ -216,6 +220,7 @@ export function captureException(
   if (!rateLimitAllow()) return;
   try {
     sdk.captureException(error, toSentryCaptureContext(context));
+    lastEventSentAt = new Date().toISOString();
   } catch {
     /* never let telemetry crash the host app */
   }
@@ -281,6 +286,12 @@ export type SentryStatus = {
   dsnPresent: boolean;
   environment: SentryEnvironment | null;
   release: string | null;
+  /**
+   * ISO timestamp of the last event handed to the SDK this session (crash
+   * capture or smoke test), or null when nothing has been sent. Drives the
+   * "last sent 3 hours ago" footer on Settings → Diagnostics.
+   */
+  lastEventSentAt: string | null;
   reason:
     | "ready"
     | "not-initialised"
@@ -317,6 +328,7 @@ export function getSentryStatus(): SentryStatus {
     dsnPresent,
     environment,
     release,
+    lastEventSentAt,
     reason,
   };
 }
@@ -350,6 +362,7 @@ export function triggerSentryTestError(
     sdk.captureException(new Error(message), {
       extra: { context: "sentry.smokeTest", triggeredAt: new Date().toISOString() },
     });
+    lastEventSentAt = new Date().toISOString();
     return "captured";
   } catch {
     return "not-ready";
@@ -363,6 +376,7 @@ export function __resetSentryForTests(): void {
   pending = null;
   lastInitError = null;
   initErrorLogged = false;
+  lastEventSentAt = null;
   rateLimiter.reset();
   userOptedOut = false;
 }

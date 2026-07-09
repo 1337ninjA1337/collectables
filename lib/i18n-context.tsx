@@ -528,6 +528,11 @@ const en = {
     "When enabled, anonymous crash reports help us fix bugs faster. Toggle off to stop sending diagnostics.",
   diagnosticsEnabled: "Sending diagnostics",
   diagnosticsDisabled: "Diagnostics paused",
+  diagnosticsCrashFooterLastSent: "Crash reports: enabled — last sent",
+  diagnosticsCrashFooterNoneSent:
+    "Crash reports: enabled — nothing sent yet this session",
+  diagnosticsCrashFooterDisabled:
+    "Crash reports: off — nothing leaves this device",
   profileCacheTtlLowTitle: "Profile cache TTL too low",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS is set below 30 seconds. Aggressive overrides can hammer Supabase rate limits.",
@@ -538,6 +543,16 @@ type TranslationMap = Record<TranslationKey, TranslationValue>;
 
 const ru: TranslationMap = {
   ...en,
+  diagnosticsTitle: "Диагностика и отчёты о сбоях",
+  diagnosticsHint:
+    "Если включено, анонимные отчёты о сбоях помогают нам быстрее исправлять ошибки. Выключите, чтобы не отправлять диагностику.",
+  diagnosticsEnabled: "Диагностика отправляется",
+  diagnosticsDisabled: "Диагностика приостановлена",
+  diagnosticsCrashFooterLastSent: "Отчёты о сбоях: включены — последняя отправка",
+  diagnosticsCrashFooterNoneSent:
+    "Отчёты о сбоях: включены — в этой сессии ничего не отправлялось",
+  diagnosticsCrashFooterDisabled:
+    "Отчёты о сбоях: выключены — данные не покидают устройство",
   checkingSession: "Проверяем вашу сессию...",
   authAccount: "Аккаунт Collectables",
   authTitle: "Войдите, чтобы хранить свои коллекции в личном профиле.",
@@ -1066,6 +1081,16 @@ const ru: TranslationMap = {
 
 const be: TranslationMap = {
   ...en,
+  diagnosticsTitle: "Дыягностыка і справаздачы пра збоі",
+  diagnosticsHint:
+    "Калі ўключана, ананімныя справаздачы пра збоі дапамагаюць нам хутчэй выпраўляць памылкі. Выключыце, каб не адпраўляць дыягностыку.",
+  diagnosticsEnabled: "Дыягностыка адпраўляецца",
+  diagnosticsDisabled: "Дыягностыка прыпынена",
+  diagnosticsCrashFooterLastSent: "Справаздачы пра збоі: уключаны — апошняя адпраўка",
+  diagnosticsCrashFooterNoneSent:
+    "Справаздачы пра збоі: уключаны — у гэтай сесіі нічога не адпраўлялася",
+  diagnosticsCrashFooterDisabled:
+    "Справаздачы пра збоі: выключаны — даныя не пакідаюць прыладу",
   loadMoreItems: (params?: TranslationParams) => `Загрузіць яшчэ (засталося ${params?.count ?? 0})`,
   loadMoreItemsA11y: (params?: TranslationParams) => `Загрузіць яшчэ прадметы — засталося ${params?.count ?? 0}`,
   loadMoreItemsHint: "Падгружае наступную старонку, каб памяць на iOS не расла бясконца.",
@@ -1263,6 +1288,16 @@ const be: TranslationMap = {
 
 const pl: TranslationMap = {
   ...en,
+  diagnosticsTitle: "Diagnostyka i raporty o awariach",
+  diagnosticsHint:
+    "Gdy włączone, anonimowe raporty o awariach pomagają nam szybciej naprawiać błędy. Wyłącz, aby nie wysyłać diagnostyki.",
+  diagnosticsEnabled: "Wysyłanie diagnostyki",
+  diagnosticsDisabled: "Diagnostyka wstrzymana",
+  diagnosticsCrashFooterLastSent: "Raporty o awariach: włączone — ostatnio wysłano",
+  diagnosticsCrashFooterNoneSent:
+    "Raporty o awariach: włączone — w tej sesji nic nie wysłano",
+  diagnosticsCrashFooterDisabled:
+    "Raporty o awariach: wyłączone — nic nie opuszcza urządzenia",
   loadMoreItems: (params?: TranslationParams) => `Załaduj więcej (zostało ${params?.count ?? 0})`,
   loadMoreItemsA11y: (params?: TranslationParams) => `Załaduj więcej przedmiotów — zostało ${params?.count ?? 0}`,
   loadMoreItemsHint: "Doładowuje kolejną stronę, żeby pamięć na iOS nie rosła w nieskończoność.",
@@ -1450,6 +1485,16 @@ const pl: TranslationMap = {
 
 const de: TranslationMap = {
   ...en,
+  diagnosticsTitle: "Diagnose & Absturzberichte",
+  diagnosticsHint:
+    "Wenn aktiviert, helfen uns anonyme Absturzberichte, Fehler schneller zu beheben. Deaktivieren, um keine Diagnosedaten zu senden.",
+  diagnosticsEnabled: "Diagnose wird gesendet",
+  diagnosticsDisabled: "Diagnose pausiert",
+  diagnosticsCrashFooterLastSent: "Absturzberichte: aktiviert — zuletzt gesendet",
+  diagnosticsCrashFooterNoneSent:
+    "Absturzberichte: aktiviert — in dieser Sitzung nichts gesendet",
+  diagnosticsCrashFooterDisabled:
+    "Absturzberichte: aus — nichts verlässt das Gerät",
   loadMoreItems: (params?: TranslationParams) => `Mehr laden (noch ${params?.count ?? 0})`,
   loadMoreItemsA11y: (params?: TranslationParams) => `Weitere Objekte laden — noch ${params?.count ?? 0}`,
   loadMoreItemsHint: "Lädt die nächste Seite, damit der iOS-Speicher nicht unbegrenzt wächst.",
@@ -1633,6 +1678,16 @@ const de: TranslationMap = {
 
 const es: TranslationMap = {
   ...en,
+  diagnosticsTitle: "Diagnóstico e informes de fallos",
+  diagnosticsHint:
+    "Si está activado, los informes anónimos de fallos nos ayudan a corregir errores más rápido. Desactívalo para no enviar diagnósticos.",
+  diagnosticsEnabled: "Enviando diagnósticos",
+  diagnosticsDisabled: "Diagnóstico en pausa",
+  diagnosticsCrashFooterLastSent: "Informes de fallos: activados — último envío",
+  diagnosticsCrashFooterNoneSent:
+    "Informes de fallos: activados — nada enviado en esta sesión",
+  diagnosticsCrashFooterDisabled:
+    "Informes de fallos: desactivados — nada sale del dispositivo",
   loadMoreItems: (params?: TranslationParams) => `Cargar más (${params?.count ?? 0} restantes)`,
   loadMoreItemsA11y: (params?: TranslationParams) => `Cargar más objetos — ${params?.count ?? 0} restantes`,
   loadMoreItemsHint: "Carga la siguiente página para que la memoria de iOS no crezca sin control.",
