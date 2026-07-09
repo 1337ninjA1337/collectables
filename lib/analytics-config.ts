@@ -2,6 +2,7 @@ import {
   normaliseDeploymentEnv,
   type DeploymentEnvironment,
 } from "@/lib/deployment-env";
+import { makeExpoPublicEnvReader } from "@/lib/expo-public-env";
 
 export type AnalyticsEnvironment = DeploymentEnvironment;
 
@@ -54,18 +55,30 @@ export function resolveAnalyticsConfig(
   return { posthogKey, posthogHost, clarityId, environment, enabled, mirrorDisabled };
 }
 
+/** Every EXPO_PUBLIC_ var the analytics resolver supports, declared once. */
+export const ANALYTICS_ENV_VAR_NAMES = [
+  "EXPO_PUBLIC_POSTHOG_KEY",
+  "EXPO_PUBLIC_POSTHOG_HOST",
+  "EXPO_PUBLIC_CLARITY_PROJECT_ID",
+  "EXPO_PUBLIC_ANALYTICS_ENV",
+  "EXPO_PUBLIC_SENTRY_ENV",
+  "EXPO_PUBLIC_ANALYTICS_DISABLED",
+  "EXPO_PUBLIC_ANALYTICS_MIRROR_DISABLED",
+] as const;
+
 /**
  * Reads the analytics env vars from `process.env` using *literal* member
  * accesses so Expo's babel plugin (`babel-preset-expo`) inlines each value
  * into the JS bundle at build time. Passing `process.env` whole bypasses
  * inlining and the bundled code reads `undefined` at runtime — the bug
- * fixed for Sentry in `lib/sentry-config.ts:readSentryEnvFromProcess`.
+ * fixed for Sentry in `lib/sentry-config.ts:readSentryEnvFromProcess`. The
+ * `makeExpoPublicEnvReader` wrapper enforces name-tuple ↔ literal-object
+ * parity at compile time (see lib/expo-public-env.ts).
  */
-export function readAnalyticsEnvFromProcess(): Record<
-  string,
-  string | undefined
-> {
-  return {
+export const readAnalyticsEnvFromProcess = makeExpoPublicEnvReader(
+  "lib/analytics-config.ts",
+  ANALYTICS_ENV_VAR_NAMES,
+  () => ({
     EXPO_PUBLIC_POSTHOG_KEY: process.env.EXPO_PUBLIC_POSTHOG_KEY,
     EXPO_PUBLIC_POSTHOG_HOST: process.env.EXPO_PUBLIC_POSTHOG_HOST,
     EXPO_PUBLIC_CLARITY_PROJECT_ID: process.env.EXPO_PUBLIC_CLARITY_PROJECT_ID,
@@ -74,8 +87,8 @@ export function readAnalyticsEnvFromProcess(): Record<
     EXPO_PUBLIC_ANALYTICS_DISABLED: process.env.EXPO_PUBLIC_ANALYTICS_DISABLED,
     EXPO_PUBLIC_ANALYTICS_MIRROR_DISABLED:
       process.env.EXPO_PUBLIC_ANALYTICS_MIRROR_DISABLED,
-  };
-}
+  }),
+);
 
 export const analyticsConfig: AnalyticsConfig = resolveAnalyticsConfig(
   readAnalyticsEnvFromProcess(),
