@@ -533,6 +533,7 @@ const en = {
     "Crash reports: enabled — nothing sent yet this session",
   diagnosticsCrashFooterDisabled:
     "Crash reports: off — nothing leaves this device",
+  diagnosticsDsnInlined: "Sentry DSN inlined in this build",
   profileCacheTtlLowTitle: "Profile cache TTL too low",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS is set below 30 seconds. Aggressive overrides can hammer Supabase rate limits.",
@@ -553,6 +554,7 @@ const ru: TranslationMap = {
     "Отчёты о сбоях: включены — в этой сессии ничего не отправлялось",
   diagnosticsCrashFooterDisabled:
     "Отчёты о сбоях: выключены — данные не покидают устройство",
+  diagnosticsDsnInlined: "Sentry DSN вшит в эту сборку",
   checkingSession: "Проверяем вашу сессию...",
   authAccount: "Аккаунт Collectables",
   authTitle: "Войдите, чтобы хранить свои коллекции в личном профиле.",
@@ -1091,6 +1093,7 @@ const be: TranslationMap = {
     "Справаздачы пра збоі: уключаны — у гэтай сесіі нічога не адпраўлялася",
   diagnosticsCrashFooterDisabled:
     "Справаздачы пра збоі: выключаны — даныя не пакідаюць прыладу",
+  diagnosticsDsnInlined: "Sentry DSN ушыты ў гэтую зборку",
   loadMoreItems: (params?: TranslationParams) => `Загрузіць яшчэ (засталося ${params?.count ?? 0})`,
   loadMoreItemsA11y: (params?: TranslationParams) => `Загрузіць яшчэ прадметы — засталося ${params?.count ?? 0}`,
   loadMoreItemsHint: "Падгружае наступную старонку, каб памяць на iOS не расла бясконца.",
@@ -1298,6 +1301,7 @@ const pl: TranslationMap = {
     "Raporty o awariach: włączone — w tej sesji nic nie wysłano",
   diagnosticsCrashFooterDisabled:
     "Raporty o awariach: wyłączone — nic nie opuszcza urządzenia",
+  diagnosticsDsnInlined: "Sentry DSN wbudowany w tę kompilację",
   loadMoreItems: (params?: TranslationParams) => `Załaduj więcej (zostało ${params?.count ?? 0})`,
   loadMoreItemsA11y: (params?: TranslationParams) => `Załaduj więcej przedmiotów — zostało ${params?.count ?? 0}`,
   loadMoreItemsHint: "Doładowuje kolejną stronę, żeby pamięć na iOS nie rosła w nieskończoność.",
@@ -1495,6 +1499,7 @@ const de: TranslationMap = {
     "Absturzberichte: aktiviert — in dieser Sitzung nichts gesendet",
   diagnosticsCrashFooterDisabled:
     "Absturzberichte: aus — nichts verlässt das Gerät",
+  diagnosticsDsnInlined: "Sentry-DSN in diesem Build eingebettet",
   loadMoreItems: (params?: TranslationParams) => `Mehr laden (noch ${params?.count ?? 0})`,
   loadMoreItemsA11y: (params?: TranslationParams) => `Weitere Objekte laden — noch ${params?.count ?? 0}`,
   loadMoreItemsHint: "Lädt die nächste Seite, damit der iOS-Speicher nicht unbegrenzt wächst.",
@@ -1688,6 +1693,7 @@ const es: TranslationMap = {
     "Informes de fallos: activados — nada enviado en esta sesión",
   diagnosticsCrashFooterDisabled:
     "Informes de fallos: desactivados — nada sale del dispositivo",
+  diagnosticsDsnInlined: "Sentry DSN integrado en esta compilación",
   loadMoreItems: (params?: TranslationParams) => `Cargar más (${params?.count ?? 0} restantes)`,
   loadMoreItemsA11y: (params?: TranslationParams) => `Cargar más objetos — ${params?.count ?? 0} restantes`,
   loadMoreItemsHint: "Carga la siguiente página para que la memoria de iOS no crezca sin control.",
