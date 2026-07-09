@@ -38,8 +38,11 @@ function appCodeFiles(): string[] {
 
 describe("sentry lazy-import invariant", () => {
   it("lib/sentry.ts loads the SDK via dynamic import only", () => {
+    // Matches both the direct `await import(...)` shape and the
+    // makeLazyLoader thunk shape `() => import(...)` — the invariant is a
+    // dynamic import with a static string specifier, however it's awaited.
     assert.ok(
-      sentrySource.includes('await import("@sentry/react-native")'),
+      sentrySource.includes('import("@sentry/react-native")'),
       "the lazy loader must dynamic-import the SDK",
     );
     assert.ok(

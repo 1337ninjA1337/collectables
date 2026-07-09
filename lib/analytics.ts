@@ -3,6 +3,7 @@ import {
   resolveAnalyticsConfig,
   type AnalyticsConfig,
 } from "@/lib/analytics-config";
+import { makeLazyLoader } from "@/lib/lazy-sdk";
 import { createSlidingWindowLimiter } from "@/lib/sliding-window-limiter";
 
 /**
@@ -84,13 +85,16 @@ export function isAnalyticsOptedOut(): boolean {
   return userOptedOut;
 }
 
-const defaultLoader: AnalyticsLoader = async () => {
-  const mod = (await import("posthog-react-native")) as unknown as {
-    default: PostHogConstructor;
-    PostHog?: PostHogConstructor;
-  };
-  return mod.default ?? mod.PostHog!;
-};
+const defaultLoader: AnalyticsLoader = makeLazyLoader(
+  () => import("posthog-react-native"),
+  (mod) => {
+    const m = mod as unknown as {
+      default: PostHogConstructor;
+      PostHog?: PostHogConstructor;
+    };
+    return m.default ?? m.PostHog!;
+  },
+);
 
 export type InitOptions = {
   env?: Record<string, string | undefined>;

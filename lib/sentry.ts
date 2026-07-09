@@ -4,6 +4,7 @@ import {
   type SentryConfig,
   type SentryEnvironment,
 } from "@/lib/sentry-config";
+import { makeLazyLoader } from "@/lib/lazy-sdk";
 import { createSlidingWindowLimiter } from "@/lib/sliding-window-limiter";
 
 export type SentryEvent = {
@@ -91,10 +92,10 @@ function rateLimitAllow(now: number = Date.now()): boolean {
   return rateLimiter.allow(now);
 }
 
-const defaultLoader: SentryLoader = async () => {
-  const mod = (await import("@sentry/react-native")) as unknown as SentrySdk;
-  return mod;
-};
+const defaultLoader: SentryLoader = makeLazyLoader(
+  () => import("@sentry/react-native"),
+  (mod) => mod as unknown as SentrySdk,
+);
 
 export type InitOptions = {
   env?: Record<string, string | undefined>;
