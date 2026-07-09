@@ -65,6 +65,21 @@ jobs:
           # build. Runtime capture never needs SENTRY_AUTH_TOKEN — this flag
           # only powers the diagnostics hint when sourcemaps were skipped.
           EXPO_PUBLIC_SENTRY_SOURCEMAPS: ${{ secrets.SENTRY_AUTH_TOKEN != '' && '1' || '' }}
+      - name: Verify secret inlining in bundle
+        # The secret-status step above proves a secret reached CI; this step
+        # proves it reached the artifact. Fails the deploy when a set secret's
+        # value is absent from the exported bundle (e.g. a non-literal
+        # process.env access slipped past lint:env-inlining). Unset secrets
+        # are skipped, so a secretless fork build still deploys.
+        # Env list must mirror what the "Build web" step passed to expo
+        # export — a var handed to the verifier but not the build would
+        # false-fail (watched-but-unset vars are skipped, so the narrower
+        # build list is the correct one to mirror).
+        run: npx tsx scripts/verify-bundle-inlining.ts
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
       - name: Upload sourcemaps to Sentry
         if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
         # Sentry sourcemap upload is best-effort — a token-scope / org-slug
