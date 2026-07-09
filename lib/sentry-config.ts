@@ -2,6 +2,7 @@ import {
   normaliseDeploymentEnv,
   type DeploymentEnvironment,
 } from "@/lib/deployment-env";
+import { makeExpoPublicEnvReader } from "@/lib/expo-public-env";
 
 import appJson from "../app.json";
 
@@ -125,16 +126,29 @@ export function resolveSourcemapsExpected(value: string | undefined): boolean {
   return trimmed === "1" || trimmed === "true";
 }
 
+/** Every EXPO_PUBLIC_ var the Sentry resolver supports, declared once. */
+export const SENTRY_ENV_VAR_NAMES = [
+  "EXPO_PUBLIC_SENTRY_DSN",
+  "EXPO_PUBLIC_SENTRY_ENV",
+  "EXPO_PUBLIC_SENTRY_RELEASE",
+  "EXPO_PUBLIC_APP_VERSION",
+  "EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE",
+  "EXPO_PUBLIC_SENTRY_SOURCEMAPS",
+] as const;
+
 /**
  * Reads the Sentry env vars from `process.env` using *literal* member
  * accesses. Expo's babel plugin (`babel-preset-expo`) only inlines
  * `process.env.EXPO_PUBLIC_*` references when it sees them as direct member
  * expressions in source — passing `process.env` whole to a helper bypasses
- * inlining and the bundled code reads `undefined` at runtime. Keep every
- * supported variable referenced literally below.
+ * inlining and the bundled code reads `undefined` at runtime. The
+ * `makeExpoPublicEnvReader` wrapper enforces name-tuple ↔ literal-object
+ * parity at compile time (see lib/expo-public-env.ts).
  */
-export function readSentryEnvFromProcess(): Record<string, string | undefined> {
-  return {
+export const readSentryEnvFromProcess = makeExpoPublicEnvReader(
+  "lib/sentry-config.ts",
+  SENTRY_ENV_VAR_NAMES,
+  () => ({
     EXPO_PUBLIC_SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,
     EXPO_PUBLIC_SENTRY_ENV: process.env.EXPO_PUBLIC_SENTRY_ENV,
     EXPO_PUBLIC_SENTRY_RELEASE: process.env.EXPO_PUBLIC_SENTRY_RELEASE,
@@ -142,8 +156,8 @@ export function readSentryEnvFromProcess(): Record<string, string | undefined> {
     EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE:
       process.env.EXPO_PUBLIC_SENTRY_TRACES_SAMPLE_RATE,
     EXPO_PUBLIC_SENTRY_SOURCEMAPS: process.env.EXPO_PUBLIC_SENTRY_SOURCEMAPS,
-  };
-}
+  }),
+);
 
 export const sentryConfig: SentryConfig = resolveSentryConfig(
   readSentryEnvFromProcess(),
