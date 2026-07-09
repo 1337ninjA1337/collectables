@@ -292,6 +292,14 @@ export type SentryStatus = {
    * "last sent 3 hours ago" footer on Settings → Diagnostics.
    */
   lastEventSentAt: string | null;
+  /**
+   * True when the deploy that produced this bundle ran the Sentry
+   * sourcemap-upload step (SENTRY_AUTH_TOKEN present in CI). `ready && !this`
+   * means events flow but stack traces arrive minified — the diagnostics
+   * screen can hint "add SENTRY_AUTH_TOKEN". Runtime capture never needs the
+   * token; see the invariant note on `SentryConfig` in lib/sentry-config.ts.
+   */
+  sourcemapsExpected: boolean;
   reason:
     | "ready"
     | "not-initialised"
@@ -329,6 +337,7 @@ export function getSentryStatus(): SentryStatus {
     environment,
     release,
     lastEventSentAt,
+    sourcemapsExpected: activeConfig?.sourcemapsExpected ?? false,
     reason,
   };
 }
