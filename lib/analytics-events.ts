@@ -24,9 +24,13 @@ export type AnalyticsEventDefinition = {
   readonly props: readonly string[];
 };
 
-export const ANALYTICS_EVENTS: Readonly<
-  Record<AnalyticsEventName, AnalyticsEventDefinition>
-> = {
+// `as const satisfies` (instead of a wide `Record<...>` annotation) lifts
+// every prop name into the type system: `ANALYTICS_EVENTS.collection_created
+// .props[0]` is typed `"visibility"`, not `string`, so the future
+// `validateEventProps(name, payload)` guard and per-event autocomplete get
+// literal keys while the shape is still checked against
+// `AnalyticsEventDefinition`. Runtime value is unchanged.
+export const ANALYTICS_EVENTS = {
   signup_completed: {
     description:
       "Fired when a freshly-created user finishes the OTP/OAuth flow (detected by `created_at` within the last 5 minutes).",
@@ -82,7 +86,14 @@ export const ANALYTICS_EVENTS: Readonly<
       "Fired from `lib/i18n-context.tsx:setLanguage()` whenever the user picks a new language. Used to size the i18n test surface per locale.",
     props: ["language", "previousLanguage"],
   },
-};
+} as const satisfies Record<AnalyticsEventName, AnalyticsEventDefinition>;
+
+/**
+ * Literal union of the allowed prop keys for one event, e.g.
+ * `AnalyticsEventProps<"collection_created">` = `"visibility" | "isPremium"`.
+ */
+export type AnalyticsEventProps<N extends AnalyticsEventName> =
+  (typeof ANALYTICS_EVENTS)[N]["props"][number];
 
 /**
  * Sorted array of event names. Useful for the Power BI schema doc (predictable
