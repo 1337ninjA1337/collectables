@@ -90,6 +90,12 @@ jobs:
       - name: No inline hex literals
         run: npm run lint:hex
 
+      # Metro only inlines literal `process.env.EXPO_PUBLIC_*` accesses —
+      # passing `process.env` whole into a lib/*-config.ts resolver ships
+      # `undefined` values in the production bundle despite the CI secret.
+      - name: No whole-process.env in config resolvers
+        run: npm run lint:env-inlining
+
       - name: Migrations documented in MANUAL-TASKS.md
         run: npm run lint:migration-docs
 
