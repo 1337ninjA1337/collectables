@@ -197,6 +197,58 @@ export function isAnalyticsReady(): boolean {
   return sdk !== null && (activeConfig?.enabled ?? false);
 }
 
+export type AnalyticsStatus = {
+  ready: boolean;
+  initialised: boolean;
+  optedOut: boolean;
+  keyPresent: boolean;
+  environment: AnalyticsConfig["environment"] | null;
+  host: string | null;
+  reason:
+    | "ready"
+    | "not-initialised"
+    | "user-opted-out"
+    | "missing-key"
+    | "development-env"
+    | "kill-switch"
+    | "init-failed";
+};
+
+/**
+ * Returns a structured snapshot of the analytics wrapper state, mirroring
+ * `getSentryStatus()` in lib/sentry.ts. Surfaces exactly which gate (key
+ * missing, dev env, kill-switch, opt-out, init still pending, loader failed)
+ * is blocking event capture, so the settings Diagnostics screen can render
+ * "events flowing / blocked because X" without reimplementing the gate-walk.
+ *
+ * Exposed on `globalThis.__analyticsStatus()` from app/_layout.tsx.
+ */
+export function getAnalyticsStatus(): AnalyticsStatus {
+  const keyPresent = (activeConfig?.posthogKey ?? "").length > 0;
+  const environment = activeConfig?.environment ?? null;
+  const host = activeConfig?.posthogHost ?? null;
+  const ready = isAnalyticsReady();
+  let reason: AnalyticsStatus["reason"];
+  if (ready) reason = "ready";
+  else if (userOptedOut) reason = "user-opted-out";
+  else if (!initialised) reason = "not-initialised";
+  else if (!keyPresent) reason = "missing-key";
+  else if (environment === "development") reason = "development-env";
+  // Key present, non-dev env, yet the resolver still disabled analytics —
+  // only the EXPO_PUBLIC_ANALYTICS_DISABLED kill-switch produces that combo.
+  else if (!(activeConfig?.enabled ?? false)) reason = "kill-switch";
+  else reason = "init-failed";
+  return {
+    ready,
+    initialised,
+    optedOut: userOptedOut,
+    keyPresent,
+    environment,
+    host,
+    reason,
+  };
+}
+
 export function __resetAnalyticsForTests(): void {
   sdk = null;
   initialised = false;

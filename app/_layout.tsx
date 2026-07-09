@@ -37,6 +37,7 @@ import {
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
 import { DiagnosticsProvider } from "@/lib/diagnostics-context";
+import { getAnalyticsStatus } from "@/lib/analytics";
 import { isDevEnvironment, loadDevMenuModule, registerDevMenu } from "@/lib/dev-menu";
 import { I18nProvider, useI18n, useOptionalI18n } from "@/lib/i18n-context";
 import { MarketplaceProvider } from "@/lib/marketplace-context";
@@ -60,6 +61,7 @@ export default Sentry.wrap(function RootLayout() {
     const scope = globalThis as unknown as Record<string, unknown>;
     scope.__sendSentryTestError = triggerSentryTestError;
     scope.__sentryStatus = getSentryStatus;
+    scope.__analyticsStatus = getAnalyticsStatus;
   }, []);
 
   useEffect(() => {
