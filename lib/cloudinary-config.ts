@@ -13,6 +13,22 @@ export function resolveCloudinaryConfig(env: Record<string, string | undefined>)
   return { apiBase, cloudName, uploadPreset };
 }
 
+/**
+ * Reads the Cloudinary env vars from `process.env` using *literal* member
+ * accesses. Metro / babel-preset-expo only inlines
+ * `process.env.EXPO_PUBLIC_*` references when it sees them as direct member
+ * expressions in source — passing `process.env` whole to a helper bypasses
+ * the transform and every value reads `undefined` in the production bundle
+ * (same footgun fixed for Sentry in `lib/sentry-config.ts`).
+ */
+export function readCloudinaryEnvFromProcess(): Record<string, string | undefined> {
+  return {
+    EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME: process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME,
+    EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET: process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET,
+    EXPO_PUBLIC_CLOUDINARY_URL: process.env.EXPO_PUBLIC_CLOUDINARY_URL,
+  };
+}
+
 export const cloudinaryConfig: CloudinaryConfig = resolveCloudinaryConfig(
-  process.env as Record<string, string | undefined>,
+  readCloudinaryEnvFromProcess(),
 );
