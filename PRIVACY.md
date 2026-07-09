@@ -117,8 +117,8 @@ Sub-processor retention windows:
 
 | Surface | Store | Retention window |
 | --- | --- | --- |
-| Product events | PostHog (EU cloud) | 7 days (hot); longer history lives only in our own database, below |
 | Crash reports | Sentry | 90 days |
+| Product events | PostHog (EU cloud) | 7 days (hot); longer history lives only in our own database, below |
 | Session replays | Microsoft Clarity (web only) | 30 days |
 
 > **Server-side data retention.** Data we store in our own Supabase database
