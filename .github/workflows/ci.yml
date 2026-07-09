@@ -150,3 +150,17 @@ jobs:
             fi
           done
           echo "Bundle smoke check passed."
+
+      - name: Privacy page smoke check
+        # npm run build runs build-spa-fallback.ts, which emits the static
+        # /privacy page from PRIVACY.md — verify the rendered output survived.
+        run: |
+          if [ ! -f dist/privacy/index.html ]; then
+            echo "ERROR: dist/privacy/index.html missing — /privacy page not emitted" >&2
+            exit 1
+          fi
+          if ! grep -q "Privacy Policy" dist/privacy/index.html; then
+            echo "ERROR: dist/privacy/index.html does not contain 'Privacy Policy'" >&2
+            exit 1
+          fi
+          echo "Privacy page smoke check passed."
