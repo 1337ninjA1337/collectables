@@ -13,6 +13,7 @@
     "build:powerbi": "tsx scripts/build-powerbi-template.ts",
     "lint:hex": "tsx scripts/check-inline-hex.ts",
     "lint:env-inlining": "tsx scripts/check-env-inlining.ts",
+    "verify:bundle-inlining": "tsx scripts/verify-bundle-inlining.ts",
     "lint:clarity-mask": "tsx scripts/check-clarity-input-mask.ts",
     "lint:migration-docs": "tsx scripts/check-migration-docs.ts",
     "lint:migration-naming": "tsx scripts/check-supabase-migration-naming.ts",
