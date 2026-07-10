@@ -1,5 +1,6 @@
 import { captureException } from "@/lib/sentry";
 import { fetchWithRetry } from "@/lib/fetch-retry";
+import { deterministicUuidV4 } from "@/lib/uuid";
 import { devLog } from "@/lib/safe-log";
 import {
   authClient,
@@ -22,7 +23,9 @@ import {
   profileUpdateUrl,
   profilesPageRangeHeader,
   profilesPageUrl,
+  profilesSearchUrl,
   profilesUrl,
+  sanitizeProfileSearchQuery,
   publicCollectionsByUserUrl,
   removeFriendRequestUrl,
   sendFriendRequestBody,
@@ -153,10 +156,43 @@ export async function fetchProfiles(
   });
 
   const totalCount = parseInt(res.headers.get("content-range")?.split("/")?.[1] ?? "0", 10);
-  const rows: DbProfile[] = await res.json();
-  const filtered = rows.filter((r) => !isHiddenProfile(r));
+  const rows: unknown = await res.json();
+  // A non-OK response (RLS misconfig, revoked column, expired session) comes
+  // back as a PostgREST error OBJECT, not an array — `.filter` on it used to
+  // throw and the people screen went silently blank. Surface it instead.
+  if (!res.ok || !Array.isArray(rows)) {
+    devLog.debug("[fetchProfiles] non-OK response", res.status);
+    return { data: [], totalCount: 0 };
+  }
+  const dbRows = rows as DbProfile[];
+  const filtered = dbRows.filter((r) => !isHiddenProfile(r));
 
-  return { data: filtered.map(toUserProfile), totalCount: totalCount - (rows.length - filtered.length) };
+  return { data: filtered.map(toUserProfile), totalCount: totalCount - (dbRows.length - filtered.length) };
+}
+
+/**
+ * Server-side profile search by username / display name substring. The people
+ * browser and search overlay previously filtered ONLY the page of profiles
+ * they had already fetched (25 and 100 rows respectively), so any user beyond
+ * that page was unfindable. This queries the whole table with `ilike` and
+ * returns up to `limit` matches.
+ */
+export async function searchProfiles(
+  query: string,
+  limit: number = 20,
+): Promise<UserProfile[]> {
+  if (!isSupabaseConfigured) return [];
+  if (sanitizeProfileSearchQuery(query).length === 0) return [];
+
+  const res = await supabaseRest(profilesSearchUrl(supabaseUrl!, query, limit));
+  const rows: unknown = await res.json();
+  if (!res.ok || !Array.isArray(rows)) {
+    devLog.debug("[searchProfiles] non-OK response", res.status);
+    return [];
+  }
+  return (rows as DbProfile[])
+    .filter((r) => !isHiddenProfile(r))
+    .map(toUserProfile);
 }
 
 // --- Collections ---
@@ -384,7 +420,12 @@ async function ensureWishlistCollection(userId: string, ownerName: string): Prom
   const cached = wishlistCollectionCache.get(userId);
   if (cached) return cached;
 
-  const wishlistId = `wishlist-${userId}`;
+  // Deterministic per-user uuid: `collections.id` is a uuid column, so the
+  // previous `wishlist-<userId>` string id was rejected by Postgres — the
+  // lookup 400'd and wishlist items could never sync. The seed-derived uuid
+  // is stable across devices/sessions, so every client converges on the same
+  // hidden wishlist collection row.
+  const wishlistId = deterministicUuidV4(`wishlist:${userId}`);
 
   const res = await supabaseRest(`/collections?id=eq.${encodeURIComponent(wishlistId)}&select=id`);
   const rows: { id: string }[] = await res.json();

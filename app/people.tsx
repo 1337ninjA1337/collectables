@@ -36,7 +36,7 @@ import {
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
-import { fetchProfiles } from "@/lib/supabase-profiles";
+import { fetchProfiles, searchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
@@ -70,10 +70,37 @@ export default function PeopleScreen() {
       const result = await fetchProfiles(pageNum, PAGE_SIZE);
       setRemoteProfiles(result.data);
       setTotalCount(result.totalCount);
+    } catch {
+      // Network/auth failure: keep whatever page is already shown instead of
+      // leaving the list stuck on the skeleton via an unhandled rejection.
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // Server-side search: the loaded page only holds PAGE_SIZE profiles, so
+  // filtering it client-side made anyone beyond the current page unfindable.
+  // Debounced ilike query against the whole profiles table.
+  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  useEffect(() => {
+    const normalized = query.trim();
+    if (!normalized) {
+      setSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      searchProfiles(normalized, 50)
+        .then((results) => {
+          if (!cancelled) setSearchResults(results);
+        })
+        .catch(() => {});
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
   useEffect(() => {
     void loadPage(page);
@@ -92,8 +119,20 @@ export default function PeopleScreen() {
   const filteredPeople = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return others;
-    return others.filter((p) => p.username.toLowerCase().includes(normalized.replace(/^@/, "")));
-  }, [others, query]);
+    const needle = normalized.replace(/^@/, "");
+    // Instant pass over the already-loaded page, unioned with the (debounced)
+    // server-wide results so matches beyond the current page appear too.
+    const local = others.filter(
+      (p) =>
+        p.username.toLowerCase().includes(needle) ||
+        p.displayName.toLowerCase().includes(needle),
+    );
+    const seen = new Set(local.map((p) => p.id));
+    const remote = searchResults.filter(
+      (p) => p.id !== myProfile?.id && !seen.has(p.id),
+    );
+    return [...local, ...remote];
+  }, [others, query, searchResults, myProfile]);
 
   function renderProfileCard(profile: UserProfile) {
     const relationship = getRelationship(profile.id);

@@ -36,7 +36,7 @@ import {
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
-import { fetchProfiles } from "@/lib/supabase-profiles";
+import { fetchProfiles, searchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
 
 type Props = {
@@ -106,17 +106,40 @@ export function SearchOverlay({ visible, onClose }: Props) {
       .slice(0, 20);
   }, [items, q, filter, ownerFilter]);
 
+  // Server-side people search: the 100-row snapshot fetched on open misses
+  // any profile beyond it, so the query also hits the whole table (debounced).
+  const [remoteMatches, setRemoteMatches] = useState<UserProfile[]>([]);
+  useEffect(() => {
+    if (!q || filter === "collections" || filter === "items") {
+      setRemoteMatches([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      searchProfiles(q, 20)
+        .then((results) => {
+          if (!cancelled) setRemoteMatches(results);
+        })
+        .catch(() => {});
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [q, filter]);
+
   const matchedProfiles = useMemo(() => {
     if (!q || filter === "collections" || filter === "items") return [];
     const needle = q.replace(/^@/, "");
-    return profiles
-      .filter(
-        (p) =>
-          p.username.toLowerCase().includes(needle) ||
-          p.displayName.toLowerCase().includes(needle),
-      )
-      .slice(0, 20);
-  }, [profiles, q, filter]);
+    const local = profiles.filter(
+      (p) =>
+        p.username.toLowerCase().includes(needle) ||
+        p.displayName.toLowerCase().includes(needle),
+    );
+    const seen = new Set(local.map((p) => p.id));
+    const merged = [...local, ...remoteMatches.filter((p) => !seen.has(p.id))];
+    return merged.slice(0, 20);
+  }, [profiles, q, filter, remoteMatches]);
 
   // Get collection name for an item
   function getCollectionName(collectionId: string): string {
