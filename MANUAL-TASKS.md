@@ -1143,3 +1143,78 @@ delete from public.analytics_events where occurred_at < now() - interval '90 day
 
 This touches data only (no schema change), so it is not a versioned migration.
 Adjust the interval if you change the documented retention window.
+
+## Deduplicate items (one-off cleanup) — REQUIRED
+
+The BE-5 legacy-id rewrite minted a **random** uuid per run/device for every
+pre-uuid item and re-upserted it, so the same item landed in `public.items`
+multiple times under different ids ("every item is duplicated"). The client
+code is fixed (deterministic seed-derived uuid + content-level dedupe), but
+the rows already inserted must be cleaned up once, by hand.
+
+**1. Preview the duplicates (safe, read-only):**
+
+The duplicate key is "every content field except `id`/`created_at`/
+`sort_order`", with one safety valve mirroring the client's `dedupeItems`:
+**photo-less** rows only count as duplicates when their `created_at` also
+matches — two genuine copies of a photo-less item bought at different times
+are NOT merged. Rows sharing a non-empty `photos` array point at the same
+uploaded asset, so they are duplicates regardless of timestamp.
+
+```sql
+select collection_id, created_by_user_id, title, count(*) as copies
+from public.items
+where deleted_at is null
+group by collection_id, created_by_user_id, is_wishlist, title, description,
+         acquired_at, acquired_from, variants, photos,
+         coalesce(cost::text,''), coalesce(cost_currency,''),
+         coalesce(condition,''), coalesce(tags::text,''),
+         case when photos = '{}' then created_at::text else '' end
+having count(*) > 1
+order by copies desc;
+```
+
+**2. Soft-delete every copy except one per group:**
+
+Soft delete (`deleted_at = now()`), NOT a hard `DELETE` — the app's delta pull
+treats `deleted_at` as a tombstone, so every signed-in device will drop its
+local copies automatically on the next sync. A hard delete would leave stale
+local rows stranded as "local-only" forever. The survivor is the row a
+marketplace listing points at (if any), else the earliest-created, else the
+smallest id — the same order the client's `dedupeItems` uses, so local state
+and the cloud converge on the same row.
+
+```sql
+with ranked as (
+  select id,
+         row_number() over (
+           partition by collection_id, created_by_user_id, is_wishlist, title,
+                        description, acquired_at, acquired_from, variants,
+                        photos, coalesce(cost::text,''),
+                        coalesce(cost_currency,''), coalesce(condition,''),
+                        coalesce(tags::text,''),
+                        case when photos = '{}' then created_at::text else '' end
+           order by
+             (exists (select 1 from public.marketplace_listings ml
+                      where ml.item_id = items.id::text)) desc,
+             created_at asc,
+             id asc
+         ) as rn
+  from public.items
+  where deleted_at is null
+)
+update public.items i
+set deleted_at = now()
+from ranked
+where i.id = ranked.id
+  and ranked.rn > 1;
+```
+
+**3. Verify (re-run the preview — it should return 0 rows).**
+
+This touches data only (no schema change), so it is not a versioned migration.
+Run it once in the Supabase SQL editor. If you later prefer to purge the
+soft-deleted rows entirely, the existing retention sweep
+(`20260627_retention_sweeps.sql`) — or a manual
+`delete from public.items where deleted_at is not null and deleted_at < now() - interval '30 days'`
+— will take care of them after every device has synced.

@@ -92,6 +92,36 @@ export function profilesPageRangeHeader(page: number, pageSize: number): string 
   return `${from}-${to}`;
 }
 
+/**
+ * Strips every character that carries meaning inside a PostgREST `or=(...)`
+ * filter or an `ilike` pattern (commas/parens break the boolean tree; `%`,
+ * `*` and `\` are wildcards; quotes end a quoted literal), plus a leading `@`
+ * so users can paste an `@handle` verbatim. What's left is matched as a plain
+ * substring.
+ */
+export function sanitizeProfileSearchQuery(query: string): string {
+  return query.trim().replace(/^@/, "").replace(/[%*,()\\"']/g, "").trim();
+}
+
+/**
+ * Server-side profile search: username OR display name contains the query
+ * (case-insensitive). Search must hit the SERVER — the people browser only
+ * holds one page client-side, so filtering that page silently missed every
+ * profile beyond it (the "search finds nobody" bug).
+ */
+export function profilesSearchUrl(
+  baseUrl: string,
+  query: string,
+  limit: number,
+): string {
+  const q = encodeURIComponent(`*${sanitizeProfileSearchQuery(query)}*`);
+  return (
+    `${baseUrl}/rest/v1/profiles?select=${PROFILE_COLUMNS}` +
+    `&or=(username.ilike.${q},display_name.ilike.${q})` +
+    `&order=created_at.desc&limit=${limit}`
+  );
+}
+
 export function upsertProfileBody(profile: UserProfile): Record<string, unknown> {
   // `is_admin` is intentionally omitted: the column REVOKEs UPDATE from
   // authenticated/anon (see `20260616_core_tables_rls.sql`), so it is

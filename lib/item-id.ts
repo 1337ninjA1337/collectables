@@ -1,5 +1,5 @@
 import type { CollectableItem } from "@/lib/types";
-import { generateUuidV4, isUuidV4 } from "@/lib/uuid";
+import { deterministicUuidV4, isUuidV4 } from "@/lib/uuid";
 
 /**
  * BE-5: items must be server-keyed by a real uuid so they match the
@@ -18,18 +18,25 @@ import { generateUuidV4, isUuidV4 } from "@/lib/uuid";
  * Returns the (possibly new) item array plus the list of items whose id changed
  * so the caller can re-upsert them to the cloud. The original array is returned
  * unchanged when nothing matched, so a no-op hydrate doesn't churn React state.
+ *
+ * The replacement uuid is DETERMINISTIC — derived from `owner:legacyId` — not
+ * random. The rewrite can run again before the rewritten cache persists
+ * (reload mid-hydrate) and runs independently on every signed-in device; a
+ * random uuid per run gave the same item a different id each time, and the
+ * id-keyed cloud upsert then INSERTed a fresh row per run ("every item is
+ * duplicated"). A seed-derived id makes every run converge on one row.
  */
 export function normalizeOwnItemIds(
   items: CollectableItem[],
   ownerUserId: string,
-  newId: () => string = generateUuidV4,
+  newId: (seed: string) => string = deterministicUuidV4,
 ): { items: CollectableItem[]; rewritten: CollectableItem[] } {
   const rewritten: CollectableItem[] = [];
   const next = items.map((item) => {
     if (isUuidV4(item.id) || item.createdByUserId !== ownerUserId) {
       return item;
     }
-    const updated = { ...item, id: newId() };
+    const updated = { ...item, id: newId(`${ownerUserId}:${item.id}`) };
     rewritten.push(updated);
     return updated;
   });
