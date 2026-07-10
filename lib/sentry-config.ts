@@ -4,7 +4,7 @@ import {
 } from "@/lib/deployment-env";
 import { makeExpoPublicEnvReader } from "@/lib/expo-public-env";
 
-import appJson from "../app.json";
+import { APP_VERSION } from "@/lib/app-version";
 
 export type SentryEnvironment = DeploymentEnvironment;
 
@@ -32,7 +32,6 @@ export type SentryConfig = {
   sourcemapsExpected: boolean;
 };
 
-const APP_VERSION = (appJson as { expo: { version: string } }).expo.version;
 const DEFAULT_RELEASE = `collectables@${APP_VERSION}`;
 export const DEFAULT_TRACES_SAMPLE_RATE = 0.1;
 
@@ -80,7 +79,7 @@ export function resolveSentryConfig(
   const environment = normaliseDeploymentEnv(env.EXPO_PUBLIC_SENTRY_ENV);
   const explicitRelease = (env.EXPO_PUBLIC_SENTRY_RELEASE ?? "").trim();
   const explicitVersion = (env.EXPO_PUBLIC_APP_VERSION ?? "").trim();
-  // Precedence: explicit SENTRY_RELEASE (CI sha) > APP_VERSION > options > app.json.
+  // Precedence: explicit SENTRY_RELEASE (CI sha) > APP_VERSION > options > package.json.
   const release =
     explicitRelease.length > 0
       ? explicitRelease
