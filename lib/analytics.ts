@@ -3,6 +3,7 @@ import {
   resolveAnalyticsConfig,
   type AnalyticsConfig,
 } from "@/lib/analytics-config";
+import { assertValidProps } from "@/lib/analytics-validate";
 import { makeLazyLoader } from "@/lib/lazy-sdk";
 import { createSlidingWindowLimiter } from "@/lib/sliding-window-limiter";
 
@@ -167,11 +168,15 @@ export function trackEvent(
   name: AnalyticsEventName,
   props?: AnalyticsProps,
 ): void {
+  // Validate BEFORE the enabled/opt-out gates: analytics is disabled in dev
+  // builds, and dev is exactly where a typo'd payload key must throw (see
+  // lib/analytics-validate.ts). In production this warns + strips instead.
+  const safeProps = assertValidProps(name, props);
   if (userOptedOut) return;
   if (!sdk || !activeConfig?.enabled) return;
   if (!rateLimitAllow()) return;
   try {
-    sdk.capture(name, props);
+    sdk.capture(name, safeProps);
   } catch {
     /* never let telemetry crash the host app */
   }
