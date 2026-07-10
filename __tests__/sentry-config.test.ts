@@ -10,10 +10,10 @@ import {
   __resetSentryConfigWarningForTests,
 } from "../lib/sentry-config";
 
-const appJson = JSON.parse(
-  readFileSync(path.join(process.cwd(), "app.json"), "utf8"),
+const packageJson = JSON.parse(
+  readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
 );
-const APP_VERSION: string = appJson.expo.version;
+const APP_VERSION: string = packageJson.version;
 
 describe("resolveSentryConfig", () => {
   it("disables the SDK when no DSN is provided", () => {
@@ -92,7 +92,7 @@ describe("resolveSentryConfig", () => {
     assert.equal(cfg.release, "collectables@2.4.1");
   });
 
-  it("falls back to app.json version when EXPO_PUBLIC_APP_VERSION is unset", () => {
+  it("falls back to package.json version when EXPO_PUBLIC_APP_VERSION is unset", () => {
     const cfg = resolveSentryConfig({});
     assert.equal(cfg.release, `collectables@${APP_VERSION}`);
   });

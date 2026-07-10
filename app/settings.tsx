@@ -42,6 +42,7 @@ import {
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
+import { getAnalyticsEventCatalog } from "@/lib/analytics";
 import { isDevEnvironment } from "@/lib/dev-menu";
 import { useDiagnostics } from "@/lib/diagnostics-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
@@ -79,6 +80,10 @@ export default function SettingsScreen() {
   // run that inlined the Sentry secret, without opening devtools. Hidden from
   // regular production users (dev builds + admins only).
   const showDsnInlinedRow = isDevEnvironment() || isAdmin;
+  // "What does this app track?" — the taxonomy list shares the internal-only
+  // gate: power users (admins) and dev builds see it, regular users don't.
+  const eventCatalog = getAnalyticsEventCatalog();
+  const [eventsListOpen, setEventsListOpen] = useState(false);
   const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [currencyQuery, setCurrencyQuery] = useState("");
   const [refreshingRates, setRefreshingRates] = useState(false);
@@ -313,6 +318,36 @@ export default function SettingsScreen() {
             {`${t("diagnosticsDsnInlined")}: ${sentryStatus.dsnPresent ? "✅" : "❌"}`}
           </Text>
         )}
+        {showDsnInlinedRow && (
+          <>
+            <Pressable
+              onPress={() => setEventsListOpen(!eventsListOpen)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: eventsListOpen }}
+              testID="diagnostics-events-toggle"
+            >
+              <Text style={styles.diagnosticsEventsToggle}>
+                {`${t("diagnosticsEventsTitle")} (${eventCatalog.length}) ${eventsListOpen ? "▴" : "▾"}`}
+              </Text>
+            </Pressable>
+            {eventsListOpen &&
+              eventCatalog.map((event) => (
+                <View
+                  key={event.name}
+                  style={styles.diagnosticsEventRow}
+                  testID={`diagnostics-event-${event.name}`}
+                >
+                  <Text style={styles.diagnosticsEventName}>{event.name}</Text>
+                  <Text style={styles.diagnosticsEventDescription}>
+                    {event.description}
+                  </Text>
+                  <Text style={styles.diagnosticsEventProps}>
+                    {event.props.join(" · ")}
+                  </Text>
+                </View>
+              ))}
+          </>
+        )}
       </View>
 
       <Pressable
@@ -463,6 +498,35 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     fontFamily: FONT_BODY,
     marginTop: 2,
+  },
+  diagnosticsEventsToggle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: HERO_DARK,
+    fontFamily: FONT_BODY_EXTRABOLD,
+    marginTop: 4,
+  },
+  diagnosticsEventRow: {
+    gap: 2,
+    marginTop: 6,
+  },
+  diagnosticsEventName: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: HERO_DARK,
+    fontFamily: FONT_BODY_BOLD,
+  },
+  diagnosticsEventDescription: {
+    fontSize: 12,
+    color: MUTED_11,
+    lineHeight: 16,
+    fontFamily: FONT_BODY,
+  },
+  diagnosticsEventProps: {
+    fontSize: 11,
+    color: MUTED_11,
+    fontStyle: "italic",
+    fontFamily: FONT_BODY,
   },
   diagnosticsToggle: {
     alignSelf: "flex-start",

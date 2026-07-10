@@ -3,6 +3,11 @@ import {
   resolveAnalyticsConfig,
   type AnalyticsConfig,
 } from "@/lib/analytics-config";
+import {
+  ANALYTICS_EVENTS,
+  ANALYTICS_EVENT_NAMES,
+} from "@/lib/analytics-events";
+import { assertValidProps } from "@/lib/analytics-validate";
 import { makeLazyLoader } from "@/lib/lazy-sdk";
 import { createSlidingWindowLimiter } from "@/lib/sliding-window-limiter";
 
@@ -167,11 +172,15 @@ export function trackEvent(
   name: AnalyticsEventName,
   props?: AnalyticsProps,
 ): void {
+  // Validate BEFORE the enabled/opt-out gates: analytics is disabled in dev
+  // builds, and dev is exactly where a typo'd payload key must throw (see
+  // lib/analytics-validate.ts). In production this warns + strips instead.
+  const safeProps = assertValidProps(name, props);
   if (userOptedOut) return;
   if (!sdk || !activeConfig?.enabled) return;
   if (!rateLimitAllow()) return;
   try {
-    sdk.capture(name, props);
+    sdk.capture(name, safeProps);
   } catch {
     /* never let telemetry crash the host app */
   }
@@ -251,6 +260,28 @@ export function getAnalyticsStatus(): AnalyticsStatus {
     host,
     reason,
   };
+}
+
+export type AnalyticsEventCatalogEntry = {
+  readonly name: AnalyticsEventName;
+  readonly description: string;
+  readonly props: readonly string[];
+};
+
+/**
+ * Read-only view of the event taxonomy for UI consumers (the settings
+ * Diagnostics "Events captured by this app" list). Derived entirely from
+ * `ANALYTICS_EVENTS` — zero hardcoded copy — and exposed here so screens
+ * consume the taxonomy through lib/analytics.ts rather than importing
+ * `@/lib/analytics-events` directly (keeps the future bundle-size import
+ * gate on that module intact). Sorted by event name.
+ */
+export function getAnalyticsEventCatalog(): readonly AnalyticsEventCatalogEntry[] {
+  return ANALYTICS_EVENT_NAMES.map((name) => ({
+    name,
+    description: ANALYTICS_EVENTS[name].description,
+    props: ANALYTICS_EVENTS[name].props,
+  }));
 }
 
 export function __resetAnalyticsForTests(): void {
