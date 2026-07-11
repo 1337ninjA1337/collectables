@@ -6,6 +6,35 @@
 
 import type { CollectionVisibility } from "@/lib/types";
 
+/** True for a string that carries visible content once trimmed. */
+function isNonBlank(value: string | null | undefined): boolean {
+  return (value ?? "").trim().length > 0;
+}
+
+/**
+ * Canonical "does the record carry X" booleans for analytics payloads.
+ * `item_added.hasPhoto` and `collection_created.hasCover` both read from
+ * here so every event derives the flags the same way (blank/whitespace
+ * strings never count) instead of re-rolling `x.length > 0` per screen.
+ *
+ * Callers pick the keys their event's registry entry allows —
+ * `hasDescription` is derived for future item events but is not yet a
+ * registered prop anywhere (note: the PII key guard rejects the token
+ * "description", so a future event must widen that rule deliberately
+ * before registering the key).
+ */
+export function summarisePayload(item: {
+  photos?: readonly string[] | null;
+  coverPhoto?: string | null;
+  description?: string | null;
+}): { hasPhoto: boolean; hasCover: boolean; hasDescription: boolean } {
+  return {
+    hasPhoto: (item.photos ?? []).some((uri) => isNonBlank(uri)),
+    hasCover: isNonBlank(item.coverPhoto),
+    hasDescription: isNonBlank(item.description),
+  };
+}
+
 /**
  * Canonical payload for `collection_*` events. `collection_created` today;
  * future events (`collection_shared`, `collection_archived`) should build
@@ -28,7 +57,7 @@ export function buildCollectionAnalyticsProps(
   return {
     visibility: collection.visibility,
     isPremium,
-    hasCover: (collection.coverPhoto ?? "").trim().length > 0,
+    hasCover: summarisePayload({ coverPhoto: collection.coverPhoto }).hasCover,
   };
 }
 

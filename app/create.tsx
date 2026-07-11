@@ -10,6 +10,7 @@ import { PhotoPreview } from "@/components/photo-preview";
 import { Screen } from "@/components/screen";
 import { analyzeItemPhoto, isAiVisionConfigured } from "@/lib/ai-vision";
 import { trackEvent } from "@/lib/analytics";
+import { summarisePayload } from "@/lib/analytics-helpers";
 import { uploadImages } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useI18n } from "@/lib/i18n-context";
@@ -211,9 +212,10 @@ export default function CreateItemScreen() {
         tags: tags.length > 0 ? tags : undefined,
       });
 
+      const { hasPhoto } = summarisePayload({ photos: uploadedPhotos });
       trackEvent("item_added", {
         collectionId,
-        hasPhoto: uploadedPhotos.length > 0,
+        hasPhoto,
       });
 
       router.replace(`/item/${id}`);
