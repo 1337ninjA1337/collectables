@@ -120,6 +120,24 @@ describe("Crash #15 — getSentryStatus diagnostics", () => {
     assert.equal(getSentryStatus().reason, "user-opted-out");
   });
 
+  it("reports 'user-opted-out' (not 'ready') when opted out AFTER init with the SDK still live", async () => {
+    // The window between setSentryOptOut(true) and shutdownSentry() — the SDK
+    // is alive but captureException drops everything, so the status must not
+    // claim events are flowing.
+    await initSentry({
+      env: {
+        EXPO_PUBLIC_SENTRY_DSN: "https://x@o.ingest.sentry.io/1",
+        EXPO_PUBLIC_SENTRY_ENV: "production",
+      },
+      loader: async () => makeFakeSdk().sdk,
+    });
+    assert.equal(getSentryStatus().ready, true);
+    setSentryOptOut(true);
+    const status = getSentryStatus();
+    assert.equal(status.ready, false);
+    assert.equal(status.reason, "user-opted-out");
+  });
+
   it("reports 'ready' when DSN+env+SDK all present", async () => {
     const { sdk } = makeFakeSdk();
     await initSentry({

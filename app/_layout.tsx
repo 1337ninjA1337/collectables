@@ -37,7 +37,7 @@ import {
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
 import { DiagnosticsProvider } from "@/lib/diagnostics-context";
-import { getAnalyticsStatus } from "@/lib/analytics";
+import { getAnalyticsStatus, simulateSignupEvent } from "@/lib/analytics";
 import { isDevEnvironment, loadDevMenuModule, registerDevMenu } from "@/lib/dev-menu";
 import { I18nProvider, useI18n, useOptionalI18n } from "@/lib/i18n-context";
 import { MarketplaceProvider } from "@/lib/marketplace-context";
@@ -80,6 +80,13 @@ export default Sentry.wrap(function RootLayout() {
           run: () => {
             void clearAllCollectablesStorage();
           },
+        },
+        simulateSignupEvent: {
+          label: "Simulate signup event",
+          // Attached as globalThis.__simulateSignupEvent — returning the
+          // status snapshot lets a console caller see which gate (if any)
+          // blocked the capture.
+          run: simulateSignupEvent,
         },
       },
     });
