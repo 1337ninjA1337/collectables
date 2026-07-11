@@ -19,6 +19,7 @@ const EXPECTED_NAMES: readonly AnalyticsEventName[] = [
   "collection_created",
   "item_added",
   "item_photo_attached",
+  "item_photos_replaced",
   "listing_created",
   "listing_claimed",
   "chat_opened",
