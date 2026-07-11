@@ -22,6 +22,7 @@ const EXPECTED_NAMES: readonly AnalyticsEventName[] = [
   "item_photos_replaced",
   "listing_created",
   "listing_dropped",
+  "listing_price_invalid",
   "listing_claimed",
   "chat_opened",
   "friend_requested",
