@@ -13,6 +13,7 @@
     "build:powerbi": "tsx scripts/build-powerbi-template.ts",
     "lint:hex": "tsx scripts/check-inline-hex.ts",
     "lint:env-inlining": "tsx scripts/check-env-inlining.ts",
+    "lint:analytics-imports": "tsx scripts/check-analytics-imports.ts",
     "verify:bundle-inlining": "tsx scripts/verify-bundle-inlining.ts",
     "lint:clarity-mask": "tsx scripts/check-clarity-input-mask.ts",
     "lint:migration-docs": "tsx scripts/check-migration-docs.ts",
@@ -29,7 +30,7 @@
     "powerbi:conn": "tsx scripts/print-powerbi-conn.ts",
     "lint:powerbi-doc": "tsx scripts/generate-powerbi-schema-doc.ts --check",
     "sentry:check": "tsx scripts/sentry-doctor.ts",
-    "lint:ci": "npx tsc --noEmit && npm run lint:hex && npm run lint:env-inlining && npm run lint:clarity-mask && npm run lint:migration-docs && npm run lint:migration-naming && npm run lint:secrets && npm run lint:appstore && npm run lint:sentry-version && npm run lint:powerbi-doc && npm test",
+    "lint:ci": "npx tsc --noEmit && npm run lint:hex && npm run lint:env-inlining && npm run lint:analytics-imports && npm run lint:clarity-mask && npm run lint:migration-docs && npm run lint:migration-naming && npm run lint:secrets && npm run lint:appstore && npm run lint:sentry-version && npm run lint:powerbi-doc && npm test",
     "postinstall": "npx expo install --check || true",
     "build": "npx expo export --platform web && tsx scripts/build-spa-fallback.ts",
     "deploy": "cross-env-shell 'set -a && [ -f .env ] && . ./.env; set +a && EXPO_PUBLIC_APP_URL=https://1337ninja1337.github.io/collectables npx expo export --platform web --clear && tsx scripts/build-spa-fallback.ts && touch dist/.nojekyll && echo > dist/.gitignore && npx gh-pages -d dist --dotfiles'"
