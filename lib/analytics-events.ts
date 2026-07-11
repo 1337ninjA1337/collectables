@@ -38,8 +38,8 @@ export const ANALYTICS_EVENTS = {
   },
   collection_created: {
     description:
-      "Fired after a successful save in `app/create-collection.tsx`. Lets us track public-vs-private adoption and whether premium users behave differently.",
-    props: ["visibility", "isPremium"],
+      "Fired after a successful save in `app/create-collection.tsx`. Lets us track public-vs-private adoption and whether premium users behave differently; `hasCover` flags whether a cover photo was uploaded at create time.",
+    props: ["visibility", "isPremium", "hasCover"],
   },
   item_added: {
     description:

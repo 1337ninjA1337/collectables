@@ -158,6 +158,7 @@ describe("per-event prop literal typing (compile-time, checked by tsc)", () => {
     assert.deepStrictEqual(ANALYTICS_EVENTS.collection_created.props, [
       "visibility",
       "isPremium",
+      "hasCover",
     ]);
   });
 
