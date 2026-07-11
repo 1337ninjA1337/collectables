@@ -6,6 +6,7 @@ import { AuthChangeEvent, Session, User } from "@supabase/auth-js";
 
 import { trackEvent } from "@/lib/analytics";
 import {
+  FRESHLY_CREATED_WINDOW_MS,
   isFreshlyCreatedUser,
   shouldTrackSignupOnAuthEvent,
   signupEventProps,
@@ -16,9 +17,21 @@ import { authClient, isSupabaseConfigured } from "@/lib/supabase";
 import { clearAllUserData } from "@/lib/storage-keys";
 import { deleteAccountViaEdgeFunction, fetchAllUserImageUrls } from "@/lib/supabase-profiles";
 import { closeSharedRealtimeClient } from "@/lib/supabase-realtime";
-import { getAppBaseUrl } from "@/lib/env";
+import { getAppBaseUrl, resolveNumericEnv } from "@/lib/env";
 
 WebBrowser.maybeCompleteAuthSession();
+
+// Signup-freshness window for signup_completed detection. Env-tunable so QA
+// can widen it (e.g. to 60 min) on staging runs where a slow verifyOtp
+// round-trip delays the check past the 5-minute default. Resolved here — not
+// in lib/auth-helpers.ts — because the helpers module must stay node-pure
+// while the env read mirrors lib/social-context.tsx's
+// EXPO_PUBLIC_PROFILE_CACHE_TTL_MS idiom (literal member access so
+// Metro/babel inlines it in the web bundle).
+const SIGNUP_FRESHNESS_WINDOW_MS = resolveNumericEnv(
+  process.env.EXPO_PUBLIC_SIGNUP_FRESHNESS_WINDOW_MS,
+  FRESHLY_CREATED_WINDOW_MS,
+);
 
 type AuthContextValue = {
   ready: boolean;
@@ -80,7 +93,13 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       const nextUser = nextSession?.user ?? null;
       if (
         nextUser?.id &&
-        shouldTrackSignupOnAuthEvent(event, nextUser, seenSignupUserIds.current)
+        shouldTrackSignupOnAuthEvent(
+          event,
+          nextUser,
+          seenSignupUserIds.current,
+          Date.now(),
+          SIGNUP_FRESHNESS_WINDOW_MS,
+        )
       ) {
         seenSignupUserIds.current.add(nextUser.id);
         trackEvent("signup_completed", signupEventProps(nextUser));
@@ -141,7 +160,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
           const freshUser = data?.user ?? null;
           if (
             !error &&
-            isFreshlyCreatedUser(freshUser) &&
+            isFreshlyCreatedUser(freshUser, Date.now(), SIGNUP_FRESHNESS_WINDOW_MS) &&
             freshUser?.id &&
             !seenSignupUserIds.current.has(freshUser.id)
           ) {
