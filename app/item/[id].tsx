@@ -13,6 +13,7 @@ import { ReactionBar } from "@/components/reaction-bar";
 import { Screen, useResponsive } from "@/components/screen";
 import { useAppTheme, type AppTheme } from "@/components/use-app-theme";
 import { trackEvent } from "@/lib/analytics";
+import { isRisingEdge } from "@/lib/use-transition-event";
 import { buildDeepLink } from "@/lib/deep-link";
 import { useAuth } from "@/lib/auth-context";
 import { uploadImages } from "@/lib/cloudinary";
@@ -247,7 +248,7 @@ export default function ItemDetailsScreen() {
         tags: editTags.length > 0 ? editTags : undefined,
         photos: finalPhotos,
       });
-      if (!hadPhotosBefore && finalPhotos.length > 0) {
+      if (isRisingEdge(hadPhotosBefore, finalPhotos.length > 0)) {
         trackEvent("item_photo_attached", {
           itemId: activeItem.id,
           collectionId: activeItem.collectionId,
