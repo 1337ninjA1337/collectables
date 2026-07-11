@@ -137,8 +137,8 @@ describe("auth-context — OAuth signup_completed wiring (onAuthStateChange)", (
     const body = src.slice(cbIdx, src.indexOf("});", cbIdx));
     assert.match(
       body,
-      /shouldTrackSignupOnAuthEvent\(event, nextUser, seenSignupUserIds\.current\)/,
-      "the callback must delegate detection to shouldTrackSignupOnAuthEvent",
+      /shouldTrackSignupOnAuthEvent\(\s*event,\s*nextUser,\s*seenSignupUserIds\.current,\s*Date\.now\(\),\s*SIGNUP_FRESHNESS_WINDOW_MS,?\s*\)/,
+      "the callback must delegate detection to shouldTrackSignupOnAuthEvent with the env-tunable window",
     );
     assert.match(
       body,

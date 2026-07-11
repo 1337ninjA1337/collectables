@@ -2,23 +2,30 @@ export const FRESHLY_CREATED_WINDOW_MS = 5 * 60 * 1000;
 
 /**
  * Returns true when the Supabase user object represents a freshly-created
- * account — `created_at` within the last 5 minutes. Used to fire the
- * `signup_completed` analytics event from the verifyOtp path so we don't
- * also fire it on every subsequent OTP login by the same user.
+ * account — `created_at` within the last `windowMs` (default 5 minutes).
+ * Used to fire the `signup_completed` analytics event from the verifyOtp
+ * path so we don't also fire it on every subsequent OTP login by the same
+ * user.
  *
- * Lives in this pure module (no react-native imports) so unit tests can
- * import it without needing a metro shim.
+ * `windowMs` is overridable so `lib/auth-context.tsx` can widen it via
+ * `EXPO_PUBLIC_SIGNUP_FRESHNESS_WINDOW_MS` for staging QA runs where a slow
+ * verifyOtp round-trip may delay the check past the default window. The env
+ * read lives in the context module (mirroring how `lib/social-context.tsx`
+ * resolves `EXPO_PUBLIC_PROFILE_CACHE_TTL_MS`) because this module must stay
+ * pure — no react-native imports — so unit tests can import it without a
+ * metro shim, and `lib/env.ts` pulls in `Platform`.
  */
 export function isFreshlyCreatedUser(
   user: { created_at?: string } | null,
   now: number = Date.now(),
+  windowMs: number = FRESHLY_CREATED_WINDOW_MS,
 ): boolean {
   const iso = user?.created_at;
   if (!iso) return false;
   const created = Date.parse(iso);
   if (!Number.isFinite(created)) return false;
   const age = now - created;
-  return age >= 0 && age <= FRESHLY_CREATED_WINDOW_MS;
+  return age >= 0 && age <= windowMs;
 }
 
 /**
@@ -45,10 +52,11 @@ export function shouldTrackSignupOnAuthEvent(
   user: SignupAuthUser | null,
   seenUserIds: ReadonlySet<string>,
   now: number = Date.now(),
+  windowMs: number = FRESHLY_CREATED_WINDOW_MS,
 ): boolean {
   if (event !== "SIGNED_IN") return false;
   if (!user?.id || seenUserIds.has(user.id)) return false;
-  return isFreshlyCreatedUser(user, now);
+  return isFreshlyCreatedUser(user, now, windowMs);
 }
 
 /**
