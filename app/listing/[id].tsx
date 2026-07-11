@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { SkeletonItemDetail } from "@/components/skeleton";
 import { trackEvent } from "@/lib/analytics";
+import { relationshipForAnalytics } from "@/lib/social-helpers";
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
 import { useCollections } from "@/lib/collections-context";
@@ -204,9 +205,13 @@ export default function ListingDetailScreen() {
               title: sourceItem?.title ?? fallbackTitle,
             });
       void sendMessage(listing.ownerUserId, messageBody);
+      const sellerRelationship = relationshipForAnalytics(
+        getRelationship(listing.ownerUserId),
+      );
       trackEvent("listing_claimed", {
         mode: listing.mode,
-        sellerWasFriend: getRelationship(listing.ownerUserId) === "friend",
+        sellerWasFriend: sellerRelationship === "friend",
+        sellerRelationship,
       });
     } finally {
       setClaimingListingId(null);

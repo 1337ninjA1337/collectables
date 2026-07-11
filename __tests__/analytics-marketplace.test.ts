@@ -75,13 +75,28 @@ describe("app/listing/[id].tsx — listing_claimed wiring", () => {
     );
   });
 
-  it("sellerWasFriend is derived from getRelationship(...) === 'friend'", () => {
+  it("sellerWasFriend + sellerRelationship derive from the canonical relationshipForAnalytics bucket", () => {
+    assert.match(
+      src,
+      /import\s*\{[^}]*\brelationshipForAnalytics\b[^}]*\}\s*from\s*["']@\/lib\/social-helpers["']/,
+      "listing/[id].tsx must import relationshipForAnalytics from @/lib/social-helpers",
+    );
+    assert.match(
+      src,
+      /const\s+sellerRelationship\s*=\s*relationshipForAnalytics\(\s*getRelationship\([^)]+\)\s*,?\s*\)/,
+      "sellerRelationship must be bucketed via relationshipForAnalytics(getRelationship(...))",
+    );
     const trackIdx = src.indexOf("trackEvent(\"listing_claimed\"");
-    const block = src.slice(trackIdx, trackIdx + 250);
+    const block = src.slice(trackIdx, trackIdx + 300);
     assert.match(
       block,
-      /sellerWasFriend:\s*getRelationship\([^)]+\)\s*===\s*["']friend["']/,
-      "sellerWasFriend must check the 'friend' (mutual) relationship — not 'following' / 'request_sent' etc.",
+      /sellerWasFriend:\s*sellerRelationship\s*===\s*["']friend["']/,
+      "sellerWasFriend must be the boolean arm of the same bucket — one derivation, no drift",
+    );
+    assert.match(
+      block,
+      /sellerRelationship\s*,/,
+      "the 3-way sellerRelationship bucket must ride along in the payload",
     );
   });
 

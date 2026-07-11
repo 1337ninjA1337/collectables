@@ -68,8 +68,8 @@ export const ANALYTICS_EVENTS = {
   },
   listing_claimed: {
     description:
-      "Fired from `app/listing/[id].tsx` after the buy/trade flow completes. `sellerWasFriend` measures the social-graph contribution to marketplace velocity.",
-    props: ["mode", "sellerWasFriend"],
+      "Fired from `app/listing/[id].tsx` after the buy/trade flow completes. `sellerWasFriend` measures the social-graph contribution to marketplace velocity; `sellerRelationship` is the finer friend/following/stranger bucket (`relationshipForAnalytics`) so reports can slice friend trades from stranger sales.",
+    props: ["mode", "sellerWasFriend", "sellerRelationship"],
   },
   chat_opened: {
     description:
