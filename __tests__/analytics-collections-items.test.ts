@@ -17,11 +17,16 @@ describe("app/create-collection.tsx — collection_created wiring", () => {
     );
   });
 
-  it("fires collection_created with { visibility, isPremium } props", () => {
+  it("fires collection_created via buildCollectionAnalyticsProps (canonical shape)", () => {
     assert.match(
       src,
-      /trackEvent\(\s*["']collection_created["']\s*,\s*\{[^}]*visibility[^}]*isPremium[^}]*\}\s*\)/,
-      "create-collection must fire trackEvent('collection_created', { visibility, isPremium })",
+      /trackEvent\(\s*["']collection_created["']\s*,\s*buildCollectionAnalyticsProps\(/,
+      "create-collection must build the payload with buildCollectionAnalyticsProps, not a hand-rolled literal",
+    );
+    assert.match(
+      src,
+      /import\s*\{[^}]*\bbuildCollectionAnalyticsProps\b[^}]*\}\s*from\s*["']@\/lib\/analytics-helpers["']/,
+      "must import the builder from @/lib/analytics-helpers",
     );
   });
 
@@ -42,7 +47,7 @@ describe("app/create-collection.tsx — collection_created wiring", () => {
     // The free-tier user clamps `visibility` -> `public`; the event must
     // reflect the actual saved value, not the user's selection.
     const trackIdx = src.indexOf("trackEvent(\"collection_created\"");
-    const block = src.slice(trackIdx, trackIdx + 200);
+    const block = src.slice(trackIdx, trackIdx + 300);
     assert.match(
       block,
       /visibility:\s*finalVisibility/,

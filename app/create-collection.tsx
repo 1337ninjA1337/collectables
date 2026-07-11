@@ -8,6 +8,7 @@ import { PremiumUpsellSheet } from "@/components/premium-upsell-sheet";
 import { Screen } from "@/components/screen";
 import { collectionTemplates } from "@/data/collection-templates";
 import { trackEvent } from "@/lib/analytics";
+import { buildCollectionAnalyticsProps } from "@/lib/analytics-helpers";
 import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import {
@@ -137,10 +138,10 @@ export default function CreateCollectionScreen() {
         visibility: finalVisibility,
       });
 
-      trackEvent("collection_created", {
-        visibility: finalVisibility,
+      trackEvent("collection_created", buildCollectionAnalyticsProps(
+        { visibility: finalVisibility, coverPhoto: uploadedCover },
         isPremium,
-      });
+      ));
 
       router.replace(`/collection/${id}`);
     } finally {
