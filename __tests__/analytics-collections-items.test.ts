@@ -75,13 +75,21 @@ describe("app/create.tsx — item_added wiring", () => {
     );
   });
 
-  it("hasPhoto is derived from uploadedPhotos.length, not the raw local list", () => {
-    const trackIdx = src.indexOf("trackEvent(\"item_added\"");
-    const block = src.slice(trackIdx, trackIdx + 200);
+  it("hasPhoto is derived via summarisePayload from uploadedPhotos, not the raw local list", () => {
     assert.match(
-      block,
-      /hasPhoto:\s*uploadedPhotos\.length\s*>\s*0/,
-      "hasPhoto must reflect successfully-uploaded photos, not the raw local picks",
+      src,
+      /import\s*\{[^}]*\bsummarisePayload\b[^}]*\}\s*from\s*["']@\/lib\/analytics-helpers["']/,
+      "create.tsx must import summarisePayload from @/lib/analytics-helpers",
+    );
+    assert.match(
+      src,
+      /\{\s*hasPhoto\s*\}\s*=\s*summarisePayload\(\s*\{\s*photos:\s*uploadedPhotos\s*\}\s*\)/,
+      "hasPhoto must come from summarisePayload({ photos: uploadedPhotos }) — successfully-uploaded photos, not the raw local picks",
+    );
+    assert.doesNotMatch(
+      src,
+      /hasPhoto:\s*uploadedPhotos\.length/,
+      "the inline uploadedPhotos.length re-roll must be gone (one derivation lives in summarisePayload)",
     );
   });
 
