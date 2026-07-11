@@ -1,11 +1,15 @@
 import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { AuthChangeEvent, Session, User } from "@supabase/auth-js";
 
 import { trackEvent } from "@/lib/analytics";
-import { isFreshlyCreatedUser } from "@/lib/auth-helpers";
+import {
+  isFreshlyCreatedUser,
+  shouldTrackSignupOnAuthEvent,
+  signupEventProps,
+} from "@/lib/auth-helpers";
 import { deleteCloudinaryImages } from "@/lib/cloudinary";
 import { setSentryUser } from "@/lib/sentry";
 import { authClient, isSupabaseConfigured } from "@/lib/supabase";
@@ -40,6 +44,9 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
+  // User ids whose signup_completed already fired this session — dedups the
+  // verifyOtp resolution against the SIGNED_IN event for the same signup.
+  const seenSignupUserIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authClient) {
@@ -65,8 +72,19 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
 
     const {
       data: { subscription },
-    } = authClient.onAuthStateChange((_event: AuthChangeEvent, nextSession: Session | null) => {
+    } = authClient.onAuthStateChange((event: AuthChangeEvent, nextSession: Session | null) => {
       setSession(nextSession);
+      // A freshly-created user's first SIGNED_IN is a signup — this is the
+      // only signal the OAuth path (signInWithProvider) produces, since the
+      // redirect flow never resolves through verifyOtp.
+      const nextUser = nextSession?.user ?? null;
+      if (
+        nextUser?.id &&
+        shouldTrackSignupOnAuthEvent(event, nextUser, seenSignupUserIds.current)
+      ) {
+        seenSignupUserIds.current.add(nextUser.id);
+        trackEvent("signup_completed", signupEventProps(nextUser));
+      }
     });
 
     return () => {
@@ -120,7 +138,14 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
             type: "email",
           });
 
-          if (!error && isFreshlyCreatedUser(data?.user ?? null)) {
+          const freshUser = data?.user ?? null;
+          if (
+            !error &&
+            isFreshlyCreatedUser(freshUser) &&
+            freshUser?.id &&
+            !seenSignupUserIds.current.has(freshUser.id)
+          ) {
+            seenSignupUserIds.current.add(freshUser.id);
             trackEvent("signup_completed", {
               method: "otp",
               provider: "email",
