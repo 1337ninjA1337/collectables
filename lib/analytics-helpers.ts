@@ -115,6 +115,25 @@ export function buildListingDroppedProps(draft: ListingDraft): {
   return { mode: draft.mode, hasPrice: isNonBlank(draft.price) };
 }
 
+export type InvalidPriceReason = "empty" | "unparseable" | "non_positive";
+
+/**
+ * Classifies WHY a typed price failed `parseCurrencyValue` (components/
+ * currency-input.tsx), for `listing_price_invalid.reason`. Kept in
+ * lock-step with that parser's decision order (empty → NaN → <= 0); a
+ * structural test pins the parser's gates so the two can't drift.
+ * Returns `null` for a price the parser would accept — callers fire the
+ * event only on a non-null reason, so a classifier/parser mismatch fails
+ * silent instead of mislabelling a valid price.
+ */
+export function classifyInvalidPrice(raw: string): InvalidPriceReason | null {
+  if (!raw.trim()) return "empty";
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return "unparseable";
+  if (n <= 0) return "non_positive";
+  return null;
+}
+
 export function hasReplacedPhotoSet(
   prev: readonly string[],
   next: readonly string[],

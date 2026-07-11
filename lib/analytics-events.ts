@@ -66,6 +66,11 @@ export const ANALYTICS_EVENTS = {
       "Fired from `app/item/[id].tsx` when the listing sheet is dismissed with a dirty draft (the user filled in fields but never published). The abandon arm balancing `listing_created`; `hasPrice` flags whether a price had been typed at dismissal.",
     props: ["mode", "hasPrice"],
   },
+  listing_price_invalid: {
+    description:
+      "Fired from `app/item/[id].tsx` when a sell-mode submit is rejected because the typed price fails `parseCurrencyValue`. `reason` classifies the failure (empty / unparseable / non_positive); `language` surfaces locales where comma-vs-dot decimal habits drive high invalid rates.",
+    props: ["reason", "language"],
+  },
   listing_claimed: {
     description:
       "Fired from `app/listing/[id].tsx` after the buy/trade flow completes. `sellerWasFriend` measures the social-graph contribution to marketplace velocity; `sellerRelationship` is the finer friend/following/stranger bucket (`relationshipForAnalytics`) so reports can slice friend trades from stranger sales.",

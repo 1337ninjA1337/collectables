@@ -15,6 +15,7 @@ import { useAppTheme, type AppTheme } from "@/components/use-app-theme";
 import { trackEvent } from "@/lib/analytics";
 import {
   buildListingDroppedProps,
+  classifyInvalidPrice,
   hasReplacedPhotoSet,
   isListingDraftDirty,
   LISTING_DRAFT_DEFAULTS,
@@ -323,6 +324,10 @@ export default function ItemDetailsScreen() {
     if (listingMode === "sell") {
       finalPrice = parseCurrencyValue(listingPrice);
       if (finalPrice === null) {
+        const reason = classifyInvalidPrice(listingPrice);
+        if (reason) {
+          trackEvent("listing_price_invalid", { reason, language });
+        }
         toast.error(t("marketplacePriceInvalid"), t("marketplacePriceLabel"));
         return;
       }
