@@ -104,6 +104,6 @@ describe("getAnalyticsStatus", () => {
   it("is registered as a devtools global in app/_layout.tsx", () => {
     const layoutSrc = readFileSync(path.join(ROOT, "app/_layout.tsx"), "utf8");
     assert.match(layoutSrc, /scope\.__analyticsStatus = getAnalyticsStatus/);
-    assert.match(layoutSrc, /import \{ getAnalyticsStatus \} from "@\/lib\/analytics"/);
+    assert.match(layoutSrc, /import \{[^}]*\bgetAnalyticsStatus\b[^}]*\} from "@\/lib\/analytics"/);
   });
 });

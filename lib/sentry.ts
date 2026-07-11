@@ -322,10 +322,15 @@ export function getSentryStatus(): SentryStatus {
   const dsnPresent = !!activeConfig?.dsn;
   const environment = activeConfig?.environment ?? null;
   const release = activeConfig?.release ?? null;
-  const ready = isSentryReady();
+  // Opt-out is the FIRST gate captureException checks, before the
+  // sdk/enabled pair isSentryReady() reflects — so a live SDK with the flag
+  // flipped (the window between setSentryOptOut and shutdownSentry, or a
+  // caller that forgets the shutdown) must report not-ready, not "ready"
+  // while every capture is silently dropped.
+  const ready = isSentryReady() && !userOptedOut;
   let reason: SentryStatus["reason"];
-  if (ready) reason = "ready";
-  else if (userOptedOut) reason = "user-opted-out";
+  if (userOptedOut) reason = "user-opted-out";
+  else if (ready) reason = "ready";
   else if (!initialised) reason = "not-initialised";
   else if (!dsnPresent) reason = "missing-dsn";
   else if (environment === "development") reason = "development-env";

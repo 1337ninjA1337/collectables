@@ -273,10 +273,15 @@ export function getAnalyticsStatus(): AnalyticsStatus {
   const keyPresent = (activeConfig?.posthogKey ?? "").length > 0;
   const environment = activeConfig?.environment ?? null;
   const host = activeConfig?.posthogHost ?? null;
-  const ready = isAnalyticsReady();
+  // Opt-out is the FIRST gate trackEvent checks, before the sdk/enabled
+  // pair isAnalyticsReady() reflects — so a live SDK with the flag flipped
+  // (the window between setAnalyticsOptOut and shutdownAnalytics, or a
+  // caller that forgets the shutdown) must report not-ready, not "ready"
+  // while every capture is silently dropped.
+  const ready = isAnalyticsReady() && !userOptedOut;
   let reason: AnalyticsStatus["reason"];
-  if (ready) reason = "ready";
-  else if (userOptedOut) reason = "user-opted-out";
+  if (userOptedOut) reason = "user-opted-out";
+  else if (ready) reason = "ready";
   else if (!initialised) reason = "not-initialised";
   else if (!keyPresent) reason = "missing-key";
   else if (environment === "development") reason = "development-env";
@@ -293,6 +298,22 @@ export function getAnalyticsStatus(): AnalyticsStatus {
     host,
     reason,
   };
+}
+
+/**
+ * Dev-only smoke test for the PostHog wire. Fires a synthetic
+ * `signup_completed` event (`method: "manual_test"`) so a developer can
+ * verify the capture pipeline end-to-end without forging a fresh OTP/OAuth
+ * flow, then returns the status snapshot so a console caller immediately
+ * sees which gate (if any) blocked the capture. Exposed as
+ * `globalThis.__simulateSignupEvent()` via the `isDevEnvironment()`-gated
+ * `registerDevMenu` call in app/_layout.tsx — never attached in production
+ * builds, and every runtime gate in `trackEvent` (opt-out, enabled, rate
+ * limit) still applies to the synthetic event.
+ */
+export function simulateSignupEvent(): AnalyticsStatus {
+  trackEvent("signup_completed", { method: "manual_test" });
+  return getAnalyticsStatus();
 }
 
 export type AnalyticsEventCatalogEntry = {
