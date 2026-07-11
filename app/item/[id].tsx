@@ -13,7 +13,13 @@ import { ReactionBar } from "@/components/reaction-bar";
 import { Screen, useResponsive } from "@/components/screen";
 import { useAppTheme, type AppTheme } from "@/components/use-app-theme";
 import { trackEvent } from "@/lib/analytics";
-import { hasReplacedPhotoSet } from "@/lib/analytics-helpers";
+import {
+  buildListingDroppedProps,
+  hasReplacedPhotoSet,
+  isListingDraftDirty,
+  LISTING_DRAFT_DEFAULTS,
+  type ListingDraft,
+} from "@/lib/analytics-helpers";
 import { isRisingEdge } from "@/lib/use-transition-event";
 import { buildDeepLink } from "@/lib/deep-link";
 import { useAuth } from "@/lib/auth-context";
@@ -282,14 +288,32 @@ export default function ItemDetailsScreen() {
   }
 
   function openListingSheet() {
-    setListingMode("trade");
+    setListingMode(LISTING_DRAFT_DEFAULTS.mode);
     setListingPrice("");
-    setListingCurrency("USD");
+    // Programmatic reset — bypass setListingCurrency so opening the sheet
+    // doesn't persist the default as the user's preferred currency.
+    setListingCurrencyState(LISTING_DRAFT_DEFAULTS.currency);
     setListingNotes("");
     setListingSheetOpen(true);
   }
 
+  function currentListingDraft(): ListingDraft {
+    return {
+      mode: listingMode,
+      price: listingPrice,
+      currency: listingCurrency,
+      notes: listingNotes,
+    };
+  }
+
   function closeListingSheet() {
+    // Dismissal path only — a successful submit closes the sheet directly
+    // (setListingSheetOpen(false) in handleSubmitListing), so an
+    // abandoned-draft event can never fire for a published listing.
+    const draft = currentListingDraft();
+    if (isListingDraftDirty(draft)) {
+      trackEvent("listing_dropped", buildListingDroppedProps(draft));
+    }
     setListingSheetOpen(false);
   }
 
@@ -319,7 +343,7 @@ export default function ItemDetailsScreen() {
       mode: listingMode,
       hasPrice: finalPrice !== null,
     });
-    closeListingSheet();
+    setListingSheetOpen(false);
     toast.success(t("marketplaceListingCreated"));
   }
 
