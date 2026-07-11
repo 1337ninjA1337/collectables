@@ -1,3 +1,5 @@
+import { isWithinDuration } from "@/lib/time-helpers";
+
 export const FRESHLY_CREATED_WINDOW_MS = 5 * 60 * 1000;
 
 /**
@@ -20,12 +22,7 @@ export function isFreshlyCreatedUser(
   now: number = Date.now(),
   windowMs: number = FRESHLY_CREATED_WINDOW_MS,
 ): boolean {
-  const iso = user?.created_at;
-  if (!iso) return false;
-  const created = Date.parse(iso);
-  if (!Number.isFinite(created)) return false;
-  const age = now - created;
-  return age >= 0 && age <= windowMs;
+  return isWithinDuration(user?.created_at, windowMs, now);
 }
 
 /**
