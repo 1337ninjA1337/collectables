@@ -31,6 +31,14 @@ export type AnalyticsContextValue = {
 const AnalyticsContext = createContext<AnalyticsContextValue | null>(null);
 
 /**
+ * Debounce window for the identify effect. A rapid premium-flag flip +
+ * language switch inside the same render cycle (or a React Strict-Mode
+ * double-mount) collapses into a single `identifyUser` call instead of
+ * double-charging the PostHog identify quota.
+ */
+export const IDENTIFY_DEBOUNCE_MS = 500;
+
+/**
  * Provider-tree node that wires the analytics SDK identity to the auth +
  * preference contexts and exposes the wrapper via `useAnalytics()`. Mounts a
  * single `useEffect` that:
@@ -53,11 +61,18 @@ export function AnalyticsProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     if (user) {
-      identifyUser(user.id, { language, isPremium });
-      lastUserIdRef.current = user.id;
-    } else if (lastUserIdRef.current) {
+      // Debounced: a dep change (or effect re-run) within the window cancels
+      // the pending identify via the cleanup, so only the settled traits fire.
+      const timer = setTimeout(() => {
+        identifyUser(user.id, { language, isPremium });
+        lastUserIdRef.current = user.id;
+      }, IDENTIFY_DEBOUNCE_MS);
+      return () => clearTimeout(timer);
+    }
+    if (lastUserIdRef.current) {
       // Auth transitioned from "signed in" to "signed out" — clear identity
-      // so the next anonymous session does not inherit traits.
+      // so the next anonymous session does not inherit traits. Intentionally
+      // NOT debounced: a stale identity must not outlive the session.
       resetUser();
       lastUserIdRef.current = null;
     }
