@@ -61,6 +61,11 @@ export const ANALYTICS_EVENTS = {
       "Fired from `app/item/[id].tsx` after a marketplace listing is published. `mode` = sale/trade/swap; `hasPrice` flags whether the listing carries a numeric price.",
     props: ["mode", "hasPrice"],
   },
+  listing_dropped: {
+    description:
+      "Fired from `app/item/[id].tsx` when the listing sheet is dismissed with a dirty draft (the user filled in fields but never published). The abandon arm balancing `listing_created`; `hasPrice` flags whether a price had been typed at dismissal.",
+    props: ["mode", "hasPrice"],
+  },
   listing_claimed: {
     description:
       "Fired from `app/listing/[id].tsx` after the buy/trade flow completes. `sellerWasFriend` measures the social-graph contribution to marketplace velocity.",

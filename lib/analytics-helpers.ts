@@ -4,7 +4,7 @@
  * per screen.
  */
 
-import type { CollectionVisibility } from "@/lib/types";
+import type { CollectionVisibility, MarketplaceMode } from "@/lib/types";
 
 /** True for a string that carries visible content once trimmed. */
 function isNonBlank(value: string | null | undefined): boolean {
@@ -71,6 +71,50 @@ export function buildCollectionAnalyticsProps(
  * none → some is the `item_photo_attached` rising edge (`isRisingEdge`), and
  * some → none is a removal, not a replacement.
  */
+/**
+ * The listing sheet's just-opened baseline (`openListingSheet` resets to
+ * this). Shared with `isListingDraftDirty` so the "did the user actually
+ * fill in fields" gate can never drift from the reset values.
+ */
+export const LISTING_DRAFT_DEFAULTS = {
+  mode: "trade",
+  currency: "USD",
+} as const satisfies { mode: MarketplaceMode; currency: string };
+
+export type ListingDraft = {
+  mode: MarketplaceMode;
+  price: string;
+  currency: string;
+  notes: string;
+};
+
+/**
+ * True when the user actually filled in the listing sheet — any deviation
+ * from the just-opened defaults. Gates `listing_dropped` so merely opening
+ * and closing the sheet doesn't count as an abandoned listing.
+ */
+export function isListingDraftDirty(draft: ListingDraft): boolean {
+  return (
+    draft.mode !== LISTING_DRAFT_DEFAULTS.mode ||
+    isNonBlank(draft.price) ||
+    isNonBlank(draft.notes) ||
+    draft.currency !== LISTING_DRAFT_DEFAULTS.currency
+  );
+}
+
+/**
+ * Canonical `listing_dropped` payload — mirrors `listing_created`'s
+ * `{ mode, hasPrice }` shape so the two funnel arms slice identically.
+ * `hasPrice` is "a price had been typed", not "the price parsed" — an
+ * invalid price the user gave up on still counts as price intent.
+ */
+export function buildListingDroppedProps(draft: ListingDraft): {
+  mode: MarketplaceMode;
+  hasPrice: boolean;
+} {
+  return { mode: draft.mode, hasPrice: isNonBlank(draft.price) };
+}
+
 export function hasReplacedPhotoSet(
   prev: readonly string[],
   next: readonly string[],
