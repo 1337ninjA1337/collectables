@@ -96,6 +96,12 @@ jobs:
       - name: No whole-process.env in config resolvers
         run: npm run lint:env-inlining
 
+      # The taxonomy module grows a description string per event — screens
+      # must consume it via lib/analytics.ts so the copy stays out of the
+      # runtime bundle and UI code can't bypass the wrapper's gates.
+      - name: No direct analytics-events imports from UI code
+        run: npm run lint:analytics-imports
+
       - name: Migrations documented in MANUAL-TASKS.md
         run: npm run lint:migration-docs
 
