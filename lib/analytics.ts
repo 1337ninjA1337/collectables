@@ -61,6 +61,12 @@ let pending: Promise<void> | null = null;
 
 let userOptedOut = false;
 
+// Last successful identify, for the diagnostics screen ("Last identify:
+// 2 minutes ago — language=ru, isPremium=false"). Cleared on resetUser so a
+// signed-out session never exposes the previous user's traits.
+let lastIdentifyAt: number | null = null;
+let lastIdentifyTraits: AnalyticsTraits | null = null;
+
 // Rate-limit trackEvent to MAX_EVENTS_PER_WINDOW within RATE_LIMIT_WINDOW_MS
 // so a runaway useEffect loop or a list render that fires capture() per row
 // cannot exhaust the PostHog free-tier (1M events/mo) in seconds. Mirrors the
@@ -191,6 +197,8 @@ export function identifyUser(userId: string, traits?: AnalyticsTraits): void {
   if (!sdk || !activeConfig?.enabled) return;
   try {
     sdk.identify(userId, traits);
+    lastIdentifyAt = Date.now();
+    lastIdentifyTraits = traits ? { ...traits } : null;
   } catch {
     /* never let identity tracking crash the host app */
   }
@@ -201,9 +209,34 @@ export function resetUser(): void {
   if (!sdk || !activeConfig?.enabled) return;
   try {
     sdk.reset();
+    lastIdentifyAt = null;
+    lastIdentifyTraits = null;
   } catch {
     /* ignore */
   }
+}
+
+export type AnalyticsSnapshot = {
+  /** Epoch ms of the last identify that actually reached the SDK, or null. */
+  lastIdentifyAt: number | null;
+  /** Traits sent with that identify (defensive copy), or null. */
+  lastIdentifyTraits: AnalyticsTraits | null;
+};
+
+/**
+ * Read-only snapshot of the last successful identify, mirroring
+ * `getAnalyticsStatus()`. Lets the settings diagnostics screen render
+ * "Last identify: 2 minutes ago — language=ru, isPremium=false" without
+ * re-deriving the values from the React tree. Only identifies that pass the
+ * opt-out/enabled gates and reach `sdk.identify` are recorded; `resetUser()`
+ * clears the snapshot so a signed-out session never exposes the previous
+ * user's traits.
+ */
+export function getAnalyticsSnapshot(): AnalyticsSnapshot {
+  return {
+    lastIdentifyAt,
+    lastIdentifyTraits: lastIdentifyTraits ? { ...lastIdentifyTraits } : null,
+  };
 }
 
 export function isAnalyticsReady(): boolean {
@@ -290,6 +323,8 @@ export function __resetAnalyticsForTests(): void {
   activeConfig = null;
   pending = null;
   userOptedOut = false;
+  lastIdentifyAt = null;
+  lastIdentifyTraits = null;
   rateLimiter.reset();
 }
 
