@@ -120,8 +120,8 @@ describe("app/item/[id].tsx — item_photo_attached wiring", () => {
     const window = src.slice(Math.max(0, trackIdx - 200), trackIdx);
     assert.match(
       window,
-      /if\s*\(\s*!hadPhotosBefore\s*&&\s*finalPhotos\.length\s*>\s*0\s*\)/,
-      "item_photo_attached must be gated on (!hadPhotosBefore && finalPhotos.length > 0) so it only fires for the FIRST photo",
+      /if\s*\(\s*isRisingEdge\s*\(\s*hadPhotosBefore\s*,\s*finalPhotos\.length\s*>\s*0\s*\)\s*\)/,
+      "item_photo_attached must be gated on isRisingEdge(hadPhotosBefore, finalPhotos.length > 0) so it only fires for the FIRST photo",
     );
   });
 
