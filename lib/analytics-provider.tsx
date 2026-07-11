@@ -11,6 +11,11 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { useDiagnostics } from "@/lib/diagnostics-context";
 import { useI18n } from "@/lib/i18n-context";
+import {
+  createIdentifyScheduler,
+  DEFAULT_IDENTIFY_DEBOUNCE_MS,
+  type IdentifyScheduler,
+} from "@/lib/identify-scheduler";
 import { usePremium } from "@/lib/premium-context";
 
 /**
@@ -34,20 +39,22 @@ const AnalyticsContext = createContext<AnalyticsContextValue | null>(null);
  * Debounce window for the identify effect. A rapid premium-flag flip +
  * language switch inside the same render cycle (or a React Strict-Mode
  * double-mount) collapses into a single `identifyUser` call instead of
- * double-charging the PostHog identify quota.
+ * double-charging the PostHog identify quota. Re-exports the scheduler's
+ * default so the two modules can never drift.
  */
-export const IDENTIFY_DEBOUNCE_MS = 500;
+export const IDENTIFY_DEBOUNCE_MS = DEFAULT_IDENTIFY_DEBOUNCE_MS;
 
 /**
  * Provider-tree node that wires the analytics SDK identity to the auth +
- * preference contexts and exposes the wrapper via `useAnalytics()`. Mounts a
- * single `useEffect` that:
+ * preference contexts and exposes the wrapper via `useAnalytics()`. The
+ * identify-edge semantics (debounce, fired-identity guard, synchronous reset)
+ * live in `createIdentifyScheduler`; the effect here only feeds it:
  *
- *   - calls `identifyUser(user.id, { language, isPremium })` whenever the
+ *   - `scheduler.update(user.id, { language, isPremium })` whenever the
  *     authenticated user changes (sign-in, refresh) or the language /
- *     premium-state traits change
- *   - calls `resetUser()` on signout so the next anonymous session does not
- *     inherit the previous user's identity
+ *     premium-state traits change → debounced `identifyUser`
+ *   - `scheduler.update(null)` on signout → synchronous `resetUser()` so the
+ *     next anonymous session does not inherit the previous user's identity
  *
  * Must mount inside `AuthProvider`, `I18nProvider`, `PremiumProvider`, and
  * `DiagnosticsProvider` (uses each via its hook).
@@ -57,26 +64,28 @@ export function AnalyticsProvider({ children }: React.PropsWithChildren) {
   const { language } = useI18n();
   const { isPremium } = usePremium();
   const { diagnosticsEnabled } = useDiagnostics();
-  const lastUserIdRef = useRef<string | null>(null);
+  const schedulerRef = useRef<IdentifyScheduler | null>(null);
+  if (!schedulerRef.current) {
+    schedulerRef.current = createIdentifyScheduler({
+      identify: identifyUser,
+      reset: resetUser,
+      debounceMs: IDENTIFY_DEBOUNCE_MS,
+    });
+  }
+  const scheduler = schedulerRef.current;
 
   useEffect(() => {
-    if (user) {
-      // Debounced: a dep change (or effect re-run) within the window cancels
-      // the pending identify via the cleanup, so only the settled traits fire.
-      const timer = setTimeout(() => {
-        identifyUser(user.id, { language, isPremium });
-        lastUserIdRef.current = user.id;
-      }, IDENTIFY_DEBOUNCE_MS);
-      return () => clearTimeout(timer);
-    }
-    if (lastUserIdRef.current) {
-      // Auth transitioned from "signed in" to "signed out" — clear identity
-      // so the next anonymous session does not inherit traits. Intentionally
-      // NOT debounced: a stale identity must not outlive the session.
-      resetUser();
-      lastUserIdRef.current = null;
-    }
-  }, [user, language, isPremium]);
+    // Debounced identify on sign-in / trait changes, synchronous reset on the
+    // signed-in→signed-out edge — the semantics live in the scheduler.
+    scheduler.update(user?.id ?? null, { language, isPremium });
+  }, [scheduler, user, language, isPremium]);
+
+  useEffect(() => {
+    // Unmount cleanup: cancel any pending identify so it cannot fire after
+    // the provider is gone (Strict-Mode double-mounts re-arm via the effect
+    // above on the second mount).
+    return () => scheduler.dispose();
+  }, [scheduler]);
 
   const value = useMemo<AnalyticsContextValue>(
     () => ({
