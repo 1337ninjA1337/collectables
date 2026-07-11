@@ -78,9 +78,19 @@ describe("useAnalytics — context surface on AnalyticsProvider", () => {
   });
 
   it("keeps the identify/reset identity wiring (thin wrapper, not a rewrite)", () => {
-    assert.match(src, /identifyUser\(\s*user\.id/, "identity effect must remain");
-    assert.match(src, /resetUser\(\)/, "sign-out reset must remain");
-    assert.match(src, /lastUserIdRef/, "signed-in→signed-out edge guard must remain");
+    // The identify edge is delegated to createIdentifyScheduler; the provider
+    // must still wire the module wrappers into it and feed it from the effect.
+    assert.match(
+      src,
+      /identify:\s*identifyUser/,
+      "scheduler must identify via identifyUser",
+    );
+    assert.match(src, /reset:\s*resetUser/, "scheduler must reset via resetUser");
+    assert.match(
+      src,
+      /scheduler\.update\(user\?\.id \?\? null/,
+      "identity effect must feed the scheduler",
+    );
   });
 });
 

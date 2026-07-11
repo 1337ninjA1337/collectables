@@ -136,25 +136,26 @@ describe("AnalyticsProvider — hook usage + identify/reset behaviour", () => {
     }
   });
 
-  it("forwards { language, isPremium } as identifyUser traits", () => {
+  it("forwards { language, isPremium } as identify traits via the scheduler", () => {
     assert.match(
       src,
-      /identifyUser\(\s*[^,]+,\s*\{[^}]*language[^}]*isPremium[^}]*\}\s*\)/,
-      "identifyUser must be invoked with { language, isPremium } traits",
+      /scheduler\.update\(\s*user\?\.id \?\? null,\s*\{[^}]*language[^}]*isPremium[^}]*\}\s*\)/,
+      "the identify effect must pass { language, isPremium } traits to scheduler.update",
     );
   });
 
-  it("calls resetUser on the signed-in -> signed-out transition", () => {
+  it("wires resetUser as the scheduler's reset so sign-out clears identity", () => {
     assert.match(
       src,
-      /resetUser\(\)/,
-      "analytics-provider must call resetUser() when the user signs out",
+      /reset:\s*resetUser/,
+      "createIdentifyScheduler must receive resetUser — the scheduler fires it on the signed-in→signed-out edge",
     );
-    // Guard: do not call resetUser on every initial render where user starts as null
+    // Guard: the fired-identity edge tracking lives in the scheduler, not a
+    // provider-local ref (a cancelled identify must leave no phantom identity).
     assert.match(
       src,
-      /lastUserIdRef/,
-      "analytics-provider must track the previous user id so resetUser fires only on the signed-in→signed-out edge",
+      /createIdentifyScheduler\(/,
+      "analytics-provider must delegate the identify edge to createIdentifyScheduler",
     );
   });
 });
