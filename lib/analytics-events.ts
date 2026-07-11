@@ -51,6 +51,11 @@ export const ANALYTICS_EVENTS = {
       "Fired the first time an existing item gets a photo (post-create photo upload). Distinct from `item_added` so we can attribute photo conversions independently.",
     props: ["itemId", "collectionId"],
   },
+  item_photos_replaced: {
+    description:
+      "Fired when an item that already had photos is saved with a different photo set (gallery rotation). Distinct from `item_photo_attached`, which only covers the first-photo edge — together they separate curation behaviour from photo onboarding.",
+    props: ["itemId", "collectionId", "photoCount"],
+  },
   listing_created: {
     description:
       "Fired from `app/item/[id].tsx` after a marketplace listing is published. `mode` = sale/trade/swap; `hasPrice` flags whether the listing carries a numeric price.",

@@ -13,6 +13,7 @@ import { ReactionBar } from "@/components/reaction-bar";
 import { Screen, useResponsive } from "@/components/screen";
 import { useAppTheme, type AppTheme } from "@/components/use-app-theme";
 import { trackEvent } from "@/lib/analytics";
+import { hasReplacedPhotoSet } from "@/lib/analytics-helpers";
 import { isRisingEdge } from "@/lib/use-transition-event";
 import { buildDeepLink } from "@/lib/deep-link";
 import { useAuth } from "@/lib/auth-context";
@@ -230,7 +231,8 @@ export default function ItemDetailsScreen() {
     }
     setSaving(true);
     try {
-      const hadPhotosBefore = activeItem.photos.length > 0;
+      const previousPhotos = activeItem.photos;
+      const hadPhotosBefore = previousPhotos.length > 0;
       let finalPhotos = editPhotos;
       if (newLocalPhotos.length > 0) {
         finalPhotos = await uploadImages(newLocalPhotos);
@@ -252,6 +254,12 @@ export default function ItemDetailsScreen() {
         trackEvent("item_photo_attached", {
           itemId: activeItem.id,
           collectionId: activeItem.collectionId,
+        });
+      } else if (hasReplacedPhotoSet(previousPhotos, finalPhotos)) {
+        trackEvent("item_photos_replaced", {
+          itemId: activeItem.id,
+          collectionId: activeItem.collectionId,
+          photoCount: finalPhotos.length,
         });
       }
       setEditing(false);
