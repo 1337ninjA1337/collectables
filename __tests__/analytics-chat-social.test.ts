@@ -55,13 +55,18 @@ describe("app/chat/[id].tsx — chat_opened wiring", () => {
     );
   });
 
-  it("withFriend uses the mutual 'friend' relationship enum", () => {
+  it("withFriend uses the canonical isFriendRelationship helper (mutual only)", () => {
+    assert.match(
+      src,
+      /import\s*\{[^}]*\bisFriendRelationship\b[^}]*\}\s*from\s*["']@\/lib\/social-helpers["']/,
+      "chat/[id].tsx must import isFriendRelationship from @/lib/social-helpers",
+    );
     const trackIdx = src.indexOf("trackEvent(\"chat_opened\"");
     const block = src.slice(trackIdx, trackIdx + 300);
     assert.match(
       block,
-      /withFriend:\s*getRelationship\([^)]+\)\s*===\s*["']friend["']/,
-      "withFriend must check 'friend' (mutual), not 'following'/'request_sent' etc.",
+      /withFriend:\s*isFriendRelationship\(\s*getRelationship\([^)]+\)\s*\)/,
+      "withFriend must delegate to isFriendRelationship(getRelationship(...)) — 'friend' (mutual) only",
     );
   });
 });

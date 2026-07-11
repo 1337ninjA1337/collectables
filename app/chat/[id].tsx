@@ -17,6 +17,7 @@ import { MaskedTextInput } from "@/components/masked-text-input";
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { trackEvent } from "@/lib/analytics";
+import { isFriendRelationship } from "@/lib/social-helpers";
 import {
   AMBER_MUTED,
   AMBER_SOFT,
@@ -106,7 +107,7 @@ export default function ChatDetailScreen() {
     const timer = setTimeout(() => {
       trackEvent("chat_opened", {
         conversationId: chatId,
-        withFriend: getRelationship(otherUserId) === "friend",
+        withFriend: isFriendRelationship(getRelationship(otherUserId)),
       });
     }, 500);
     return () => clearTimeout(timer);
