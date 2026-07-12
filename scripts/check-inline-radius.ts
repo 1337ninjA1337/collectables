@@ -1,9 +1,10 @@
 #!/usr/bin/env tsx
 /**
- * Fails when any inline `borderRadius: 999` literal slips into `app/**` or
- * `components/**` — pill radii must route through `RADIUS_PILL` from
- * `lib/design-tokens.ts`. Run via `npm run lint:radius` locally and via
- * `npm run lint:ci` in CI.
+ * Fails when any inline `borderRadius: 999` / `22` / `24` literal slips
+ * into `app/**` or `components/**` — radii must route through
+ * `RADIUS_PILL` / `RADIUS_CARD` / `RADIUS_CARD_LG` from
+ * `lib/design-tokens.ts` (see RADIUS_RULES in lib/check-inline-radius.ts).
+ * Run via `npm run lint:radius` locally and via `npm run lint:ci` in CI.
  */
 
 import * as fs from "node:fs";
@@ -43,7 +44,7 @@ function main(): void {
 
   if (allMatches.length === 0) {
     console.log(
-      `check-inline-radius: scanned ${files.length} file(s), no inline pill-radius literals.`,
+      `check-inline-radius: scanned ${files.length} file(s), no inline radius literals.`,
     );
     return;
   }
