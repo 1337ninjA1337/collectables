@@ -28,6 +28,7 @@
     "lint:expo-install": "tsx scripts/check-expo-install.ts",
     "privacy:generate": "tsx scripts/generate-privacy-manifest.ts",
     "powerbi:schema-doc": "tsx scripts/generate-powerbi-schema-doc.ts",
+    "db:find-duplicates": "tsx scripts/find-db-duplicates.ts",
     "powerbi:conn": "tsx scripts/print-powerbi-conn.ts",
     "lint:powerbi-doc": "tsx scripts/generate-powerbi-schema-doc.ts --check",
     "sentry:check": "tsx scripts/sentry-doctor.ts",
