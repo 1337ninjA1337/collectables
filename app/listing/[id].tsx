@@ -152,6 +152,10 @@ export default function ListingDetailScreen() {
 
   const performClaim = useCallback(async () => {
     if (!listing || !user) return;
+    // The claim CTA is hidden once `isSold`, but a realtime UPDATE can land
+    // while the confirm dialog is open — re-check so a just-sold listing
+    // can't run the transfer tail (and emit listing_claimed) twice.
+    if (listing.soldAt) return;
     setClaimingListingId(listing.id);
     try {
       const sourceItem = getItemById(listing.itemId);
