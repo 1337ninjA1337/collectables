@@ -54,6 +54,8 @@ import {
   MUTED_3,
   MUTED_10,
   PLACEHOLDER,
+  RADIUS_CARD,
+  RADIUS_CARD_LG,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
@@ -1041,7 +1043,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   editInput: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
@@ -1106,7 +1108,7 @@ const styles = StyleSheet.create({
   },
   tagInput: {
     flex: 1,
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
@@ -1117,7 +1119,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   tagAddButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: HERO_DARK,
     paddingHorizontal: 18,
     paddingVertical: 12,
@@ -1142,7 +1144,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   saveButton: {
-    borderRadius: 24,
+    borderRadius: RADIUS_CARD_LG,
     paddingVertical: 18,
     alignItems: "center",
     backgroundColor: HERO_DARK,
@@ -1157,7 +1159,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   cancelButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: CARD_BG_3,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
