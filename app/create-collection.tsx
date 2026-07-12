@@ -25,6 +25,7 @@ import {
   MUTED_10,
   MUTED_17,
   PLACEHOLDER,
+  RADIUS_PILL,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_DARK_4,
@@ -394,7 +395,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   visibilityChip: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingVertical: 10,
     paddingHorizontal: 18,
     backgroundColor: CARD_BG,

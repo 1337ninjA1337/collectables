@@ -27,6 +27,7 @@ import {
   HERO_DARK_7,
   MUTED,
   MUTED_3,
+  RADIUS_PILL,
   SUCCESS_GREEN,
   TEXT_DARK,
   TEXT_ON_DARK,
@@ -468,7 +469,7 @@ const styles = StyleSheet.create({
   modeBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
   },
   modeBadgeText: {
     color: TEXT_ON_DARK,
@@ -613,7 +614,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingVertical: 4,
     paddingHorizontal: 10,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: SUCCESS_GREEN,
   },
   transferredBadgeText: {
@@ -693,7 +694,7 @@ const styles = StyleSheet.create({
   priceHistoryModeBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
   },
   priceHistoryModeText: {
     color: TEXT_ON_DARK,

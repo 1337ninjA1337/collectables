@@ -28,6 +28,7 @@ import {
   PURE_WHITE,
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
+  RADIUS_PILL,
   SHADOW_SOFT,
   TEXT_DARK,
   TEXT_ON_DARK_3,
@@ -357,7 +358,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   primaryAction: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: HERO_DARK,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   secondaryAction: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: CARD_BG_3,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
@@ -381,7 +382,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   statusBadge: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: BORDER_2,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
@@ -400,7 +401,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   pageButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: HERO_DARK,
     paddingHorizontal: 18,
     paddingVertical: 12,
