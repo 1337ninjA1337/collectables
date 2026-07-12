@@ -41,6 +41,7 @@ import {
   MUTED_20,
   MUTED_21,
   RADIUS_ITEM_AIRY,
+  RADIUS_PILL,
   SHADOW_SOFT,
   TEXT_DARK,
   TEXT_DARK_2,
@@ -405,7 +406,7 @@ const styles = StyleSheet.create({
     backgroundColor: AMBER_ACCENT,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
   },
   addButtonText: {
     color: TEXT_DARK_2,
@@ -453,7 +454,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   metaChip: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: CARD_BG_7,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -477,7 +478,7 @@ const styles = StyleSheet.create({
     backgroundColor: TEXT_DARK,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
   },
   promoteButtonText: {
     color: TEXT_ON_DARK_5,
@@ -486,7 +487,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   deleteButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: DANGER_SOFT,
     paddingHorizontal: 10,
@@ -564,7 +565,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     alignSelf: "flex-start",
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
     backgroundColor: CARD_BG_9,
@@ -584,7 +585,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
     paddingVertical: 14,
@@ -599,7 +600,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     flex: 1,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: AMBER_ACCENT,
     paddingVertical: 14,
     alignItems: "center",

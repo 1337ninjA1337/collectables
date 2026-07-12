@@ -16,6 +16,9 @@ const MIGRATED_FILES = [
   // batch 1/5
   "app/settings.tsx",
   "app/item/[id].tsx",
+  // batch 2/5
+  "app/wishlist.tsx",
+  "app/profile/[id].tsx",
 ] as const;
 
 describe("RADIUS_PILL adoption — migrated files", () => {
