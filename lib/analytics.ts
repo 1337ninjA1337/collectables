@@ -31,6 +31,7 @@ export type AnalyticsEventName =
   | "listing_view"
   | "chat_opened"
   | "friend_requested"
+  | "friend_request_accepted"
   | "premium_activated"
   | "premium_upsell_shown"
   | "language_switched";
