@@ -20,6 +20,9 @@ const MIGRATED_FILES: ReadonlyArray<{ rel: string; usesLg: boolean }> = [
   // batch A/4
   { rel: "app/collection/[id].tsx", usesLg: false },
   { rel: "app/item/[id].tsx", usesLg: true },
+  // batch B/4
+  { rel: "app/listing/[id].tsx", usesLg: true },
+  { rel: "app/create.tsx", usesLg: true },
 ];
 
 describe("RADIUS_CARD adoption — migrated files", () => {
