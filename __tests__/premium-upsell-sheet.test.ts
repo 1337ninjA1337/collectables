@@ -25,7 +25,7 @@ describe("PremiumUpsellSheet component", () => {
     // (e.g. flip visibility) lands while the sheet is already dismissed.
     assert.match(
       src,
-      /activatePremium\(\);\s*toast\.success\(t\("premiumActivated"\)\);\s*onClose\(\);\s*onActivated\?\.\(\);/,
+      /activatePremium\(source \?\? "upsell_sheet"\);\s*toast\.success\(t\("premiumActivated"\)\);\s*onClose\(\);\s*onActivated\?\.\(\);/,
     );
   });
 

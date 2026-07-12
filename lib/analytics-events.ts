@@ -103,7 +103,7 @@ export const ANALYTICS_EVENTS = {
   },
   premium_activated: {
     description:
-      "Fired from the premium false→true transition hook in `components/bottom-nav.tsx`. `source` carries which screen triggered the upgrade.",
+      "Fired from the premium false→true transition hook in `components/bottom-nav.tsx`. `source` carries which screen triggered the upgrade via the one-shot `consumeLastPremiumIntent()` intent ref (`settings` / `create_collection` / `upsell_sheet` / `server_sync` for entitlements restored by the cloud validation merge / `unknown` for an untagged caller).",
     props: ["source"],
   },
   premium_upsell_shown: {

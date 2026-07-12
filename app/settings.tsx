@@ -99,7 +99,7 @@ export default function SettingsScreen() {
   }
 
   function handleActivatePremium() {
-    activatePremium();
+    activatePremium("settings");
     toast.success(t("premiumActivated"));
   }
 

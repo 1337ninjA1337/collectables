@@ -52,7 +52,7 @@ describe("settings screen wires the premium section", () => {
   });
 
   it("calls activatePremium and cancelPremium from the handlers", () => {
-    assert.match(src, /activatePremium\(\)/);
+    assert.match(src, /activatePremium\("settings"\)/);
     assert.match(src, /cancelPremium\(\)/);
   });
 });
