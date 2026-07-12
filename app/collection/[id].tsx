@@ -67,6 +67,7 @@ import {
   MUTED_23,
   PLACEHOLDER,
   PURE_WHITE,
+  RADIUS_CARD,
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
@@ -1178,7 +1179,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadMore: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     paddingVertical: 14,
     paddingHorizontal: 18,
     borderWidth: 1,
@@ -1197,7 +1198,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   exportButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
@@ -1215,7 +1216,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   shareButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
@@ -1326,7 +1327,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   addButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     paddingVertical: 18,
     paddingHorizontal: 18,
     backgroundColor: HERO_DARK,
@@ -1339,7 +1340,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   deleteButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
@@ -1354,7 +1355,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   unfollowButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
@@ -1381,7 +1382,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_BOLD,
   },
   selectButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
@@ -1447,7 +1448,7 @@ const styles = StyleSheet.create({
   },
   bulkBarInner: {
     backgroundColor: HERO_DARK,
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     padding: 14,
     gap: 12,
     shadowColor: HERO_DARK_9,
@@ -1508,7 +1509,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
     backgroundColor: CARD_BG,
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     padding: 20,
     gap: 14,
     borderWidth: 1,
@@ -1550,7 +1551,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   editCollectionButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     paddingVertical: 16,
     paddingHorizontal: 18,
     borderWidth: 1,
@@ -1568,7 +1569,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
     backgroundColor: CARD_BG,
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     padding: 20,
     gap: 16,
     borderWidth: 1,
