@@ -28,6 +28,7 @@ import {
   MUTED,
   MUTED_2,
   MUTED_10,
+  RADIUS_PILL,
   TEXT_DARK,
   TEXT_ON_DARK_3,
   TEXT_ON_DARK_4,
@@ -360,7 +361,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   primaryAction: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: HERO_DARK,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -371,7 +372,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   secondaryAction: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: CARD_BG_3,
     borderWidth: 1,
     borderColor: AMBER_SOFT,

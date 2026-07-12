@@ -30,6 +30,7 @@ import {
   HERO_DARK_2,
   MUTED_9,
   PAGE_BG_2,
+  RADIUS_PILL,
   STATUS_OFFLINE,
   STATUS_ONLINE,
   TEXT_DARK,
@@ -306,7 +307,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: CARD_BG_3,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
@@ -314,7 +315,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   headerIconButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: CARD_BG_3,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
@@ -364,7 +365,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   homeButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: HERO_DARK,
     paddingHorizontal: 14,
     paddingVertical: 8,

@@ -23,6 +23,14 @@ const MIGRATED_FILES = [
   "app/index.tsx",
   "app/marketplace.tsx",
   "app/collection/[id].tsx",
+  // batch 4/5 — app/ now greps clean for `borderRadius: 999`
+  "app/people.tsx",
+  "app/listing/[id].tsx",
+  "app/_layout.tsx",
+  "app/friends.tsx",
+  "app/create.tsx",
+  "app/create-collection.tsx",
+  "app/chat/[id].tsx",
 ] as const;
 
 describe("RADIUS_PILL adoption — migrated files", () => {

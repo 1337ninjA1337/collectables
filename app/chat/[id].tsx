@@ -33,6 +33,7 @@ import {
   MUTED_12,
   MUTED_13,
   MUTED_14,
+  RADIUS_PILL,
   TEXT_DARK,
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
@@ -470,7 +471,7 @@ const styles = StyleSheet.create({
   offlinePill: {
     alignSelf: "center",
     backgroundColor: CARD_BG_4,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: AMBER_SOFT_2,
     paddingHorizontal: 14,
