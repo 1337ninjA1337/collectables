@@ -69,6 +69,7 @@ import {
   PURE_WHITE,
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
+  RADIUS_PILL,
   SHADOW_SOFT,
   SPACING_AIRY,
   SPACING_GUTTER,
@@ -1280,7 +1281,7 @@ const styles = StyleSheet.create({
   },
   shareCopyButton: {
     flex: 1,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: HERO_DARK,
     paddingVertical: 14,
     alignItems: "center",
@@ -1299,7 +1300,7 @@ const styles = StyleSheet.create({
   },
   shareNativeButton: {
     flex: 1,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: AMBER_ACCENT,
     paddingVertical: 14,
     alignItems: "center",
@@ -1311,7 +1312,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   shareCancelButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
     paddingVertical: 14,
@@ -1645,7 +1646,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   editVisibilityChip: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingVertical: 8,
     paddingHorizontal: 16,
     backgroundColor: CARD_BG,
@@ -1720,7 +1721,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_BOLD,
   },
   shareFriendButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingVertical: 8,
     paddingHorizontal: 16,
     backgroundColor: HERO_DARK,
