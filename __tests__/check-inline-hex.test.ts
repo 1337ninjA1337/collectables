@@ -4,9 +4,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
+  HEX_ALLOWLIST,
   INLINE_HEX_PATTERN,
   findInlineHexLiterals,
   formatHexReport,
+  isHexAllowlisted,
 } from "../lib/check-inline-hex";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -126,12 +128,13 @@ describe("check-inline-hex script wiring", () => {
     assert.match(src, /\bformatHexReport\b/);
   });
 
-  it("scripts/check-inline-hex.ts scans both app/ and components/", () => {
+  it("scripts/check-inline-hex.ts scans app/, components/ AND lib/", () => {
     const src = read("scripts/check-inline-hex.ts");
     // The SCAN_ROOTS literal — keep the test loose enough to survive a future
     // refactor (e.g. adding `hooks/`) but strict enough to catch a missing root.
     assert.match(src, /["']app["']/);
     assert.match(src, /["']components["']/);
+    assert.match(src, /["']lib["']/);
   });
 
   it("scripts/check-inline-hex.ts exits with code 1 on findings", () => {
@@ -139,11 +142,36 @@ describe("check-inline-hex script wiring", () => {
     assert.match(src, /process\.exit\(1\)/);
   });
 
-  it("scripts/check-inline-hex.ts walks only .tsx files", () => {
-    // The walker uses .tsx suffix matching so it skips .ts/.json/.md
-    // (those don't carry inline JSX style hex values).
+  it("scripts/check-inline-hex.ts walks .ts AND .tsx files", () => {
+    // The walker matches both extensions so utility modules that hard-code
+    // a color value are caught too (the intentional producers are exempted
+    // via HEX_ALLOWLIST instead of being skipped by extension).
     const src = read("scripts/check-inline-hex.ts");
-    assert.match(src, /\.tsx/);
+    assert.match(src, /\\\.tsx\?\$/);
+  });
+
+  it("allowlisted files are skipped by the matcher itself", () => {
+    const source = 'const PALETTE = ["#8B6F5E"];';
+    assert.equal(
+      findInlineHexLiterals("lib/placeholder-color.ts", source).length,
+      0,
+    );
+    // The same source under a NON-allowlisted path still flags.
+    assert.equal(findInlineHexLiterals("lib/new-util.ts", source).length, 1);
+  });
+
+  it("every allowlist entry exists on disk and actually carries hex literals", () => {
+    // A stale entry (file deleted/renamed or migrated to tokens) must be
+    // pruned so the exemption surface never outgrows its justification.
+    for (const rel of HEX_ALLOWLIST) {
+      assert.ok(isHexAllowlisted(rel));
+      const source = read(rel);
+      const re = new RegExp(INLINE_HEX_PATTERN.source, "g");
+      assert.ok(
+        re.test(source),
+        `${rel} is allowlisted but carries no hex literal — remove the stale entry`,
+      );
+    }
   });
 
   it("package.json wires lint:hex and lint:ci runs it before tests", () => {
@@ -160,7 +188,7 @@ describe("check-inline-hex script wiring", () => {
     assert.match(src, /lint:hex/);
   });
 
-  it("app/** and components/** are clean today (regression baseline)", () => {
+  it("app/**, components/** and lib/** are clean today (regression baseline)", () => {
     // Empirical guard: re-runs the full scan against the working tree so a
     // PR that adds a stray inline hex fails this test even before CI runs.
     // We use Node fs directly rather than spawning the script to keep the
@@ -177,7 +205,7 @@ describe("check-inline-hex script wiring", () => {
       for (const entry of entries) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) walk(full);
-        else if (entry.isFile() && full.endsWith(".tsx")) {
+        else if (entry.isFile() && /\.tsx?$/.test(entry.name)) {
           const source = fs.readFileSync(full, "utf8");
           const rel = path.relative(REPO_ROOT, full);
           allMatches.push(...findInlineHexLiterals(rel, source));
@@ -186,10 +214,11 @@ describe("check-inline-hex script wiring", () => {
     };
     walk(path.join(REPO_ROOT, "app"));
     walk(path.join(REPO_ROOT, "components"));
+    walk(path.join(REPO_ROOT, "lib"));
     assert.deepEqual(
       allMatches,
       [],
-      `unexpected inline hex literals in app/** or components/**:\n${formatHexReport(allMatches)}`,
+      `unexpected inline hex literals in app/**, components/** or lib/**:\n${formatHexReport(allMatches)}`,
     );
   });
 });

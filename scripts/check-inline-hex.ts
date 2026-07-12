@@ -1,11 +1,13 @@
 #!/usr/bin/env tsx
 /**
- * Fails when any 6-digit hex literal slips into `app/**.tsx` or
- * `components/**.tsx`. Run via `npm run lint:hex` locally and via
- * `npm run lint:ci` in CI.
+ * Fails when any 6-digit hex literal slips into `app/**`, `components/**`
+ * or `lib/**` (`.ts` and `.tsx` alike). Run via `npm run lint:hex` locally
+ * and via `npm run lint:ci` in CI.
  *
- * `lib/design-tokens.ts` is the only file allowed to carry hex literals;
- * it is not in the scan roots, so no allowlist is needed.
+ * The few modules that legitimately produce color values (the design-tokens
+ * source itself, the deterministic placeholder palette, the standalone HTML
+ * templates) are exempted by exact path via `HEX_ALLOWLIST` in
+ * `lib/check-inline-hex.ts` — the matcher skips them, so the walk stays dumb.
  */
 
 import * as fs from "node:fs";
@@ -18,9 +20,10 @@ import {
 } from "../lib/check-inline-hex";
 
 const REPO_ROOT = path.join(__dirname, "..");
-const SCAN_ROOTS = ["app", "components"];
+const SCAN_ROOTS = ["app", "components", "lib"];
+const SOURCE_FILE_PATTERN = /\.tsx?$/;
 
-function walkTsx(dir: string, out: string[]): void {
+function walkSources(dir: string, out: string[]): void {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -30,8 +33,8 @@ function walkTsx(dir: string, out: string[]): void {
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      walkTsx(full, out);
-    } else if (entry.isFile() && full.endsWith(".tsx")) {
+      walkSources(full, out);
+    } else if (entry.isFile() && SOURCE_FILE_PATTERN.test(entry.name)) {
       out.push(full);
     }
   }
@@ -40,7 +43,7 @@ function walkTsx(dir: string, out: string[]): void {
 function main(): void {
   const files: string[] = [];
   for (const root of SCAN_ROOTS) {
-    walkTsx(path.join(REPO_ROOT, root), files);
+    walkSources(path.join(REPO_ROOT, root), files);
   }
   files.sort();
 
