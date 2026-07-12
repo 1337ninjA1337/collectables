@@ -15,6 +15,8 @@ import {
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
   SHADOW_SOFT,
+  SPACING_INLINE,
+  SPACING_LIST,
   TEXT_ON_DARK_3,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
@@ -113,7 +115,7 @@ const styles = StyleSheet.create({
     backgroundColor: HERO_DARK,
     borderRadius: RADIUS_HERO_LG,
     padding: 24,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   eyebrow: {
     color: AMBER_LIGHT,
@@ -134,7 +136,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   list: {
-    gap: 10,
+    gap: SPACING_LIST,
   },
   row: {
     flexDirection: "row",
@@ -168,12 +170,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   rowFooter: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   name: {
     fontFamily: FONT_DISPLAY_EDITORIAL,

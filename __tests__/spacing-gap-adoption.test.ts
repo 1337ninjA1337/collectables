@@ -30,6 +30,13 @@ const MIGRATED_FILES: ReadonlyArray<{
   { rel: "app/create.tsx", list: true, card: true, inline: true },
   { rel: "app/settings.tsx", list: true, card: true, inline: true },
   { rel: "app/index.tsx", list: true, card: true, inline: true },
+  // batch 3/6
+  { rel: "app/listing/[id].tsx", list: true, card: false, inline: true },
+  { rel: "app/wishlist.tsx", list: true, card: true, inline: true },
+  { rel: "app/profile/[id].tsx", list: true, card: true, inline: true },
+  { rel: "app/chat/[id].tsx", list: true, card: true, inline: true },
+  { rel: "app/chats.tsx", list: true, card: false, inline: true },
+  { rel: "app/marketplace.tsx", list: true, card: true, inline: true },
 ];
 
 const TOKEN_BY_GAP = [

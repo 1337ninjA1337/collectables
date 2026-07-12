@@ -36,6 +36,9 @@ import {
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
+  SPACING_CARD,
+  SPACING_INLINE,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_DARK_3,
   TEXT_ON_DARK,
@@ -575,7 +578,7 @@ const styles = StyleSheet.create({
     backgroundColor: HERO_DARK,
     padding: 24,
     alignItems: "center",
-    gap: 8,
+    gap: SPACING_INLINE,
     position: "relative",
   },
   settingsIcon: {
@@ -623,7 +626,7 @@ const styles = StyleSheet.create({
   handleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   handlePrefix: {
     color: AMBER_LIGHT,
@@ -665,7 +668,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
     padding: 18,
-    gap: 12,
+    gap: SPACING_CARD,
   },
   selfTools: {
     gap: 14,
@@ -673,7 +676,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   primaryAction: {
     borderRadius: RADIUS_PILL,
@@ -764,7 +767,7 @@ const styles = StyleSheet.create({
   wishlistCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: SPACING_CARD,
     borderRadius: 16,
     backgroundColor: CARD_BG,
     borderWidth: 1,
@@ -806,7 +809,7 @@ const styles = StyleSheet.create({
   historyMetaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: SPACING_INLINE,
     marginTop: 2,
   },
   historyMode: {

@@ -35,6 +35,9 @@ import {
   MUTED_14,
   RADIUS_CARD,
   RADIUS_PILL,
+  SPACING_CARD,
+  SPACING_INLINE,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
@@ -355,7 +358,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: SPACING_CARD,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
@@ -363,7 +366,7 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: SPACING_CARD,
     flex: 1,
   },
   headerAvatar: {
@@ -409,12 +412,12 @@ const styles = StyleSheet.create({
   },
   messagesContent: {
     paddingVertical: 16,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   emptyWrap: {
     alignItems: "center",
     paddingVertical: 40,
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   emptyTitle: {
     fontSize: 16,
@@ -496,7 +499,7 @@ const styles = StyleSheet.create({
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 10,
+    gap: SPACING_LIST,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: BORDER,
