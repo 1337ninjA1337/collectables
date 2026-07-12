@@ -20,6 +20,7 @@ import {
   PLACEHOLDER,
   PURE_WHITE,
   RADIUS_CARD,
+  SPACING_CARD,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_ON_DARK_3,
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
   hero: {
     borderRadius: 32,
     padding: 24,
-    gap: 12,
+    gap: SPACING_CARD,
   },
   eyebrow: {
     color: AMBER_LIGHT,
@@ -178,7 +179,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 28,
     padding: 20,
-    gap: 12,
+    gap: SPACING_CARD,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,

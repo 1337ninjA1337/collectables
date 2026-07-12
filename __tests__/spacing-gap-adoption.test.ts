@@ -52,6 +52,17 @@ const MIGRATED_FILES: ReadonlyArray<{
   { rel: "components/skeleton.tsx", list: true, card: true, inline: false },
   { rel: "components/premium-upsell-sheet.tsx", list: true, card: true, inline: true },
   { rel: "components/item-card.tsx", list: false, card: false, inline: true },
+  // batch 6/6 — the whole tree now greps clean for gap: 10 / 12 / 8
+  { rel: "components/reaction-bar.tsx", list: true, card: false, inline: true },
+  { rel: "components/photo-preview.tsx", list: true, card: false, inline: false },
+  { rel: "components/login-screen.tsx", list: false, card: true, inline: false },
+  { rel: "components/sold-listing-prompt.tsx", list: false, card: true, inline: false },
+  { rel: "components/empty-state.tsx", list: false, card: true, inline: false },
+  { rel: "components/collection-card.tsx", list: false, card: true, inline: true },
+  { rel: "components/bottom-nav.tsx", list: false, card: true, inline: false },
+  { rel: "components/swipe-tabs.tsx", list: false, card: false, inline: true },
+  { rel: "components/currency-input.tsx", list: false, card: false, inline: true },
+  { rel: "lib/toast-context.tsx", list: false, card: false, inline: true },
 ];
 
 const TOKEN_BY_GAP = [

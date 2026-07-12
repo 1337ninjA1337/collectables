@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { BORDER, CARD_BG, HERO_DARK, MUTED, MUTED_2, RADIUS_PILL, TEXT_ON_DARK } from "@/lib/design-tokens";
+import { BORDER, CARD_BG, HERO_DARK, MUTED, MUTED_2, RADIUS_PILL, SPACING_INLINE, SPACING_LIST, TEXT_ON_DARK } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { REACTION_EMOJIS, useReactions } from "@/lib/use-reactions";
 import { ReactionTargetType } from "@/lib/types";
@@ -47,7 +47,7 @@ export function ReactionBar({ targetType, targetId }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    gap: 10,
+    gap: SPACING_LIST,
   },
   label: {
     color: MUTED,
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   chip: {
     flexDirection: "row",

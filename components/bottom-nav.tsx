@@ -18,6 +18,7 @@ import {
   HERO_DARK,
   MUTED_3,
   RADIUS_CARD,
+  SPACING_CARD,
   TEXT_DARK_2,
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
@@ -306,7 +307,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     padding: 22,
     paddingBottom: 32,
-    gap: 12,
+    gap: SPACING_CARD,
   },
   modalPrimaryButton: {
     borderRadius: RADIUS_CARD,
