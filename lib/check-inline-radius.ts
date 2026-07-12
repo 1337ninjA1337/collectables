@@ -2,12 +2,13 @@ import { stripComments } from "@/lib/env-inlining";
 
 /**
  * Inline-radius scanner behind `scripts/check-inline-radius.ts` (`npm run
- * lint:radius`): flags any `borderRadius: 999` literal in `app/**` /
- * `components/**`. The RADIUS_PILL migration (batches 1-5, 2026-07-12)
- * routed all 71 occurrences through `RADIUS_PILL` from
- * `lib/design-tokens.ts`; this guard keeps the tree clean the same way
- * `lint:hex` guards the color palette. `lib/design-tokens.ts` itself is the
- * only file allowed to carry the literal and is outside the scan roots.
+ * lint:radius`): flags inline radius literals in `app/**` / `components/**`
+ * that have a design token. The RADIUS_PILL migration (batches 1-5) and the
+ * RADIUS_CARD migration (batches A-D, both 2026-07-12) routed every
+ * occurrence through `lib/design-tokens.ts`; this guard keeps the tree
+ * clean the same way `lint:hex` guards the color palette.
+ * `lib/design-tokens.ts` itself is the only file allowed to carry the
+ * literals and is outside the scan roots.
  *
  * Pure module: no filesystem access — the CLI walks the directories and
  * hands sources over, so the matcher is unit-testable under node --test.
@@ -16,23 +17,32 @@ import { stripComments } from "@/lib/env-inlining";
  */
 
 /**
- * Matches an inline pill-radius literal in both StyleSheet and JSX-inline
- * shapes (`borderRadius: 999`). The word boundary keeps 9990-style values
- * (none exist today) from matching by accident.
+ * The guarded literals and the token each must route through. Word
+ * boundaries keep 9990/220/247-style values from matching by accident.
+ * Extend this table as further radius anchors gain tokens.
  */
-export const INLINE_RADIUS_PATTERN = /borderRadius:\s*999\b/g;
+export const RADIUS_RULES: ReadonlyArray<{
+  pattern: RegExp;
+  token: string;
+}> = [
+  { pattern: /borderRadius:\s*999\b/g, token: "RADIUS_PILL" },
+  { pattern: /borderRadius:\s*22\b/g, token: "RADIUS_CARD" },
+  { pattern: /borderRadius:\s*24\b/g, token: "RADIUS_CARD_LG" },
+];
 
 export type RadiusMatch = {
   file: string;
   line: number;
   /** The offending source line, trimmed, for the report. */
   snippet: string;
+  /** The design token the literal must route through. */
+  token: string;
 };
 
 /**
- * Scan one source string for inline pill-radius literals. Comments are
- * ignored; string literals are left intact (a `"borderRadius: 999"` string
- * would still flag, which is fine — no legitimate one exists).
+ * Scan one source string for inline radius literals. Comments are ignored;
+ * string literals are left intact (a `"borderRadius: 999"` string would
+ * still flag, which is fine — no legitimate one exists).
  */
 export function findInlineRadiusLiterals(
   file: string,
@@ -40,21 +50,27 @@ export function findInlineRadiusLiterals(
 ): RadiusMatch[] {
   const matches: RadiusMatch[] = [];
   const stripped = stripComments(source);
-  const re = new RegExp(INLINE_RADIUS_PATTERN.source, "g");
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(stripped)) !== null) {
-    const before = stripped.slice(0, m.index);
-    const line = before.split("\n").length;
-    const lineStart = before.lastIndexOf("\n") + 1;
-    const lineEnd = source.indexOf("\n", m.index);
-    matches.push({
-      file,
-      line,
-      snippet: source
-        .slice(lineStart, lineEnd === -1 ? undefined : lineEnd)
-        .trim(),
-    });
+  for (const rule of RADIUS_RULES) {
+    const re = new RegExp(rule.pattern.source, "g");
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(stripped)) !== null) {
+      const before = stripped.slice(0, m.index);
+      const line = before.split("\n").length;
+      const lineStart = before.lastIndexOf("\n") + 1;
+      const lineEnd = source.indexOf("\n", m.index);
+      matches.push({
+        file,
+        line,
+        snippet: source
+          .slice(lineStart, lineEnd === -1 ? undefined : lineEnd)
+          .trim(),
+        token: rule.token,
+      });
+    }
   }
+  matches.sort((a, b) =>
+    a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1,
+  );
   return matches;
 }
 
@@ -66,14 +82,14 @@ export function formatRadiusReport(matches: RadiusMatch[]): string {
   if (matches.length === 0) return "";
   const lines: string[] = [];
   lines.push(
-    `Found ${matches.length} inline pill-radius literal(s) in app/** or components/**.`,
+    `Found ${matches.length} inline radius literal(s) in app/** or components/**.`,
   );
   lines.push(
-    "Use RADIUS_PILL from lib/design-tokens.ts instead (see the RADIUS_PILL migration in .tasks/.tasks.md).",
+    "Use the named token from lib/design-tokens.ts instead (see the RADIUS_PILL / RADIUS_CARD migrations in .tasks/.tasks.md).",
   );
   for (const m of matches) {
     lines.push("");
-    lines.push(`  ${m.file}:${m.line}`);
+    lines.push(`  ${m.file}:${m.line}  → use ${m.token}`);
     lines.push(`    ${m.snippet}`);
   }
   return lines.join("\n");

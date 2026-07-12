@@ -29,11 +29,28 @@ describe("findInlineRadiusLiterals — matcher", () => {
     }
   });
 
-  it("does not flag token usage, other radii, or 999-prefixed values", () => {
+  it("flags card radii and names the right token per literal", () => {
+    const table = [
+      { src: "card: { borderRadius: 22 },", token: "RADIUS_CARD" },
+      { src: "sheet: { borderRadius: 24 },", token: "RADIUS_CARD_LG" },
+      { src: "chip: { borderRadius: 999 },", token: "RADIUS_PILL" },
+    ];
+    for (const { src, token } of table) {
+      const matches = findInlineRadiusLiterals("app/x.tsx", src);
+      assert.equal(matches.length, 1, `must flag: ${src}`);
+      assert.equal(matches[0].token, token);
+    }
+  });
+
+  it("does not flag token usage, unguarded radii, or prefixed values", () => {
     const clean = [
       "chip: { borderRadius: RADIUS_PILL },",
-      "card: { borderRadius: 22 },",
+      "card: { borderRadius: RADIUS_CARD },",
+      "sheet: { borderRadius: RADIUS_CARD_LG },",
+      "airy: { borderRadius: 32 },",
       "weird: { borderRadius: 9990 },",
+      "wide: { borderRadius: 220 },",
+      "wider: { borderRadius: 247 },",
       "const height = 999;",
     ];
     for (const src of clean) {
@@ -45,10 +62,22 @@ describe("findInlineRadiusLiterals — matcher", () => {
     }
   });
 
+  it("sorts multi-rule findings by file position, not rule order", () => {
+    const src = "a: { borderRadius: 22 },\nb: { borderRadius: 999 },";
+    const matches = findInlineRadiusLiterals("app/x.tsx", src);
+    assert.deepEqual(
+      matches.map((m) => [m.line, m.token]),
+      [
+        [1, "RADIUS_CARD"],
+        [2, "RADIUS_PILL"],
+      ],
+    );
+  });
+
   it("ignores commented-out literals but reports real ones with line numbers", () => {
     const src = [
       "// borderRadius: 999 used to live here",
-      "/* borderRadius: 999 */",
+      "/* borderRadius: 22 */",
       "chip: {",
       "  borderRadius: 999,",
       "},",
@@ -59,12 +88,17 @@ describe("findInlineRadiusLiterals — matcher", () => {
     assert.equal(matches[0].snippet, "borderRadius: 999,");
   });
 
-  it("formats a report naming file:line and stays empty when clean", () => {
+  it("formats a report naming file:line + token and stays empty when clean", () => {
     const report = formatRadiusReport([
-      { file: "app/settings.tsx", line: 7, snippet: "borderRadius: 999," },
+      {
+        file: "app/settings.tsx",
+        line: 7,
+        snippet: "borderRadius: 999,",
+        token: "RADIUS_PILL",
+      },
     ]);
     assert.match(report, /app\/settings\.tsx:7/);
-    assert.match(report, /RADIUS_PILL/);
+    assert.match(report, /use RADIUS_PILL/);
     assert.equal(formatRadiusReport([]), "");
   });
 });
