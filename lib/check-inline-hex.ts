@@ -7,8 +7,10 @@
  *
  * The check enforces the design-tokens convention shipped across the
  * Low-density design-tokens migration (lines 122-148 of .tasks/.tasks.md):
- * every 6-digit hex literal in `app/**.tsx` and `components/**.tsx` must
- * route through a named export from `lib/design-tokens.ts`. The 3-digit
+ * every 6-digit hex literal in `app/**`, `components/**` and `lib/**`
+ * (`.ts` and `.tsx` alike) must route through a named export from
+ * `lib/design-tokens.ts`, except the exact paths in `HEX_ALLOWLIST` that
+ * legitimately produce color values. The 3-digit
  * `#fff` shorthand (deliberately preserved per the migration call-outs for
  * pure-white badge text) and `rgba(...)` alpha overlays (pending the
  * `OVERLAY_*` family) are not caught by the 6-digit regex by design.
@@ -16,6 +18,35 @@
 
 /** Regex matching a 6-digit hex literal (case-insensitive, no word boundary). */
 export const INLINE_HEX_PATTERN = /#[0-9a-fA-F]{6}/g;
+
+/**
+ * Exact repo-relative paths allowed to carry 6-digit hex literals. The scan
+ * covers `.ts` as well as `.tsx` (and `lib/` as well as `app/`/`components/`),
+ * so the modules that legitimately produce or hard-code color values need an
+ * explicit, documented exemption — anything NOT listed here fails the lint.
+ *
+ * - `lib/design-tokens.ts` — the palette source of truth itself.
+ * - `lib/placeholder-color.ts` — derives a deterministic warm-palette color
+ *   from an item id; the 12-entry PALETTE is the feature.
+ * - `lib/privacy-page.ts` — renders the standalone /privacy HTML page whose
+ *   inline CSS cannot import design tokens (CSP `default-src 'none'`).
+ * - `lib/export-pdf.ts` — builds the print-HTML template for PDF export;
+ *   same standalone-document reasoning as the privacy page.
+ * - `lib/toast-context.tsx` — the 13-hex toast palette; queued for its own
+ *   design-tokens migration (see .tasks/.suggestions.md), exempt until then.
+ */
+export const HEX_ALLOWLIST: ReadonlySet<string> = new Set([
+  "lib/design-tokens.ts",
+  "lib/placeholder-color.ts",
+  "lib/privacy-page.ts",
+  "lib/export-pdf.ts",
+  "lib/toast-context.tsx",
+]);
+
+/** True when the repo-relative path is exempt from the inline-hex scan. */
+export function isHexAllowlisted(file: string): boolean {
+  return HEX_ALLOWLIST.has(file);
+}
 
 export type HexMatch = {
   file: string;
@@ -30,6 +61,7 @@ export type HexMatch = {
  */
 export function findInlineHexLiterals(file: string, source: string): HexMatch[] {
   const matches: HexMatch[] = [];
+  if (isHexAllowlisted(file)) return matches;
   const lines = source.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -62,7 +94,7 @@ export function formatHexReport(matches: HexMatch[]): string {
   }
   const lines: string[] = [];
   lines.push(
-    `Found ${matches.length} inline hex literal(s) in app/** or components/**.`,
+    `Found ${matches.length} inline hex literal(s) in app/**, components/** or lib/**.`,
   );
   lines.push(
     "Route each through a named export from lib/design-tokens.ts (see .tasks/.tasks.md ‘Low-density design-tokens migration’).",
