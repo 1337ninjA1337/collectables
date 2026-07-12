@@ -32,6 +32,7 @@ import {
   RADIUS_CARD_AIRY,
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
+  RADIUS_PILL,
   SHADOW_SOFT,
   SPACING_GUTTER,
   TEXT_DARK,
@@ -450,7 +451,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   settingsButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: MUTED_18,
     paddingHorizontal: 16,
@@ -463,7 +464,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_BOLD,
   },
   signOutButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: MUTED_18,
     paddingHorizontal: 16,
@@ -495,7 +496,7 @@ const styles = StyleSheet.create({
     backgroundColor: AMBER_ACCENT,
     paddingHorizontal: 18,
     paddingVertical: 14,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
   },
   ctaText: {
     color: TEXT_DARK_2,
@@ -505,7 +506,7 @@ const styles = StyleSheet.create({
   },
   secondaryCta: {
     alignSelf: "flex-start",
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: CARD_BG_9,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
@@ -520,7 +521,7 @@ const styles = StyleSheet.create({
   },
   peopleCta: {
     alignSelf: "flex-start",
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: "rgba(255, 244, 229, 0.12)",
     borderWidth: 1,
     borderColor: MUTED_18,
@@ -563,7 +564,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   inlineAction: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },

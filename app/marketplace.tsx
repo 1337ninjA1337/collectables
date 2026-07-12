@@ -18,6 +18,7 @@ import {
   PAGE_BG,
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
+  RADIUS_PILL,
   SHADOW_SOFT,
   SUCCESS_GREEN,
   TEXT_DARK,
@@ -376,7 +377,7 @@ const styles = StyleSheet.create({
   modeBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
   },
   modeBadgeText: {
     color: TEXT_ON_DARK,
@@ -396,7 +397,7 @@ const styles = StyleSheet.create({
     right: 10,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: SUCCESS_GREEN,
   },
   transferredBadgeText: {
@@ -410,7 +411,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: AMBER_MUTED_3,
     borderWidth: 1,
     borderColor: BORDER,
@@ -426,7 +427,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: SUCCESS_GREEN,
   },
   deliveryConfirmedPillText: {
@@ -465,7 +466,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: SUCCESS_GREEN,
   },
   receivedBadgeText: {
