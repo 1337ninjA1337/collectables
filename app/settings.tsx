@@ -34,6 +34,7 @@ import {
   MUTED_11,
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
+  RADIUS_PILL,
   SHADOW_SOFT,
   STATUS_ONLINE,
   TEXT_DARK_2,
@@ -418,7 +419,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   languageChip: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: CARD_BG_3,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
@@ -532,7 +533,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     marginTop: 4,
   },
   diagnosticsToggleOn: {
@@ -548,7 +549,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   signOutButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: DANGER_SOFT_2,
     backgroundColor: CARD_BG_10,
@@ -586,7 +587,7 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     alignSelf: "flex-start",
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: DANGER_DEEP_2,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -633,7 +634,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   premiumBadge: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: AMBER_ACCENT,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -690,7 +691,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   premiumActivateButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: AMBER_ACCENT,
     paddingVertical: 14,
     alignItems: "center",
@@ -703,7 +704,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   premiumCancelButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: "transparent",
     borderWidth: 1,
     borderColor: AMBER_SOFT,
@@ -744,7 +745,7 @@ const styles = StyleSheet.create({
   },
   premiumSkeletonButton: {
     height: 44,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: BORDER_5,
     marginTop: 8,
   },

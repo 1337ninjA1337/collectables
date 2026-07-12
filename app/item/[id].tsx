@@ -55,6 +55,7 @@ import {
   MUTED_10,
   PLACEHOLDER,
   RADIUS_ITEM_AIRY,
+  RADIUS_PILL,
   SHADOW_SOFT,
   SPACING_GUTTER,
   SUCCESS_GREEN,
@@ -901,7 +902,7 @@ const styles = StyleSheet.create({
   },
   shareCopyButton: {
     flex: 1,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: HERO_DARK,
     paddingVertical: 14,
     alignItems: "center",
@@ -920,7 +921,7 @@ const styles = StyleSheet.create({
   },
   shareNativeButton: {
     flex: 1,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: AMBER_ACCENT,
     paddingVertical: 14,
     alignItems: "center",
@@ -932,7 +933,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   shareCancelButton: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
     paddingVertical: 14,
@@ -983,7 +984,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tagBadge: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingVertical: 5,
     paddingHorizontal: 12,
   },
@@ -994,7 +995,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_BOLD,
   },
   conditionBadge: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingVertical: 6,
     paddingHorizontal: 14,
     backgroundColor: HERO_DARK,
@@ -1059,7 +1060,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   conditionChip: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingVertical: 10,
     paddingHorizontal: 18,
     backgroundColor: CARD_BG,
@@ -1083,7 +1084,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
@@ -1195,7 +1196,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_SEMIBOLD,
   },
   listingStatusBadge: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: SUCCESS_GREEN,
     paddingHorizontal: 14,
     paddingVertical: 8,
