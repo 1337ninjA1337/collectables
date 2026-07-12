@@ -33,15 +33,26 @@ describe("app/chat/[id].tsx — chat_opened wiring", () => {
     );
   });
 
-  it("debounces via setTimeout + cleanup so quick in/out doesn't double-count", () => {
-    // Find the useEffect block that wraps trackEvent.
+  it("debounces via the shared useDwellTimeEffect gate so quick in/out doesn't double-count", () => {
+    assert.match(
+      src,
+      /import\s*\{[^}]*\buseDwellTimeEffect\b[^}]*\}\s*from\s*["']@\/lib\/use-dwell-time["']/,
+      "chat screen must import the shared dwell-time hook",
+    );
+    // Find the dwell block that wraps trackEvent — the setTimeout/clearTimeout
+    // debounce now lives inside useDwellTimeEffect (tested in
+    // use-dwell-time.test.ts), so the screen just declares the gate.
     const trackIdx = src.indexOf("trackEvent(\"chat_opened\"");
     const window = src.slice(Math.max(0, trackIdx - 400), trackIdx + 200);
-    assert.match(window, /setTimeout\(/, "chat_opened must be wrapped in setTimeout for debounce");
     assert.match(
       window,
-      /clearTimeout\(/,
-      "the debounce useEffect must clean up its timer in the cleanup function",
+      /useDwellTimeEffect\(\s*\[chatId,\s*otherUserId\]\s*,\s*DWELL_TIME_DEFAULT_MS\s*,/,
+      "chat_opened must fire through useDwellTimeEffect keyed on the conversation identity",
+    );
+    assert.doesNotMatch(
+      window,
+      /setTimeout\(/,
+      "no hand-rolled setTimeout debounce — the dwell gate is centralised in lib/use-dwell-time.ts",
     );
   });
 

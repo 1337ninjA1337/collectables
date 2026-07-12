@@ -76,6 +76,11 @@ export const ANALYTICS_EVENTS = {
       "Fired from `app/listing/[id].tsx` after the buy/trade flow completes. `sellerWasFriend` measures the social-graph contribution to marketplace velocity; `sellerRelationship` is the finer friend/following/stranger bucket (`relationshipForAnalytics`) so reports can slice friend trades from stranger sales.",
     props: ["mode", "sellerWasFriend", "sellerRelationship"],
   },
+  listing_view: {
+    description:
+      "Fired from `app/listing/[id].tsx` after a dwell-time gate (`useDwellTimeEffect`) when a user views someone else's listing — pagination scroll-pasts and navigation flickers never count. The denominator for `listing_claimed`'s view-to-buy conversion; `sellerRelationship` slices conversion by social proximity, `isSold` separates browsing the active feed from viewing sold history.",
+    props: ["mode", "sellerRelationship", "isSold"],
+  },
   chat_opened: {
     description:
       "Fired from `app/chat/[id].tsx` `useEffect`, debounced so navigating in/out doesn't double-count. `withFriend` distinguishes mutual-follow chats.",

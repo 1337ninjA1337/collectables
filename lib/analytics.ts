@@ -28,6 +28,7 @@ export type AnalyticsEventName =
   | "listing_dropped"
   | "listing_price_invalid"
   | "listing_claimed"
+  | "listing_view"
   | "chat_opened"
   | "friend_requested"
   | "premium_activated"
