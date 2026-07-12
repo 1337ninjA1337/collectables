@@ -27,6 +27,8 @@ import {
   HERO_DARK_7,
   MUTED,
   MUTED_3,
+  RADIUS_CARD,
+  RADIUS_CARD_LG,
   RADIUS_PILL,
   SUCCESS_GREEN,
   TEXT_DARK,
@@ -447,11 +449,11 @@ const styles = StyleSheet.create({
   photo: {
     width: "100%",
     height: 280,
-    borderRadius: 24,
+    borderRadius: RADIUS_CARD_LG,
     backgroundColor: AMBER_MUTED_3,
   },
   headerCard: {
-    borderRadius: 24,
+    borderRadius: RADIUS_CARD_LG,
     padding: 18,
     backgroundColor: HERO_DARK_7,
     gap: 10,
@@ -493,7 +495,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 14,
     padding: 14,
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
@@ -546,7 +548,7 @@ const styles = StyleSheet.create({
     backgroundColor: AMBER_MUTED_4,
   },
   sheet: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     padding: 16,
     backgroundColor: CARD_BG,
     borderWidth: 1,
@@ -569,7 +571,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   claimButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     paddingVertical: 16,
     alignItems: "center",
   },
@@ -581,7 +583,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   messageButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: HERO_DARK,
     paddingVertical: 16,
     alignItems: "center",
@@ -592,7 +594,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   soldBanner: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     padding: 14,
     backgroundColor: HERO_DARK_3,
     gap: 4,
@@ -625,7 +627,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   receiveButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     paddingVertical: 16,
     alignItems: "center",
     backgroundColor: AMBER_ACCENT,
@@ -638,7 +640,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   receivedBanner: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     padding: 14,
     backgroundColor: SUCCESS_GREEN,
     alignItems: "center",
@@ -651,7 +653,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   selfHint: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     padding: 16,
     backgroundColor: CARD_BG_3,
     borderWidth: 1,
