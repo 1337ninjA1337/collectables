@@ -31,6 +31,7 @@ import {
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_ON_DARK_3,
   TEXT_ON_DARK_4,
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
     backgroundColor: HERO_DARK,
     borderRadius: RADIUS_HERO_LG,
     padding: 24,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   eyebrow: {
     color: AMBER_LIGHT,
@@ -294,7 +295,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
     padding: 18,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   searchLabel: {
     color: MUTED_10,
@@ -356,7 +357,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   primaryAction: {
     borderRadius: RADIUS_PILL,

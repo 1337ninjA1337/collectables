@@ -28,6 +28,8 @@ import {
   RADIUS_CARD,
   RADIUS_CARD_LG,
   RADIUS_PILL,
+  SPACING_INLINE,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_DARK_4,
@@ -284,7 +286,7 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_BG_5,
     borderRadius: 28,
     padding: 20,
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   heroTitle: {
     fontSize: 28,
@@ -304,7 +306,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   templateRow: {
-    gap: 10,
+    gap: SPACING_LIST,
     paddingVertical: 4,
   },
   templateCard: {
@@ -336,7 +338,7 @@ const styles = StyleSheet.create({
     color: HERO_DARK,
   },
   fieldGroup: {
-    gap: 10,
+    gap: SPACING_LIST,
   },
   label: {
     color: MUTED_10,
@@ -394,7 +396,7 @@ const styles = StyleSheet.create({
   },
   visibilityRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   visibilityChip: {
     borderRadius: RADIUS_PILL,

@@ -14,6 +14,8 @@ import {
   MUTED_2,
   MUTED_5,
   RADIUS_CARD_LG,
+  SPACING_INLINE,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_DARK_3,
   TEXT_ON_DARK,
@@ -116,7 +118,7 @@ const styles = StyleSheet.create({
     backgroundColor: HERO_DARK,
     borderRadius: 28,
     padding: 20,
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   heroTitle: {
     fontSize: 28,
@@ -131,7 +133,7 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   summaryCard: {
     flex: 1,

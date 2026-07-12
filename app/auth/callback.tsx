@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import { Screen } from "@/components/screen";
 import { scrubAuthParamsFromLocation } from "@/lib/auth-callback-scrub";
 import { useAuth } from "@/lib/auth-context";
-import { ACCENT_DEEP, HERO_DARK, MUTED_9, RADIUS_CARD, TEXT_DARK, TEXT_ON_DARK_2 } from "@/lib/design-tokens";
+import { ACCENT_DEEP, HERO_DARK, MUTED_9, RADIUS_CARD, SPACING_CARD, TEXT_DARK, TEXT_ON_DARK_2 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { authClient } from "@/lib/supabase";
 
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
+    gap: SPACING_CARD,
   },
   title: {
     color: TEXT_DARK,

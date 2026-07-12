@@ -31,6 +31,7 @@ import {
   RADIUS_CARD,
   RADIUS_CARD_LG,
   RADIUS_PILL,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_ON_DARK_3,
   TEXT_ON_DARK_4,
@@ -234,7 +235,7 @@ const styles = StyleSheet.create({
     backgroundColor: HERO_DARK,
     borderRadius: 32,
     padding: 24,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   tabPanel: {
     gap: 14,
@@ -360,7 +361,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   primaryAction: {
     borderRadius: RADIUS_PILL,

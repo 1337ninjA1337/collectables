@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { SwipeTabs } from "@/components/swipe-tabs";
 import { useCollections } from "@/lib/collections-context";
-import { AMBER_LIGHT, HERO_DARK, TEXT_ON_DARK_3, TEXT_ON_DARK_SOFT } from "@/lib/design-tokens";
+import { AMBER_LIGHT, HERO_DARK, SPACING_LIST, TEXT_ON_DARK_3, TEXT_ON_DARK_SOFT } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { fetchItemsByCollectionId } from "@/lib/supabase-profiles";
 import { Collection } from "@/lib/types";
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     backgroundColor: HERO_DARK,
     borderRadius: 32,
     padding: 24,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   eyebrow: {
     color: AMBER_LIGHT,

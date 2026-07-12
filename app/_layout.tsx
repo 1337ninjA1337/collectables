@@ -31,6 +31,8 @@ import {
   MUTED_9,
   PAGE_BG_2,
   RADIUS_PILL,
+  SPACING_CARD,
+  SPACING_INLINE,
   STATUS_OFFLINE,
   STATUS_ONLINE,
   TEXT_DARK,
@@ -294,7 +296,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
+    gap: SPACING_CARD,
   },
   loadingText: {
     color: MUTED_9,
@@ -302,7 +304,7 @@ const styles = StyleSheet.create({
   },
   headerRightRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: SPACING_INLINE,
     marginRight: 20,
     alignItems: "center",
   },

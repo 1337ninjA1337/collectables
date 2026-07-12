@@ -37,6 +37,14 @@ const MIGRATED_FILES: ReadonlyArray<{
   { rel: "app/chat/[id].tsx", list: true, card: true, inline: true },
   { rel: "app/chats.tsx", list: true, card: false, inline: true },
   { rel: "app/marketplace.tsx", list: true, card: true, inline: true },
+  // batch 4/6 — app/ now greps clean for gap: 10 / 12 / 8
+  { rel: "app/create-collection.tsx", list: true, card: false, inline: true },
+  { rel: "app/people.tsx", list: true, card: false, inline: false },
+  { rel: "app/friends.tsx", list: true, card: false, inline: false },
+  { rel: "app/stats.tsx", list: true, card: false, inline: true },
+  { rel: "app/collections-feed.tsx", list: true, card: false, inline: false },
+  { rel: "app/auth/callback.tsx", list: false, card: true, inline: false },
+  { rel: "app/_layout.tsx", list: false, card: true, inline: true },
 ];
 
 const TOKEN_BY_GAP = [
