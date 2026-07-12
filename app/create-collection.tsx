@@ -25,6 +25,8 @@ import {
   MUTED_10,
   MUTED_17,
   PLACEHOLDER,
+  RADIUS_CARD,
+  RADIUS_CARD_LG,
   RADIUS_PILL,
   TEXT_DARK,
   TEXT_DARK_2,
@@ -345,7 +347,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   input: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
@@ -382,7 +384,7 @@ const styles = StyleSheet.create({
   previewImage: {
     width: "100%",
     height: 220,
-    borderRadius: 24,
+    borderRadius: RADIUS_CARD_LG,
     backgroundColor: AMBER_MUTED_2,
   },
   photoHint: {
@@ -425,7 +427,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   saveButton: {
-    borderRadius: 24,
+    borderRadius: RADIUS_CARD_LG,
     paddingVertical: 18,
     alignItems: "center",
     backgroundColor: HERO_DARK,

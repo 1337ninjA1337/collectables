@@ -27,6 +27,7 @@ import {
   PLACEHOLDER,
   PURE_WHITE,
   RADIUS_HERO_LG,
+  RADIUS_CARD_LG,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
@@ -329,7 +330,7 @@ const styles = StyleSheet.create({
   avatar: {
     width: 76,
     height: 76,
-    borderRadius: 24,
+    borderRadius: RADIUS_CARD_LG,
     backgroundColor: AMBER_MUTED,
   },
   profileMeta: {

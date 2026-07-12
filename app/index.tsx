@@ -29,7 +29,9 @@ import {
   MUTED_2,
   MUTED_18,
   RADIUS_AVATAR,
+  RADIUS_CARD,
   RADIUS_CARD_AIRY,
+  RADIUS_CARD_LG,
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
@@ -597,7 +599,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   personCard: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
@@ -616,7 +618,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_BOLD,
   },
   emptyCard: {
-    borderRadius: 24,
+    borderRadius: RADIUS_CARD_LG,
     backgroundColor: CARD_BG,
     borderWidth: 1,
     borderColor: BORDER,
@@ -684,7 +686,7 @@ const styles = StyleSheet.create({
   wishlistBannerIcon: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: AMBER_ACCENT,
     alignItems: "center",
     justifyContent: "center",
@@ -721,7 +723,7 @@ const styles = StyleSheet.create({
   statsBannerIcon: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: HERO_DARK,
     alignItems: "center",
     justifyContent: "center",
