@@ -31,6 +31,7 @@ import {
   MUTED_15,
   PAGE_BG_2,
   PLACEHOLDER,
+  RADIUS_PILL,
   TEXT_DARK,
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_5,
@@ -455,7 +456,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   filterChip: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingHorizontal: 14,
     paddingVertical: 8,
     backgroundColor: CARD_BG_3,
@@ -480,7 +481,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   ownerChip: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: CARD_BG,

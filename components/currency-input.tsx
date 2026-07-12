@@ -10,6 +10,7 @@ import {
   HERO_DARK,
   MUTED_27,
   PLACEHOLDER,
+  RADIUS_PILL,
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
@@ -145,7 +146,7 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   chip: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: BORDER,
     backgroundColor: CARD_BG_2,

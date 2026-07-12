@@ -14,6 +14,7 @@ import {
   AMBER_ACCENT,
   AMBER_SOFT,
   DANGER,
+  RADIUS_PILL,
   TEXT_DARK_2,
 } from "@/lib/design-tokens";
 import { useAppTheme } from "@/components/use-app-theme";
@@ -358,7 +359,7 @@ const styles = StyleSheet.create({
     // long unbreakable label (e.g. ru "Отслеживаемые") can't push the row
     // past the screen edge. Pairs with numberOfLines/adjustsFontSizeToFit.
     minWidth: 0,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingVertical: 14,
     paddingHorizontal: 8,
     alignItems: "center",

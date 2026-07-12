@@ -31,6 +31,17 @@ const MIGRATED_FILES = [
   "app/create.tsx",
   "app/create-collection.tsx",
   "app/chat/[id].tsx",
+  // batch 5/5 — the whole tree now greps clean for `borderRadius: 999`
+  "components/item-filters.tsx",
+  "components/search-overlay.tsx",
+  "components/item-card.tsx",
+  "components/visibility-badge.tsx",
+  "components/sync-status-pill.tsx",
+  "components/swipe-tabs.tsx",
+  "components/realtime-status-pill.tsx",
+  "components/reaction-bar.tsx",
+  "components/empty-state.tsx",
+  "components/currency-input.tsx",
 ] as const;
 
 describe("RADIUS_PILL adoption — migrated files", () => {

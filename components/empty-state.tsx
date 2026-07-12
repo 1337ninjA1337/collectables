@@ -8,6 +8,7 @@ import {
   CARD_BG_3,
   CARD_BG_14,
   RADIUS_CARD_AIRY,
+  RADIUS_PILL,
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
 import { useAppTheme } from "@/components/use-app-theme";
@@ -118,7 +119,7 @@ const styles = StyleSheet.create({
     backgroundColor: AMBER_ACCENT,
     paddingHorizontal: 22,
     paddingVertical: 12,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
   },
   actionText: {
     color: TEXT_ON_DARK_5,
