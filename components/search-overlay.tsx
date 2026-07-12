@@ -34,6 +34,9 @@ import {
   RADIUS_CARD,
   RADIUS_CARD_LG,
   RADIUS_PILL,
+  SPACING_CARD,
+  SPACING_INLINE,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_5,
@@ -422,7 +425,7 @@ const styles = StyleSheet.create({
     maxWidth: 600,
     width: "100%",
     alignSelf: "center",
-    gap: 10,
+    gap: SPACING_LIST,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
@@ -432,7 +435,7 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: SPACING_LIST,
     backgroundColor: CARD_BG_3,
     borderRadius: 16,
     paddingHorizontal: 14,
@@ -454,7 +457,7 @@ const styles = StyleSheet.create({
   },
   filtersRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: SPACING_INLINE,
     paddingVertical: 2,
   },
   filterChip: {
@@ -524,7 +527,7 @@ const styles = StyleSheet.create({
   rowContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: SPACING_CARD,
   },
   rowThumb: {
     width: 44,

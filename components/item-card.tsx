@@ -10,6 +10,7 @@ import {
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
+  SPACING_INLINE,
   TEXT_ON_DARK,
 } from "@/lib/design-tokens";
 import { useAppTheme } from "@/components/use-app-theme";
@@ -143,7 +144,7 @@ const styles = StyleSheet.create({
   textWrap: {
     flex: 1,
     justifyContent: "space-between",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   title: {
     fontSize: 19,
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   meta: {
     fontSize: 13,
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     overflow: "hidden",
-    gap: 8,
+    gap: SPACING_INLINE,
     paddingBottom: 10,
   },
   compactImage: {

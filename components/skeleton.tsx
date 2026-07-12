@@ -2,7 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import { Animated, DimensionValue, Easing, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 
-import { BORDER_2, PAGE_BG_2, TEXT_ON_DARK_SOFT } from "@/lib/design-tokens";
+import { BORDER_2, PAGE_BG_2, SPACING_CARD, SPACING_LIST, TEXT_ON_DARK_SOFT } from "@/lib/design-tokens";
 
 type SkeletonProps = {
   width?: DimensionValue;
@@ -99,7 +99,7 @@ export function SkeletonCollectionDetail() {
         <Skeleton width="95%" height={12} style={{ marginTop: 14 }} />
         <Skeleton width="85%" height={12} style={{ marginTop: 6 }} />
       </View>
-      <View style={{ gap: 12 }}>
+      <View style={{ gap: SPACING_CARD }}>
         {Array.from({ length: 3 }).map((_, i) => (
           <View key={i} style={styles.card}>
             <View style={styles.row}>
@@ -142,7 +142,7 @@ export function SkeletonProfile() {
         <Skeleton width="90%" height={12} style={{ marginTop: 14 }} />
         <Skeleton width="80%" height={12} style={{ marginTop: 6 }} />
       </View>
-      <View style={{ gap: 12 }}>
+      <View style={{ gap: SPACING_CARD }}>
         {Array.from({ length: 2 }).map((_, i) => (
           <View key={i} style={styles.card}>
             <Skeleton width="65%" height={18} />
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     backgroundColor: PAGE_BG_2,
     borderRadius: 20,
     padding: 18,
-    gap: 12,
+    gap: SPACING_CARD,
     borderWidth: 1,
     borderColor: BORDER_2,
   },
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
     marginTop: 4,
   },
 });

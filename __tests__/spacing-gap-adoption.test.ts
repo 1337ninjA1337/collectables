@@ -45,6 +45,13 @@ const MIGRATED_FILES: ReadonlyArray<{
   { rel: "app/collections-feed.tsx", list: true, card: false, inline: false },
   { rel: "app/auth/callback.tsx", list: false, card: true, inline: false },
   { rel: "app/_layout.tsx", list: false, card: true, inline: true },
+  // batch 5/6
+  { rel: "components/item-filters.tsx", list: true, card: true, inline: true },
+  { rel: "components/search-overlay.tsx", list: true, card: true, inline: true },
+  { rel: "components/currency-sheet.tsx", list: true, card: true, inline: false },
+  { rel: "components/skeleton.tsx", list: true, card: true, inline: false },
+  { rel: "components/premium-upsell-sheet.tsx", list: true, card: true, inline: true },
+  { rel: "components/item-card.tsx", list: false, card: false, inline: true },
 ];
 
 const TOKEN_BY_GAP = [

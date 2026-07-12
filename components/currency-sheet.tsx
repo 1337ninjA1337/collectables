@@ -18,6 +18,8 @@ import {
   PAGE_BG_2,
   PLACEHOLDER,
   RADIUS_CARD,
+  SPACING_CARD,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_DARK_3,
 } from "@/lib/design-tokens";
@@ -157,7 +159,7 @@ const styles = StyleSheet.create({
   sheetSearchRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: SPACING_LIST,
     backgroundColor: CARD_BG_3,
     borderRadius: 16,
     paddingHorizontal: 14,
@@ -191,7 +193,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderBottomWidth: 1,
     borderBottomColor: BORDER_3,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   sheetRowSelected: {
     backgroundColor: CARD_BG_3,
@@ -200,7 +202,7 @@ const styles = StyleSheet.create({
   currencyRowText: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: SPACING_CARD,
     flex: 1,
   },
   currencyRowCode: {
