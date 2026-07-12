@@ -91,7 +91,7 @@ describe("components/item-filters.tsx — sort chip UI", () => {
 
   it("declares sortRow + sortChip + sortChipActive + sortChipText + sortChipTextActive styles", () => {
     assert.match(src, /sortRow:\s*\{[\s\S]*?flexDirection:\s*"row"/);
-    assert.match(src, /sortChip:\s*\{[\s\S]*?borderRadius:\s*999/);
+    assert.match(src, /sortChip:\s*\{[\s\S]*?borderRadius:\s*RADIUS_PILL/);
     assert.match(src, /sortChipActive:\s*\{/);
     assert.match(src, /sortChipText:\s*\{/);
     assert.match(src, /sortChipTextActive:\s*\{/);

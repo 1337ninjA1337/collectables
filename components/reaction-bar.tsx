@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { BORDER, CARD_BG, HERO_DARK, MUTED, MUTED_2, TEXT_ON_DARK } from "@/lib/design-tokens";
+import { BORDER, CARD_BG, HERO_DARK, MUTED, MUTED_2, RADIUS_PILL, TEXT_ON_DARK } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { REACTION_EMOJIS, useReactions } from "@/lib/use-reactions";
 import { ReactionTargetType } from "@/lib/types";
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingVertical: 8,
     paddingHorizontal: 12,
     backgroundColor: CARD_BG,

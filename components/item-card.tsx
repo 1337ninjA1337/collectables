@@ -8,6 +8,7 @@ import {
   AMBER_MUTED_3,
   HERO_DARK,
   RADIUS_ITEM_AIRY,
+  RADIUS_PILL,
   SHADOW_SOFT,
   TEXT_ON_DARK,
 } from "@/lib/design-tokens";
@@ -169,7 +170,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   tagBadge: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingVertical: 2,
     paddingHorizontal: 8,
   },
@@ -180,7 +181,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_BOLD,
   },
   conditionBadge: {
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingVertical: 3,
     paddingHorizontal: 10,
     backgroundColor: HERO_DARK,

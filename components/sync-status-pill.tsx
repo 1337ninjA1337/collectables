@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { useChat } from "@/lib/chat-context";
 import { useCollections } from "@/lib/collections-context";
-import { AMBER_SOFT, AMBER_SOFT_4, MUTED_25 } from "@/lib/design-tokens";
+import { AMBER_SOFT, AMBER_SOFT_4, MUTED_25, RADIUS_PILL } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: AMBER_SOFT_4,
     borderWidth: 1,
     borderColor: AMBER_SOFT,

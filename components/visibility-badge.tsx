@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
-import { ACCENT_DEEP_2, MUTED_2, SUCCESS_GREEN_2, TEXT_ON_DARK } from "@/lib/design-tokens";
+import { ACCENT_DEEP_2, MUTED_2, RADIUS_PILL, SUCCESS_GREEN_2, TEXT_ON_DARK } from "@/lib/design-tokens";
 import { useAppTheme } from "@/components/use-app-theme";
 import { useI18n } from "@/lib/i18n-context";
 import { Collection } from "@/lib/types";
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
