@@ -73,7 +73,10 @@ import {
   RADIUS_PILL,
   SHADOW_SOFT,
   SPACING_AIRY,
+  SPACING_CARD,
   SPACING_GUTTER,
+  SPACING_INLINE,
+  SPACING_LIST,
   SUCCESS_GREEN_2,
   TEXT_DARK,
   TEXT_DARK_2,
@@ -1128,7 +1131,7 @@ const styles = StyleSheet.create({
   },
   heroContent: {
     padding: SPACING_GUTTER,
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   heroTitle: {
     color: PURE_WHITE,
@@ -1150,7 +1153,7 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: SPACING_CARD,
   },
   summaryCard: {
     flex: 1,
@@ -1176,7 +1179,7 @@ const styles = StyleSheet.create({
     gap: SPACING_AIRY,
   },
   draggableList: {
-    gap: 12,
+    gap: SPACING_CARD,
   },
   loadMore: {
     borderRadius: RADIUS_CARD,
@@ -1195,7 +1198,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_BOLD,
   },
   ownerActions: {
-    gap: 12,
+    gap: SPACING_CARD,
   },
   exportButton: {
     borderRadius: RADIUS_CARD,
@@ -1242,7 +1245,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 28,
-    gap: 12,
+    gap: SPACING_CARD,
   },
   shareHandle: {
     alignSelf: "center",
@@ -1278,7 +1281,7 @@ const styles = StyleSheet.create({
   },
   shareActions: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   shareCopyButton: {
     flex: 1,
@@ -1397,13 +1400,13 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   selectList: {
-    gap: 12,
+    gap: SPACING_CARD,
   },
   masonryList: {
-    gap: 10,
+    gap: SPACING_LIST,
   },
   masonryRow: {
-    gap: 10,
+    gap: SPACING_LIST,
   },
   masonryItem: {
     flex: 1,
@@ -1432,7 +1435,7 @@ const styles = StyleSheet.create({
   // gap that previously lived on `masonryList`. Mirrors the 10px row gap of
   // the pre-VM-D inline masonry FlatList so the visual rhythm is preserved.
   viewerFlatListContent: {
-    gap: 10,
+    gap: SPACING_LIST,
   },
   bulkBarSpacer: {
     height: 120,
@@ -1450,7 +1453,7 @@ const styles = StyleSheet.create({
     backgroundColor: HERO_DARK,
     borderRadius: RADIUS_CARD,
     padding: 14,
-    gap: 12,
+    gap: SPACING_CARD,
     shadowColor: HERO_DARK_9,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
@@ -1465,7 +1468,7 @@ const styles = StyleSheet.create({
   },
   bulkBarButtons: {
     flexDirection: "row",
-    gap: 8,
+    gap: SPACING_INLINE,
     flexWrap: "wrap",
   },
   bulkBarButton: {
@@ -1522,7 +1525,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   modalList: {
-    gap: 8,
+    gap: SPACING_INLINE,
     maxHeight: 360,
   },
   modalRow: {
@@ -1576,7 +1579,7 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
   },
   editFieldGroup: {
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   editFieldLabel: {
     color: MUTED_10,
@@ -1644,7 +1647,7 @@ const styles = StyleSheet.create({
   },
   editVisibilityRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   editVisibilityChip: {
     borderRadius: RADIUS_PILL,
@@ -1677,10 +1680,10 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   shareScrollView: {
-    gap: 12,
+    gap: SPACING_CARD,
   },
   shareFriendsSection: {
-    gap: 10,
+    gap: SPACING_LIST,
     marginTop: 4,
   },
   shareFriendsTitle: {
@@ -1706,7 +1709,7 @@ const styles = StyleSheet.create({
   shareFriendInfo: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: SPACING_LIST,
     flex: 1,
   },
   shareFriendAvatar: {

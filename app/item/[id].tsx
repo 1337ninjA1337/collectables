@@ -59,7 +59,10 @@ import {
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
+  SPACING_CARD,
   SPACING_GUTTER,
+  SPACING_INLINE,
+  SPACING_LIST,
   SUCCESS_GREEN,
   SUCCESS_GREEN_2,
   TAG_BLUE,
@@ -797,7 +800,7 @@ const styles = StyleSheet.create({
     top: 16,
     left: 16,
     flexDirection: "row",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   titleBlock: {
     gap: 6,
@@ -809,7 +812,7 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   editButton: {
     flex: 1,
@@ -864,7 +867,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 28,
-    gap: 12,
+    gap: SPACING_CARD,
   },
   shareHandle: {
     alignSelf: "center",
@@ -900,7 +903,7 @@ const styles = StyleSheet.create({
   },
   shareActions: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   shareCopyButton: {
     flex: 1,
@@ -983,7 +986,7 @@ const styles = StyleSheet.create({
   tagsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   tagBadge: {
     borderRadius: RADIUS_PILL,
@@ -1018,7 +1021,7 @@ const styles = StyleSheet.create({
     backgroundColor: BORDER_2,
     borderRadius: 28,
     padding: 20,
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   heroTitle: {
     fontSize: 28,
@@ -1027,7 +1030,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_DISPLAY,
   },
   editFieldGroup: {
-    gap: 10,
+    gap: SPACING_LIST,
   },
   editLabel: {
     color: MUTED_10,
@@ -1059,7 +1062,7 @@ const styles = StyleSheet.create({
   conditionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   conditionChip: {
     borderRadius: RADIUS_PILL,
@@ -1104,7 +1107,7 @@ const styles = StyleSheet.create({
   },
   tagInputRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   tagInput: {
     flex: 1,
@@ -1173,7 +1176,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   listingStatusGroup: {
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   listingButton: {
     borderRadius: 20,
