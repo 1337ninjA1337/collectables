@@ -26,6 +26,10 @@ const MIGRATED_FILES: ReadonlyArray<{
   // batch 1/6
   { rel: "app/collection/[id].tsx", list: true, card: true, inline: true },
   { rel: "app/item/[id].tsx", list: true, card: true, inline: true },
+  // batch 2/6
+  { rel: "app/create.tsx", list: true, card: true, inline: true },
+  { rel: "app/settings.tsx", list: true, card: true, inline: true },
+  { rel: "app/index.tsx", list: true, card: true, inline: true },
 ];
 
 const TOKEN_BY_GAP = [

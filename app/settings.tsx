@@ -36,6 +36,9 @@ import {
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
+  SPACING_CARD,
+  SPACING_INLINE,
+  SPACING_LIST,
   STATUS_ONLINE,
   TEXT_DARK_2,
   TEXT_ON_DARK,
@@ -380,7 +383,7 @@ const styles = StyleSheet.create({
   hero: {
     borderRadius: RADIUS_HERO_LG,
     padding: 24,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   eyebrow: {
     color: AMBER_LIGHT,
@@ -401,7 +404,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS_ITEM_AIRY,
     borderWidth: 1,
     padding: 18,
-    gap: 12,
+    gap: SPACING_CARD,
     ...SHADOW_SOFT,
   },
   sectionTitle: {
@@ -416,7 +419,7 @@ const styles = StyleSheet.create({
   languageRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   languageChip: {
     borderRadius: RADIUS_PILL,
@@ -478,7 +481,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: AMBER_SOFT_3,
     padding: 16,
-    gap: 8,
+    gap: SPACING_INLINE,
     marginVertical: 4,
   },
   diagnosticsTitle: {
@@ -572,7 +575,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DANGER_SOFT_3,
     padding: 18,
-    gap: 12,
+    gap: SPACING_CARD,
   },
   dangerTitle: {
     fontSize: 20,
@@ -605,7 +608,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS_ITEM_AIRY,
     borderWidth: 1,
     padding: 18,
-    gap: 12,
+    gap: SPACING_CARD,
     ...SHADOW_SOFT,
   },
   premiumCardActive: {
@@ -614,13 +617,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: AMBER_ACCENT,
     padding: 18,
-    gap: 12,
+    gap: SPACING_CARD,
   },
   premiumHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   premiumSectionTitle: {
     fontSize: 22,
@@ -664,12 +667,12 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   premiumBenefits: {
-    gap: 8,
+    gap: SPACING_INLINE,
     marginTop: 4,
   },
   premiumBenefitRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
     alignItems: "flex-start",
   },
   premiumBenefitDot: {
@@ -722,7 +725,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS_ITEM_AIRY,
     borderWidth: 1,
     padding: 18,
-    gap: 12,
+    gap: SPACING_CARD,
     minHeight: 220,
   },
   premiumSkeletonTitle: {
