@@ -105,8 +105,8 @@ describe("lib/social-context.tsx — friend_requested wiring", () => {
     );
     assert.match(
       body,
-      /if\s*\(\s*!alreadyRequested\s*\)\s*\{[\s\S]*?trackEvent/,
-      "trackEvent must be gated on !alreadyRequested so a re-tap doesn't double-fire",
+      /if\s*\(\s*!alreadyRequested\s*&&\s*!isAccept\s*\)\s*\{[\s\S]*?trackEvent/,
+      "trackEvent must be gated on !alreadyRequested (re-tap) AND !isAccept (an accept is friend_request_accepted's job, not a send)",
     );
   });
 

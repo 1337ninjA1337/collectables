@@ -91,6 +91,11 @@ export const ANALYTICS_EVENTS = {
       "Fired from the request-send action in `lib/social-context.tsx`. `targetUserId` lets us spot reciprocal-follow loops.",
     props: ["targetUserId"],
   },
+  friend_request_accepted: {
+    description:
+      "Fired from the friendRequests diff effect in `lib/social-context.tsx` when a half handshake flips to a mutual friendship — the accepted arm of the `friend_requested` funnel. `direction` says which side completed it: `accepted_by_me` (this device tapped accept) or `accepted_by_them` (our outgoing request converted remotely).",
+    props: ["targetUserId", "direction"],
+  },
   premium_activated: {
     description:
       "Fired from the premium false→true transition hook in `components/bottom-nav.tsx`. `source` carries which screen triggered the upgrade.",

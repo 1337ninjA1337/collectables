@@ -34,6 +34,7 @@ import {
   type PendingSocialQueue,
   type SocialMutation,
 } from "@/lib/pending-social";
+import { diffAcceptedFriendships } from "@/lib/social-helpers";
 import { createRateLimitedDeliver } from "@/lib/write-rate-limit";
 import { Collection, CollectableItem, ProfileRelationship, UserProfile } from "@/lib/types";
 
@@ -480,6 +481,31 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     return [...uniqueIds];
   }, [friendRequests, user]);
 
+  // Analytics: the accepted arm of the friend-request funnel. A friendship can
+  // turn mutual on either side — this device taps accept (addFriend's isAccept
+  // branch) or the counterpart accepts remotely and the realtime refetch lands
+  // — so the event derives from the friendRequests *transition*: a pending
+  // handshake in the previous snapshot that is mutual in the next one fires
+  // exactly once. The baseline resets to [] on account change, so hydration
+  // (which delivers already-mutual pairs with no pending state before them)
+  // never fires retroactively.
+  const friendRequestsBaselineRef = useRef<{ userId: string | null; requests: FriendRequest[] }>({
+    userId: null,
+    requests: [],
+  });
+  useEffect(() => {
+    const userId = user?.id ?? null;
+    const baseline = friendRequestsBaselineRef.current;
+    const previous = baseline.userId === userId ? baseline.requests : [];
+    friendRequestsBaselineRef.current = { userId, requests: friendRequests };
+    if (!userId) {
+      return;
+    }
+    for (const accepted of diffAcceptedFriendships(previous, friendRequests, userId)) {
+      trackEvent("friend_request_accepted", accepted);
+    }
+  }, [friendRequests, user]);
+
   useEffect(() => {
     if (friends.length === 0) {
       setRemoteProfiles(prev => prev.length === 0 ? prev : []);
@@ -628,7 +654,10 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
           void syncSocial({ kind: "send-request", fromUserId: user.id, toUserId: profileId });
         }
 
-        if (!alreadyRequested) {
+        // An accept is not a "send": counting it under friend_requested would
+        // inflate the funnel's sent arm — the friendRequests diff effect fires
+        // friend_request_accepted for it instead.
+        if (!alreadyRequested && !isAccept) {
           trackEvent("friend_requested", {
             targetUserId: profileId,
           });

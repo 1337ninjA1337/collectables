@@ -105,6 +105,7 @@ Power Query: select the `properties` column → **Transform** → **Parse** →
 | ----- | ------------- | ----------- |
 | `chat_opened` | `conversationId`, `withFriend` | Fired from `app/chat/[id].tsx` `useEffect`, debounced so navigating in/out doesn't double-count. `withFriend` distinguishes mutual-follow chats. |
 | `collection_created` | `visibility`, `isPremium`, `hasCover` | Fired after a successful save in `app/create-collection.tsx`. Lets us track public-vs-private adoption and whether premium users behave differently; `hasCover` flags whether a cover photo was uploaded at create time. |
+| `friend_request_accepted` | `targetUserId`, `direction` | Fired from the friendRequests diff effect in `lib/social-context.tsx` when a half handshake flips to a mutual friendship — the accepted arm of the `friend_requested` funnel. `direction` says which side completed it: `accepted_by_me` (this device tapped accept) or `accepted_by_them` (our outgoing request converted remotely). |
 | `friend_requested` | `targetUserId` | Fired from the request-send action in `lib/social-context.tsx`. `targetUserId` lets us spot reciprocal-follow loops. |
 | `item_added` | `collectionId`, `hasPhoto` | Fired after a successful save in `app/create.tsx`. Slice by `collectionId` to find the most-active collections; `hasPhoto` measures the first-photo conversion funnel. |
 | `item_photo_attached` | `itemId`, `collectionId` | Fired the first time an existing item gets a photo (post-create photo upload). Distinct from `item_added` so we can attribute photo conversions independently. |
