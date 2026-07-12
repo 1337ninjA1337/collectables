@@ -42,6 +42,7 @@ import { buildChatId } from "@/lib/chat-helpers";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { subscribeToTyping } from "@/lib/supabase-chat";
+import { DWELL_TIME_DEFAULT_MS, useDwellTimeEffect } from "@/lib/use-dwell-time";
 import { useVisibilityRefresh } from "@/lib/use-visibility-refresh";
 
 const TYPING_DEBOUNCE_MS = 1000;
@@ -99,19 +100,16 @@ export default function ChatDetailScreen() {
     if (chatId) markRead(chatId);
   }, [chatId, messages.length, markRead]);
 
-  // Fire chat_opened debounced — a 500ms dwell-time gate prevents a back/forth
-  // navigation flicker from double-counting the conversation. The cleanup
-  // clears the timer if the user leaves before the gate elapses.
-  useEffect(() => {
+  // Fire chat_opened debounced — the dwell-time gate prevents a back/forth
+  // navigation flicker from double-counting the conversation. Leaving (or
+  // switching conversations) before the gate elapses cancels the pending fire.
+  useDwellTimeEffect([chatId, otherUserId], DWELL_TIME_DEFAULT_MS, () => {
     if (!chatId) return;
-    const timer = setTimeout(() => {
-      trackEvent("chat_opened", {
-        conversationId: chatId,
-        withFriend: isFriendRelationship(getRelationship(otherUserId)),
-      });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [chatId, otherUserId, getRelationship]);
+    trackEvent("chat_opened", {
+      conversationId: chatId,
+      withFriend: isFriendRelationship(getRelationship(otherUserId)),
+    });
+  });
 
   // Belt-and-braces fallback for realtime: pull fresh messages on mount and
   // every few seconds while the chat is open, pausing when backgrounded.

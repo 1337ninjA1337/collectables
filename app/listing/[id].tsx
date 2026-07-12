@@ -40,6 +40,7 @@ import { priceHistoryForTitle } from "@/lib/marketplace-helpers";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
+import { DWELL_TIME_DEFAULT_MS, useDwellTimeEffect } from "@/lib/use-dwell-time";
 
 export default function ListingDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -79,6 +80,20 @@ export default function ListingDetailScreen() {
     if (listing.buyerUserId) ids.push(listing.buyerUserId);
     ensureProfilesLoaded(ids);
   }, [listing, ensureProfilesLoaded]);
+
+  // Fire listing_view after a dwell gate so a pagination scroll-past or a
+  // back/forth navigation flicker never counts — the view-to-buy denominator
+  // pairing listing_claimed. Own listings don't count as views.
+  useDwellTimeEffect([listing?.id, user?.id], DWELL_TIME_DEFAULT_MS, () => {
+    if (!listing || !user || listing.ownerUserId === user.id) return;
+    trackEvent("listing_view", {
+      mode: listing.mode,
+      sellerRelationship: relationshipForAnalytics(
+        getRelationship(listing.ownerUserId),
+      ),
+      isSold: listing.soldAt !== null,
+    });
+  });
 
   if (!listing) {
     if (fetchingRemote) {
