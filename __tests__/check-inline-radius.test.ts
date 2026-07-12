@@ -29,11 +29,15 @@ describe("findInlineRadiusLiterals — matcher", () => {
     }
   });
 
-  it("flags card radii and names the right token per literal", () => {
+  it("flags card radii and gaps and names the right token per literal", () => {
     const table = [
       { src: "card: { borderRadius: 22 },", token: "RADIUS_CARD" },
       { src: "sheet: { borderRadius: 24 },", token: "RADIUS_CARD_LG" },
       { src: "chip: { borderRadius: 999 },", token: "RADIUS_PILL" },
+      { src: "row: { gap: 10 },", token: "SPACING_LIST" },
+      { src: "card: { gap: 12 },", token: "SPACING_CARD" },
+      { src: "inline: { gap: 8 },", token: "SPACING_INLINE" },
+      { src: "<View style={{ gap: 12 }} />", token: "SPACING_CARD" },
     ];
     for (const { src, token } of table) {
       const matches = findInlineRadiusLiterals("app/x.tsx", src);
@@ -52,6 +56,17 @@ describe("findInlineRadiusLiterals — matcher", () => {
       "wide: { borderRadius: 220 },",
       "wider: { borderRadius: 247 },",
       "const height = 999;",
+      "row: { gap: SPACING_LIST },",
+      "card: { gap: SPACING_CARD },",
+      "inline: { gap: SPACING_INLINE },",
+      "airy: { gap: SPACING_AIRY },",
+      "unguarded: { gap: 14 },",
+      "tight: { gap: 6 },",
+      "big: { gap: 100 },",
+      "bigger: { gap: 128 },",
+      "eighty: { gap: 80 },",
+      "axis: { rowGap: 10 },",
+      "axis2: { columnGap: 12 },",
     ];
     for (const src of clean) {
       assert.equal(
@@ -63,13 +78,15 @@ describe("findInlineRadiusLiterals — matcher", () => {
   });
 
   it("sorts multi-rule findings by file position, not rule order", () => {
-    const src = "a: { borderRadius: 22 },\nb: { borderRadius: 999 },";
+    const src =
+      "a: { borderRadius: 22 },\nb: { gap: 8 },\nc: { borderRadius: 999 },";
     const matches = findInlineRadiusLiterals("app/x.tsx", src);
     assert.deepEqual(
       matches.map((m) => [m.line, m.token]),
       [
         [1, "RADIUS_CARD"],
-        [2, "RADIUS_PILL"],
+        [2, "SPACING_INLINE"],
+        [3, "RADIUS_PILL"],
       ],
     );
   });
