@@ -8,6 +8,7 @@ import {
   HERO_DARK,
   MUTED,
   PAGE_BG_2,
+  RADIUS_CARD_LG,
   TEXT_DARK,
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
@@ -100,7 +101,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 460,
     backgroundColor: PAGE_BG_2,
-    borderRadius: 24,
+    borderRadius: RADIUS_CARD_LG,
     padding: 24,
     gap: 12,
     borderWidth: 1,

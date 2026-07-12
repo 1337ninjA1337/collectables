@@ -17,6 +17,7 @@ import {
   MUTED_15,
   PAGE_BG_2,
   PLACEHOLDER,
+  RADIUS_CARD,
   TEXT_DARK,
   TEXT_DARK_3,
 } from "@/lib/design-tokens";
@@ -218,7 +219,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   sheetCloseButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: CARD_BG_3,
     borderWidth: 1,
     borderColor: AMBER_SOFT,

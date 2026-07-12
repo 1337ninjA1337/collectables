@@ -19,6 +19,7 @@ import {
   MUTED_7,
   PLACEHOLDER,
   PURE_WHITE,
+  RADIUS_CARD,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_ON_DARK_3,
@@ -194,7 +195,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   input: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: PURE_WHITE,
     borderWidth: 1,
     borderColor: BORDER,
@@ -205,7 +206,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   primaryButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: AMBER_ACCENT,
     paddingVertical: 16,
     alignItems: "center",
@@ -217,7 +218,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   secondaryButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: HERO_DARK_6,
     paddingVertical: 16,
     alignItems: "center",

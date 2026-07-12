@@ -31,6 +31,8 @@ import {
   MUTED_15,
   PAGE_BG_2,
   PLACEHOLDER,
+  RADIUS_CARD,
+  RADIUS_CARD_LG,
   RADIUS_PILL,
   TEXT_DARK,
   TEXT_ON_DARK_4,
@@ -414,7 +416,7 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: PAGE_BG_2,
-    borderRadius: 24,
+    borderRadius: RADIUS_CARD_LG,
     padding: 16,
     maxHeight: "85%",
     maxWidth: 600,
@@ -543,7 +545,7 @@ const styles = StyleSheet.create({
   rowAvatar: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: AMBER_MUTED,
   },
   rowAvatarEmpty: {
