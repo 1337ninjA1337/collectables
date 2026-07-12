@@ -80,7 +80,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const pathname = usePathname();
   const { getMyProfile, incomingRequestUserIds } = useSocial();
   const { unreadTotal } = useChat();
-  const { isPremium } = usePremium();
+  const { isPremium, consumeLastPremiumIntent } = usePremium();
   const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { setAnimation } = useNavAnimation();
@@ -94,11 +94,11 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     if (!prevIsPremium.current && isPremium) {
       toast.success(t("premiumActive"));
       trackEvent("premium_activated", {
-        source: "settings",
+        source: consumeLastPremiumIntent(),
       });
     }
     prevIsPremium.current = isPremium;
-  }, [isPremium, t, toast]);
+  }, [consumeLastPremiumIntent, isPremium, t, toast]);
 
   if (!isMobile) return null;
 

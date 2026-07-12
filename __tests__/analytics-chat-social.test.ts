@@ -146,13 +146,13 @@ describe("components/bottom-nav.tsx — premium_activated wiring", () => {
     );
   });
 
-  it("includes a `source` prop on premium_activated", () => {
+  it("includes a `source` prop on premium_activated, read from the one-shot intent ref", () => {
     const trackIdx = src.indexOf("trackEvent(\"premium_activated\"");
     const block = src.slice(trackIdx, trackIdx + 200);
     assert.match(
       block,
-      /source:\s*["'][a-zA-Z_]+["']/,
-      "premium_activated must include source per the taxonomy",
+      /source:\s*consumeLastPremiumIntent\(\)/,
+      "premium_activated.source must come from consumeLastPremiumIntent() — a hardcoded screen mislabels every non-settings upgrade",
     );
   });
 });

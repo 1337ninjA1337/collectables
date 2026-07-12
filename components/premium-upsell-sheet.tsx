@@ -13,7 +13,7 @@ import {
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD, FONT_DISPLAY } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
-import { usePremium } from "@/lib/premium-context";
+import { usePremium, type PremiumIntentSource } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
 
 type Props = {
@@ -30,6 +30,11 @@ type Props = {
   title?: string;
   /** Sub-headline explaining the locked feature in context. */
   body?: string;
+  /**
+   * Which screen surfaced the sheet — becomes `premium_activated.source` so
+   * dashboards can rank upgrade surfaces. Defaults to the generic sheet tag.
+   */
+  source?: PremiumIntentSource;
 };
 
 /**
@@ -39,13 +44,13 @@ type Props = {
  * unlocks, and offers a one-tap "Activate premium" CTA instead of silently
  * refusing the action.
  */
-export function PremiumUpsellSheet({ visible, onClose, onActivated, title, body }: Props) {
+export function PremiumUpsellSheet({ visible, onClose, onActivated, title, body, source }: Props) {
   const { t } = useI18n();
   const { activatePremium } = usePremium();
   const toast = useToast();
 
   function handleActivate() {
-    activatePremium();
+    activatePremium(source ?? "upsell_sheet");
     toast.success(t("premiumActivated"));
     onClose();
     onActivated?.();

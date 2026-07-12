@@ -270,6 +270,7 @@ export default function CreateCollectionScreen() {
         onActivated={() => setVisibility("private")}
         title={t("premiumUpsellPrivateTitle")}
         body={t("premiumUpsellPrivateBody")}
+        source="create_collection"
       />
     </Screen>
   );

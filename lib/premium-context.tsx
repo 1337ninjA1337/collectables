@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -17,14 +17,35 @@ import {
 import { validationToPremiumState } from "@/lib/subscriptions";
 import { cloudValidatePremium } from "@/lib/supabase-subscriptions";
 
+/**
+ * Which surface triggered a premium activation. Local call sites tag
+ * themselves via `activatePremium(source)`; `"server_sync"` is the resting
+ * value, so a false→true flip with no local intent (the cloud validation
+ * merge restoring an entitlement) reports honestly instead of inheriting a
+ * stale screen. `"unknown"` marks an untagged caller — seeing it on a
+ * dashboard means a new call site forgot its source.
+ */
+export type PremiumIntentSource =
+  | "settings"
+  | "create_collection"
+  | "upsell_sheet"
+  | "server_sync"
+  | "unknown";
+
 type PremiumContextValue = {
   ready: boolean;
   isPremium: boolean;
   activatedAt: string | null;
   premiumActivatedAt: string | null;
   expiresAt: string | null;
-  activatePremium: () => void;
+  activatePremium: (source?: PremiumIntentSource) => void;
   cancelPremium: () => void;
+  /**
+   * One-shot read of the surface behind the most recent activation, for the
+   * `premium_activated` transition hook. Consuming resets the intent to
+   * `"server_sync"` so a later server-driven flip can't reuse it.
+   */
+  consumeLastPremiumIntent: () => PremiumIntentSource;
 };
 
 const PremiumContext = createContext<PremiumContextValue | null>(null);
@@ -72,12 +93,23 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
     AsyncStorage.setItem(storageKey, JSON.stringify(state)).catch(() => undefined);
   }, [ready, storageKey, state]);
 
-  const activatePremium = useCallback(() => {
+  // The intent must be recorded BEFORE the state flip so the transition hook
+  // observing isPremium sees it on the very render the flip commits.
+  const lastPremiumIntentRef = useRef<PremiumIntentSource>("server_sync");
+
+  const activatePremium = useCallback((source: PremiumIntentSource = "unknown") => {
+    lastPremiumIntentRef.current = source;
     setState((prev) => activatePremiumState(prev));
   }, []);
 
   const cancelPremium = useCallback(() => {
     setState((prev) => cancelPremiumState(prev));
+  }, []);
+
+  const consumeLastPremiumIntent = useCallback(() => {
+    const source = lastPremiumIntentRef.current;
+    lastPremiumIntentRef.current = "server_sync";
+    return source;
   }, []);
 
   const value = useMemo<PremiumContextValue>(
@@ -89,8 +121,9 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
       expiresAt: premiumExpiresAt(state),
       activatePremium,
       cancelPremium,
+      consumeLastPremiumIntent,
     }),
-    [ready, state, activatePremium, cancelPremium],
+    [ready, state, activatePremium, cancelPremium, consumeLastPremiumIntent],
   );
 
   return <PremiumContext.Provider value={value}>{children}</PremiumContext.Provider>;
