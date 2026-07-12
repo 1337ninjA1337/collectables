@@ -96,6 +96,11 @@ export const ANALYTICS_EVENTS = {
       "Fired from the friendRequests diff effect in `lib/social-context.tsx` when a half handshake flips to a mutual friendship — the accepted arm of the `friend_requested` funnel. `direction` says which side completed it: `accepted_by_me` (this device tapped accept) or `accepted_by_them` (our outgoing request converted remotely).",
     props: ["targetUserId", "direction"],
   },
+  friend_request_cancelled: {
+    description:
+      "Fired from `removeFriend` in `lib/social-context.tsx` when a pending outgoing request is withdrawn before the counterpart accepted (`classifyRequestRemoval` = cancelled_request — declines and unfriends stay silent). The churn arm of the funnel: sent → accepted | cancelled.",
+    props: ["targetUserId"],
+  },
   premium_activated: {
     description:
       "Fired from the premium false→true transition hook in `components/bottom-nav.tsx`. `source` carries which screen triggered the upgrade.",

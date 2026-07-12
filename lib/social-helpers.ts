@@ -88,6 +88,33 @@ function collectHandshakes(
 }
 
 /**
+ * What removing both handshake directions with a counterpart actually was,
+ * given which directions existed beforehand. `removeFriend` in
+ * `lib/social-context.tsx` serves all three flows with one mutation, but the
+ * funnel events must not conflate them:
+ *   - `"cancelled_request"` — my pending outgoing request withdrawn before the
+ *     counterpart accepted (fires `friend_request_cancelled`).
+ *   - `"declined_request"`  — their incoming request dismissed (silent today).
+ *   - `"unfriended"`        — a mutual friendship dissolved (silent today).
+ *   - `"none"`              — nothing existed; a stale-UI no-op.
+ */
+export type RequestRemovalKind =
+  | "cancelled_request"
+  | "declined_request"
+  | "unfriended"
+  | "none";
+
+export function classifyRequestRemoval(
+  hadOutgoing: boolean,
+  hadIncoming: boolean,
+): RequestRemovalKind {
+  if (hadOutgoing && hadIncoming) return "unfriended";
+  if (hadOutgoing) return "cancelled_request";
+  if (hadIncoming) return "declined_request";
+  return "none";
+}
+
+/**
  * Diffs two `friendRequests` snapshots and returns the friendships that were
  * *accepted* in between: counterparts with exactly one handshake direction in
  * `prev` (a pending request, either way) that are mutual in `next`.

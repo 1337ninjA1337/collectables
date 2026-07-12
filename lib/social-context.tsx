@@ -34,7 +34,7 @@ import {
   type PendingSocialQueue,
   type SocialMutation,
 } from "@/lib/pending-social";
-import { diffAcceptedFriendships } from "@/lib/social-helpers";
+import { classifyRequestRemoval, diffAcceptedFriendships } from "@/lib/social-helpers";
 import { createRateLimitedDeliver } from "@/lib/write-rate-limit";
 import { Collection, CollectableItem, ProfileRelationship, UserProfile } from "@/lib/types";
 
@@ -668,6 +668,14 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
           return;
         }
 
+        // Snapshot BEFORE the mutation: the same removal serves cancelling my
+        // pending request, declining theirs, and unfriending — only the first
+        // is the funnel's churn arm.
+        const removal = classifyRequestRemoval(
+          hasRequest(friendRequests, user.id, profileId),
+          hasRequest(friendRequests, profileId, user.id),
+        );
+
         setFriendRequests((current) =>
           current.filter(
             (request) =>
@@ -678,6 +686,12 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
           ),
         );
         void syncSocial({ kind: "remove-request", userId: user.id, otherUserId: profileId });
+
+        if (removal === "cancelled_request") {
+          trackEvent("friend_request_cancelled", {
+            targetUserId: profileId,
+          });
+        }
       },
       followProfile: async (profileId) => {
         setFollowing((current) => (current.includes(profileId) ? current : [...current, profileId]));

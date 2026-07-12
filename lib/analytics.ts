@@ -32,6 +32,7 @@ export type AnalyticsEventName =
   | "chat_opened"
   | "friend_requested"
   | "friend_request_accepted"
+  | "friend_request_cancelled"
   | "premium_activated"
   | "premium_upsell_shown"
   | "language_switched";
