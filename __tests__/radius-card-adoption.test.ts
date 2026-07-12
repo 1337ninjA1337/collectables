@@ -37,6 +37,15 @@ const MIGRATED_FILES: ReadonlyArray<{
   { rel: "app/auth/callback.tsx", usesLg: false },
   { rel: "app/stats.tsx", usesLg: true, cardless: true },
   { rel: "app/people.tsx", usesLg: true, cardless: true },
+  // batch D/4 — the whole tree now greps clean for borderRadius: 22 / 24
+  { rel: "components/login-screen.tsx", usesLg: false },
+  { rel: "components/bottom-nav.tsx", usesLg: false },
+  { rel: "components/search-overlay.tsx", usesLg: true },
+  { rel: "components/currency-sheet.tsx", usesLg: false },
+  { rel: "components/currency-input.tsx", usesLg: false },
+  { rel: "components/sold-listing-prompt.tsx", usesLg: true, cardless: true },
+  { rel: "components/premium-upsell-sheet.tsx", usesLg: true, cardless: true },
+  { rel: "components/item-filters.tsx", usesLg: true, cardless: true },
 ];
 
 describe("RADIUS_CARD adoption — migrated files", () => {

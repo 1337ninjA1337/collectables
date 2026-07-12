@@ -17,6 +17,7 @@ import {
   CARD_BG_3,
   HERO_DARK,
   MUTED_3,
+  RADIUS_CARD,
   TEXT_DARK_2,
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
@@ -308,7 +309,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   modalPrimaryButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: HERO_DARK,
     paddingVertical: 16,
     alignItems: "center",
@@ -320,7 +321,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   modalSecondaryButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: AMBER_ACCENT,
     paddingVertical: 16,
     alignItems: "center",
@@ -332,7 +333,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   modalCancelButton: {
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     backgroundColor: CARD_BG_3,
     borderWidth: 1,
     borderColor: AMBER_SOFT,

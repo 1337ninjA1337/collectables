@@ -10,6 +10,7 @@ import {
   HERO_DARK,
   MUTED_27,
   PLACEHOLDER,
+  RADIUS_CARD,
   RADIUS_PILL,
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
@@ -124,7 +125,7 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 22,
+    borderRadius: RADIUS_CARD,
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
