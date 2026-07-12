@@ -46,6 +46,9 @@ import {
   RADIUS_CARD,
   RADIUS_CARD_LG,
   RADIUS_PILL,
+  SPACING_CARD,
+  SPACING_INLINE,
+  SPACING_LIST,
   TAG_BLUE,
   TAG_BROWN,
   TAG_CYAN,
@@ -569,7 +572,7 @@ const styles = StyleSheet.create({
     backgroundColor: BORDER_2,
     borderRadius: 28,
     padding: 20,
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   heroTitle: {
     fontSize: 28,
@@ -583,7 +586,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   fieldGroup: {
-    gap: 10,
+    gap: SPACING_LIST,
   },
   label: {
     color: MUTED_10,
@@ -614,7 +617,7 @@ const styles = StyleSheet.create({
   costRow: {
     flexDirection: "row",
     alignItems: "stretch",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   costInput: {
     flex: 1,
@@ -640,7 +643,7 @@ const styles = StyleSheet.create({
   currencyRowText: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: SPACING_CARD,
     flex: 1,
   },
   currencyRowCode: {
@@ -673,7 +676,7 @@ const styles = StyleSheet.create({
   selectorContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: SPACING_LIST,
     flex: 1,
   },
   selectorText: {
@@ -721,7 +724,7 @@ const styles = StyleSheet.create({
   sheetSearchRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: SPACING_LIST,
     backgroundColor: CARD_BG_3,
     borderRadius: 16,
     paddingHorizontal: 14,
@@ -755,7 +758,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderBottomWidth: 1,
     borderBottomColor: BORDER_3,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   sheetRowSelected: {
     backgroundColor: CARD_BG_3,
@@ -764,7 +767,7 @@ const styles = StyleSheet.create({
   sheetRowContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: SPACING_CARD,
     flex: 1,
   },
   sheetRowThumb: {
@@ -844,7 +847,7 @@ const styles = StyleSheet.create({
   tagsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   tagChip: {
     flexDirection: "row",
@@ -868,7 +871,7 @@ const styles = StyleSheet.create({
   },
   tagInputRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   tagInput: {
     flex: 1,
@@ -901,7 +904,7 @@ const styles = StyleSheet.create({
   conditionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   conditionChip: {
     borderRadius: RADIUS_PILL,

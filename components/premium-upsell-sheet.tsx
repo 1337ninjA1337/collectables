@@ -9,6 +9,9 @@ import {
   MUTED,
   PAGE_BG_2,
   RADIUS_CARD_LG,
+  SPACING_CARD,
+  SPACING_INLINE,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
@@ -103,7 +106,7 @@ const styles = StyleSheet.create({
     backgroundColor: PAGE_BG_2,
     borderRadius: RADIUS_CARD_LG,
     padding: 24,
-    gap: 12,
+    gap: SPACING_CARD,
     borderWidth: 1,
     borderColor: AMBER_SOFT,
   },
@@ -123,13 +126,13 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   benefits: {
-    gap: 8,
+    gap: SPACING_INLINE,
     marginTop: 4,
   },
   benefitRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   benefitCheck: {
     color: AMBER_ACCENT,

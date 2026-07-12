@@ -3,7 +3,7 @@ import { Link } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VisibilityBadge } from "@/components/visibility-badge";
-import { MUTED_26, PURE_WHITE, RADIUS_CARD_AIRY, TEXT_ON_DARK_10, TEXT_ON_DARK_11, TEXT_ON_DARK_12, TEXT_ON_DARK_13 } from "@/lib/design-tokens";
+import { MUTED_26, PURE_WHITE, RADIUS_CARD_AIRY, SPACING_CARD, SPACING_INLINE, TEXT_ON_DARK_10, TEXT_ON_DARK_11, TEXT_ON_DARK_12, TEXT_ON_DARK_13 } from "@/lib/design-tokens";
 import { formatCostAmount } from "@/lib/format-cost";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
@@ -76,12 +76,12 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 12,
+    gap: SPACING_CARD,
   },
   role: {
     color: TEXT_ON_DARK_10,

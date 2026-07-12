@@ -9,6 +9,7 @@ import {
   CARD_BG_14,
   RADIUS_CARD_AIRY,
   RADIUS_PILL,
+  SPACING_CARD,
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
 import { useAppTheme } from "@/components/use-app-theme";
@@ -60,7 +61,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 36,
     paddingHorizontal: 24,
-    gap: 12,
+    gap: SPACING_CARD,
     borderRadius: RADIUS_CARD_AIRY,
     borderWidth: 1.5,
     borderColor: AMBER_SOFT_3,

@@ -36,7 +36,10 @@ import {
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
+  SPACING_CARD,
   SPACING_GUTTER,
+  SPACING_INLINE,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_ON_DARK,
@@ -395,12 +398,12 @@ const styles = StyleSheet.create({
   hero: {
     borderRadius: RADIUS_HERO_LG,
     padding: SPACING_GUTTER,
-    gap: 12,
+    gap: SPACING_CARD,
   },
   phoneActionsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: SPACING_CARD,
   },
   eyebrow: {
     color: AMBER_LIGHT,
@@ -419,7 +422,7 @@ const styles = StyleSheet.create({
   },
   profileRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: SPACING_CARD,
     alignItems: "center",
     justifyContent: "space-between",
     flexWrap: "wrap",
@@ -449,7 +452,7 @@ const styles = StyleSheet.create({
   },
   headerButtons: {
     flexDirection: "row",
-    gap: 8,
+    gap: SPACING_INLINE,
     alignItems: "center",
   },
   settingsButton: {
@@ -490,7 +493,7 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: SPACING_CARD,
     marginTop: 8,
   },
   cta: {
@@ -549,7 +552,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-end",
-    gap: 12,
+    gap: SPACING_CARD,
     flexWrap: "wrap",
   },
   sectionHeaderText: {
@@ -577,7 +580,7 @@ const styles = StyleSheet.create({
   },
   socialSummary: {
     flexDirection: "row",
-    gap: 12,
+    gap: SPACING_CARD,
   },
   summaryCard: {
     flex: 1,
@@ -596,7 +599,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   socialList: {
-    gap: 10,
+    gap: SPACING_LIST,
   },
   personCard: {
     borderRadius: RADIUS_CARD,
@@ -630,7 +633,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY,
   },
   recentRow: {
-    gap: 12,
+    gap: SPACING_CARD,
     paddingRight: 4,
   },
   recentCard: {

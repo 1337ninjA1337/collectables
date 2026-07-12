@@ -20,6 +20,9 @@ import {
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
+  SPACING_CARD,
+  SPACING_INLINE,
+  SPACING_LIST,
   SUCCESS_GREEN,
   TEXT_DARK,
   TEXT_ON_DARK,
@@ -313,7 +316,7 @@ const styles = StyleSheet.create({
     backgroundColor: HERO_DARK,
     borderRadius: RADIUS_HERO_LG,
     padding: 24,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   eyebrow: {
     color: AMBER_LIGHT,
@@ -355,7 +358,7 @@ const styles = StyleSheet.create({
   },
   cardBody: {
     padding: 14,
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   cardTitle: {
     fontSize: 16,
@@ -371,7 +374,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8,
+    gap: SPACING_INLINE,
     marginTop: 4,
   },
   modeBadge: {
@@ -437,7 +440,7 @@ const styles = StyleSheet.create({
   },
   purchasesSection: {
     marginTop: 24,
-    gap: 12,
+    gap: SPACING_CARD,
   },
   sectionTitle: {
     color: TEXT_DARK,

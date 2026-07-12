@@ -30,6 +30,8 @@ import {
   RADIUS_CARD,
   RADIUS_CARD_LG,
   RADIUS_PILL,
+  SPACING_INLINE,
+  SPACING_LIST,
   SUCCESS_GREEN,
   TEXT_DARK,
   TEXT_ON_DARK,
@@ -456,7 +458,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS_CARD_LG,
     padding: 18,
     backgroundColor: HERO_DARK_7,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   itemTitle: {
     color: TEXT_ON_DARK_6,
@@ -466,7 +468,7 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   modeBadge: {
     paddingHorizontal: 12,
@@ -538,7 +540,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   gallery: {
-    gap: 10,
+    gap: SPACING_LIST,
     paddingRight: 20,
   },
   galleryImage: {
@@ -568,7 +570,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   actionsColumn: {
-    gap: 10,
+    gap: SPACING_LIST,
   },
   claimButton: {
     borderRadius: RADIUS_CARD,
@@ -670,13 +672,13 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   priceHistoryList: {
-    gap: 8,
+    gap: SPACING_INLINE,
     marginTop: 4,
   },
   priceHistoryRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: SPACING_LIST,
     paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: BORDER_2,

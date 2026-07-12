@@ -8,6 +8,7 @@ import {
   MUTED_17,
   PLACEHOLDER,
   PURE_WHITE,
+  SPACING_LIST,
   TEXT_ON_DARK,
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
@@ -101,7 +102,7 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: SPACING_LIST,
   },
   hint: {
     color: MUTED_17,

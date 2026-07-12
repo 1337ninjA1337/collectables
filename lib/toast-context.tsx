@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Platform, Pressable, StatusBar, StyleSheet, Text, View } from "react-native";
+import { SPACING_INLINE } from "@/lib/design-tokens";
 
 export type ToastType = "success" | "error" | "info";
 
@@ -137,7 +138,7 @@ const styles = StyleSheet.create({
   stack: {
     width: "100%",
     maxWidth: 520,
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   toast: {
     flexDirection: "row",

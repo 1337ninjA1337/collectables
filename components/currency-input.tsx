@@ -12,6 +12,7 @@ import {
   PLACEHOLDER,
   RADIUS_CARD,
   RADIUS_PILL,
+  SPACING_INLINE,
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
@@ -120,7 +121,7 @@ export function parseCurrencyValue(value: string): number | null {
 
 const styles = StyleSheet.create({
   container: {
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   inputRow: {
     flexDirection: "row",
@@ -129,7 +130,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   currencySymbol: {
     color: MUTED_27,

@@ -21,6 +21,9 @@ import {
   PURE_WHITE,
   RADIUS_CARD_LG,
   RADIUS_PILL,
+  SPACING_CARD,
+  SPACING_INLINE,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_DARK_3,
   TEXT_ON_DARK,
@@ -270,7 +273,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
 const styles = StyleSheet.create({
   bar: {
     flexDirection: "row",
-    gap: 8,
+    gap: SPACING_INLINE,
     paddingVertical: 4,
   },
   filterButton: {
@@ -357,7 +360,7 @@ const styles = StyleSheet.create({
   sheetSearchRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: SPACING_LIST,
     backgroundColor: CARD_BG_3,
     borderRadius: 16,
     paddingHorizontal: 14,
@@ -373,7 +376,7 @@ const styles = StyleSheet.create({
   },
   fieldRow: {
     flexDirection: "row",
-    gap: 12,
+    gap: SPACING_CARD,
   },
   fieldHalf: {
     flex: 1,
@@ -402,7 +405,7 @@ const styles = StyleSheet.create({
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: SPACING_LIST,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -421,7 +424,7 @@ const styles = StyleSheet.create({
   },
   sheetActions: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
     marginTop: 4,
   },
   applyButton: {
@@ -453,7 +456,7 @@ const styles = StyleSheet.create({
   sortRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   sortChip: {
     flexDirection: "row",

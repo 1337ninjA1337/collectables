@@ -15,6 +15,7 @@ import {
   AMBER_SOFT,
   DANGER,
   RADIUS_PILL,
+  SPACING_INLINE,
   TEXT_DARK_2,
 } from "@/lib/design-tokens";
 import { useAppTheme } from "@/components/use-app-theme";
@@ -351,7 +352,7 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   tab: {
     flex: 1,
@@ -372,7 +373,7 @@ const styles = StyleSheet.create({
   },
   subTabRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: SPACING_INLINE,
   },
   subTab: {
     flex: 1,

@@ -43,6 +43,9 @@ import {
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
+  SPACING_CARD,
+  SPACING_INLINE,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_ON_DARK_5,
@@ -385,7 +388,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: SPACING_CARD,
   },
   title: {
     fontSize: 26,
@@ -468,7 +471,7 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: SPACING_INLINE,
     marginTop: 4,
   },
   promoteButton: {
@@ -533,7 +536,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   sheetScroll: {
-    gap: 10,
+    gap: SPACING_LIST,
     paddingBottom: 12,
   },
   label: {
@@ -563,7 +566,7 @@ const styles = StyleSheet.create({
   pickButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: SPACING_INLINE,
     alignSelf: "flex-start",
     borderRadius: RADIUS_PILL,
     borderWidth: 1,
@@ -580,7 +583,7 @@ const styles = StyleSheet.create({
   },
   sheetActions: {
     flexDirection: "row",
-    gap: 10,
+    gap: SPACING_LIST,
     marginTop: 10,
   },
   cancelButton: {
@@ -619,7 +622,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS_ITEM_AIRY,
     backgroundColor: CARD_BG,
     padding: 20,
-    gap: 10,
+    gap: SPACING_LIST,
   },
   collectionRow: {
     flexDirection: "row",
