@@ -7,6 +7,7 @@ import { formatCostAmount } from "@/lib/item-cost";
 import {
   AMBER_MUTED_3,
   HERO_DARK,
+  PURE_WHITE,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   tagBadgeText: {
-    color: "#fff",
+    color: PURE_WHITE,
     fontSize: 10,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,

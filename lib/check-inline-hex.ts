@@ -10,14 +10,25 @@
  * every 6-digit hex literal in `app/**`, `components/**` and `lib/**`
  * (`.ts` and `.tsx` alike) must route through a named export from
  * `lib/design-tokens.ts`, except the exact paths in `HEX_ALLOWLIST` that
- * legitimately produce color values. The 3-digit
- * `#fff` shorthand (deliberately preserved per the migration call-outs for
- * pure-white badge text) and `rgba(...)` alpha overlays (pending the
- * `OVERLAY_*` family) are not caught by the 6-digit regex by design.
+ * legitimately produce color values. Quote-delimited 3/4-digit shorthands
+ * (#fff, #fffa — migrated to PURE_WHITE in 2026-07) are caught by a second
+ * pattern that requires surrounding quotes, so prose references to issue
+ * numbers or shorthand hex in comments never false-positive. `rgba(...)`
+ * alpha overlays (pending the OVERLAY_* family) are still exempt by design.
  */
 
 /** Regex matching a 6-digit hex literal (case-insensitive, no word boundary). */
 export const INLINE_HEX_PATTERN = /#[0-9a-fA-F]{6}/g;
+
+/**
+ * Regex matching a QUOTED 3- or 4-digit hex shorthand — the whole string
+ * literal must be the shorthand (quote, hash, 3-4 hex digits, same quote).
+ * Requiring the quotes keeps comment prose like "task #15b" or an unquoted
+ * #fff mention in a doc block from being flagged; an actual style value in
+ * RN code is always a string literal. 5+ digits fall through: 6-digit is the
+ * main pattern's job and 7-digit typos still match its leading 6.
+ */
+export const INLINE_HEX_SHORT_PATTERN = /(["'`])#[0-9a-fA-F]{3,4}\1/g;
 
 /**
  * Exact repo-relative paths allowed to carry 6-digit hex literals. The scan
@@ -56,8 +67,9 @@ export type HexMatch = {
 };
 
 /**
- * Scan a single source string for 6-digit hex literals.
- * Returns one entry per occurrence (line + column 1-indexed).
+ * Scan a single source string for 6-digit hex literals and quoted 3/4-digit
+ * shorthands. Returns one entry per occurrence (line + column 1-indexed,
+ * column pointing at the leading `#`), sorted by position within each line.
  */
 export function findInlineHexLiterals(file: string, source: string): HexMatch[] {
   const matches: HexMatch[] = [];
@@ -65,17 +77,30 @@ export function findInlineHexLiterals(file: string, source: string): HexMatch[] 
   const lines = source.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const perLine: HexMatch[] = [];
     // Reset regex state per-line because we use `g` flag at the module scope.
     const re = new RegExp(INLINE_HEX_PATTERN.source, "g");
     let m: RegExpExecArray | null;
     while ((m = re.exec(line)) !== null) {
-      matches.push({
+      perLine.push({
         file,
         line: i + 1,
         column: m.index + 1,
         value: m[0],
       });
     }
+    const shortRe = new RegExp(INLINE_HEX_SHORT_PATTERN.source, "g");
+    while ((m = shortRe.exec(line)) !== null) {
+      perLine.push({
+        file,
+        line: i + 1,
+        // +1 for 1-indexing, +1 to skip the opening quote onto the `#`.
+        column: m.index + 2,
+        value: m[0].slice(1, -1),
+      });
+    }
+    perLine.sort((a, b) => a.column - b.column);
+    matches.push(...perLine);
   }
   return matches;
 }

@@ -28,6 +28,7 @@ import {
   MUTED,
   MUTED_2,
   MUTED_10,
+  PURE_WHITE,
   RADIUS_CARD,
   RADIUS_CARD_LG,
   RADIUS_PILL,
@@ -306,7 +307,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   chatsBadgeText: {
-    color: "#fff",
+    color: PURE_WHITE,
     fontSize: 12,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
