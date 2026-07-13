@@ -146,6 +146,27 @@ describe("findInlineHexLiterals", () => {
     const source = "// the #fff shorthand and task #15b are prose, not styles";
     assert.deepEqual(findInlineHexLiterals("foo.tsx", source), []);
   });
+
+  it("flags JSX-literal gradient stops (<LinearGradient colors={[...]}>)", () => {
+    // The scanner is line-based, not StyleSheet-based, so inline JSX hex
+    // arrays are caught too — pinned here so a future "only scan
+    // StyleSheet.create blocks" refactor can't silently open this backdoor.
+    const source = '      <LinearGradient colors={["#001122", "#334455"]} start={{ x: 0, y: 0 }} />';
+    const matches = findInlineHexLiterals("foo.tsx", source);
+    assert.deepEqual(
+      matches.map((m) => m.value),
+      ["#001122", "#334455"],
+    );
+  });
+
+  it("flags shorthand gradient stops in JSX via the short pattern", () => {
+    const source = '      <LinearGradient colors={["#abc", "#def"]} />';
+    const matches = findInlineHexLiterals("foo.tsx", source);
+    assert.deepEqual(
+      matches.map((m) => m.value),
+      ["#abc", "#def"],
+    );
+  });
 });
 
 describe("formatHexReport", () => {
