@@ -12,6 +12,7 @@ import {
   DANGER,
   HERO_DARK,
   HERO_DARK_3,
+  PURE_WHITE,
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
   SHADOW_SOFT,
@@ -201,7 +202,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   badgeText: {
-    color: "#fff",
+    color: PURE_WHITE,
     fontSize: 12,
     fontWeight: "800",
   },

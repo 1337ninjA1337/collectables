@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignSelf: "center",
     gap: SPACING_LIST,
-    shadowColor: "#000",
+    shadowColor: HERO_DARK,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 20,

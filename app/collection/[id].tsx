@@ -1268,7 +1268,7 @@ const styles = StyleSheet.create({
   },
   shareLinkBox: {
     borderRadius: 16,
-    backgroundColor: "#fff",
+    backgroundColor: PURE_WHITE,
     borderWidth: 1,
     borderColor: BORDER,
     paddingHorizontal: 14,
@@ -1300,7 +1300,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   shareCopyButtonTextDone: {
-    color: "#fff",
+    color: PURE_WHITE,
   },
   shareNativeButton: {
     flex: 1,
@@ -1321,7 +1321,7 @@ const styles = StyleSheet.create({
     borderColor: AMBER_SOFT,
     paddingVertical: 14,
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: PURE_WHITE,
   },
   shareCancelText: {
     color: TEXT_DARK,
@@ -1596,7 +1596,7 @@ const styles = StyleSheet.create({
   },
   editFieldInput: {
     borderRadius: 16,
-    backgroundColor: "#fff",
+    backgroundColor: PURE_WHITE,
     borderWidth: 1,
     borderColor: BORDER,
     paddingHorizontal: 14,
@@ -1610,7 +1610,7 @@ const styles = StyleSheet.create({
   },
   editCurrencyButton: {
     borderRadius: 16,
-    backgroundColor: "#fff",
+    backgroundColor: PURE_WHITE,
     borderWidth: 1,
     borderColor: BORDER,
     paddingHorizontal: 14,
@@ -1740,7 +1740,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   shareFriendButtonTextActive: {
-    color: "#fff",
+    color: PURE_WHITE,
   },
   shareFriendsList: {
     maxHeight: 228,

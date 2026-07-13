@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   HEX_ALLOWLIST,
   INLINE_HEX_PATTERN,
+  INLINE_HEX_SHORT_PATTERN,
   findInlineHexLiterals,
   formatHexReport,
   isHexAllowlisted,
@@ -27,8 +28,7 @@ describe("INLINE_HEX_PATTERN", () => {
     assert.deepEqual(m, ["#ABCDEF", "#aB12cD"]);
   });
 
-  it("does NOT match 3-digit shorthand (#fff)", () => {
-    // Deliberately preserved per the migration call-outs — tagBadgeText, etc.
+  it("does NOT match bare 3-digit shorthand — that is the short pattern's job", () => {
     const re = new RegExp(INLINE_HEX_PATTERN.source, "g");
     assert.equal("#fff".match(re), null);
     assert.equal("#abc".match(re), null);
@@ -50,6 +50,33 @@ describe("INLINE_HEX_PATTERN", () => {
     // `#abcdefg` is almost always a typo for a 6-digit token anyway.
     const sevenMatch = "#abcdef0".match(re);
     assert.deepEqual(sevenMatch, ["#abcdef"]);
+  });
+});
+
+describe("INLINE_HEX_SHORT_PATTERN", () => {
+  const fresh = () => new RegExp(INLINE_HEX_SHORT_PATTERN.source, "g");
+
+  it("matches quoted 3-digit shorthand in every quote style", () => {
+    assert.deepEqual('color: "#fff",'.match(fresh()), ['"#fff"']);
+    assert.deepEqual("color: '#abc',".match(fresh()), ["'#abc'"]);
+    assert.deepEqual("`#0aF`".match(fresh()), ["`#0aF`"]);
+  });
+
+  it("matches quoted 4-digit alpha shorthand", () => {
+    assert.deepEqual('"#fffa"'.match(fresh()), ['"#fffa"']);
+  });
+
+  it("does NOT match unquoted shorthand (comment prose stays exempt)", () => {
+    // Doc blocks legitimately mention #fff or issue refs like #15b in prose;
+    // an actual RN style value is always a string literal.
+    assert.equal("the #fff shorthand".match(fresh()), null);
+    assert.equal("Analytics #15b) helper".match(fresh()), null);
+  });
+
+  it("does NOT match mismatched quotes or quoted 6-digit literals", () => {
+    assert.equal("\"#fff'".match(fresh()), null);
+    // Quoted 6-digit is the main pattern's territory — no double-report.
+    assert.equal('"#aabbcc"'.match(fresh()), null);
   });
 });
 
@@ -95,6 +122,29 @@ describe("findInlineHexLiterals", () => {
     const first = findInlineHexLiterals("a.tsx", src);
     const second = findInlineHexLiterals("a.tsx", src);
     assert.deepEqual(first, second, "subsequent calls must return identical results");
+  });
+
+  it("flags quoted 3-digit shorthand with column on the # (not the quote)", () => {
+    const source = '  color: "#fff",';
+    const matches = findInlineHexLiterals("foo.tsx", source);
+    assert.equal(matches.length, 1);
+    assert.equal(matches[0].value, "#fff");
+    assert.equal(matches[0].column, source.indexOf("#") + 1);
+  });
+
+  it("sorts mixed 6-digit and shorthand matches by column within a line", () => {
+    const source = '  borderColor: "#abc", backgroundColor: "#123456",';
+    const matches = findInlineHexLiterals("foo.tsx", source);
+    assert.deepEqual(
+      matches.map((m) => m.value),
+      ["#abc", "#123456"],
+    );
+    assert.ok(matches[0].column < matches[1].column);
+  });
+
+  it("does NOT flag shorthand mentions in comment prose", () => {
+    const source = "// the #fff shorthand and task #15b are prose, not styles";
+    assert.deepEqual(findInlineHexLiterals("foo.tsx", source), []);
   });
 });
 

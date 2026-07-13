@@ -54,6 +54,7 @@ import {
   MUTED_3,
   MUTED_10,
   PLACEHOLDER,
+  PURE_WHITE,
   RADIUS_CARD,
   RADIUS_CARD_LG,
   RADIUS_ITEM_AIRY,
@@ -890,7 +891,7 @@ const styles = StyleSheet.create({
   },
   shareLinkBox: {
     borderRadius: 16,
-    backgroundColor: "#fff",
+    backgroundColor: PURE_WHITE,
     borderWidth: 1,
     borderColor: BORDER,
     paddingHorizontal: 14,
@@ -922,7 +923,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_EXTRABOLD,
   },
   shareCopyButtonTextDone: {
-    color: "#fff",
+    color: PURE_WHITE,
   },
   shareNativeButton: {
     flex: 1,
@@ -943,7 +944,7 @@ const styles = StyleSheet.create({
     borderColor: AMBER_SOFT,
     paddingVertical: 14,
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: PURE_WHITE,
   },
   shareCancelText: {
     color: TEXT_DARK,
@@ -994,7 +995,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   tagBadgeText: {
-    color: "#fff",
+    color: PURE_WHITE,
     fontSize: 13,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
@@ -1094,7 +1095,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   editTagChipText: {
-    color: "#fff",
+    color: PURE_WHITE,
     fontSize: 13,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,

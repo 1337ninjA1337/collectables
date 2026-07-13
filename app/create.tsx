@@ -43,6 +43,7 @@ import {
   MUTED_15,
   PAGE_BG_2,
   PLACEHOLDER,
+  PURE_WHITE,
   RADIUS_CARD,
   RADIUS_CARD_LG,
   RADIUS_PILL,
@@ -858,7 +859,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   tagChipText: {
-    color: "#fff",
+    color: PURE_WHITE,
     fontSize: 13,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,

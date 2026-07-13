@@ -32,6 +32,7 @@ import {
   HERO_DARK_7,
   MUTED_2,
   MUTED_11,
+  PURE_WHITE,
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
@@ -546,7 +547,7 @@ const styles = StyleSheet.create({
     backgroundColor: COOL_GRAY,
   },
   diagnosticsToggleText: {
-    color: "#fff",
+    color: PURE_WHITE,
     fontSize: 13,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
