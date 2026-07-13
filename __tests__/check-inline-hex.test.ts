@@ -8,6 +8,7 @@ import {
   INLINE_HEX_PATTERN,
   INLINE_HEX_SHORT_PATTERN,
   findInlineHexLiterals,
+  formatGitHubAnnotations,
   formatHexReport,
   isHexAllowlisted,
 } from "../lib/check-inline-hex";
@@ -191,6 +192,35 @@ describe("formatHexReport", () => {
   });
 });
 
+describe("formatGitHubAnnotations", () => {
+  it("returns empty array for no matches", () => {
+    assert.deepEqual(formatGitHubAnnotations([]), []);
+  });
+
+  it("emits one ::error workflow command per finding with file/line/col", () => {
+    const out = formatGitHubAnnotations([
+      { file: "app/foo.tsx", line: 12, column: 5, value: "#aabbcc" },
+      { file: "components/bar.tsx", line: 3, column: 9, value: "#fff" },
+    ]);
+    assert.equal(out.length, 2);
+    assert.equal(
+      out[0],
+      "::error file=app/foo.tsx,line=12,col=5::Inline hex literal #aabbcc — route it through a named export from lib/design-tokens.ts",
+    );
+    assert.match(out[1], /^::error file=components\/bar\.tsx,line=3,col=9::/);
+    assert.match(out[1], /#fff/);
+  });
+
+  it("escapes workflow-command metacharacters in properties and message", () => {
+    const [out] = formatGitHubAnnotations([
+      // A path carrying every property metacharacter (%, :, ,) — impossible
+      // for real repo files, but the escaping must never corrupt the command.
+      { file: "app/a:b,c%.tsx", line: 1, column: 1, value: "#abcdef" },
+    ]);
+    assert.match(out, /^::error file=app\/a%3Ab%2Cc%25\.tsx,line=1,col=1::/);
+  });
+});
+
 describe("check-inline-hex script wiring", () => {
   it("scripts/check-inline-hex.ts imports the pure helpers from lib/check-inline-hex", () => {
     const src = read("scripts/check-inline-hex.ts");
@@ -211,6 +241,13 @@ describe("check-inline-hex script wiring", () => {
   it("scripts/check-inline-hex.ts exits with code 1 on findings", () => {
     const src = read("scripts/check-inline-hex.ts");
     assert.match(src, /process\.exit\(1\)/);
+  });
+
+  it("scripts/check-inline-hex.ts emits PR annotations under GitHub Actions", () => {
+    const src = read("scripts/check-inline-hex.ts");
+    assert.match(src, /\bformatGitHubAnnotations\b/);
+    // Gated on the Actions env so local runs stay noise-free.
+    assert.match(src, /GITHUB_ACTIONS/);
   });
 
   it("scripts/check-inline-hex.ts walks .ts AND .tsx files", () => {

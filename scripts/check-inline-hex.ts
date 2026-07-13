@@ -15,6 +15,7 @@ import * as path from "node:path";
 
 import {
   findInlineHexLiterals,
+  formatGitHubAnnotations,
   formatHexReport,
   type HexMatch,
 } from "../lib/check-inline-hex";
@@ -60,6 +61,12 @@ function main(): void {
   }
 
   console.error(formatHexReport(allMatches));
+  if (process.env.GITHUB_ACTIONS === "true") {
+    // Surface each finding as a line-level annotation on the PR diff.
+    for (const annotation of formatGitHubAnnotations(allMatches)) {
+      console.log(annotation);
+    }
+  }
   process.exit(1);
 }
 
