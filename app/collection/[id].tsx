@@ -264,6 +264,19 @@ export default function CollectionDetailsScreen() {
     [selectedIds, toggleSelect],
   );
 
+  // VM-F (viewer branch): same hoist for the masonry FlatList — the inline
+  // arrow allocated a fresh wrapper closure every parent render, defeating
+  // the new React.memo on `<ItemCard>`. No deps: the closure only touches
+  // `styles` (module scope) and the row's own `item`.
+  const renderMasonryItem = useCallback(
+    ({ item }: { item: CollectableItem }) => (
+      <View style={styles.masonryItem}>
+        <ItemCard item={item} compact />
+      </View>
+    ),
+    [],
+  );
+
   if (loadingRemote && !collection) {
     return (
       <Screen>
@@ -981,11 +994,7 @@ export default function CollectionDetailsScreen() {
             </View>
           }
           ListFooterComponent={loadMoreCta}
-          renderItem={({ item }) => (
-            <View style={styles.masonryItem}>
-              <ItemCard item={item} compact />
-            </View>
-          )}
+          renderItem={renderMasonryItem}
           initialNumToRender={10}
           maxToRenderPerBatch={8}
           windowSize={5}
