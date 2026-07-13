@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Link } from "expo-router";
 import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -22,7 +23,11 @@ import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD }
 
 type ItemCardProps = { item: CollectableItem; compact?: boolean };
 
-export function ItemCard({ item, compact }: ItemCardProps) {
+// VM-F: memoized like SelectableItemRow — the named-function form keeps the
+// component name visible in React DevTools' profiler tree. Context consumers
+// (i18n/theme/collections) still re-render the card on context changes;
+// memo skips only parent-driven re-renders with referentially stable props.
+export const ItemCard = memo(function ItemCard({ item, compact }: ItemCardProps) {
   const { t } = useI18n();
   const theme = useAppTheme();
   const { convertItemCost, getCollectionById } = useCollections();
@@ -125,7 +130,7 @@ export function ItemCard({ item, compact }: ItemCardProps) {
       </Pressable>
     </Link>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

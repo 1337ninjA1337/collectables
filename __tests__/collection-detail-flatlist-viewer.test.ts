@@ -67,10 +67,14 @@ describe("app/collection/[id].tsx — FlatList viewer-masonry migration (VM-C)",
     const src = readSrc();
     // The renderItem must mount the compact variant of ItemCard — the
     // full-size variant breaks the two-column layout and was never used
-    // in the masonry branch pre-VM-C.
+    // in the masonry branch pre-VM-C. Since the ItemCard-memo work the
+    // renderer is hoisted into a `renderMasonryItem` useCallback, so the
+    // pin follows the reference: FlatList consumes the hoisted callback,
+    // and the callback body mounts the compact card.
+    assert.match(src, /renderItem=\{renderMasonryItem\}/);
     assert.match(
       src,
-      /renderItem=\{[\s\S]*?<ItemCard\s+item=\{\s*item\s*\}\s+compact\s*\/>[\s\S]*?\}/,
+      /const\s+renderMasonryItem\s*=\s*useCallback\s*\([\s\S]*?<ItemCard\s+item=\{\s*item\s*\}\s+compact\s*\/>[\s\S]*?\)/,
     );
   });
 
