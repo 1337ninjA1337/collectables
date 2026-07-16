@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 import { CurrencySheet } from "@/components/currency-sheet";
+import { ErrorPill } from "@/components/error-pill";
 import { useAppTheme } from "@/components/use-app-theme";
 import {
   BORDER,
@@ -26,6 +27,8 @@ type CurrencyInputProps = {
   onChangeValue: (v: string) => void;
   onChangeCurrency: (c: string) => void;
   placeholder?: string;
+  /** Already-translated inline validation message; null/undefined hides the pill. */
+  error?: string | null;
 };
 
 function sanitize(raw: string): string {
@@ -44,6 +47,7 @@ export function CurrencyInput({
   onChangeValue,
   onChangeCurrency,
   placeholder = "0.00",
+  error,
 }: CurrencyInputProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -72,6 +76,7 @@ export function CurrencyInput({
           returnKeyType="done"
         />
       </View>
+      <ErrorPill label={error ?? ""} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
         {chipCodes.map((c) => {
           const active = c === currency;
@@ -147,6 +152,16 @@ export function parseCurrencyValueDetailed(value: string): ParsedCurrencyValue {
   if (n <= 0) return { value: null, error: "non_positive" };
   return { value: n, error: null };
 }
+
+/**
+ * i18n key per failure reason, so every form maps the shared error vocabulary
+ * to the same three strings. Translation itself stays at the caller (`t()`).
+ */
+export const CURRENCY_ERROR_I18N_KEY = {
+  empty: "currencyErrorEmpty",
+  unparseable: "currencyErrorUnparseable",
+  non_positive: "currencyErrorNonPositive",
+} as const satisfies Record<CurrencyValueError, string>;
 
 const styles = StyleSheet.create({
   container: {

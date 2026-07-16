@@ -5,7 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
+import {
+  CURRENCY_ERROR_I18N_KEY,
+  parseCurrencyValueDetailed,
+  type CurrencyValueError,
+} from "@/components/currency-input";
 import { CurrencySheet } from "@/components/currency-sheet";
+import { ErrorPill } from "@/components/error-pill";
 import { PhotoPreview } from "@/components/photo-preview";
 import { Screen } from "@/components/screen";
 import { analyzeItemPhoto, isAiVisionConfigured } from "@/lib/ai-vision";
@@ -92,6 +98,7 @@ export default function CreateItemScreen() {
   const [description, setDescription] = useState("");
   const [variants, setVariants] = useState("");
   const [cost, setCost] = useState("");
+  const [costError, setCostError] = useState<CurrencyValueError | null>(null);
   const [currency, setCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
   const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [currencyQuery, setCurrencyQuery] = useState("");
@@ -200,10 +207,17 @@ export default function CreateItemScreen() {
       return;
     }
 
+    // Cost is optional: empty stays silently-null, only non-empty invalid
+    // input blocks the save with an inline pill.
+    const parsedCost = parseCurrencyValueDetailed(cost.replace(",", "."));
+    if (parsedCost.error && parsedCost.error !== "empty") {
+      setCostError(parsedCost.error);
+      return;
+    }
+
     setSaving(true);
     try {
       const uploadedPhotos = photos.length > 0 ? await uploadImages(photos) : [];
-      const parsedCost = cost.trim() ? Number(cost.replace(",", ".")) : null;
 
       const id = await addItem({
         collectionId,
@@ -213,8 +227,8 @@ export default function CreateItemScreen() {
         description,
         variants,
         photos: uploadedPhotos,
-        cost: parsedCost !== null && !Number.isNaN(parsedCost) ? parsedCost : null,
-        costCurrency: parsedCost !== null && !Number.isNaN(parsedCost) ? currency : null,
+        cost: parsedCost.value,
+        costCurrency: parsedCost.value !== null ? currency : null,
         condition: condition || undefined,
         tags: tags.length > 0 ? tags : undefined,
       });
@@ -298,7 +312,10 @@ export default function CreateItemScreen() {
         <View style={styles.costRow}>
           <MaskedTextInput
             value={cost}
-            onChangeText={setCost}
+            onChangeText={(v) => {
+              setCost(v);
+              setCostError(null);
+            }}
             placeholder={t("costPlaceholder")}
             placeholderTextColor={PLACEHOLDER}
             keyboardType="numeric"
@@ -314,6 +331,7 @@ export default function CreateItemScreen() {
             <Ionicons name="chevron-down" size={16} color={PLACEHOLDER} />
           </Pressable>
         </View>
+        <ErrorPill label={costError ? t(CURRENCY_ERROR_I18N_KEY[costError]) : ""} />
       </View>
 
       <View style={styles.fieldGroup}>

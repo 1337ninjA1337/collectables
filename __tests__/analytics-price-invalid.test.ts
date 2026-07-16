@@ -68,9 +68,9 @@ describe("listing_price_invalid — taxonomy + wiring", () => {
     );
   });
 
-  it("fires from the parseCurrencyValue failure branch, gated on a non-null reason", () => {
+  it("fires from the parseCurrencyValueDetailed failure branch, gated on a non-null reason", () => {
     const src = read("app/item/[id].tsx");
-    const failIdx = src.indexOf("if (finalPrice === null)");
+    const failIdx = src.indexOf("if (parsed.error)");
     assert.ok(failIdx >= 0, "price-failure branch not found");
     const block = src.slice(failIdx, failIdx + 500);
     assert.match(
