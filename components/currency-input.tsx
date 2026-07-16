@@ -17,6 +17,7 @@ import {
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
+import { sanitizeCurrencyInput } from "@/lib/format-currency-input";
 import {
   CURRENCY_CHIPS,
   getCurrencySymbol,
@@ -44,16 +45,6 @@ type CurrencyInputProps = {
   /** Already-translated inline validation message; null/undefined hides the pill. */
   error?: string | null;
 };
-
-function sanitize(raw: string): string {
-  // Normalise comma decimal separator and strip everything except digits and one dot.
-  const normalised = raw.replace(",", ".");
-  const stripped = normalised.replace(/[^0-9.]/g, "");
-  // Keep only the first dot.
-  const parts = stripped.split(".");
-  if (parts.length <= 2) return stripped;
-  return parts[0] + "." + parts.slice(1).join("");
-}
 
 export function CurrencyInput({
   value,
@@ -101,7 +92,7 @@ export function CurrencyInput({
         </Text>
         <MaskedTextInput
           value={value}
-          onChangeText={(raw) => onChangeValue(sanitize(raw))}
+          onChangeText={(raw) => onChangeValue(sanitizeCurrencyInput(raw))}
           placeholder={placeholder}
           placeholderTextColor={PLACEHOLDER}
           keyboardType="decimal-pad"
