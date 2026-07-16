@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Link } from "expo-router";
-import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
@@ -15,6 +15,7 @@ import {
   SPACING_INLINE,
   TEXT_ON_DARK,
 } from "@/lib/design-tokens";
+import { LazyPhoto } from "@/components/lazy-photo";
 import { useAppTheme } from "@/components/use-app-theme";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
@@ -65,9 +66,10 @@ export const ItemCard = memo(function ItemCard({ item, compact }: ItemCardProps)
       <Link href={`/item/${item.id}`} asChild>
         <Pressable style={{ ...styles.compactCard, backgroundColor: theme.card, borderColor: theme.border }}>
           {hasPhoto ? (
-            <Image
-              source={{ uri: withCloudinaryThumbUrl(item.photos[0], { width: 480, height: 360, mode: "fill" }) }}
+            <LazyPhoto
+              uri={withCloudinaryThumbUrl(item.photos[0], { width: 480, height: 360, mode: "fill" })}
               style={styles.compactImage}
+              fallbackColor={placeholderColor(item.id)}
             />
           ) : (
             <View style={[styles.compactImage, { backgroundColor: placeholderColor(item.id) }]} />
@@ -87,9 +89,10 @@ export const ItemCard = memo(function ItemCard({ item, compact }: ItemCardProps)
     <Link href={`/item/${item.id}`} asChild>
       <Pressable style={{ ...styles.card, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
         {hasPhoto ? (
-          <Image
-            source={{ uri: withCloudinaryThumbUrl(item.photos[0], { width: 320, height: 320, mode: "fill" }) }}
+          <LazyPhoto
+            uri={withCloudinaryThumbUrl(item.photos[0], { width: 320, height: 320, mode: "fill" })}
             style={styles.image}
+            fallbackColor={placeholderColor(item.id)}
           />
         ) : (
           <View style={{...styles.image, backgroundColor: placeholderColor(item.id)}} />
