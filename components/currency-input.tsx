@@ -23,15 +23,23 @@ import {
   getDefaultCurrencyForLanguage,
   getPinnedCurrencies,
   pinCurrency,
+  type CurrencyChipCode,
 } from "@/lib/locale-helpers";
+
+/**
+ * Any ISO 4217 code is accepted (the full-picker sheet can hand back all 150),
+ * but the `(string & {})` intersection keeps the 10 shortlist codes surfaced
+ * in IntelliSense without narrowing the prop to just them.
+ */
+export type CurrencyCode = CurrencyChipCode | (string & {});
 
 export { getDefaultCurrencyForLanguage };
 
 type CurrencyInputProps = {
   value: string;
-  currency: string;
+  currency: CurrencyCode;
   onChangeValue: (v: string) => void;
-  onChangeCurrency: (c: string) => void;
+  onChangeCurrency: (c: CurrencyCode) => void;
   placeholder?: string;
   /** Already-translated inline validation message; null/undefined hides the pill. */
   error?: string | null;

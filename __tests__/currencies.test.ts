@@ -68,6 +68,12 @@ describe("CurrencyInput exposes the full picker (so any currency, e.g. HUF, is s
   it("keeps a non-shortlist selection (e.g. HUF) visible as an active chip", () => {
     assert.match(src, /baseCodes\.includes\(currency\)\s*\?\s*baseCodes\s*:\s*\[currency,\s*\.\.\.baseCodes\]/);
   });
+
+  it("types currency props as CurrencyChipCode | (string & {}) for IntelliSense without narrowing", () => {
+    assert.match(src, /export type CurrencyCode = CurrencyChipCode \| \(string & \{\}\)/);
+    assert.match(src, /currency: CurrencyCode;/);
+    assert.match(src, /onChangeCurrency: \(c: CurrencyCode\) => void;/);
+  });
 });
 
 describe("currency pickers hide the vertical scrollbar", () => {
