@@ -7,6 +7,7 @@ import {
   findInlineRadiusLiterals,
   formatRadiusReport,
 } from "../lib/check-inline-radius";
+import { LINT_GUARDS } from "../lib/lint-guards";
 
 const ROOT = process.cwd();
 
@@ -124,17 +125,20 @@ describe("lint:radius — wiring", () => {
   const pkg = read("package.json");
   const ci = read(".github/workflows/ci.yml");
 
-  it("package.json declares the script and chains it into lint:ci", () => {
+  it("package.json declares the script and the lint:all registry enforces it", () => {
     assert.match(
       pkg,
       /"lint:radius":\s*"tsx scripts\/check-inline-radius\.ts"/,
     );
-    assert.match(pkg, /lint:ci[^\n]*npm run lint:radius/);
+    // Registry membership means lint:ci and the ci.yml "Code-style guards"
+    // step both run the guard via the lint:all aggregator (wiring pinned
+    // in lint-guards.test.ts).
+    assert.ok(LINT_GUARDS.some((g) => g.npmScript === "lint:radius"));
   });
 
-  it("ci.yml runs the gate as a blocking step", () => {
-    assert.match(ci, /run:\s*npm run lint:radius/);
-    const step = ci.slice(ci.indexOf("No inline pill-radius literals"));
+  it("ci.yml runs the aggregated guard step as blocking", () => {
+    assert.match(ci, /run:\s*npm run lint:all/);
+    const step = ci.slice(ci.indexOf("Code-style guards (lint:all)"));
     assert.ok(
       !/continue-on-error/.test(step.slice(0, 200)),
       "the CI step must be blocking",

@@ -15,6 +15,7 @@ import {
   renderPowerbiSchemaBlock,
   renderPowerbiSchemaTable,
 } from "../lib/powerbi-schema-doc";
+import { LINT_GUARDS } from "../lib/lint-guards";
 
 const ROOT = join(__dirname, "..");
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -109,7 +110,7 @@ describe("docs/powerbi-connection.md", () => {
     assert.equal(injectPowerbiSchemaBlock(doc), doc);
   });
 
-  it("lint:ci wires the --check mode so drift fails CI", () => {
+  it("the lint:all registry wires the --check mode so drift fails CI", () => {
     const pkg = JSON.parse(read("package.json")) as {
       scripts: Record<string, string>;
     };
@@ -117,7 +118,12 @@ describe("docs/powerbi-connection.md", () => {
       pkg.scripts["lint:powerbi-doc"],
       "tsx scripts/generate-powerbi-schema-doc.ts --check",
     );
-    assert.ok(pkg.scripts["lint:ci"].includes("lint:powerbi-doc"));
+    // Registry membership means lint:ci and the ci.yml "Code-style guards"
+    // step both run the drift check via the lint:all aggregator (wiring
+    // pinned in lint-guards.test.ts).
+    const guard = LINT_GUARDS.find((g) => g.npmScript === "lint:powerbi-doc");
+    assert.ok(guard, "lint:powerbi-doc must be a LINT_GUARDS entry");
+    assert.deepEqual(guard.args, ["--check"]);
     assert.equal(
       pkg.scripts["powerbi:schema-doc"],
       "tsx scripts/generate-powerbi-schema-doc.ts",

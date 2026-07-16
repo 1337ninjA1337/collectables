@@ -87,41 +87,16 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
-      - name: No inline hex literals
-        run: npm run lint:hex
-
-      # Pill radii route through RADIUS_PILL from lib/design-tokens.ts —
-      # the RADIUS_PILL migration cleared all 71 inline occurrences and
-      # this gate keeps the tree clean.
-      - name: No inline pill-radius literals
-        run: npm run lint:radius
-
-      # Metro only inlines literal `process.env.EXPO_PUBLIC_*` accesses —
-      # passing `process.env` whole into a lib/*-config.ts resolver ships
-      # `undefined` values in the production bundle despite the CI secret.
-      - name: No whole-process.env in config resolvers
-        run: npm run lint:env-inlining
-
-      # The taxonomy module grows a description string per event — screens
-      # must consume it via lib/analytics.ts so the copy stays out of the
-      # runtime bundle and UI code can't bypass the wrapper's gates.
-      - name: No direct analytics-events imports from UI code
-        run: npm run lint:analytics-imports
-
-      - name: Migrations documented in MANUAL-TASKS.md
-        run: npm run lint:migration-docs
-
-      - name: Migration filenames follow convention
-        run: npm run lint:migration-naming
-
-      - name: No committed secrets
-        run: npm run lint:secrets
-
-      - name: App Store config pre-flight
-        run: npm run lint:appstore
-
-      - name: Sentry SDK major pinned
-        run: npm run lint:sentry-version
+      # All pure code-style guards (inline hex/geometry literals, env
+      # inlining, analytics imports, Clarity input masking, migration
+      # docs/naming, committed secrets, App Store pre-flight, Sentry SDK
+      # pin, Power BI schema drift) run through one aggregator. The
+      # registry in lib/lint-guards.ts is the single source of truth —
+      # a guard added there is automatically enforced here — and unlike a
+      # step-per-guard chain the aggregator runs EVERY guard even after
+      # one fails, so a single CI run surfaces all findings.
+      - name: Code-style guards (lint:all)
+        run: npm run lint:all
 
       - name: Run tests
         run: npm test

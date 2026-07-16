@@ -9,6 +9,7 @@ import {
   findMisnamedMigrations,
   formatMigrationNamingReport,
 } from "../lib/check-migration-naming";
+import { LINT_GUARDS } from "../lib/lint-guards";
 
 describe("check-migration-naming", () => {
   it("accepts the two sanctioned version-prefix shapes", () => {
@@ -107,7 +108,7 @@ describe("check-migration-naming", () => {
     );
   });
 
-  it("is wired into package.json and CI", () => {
+  it("is wired into package.json and the lint:all registry", () => {
     const pkg = JSON.parse(
       readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     );
@@ -115,11 +116,9 @@ describe("check-migration-naming", () => {
       pkg.scripts["lint:migration-naming"],
       "tsx scripts/check-supabase-migration-naming.ts",
     );
-    assert.match(pkg.scripts["lint:ci"], /npm run lint:migration-naming/);
-    const ci = readFileSync(
-      path.join(process.cwd(), ".github", "workflows", "ci.yml"),
-      "utf8",
-    );
-    assert.match(ci, /npm run lint:migration-naming/);
+    // Registry membership means lint:ci and the ci.yml "Code-style guards"
+    // step both run the guard via the lint:all aggregator (wiring pinned
+    // in lint-guards.test.ts).
+    assert.ok(LINT_GUARDS.some((g) => g.npmScript === "lint:migration-naming"));
   });
 });
