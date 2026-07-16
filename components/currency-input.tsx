@@ -16,7 +16,7 @@ import {
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
-import { CURRENCY_CHIPS, getDefaultCurrencyForLanguage } from "@/lib/locale-helpers";
+import { CURRENCY_CHIPS, getCurrencySymbol, getDefaultCurrencyForLanguage } from "@/lib/locale-helpers";
 
 export { getDefaultCurrencyForLanguage };
 
@@ -58,7 +58,10 @@ export function CurrencyInput({
   return (
     <View style={styles.container}>
       <View style={{ ...styles.inputRow, backgroundColor: theme.card, borderColor: theme.border }}>
-        <Text style={styles.currencySymbol}>{currency}</Text>
+        {/* Glyph for the visual cue ($ / € / ₽); the code stays announced for screen readers. */}
+        <Text style={styles.currencySymbol} accessibilityLabel={currency}>
+          {getCurrencySymbol(currency)}
+        </Text>
         <MaskedTextInput
           value={value}
           onChangeText={(raw) => onChangeValue(sanitize(raw))}
