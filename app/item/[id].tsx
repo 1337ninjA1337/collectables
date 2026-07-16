@@ -5,7 +5,13 @@ import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet
 import { CostBadge } from "@/components/cost-badge";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
-import { CurrencyInput, getDefaultCurrencyForLanguage, parseCurrencyValue } from "@/components/currency-input";
+import {
+  CURRENCY_ERROR_I18N_KEY,
+  CurrencyInput,
+  getDefaultCurrencyForLanguage,
+  parseCurrencyValueDetailed,
+  type CurrencyValueError,
+} from "@/components/currency-input";
 import { getUserPreferredCurrency, setUserPreferredCurrency } from "@/lib/locale-helpers";
 import { SkeletonItemDetail } from "@/components/skeleton";
 
@@ -132,6 +138,7 @@ export default function ItemDetailsScreen() {
   const [editAcquiredAt, setEditAcquiredAt] = useState("");
   const [editVariants, setEditVariants] = useState("");
   const [editCost, setEditCost] = useState("");
+  const [editCostError, setEditCostError] = useState<CurrencyValueError | null>(null);
   const [editCurrency, setEditCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
   const [editCondition, setEditCondition] = useState<ItemCondition | "">("");
   const [editTags, setEditTags] = useState<ItemTag[]>([]);
@@ -142,6 +149,7 @@ export default function ItemDetailsScreen() {
   const [listingSheetOpen, setListingSheetOpen] = useState(false);
   const [listingMode, setListingMode] = useState<MarketplaceMode>("trade");
   const [listingPrice, setListingPrice] = useState("");
+  const [listingPriceError, setListingPriceError] = useState<CurrencyValueError | null>(null);
   const [listingCurrency, setListingCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
   function setListingCurrency(next: string) {
     setListingCurrencyState(next);
@@ -204,6 +212,7 @@ export default function ItemDetailsScreen() {
     setEditAcquiredAt(activeItem.acquiredAt);
     setEditVariants(activeItem.variants);
     setEditCost(typeof activeItem.cost === "number" ? String(activeItem.cost) : "");
+    setEditCostError(null);
     setEditCurrencyState(activeItem.costCurrency ?? getDefaultCurrencyForLanguage(language));
     void getUserPreferredCurrency().then((stored) => {
       if (!activeItem.costCurrency && stored) setEditCurrencyState(stored);
@@ -244,6 +253,13 @@ export default function ItemDetailsScreen() {
       toast.error(t("requiredFieldsMissing"), t("needMoreData"));
       return;
     }
+    // Cost is optional: empty stays silently-null, only non-empty invalid
+    // input blocks the save with an inline pill.
+    const parsedCost = parseCurrencyValueDetailed(editCost.replace(",", "."));
+    if (parsedCost.error && parsedCost.error !== "empty") {
+      setEditCostError(parsedCost.error);
+      return;
+    }
     setSaving(true);
     try {
       const previousPhotos = activeItem.photos;
@@ -252,15 +268,14 @@ export default function ItemDetailsScreen() {
       if (newLocalPhotos.length > 0) {
         finalPhotos = await uploadImages(newLocalPhotos);
       }
-      const parsedCost = editCost.trim() ? Number(editCost.replace(",", ".")) : null;
       await updateItem(activeItem.id, {
         title: editTitle.trim(),
         description: editDescription.trim(),
         acquiredFrom: editAcquiredFrom.trim(),
         acquiredAt: editAcquiredAt.trim(),
         variants: editVariants.trim(),
-        cost: parsedCost !== null && !Number.isNaN(parsedCost) ? parsedCost : null,
-        costCurrency: parsedCost !== null && !Number.isNaN(parsedCost) ? editCurrency : null,
+        cost: parsedCost.value,
+        costCurrency: parsedCost.value !== null ? editCurrency : null,
         condition: editCondition || undefined,
         tags: editTags.length > 0 ? editTags : undefined,
         photos: finalPhotos,
@@ -299,6 +314,7 @@ export default function ItemDetailsScreen() {
   function openListingSheet() {
     setListingMode(LISTING_DRAFT_DEFAULTS.mode);
     setListingPrice("");
+    setListingPriceError(null);
     // Programmatic reset — bypass setListingCurrency so opening the sheet
     // doesn't persist the default as the user's preferred currency.
     setListingCurrencyState(LISTING_DRAFT_DEFAULTS.currency);
@@ -330,8 +346,9 @@ export default function ItemDetailsScreen() {
     if (overFreeCap) return;
     let finalPrice: number | null = null;
     if (listingMode === "sell") {
-      finalPrice = parseCurrencyValue(listingPrice);
-      if (finalPrice === null) {
+      const parsed = parseCurrencyValueDetailed(listingPrice);
+      if (parsed.error) {
+        setListingPriceError(parsed.error);
         const reason = classifyInvalidPrice(listingPrice);
         if (reason) {
           trackEvent("listing_price_invalid", { reason, language });
@@ -339,6 +356,7 @@ export default function ItemDetailsScreen() {
         toast.error(t("marketplacePriceInvalid"), t("marketplacePriceLabel"));
         return;
       }
+      finalPrice = parsed.value;
     }
     const result = addListing({
       itemId: activeItem.id,
@@ -406,9 +424,13 @@ export default function ItemDetailsScreen() {
           <CurrencyInput
             value={editCost}
             currency={editCurrency}
-            onChangeValue={setEditCost}
+            onChangeValue={(v) => {
+              setEditCost(v);
+              setEditCostError(null);
+            }}
             onChangeCurrency={setEditCurrency}
             placeholder={t("costPlaceholder")}
+            error={editCostError ? t(CURRENCY_ERROR_I18N_KEY[editCostError]) : null}
           />
         </View>
 
@@ -640,9 +662,13 @@ export default function ItemDetailsScreen() {
                 <CurrencyInput
                   value={listingPrice}
                   currency={listingCurrency}
-                  onChangeValue={setListingPrice}
+                  onChangeValue={(v) => {
+                    setListingPrice(v);
+                    setListingPriceError(null);
+                  }}
                   onChangeCurrency={setListingCurrency}
                   placeholder={t("marketplacePricePlaceholder")}
+                  error={listingPriceError ? t(CURRENCY_ERROR_I18N_KEY[listingPriceError]) : null}
                 />
               </View>
             ) : null}

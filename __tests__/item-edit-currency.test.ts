@@ -38,10 +38,10 @@ describe("item edit form — value currency", () => {
   it("threads costCurrency into the updateItem call on save", () => {
     const idx = src.indexOf("function handleSaveEdit");
     assert.ok(idx >= 0, "handleSaveEdit not found");
-    const block = src.slice(idx, idx + 1200);
+    const block = src.slice(idx, idx + 1400);
     assert.match(
       block,
-      /costCurrency:\s*parsedCost\s*!==\s*null\s*&&\s*!Number\.isNaN\(parsedCost\)\s*\?\s*editCurrency\s*:\s*null/,
+      /costCurrency:\s*parsedCost\.value\s*!==\s*null\s*\?\s*editCurrency\s*:\s*null/,
       "save must persist costCurrency (editCurrency when a cost is set, else null)",
     );
   });
