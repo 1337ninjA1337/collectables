@@ -1,10 +1,8 @@
 import { memo } from "react";
 import { Link } from "expo-router";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
-import { useCollections } from "@/lib/collections-context";
-import { formatCostAmount } from "@/lib/item-cost";
 import {
   AMBER_MUTED_3,
   HERO_DARK,
@@ -15,6 +13,7 @@ import {
   SPACING_INLINE,
   TEXT_ON_DARK,
 } from "@/lib/design-tokens";
+import { CostBadge } from "@/components/cost-badge";
 import { LazyPhoto } from "@/components/lazy-photo";
 import { useAppTheme } from "@/components/use-app-theme";
 import { useI18n } from "@/lib/i18n-context";
@@ -31,35 +30,7 @@ type ItemCardProps = { item: CollectableItem; compact?: boolean };
 export const ItemCard = memo(function ItemCard({ item, compact }: ItemCardProps) {
   const { t } = useI18n();
   const theme = useAppTheme();
-  const { convertItemCost, getCollectionById } = useCollections();
   const hasPhoto = item.photos.length > 0 && Boolean(item.photos[0]);
-
-  // Convert the stored cost into the viewer's display currency (or the parent
-  // collection's currency override, consistent with getCollectionTotalCost).
-  // `costApprox` flags a real conversion so we prefix "≈"; the original
-  // amount+currency is surfaced as an accessibility label / web tooltip.
-  const hasCost = typeof item.cost === "number" && Number.isFinite(item.cost);
-  const cost = hasCost
-    ? convertItemCost(item, getCollectionById(item.collectionId)?.currency ?? undefined)
-    : null;
-  const costAmount = cost ? cost.amount ?? (item.cost as number) : 0;
-  const costApprox = cost
-    ? cost.converted && item.costCurrency != null && item.costCurrency !== cost.currency
-    : false;
-  const costDisplay = !cost
-    ? ""
-    : costApprox
-      ? t("itemValueApprox", { amount: formatCostAmount(costAmount), currency: cost.currency })
-      : `${formatCostAmount(costAmount)} ${cost.currency}`;
-  const costOriginal = hasCost
-    ? `${formatCostAmount(item.cost as number)}${item.costCurrency ? ` ${item.costCurrency}` : ""}`
-    : "";
-  const costTooltipProps = cost
-    ? {
-        accessibilityLabel: `${t("costLabel")}: ${costOriginal}`,
-        ...(Platform.OS === "web" ? ({ title: costOriginal } as object) : null),
-      }
-    : null;
 
   if (compact) {
     return (
@@ -75,11 +46,7 @@ export const ItemCard = memo(function ItemCard({ item, compact }: ItemCardProps)
             <View style={[styles.compactImage, { backgroundColor: placeholderColor(item.id) }]} />
           )}
           <Text style={{ ...styles.compactTitle, color: theme.text }} numberOfLines={2}>{item.title}</Text>
-          {cost ? (
-            <Text style={{ ...styles.compactCost, color: theme.meta }} {...costTooltipProps}>
-              {t("costLabel")}: {costDisplay}
-            </Text>
-          ) : null}
+          <CostBadge item={item} withLabel style={{ ...styles.compactCost, color: theme.meta }} />
         </Pressable>
       </Link>
     );
@@ -123,11 +90,7 @@ export const ItemCard = memo(function ItemCard({ item, compact }: ItemCardProps)
                 </Text>
               </View>
             ) : null}
-            {cost ? (
-              <Text style={{ ...styles.meta, color: theme.meta }} {...costTooltipProps}>
-                {t("costLabel")}: {costDisplay}
-              </Text>
-            ) : null}
+            <CostBadge item={item} withLabel style={{ ...styles.meta, color: theme.meta }} />
           </View>
         </View>
       </Pressable>

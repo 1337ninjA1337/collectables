@@ -16,6 +16,19 @@
 
 import { convertAmount, type UsdRates } from "@/lib/currency-rates";
 
+/**
+ * Single cost formatter for the whole app. Historically this module carried
+ * its own weaker copy (no thousands separator, padded trailing zeros), so
+ * item cards rendered "1500 USD" while collection totals showed "1,500" —
+ * re-exporting keeps the two import paths but one implementation.
+ */
+export { formatCostAmount } from "@/lib/format-cost";
+
+/** Shared gate for "this item has a renderable cost" (excludes null/NaN/±Infinity). */
+export function hasFiniteCost(item: { cost?: number | null }): boolean {
+  return typeof item.cost === "number" && Number.isFinite(item.cost);
+}
+
 export type ConvertedItemCost = {
   /** Cost expressed in `currency`. `null` when the item has no numeric cost. */
   amount: number | null;
@@ -52,13 +65,4 @@ export function convertItemCost(
   // Missing rate (or rates not loaded yet): hand back the raw stored value so
   // the caller shows the original amount instead of a wrong/blank figure.
   return { amount: item.cost, currency: stored, converted: false };
-}
-
-/**
- * Format a cost amount for display: whole numbers stay whole, fractional
- * (typically a freshly-converted figure) shows two decimals. Keeps converted
- * values from rendering 12-decimal float noise without padding integers.
- */
-export function formatCostAmount(amount: number): string {
-  return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
 }
