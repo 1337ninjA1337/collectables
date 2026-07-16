@@ -41,3 +41,17 @@ describe("placeholderColor", () => {
     assert.equal(b, placeholderColor("abc"));
   });
 });
+
+describe("placeholderColorForId — design-tokens co-location", () => {
+  it("lib/design-tokens re-exports the SAME function (one implementation)", async () => {
+    const tokens = await import("@/lib/design-tokens");
+    assert.equal(tokens.placeholderColorForId, placeholderColor);
+  });
+
+  it("resolves to a 6-digit hex like every static color token", () => {
+    const { placeholderColorForId } = require("@/lib/design-tokens") as {
+      placeholderColorForId: (id: string) => string;
+    };
+    assert.match(placeholderColorForId("any-item-id"), /^#[0-9a-fA-F]{6}$/);
+  });
+});

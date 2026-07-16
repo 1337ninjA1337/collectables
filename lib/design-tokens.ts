@@ -414,3 +414,17 @@ export type ColorValue = ColorTokenValue | (string & {});
  * alias lets the reader see the prop's role at a glance.
  */
 export type BackgroundColorValue = ColorValue;
+
+/**
+ * Deterministic per-id placeholder color — a warm-palette hash of the id,
+ * used for photo-less item cards and error fallbacks (see `LazyPhoto`).
+ * The implementation (and its hex PALETTE, allowlisted in lint:hex) stays
+ * in `lib/placeholder-color.ts`; it is re-exported here so the
+ * deterministic-color pattern is discoverable next to the static tokens —
+ * the future `tokens preview` route can demo it alongside the palette, and
+ * future "deterministic avatar" code finds it where colors live. Kept OUT
+ * of the `designTokens` aggregate on purpose: the aggregate is a frozen
+ * map of static values and the `ColorTokenName` mapped type filters on
+ * `extends string`.
+ */
+export { placeholderColor as placeholderColorForId } from "./placeholder-color";
