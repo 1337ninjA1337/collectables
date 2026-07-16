@@ -104,6 +104,50 @@ export const CURRENCY_CHIPS = [
 export type CurrencyChipCode = (typeof CURRENCY_CHIPS)[number];
 
 /**
+ * Symbols never change for a given code, and `Intl.NumberFormat` construction
+ * is the expensive part — cache per code so per-keystroke re-renders of the
+ * amount input don't rebuild formatters.
+ */
+const CURRENCY_SYMBOL_CACHE = new Map<string, string>();
+
+/**
+ * Derive the display symbol for an ISO 4217 code: `USD` → `$`, `EUR` → `€`,
+ * `RUB` → `₽`. Prefers the narrow symbol (`narrowSymbol` gives `₽`/`zł`/`₴`
+ * where the default `symbol` display keeps the all-caps code outside the
+ * home locale), degrading to the plain symbol display and finally to the
+ * code itself — for currencies without a Unicode symbol (CHF), unknown
+ * codes, or Intl builds without `formatToParts`/`narrowSymbol` (older
+ * Hermes), the caller renders exactly what the UI showed before this helper.
+ */
+export function getCurrencySymbol(code: string): string {
+  const normalized = parseStoredCurrency(code);
+  if (!normalized) return code;
+  const cached = CURRENCY_SYMBOL_CACHE.get(normalized);
+  if (cached !== undefined) return cached;
+  let symbol = normalized;
+  for (const display of ["narrowSymbol", "symbol"] as const) {
+    try {
+      const formatter = new Intl.NumberFormat("en", {
+        style: "currency",
+        currency: normalized,
+        currencyDisplay: display,
+      });
+      if (typeof formatter.formatToParts !== "function") break;
+      const part = formatter.formatToParts(0).find((p) => p.type === "currency");
+      if (part?.value) {
+        symbol = part.value;
+        break;
+      }
+    } catch {
+      // RangeError: unknown currency code or unsupported currencyDisplay —
+      // try the next display form (or fall through to the code).
+    }
+  }
+  CURRENCY_SYMBOL_CACHE.set(normalized, symbol);
+  return symbol;
+}
+
+/**
  * BCP-47 locale tags keyed by `AppLanguage` (mirrors `LANGUAGE_CURRENCY`'s
  * key set). Tags carry the region so `Intl.NumberFormat` / `DateTimeFormat`
  * picks the right currency display, thousands separators, and date order
