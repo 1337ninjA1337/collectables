@@ -55,7 +55,9 @@ describe("CurrencyInput exposes the full picker (so any currency, e.g. HUF, is s
   it("mounts the shared CurrencySheet and persists the pick via onChangeCurrency", () => {
     assert.match(src, /import\s*\{\s*CurrencySheet\s*\}\s*from\s*"@\/components\/currency-sheet"/);
     assert.match(src, /<CurrencySheet/);
-    assert.match(src, /onSelect=\{\(code\)\s*=>\s*\{\s*onChangeCurrency\(code\);/);
+    // sheet picks route through selectCurrency, which forwards to onChangeCurrency
+    assert.match(src, /onSelect=\{\(code\)\s*=>\s*\{\s*selectCurrency\(code\);/);
+    assert.match(src, /function selectCurrency\(code: string\) \{\s*onChangeCurrency\(code\);/);
   });
 
   it("renders a 'more currencies' affordance that opens the sheet", () => {
@@ -64,8 +66,7 @@ describe("CurrencyInput exposes the full picker (so any currency, e.g. HUF, is s
   });
 
   it("keeps a non-shortlist selection (e.g. HUF) visible as an active chip", () => {
-    assert.match(src, /\(CURRENCY_CHIPS as readonly string\[\]\)\.includes\(currency\)/);
-    assert.match(src, /\[currency,\s*\.\.\.CURRENCY_CHIPS\]/);
+    assert.match(src, /baseCodes\.includes\(currency\)\s*\?\s*baseCodes\s*:\s*\[currency,\s*\.\.\.baseCodes\]/);
   });
 });
 

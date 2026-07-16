@@ -23,6 +23,7 @@ import { useI18n } from "@/lib/i18n-context";
 import {
   getDefaultCurrencyForLanguage,
   getUserPreferredCurrency,
+  pinCurrency,
   setUserPreferredCurrency,
 } from "@/lib/locale-helpers";
 import { useToast } from "@/lib/toast-context";
@@ -117,6 +118,9 @@ export default function CreateItemScreen() {
   function setCurrency(next: string) {
     setCurrencyState(next);
     void setUserPreferredCurrency(next);
+    // The create form's cost row uses a raw CurrencySheet (no <CurrencyInput>),
+    // so it records the MRU pin itself.
+    void pinCurrency(next);
   }
   const [condition, setCondition] = useState<ItemCondition | "">("");
   const [tags, setTags] = useState<ItemTag[]>([]);

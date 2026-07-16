@@ -66,7 +66,7 @@ describe("locale-helpers persistence wiring", () => {
 
   it("reads/writes via the CURRENCY_KEY slot in storage-keys.ts", () => {
     const src = read("lib/locale-helpers.ts");
-    assert.match(src, /import\s*\{\s*CURRENCY_KEY\s*\}\s*from\s*"@\/lib\/storage-keys"/);
+    assert.match(src, /import\s*\{\s*CURRENCY_KEY[^}]*\}\s*from\s*"@\/lib\/storage-keys"/);
     assert.match(src, /AsyncStorage\.getItem\(\s*CURRENCY_KEY\s*\)/);
     assert.match(src, /AsyncStorage\.setItem\(\s*CURRENCY_KEY\s*,/);
   });
