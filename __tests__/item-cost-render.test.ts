@@ -4,49 +4,47 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { formatCostAmount } from "@/lib/item-cost";
+import { formatCostAmount as canonicalFormatCostAmount } from "@/lib/format-cost";
 
 function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
 }
 
-describe("formatCostAmount", () => {
+describe("formatCostAmount (re-exported via lib/item-cost)", () => {
+  it("is the exact same function as lib/format-cost's (no drift possible)", () => {
+    assert.equal(formatCostAmount, canonicalFormatCostAmount);
+  });
+
   it("keeps whole numbers whole (no trailing zeros)", () => {
     assert.equal(formatCostAmount(100), "100");
     assert.equal(formatCostAmount(0), "0");
   });
 
-  it("renders fractional (converted) amounts at 2 decimals", () => {
+  it("renders fractional (converted) amounts at 2 decimals, dropping zero-noise", () => {
     assert.equal(formatCostAmount(92.3456), "92.35");
-    assert.equal(formatCostAmount(90.000001), "90.00");
+    // The old lib/item-cost copy padded this to "90.00"; the canonical
+    // formatter rounds then drops the empty fraction.
+    assert.equal(formatCostAmount(90.000001), "90");
+  });
+
+  it("uses thousands separators like the collection totals always did", () => {
+    assert.equal(formatCostAmount(1500), "1,500");
   });
 });
 
-describe("item-card — renders converted cost via the bug-2a selector", () => {
+describe("item-card — renders cost via the shared <CostBadge>", () => {
   const src = read("components/item-card.tsx");
 
-  it("pulls convertItemCost + getCollectionById from the collections context", () => {
-    assert.match(src, /import\s*\{\s*useCollections\s*\}\s*from\s*"@\/lib\/collections-context"/);
-    assert.match(src, /const\s*\{\s*convertItemCost,\s*getCollectionById\s*\}\s*=\s*useCollections\(\)/);
+  it("imports CostBadge and no longer duplicates the conversion pipeline", () => {
+    assert.match(src, /import\s*\{\s*CostBadge\s*\}\s*from\s*"@\/components\/cost-badge"/);
+    assert.doesNotMatch(src, /convertItemCost/);
+    assert.doesNotMatch(src, /itemValueApprox/);
+    assert.doesNotMatch(src, /formatCostAmount/);
   });
 
-  it("targets the parent collection's currency override (coerced from null)", () => {
-    assert.match(
-      src,
-      /convertItemCost\(item,\s*getCollectionById\(item\.collectionId\)\?\.currency\s*\?\?\s*undefined\)/,
-    );
-  });
-
-  it("prefixes the approx i18n key only when a real conversion changed the currency", () => {
-    assert.match(
-      src,
-      /cost\.converted\s*&&\s*item\.costCurrency\s*!=\s*null\s*&&\s*item\.costCurrency\s*!==\s*cost\.currency/,
-    );
-    assert.match(src, /t\("itemValueApprox",\s*\{\s*amount:\s*formatCostAmount\(costAmount\),\s*currency:\s*cost\.currency\s*\}\)/);
-  });
-
-  it("surfaces the original stored amount via accessibilityLabel + web title", () => {
-    assert.match(src, /accessibilityLabel:\s*`\$\{t\("costLabel"\)\}:\s*\$\{costOriginal\}`/);
-    assert.match(src, /Platform\.OS === "web"\s*\?\s*\(\{\s*title:\s*costOriginal\s*\}/);
+  it("renders <CostBadge item withLabel> in BOTH the compact and full branches", () => {
+    const matches = src.match(/<CostBadge\s+item=\{item\}\s+withLabel\b/g) ?? [];
+    assert.equal(matches.length, 2, `expected 2 CostBadge adoptions, got ${matches.length}`);
   });
 
   it("drops the old raw `{item.cost}{item.costCurrency}` inline render", () => {
@@ -54,21 +52,22 @@ describe("item-card — renders converted cost via the bug-2a selector", () => {
   });
 });
 
-describe("item detail — converted cost + long-press original", () => {
+describe("item detail — cost meta row via <CostBadge> + long-press original", () => {
   const src = read("app/item/[id].tsx");
 
-  it("imports formatCostAmount and destructures convertItemCost", () => {
-    assert.match(src, /import\s*\{\s*formatCostAmount\s*\}\s*from\s*"@\/lib\/item-cost"/);
-    assert.match(src, /convertItemCost\s*\}\s*=\s*useCollections\(\)/);
+  it("gates the meta row on the shared hasFiniteCost helper", () => {
+    assert.match(src, /import\s*\{\s*hasFiniteCost\s*\}\s*from\s*"@\/lib\/item-cost"/);
+    assert.match(src, /\{hasFiniteCost\(activeItem\)\s*\?\s*\(/);
   });
 
-  it("converts against the collection currency override", () => {
-    assert.match(src, /convertItemCost\(activeItem,\s*collection\?\.currency\s*\?\?\s*undefined\)/);
+  it("reveals the original amount on long-press (toast) via onLongPressOriginal", () => {
+    assert.match(src, /onLongPressOriginal=\{\(original\)\s*=>\s*toast\.info\(original\)\}/);
   });
 
-  it("reveals the original amount on long-press (toast) mirroring the listing-detail pattern", () => {
-    assert.match(src, /onLongPress=\{\(\)\s*=>\s*toast\.info\(original\)\}/);
-    assert.match(src, /accessibilityLabel=\{`\$\{t\("costLabel"\)\}:\s*\$\{original\}`\}/);
+  it("no longer re-rolls the conversion pipeline inline", () => {
+    assert.doesNotMatch(src, /convertItemCost/);
+    assert.doesNotMatch(src, /itemValueApprox/);
+    assert.doesNotMatch(src, /formatCostAmount/);
   });
 });
 

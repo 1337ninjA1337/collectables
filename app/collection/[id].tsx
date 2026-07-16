@@ -13,6 +13,7 @@ import { NestableDraggableFlatList, RenderItemParams, ScaleDecorator } from "../
 
 import { ItemCard } from "@/components/item-card";
 import { ReactionBar } from "@/components/reaction-bar";
+import { CostBadge } from "@/components/cost-badge";
 import { CurrencySheet } from "@/components/currency-sheet";
 import { Screen } from "@/components/screen";
 import { SelectableItemRow } from "@/components/selectable-item-row";
@@ -23,7 +24,6 @@ import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
 import { useChunkedList } from "@/lib/use-chunked-list";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
-import { formatCostAmount } from "@/lib/format-cost";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { usePremium } from "@/lib/premium-context";
@@ -604,12 +604,12 @@ export default function CollectionDetailsScreen() {
             accessibilityRole="button"
             accessibilityLabel={t("collectionCurrencyA11y", { currency: total.currency })}
           >
-            <Text style={styles.summaryNumber}>{formatCostAmount(total.amount)} {total.currency}</Text>
+            <CostBadge amount={total.amount} currency={total.currency} style={styles.summaryNumber} />
             <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
           </Pressable>
         ) : (
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryNumber}>{formatCostAmount(total.amount)} {total.currency}</Text>
+            <CostBadge amount={total.amount} currency={total.currency} style={styles.summaryNumber} />
             <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
           </View>
         );
