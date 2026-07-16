@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { CURRENCY_KEY } from "@/lib/storage-keys";
+import { CURRENCY_KEY, PINNED_CURRENCIES_KEY } from "@/lib/storage-keys";
 
 /**
  * Locale-derived helpers shared across UI forms (currency pickers, future
@@ -218,5 +218,80 @@ export async function setUserPreferredCurrency(currency: string): Promise<void> 
     await AsyncStorage.setItem(CURRENCY_KEY, validated);
   } catch {
     // Best-effort: persistence failure must not crash the form submit.
+  }
+}
+
+/**
+ * How many recently-used currencies the chip strip surfaces ahead of the
+ * static `CURRENCY_CHIPS` shortlist. Four keeps the strip's above-the-fold
+ * width on an iPhone SE while covering the multi-currency power user.
+ */
+export const MAX_PINNED_CURRENCIES = 4;
+
+/**
+ * Validate a persisted pinned-currency payload (a JSON string array).
+ * Junk entries are dropped per-element (not whole-payload) so one corrupted
+ * slot doesn't wipe the rest; duplicates collapse to their first (most
+ * recent) position and the list is capped at `MAX_PINNED_CURRENCIES`.
+ * Pure so node tests can hit it without standing up AsyncStorage.
+ */
+export function parsePinnedCurrencies(raw: string | null | undefined): string[] {
+  if (typeof raw !== "string" || !raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const out: string[] = [];
+  for (const entry of parsed) {
+    const code = parseStoredCurrency(typeof entry === "string" ? entry : null);
+    if (code && !out.includes(code)) out.push(code);
+    if (out.length === MAX_PINNED_CURRENCIES) break;
+  }
+  return out;
+}
+
+/**
+ * MRU insert: move `code` to the front of `current`, dropping its previous
+ * position and anything past the cap. Invalid codes return an unchanged
+ * copy. Pure — the storage read/write pair below rides it.
+ */
+export function mergePinnedCurrencies(current: readonly string[], code: string): string[] {
+  const validated = parseStoredCurrency(code);
+  if (!validated) return [...current];
+  return [validated, ...current.filter((c) => c !== validated)].slice(0, MAX_PINNED_CURRENCIES);
+}
+
+/**
+ * Read the user's recently-used currencies (most recent first). Returns []
+ * when nothing is stored, when storage throws, or when the payload fails
+ * validation — the chip strip then falls back to the static shortlist.
+ */
+export async function getPinnedCurrencies(): Promise<string[]> {
+  try {
+    return parsePinnedCurrencies(await AsyncStorage.getItem(PINNED_CURRENCIES_KEY));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Record a currency pick into the MRU list so the next form open surfaces
+ * it ahead of the static chips. Best-effort like `setUserPreferredCurrency`:
+ * malformed input and storage failures silently no-op.
+ */
+export async function pinCurrency(currency: string): Promise<void> {
+  const validated = parseStoredCurrency(currency);
+  if (!validated) return;
+  try {
+    const current = parsePinnedCurrencies(await AsyncStorage.getItem(PINNED_CURRENCIES_KEY));
+    await AsyncStorage.setItem(
+      PINNED_CURRENCIES_KEY,
+      JSON.stringify(mergePinnedCurrencies(current, validated)),
+    );
+  } catch {
+    // Best-effort: persistence failure must not crash the picker.
   }
 }

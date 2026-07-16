@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 import { CurrencySheet } from "@/components/currency-sheet";
@@ -17,7 +17,13 @@ import {
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
-import { CURRENCY_CHIPS, getCurrencySymbol, getDefaultCurrencyForLanguage } from "@/lib/locale-helpers";
+import {
+  CURRENCY_CHIPS,
+  getCurrencySymbol,
+  getDefaultCurrencyForLanguage,
+  getPinnedCurrencies,
+  pinCurrency,
+} from "@/lib/locale-helpers";
 
 export { getDefaultCurrencyForLanguage };
 
@@ -51,13 +57,32 @@ export function CurrencyInput({
 }: CurrencyInputProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [pinned, setPinned] = useState<string[]>([]);
   const theme = useAppTheme();
 
-  // Always show the active currency as a chip — even a non-shortlist pick (e.g.
-  // HUF chosen via the full picker) so the selection stays visible.
-  const chipCodes: string[] = (CURRENCY_CHIPS as readonly string[]).includes(currency)
-    ? [...CURRENCY_CHIPS]
-    : [currency, ...CURRENCY_CHIPS];
+  // Recently-used currencies lead the strip. Loaded once per mount (picks
+  // write through to storage but don't reshuffle the strip mid-interaction —
+  // the new order shows on the next form open).
+  useEffect(() => {
+    let cancelled = false;
+    void getPinnedCurrencies().then((stored) => {
+      if (!cancelled && stored.length > 0) setPinned(stored);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function selectCurrency(code: string) {
+    onChangeCurrency(code);
+    void pinCurrency(code);
+  }
+
+  // Pinned (MRU) chips first, then the static shortlist; always show the
+  // active currency as a chip — even a non-shortlist pick (e.g. HUF chosen
+  // via the full picker) so the selection stays visible.
+  const baseCodes = [...new Set([...pinned, ...CURRENCY_CHIPS])];
+  const chipCodes: string[] = baseCodes.includes(currency) ? baseCodes : [currency, ...baseCodes];
 
   return (
     <View style={styles.container}>
@@ -84,7 +109,7 @@ export function CurrencyInput({
             <Pressable
               key={c}
               style={[styles.chip, active && styles.chipActive]}
-              onPress={() => onChangeCurrency(c)}
+              onPress={() => selectCurrency(c)}
             >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{c}</Text>
             </Pressable>
@@ -108,7 +133,7 @@ export function CurrencyInput({
         query={query}
         onQueryChange={setQuery}
         onSelect={(code) => {
-          onChangeCurrency(code);
+          selectCurrency(code);
           setSheetOpen(false);
         }}
         onClose={() => setSheetOpen(false)}
