@@ -122,6 +122,32 @@ export function parseCurrencyValue(value: string): number | null {
   return n;
 }
 
+/**
+ * Why a value failed to parse. Deliberately the same vocabulary as
+ * `InvalidPriceReason` (lib/analytics-helpers.ts) so the inline error a user
+ * sees and the `listing_price_invalid.reason` the funnel records can never
+ * disagree about what went wrong.
+ */
+export type CurrencyValueError = "empty" | "unparseable" | "non_positive";
+
+export type ParsedCurrencyValue =
+  | { value: number; error: null }
+  | { value: null; error: CurrencyValueError };
+
+/**
+ * `parseCurrencyValue` with the failure reason attached, for callers that
+ * surface inline errors instead of silently dropping the input. Gate order
+ * mirrors `parseCurrencyValue` (empty → non-finite → <= 0) so the two can
+ * never accept different values.
+ */
+export function parseCurrencyValueDetailed(value: string): ParsedCurrencyValue {
+  if (!value.trim()) return { value: null, error: "empty" };
+  const n = Number(value);
+  if (!Number.isFinite(n)) return { value: null, error: "unparseable" };
+  if (n <= 0) return { value: null, error: "non_positive" };
+  return { value: n, error: null };
+}
+
 const styles = StyleSheet.create({
   container: {
     gap: SPACING_INLINE,
