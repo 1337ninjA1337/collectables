@@ -8,6 +8,7 @@ import {
   formatAppstoreConfigReport,
   REQUIRED_INFO_PLIST_KEYS,
 } from "../lib/check-appstore-config";
+import { LINT_GUARDS } from "../lib/lint-guards";
 
 /** A minimal valid config mirroring app.json's real shape. */
 function validAppJson() {
@@ -192,7 +193,7 @@ describe("formatAppstoreConfigReport", () => {
 });
 
 describe("lint wiring", () => {
-  it("registers lint:appstore in package.json and lint:ci", () => {
+  it("registers lint:appstore in package.json and the lint:all registry", () => {
     const pkg = JSON.parse(
       readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     );
@@ -200,20 +201,12 @@ describe("lint wiring", () => {
       pkg.scripts["lint:appstore"],
       "tsx scripts/check-appstore-config.ts",
     );
+    // Registry membership means lint:ci and the ci.yml "Code-style guards"
+    // step both run the guard via the lint:all aggregator (wiring pinned
+    // in lint-guards.test.ts).
     assert.ok(
-      pkg.scripts["lint:ci"].includes("npm run lint:appstore"),
-      "lint:ci must run lint:appstore",
-    );
-  });
-
-  it("runs the pre-flight in the CI workflow", () => {
-    const ci = readFileSync(
-      path.join(process.cwd(), ".github", "workflows", "ci.yml"),
-      "utf8",
-    );
-    assert.ok(
-      ci.includes("npm run lint:appstore"),
-      "ci.yml must run lint:appstore",
+      LINT_GUARDS.some((g) => g.npmScript === "lint:appstore"),
+      "lint:appstore must be a LINT_GUARDS entry",
     );
   });
 });

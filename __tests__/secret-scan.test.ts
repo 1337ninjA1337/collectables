@@ -12,6 +12,7 @@ import {
   redact,
   scanForSecrets,
 } from "../lib/secret-scan";
+import { LINT_GUARDS } from "../lib/lint-guards";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 const read = (rel: string) => readFileSync(path.join(REPO_ROOT, rel), "utf8");
@@ -193,7 +194,7 @@ describe("SEC-14 wiring (structural)", () => {
     read("scripts/check-bundle-secrets.ts");
   });
 
-  it("registers the npm scripts and runs the source scan inside lint:ci", () => {
+  it("registers the npm scripts and the source scan in the lint:all registry", () => {
     const pkg = JSON.parse(read("package.json")) as {
       scripts: Record<string, string>;
     };
@@ -202,12 +203,15 @@ describe("SEC-14 wiring (structural)", () => {
       pkg.scripts["lint:secrets:bundle"],
       "tsx scripts/check-bundle-secrets.ts",
     );
-    assert.match(pkg.scripts["lint:ci"], /lint:secrets/);
+    // Registry membership means lint:ci and the ci.yml "Code-style guards"
+    // step both run the source scan via the lint:all aggregator (wiring
+    // pinned in lint-guards.test.ts).
+    assert.ok(LINT_GUARDS.some((g) => g.npmScript === "lint:secrets"));
   });
 
-  it("wires both scans + a gitleaks job into CI", () => {
+  it("wires the bundle scan + a gitleaks job into CI", () => {
     const ci = read(".github/workflows/ci.yml");
-    assert.match(ci, /npm run lint:secrets\b/);
+    // The bundle scan needs dist/ so it stays its own post-build step.
     assert.match(ci, /npm run lint:secrets:bundle/);
     assert.match(ci, /gitleaks\/gitleaks-action/);
   });

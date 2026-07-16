@@ -9,6 +9,7 @@ import {
   majorOfRange,
   majorOfVersion,
 } from "../lib/check-sentry-version";
+import { LINT_GUARDS } from "../lib/lint-guards";
 
 describe("majorOfRange / majorOfVersion", () => {
   it("parses tilde, caret, and exact ranges", () => {
@@ -104,16 +105,14 @@ describe("repository state", () => {
     );
   });
 
-  it("registers lint:sentry-version in package.json, lint:ci, and ci.yml", () => {
+  it("registers lint:sentry-version in package.json and the lint:all registry", () => {
     assert.equal(
       pkg.scripts["lint:sentry-version"],
       "tsx scripts/check-sentry-version.ts",
     );
-    assert.ok(pkg.scripts["lint:ci"].includes("npm run lint:sentry-version"));
-    const ci = readFileSync(
-      path.join(root, ".github", "workflows", "ci.yml"),
-      "utf8",
-    );
-    assert.ok(ci.includes("npm run lint:sentry-version"));
+    // Registry membership means lint:ci and the ci.yml "Code-style guards"
+    // step both run the guard via the lint:all aggregator (wiring pinned
+    // in lint-guards.test.ts).
+    assert.ok(LINT_GUARDS.some((g) => g.npmScript === "lint:sentry-version"));
   });
 });

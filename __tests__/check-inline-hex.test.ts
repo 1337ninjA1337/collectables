@@ -12,6 +12,7 @@ import {
   formatHexReport,
   isHexAllowlisted,
 } from "../lib/check-inline-hex";
+import { LINT_GUARDS } from "../lib/lint-guards";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 const read = (rel: string) => readFileSync(path.join(REPO_ROOT, rel), "utf8");
@@ -282,18 +283,15 @@ describe("check-inline-hex script wiring", () => {
     }
   });
 
-  it("package.json wires lint:hex and lint:ci runs it before tests", () => {
+  it("package.json wires lint:hex and the lint:all registry enforces it", () => {
     const raw = read("package.json");
     const pkg = JSON.parse(raw) as { scripts: Record<string, string> };
     assert.equal(typeof pkg.scripts["lint:hex"], "string");
     assert.match(pkg.scripts["lint:hex"], /scripts\/check-inline-hex\.ts/);
-    // lint:ci must call lint:hex so a regression fails CI before tests run.
-    assert.match(pkg.scripts["lint:ci"], /lint:hex/);
-  });
-
-  it("ci.yml runs the lint:hex step", () => {
-    const src = read(".github/workflows/ci.yml");
-    assert.match(src, /lint:hex/);
+    // Registry membership means lint:ci and the ci.yml "Code-style guards"
+    // step both run the guard via the lint:all aggregator (wiring pinned
+    // in lint-guards.test.ts).
+    assert.ok(LINT_GUARDS.some((g) => g.npmScript === "lint:hex"));
   });
 
   it("app/**, components/** and lib/** are clean today (regression baseline)", () => {
