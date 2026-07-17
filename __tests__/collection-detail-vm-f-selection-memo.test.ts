@@ -48,6 +48,17 @@ describe("VM-F — SelectableItemRow memoization end-to-end", () => {
       src,
       /(?:import\s*\{[^}]*\bmemo\b[^}]*\}\s*from\s*"react"|import\s+React\s+from\s*"react")/,
     );
+    // The inner function must be the NAMED form — `memo(function
+    // SelectableItemRow(...))`, not `memo((props) => ...)`. The named form
+    // gives React DevTools a real component name in the profiler tree;
+    // anonymous rows show up as "Anonymous" and are much harder to diagnose
+    // — which matters now that the selection FlatList ships a __DEV__
+    // Profiler wrapper.
+    assert.match(
+      src,
+      /memo\(\s*function\s+SelectableItemRow\b/,
+      "SelectableItemRow's inner function must be named (memo(function SelectableItemRow(...)))",
+    );
   });
 
   it("app/collection/[id].tsx declares toggleSelect as a stable useCallback", () => {
