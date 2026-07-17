@@ -106,6 +106,21 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     assert.match(src, /<FlatList[\s\S]*?keyExtractor=\{\s*\(item\)\s*=>\s*item\.id\s*\}[\s\S]*?\/>/);
   });
 
+  it("no list renderer ever passes an unbounded array as data (only the chunked visibleItems window)", () => {
+    // The negative companion to the positive `data={visibleItems}` pins
+    // above: the positive assertions prove SOME list uses the window, but a
+    // future contributor swapping ONE of the three renderers (viewer
+    // FlatList, selection FlatList, drag NestableDraggableFlatList) to
+    // `data={items}` (or the wider allItems/filteredItems arrays) would
+    // silently re-introduce the unbounded mount the whole VM series was
+    // designed to prevent — and the positive pins would still pass because
+    // the OTHER renderers still match. The blanket doesNotMatch closes that
+    // per-renderer regression vector.
+    assert.doesNotMatch(src, /data=\{\s*items\s*\}/);
+    assert.doesNotMatch(src, /data=\{\s*allItems\s*\}/);
+    assert.doesNotMatch(src, /data=\{\s*filteredItems\s*\}/);
+  });
+
   it("EmptyState branches still gate off items.length / allItems.length — NOT visibleItems.length", () => {
     // The "no items" + "no filter matches" empty-state cards must fire
     // when the underlying list is empty, not when the visible window is
