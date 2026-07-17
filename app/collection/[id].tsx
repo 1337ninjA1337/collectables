@@ -1110,7 +1110,14 @@ export default function CollectionDetailsScreen() {
             }
             initialNumToRender={10}
             maxToRenderPerBatch={8}
-            windowSize={5}
+            // BB-C: windowSize 7 (not the nested-era 5) — now that this
+            // FlatList owns its scroll, the window is what prevents blank
+            // rows during fast flicks; 5 viewports was tuned for the old
+            // nested shape where the outer ScrollView mounted everything
+            // anyway. 7 trades ~2 extra offscreen rows of memory for
+            // flick-resilience; the viewer branch keeps 5 because its
+            // 2-column masonry mounts twice the cards per viewport.
+            windowSize={7}
             removeClippedSubviews={Platform.OS === "ios"}
             style={styles.viewerFlatList}
           />
