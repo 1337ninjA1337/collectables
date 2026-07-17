@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Profiler, useCallback, useEffect, useMemo, useRef, useState, type ProfilerOnRenderCallback } from "react";
 import { Alert, FlatList, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
@@ -259,6 +259,24 @@ export default function CollectionDetailsScreen() {
   // row pays a hidden-class property read rather than `Set.prototype.has`'s
   // generic dispatch. Same complexity, smaller constant factor on large
   // chunked windows.
+  // __DEV__-only Profiler telemetry for the selection-mode FlatList: logs
+  // each commit's actualDuration to Metro so a future refactor that
+  // re-introduces an unmemoized renderItem (or breaks the row memo) shows
+  // up as ballooning per-toggle commit times the moment it lands. The
+  // logging is double-gated — `__DEV__` compiles the body away in prod
+  // bundles, and `selectedIds.size > 0` keeps idle browsing quiet. The
+  // <Profiler> wrapper itself stays mounted in prod, where React's
+  // production build treats it as a passthrough (no timings collected).
+  // Hoisted above the early returns for the usual hook-order reason.
+  const onSelectionProfilerRender = useCallback<ProfilerOnRenderCallback>(
+    (id, phase, actualDuration) => {
+      if (__DEV__ && selectedIds.size > 0) {
+        console.log(`[profiler] ${id} ${phase} actualDuration=${actualDuration.toFixed(2)}ms`);
+      }
+    },
+    [selectedIds],
+  );
+
   const selectedById = useMemo(
     () => Object.fromEntries(Array.from(selectedIds, (id) => [id, true])),
     [selectedIds],
@@ -1108,19 +1126,21 @@ export default function CollectionDetailsScreen() {
           // `initialNumToRender` and React.memo, so the per-row image fetch
           // cost in selection mode no longer scales linearly with collection
           // size.
-          <FlatList
-            data={visibleItems}
-            keyExtractor={(item) => item.id}
-            renderItem={renderSelectableRow}
-            extraData={selectedIds}
-            getItemLayout={getSelectableRowLayout}
-            scrollEnabled={false}
-            contentContainerStyle={styles.selectList}
-            initialNumToRender={10}
-            maxToRenderPerBatch={8}
-            windowSize={5}
-            removeClippedSubviews={Platform.OS === "ios"}
-          />
+          <Profiler id="selection-flatlist" onRender={onSelectionProfilerRender}>
+            <FlatList
+              data={visibleItems}
+              keyExtractor={(item) => item.id}
+              renderItem={renderSelectableRow}
+              extraData={selectedIds}
+              getItemLayout={getSelectableRowLayout}
+              scrollEnabled={false}
+              contentContainerStyle={styles.selectList}
+              initialNumToRender={10}
+              maxToRenderPerBatch={8}
+              windowSize={5}
+              removeClippedSubviews={Platform.OS === "ios"}
+            />
+          </Profiler>
         ) : null}
         {loadMoreCta}
       </View>
