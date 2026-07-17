@@ -8,8 +8,8 @@ import path from "node:path";
  * branch in `app/collection/[id].tsx` renders a `<FlatList data={visibleItems}>`
  * that OWNS its scroll — a VM-D-style early return inside
  * `<Screen scroll={false}>` with pageHeader + title/filters in
- * ListHeaderComponent, the Load-more CTA + bulk-bar spacer in
- * ListFooterComponent, and `<BulkBar>` as a sibling OUTSIDE the FlatList's
+ * ListHeaderComponent, the bulk-bar spacer in ListFooterComponent
+ * (pagination is onEndReached-driven), and `<BulkBar>` as a sibling OUTSIDE the FlatList's
  * render tree (fixes the iOS touch fall-through the old absolutely-pinned
  * bar had over a nested non-scrolling list).
  *
@@ -58,11 +58,18 @@ describe("app/collection/[id].tsx — VM-E/BB-B selection-mode FlatList", () => 
     );
   });
 
-  it("pageHeader + filters ride in ListHeaderComponent; CTA + spacer in ListFooterComponent", () => {
+  it("pageHeader + filters ride in ListHeaderComponent; spacer-only footer + onEndReached pagination", () => {
     const block = selectionBranch(readSrc());
     assert.match(block, /ListHeaderComponent=\{[\s\S]*?\{pageHeader\}[\s\S]*?\{listTitleAndFilters\}/);
     assert.match(block, /onLayout=\{\s*onSelectionHeaderLayout\s*\}/, "header must be measured for getItemLayout's offset");
-    assert.match(block, /ListFooterComponent=\{[\s\S]*?\{loadMoreCta\}[\s\S]*?bulkBarSpacer/);
+    // Pagination is onEndReached-driven now that the list owns scroll — the
+    // footer carries ONLY the bulk-bar spacer; the manual Load-more CTA
+    // lives solely in the nested drag-mode fallback where onEndReached
+    // can't fire.
+    assert.match(block, /ListFooterComponent=\{\s*<View\s+style=\{\s*styles\.bulkBarSpacer\s*\}\s*\/>\s*\}/);
+    assert.match(block, /onEndReached=\{\s*hasMore\s*\?\s*loadMore\s*:\s*undefined\s*\}/);
+    assert.match(block, /onEndReachedThreshold=\{\s*0\.5\s*\}/);
+    assert.doesNotMatch(block, /loadMoreCta/, "the selection branch must not render the manual Load-more CTA");
   });
 
   it("<BulkBar> is a sibling outside the FlatList render tree", () => {
