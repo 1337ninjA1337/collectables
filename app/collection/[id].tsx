@@ -11,7 +11,7 @@ import { VisibilityBadge } from "@/components/visibility-badge";
 import { SkeletonCollectionDetail } from "@/components/skeleton";
 import { NestableDraggableFlatList, RenderItemParams, ScaleDecorator } from "../../components/DraggableList";
 
-import { ItemCard } from "@/components/item-card";
+import { COMPACT_ITEM_CARD_HEIGHT, ItemCard } from "@/components/item-card";
 import { ReactionBar } from "@/components/reaction-bar";
 import { CostBadge } from "@/components/cost-badge";
 import { CurrencySheet } from "@/components/currency-sheet";
@@ -311,6 +311,32 @@ export default function CollectionDetailsScreen() {
       />
     ),
     [selectedById, toggleSelect],
+  );
+
+  // Viewer-branch getItemLayout: compact cards are fixed-height
+  // (COMPACT_ITEM_CARD_HEIGHT — see item-card.tsx for the derivation, which
+  // is what makes this legal: the title reserves a 2-line block and the cost
+  // badge renders inside a fixed slot). With `numColumns={2}` FlatList still
+  // calls getItemLayout per ITEM index, so the vertical position divides by
+  // the column count (the literal 2 must match the numColumns prop below).
+  // Same measured-header + row-gap shape as `getSelectableRowLayout`: the
+  // ListHeaderComponent's height is dynamic (cover image, i18n) so it's
+  // measured via onLayout, and the stride includes the contentContainer's
+  // SPACING_LIST row gap.
+  const [viewerHeaderHeight, setViewerHeaderHeight] = useState(0);
+  const onViewerHeaderLayout = useCallback((e: LayoutChangeEvent) => {
+    setViewerHeaderHeight(e.nativeEvent.layout.height);
+  }, []);
+  const getMasonryRowLayout = useCallback(
+    (_data: unknown, index: number) => ({
+      length: COMPACT_ITEM_CARD_HEIGHT,
+      offset:
+        viewerHeaderHeight +
+        SPACING_LIST +
+        (COMPACT_ITEM_CARD_HEIGHT + SPACING_LIST) * Math.floor(index / 2),
+      index,
+    }),
+    [viewerHeaderHeight],
   );
 
   // VM-F (viewer branch): same hoist for the masonry FlatList — the inline
@@ -1054,12 +1080,13 @@ export default function CollectionDetailsScreen() {
           columnWrapperStyle={styles.masonryRow}
           contentContainerStyle={styles.viewerFlatListContent}
           ListHeaderComponent={
-            <View style={styles.viewerListHeader}>
+            <View style={styles.viewerListHeader} onLayout={onViewerHeaderLayout}>
               {pageHeader}
               <View style={styles.listWrap}>{listTitleAndFilters}</View>
             </View>
           }
           renderItem={renderMasonryItem}
+          getItemLayout={getMasonryRowLayout}
           // Native pagination: auto-extend the chunked window as the user
           // scrolls within half a viewport of the end — replaces the manual
           // Load-more CTA the nested-ScrollView era needed. `undefined` once
