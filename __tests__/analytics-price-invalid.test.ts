@@ -6,6 +6,7 @@ import { describe, it } from "node:test";
 import { classifyInvalidPrice } from "../lib/analytics-helpers";
 import { ANALYTICS_EVENTS } from "../lib/analytics-events";
 import { findPiiPropKeys } from "../lib/analytics-pii";
+import { parseCurrencyValueDetailed } from "../lib/format-currency-input";
 
 const ROOT = join(__dirname, "..");
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -43,16 +44,23 @@ describe("classifyInvalidPrice — reason taxonomy", () => {
     }
   });
 
-  it("stays in lock-step with parseCurrencyValue's gates (structural pin)", () => {
-    // The classifier mirrors the parser's decision order; if these gate
-    // shapes change in components/currency-input.tsx, revisit
-    // classifyInvalidPrice in lib/analytics-helpers.ts.
-    const src = read("components/currency-input.tsx");
-    const parserIdx = src.indexOf("export function parseCurrencyValue");
-    assert.ok(parserIdx >= 0, "parseCurrencyValue not found");
-    const block = src.slice(parserIdx, parserIdx + 400);
-    assert.match(block, /if\s*\(\s*!value\.trim\(\)\s*\)\s*return null/);
-    assert.match(block, /!Number\.isFinite\(n\)\s*\|\|\s*n\s*<=\s*0/);
+  it("delegates outright to parseCurrencyValueDetailed (no second decision table)", () => {
+    // The classifier and the parser used to be two pinned copies; now the
+    // classifier IS the parser's error channel, so drift is impossible.
+    const src = read("lib/analytics-helpers.ts");
+    assert.match(src, /return parseCurrencyValueDetailed\(raw\)\.error;/);
+    assert.match(
+      src,
+      /import \{\s*parseCurrencyValueDetailed,\s*type CurrencyValueError,\s*\} from "@\/lib\/format-currency-input"/,
+    );
+    assert.match(src, /export type InvalidPriceReason = CurrencyValueError;/);
+    for (const raw of ["", "  ", "abc", "1.2.3", "0", "-5", "12.50"]) {
+      assert.equal(
+        classifyInvalidPrice(raw),
+        parseCurrencyValueDetailed(raw).error,
+        JSON.stringify(raw),
+      );
+    }
   });
 });
 

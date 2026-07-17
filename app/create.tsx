@@ -5,11 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
-import {
-  CURRENCY_ERROR_I18N_KEY,
-  parseCurrencyValueDetailed,
-  type CurrencyValueError,
-} from "@/components/currency-input";
 import { CurrencySheet } from "@/components/currency-sheet";
 import { ErrorPill } from "@/components/error-pill";
 import { PhotoPreview } from "@/components/photo-preview";
@@ -19,6 +14,11 @@ import { trackEvent } from "@/lib/analytics";
 import { summarisePayload } from "@/lib/analytics-helpers";
 import { uploadImages } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
+import {
+  CURRENCY_ERROR_I18N_KEY,
+  parseCurrencyValueDetailed,
+  type CurrencyValueError,
+} from "@/lib/format-currency-input";
 import { useI18n } from "@/lib/i18n-context";
 import {
   getDefaultCurrencyForLanguage,

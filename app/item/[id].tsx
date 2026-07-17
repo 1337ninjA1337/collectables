@@ -6,12 +6,14 @@ import { CostBadge } from "@/components/cost-badge";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
 import {
-  CURRENCY_ERROR_I18N_KEY,
   CurrencyInput,
   getDefaultCurrencyForLanguage,
+} from "@/components/currency-input";
+import {
+  CURRENCY_ERROR_I18N_KEY,
   parseCurrencyValueDetailed,
   type CurrencyValueError,
-} from "@/components/currency-input";
+} from "@/lib/format-currency-input";
 import { getUserPreferredCurrency, setUserPreferredCurrency } from "@/lib/locale-helpers";
 import { SkeletonItemDetail } from "@/components/skeleton";
 
