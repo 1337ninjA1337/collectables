@@ -16,6 +16,7 @@ import { ReactionBar } from "@/components/reaction-bar";
 import { CostBadge } from "@/components/cost-badge";
 import { CurrencySheet } from "@/components/currency-sheet";
 import { Screen } from "@/components/screen";
+import { BulkBar } from "@/components/bulk-bar";
 import { SELECTABLE_ROW_HEIGHT, SelectableItemRow } from "@/components/selectable-item-row";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
@@ -52,18 +53,14 @@ import {
   DANGER,
   DANGER_DEEP_4,
   DANGER_SOFT_2,
-  DANGER_SOFT_5,
   HERO_DARK,
   HERO_DARK_2,
-  HERO_DARK_8,
-  HERO_DARK_9,
   MUTED,
   MUTED_2,
   MUTED_3,
   MUTED_5,
   MUTED_10,
   MUTED_17,
-  MUTED_22,
   MUTED_23,
   PLACEHOLDER,
   PURE_WHITE,
@@ -1150,30 +1147,12 @@ export default function CollectionDetailsScreen() {
       ) : null}
 
       {selectionMode ? (
-        <View style={styles.bulkBar} pointerEvents="box-none">
-          <View style={styles.bulkBarInner}>
-            <Text style={styles.bulkBarCount}>{t("selectedCount", { count: selectedIds.size })}</Text>
-            <View style={styles.bulkBarButtons}>
-              <Pressable
-                style={{...styles.bulkBarButton, ...(selectedIds.size === 0 ? styles.bulkBarButtonDisabled : {})}}
-                disabled={selectedIds.size === 0}
-                onPress={handleOpenMove}
-              >
-                <Text style={styles.bulkBarButtonText}>{t("moveToCollection")}</Text>
-              </Pressable>
-              <Pressable
-                style={{...styles.bulkBarButton, ...styles.bulkBarButtonDanger, ...(selectedIds.size === 0 ? styles.bulkBarButtonDisabled : {})}}
-                disabled={selectedIds.size === 0}
-                onPress={handleBulkDelete}
-              >
-                <Text style={{...styles.bulkBarButtonText, ...styles.bulkBarButtonDangerText}}>{t("delete")}</Text>
-              </Pressable>
-              <Pressable style={{...styles.bulkBarButton, ...styles.bulkBarButtonGhost}} onPress={exitSelectionMode}>
-                <Text style={styles.bulkBarButtonText}>{t("cancel")}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
+        <BulkBar
+          count={selectedIds.size}
+          onMove={handleOpenMove}
+          onDelete={handleBulkDelete}
+          onCancel={exitSelectionMode}
+        />
       ) : null}
 
       {modalsBlock}
@@ -1505,67 +1484,6 @@ const styles = StyleSheet.create({
   },
   bulkBarSpacer: {
     height: 120,
-  },
-  bulkBar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 18,
-    paddingTop: 12,
-  },
-  bulkBarInner: {
-    backgroundColor: HERO_DARK,
-    borderRadius: RADIUS_CARD,
-    padding: 14,
-    gap: SPACING_CARD,
-    shadowColor: HERO_DARK_9,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 18,
-    elevation: 10,
-  },
-  bulkBarCount: {
-    color: AMBER_LIGHT_2,
-    fontSize: 14,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  bulkBarButtons: {
-    flexDirection: "row",
-    gap: SPACING_INLINE,
-    flexWrap: "wrap",
-  },
-  bulkBarButton: {
-    flexGrow: 1,
-    flexBasis: 0,
-    minWidth: 100,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    backgroundColor: HERO_DARK_8,
-    alignItems: "center",
-  },
-  bulkBarButtonDisabled: {
-    opacity: 0.45,
-  },
-  bulkBarButtonDanger: {
-    backgroundColor: DANGER_DEEP_4,
-  },
-  bulkBarButtonGhost: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: MUTED_22,
-  },
-  bulkBarButtonText: {
-    color: TEXT_ON_DARK_4,
-    fontSize: 13,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  bulkBarButtonDangerText: {
-    color: DANGER_SOFT_5,
   },
   modalBackdrop: {
     flex: 1,
