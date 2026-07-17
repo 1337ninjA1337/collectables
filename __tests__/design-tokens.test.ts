@@ -1437,16 +1437,25 @@ describe("design-tokens adoption", () => {
     const src = read("components/empty-state.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     // PR4: title/hint/wrap colors now come from useAppTheme(); container radius
-    // bumped to RADIUS_CARD_AIRY.
+    // bumped to RADIUS_CARD_AIRY. The concentric icon rings (AMBER_SOFT_5 +
+    // CARD_BG_* gradient) moved into components/icon-badge.tsx — pinned below.
     assert.match(src, /from\s+"@\/components\/use-app-theme"/);
     assert.match(src, /\bAMBER_ACCENT\b/);
+    assert.match(src, /\bAMBER_SOFT_3\b/);
+    assert.match(src, /\bRADIUS_CARD_AIRY\b/);
+    assert.match(src, /\bTEXT_ON_DARK_5\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/icon-badge.tsx carries the concentric-ring gradient tokens and no inline hex literals", () => {
+    const src = read("components/icon-badge.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /\bAMBER_SOFT_3\b/);
     assert.match(src, /\bAMBER_SOFT_5\b/);
     assert.match(src, /\bCARD_BG_2\b/);
     assert.match(src, /\bCARD_BG_3\b/);
     assert.match(src, /\bCARD_BG_14\b/);
-    assert.match(src, /\bRADIUS_CARD_AIRY\b/);
-    assert.match(src, /\bTEXT_ON_DARK_5\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
