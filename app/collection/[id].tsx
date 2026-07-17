@@ -1,7 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState, type ProfilerOnRenderCallback } from "react";
-import { Alert, FlatList, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { EmptyState } from "@/components/empty-state";
@@ -83,19 +83,6 @@ import {
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_9,
 } from "@/lib/design-tokens";
-
-// Selection-mode rows are fixed-height (SELECTABLE_ROW_HEIGHT, see
-// selectable-item-row.tsx for the derivation), so FlatList can be told the
-// geometry up-front and skip the per-row onLayout measurement pass. The
-// offset stride includes the `selectList` contentContainer gap
-// (SPACING_CARD) — omitting it would drift the windowing math by 12px per
-// row. Module-level (not useCallback) because it closes over constants only,
-// giving FlatList a referentially stable prop for free.
-const getSelectableRowLayout = (_data: unknown, index: number) => ({
-  length: SELECTABLE_ROW_HEIGHT,
-  offset: (SELECTABLE_ROW_HEIGHT + SPACING_CARD) * index,
-  index,
-});
 
 export default function CollectionDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -277,6 +264,29 @@ export default function CollectionDetailsScreen() {
   const selectedById = useMemo(
     () => Object.fromEntries(Array.from(selectedIds, (id) => [id, true])),
     [selectedIds],
+  );
+
+  // BB-B: selection rows are fixed-height (SELECTABLE_ROW_HEIGHT, see
+  // selectable-item-row.tsx for the derivation), so FlatList can be told the
+  // geometry up-front and skip the per-row onLayout measurement pass. Now
+  // that the selection FlatList owns its scroll and renders pageHeader via
+  // ListHeaderComponent, every row offset is shifted by the measured header
+  // height plus the contentContainer gap between header and first row —
+  // the header is measured via onLayout because the hero block's height is
+  // dynamic (cover image, description length, i18n). The per-row stride
+  // still includes the `selectList` gap (SPACING_CARD); dropping either gap
+  // term would drift the windowing math by 12px per row.
+  const [selectionHeaderHeight, setSelectionHeaderHeight] = useState(0);
+  const onSelectionHeaderLayout = useCallback((e: LayoutChangeEvent) => {
+    setSelectionHeaderHeight(e.nativeEvent.layout.height);
+  }, []);
+  const getSelectableRowLayout = useCallback(
+    (_data: unknown, index: number) => ({
+      length: SELECTABLE_ROW_HEIGHT,
+      offset: selectionHeaderHeight + SPACING_CARD + (SELECTABLE_ROW_HEIGHT + SPACING_CARD) * index,
+      index,
+    }),
+    [selectionHeaderHeight],
   );
 
   // VM-F: hoist the selection-mode FlatList renderItem into a `useCallback`
@@ -1065,6 +1075,57 @@ export default function CollectionDetailsScreen() {
     );
   }
 
+  // BB-B: selection mode owns its scroll. Pre-BB-B the selection FlatList
+  // sat inside `<Screen nestable>` with `scrollEnabled={false}`, so no real
+  // virtualization could kick in and the absolutely-pinned bulk-bar created
+  // an iOS touch fall-through near the bar. Mirrors VM-D's early-return
+  // shape: the FlatList owns scroll, pageHeader + title/filters ride in
+  // ListHeaderComponent, the Load-more CTA + bulk-bar spacer ride in
+  // ListFooterComponent (the spacer keeps the last rows scrollable clear of
+  // the bar), and <BulkBar> is a sibling OUTSIDE the FlatList's render tree
+  // so its touches never race the list's responder.
+  if (isOwner && selectionMode && allItems.length > 0) {
+    return (
+      <Screen scroll={false}>
+        <Stack.Screen options={{ title: activeCollection.name }} />
+        <Profiler id="selection-flatlist" onRender={onSelectionProfilerRender}>
+          <FlatList
+            data={visibleItems}
+            keyExtractor={(item) => item.id}
+            renderItem={renderSelectableRow}
+            extraData={selectedIds}
+            getItemLayout={getSelectableRowLayout}
+            contentContainerStyle={styles.selectList}
+            ListHeaderComponent={
+              <View style={styles.viewerListHeader} onLayout={onSelectionHeaderLayout}>
+                {pageHeader}
+                <View style={styles.listWrap}>{listTitleAndFilters}</View>
+              </View>
+            }
+            ListFooterComponent={
+              <>
+                {loadMoreCta}
+                <View style={styles.bulkBarSpacer} />
+              </>
+            }
+            initialNumToRender={10}
+            maxToRenderPerBatch={8}
+            windowSize={5}
+            removeClippedSubviews={Platform.OS === "ios"}
+            style={styles.viewerFlatList}
+          />
+        </Profiler>
+        <BulkBar
+          count={selectedIds.size}
+          onMove={handleOpenMove}
+          onDelete={handleBulkDelete}
+          onCancel={exitSelectionMode}
+        />
+        {modalsBlock}
+      </Screen>
+    );
+  }
+
   return (
     <Screen nestable refreshing={refreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: activeCollection.name }} />
@@ -1112,48 +1173,11 @@ export default function CollectionDetailsScreen() {
             }}
             contentContainerStyle={styles.draggableList}
           />
-        ) : isOwner && selectionMode ? (
-          // VM-E: selection-mode now renders via `<FlatList>` so the same
-          // chunked-window mount discipline that VM-A/B/C/D applies to the
-          // viewer branch also bounds selection mode. `scrollEnabled={false}`
-          // because the outer `<Screen nestable>` ScrollView owns scrolling
-          // — selection mode keeps the bulk-bar pinned at the bottom of the
-          // viewport so it can't be hoisted into the FlatList without losing
-          // the bulk-bar UX. FlatList still limits the initial mount via
-          // `initialNumToRender` and React.memo, so the per-row image fetch
-          // cost in selection mode no longer scales linearly with collection
-          // size.
-          <Profiler id="selection-flatlist" onRender={onSelectionProfilerRender}>
-            <FlatList
-              data={visibleItems}
-              keyExtractor={(item) => item.id}
-              renderItem={renderSelectableRow}
-              extraData={selectedIds}
-              getItemLayout={getSelectableRowLayout}
-              scrollEnabled={false}
-              contentContainerStyle={styles.selectList}
-              initialNumToRender={10}
-              maxToRenderPerBatch={8}
-              windowSize={5}
-              removeClippedSubviews={Platform.OS === "ios"}
-            />
-          </Profiler>
         ) : null}
         {loadMoreCta}
       </View>
 
-      {selectionMode ? (
-        <View style={styles.bulkBarSpacer} />
-      ) : null}
 
-      {selectionMode ? (
-        <BulkBar
-          count={selectedIds.size}
-          onMove={handleOpenMove}
-          onDelete={handleBulkDelete}
-          onCancel={exitSelectionMode}
-        />
-      ) : null}
 
       {modalsBlock}
     </Screen>

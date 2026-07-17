@@ -35,7 +35,7 @@ describe("BB-A — BulkBar extraction", () => {
 
   it("the page passes the four hoisted handlers into <BulkBar>", () => {
     const src = readCollectionSrc();
-    const m = src.match(/<BulkBar[\s\S]*?\/>/);
+    const m = src.match(/<BulkBar\s+count=[\s\S]*?\/>/);
     assert.ok(m, "<BulkBar> call site not found");
     const site = m[0];
     assert.match(site, /count=\{\s*selectedIds\.size\s*\}/);

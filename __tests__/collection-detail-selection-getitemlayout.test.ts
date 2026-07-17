@@ -4,18 +4,22 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * Selection-mode FlatList `getItemLayout` pins: rows are fixed-height, so
- * FlatList is handed the geometry up-front (skipping the per-row onLayout
- * measurement pass). Three legs, each independently revertable:
+ * Selection-mode FlatList `getItemLayout` pins (as amended by BB-B): rows
+ * are fixed-height, so FlatList is handed the geometry up-front. Since
+ * BB-B the selection FlatList owns its scroll and renders pageHeader via
+ * ListHeaderComponent, so every row offset is shifted by the measured
+ * header height plus the contentContainer gap between header and first
+ * row. Three legs, each independently revertable:
  *
  *   1. `components/selectable-item-row.tsx` exports SELECTABLE_ROW_HEIGHT
- *      and its value matches the style-derived geometry (104px image +
- *      2*12px card padding + 2*1px card border + 2*2px selection border).
- *   2. `app/collection/[id].tsx` declares a module-level
- *      `getSelectableRowLayout` whose offset stride includes the
- *      `selectList` contentContainer gap (SPACING_CARD) — without the gap
- *      term the windowing math drifts 12px per row.
- *   3. The selection-mode FlatList actually passes
+ *      matching the style-derived geometry (104px image + 2*12px card
+ *      padding + 2*1px card border + 2*2px selection border).
+ *   2. `app/collection/[id].tsx` derives `getSelectableRowLayout` as a
+ *      useCallback over the measured `selectionHeaderHeight` whose offset
+ *      is `selectionHeaderHeight + SPACING_CARD + (SELECTABLE_ROW_HEIGHT +
+ *      SPACING_CARD) * index` — dropping either gap term drifts the
+ *      windowing math 12px per row.
+ *   3. The selection-mode FlatList passes
  *      `getItemLayout={getSelectableRowLayout}`.
  */
 function readCollectionSrc(): string {
@@ -34,32 +38,40 @@ describe("selection-mode FlatList getItemLayout", () => {
     // 104 (ItemCard image) + 24 (card padding) + 2 (card border) + 4
     // (selection border). If this fails because the card geometry changed,
     // update BOTH the constant and this expectation together.
-    assert.equal(Number(m[1]), 134);
+    assert.equal(Number(m![1]), 134);
   });
 
-  it("app/collection/[id].tsx declares a module-level getSelectableRowLayout with a gap-aware offset", () => {
+  it("getSelectableRowLayout is a useCallback with a header-and-gap-aware offset", () => {
     const src = readCollectionSrc();
     const m = src.match(
-      /const\s+getSelectableRowLayout\s*=\s*\([^)]*\)\s*=>\s*\(\{\s*length:\s*SELECTABLE_ROW_HEIGHT\s*,\s*offset:\s*\(SELECTABLE_ROW_HEIGHT\s*\+\s*SPACING_CARD\)\s*\*\s*index\s*,\s*index\s*,?\s*\}\)/,
+      /const\s+getSelectableRowLayout\s*=\s*useCallback\(\s*\([^)]*\)\s*=>\s*\(\{\s*length:\s*SELECTABLE_ROW_HEIGHT\s*,\s*offset:\s*selectionHeaderHeight\s*\+\s*SPACING_CARD\s*\+\s*\(SELECTABLE_ROW_HEIGHT\s*\+\s*SPACING_CARD\)\s*\*\s*index\s*,\s*index\s*,?\s*\}\)\s*,\s*\[\s*selectionHeaderHeight\s*\]\s*,?\s*\)/,
     );
     assert.ok(
       m,
-      "getSelectableRowLayout must return { length: SELECTABLE_ROW_HEIGHT, offset: (SELECTABLE_ROW_HEIGHT + SPACING_CARD) * index, index }",
+      "getSelectableRowLayout must be a useCallback returning { length: SELECTABLE_ROW_HEIGHT, offset: selectionHeaderHeight + SPACING_CARD + (SELECTABLE_ROW_HEIGHT + SPACING_CARD) * index, index } with deps [selectionHeaderHeight]",
     );
-    // Module-level, not a hook: it must appear BEFORE the component function
-    // so its reference is stable without useCallback.
+    // Hoisted above the early returns like every other hook in this file.
     const declIdx = src.indexOf("const getSelectableRowLayout");
-    const componentIdx = src.indexOf("export default function CollectionDetailsScreen");
-    assert.ok(declIdx !== -1 && componentIdx !== -1 && declIdx < componentIdx);
+    const earlyReturnIdx = src.indexOf("if (loadingRemote && !collection)");
+    assert.ok(declIdx !== -1 && earlyReturnIdx !== -1 && declIdx < earlyReturnIdx);
+  });
+
+  it("the header height feeding the offset is measured via onSelectionHeaderLayout", () => {
+    const src = readCollectionSrc();
+    assert.match(src, /const\s+\[selectionHeaderHeight,\s*setSelectionHeaderHeight\]\s*=\s*useState\(0\)/);
+    assert.match(
+      src,
+      /const\s+onSelectionHeaderLayout\s*=\s*useCallback\(\s*\(e:\s*LayoutChangeEvent\)\s*=>\s*\{\s*setSelectionHeaderHeight\(e\.nativeEvent\.layout\.height\)/,
+    );
   });
 
   it("the selection-mode FlatList passes getItemLayout={getSelectableRowLayout}", () => {
     const src = readCollectionSrc();
     const m = src.match(
-      /isOwner\s*&&\s*selectionMode\s*\?\s*\(\s*\n?[\s\S]*?\n\s*\)\s*:\s*null\s*\}/,
+      /if\s*\(isOwner\s*&&\s*selectionMode\s*&&\s*allItems\.length\s*>\s*0\)\s*\{[\s\S]*?<\/Screen>\s*\)\s*;\s*\}/,
     );
-    assert.ok(m, "selection-mode FlatList block not found");
-    assert.match(m[0], /getItemLayout=\{\s*getSelectableRowLayout\s*\}/);
+    assert.ok(m, "selection-mode branch not found");
+    assert.match(m![0], /getItemLayout=\{\s*getSelectableRowLayout\s*\}/);
   });
 
   it("the selectList contentContainer gap the offset stride assumes is still SPACING_CARD", () => {
