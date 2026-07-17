@@ -3,61 +3,84 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { classifyInvalidPrice } from "../lib/analytics-helpers";
+import {
+  parseCurrencyValue,
+  parseCurrencyValueDetailed,
+} from "../lib/format-currency-input";
 
 const ROOT = join(__dirname, "..");
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
-// parseCurrencyValueDetailed lives in components/currency-input.tsx (pulls
-// react-native at module scope), so — like the classifyInvalidPrice lock-step
-// suite — its gates are pinned structurally and the runtime truth table rides
-// the shared classifier, whose vocabulary the parser deliberately reuses.
-describe("parseCurrencyValueDetailed — structural pins", () => {
-  const src = read("components/currency-input.tsx");
-
-  it("declares the error vocabulary shared with InvalidPriceReason", () => {
-    assert.match(
-      src,
-      /export type CurrencyValueError = "empty" \| "unparseable" \| "non_positive"/,
-    );
-    assert.match(src, /\{ value: number; error: null \}/);
-    assert.match(src, /\{ value: null; error: CurrencyValueError \}/);
+// Both parsers now live in the pure lib/format-currency-input.ts (no
+// react-native at module scope), so the truth tables below run against the
+// REAL parsers instead of riding classifyInvalidPrice's pinned copy.
+describe("parseCurrencyValueDetailed — truth table", () => {
+  it("empty / whitespace-only input is 'empty'", () => {
+    for (const raw of ["", "   ", "\n"]) {
+      assert.deepEqual(
+        parseCurrencyValueDetailed(raw),
+        { value: null, error: "empty" },
+        JSON.stringify(raw),
+      );
+    }
   });
 
-  it("mirrors parseCurrencyValue's gate order (empty → non-finite → <= 0)", () => {
-    const idx = src.indexOf("export function parseCurrencyValueDetailed");
-    assert.ok(idx >= 0, "parseCurrencyValueDetailed not found");
-    const block = src.slice(idx, idx + 500);
-    const emptyGate = block.indexOf('if (!value.trim()) return { value: null, error: "empty" }');
-    const finiteGate = block.indexOf('if (!Number.isFinite(n)) return { value: null, error: "unparseable" }');
-    const positiveGate = block.indexOf('if (n <= 0) return { value: null, error: "non_positive" }');
-    assert.ok(emptyGate >= 0, "empty gate missing");
-    assert.ok(finiteGate > emptyGate, "non-finite gate missing or out of order");
-    assert.ok(positiveGate > finiteGate, "non-positive gate missing or out of order");
-    assert.match(block, /return \{ value: n, error: null \}/);
+  it("non-numeric input is 'unparseable'", () => {
+    for (const raw of ["abc", "1.2.3", "12,50", "1 000"]) {
+      assert.deepEqual(
+        parseCurrencyValueDetailed(raw),
+        { value: null, error: "unparseable" },
+        JSON.stringify(raw),
+      );
+    }
   });
 
-  it("keeps the happy-path parseCurrencyValue shape untouched", () => {
-    const idx = src.indexOf("export function parseCurrencyValue(");
-    assert.ok(idx >= 0);
-    const block = src.slice(idx, idx + 400);
-    assert.match(block, /number \| null/);
-    assert.match(block, /if\s*\(\s*!value\.trim\(\)\s*\)\s*return null/);
+  it("zero / negative input is 'non_positive'", () => {
+    for (const raw of ["0", "-1.50", "0.00"]) {
+      assert.deepEqual(
+        parseCurrencyValueDetailed(raw),
+        { value: null, error: "non_positive" },
+        JSON.stringify(raw),
+      );
+    }
+  });
+
+  it("valid input returns the parsed number with a null error", () => {
+    assert.deepEqual(parseCurrencyValueDetailed("12.50"), { value: 12.5, error: null });
+    assert.deepEqual(parseCurrencyValueDetailed(" 5 "), { value: 5, error: null });
+    assert.deepEqual(parseCurrencyValueDetailed("0.99"), { value: 0.99, error: null });
   });
 });
 
-describe("parseCurrencyValueDetailed — truth table via the shared classifier", () => {
-  // classifyInvalidPrice is pinned in lock-step with the parser's gates
-  // (analytics-price-invalid.test.ts), so exercising it covers the same
-  // decision table the detailed parser encodes.
-  it("classifier error matches the vocabulary for every failure class", () => {
-    assert.equal(classifyInvalidPrice(""), "empty");
-    assert.equal(classifyInvalidPrice("   "), "empty");
-    assert.equal(classifyInvalidPrice("1.2.3"), "unparseable");
-    assert.equal(classifyInvalidPrice("abc"), "unparseable");
-    assert.equal(classifyInvalidPrice("0"), "non_positive");
-    assert.equal(classifyInvalidPrice("-1.50"), "non_positive");
-    assert.equal(classifyInvalidPrice("12.50"), null);
+describe("parseCurrencyValue ↔ parseCurrencyValueDetailed — agreement", () => {
+  it("the two parsers never disagree about acceptance or the parsed value", () => {
+    const samples = ["", "   ", "abc", "1.2.3", "12,50", "0", "-5", "0.00", "12", "12.50", " 5 ", "0.99"];
+    for (const raw of samples) {
+      const happy = parseCurrencyValue(raw);
+      const detailed = parseCurrencyValueDetailed(raw);
+      assert.equal(happy, detailed.value, JSON.stringify(raw));
+      assert.equal(happy === null, detailed.error !== null, JSON.stringify(raw));
+    }
+  });
+});
+
+describe("parser home — moved-to-lib sweep", () => {
+  it("the parsers and the i18n-key map live in lib/format-currency-input.ts", () => {
+    const lib = read("lib/format-currency-input.ts");
+    assert.match(lib, /export function parseCurrencyValue\(/);
+    assert.match(lib, /export function parseCurrencyValueDetailed\(/);
+    assert.match(
+      lib,
+      /export type CurrencyValueError = "empty" \| "unparseable" \| "non_positive"/,
+    );
+    assert.match(lib, /export const CURRENCY_ERROR_I18N_KEY = \{/);
+  });
+
+  it("components/currency-input.tsx no longer defines a private parser copy", () => {
+    const src = read("components/currency-input.tsx");
+    assert.doesNotMatch(src, /export function parseCurrencyValue/);
+    assert.doesNotMatch(src, /export type CurrencyValueError/);
+    assert.doesNotMatch(src, /CURRENCY_ERROR_I18N_KEY = \{/);
   });
 });
 

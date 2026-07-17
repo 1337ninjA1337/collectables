@@ -4,6 +4,10 @@
  * per screen.
  */
 
+import {
+  parseCurrencyValueDetailed,
+  type CurrencyValueError,
+} from "@/lib/format-currency-input";
 import type { CollectionVisibility, MarketplaceMode } from "@/lib/types";
 
 /** True for a string that carries visible content once trimmed. */
@@ -115,23 +119,18 @@ export function buildListingDroppedProps(draft: ListingDraft): {
   return { mode: draft.mode, hasPrice: isNonBlank(draft.price) };
 }
 
-export type InvalidPriceReason = "empty" | "unparseable" | "non_positive";
+export type InvalidPriceReason = CurrencyValueError;
 
 /**
- * Classifies WHY a typed price failed `parseCurrencyValue` (components/
- * currency-input.tsx), for `listing_price_invalid.reason`. Kept in
- * lock-step with that parser's decision order (empty → NaN → <= 0); a
- * structural test pins the parser's gates so the two can't drift.
- * Returns `null` for a price the parser would accept — callers fire the
- * event only on a non-null reason, so a classifier/parser mismatch fails
- * silent instead of mislabelling a valid price.
+ * Classifies WHY a typed price failed `parseCurrencyValue` (lib/
+ * format-currency-input.ts), for `listing_price_invalid.reason`. Now that
+ * the parser is pure it delegates outright — the classifier and the inline
+ * error the user sees are the SAME decision table, not two pinned copies.
+ * Returns `null` for a price the parser accepts — callers fire the event
+ * only on a non-null reason, so a valid price can never be mislabelled.
  */
 export function classifyInvalidPrice(raw: string): InvalidPriceReason | null {
-  if (!raw.trim()) return "empty";
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return "unparseable";
-  if (n <= 0) return "non_positive";
-  return null;
+  return parseCurrencyValueDetailed(raw).error;
 }
 
 export function hasReplacedPhotoSet(

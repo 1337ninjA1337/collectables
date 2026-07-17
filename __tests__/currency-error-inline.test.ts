@@ -24,11 +24,12 @@ describe("CurrencyInput — error prop", () => {
     assert.ok(chips > pill, "ErrorPill must sit between the input row and the chips");
   });
 
-  it("maps the full error vocabulary to the three i18n keys", () => {
-    assert.match(src, /empty: "currencyErrorEmpty"/);
-    assert.match(src, /unparseable: "currencyErrorUnparseable"/);
-    assert.match(src, /non_positive: "currencyErrorNonPositive"/);
-    assert.match(src, /satisfies Record<CurrencyValueError, string>/);
+  it("maps the full error vocabulary to the three i18n keys (in the pure lib)", () => {
+    const lib = read("lib/format-currency-input.ts");
+    assert.match(lib, /empty: "currencyErrorEmpty"/);
+    assert.match(lib, /unparseable: "currencyErrorUnparseable"/);
+    assert.match(lib, /non_positive: "currencyErrorNonPositive"/);
+    assert.match(lib, /satisfies Record<CurrencyValueError, string>/);
   });
 });
 
