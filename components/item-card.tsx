@@ -46,7 +46,13 @@ export const ItemCard = memo(function ItemCard({ item, compact }: ItemCardProps)
             <View style={[styles.compactImage, { backgroundColor: placeholderColor(item.id) }]} />
           )}
           <Text style={{ ...styles.compactTitle, color: theme.text }} numberOfLines={2}>{item.title}</Text>
-          <CostBadge item={item} withLabel style={{ ...styles.compactCost, color: theme.meta }} />
+          {/* Fixed-height slot: <CostBadge> renders null for cost-less items,
+              which would collapse the card's gap AND shrink the card — the
+              wrapper keeps the compact card's height deterministic so the
+              viewer FlatList's getItemLayout geometry holds for every row. */}
+          <View style={styles.compactCostSlot}>
+            <CostBadge item={item} withLabel style={{ ...styles.compactCost, color: theme.meta }} />
+          </View>
         </Pressable>
       </Link>
     );
@@ -183,11 +189,40 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     paddingHorizontal: 10,
     fontFamily: FONT_DISPLAY_EDITORIAL,
+    // Deterministic geometry for getItemLayout: the title always occupies
+    // exactly two lines' worth of height (numberOfLines={2} caps the top,
+    // minHeight reserves the bottom), so a 1-line title can't shrink the
+    // card. lineHeight is explicit because RN's per-platform default would
+    // make the reserved block's height platform-dependent.
+    lineHeight: 18,
+    minHeight: 36,
   },
   compactCost: {
     fontSize: 12,
     fontWeight: "600",
     paddingHorizontal: 10,
     fontFamily: FONT_BODY_SEMIBOLD,
+    lineHeight: 16,
+  },
+  // Reserved slot for <CostBadge> — fixed height whether or not the badge
+  // renders (see the JSX comment). Height matches compactCost.lineHeight.
+  compactCostSlot: {
+    height: 16,
   },
 });
+
+/**
+ * Fixed rendered height of the compact card, used by the viewer FlatList's
+ * `getItemLayout` in `app/collection/[id].tsx`. Derivation (top to bottom,
+ * all values from the styles above — update BOTH when the layout changes):
+ *   1  borderWidth (top)
+ * 110  compactImage height
+ *   8  gap (SPACING_INLINE)
+ *  36  compactTitle reserved 2-line block (minHeight)
+ *   8  gap (SPACING_INLINE)
+ *  16  compactCostSlot height
+ *  10  paddingBottom
+ *   1  borderWidth (bottom)
+ * = 190
+ */
+export const COMPACT_ITEM_CARD_HEIGHT = 190;
