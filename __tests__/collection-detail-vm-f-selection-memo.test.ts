@@ -62,21 +62,36 @@ describe("VM-F — SelectableItemRow memoization end-to-end", () => {
     );
   });
 
-  it("app/collection/[id].tsx hoists renderSelectableRow into a useCallback that closes over selectedIds + toggleSelect", () => {
+  it("app/collection/[id].tsx hoists renderSelectableRow into a useCallback that closes over selectedById + toggleSelect", () => {
     const src = readCollectionSrc();
     // The useCallback body renders <SelectableItemRow> with selected/onToggle
-    // props sourced from selectedIds.has(item.id) + toggleSelect.
+    // props sourced from the memoized selectedById map + toggleSelect.
     const m = src.match(
       /const\s+renderSelectableRow\s*=\s*useCallback\s*\(\s*\([\s\S]*?\)\s*=>\s*\([\s\S]*?<SelectableItemRow[\s\S]*?\),\s*\[([^\]]*)\]\s*,?\s*\)/,
     );
     assert.ok(m, "renderSelectableRow must be a useCallback wrapping <SelectableItemRow>");
     const deps = m[1].replace(/\s+/g, "");
-    // Deps must include both selectedIds and toggleSelect (order doesn't
-    // matter). selectedIds drives the per-row `selected` boolean (a new Set
-    // ref each toggle so the closure rebuilds and the child memo can compare
-    // its prop); toggleSelect is stable but listed for honest-deps hygiene.
-    assert.ok(deps.includes("selectedIds"), `deps must include selectedIds, got "${deps}"`);
+    // Deps must include both selectedById and toggleSelect (order doesn't
+    // matter). selectedById is rebuilt whenever the selection Set's
+    // reference changes (each toggle produces a new Set), so the closure
+    // rebuilds and the child memo can compare its `selected` prop;
+    // toggleSelect is stable but listed for honest-deps hygiene.
+    assert.ok(deps.includes("selectedById"), `deps must include selectedById, got "${deps}"`);
     assert.ok(deps.includes("toggleSelect"), `deps must include toggleSelect, got "${deps}"`);
+  });
+
+  it("app/collection/[id].tsx derives selectedById once per selection change and reads it per-row", () => {
+    const src = readCollectionSrc();
+    // The map is a useMemo keyed on the selection Set — rebuilt once per
+    // toggle instead of paying Set.prototype.has per visible row.
+    assert.match(
+      src,
+      /const\s+selectedById\s*=\s*useMemo\(\s*\(\)\s*=>\s*Object\.fromEntries\([\s\S]{0,120}?\),\s*\[\s*selectedIds\s*\]\s*,?\s*\)/,
+      "selectedById must be a useMemo over Object.fromEntries keyed on [selectedIds]",
+    );
+    // The row prop reads the map, not the Set.
+    assert.match(src, /selected=\{\s*!!selectedById\[item\.id\]\s*\}/);
+    assert.doesNotMatch(src, /selected=\{\s*selectedIds\.has\(item\.id\)\s*\}/);
   });
 
   it("app/collection/[id].tsx selection-mode FlatList passes renderItem={renderSelectableRow} (not inline)", () => {
