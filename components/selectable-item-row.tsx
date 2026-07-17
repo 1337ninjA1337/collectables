@@ -11,6 +11,15 @@ type Props = {
   onToggle: (id: string) => void;
 };
 
+// Fixed row height for FlatList `getItemLayout`: the row's height is driven
+// by the ItemCard photo column (104px image + 12px card padding top/bottom
+// + 1px card border top/bottom = 130) plus this wrapper's 2px selection
+// border top/bottom. The text column is capped below that (2-line-clamped
+// description), so the photo column is the height authority. If the 104px
+// image or either border/padding changes, update this constant in lockstep
+// — a stale value here shifts the selection-list windowing math.
+export const SELECTABLE_ROW_HEIGHT = 134;
+
 // VM-F: wrapped in React.memo so the selection-mode FlatList's renderItem
 // (now hoisted into a `useCallback` with `extraData={selectedIds}`) can
 // actually skip work for rows whose `selected` flag and `item` reference
