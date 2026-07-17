@@ -3,6 +3,12 @@ import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import {
+  RING_INNER_SIZE,
+  RING_MIDDLE_SIZE,
+  RING_OUTER_SIZE,
+} from "../lib/design-tokens";
+
 const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
 
@@ -14,11 +20,21 @@ describe("IconBadge — concentric-ring extraction", () => {
   });
 
   it("keeps the intentional 96 → 76 → 56 concentric step (20px per ring)", () => {
-    const sizes = [...src.matchAll(/width:\s*(\d+)/g)].map((m) => Number(m[1]));
-    assert.deepEqual(sizes, [96, 76, 56]);
-    // Perfect circles: each borderRadius is half its ring's size.
-    const radii = [...src.matchAll(/borderRadius:\s*(\d+)/g)].map((m) => Number(m[1]));
-    assert.deepEqual(radii, [48, 38, 28]);
+    assert.equal(RING_OUTER_SIZE, 96);
+    assert.equal(RING_MIDDLE_SIZE, 76);
+    assert.equal(RING_INNER_SIZE, 56);
+    assert.equal(RING_OUTER_SIZE - RING_MIDDLE_SIZE, 20);
+    assert.equal(RING_MIDDLE_SIZE - RING_INNER_SIZE, 20);
+  });
+
+  it("sizes every ring from the RING_* tokens, circles derived as size / 2", () => {
+    for (const token of ["RING_OUTER_SIZE", "RING_MIDDLE_SIZE", "RING_INNER_SIZE"]) {
+      assert.match(src, new RegExp(`width:\\s*${token}`));
+      assert.match(src, new RegExp(`height:\\s*${token}`));
+      assert.match(src, new RegExp(`borderRadius:\\s*${token} / 2`));
+    }
+    // No stray ring-size literals left behind in the StyleSheet.
+    assert.doesNotMatch(src, /(?:width|height|borderRadius):\s*(?:96|76|56|48|38|28)\b/);
   });
 
   it("renders the cream-to-amber gradient outer → middle → inner", () => {

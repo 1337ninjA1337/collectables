@@ -5,6 +5,9 @@ import {
   CARD_BG_2,
   CARD_BG_3,
   CARD_BG_14,
+  RING_INNER_SIZE,
+  RING_MIDDLE_SIZE,
+  RING_OUTER_SIZE,
 } from "@/lib/design-tokens";
 
 type IconBadgeProps = {
@@ -35,9 +38,9 @@ export function IconBadge({ icon, style }: IconBadgeProps) {
 
 const styles = StyleSheet.create({
   outer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: RING_OUTER_SIZE,
+    height: RING_OUTER_SIZE,
+    borderRadius: RING_OUTER_SIZE / 2,
     backgroundColor: CARD_BG_2,
     borderWidth: 1,
     borderColor: AMBER_SOFT_3,
@@ -45,9 +48,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   middle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: RING_MIDDLE_SIZE,
+    height: RING_MIDDLE_SIZE,
+    borderRadius: RING_MIDDLE_SIZE / 2,
     backgroundColor: CARD_BG_3,
     borderWidth: 1,
     borderColor: AMBER_SOFT_5,
@@ -55,9 +58,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   inner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: RING_INNER_SIZE,
+    height: RING_INNER_SIZE,
+    borderRadius: RING_INNER_SIZE / 2,
     backgroundColor: CARD_BG_14,
     alignItems: "center",
     justifyContent: "center",
