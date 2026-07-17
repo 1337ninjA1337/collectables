@@ -1254,18 +1254,14 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bDANGER\b/);
     assert.match(src, /\bDANGER_DEEP_4\b/);
     assert.match(src, /\bDANGER_SOFT_2\b/);
-    assert.match(src, /\bDANGER_SOFT_5\b/);
     assert.match(src, /\bHERO_DARK\b/);
     assert.match(src, /\bHERO_DARK_2\b/);
-    assert.match(src, /\bHERO_DARK_8\b/);
-    assert.match(src, /\bHERO_DARK_9\b/);
     assert.match(src, /\bMUTED\b/);
     assert.match(src, /\bMUTED_2\b/);
     assert.match(src, /\bMUTED_3\b/);
     assert.match(src, /\bMUTED_5\b/);
     assert.match(src, /\bMUTED_10\b/);
     assert.match(src, /\bMUTED_17\b/);
-    assert.match(src, /\bMUTED_22\b/);
     assert.match(src, /\bMUTED_23\b/);
     assert.match(src, /\bPLACEHOLDER\b/);
     assert.match(src, /\bPURE_WHITE\b/);
@@ -1277,6 +1273,23 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bTEXT_ON_DARK_2\b/);
     assert.match(src, /\bTEXT_ON_DARK_4\b/);
     assert.match(src, /\bTEXT_ON_DARK_9\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  // BB-A: the bulk-bar styles (and their four dark-surface tokens) moved
+  // from app/collection/[id].tsx into the extracted component.
+  it("components/bulk-bar.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/bulk-bar.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bAMBER_LIGHT_2\b/);
+    assert.match(src, /\bDANGER_DEEP_4\b/);
+    assert.match(src, /\bDANGER_SOFT_5\b/);
+    assert.match(src, /\bHERO_DARK\b/);
+    assert.match(src, /\bHERO_DARK_8\b/);
+    assert.match(src, /\bHERO_DARK_9\b/);
+    assert.match(src, /\bMUTED_22\b/);
+    assert.match(src, /\bTEXT_ON_DARK_4\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
