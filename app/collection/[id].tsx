@@ -290,6 +290,68 @@ export default function CollectionDetailsScreen() {
     [],
   );
 
+  // Handler-stack useCallback promotion: the selection-mode handler stack
+  // follows `toggleSelect`'s pattern so the bulk-bar buttons and header
+  // select chip receive referentially stable callbacks. Hoisted above the
+  // early returns because hooks must run unconditionally — which also means
+  // none of these may touch `activeCollection` (narrowed only after the
+  // returns); everything they close over is state, context, or the still-
+  // nullable `collection`.
+  const enterSelectionMode = useCallback(() => {
+    setSelectionMode(true);
+    setSelectedIds(new Set());
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const performBulkDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    await deleteItems(ids);
+    toast.success(t("itemsDeleted", { count: ids.length }));
+    exitSelectionMode();
+  }, [selectedIds, deleteItems, toast, t, exitSelectionMode]);
+
+  const handleBulkDelete = useCallback(() => {
+    const count = selectedIds.size;
+    if (count === 0) return;
+    const title = t("deleteItemsTitle", { count });
+    const message = t("deleteItemsText");
+
+    if (Platform.OS === "web") {
+      if (globalThis.confirm(`${title}\n\n${message}`)) {
+        void performBulkDelete();
+      }
+      return;
+    }
+
+    Alert.alert(title, message, [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("delete"), style: "destructive", onPress: () => void performBulkDelete() },
+    ]);
+  }, [selectedIds, t, performBulkDelete]);
+
+  // Hoisted alongside the handlers that close over it; `collection` is still
+  // nullable up here so the self-exclusion uses optional chaining instead of
+  // the post-narrow `activeCollection`. Memoized so `handleOpenMove`'s dep
+  // doesn't churn every render off a fresh filter() array.
+  const otherOwnedCollections = useMemo(
+    () => collections.filter((c) => c.role === "owner" && c.id !== collection?.id),
+    [collections, collection],
+  );
+
+  const handleOpenMove = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    if (otherOwnedCollections.length === 0) {
+      toast.info(t("noOtherCollections"));
+      return;
+    }
+    setMoveModalOpen(true);
+  }, [selectedIds, otherOwnedCollections, toast, t]);
+
   if (loadingRemote && !collection) {
     return (
       <Screen>
@@ -353,56 +415,6 @@ export default function CollectionDetailsScreen() {
       setRefreshing(false);
     }
   };
-
-  const otherOwnedCollections = collections.filter(
-    (c) => c.role === "owner" && c.id !== activeCollection.id,
-  );
-
-  function enterSelectionMode() {
-    setSelectionMode(true);
-    setSelectedIds(new Set());
-  }
-
-  function exitSelectionMode() {
-    setSelectionMode(false);
-    setSelectedIds(new Set());
-  }
-
-  async function performBulkDelete() {
-    const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
-    await deleteItems(ids);
-    toast.success(t("itemsDeleted", { count: ids.length }));
-    exitSelectionMode();
-  }
-
-  function handleBulkDelete() {
-    const count = selectedIds.size;
-    if (count === 0) return;
-    const title = t("deleteItemsTitle", { count });
-    const message = t("deleteItemsText");
-
-    if (Platform.OS === "web") {
-      if (globalThis.confirm(`${title}\n\n${message}`)) {
-        void performBulkDelete();
-      }
-      return;
-    }
-
-    Alert.alert(title, message, [
-      { text: t("cancel"), style: "cancel" },
-      { text: t("delete"), style: "destructive", onPress: () => void performBulkDelete() },
-    ]);
-  }
-
-  function handleOpenMove() {
-    if (selectedIds.size === 0) return;
-    if (otherOwnedCollections.length === 0) {
-      toast.info(t("noOtherCollections"));
-      return;
-    }
-    setMoveModalOpen(true);
-  }
 
   async function handleMoveTo(targetCollectionId: string) {
     const ids = Array.from(selectedIds);
