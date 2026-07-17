@@ -98,7 +98,7 @@ describe("app/_dev/tokens preview route", () => {
       "COOL_GRAY",
       "TAG_",
     ];
-    const geometryPrefixes = ["RADIUS_", "SPACING_"];
+    const geometryPrefixes = ["RADIUS_", "SPACING_", "RING_"];
     const colorEntries = Object.entries(designTokens).filter(
       ([, value]) => typeof value === "string",
     );

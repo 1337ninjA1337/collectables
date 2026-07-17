@@ -31,6 +31,9 @@ import {
   RADIUS_CARD_SM,
   RADIUS_INPUT,
   RADIUS_PILL,
+  RING_INNER_SIZE,
+  RING_MIDDLE_SIZE,
+  RING_OUTER_SIZE,
   SPACING_CARD,
   SPACING_INLINE,
   SPACING_LIST,
@@ -42,6 +45,7 @@ import {
   TEXT_ON_DARK,
   designTokens,
 } from "@/lib/design-tokens";
+import { IconBadge } from "@/components/icon-badge";
 import { isDevEnvironment } from "@/lib/dev-menu";
 import {
   FONT_BODY,
@@ -95,6 +99,12 @@ const SPACING_TOKENS = [
   { name: "SPACING_LIST", value: SPACING_LIST },
   { name: "SPACING_CARD", value: SPACING_CARD },
   { name: "SPACING_SECTION", value: SPACING_SECTION },
+] as const;
+
+const RING_TOKENS = [
+  { name: "RING_OUTER_SIZE", value: RING_OUTER_SIZE },
+  { name: "RING_MIDDLE_SIZE", value: RING_MIDDLE_SIZE },
+  { name: "RING_INNER_SIZE", value: RING_INNER_SIZE },
 ] as const;
 
 function isLightHex(hex: string): boolean {
@@ -225,6 +235,21 @@ export default function TokensPreviewScreen() {
           ))}
         </View>
       </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Icon-badge rings</Text>
+        <View style={styles.ringRow}>
+          <IconBadge icon="📦" />
+          <View style={styles.spacingList}>
+            {RING_TOKENS.map((token) => (
+              <View key={token.name} style={styles.spacingItem}>
+                <Text style={styles.spacingName}>{token.name}</Text>
+                <Text style={styles.spacingValue}>{token.value}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
     </Screen>
   );
 }
@@ -314,6 +339,11 @@ const styles = StyleSheet.create({
   },
   spacingList: {
     gap: SPACING_INLINE,
+  },
+  ringRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING_CARD,
   },
   spacingItem: {
     flexDirection: "row",

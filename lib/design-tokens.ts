@@ -207,6 +207,16 @@ export const SPACING_CARD = 12;
 export const SPACING_SECTION = 14;
 
 /**
+ * Concentric icon-badge ring sizes (`components/icon-badge.tsx`). The 20px
+ * step (96 → 76 → 56) is intentional visual rhythm — tune the three
+ * together, never one ring alone. Each ring's borderRadius is half its
+ * size, so circles stay circles when these change.
+ */
+export const RING_OUTER_SIZE = 96;
+export const RING_MIDDLE_SIZE = 76;
+export const RING_INNER_SIZE = 56;
+
+/**
  * Soft elevation used on cards in the Mixed direction. iOS shadow + Android
  * elevation in one object — spread into a card style:
  *   <View style={{ ...styles.card, ...SHADOW_SOFT }} />
@@ -373,6 +383,9 @@ export const designTokens = Object.freeze({
   SPACING_SECTION,
   SPACING_GUTTER,
   SPACING_AIRY,
+  RING_OUTER_SIZE,
+  RING_MIDDLE_SIZE,
+  RING_INNER_SIZE,
 });
 
 export type DesignToken = keyof typeof designTokens;
