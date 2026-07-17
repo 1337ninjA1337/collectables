@@ -101,13 +101,19 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     assert.match(src, /<FlatList[\s\S]*?ListHeaderComponent=\{[\s\S]*?listTitleAndFilters[\s\S]*?\}/);
   });
 
-  it("viewer FlatList passes the Load-more CTA via ListFooterComponent", () => {
+  it("viewer FlatList paginates via onEndReached (no Load-more CTA in the footer)", () => {
     const src = readSrc();
-    // The Load-more pressable stays at the bottom of the items list (just
-    // below the last row) — ListFooterComponent renders it inside the
-    // scrollable surface so it scrolls with the items instead of floating
-    // outside.
-    assert.match(src, /<FlatList[\s\S]*?ListFooterComponent=\{\s*loadMoreCta\s*\}[\s\S]*?\/>/);
+    // The manual Load-more CTA was the nested-ScrollView era's pagination
+    // trigger. Now that the viewer FlatList owns scroll, `onEndReached`
+    // auto-extends the chunked window as the user approaches the end —
+    // `hasMore ? loadMore : undefined` so a fully-extended window stops
+    // the callback entirely. The 0.5 threshold means "half a viewport
+    // before the end", per the task spec.
+    const viewerBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?\/>/);
+    assert.ok(viewerBlock, "viewer FlatList (numColumns={2}) not found");
+    assert.match(viewerBlock[0], /onEndReached=\{\s*hasMore\s*\?\s*loadMore\s*:\s*undefined\s*\}/);
+    assert.match(viewerBlock[0], /onEndReachedThreshold=\{\s*0\.5\s*\}/);
+    assert.doesNotMatch(viewerBlock[0], /ListFooterComponent/);
   });
 
   it("viewer FlatList carries its own RefreshControl (Screen scroll=false doesn't pass it through)", () => {

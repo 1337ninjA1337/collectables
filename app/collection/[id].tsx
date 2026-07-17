@@ -746,6 +746,11 @@ export default function CollectionDetailsScreen() {
     </>
   );
 
+  // Manual Load-more CTA — only for the nestable drag-mode fallback, where
+  // the NestableDraggableFlatList doesn't own scroll (the outer ScrollView
+  // does) so `onEndReached` can't fire reliably. The two scroll-owning
+  // FlatList branches (viewer VM-D, selection BB-B) paginate automatically
+  // via the hasMore-gated `onEndReached` wiring on each list instead.
   const loadMoreCta = hasMore ? (
     <Pressable
       style={styles.loadMore}
@@ -1054,8 +1059,13 @@ export default function CollectionDetailsScreen() {
               <View style={styles.listWrap}>{listTitleAndFilters}</View>
             </View>
           }
-          ListFooterComponent={loadMoreCta}
           renderItem={renderMasonryItem}
+          // Native pagination: auto-extend the chunked window as the user
+          // scrolls within half a viewport of the end — replaces the manual
+          // Load-more CTA the nested-ScrollView era needed. `undefined` once
+          // the window covers every item so FlatList stops calling back.
+          onEndReached={hasMore ? loadMore : undefined}
+          onEndReachedThreshold={0.5}
           initialNumToRender={10}
           maxToRenderPerBatch={8}
           windowSize={5}
@@ -1080,10 +1090,11 @@ export default function CollectionDetailsScreen() {
   // virtualization could kick in and the absolutely-pinned bulk-bar created
   // an iOS touch fall-through near the bar. Mirrors VM-D's early-return
   // shape: the FlatList owns scroll, pageHeader + title/filters ride in
-  // ListHeaderComponent, the Load-more CTA + bulk-bar spacer ride in
-  // ListFooterComponent (the spacer keeps the last rows scrollable clear of
-  // the bar), and <BulkBar> is a sibling OUTSIDE the FlatList's render tree
-  // so its touches never race the list's responder.
+  // ListHeaderComponent, the bulk-bar spacer rides in ListFooterComponent
+  // (the spacer keeps the last rows scrollable clear of the bar; pagination
+  // is onEndReached-driven so no Load-more CTA), and <BulkBar> is a sibling
+  // OUTSIDE the FlatList's render tree so its touches never race the list's
+  // responder.
   if (isOwner && selectionMode && allItems.length > 0) {
     return (
       <Screen scroll={false}>
@@ -1102,12 +1113,9 @@ export default function CollectionDetailsScreen() {
                 <View style={styles.listWrap}>{listTitleAndFilters}</View>
               </View>
             }
-            ListFooterComponent={
-              <>
-                {loadMoreCta}
-                <View style={styles.bulkBarSpacer} />
-              </>
-            }
+            ListFooterComponent={<View style={styles.bulkBarSpacer} />}
+            onEndReached={hasMore ? loadMore : undefined}
+            onEndReachedThreshold={0.5}
             initialNumToRender={10}
             maxToRenderPerBatch={8}
             // BB-C: windowSize 7 (not the nested-era 5) — now that this
