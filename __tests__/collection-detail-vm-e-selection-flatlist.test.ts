@@ -80,7 +80,9 @@ describe("app/collection/[id].tsx — VM-E/BB-B selection-mode FlatList", () => 
     assert.match(block, /contentContainerStyle=\{\s*styles\.selectList\s*\}/);
     assert.match(block, /initialNumToRender=\{\s*10\s*\}/);
     assert.match(block, /maxToRenderPerBatch=\{\s*8\s*\}/);
-    assert.match(block, /windowSize=\{\s*5\s*\}/);
+    // BB-C: 7, not the nested-era 5 — a scroll-owning list needs the wider
+    // window to avoid blank rows on fast flicks.
+    assert.match(block, /windowSize=\{\s*7\s*\}/);
     assert.match(block, /removeClippedSubviews=\{\s*Platform\.OS\s*===\s*"ios"\s*\}/);
   });
 
