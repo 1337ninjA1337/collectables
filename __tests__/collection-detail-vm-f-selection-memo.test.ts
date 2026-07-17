@@ -111,9 +111,9 @@ describe("VM-F — SelectableItemRow memoization end-to-end", () => {
     // the useCallback memoization — pin the absence of the inline arrow
     // AND the presence of the hoisted-callback reference.
     const m = src.match(
-      /isOwner\s*&&\s*selectionMode\s*\?\s*\(\s*\n?[\s\S]*?\n\s*\)\s*:\s*null\s*\}/,
+      /if\s*\(isOwner\s*&&\s*selectionMode\s*&&\s*allItems\.length\s*>\s*0\)\s*\{[\s\S]*?<\/Screen>\s*\)\s*;\s*\}/,
     );
-    assert.ok(m, "selection-mode FlatList block not found");
+    assert.ok(m, "selection-mode branch not found");
     const block = m[0];
     assert.match(block, /renderItem=\{\s*renderSelectableRow\s*\}/);
     // Negative pin: no inline arrow allocating <SelectableItemRow> inside
@@ -130,9 +130,9 @@ describe("VM-F — SelectableItemRow memoization end-to-end", () => {
     // until something else changed. extraData restores the re-render trigger
     // without forcing data to change.
     const m = src.match(
-      /isOwner\s*&&\s*selectionMode\s*\?\s*\(\s*\n?[\s\S]*?\n\s*\)\s*:\s*null\s*\}/,
+      /if\s*\(isOwner\s*&&\s*selectionMode\s*&&\s*allItems\.length\s*>\s*0\)\s*\{[\s\S]*?<\/Screen>\s*\)\s*;\s*\}/,
     );
-    assert.ok(m, "selection-mode FlatList block not found");
+    assert.ok(m, "selection-mode branch not found");
     const block = m[0];
     assert.match(block, /extraData=\{\s*selectedIds\s*\}/);
   });

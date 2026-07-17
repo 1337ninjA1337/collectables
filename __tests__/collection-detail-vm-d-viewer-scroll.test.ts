@@ -165,7 +165,9 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // the move/share/edit modals when an owner enters selection mode (they
     // still need to be able to open the share or edit sheet).
     const refs = src.match(/\{\s*modalsBlock\s*\}/g) ?? [];
-    assert.equal(refs.length, 2, `expected exactly 2 {modalsBlock} renders, got ${refs.length}`);
+    // Three render sites since BB-B: viewer early-return, selection
+    // early-return, and the nestable fallback.
+    assert.equal(refs.length, 3, `expected exactly 3 {modalsBlock} renders, got ${refs.length}`);
   });
 
   it("Screen scroll=false path makes the inner View flex:1 (so the nested FlatList has a viewport to scroll inside)", () => {

@@ -41,9 +41,9 @@ describe("selection-mode FlatList Profiler telemetry", () => {
   it("wraps the selection-mode FlatList in <Profiler id=\"selection-flatlist\">", () => {
     const src = readCollectionSrc();
     const m = src.match(
-      /isOwner\s*&&\s*selectionMode\s*\?\s*\(\s*\n?[\s\S]*?\n\s*\)\s*:\s*null\s*\}/,
+      /if\s*\(isOwner\s*&&\s*selectionMode\s*&&\s*allItems\.length\s*>\s*0\)\s*\{[\s\S]*?<\/Screen>\s*\)\s*;\s*\}/,
     );
-    assert.ok(m, "selection-mode block not found");
+    assert.ok(m, "selection-mode branch not found");
     const block = m[0];
     assert.match(block, /<Profiler\s+id="selection-flatlist"\s+onRender=\{\s*onSelectionProfilerRender\s*\}\s*>/);
     // The FlatList is the Profiler's immediate child, and the wrapper closes

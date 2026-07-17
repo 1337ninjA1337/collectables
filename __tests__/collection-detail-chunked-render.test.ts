@@ -89,7 +89,7 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     // back to `items` fails loudly.
     assert.match(
       src,
-      /isOwner\s*&&\s*selectionMode\s*\?[\s\S]*?<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}/,
+      /if\s*\(isOwner\s*&&\s*selectionMode\s*&&\s*allItems\.length\s*>\s*0\)\s*\{[\s\S]*?<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}/,
     );
   });
 
