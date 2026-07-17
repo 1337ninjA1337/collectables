@@ -16,7 +16,7 @@ import { ReactionBar } from "@/components/reaction-bar";
 import { CostBadge } from "@/components/cost-badge";
 import { CurrencySheet } from "@/components/currency-sheet";
 import { Screen } from "@/components/screen";
-import { SelectableItemRow } from "@/components/selectable-item-row";
+import { SELECTABLE_ROW_HEIGHT, SelectableItemRow } from "@/components/selectable-item-row";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import { uploadImage } from "@/lib/cloudinary";
@@ -86,6 +86,19 @@ import {
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_9,
 } from "@/lib/design-tokens";
+
+// Selection-mode rows are fixed-height (SELECTABLE_ROW_HEIGHT, see
+// selectable-item-row.tsx for the derivation), so FlatList can be told the
+// geometry up-front and skip the per-row onLayout measurement pass. The
+// offset stride includes the `selectList` contentContainer gap
+// (SPACING_CARD) — omitting it would drift the windowing math by 12px per
+// row. Module-level (not useCallback) because it closes over constants only,
+// giving FlatList a referentially stable prop for free.
+const getSelectableRowLayout = (_data: unknown, index: number) => ({
+  length: SELECTABLE_ROW_HEIGHT,
+  offset: (SELECTABLE_ROW_HEIGHT + SPACING_CARD) * index,
+  index,
+});
 
 export default function CollectionDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -1077,6 +1090,7 @@ export default function CollectionDetailsScreen() {
             keyExtractor={(item) => item.id}
             renderItem={renderSelectableRow}
             extraData={selectedIds}
+            getItemLayout={getSelectableRowLayout}
             scrollEnabled={false}
             contentContainerStyle={styles.selectList}
             initialNumToRender={10}
