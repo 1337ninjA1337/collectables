@@ -53,4 +53,10 @@ describe("CurrencyInput adoption", () => {
     assert.match(src, /onChangeValue\(sanitizeCurrencyInput\(raw\)\)/);
     assert.doesNotMatch(src, /function sanitize\(/);
   });
+
+  it("create form's raw cost input sanitizes keystrokes too (no unsanitized setCost)", () => {
+    const src = read("app/create.tsx");
+    assert.match(src, /setCost\(sanitizeCurrencyInput\(v\)\)/);
+    assert.doesNotMatch(src, /setCost\(v\)/);
+  });
 });
