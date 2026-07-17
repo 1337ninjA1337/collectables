@@ -746,6 +746,10 @@ export default function CollectionDetailsScreen() {
     </>
   );
 
+  // Manual Load-more CTA — only the nested drag-mode branch renders this now.
+  // The viewer + selection FlatLists own their scroll and auto-extend the
+  // window via onEndReached; the drag branch sits inside `<Screen nestable>`
+  // (the outer ScrollView owns scroll) so onEndReached would never fire there.
   const loadMoreCta = hasMore ? (
     <Pressable
       style={styles.loadMore}
@@ -1054,8 +1058,13 @@ export default function CollectionDetailsScreen() {
               <View style={styles.listWrap}>{listTitleAndFilters}</View>
             </View>
           }
-          ListFooterComponent={loadMoreCta}
           renderItem={renderMasonryItem}
+          // Native pagination: the FlatList owns scroll here (VM-D), so the
+          // window auto-extends as the user approaches the end instead of
+          // requiring a manual Load-more tap. `loadMore` is clamp-guarded in
+          // useChunkedList, so repeat fires past the last page are no-ops.
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
           initialNumToRender={10}
           maxToRenderPerBatch={8}
           windowSize={5}
@@ -1102,12 +1111,13 @@ export default function CollectionDetailsScreen() {
                 <View style={styles.listWrap}>{listTitleAndFilters}</View>
               </View>
             }
-            ListFooterComponent={
-              <>
-                {loadMoreCta}
-                <View style={styles.bulkBarSpacer} />
-              </>
-            }
+            ListFooterComponent={<View style={styles.bulkBarSpacer} />}
+            // Native pagination (same as the viewer branch): this FlatList
+            // owns scroll post-BB-B, so onEndReached replaces the manual
+            // Load-more CTA. The spacer stays so the last rows scroll clear
+            // of the absolutely-pinned bulk-bar.
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
             initialNumToRender={10}
             maxToRenderPerBatch={8}
             // BB-C: windowSize 7 (not the nested-era 5) — now that this

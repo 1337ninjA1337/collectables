@@ -58,11 +58,17 @@ describe("app/collection/[id].tsx — VM-E/BB-B selection-mode FlatList", () => 
     );
   });
 
-  it("pageHeader + filters ride in ListHeaderComponent; CTA + spacer in ListFooterComponent", () => {
+  it("pageHeader + filters ride in ListHeaderComponent; spacer-only footer + onEndReached pagination", () => {
     const block = selectionBranch(readSrc());
     assert.match(block, /ListHeaderComponent=\{[\s\S]*?\{pageHeader\}[\s\S]*?\{listTitleAndFilters\}/);
     assert.match(block, /onLayout=\{\s*onSelectionHeaderLayout\s*\}/, "header must be measured for getItemLayout's offset");
-    assert.match(block, /ListFooterComponent=\{[\s\S]*?\{loadMoreCta\}[\s\S]*?bulkBarSpacer/);
+    // The manual Load-more CTA is gone — the scroll-owning list auto-extends
+    // the chunked window via onEndReached. The footer keeps ONLY the spacer
+    // so the last rows scroll clear of the pinned <BulkBar>.
+    assert.match(block, /ListFooterComponent=\{\s*<View\s+style=\{\s*styles\.bulkBarSpacer\s*\}\s*\/>\s*\}/);
+    assert.doesNotMatch(block, /loadMoreCta/, "selection branch must not render the manual Load-more CTA");
+    assert.match(block, /onEndReached=\{\s*loadMore\s*\}/);
+    assert.match(block, /onEndReachedThreshold=\{\s*0\.5\s*\}/);
   });
 
   it("<BulkBar> is a sibling outside the FlatList render tree", () => {

@@ -101,13 +101,15 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     assert.match(src, /<FlatList[\s\S]*?ListHeaderComponent=\{[\s\S]*?listTitleAndFilters[\s\S]*?\}/);
   });
 
-  it("viewer FlatList passes the Load-more CTA via ListFooterComponent", () => {
+  it("viewer FlatList auto-paginates via onEndReached instead of a Load-more footer", () => {
     const src = readSrc();
-    // The Load-more pressable stays at the bottom of the items list (just
-    // below the last row) — ListFooterComponent renders it inside the
-    // scrollable surface so it scrolls with the items instead of floating
-    // outside.
-    assert.match(src, /<FlatList[\s\S]*?ListFooterComponent=\{\s*loadMoreCta\s*\}[\s\S]*?\/>/);
+    // The manual Load-more CTA is replaced by native FlatList pagination:
+    // the window auto-extends as the user scrolls within half a viewport of
+    // the end. The CTA must NOT come back as ListFooterComponent here — the
+    // viewer branch owns its scroll, so onEndReached is the trigger.
+    assert.match(src, /<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?onEndReached=\{\s*loadMore\s*\}[\s\S]*?\/>/);
+    assert.match(src, /<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?onEndReachedThreshold=\{\s*0\.5\s*\}[\s\S]*?\/>/);
+    assert.doesNotMatch(src, /ListFooterComponent=\{\s*loadMoreCta\s*\}/);
   });
 
   it("viewer FlatList carries its own RefreshControl (Screen scroll=false doesn't pass it through)", () => {

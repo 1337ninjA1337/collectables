@@ -118,9 +118,10 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
 
   it("renders the Load more CTA gated on hasMore", () => {
     // VM-D extracted the inline `{hasMore ? <Pressable .../> : null}` JSX
-    // into a `const loadMoreCta = hasMore ? (<Pressable .../>) : null` so
-    // both the viewer-FlatList ListFooterComponent path and the nestable
-    // path can reuse the same node. The gating condition is still on
+    // into a `const loadMoreCta = hasMore ? (<Pressable .../>) : null`.
+    // Since the onEndReached migration only the nestable drag-mode branch
+    // renders it (the scroll-owning FlatLists auto-paginate), but the CTA
+    // itself is unchanged. The gating condition is still on
     // `hasMore`, the click target is still `loadMore`, and the renderer is
     // still a `<Pressable>` — the `{` JSX-expression brace is gone because
     // the conditional now lives in a `const` declaration, not in JSX.
