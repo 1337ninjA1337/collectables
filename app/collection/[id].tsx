@@ -253,28 +253,39 @@ export default function CollectionDetailsScreen() {
     });
   }, []);
 
+  // The per-row `selected` lookup reads a plain-object map instead of
+  // calling `selectedIds.has()` inside renderItem — the map is rebuilt once
+  // per selection change (new Set reference each toggle), so every visible
+  // row pays a hidden-class property read rather than `Set.prototype.has`'s
+  // generic dispatch. Same complexity, smaller constant factor on large
+  // chunked windows.
+  const selectedById = useMemo(
+    () => Object.fromEntries(Array.from(selectedIds, (id) => [id, true])),
+    [selectedIds],
+  );
+
   // VM-F: hoist the selection-mode FlatList renderItem into a `useCallback`
   // so React.memo on `<SelectableItemRow>` (the row-component memo) can
   // actually skip re-render work for rows whose `selected` flag didn't
   // change between toggles. Pre-VM-F the inline arrow `({ item }) => (...)`
   // allocated a fresh closure every parent render, defeating the row memo.
-  // The dep list intentionally carries `selectedIds` (each toggle produces a
-  // new Set reference) so `<SelectableItemRow>`'s `selected` boolean prop is
-  // recomputed; the row memo then compares props and skips for rows whose
-  // boolean didn't change. Pair with `extraData={selectedIds}` on the
-  // FlatList so virtualization knows to consider re-rendering when the
-  // selection set mutates even though `data={visibleItems}` reference is
+  // The dep list intentionally carries `selectedById` (rebuilt whenever the
+  // selection Set's reference changes) so `<SelectableItemRow>`'s `selected`
+  // boolean prop is recomputed; the row memo then compares props and skips
+  // for rows whose boolean didn't change. Pair with `extraData={selectedIds}`
+  // on the FlatList so virtualization knows to consider re-rendering when
+  // the selection set mutates even though `data={visibleItems}` reference is
   // stable across a single toggle. Hoisted above the early returns for the
   // same hook-order reason as `toggleSelect`.
   const renderSelectableRow = useCallback(
     ({ item }: { item: CollectableItem }) => (
       <SelectableItemRow
         item={item}
-        selected={selectedIds.has(item.id)}
+        selected={!!selectedById[item.id]}
         onToggle={toggleSelect}
       />
     ),
-    [selectedIds, toggleSelect],
+    [selectedById, toggleSelect],
   );
 
   // VM-F (viewer branch): same hoist for the masonry FlatList — the inline

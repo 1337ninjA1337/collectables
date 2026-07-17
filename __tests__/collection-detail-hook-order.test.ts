@@ -77,6 +77,10 @@ describe("CollectionDetailsScreen hook ordering", () => {
     // Hoisting them must not break the original referential-stability contract.
     assert.match(src, /const\s+toggleSelect\s*=\s*useCallback/);
     assert.match(src, /const\s+renderSelectableRow\s*=\s*useCallback/);
-    assert.match(src, /\[selectedIds,\s*toggleSelect\]/);
+    // renderSelectableRow now reads the memoized selectedById map (itself
+    // keyed on [selectedIds]), so the stability chain is
+    // selectedIds → selectedById → renderSelectableRow.
+    assert.match(src, /\[selectedById,\s*toggleSelect\]/);
+    assert.match(src, /selectedById\s*=\s*useMemo/);
   });
 });
