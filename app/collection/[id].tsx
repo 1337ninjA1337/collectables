@@ -540,6 +540,22 @@ export default function CollectionDetailsScreen() {
 
   const closeEditModal = useCallback(() => setEditModalOpen(false), []);
 
+  // HM-C4: <CurrencySheet> is memoized, so both handlers it receives must be
+  // referentially stable. Quick-swap path: persist on the spot so the total
+  // card re-renders in the new currency without a follow-up modal save.
+  const handleCurrencySelect = useCallback(
+    (code: string) => {
+      setEditCurrency(code);
+      setCurrencySheetOpen(false);
+      if (currencySheetMode === "quick" && collection) {
+        void updateCollection(collection.id, { currency: code });
+      }
+    },
+    [currencySheetMode, collection, updateCollection],
+  );
+
+  const closeCurrencySheet = useCallback(() => setCurrencySheetOpen(false), []);
+
   // HM-B handler promotion: the four handlers pageHeader closes over move
   // above the early returns as useCallbacks (hook-order invariant), which
   // means none may touch the post-narrow `activeCollection` — each guards on
@@ -918,16 +934,8 @@ export default function CollectionDetailsScreen() {
         selectedCode={editCurrency}
         query={currencyQuery}
         onQueryChange={setCurrencyQuery}
-        onSelect={(code) => {
-          setEditCurrency(code);
-          setCurrencySheetOpen(false);
-          // Quick-swap path: persist on the spot so the total card re-renders
-          // in the new currency without a follow-up modal save.
-          if (currencySheetMode === "quick") {
-            void updateCollection(activeCollection.id, { currency: code });
-          }
-        }}
-        onClose={() => setCurrencySheetOpen(false)}
+        onSelect={handleCurrencySelect}
+        onClose={closeCurrencySheet}
       />
     </>
   );
