@@ -46,9 +46,9 @@ describe("ItemCard memoization end-to-end", () => {
   it("app/collection/[id].tsx hoists the masonry renderItem into a useCallback", () => {
     const src = readCollectionSrc();
     const m = src.match(
-      /const\s+renderMasonryItem\s*=\s*useCallback\s*\(\s*\([\s\S]*?\)\s*=>\s*\([\s\S]*?<ItemCard\s+item=\{item\}\s+compact\s*\/>[\s\S]*?\),\s*\[([^\]]*)\]\s*,?\s*\)/,
+      /const\s+renderMasonryItem\s*=\s*useCallback\s*\(\s*\([\s\S]*?\)\s*=>\s*\([\s\S]*?<ItemCard\s+item=\{item\}\s+compact\s+style=\{styles\.masonryItem\}\s*\/>[\s\S]*?\),\s*\[([^\]]*)\]\s*,?\s*\)/,
     );
-    assert.ok(m, "renderMasonryItem must be a useCallback wrapping <ItemCard compact>");
+    assert.ok(m, "renderMasonryItem must be a useCallback rendering <ItemCard compact style={styles.masonryItem}>");
     assert.equal(
       m[1].trim(),
       "",

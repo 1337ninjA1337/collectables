@@ -5,11 +5,13 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  FlatList,
   Image,
   Modal,
   PanResponder,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,7 +27,10 @@ import { Screen } from "@/components/screen";
 import { useAppTheme } from "@/components/use-app-theme";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useCollections } from "@/lib/collections-context";
+import { flatListStyles } from "@/lib/flat-list-styles";
+import { useChunkedList } from "@/lib/use-chunked-list";
 import {
+  ACCENT_DEEP,
   AMBER_ACCENT,
   AMBER_MUTED_2,
   AMBER_SOFT,
@@ -76,6 +81,9 @@ export default function WishlistScreen() {
     () => collections.filter((c) => c.role === "owner"),
     [collections],
   );
+  // WLF-B: chunked window bounds the mount count (a 500-entry wishlist mounts
+  // 20 cards + their images up-front); onEndReached grows it while scrolling.
+  const { visibleItems, hasMore, loadMore } = useChunkedList(wishlistItems);
 
   const [addOpen, setAddOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -136,20 +144,25 @@ export default function WishlistScreen() {
     }
   }
 
-  function confirmDelete(item: CollectableItem) {
-    const onConfirm = () => {
-      void deleteItem(item.id);
-      toast.success(t("wishlistDeleted"));
-    };
-    if (Platform.OS === "web") {
-      if (window.confirm(t("wishlistConfirmDelete"))) onConfirm();
-      return;
-    }
-    Alert.alert(item.title, t("wishlistConfirmDelete"), [
-      { text: t("cancel"), style: "cancel" },
-      { text: t("delete"), style: "destructive", onPress: onConfirm },
-    ]);
-  }
+  // useCallback (not a plain function) so the memoized renderItem below can
+  // list it as an honest dep without re-arming on every render.
+  const confirmDelete = useCallback(
+    (item: CollectableItem) => {
+      const onConfirm = () => {
+        void deleteItem(item.id);
+        toast.success(t("wishlistDeleted"));
+      };
+      if (Platform.OS === "web") {
+        if (window.confirm(t("wishlistConfirmDelete"))) onConfirm();
+        return;
+      }
+      Alert.alert(item.title, t("wishlistConfirmDelete"), [
+        { text: t("cancel"), style: "cancel" },
+        { text: t("delete"), style: "destructive", onPress: onConfirm },
+      ]);
+    },
+    [deleteItem, toast, t],
+  );
 
   async function handlePromote(targetCollectionId: string) {
     if (!promoteFor) return;
@@ -158,6 +171,89 @@ export default function WishlistScreen() {
     setPromoteFor(null);
     router.push(`/item/${promoteFor.id}`);
   }
+
+  const openAddSheet = useCallback(() => setAddOpen(true), []);
+
+  // WLF-B: header chrome rides in ListHeaderComponent (the FlatList owns the
+  // screen scroll), memoized so the header subtree keeps a stable element
+  // identity across scroll-driven re-renders (the HM-A precedent).
+  const listHeader = useMemo(
+    () => (
+      <View style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ ...styles.title, color: theme.text }}>{t("wishlist")}</Text>
+          <Text style={{ ...styles.subtitle, color: theme.meta }}>{t("wishlistHint")}</Text>
+        </View>
+        <Pressable style={styles.addButton} onPress={openAddSheet}>
+          <Ionicons name="add" size={20} color={TEXT_DARK_2} />
+          <Text style={styles.addButtonText}>{t("wishlistAdd")}</Text>
+        </Pressable>
+      </View>
+    ),
+    [theme.text, theme.meta, t, openAddSheet],
+  );
+
+  const listEmpty = useMemo(
+    () => (
+      <EmptyState
+        icon="★"
+        title={t("wishlistEmptyTitle")}
+        hint={t("wishlistEmptyHint")}
+        actionLabel={t("wishlistAdd")}
+        onAction={openAddSheet}
+      />
+    ),
+    [t, openAddSheet],
+  );
+
+  const renderWishlistCard = useCallback(
+    ({ item }: { item: CollectableItem }) => {
+      const hasPhoto = item.photos.length > 0 && Boolean(item.photos[0]);
+      return (
+        <View style={{ ...styles.card, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+          {hasPhoto ? (
+            <Image source={{ uri: item.photos[0] }} style={styles.cardImage} />
+          ) : (
+            <View style={{ ...styles.cardImage, backgroundColor: placeholderColor(item.id) }} />
+          )}
+          <View style={styles.cardBody}>
+            <Text style={{ ...styles.cardTitle, color: theme.text }}>{item.title}</Text>
+            {item.description ? (
+              <Text style={{ ...styles.cardDescription, color: theme.muted }} numberOfLines={2}>
+                {item.description}
+              </Text>
+            ) : null}
+            <View style={styles.metaRow}>
+              {typeof item.cost === "number" ? (
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaChipText}>{item.cost}</Text>
+                </View>
+              ) : null}
+              {item.acquiredFrom ? (
+                <View style={styles.metaChip}>
+                  <Text style={styles.metaChipText}>{item.acquiredFrom}</Text>
+                </View>
+              ) : null}
+            </View>
+            <View style={styles.actionsRow}>
+              <Pressable
+                style={styles.promoteButton}
+                onPress={() => setPromoteFor(item)}
+                disabled={ownedCollections.length === 0}
+              >
+                <Ionicons name="arrow-forward" size={16} color={TEXT_ON_DARK_5} />
+                <Text style={styles.promoteButtonText}>{t("wishlistPromote")}</Text>
+              </Pressable>
+              <Pressable style={styles.deleteButton} onPress={() => confirmDelete(item)}>
+                <Ionicons name="trash-outline" size={16} color={DANGER_DEEP_3} />
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      );
+    },
+    [theme.card, theme.border, theme.text, theme.muted, ownedCollections.length, confirmDelete, t],
+  );
 
   const SWIPE_THRESHOLD = 80;
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
@@ -200,77 +296,40 @@ export default function WishlistScreen() {
     }),
   ).current;
 
+  // WLF-B: the FlatList owns the screen scroll (VM-D shape) so iOS can
+  // recycle off-screen wishlist cards instead of mounting every card (and its
+  // remote image) up-front inside the old Screen ScrollView.
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+    <Screen scroll={false}>
       <Stack.Screen options={{ title: t("wishlist") }} />
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ ...styles.title, color: theme.text }}>{t("wishlist")}</Text>
-          <Text style={{ ...styles.subtitle, color: theme.meta }}>{t("wishlistHint")}</Text>
-        </View>
-        <Pressable style={styles.addButton} onPress={() => setAddOpen(true)}>
-          <Ionicons name="add" size={20} color={TEXT_DARK_2} />
-          <Text style={styles.addButtonText}>{t("wishlistAdd")}</Text>
-        </Pressable>
-      </View>
-
-      {wishlistItems.length === 0 ? (
-        <EmptyState
-          icon="★"
-          title={t("wishlistEmptyTitle")}
-          hint={t("wishlistEmptyHint")}
-          actionLabel={t("wishlistAdd")}
-          onAction={() => setAddOpen(true)}
-        />
-      ) : (
-        <View style={styles.list}>
-          {wishlistItems.map((item) => {
-            const hasPhoto = item.photos.length > 0 && Boolean(item.photos[0]);
-            return (
-              <View key={item.id} style={{ ...styles.card, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
-                {hasPhoto ? (
-                  <Image source={{ uri: item.photos[0] }} style={styles.cardImage} />
-                ) : (
-                  <View style={{ ...styles.cardImage, backgroundColor: placeholderColor(item.id) }} />
-                )}
-                <View style={styles.cardBody}>
-                  <Text style={{ ...styles.cardTitle, color: theme.text }}>{item.title}</Text>
-                  {item.description ? (
-                    <Text style={{ ...styles.cardDescription, color: theme.muted }} numberOfLines={2}>
-                      {item.description}
-                    </Text>
-                  ) : null}
-                  <View style={styles.metaRow}>
-                    {typeof item.cost === "number" ? (
-                      <View style={styles.metaChip}>
-                        <Text style={styles.metaChipText}>{item.cost}</Text>
-                      </View>
-                    ) : null}
-                    {item.acquiredFrom ? (
-                      <View style={styles.metaChip}>
-                        <Text style={styles.metaChipText}>{item.acquiredFrom}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <View style={styles.actionsRow}>
-                    <Pressable
-                      style={styles.promoteButton}
-                      onPress={() => setPromoteFor(item)}
-                      disabled={ownedCollections.length === 0}
-                    >
-                      <Ionicons name="arrow-forward" size={16} color={TEXT_ON_DARK_5} />
-                      <Text style={styles.promoteButtonText}>{t("wishlistPromote")}</Text>
-                    </Pressable>
-                    <Pressable style={styles.deleteButton} onPress={() => confirmDelete(item)}>
-                      <Ionicons name="trash-outline" size={16} color={DANGER_DEEP_3} />
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      )}
+      <FlatList
+        data={visibleItems}
+        keyExtractor={(item) => item.id}
+        renderItem={renderWishlistCard}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={listEmpty}
+        contentContainerStyle={styles.listContent}
+        // Native pagination: auto-extend the chunked window as the user
+        // scrolls within half a viewport of the end; `undefined` once the
+        // window covers every entry so FlatList stops calling back.
+        onEndReached={hasMore ? loadMore : undefined}
+        onEndReachedThreshold={0.5}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        // Single-column list that owns its scroll — windowSize 7 for
+        // flick-resilience (the BB-C rationale; 2-col masonry keeps 5).
+        windowSize={7}
+        removeClippedSubviews={Platform.OS === "ios"}
+        refreshControl={
+          <RefreshControl
+            refreshing={!!refreshing}
+            onRefresh={handleRefresh}
+            tintColor={ACCENT_DEEP}
+            colors={[ACCENT_DEEP]}
+          />
+        }
+        style={flatListStyles.viewerFlatList}
+      />
 
       <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setAddOpen(false)}>
@@ -390,6 +449,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING_CARD,
+    // + the 14px listContent row gap = 20 (SPACING_AIRY), preserving the
+    // header→first-card rhythm the pre-WLF-B Screen ScrollView gap provided.
+    marginBottom: 6,
   },
   title: {
     fontSize: 26,
@@ -418,7 +480,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: FONT_BODY_EXTRABOLD,
   },
-  list: {
+  // WLF-B: the Screen's inner View (scroll=false) already pads around the
+  // FlatList; the content container only carries the 14px row gap the old
+  // `list` View had.
+  listContent: {
     gap: 14,
   },
   card: {

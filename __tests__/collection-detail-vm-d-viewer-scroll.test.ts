@@ -135,8 +135,10 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // and the scrollable viewport collapses to ~0 — items pile up and
     // virtualization can't fire. The style indirection (viewerFlatList) is
     // there so the style can be tweaked from one place.
-    assert.match(src, /<FlatList[\s\S]*?style=\{\s*styles\.viewerFlatList\s*\}[\s\S]*?\/>/);
-    assert.match(src, /viewerFlatList:\s*\{[\s\S]*?flex:\s*1[\s\S]*?\}/);
+    // The style moved to the shared lib/flat-list-styles.ts (WLF-A).
+    assert.match(src, /<FlatList[\s\S]*?style=\{\s*flatListStyles\.viewerFlatList\s*\}[\s\S]*?\/>/);
+    const sharedSrc = readFileSync(path.join(process.cwd(), "lib", "flat-list-styles.ts"), "utf8");
+    assert.match(sharedSrc, /viewerFlatList:\s*\{[\s\S]*?flex:\s*1[\s\S]*?\}/);
   });
 
   it("declares pageHeader / listTitleAndFilters / loadMoreCta / modalsBlock consts so both paths share JSX", () => {

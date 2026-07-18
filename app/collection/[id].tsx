@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth-context";
 import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
+import { flatListStyles } from "@/lib/flat-list-styles";
 import { useChunkedList } from "@/lib/use-chunked-list";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { useI18n } from "@/lib/i18n-context";
@@ -326,12 +327,12 @@ export default function CollectionDetailsScreen() {
   // VM-F (viewer branch): same hoist for the masonry FlatList — the inline
   // arrow allocated a fresh wrapper closure every parent render, defeating
   // the new React.memo on `<ItemCard>`. No deps: the closure only touches
-  // `styles` (module scope) and the row's own `item`.
+  // `styles` (module scope) and the row's own `item`. The cell's `flex: 1`
+  // rides on ItemCard's forwarded `style` prop — the old per-item wrapper
+  // View cost one extra node per cell × hundreds of cells.
   const renderMasonryItem = useCallback(
     ({ item }: { item: CollectableItem }) => (
-      <View style={styles.masonryItem}>
-        <ItemCard item={item} compact />
-      </View>
+      <ItemCard item={item} compact style={styles.masonryItem} />
     ),
     [],
   );
@@ -949,7 +950,7 @@ export default function CollectionDetailsScreen() {
           numColumns={2}
           keyExtractor={(item) => item.id}
           columnWrapperStyle={styles.masonryRow}
-          contentContainerStyle={styles.viewerFlatListContent}
+          contentContainerStyle={flatListStyles.viewerFlatListContent}
           ListHeaderComponent={
             <View style={styles.viewerListHeader} onLayout={onViewerHeaderLayout}>
               {pageHeader}
@@ -976,7 +977,7 @@ export default function CollectionDetailsScreen() {
               colors={[ACCENT_DEEP]}
             />
           }
-          style={styles.viewerFlatList}
+          style={flatListStyles.viewerFlatList}
         />
         {modalsBlock}
       </Screen>
@@ -1025,7 +1026,7 @@ export default function CollectionDetailsScreen() {
             // 2-column masonry mounts twice the cards per viewport.
             windowSize={7}
             removeClippedSubviews={Platform.OS === "ios"}
-            style={styles.viewerFlatList}
+            style={flatListStyles.viewerFlatList}
           />
         </Profiler>
         <BulkBar
@@ -1311,18 +1312,9 @@ const styles = StyleSheet.create({
   viewerListHeader: {
     gap: 18,
   },
-  // VM-D: FlatList itself owns the scroll in the viewer branch — flex:1 so it
-  // fills the Screen's inner View vertically.
-  viewerFlatList: {
-    flex: 1,
-  },
-  // VM-D: the Screen's inner View (scroll=false) already pads 20px / 32 on
-  // bottom around the FlatList, so contentContainerStyle adds only the row
-  // gap that previously lived on `masonryList`. Mirrors the 10px row gap of
-  // the pre-VM-D inline masonry FlatList so the visual rhythm is preserved.
-  viewerFlatListContent: {
-    gap: SPACING_LIST,
-  },
+  // VM-D's viewerFlatList / viewerFlatListContent moved to the shared
+  // `lib/flat-list-styles.ts` (WLF-A) so other screens adopting the
+  // scroll-owning-FlatList pattern import them instead of copying.
   bulkBarSpacer: {
     height: 120,
   },
