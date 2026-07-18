@@ -110,14 +110,16 @@ describe("Collection edit modal — currency picker UI wiring", () => {
     );
   });
 
-  it("renders an edit-modal Pressable that opens the sheet in `edit` mode", () => {
+  it("hoists an openEditCurrencySheet useCallback that opens the sheet in `edit` mode and threads it into the modal", () => {
     // The edit-mode path defers the save to the modal submit so Cancel
     // still works. Without the mode flag, every pick would persist
-    // immediately and break Cancel semantics.
+    // immediately and break Cancel semantics. HM-C3: the button lives in
+    // <EditCollectionModal>; the page supplies the stable handler.
     assert.match(
       src,
-      /onPress=\{\s*\(\s*\)\s*=>\s*\{\s*setCurrencyQuery\(""\);\s*setCurrencySheetMode\("edit"\);\s*setCurrencySheetOpen\(true\);\s*\}\s*\}/,
+      /const\s+openEditCurrencySheet\s*=\s*useCallback\(\s*\(\s*\)\s*=>\s*\{\s*setCurrencyQuery\(""\);\s*setCurrencySheetMode\("edit"\);\s*setCurrencySheetOpen\(true\);\s*\},\s*\[\s*\]\s*\)/,
     );
+    assert.match(src, /onOpenCurrencySheet=\{\s*openEditCurrencySheet\s*\}/);
   });
 
   it("total-cost summary card is a Pressable for owners that opens the sheet in `quick` mode", () => {

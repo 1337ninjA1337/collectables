@@ -1,8 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState, type ProfilerOnRenderCallback } from "react";
-import { Alert, FlatList, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
-import { MaskedTextInput } from "@/components/masked-text-input";
+import { Alert, FlatList, Image, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { applyItemFilters, applySortMode, EMPTY_FILTERS, ItemFilterBar, type ItemFilters } from "@/components/item-filters";
@@ -15,11 +14,11 @@ import { ReactionBar } from "@/components/reaction-bar";
 import { CostBadge } from "@/components/cost-badge";
 import { CollectionShareSheet } from "@/components/collection-share-sheet";
 import { CurrencySheet } from "@/components/currency-sheet";
+import { EditCollectionModal } from "@/components/edit-collection-modal";
 import { MoveCollectionModal } from "@/components/move-collection-modal";
 import { Screen } from "@/components/screen";
 import { BulkBar } from "@/components/bulk-bar";
 import { SELECTABLE_ROW_HEIGHT, SelectableItemRow } from "@/components/selectable-item-row";
-import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
@@ -38,9 +37,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { FONT_DISPLAY, FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import {
   ACCENT_DEEP,
-  AMBER_ACCENT,
   AMBER_LIGHT_2,
-  AMBER_MUTED_2,
   AMBER_MUTED_7,
   AMBER_MUTED_8,
   AMBER_SOFT,
@@ -51,35 +48,23 @@ import {
   CARD_BG_9,
   CARD_BG_10,
   CARD_BG_13,
-  DANGER,
   DANGER_DEEP_4,
   DANGER_SOFT_2,
   HERO_DARK,
   HERO_DARK_2,
-  MUTED_2,
   MUTED_3,
   MUTED_5,
-  MUTED_10,
-  MUTED_17,
-  MUTED_23,
-  PLACEHOLDER,
   PURE_WHITE,
   RADIUS_CARD,
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
-  RADIUS_PILL,
   SHADOW_SOFT,
   SPACING_AIRY,
   SPACING_CARD,
   SPACING_GUTTER,
   SPACING_INLINE,
   SPACING_LIST,
-  SUCCESS_GREEN_2,
-  TEXT_DARK,
-  TEXT_DARK_2,
   TEXT_DARK_3,
-  TEXT_ON_DARK,
-  TEXT_ON_DARK_2,
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_9,
 } from "@/lib/design-tokens";
@@ -453,6 +438,108 @@ export default function CollectionDetailsScreen() {
 
   const closeShareSheet = useCallback(() => setShareOpen(false), []);
 
+  // HM-C3: <EditCollectionModal> is memoized, so every handler it receives
+  // must be referentially stable. Hoisted above the early returns
+  // (hook-order invariant); `handleSaveEdit` guards on the still-nullable
+  // `collection` instead of the post-narrow `activeCollection`.
+  const pickEditCoverFromGallery = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      toast.error(t("noAccessCover"), t("noAccess"));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setEditCoverUri(result.assets[0].uri);
+      setEditCoverChanged(true);
+    }
+  }, [toast, t]);
+
+  const pickEditCoverFromCamera = useCallback(async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      toast.error(t("noAccessCamera"), t("noAccess"));
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setEditCoverUri(result.assets[0].uri);
+      setEditCoverChanged(true);
+    }
+  }, [toast, t]);
+
+  const pickEditCover = useCallback(async () => {
+    if (Platform.OS !== "web") {
+      Alert.alert(t("collectionCoverLabel"), undefined, [
+        {
+          text: t("pickFromGallery"),
+          onPress: () => void pickEditCoverFromGallery(),
+        },
+        {
+          text: t("takePhoto"),
+          onPress: () => void pickEditCoverFromCamera(),
+        },
+        { text: t("cancel"), style: "cancel" },
+      ]);
+      return;
+    }
+    await pickEditCoverFromGallery();
+  }, [pickEditCoverFromGallery, pickEditCoverFromCamera, t]);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!collection) return;
+    if (!editName.trim()) {
+      toast.error(t("requiredFieldsMissing"), t("needTitle"));
+      return;
+    }
+    setEditSaving(true);
+    try {
+      let finalCover = editCoverUri;
+      if (editCoverChanged && editCoverUri) {
+        finalCover = await uploadImage(editCoverUri);
+      }
+      // Defense-in-depth: even if the locked chip is bypassed, a non-premium
+      // user can never flip a public collection to private (matches the
+      // creation gate). An already-private collection is left untouched.
+      const finalVisibility: CollectionVisibility =
+        !isPremium &&
+        editVisibility === "private" &&
+        (collection.visibility ?? "private") !== "private"
+          ? "public"
+          : editVisibility;
+      await updateCollection(collection.id, {
+        name: editName.trim(),
+        description: editDescription.trim(),
+        coverPhoto: finalCover,
+        visibility: finalVisibility,
+        // Empty picker selection = clear the override and fall back to the
+        // user's app-wide displayCurrency in `getCollectionTotalCost`.
+        currency: editCurrency.trim() || null,
+      });
+      setEditModalOpen(false);
+    } finally {
+      setEditSaving(false);
+    }
+  }, [collection, editName, editDescription, editCoverUri, editCoverChanged, editVisibility, editCurrency, isPremium, updateCollection, toast, t]);
+
+  // The edit-mode path defers the save to the modal submit so Cancel still
+  // works. Without the mode flag, every pick would persist immediately and
+  // break Cancel semantics.
+  const openEditCurrencySheet = useCallback(() => {
+    setCurrencyQuery("");
+    setCurrencySheetMode("edit");
+    setCurrencySheetOpen(true);
+  }, []);
+
+  const closeEditModal = useCallback(() => setEditModalOpen(false), []);
+
   // HM-B handler promotion: the four handlers pageHeader closes over move
   // above the early returns as useCallbacks (hook-order invariant), which
   // means none may touch the post-narrow `activeCollection` — each guards on
@@ -762,92 +849,6 @@ export default function CollectionDetailsScreen() {
     }
   };
 
-  async function pickEditCover() {
-    if (Platform.OS !== "web") {
-      Alert.alert(t("collectionCoverLabel"), undefined, [
-        {
-          text: t("pickFromGallery"),
-          onPress: () => void pickEditCoverFromGallery(),
-        },
-        {
-          text: t("takePhoto"),
-          onPress: () => void pickEditCoverFromCamera(),
-        },
-        { text: t("cancel"), style: "cancel" },
-      ]);
-      return;
-    }
-    await pickEditCoverFromGallery();
-  }
-
-  async function pickEditCoverFromGallery() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      toast.error(t("noAccessCover"), t("noAccess"));
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: false,
-      quality: 0.9,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setEditCoverUri(result.assets[0].uri);
-      setEditCoverChanged(true);
-    }
-  }
-
-  async function pickEditCoverFromCamera() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      toast.error(t("noAccessCamera"), t("noAccess"));
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.9,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setEditCoverUri(result.assets[0].uri);
-      setEditCoverChanged(true);
-    }
-  }
-
-  async function handleSaveEdit() {
-    if (!editName.trim()) {
-      toast.error(t("requiredFieldsMissing"), t("needTitle"));
-      return;
-    }
-    setEditSaving(true);
-    try {
-      let finalCover = editCoverUri;
-      if (editCoverChanged && editCoverUri) {
-        finalCover = await uploadImage(editCoverUri);
-      }
-      // Defense-in-depth: even if the locked chip is bypassed, a non-premium
-      // user can never flip a public collection to private (matches the
-      // creation gate). An already-private collection is left untouched.
-      const finalVisibility: CollectionVisibility =
-        !isPremium &&
-        editVisibility === "private" &&
-        (activeCollection.visibility ?? "private") !== "private"
-          ? "public"
-          : editVisibility;
-      await updateCollection(activeCollection.id, {
-        name: editName.trim(),
-        description: editDescription.trim(),
-        coverPhoto: finalCover,
-        visibility: finalVisibility,
-        // Empty picker selection = clear the override and fall back to the
-        // user's app-wide displayCurrency in `getCollectionTotalCost`.
-        currency: editCurrency.trim() || null,
-      });
-      setEditModalOpen(false);
-    } finally {
-      setEditSaving(false);
-    }
-  }
-
   const renderItemRow = ({ item, drag, isActive }: RenderItemParams<CollectableItem>) => (
     <ScaleDecorator>
       <Pressable
@@ -893,126 +894,24 @@ export default function CollectionDetailsScreen() {
         onClose={closeShareSheet}
       />
 
-      <Modal visible={editModalOpen} transparent animationType="fade" onRequestClose={() => setEditModalOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setEditModalOpen(false)}>
-          <Pressable style={styles.editModalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>{t("editCollection")}</Text>
-
-            <View style={styles.editFieldGroup}>
-              <Text style={styles.editFieldLabel}>
-                {t("collectionNameLabel")}<Text style={styles.editFieldRequired}> *</Text>
-              </Text>
-              <MaskedTextInput
-                value={editName}
-                onChangeText={setEditName}
-                placeholder={t("collectionNamePlaceholder")}
-                placeholderTextColor={PLACEHOLDER}
-                style={styles.editFieldInput}
-              />
-            </View>
-
-            <View style={styles.editFieldGroup}>
-              <Text style={styles.editFieldLabel}>{t("collectionDescriptionLabel")}</Text>
-              <MaskedTextInput
-                value={editDescription}
-                onChangeText={setEditDescription}
-                placeholder={t("collectionDescriptionPlaceholder")}
-                placeholderTextColor={PLACEHOLDER}
-                multiline
-                textAlignVertical="top"
-                style={{...styles.editFieldInput, ...styles.editFieldInputMultiline}}
-              />
-            </View>
-
-            <View style={styles.editFieldGroup}>
-              <Text style={styles.editFieldLabel}>{t("collectionCoverLabel")}</Text>
-              <Pressable style={styles.editCoverButton} onPress={() => void pickEditCover()}>
-                <Text style={styles.editCoverButtonText}>{t("editCover")}</Text>
-              </Pressable>
-              {editCoverUri ? (
-                <Image source={{ uri: editCoverUri }} style={styles.editCoverPreview} />
-              ) : null}
-            </View>
-
-            <View style={styles.editFieldGroup}>
-              <Text style={styles.editFieldLabel}>{t("visibilityLabel")}</Text>
-              <View style={styles.editVisibilityRow}>
-                {(["private", "public"] as const).map((v) => {
-                  const selected = editVisibility === v;
-                  // Block the public→private transition for non-premium users,
-                  // but never lock an already-private collection (so a lapsed
-                  // owner keeps it private without being forced to downgrade).
-                  const locked =
-                    v === "private" &&
-                    !isPremium &&
-                    (activeCollection.visibility ?? "private") !== "private";
-                  return (
-                    <Pressable
-                      key={v}
-                      style={{
-                        ...styles.editVisibilityChip,
-                        ...(selected ? styles.editVisibilityChipSelected : {}),
-                        ...(locked ? styles.editVisibilityChipLocked : {}),
-                      }}
-                      onPress={() => {
-                        if (locked) {
-                          trackEvent("premium_upsell_shown", {
-                            feature: "private_collection",
-                            source: "collection_edit",
-                          });
-                          toast.error(t("visibilityPrivatePremiumOnly"), t("premiumTitle"));
-                          return;
-                        }
-                        setEditVisibility(v);
-                      }}
-                    >
-                      <Text style={{...styles.editVisibilityChipText, ...(selected ? styles.editVisibilityChipTextSelected : {})}}>
-                        {t(v === "public" ? "visibilityPublic" : "visibilityPrivate")}
-                        {locked ? " 🔒" : ""}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={styles.editVisibilityHint}>
-                {!isPremium &&
-                editVisibility === "private" &&
-                (activeCollection.visibility ?? "private") !== "private"
-                  ? t("visibilityPrivatePremiumOnly")
-                  : editVisibility === "public"
-                    ? t("visibilityPublicHint")
-                    : t("visibilityPrivateHint")}
-              </Text>
-            </View>
-
-            <View style={styles.editFieldGroup}>
-              <Text style={styles.editFieldLabel}>{t("currencyLabel")}</Text>
-              <Pressable
-                style={styles.editCurrencyButton}
-                onPress={() => { setCurrencyQuery(""); setCurrencySheetMode("edit"); setCurrencySheetOpen(true); }}
-                accessibilityRole="button"
-                accessibilityLabel={t("currencyLabel")}
-              >
-                <Text style={editCurrency ? styles.editCurrencyButtonText : styles.editCurrencyButtonPlaceholder}>
-                  {editCurrency || t("collectionCurrencyAuto")}
-                </Text>
-              </Pressable>
-              <Text style={styles.editVisibilityHint}>{t("collectionCurrencyHint")}</Text>
-            </View>
-
-            <Pressable
-              style={{...styles.editSaveButton, ...(editSaving ? styles.editSaveButtonDisabled : {})}}
-              onPress={() => void handleSaveEdit()}
-              disabled={editSaving}
-            >
-              <Text style={styles.editSaveButtonText}>{editSaving ? t("saving") : t("saveChanges")}</Text>
-            </Pressable>
-            <Pressable style={styles.modalCancel} onPress={() => setEditModalOpen(false)}>
-              <Text style={styles.modalCancelText}>{t("cancelEdit")}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <EditCollectionModal
+        visible={editModalOpen}
+        name={editName}
+        description={editDescription}
+        coverUri={editCoverUri}
+        visibility={editVisibility}
+        currency={editCurrency}
+        saving={editSaving}
+        isPremium={isPremium}
+        savedVisibility={activeCollection.visibility}
+        onChangeName={setEditName}
+        onChangeDescription={setEditDescription}
+        onChangeVisibility={setEditVisibility}
+        onPickCover={pickEditCover}
+        onOpenCurrencySheet={openEditCurrencySheet}
+        onSave={handleSaveEdit}
+        onClose={closeEditModal}
+      />
 
       <CurrencySheet
         visible={currencySheetOpen}
@@ -1419,30 +1318,6 @@ const styles = StyleSheet.create({
   bulkBarSpacer: {
     height: 120,
   },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(26, 14, 6, 0.55)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: TEXT_DARK_3,
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  modalCancel: {
-    alignSelf: "flex-end",
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
-  modalCancelText: {
-    color: MUTED_23,
-    fontSize: 14,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
   editCollectionButton: {
     borderRadius: RADIUS_CARD,
     paddingVertical: 16,
@@ -1454,132 +1329,6 @@ const styles = StyleSheet.create({
   },
   editCollectionButtonText: {
     color: MUTED_3,
-    fontSize: 15,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  editModalCard: {
-    width: "100%",
-    maxWidth: 420,
-    backgroundColor: CARD_BG,
-    borderRadius: RADIUS_CARD,
-    padding: 20,
-    gap: 16,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  editFieldGroup: {
-    gap: SPACING_INLINE,
-  },
-  editFieldLabel: {
-    color: MUTED_10,
-    fontWeight: "800",
-    fontSize: 13,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  editFieldRequired: {
-    color: DANGER,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  editFieldInput: {
-    borderRadius: 16,
-    backgroundColor: PURE_WHITE,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: TEXT_DARK,
-    fontSize: 15,
-    fontFamily: FONT_BODY,
-  },
-  editFieldInputMultiline: {
-    minHeight: 90,
-  },
-  editCurrencyButton: {
-    borderRadius: 16,
-    backgroundColor: PURE_WHITE,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  editCurrencyButtonText: {
-    color: TEXT_DARK,
-    fontSize: 15,
-    fontWeight: "700",
-    fontFamily: FONT_BODY_BOLD,
-  },
-  editCurrencyButtonPlaceholder: {
-    color: PLACEHOLDER,
-    fontSize: 15,
-    fontFamily: FONT_BODY,
-  },
-  editCoverButton: {
-    borderRadius: 16,
-    backgroundColor: AMBER_ACCENT,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  editCoverButtonText: {
-    color: TEXT_DARK_2,
-    fontWeight: "800",
-    fontSize: 14,
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  editCoverPreview: {
-    width: "100%",
-    height: 160,
-    borderRadius: 16,
-    backgroundColor: AMBER_MUTED_2,
-  },
-  editVisibilityRow: {
-    flexDirection: "row",
-    gap: SPACING_LIST,
-  },
-  editVisibilityChip: {
-    borderRadius: RADIUS_PILL,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: CARD_BG,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  editVisibilityChipSelected: {
-    backgroundColor: HERO_DARK,
-    borderColor: HERO_DARK,
-  },
-  editVisibilityChipLocked: {
-    opacity: 0.55,
-  },
-  editVisibilityChipText: {
-    color: MUTED_2,
-    fontSize: 14,
-    fontWeight: "700",
-    fontFamily: FONT_BODY_BOLD,
-  },
-  editVisibilityChipTextSelected: {
-    color: TEXT_ON_DARK,
-  },
-  editVisibilityHint: {
-    color: MUTED_17,
-    fontSize: 12,
-    lineHeight: 18,
-    fontFamily: FONT_BODY,
-  },
-  editSaveButton: {
-    borderRadius: 18,
-    paddingVertical: 16,
-    alignItems: "center",
-    backgroundColor: HERO_DARK,
-  },
-  editSaveButtonDisabled: {
-    opacity: 0.75,
-  },
-  editSaveButtonText: {
-    color: TEXT_ON_DARK_2,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,

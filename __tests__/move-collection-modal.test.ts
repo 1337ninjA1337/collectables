@@ -79,10 +79,10 @@ describe("HM-C1 — MoveCollectionModal extraction", () => {
     for (const style of ["modalCard:", "modalList:", "modalRow:", "modalRowText:"]) {
       assert.doesNotMatch(src, new RegExp(style.replace(":", "\\s*:")), `${style} must live in components/move-collection-modal.tsx`);
     }
-    // The backdrop/title/cancel styles deliberately STAY until HM-C3 moves the
-    // edit modal out — they're still consumed by the inline edit modal.
+    // HM-C3 moved the edit modal out too, so the shared backdrop/title/cancel
+    // styles have no page consumer left — each extracted modal owns its copy.
     for (const style of ["modalBackdrop:", "modalTitle:", "modalCancel:", "modalCancelText:"]) {
-      assert.match(src, new RegExp(style.replace(":", "\\s*:")), `${style} is still an edit-modal concern until HM-C3`);
+      assert.doesNotMatch(src, new RegExp(style.replace(":", "\\s*:")), `${style} now lives with the extracted modals`);
     }
   });
 

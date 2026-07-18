@@ -39,14 +39,16 @@ describe("app/create-collection.tsx — premium_upsell_shown wiring", () => {
   });
 });
 
-describe("app/collection/[id].tsx — premium_upsell_shown wiring", () => {
-  const src = read("app/collection/[id].tsx");
+// HM-C3: the locked-chip upsell moved into the extracted edit modal — the
+// event fires from the component that owns the chip.
+describe("components/edit-collection-modal.tsx — premium_upsell_shown wiring", () => {
+  const src = read("components/edit-collection-modal.tsx");
 
   it("imports trackEvent from @/lib/analytics", () => {
     assert.match(
       src,
       /import\s*\{\s*trackEvent\s*\}\s*from\s*["']@\/lib\/analytics["']/,
-      "collection/[id].tsx must import trackEvent",
+      "edit-collection-modal.tsx must import trackEvent",
     );
   });
 

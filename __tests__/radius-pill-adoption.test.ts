@@ -22,7 +22,11 @@ const MIGRATED_FILES = [
   // batch 3/5
   "app/index.tsx",
   "app/marketplace.tsx",
-  "app/collection/[id].tsx",
+  // app/collection/[id].tsx left the registry with the HM-C2/C3 modal
+  // extractions — its last RADIUS_PILL consumers (share buttons, visibility
+  // chips) moved into these components; lint:radius still guards the page.
+  "components/collection-share-sheet.tsx",
+  "components/edit-collection-modal.tsx",
   // batch 4/5 — app/ now greps clean for `borderRadius: 999`
   "app/people.tsx",
   "app/listing/[id].tsx",
