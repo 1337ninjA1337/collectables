@@ -1237,10 +1237,13 @@ describe("design-tokens adoption", () => {
   it("app/collection/[id].tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("app/collection/[id].tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    // The HM-C1/C2/C3 modal extractions moved a swath of tokens out with
+    // their styles (MUTED with the share sheet's link text; AMBER_ACCENT,
+    // AMBER_MUTED_2, DANGER, MUTED_2/10/17/23, PLACEHOLDER, SUCCESS_GREEN_2,
+    // TEXT_DARK, TEXT_DARK_2, TEXT_ON_DARK, TEXT_ON_DARK_2 with the share
+    // sheet + edit modal) — see the per-component cases below.
     assert.match(src, /\bACCENT_DEEP\b/);
-    assert.match(src, /\bAMBER_ACCENT\b/);
     assert.match(src, /\bAMBER_LIGHT_2\b/);
-    assert.match(src, /\bAMBER_MUTED_2\b/);
     assert.match(src, /\bAMBER_MUTED_7\b/);
     assert.match(src, /\bAMBER_MUTED_8\b/);
     assert.match(src, /\bAMBER_SOFT\b/);
@@ -1251,29 +1254,42 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bCARD_BG_9\b/);
     assert.match(src, /\bCARD_BG_10\b/);
     assert.match(src, /\bCARD_BG_13\b/);
-    assert.match(src, /\bDANGER\b/);
     assert.match(src, /\bDANGER_DEEP_4\b/);
     assert.match(src, /\bDANGER_SOFT_2\b/);
     assert.match(src, /\bHERO_DARK\b/);
     assert.match(src, /\bHERO_DARK_2\b/);
-    // MUTED left the page with the HM-C2 share-sheet extraction (its only
-    // consumer was shareLinkText) — see the collection-share-sheet case below.
-    assert.match(src, /\bMUTED_2\b/);
     assert.match(src, /\bMUTED_3\b/);
     assert.match(src, /\bMUTED_5\b/);
+    assert.match(src, /\bPURE_WHITE\b/);
+    assert.match(src, /\bTEXT_DARK_3\b/);
+    assert.match(src, /\bTEXT_ON_DARK_4\b/);
+    assert.match(src, /\bTEXT_ON_DARK_9\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  // HM-C3: the edit-modal styles (and their tokens) moved from
+  // app/collection/[id].tsx into the extracted component.
+  it("components/edit-collection-modal.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/edit-collection-modal.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bAMBER_ACCENT\b/);
+    assert.match(src, /\bAMBER_MUTED_2\b/);
+    assert.match(src, /\bBORDER\b/);
+    assert.match(src, /\bCARD_BG\b/);
+    assert.match(src, /\bDANGER\b/);
+    assert.match(src, /\bHERO_DARK\b/);
+    assert.match(src, /\bMUTED_2\b/);
     assert.match(src, /\bMUTED_10\b/);
     assert.match(src, /\bMUTED_17\b/);
     assert.match(src, /\bMUTED_23\b/);
     assert.match(src, /\bPLACEHOLDER\b/);
     assert.match(src, /\bPURE_WHITE\b/);
-    assert.match(src, /\bSUCCESS_GREEN_2\b/);
     assert.match(src, /\bTEXT_DARK\b/);
     assert.match(src, /\bTEXT_DARK_2\b/);
     assert.match(src, /\bTEXT_DARK_3\b/);
     assert.match(src, /\bTEXT_ON_DARK\b/);
     assert.match(src, /\bTEXT_ON_DARK_2\b/);
-    assert.match(src, /\bTEXT_ON_DARK_4\b/);
-    assert.match(src, /\bTEXT_ON_DARK_9\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

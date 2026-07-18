@@ -7,42 +7,51 @@ function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
 }
 
-describe("collection detail screen: editing visibility public→private requires premium", () => {
-  const src = read("app/collection/[id].tsx");
+// HM-C3: the edit modal (and with it the locked-chip UI) moved into
+// components/edit-collection-modal.tsx — the chip pins target the component,
+// while the save-time clamp stays a page concern inside the hoisted
+// handleSaveEdit (which guards on the still-nullable `collection`).
+describe("collection edit modal: editing visibility public→private requires premium", () => {
+  const modal = read("components/edit-collection-modal.tsx");
+  const page = read("app/collection/[id].tsx");
 
-  it("imports usePremium and destructures isPremium", () => {
-    assert.match(src, /from\s+"@\/lib\/premium-context"/);
-    assert.match(src, /const\s+\{[^}]*isPremium[^}]*\}\s*=\s*usePremium\(\)/);
+  it("page imports usePremium, destructures isPremium, and threads it into the modal", () => {
+    assert.match(page, /from\s+"@\/lib\/premium-context"/);
+    assert.match(page, /const\s+\{[^}]*isPremium[^}]*\}\s*=\s*usePremium\(\)/);
+    assert.match(page, /isPremium=\{\s*isPremium\s*\}/);
+    assert.match(page, /savedVisibility=\{\s*activeCollection\.visibility\s*\}/);
   });
 
   it("locks the edit Private chip for non-premium users only when the collection isn't already private", () => {
     // The lock targets the public→private transition: not premium AND the
-    // existing collection is not already private.
+    // persisted visibility (the savedVisibility prop) is not already private.
     assert.match(
-      src,
-      /v\s*===\s*"private"\s*&&\s*!isPremium\s*&&\s*\(activeCollection\.visibility\s*\?\?\s*"private"\)\s*!==\s*"private"/,
+      modal,
+      /v\s*===\s*"private"\s*&&\s*!isPremium\s*&&\s*\(savedVisibility\s*\?\?\s*"private"\)\s*!==\s*"private"/,
     );
   });
 
   it("toasts the premium-only hint when a locked edit chip is tapped", () => {
     assert.match(
-      src,
-      /if\s*\(locked\)\s*\{(?:(?!\}\s*setEditVisibility)[\s\S])*?toast\.error\(t\("visibilityPrivatePremiumOnly"\)/,
+      modal,
+      /if\s*\(locked\)\s*\{(?:(?!\}\s*onChangeVisibility)[\s\S])*?toast\.error\(t\("visibilityPrivatePremiumOnly"\)/,
     );
   });
 
   it("forces 'public' on save when a non-premium user tries to make a public collection private", () => {
     assert.match(
-      src,
-      /finalVisibility[^=]*=\s*\n?\s*!isPremium\s*&&\s*\n?\s*editVisibility\s*===\s*"private"\s*&&\s*\n?\s*\(activeCollection\.visibility\s*\?\?\s*"private"\)\s*!==\s*"private"\s*\n?\s*\?\s*"public"\s*\n?\s*:\s*editVisibility/,
+      page,
+      /finalVisibility[^=]*=\s*\n?\s*!isPremium\s*&&\s*\n?\s*editVisibility\s*===\s*"private"\s*&&\s*\n?\s*\(collection\.visibility\s*\?\?\s*"private"\)\s*!==\s*"private"\s*\n?\s*\?\s*"public"\s*\n?\s*:\s*editVisibility/,
     );
-    assert.match(src, /visibility:\s*finalVisibility/);
+    assert.match(page, /visibility:\s*finalVisibility/);
   });
 
   it("leaves an already-private collection untouched (no forced downgrade)", () => {
     // The guard predicate excludes already-private collections, so a lapsed
-    // owner editing an unrelated field keeps the collection private.
-    assert.match(src, /\(activeCollection\.visibility\s*\?\?\s*"private"\)\s*!==\s*"private"/);
+    // owner editing an unrelated field keeps the collection private — both
+    // at chip level (component) and at save level (page clamp).
+    assert.match(modal, /\(savedVisibility\s*\?\?\s*"private"\)\s*!==\s*"private"/);
+    assert.match(page, /\(collection\.visibility\s*\?\?\s*"private"\)\s*!==\s*"private"/);
   });
 });
 
