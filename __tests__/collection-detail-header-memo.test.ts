@@ -4,15 +4,20 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * HM-A header-fragment memoization pins: `listTitleAndFilters` and
- * `loadMoreCta` in `app/collection/[id].tsx` are `useMemo`'d so the
- * ListHeaderComponent's children keep a stable element identity across
- * scroll-driven parent re-renders — React bails out of reconciling a subtree
- * whose element reference didn't change between passes. Both memos are
- * hoisted ABOVE the loading/not-found early returns (hooks must run
- * unconditionally), which is only legal because neither fragment touches the
- * post-narrow `activeCollection` (pageHeader/modalsBlock stay un-memoized —
- * HM-B/HM-C).
+ * HM-A/HM-B header-fragment memoization pins: `listTitleAndFilters`,
+ * `loadMoreCta` (HM-A) and `pageHeader` (HM-B) in `app/collection/[id].tsx`
+ * are `useMemo`'d so the ListHeaderComponent's children keep a stable element
+ * identity across scroll-driven parent re-renders — React bails out of
+ * reconciling a subtree whose element reference didn't change between passes.
+ * All three memos are hoisted ABOVE the loading/not-found early returns
+ * (hooks must run unconditionally), which is only legal because none of them
+ * touches the post-narrow `activeCollection` — HM-A's fragments don't need
+ * it, and HM-B's pageHeader factory guards on the still-nullable
+ * `collection` and derives ownership locally. The handlers pageHeader closes
+ * over (`confirmAndDeleteCollection` / `handleDeleteCollection` /
+ * `handleExportPdf` / `openEditModal`) were promoted to nullable-guarded
+ * useCallbacks above the returns for the same reason (modalsBlock stays
+ * un-memoized — HM-C).
  *
  * The memo is only effective if `loadMore` is referentially stable while the
  * `items` identity is unchanged, so `lib/use-chunked-list.ts`'s callbacks are
@@ -92,6 +97,86 @@ describe("app/collection/[id].tsx — HM-A header-fragment memoization", () => {
     assert.equal(ctaDecls.length, 1, `expected exactly 1 loadMoreCta declaration, got ${ctaDecls.length}`);
   });
 });
+
+describe("app/collection/[id].tsx — HM-B pageHeader memoization", () => {
+  it("pageHeader is a useMemo whose factory guards on the nullable collection", () => {
+    const src = readScreenSrc();
+    assert.match(
+      src,
+      /const\s+pageHeader\s*=\s*useMemo\(\(\)\s*=>\s*\{\s*\n\s*if\s*\(!collection\)\s*return\s+null;/,
+      "pageHeader must be a useMemo that returns null while collection is unresolved",
+    );
+  });
+
+  it("pageHeader factory derives ownership locally instead of reading post-narrow bindings", () => {
+    const src = readScreenSrc();
+    assert.match(
+      src,
+      /const\s+owner\s*=\s*user\?\.id\s*===\s*collection\.ownerUserId;/,
+      "the factory must compute `owner` from the nullable-guarded collection",
+    );
+    const block = extractPageHeaderMemo(src);
+    assert.doesNotMatch(block, /activeCollection/);
+    assert.doesNotMatch(block, /\bisOwner\b/);
+  });
+
+  it("pageHeader memo is hoisted ABOVE the early returns and declared exactly once", () => {
+    const src = readScreenSrc();
+    const firstEarlyReturn = src.indexOf("if (loadingRemote && !collection)");
+    const decl = src.indexOf("const pageHeader = useMemo(");
+    assert.ok(decl > 0 && decl < firstEarlyReturn, "pageHeader memo must sit above the early returns (hook-order invariant)");
+    const decls = src.match(/const\s+pageHeader\s*=/g) ?? [];
+    assert.equal(decls.length, 1, `expected exactly 1 pageHeader declaration, got ${decls.length}`);
+  });
+
+  it("pageHeader deps carry the values the fragment renders", () => {
+    const src = readScreenSrc();
+    const block = extractPageHeaderMemo(src);
+    // Spot-check the load-bearing deps rather than pinning the full array
+    // order: collection (all chrome), allItems (summary counts), theme
+    // (summary cards), exporting/selectionMode (action buttons), and the
+    // four promoted handlers.
+    for (const dep of [
+      "collection,",
+      "allItems,",
+      "theme,",
+      "user?.id,",
+      "exporting,",
+      "selectionMode,",
+      "openEditModal,",
+      "enterSelectionMode,",
+      "handleExportPdf,",
+      "handleDeleteCollection,",
+    ]) {
+      assert.ok(block.includes(dep), `pageHeader dep array must include ${dep.replace(/,$/, "")}`);
+    }
+  });
+
+  it("the four handlers pageHeader closes over are nullable-guarded useCallbacks above the returns", () => {
+    const src = readScreenSrc();
+    const firstEarlyReturn = src.indexOf("if (loadingRemote && !collection)");
+    assert.match(src, /const\s+confirmAndDeleteCollection\s*=\s*useCallback\(async\s*\(\)\s*=>\s*\{\s*\n\s*if\s*\(!collection\)\s*return;/);
+    assert.match(src, /const\s+handleDeleteCollection\s*=\s*useCallback\(/);
+    assert.match(src, /const\s+handleExportPdf\s*=\s*useCallback\(async\s*\(\)\s*=>\s*\{\s*\n\s*if\s*\(!collection\)\s*return;/);
+    assert.match(src, /const\s+openEditModal\s*=\s*useCallback\(\(\)\s*=>\s*\{\s*\n\s*if\s*\(!collection\)\s*return;/);
+    for (const name of ["confirmAndDeleteCollection", "handleDeleteCollection", "handleExportPdf", "openEditModal"]) {
+      const decl = src.indexOf(`const ${name} = useCallback(`);
+      assert.ok(decl > 0 && decl < firstEarlyReturn, `${name} must be declared above the early returns`);
+      // No plain-function shadow left behind below the returns.
+      assert.doesNotMatch(src, new RegExp(`(?:async\\s+)?function\\s+${name}\\b`));
+    }
+  });
+});
+
+function extractPageHeaderMemo(src: string): string {
+  const start = src.indexOf("const pageHeader = useMemo(");
+  assert.ok(start > 0, "pageHeader useMemo declaration not found");
+  // The memo ends at the first `]);` at 2-space indentation after the dep
+  // array — the multi-line dep list closes with `  ]);`.
+  const end = src.indexOf("\n  ]);", start);
+  assert.ok(end > start, "pageHeader memo closing `]);` not found");
+  return src.slice(start, end + 6);
+}
 
 describe("lib/use-chunked-list.ts — stable loadMore/reset callbacks", () => {
   it("loadMore is a useCallback keyed on [items, safePageSize]", () => {

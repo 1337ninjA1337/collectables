@@ -96,9 +96,9 @@ describe("CurrencySheet — extracted to a shared component", () => {
 describe("Collection edit modal — currency picker UI wiring", () => {
   const src = read("app/collection/[id].tsx");
 
-  it("declares editCurrency state seeded by openEditModal from activeCollection.currency", () => {
+  it("declares editCurrency state seeded by openEditModal from collection.currency", () => {
     assert.match(src, /const\s+\[editCurrency,\s*setEditCurrency\]\s*=\s*useState<string>\(/);
-    assert.match(src, /setEditCurrency\(activeCollection\.currency\s*\?\?\s*""\)/);
+    assert.match(src, /setEditCurrency\(collection\.currency\s*\?\?\s*""\)/);
   });
 
   it("save handler sends `currency: editCurrency.trim() || null` so blank clears the override", () => {
@@ -124,7 +124,10 @@ describe("Collection edit modal — currency picker UI wiring", () => {
     // Quick-mode tap-to-swap is the discoverable shortcut: tap the
     // currency code on the total-cost card → pick → persists on the spot.
     assert.match(src, /setCurrencySheetMode\("quick"\)/);
-    assert.match(src, /isOwner\s*\?\s*\(\s*<Pressable[\s\S]*?onPress=\{openCurrencyPicker\}/);
+    // HM-B: the total-cost card lives inside the pageHeader useMemo factory,
+    // which derives ownership locally as `owner` (the post-narrow `isOwner`
+    // binding doesn't exist above the early returns).
+    assert.match(src, /\bowner\s*\?\s*\(\s*<Pressable[\s\S]*?onPress=\{openCurrencyPicker\}/);
   });
 
   it("CurrencySheet onSelect persists immediately when mode === 'quick'", () => {

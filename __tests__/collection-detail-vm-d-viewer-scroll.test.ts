@@ -146,7 +146,7 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // the inline return (drag/selection/empty) can reuse the same chrome
     // without duplicating the JSX. A regression where one of them gets
     // inlined again would mean only one path renders correctly.
-    assert.match(src, /const\s+pageHeader\s*=\s*\(/);
+    assert.match(src, /const\s+pageHeader\s*=\s*useMemo\(\(\)\s*=>\s*\{/);
     // HM-A memoized the two lightweight fragments (stable element identity
     // for the ListHeaderComponent children); the declaration shape moved
     // from a plain const to a useMemo factory.

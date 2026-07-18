@@ -414,6 +414,71 @@ export default function CollectionDetailsScreen() {
     setMoveModalOpen(true);
   }, [selectedIds, otherOwnedCollections, toast, t]);
 
+  // HM-B handler promotion: the four handlers pageHeader closes over move
+  // above the early returns as useCallbacks (hook-order invariant), which
+  // means none may touch the post-narrow `activeCollection` — each guards on
+  // the still-nullable `collection` instead, mirroring `handleOpenMove`.
+  const confirmAndDeleteCollection = useCallback(async () => {
+    if (!collection) return;
+    await deleteCollection(collection.id);
+    router.replace("/");
+  }, [collection, deleteCollection]);
+
+  const handleDeleteCollection = useCallback(() => {
+    const message = `${t("deleteCollectionTitle")} ${t("deleteCollectionText")}`;
+
+    if (Platform.OS === "web") {
+      if (globalThis.confirm(message)) {
+        void confirmAndDeleteCollection();
+      }
+      return;
+    }
+
+    Alert.alert(t("deleteCollectionTitle"), t("deleteCollectionText"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("delete"),
+        style: "destructive",
+        onPress: () => {
+          void confirmAndDeleteCollection();
+        },
+      },
+    ]);
+  }, [t, confirmAndDeleteCollection]);
+
+  const handleExportPdf = useCallback(async () => {
+    if (!collection) return;
+    setExporting(true);
+    try {
+      await exportCollectionToPdf(collection, allItems, {
+        acquiredHow: t("acquiredHow"),
+        acquiredDate: t("acquiredDate"),
+        description: t("description"),
+        variants: t("variants"),
+        costLabel: t("costLabel"),
+        totalCost: t("totalCost"),
+        exportPdfItemCount: t("exportPdfItemCount", { count: allItems.length }),
+        photosSaved: t("photosSaved"),
+      });
+      toast.success(t("exportPdfDone"));
+    } catch {
+      toast.error(t("exportPdfFailed"));
+    } finally {
+      setExporting(false);
+    }
+  }, [collection, allItems, t, toast]);
+
+  const openEditModal = useCallback(() => {
+    if (!collection) return;
+    setEditName(collection.name);
+    setEditDescription(collection.description);
+    setEditCoverUri(collection.coverPhoto);
+    setEditCoverChanged(false);
+    setEditVisibility(collection.visibility ?? "private");
+    setEditCurrency(collection.currency ?? "");
+    setEditModalOpen(true);
+  }, [collection]);
+
   // HM-A (header memoization): the lightweight list-header/footer fragments
   // are useMemo'd so the ListHeaderComponent's children keep a stable element
   // identity across scroll-driven parent re-renders — React bails out of
@@ -460,6 +525,167 @@ export default function CollectionDetailsScreen() {
     [hasMore, loadMore, items.length, visibleItems.length, t],
   );
 
+  // HM-B: hero + summary + total + reactions + owner-actions — the JSX that
+  // sits above the items list in BOTH render paths, wrapped in a single View
+  // with a vertical gap so the viewer-FlatList path (where
+  // ListHeaderComponent doesn't get the outer ScrollView's `gap: 18`) keeps
+  // the original visual rhythm. useMemo'd so the ListHeaderComponent's
+  // heaviest child — the hero `<Image>` mounts a Cloudinary fetch — keeps a
+  // stable element identity across scroll-driven parent re-renders. Lives
+  // above the early returns (hook-order invariant), so the factory guards on
+  // the still-nullable `collection` and derives ownership locally instead of
+  // reading the post-narrow `activeCollection`/`isOwner` bindings.
+  const pageHeader = useMemo(() => {
+    if (!collection) return null;
+    const owner = user?.id === collection.ownerUserId;
+    return (
+      <View style={styles.pageHeader}>
+        <View style={{...styles.hero, ...(!collection.coverPhoto ? { backgroundColor: placeholderColor(collection.id) } : {})}}>
+          {collection.coverPhoto ? (
+            <Image
+              source={{ uri: withCloudinaryThumbUrl(collection.coverPhoto, { width: 1200, height: 900, mode: "fill" }) }}
+              style={styles.heroImage}
+            />
+          ) : null}
+          <LinearGradient
+            colors={["rgba(34, 24, 17, 0.08)", "rgba(34, 24, 17, 0.55)"]}
+            style={styles.heroOverlay}
+          />
+          <View style={styles.heroContent}>
+            <VisibilityBadge collection={collection} variant="hero" />
+            <Text style={styles.heroTitle}>{collection.name}</Text>
+            <Text style={styles.heroText}>{collection.description}</Text>
+            {collection.role === "owner" && collection.visibility !== "public" ? (
+              <Text style={styles.heroMeta}>
+                {t("accessOpenFor", { count: collection.sharedWith.length })}
+              </Text>
+            ) : collection.role !== "owner" ? (
+              <Text style={styles.heroMeta}>
+                {t("viewingCollectionOf", { name: collection.ownerName })}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+
+        <View style={styles.summaryRow}>
+          <View style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+            <Text style={{ ...styles.summaryNumber, color: theme.text }}>{allItems.length}</Text>
+            <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("itemsInside")}</Text>
+          </View>
+          <View style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+            <Text style={{ ...styles.summaryNumber, color: theme.text }}>{allItems.reduce((total, item) => total + item.photos.length, 0)}</Text>
+            <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("photosSaved")}</Text>
+          </View>
+        </View>
+
+        {(() => {
+          const total = getCollectionTotalCost(collection.id);
+          if (total.amount <= 0) return null;
+          // Owners get tap-to-swap on the total card — opens the currency sheet
+          // pre-seeded with the active currency. Saves on the spot, no need to
+          // dig into the 3-dot edit modal. Non-owners see a plain View.
+          const openCurrencyPicker = () => {
+            setEditCurrency(collection.currency ?? total.currency);
+            setCurrencyQuery("");
+            setCurrencySheetMode("quick");
+            setCurrencySheetOpen(true);
+          };
+          return owner ? (
+            <Pressable
+              style={styles.summaryCard}
+              onPress={openCurrencyPicker}
+              accessibilityRole="button"
+              accessibilityLabel={t("collectionCurrencyA11y", { currency: total.currency })}
+            >
+              <CostBadge amount={total.amount} currency={total.currency} style={styles.summaryNumber} />
+              <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.summaryCard}>
+              <CostBadge amount={total.amount} currency={total.currency} style={styles.summaryNumber} />
+              <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
+            </View>
+          );
+        })()}
+
+        <ReactionBar targetType="collection" targetId={collection.id} />
+
+        {owner ? (
+          <View style={styles.ownerActions}>
+            <Pressable style={styles.editCollectionButton} onPress={openEditModal}>
+              <Text style={styles.editCollectionButtonText}>{t("editCollection")}</Text>
+            </Pressable>
+            <Link href={{ pathname: "/create", params: { collectionId: collection.id } }} asChild>
+              <Pressable style={styles.addButton}>
+                <Text style={styles.addButtonText}>{t("addItemToCollection")}</Text>
+              </Pressable>
+            </Link>
+            {allItems.length > 0 && !selectionMode ? (
+              <Pressable style={styles.selectButton} onPress={enterSelectionMode}>
+                <Text style={styles.selectButtonText}>{t("selectItems")}</Text>
+              </Pressable>
+            ) : null}
+            {allItems.length > 0 ? (
+              <Pressable
+                style={{...styles.exportButton, ...(exporting ? styles.exportButtonDisabled : {})}}
+                onPress={() => void handleExportPdf()}
+                disabled={exporting}
+              >
+                <Text style={styles.exportButtonText}>{exporting ? t("exportPdfGenerating") : t("exportPdf")}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable style={styles.shareButton} onPress={() => setShareOpen(true)}>
+              <Text style={styles.shareButtonText}>{t("share")}</Text>
+            </Pressable>
+            <Pressable style={styles.deleteButton} onPress={handleDeleteCollection}>
+              <Text style={styles.deleteButtonText}>{t("deleteCollection")}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.ownerActions}>
+            {isCollectionFollowed(collection.id) ? (
+              <Pressable style={styles.unfollowButton} onPress={() => void unfollowCollection(collection.id)}>
+                <Text style={styles.unfollowButtonText}>{t("unfollowCollection")}</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.addButton} onPress={() => void followCollection(collection.id)}>
+                <Text style={styles.addButtonText}>{t("followCollection")}</Text>
+              </Pressable>
+            )}
+            {allItems.length > 0 ? (
+              <Pressable
+                style={{...styles.exportButton, ...(exporting ? styles.exportButtonDisabled : {})}}
+                onPress={() => void handleExportPdf()}
+                disabled={exporting}
+              >
+                <Text style={styles.exportButtonText}>{exporting ? t("exportPdfGenerating") : t("exportPdf")}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable style={styles.shareButton} onPress={() => setShareOpen(true)}>
+              <Text style={styles.shareButtonText}>{t("share")}</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+    );
+  }, [
+    collection,
+    allItems,
+    theme,
+    user?.id,
+    exporting,
+    selectionMode,
+    t,
+    getCollectionTotalCost,
+    isCollectionFollowed,
+    followCollection,
+    unfollowCollection,
+    openEditModal,
+    enterSelectionMode,
+    handleExportPdf,
+    handleDeleteCollection,
+  ]);
+
   if (loadingRemote && !collection) {
     return (
       <Screen>
@@ -477,33 +703,6 @@ export default function CollectionDetailsScreen() {
   }
 
   const activeCollection = collection;
-
-  async function confirmAndDeleteCollection() {
-    await deleteCollection(activeCollection.id);
-    router.replace("/");
-  }
-
-  function handleDeleteCollection() {
-    const message = `${t("deleteCollectionTitle")} ${t("deleteCollectionText")}`;
-
-    if (Platform.OS === "web") {
-      if (globalThis.confirm(message)) {
-        void confirmAndDeleteCollection();
-      }
-      return;
-    }
-
-    Alert.alert(t("deleteCollectionTitle"), t("deleteCollectionText"), [
-      { text: t("cancel"), style: "cancel" },
-      {
-        text: t("delete"),
-        style: "destructive",
-        onPress: () => {
-          void confirmAndDeleteCollection();
-        },
-      },
-    ]);
-  }
 
   const isOwner = user?.id === activeCollection.ownerUserId;
 
@@ -531,37 +730,6 @@ export default function CollectionDetailsScreen() {
     await moveItems(ids, targetCollectionId);
     toast.success(t("itemsMoved", { count: ids.length }));
     exitSelectionMode();
-  }
-
-  async function handleExportPdf() {
-    setExporting(true);
-    try {
-      await exportCollectionToPdf(activeCollection, allItems, {
-        acquiredHow: t("acquiredHow"),
-        acquiredDate: t("acquiredDate"),
-        description: t("description"),
-        variants: t("variants"),
-        costLabel: t("costLabel"),
-        totalCost: t("totalCost"),
-        exportPdfItemCount: t("exportPdfItemCount", { count: allItems.length }),
-        photosSaved: t("photosSaved"),
-      });
-      toast.success(t("exportPdfDone"));
-    } catch {
-      toast.error(t("exportPdfFailed"));
-    } finally {
-      setExporting(false);
-    }
-  }
-
-  function openEditModal() {
-    setEditName(activeCollection.name);
-    setEditDescription(activeCollection.description);
-    setEditCoverUri(activeCollection.coverPhoto);
-    setEditCoverChanged(false);
-    setEditVisibility(activeCollection.visibility ?? "private");
-    setEditCurrency(activeCollection.currency ?? "");
-    setEditModalOpen(true);
   }
 
   async function pickEditCover() {
@@ -672,142 +840,6 @@ export default function CollectionDetailsScreen() {
   // renders a non-virtualized vertical list (VM-E migrates selection too).
   const isViewerFlatListBranch =
     items.length > 0 && (!isOwner || (!selectionMode && itemFilters.sort !== "default"));
-
-  // Hero + summary + total + reactions + owner-actions — the JSX that sits
-  // above the items list in BOTH render paths. Wrapped in a single View with
-  // a vertical gap so the viewer-FlatList path (where ListHeaderComponent
-  // doesn't get the outer ScrollView's `gap: 18`) keeps the original visual
-  // rhythm.
-  const pageHeader = (
-    <View style={styles.pageHeader}>
-      <View style={{...styles.hero, ...(!activeCollection.coverPhoto ? { backgroundColor: placeholderColor(activeCollection.id) } : {})}}>
-        {activeCollection.coverPhoto ? (
-          <Image
-            source={{ uri: withCloudinaryThumbUrl(activeCollection.coverPhoto, { width: 1200, height: 900, mode: "fill" }) }}
-            style={styles.heroImage}
-          />
-        ) : null}
-        <LinearGradient
-          colors={["rgba(34, 24, 17, 0.08)", "rgba(34, 24, 17, 0.55)"]}
-          style={styles.heroOverlay}
-        />
-        <View style={styles.heroContent}>
-          <VisibilityBadge collection={activeCollection} variant="hero" />
-          <Text style={styles.heroTitle}>{activeCollection.name}</Text>
-          <Text style={styles.heroText}>{activeCollection.description}</Text>
-          {activeCollection.role === "owner" && activeCollection.visibility !== "public" ? (
-            <Text style={styles.heroMeta}>
-              {t("accessOpenFor", { count: activeCollection.sharedWith.length })}
-            </Text>
-          ) : activeCollection.role !== "owner" ? (
-            <Text style={styles.heroMeta}>
-              {t("viewingCollectionOf", { name: activeCollection.ownerName })}
-            </Text>
-          ) : null}
-        </View>
-      </View>
-
-      <View style={styles.summaryRow}>
-        <View style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
-          <Text style={{ ...styles.summaryNumber, color: theme.text }}>{allItems.length}</Text>
-          <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("itemsInside")}</Text>
-        </View>
-        <View style={{ ...styles.summaryCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
-          <Text style={{ ...styles.summaryNumber, color: theme.text }}>{allItems.reduce((total, item) => total + item.photos.length, 0)}</Text>
-          <Text style={{ ...styles.summaryLabel, color: theme.meta }}>{t("photosSaved")}</Text>
-        </View>
-      </View>
-
-      {(() => {
-        const total = getCollectionTotalCost(activeCollection.id);
-        if (total.amount <= 0) return null;
-        // Owners get tap-to-swap on the total card — opens the currency sheet
-        // pre-seeded with the active currency. Saves on the spot, no need to
-        // dig into the 3-dot edit modal. Non-owners see a plain View.
-        const openCurrencyPicker = () => {
-          setEditCurrency(activeCollection.currency ?? total.currency);
-          setCurrencyQuery("");
-          setCurrencySheetMode("quick");
-          setCurrencySheetOpen(true);
-        };
-        return isOwner ? (
-          <Pressable
-            style={styles.summaryCard}
-            onPress={openCurrencyPicker}
-            accessibilityRole="button"
-            accessibilityLabel={t("collectionCurrencyA11y", { currency: total.currency })}
-          >
-            <CostBadge amount={total.amount} currency={total.currency} style={styles.summaryNumber} />
-            <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.summaryCard}>
-            <CostBadge amount={total.amount} currency={total.currency} style={styles.summaryNumber} />
-            <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
-          </View>
-        );
-      })()}
-
-      <ReactionBar targetType="collection" targetId={activeCollection.id} />
-
-      {user?.id === activeCollection.ownerUserId ? (
-        <View style={styles.ownerActions}>
-          <Pressable style={styles.editCollectionButton} onPress={openEditModal}>
-            <Text style={styles.editCollectionButtonText}>{t("editCollection")}</Text>
-          </Pressable>
-          <Link href={{ pathname: "/create", params: { collectionId: activeCollection.id } }} asChild>
-            <Pressable style={styles.addButton}>
-              <Text style={styles.addButtonText}>{t("addItemToCollection")}</Text>
-            </Pressable>
-          </Link>
-          {allItems.length > 0 && !selectionMode ? (
-            <Pressable style={styles.selectButton} onPress={enterSelectionMode}>
-              <Text style={styles.selectButtonText}>{t("selectItems")}</Text>
-            </Pressable>
-          ) : null}
-          {allItems.length > 0 ? (
-            <Pressable
-              style={{...styles.exportButton, ...(exporting ? styles.exportButtonDisabled : {})}}
-              onPress={() => void handleExportPdf()}
-              disabled={exporting}
-            >
-              <Text style={styles.exportButtonText}>{exporting ? t("exportPdfGenerating") : t("exportPdf")}</Text>
-            </Pressable>
-          ) : null}
-          <Pressable style={styles.shareButton} onPress={() => setShareOpen(true)}>
-            <Text style={styles.shareButtonText}>{t("share")}</Text>
-          </Pressable>
-          <Pressable style={styles.deleteButton} onPress={handleDeleteCollection}>
-            <Text style={styles.deleteButtonText}>{t("deleteCollection")}</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <View style={styles.ownerActions}>
-          {isCollectionFollowed(activeCollection.id) ? (
-            <Pressable style={styles.unfollowButton} onPress={() => void unfollowCollection(activeCollection.id)}>
-              <Text style={styles.unfollowButtonText}>{t("unfollowCollection")}</Text>
-            </Pressable>
-          ) : (
-            <Pressable style={styles.addButton} onPress={() => void followCollection(activeCollection.id)}>
-              <Text style={styles.addButtonText}>{t("followCollection")}</Text>
-            </Pressable>
-          )}
-          {allItems.length > 0 ? (
-            <Pressable
-              style={{...styles.exportButton, ...(exporting ? styles.exportButtonDisabled : {})}}
-              onPress={() => void handleExportPdf()}
-              disabled={exporting}
-            >
-              <Text style={styles.exportButtonText}>{exporting ? t("exportPdfGenerating") : t("exportPdf")}</Text>
-            </Pressable>
-          ) : null}
-          <Pressable style={styles.shareButton} onPress={() => setShareOpen(true)}>
-            <Text style={styles.shareButtonText}>{t("share")}</Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
-  );
 
   const modalsBlock = (
     <>
