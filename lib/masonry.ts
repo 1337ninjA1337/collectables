@@ -17,12 +17,59 @@
  * The input array is not mutated.
  */
 export function distributeIntoMasonryColumns<T>(items: T[], columnCount: number = 2): T[][] {
-  const safeCount = resolveColumnCount(columnCount);
-  const columns: T[][] = Array.from({ length: safeCount }, () => []);
+  const columns = allocateColumns<T>(columnCount);
   for (let i = 0; i < items.length; i++) {
-    columns[i % safeCount].push(items[i]);
+    columns[i % columns.length].push(items[i]);
   }
   return columns;
+}
+
+/**
+ * Balanced-height variant: instead of index modulo, each item lands in the
+ * currently-shortest column (greedy bin-packing), so a card that renders
+ * taller than its siblings — price tag, condition pill, odd aspect ratio —
+ * doesn't drag its column visually below the others and break the
+ * staggered-flow illusion.
+ *
+ * Contract mirrors `distributeIntoMasonryColumns`: pure, input not mutated,
+ * item references preserved, bad `columnCount` falls back to 1 column.
+ * Ties go to the lowest-index column, which makes the distribution stable
+ * AND means uniform heights reproduce the round-robin layout exactly — a
+ * caller can switch between the two helpers without a visual jump while
+ * all cards are still fixed-height.
+ *
+ * A `getHeight` result that is non-finite or negative counts as 0 (the
+ * item still renders *somewhere*; a NaN must not poison every subsequent
+ * shortest-column comparison).
+ */
+export function distributeByHeight<T>(
+  items: T[],
+  columnCount: number,
+  getHeight: (item: T) => number,
+): T[][] {
+  const columns = allocateColumns<T>(columnCount);
+  const heights = columns.map(() => 0);
+  for (const item of items) {
+    let target = 0;
+    for (let c = 1; c < heights.length; c++) {
+      if (heights[c] < heights[target]) target = c;
+    }
+    columns[target].push(item);
+    const h = getHeight(item);
+    heights[target] += Number.isFinite(h) && h > 0 ? h : 0;
+  }
+  return columns;
+}
+
+/**
+ * Shared column allocation for every column-aware helper in this module —
+ * one place to harden (e.g. `Object.freeze` the outer array) if column
+ * mutation ever becomes a contract risk. Always returns at least one
+ * column (see `resolveColumnCount`).
+ */
+export function allocateColumns<T>(columnCount: number): T[][] {
+  const safeCount = resolveColumnCount(columnCount);
+  return Array.from({ length: safeCount }, () => []);
 }
 
 /**
