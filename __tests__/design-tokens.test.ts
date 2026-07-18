@@ -1256,7 +1256,8 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bDANGER_SOFT_2\b/);
     assert.match(src, /\bHERO_DARK\b/);
     assert.match(src, /\bHERO_DARK_2\b/);
-    assert.match(src, /\bMUTED\b/);
+    // MUTED left the page with the HM-C2 share-sheet extraction (its only
+    // consumer was shareLinkText) — see the collection-share-sheet case below.
     assert.match(src, /\bMUTED_2\b/);
     assert.match(src, /\bMUTED_3\b/);
     assert.match(src, /\bMUTED_5\b/);
@@ -1273,6 +1274,30 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bTEXT_ON_DARK_2\b/);
     assert.match(src, /\bTEXT_ON_DARK_4\b/);
     assert.match(src, /\bTEXT_ON_DARK_9\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  // HM-C2: the share-sheet styles (and MUTED, whose only page consumer was
+  // shareLinkText) moved from app/collection/[id].tsx into the extracted
+  // component.
+  it("components/collection-share-sheet.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/collection-share-sheet.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bAMBER_ACCENT\b/);
+    assert.match(src, /\bAMBER_SOFT\b/);
+    assert.match(src, /\bBORDER\b/);
+    assert.match(src, /\bBORDER_7\b/);
+    assert.match(src, /\bCARD_BG\b/);
+    assert.match(src, /\bHERO_DARK\b/);
+    assert.match(src, /\bMUTED\b/);
+    assert.match(src, /\bMUTED_2\b/);
+    assert.match(src, /\bMUTED_17\b/);
+    assert.match(src, /\bPURE_WHITE\b/);
+    assert.match(src, /\bSUCCESS_GREEN_2\b/);
+    assert.match(src, /\bTEXT_DARK\b/);
+    assert.match(src, /\bTEXT_DARK_2\b/);
+    assert.match(src, /\bTEXT_ON_DARK_2\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
