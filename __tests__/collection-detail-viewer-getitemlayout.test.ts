@@ -88,11 +88,17 @@ describe("viewer FlatList getItemLayout", () => {
   });
 
   it("the contentContainer row gap the offset stride assumes is still SPACING_LIST", () => {
+    // The offset math bakes in SPACING_LIST as the inter-row gap; the style
+    // now lives in the shared lib/flat-list-styles.ts (WLF-A) — if it
+    // migrates to a different token the stride must follow.
     const src = readCollectionSrc();
-    // The offset math bakes in SPACING_LIST as the inter-row gap; if the
-    // viewerFlatListContent style migrates to a different token the stride
-    // must follow.
-    const m = src.match(/viewerFlatListContent:\s*\{\s*gap:\s*SPACING_LIST\s*,?\s*\}/);
-    assert.ok(m, "styles.viewerFlatListContent must keep gap: SPACING_LIST (or update getMasonryRowLayout's stride)");
+    assert.match(
+      src,
+      /contentContainerStyle=\{\s*flatListStyles\.viewerFlatListContent\s*\}/,
+      "viewer FlatList must take its content style from the shared flatListStyles",
+    );
+    const sharedSrc = readFileSync(path.join(process.cwd(), "lib", "flat-list-styles.ts"), "utf8");
+    const m = sharedSrc.match(/viewerFlatListContent:\s*\{\s*gap:\s*SPACING_LIST\s*,?\s*\}/);
+    assert.ok(m, "flatListStyles.viewerFlatListContent must keep gap: SPACING_LIST (or update getMasonryRowLayout's stride)");
   });
 });
