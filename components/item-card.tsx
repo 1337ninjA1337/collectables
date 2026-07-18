@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { Link } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import {
@@ -21,13 +21,17 @@ import { placeholderColor } from "@/lib/placeholder-color";
 import { CollectableItem } from "@/lib/types";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD } from "@/lib/fonts";
 
-type ItemCardProps = { item: CollectableItem; compact?: boolean };
+// `style` is forwarded to the outer Pressable (additive — no behavior change
+// for callers that omit it) so layout-only wrappers like the masonry cell's
+// `flex: 1` View can collapse into a prop: one less node per cell × hundreds
+// of cells is measurable RN bridge / Yoga layout savings on long collections.
+type ItemCardProps = { item: CollectableItem; compact?: boolean; style?: StyleProp<ViewStyle> };
 
 // VM-F: memoized like SelectableItemRow — the named-function form keeps the
 // component name visible in React DevTools' profiler tree. Context consumers
 // (i18n/theme/collections) still re-render the card on context changes;
 // memo skips only parent-driven re-renders with referentially stable props.
-export const ItemCard = memo(function ItemCard({ item, compact }: ItemCardProps) {
+export const ItemCard = memo(function ItemCard({ item, compact, style }: ItemCardProps) {
   const { t } = useI18n();
   const theme = useAppTheme();
   const hasPhoto = item.photos.length > 0 && Boolean(item.photos[0]);
@@ -35,7 +39,7 @@ export const ItemCard = memo(function ItemCard({ item, compact }: ItemCardProps)
   if (compact) {
     return (
       <Link href={`/item/${item.id}`} asChild>
-        <Pressable style={{ ...styles.compactCard, backgroundColor: theme.card, borderColor: theme.border }}>
+        <Pressable style={[styles.compactCard, { backgroundColor: theme.card, borderColor: theme.border }, style]}>
           {hasPhoto ? (
             <LazyPhoto
               uri={withCloudinaryThumbUrl(item.photos[0], { width: 480, height: 360, mode: "fill" })}
@@ -60,7 +64,7 @@ export const ItemCard = memo(function ItemCard({ item, compact }: ItemCardProps)
 
   return (
     <Link href={`/item/${item.id}`} asChild>
-      <Pressable style={{ ...styles.card, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
+      <Pressable style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }, SHADOW_SOFT, style]}>
         {hasPhoto ? (
           <LazyPhoto
             uri={withCloudinaryThumbUrl(item.photos[0], { width: 320, height: 320, mode: "fill" })}

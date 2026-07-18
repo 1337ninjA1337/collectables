@@ -74,7 +74,7 @@ describe("app/collection/[id].tsx — FlatList viewer-masonry migration (VM-C)",
     assert.match(src, /renderItem=\{renderMasonryItem\}/);
     assert.match(
       src,
-      /const\s+renderMasonryItem\s*=\s*useCallback\s*\([\s\S]*?<ItemCard\s+item=\{\s*item\s*\}\s+compact\s*\/>[\s\S]*?\)/,
+      /const\s+renderMasonryItem\s*=\s*useCallback\s*\([\s\S]*?<ItemCard\s+item=\{\s*item\s*\}\s+compact\s+style=\{\s*styles\.masonryItem\s*\}\s*\/>[\s\S]*?\)/,
     );
   });
 

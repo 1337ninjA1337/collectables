@@ -327,12 +327,12 @@ export default function CollectionDetailsScreen() {
   // VM-F (viewer branch): same hoist for the masonry FlatList — the inline
   // arrow allocated a fresh wrapper closure every parent render, defeating
   // the new React.memo on `<ItemCard>`. No deps: the closure only touches
-  // `styles` (module scope) and the row's own `item`.
+  // `styles` (module scope) and the row's own `item`. The cell's `flex: 1`
+  // rides on ItemCard's forwarded `style` prop — the old per-item wrapper
+  // View cost one extra node per cell × hundreds of cells.
   const renderMasonryItem = useCallback(
     ({ item }: { item: CollectableItem }) => (
-      <View style={styles.masonryItem}>
-        <ItemCard item={item} compact />
-      </View>
+      <ItemCard item={item} compact style={styles.masonryItem} />
     ),
     [],
   );
