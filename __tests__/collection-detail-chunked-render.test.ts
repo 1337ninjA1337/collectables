@@ -93,16 +93,17 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     );
   });
 
-  it("masonry branch feeds visibleItems into a FlatList numColumns={2} (VM-C)", () => {
+  it("masonry branch feeds visibleItems into a FlatList numColumns={masonryColumnCount} (VM-C)", () => {
     // Post VM-C the viewer/read-only branch renders a `<FlatList>` with
-    // `numColumns={2}` and `data={visibleItems}` — FlatList itself handles
+    // `numColumns` and `data={visibleItems}` — FlatList itself handles
     // the column distribution, so the previous `distributeIntoMasonryColumns`
     // helper + inline modulo split are gone. The data source MUST stay on
     // `visibleItems` (not `items`) so the chunked window still bounds the
-    // mount count, and `numColumns={2}` MUST be a literal so a typo can't
-    // silently collapse the grid to a single column.
+    // mount count, and `numColumns={masonryColumnCount}` MUST consume the
+    // shared responsive value (2 mobile / 3 tablet / 4 desktop) so it can't
+    // drift from getMasonryRowLayout's divisor.
     assert.match(src, /<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}[\s\S]*?\/>/);
-    assert.match(src, /<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?\/>/);
+    assert.match(src, /<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
     assert.match(src, /<FlatList[\s\S]*?keyExtractor=\{\s*\(item\)\s*=>\s*item\.id\s*\}[\s\S]*?\/>/);
   });
 

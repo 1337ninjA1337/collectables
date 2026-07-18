@@ -16,7 +16,7 @@ import { CollectionShareSheet } from "@/components/collection-share-sheet";
 import { CurrencySheet } from "@/components/currency-sheet";
 import { EditCollectionModal } from "@/components/edit-collection-modal";
 import { MoveCollectionModal } from "@/components/move-collection-modal";
-import { Screen } from "@/components/screen";
+import { Screen, useResponsive } from "@/components/screen";
 import { BulkBar } from "@/components/bulk-bar";
 import { SELECTABLE_ROW_HEIGHT, SelectableItemRow } from "@/components/selectable-item-row";
 import { useAuth } from "@/lib/auth-context";
@@ -298,12 +298,21 @@ export default function CollectionDetailsScreen() {
     [selectedById, toggleSelect],
   );
 
+  // Responsive masonry column count: 2 on mobile (and always on native —
+  // useResponsive's tablet/desktop breakpoints are web-only), 3 on tablet,
+  // 4 on desktop, so wide layouts stop wasting horizontal space. The count
+  // must thread through numColumns, getMasonryRowLayout's row math AND the
+  // FlatList `key` — React Native forbids changing numColumns on a mounted
+  // list, so a breakpoint flip (web window resize) remounts via the key.
+  const { isTablet, isDesktop } = useResponsive();
+  const masonryColumnCount = isDesktop ? 4 : isTablet ? 3 : 2;
+
   // Viewer-branch getItemLayout: compact cards are fixed-height
   // (COMPACT_ITEM_CARD_HEIGHT — see item-card.tsx for the derivation, which
   // is what makes this legal: the title reserves a 2-line block and the cost
-  // badge renders inside a fixed slot). With `numColumns={2}` FlatList still
+  // badge renders inside a fixed slot). With `numColumns` set FlatList still
   // calls getItemLayout per ITEM index, so the vertical position divides by
-  // the column count (the literal 2 must match the numColumns prop below).
+  // the column count (masonryColumnCount — the same value numColumns gets).
   // Same measured-header + row-gap shape as `getSelectableRowLayout`: the
   // ListHeaderComponent's height is dynamic (cover image, i18n) so it's
   // measured via onLayout, and the stride includes the contentContainer's
@@ -318,10 +327,11 @@ export default function CollectionDetailsScreen() {
       offset:
         viewerHeaderHeight +
         SPACING_LIST +
-        (COMPACT_ITEM_CARD_HEIGHT + SPACING_LIST) * Math.floor(index / 2),
+        (COMPACT_ITEM_CARD_HEIGHT + SPACING_LIST) *
+          Math.floor(index / masonryColumnCount),
       index,
     }),
-    [viewerHeaderHeight],
+    [viewerHeaderHeight, masonryColumnCount],
   );
 
   // VM-F (viewer branch): same hoist for the masonry FlatList — the inline
@@ -878,7 +888,7 @@ export default function CollectionDetailsScreen() {
     </ScaleDecorator>
   );
 
-  // VM-D: When the viewer/read-only branch (the FlatList numColumns=2 case)
+  // VM-D: When the viewer/read-only branch (the multi-column FlatList case)
   // is active, hoist the outer scroll INTO the FlatList itself so iOS can
   // recycle off-screen rows. Pre-VM-D the inner FlatList lived inside a
   // ScrollView with its scrolling disabled and every item card mounted up-
@@ -946,8 +956,11 @@ export default function CollectionDetailsScreen() {
       <Screen scroll={false}>
         <Stack.Screen options={{ title: activeCollection.name }} />
         <FlatList
+          // numColumns can't change on a mounted list (RN throws) — the key
+          // remounts the list when a web resize crosses a breakpoint.
+          key={`viewer-masonry-${masonryColumnCount}`}
           data={visibleItems}
-          numColumns={2}
+          numColumns={masonryColumnCount}
           keyExtractor={(item) => item.id}
           columnWrapperStyle={styles.masonryRow}
           contentContainerStyle={flatListStyles.viewerFlatListContent}
