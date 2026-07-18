@@ -1,7 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { distributeIntoMasonryColumns, resolveColumnCount } from "@/lib/masonry";
+import {
+  allocateColumns,
+  distributeByHeight,
+  distributeIntoMasonryColumns,
+  resolveColumnCount,
+} from "@/lib/masonry";
 
 /**
  * Round-robin distribution helper backing the collection-detail masonry
@@ -124,5 +129,92 @@ describe("distributeIntoMasonryColumns", () => {
     const cols = distributeIntoMasonryColumns([10, 20, 30, 40, 50, 60], 2);
     assert.deepEqual(cols[0], [10, 30, 50]);
     assert.deepEqual(cols[1], [20, 40, 60]);
+  });
+});
+
+describe("allocateColumns", () => {
+  it("returns columnCount independent empty arrays", () => {
+    const cols = allocateColumns<number>(3);
+    assert.equal(cols.length, 3);
+    // Independence matters: a shared array reference would make every
+    // column receive every item.
+    cols[0].push(1);
+    assert.deepEqual(cols, [[1], [], []] as number[][]);
+  });
+
+  it("clamps through resolveColumnCount (never fewer than one column)", () => {
+    assert.deepEqual(allocateColumns(0), [[]]);
+    assert.deepEqual(allocateColumns(Number.NaN), [[]]);
+    assert.deepEqual(allocateColumns(2.9), [[], []]);
+  });
+});
+
+describe("distributeByHeight", () => {
+  const height = (n: number) => n;
+
+  it("places each item in the currently-shortest column", () => {
+    // Heights 10, 2, 3: col0 takes 10, col1 takes 2 (shorter), col1 again
+    // takes 3 (2 < 10) — the greedy step round-robin would get wrong.
+    assert.deepEqual(distributeByHeight([10, 2, 3], 2, height), [[10], [2, 3]]);
+  });
+
+  it("breaks ties toward the lowest-index column, so uniform heights reproduce round-robin", () => {
+    // The switch-without-visual-jump contract: while every card is the
+    // same fixed height, this helper and distributeIntoMasonryColumns
+    // must produce identical layouts.
+    const uniform = [0, 1, 2, 3, 4, 5];
+    assert.deepEqual(
+      distributeByHeight(uniform, 2, () => 180),
+      distributeIntoMasonryColumns(uniform, 2),
+    );
+    assert.deepEqual(
+      distributeByHeight(uniform, 3, () => 180),
+      distributeIntoMasonryColumns(uniform, 3),
+    );
+  });
+
+  it("returns N empty columns for an empty input", () => {
+    assert.deepEqual(distributeByHeight<number>([], 2, height), [[], []]);
+  });
+
+  it("falls back to a single column for bad columnCount", () => {
+    assert.deepEqual(distributeByHeight([1, 2, 3], 0, height), [[1, 2, 3]]);
+    assert.deepEqual(distributeByHeight([1, 2, 3], Number.NaN, height), [[1, 2, 3]]);
+  });
+
+  it("treats non-finite / negative heights as 0 instead of poisoning the comparison", () => {
+    // A NaN height would make every subsequent `<` comparison false and
+    // dump ALL remaining items into whichever column got the NaN.
+    const cols = distributeByHeight([Number.NaN, 5, 1, 1], 2, height);
+    // NaN→col0 counts as 0, so col0 is still "shortest" for 5; then 1
+    // lands in col1 (0+... col0 has 0+5? no — col0 got NaN(0) then 5 → 5),
+    // so: NaN→col0 (h 0), 5→col0 (0 ≤ 0 tie → col0, h 5), 1→col1 (0 < 5),
+    // 1→col1 (1 < 5).
+    assert.deepEqual(cols, [[Number.NaN, 5], [1, 1]]);
+    const negative = distributeByHeight([-10, 3, 2], 2, height);
+    // -10 counts as 0: col0 stays height 0, 3 ties into col0 (h 3), 2→col1.
+    assert.deepEqual(negative, [[-10, 3], [2]]);
+  });
+
+  it("does not mutate the input and preserves item identity", () => {
+    const a = { id: "a", h: 30 };
+    const b = { id: "b", h: 10 };
+    const c = { id: "c", h: 10 };
+    const input = [a, b, c];
+    const snapshot = [...input];
+    const cols = distributeByHeight(input, 2, (item) => item.h);
+    assert.deepEqual(input, snapshot);
+    assert.equal(cols[0][0], a);
+    assert.equal(cols[1][0], b);
+    // c goes to col1: 10+... col1 height 10 < col0 30? yes → col1.
+    assert.equal(cols[1][1], c);
+  });
+
+  it("preserves input order within each column", () => {
+    const cols = distributeByHeight([4, 4, 4, 4, 1, 1], 2, height);
+    // Greedy placement never reorders within a column — each column's
+    // entries appear in their original relative order:
+    // 4→c0(4), 4→c1(4), 4→c0 tie(8), 4→c1(8), 1→c0 tie(9), 1→c1(9).
+    assert.deepEqual(cols, [[4, 4, 1], [4, 4, 1]]);
   });
 });
