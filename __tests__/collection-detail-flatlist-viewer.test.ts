@@ -5,7 +5,7 @@ import path from "node:path";
 
 /**
  * VM-C structural pins: the viewer/read-only branch in
- * `app/collection/[id].tsx` now renders a `<FlatList numColumns={2}>` over
+ * `app/collection/[id].tsx` now renders a `<FlatList numColumns={masonryColumnCount}>` over
  * `visibleItems` instead of the previous two-column `<View>` masonry pair
  * driven by `distributeIntoMasonryColumns`. FlatList itself handles column
  * distribution, so the helper import is gone and the masonry styles
@@ -45,14 +45,15 @@ describe("app/collection/[id].tsx — FlatList viewer-masonry migration (VM-C)",
     assert.doesNotMatch(src, /masonryColumns/);
   });
 
-  it("viewer branch renders FlatList numColumns={2} data={visibleItems}", () => {
+  it("viewer branch renders FlatList numColumns={masonryColumnCount} data={visibleItems}", () => {
     const src = readSrc();
-    // The literal `numColumns={2}` and `data={visibleItems}` props are
-    // load-bearing: a typo collapsing to 1 column would silently destroy
-    // the two-column grid, and switching the data source to `items` would
-    // undo the chunked-window memory bound that VM-A/B shipped.
+    // The `numColumns={masonryColumnCount}` and `data={visibleItems}` props
+    // are load-bearing: numColumns must consume the same responsive value
+    // getMasonryRowLayout divides by (a literal here could drift from the
+    // divisor), and switching the data source to `items` would undo the
+    // chunked-window memory bound that VM-A/B shipped.
     assert.match(src, /<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}[\s\S]*?\/>/);
-    assert.match(src, /<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?\/>/);
+    assert.match(src, /<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
   });
 
   it("viewer FlatList passes keyExtractor item.id (so React keys survive re-renders)", () => {
@@ -82,12 +83,12 @@ describe("app/collection/[id].tsx — FlatList viewer-masonry migration (VM-C)",
     const src = readSrc();
     // VM-D hoists the outer scroll INTO the viewer-branch FlatList itself,
     // so the FlatList is now the scrollable surface (not nested inside a
-    // ScrollView). The viewer FlatList is identified by `numColumns={2}` —
+    // ScrollView). The viewer FlatList is identified by `numColumns={masonryColumnCount}` —
     // the selection-mode FlatList (VM-E) is a different list with NO
     // numColumns prop and intentionally keeps scrollEnabled={false}
     // because the outer ScrollView still owns scroll for selection mode.
-    const viewerFlatListBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?\/>/);
-    assert.ok(viewerFlatListBlock, "viewer FlatList (numColumns={2}) not found");
+    const viewerFlatListBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
+    assert.ok(viewerFlatListBlock, "viewer FlatList (numColumns={masonryColumnCount}) not found");
     assert.doesNotMatch(viewerFlatListBlock[0], /scrollEnabled=\{\s*false\s*\}/);
   });
 

@@ -5,7 +5,7 @@ import path from "node:path";
 
 /**
  * VM-D structural pins: the viewer/read-only branch in
- * `app/collection/[id].tsx` no longer renders its `<FlatList numColumns={2}>`
+ * `app/collection/[id].tsx` no longer renders its `<FlatList numColumns={masonryColumnCount}>`
  * nested inside a `<Screen nestable>` ScrollView with `scrollEnabled={false}`.
  * Instead the screen branches at the top of `return` — when the viewer-
  * FlatList branch is active, the early-return mounts `<Screen scroll={false}>`
@@ -109,8 +109,8 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // `hasMore ? loadMore : undefined` so a fully-extended window stops
     // the callback entirely. The 0.5 threshold means "half a viewport
     // before the end", per the task spec.
-    const viewerBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?\/>/);
-    assert.ok(viewerBlock, "viewer FlatList (numColumns={2}) not found");
+    const viewerBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
+    assert.ok(viewerBlock, "viewer FlatList (numColumns={masonryColumnCount}) not found");
     assert.match(viewerBlock[0], /onEndReached=\{\s*hasMore\s*\?\s*loadMore\s*:\s*undefined\s*\}/);
     assert.match(viewerBlock[0], /onEndReachedThreshold=\{\s*0\.5\s*\}/);
     assert.doesNotMatch(viewerBlock[0], /ListFooterComponent/);
@@ -199,13 +199,13 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // because the viewer-FlatList branch handles all those cases via the
     // early-return — leaving it would be dead code AND would mismatch the
     // scrollEnabled={false} test pin. The viewer FlatList (the one that
-    // OWNS the outer scroll post-VM-D) is identified by `numColumns={2}`,
+    // OWNS the outer scroll post-VM-D) is identified by `numColumns={masonryColumnCount}`,
     // and that block must NOT carry scrollEnabled={false}. The selection-
     // mode FlatList from VM-E lives in a different branch and intentionally
     // keeps scrollEnabled={false} because the outer ScrollView still owns
     // scroll for selection mode.
-    const viewerFlatListBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?\/>/);
-    assert.ok(viewerFlatListBlock, "viewer FlatList (numColumns={2}) not found");
+    const viewerFlatListBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
+    assert.ok(viewerFlatListBlock, "viewer FlatList (numColumns={masonryColumnCount}) not found");
     assert.doesNotMatch(viewerFlatListBlock[0], /scrollEnabled=\{\s*false\s*\}/);
   });
 });

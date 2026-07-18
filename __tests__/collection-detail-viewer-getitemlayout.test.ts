@@ -10,9 +10,11 @@ import path from "node:path";
  * `getSelectableRowLayout` shape (measured ListHeaderComponent + row-gap
  * stride) with two viewer-specific twists:
  *
- *   1. `numColumns={2}` — FlatList calls getItemLayout per ITEM index, so
+ *   1. `numColumns={masonryColumnCount}` — FlatList calls getItemLayout per ITEM index, so
  *      the vertical offset divides by the column count
- *      (`Math.floor(index / 2)`; the literal 2 must match numColumns).
+ *      (`Math.floor(index / masonryColumnCount)`; the same responsive value
+ *      — 2 mobile / 3 tablet / 4 desktop — feeds numColumns and the
+ *      remount key, so the divisor can never drift from the column count).
  *   2. The fixed height is only legal because the compact `<ItemCard>` was
  *      made deterministic: the title reserves a 2-line block
  *      (lineHeight 18 / minHeight 36 with numberOfLines={2}) and the
@@ -56,11 +58,11 @@ describe("viewer FlatList getItemLayout", () => {
   it("getMasonryRowLayout divides by the column count with a header-and-gap-aware offset", () => {
     const src = readCollectionSrc();
     const m = src.match(
-      /const\s+getMasonryRowLayout\s*=\s*useCallback\(\s*\([^)]*\)\s*=>\s*\(\{\s*length:\s*COMPACT_ITEM_CARD_HEIGHT\s*,\s*offset:\s*\n?\s*viewerHeaderHeight\s*\+\s*\n?\s*SPACING_LIST\s*\+\s*\n?\s*\(COMPACT_ITEM_CARD_HEIGHT\s*\+\s*SPACING_LIST\)\s*\*\s*Math\.floor\(index\s*\/\s*2\)\s*,\s*index\s*,?\s*\}\)\s*,\s*\[\s*viewerHeaderHeight\s*\]\s*,?\s*\)/,
+      /const\s+getMasonryRowLayout\s*=\s*useCallback\(\s*\([^)]*\)\s*=>\s*\(\{\s*length:\s*COMPACT_ITEM_CARD_HEIGHT\s*,\s*offset:\s*\n?\s*viewerHeaderHeight\s*\+\s*\n?\s*SPACING_LIST\s*\+\s*\n?\s*\(COMPACT_ITEM_CARD_HEIGHT\s*\+\s*SPACING_LIST\)\s*\*\s*\n?\s*Math\.floor\(index\s*\/\s*masonryColumnCount\)\s*,\s*index\s*,?\s*\}\)\s*,\s*\[\s*viewerHeaderHeight\s*,\s*masonryColumnCount\s*\]\s*,?\s*\)/,
     );
     assert.ok(
       m,
-      "getMasonryRowLayout must be a useCallback returning { length: COMPACT_ITEM_CARD_HEIGHT, offset: viewerHeaderHeight + SPACING_LIST + (COMPACT_ITEM_CARD_HEIGHT + SPACING_LIST) * Math.floor(index / 2), index } with deps [viewerHeaderHeight]",
+      "getMasonryRowLayout must be a useCallback returning { length: COMPACT_ITEM_CARD_HEIGHT, offset: viewerHeaderHeight + SPACING_LIST + (COMPACT_ITEM_CARD_HEIGHT + SPACING_LIST) * Math.floor(index / masonryColumnCount), index } with deps [viewerHeaderHeight, masonryColumnCount]",
     );
     // Hoisted above the early returns like every other hook in this file.
     const declIdx = src.indexOf("const getMasonryRowLayout");
@@ -79,12 +81,13 @@ describe("viewer FlatList getItemLayout", () => {
 
   it("the viewer FlatList passes getItemLayout + measures its ListHeaderComponent", () => {
     const src = readCollectionSrc();
-    const viewerBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*2\s*\}[\s\S]*?\/>/);
-    assert.ok(viewerBlock, "viewer FlatList (numColumns={2}) not found");
+    const viewerBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
+    assert.ok(viewerBlock, "viewer FlatList (numColumns={masonryColumnCount}) not found");
     assert.match(viewerBlock![0], /getItemLayout=\{\s*getMasonryRowLayout\s*\}/);
     assert.match(viewerBlock![0], /ListHeaderComponent=\{[\s\S]*?onLayout=\{\s*onViewerHeaderLayout\s*\}/);
-    // The divisor (2) is only correct while numColumns stays 2.
-    assert.match(viewerBlock![0], /numColumns=\{\s*2\s*\}/);
+    // The divisor is only correct because numColumns takes the SAME
+    // masonryColumnCount variable that getMasonryRowLayout divides by.
+    assert.match(viewerBlock![0], /numColumns=\{\s*masonryColumnCount\s*\}/);
   });
 
   it("the contentContainer row gap the offset stride assumes is still SPACING_LIST", () => {
