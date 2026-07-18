@@ -15,6 +15,7 @@ import { COMPACT_ITEM_CARD_HEIGHT, ItemCard } from "@/components/item-card";
 import { ReactionBar } from "@/components/reaction-bar";
 import { CostBadge } from "@/components/cost-badge";
 import { CurrencySheet } from "@/components/currency-sheet";
+import { MoveCollectionModal } from "@/components/move-collection-modal";
 import { Screen } from "@/components/screen";
 import { BulkBar } from "@/components/bulk-bar";
 import { SELECTABLE_ROW_HEIGHT, SelectableItemRow } from "@/components/selectable-item-row";
@@ -414,6 +415,24 @@ export default function CollectionDetailsScreen() {
     setMoveModalOpen(true);
   }, [selectedIds, otherOwnedCollections, toast, t]);
 
+  // HM-C1: <MoveCollectionModal> is memoized, so both handlers it receives
+  // must be referentially stable useCallbacks (same reason as the bulk-bar's
+  // handler stack). Hoisted above the early returns per the hook-order
+  // invariant; neither touches the post-narrow `activeCollection`.
+  const handleMoveTo = useCallback(
+    async (targetCollectionId: string) => {
+      const ids = Array.from(selectedIds);
+      setMoveModalOpen(false);
+      if (ids.length === 0) return;
+      await moveItems(ids, targetCollectionId);
+      toast.success(t("itemsMoved", { count: ids.length }));
+      exitSelectionMode();
+    },
+    [selectedIds, moveItems, toast, t, exitSelectionMode],
+  );
+
+  const closeMoveModal = useCallback(() => setMoveModalOpen(false), []);
+
   // HM-B handler promotion: the four handlers pageHeader closes over move
   // above the early returns as useCallbacks (hook-order invariant), which
   // means none may touch the post-narrow `activeCollection` — each guards on
@@ -723,15 +742,6 @@ export default function CollectionDetailsScreen() {
     }
   };
 
-  async function handleMoveTo(targetCollectionId: string) {
-    const ids = Array.from(selectedIds);
-    setMoveModalOpen(false);
-    if (ids.length === 0) return;
-    await moveItems(ids, targetCollectionId);
-    toast.success(t("itemsMoved", { count: ids.length }));
-    exitSelectionMode();
-  }
-
   async function pickEditCover() {
     if (Platform.OS !== "web") {
       Alert.alert(t("collectionCoverLabel"), undefined, [
@@ -843,23 +853,12 @@ export default function CollectionDetailsScreen() {
 
   const modalsBlock = (
     <>
-      <Modal visible={moveModalOpen} transparent animationType="fade" onRequestClose={() => setMoveModalOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setMoveModalOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>{t("moveToCollection")}</Text>
-            <View style={styles.modalList}>
-              {otherOwnedCollections.map((c) => (
-                <Pressable key={c.id} style={styles.modalRow} onPress={() => void handleMoveTo(c.id)}>
-                  <Text style={styles.modalRowText}>{c.name}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable style={styles.modalCancel} onPress={() => setMoveModalOpen(false)}>
-              <Text style={styles.modalCancelText}>{t("cancel")}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <MoveCollectionModal
+        visible={moveModalOpen}
+        collections={otherOwnedCollections}
+        onMove={handleMoveTo}
+        onClose={closeMoveModal}
+      />
 
       <Modal visible={shareOpen} transparent animationType="slide" onRequestClose={() => setShareOpen(false)}>
         <Pressable style={styles.shareBackdrop} onPress={() => setShareOpen(false)}>
@@ -1608,39 +1607,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 24,
   },
-  modalCard: {
-    width: "100%",
-    maxWidth: 420,
-    backgroundColor: CARD_BG,
-    borderRadius: RADIUS_CARD,
-    padding: 20,
-    gap: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
   modalTitle: {
     fontSize: 18,
     fontWeight: "800",
     color: TEXT_DARK_3,
     fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  modalList: {
-    gap: SPACING_INLINE,
-    maxHeight: 360,
-  },
-  modalRow: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: CARD_BG_3,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-  },
-  modalRowText: {
-    color: HERO_DARK_2,
-    fontSize: 15,
-    fontWeight: "700",
-    fontFamily: FONT_BODY_BOLD,
   },
   modalCancel: {
     alignSelf: "flex-end",
