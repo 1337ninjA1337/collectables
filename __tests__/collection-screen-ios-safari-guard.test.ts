@@ -60,7 +60,7 @@ describe("app/collection/[id].tsx — iOS Safari crash guards", () => {
     assert.match(src, /from\s+"@\/lib\/cloudinary-url"/);
     assert.match(
       src,
-      /withCloudinaryThumbUrl\(\s*activeCollection\.coverPhoto\s*,\s*\{\s*width:\s*1200/,
+      /withCloudinaryThumbUrl\(\s*collection\.coverPhoto\s*,\s*\{\s*width:\s*1200/,
     );
   });
 });

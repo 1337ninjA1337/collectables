@@ -139,9 +139,11 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     // `hasMore`, the click target is still `loadMore`, and the renderer is
     // still a `<Pressable>` — the `{` JSX-expression brace is gone because
     // the conditional now lives in a `const` declaration, not in JSX.
+    // HM-A wrapped the declaration in a useMemo factory (stable element
+    // identity), so the conditional now sits inside `useMemo(() => ...)`.
     assert.match(
       src,
-      /loadMoreCta\s*=\s*hasMore\s*\?\s*\(\s*\n\s*<Pressable[\s\S]*?onPress=\{\s*loadMore\s*\}/,
+      /loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\n?\s*hasMore\s*\?\s*\(\s*\n\s*<Pressable[\s\S]*?onPress=\{\s*loadMore\s*\}/,
     );
   });
 

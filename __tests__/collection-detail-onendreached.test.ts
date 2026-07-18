@@ -46,7 +46,7 @@ describe("app/collection/[id].tsx — onEndReached pagination", () => {
     // The const declaration + exactly one render site ({loadMoreCta} in the
     // fallback return). The viewer/selection early-returns must not render
     // it — their pagination is scroll-driven.
-    assert.match(src, /const\s+loadMoreCta\s*=\s*hasMore\s*\?/);
+    assert.match(src, /const\s+loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\n?\s*hasMore\s*\?/);
     const renders = src.match(/\{\s*loadMoreCta\s*\}/g) ?? [];
     assert.equal(renders.length, 1, `expected exactly 1 {loadMoreCta} render (drag fallback), got ${renders.length}`);
     // And that one render site lives in the nestable fallback return, after
@@ -68,7 +68,7 @@ describe("app/collection/[id].tsx — onEndReached pagination", () => {
     const src = readSrc();
     // The surviving CTA keeps its press target + i18n a11y contract so the
     // drag-mode path (no onEndReached) still paginates accessibly.
-    assert.match(src, /loadMoreCta\s*=\s*hasMore\s*\?\s*\(\s*\n\s*<Pressable[\s\S]*?onPress=\{\s*loadMore\s*\}/);
+    assert.match(src, /loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\n?\s*hasMore\s*\?\s*\(\s*\n\s*<Pressable[\s\S]*?onPress=\{\s*loadMore\s*\}/);
     assert.match(src, /accessibilityLabel=\{t\("loadMoreItemsA11y"/);
     assert.match(src, /accessibilityHint=\{t\("loadMoreItemsHint"\)\}/);
   });

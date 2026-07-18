@@ -46,8 +46,12 @@ describe("CollectionDetailsScreen hook ordering", () => {
     assert.ok(fnStart >= 0, "CollectionDetailsScreen export must exist");
     const body = src.slice(fnStart);
 
+    // The needles are anchored to the top-level statement form ("\n  if ...")
+    // so the nullable-collection guards INSIDE the hoisted useCallbacks
+    // (`if (!collection) return;` at deeper indentation — HM-B) don't
+    // masquerade as the component's early returns.
     const earliestEarlyReturn = Math.min(
-      ...["if (loadingRemote && !collection)", "if (!collection)"]
+      ...["\n  if (loadingRemote && !collection)", "\n  if (!collection)"]
         .map((needle) => body.indexOf(needle))
         .filter((i) => i >= 0),
     );
