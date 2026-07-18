@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
@@ -40,7 +40,11 @@ type CurrencySheetProps = {
  * selector (item create, collection edit). Search-as-you-type filter, single
  * selection, ISO 4217 list sourced from `lib/currencies.ts`.
  */
-export function CurrencySheet({
+// HM-C4: memoized so a scroll-driven re-render of a parent screen skips the
+// hidden <Modal visible={false}> subtree — pays off wherever the six props
+// are referentially stable (collection detail hoists its handlers; other
+// consumers still pass inline arrows and simply keep today's behaviour).
+export const CurrencySheet = memo(function CurrencySheet({
   visible,
   selectedCode,
   query,
@@ -124,7 +128,7 @@ export function CurrencySheet({
       </Pressable>
     </Modal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   sheetBackdrop: {

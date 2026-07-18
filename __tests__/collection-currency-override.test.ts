@@ -78,7 +78,8 @@ describe("CurrencySheet — extracted to a shared component", () => {
   const collection = read("app/collection/[id].tsx");
 
   it("components/currency-sheet.tsx exports a named CurrencySheet React component", () => {
-    assert.match(sheet, /export\s+function\s+CurrencySheet\s*\(/);
+    // HM-C4: memoized named form (was a plain `export function` before).
+    assert.match(sheet, /export\s+const\s+CurrencySheet\s*=\s*memo\(\s*function\s+CurrencySheet\s*\(/);
   });
 
   it("app/create.tsx imports the shared CurrencySheet and no longer declares a local copy", () => {
@@ -133,9 +134,11 @@ describe("Collection edit modal — currency picker UI wiring", () => {
   });
 
   it("CurrencySheet onSelect persists immediately when mode === 'quick'", () => {
+    // HM-C4: the handler is the hoisted handleCurrencySelect useCallback,
+    // so it guards on the still-nullable `collection` (not activeCollection).
     assert.match(
       src,
-      /if\s*\(\s*currencySheetMode\s*===\s*"quick"\s*\)\s*\{\s*void\s+updateCollection\(\s*activeCollection\.id\s*,\s*\{\s*currency:\s*code\s*\}\s*\);\s*\}/,
+      /if\s*\(\s*currencySheetMode\s*===\s*"quick"\s*&&\s*collection\s*\)\s*\{\s*void\s+updateCollection\(\s*collection\.id\s*,\s*\{\s*currency:\s*code\s*\}\s*\);\s*\}/,
     );
   });
 });
