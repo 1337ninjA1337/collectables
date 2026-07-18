@@ -929,6 +929,19 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     return dedupeItems(merged);
   }, [getVisibleItems, localItems, friendItems, subscribedItems, sharedWithMeItems]);
 
+  // Memoized separately from the big `value` memo below so the array keeps a
+  // stable identity while `localItems` is unchanged — `useChunkedList` on the
+  // wishlist screen resets its visible window whenever the reference changes,
+  // so recomputing this inline in the value factory would snap the window
+  // back to one page on every unrelated context update.
+  const wishlistItems = useMemo(
+    () =>
+      localItems
+        .filter((item) => item.isWishlist)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+    [localItems],
+  );
+
   const value = useMemo<CollectionsContextValue>(
     () => ({
       collections,
@@ -1072,9 +1085,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       },
       refreshCurrencyRates,
       getItemById: (itemId) => items.find((item) => item.id === itemId),
-      wishlistItems: localItems
-        .filter((item) => item.isWishlist)
-        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+      wishlistItems,
       addWishlistItem: async (input) => {
         const nextItem: CollectableItem = {
           // Server-keyed uuid (BE-5) so the row matches `items.id uuid` and
@@ -1350,7 +1361,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     }),
     // syncCollection/syncItem are stable useCallback([]) refs, so they're
     // intentionally omitted here (ratesUpdatedAt stays last in the deps list).
-    [collections, items, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
+    [collections, items, wishlistItems, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;
