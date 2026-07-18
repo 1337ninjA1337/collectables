@@ -1,13 +1,25 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CollectionCard } from "@/components/collection-card";
 import { EmptyState } from "@/components/empty-state";
 import { Screen } from "@/components/screen";
 import { SwipeTabs } from "@/components/swipe-tabs";
 import { useCollections } from "@/lib/collections-context";
-import { AMBER_LIGHT, HERO_DARK, SPACING_LIST, TEXT_ON_DARK_3, TEXT_ON_DARK_SOFT } from "@/lib/design-tokens";
+import {
+  AMBER_LIGHT,
+  AMBER_SOFT,
+  CARD_BG_3,
+  HERO_DARK,
+  MUTED_3,
+  RADIUS_CARD,
+  SPACING_LIST,
+  TEXT_ON_DARK_3,
+  TEXT_ON_DARK_SOFT,
+} from "@/lib/design-tokens";
+import { FONT_BODY_BOLD } from "@/lib/fonts";
+import { useChunkedList } from "@/lib/use-chunked-list";
 import { useI18n } from "@/lib/i18n-context";
 import { fetchItemsByCollectionId } from "@/lib/supabase-profiles";
 import { Collection } from "@/lib/types";
@@ -21,9 +33,23 @@ export default function CollectionsFeedScreen() {
   const [mainTab, setMainTab] = useState<MainTab>("friends");
   const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
 
-  // Fetch item counts for all visible collections
+  // WLF-C: per-tab chunked windows bound the card mount count. A scroll-owning
+  // FlatList (the VM-D flip) can't live inside <SwipeTabs>' pager — its
+  // prev/next panels are absolutely positioned and the container's height
+  // tracks the active panel — so the bounded-mount win comes from the chunked
+  // window + the manual Load-more CTA (the drag-fallback precedent from
+  // collection detail). A future fill-height SwipeTabs refactor can graduate
+  // this to true windowing.
+  const friendsWindow = useChunkedList(friendCollections);
+  const subscribedWindow = useChunkedList(subscribedCollections);
+
+  // Fetch item counts for the *mounted* window of collections only — the
+  // chunked window bounds the network fan-out the same way it bounds card
+  // mounts; growing the window (or switching tabs) fetches the newly
+  // revealed rows, and already-fetched counts stay merged in state.
   useEffect(() => {
-    const visible: Collection[] = mainTab === "friends" ? friendCollections : subscribedCollections;
+    const visible: Collection[] =
+      mainTab === "friends" ? friendsWindow.visibleItems : subscribedWindow.visibleItems;
     if (visible.length === 0) return;
 
     let active = true;
@@ -43,7 +69,7 @@ export default function CollectionsFeedScreen() {
       .catch(() => {});
 
     return () => { active = false; };
-  }, [mainTab, friendCollections, subscribedCollections]);
+  }, [mainTab, friendsWindow.visibleItems, subscribedWindow.visibleItems]);
 
   return (
     <Screen>
@@ -61,8 +87,10 @@ export default function CollectionsFeedScreen() {
         active={mainTab}
         onChange={(k) => setMainTab(k as MainTab)}
         renderTab={(key) => {
-          const cols = key === "friends" ? friendCollections : subscribedCollections;
-          if (cols.length === 0) {
+          const window = key === "friends" ? friendsWindow : subscribedWindow;
+          const total = key === "friends" ? friendCollections.length : subscribedCollections.length;
+          const cols = window.visibleItems;
+          if (total === 0) {
             return key === "friends" ? (
               <EmptyState
                 icon="🤝"
@@ -84,17 +112,30 @@ export default function CollectionsFeedScreen() {
           return (
             <View style={styles.tabPanel}>
               {cols.map((collection) => {
-                const total = getCollectionTotalCost(collection.id);
+                const totalCost = getCollectionTotalCost(collection.id);
                 return (
                   <CollectionCard
                     key={collection.id}
                     collection={collection}
                     count={getItemsForCollection(collection.id).length || itemCounts[collection.id] || 0}
-                    totalCost={total.amount}
-                    totalCostCurrency={total.currency}
+                    totalCost={totalCost.amount}
+                    totalCostCurrency={totalCost.currency}
                   />
                 );
               })}
+              {window.hasMore ? (
+                <Pressable
+                  style={styles.loadMore}
+                  onPress={window.loadMore}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("loadMoreItemsA11y", { count: total - cols.length })}
+                  accessibilityHint={t("loadMoreItemsHint")}
+                >
+                  <Text style={styles.loadMoreText}>
+                    {t("loadMoreItems", { count: total - cols.length })}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           );
         }}
@@ -129,5 +170,22 @@ const styles = StyleSheet.create({
   },
   tabPanel: {
     gap: 14,
+  },
+  // Mirrors collection detail's drag-fallback Load-more CTA styles.
+  loadMore: {
+    borderRadius: RADIUS_CARD,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: AMBER_SOFT,
+    backgroundColor: CARD_BG_3,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  loadMoreText: {
+    color: MUTED_3,
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
   },
 });
