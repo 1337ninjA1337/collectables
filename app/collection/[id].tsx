@@ -414,6 +414,52 @@ export default function CollectionDetailsScreen() {
     setMoveModalOpen(true);
   }, [selectedIds, otherOwnedCollections, toast, t]);
 
+  // HM-A (header memoization): the lightweight list-header/footer fragments
+  // are useMemo'd so the ListHeaderComponent's children keep a stable element
+  // identity across scroll-driven parent re-renders — React bails out of
+  // reconciling a subtree whose element reference didn't change between
+  // passes. Hoisted above the loading/not-found early returns for the usual
+  // hook-order reason; neither fragment may touch the post-narrow
+  // `activeCollection` up here (pageHeader/modalsBlock stay un-memoized below
+  // for exactly that reason — see HM-B/HM-C in .tasks/.tasks.md).
+  const listTitleAndFilters = useMemo(
+    () => (
+      <>
+        <Text style={styles.listTitle}>{t("collectionItems")}</Text>
+        {allItems.length > 0 ? (
+          <ItemFilterBar filters={itemFilters} onChange={setItemFilters} />
+        ) : null}
+      </>
+    ),
+    [allItems.length, itemFilters, t],
+  );
+
+  // Manual Load-more CTA — only for the nestable drag-mode fallback, where
+  // the NestableDraggableFlatList doesn't own scroll (the outer ScrollView
+  // does) so `onEndReached` can't fire reliably. The two scroll-owning
+  // FlatList branches (viewer VM-D, selection BB-B) paginate automatically
+  // via the hasMore-gated `onEndReached` wiring on each list instead.
+  // `loadMore` is referentially stable while the `items` identity is
+  // unchanged (useCallback inside useChunkedList), so this memo only
+  // re-fires when pagination state actually moves.
+  const loadMoreCta = useMemo(
+    () =>
+      hasMore ? (
+        <Pressable
+          style={styles.loadMore}
+          onPress={loadMore}
+          accessibilityRole="button"
+          accessibilityLabel={t("loadMoreItemsA11y", { count: items.length - visibleItems.length })}
+          accessibilityHint={t("loadMoreItemsHint")}
+        >
+          <Text style={styles.loadMoreText}>
+            {t("loadMoreItems", { count: items.length - visibleItems.length })}
+          </Text>
+        </Pressable>
+      ) : null,
+    [hasMore, loadMore, items.length, visibleItems.length, t],
+  );
+
   if (loadingRemote && !collection) {
     return (
       <Screen>
@@ -762,34 +808,6 @@ export default function CollectionDetailsScreen() {
       )}
     </View>
   );
-
-  const listTitleAndFilters = (
-    <>
-      <Text style={styles.listTitle}>{t("collectionItems")}</Text>
-      {allItems.length > 0 ? (
-        <ItemFilterBar filters={itemFilters} onChange={setItemFilters} />
-      ) : null}
-    </>
-  );
-
-  // Manual Load-more CTA — only for the nestable drag-mode fallback, where
-  // the NestableDraggableFlatList doesn't own scroll (the outer ScrollView
-  // does) so `onEndReached` can't fire reliably. The two scroll-owning
-  // FlatList branches (viewer VM-D, selection BB-B) paginate automatically
-  // via the hasMore-gated `onEndReached` wiring on each list instead.
-  const loadMoreCta = hasMore ? (
-    <Pressable
-      style={styles.loadMore}
-      onPress={loadMore}
-      accessibilityRole="button"
-      accessibilityLabel={t("loadMoreItemsA11y", { count: items.length - visibleItems.length })}
-      accessibilityHint={t("loadMoreItemsHint")}
-    >
-      <Text style={styles.loadMoreText}>
-        {t("loadMoreItems", { count: items.length - visibleItems.length })}
-      </Text>
-    </Pressable>
-  ) : null;
 
   const modalsBlock = (
     <>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 /**
  * Windowed slice of an in-memory array. Mounts only the first `pageSize`
@@ -49,13 +49,18 @@ export function useChunkedList<T>(
 
   const hasMore = items.length > visibleItems.length;
 
-  const loadMore = () => {
+  // Both callbacks are referentially stable while the `items` identity is
+  // unchanged, so callers can safely list them in `useMemo`/`useCallback`
+  // dep arrays (e.g. a memoized Load-more CTA) without the memo re-firing
+  // on every parent render. An `items` swap already resets the window via
+  // the effect above, so the new closure it produces is never stale.
+  const loadMore = useCallback(() => {
     setCount((current) => clampCount(current + safePageSize, safePageSize, items.length));
-  };
+  }, [items, safePageSize]);
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setCount(safePageSize);
-  };
+  }, [safePageSize]);
 
   return { visibleItems, hasMore, loadMore, reset };
 }
