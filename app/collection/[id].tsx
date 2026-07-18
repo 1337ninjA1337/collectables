@@ -1,12 +1,11 @@
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState, type ProfilerOnRenderCallback } from "react";
-import { Alert, FlatList, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import { Alert, FlatList, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { EmptyState } from "@/components/empty-state";
 import { applyItemFilters, applySortMode, EMPTY_FILTERS, ItemFilterBar, type ItemFilters } from "@/components/item-filters";
-import { buildDeepLink } from "@/lib/deep-link";
 import { VisibilityBadge } from "@/components/visibility-badge";
 import { SkeletonCollectionDetail } from "@/components/skeleton";
 import { NestableDraggableFlatList, RenderItemParams, ScaleDecorator } from "../../components/DraggableList";
@@ -14,6 +13,7 @@ import { NestableDraggableFlatList, RenderItemParams, ScaleDecorator } from "../
 import { COMPACT_ITEM_CARD_HEIGHT, ItemCard } from "@/components/item-card";
 import { ReactionBar } from "@/components/reaction-bar";
 import { CostBadge } from "@/components/cost-badge";
+import { CollectionShareSheet } from "@/components/collection-share-sheet";
 import { CurrencySheet } from "@/components/currency-sheet";
 import { MoveCollectionModal } from "@/components/move-collection-modal";
 import { Screen } from "@/components/screen";
@@ -56,7 +56,6 @@ import {
   DANGER_SOFT_2,
   HERO_DARK,
   HERO_DARK_2,
-  MUTED,
   MUTED_2,
   MUTED_3,
   MUTED_5,
@@ -118,7 +117,6 @@ export default function CollectionDetailsScreen() {
   const [itemFilters, setItemFilters] = useState<ItemFilters>(EMPTY_FILTERS);
   const [exporting, setExporting] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -432,6 +430,28 @@ export default function CollectionDetailsScreen() {
   );
 
   const closeMoveModal = useCallback(() => setMoveModalOpen(false), []);
+
+  // HM-C2: <CollectionShareSheet> is memoized, so its handlers must be
+  // referentially stable. Hoisted above the early returns (hook-order
+  // invariant); both share mutations guard on the still-nullable
+  // `collection` instead of the post-narrow `activeCollection`.
+  const handleShareWithFriend = useCallback(
+    (friendId: string) => {
+      if (!collection) return;
+      shareCollectionWithUser(collection.id, friendId);
+    },
+    [collection, shareCollectionWithUser],
+  );
+
+  const handleUnshareWithUser = useCallback(
+    (viewerId: string) => {
+      if (!collection) return;
+      unshareCollectionWithUser(collection.id, viewerId);
+    },
+    [collection, unshareCollectionWithUser],
+  );
+
+  const closeShareSheet = useCallback(() => setShareOpen(false), []);
 
   // HM-B handler promotion: the four handlers pageHeader closes over move
   // above the early returns as useCallbacks (hook-order invariant), which
@@ -860,123 +880,18 @@ export default function CollectionDetailsScreen() {
         onClose={closeMoveModal}
       />
 
-      <Modal visible={shareOpen} transparent animationType="slide" onRequestClose={() => setShareOpen(false)}>
-        <Pressable style={styles.shareBackdrop} onPress={() => setShareOpen(false)}>
-          <Pressable style={styles.shareSheet} onPress={(e) => e.stopPropagation()}>
-            <ScrollView style={styles.shareScrollView} bounces={false}>
-            <View style={styles.shareHandle} />
-            <Text style={styles.shareTitle}>{t("shareTitle")}</Text>
-            <Text style={styles.shareHint}>{t("shareCollectionHint")}</Text>
-            <View style={styles.shareLinkBox}>
-              <Text style={styles.shareLinkText} numberOfLines={1}>{buildDeepLink(`collection/${activeCollection.id}`)}</Text>
-            </View>
-            <View style={styles.shareActions}>
-              <Pressable
-                style={{...styles.shareCopyButton, ...(linkCopied ? styles.shareCopyButtonDone : {})}}
-                onPress={() => {
-                  const link = buildDeepLink(`collection/${activeCollection.id}`);
-                  if (Platform.OS === "web" && navigator.clipboard) {
-                    navigator.clipboard.writeText(link).then(() => {
-                      setLinkCopied(true);
-                      setTimeout(() => setLinkCopied(false), 2000);
-                    });
-                  }
-                }}
-              >
-                <Text style={{...styles.shareCopyButtonText, ...(linkCopied ? styles.shareCopyButtonTextDone : {})}}>
-                  {linkCopied ? t("linkCopied") : t("copyLink")}
-                </Text>
-              </Pressable>
-              {Platform.OS !== "web" ? (
-                <Pressable
-                  style={styles.shareNativeButton}
-                  onPress={() => {
-                    const link = buildDeepLink(`collection/${activeCollection.id}`);
-                    Share.share({ message: `${activeCollection.name}\n${link}`, url: link });
-                  }}
-                >
-                  <Text style={styles.shareNativeButtonText}>{t("shareVia")}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-            {isOwner && friends.length > 0 ? (
-              <View style={styles.shareFriendsSection}>
-                <Text style={styles.shareFriendsTitle}>{t("shareWithFriends")}</Text>
-                <Text style={styles.shareFriendsHint}>{t("shareWithFriendsHint")}</Text>
-                <ScrollView style={styles.shareFriendsList} nestedScrollEnabled>
-                  {friends.map((friendId) => {
-                    const profile = getProfileById(friendId);
-                    if (!profile) return null;
-                    const isShared = activeCollection.sharedWithUserIds.includes(friendId);
-                    return (
-                      <View key={friendId} style={styles.shareFriendRow}>
-                        <View style={styles.shareFriendInfo}>
-                          {profile.avatar ? (
-                            <Image source={{ uri: profile.avatar }} style={styles.shareFriendAvatar} />
-                          ) : (
-                            <View style={{...styles.shareFriendAvatar, backgroundColor: placeholderColor(friendId)}} />
-                          )}
-                          <Text style={styles.shareFriendName} numberOfLines={1}>{profile.displayName}</Text>
-                        </View>
-                        <Pressable
-                          style={{...styles.shareFriendButton, ...(isShared ? styles.shareFriendButtonActive : {})}}
-                          onPress={() => {
-                            if (isShared) {
-                              unshareCollectionWithUser(activeCollection.id, friendId);
-                            } else {
-                              shareCollectionWithUser(activeCollection.id, friendId);
-                            }
-                          }}
-                        >
-                          <Text style={{...styles.shareFriendButtonText, ...(isShared ? styles.shareFriendButtonTextActive : {})}}>
-                            {isShared ? t("shared") : t("share")}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ) : isOwner && friends.length === 0 ? (
-              <Text style={styles.shareFriendsEmpty}>{t("noFriendsToShare")}</Text>
-            ) : null}
-            {isOwner && activeCollection.sharedWithUserIds.length > 0 ? (
-              <View style={styles.shareFriendsSection}>
-                <Text style={styles.shareFriendsTitle}>{t("peopleWithAccess")}</Text>
-                <Text style={styles.shareFriendsHint}>{t("peopleWithAccessHint")}</Text>
-                <ScrollView style={styles.shareFriendsList} nestedScrollEnabled>
-                  {activeCollection.sharedWithUserIds.map((viewerId) => {
-                    const profile = getProfileById(viewerId);
-                    const displayName = profile?.displayName ?? profile?.username ?? viewerId;
-                    return (
-                      <View key={viewerId} style={styles.shareFriendRow}>
-                        <View style={styles.shareFriendInfo}>
-                          {profile?.avatar ? (
-                            <Image source={{ uri: profile.avatar }} style={styles.shareFriendAvatar} />
-                          ) : (
-                            <View style={{...styles.shareFriendAvatar, backgroundColor: placeholderColor(viewerId)}} />
-                          )}
-                          <Text style={styles.shareFriendName} numberOfLines={1}>{displayName}</Text>
-                        </View>
-                        <Pressable
-                          style={styles.shareFriendButton}
-                          onPress={() => unshareCollectionWithUser(activeCollection.id, viewerId)}
-                        >
-                          <Text style={styles.shareFriendButtonText}>{t("removeAccess")}</Text>
-                        </Pressable>
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ) : null}
-            <Pressable style={styles.shareCancelButton} onPress={() => setShareOpen(false)}>
-              <Text style={styles.shareCancelText}>{t("cancel")}</Text>
-            </Pressable>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <CollectionShareSheet
+        visible={shareOpen}
+        collectionId={activeCollection.id}
+        collectionName={activeCollection.name}
+        sharedWithUserIds={sharedWithUserIds}
+        isOwner={isOwner}
+        friends={friends}
+        getProfileById={getProfileById}
+        onShare={handleShareWithFriend}
+        onUnshare={handleUnshareWithUser}
+        onClose={closeShareSheet}
+      />
 
       <Modal visible={editModalOpen} transparent animationType="fade" onRequestClose={() => setEditModalOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setEditModalOpen(false)}>
@@ -1393,102 +1308,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },
-  shareBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(38, 27, 20, 0.4)",
-    justifyContent: "flex-end",
-  },
-  shareSheet: {
-    backgroundColor: CARD_BG,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 28,
-    gap: SPACING_CARD,
-  },
-  shareHandle: {
-    alignSelf: "center",
-    width: 44,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: AMBER_SOFT,
-  },
-  shareTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: TEXT_DARK,
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  shareHint: {
-    color: MUTED_2,
-    fontSize: 14,
-    lineHeight: 20,
-    fontFamily: FONT_BODY,
-  },
-  shareLinkBox: {
-    borderRadius: 16,
-    backgroundColor: PURE_WHITE,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  shareLinkText: {
-    color: MUTED,
-    fontSize: 14,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-  },
-  shareActions: {
-    flexDirection: "row",
-    gap: SPACING_LIST,
-  },
-  shareCopyButton: {
-    flex: 1,
-    borderRadius: RADIUS_PILL,
-    backgroundColor: HERO_DARK,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  shareCopyButtonDone: {
-    backgroundColor: SUCCESS_GREEN_2,
-  },
-  shareCopyButtonText: {
-    color: TEXT_ON_DARK_2,
-    fontWeight: "800",
-    fontSize: 15,
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  shareCopyButtonTextDone: {
-    color: PURE_WHITE,
-  },
-  shareNativeButton: {
-    flex: 1,
-    borderRadius: RADIUS_PILL,
-    backgroundColor: AMBER_ACCENT,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  shareNativeButtonText: {
-    color: TEXT_DARK_2,
-    fontWeight: "800",
-    fontSize: 15,
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  shareCancelButton: {
-    borderRadius: RADIUS_PILL,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-    paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: PURE_WHITE,
-  },
-  shareCancelText: {
-    color: TEXT_DARK,
-    fontWeight: "800",
-    fontSize: 14,
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
   addButton: {
     borderRadius: RADIUS_CARD,
     paddingVertical: 18,
@@ -1748,79 +1567,6 @@ const styles = StyleSheet.create({
     color: MUTED_17,
     fontSize: 12,
     lineHeight: 18,
-    fontFamily: FONT_BODY,
-  },
-  shareScrollView: {
-    gap: SPACING_CARD,
-  },
-  shareFriendsSection: {
-    gap: SPACING_LIST,
-    marginTop: 4,
-  },
-  shareFriendsTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: TEXT_DARK,
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  shareFriendsHint: {
-    color: MUTED_2,
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: FONT_BODY,
-  },
-  shareFriendRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_7,
-  },
-  shareFriendInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING_LIST,
-    flex: 1,
-  },
-  shareFriendAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  shareFriendName: {
-    color: TEXT_DARK,
-    fontSize: 15,
-    fontWeight: "700",
-    flex: 1,
-    fontFamily: FONT_BODY_BOLD,
-  },
-  shareFriendButton: {
-    borderRadius: RADIUS_PILL,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: HERO_DARK,
-  },
-  shareFriendButtonActive: {
-    backgroundColor: SUCCESS_GREEN_2,
-  },
-  shareFriendButtonText: {
-    color: TEXT_ON_DARK_2,
-    fontSize: 13,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  shareFriendButtonTextActive: {
-    color: PURE_WHITE,
-  },
-  shareFriendsList: {
-    maxHeight: 228,
-  },
-  shareFriendsEmpty: {
-    color: MUTED_17,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 4,
     fontFamily: FONT_BODY,
   },
   editSaveButton: {
