@@ -128,7 +128,7 @@ describe("create cost (app/create.tsx) — optional-field semantics", () => {
     );
   });
 
-  it("clears the error on typing", () => {
-    assert.match(src, /setCost\(v\);\s*setCostError\(null\);/);
+  it("clears the error on typing (keystrokes sanitized through the shared helper)", () => {
+    assert.match(src, /setCost\(sanitizeCurrencyInput\(v\)\);\s*setCostError\(null\);/);
   });
 });
