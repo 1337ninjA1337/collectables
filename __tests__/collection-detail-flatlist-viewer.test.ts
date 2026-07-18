@@ -42,7 +42,18 @@ describe("app/collection/[id].tsx — FlatList viewer-masonry migration (VM-C)",
     const src = readSrc();
     // The pre-VM-C `useMemo(() => distributeIntoMasonryColumns(...))`
     // memoization is obsolete — FlatList consumes `visibleItems` directly.
-    assert.doesNotMatch(src, /masonryColumns/);
+    assert.doesNotMatch(src, /masonryColumns\b/);
+  });
+
+  it("no modulo-by-2 column split can sneak back in (broader than the literal i % 2 === N pins)", () => {
+    const src = readSrc();
+    // The pre-VM-B masonry split was `.filter((_, i) => i % 2 === 0)` /
+    // `=== 1`. A narrow guard on those exact literals would miss subtle
+    // re-rolls (`i % 2 !== 0`, `idx % 2 < 1`), so this catches ANY
+    // identifier-mod-2 in the file — FlatList owns column distribution
+    // now, and no legitimate code here should mod by 2. If one ever does,
+    // rewriting this pin is the deliberate act the guard exists to force.
+    assert.doesNotMatch(src, /[A-Za-z_$][\w$]*\s*%\s*2\b/);
   });
 
   it("viewer branch renders FlatList numColumns={masonryColumnCount} data={visibleItems}", () => {
