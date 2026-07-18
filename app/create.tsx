@@ -17,6 +17,7 @@ import { useCollections } from "@/lib/collections-context";
 import {
   CURRENCY_ERROR_I18N_KEY,
   parseCurrencyValueDetailed,
+  sanitizeCurrencyInput,
   type CurrencyValueError,
 } from "@/lib/format-currency-input";
 import { useI18n } from "@/lib/i18n-context";
@@ -317,7 +318,7 @@ export default function CreateItemScreen() {
           <MaskedTextInput
             value={cost}
             onChangeText={(v) => {
-              setCost(v);
+              setCost(sanitizeCurrencyInput(v));
               setCostError(null);
             }}
             placeholder={t("costPlaceholder")}
