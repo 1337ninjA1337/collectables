@@ -1218,3 +1218,101 @@ soft-deleted rows entirely, the existing retention sweep
 (`20260627_retention_sweeps.sql`) — or a manual
 `delete from public.items where deleted_at is not null and deleted_at < now() - interval '30 days'`
 — will take care of them after every device has synced.
+
+## Production outage triage — REST 400s and the `validate-premium` preflight
+
+Symptoms seen on the deployed build (`https://1337ninja1337.github.io/collectables/`),
+alongside the web crash that was fixed in code:
+
+```
+Failed to load resource: the server responded with a status of 400 ()
+  …/rest/v1/profiles?select=…,display_currency,is_admin
+  …/rest/v1/collections?…&order=created_at.desc&limit=200
+  …/rest/v1/items?…&order=created_at.desc&limit=200
+Access to fetch at '…/functions/v1/validate-premium' … blocked by CORS policy:
+  Response to preflight request doesn't pass access control check:
+  It does not have HTTP ok status.
+```
+
+Neither is a client bug — both are **the deployed Supabase project lagging the
+repo**. Nothing in `app/`, `components/` or `lib/` needs to change.
+
+### 1. The `400`s: pending migrations are not applied
+
+`lib/supabase-profiles-shapes.ts` selects explicit column lists
+(`PROFILE_COLUMNS` / `COLLECTION_COLUMNS` / `ITEM_COLUMNS`). PostgREST answers
+`400` with `42703 column … does not exist` when any one of them is missing, so a
+single un-applied migration fails the whole read. The columns those projections
+depend on arrive in `display_currency` (`20260528_profile_display_currency.sql`),
+`is_admin` (`20260616_core_tables_rls.sql`), `archived_at`
+(`20260527142510_items_archived_at.sql`) and `deleted_at`
+(`20260623_soft_delete_deleted_at.sql`), among others.
+
+**Find out which column is actually missing** — run in the Supabase SQL editor:
+
+```sql
+with expected(tbl, col) as (
+  values
+    ('profiles','display_currency'), ('profiles','is_admin'),
+    ('collections','currency'), ('collections','visibility'),
+    ('collections','shared_with_user_ids'), ('collections','sort_order'),
+    ('collections','updated_at'), ('collections','deleted_at'),
+    ('items','cost'), ('items','cost_currency'), ('items','sort_order'),
+    ('items','is_wishlist'), ('items','condition'), ('items','tags'),
+    ('items','archived_at'), ('items','updated_at'), ('items','deleted_at')
+)
+select e.tbl, e.col
+from expected e
+left join information_schema.columns c
+  on c.table_schema = 'public' and c.table_name = e.tbl and c.column_name = e.col
+where c.column_name is null
+order by e.tbl, e.col;
+```
+
+Every row it returns is a column the app selects but the DB does not have.
+
+**Fix:** apply the pending migrations. Either
+- set the `SUPABASE_DB_URL` GitHub Actions secret so
+  `.github/workflows/supabase-migrations.yml` runs `supabase db push` on every
+  push to `main` (see the "Migrations: free, main-only setup" section at the top
+  of this file), **or**
+- run the un-applied files in `supabase/migrations/` in filename order by hand
+  in the SQL editor.
+
+Then reload the app and confirm the `/rest/v1/*` calls return `200`.
+
+### 2. The `validate-premium` preflight failure
+
+The CORS policy in `supabase/functions/_shared/cors.ts` already allow-lists
+`https://1337ninja1337.github.io`, and `validate-premium/index.ts` already calls
+`evaluateCors`. "Response to preflight request … does not have HTTP ok status"
+therefore means the browser's `OPTIONS` never reached that code — the deployed
+function is missing or stale. There is **no** workflow that deploys Edge
+Functions, so they only exist in production if they were pushed by hand.
+
+**Fix — deploy the functions once (and after every change to them):**
+
+```bash
+supabase login
+supabase link --project-ref <your-project-ref>
+supabase functions deploy validate-premium
+# and the rest, whenever they change:
+supabase functions deploy accept-friend-request analytics-mirror claim-listing \
+  delete-account delete-image export-data sign-upload
+```
+
+If the preflight still fails afterwards, platform-level JWT verification is
+answering the unauthenticated `OPTIONS` with `401` before the handler runs.
+Deploy that one function with verification off — the handler does its own auth
+via `assertCaller` / `auth.getUser()`, so this does not weaken it:
+
+```bash
+supabase functions deploy validate-premium --no-verify-jwt
+```
+
+Set the `ALLOWED_ORIGINS` function secret only if you serve the app from an
+extra origin (e.g. `http://localhost:8081` for local dev):
+
+```bash
+supabase secrets set ALLOWED_ORIGINS="http://localhost:8081"
+```

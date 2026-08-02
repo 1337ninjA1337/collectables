@@ -25,6 +25,15 @@ import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD }
 // for callers that omit it) so layout-only wrappers like the masonry cell's
 // `flex: 1` View can collapse into a prop: one less node per cell × hundreds
 // of cells is measurable RN bridge / Yoga layout savings on long collections.
+//
+// The forwarded style MUST be merged with `StyleSheet.flatten`, never left as a
+// raw array, because this Pressable is the child of `<Link asChild>`: expo-router
+// renders that through Radix's `Slot`, which merges the two styles with a plain
+// object spread (`{ ...slotStyle, ...childStyle }`). Spreading an ARRAY there
+// produces `{0: …, 1: …}`, and react-native-web hands those numeric keys to the
+// DOM as `node.style[0] = …` — "Failed to set an indexed property [0] on
+// 'CSSStyleDeclaration'", which crashed the whole web build to the error screen.
+// See `__tests__/link-aschild-style-flatten.test.ts` for the regression guard.
 type ItemCardProps = { item: CollectableItem; compact?: boolean; style?: StyleProp<ViewStyle> };
 
 // VM-F: memoized like SelectableItemRow — the named-function form keeps the
@@ -39,7 +48,7 @@ export const ItemCard = memo(function ItemCard({ item, compact, style }: ItemCar
   if (compact) {
     return (
       <Link href={`/item/${item.id}`} asChild>
-        <Pressable style={[styles.compactCard, { backgroundColor: theme.card, borderColor: theme.border }, style]}>
+        <Pressable style={StyleSheet.flatten([styles.compactCard, { backgroundColor: theme.card, borderColor: theme.border }, style])}>
           {hasPhoto ? (
             <LazyPhoto
               uri={withCloudinaryThumbUrl(item.photos[0], { width: 480, height: 360, mode: "fill" })}
@@ -64,7 +73,7 @@ export const ItemCard = memo(function ItemCard({ item, compact, style }: ItemCar
 
   return (
     <Link href={`/item/${item.id}`} asChild>
-      <Pressable style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }, SHADOW_SOFT, style]}>
+      <Pressable style={StyleSheet.flatten([styles.card, { backgroundColor: theme.card, borderColor: theme.border }, SHADOW_SOFT, style])}>
         {hasPhoto ? (
           <LazyPhoto
             uri={withCloudinaryThumbUrl(item.photos[0], { width: 320, height: 320, mode: "fill" })}
