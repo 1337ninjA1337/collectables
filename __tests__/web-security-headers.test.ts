@@ -12,6 +12,7 @@ import {
   extractInlineScriptBodies,
   injectSecurityMetaTags,
 } from "../lib/web-security-headers";
+import { RATES_ENDPOINT_URL } from "../lib/currency-rates";
 import { injectServiceWorkerRegistration } from "../lib/spa-fallback";
 
 const repoRoot = path.join(__dirname, "..");
@@ -72,6 +73,19 @@ describe("buildContentSecurityPolicy", () => {
     // Never a blanket wildcard.
     assert.ok(!d["connect-src"].includes("*"));
     assert.ok(!d["connect-src"].includes("https:"));
+  });
+
+  // The FX feed was missing from the allow-list, so on the deployed build every
+  // rate refresh died with "Refused to connect … violates the following Content
+  // Security Policy directive: connect-src" and multi-currency totals silently
+  // stopped updating. Assert the endpoint the code actually calls is covered.
+  it("allows the exchange-rate endpoint lib/currency-rates.ts fetches", () => {
+    const d = parseDirectives(buildContentSecurityPolicy());
+    const origin = new URL(RATES_ENDPOINT_URL).origin;
+    assert.ok(
+      d["connect-src"].includes(origin),
+      `connect-src must cover ${origin} (RATES_ENDPOINT_URL), got ${d["connect-src"].join(" ")}`,
+    );
   });
 
   it("merges extra connect/img sources and de-dupes", () => {

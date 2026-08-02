@@ -22,6 +22,13 @@ export const CLOUDINARY_API_HOST = "https://api.cloudinary.com";
 export const CLOUDINARY_CDN_HOST = "https://res.cloudinary.com";
 /** Microsoft Clarity loads its tag from this exact origin (see lib/clarity.ts). */
 export const CLARITY_SCRIPT_HOST = "https://www.clarity.ms";
+/**
+ * Free FX-rate feed polled by `lib/currency-rates.ts` (`RATES_ENDPOINT_URL`).
+ * Omitting it from `connect-src` made every rate refresh fail on the deployed
+ * web build with a CSP violation, so multi-currency totals silently fell back
+ * to stale/absent rates.
+ */
+export const EXCHANGE_RATES_HOST = "https://open.er-api.com";
 
 /**
  * `connect-src` allow-list (fetch / XHR / WebSocket targets). Wildcarded per
@@ -32,6 +39,7 @@ export const CLARITY_SCRIPT_HOST = "https://www.clarity.ms";
  * - PostHog ingest (`*.posthog.com`)
  * - Microsoft Clarity ingest (`*.clarity.ms` + the `c.bing.com` beacon)
  * - Sentry ingest (`*.sentry.io`)
+ * - open.er-api.com FX rates (`lib/currency-rates.ts`)
  */
 export const CSP_CONNECT_SRC: readonly string[] = [
   "'self'",
@@ -43,6 +51,7 @@ export const CSP_CONNECT_SRC: readonly string[] = [
   "https://*.clarity.ms",
   "https://c.bing.com",
   "https://*.sentry.io",
+  EXCHANGE_RATES_HOST,
 ];
 
 /** `img-src` — local assets, inline data/blob previews, Cloudinary delivery. */

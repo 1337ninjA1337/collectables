@@ -26,15 +26,22 @@ describe("ItemCard style prop — masonry wrapper collapse", () => {
     assert.match(src, /function ItemCard\(\{ item, compact, style \}/);
   });
 
+  // The merge stays caller-last so a caller's style still wins — but it must go
+  // through `StyleSheet.flatten`, never reach the Pressable as a raw array: this
+  // Pressable is the child of `<Link asChild>`, and Radix's Slot merges the two
+  // styles with an object spread. Spreading an array yields `{0:…,1:…}`, which
+  // react-native-web pushes into the DOM as `node.style[0] = …` and crashes the
+  // web build ("Failed to set an indexed property [0] on 'CSSStyleDeclaration'").
+  // See `__tests__/link-aschild-style-flatten.test.ts`.
   it("forwards style to the outer Pressable of BOTH branches, caller-last so it can win", () => {
     const src = readCardSrc();
     assert.match(
       src,
-      /<Pressable style=\{\[styles\.compactCard, \{ backgroundColor: theme\.card, borderColor: theme\.border \}, style\]\}>/,
+      /<Pressable style=\{StyleSheet\.flatten\(\[styles\.compactCard, \{ backgroundColor: theme\.card, borderColor: theme\.border \}, style\]\)\}>/,
     );
     assert.match(
       src,
-      /<Pressable style=\{\[styles\.card, \{ backgroundColor: theme\.card, borderColor: theme\.border \}, SHADOW_SOFT, style\]\}>/,
+      /<Pressable style=\{StyleSheet\.flatten\(\[styles\.card, \{ backgroundColor: theme\.card, borderColor: theme\.border \}, SHADOW_SOFT, style\]\)\}>/,
     );
   });
 
