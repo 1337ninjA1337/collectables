@@ -61,6 +61,11 @@ export const CSP_IMG_SRC: readonly string[] = [
   "blob:",
   CLOUDINARY_CDN_HOST,
   "https://*.cloudinary.com",
+  // Google account avatars. A Google OAuth sign-in returns a `picture` URL on
+  // `lh3.googleusercontent.com` (the `lh3`…`lh6` shards rotate), which we store
+  // verbatim as the profile avatar — so every Google-signed-in user's avatar
+  // was blocked by img-src until this was allow-listed.
+  "https://*.googleusercontent.com",
 ];
 
 /**

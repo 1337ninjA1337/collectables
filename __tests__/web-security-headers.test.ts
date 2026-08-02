@@ -88,6 +88,17 @@ describe("buildContentSecurityPolicy", () => {
     );
   });
 
+  // Every Google-signed-in user's avatar is an `lh3.googleusercontent.com` URL
+  // stored verbatim from the OAuth `picture` claim, and img-src blocked all of
+  // them on the deployed build until this was allow-listed.
+  it("allows Google account avatars", () => {
+    const d = parseDirectives(buildContentSecurityPolicy());
+    assert.ok(d["img-src"].includes("https://*.googleusercontent.com"));
+    // Still no blanket wildcard.
+    assert.ok(!d["img-src"].includes("*"));
+    assert.ok(!d["img-src"].includes("https:"));
+  });
+
   it("merges extra connect/img sources and de-dupes", () => {
     const csp = buildContentSecurityPolicy({
       extraConnectSrc: ["https://custom.example.com", "'self'"],
