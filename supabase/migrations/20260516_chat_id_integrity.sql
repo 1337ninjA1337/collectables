@@ -15,6 +15,12 @@
 -- rows are left untouched. Run `VALIDATE CONSTRAINT` manually after auditing
 -- historical rows (see MANUAL-TASKS.md) to extend the guarantee backwards.
 
+-- Dropped first so the file is safe to re-run by hand: ADD CONSTRAINT has no
+-- IF NOT EXISTS form, and a second run would otherwise abort the script with
+-- "constraint already exists". The DROP is a no-op on a fresh database.
+ALTER TABLE public.chat_messages
+  DROP CONSTRAINT IF EXISTS chat_messages_chat_id_matches_participants;
+
 ALTER TABLE public.chat_messages
   ADD CONSTRAINT chat_messages_chat_id_matches_participants
   CHECK (

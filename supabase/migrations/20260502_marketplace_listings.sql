@@ -31,24 +31,28 @@ CREATE INDEX IF NOT EXISTS marketplace_listings_item_idx
 ALTER TABLE public.marketplace_listings ENABLE ROW LEVEL SECURITY;
 
 -- Any authenticated user can read all listings (marketplace is public).
+DROP POLICY IF EXISTS "marketplace_listings_select_authenticated" ON public.marketplace_listings;
 CREATE POLICY "marketplace_listings_select_authenticated"
 ON public.marketplace_listings
 FOR SELECT
 USING (auth.uid() IS NOT NULL);
 
 -- Users can only insert their own listings.
+DROP POLICY IF EXISTS "marketplace_listings_insert_own" ON public.marketplace_listings;
 CREATE POLICY "marketplace_listings_insert_own"
 ON public.marketplace_listings
 FOR INSERT
 WITH CHECK (auth.uid() = owner_user_id);
 
 -- Users can only update (e.g. mark sold) their own listings.
+DROP POLICY IF EXISTS "marketplace_listings_update_own" ON public.marketplace_listings;
 CREATE POLICY "marketplace_listings_update_own"
 ON public.marketplace_listings
 FOR UPDATE
 USING (auth.uid() = owner_user_id);
 
 -- Users can only delete their own listings.
+DROP POLICY IF EXISTS "marketplace_listings_delete_own" ON public.marketplace_listings;
 CREATE POLICY "marketplace_listings_delete_own"
 ON public.marketplace_listings
 FOR DELETE

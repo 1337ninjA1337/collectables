@@ -1248,7 +1248,25 @@ depend on arrive in `display_currency` (`20260528_profile_display_currency.sql`)
 (`20260527142510_items_archived_at.sql`) and `deleted_at`
 (`20260623_soft_delete_deleted_at.sql`), among others.
 
-**Find out which column is actually missing** — run in the Supabase SQL editor:
+#### Fastest fix: run `supabase/repair-schema.sql`
+
+Open the Supabase **SQL editor**, paste the contents of
+[`supabase/repair-schema.sql`](supabase/repair-schema.sql), and run it. It adds
+every column the four projections read, reloads the PostgREST schema cache, and
+finishes with a verification query that **should return zero rows** — any row it
+does return names a column still missing.
+
+The script is additive and safe to re-run: every statement is
+`ADD COLUMN IF NOT EXISTS`, nothing is dropped, retyped or backfilled, and a
+table that does not exist is skipped with a `NOTICE` naming the migration you
+need instead. It gets reads working again; it does **not** replace
+`supabase/migrations/` (RLS policies, indexes, FKs, triggers and the retention
+sweeps still live there), so still apply the full migration set when you can.
+
+`__tests__/repair-schema-parity.test.ts` fails the build if a column is ever
+added to a `*_COLUMNS` projection without the repair script learning about it.
+
+#### Or: find out exactly which column is missing
 
 ```sql
 with expected(tbl, col) as (
@@ -1277,7 +1295,12 @@ Every row it returns is a column the app selects but the DB does not have.
   push to `main` (see the "Migrations: free, main-only setup" section at the top
   of this file), **or**
 - run the un-applied files in `supabase/migrations/` in filename order by hand
-  in the SQL editor.
+  in the SQL editor. Every migration is now safe to re-run: the ones that used
+  to abort a second run on "policy already exists" / "constraint already exists"
+  (`20260424_chat_messages`, `20260501_chat_reads`,
+  `20260502_marketplace_listings`, `20260507_marketplace_buyer_user_id`,
+  `20260516_chat_id_integrity`) now `DROP … IF EXISTS` first, so you can paste
+  the whole set in order without tracking which ones already landed.
 
 Then reload the app and confirm the `/rest/v1/*` calls return `200`.
 
@@ -1286,29 +1309,64 @@ Then reload the app and confirm the `/rest/v1/*` calls return `200`.
 The CORS policy in `supabase/functions/_shared/cors.ts` already allow-lists
 `https://1337ninja1337.github.io`, and `validate-premium/index.ts` already calls
 `evaluateCors`. "Response to preflight request … does not have HTTP ok status"
-therefore means the browser's `OPTIONS` never reached that code — the deployed
-function is missing or stale. There is **no** workflow that deploys Edge
-Functions, so they only exist in production if they were pushed by hand.
+therefore means the browser's `OPTIONS` never reached that code.
+
+There are two independent causes, and you likely have both:
+
+1. **Nothing deploys the functions.** The Supabase Git integration only
+   auto-deploys functions declared in `supabase/config.toml`, and this repo
+   deliberately does **not** commit that file (see BE-31 in
+   `__tests__/supabase-test-ci.test.ts`: a committed config becomes the source
+   of truth for the preview/production projects, and a partial one disables
+   undeclared storage/functions and clobbers dashboard-managed settings on
+   merge). No workflow deploys them either. So they exist in production only if
+   pushed by hand.
+
+2. **`verify_jwt` defaults to `true`**, and that platform gate runs *before* the
+   function body. A CORS preflight is an `OPTIONS` with no `Authorization`
+   header by spec, so the platform answers it `401` and the handler's
+   `evaluateCors` never runs — producing exactly the reported error.
+
+Turning the gate off is safe for these functions and does not weaken auth:
+every handler re-asserts the caller itself (`assertCaller` + `auth.getUser()`,
+or the `x-posthog-webhook-secret` header for `analytics-mirror`) and runs
+`evaluateCors` first, so a non-allow-listed origin still gets a 403.
+
+Because config.toml is intentionally not committed, set this **per deploy**
+(below) or in the dashboard under each function's settings — do not commit a
+partial config.toml to do it.
 
 **Fix — deploy the functions once (and after every change to them):**
 
 ```bash
 supabase login
 supabase link --project-ref <your-project-ref>
-supabase functions deploy validate-premium
+
+# --no-verify-jwt is required, not optional: without it the platform 401s the
+# browser's unauthenticated OPTIONS preflight before the handler's CORS code
+# runs. Each handler re-asserts the caller itself, so this loses no check.
+supabase functions deploy validate-premium --no-verify-jwt
+
 # and the rest, whenever they change:
-supabase functions deploy accept-friend-request analytics-mirror claim-listing \
-  delete-account delete-image export-data sign-upload
+for fn in accept-friend-request analytics-mirror claim-listing \
+          delete-account delete-image export-data sign-upload; do
+  supabase functions deploy "$fn" --no-verify-jwt
+done
 ```
 
-If the preflight still fails afterwards, platform-level JWT verification is
-answering the unauthenticated `OPTIONS` with `401` before the handler runs.
-Deploy that one function with verification off — the handler does its own auth
-via `assertCaller` / `auth.getUser()`, so this does not weaken it:
+Verify the preflight directly — a healthy function answers `200`/`204` with an
+`access-control-allow-origin` header echoing the Pages origin:
 
 ```bash
-supabase functions deploy validate-premium --no-verify-jwt
+curl -i -X OPTIONS \
+  -H "Origin: https://1337ninja1337.github.io" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: authorization, content-type" \
+  "https://<your-project-ref>.supabase.co/functions/v1/validate-premium"
 ```
+
+A `401` here means `--no-verify-jwt` did not take; a `404` means the function is
+not deployed.
 
 Set the `ALLOWED_ORIGINS` function secret only if you serve the app from an
 extra origin (e.g. `http://localhost:8081` for local dev):

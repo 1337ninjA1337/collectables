@@ -30,6 +30,7 @@ CREATE INDEX IF NOT EXISTS chat_messages_recipient_created_idx
 ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
 
 -- Either participant may read messages addressed to / sent by them.
+DROP POLICY IF EXISTS "chat_messages_select_participants" ON public.chat_messages;
 CREATE POLICY "chat_messages_select_participants"
 ON public.chat_messages
 FOR SELECT
@@ -42,6 +43,7 @@ USING (
 -- directions of the friend_requests row exist (i.e. mutual friendship). This
 -- enforces the "friends only" rule on the server so a crafted client cannot
 -- bypass the UI gate.
+DROP POLICY IF EXISTS "chat_messages_insert_friends_only" ON public.chat_messages;
 CREATE POLICY "chat_messages_insert_friends_only"
 ON public.chat_messages
 FOR INSERT
