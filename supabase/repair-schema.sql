@@ -109,6 +109,43 @@ begin
   end if;
 end $$;
 
+-- subscriptions ---------------------------------------------------------------
+-- Unlike the tables above this one is CREATEd when absent, because the
+-- `validate-premium` Edge Function queries it on every premium check and
+-- answers `500 (Internal Server Error)` when it does not exist — there is no
+-- degraded mode to fall back to. Definition mirrors
+-- `supabase/migrations/20260625_subscriptions.sql`; RLS and grants still come
+-- from that migration, so apply it when you can.
+create table if not exists public.subscriptions (
+  user_id            uuid primary key references auth.users (id) on delete cascade,
+  status             text not null default 'inactive'
+                       check (status in ('active', 'inactive', 'expired', 'cancelled')),
+  activated_at       timestamptz,
+  current_period_end timestamptz,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now(),
+  deleted_at         timestamptz
+);
+
+do $$
+begin
+  alter table public.subscriptions add column if not exists status             text        not null default 'inactive';
+  alter table public.subscriptions add column if not exists activated_at       timestamptz null;
+  alter table public.subscriptions add column if not exists current_period_end timestamptz null;
+  alter table public.subscriptions add column if not exists created_at         timestamptz not null default now();
+  alter table public.subscriptions add column if not exists updated_at         timestamptz not null default now();
+  alter table public.subscriptions add column if not exists deleted_at         timestamptz null;
+end $$;
+
+-- A brand-new `subscriptions` table has no RLS, which would expose every row to
+-- any authenticated caller. Enable it here and grant only self-reads; all
+-- writes stay service_role-only (the Edge Function holds that key).
+alter table public.subscriptions enable row level security;
+drop policy if exists "subscriptions_select_own" on public.subscriptions;
+create policy "subscriptions_select_own"
+  on public.subscriptions for select
+  using (auth.uid() = user_id);
+
 commit;
 
 -- PostgREST caches the schema. Without this the API can keep answering 400
@@ -136,7 +173,10 @@ with expected(tbl, col) as (
     ('marketplace_listings','mode'), ('marketplace_listings','asking_price'),
     ('marketplace_listings','currency'), ('marketplace_listings','notes'),
     ('marketplace_listings','created_at'), ('marketplace_listings','sold_at'),
-    ('marketplace_listings','buyer_user_id'), ('marketplace_listings','arrived_at')
+    ('marketplace_listings','buyer_user_id'), ('marketplace_listings','arrived_at'),
+    ('subscriptions','user_id'), ('subscriptions','status'),
+    ('subscriptions','activated_at'), ('subscriptions','current_period_end'),
+    ('subscriptions','deleted_at')
 )
 select e.tbl as still_missing_table, e.col as still_missing_column
 from expected e

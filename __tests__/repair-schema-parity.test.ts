@@ -84,6 +84,29 @@ describe("supabase/repair-schema.sql covers every projected column", () => {
     }
   });
 
+  // `validate-premium` answers 500 (not a degraded read) when `subscriptions`
+  // is absent, so the repair script CREATEs it rather than only adding columns —
+  // and must enable RLS, or a fresh table would expose every row.
+  it("creates the subscriptions table with RLS and a self-read policy", () => {
+    assert.match(sql, /create table if not exists public\.subscriptions/i);
+    assert.match(
+      sql,
+      /alter table public\.subscriptions enable row level security/i,
+      "a newly created subscriptions table without RLS would be world-readable",
+    );
+    assert.match(sql, /create policy "subscriptions_select_own"/i);
+    assert.match(
+      sql,
+      /using \(auth\.uid\(\) = user_id\)/i,
+      "the self-read policy must scope rows to the calling user",
+    );
+    assert.match(
+      sql,
+      /drop policy if exists "subscriptions_select_own"/i,
+      "policy creation must stay re-runnable",
+    );
+  });
+
   it("reloads the PostgREST schema cache so the fix takes effect immediately", () => {
     assert.match(sql, /notify pgrst, 'reload schema'/i);
   });
