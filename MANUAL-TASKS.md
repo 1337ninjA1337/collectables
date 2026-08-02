@@ -1309,29 +1309,64 @@ Then reload the app and confirm the `/rest/v1/*` calls return `200`.
 The CORS policy in `supabase/functions/_shared/cors.ts` already allow-lists
 `https://1337ninja1337.github.io`, and `validate-premium/index.ts` already calls
 `evaluateCors`. "Response to preflight request … does not have HTTP ok status"
-therefore means the browser's `OPTIONS` never reached that code — the deployed
-function is missing or stale. There is **no** workflow that deploys Edge
-Functions, so they only exist in production if they were pushed by hand.
+therefore means the browser's `OPTIONS` never reached that code.
+
+There are two independent causes, and you likely have both:
+
+1. **Nothing deploys the functions.** The Supabase Git integration only
+   auto-deploys functions declared in `supabase/config.toml`, and this repo
+   deliberately does **not** commit that file (see BE-31 in
+   `__tests__/supabase-test-ci.test.ts`: a committed config becomes the source
+   of truth for the preview/production projects, and a partial one disables
+   undeclared storage/functions and clobbers dashboard-managed settings on
+   merge). No workflow deploys them either. So they exist in production only if
+   pushed by hand.
+
+2. **`verify_jwt` defaults to `true`**, and that platform gate runs *before* the
+   function body. A CORS preflight is an `OPTIONS` with no `Authorization`
+   header by spec, so the platform answers it `401` and the handler's
+   `evaluateCors` never runs — producing exactly the reported error.
+
+Turning the gate off is safe for these functions and does not weaken auth:
+every handler re-asserts the caller itself (`assertCaller` + `auth.getUser()`,
+or the `x-posthog-webhook-secret` header for `analytics-mirror`) and runs
+`evaluateCors` first, so a non-allow-listed origin still gets a 403.
+
+Because config.toml is intentionally not committed, set this **per deploy**
+(below) or in the dashboard under each function's settings — do not commit a
+partial config.toml to do it.
 
 **Fix — deploy the functions once (and after every change to them):**
 
 ```bash
 supabase login
 supabase link --project-ref <your-project-ref>
-supabase functions deploy validate-premium
+
+# --no-verify-jwt is required, not optional: without it the platform 401s the
+# browser's unauthenticated OPTIONS preflight before the handler's CORS code
+# runs. Each handler re-asserts the caller itself, so this loses no check.
+supabase functions deploy validate-premium --no-verify-jwt
+
 # and the rest, whenever they change:
-supabase functions deploy accept-friend-request analytics-mirror claim-listing \
-  delete-account delete-image export-data sign-upload
+for fn in accept-friend-request analytics-mirror claim-listing \
+          delete-account delete-image export-data sign-upload; do
+  supabase functions deploy "$fn" --no-verify-jwt
+done
 ```
 
-If the preflight still fails afterwards, platform-level JWT verification is
-answering the unauthenticated `OPTIONS` with `401` before the handler runs.
-Deploy that one function with verification off — the handler does its own auth
-via `assertCaller` / `auth.getUser()`, so this does not weaken it:
+Verify the preflight directly — a healthy function answers `200`/`204` with an
+`access-control-allow-origin` header echoing the Pages origin:
 
 ```bash
-supabase functions deploy validate-premium --no-verify-jwt
+curl -i -X OPTIONS \
+  -H "Origin: https://1337ninja1337.github.io" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: authorization, content-type" \
+  "https://<your-project-ref>.supabase.co/functions/v1/validate-premium"
 ```
+
+A `401` here means `--no-verify-jwt` did not take; a `404` means the function is
+not deployed.
 
 Set the `ALLOWED_ORIGINS` function secret only if you serve the app from an
 extra origin (e.g. `http://localhost:8081` for local dev):
