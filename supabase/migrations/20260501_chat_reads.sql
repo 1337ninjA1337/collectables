@@ -12,14 +12,17 @@ create table if not exists public.chat_reads (
 alter table public.chat_reads enable row level security;
 
 -- Users can only read and write their own rows.
+DROP POLICY IF EXISTS "chat_reads_select_own" ON public.chat_reads;
 create policy "chat_reads_select_own"
   on public.chat_reads for select
   using (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "chat_reads_upsert_own" ON public.chat_reads;
 create policy "chat_reads_upsert_own"
   on public.chat_reads for insert
   with check (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "chat_reads_update_own" ON public.chat_reads;
 create policy "chat_reads_update_own"
   on public.chat_reads for update
   using (auth.uid() = user_id);

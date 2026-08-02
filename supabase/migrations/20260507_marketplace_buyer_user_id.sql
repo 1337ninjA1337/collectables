@@ -17,6 +17,7 @@ CREATE INDEX IF NOT EXISTS marketplace_listings_buyer_idx
 -- but only by setting `buyer_user_id` to themselves and `sold_at` to
 -- a non-null timestamp. Sellers retain full update rights via the
 -- existing `marketplace_listings_update_own` policy.
+DROP POLICY IF EXISTS "marketplace_listings_update_buyer_claim" ON public.marketplace_listings;
 CREATE POLICY "marketplace_listings_update_buyer_claim"
 ON public.marketplace_listings
 FOR UPDATE

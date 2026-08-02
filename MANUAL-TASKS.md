@@ -1248,7 +1248,25 @@ depend on arrive in `display_currency` (`20260528_profile_display_currency.sql`)
 (`20260527142510_items_archived_at.sql`) and `deleted_at`
 (`20260623_soft_delete_deleted_at.sql`), among others.
 
-**Find out which column is actually missing** — run in the Supabase SQL editor:
+#### Fastest fix: run `supabase/repair-schema.sql`
+
+Open the Supabase **SQL editor**, paste the contents of
+[`supabase/repair-schema.sql`](supabase/repair-schema.sql), and run it. It adds
+every column the four projections read, reloads the PostgREST schema cache, and
+finishes with a verification query that **should return zero rows** — any row it
+does return names a column still missing.
+
+The script is additive and safe to re-run: every statement is
+`ADD COLUMN IF NOT EXISTS`, nothing is dropped, retyped or backfilled, and a
+table that does not exist is skipped with a `NOTICE` naming the migration you
+need instead. It gets reads working again; it does **not** replace
+`supabase/migrations/` (RLS policies, indexes, FKs, triggers and the retention
+sweeps still live there), so still apply the full migration set when you can.
+
+`__tests__/repair-schema-parity.test.ts` fails the build if a column is ever
+added to a `*_COLUMNS` projection without the repair script learning about it.
+
+#### Or: find out exactly which column is missing
 
 ```sql
 with expected(tbl, col) as (
@@ -1277,7 +1295,12 @@ Every row it returns is a column the app selects but the DB does not have.
   push to `main` (see the "Migrations: free, main-only setup" section at the top
   of this file), **or**
 - run the un-applied files in `supabase/migrations/` in filename order by hand
-  in the SQL editor.
+  in the SQL editor. Every migration is now safe to re-run: the ones that used
+  to abort a second run on "policy already exists" / "constraint already exists"
+  (`20260424_chat_messages`, `20260501_chat_reads`,
+  `20260502_marketplace_listings`, `20260507_marketplace_buyer_user_id`,
+  `20260516_chat_id_integrity`) now `DROP … IF EXISTS` first, so you can paste
+  the whole set in order without tracking which ones already landed.
 
 Then reload the app and confirm the `/rest/v1/*` calls return `200`.
 
