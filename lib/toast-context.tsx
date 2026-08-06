@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Platform, Pressable, StatusBar, StyleSheet, Text, View } from "react-native";
 import { SPACING_INLINE } from "@/lib/design-tokens";
+import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
 
 export type ToastType = "success" | "error" | "info";
 
@@ -92,7 +93,7 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
       toValue: 1,
       duration: 220,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
   }, [anim]);
 

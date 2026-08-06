@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, DimensionValue, Easing, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 
 import { BORDER_2, PAGE_BG_2, SPACING_CARD, SPACING_LIST, TEXT_ON_DARK_SOFT } from "@/lib/design-tokens";
+import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
 
 type SkeletonProps = {
   width?: DimensionValue;
@@ -24,7 +25,7 @@ export function Skeleton({ width = "100%", height = 16, borderRadius = 8, style 
         toValue: 1,
         duration: 1300,
         easing: Easing.linear,
-        useNativeDriver: true,
+        useNativeDriver: USE_NATIVE_DRIVER,
       }),
     );
     loop.start();

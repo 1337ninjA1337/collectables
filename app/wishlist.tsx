@@ -60,6 +60,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
 
 export default function WishlistScreen() {
   const { t } = useI18n();
@@ -104,7 +105,7 @@ export default function WishlistScreen() {
       }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsMultipleSelection: true,
       quality: 0.9,
       selectionLimit: 5,
@@ -279,7 +280,7 @@ export default function WishlistScreen() {
           Animated.timing(sheetTranslateY, {
             toValue: 600,
             duration: 200,
-            useNativeDriver: true,
+            useNativeDriver: USE_NATIVE_DRIVER,
           }).start(() => {
             setAddOpen(false);
             sheetTranslateY.setValue(0);
@@ -287,7 +288,7 @@ export default function WishlistScreen() {
         } else {
           Animated.spring(sheetTranslateY, {
             toValue: 0,
-            useNativeDriver: true,
+            useNativeDriver: USE_NATIVE_DRIVER,
             tension: 100,
             friction: 10,
           }).start();
