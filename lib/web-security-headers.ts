@@ -40,9 +40,20 @@ export const EXCHANGE_RATES_HOST = "https://open.er-api.com";
  * - Microsoft Clarity ingest (`*.clarity.ms` + the `c.bing.com` beacon)
  * - Sentry ingest (`*.sentry.io`)
  * - open.er-api.com FX rates (`lib/currency-rates.ts`)
+ * - `blob:` / `data:` — NOT a network origin. On web an image picked through
+ *   `expo-image-picker` arrives as a `blob:`/`data:` URI, and both
+ *   `lib/cloudinary.ts uploadImage` and `lib/ai-vision.ts` read those bytes
+ *   back with `fetch(uri).blob()` before uploading. `connect-src` governs
+ *   `fetch()` regardless of scheme, so omitting them made every web photo
+ *   upload throw "Refused to connect because it violates the document's
+ *   Content Security Policy" — `img-src` already allow-lists both for the
+ *   preview thumbnails, which is why the picked image rendered but never
+ *   uploaded.
  */
 export const CSP_CONNECT_SRC: readonly string[] = [
   "'self'",
+  "blob:",
+  "data:",
   "https://*.supabase.co",
   "wss://*.supabase.co",
   CLOUDINARY_API_HOST,

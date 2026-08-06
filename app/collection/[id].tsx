@@ -98,6 +98,13 @@ export default function CollectionDetailsScreen() {
   const { isPremium } = usePremium();
   const theme = useAppTheme();
   const [selectionMode, setSelectionMode] = useState(false);
+  // Owners default to the card GRID (the trading cards tile 2/3/4 across).
+  // Drag-to-reorder needs a single column — react-native-draggable-flatlist has
+  // no multi-column mode, and a wrapped grid would hand onDragEnd a row order
+  // that doesn't match what the user sees — so reordering is an explicit mode
+  // the owner opts into from the actions row, mirroring how selection mode
+  // already takes over the list.
+  const [reorderMode, setReorderMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [itemFilters, setItemFilters] = useState<ItemFilters>(EMPTY_FILTERS);
@@ -778,6 +785,18 @@ export default function CollectionDetailsScreen() {
                 <Text style={styles.selectButtonText}>{t("selectItems")}</Text>
               </Pressable>
             ) : null}
+            {allItems.length > 0 && !selectionMode ? (
+              <Pressable
+                style={reorderMode ? styles.reorderButtonActive : styles.reorderButton}
+                onPress={() => setReorderMode((on) => !on)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: reorderMode }}
+              >
+                <Text style={reorderMode ? styles.reorderButtonActiveText : styles.reorderButtonText}>
+                  {reorderMode ? t("reorderItemsDone") : t("reorderItems")}
+                </Text>
+              </Pressable>
+            ) : null}
             {allItems.length > 0 ? (
               <Pressable
                 style={{...styles.exportButton, ...(exporting ? styles.exportButtonDisabled : {})}}
@@ -828,6 +847,7 @@ export default function CollectionDetailsScreen() {
     user?.id,
     exporting,
     selectionMode,
+    reorderMode,
     t,
     getCollectionTotalCost,
     isCollectionFollowed,
@@ -888,6 +908,12 @@ export default function CollectionDetailsScreen() {
     </ScaleDecorator>
   );
 
+  // Drag-to-reorder is reachable only when the owner opts into reorder mode AND
+  // the list is unsorted: onDragEnd re-writes `sortOrder` from the VISIBLE order,
+  // so dragging while alphabetically sorted would silently corrupt the manual
+  // order. Either gate failing hands the owner back to the read-only card grid.
+  const isDragBranch = isOwner && !selectionMode && reorderMode && itemFilters.sort === "default";
+
   // VM-D: When the viewer/read-only branch (the multi-column FlatList case)
   // is active, hoist the outer scroll INTO the FlatList itself so iOS can
   // recycle off-screen rows. Pre-VM-D the inner FlatList lived inside a
@@ -897,7 +923,7 @@ export default function CollectionDetailsScreen() {
   // drag needs `NestableScrollContainer`'s gesture coordination and selection
   // renders a non-virtualized vertical list (VM-E migrates selection too).
   const isViewerFlatListBranch =
-    items.length > 0 && (!isOwner || (!selectionMode && itemFilters.sort !== "default"));
+    items.length > 0 && (!isOwner || (!selectionMode && !isDragBranch));
 
   const modalsBlock = (
     <>
@@ -1077,13 +1103,12 @@ export default function CollectionDetailsScreen() {
             onAction={() => setItemFilters(EMPTY_FILTERS)}
             compact
           />
-        ) : isOwner && !selectionMode && itemFilters.sort === "default" ? (
-          // Drag-mode is gated on `itemFilters.sort === "default"` so the user
-          // can never drag while alphabetically sorted — otherwise onDragEnd
-          // would re-write `sortOrder` based on the visible (alphabetical)
-          // order and silently corrupt the manual drag order. When the gate
-          // falls through (any non-default sort), the early-return above hands
-          // owners back to the viewer-FlatList branch.
+        ) : isDragBranch ? (
+          // See the `isDragBranch` derivation above: reorder mode must be on
+          // AND the sort must be default, otherwise onDragEnd would re-write
+          // `sortOrder` from the visible (alphabetical) order and silently
+          // corrupt the manual drag order. When either gate falls through the
+          // early-return above hands owners back to the card-grid branch.
           <NestableDraggableFlatList
             data={visibleItems}
             keyExtractor={(item) => item.id}
@@ -1295,6 +1320,38 @@ const styles = StyleSheet.create({
   },
   selectButtonText: {
     color: HERO_DARK_2,
+    fontSize: 15,
+    fontWeight: "800",
+    fontFamily: FONT_BODY_EXTRABOLD,
+  },
+  // Reorder toggle — same chrome as the select chip, filled when the mode is on
+  // so the owner can see at a glance that the list has left grid layout.
+  reorderButton: {
+    borderRadius: RADIUS_CARD,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: AMBER_SOFT,
+    backgroundColor: CARD_BG_3,
+    alignItems: "center",
+  },
+  reorderButtonText: {
+    color: HERO_DARK_2,
+    fontSize: 15,
+    fontWeight: "800",
+    fontFamily: FONT_BODY_EXTRABOLD,
+  },
+  reorderButtonActive: {
+    borderRadius: RADIUS_CARD,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: HERO_DARK_2,
+    backgroundColor: HERO_DARK_2,
+    alignItems: "center",
+  },
+  reorderButtonActiveText: {
+    color: TEXT_ON_DARK_4,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,

@@ -25,16 +25,17 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
   it("declares the isViewerFlatListBranch flag with the documented gate", () => {
     const src = readSrc();
     // The flag must gate on items.length > 0 (FlatList only useful when
-    // there are items) AND (!isOwner OR (!selectionMode && sort !== "default")).
+    // there are items) AND (!isOwner OR (!selectionMode && !isDragBranch)).
     // - !isOwner: any non-owner viewer falls into this branch.
-    // - isOwner && sort !== "default": owners viewing a sorted list also
-    //   fall through because drag-mode is locked behind sort === "default"
-    //   (see VM-D and sort-gate.test).
+    // - isOwner && !isDragBranch: owners land in the card grid by DEFAULT now.
+    //   `isDragBranch` is the narrow opt-out — reorder mode on AND sort
+    //   default (see sort-gate.test) — so a sorted list, or simply not having
+    //   tapped Reorder, keeps the owner on the virtualized grid.
     // - isOwner && selectionMode: stays on the inline selection path because
     //   selection renders a non-virtualized vertical list (VM-E).
     assert.match(
       src,
-      /const\s+isViewerFlatListBranch\s*=\s*\n?\s*items\.length\s*>\s*0\s*&&\s*\(\s*!\s*isOwner\s*\|\|\s*\(\s*!\s*selectionMode\s*&&\s*itemFilters\.sort\s*!==\s*"default"\s*\)\s*\)/,
+      /const\s+isViewerFlatListBranch\s*=\s*\n?\s*items\.length\s*>\s*0\s*&&\s*\(\s*!\s*isOwner\s*\|\|\s*\(\s*!\s*selectionMode\s*&&\s*!\s*isDragBranch\s*\)\s*\)/,
     );
   });
 

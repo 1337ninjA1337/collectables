@@ -101,7 +101,7 @@ describe("app/collection/[id].tsx — VM-E/BB-B selection-mode FlatList", () => 
     // migration which is its own out-of-scope task.
     assert.match(
       src,
-      /isOwner\s*&&\s*!selectionMode\s*&&\s*itemFilters\.sort\s*===\s*"default"\s*\?\s*\([\s\S]*?<NestableDraggableFlatList[\s\S]*?data=\{\s*visibleItems\s*\}/,
+      /\)\s*:\s*isDragBranch\s*\?\s*\([\s\S]*?<NestableDraggableFlatList[\s\S]*?data=\{\s*visibleItems\s*\}/,
     );
   });
 });

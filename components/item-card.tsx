@@ -231,15 +231,37 @@ export const ItemCard = memo(function ItemCard({ item, compact, style }: ItemCar
   );
 });
 
+/**
+ * A trading card's printed shape. The card never renders larger than this even
+ * on a desktop-width column; below it, the 3:4 ratio scales it down to whatever
+ * grid cell it is dropped into.
+ */
+export const CARD_MAX_WIDTH = 600;
+export const CARD_MAX_HEIGHT = 800;
+export const CARD_ASPECT_RATIO = CARD_MAX_WIDTH / CARD_MAX_HEIGHT;
+
 const styles = StyleSheet.create({
   // Outer "card stock": the theme-coloured border the rest of the app uses,
   // with the amber frame nested inside for the double-border trading-card look.
+  //
+  // A printed card has a fixed shape, so this one does too: portrait 3:4,
+  // capped at CARD_MAX_WIDTH × CARD_MAX_HEIGHT and centred in whatever column
+  // it lands in. Below the cap it scales down with the column instead of
+  // growing to fill a wide screen — an item with a long description and one
+  // with none render the same silhouette, which is what makes a wall of them
+  // scan as a set.
   card: {
+    width: "100%",
+    maxWidth: CARD_MAX_WIDTH,
+    maxHeight: CARD_MAX_HEIGHT,
+    aspectRatio: CARD_ASPECT_RATIO,
+    alignSelf: "center",
     borderRadius: RADIUS_ITEM_AIRY,
     padding: SPACING_TIGHT,
     borderWidth: 1,
   },
   frame: {
+    flex: 1,
     borderRadius: RADIUS_CARD_SM,
     borderWidth: 2,
     borderColor: AMBER_MUTED_7,
@@ -266,7 +288,13 @@ const styles = StyleSheet.create({
     fontFamily: FONT_BODY_BOLD,
     color: MUTED_10,
   },
+  // The art window is the card's elastic block: every other row is
+  // content-sized, so the artwork absorbs whatever height the fixed aspect
+  // ratio leaves over. That keeps the frame full whether the item has tags,
+  // a description, both or neither.
   artWindow: {
+    flex: 1,
+    minHeight: 96,
     borderRadius: RADIUS_INPUT,
     borderWidth: 2,
     borderColor: AMBER_ACCENT,
@@ -275,7 +303,7 @@ const styles = StyleSheet.create({
   },
   art: {
     width: "100%",
-    height: 168,
+    height: "100%",
     backgroundColor: AMBER_MUTED_3,
   },
   photoCountBadge: {

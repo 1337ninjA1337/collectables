@@ -543,6 +543,8 @@ const en = {
   galleryPrevious: "Previous photo",
   galleryNext: "Next photo",
   galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
+  reorderItems: "Reorder",
+  reorderItemsDone: "Done reordering",
   profileCacheTtlLowTitle: "Profile cache TTL too low",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS is set below 30 seconds. Aggressive overrides can hammer Supabase rate limits.",
@@ -1094,6 +1096,8 @@ const ru: TranslationMap = {
   galleryPrevious: "Предыдущее фото",
   galleryNext: "Следующее фото",
   galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
+  reorderItems: "Изменить порядок",
+  reorderItemsDone: "Готово",
   profileCacheTtlLowTitle: "Слишком короткий TTL кэша профилей",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS установлен ниже 30 секунд. Слишком агрессивные значения нагружают лимиты Supabase.",
@@ -1311,6 +1315,8 @@ const be: TranslationMap = {
   galleryPrevious: "Папярэдняе фота",
   galleryNext: "Наступнае фота",
   galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
+  reorderItems: "Змяніць парадак",
+  reorderItemsDone: "Гатова",
   profileCacheTtlLowTitle: "Занадта малы TTL кэша профіляў",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS усталяваны ніжэй за 30 секунд. Занадта агрэсіўныя значэнні нагружаюць ліміты Supabase.",
@@ -1518,6 +1524,8 @@ const pl: TranslationMap = {
   galleryPrevious: "Poprzednie zdjęcie",
   galleryNext: "Następne zdjęcie",
   galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
+  reorderItems: "Zmień kolejność",
+  reorderItemsDone: "Gotowe",
   profileCacheTtlLowTitle: "Za niski TTL pamięci podręcznej profili",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS jest ustawiony poniżej 30 sekund. Zbyt agresywne wartości obciążają limity Supabase.",
@@ -1721,6 +1729,8 @@ const de: TranslationMap = {
   galleryPrevious: "Vorheriges Foto",
   galleryNext: "Nächstes Foto",
   galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
+  reorderItems: "Neu anordnen",
+  reorderItemsDone: "Fertig",
   profileCacheTtlLowTitle: "Profil-Cache-TTL zu niedrig",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS ist auf unter 30 Sekunden gesetzt. Zu aggressive Werte belasten die Supabase-Limits.",
@@ -1924,6 +1934,8 @@ const es: TranslationMap = {
   galleryPrevious: "Foto anterior",
   galleryNext: "Foto siguiente",
   galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
+  reorderItems: "Reordenar",
+  reorderItemsDone: "Listo",
   profileCacheTtlLowTitle: "TTL de caché de perfiles demasiado bajo",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS está por debajo de 30 segundos. Valores demasiado agresivos saturan los límites de Supabase.",

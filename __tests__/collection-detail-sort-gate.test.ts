@@ -20,13 +20,20 @@ function read(rel: string): string {
 describe("app/collection/[id].tsx — drag-mode sort gate (corruption fix)", () => {
   const src = read("app/collection/[id].tsx");
 
-  it("drag-mode branch condition includes itemFilters.sort === \"default\"", () => {
+  it("isDragBranch carries the itemFilters.sort === \"default\" gate", () => {
     // Without this gate, the user could enter alphabetical sort, drag a
     // row, and onDragEnd would re-write `sortOrder` based on the
-    // alphabetical order — destroying their manual ordering.
+    // alphabetical order — destroying their manual ordering. The condition
+    // now lives in the named `isDragBranch` flag (owners default to the card
+    // grid; reorder mode is the opt-in that reaches the draggable list), so
+    // both halves are pinned: the derivation and the branch it drives.
     assert.match(
       src,
-      /isOwner\s*&&\s*!selectionMode\s*&&\s*itemFilters\.sort\s*===\s*"default"\s*\?\s*\(\s*\n\s*\/\/[^\n]*\n[\s\S]*?<NestableDraggableFlatList/,
+      /const\s+isDragBranch\s*=\s*isOwner\s*&&\s*!selectionMode\s*&&\s*reorderMode\s*&&\s*itemFilters\.sort\s*===\s*"default";/,
+    );
+    assert.match(
+      src,
+      /\)\s*:\s*isDragBranch\s*\?\s*\(\s*\n\s*\/\/[^\n]*\n[\s\S]*?<NestableDraggableFlatList/,
     );
   });
 

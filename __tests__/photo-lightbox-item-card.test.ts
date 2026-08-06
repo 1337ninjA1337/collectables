@@ -174,3 +174,74 @@ describe("gallery i18n keys", () => {
     assert.equal(hits.length, 6);
   });
 });
+
+describe("<ItemCard> — printed card geometry", () => {
+  it("exports the 600x800 cap and derives the aspect ratio from it", () => {
+    assert.match(cardSrc, /export const CARD_MAX_WIDTH = 600;/);
+    assert.match(cardSrc, /export const CARD_MAX_HEIGHT = 800;/);
+    // Derived, never hand-typed as 0.75 — a future cap change must move the
+    // ratio with it or the card stops being the shape it advertises.
+    assert.match(cardSrc, /export const CARD_ASPECT_RATIO = CARD_MAX_WIDTH \/ CARD_MAX_HEIGHT;/);
+  });
+
+  it("caps the card and centres it instead of stretching to the column", () => {
+    const card = cardSrc.match(/\n  card: \{[\s\S]*?\n  \},/)?.[0] ?? "";
+    assert.match(card, /width: "100%"/);
+    assert.match(card, /maxWidth: CARD_MAX_WIDTH/);
+    assert.match(card, /maxHeight: CARD_MAX_HEIGHT/);
+    assert.match(card, /aspectRatio: CARD_ASPECT_RATIO/);
+    assert.match(card, /alignSelf: "center"/);
+  });
+
+  it("lets the art window absorb the leftover height so the frame stays full", () => {
+    const frame = cardSrc.match(/\n  frame: \{[\s\S]*?\n  \},/)?.[0] ?? "";
+    assert.match(frame, /flex: 1/);
+    const art = cardSrc.match(/\n  artWindow: \{[\s\S]*?\n  \},/)?.[0] ?? "";
+    assert.match(art, /flex: 1/);
+    assert.match(cardSrc, /\n  art: \{[\s\S]*?height: "100%"[\s\S]*?\n  \},/);
+  });
+});
+
+describe("app/collection/[id].tsx — grid by default, reorder on demand", () => {
+  const collectionSrc = read("app/collection/[id].tsx");
+
+  it("owners land in the virtualized card grid unless they opt into reordering", () => {
+    assert.match(collectionSrc, /const \[reorderMode, setReorderMode\] = useState\(false\);/);
+    assert.match(
+      collectionSrc,
+      /const isDragBranch = isOwner && !selectionMode && reorderMode && itemFilters\.sort === "default";/,
+    );
+    assert.match(
+      collectionSrc,
+      /const isViewerFlatListBranch =\s*\n\s*items\.length > 0 && \(!isOwner \|\| \(!selectionMode && !isDragBranch\)\);/,
+    );
+  });
+
+  it("exposes the toggle in the owner actions row with a selected a11y state", () => {
+    assert.match(collectionSrc, /onPress=\{\(\) => setReorderMode\(\(on\) => !on\)\}/);
+    assert.match(collectionSrc, /accessibilityState=\{\{ selected: reorderMode \}\}/);
+    assert.match(collectionSrc, /\{reorderMode \? t\("reorderItemsDone"\) : t\("reorderItems"\)\}/);
+  });
+
+  it("declares reorderItems/reorderItemsDone in every locale", () => {
+    for (const key of ["reorderItems", "reorderItemsDone"]) {
+      const hits = i18nSrc.match(new RegExp(`^  ${key}:`, "gm")) ?? [];
+      assert.equal(hits.length, 6, `${key} must exist in all six locales (got ${hits.length})`);
+    }
+  });
+});
+
+describe("CSP — web photo uploads read blob:/data: URIs through fetch()", () => {
+  const cspSrc = read("lib/web-security-headers.ts");
+
+  it("allow-lists blob: and data: in connect-src, not just img-src", () => {
+    const connect = cspSrc.match(/export const CSP_CONNECT_SRC[\s\S]*?\n\];/)?.[0] ?? "";
+    assert.match(connect, /"blob:"/);
+    assert.match(connect, /"data:"/);
+  });
+
+  it("the readers that need them still go through fetch()", () => {
+    assert.match(read("lib/cloudinary.ts"), /await fetch\(uri\)/);
+    assert.match(read("lib/ai-vision.ts"), /await fetch\(uri\)/);
+  });
+});
