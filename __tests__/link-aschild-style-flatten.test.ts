@@ -126,20 +126,29 @@ describe("<Link asChild> style merging", () => {
     );
   });
 
-  it("item-card keeps its forwarded style flattened", () => {
+  // Only the OUTER Pressable of each branch is the direct child of
+  // `<Link asChild>` and therefore goes through Radix's Slot merge. The card
+  // also nests a Pressable around the art window (it opens the gallery instead
+  // of navigating) — that one is an ordinary child and needs no flattening, so
+  // the assertion targets the two Slot-merged tags rather than every Pressable
+  // in the file. The repo-wide `findArrayStylesUnderAsChild` scan above is what
+  // guards the general shape.
+  it("item-card keeps its forwarded style flattened on both Link children", () => {
     const source = fs.readFileSync(
       path.join(repoRoot, "components/item-card.tsx"),
       "utf8",
     );
-    const pressables = source.match(/<Pressable\s+style=\{[^\n]*/g) ?? [];
-    assert.ok(pressables.length >= 2, "expected both the compact and full cards");
-    for (const tag of pressables) {
-      assert.match(
-        tag,
-        /StyleSheet\.flatten\(/,
-        `ItemCard's Pressable sits under <Link asChild>; its style must be flattened: ${tag}`,
-      );
-    }
+    assert.equal(
+      findArrayStylesUnderAsChild(source).length,
+      0,
+      "no bare array style may reach a <Link asChild> child in item-card.tsx",
+    );
+    const flattened = source.match(/<Pressable style=\{StyleSheet\.flatten\(\[/g) ?? [];
+    assert.equal(
+      flattened.length,
+      2,
+      `expected both the compact and full cards to flatten their forwarded style, got ${flattened.length}`,
+    );
   });
 });
 

@@ -42,9 +42,16 @@ describe("item-card — renders cost via the shared <CostBadge>", () => {
     assert.doesNotMatch(src, /formatCostAmount/);
   });
 
-  it("renders <CostBadge item withLabel> in BOTH the compact and full branches", () => {
-    const matches = src.match(/<CostBadge\s+item=\{item\}\s+withLabel\b/g) ?? [];
+  // Both branches render the cost through <CostBadge> — only the labelling
+  // differs. The compact card keeps `withLabel` ("Cost: 12 USD") because the
+  // masonry cell has no other cost affordance; the full trading-card branch
+  // drops the label because the value sits in the name bar's HP slot, where a
+  // bare "12 USD" reads the way a printed card's HP does.
+  it("renders <CostBadge item> in BOTH the compact and full branches", () => {
+    const matches = src.match(/<CostBadge\s+item=\{item\}/g) ?? [];
     assert.equal(matches.length, 2, `expected 2 CostBadge adoptions, got ${matches.length}`);
+    assert.match(src, /<CostBadge\s+item=\{item\}\s+withLabel\b/, "compact branch keeps the label");
+    assert.match(src, /<CostBadge\s+item=\{item\}\s+style=\{styles\.hp\}/, "full branch fills the HP slot");
   });
 
   it("drops the old raw `{item.cost}{item.costCurrency}` inline render", () => {

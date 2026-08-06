@@ -538,6 +538,11 @@ const en = {
     "Crash reports: off — nothing leaves this device",
   diagnosticsDsnInlined: "Sentry DSN inlined in this build",
   diagnosticsEventsTitle: "Events captured by this app",
+  galleryOpen: "Open photo gallery",
+  galleryClose: "Close gallery",
+  galleryPrevious: "Previous photo",
+  galleryNext: "Next photo",
+  galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Profile cache TTL too low",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS is set below 30 seconds. Aggressive overrides can hammer Supabase rate limits.",
@@ -1084,6 +1089,11 @@ const ru: TranslationMap = {
   crashFallbackBody:
     "Произошла непредвиденная ошибка, мы её записали. Попробуйте ещё раз или перезапустите приложение.",
   crashFallbackRetry: "Попробовать ещё раз",
+  galleryOpen: "Открыть галерею",
+  galleryClose: "Закрыть галерею",
+  galleryPrevious: "Предыдущее фото",
+  galleryNext: "Следующее фото",
+  galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Слишком короткий TTL кэша профилей",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS установлен ниже 30 секунд. Слишком агрессивные значения нагружают лимиты Supabase.",
@@ -1296,6 +1306,11 @@ const be: TranslationMap = {
   crashFallbackBody:
     "Адбылася нечаканая памылка, мы яе запісалі. Паспрабуйце яшчэ раз ці перазапусціце прыкладанне.",
   crashFallbackRetry: "Паспрабаваць яшчэ раз",
+  galleryOpen: "Адкрыць галерэю",
+  galleryClose: "Закрыць галерэю",
+  galleryPrevious: "Папярэдняе фота",
+  galleryNext: "Наступнае фота",
+  galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Занадта малы TTL кэша профіляў",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS усталяваны ніжэй за 30 секунд. Занадта агрэсіўныя значэнні нагружаюць ліміты Supabase.",
@@ -1498,6 +1513,11 @@ const pl: TranslationMap = {
   crashFallbackBody:
     "Wystąpił nieoczekiwany błąd i został zapisany. Spróbuj ponownie lub uruchom aplikację jeszcze raz.",
   crashFallbackRetry: "Spróbuj ponownie",
+  galleryOpen: "Otwórz galerię zdjęć",
+  galleryClose: "Zamknij galerię",
+  galleryPrevious: "Poprzednie zdjęcie",
+  galleryNext: "Następne zdjęcie",
+  galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Za niski TTL pamięci podręcznej profili",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS jest ustawiony poniżej 30 sekund. Zbyt agresywne wartości obciążają limity Supabase.",
@@ -1696,6 +1716,11 @@ const de: TranslationMap = {
   crashFallbackBody:
     "Ein unerwarteter Fehler ist aufgetreten und wurde protokolliert. Bitte erneut versuchen oder die App neu starten.",
   crashFallbackRetry: "Erneut versuchen",
+  galleryOpen: "Fotogalerie öffnen",
+  galleryClose: "Galerie schließen",
+  galleryPrevious: "Vorheriges Foto",
+  galleryNext: "Nächstes Foto",
+  galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Profil-Cache-TTL zu niedrig",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS ist auf unter 30 Sekunden gesetzt. Zu aggressive Werte belasten die Supabase-Limits.",
@@ -1894,6 +1919,11 @@ const es: TranslationMap = {
   crashFallbackBody:
     "Se produjo un error inesperado y lo hemos registrado. Vuelve a intentarlo o reinicia la aplicación.",
   crashFallbackRetry: "Intentar de nuevo",
+  galleryOpen: "Abrir galería de fotos",
+  galleryClose: "Cerrar galería",
+  galleryPrevious: "Foto anterior",
+  galleryNext: "Foto siguiente",
+  galleryCounter: (params?: TranslationParams) => `${params?.current ?? 1} / ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "TTL de caché de perfiles demasiado bajo",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS está por debajo de 30 segundos. Valores demasiado agresivos saturan los límites de Supabase.",

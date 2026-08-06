@@ -31,15 +31,15 @@ function readCardSrc(): string {
 }
 
 describe("viewer FlatList getItemLayout", () => {
-  it("components/item-card.tsx exports COMPACT_ITEM_CARD_HEIGHT = 190", () => {
+  it("components/item-card.tsx exports COMPACT_ITEM_CARD_HEIGHT = 186", () => {
     const src = readCardSrc();
     const m = src.match(/export\s+const\s+COMPACT_ITEM_CARD_HEIGHT\s*=\s*(\d+)\s*;/);
     assert.ok(m, "COMPACT_ITEM_CARD_HEIGHT must be exported as a numeric constant");
-    // 1 (border) + 110 (image) + 8 (gap) + 36 (title block) + 8 (gap) +
-    // 16 (cost slot) + 10 (paddingBottom) + 1 (border). If this fails
-    // because the card geometry changed, update BOTH the constant and this
-    // expectation together.
-    assert.equal(Number(m![1]), 190);
+    // Trading-card compact layout: 2 (border) + 6 (padding) + 106 (art frame:
+    // 1 border + 104 image + 1 border) + 6 (gap) + 36 (title block) + 6 (gap) +
+    // 16 (cost slot) + 6 (padding) + 2 (border). If this fails because the card
+    // geometry changed, update BOTH the constant and this expectation together.
+    assert.equal(Number(m![1]), 186);
   });
 
   it("compact card geometry is deterministic (2-line title block + fixed cost slot)", () => {

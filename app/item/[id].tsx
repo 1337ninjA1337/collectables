@@ -17,6 +17,7 @@ import {
 import { getUserPreferredCurrency, setUserPreferredCurrency } from "@/lib/locale-helpers";
 import { SkeletonItemDetail } from "@/components/skeleton";
 
+import { PhotoLightbox } from "@/components/photo-lightbox";
 import { PhotoPreview } from "@/components/photo-preview";
 import { ReactionBar } from "@/components/reaction-bar";
 import { Screen, useResponsive } from "@/components/screen";
@@ -119,6 +120,7 @@ export default function ItemDetailsScreen() {
   const [remoteItem, setRemoteItem] = useState<CollectableItem | null>(null);
   const [loadingRemote, setLoadingRemote] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -514,8 +516,15 @@ export default function ItemDetailsScreen() {
       <View style={styles.photoHero}>
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
           {activeItem.photos.length > 0 ? (
-            activeItem.photos.map((photo) => (
-              <Image key={photo} source={{ uri: photo }} style={{ ...styles.heroImage, width: heroWidth }} />
+            activeItem.photos.map((photo, photoIndex) => (
+              <Pressable
+                key={photo}
+                onPress={() => setGalleryIndex(photoIndex)}
+                accessibilityRole="imagebutton"
+                accessibilityLabel={t("galleryOpen")}
+              >
+                <Image source={{ uri: photo }} style={{ ...styles.heroImage, width: heroWidth }} />
+              </Pressable>
             ))
           ) : (
             <View style={{ ...styles.heroImage, width: heroWidth, backgroundColor: placeholderColor(activeItem.id) }} />
@@ -531,6 +540,13 @@ export default function ItemDetailsScreen() {
           </View>
         ) : null}
       </View>
+
+      <PhotoLightbox
+        photos={activeItem.photos}
+        visible={galleryIndex !== null}
+        initialIndex={galleryIndex ?? 0}
+        onClose={() => setGalleryIndex(null)}
+      />
 
       <View style={styles.titleBlock}>
         <Text style={{ ...styles.itemTitle, color: theme.text }}>{activeItem.title}</Text>

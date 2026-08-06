@@ -1,20 +1,42 @@
-import { memo } from "react";
+import { memo, useCallback, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { Link } from "expo-router";
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import {
+  AMBER_ACCENT,
   AMBER_MUTED_3,
+  AMBER_MUTED_7,
+  AMBER_SOFT_4,
+  BORDER_4,
+  CARD_BG_9,
   HERO_DARK,
+  MUTED_10,
+  MUTED_11,
   PURE_WHITE,
+  RADIUS_CARD_SM,
+  RADIUS_INPUT,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
   SPACING_INLINE,
+  SPACING_LIST,
+  SPACING_MICRO,
+  SPACING_TIGHT,
   TEXT_ON_DARK,
 } from "@/lib/design-tokens";
 import { CostBadge } from "@/components/cost-badge";
 import { LazyPhoto } from "@/components/lazy-photo";
+import { PhotoLightbox } from "@/components/photo-lightbox";
 import { useAppTheme } from "@/components/use-app-theme";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
@@ -36,6 +58,20 @@ import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD }
 // See `__tests__/link-aschild-style-flatten.test.ts` for the regression guard.
 type ItemCardProps = { item: CollectableItem; compact?: boolean; style?: StyleProp<ViewStyle> };
 
+/**
+ * The card reads as a collectable trading card: an outer "card stock" border,
+ * an inner amber frame, a name bar with the value where a trading card prints
+ * its HP, a framed art window, a type band (condition + provenance), flavour
+ * text, and a footer carrying the tags and a short card number derived from the
+ * item id.
+ *
+ * The art window is its own Pressable nested inside the `<Link asChild>` child:
+ * tapping the art opens the fullscreen gallery, tapping anywhere else still
+ * navigates to the item screen. On web the link is a real `<a>`, so the art
+ * handler has to cancel the click before it navigates — hence the
+ * preventDefault/stopPropagation in `openGallery` (both are no-ops on native,
+ * where the nested Pressable already wins the responder negotiation).
+ */
 // VM-F: memoized like SelectableItemRow — the named-function form keeps the
 // component name visible in React DevTools' profiler tree. Context consumers
 // (i18n/theme/collections) still re-render the card on context changes;
@@ -43,128 +79,263 @@ type ItemCardProps = { item: CollectableItem; compact?: boolean; style?: StylePr
 export const ItemCard = memo(function ItemCard({ item, compact, style }: ItemCardProps) {
   const { t } = useI18n();
   const theme = useAppTheme();
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const hasPhoto = item.photos.length > 0 && Boolean(item.photos[0]);
+  const photoCount = item.photos.filter(Boolean).length;
+
+  const openGallery = useCallback((e?: GestureResponderEvent) => {
+    const domEvent = e as unknown as
+      | { preventDefault?: () => void; stopPropagation?: () => void }
+      | undefined;
+    domEvent?.preventDefault?.();
+    domEvent?.stopPropagation?.();
+    setGalleryOpen(true);
+  }, []);
+  const closeGallery = useCallback(() => setGalleryOpen(false), []);
+
+  const conditionLabel = item.condition
+    ? t(
+        `condition${item.condition[0].toUpperCase()}${item.condition.slice(1)}` as
+          | "conditionNew"
+          | "conditionExcellent"
+          | "conditionGood"
+          | "conditionFair",
+      )
+    : null;
+
+  // Trading cards print a set number; the item id's first 6 chars give a stable
+  // per-item token that reads the same way without inventing new state.
+  const cardNumber = item.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase();
+
+  const gallery = hasPhoto ? (
+    <PhotoLightbox
+      photos={item.photos.filter(Boolean)}
+      visible={galleryOpen}
+      onClose={closeGallery}
+    />
+  ) : null;
 
   if (compact) {
     return (
-      <Link href={`/item/${item.id}`} asChild>
-        <Pressable style={StyleSheet.flatten([styles.compactCard, { backgroundColor: theme.card, borderColor: theme.border }, style])}>
-          {hasPhoto ? (
-            <LazyPhoto
-              uri={withCloudinaryThumbUrl(item.photos[0], { width: 480, height: 360, mode: "fill" })}
-              style={styles.compactImage}
-              fallbackColor={placeholderColor(item.id)}
-            />
-          ) : (
-            <View style={[styles.compactImage, { backgroundColor: placeholderColor(item.id) }]} />
-          )}
-          <Text style={{ ...styles.compactTitle, color: theme.text }} numberOfLines={2}>{item.title}</Text>
-          {/* Fixed-height slot: <CostBadge> renders null for cost-less items,
-              which would collapse the card's gap AND shrink the card — the
-              wrapper keeps the compact card's height deterministic so the
-              viewer FlatList's getItemLayout geometry holds for every row. */}
-          <View style={styles.compactCostSlot}>
-            <CostBadge item={item} withLabel style={{ ...styles.compactCost, color: theme.meta }} />
-          </View>
-        </Pressable>
-      </Link>
+      <>
+        <Link href={`/item/${item.id}`} asChild>
+          <Pressable style={StyleSheet.flatten([styles.compactCard, { backgroundColor: theme.card, borderColor: theme.border }, style])}>
+            <Pressable
+              style={styles.compactArtFrame}
+              onPress={hasPhoto ? openGallery : undefined}
+              disabled={!hasPhoto}
+              accessibilityRole="imagebutton"
+              accessibilityLabel={t("galleryOpen")}
+            >
+              {hasPhoto ? (
+                <LazyPhoto
+                  uri={withCloudinaryThumbUrl(item.photos[0], { width: 480, height: 360, mode: "fill" })}
+                  style={styles.compactImage}
+                  fallbackColor={placeholderColor(item.id)}
+                />
+              ) : (
+                <View style={[styles.compactImage, { backgroundColor: placeholderColor(item.id) }]} />
+              )}
+              {photoCount > 1 ? (
+                <View style={styles.photoCountBadge}>
+                  <Ionicons name="images-outline" size={10} color={TEXT_ON_DARK} />
+                  <Text style={styles.photoCountText}>{photoCount}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+            <Text style={{ ...styles.compactTitle, color: theme.text }} numberOfLines={2}>{item.title}</Text>
+            {/* Fixed-height slot: <CostBadge> renders null for cost-less items,
+                which would collapse the card's gap AND shrink the card — the
+                wrapper keeps the compact card's height deterministic so the
+                viewer FlatList's getItemLayout geometry holds for every row. */}
+            <View style={styles.compactCostSlot}>
+              <CostBadge item={item} withLabel style={{ ...styles.compactCost, color: theme.meta }} />
+            </View>
+          </Pressable>
+        </Link>
+        {gallery}
+      </>
     );
   }
 
   return (
-    <Link href={`/item/${item.id}`} asChild>
-      <Pressable style={StyleSheet.flatten([styles.card, { backgroundColor: theme.card, borderColor: theme.border }, SHADOW_SOFT, style])}>
-        {hasPhoto ? (
-          <LazyPhoto
-            uri={withCloudinaryThumbUrl(item.photos[0], { width: 320, height: 320, mode: "fill" })}
-            style={styles.image}
-            fallbackColor={placeholderColor(item.id)}
-          />
-        ) : (
-          <View style={{...styles.image, backgroundColor: placeholderColor(item.id)}} />
-        )}
-        <View style={styles.textWrap}>
-          <Text style={{ ...styles.title, color: theme.text }}>{item.title}</Text>
-          <Text style={{ ...styles.description, color: theme.muted }} numberOfLines={2}>
-            {item.description}
-          </Text>
-          <View style={styles.metaRow}>
-            <Text style={{ ...styles.meta, color: theme.meta }}>{item.acquiredFrom}</Text>
-            <Text style={{ ...styles.meta, color: theme.meta }}>{t("photosCount", { count: item.photos.length })}</Text>
-          </View>
-          {item.tags && item.tags.length > 0 ? (
-            <View style={styles.tagsRow}>
-              {item.tags.map((tag, i) => (
-                <View key={i} style={{...styles.tagBadge, backgroundColor: tag.color}}>
-                  <Text style={styles.tagBadgeText}>{tag.label}</Text>
-                </View>
-              ))}
+    <>
+      <Link href={`/item/${item.id}`} asChild>
+        <Pressable style={StyleSheet.flatten([styles.card, { backgroundColor: theme.card, borderColor: theme.border }, SHADOW_SOFT, style])}>
+          <View style={styles.frame}>
+            <View style={styles.nameBar}>
+              <Text style={{ ...styles.name, color: theme.text }} numberOfLines={1}>{item.title}</Text>
+              <CostBadge item={item} style={styles.hp} />
             </View>
-          ) : null}
-          <View style={styles.metaRow}>
-            {item.condition ? (
-              <View style={styles.conditionBadge}>
-                <Text style={styles.conditionBadgeText}>
-                  {t(`condition${item.condition[0].toUpperCase()}${item.condition.slice(1)}` as "conditionNew" | "conditionExcellent" | "conditionGood" | "conditionFair")}
-                </Text>
+
+            <Pressable
+              style={styles.artWindow}
+              onPress={hasPhoto ? openGallery : undefined}
+              disabled={!hasPhoto}
+              accessibilityRole="imagebutton"
+              accessibilityLabel={t("galleryOpen")}
+            >
+              {hasPhoto ? (
+                <LazyPhoto
+                  uri={withCloudinaryThumbUrl(item.photos[0], { width: 640, height: 480, mode: "fill" })}
+                  style={styles.art}
+                  fallbackColor={placeholderColor(item.id)}
+                />
+              ) : (
+                <View style={{ ...styles.art, backgroundColor: placeholderColor(item.id) }} />
+              )}
+              {photoCount > 1 ? (
+                <View style={styles.photoCountBadge}>
+                  <Ionicons name="images-outline" size={11} color={TEXT_ON_DARK} />
+                  <Text style={styles.photoCountText}>{photoCount}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+
+            <View style={styles.typeBand}>
+              {conditionLabel ? (
+                <View style={styles.conditionBadge}>
+                  <Text style={styles.conditionBadgeText}>{conditionLabel}</Text>
+                </View>
+              ) : null}
+              {item.acquiredFrom ? (
+                <Text style={styles.typeBandMeta} numberOfLines={1}>{item.acquiredFrom}</Text>
+              ) : null}
+            </View>
+
+            {item.description ? (
+              <View style={styles.flavorBox}>
+                <Text style={styles.flavorText} numberOfLines={2}>{item.description}</Text>
               </View>
             ) : null}
-            <CostBadge item={item} withLabel style={{ ...styles.meta, color: theme.meta }} />
+
+            {item.tags && item.tags.length > 0 ? (
+              <View style={styles.tagsRow}>
+                {item.tags.map((tag, i) => (
+                  <View key={i} style={{ ...styles.tagBadge, backgroundColor: tag.color }}>
+                    <Text style={styles.tagBadgeText}>{tag.label}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            <View style={styles.footerRow}>
+              <Text style={styles.footerMeta}>{t("photosCount", { count: item.photos.length })}</Text>
+              <Text style={styles.footerMeta}>№ {cardNumber}</Text>
+            </View>
           </View>
-        </View>
-      </Pressable>
-    </Link>
+        </Pressable>
+      </Link>
+      {gallery}
+    </>
   );
 });
 
 const styles = StyleSheet.create({
+  // Outer "card stock": the theme-coloured border the rest of the app uses,
+  // with the amber frame nested inside for the double-border trading-card look.
   card: {
-    flexDirection: "row",
-    gap: 14,
-    alignItems: "stretch",
     borderRadius: RADIUS_ITEM_AIRY,
-    padding: 12,
+    padding: SPACING_TIGHT,
     borderWidth: 1,
   },
-  image: {
-    width: 104,
-    height: 104,
-    borderRadius: 18,
-    backgroundColor: AMBER_MUTED_3,
+  frame: {
+    borderRadius: RADIUS_CARD_SM,
+    borderWidth: 2,
+    borderColor: AMBER_MUTED_7,
+    backgroundColor: CARD_BG_9,
+    padding: SPACING_INLINE,
+    gap: SPACING_INLINE,
   },
-  textWrap: {
-    flex: 1,
+  nameBar: {
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: SPACING_INLINE,
   },
-  title: {
+  name: {
+    flex: 1,
     fontSize: 19,
     fontWeight: "700",
     fontFamily: FONT_DISPLAY_EDITORIAL,
   },
-  description: {
-    lineHeight: 22,
-    fontFamily: FONT_BODY,
+  // Where a trading card prints its HP.
+  hp: {
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
+    color: MUTED_10,
   },
-  metaRow: {
+  artWindow: {
+    borderRadius: RADIUS_INPUT,
+    borderWidth: 2,
+    borderColor: AMBER_ACCENT,
+    overflow: "hidden",
+    backgroundColor: AMBER_MUTED_3,
+  },
+  art: {
+    width: "100%",
+    height: 168,
+    backgroundColor: AMBER_MUTED_3,
+  },
+  photoCountBadge: {
+    position: "absolute",
+    right: SPACING_TIGHT,
+    bottom: SPACING_TIGHT,
     flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING_MICRO,
+    paddingVertical: 2,
+    paddingHorizontal: SPACING_TIGHT,
+    borderRadius: RADIUS_PILL,
+    backgroundColor: HERO_DARK,
+  },
+  photoCountText: {
+    color: TEXT_ON_DARK,
+    fontSize: 10,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
+  },
+  typeBand: {
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: SPACING_INLINE,
+    minHeight: 22,
   },
-  meta: {
-    fontSize: 13,
+  typeBandMeta: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 12,
     fontWeight: "600",
+    color: MUTED_11,
     fontFamily: FONT_BODY_SEMIBOLD,
+  },
+  // Flavour text — the italicised description box near the bottom of a card.
+  flavorBox: {
+    borderRadius: RADIUS_INPUT,
+    borderWidth: 1,
+    borderColor: BORDER_4,
+    backgroundColor: AMBER_SOFT_4,
+    paddingVertical: SPACING_TIGHT,
+    paddingHorizontal: SPACING_INLINE,
+  },
+  flavorText: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontStyle: "italic",
+    color: MUTED_10,
+    fontFamily: FONT_BODY,
   },
   tagsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 4,
+    gap: SPACING_MICRO,
   },
   tagBadge: {
     borderRadius: RADIUS_PILL,
     paddingVertical: 2,
-    paddingHorizontal: 8,
+    paddingHorizontal: SPACING_INLINE,
   },
   tagBadgeText: {
     color: PURE_WHITE,
@@ -175,7 +346,7 @@ const styles = StyleSheet.create({
   conditionBadge: {
     borderRadius: RADIUS_PILL,
     paddingVertical: 3,
-    paddingHorizontal: 10,
+    paddingHorizontal: SPACING_LIST,
     backgroundColor: HERO_DARK,
   },
   conditionBadgeText: {
@@ -184,23 +355,46 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },
-  compactCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    overflow: "hidden",
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: SPACING_INLINE,
-    paddingBottom: 10,
+    borderTopWidth: 1,
+    borderTopColor: BORDER_4,
+    paddingTop: SPACING_TIGHT,
+  },
+  footerMeta: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: MUTED_11,
+    fontFamily: FONT_BODY_BOLD,
+  },
+  // Compact = the same trading-card language at masonry scale: amber-framed art
+  // window on top, name block, then the value slot. Geometry stays deterministic
+  // for the viewer FlatList's getItemLayout (see COMPACT_ITEM_CARD_HEIGHT).
+  compactCard: {
+    borderRadius: RADIUS_INPUT,
+    borderWidth: 2,
+    overflow: "hidden",
+    gap: SPACING_TIGHT,
+    padding: SPACING_TIGHT,
+  },
+  compactArtFrame: {
+    borderRadius: RADIUS_INPUT,
+    borderWidth: 1,
+    borderColor: AMBER_ACCENT,
+    overflow: "hidden",
   },
   compactImage: {
     width: "100%",
-    height: 110,
-    borderRadius: 16,
+    height: 104,
     backgroundColor: AMBER_MUTED_3,
   },
   compactTitle: {
     fontSize: 14,
     fontWeight: "700",
-    paddingHorizontal: 10,
+    paddingHorizontal: 2,
     fontFamily: FONT_DISPLAY_EDITORIAL,
     // Deterministic geometry for getItemLayout: the title always occupies
     // exactly two lines' worth of height (numberOfLines={2} caps the top,
@@ -213,7 +407,7 @@ const styles = StyleSheet.create({
   compactCost: {
     fontSize: 12,
     fontWeight: "600",
-    paddingHorizontal: 10,
+    paddingHorizontal: 2,
     fontFamily: FONT_BODY_SEMIBOLD,
     lineHeight: 16,
   },
@@ -228,14 +422,15 @@ const styles = StyleSheet.create({
  * Fixed rendered height of the compact card, used by the viewer FlatList's
  * `getItemLayout` in `app/collection/[id].tsx`. Derivation (top to bottom,
  * all values from the styles above — update BOTH when the layout changes):
- *   1  borderWidth (top)
- * 110  compactImage height
- *   8  gap (SPACING_INLINE)
+ *   2  borderWidth (top)
+ *   6  padding (top, SPACING_TIGHT)
+ * 106  compactArtFrame (1 border + 104 image + 1 border)
+ *   6  gap (SPACING_TIGHT)
  *  36  compactTitle reserved 2-line block (minHeight)
- *   8  gap (SPACING_INLINE)
+ *   6  gap (SPACING_TIGHT)
  *  16  compactCostSlot height
- *  10  paddingBottom
- *   1  borderWidth (bottom)
- * = 190
+ *   6  padding (bottom, SPACING_TIGHT)
+ *   2  borderWidth (bottom)
+ * = 186
  */
-export const COMPACT_ITEM_CARD_HEIGHT = 190;
+export const COMPACT_ITEM_CARD_HEIGHT = 186;
