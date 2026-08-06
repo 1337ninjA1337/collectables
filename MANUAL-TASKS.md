@@ -1374,3 +1374,38 @@ extra origin (e.g. `http://localhost:8081` for local dev):
 ```bash
 supabase secrets set ALLOWED_ORIGINS="http://localhost:8081"
 ```
+
+## Edge Functions returning 500 (observed 2026-08-06)
+
+The deployed web app logs two `500 (Internal Server Error)` responses from
+Supabase Edge Functions:
+
+- `POST /functions/v1/sign-upload` — signed Cloudinary uploads (SEC-5b)
+- `POST /functions/v1/validate-premium` — server-authoritative premium (BE-22b)
+
+Both functions' source lives in `supabase/functions/`, but nothing deploys
+them — only the DB migrations ship from CI (`.github/workflows/supabase-migrations.yml`).
+The 500s are a deployment/secret gap on the Supabase side, not a code defect
+in this repo. To fix, from a machine with the Supabase CLI logged in:
+
+```bash
+supabase functions deploy sign-upload
+supabase functions deploy validate-premium
+```
+
+Then set the function secrets they read (Supabase dashboard → Edge Functions →
+Secrets), using *paste your creds*:
+
+```
+CLOUDINARY_API_KEY=*paste your creds*
+CLOUDINARY_API_SECRET=*paste your creds*
+CLOUDINARY_CLOUD_NAME=*paste your creds*
+```
+
+Verify with `supabase functions logs sign-upload` — a 500 with no log line
+means the function was never deployed; a 500 with a log line names the missing
+secret.
+
+Note: the CSP half of the upload failure IS fixed in-repo — `connect-src` now
+allow-lists `blob:` and `data:` so `fetch(uri).blob()` can read a
+web-picked image before upload (`lib/web-security-headers.ts`).
