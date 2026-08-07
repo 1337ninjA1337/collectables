@@ -1,8 +1,9 @@
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { CostBadge } from "@/components/cost-badge";
+import { ShareSheet } from "@/components/share-sheet";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
 import {
@@ -121,7 +122,6 @@ export default function ItemDetailsScreen() {
   const [loadingRemote, setLoadingRemote] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -135,6 +135,8 @@ export default function ItemDetailsScreen() {
       }
     } finally { setRefreshing(false); }
   }, [refresh, params.id]);
+  // Stable so the memoized <ShareSheet> doesn't re-render on every page tick.
+  const closeShareSheet = useCallback(() => setShareOpen(false), []);
 
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -724,50 +726,13 @@ export default function ItemDetailsScreen() {
         </Pressable>
       </Modal>
 
-      <Modal visible={shareOpen} transparent animationType="slide" onRequestClose={() => setShareOpen(false)}>
-        <Pressable style={styles.shareBackdrop} onPress={() => setShareOpen(false)}>
-          <Pressable style={styles.shareSheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.shareHandle} />
-            <Text style={styles.shareTitle}>{t("shareTitle")}</Text>
-            <Text style={styles.shareHint}>{t("shareItemHint")}</Text>
-            <View style={styles.shareLinkBox}>
-              <Text style={styles.shareLinkText} numberOfLines={1}>{buildDeepLink(`item/${activeItem.id}`)}</Text>
-            </View>
-            <View style={styles.shareActions}>
-              <Pressable
-                style={{...styles.shareCopyButton, ...(linkCopied ? styles.shareCopyButtonDone : {})}}
-                onPress={() => {
-                  const link = buildDeepLink(`item/${activeItem.id}`);
-                  if (Platform.OS === "web" && navigator.clipboard) {
-                    navigator.clipboard.writeText(link).then(() => {
-                      setLinkCopied(true);
-                      setTimeout(() => setLinkCopied(false), 2000);
-                    });
-                  }
-                }}
-              >
-                <Text style={{...styles.shareCopyButtonText, ...(linkCopied ? styles.shareCopyButtonTextDone : {})}}>
-                  {linkCopied ? t("linkCopied") : t("copyLink")}
-                </Text>
-              </Pressable>
-              {Platform.OS !== "web" ? (
-                <Pressable
-                  style={styles.shareNativeButton}
-                  onPress={() => {
-                    const link = buildDeepLink(`item/${activeItem.id}`);
-                    Share.share({ message: `${activeItem.title}\n${link}`, url: link });
-                  }}
-                >
-                  <Text style={styles.shareNativeButtonText}>{t("shareVia")}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-            <Pressable style={styles.shareCancelButton} onPress={() => setShareOpen(false)}>
-              <Text style={styles.shareCancelText}>{t("cancel")}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ShareSheet
+        visible={shareOpen}
+        url={buildDeepLink(`item/${activeItem.id}`)}
+        hint={t("shareItemHint")}
+        message={activeItem.title}
+        onClose={closeShareSheet}
+      />
     </Screen>
   );
 }
@@ -922,19 +887,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: FONT_BODY,
   },
-  shareLinkBox: {
-    borderRadius: 16,
-    backgroundColor: PURE_WHITE,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  shareLinkText: {
-    color: MUTED,
-    fontSize: 14,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-  },
   shareActions: {
     flexDirection: "row",
     gap: SPACING_LIST,
@@ -946,27 +898,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
   },
-  shareCopyButtonDone: {
-    backgroundColor: SUCCESS_GREEN_2,
-  },
   shareCopyButtonText: {
     color: TEXT_ON_DARK_2,
-    fontWeight: "800",
-    fontSize: 15,
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  shareCopyButtonTextDone: {
-    color: PURE_WHITE,
-  },
-  shareNativeButton: {
-    flex: 1,
-    borderRadius: RADIUS_PILL,
-    backgroundColor: AMBER_ACCENT,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  shareNativeButtonText: {
-    color: TEXT_DARK_2,
     fontWeight: "800",
     fontSize: 15,
     fontFamily: FONT_BODY_EXTRABOLD,
