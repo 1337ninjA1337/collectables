@@ -47,10 +47,18 @@ function item(id: string, title: string): CollectableItem {
 }
 
 describe("SORT_OPTIONS table", () => {
-  it("lists the three modes in display order, default first", () => {
+  it("lists every mode in display order, default first, grouped by axis", () => {
     assert.deepEqual(
       SORT_OPTIONS.map((o) => o.mode),
-      ["default", "name-asc", "name-desc"],
+      [
+        "default",
+        "name-asc",
+        "name-desc",
+        "cost-asc",
+        "cost-desc",
+        "acquired-desc",
+        "acquired-asc",
+      ],
     );
   });
 
@@ -58,7 +66,15 @@ describe("SORT_OPTIONS table", () => {
     // A mode added to the union without a row here would be unreachable from
     // the UI. The exhaustive switch makes the compiler complain first; this
     // asserts the runtime table caught up too.
-    const allModes: ItemSortMode[] = ["default", "name-asc", "name-desc"];
+    const allModes: ItemSortMode[] = [
+      "default",
+      "name-asc",
+      "name-desc",
+      "cost-asc",
+      "cost-desc",
+      "acquired-asc",
+      "acquired-desc",
+    ];
     for (const mode of allModes) {
       assert.ok(
         SORT_OPTIONS.some((o) => o.mode === mode),
@@ -94,13 +110,22 @@ describe("SORT_OPTIONS table", () => {
   });
 
   it("every listed mode is one applySortMode actually handles", () => {
-    const items = [item("b", "Beta"), item("a", "Alpha")];
+    // `b` is the pricier, more recently acquired item; `a` the cheaper, older
+    // one — so every axis produces a different, checkable permutation.
+    const items = [
+      { ...item("b", "Beta"), cost: 90, acquiredAt: "2025-01-01" } as CollectableItem,
+      { ...item("a", "Alpha"), cost: 10, acquiredAt: "2024-01-01" } as CollectableItem,
+    ];
     const byMode = new Map(
       SORT_OPTIONS.map((o) => [o.mode, applySortMode(items, o.mode).map((i) => i.id).join(",")]),
     );
     assert.equal(byMode.get("default"), "b,a", "default must preserve the incoming order");
     assert.equal(byMode.get("name-asc"), "a,b");
     assert.equal(byMode.get("name-desc"), "b,a");
+    assert.equal(byMode.get("cost-asc"), "a,b");
+    assert.equal(byMode.get("cost-desc"), "b,a");
+    assert.equal(byMode.get("acquired-asc"), "a,b");
+    assert.equal(byMode.get("acquired-desc"), "b,a");
   });
 });
 

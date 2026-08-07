@@ -121,7 +121,15 @@ describe("applySortMode — alphabetical sort comparator", () => {
   });
 
   it("empty input returns an empty array for every mode", () => {
-    for (const mode of ["default", "name-asc", "name-desc"] as ItemSortMode[]) {
+    for (const mode of [
+      "default",
+      "name-asc",
+      "name-desc",
+      "cost-asc",
+      "cost-desc",
+      "acquired-asc",
+      "acquired-desc",
+    ] as ItemSortMode[]) {
       assert.deepEqual(applySortMode([], mode), []);
     }
   });
@@ -142,6 +150,10 @@ describe("EMPTY_FILTERS / countActiveFilters — sort field integration", () => 
   it("countActiveFilters increments by 1 for each non-default sort mode", () => {
     assert.equal(countActiveFilters(withSort("name-asc")), 1);
     assert.equal(countActiveFilters(withSort("name-desc")), 1);
+    assert.equal(countActiveFilters(withSort("cost-asc")), 1);
+    assert.equal(countActiveFilters(withSort("cost-desc")), 1);
+    assert.equal(countActiveFilters(withSort("acquired-asc")), 1);
+    assert.equal(countActiveFilters(withSort("acquired-desc")), 1);
   });
 
   it("countActiveFilters composes sort with other active filters (additive)", () => {

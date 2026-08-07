@@ -193,7 +193,8 @@ export default function CollectionDetailsScreen() {
   // alphabetical order that disagrees with every label around it.
   const sortLocale = useMemo(() => getDefaultLocaleForLanguage(language), [language]);
   // applySortMode runs AFTER the price/date/source/query filter pass so the
-  // alphabetical sort applies to the already-narrowed result set. Memoized
+  // sort (title, cost or acquisition date) applies to the already-narrowed
+  // result set. Memoized
   // on [filteredItems, itemFilters.sort, sortLocale] so a sort-mode change
   // reuses the existing filtered slice without re-running the filter
   // predicate, and a language switch re-sorts under the new collation rules.
@@ -659,8 +660,8 @@ export default function CollectionDetailsScreen() {
   // for exactly that reason — see HM-B/HM-C in .tasks/.tasks.md).
   // Reorder mode is silently inert while a sort is active (see the
   // `isDragBranch` derivation below: onDragEnd re-writes `sortOrder` from the
-  // VISIBLE order, so dragging an alphabetical list would corrupt the manual
-  // one). Without this notice the owner taps "Reorder", the button lights up,
+  // VISIBLE order, so dragging a sorted list — by title, cost or acquisition
+  // date — would corrupt the manual one). Without this notice the owner taps "Reorder", the button lights up,
   // and nothing becomes draggable — indistinguishable from a broken button.
   // Gated on reorderMode so a sorted owner who never asked to reorder isn't
   // nagged. Derives ownership locally: this memo lives above the early returns
@@ -953,8 +954,8 @@ export default function CollectionDetailsScreen() {
 
   // Drag-to-reorder is reachable only when the owner opts into reorder mode AND
   // the list is unsorted: onDragEnd re-writes `sortOrder` from the VISIBLE order,
-  // so dragging while alphabetically sorted would silently corrupt the manual
-  // order. Either gate failing hands the owner back to the read-only card grid.
+  // so dragging under ANY non-default sort (title, cost or acquisition date)
+  // would silently corrupt the manual order. Either gate failing hands the owner back to the read-only card grid.
   const isDragBranch = isOwner && !selectionMode && reorderMode && itemFilters.sort === "default";
 
   // VM-D: When the viewer/read-only branch (the multi-column FlatList case)
@@ -1149,7 +1150,7 @@ export default function CollectionDetailsScreen() {
         ) : isDragBranch ? (
           // See the `isDragBranch` derivation above: reorder mode must be on
           // AND the sort must be default, otherwise onDragEnd would re-write
-          // `sortOrder` from the visible (alphabetical) order and silently
+          // `sortOrder` from the visible (sorted) order and silently
           // corrupt the manual drag order. When either gate falls through the
           // early-return above hands owners back to the card-grid branch.
           <NestableDraggableFlatList

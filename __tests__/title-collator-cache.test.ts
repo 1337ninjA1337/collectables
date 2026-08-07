@@ -153,13 +153,30 @@ describe("lib/item-filters.ts — the per-call construction is gone for good", (
   });
 
   it("hoists the collator OUT of the comparator, not inside it", () => {
-    // `const collator = getTitleCollator()` must sit above `.sort(`; calling it
-    // inside the arrow would keep one Map lookup per pair-compare.
-    assert.match(
-      src,
-      /const\s+collator\s*=\s*getTitleCollator\(locale\);\s*\n\s*const\s+sorted\s*=\s*\[\.\.\.items\]\.sort\(/,
+    // `const collator = getTitleCollator(locale)` must be resolved ONCE, above
+    // every `.sort(` in the function; calling it inside a comparator arrow
+    // would restore one Map lookup per pair-compare.
+    //
+    // Asserted against the function body rather than a fixed line pair: the
+    // cost/acquired axes gave `applySortMode` three `.sort(` call sites, so
+    // pinning the old adjacent `const collator … const sorted = [...]` text
+    // would fail on a shape that still honours the invariant.
+    const start = src.indexOf("export function applySortMode");
+    assert.ok(start > 0, "applySortMode not found");
+    const body = src.slice(start);
+    const end = body.indexOf("\nexport function ", 1);
+    const fn = end > 0 ? body.slice(0, end) : body;
+
+    const lookups = fn.match(/getTitleCollator\(/g) ?? [];
+    assert.equal(lookups.length, 1, `expected 1 getTitleCollator call, got ${lookups.length}`);
+    assert.match(fn, /const\s+collator\s*=\s*getTitleCollator\(locale\);/);
+    assert.ok(
+      fn.indexOf("getTitleCollator(locale)") < fn.indexOf(".sort("),
+      "getTitleCollator must resolve before the first .sort( call",
     );
-    assert.match(src, /\.sort\(\(a,\s*b\)\s*=>\s*collator\.compare\(a\.title,\s*b\.title\)\)/);
+    // Every comparison goes through the hoisted instance, never a fresh
+    // `localeCompare(…, locale, …)` overload.
+    assert.match(fn, /collator\.compare\(a\.title,\s*b\.title\)/);
   });
 
   it("caches through a module-scoped Map, not a single bare instance", () => {
