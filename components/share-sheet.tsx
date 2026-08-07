@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { memo, type ReactNode } from "react";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   AMBER_ACCENT,
@@ -20,6 +20,7 @@ import {
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
+import { useShareLink } from "@/lib/use-share-link";
 
 type Props = {
   visible: boolean;
@@ -43,15 +44,15 @@ type Props = {
  * The deep-link share sheet shared by every screen that can be shared:
  * handle bar + title/hint + link box + copy/native actions + Cancel. Owns its
  * own styles, its own i18n keys and the `copied` feedback state so a consumer
- * never re-implements the 2s reset timer (which is cleaned up on unmount here
- * — the three inline copies it replaced all leaked their pending timeout).
+ * never re-implements the 2s reset timer (which `useShareLink` cleans up on
+ * unmount — the inline copies it replaced all leaked their pending timeout).
  *
  * Consumers layer their own sections in via `children`
  * (see `<CollectionShareSheet>`'s friends / people-with-access lists).
  *
- * Copy vs. share is platform-exclusive by design: `navigator.clipboard` only
- * exists on web, and the pre-extraction sheets rendered a copy button on
- * native that silently did nothing when pressed.
+ * Copy vs. share is platform-exclusive by design (`useShareLink`'s `canCopy`):
+ * `navigator.clipboard` only exists on web, and the pre-extraction sheets
+ * rendered a copy button on native that silently did nothing when pressed.
  */
 export const ShareSheet = memo(function ShareSheet({
   visible,
@@ -63,29 +64,7 @@ export const ShareSheet = memo(function ShareSheet({
   children,
 }: Props) {
   const { t } = useI18n();
-  const [copied, setCopied] = useState(false);
-  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (resetTimer.current) clearTimeout(resetTimer.current);
-    },
-    [],
-  );
-
-  const handleCopy = useCallback(() => {
-    if (Platform.OS !== "web" || !navigator.clipboard) return;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      onCopy?.(url);
-      if (resetTimer.current) clearTimeout(resetTimer.current);
-      resetTimer.current = setTimeout(() => setCopied(false), 2000);
-    });
-  }, [onCopy, url]);
-
-  const handleNativeShare = useCallback(() => {
-    Share.share({ message: message ? `${message}\n${url}` : url, url });
-  }, [message, url]);
+  const { copied, canCopy, copyLink, shareNative } = useShareLink(url, { message, onCopy });
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -99,18 +78,18 @@ export const ShareSheet = memo(function ShareSheet({
               <Text style={styles.shareLinkText} numberOfLines={1}>{url}</Text>
             </View>
             <View style={styles.shareActions}>
-              {Platform.OS === "web" ? (
+              {canCopy ? (
                 <Pressable
                   accessibilityRole="button"
                   style={{ ...styles.shareCopyButton, ...(copied ? styles.shareCopyButtonDone : {}) }}
-                  onPress={handleCopy}
+                  onPress={copyLink}
                 >
                   <Text style={{ ...styles.shareCopyButtonText, ...(copied ? styles.shareCopyButtonTextDone : {}) }}>
                     {copied ? t("linkCopied") : t("copyLink")}
                   </Text>
                 </Pressable>
               ) : (
-                <Pressable accessibilityRole="button" style={styles.shareNativeButton} onPress={handleNativeShare}>
+                <Pressable accessibilityRole="button" style={styles.shareNativeButton} onPress={shareNative}>
                   <Text style={styles.shareNativeButtonText}>{t("shareVia")}</Text>
                 </Pressable>
               )}

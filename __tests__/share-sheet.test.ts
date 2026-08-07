@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { stripComments } from "@/lib/env-inlining";
+
 /**
  * Structural pins for the shared deep-link share sheet
  * (`components/share-sheet.tsx`), extracted from `app/item/[id].tsx` so the
@@ -77,29 +79,30 @@ describe("ShareSheet — shared deep-link sheet", () => {
     assert.doesNotMatch(src, /t\("share(Item|Collection|Profile)Hint"\)/);
   });
 
-  it("owns the copied state and clears the 2s reset timer on unmount", () => {
+  it("delegates the copy/share state machine to useShareLink instead of re-declaring it", () => {
     const src = shareSheetSrc();
-    assert.match(src, /const\s+\[copied,\s*setCopied\]\s*=\s*useState\(false\)/);
-    assert.match(src, /setTimeout\(\(\)\s*=>\s*setCopied\(false\),\s*2000\)/);
-    assert.match(src, /useRef<ReturnType<typeof setTimeout>\s*\|\s*null>\(null\)/);
-    assert.match(src, /useEffect\([\s\S]*?clearTimeout\(resetTimer\.current\)[\s\S]*?\[\],?\s*\)/);
+    assert.match(src, /import\s*\{\s*useShareLink\s*\}\s*from\s*"@\/lib\/use-share-link"/);
+    assert.match(
+      src,
+      /const \{ copied, canCopy, copyLink, shareNative \} = useShareLink\(url, \{ message, onCopy \}\);/,
+    );
+    // Comments are stripped so the doc block above can explain WHY the copy
+    // path is web-only without tripping the "no clipboard code here" pin.
+    const code = stripComments(src);
+    for (const leftover of [/useState/, /useRef/, /setTimeout/, /navigator\.clipboard/, /Share\.share\(/]) {
+      assert.doesNotMatch(code, leftover, `${leftover} belongs to lib/use-share-link.ts`);
+    }
   });
 
-  it("fires onCopy only after a successful clipboard write", () => {
-    const src = shareSheetSrc();
-    const handler = src.match(/const handleCopy = useCallback\([\s\S]*?\}, \[onCopy, url\]\);/);
-    assert.ok(handler, "handleCopy useCallback not found");
-    assert.match(handler[0], /navigator\.clipboard\.writeText\(url\)\.then\(\(\) => \{[\s\S]*?onCopy\?\.\(url\)/);
-  });
-
-  it("copy and native-share are platform-exclusive (no dead copy button on native)", () => {
+  it("copy and native-share are mutually exclusive (no dead copy button on native)", () => {
     const src = shareSheetSrc();
     assert.match(
       src,
-      /Platform\.OS === "web" \? \([\s\S]*?styles\.shareCopyButton[\s\S]*?\) : \([\s\S]*?styles\.shareNativeButton/,
+      /\{canCopy \? \([\s\S]*?styles\.shareCopyButton[\s\S]*?\) : \([\s\S]*?styles\.shareNativeButton/,
       "web renders copy, native renders share-via — never both",
     );
-    assert.match(src, /Share\.share\(\{ message: message \? `\$\{message\}\\n\$\{url\}` : url, url \}\)/);
+    assert.match(src, /onPress=\{copyLink\}/);
+    assert.match(src, /onPress=\{shareNative\}/);
   });
 
   it("puts the section gap on the ScrollView contentContainerStyle, not the wrapper", () => {
