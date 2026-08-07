@@ -29,6 +29,45 @@ export const SORT_OPTIONS = [
   { mode: "name-desc", labelKey: "sortNameDesc" },
 ] as const satisfies ReadonlyArray<{ mode: ItemSortMode; labelKey: string }>;
 
+/**
+ * Ionicons glyph paired with each non-default sort mode for the removable
+ * quick-chip in `<ItemFilterBar>`. Typed as an exhaustive record over
+ * `Exclude<ItemSortMode, "default">` on purpose: adding a fourth mode to the
+ * union is then a type error HERE, forcing the icon decision at the same time
+ * as the `SORT_OPTIONS` row rather than shipping a chip with a blank glyph.
+ * `"default"` has no entry because it has no chip — it IS the empty state.
+ */
+export const SORT_CHIP_ICONS = {
+  "name-asc": "arrow-up",
+  "name-desc": "arrow-down",
+} as const satisfies Record<Exclude<ItemSortMode, "default">, string>;
+
+export type ActiveSortChip = {
+  mode: Exclude<ItemSortMode, "default">;
+  /** i18n key, not a label — see the `SORT_OPTIONS` note on why. */
+  labelKey: (typeof SORT_OPTIONS)[number]["labelKey"];
+  icon: (typeof SORT_CHIP_ICONS)[keyof typeof SORT_CHIP_ICONS];
+};
+
+/**
+ * Descriptor for the removable "active sort" quick-chip, or `null` when there
+ * is nothing to show.
+ *
+ * The hide-on-default rule lives here rather than in the JSX so it is testable
+ * without React, and so every surface that renders the chip agrees on when it
+ * disappears: tapping it writes `sort: "default"`, which makes this return
+ * `null`, which un-renders the chip. That round trip is the whole contract.
+ */
+export function activeSortChip(sort: ItemSortMode): ActiveSortChip | null {
+  if (sort === "default") return null;
+  const option = SORT_OPTIONS.find((o) => o.mode === sort);
+  // Unreachable while `sort-options-parity.test.ts` holds (every union member
+  // has a row), but staying total keeps a future mode from crashing the bar
+  // before the parity test is run.
+  if (!option) return null;
+  return { mode: sort, labelKey: option.labelKey, icon: SORT_CHIP_ICONS[sort] };
+}
+
 export type ItemFilters = {
   priceFrom: string;
   priceTo: string;
