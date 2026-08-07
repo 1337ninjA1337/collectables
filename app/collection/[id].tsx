@@ -57,8 +57,10 @@ import {
   MUTED_5,
   PURE_WHITE,
   RADIUS_CARD,
+  RADIUS_CARD_SM,
   RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
+  RADIUS_PILL,
   SHADOW_SOFT,
   SPACING_AIRY,
   SPACING_CARD,
@@ -647,6 +649,26 @@ export default function CollectionDetailsScreen() {
   // hook-order reason; neither fragment may touch the post-narrow
   // `activeCollection` up here (pageHeader/modalsBlock stay un-memoized below
   // for exactly that reason — see HM-B/HM-C in .tasks/.tasks.md).
+  // Reorder mode is silently inert while a sort is active (see the
+  // `isDragBranch` derivation below: onDragEnd re-writes `sortOrder` from the
+  // VISIBLE order, so dragging an alphabetical list would corrupt the manual
+  // one). Without this notice the owner taps "Reorder", the button lights up,
+  // and nothing becomes draggable — indistinguishable from a broken button.
+  // Gated on reorderMode so a sorted owner who never asked to reorder isn't
+  // nagged. Derives ownership locally: this memo lives above the early returns
+  // that narrow `collection`, so `isOwner` isn't in scope yet.
+  const reorderBlockedBySort =
+    !!collection &&
+    user?.id === collection.ownerUserId &&
+    !selectionMode &&
+    reorderMode &&
+    itemFilters.sort !== "default";
+
+  const resetSort = useCallback(
+    () => setItemFilters((current) => ({ ...current, sort: "default" })),
+    [],
+  );
+
   const listTitleAndFilters = useMemo(
     () => (
       <>
@@ -654,9 +676,22 @@ export default function CollectionDetailsScreen() {
         {allItems.length > 0 ? (
           <ItemFilterBar filters={itemFilters} onChange={setItemFilters} />
         ) : null}
+        {reorderBlockedBySort ? (
+          <View style={styles.reorderNotice} accessibilityRole="alert">
+            <Text style={styles.reorderNoticeText}>{t("reorderBlockedBySort")}</Text>
+            <Pressable
+              style={styles.reorderNoticeAction}
+              onPress={resetSort}
+              accessibilityRole="button"
+              accessibilityLabel={t("reorderResetSort")}
+            >
+              <Text style={styles.reorderNoticeActionText}>{t("reorderResetSort")}</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </>
     ),
-    [allItems.length, itemFilters, t],
+    [allItems.length, itemFilters, reorderBlockedBySort, resetSort, t],
   );
 
   // Manual Load-more CTA — only for the nestable drag-mode fallback, where
@@ -1355,6 +1390,40 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
+  },
+  reorderNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: SPACING_INLINE,
+    flexWrap: "wrap",
+    borderRadius: RADIUS_CARD_SM,
+    borderWidth: 1,
+    borderColor: AMBER_SOFT,
+    backgroundColor: CARD_BG_3,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  reorderNoticeText: {
+    flex: 1,
+    minWidth: 180,
+    color: MUTED_3,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: FONT_BODY,
+  },
+  reorderNoticeAction: {
+    borderRadius: RADIUS_PILL,
+    borderWidth: 1,
+    borderColor: ACCENT_DEEP,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  reorderNoticeActionText: {
+    color: ACCENT_DEEP,
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
   },
   selectList: {
     gap: SPACING_CARD,

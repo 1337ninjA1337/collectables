@@ -43,12 +43,13 @@ describe("app/collection/[id].tsx — HM-A header-fragment memoization", () => {
       "listTitleAndFilters must be declared via useMemo",
     );
     // Dep array carries exactly what the fragment reads: the items count
-    // (empty-state gate), the filter state, and the translator. The
+    // (empty-state gate), the filter state, the reorder-blocked-by-sort flag
+    // and its reset handler (the sorted-owner notice), and the translator. The
     // `setItemFilters` setter is React-stable and deliberately absent.
     assert.match(
       src,
-      /listTitleAndFilters\s*=\s*useMemo\([\s\S]*?\[allItems\.length,\s*itemFilters,\s*t\],?\s*\n\s*\)/,
-      "listTitleAndFilters deps must be [allItems.length, itemFilters, t]",
+      /listTitleAndFilters\s*=\s*useMemo\([\s\S]*?\[allItems\.length,\s*itemFilters,\s*reorderBlockedBySort,\s*resetSort,\s*t\],?\s*\n\s*\)/,
+      "listTitleAndFilters deps must be [allItems.length, itemFilters, reorderBlockedBySort, resetSort, t]",
     );
   });
 
@@ -82,7 +83,7 @@ describe("app/collection/[id].tsx — HM-A header-fragment memoization", () => {
     // the narrowed binding doesn't exist yet — referencing it would be a TDZ
     // crash at runtime. Pin the invariant so a future edit that folds
     // collection chrome into these memos fails loudly.
-    const titleBlock = src.match(/const\s+listTitleAndFilters\s*=\s*useMemo\([\s\S]*?\[allItems\.length,\s*itemFilters,\s*t\],?\s*\n\s*\);/)?.[0] ?? "";
+    const titleBlock = src.match(/const\s+listTitleAndFilters\s*=\s*useMemo\([\s\S]*?\[allItems\.length,\s*itemFilters,\s*reorderBlockedBySort,\s*resetSort,\s*t\],?\s*\n\s*\);/)?.[0] ?? "";
     const ctaBlock = src.match(/const\s+loadMoreCta\s*=\s*useMemo\([\s\S]*?\[hasMore,\s*loadMore,\s*items\.length,\s*visibleItems\.length,\s*t\],?\s*\n\s*\);/)?.[0] ?? "";
     assert.ok(titleBlock.length > 0 && ctaBlock.length > 0, "expected to extract both memo blocks");
     assert.doesNotMatch(titleBlock, /activeCollection/);
