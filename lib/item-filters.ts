@@ -169,6 +169,37 @@ export function countActiveFilters(f: ItemFilters): number {
 }
 
 /**
+ * Whether any field `applyItemFilters` actually MATCHES ON is set — i.e. every
+ * field `countActiveFilters` counts EXCEPT `sort`.
+ *
+ * The exclusion is the whole point, not an oversight. `sort` is applied by
+ * `applySortMode`, which runs after and separately; a collection that is only
+ * sorted has `countActiveFilters() === 1` while the filter pass is a pure
+ * no-op. Gating the identity path on the count would therefore miss exactly
+ * the most common non-empty state — sort picked, nothing filtered — which is
+ * also the state where the wasted allocation hurts most, because a re-sort
+ * re-runs the whole chain.
+ *
+ * `filters-identity-path.test.ts` pins the two functions against each other
+ * field by field so this stays a deliberate one-clause difference rather than
+ * drift.
+ */
+export function hasActiveMatchers(f: ItemFilters): boolean {
+  return Boolean(
+    f.priceFrom ||
+      f.priceTo ||
+      f.dateFrom ||
+      f.dateTo ||
+      f.source ||
+      f.hasPhotos ||
+      // Trimmed for the same reason as the badge count: `applyItemFilters`
+      // treats a whitespace-only query as no search, so it must not keep the
+      // identity path from firing.
+      f.query.trim(),
+  );
+}
+
+/**
  * Memoise the `Intl.Collator` per BCP-47 tag, mirroring the
  * `relativeTimeFormatCache` shape in `lib/i18n-context.tsx`.
  *
@@ -305,6 +336,19 @@ export function applySortMode(
 }
 
 export function applyItemFilters(items: CollectableItem[], filters: ItemFilters): CollectableItem[] {
+  // Identity path on the no-op input, mirroring `applySortMode(items,
+  // "default")`. `.filter()` ALWAYS allocates a fresh array, even when the
+  // predicate accepts every element, so an unfiltered collection produced a
+  // brand-new reference every time the `[allItems, itemFilters]` memo re-ran.
+  //
+  // That is not just GC pressure. The collection screen chains
+  // `applyItemFilters → applySortMode → useChunkedList`, and `useChunkedList`
+  // resets its window to page one whenever the `items` REFERENCE changes. So
+  // a user who had scrolled 200 items into an unfiltered collection and then
+  // toggled a quick-chip on and back off — two new `itemFilters` objects, one
+  // empty filter state — was thrown back to the top of the list. Returning
+  // `items` itself keeps the downstream memo from invalidating at all.
+  if (!hasActiveMatchers(filters)) return items;
   // Pre-compute the title-search needle ONCE — otherwise a 500-item collection
   // would pay 1000 `.toLowerCase()` calls (needle + each item title) on every
   // filter pass. Trim outside the loop too; whitespace-only is "no search".
