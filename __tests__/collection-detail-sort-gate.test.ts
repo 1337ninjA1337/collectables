@@ -77,14 +77,17 @@ describe("components/item-filters.tsx — sort chip UI", () => {
     assert.match(src, /\{\s*t\(\s*"sortLabel"\s*\)\s*\}/);
   });
 
-  it("renders 3 sort chips (default / name-asc / name-desc) each with accessibilityRole=\"button\"", () => {
-    // The 3-mode array drives the chip rendering — pinning each mode
-    // by literal string ensures a future refactor can't silently drop
-    // a chip and leave the UI without (say) the Z→A option.
-    assert.match(src, /mode:\s*"default"\s+as\s+ItemSortMode/);
-    assert.match(src, /mode:\s*"name-asc"\s+as\s+ItemSortMode/);
-    assert.match(src, /mode:\s*"name-desc"\s+as\s+ItemSortMode/);
+  it("renders the sort chips from SORT_OPTIONS with role + selected state", () => {
+    // The mode table moved to `lib/item-filters.ts` as SORT_OPTIONS on
+    // 2026-08-07 (see sort-options-parity.test.ts, which pins the three
+    // literals and their union coverage against the real export). What this
+    // screen-level pin still owns: the chips are rendered FROM that table, so
+    // a future refactor can't silently drop the picker or hand-roll a
+    // divergent copy, and each chip carries its a11y role + selected state.
+    assert.match(src, /\{SORT_OPTIONS\.map\(\(opt\) => \{/);
+    assert.match(src, /SORT_OPTIONS,[\s\S]*?\} from "@\/lib\/item-filters";/);
     assert.match(src, /accessibilityRole=\{?\s*"button"\s*\}?/);
+    assert.match(src, /accessibilityState=\{\{ selected: active \}\}/);
   });
 
   it("writes back to draft.sort via setDraft with spread (preserves other fields)", () => {

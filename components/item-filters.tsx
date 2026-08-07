@@ -36,6 +36,7 @@ import {
   applySortMode,
   countActiveFilters,
   EMPTY_FILTERS,
+  SORT_OPTIONS,
   type ItemFilters,
   type ItemSortMode,
 } from "@/lib/item-filters";
@@ -43,7 +44,7 @@ import {
 // Re-export the pure filter helpers + type so existing call sites that
 // import from `@/components/item-filters` (where this used to live before
 // the lib/ extraction) keep working unchanged.
-export { applyItemFilters, applySortMode, EMPTY_FILTERS };
+export { applyItemFilters, applySortMode, EMPTY_FILTERS, SORT_OPTIONS };
 export type { ItemFilters, ItemSortMode };
 
 type Props = {
@@ -230,23 +231,21 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>{t("sortLabel")}</Text>
               <View style={styles.sortRow}>
-                {(
-                  [
-                    { mode: "default" as ItemSortMode, label: t("sortDefault") },
-                    { mode: "name-asc" as ItemSortMode, label: t("sortNameAsc") },
-                    { mode: "name-desc" as ItemSortMode, label: t("sortNameDesc") },
-                  ]
-                ).map((opt) => {
+                {SORT_OPTIONS.map((opt) => {
                   const active = draft.sort === opt.mode;
                   return (
                     <Pressable
                       key={opt.mode}
                       accessibilityRole="button"
+                      // Without `selected`, VoiceOver announces all three
+                      // chips identically ("button") and the active sort is
+                      // conveyed by colour alone.
+                      accessibilityState={{ selected: active }}
                       style={[styles.sortChip, active && styles.sortChipActive]}
                       onPress={() => setDraft({ ...draft, sort: opt.mode })}
                     >
                       <Text style={[styles.sortChipText, active && styles.sortChipTextActive]}>
-                        {opt.label}
+                        {t(opt.labelKey)}
                       </Text>
                     </Pressable>
                   );

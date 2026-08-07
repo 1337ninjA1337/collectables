@@ -12,6 +12,23 @@ import type { CollectableItem } from "@/lib/types";
 
 export type ItemSortMode = "default" | "name-asc" | "name-desc";
 
+/**
+ * The sort picker's options, in display order. Carries the i18n KEY rather
+ * than a translated label so this module stays free of `useI18n` (it must be
+ * importable under `node --test`) and so every surface that renders the
+ * picker — the `<ItemFilterBar>` sheet today, a future "sort all collections"
+ * sheet — offers the same three modes in the same order.
+ *
+ * Kept in lockstep with `ItemSortMode` by `sort-options-parity.test.ts`:
+ * adding a mode to the union without adding a row here would ship a mode no
+ * UI can reach.
+ */
+export const SORT_OPTIONS = [
+  { mode: "default", labelKey: "sortDefault" },
+  { mode: "name-asc", labelKey: "sortNameAsc" },
+  { mode: "name-desc", labelKey: "sortNameDesc" },
+] as const satisfies ReadonlyArray<{ mode: ItemSortMode; labelKey: string }>;
+
 export type ItemFilters = {
   priceFrom: string;
   priceTo: string;
