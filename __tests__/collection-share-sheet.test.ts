@@ -27,14 +27,12 @@ describe("HM-C2 — CollectionShareSheet extraction", () => {
     assert.match(src, /import\s*\{[^}]*\bmemo\b[^}]*\}\s*from\s*"react"/);
   });
 
-  it("all sheet strings go through t()", () => {
+  it("all collection-specific sheet strings go through t()", () => {
     const src = readSheetSrc();
+    // The chrome keys (shareTitle / copyLink / linkCopied / shareVia / cancel)
+    // moved into <ShareSheet> — see __tests__/share-sheet.test.ts.
     for (const key of [
-      "shareTitle",
       "shareCollectionHint",
-      "linkCopied",
-      "copyLink",
-      "shareVia",
       "shareWithFriends",
       "shareWithFriendsHint",
       "shared",
@@ -43,19 +41,30 @@ describe("HM-C2 — CollectionShareSheet extraction", () => {
       "peopleWithAccess",
       "peopleWithAccessHint",
       "removeAccess",
-      "cancel",
     ]) {
       assert.match(src, new RegExp(`t\\("${key}"`), `missing t("${key}")`);
     }
     assert.match(src, /useI18n\(\)/);
   });
 
-  it("linkCopied state (and its 2s reset timer) lives inside the component, not the page", () => {
-    const sheet = readSheetSrc();
-    assert.match(sheet, /const\s+\[linkCopied,\s*setLinkCopied\]\s*=\s*useState\(false\)/);
-    assert.match(sheet, /setTimeout\(\(\)\s*=>\s*setLinkCopied\(false\),\s*2000\)/);
+  it("the copy-feedback state lives in <ShareSheet>, never in the page or the collection wrapper", () => {
     const page = readCollectionSrc();
     assert.doesNotMatch(page, /linkCopied/, "linkCopied must no longer be page state");
+    const sheet = readSheetSrc();
+    assert.doesNotMatch(sheet, /useState/, "copy-feedback state belongs to the shared <ShareSheet>");
+    assert.doesNotMatch(sheet, /setTimeout/, "the 2s reset timer belongs to the shared <ShareSheet>");
+  });
+
+  it("the collection sheet composes the shared <ShareSheet> instead of re-declaring the chrome", () => {
+    const sheet = readSheetSrc();
+    assert.match(sheet, /import\s*\{\s*ShareSheet\s*\}\s*from\s*"@\/components\/share-sheet"/);
+    assert.match(sheet, /<ShareSheet\b/);
+    // The chrome styles moved with it; only the friends/access rows stay here.
+    for (const style of ["shareBackdrop:", "shareSheet:", "shareHandle:", "shareTitle:", "shareLinkBox:", "shareCancelButton:"]) {
+      assert.doesNotMatch(sheet, new RegExp(style.replace(":", "\\s*:")), `${style} must live in components/share-sheet.tsx`);
+    }
+    assert.match(sheet, /shareFriendRow\s*:/);
+    assert.match(sheet, /shareFriendsEmpty\s*:/);
   });
 
   it("the page passes stable handlers + the memoized sharedWithUserIds array", () => {
@@ -108,8 +117,10 @@ describe("HM-C2 — CollectionShareSheet extraction", () => {
     assert.doesNotMatch(src, /\bShare\b\s*[,}]/, "react-native Share import must be gone from the page");
     assert.doesNotMatch(src, /buildDeepLink/, "buildDeepLink is now a sheet concern");
     const sheet = readSheetSrc();
-    assert.match(sheet, /\bShare\.share\(/);
+    // The link SHAPE stays a collection concern (it owns the route); the
+    // Share.share() invocation moved into the shared <ShareSheet>.
     assert.match(sheet, /buildDeepLink\(`collection\/\$\{collectionId\}`\)/);
+    assert.doesNotMatch(sheet, /\bShare\.share\(/);
   });
 
   it("the shareOpen profile-prefetch effect stays a page concern", () => {

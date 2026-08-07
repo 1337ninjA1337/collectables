@@ -1296,20 +1296,39 @@ describe("design-tokens adoption", () => {
 
   // HM-C2: the share-sheet styles (and MUTED, whose only page consumer was
   // shareLinkText) moved from app/collection/[id].tsx into the extracted
-  // component.
+  // component. The sheet CHROME then moved on again into the shared
+  // components/share-sheet.tsx, leaving only the friends/access rows here.
   it("components/collection-share-sheet.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("components/collection-share-sheet.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bBORDER_7\b/);
+    assert.match(src, /\bHERO_DARK\b/);
+    assert.match(src, /\bMUTED_2\b/);
+    assert.match(src, /\bMUTED_17\b/);
+    assert.match(src, /\bPURE_WHITE\b/);
+    assert.match(src, /\bSUCCESS_GREEN_2\b/);
+    assert.match(src, /\bTEXT_DARK\b/);
+    assert.match(src, /\bTEXT_ON_DARK_2\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  // The shared sheet chrome extracted from app/item/[id].tsx — it inherited
+  // the full backdrop/handle/link-box/actions/cancel token set.
+  it("components/share-sheet.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/share-sheet.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /\bAMBER_ACCENT\b/);
     assert.match(src, /\bAMBER_SOFT\b/);
     assert.match(src, /\bBORDER\b/);
-    assert.match(src, /\bBORDER_7\b/);
     assert.match(src, /\bCARD_BG\b/);
     assert.match(src, /\bHERO_DARK\b/);
     assert.match(src, /\bMUTED\b/);
     assert.match(src, /\bMUTED_2\b/);
-    assert.match(src, /\bMUTED_17\b/);
     assert.match(src, /\bPURE_WHITE\b/);
+    assert.match(src, /\bRADIUS_PILL\b/);
+    assert.match(src, /\bSPACING_CARD\b/);
+    assert.match(src, /\bSPACING_LIST\b/);
     assert.match(src, /\bSUCCESS_GREEN_2\b/);
     assert.match(src, /\bTEXT_DARK\b/);
     assert.match(src, /\bTEXT_DARK_2\b/);
