@@ -37,6 +37,7 @@ import {
   applySortMode,
   countActiveFilters,
   EMPTY_FILTERS,
+  getTitleCollator,
   SORT_CHIP_ICONS,
   SORT_OPTIONS,
   type ActiveSortChip,
@@ -44,14 +45,23 @@ import {
   type ItemSortMode,
 } from "@/lib/item-filters";
 
-// Re-export the pure filter helpers + type so existing call sites that
+// Re-export the pure filter helpers + types so existing call sites that
 // import from `@/components/item-filters` (where this used to live before
 // the lib/ extraction) keep working unchanged.
+//
+// The rule is ALL-OR-NOTHING: every public export of `lib/item-filters.ts`
+// is mirrored here, and `item-filters-sort-export-parity.test.ts` fails if a
+// new one is added there without being threaded through. A hand-picked subset
+// is what created the original drift — `countActiveFilters` and
+// `getTitleCollator` existed in the lib for weeks while consumers importing
+// from this path could not see them, with nothing to catch it.
 export {
   activeSortChip,
   applyItemFilters,
   applySortMode,
+  countActiveFilters,
   EMPTY_FILTERS,
+  getTitleCollator,
   SORT_CHIP_ICONS,
   SORT_OPTIONS,
 };
