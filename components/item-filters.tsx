@@ -32,20 +32,40 @@ import {
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import {
+  activeSortChip,
   applyItemFilters,
   applySortMode,
   countActiveFilters,
   EMPTY_FILTERS,
+  getTitleCollator,
+  SORT_CHIP_ICONS,
   SORT_OPTIONS,
+  type ActiveSortChip,
   type ItemFilters,
   type ItemSortMode,
 } from "@/lib/item-filters";
 
-// Re-export the pure filter helpers + type so existing call sites that
+// Re-export the pure filter helpers + types so existing call sites that
 // import from `@/components/item-filters` (where this used to live before
 // the lib/ extraction) keep working unchanged.
-export { applyItemFilters, applySortMode, EMPTY_FILTERS, SORT_OPTIONS };
-export type { ItemFilters, ItemSortMode };
+//
+// The rule is ALL-OR-NOTHING: every public export of `lib/item-filters.ts`
+// is mirrored here, and `item-filters-sort-export-parity.test.ts` fails if a
+// new one is added there without being threaded through. A hand-picked subset
+// is what created the original drift — `countActiveFilters` and
+// `getTitleCollator` existed in the lib for weeks while consumers importing
+// from this path could not see them, with nothing to catch it.
+export {
+  activeSortChip,
+  applyItemFilters,
+  applySortMode,
+  countActiveFilters,
+  EMPTY_FILTERS,
+  getTitleCollator,
+  SORT_CHIP_ICONS,
+  SORT_OPTIONS,
+};
+export type { ActiveSortChip, ItemFilters, ItemSortMode };
 
 type Props = {
   filters: ItemFilters;
@@ -87,6 +107,20 @@ export function ItemFilterBar({ filters, onChange }: Props) {
     return chips;
   }, [filters, onChange, t]);
 
+  // The active sort is otherwise invisible until the sheet is reopened — the
+  // `activeCount` badge increments but never names WHICH sort is on, so a user
+  // who left the collection alphabetical sees only "Filters (1)" and, if they
+  // are the owner, a reorder button that refuses to work. Surfacing it as a
+  // removable chip makes the state legible and clearable in one tap.
+  const sortChip = useMemo(() => activeSortChip(filters.sort), [filters.sort]);
+
+  // Clears ONLY the sort. `reset()` next to it wipes every field, which would
+  // silently drop an active search query or price range the user still wants —
+  // the chip's ✕ must undo the chip, nothing else.
+  function clearSort() {
+    onChange({ ...filters, sort: "default" });
+  }
+
   return (
     <>
       <ScrollView
@@ -119,6 +153,19 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             </Text>
           </Pressable>
         ))}
+
+        {sortChip ? (
+          <Pressable
+            style={styles.sortQuickChip}
+            onPress={clearSort}
+            accessibilityRole="button"
+            accessibilityLabel={t("sortChipClear", { sort: t(sortChip.labelKey) })}
+          >
+            <Ionicons name={sortChip.icon} size={14} color={TEXT_ON_DARK_5} />
+            <Text style={styles.sortQuickChipText}>{t(sortChip.labelKey)}</Text>
+            <Ionicons name="close-circle" size={14} color={TEXT_ON_DARK_5} />
+          </Pressable>
+        ) : null}
 
         {activeCount > 0 ? (
           <Pressable style={styles.resetChip} onPress={reset}>
@@ -317,6 +364,25 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: TEXT_ON_DARK_5,
+  },
+  // Distinct from the sheet's `sortChip` (an unselected picker option) — this
+  // one always renders in its "on" state, so it borrows the amber `chipActive`
+  // fill to read as an applied value rather than an available choice.
+  sortQuickChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: RADIUS_PILL,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: AMBER_ACCENT,
+    borderWidth: 1,
+    borderColor: AMBER_ACCENT,
+  },
+  sortQuickChipText: {
+    color: TEXT_ON_DARK_5,
+    fontWeight: "700",
+    fontSize: 12,
   },
   resetChip: {
     flexDirection: "row",
