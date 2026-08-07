@@ -10,14 +10,59 @@ import type { CollectableItem } from "@/lib/types";
  * types so existing callers (`@/components/item-filters`) keep working.
  */
 
-export type ItemSortMode = "default" | "name-asc" | "name-desc";
+/**
+ * `"{axis}-{direction}"`, kept as a FLAT string union rather than the
+ * discriminated object union the task sketched (`{ mode: "cost", direction }`).
+ * The value is persisted verbatim inside `ItemFilters` and round-trips through
+ * the filter sheet's `draft` state, so a plain string stays comparable with
+ * `===`, usable as a React `key`, and JSON-stable — an object shape would need
+ * a normaliser at every one of those boundaries to avoid `{mode,direction}`
+ * identity churn re-running the sort `useMemo` on each render.
+ *
+ * The axis/direction halves are still first-class: `SORT_MODE_PARTS` below
+ * decodes them, so the comparator never string-matches on mode names.
+ */
+export type ItemSortMode =
+  | "default"
+  | "name-asc"
+  | "name-desc"
+  | "cost-asc"
+  | "cost-desc"
+  | "acquired-asc"
+  | "acquired-desc";
+
+/** What a non-default mode orders by. */
+export type ItemSortAxis = "name" | "cost" | "acquired";
+export type ItemSortDirection = "asc" | "desc";
+
+/**
+ * Decodes each non-default mode into its axis + direction. Exhaustive over
+ * `Exclude<ItemSortMode, "default">` on purpose (same forcing function as
+ * `SORT_CHIP_ICONS`): adding a mode to the union without a row here is a type
+ * error, so no mode can reach `applySortMode` without a defined comparator.
+ */
+export const SORT_MODE_PARTS = {
+  "name-asc": { axis: "name", direction: "asc" },
+  "name-desc": { axis: "name", direction: "desc" },
+  "cost-asc": { axis: "cost", direction: "asc" },
+  "cost-desc": { axis: "cost", direction: "desc" },
+  "acquired-asc": { axis: "acquired", direction: "asc" },
+  "acquired-desc": { axis: "acquired", direction: "desc" },
+} as const satisfies Record<
+  Exclude<ItemSortMode, "default">,
+  { axis: ItemSortAxis; direction: ItemSortDirection }
+>;
 
 /**
  * The sort picker's options, in display order. Carries the i18n KEY rather
  * than a translated label so this module stays free of `useI18n` (it must be
  * importable under `node --test`) and so every surface that renders the
  * picker — the `<ItemFilterBar>` sheet today, a future "sort all collections"
- * sheet — offers the same three modes in the same order.
+ * sheet — offers the same modes in the same order.
+ *
+ * Grouped by axis (name, then cost, then acquisition date) with `"default"`
+ * first, so the picker reads as three direction pairs rather than an
+ * arbitrary list.
  *
  * Kept in lockstep with `ItemSortMode` by `sort-options-parity.test.ts`:
  * adding a mode to the union without adding a row here would ship a mode no
@@ -27,6 +72,10 @@ export const SORT_OPTIONS = [
   { mode: "default", labelKey: "sortDefault" },
   { mode: "name-asc", labelKey: "sortNameAsc" },
   { mode: "name-desc", labelKey: "sortNameDesc" },
+  { mode: "cost-asc", labelKey: "sortCostAsc" },
+  { mode: "cost-desc", labelKey: "sortCostDesc" },
+  { mode: "acquired-desc", labelKey: "sortAcquiredDesc" },
+  { mode: "acquired-asc", labelKey: "sortAcquiredAsc" },
 ] as const satisfies ReadonlyArray<{ mode: ItemSortMode; labelKey: string }>;
 
 /**
@@ -40,6 +89,13 @@ export const SORT_OPTIONS = [
 export const SORT_CHIP_ICONS = {
   "name-asc": "arrow-up",
   "name-desc": "arrow-down",
+  // The money axis gets the trend glyphs so a glance at the chip distinguishes
+  // "cheapest first" from "A → Z" without reading the label; the date axis
+  // reuses the plain arrows because its label already names the axis.
+  "cost-asc": "trending-up",
+  "cost-desc": "trending-down",
+  "acquired-asc": "arrow-up",
+  "acquired-desc": "arrow-down",
 } as const satisfies Record<Exclude<ItemSortMode, "default">, string>;
 
 export type ActiveSortChip = {
@@ -78,9 +134,10 @@ export type ItemFilters = {
   /** Free-text needle matched case-insensitively against `item.title`. */
   query: string;
   /**
-   * Alphabetical sort applied AFTER `applyItemFilters` via `applySortMode`.
-   * `"default"` preserves the existing `sortOrder` → `createdAt` ordering
-   * coming out of `getItemsForCollection` (i.e. user-managed drag order).
+   * Sort applied AFTER `applyItemFilters` via `applySortMode` — by title,
+   * cost or acquisition date, each in both directions. `"default"` preserves
+   * the existing `sortOrder` → `createdAt` ordering coming out of
+   * `getItemsForCollection` (i.e. user-managed drag order).
    */
   sort: ItemSortMode;
 };
@@ -144,17 +201,56 @@ export function getTitleCollator(locale?: string): Intl.Collator {
 }
 
 /**
- * Pure alphabetical sort applied AFTER `applyItemFilters`. Kept separate so
- * the comparator stays composable and unit-testable in isolation.
+ * The `cost` sort key, or `null` when the item carries no usable price.
+ *
+ * `cost` is `number | null | undefined` on `CollectableItem` and a hand-typed
+ * field, so `NaN`/`Infinity` are reachable through a bad import; `null` folds
+ * all three into one "missing" bucket that `compareByKey` parks at the end.
+ */
+function costKey(item: CollectableItem): number | null {
+  return typeof item.cost === "number" && Number.isFinite(item.cost) ? item.cost : null;
+}
+
+/**
+ * The `acquiredAt` sort key, or `null` when the item has no date.
+ *
+ * Kept as the raw `YYYY-MM-DD` string rather than a `Date`: the format is
+ * lexicographically chronological, so string `<`/`>` is both correct and free
+ * of the timezone drift `new Date("2025-03-01")` introduces (parsed as UTC,
+ * compared against a local-midnight sibling). `applyItemFilters`'s
+ * `dateFrom`/`dateTo` range already compares these the same way.
+ */
+function acquiredKey(item: CollectableItem): string | null {
+  const raw = item.acquiredAt?.trim();
+  return raw ? raw : null;
+}
+
+/**
+ * Pure sort applied AFTER `applyItemFilters`. Kept separate so the comparator
+ * stays composable and unit-testable in isolation.
  *
  * `"default"` returns the input array unchanged (same reference) so the
  * user-managed drag ordering coming out of `getItemsForCollection` is
  * preserved without an unnecessary allocation.
  *
- * The comparator runs through the cached `getTitleCollator()` with
- * `{ sensitivity: "base", numeric: true }`, so accented characters collate
- * next to their base letter (matters for ru/be/pl/de/es users) and "Item 2"
- * sorts before "Item 10" (natural numeric ordering, not lexicographic).
+ * Three axes, each with both directions (see `SORT_MODE_PARTS`):
+ *  - `name` — collated titles via the cached `getTitleCollator()` with
+ *    `{ sensitivity: "base", numeric: true }`, so accented characters collate
+ *    next to their base letter (matters for ru/be/pl/de/es users) and "Item 2"
+ *    sorts before "Item 10" (natural numeric ordering, not lexicographic).
+ *  - `cost` — numeric price.
+ *  - `acquired` — `YYYY-MM-DD` acquisition date.
+ *
+ * Two rules make the cost/acquired axes total:
+ *  1. **Items with no key sort LAST in BOTH directions.** A priceless item is
+ *     not "free", and an undated one is not "oldest" — flipping the direction
+ *     must not promote the unknowns to the top of the screen. This is why the
+ *     comparator negates only the value branch and never the whole result, and
+ *     why `"desc"` is not implemented as `asc().reverse()`.
+ *  2. **Ties break on the collated title**, always ascending. Without it two
+ *     €10 items would land in whatever order the drag ordering happened to
+ *     leave them, so the same collection could render differently after an
+ *     unrelated reorder.
  *
  * `locale` is a BCP-47 tag — pass the one derived from the user's PINNED app
  * language, not the device's. Omitting it falls back to the JS runtime default,
@@ -171,12 +267,41 @@ export function applySortMode(
   locale?: string,
 ): CollectableItem[] {
   if (sort === "default") return items;
+  const parts = SORT_MODE_PARTS[sort];
+  // Unreachable while the `satisfies` on `SORT_MODE_PARTS` holds, but an
+  // unknown mode rehydrated from an older/newer persisted `ItemFilters` must
+  // fall back to the drag order rather than throwing inside a render memo.
+  if (!parts) return items;
   // Hoisted out of the comparator on purpose: inside the arrow this would run
   // a Map lookup on every pair-compare instead of once per sort.
   const collator = getTitleCollator(locale);
-  const sorted = [...items].sort((a, b) => collator.compare(a.title, b.title));
-  if (sort === "name-desc") sorted.reverse();
-  return sorted;
+  const sign = parts.direction === "asc" ? 1 : -1;
+
+  if (parts.axis === "name") {
+    // Negating the comparison (rather than sorting ascending and reversing)
+    // keeps equal-title items in their incoming drag order under both
+    // directions instead of mirroring them.
+    return [...items].sort((a, b) => sign * collator.compare(a.title, b.title));
+  }
+
+  const keyOf =
+    parts.axis === "cost"
+      ? (costKey as (i: CollectableItem) => number | string | null)
+      : (acquiredKey as (i: CollectableItem) => number | string | null);
+
+  return [...items].sort((a, b) => {
+    const av = keyOf(a);
+    const bv = keyOf(b);
+    // Rule 1 — missing keys sink to the bottom regardless of `sign`.
+    if (av === null || bv === null) {
+      if (av === bv) return collator.compare(a.title, b.title);
+      return av === null ? 1 : -1;
+    }
+    if (av < bv) return -sign;
+    if (av > bv) return sign;
+    // Rule 2 — deterministic tiebreak, always ascending by title.
+    return collator.compare(a.title, b.title);
+  });
 }
 
 export function applyItemFilters(items: CollectableItem[], filters: ItemFilters): CollectableItem[] {

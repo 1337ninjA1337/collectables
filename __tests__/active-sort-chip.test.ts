@@ -28,7 +28,15 @@ function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
 }
 
-const ALL_MODES: ItemSortMode[] = ["default", "name-asc", "name-desc"];
+const ALL_MODES: ItemSortMode[] = [
+  "default",
+  "name-asc",
+  "name-desc",
+  "cost-asc",
+  "cost-desc",
+  "acquired-asc",
+  "acquired-desc",
+];
 
 describe("activeSortChip — the pure hide/show contract", () => {
   it("returns null for the default sort (no chip when nothing is applied)", () => {

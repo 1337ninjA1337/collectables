@@ -39,9 +39,12 @@ import {
   EMPTY_FILTERS,
   getTitleCollator,
   SORT_CHIP_ICONS,
+  SORT_MODE_PARTS,
   SORT_OPTIONS,
   type ActiveSortChip,
   type ItemFilters,
+  type ItemSortAxis,
+  type ItemSortDirection,
   type ItemSortMode,
 } from "@/lib/item-filters";
 
@@ -63,9 +66,10 @@ export {
   EMPTY_FILTERS,
   getTitleCollator,
   SORT_CHIP_ICONS,
+  SORT_MODE_PARTS,
   SORT_OPTIONS,
 };
-export type { ActiveSortChip, ItemFilters, ItemSortMode };
+export type { ActiveSortChip, ItemFilters, ItemSortAxis, ItemSortDirection, ItemSortMode };
 
 type Props = {
   filters: ItemFilters;
@@ -178,137 +182,150 @@ export function ItemFilterBar({ filters, onChange }: Props) {
       <Modal visible={modalOpen} transparent animationType="fade" onRequestClose={() => setModalOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setModalOpen(false)}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.sheetTitle}>{t("filterTitle")}</Text>
-
-            {/* Search by title */}
-            <View style={styles.sheetSearchRow}>
-              <Ionicons name="search" size={18} color={MUTED_15} />
-              <MaskedTextInput
-                style={styles.sheetSearchInput}
-                value={draft.query}
-                onChangeText={(v) => setDraft({ ...draft, query: v })}
-                placeholder={t("searchInCollectionPlaceholder")}
-                placeholderTextColor={PLACEHOLDER}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {draft.query.length > 0 ? (
-                <Pressable onPress={() => setDraft({ ...draft, query: "" })} hitSlop={8}>
-                  <Ionicons name="close-circle" size={18} color={MUTED_15} />
-                </Pressable>
-              ) : null}
-            </View>
-
-            {/* Price range */}
-            <View style={styles.fieldRow}>
-              <View style={styles.fieldHalf}>
-                <Text style={styles.fieldLabel}>{t("filterPriceFrom")}</Text>
-                <MaskedTextInput
-                  style={styles.fieldInput}
-                  value={draft.priceFrom}
-                  onChangeText={(v) => setDraft({ ...draft, priceFrom: v })}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor={MUTED_15}
-                />
-              </View>
-              <View style={styles.fieldHalf}>
-                <Text style={styles.fieldLabel}>{t("filterPriceTo")}</Text>
-                <MaskedTextInput
-                  style={styles.fieldInput}
-                  value={draft.priceTo}
-                  onChangeText={(v) => setDraft({ ...draft, priceTo: v })}
-                  keyboardType="numeric"
-                  placeholder="∞"
-                  placeholderTextColor={MUTED_15}
-                />
-              </View>
-            </View>
-
-            {/* Date range */}
-            <View style={styles.fieldRow}>
-              <View style={styles.fieldHalf}>
-                <Text style={styles.fieldLabel}>{t("filterDateFrom")}</Text>
-                <MaskedTextInput
-                  style={styles.fieldInput}
-                  value={draft.dateFrom}
-                  onChangeText={(v) => setDraft({ ...draft, dateFrom: v })}
-                  placeholder="2024-01-01"
-                  placeholderTextColor={MUTED_15}
-                />
-              </View>
-              <View style={styles.fieldHalf}>
-                <Text style={styles.fieldLabel}>{t("filterDateTo")}</Text>
-                <MaskedTextInput
-                  style={styles.fieldInput}
-                  value={draft.dateTo}
-                  onChangeText={(v) => setDraft({ ...draft, dateTo: v })}
-                  placeholder="2026-12-31"
-                  placeholderTextColor={MUTED_15}
-                />
-              </View>
-            </View>
-
-            {/* Source */}
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>{t("filterSource")}</Text>
-              <MaskedTextInput
-                style={styles.fieldInput}
-                value={draft.source}
-                onChangeText={(v) => setDraft({ ...draft, source: v })}
-                placeholder={t("filterSourcePlaceholder")}
-                placeholderTextColor={MUTED_15}
-              />
-            </View>
-
-            {/* Has photos toggle */}
-            <Pressable
-              style={[styles.toggleRow, draft.hasPhotos && styles.toggleRowActive]}
-              onPress={() => setDraft({ ...draft, hasPhotos: !draft.hasPhotos })}
+            {/* The sheet grew past a small phone's viewport once the sort
+                picker went from 3 chips to 7 (three axes x two directions, plus
+                default). Without this scroll the wrapped chip rows push the
+                Apply/Reset row off-screen with no way to reach it: the backdrop
+                is a fixed flex:1 box that clips its overflow rather than
+                scrolling it. */}
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={styles.sheetContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
-              <Ionicons
-                name={draft.hasPhotos ? "checkbox" : "square-outline"}
-                size={22}
-                color={draft.hasPhotos ? AMBER_ACCENT : PLACEHOLDER}
-              />
-              <Text style={styles.toggleLabel}>{t("filterHasPhotos")}</Text>
-            </Pressable>
+              <Text style={styles.sheetTitle}>{t("filterTitle")}</Text>
 
-            {/* Sort mode */}
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>{t("sortLabel")}</Text>
-              <View style={styles.sortRow}>
-                {SORT_OPTIONS.map((opt) => {
-                  const active = draft.sort === opt.mode;
-                  return (
-                    <Pressable
-                      key={opt.mode}
-                      accessibilityRole="button"
-                      // Without `selected`, VoiceOver announces all three
-                      // chips identically ("button") and the active sort is
-                      // conveyed by colour alone.
-                      accessibilityState={{ selected: active }}
-                      style={[styles.sortChip, active && styles.sortChipActive]}
-                      onPress={() => setDraft({ ...draft, sort: opt.mode })}
-                    >
-                      <Text style={[styles.sortChipText, active && styles.sortChipTextActive]}>
-                        {t(opt.labelKey)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+              {/* Search by title */}
+              <View style={styles.sheetSearchRow}>
+                <Ionicons name="search" size={18} color={MUTED_15} />
+                <MaskedTextInput
+                  style={styles.sheetSearchInput}
+                  value={draft.query}
+                  onChangeText={(v) => setDraft({ ...draft, query: v })}
+                  placeholder={t("searchInCollectionPlaceholder")}
+                  placeholderTextColor={PLACEHOLDER}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {draft.query.length > 0 ? (
+                  <Pressable onPress={() => setDraft({ ...draft, query: "" })} hitSlop={8}>
+                    <Ionicons name="close-circle" size={18} color={MUTED_15} />
+                  </Pressable>
+                ) : null}
               </View>
-            </View>
 
-            {/* Actions */}
-            <View style={styles.sheetActions}>
-              <Pressable style={styles.applyButton} onPress={apply}>
-                <Text style={styles.applyButtonText}>{t("filterApply")}</Text>
+              {/* Price range */}
+              <View style={styles.fieldRow}>
+                <View style={styles.fieldHalf}>
+                  <Text style={styles.fieldLabel}>{t("filterPriceFrom")}</Text>
+                  <MaskedTextInput
+                    style={styles.fieldInput}
+                    value={draft.priceFrom}
+                    onChangeText={(v) => setDraft({ ...draft, priceFrom: v })}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor={MUTED_15}
+                  />
+                </View>
+                <View style={styles.fieldHalf}>
+                  <Text style={styles.fieldLabel}>{t("filterPriceTo")}</Text>
+                  <MaskedTextInput
+                    style={styles.fieldInput}
+                    value={draft.priceTo}
+                    onChangeText={(v) => setDraft({ ...draft, priceTo: v })}
+                    keyboardType="numeric"
+                    placeholder="∞"
+                    placeholderTextColor={MUTED_15}
+                  />
+                </View>
+              </View>
+
+              {/* Date range */}
+              <View style={styles.fieldRow}>
+                <View style={styles.fieldHalf}>
+                  <Text style={styles.fieldLabel}>{t("filterDateFrom")}</Text>
+                  <MaskedTextInput
+                    style={styles.fieldInput}
+                    value={draft.dateFrom}
+                    onChangeText={(v) => setDraft({ ...draft, dateFrom: v })}
+                    placeholder="2024-01-01"
+                    placeholderTextColor={MUTED_15}
+                  />
+                </View>
+                <View style={styles.fieldHalf}>
+                  <Text style={styles.fieldLabel}>{t("filterDateTo")}</Text>
+                  <MaskedTextInput
+                    style={styles.fieldInput}
+                    value={draft.dateTo}
+                    onChangeText={(v) => setDraft({ ...draft, dateTo: v })}
+                    placeholder="2026-12-31"
+                    placeholderTextColor={MUTED_15}
+                  />
+                </View>
+              </View>
+
+              {/* Source */}
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>{t("filterSource")}</Text>
+                <MaskedTextInput
+                  style={styles.fieldInput}
+                  value={draft.source}
+                  onChangeText={(v) => setDraft({ ...draft, source: v })}
+                  placeholder={t("filterSourcePlaceholder")}
+                  placeholderTextColor={MUTED_15}
+                />
+              </View>
+
+              {/* Has photos toggle */}
+              <Pressable
+                style={[styles.toggleRow, draft.hasPhotos && styles.toggleRowActive]}
+                onPress={() => setDraft({ ...draft, hasPhotos: !draft.hasPhotos })}
+              >
+                <Ionicons
+                  name={draft.hasPhotos ? "checkbox" : "square-outline"}
+                  size={22}
+                  color={draft.hasPhotos ? AMBER_ACCENT : PLACEHOLDER}
+                />
+                <Text style={styles.toggleLabel}>{t("filterHasPhotos")}</Text>
               </Pressable>
-              <Pressable style={styles.resetButton} onPress={reset}>
-                <Text style={styles.resetButtonText}>{t("filterReset")}</Text>
-              </Pressable>
-            </View>
+
+              {/* Sort mode */}
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>{t("sortLabel")}</Text>
+                <View style={styles.sortRow}>
+                  {SORT_OPTIONS.map((opt) => {
+                    const active = draft.sort === opt.mode;
+                    return (
+                      <Pressable
+                        key={opt.mode}
+                        accessibilityRole="button"
+                        // Without `selected`, VoiceOver announces every chip
+                        // identically ("button") and the active sort is
+                        // conveyed by colour alone.
+                        accessibilityState={{ selected: active }}
+                        style={[styles.sortChip, active && styles.sortChipActive]}
+                        onPress={() => setDraft({ ...draft, sort: opt.mode })}
+                      >
+                        <Text style={[styles.sortChipText, active && styles.sortChipTextActive]}>
+                          {t(opt.labelKey)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Actions */}
+              <View style={styles.sheetActions}>
+                <Pressable style={styles.applyButton} onPress={apply}>
+                  <Text style={styles.applyButtonText}>{t("filterApply")}</Text>
+                </Pressable>
+                <Pressable style={styles.resetButton} onPress={reset}>
+                  <Text style={styles.resetButtonText}>{t("filterReset")}</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -410,12 +427,23 @@ const styles = StyleSheet.create({
   sheet: {
     width: "100%",
     maxWidth: 420,
+    // Caps the card at the backdrop's padded box so the ScrollView inside it
+    // has a bounded height to scroll within; without it the card grows past
+    // the viewport and clips instead.
+    maxHeight: "100%",
     backgroundColor: CARD_BG,
     borderRadius: RADIUS_CARD_LG,
     padding: 22,
-    gap: 16,
     borderWidth: 1,
     borderColor: BORDER,
+  },
+  sheetScroll: {
+    // `flexGrow: 0` keeps a short sheet hugging its content instead of
+    // stretching to the full capped height.
+    flexGrow: 0,
+  },
+  sheetContent: {
+    gap: 16,
   },
   sheetTitle: {
     fontSize: 20,
