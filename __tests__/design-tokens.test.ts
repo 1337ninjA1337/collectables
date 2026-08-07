@@ -1160,15 +1160,10 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bPLACEHOLDER\b/);
     assert.match(src, /\bSUCCESS_GREEN\b/);
     assert.match(src, /\bSUCCESS_GREEN_2\b/);
-    assert.match(src, /\bTAG_BLUE\b/);
-    assert.match(src, /\bTAG_BROWN\b/);
-    assert.match(src, /\bTAG_CYAN\b/);
-    assert.match(src, /\bTAG_GOLD\b/);
-    assert.match(src, /\bTAG_PURPLE\b/);
-    assert.match(src, /\bTAG_RUST\b/);
-    assert.match(src, /\bTAG_SAGE\b/);
-    assert.match(src, /\bTAG_TEAL\b/);
-    assert.match(src, /\bTAG_TERRACOTTA\b/);
+    // The 9 individual TAG_* hues are no longer imported here: the rotation
+    // moved into the shared `TAG_COLORS` export + `nextTagColor()` helper
+    // (2026-08-07) so the new-item form and the item-edit form can't drift.
+    assert.match(src, /\bnextTagColor\b/);
     assert.match(src, /\bTEXT_DARK\b/);
     assert.match(src, /\bTEXT_DARK_2\b/);
     assert.match(src, /\bTEXT_DARK_3\b/);
@@ -1215,15 +1210,9 @@ describe("design-tokens adoption", () => {
     assert.match(src, /MUTED_15\b/);
     assert.match(src, /PAGE_BG_2/);
     assert.match(src, /PLACEHOLDER/);
-    assert.match(src, /TAG_BLUE/);
-    assert.match(src, /TAG_BROWN/);
-    assert.match(src, /TAG_CYAN/);
-    assert.match(src, /TAG_GOLD/);
-    assert.match(src, /TAG_PURPLE/);
-    assert.match(src, /TAG_RUST/);
-    assert.match(src, /TAG_SAGE/);
-    assert.match(src, /TAG_TEAL/);
-    assert.match(src, /TAG_TERRACOTTA/);
+    // Same as app/item/[id].tsx: the hues arrive via the shared TAG_COLORS
+    // rotation rather than 9 individual imports.
+    assert.match(src, /\bnextTagColor\b/);
     assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_DARK_2\b/);
     assert.match(src, /TEXT_DARK_3\b/);

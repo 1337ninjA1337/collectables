@@ -58,27 +58,14 @@ import {
   SPACING_CARD,
   SPACING_INLINE,
   SPACING_LIST,
-  TAG_BLUE,
-  TAG_BROWN,
-  TAG_CYAN,
-  TAG_GOLD,
-  TAG_PURPLE,
-  TAG_RUST,
-  TAG_SAGE,
-  TAG_TEAL,
-  TAG_TERRACOTTA,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_DARK_3,
   TEXT_DARK_4,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
+  nextTagColor,
 } from "@/lib/design-tokens";
-
-const TAG_COLORS = [
-  AMBER_ACCENT, TAG_RUST, TAG_SAGE, TAG_BLUE, TAG_PURPLE,
-  TAG_TERRACOTTA, TAG_CYAN, TAG_GOLD, TAG_BROWN, TAG_TEAL,
-];
 
 export default function CreateItemScreen() {
   const params = useLocalSearchParams<{ collectionId?: string }>();
@@ -191,6 +178,16 @@ export default function CreateItemScreen() {
     } finally {
       setAnalyzing(false);
     }
+  }
+
+  // Shared by the keyboard "submit" path and the Add button so the two can't
+  // drift; mirrors `addTag()` in app/item/[id].tsx.
+  function addTag() {
+    const label = tagInput.trim();
+    if (!label) return;
+    if (tags.some((tag) => tag.label.toLowerCase() === label.toLowerCase())) return;
+    setTags([...tags, { label, color: nextTagColor(tags.map((tag) => tag.color)) }]);
+    setTagInput("");
   }
 
   function pickImages() {
@@ -378,23 +375,11 @@ export default function CreateItemScreen() {
             onChangeText={setTagInput}
             placeholder={t("tagsPlaceholder")}
             placeholderTextColor={PLACEHOLDER}
-            onSubmitEditing={() => {
-              const label = tagInput.trim();
-              if (label && !tags.some((t) => t.label.toLowerCase() === label.toLowerCase())) {
-                setTags([...tags, { label, color: TAG_COLORS[tags.length % TAG_COLORS.length] }]);
-                setTagInput("");
-              }
-            }}
+            onSubmitEditing={addTag}
           />
           <Pressable
             style={{...styles.tagAddButton, ...(tagInput.trim() ? {} : styles.tagAddButtonDisabled)}}
-            onPress={() => {
-              const label = tagInput.trim();
-              if (label && !tags.some((t) => t.label.toLowerCase() === label.toLowerCase())) {
-                setTags([...tags, { label, color: TAG_COLORS[tags.length % TAG_COLORS.length] }]);
-                setTagInput("");
-              }
-            }}
+            onPress={addTag}
           >
             <Text style={styles.tagAddButtonText}>{t("tagsAdd")}</Text>
           </Pressable>

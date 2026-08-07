@@ -156,6 +156,44 @@ export const TAG_BROWN = "#8b6b5b";
 export const TAG_TEAL = "#6b8f8f";
 
 /**
+ * The rotation order tag colours are assigned in: a new tag takes
+ * `TAG_COLORS[existingTagCount % TAG_COLORS.length]`. Lives here rather than
+ * in the two consumers (`app/create.tsx`, `app/item/[id].tsx`) so re-ordering
+ * the slots or adding an 11th hue can't leave the new-item form and the
+ * item-edit form assigning different colours to the same tag position.
+ */
+export const TAG_COLORS = [
+  AMBER_ACCENT,
+  TAG_RUST,
+  TAG_SAGE,
+  TAG_BLUE,
+  TAG_PURPLE,
+  TAG_TERRACOTTA,
+  TAG_CYAN,
+  TAG_GOLD,
+  TAG_BROWN,
+  TAG_TEAL,
+] as const;
+
+/**
+ * Pick the colour for the next tag a user adds.
+ *
+ * Naive `TAG_COLORS[tags.length % TAG_COLORS.length]` indexing repeats a hue
+ * that is still on screen as soon as a tag is removed — delete the 2nd of 3
+ * tags and the next one added lands back on slot 2, matching the tag that
+ * shifted into it. Preferring the first UNUSED slot keeps every visible tag a
+ * different colour; once all 10 are taken it falls back to the plain rotation
+ * so the function is total.
+ */
+export function nextTagColor(usedColors: readonly string[]): string {
+  const used = new Set(usedColors);
+  return (
+    TAG_COLORS.find((color) => !used.has(color)) ??
+    TAG_COLORS[usedColors.length % TAG_COLORS.length]
+  );
+}
+
+/**
  * Semantic radius tokens — keep card / pill / chip geometry one-line tunable.
  * Names map to the most common usage today (counts from a repo-wide scan):
  *   RADIUS_PILL = 999 (71×) — fully rounded pills, chips, badges

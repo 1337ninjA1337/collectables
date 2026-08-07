@@ -77,27 +77,14 @@ import {
   SPACING_LIST,
   SUCCESS_GREEN,
   SUCCESS_GREEN_2,
-  TAG_BLUE,
-  TAG_BROWN,
-  TAG_CYAN,
-  TAG_GOLD,
-  TAG_PURPLE,
-  TAG_RUST,
-  TAG_SAGE,
-  TAG_TEAL,
-  TAG_TERRACOTTA,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_DARK_3,
   TEXT_DARK_4,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
+  nextTagColor,
 } from "@/lib/design-tokens";
-
-const TAG_COLORS = [
-  AMBER_ACCENT, TAG_RUST, TAG_SAGE, TAG_BLUE, TAG_PURPLE,
-  TAG_TERRACOTTA, TAG_CYAN, TAG_GOLD, TAG_BROWN, TAG_TEAL,
-];
 
 export default function ItemDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -306,10 +293,10 @@ export default function ItemDetailsScreen() {
 
   function addTag() {
     const label = editTagInput.trim();
-    if (label && !editTags.some((t) => t.label.toLowerCase() === label.toLowerCase())) {
-      setEditTags([...editTags, { label, color: TAG_COLORS[editTags.length % TAG_COLORS.length] }]);
-      setEditTagInput("");
-    }
+    if (!label) return;
+    if (editTags.some((tag) => tag.label.toLowerCase() === label.toLowerCase())) return;
+    setEditTags([...editTags, { label, color: nextTagColor(editTags.map((tag) => tag.color)) }]);
+    setEditTagInput("");
   }
 
   async function confirmAndDeleteItem() {
