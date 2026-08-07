@@ -112,6 +112,38 @@ export function countActiveFilters(f: ItemFilters): number {
 }
 
 /**
+ * Memoise the `Intl.Collator` per BCP-47 tag, mirroring the
+ * `relativeTimeFormatCache` shape in `lib/i18n-context.tsx`.
+ *
+ * `String.prototype.localeCompare(other, locale, options)` constructs a fresh
+ * collator on every call, and a comparator is called O(n log n) times per sort
+ * — so an 2000-item collection paid ~22 000 ICU collator constructions per
+ * re-sort, each walking the collation tables for the locale. Hoisting the
+ * instance turns that into one construction per locale for the app's lifetime;
+ * `collator.compare` itself is the same comparison, just without the setup.
+ *
+ * Keyed by the locale string, with `""` standing in for "runtime default"
+ * (`undefined`), because a Map keyed on `string | undefined` would let a
+ * caller passing `undefined` and a caller passing `""` collide on semantics
+ * that differ. Unbounded by design: the key space is the six supported app
+ * languages plus the device default, not user input.
+ */
+const collatorCache = new Map<string, Intl.Collator>();
+
+export function getTitleCollator(locale?: string): Intl.Collator {
+  const key = locale ?? "";
+  const cached = collatorCache.get(key);
+  if (cached) return cached;
+  // `sensitivity: "base"` folds case and accents together (so "Écu" sorts next
+  // to "ecu"); `numeric: true` makes "Card 2" precede "Card 10" instead of the
+  // lexicographic reverse. Both must match the pre-cache `localeCompare` call
+  // exactly — changing either silently re-orders every sorted collection.
+  const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
+  collatorCache.set(key, collator);
+  return collator;
+}
+
+/**
  * Pure alphabetical sort applied AFTER `applyItemFilters`. Kept separate so
  * the comparator stays composable and unit-testable in isolation.
  *
@@ -119,19 +151,20 @@ export function countActiveFilters(f: ItemFilters): number {
  * user-managed drag ordering coming out of `getItemsForCollection` is
  * preserved without an unnecessary allocation.
  *
- * The comparator uses `localeCompare(_, undefined, { sensitivity: "base",
- * numeric: true })` so accented characters collate next to their base
- * letter (matters for ru/be/pl/de/es users) and "Item 2" sorts before
- * "Item 10" (natural numeric ordering, not lexicographic).
+ * The comparator runs through the cached `getTitleCollator()` with
+ * `{ sensitivity: "base", numeric: true }`, so accented characters collate
+ * next to their base letter (matters for ru/be/pl/de/es users) and "Item 2"
+ * sorts before "Item 10" (natural numeric ordering, not lexicographic).
  */
 export function applySortMode(
   items: CollectableItem[],
   sort: ItemSortMode,
 ): CollectableItem[] {
   if (sort === "default") return items;
-  const sorted = [...items].sort((a, b) =>
-    a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }),
-  );
+  // Hoisted out of the comparator on purpose: inside the arrow this would run
+  // a Map lookup on every pair-compare instead of once per sort.
+  const collator = getTitleCollator();
+  const sorted = [...items].sort((a, b) => collator.compare(a.title, b.title));
   if (sort === "name-desc") sorted.reverse();
   return sorted;
 }
