@@ -49,7 +49,7 @@ describe("app/collection/[id].tsx — drag-mode sort gate (corruption fix)", () 
     // works on the narrowed result set, and BEFORE useChunkedList so
     // the visible window reflects the chosen sort.
     const filterIdx = src.search(/applyItemFilters\(allItems\s*,\s*itemFilters\)/);
-    const sortIdx = src.search(/applySortMode\(filteredItems\s*,\s*itemFilters\.sort\)/);
+    const sortIdx = src.search(/applySortMode\(filteredItems\s*,\s*itemFilters\.sort\s*,\s*sortLocale\)/);
     const chunkIdx = src.search(/useChunkedList\(\s*items\s*\)/);
     assert.ok(filterIdx > 0, "applyItemFilters call missing");
     assert.ok(sortIdx > 0, "applySortMode call missing");
@@ -60,12 +60,15 @@ describe("app/collection/[id].tsx — drag-mode sort gate (corruption fix)", () 
     );
   });
 
-  it("sort memo deps are [filteredItems, itemFilters.sort] — not [filteredItems, itemFilters]", () => {
+  it("sort memo deps are [filteredItems, itemFilters.sort, sortLocale] — not [filteredItems, itemFilters]", () => {
     // Depending on the full `itemFilters` object would re-sort on every
     // priceFrom keystroke even though the sort mode hasn't changed.
+    // `sortLocale` joined the list on 2026-08-07 (collator now follows the
+    // pinned app language) and MUST be a dep: without it, switching language
+    // leaves the list collated under the previous locale's rules.
     assert.match(
       src,
-      /applySortMode\(filteredItems\s*,\s*itemFilters\.sort\)[\s\S]*?\[\s*filteredItems\s*,\s*itemFilters\.sort\s*\]/,
+      /applySortMode\(filteredItems\s*,\s*itemFilters\.sort\s*,\s*sortLocale\)[\s\S]*?\[\s*filteredItems\s*,\s*itemFilters\.sort\s*,\s*sortLocale\s*\]/,
     );
   });
 });

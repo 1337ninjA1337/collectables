@@ -27,6 +27,7 @@ import { flatListStyles } from "@/lib/flat-list-styles";
 import { useChunkedList } from "@/lib/use-chunked-list";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { useI18n } from "@/lib/i18n-context";
+import { getDefaultLocaleForLanguage } from "@/lib/locale-helpers";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { usePremium } from "@/lib/premium-context";
 import { useSocial } from "@/lib/social-context";
@@ -95,7 +96,7 @@ export default function CollectionDetailsScreen() {
   } = useCollections();
   const { friends, getProfileById, ensureProfilesLoaded } = useSocial();
   const [refreshing, setRefreshing] = useState(false);
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const toast = useToast();
   const { isPremium } = usePremium();
   const theme = useAppTheme();
@@ -185,13 +186,20 @@ export default function CollectionDetailsScreen() {
   );
   const allItems = localItems.length > 0 ? localItems : remoteItems;
   const filteredItems = useMemo(() => applyItemFilters(allItems, itemFilters), [allItems, itemFilters]);
+  // The collator follows the language the user PINNED in the app, not the
+  // device's. Without this the comparator falls back to the JS runtime default
+  // — the device locale on native, but often `en-US` on a server-rendered web
+  // preview — so a Russian user reading the app in Polish could see an
+  // alphabetical order that disagrees with every label around it.
+  const sortLocale = useMemo(() => getDefaultLocaleForLanguage(language), [language]);
   // applySortMode runs AFTER the price/date/source/query filter pass so the
   // alphabetical sort applies to the already-narrowed result set. Memoized
-  // on [filteredItems, itemFilters.sort] so a sort-mode change reuses the
-  // existing filtered slice without re-running the filter predicate.
+  // on [filteredItems, itemFilters.sort, sortLocale] so a sort-mode change
+  // reuses the existing filtered slice without re-running the filter
+  // predicate, and a language switch re-sorts under the new collation rules.
   const items = useMemo(
-    () => applySortMode(filteredItems, itemFilters.sort),
-    [filteredItems, itemFilters.sort],
+    () => applySortMode(filteredItems, itemFilters.sort, sortLocale),
+    [filteredItems, itemFilters.sort, sortLocale],
   );
   // Chunked rendering: mount only the first page of item cards (~20) up-front
   // so iOS RAM stays bounded as the collection grows. `useChunkedList` resets

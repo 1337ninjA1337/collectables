@@ -155,15 +155,25 @@ export function getTitleCollator(locale?: string): Intl.Collator {
  * `{ sensitivity: "base", numeric: true }`, so accented characters collate
  * next to their base letter (matters for ru/be/pl/de/es users) and "Item 2"
  * sorts before "Item 10" (natural numeric ordering, not lexicographic).
+ *
+ * `locale` is a BCP-47 tag — pass the one derived from the user's PINNED app
+ * language, not the device's. Omitting it falls back to the JS runtime default,
+ * which is the device locale on native but often `en-US` on a server-rendered
+ * web preview; a Russian user who pinned the app to `pl` would then see an
+ * ordering that disagrees with the UI around it. Callers do the
+ * `AppLanguage` → BCP-47 mapping themselves because the map lives in
+ * `lib/locale-helpers.ts`, which pulls AsyncStorage and would make this module
+ * un-importable under `tsx --test`.
  */
 export function applySortMode(
   items: CollectableItem[],
   sort: ItemSortMode,
+  locale?: string,
 ): CollectableItem[] {
   if (sort === "default") return items;
   // Hoisted out of the comparator on purpose: inside the arrow this would run
   // a Map lookup on every pair-compare instead of once per sort.
-  const collator = getTitleCollator();
+  const collator = getTitleCollator(locale);
   const sorted = [...items].sort((a, b) => collator.compare(a.title, b.title));
   if (sort === "name-desc") sorted.reverse();
   return sorted;

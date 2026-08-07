@@ -157,7 +157,7 @@ describe("lib/item-filters.ts — the per-call construction is gone for good", (
     // inside the arrow would keep one Map lookup per pair-compare.
     assert.match(
       src,
-      /const\s+collator\s*=\s*getTitleCollator\(\);\s*\n\s*const\s+sorted\s*=\s*\[\.\.\.items\]\.sort\(/,
+      /const\s+collator\s*=\s*getTitleCollator\(locale\);\s*\n\s*const\s+sorted\s*=\s*\[\.\.\.items\]\.sort\(/,
     );
     assert.match(src, /\.sort\(\(a,\s*b\)\s*=>\s*collator\.compare\(a\.title,\s*b\.title\)\)/);
   });
