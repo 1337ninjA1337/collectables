@@ -23,8 +23,6 @@ import {
   CARD_BG_9,
   HERO_DARK,
   HERO_DARK_2,
-  HERO_DARK_4,
-  HERO_DARK_5,
   MUTED,
   MUTED_2,
   MUTED_18,
@@ -49,6 +47,7 @@ import {
   TEXT_ON_DARK_8,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
+import { HERO_DARK_GRADIENT } from "@/lib/gradients";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
@@ -136,12 +135,7 @@ export default function HomeScreen() {
     <Screen nestable refreshing={refreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: "Collectables" }} />
       {isPhone ? null : (
-      <LinearGradient
-        colors={[HERO_DARK_4, HERO_DARK, HERO_DARK_5]}
-        start={{ x: 0.2, y: 0.6 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.hero}
-      >
+      <LinearGradient {...HERO_DARK_GRADIENT} style={styles.hero}>
         <Text style={styles.eyebrow}>{t("appName")}</Text>
         <View style={styles.profileRow}>
           {myProfile ? (

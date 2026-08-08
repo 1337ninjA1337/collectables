@@ -702,9 +702,9 @@ describe("design-tokens adoption", () => {
   it("components/login-screen.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("components/login-screen.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
-    assert.match(src, /HERO_DARK\b/);
-    assert.match(src, /HERO_DARK_4/);
-    assert.match(src, /HERO_DARK_5/);
+    // HERO_DARK / HERO_DARK_4 / HERO_DARK_5 left with the hero banner when it
+    // moved into HERO_DARK_GRADIENT (lib/gradients.ts) — this screen used all
+    // three ONLY in that gradient. Pinned by gradients.test.ts.
     assert.match(src, /HERO_DARK_6/);
     assert.match(src, /AMBER_ACCENT/);
     assert.match(src, /AMBER_LIGHT/);
@@ -851,8 +851,8 @@ describe("design-tokens adoption", () => {
     assert.match(src, /CARD_BG_9/);
     assert.match(src, /HERO_DARK\b/);
     assert.match(src, /HERO_DARK_2/);
-    assert.match(src, /HERO_DARK_4/);
-    assert.match(src, /HERO_DARK_5/);
+    // HERO_DARK_4 / HERO_DARK_5 left with the hero banner when it moved into
+    // HERO_DARK_GRADIENT (lib/gradients.ts) — pinned by gradients.test.ts.
     assert.match(src, /MUTED\b/);
     assert.match(src, /MUTED_2\b/);
     assert.match(src, /MUTED_18/);
@@ -934,8 +934,8 @@ describe("design-tokens adoption", () => {
     assert.match(src, /DANGER_SOFT_3/);
     assert.match(src, /HERO_DARK\b/);
     assert.match(src, /HERO_DARK_2/);
-    assert.match(src, /HERO_DARK_4/);
-    assert.match(src, /HERO_DARK_5/);
+    // HERO_DARK_4 / HERO_DARK_5 left with the hero banner when it moved into
+    // HERO_DARK_GRADIENT (lib/gradients.ts) — pinned by gradients.test.ts.
     assert.match(src, /HERO_DARK_7/);
     assert.match(src, /MUTED_2\b/);
     assert.match(src, /MUTED_11/);
