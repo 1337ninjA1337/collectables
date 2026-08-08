@@ -35,12 +35,13 @@ import {
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { fetchProfiles, searchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
-import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useMinimumVisible } from "@/lib/use-minimum-visible";
 
 const PAGE_SIZE = 25;
 
@@ -114,6 +115,11 @@ export default function PeopleScreen() {
     setRefreshing(true);
     try { await loadPage(page); } finally { setRefreshing(false); }
   }, [loadPage, page]);
+
+  // Keeps the pull-to-refresh spinner legible when refresh() resolves from
+  // cache — see lib/minimum-visible-helpers.ts for why this is a trailing
+  // hold and not a leading debounce.
+  const showRefreshing = useMinimumVisible(refreshing);
 
   const others = useMemo(
     () => remoteProfiles.filter((p) => p.id !== myProfile?.id),
@@ -205,7 +211,7 @@ export default function PeopleScreen() {
   }
 
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+    <Screen refreshing={showRefreshing} onRefresh={handleRefresh}>
       <HeroBanner
         tone="solid"
         eyebrow={t("community")}

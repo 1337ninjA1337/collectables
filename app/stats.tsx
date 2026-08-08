@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/screen";
+import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { useCollections } from "@/lib/collections-context";
 import {
   AMBER_ACCENT,
@@ -35,6 +36,11 @@ export default function StatsScreen() {
     try { await refresh(); } finally { setRefreshing(false); }
   }, [refresh]);
 
+  // Keeps the pull-to-refresh spinner legible when refresh() resolves from
+  // cache — see lib/minimum-visible-helpers.ts for why this is a trailing
+  // hold and not a leading debounce.
+  const showRefreshing = useMinimumVisible(refreshing);
+
   const ownedCollections = collections.filter((c) => c.role === "owner");
   const ownedItems = useMemo(
     () => items.filter((i) => !i.isWishlist && ownedCollections.some((c) => c.id === i.collectionId)),
@@ -63,7 +69,7 @@ export default function StatsScreen() {
   const maxCount = Math.max(...growth.map((b) => b.count), 1);
 
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+    <Screen refreshing={showRefreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: t("statsTitle") }} />
 
       <View style={styles.hero}>

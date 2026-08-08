@@ -66,7 +66,9 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // The nestable Screen is still needed for owner drag-mode (it requires
     // NestableScrollContainer's gesture coordination) and selection-mode
     // (VM-E target). Without this branch they'd lose their outer scroll.
-    assert.match(src, /<Screen\s+nestable\s+refreshing=\{\s*refreshing\s*\}\s+onRefresh=\{\s*handleRefresh\s*\}\s*>/);
+    // `showRefreshing` since 2026-08-08 — the raw flag now runs through
+    // useMinimumVisible() so a cache-fast refresh does not flash the spinner.
+    assert.match(src, /<Screen\s+nestable\s+refreshing=\{\s*showRefreshing\s*\}\s+onRefresh=\{\s*handleRefresh\s*\}\s*>/);
   });
 
   it("viewer FlatList wires virtualization props (initialNumToRender / maxToRenderPerBatch / windowSize)", () => {
@@ -126,7 +128,7 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     assert.match(src, /import\s*\{[^}]*\bRefreshControl\b[^}]*\}\s*from\s*"react-native"/);
     assert.match(
       src,
-      /<FlatList[\s\S]*?refreshControl=\{\s*\n?\s*<RefreshControl[\s\S]*?refreshing=\{\s*!!refreshing\s*\}[\s\S]*?onRefresh=\{\s*handleRefresh\s*\}[\s\S]*?\/>[\s\S]*?\}/,
+      /<FlatList[\s\S]*?refreshControl=\{\s*\n?\s*<RefreshControl[\s\S]*?refreshing=\{\s*showRefreshing\s*\}[\s\S]*?onRefresh=\{\s*handleRefresh\s*\}[\s\S]*?\/>[\s\S]*?\}/,
     );
   });
 

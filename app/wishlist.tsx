@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PhotoPreview } from "@/components/photo-preview";
 import { Screen } from "@/components/screen";
 import { useAppTheme } from "@/components/use-app-theme";
+import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useCollections } from "@/lib/collections-context";
 import { flatListStyles } from "@/lib/flat-list-styles";
@@ -78,6 +79,11 @@ export default function WishlistScreen() {
     setRefreshing(true);
     try { await refresh(); } finally { setRefreshing(false); }
   }, [refresh]);
+
+  // Keeps the pull-to-refresh spinner legible when refresh() resolves from
+  // cache — see lib/minimum-visible-helpers.ts for why this is a trailing
+  // hold and not a leading debounce.
+  const showRefreshing = useMinimumVisible(refreshing);
   const ownedCollections = useMemo(
     () => collections.filter((c) => c.role === "owner"),
     [collections],
@@ -323,7 +329,7 @@ export default function WishlistScreen() {
         removeClippedSubviews={Platform.OS === "ios"}
         refreshControl={
           <RefreshControl
-            refreshing={!!refreshing}
+            refreshing={showRefreshing}
             onRefresh={handleRefresh}
             tintColor={ACCENT_DEEP}
             colors={[ACCENT_DEEP]}

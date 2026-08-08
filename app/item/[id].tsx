@@ -15,6 +15,7 @@ import {
   parseCurrencyValueDetailed,
   type CurrencyValueError,
 } from "@/lib/format-currency-input";
+import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { getUserPreferredCurrency, setUserPreferredCurrency } from "@/lib/locale-helpers";
 import { SkeletonItemDetail } from "@/components/skeleton";
 
@@ -122,6 +123,11 @@ export default function ItemDetailsScreen() {
       }
     } finally { setRefreshing(false); }
   }, [refresh, params.id]);
+
+  // Keeps the pull-to-refresh spinner legible when refresh() resolves from
+  // cache — see lib/minimum-visible-helpers.ts for why this is a trailing
+  // hold and not a leading debounce.
+  const showRefreshing = useMinimumVisible(refreshing);
   // Stable so the memoized <ShareSheet> doesn't re-render on every page tick.
   const closeShareSheet = useCallback(() => setShareOpen(false), []);
 
@@ -500,7 +506,7 @@ export default function ItemDetailsScreen() {
   }
 
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+    <Screen refreshing={showRefreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: activeItem.title }} />
       <View style={styles.photoHero}>
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>

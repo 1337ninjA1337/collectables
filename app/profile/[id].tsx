@@ -11,6 +11,7 @@ import { SkeletonProfile } from "@/components/skeleton";
 import { CollectionCard } from "@/components/collection-card";
 import { Screen } from "@/components/screen";
 import { useAppTheme } from "@/components/use-app-theme";
+import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
 import { useMarketplace } from "@/lib/marketplace-context";
@@ -152,6 +153,11 @@ export default function ProfileScreen() {
       await loadItemCounts(cols);
     } catch {} finally { setRefreshing(false); }
   }, [params.id, isSelf, isFriend, ensureProfilesLoaded]);
+
+  // Keeps the pull-to-refresh spinner legible when refresh() resolves from
+  // cache — see lib/minimum-visible-helpers.ts for why this is a trailing
+  // hold and not a leading debounce.
+  const showRefreshing = useMinimumVisible(refreshing);
 
   const profile = cachedProfile;
   const activeProfile = profile;
@@ -300,7 +306,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen refreshing={refreshing} onRefresh={handleRefresh}>
+    <Screen refreshing={showRefreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: activeProfile.displayName }} />
       <View style={styles.hero}>
         {relationship === "self" ? (

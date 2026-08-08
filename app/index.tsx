@@ -12,6 +12,7 @@ import { Screen, useResponsive } from "@/components/screen";
 import { Skeleton } from "@/components/skeleton";
 import { SwipeTabs } from "@/components/swipe-tabs";
 import { useAppTheme } from "@/components/use-app-theme";
+import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { useAuth } from "@/lib/auth-context";
 import { useCollections } from "@/lib/collections-context";
 import {
@@ -94,6 +95,11 @@ export default function HomeScreen() {
       .slice(0, 10);
   }, [items, collections]);
 
+  // Keeps the pull-to-refresh spinner legible when refresh() resolves from
+  // cache — see lib/minimum-visible-helpers.ts for why this is a trailing
+  // hold and not a leading debounce.
+  const showRefreshing = useMinimumVisible(refreshing);
+
   if (!ready) {
     return (
       <Screen>
@@ -128,7 +134,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <Screen nestable refreshing={refreshing} onRefresh={handleRefresh}>
+    <Screen nestable refreshing={showRefreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: "Collectables" }} />
       {isPhone ? null : (
       <HeroBanner

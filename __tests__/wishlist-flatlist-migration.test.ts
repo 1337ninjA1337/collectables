@@ -29,7 +29,7 @@ describe("app/wishlist.tsx — WLF-B FlatList migration", () => {
     assert.doesNotMatch(src, /<Screen refreshing=/);
     assert.match(
       src,
-      /<FlatList[\s\S]*?refreshControl=\{\s*\n?\s*<RefreshControl[\s\S]*?refreshing=\{\s*!!refreshing\s*\}[\s\S]*?onRefresh=\{\s*handleRefresh\s*\}[\s\S]*?\/>[\s\S]*?\}/,
+      /<FlatList[\s\S]*?refreshControl=\{\s*\n?\s*<RefreshControl[\s\S]*?refreshing=\{\s*showRefreshing\s*\}[\s\S]*?onRefresh=\{\s*handleRefresh\s*\}[\s\S]*?\/>[\s\S]*?\}/,
     );
     assert.match(src, /<FlatList[\s\S]*?style=\{\s*flatListStyles\.viewerFlatList\s*\}/);
   });

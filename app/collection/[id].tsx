@@ -19,6 +19,7 @@ import { MoveCollectionModal } from "@/components/move-collection-modal";
 import { Screen, useResponsive } from "@/components/screen";
 import { BulkBar } from "@/components/bulk-bar";
 import { SELECTABLE_ROW_HEIGHT, SelectableItemRow } from "@/components/selectable-item-row";
+import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { useAuth } from "@/lib/auth-context";
 import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
@@ -901,6 +902,11 @@ export default function CollectionDetailsScreen() {
     handleDeleteCollection,
   ]);
 
+  // Keeps the pull-to-refresh spinner legible when refresh() resolves from
+  // cache — see lib/minimum-visible-helpers.ts for why this is a trailing
+  // hold and not a leading debounce.
+  const showRefreshing = useMinimumVisible(refreshing);
+
   if (loadingRemote && !collection) {
     return (
       <Screen>
@@ -1052,7 +1058,7 @@ export default function CollectionDetailsScreen() {
           removeClippedSubviews={Platform.OS === "ios"}
           refreshControl={
             <RefreshControl
-              refreshing={!!refreshing}
+              refreshing={showRefreshing}
               onRefresh={handleRefresh}
               tintColor={ACCENT_DEEP}
               colors={[ACCENT_DEEP]}
@@ -1122,7 +1128,7 @@ export default function CollectionDetailsScreen() {
   }
 
   return (
-    <Screen nestable refreshing={refreshing} onRefresh={handleRefresh}>
+    <Screen nestable refreshing={showRefreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: activeCollection.name }} />
       {pageHeader}
 
