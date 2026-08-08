@@ -47,6 +47,7 @@ import {
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
+import { selectRecentItems } from "@/lib/recent-items";
 import { useSocial } from "@/lib/social-context";
 import { Collection } from "@/lib/types";
 import { FONT_DISPLAY_EDITORIAL, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -82,18 +83,10 @@ export default function HomeScreen() {
   const { isMobile } = useResponsive();
   const theme = useAppTheme();
 
-  const recentItems = useMemo(() => {
-    const ownedIds = new Set(
-      collections.filter((c) => c.role === "owner").map((c) => c.id),
-    );
-    return items
-      .filter(
-        (item) =>
-          !item.isWishlist && !item.archivedAt && ownedIds.has(item.collectionId),
-      )
-      .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
-      .slice(0, 10);
-  }, [items, collections]);
+  const recentItems = useMemo(
+    () => selectRecentItems(items, collections),
+    [items, collections],
+  );
 
   // Keeps the pull-to-refresh spinner legible when refresh() resolves from
   // cache — see lib/minimum-visible-helpers.ts for why this is a trailing
