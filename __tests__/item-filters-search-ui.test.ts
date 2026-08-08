@@ -108,3 +108,77 @@ describe("i18n — searchInCollectionPlaceholder key across all 6 supported lang
     );
   });
 });
+
+describe("components/item-filters.tsx — search row accessibility", () => {
+  const src = read("components/item-filters.tsx");
+
+  it("labels the TextInput so VoiceOver announces more than 'edit text'", () => {
+    // The placeholder is only read AFTER focus, so an unlabeled input is
+    // undiscoverable while swiping through the sheet — the whole point of
+    // the separate a11y key rather than reusing the placeholder string.
+    assert.match(src, /accessibilityLabel=\{\s*t\(\s*"searchInCollectionA11y"\s*\)\s*\}/);
+  });
+
+  it("gives the TextInput the search role", () => {
+    assert.match(src, /accessibilityRole="search"/);
+  });
+
+  it("keeps the label and the placeholder on separate i18n keys", () => {
+    // Reusing `searchInCollectionPlaceholder` for both would force the label
+    // to stay short enough not to be truncated in the field, which is the
+    // opposite constraint from the one a spoken label has.
+    assert.doesNotMatch(src, /accessibilityLabel=\{\s*t\(\s*"searchInCollectionPlaceholder"\s*\)\s*\}/);
+  });
+
+  it("names the clear button, which was an unlabeled icon-only Pressable", () => {
+    assert.match(
+      src,
+      /<Pressable[\s\S]{0,220}accessibilityRole="button"[\s\S]{0,120}accessibilityLabel=\{\s*t\(\s*"filterClearSearch"\s*\)\s*\}/,
+    );
+  });
+
+  it("hides both decorative Ionicons from the accessibility tree", () => {
+    // A focusable but unnamed icon makes a screen-reader user swipe past an
+    // anonymous element to reach the field it decorates.
+    const hidden = src.match(/accessibilityElementsHidden/g) ?? [];
+    assert.ok(hidden.length >= 2, `expected the magnifier + clear icons hidden, got ${hidden.length}`);
+    // Android honours importantForAccessibility, iOS accessibilityElementsHidden —
+    // shipping only one leaves the other platform announcing the icon.
+    const androidHidden = src.match(/importantForAccessibility="no"/g) ?? [];
+    assert.equal(androidHidden.length, hidden.length, "each hidden icon needs BOTH platform props");
+  });
+});
+
+describe("i18n — search a11y keys across all 6 supported languages", () => {
+  const src = read("lib/i18n-context.tsx");
+
+  for (const key of ["searchInCollectionA11y", "filterClearSearch"]) {
+    it(`declares ${key} exactly 6 times (en base + 5 overrides)`, () => {
+      const matches = src.match(new RegExp(`${key}:\\s*"[^"]+"`, "g")) ?? [];
+      assert.equal(matches.length, 6, `expected 6 ${key} declarations, got ${matches.length}`);
+    });
+
+    it(`localizes ${key} in ru / be / pl / de / es rather than falling back to en`, () => {
+      for (const lang of ["ru", "be", "pl", "de", "es"]) {
+        const re = new RegExp(
+          `const\\s+${lang}:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?${key}:\\s*"[^"]+"[\\s\\S]*?\\};`,
+        );
+        assert.match(src, re, `${lang} table is missing a localized ${key} override`);
+      }
+    });
+  }
+
+  it("keeps the spoken label distinct from the placeholder in every language", () => {
+    // Identical strings would mean VoiceOver reads the same phrase twice —
+    // once as the label, once as the placeholder value.
+    const labels = src.match(/searchInCollectionA11y:\s*"([^"]+)"/g) ?? [];
+    const placeholders = src.match(/searchInCollectionPlaceholder:\s*"([^"]+)"/g) ?? [];
+    assert.equal(labels.length, placeholders.length);
+    for (let i = 0; i < labels.length; i += 1) {
+      const label = labels[i].split('"')[1];
+      const placeholder = placeholders[i].split('"')[1];
+      assert.notEqual(label, placeholder, `label duplicates the placeholder: "${label}"`);
+      assert.ok(label.length > placeholder.length, `the spoken label should be the fuller phrase: "${label}"`);
+    }
+  });
+});
