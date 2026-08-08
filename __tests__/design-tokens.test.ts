@@ -961,6 +961,24 @@ describe("design-tokens adoption", () => {
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
 
+  it("components/sheet-search-row.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/sheet-search-row.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /AMBER_SOFT\b/);
+    assert.match(src, /CARD_BG_3\b/);
+    assert.match(src, /MUTED_13\b/);
+    assert.match(src, /MUTED_15\b/);
+    assert.match(src, /PLACEHOLDER\b/);
+    assert.match(src, /RADIUS_INPUT\b/);
+    assert.match(src, /SPACING_LIST\b/);
+    assert.match(src, /TEXT_DARK\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    // The doc comment quotes the two tints it compares — allow those, since
+    // naming the hex is what makes the drift note readable.
+    const inCode = (src.replace(/\/\*[\s\S]*?\*\//g, "").match(/#[0-9a-fA-F]{6}/g) ?? []);
+    assert.deepEqual(inCode, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
   it("components/item-filters.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("components/item-filters.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
@@ -1206,8 +1224,8 @@ describe("design-tokens adoption", () => {
     assert.match(src, /MUTED_3\b/);
     assert.match(src, /MUTED_8\b/);
     assert.match(src, /MUTED_10\b/);
-    assert.match(src, /MUTED_13\b/);
-    assert.match(src, /MUTED_15\b/);
+    // MUTED_13 / MUTED_15 left with the collection-picker search row when it
+    // moved into <SheetSearchRow> — see that file's block below.
     assert.match(src, /PAGE_BG_2/);
     assert.match(src, /PLACEHOLDER/);
     // Same as app/item/[id].tsx: the hues arrive via the shared TAG_COLORS

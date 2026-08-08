@@ -224,6 +224,10 @@ export default function PeopleScreen() {
           placeholderTextColor={PLACEHOLDER}
           autoCapitalize="none"
           style={{ ...styles.searchInput, backgroundColor: theme.page, borderColor: theme.border, color: theme.text }}
+          // The visible <Text> above is a sibling, not a bound label — RN has
+          // no htmlFor, so without this the field announces as "edit text".
+          accessibilityRole="search"
+          accessibilityLabel={t("searchByProfileId")}
         />
       </View>
 

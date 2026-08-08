@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { memo, useMemo } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { MaskedTextInput } from "@/components/masked-text-input";
+import { SheetSearchRow } from "@/components/sheet-search-row";
 
 import { CURRENCIES } from "@/lib/currencies";
 import {
@@ -13,17 +13,14 @@ import {
   MUTED,
   MUTED_2,
   MUTED_3,
-  MUTED_13,
-  MUTED_15,
   PAGE_BG_2,
-  PLACEHOLDER,
   RADIUS_CARD,
   SPACING_CARD,
   SPACING_LIST,
   TEXT_DARK,
   TEXT_DARK_3,
 } from "@/lib/design-tokens";
-import { FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD, FONT_BODY_SEMIBOLD } from "@/lib/fonts";
+import { FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
 
 type CurrencySheetProps = {
@@ -68,23 +65,15 @@ export const CurrencySheet = memo(function CurrencySheet({
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>{t("currencySelectTitle")}</Text>
 
-          <View style={styles.sheetSearchRow}>
-            <Ionicons name="search" size={18} color={MUTED_13} />
-            <MaskedTextInput
-              style={styles.sheetSearchInput}
-              value={query}
-              onChangeText={onQueryChange}
-              placeholder={t("searchPlaceholder")}
-              placeholderTextColor={PLACEHOLDER}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-            {query.length > 0 ? (
-              <Pressable onPress={() => onQueryChange("")} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color={MUTED_15} />
-              </Pressable>
-            ) : null}
-          </View>
+          <SheetSearchRow
+            value={query}
+            onChange={onQueryChange}
+            placeholder={t("searchPlaceholder")}
+            accessibilityLabel={t("currencyPickerSearchA11y")}
+            // Currency needles are codes ("USD", "PLN") far more often than
+            // names, so the keyboard opens shifted here and nowhere else.
+            autoCapitalize="characters"
+          />
 
           <ScrollView
             style={styles.sheetList}
@@ -159,24 +148,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: TEXT_DARK_3,
     fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  sheetSearchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING_LIST,
-    backgroundColor: CARD_BG_3,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-  },
-  sheetSearchInput: {
-    flex: 1,
-    color: TEXT_DARK,
-    fontSize: 15,
-    fontWeight: "600",
-    fontFamily: FONT_BODY_SEMIBOLD,
   },
   sheetList: {
     maxHeight: 340,

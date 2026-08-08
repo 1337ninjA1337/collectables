@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
+import { SheetSearchRow } from "@/components/sheet-search-row";
 
 import {
   AMBER_ACCENT,
@@ -241,52 +242,15 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             >
               <Text style={styles.sheetTitle}>{t("filterTitle")}</Text>
 
-              {/* Search by title.
-
-                  The magnifier is decorative — the affordance is announced by
-                  the input's own label, so leaving the icon focusable would
-                  make a screen-reader user swipe past an unnamed element to
-                  reach the field. Same for the clear button's icon, which is
-                  named by its parent Pressable. */}
-              <View style={styles.sheetSearchRow}>
-                <Ionicons
-                  name="search"
-                  size={18}
-                  color={MUTED_15}
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                />
-                <MaskedTextInput
-                  style={styles.sheetSearchInput}
-                  value={draft.query}
-                  onChangeText={(v) => setDraft({ ...draft, query: v })}
-                  placeholder={t("searchInCollectionPlaceholder")}
-                  placeholderTextColor={PLACEHOLDER}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  // Without these VoiceOver reads only "edit text" until the
-                  // placeholder is announced on focus, so the field is
-                  // undiscoverable while swiping through the sheet.
-                  accessibilityRole="search"
-                  accessibilityLabel={t("searchInCollectionA11y")}
-                />
-                {draft.query.length > 0 ? (
-                  <Pressable
-                    onPress={() => setDraft({ ...draft, query: "" })}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={t("filterClearSearch")}
-                  >
-                    <Ionicons
-                      name="close-circle"
-                      size={18}
-                      color={MUTED_15}
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                    />
-                  </Pressable>
-                ) : null}
-              </View>
+              {/* Search by title. The row's chrome (decorative-icon hiding,
+                  the named clear chip, the styles) lives in
+                  `<SheetSearchRow>`; only the draft binding is ours. */}
+              <SheetSearchRow
+                value={draft.query}
+                onChange={(v) => setDraft({ ...draft, query: v })}
+                placeholder={t("searchInCollectionPlaceholder")}
+                accessibilityLabel={t("searchInCollectionA11y")}
+              />
 
               {/* Price range */}
               <View style={styles.fieldRow}>
@@ -546,23 +510,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: TEXT_DARK_3,
-  },
-  sheetSearchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING_LIST,
-    backgroundColor: CARD_BG_3,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-  },
-  sheetSearchInput: {
-    flex: 1,
-    color: TEXT_DARK,
-    fontSize: 14,
-    fontWeight: "600",
   },
   fieldRow: {
     flexDirection: "row",

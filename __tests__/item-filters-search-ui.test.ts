@@ -17,7 +17,15 @@ function read(rel: string): string {
 describe("components/item-filters.tsx — search row UI", () => {
   const src = read("components/item-filters.tsx");
 
-  it("renders a TextInput bound to draft.query inside the sheet", () => {
+  it("delegates the row markup to the shared <SheetSearchRow>", () => {
+    // The row shape (magnifier + input + clear chip + styles) now lives in
+    // `components/sheet-search-row.tsx` — see `sheet-search-row.test.ts` for
+    // the markup-level pins. These tests only guard the draft binding.
+    assert.match(src, /import \{ SheetSearchRow \} from "@\/components\/sheet-search-row";/);
+    assert.match(src, /<SheetSearchRow\b/);
+  });
+
+  it("renders the row bound to draft.query inside the sheet", () => {
     // value={draft.query} — without this, the input would render blank
     // even after a previous search-and-apply round, breaking the
     // "open sheet again to refine my search" flow.
@@ -25,44 +33,27 @@ describe("components/item-filters.tsx — search row UI", () => {
   });
 
   it("writes back to draft.query via setDraft on every keystroke", () => {
-    // The onChangeText must mirror the same setDraft pattern as the
-    // other fields so Apply/Reset CTAs stay coherent.
+    // The onChange must mirror the same setDraft pattern as the other
+    // fields so Apply/Reset CTAs stay coherent. The spread also covers the
+    // clear chip, which calls this same handler with "" — a
+    // `setDraft({ query: v })` (no spread) would wipe the user's in-flight
+    // price/date inputs on every keystroke AND on clear.
     assert.match(
       src,
-      /onChangeText=\{\s*\(v\)\s*=>\s*setDraft\(\{\s*\.\.\.draft\s*,\s*query:\s*v\s*\}\)\s*\}/,
+      /onChange=\{\s*\(v\)\s*=>\s*setDraft\(\{\s*\.\.\.draft\s*,\s*query:\s*v\s*\}\)\s*\}/,
     );
   });
 
-  it("uses the new searchInCollectionPlaceholder i18n key on the TextInput", () => {
+  it("uses the new searchInCollectionPlaceholder i18n key on the row", () => {
     assert.match(src, /placeholder=\{\s*t\(\s*"searchInCollectionPlaceholder"\s*\)\s*\}/);
-  });
-
-  it("renders a clear chip (Ionicons close-circle) only when draft.query has content", () => {
-    // The chip must be gated on draft.query.length > 0 — a permanently
-    // visible clear button on an empty input is the usability anti-pattern
-    // we're avoiding (matches the create.tsx search row shape).
-    assert.match(
-      src,
-      /\{\s*draft\.query\.length\s*>\s*0\s*\?\s*\(\s*<Pressable[\s\S]*?name="close-circle"/,
-    );
-  });
-
-  it("clear chip resets draft.query to the empty string (not undefined)", () => {
-    // setDraft({ ...draft, query: "" }) preserves all other in-flight
-    // draft state — a `setDraft({ query: "" })` (no spread) would wipe
-    // the user's price/date inputs as a side effect.
-    assert.match(
-      src,
-      /onPress=\{\s*\(\)\s*=>\s*setDraft\(\{\s*\.\.\.draft\s*,\s*query:\s*""\s*\}\)\s*\}/,
-    );
   });
 
   it("places the search row above the price-range field row in the sheet", () => {
     // Ordering matters for affordance: search is the primary CTA,
     // price/date are advanced filters.
-    const searchIdx = src.indexOf("sheetSearchRow");
+    const searchIdx = src.indexOf("<SheetSearchRow");
     const priceIdx = src.indexOf("filterPriceFrom");
-    assert.ok(searchIdx > 0, "sheetSearchRow style is missing");
+    assert.ok(searchIdx > 0, "<SheetSearchRow> is missing");
     assert.ok(priceIdx > 0, "filterPriceFrom field is missing");
     assert.ok(
       searchIdx < priceIdx,
@@ -70,9 +61,12 @@ describe("components/item-filters.tsx — search row UI", () => {
     );
   });
 
-  it("declares sheetSearchRow + sheetSearchInput styles for the new row", () => {
-    assert.match(src, /sheetSearchRow:\s*\{[\s\S]*?flexDirection:\s*"row"/);
-    assert.match(src, /sheetSearchInput:\s*\{[\s\S]*?flex:\s*1/);
+  it("no longer keeps a private copy of the row's styles", () => {
+    // The whole point of the extraction: a leftover `sheetSearchRow` /
+    // `sheetSearchInput` entry here is how the three copies drifted apart
+    // (fontSize 14 vs 15, missing fontFamily) in the first place.
+    assert.doesNotMatch(src, /sheetSearchRow:\s*\{/);
+    assert.doesNotMatch(src, /sheetSearchInput:\s*\{/);
   });
 });
 
@@ -119,10 +113,6 @@ describe("components/item-filters.tsx — search row accessibility", () => {
     assert.match(src, /accessibilityLabel=\{\s*t\(\s*"searchInCollectionA11y"\s*\)\s*\}/);
   });
 
-  it("gives the TextInput the search role", () => {
-    assert.match(src, /accessibilityRole="search"/);
-  });
-
   it("keeps the label and the placeholder on separate i18n keys", () => {
     // Reusing `searchInCollectionPlaceholder` for both would force the label
     // to stay short enough not to be truncated in the field, which is the
@@ -130,23 +120,9 @@ describe("components/item-filters.tsx — search row accessibility", () => {
     assert.doesNotMatch(src, /accessibilityLabel=\{\s*t\(\s*"searchInCollectionPlaceholder"\s*\)\s*\}/);
   });
 
-  it("names the clear button, which was an unlabeled icon-only Pressable", () => {
-    assert.match(
-      src,
-      /<Pressable[\s\S]{0,220}accessibilityRole="button"[\s\S]{0,120}accessibilityLabel=\{\s*t\(\s*"filterClearSearch"\s*\)\s*\}/,
-    );
-  });
-
-  it("hides both decorative Ionicons from the accessibility tree", () => {
-    // A focusable but unnamed icon makes a screen-reader user swipe past an
-    // anonymous element to reach the field it decorates.
-    const hidden = src.match(/accessibilityElementsHidden/g) ?? [];
-    assert.ok(hidden.length >= 2, `expected the magnifier + clear icons hidden, got ${hidden.length}`);
-    // Android honours importantForAccessibility, iOS accessibilityElementsHidden —
-    // shipping only one leaves the other platform announcing the icon.
-    const androidHidden = src.match(/importantForAccessibility="no"/g) ?? [];
-    assert.equal(androidHidden.length, hidden.length, "each hidden icon needs BOTH platform props");
-  });
+  // The search role, the named clear button and the hidden decorative icons
+  // moved into `<SheetSearchRow>` with the extraction — every sheet now gets
+  // them for free instead of only this one. Pinned by `sheet-search-row.test.ts`.
 });
 
 describe("i18n — search a11y keys across all 6 supported languages", () => {
