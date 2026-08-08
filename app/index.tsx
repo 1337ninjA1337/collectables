@@ -5,6 +5,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import { NestableDraggableFlatList, ScaleDecorator, RenderItemParams } from "../components/DraggableList";
 
 import { CollectionCard } from "@/components/collection-card";
+import { DashboardBanner } from "@/components/dashboard-banner";
 import { EmptyState } from "@/components/empty-state";
 import { HeroBanner } from "@/components/hero-banner";
 import { Screen, useResponsive } from "@/components/screen";
@@ -21,7 +22,6 @@ import {
   BORDER,
   CARD_BG,
   CARD_BG_9,
-  HERO_DARK,
   HERO_DARK_2,
   MUTED,
   MUTED_2,
@@ -228,31 +228,20 @@ export default function HomeScreen() {
       </View>
       )}
 
-      <Link href="/wishlist" asChild>
-        <Pressable style={{ ...styles.wishlistBanner, backgroundColor: theme.bannerBg, ...SHADOW_SOFT }}>
-          <View style={styles.wishlistBannerIcon}>
-            <Text style={styles.wishlistBannerIconText}>★</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ ...styles.wishlistBannerTitle, color: theme.text }}>{t("wishlist")}</Text>
-            <Text style={{ ...styles.wishlistBannerHint, color: theme.meta }}>{t("wishlistHint")}</Text>
-          </View>
-          <Text style={{ ...styles.wishlistBannerArrow, color: theme.meta }}>›</Text>
-        </Pressable>
-      </Link>
+      <DashboardBanner
+        href="/wishlist"
+        tone="amber"
+        icon="★"
+        title={t("wishlist")}
+        hint={t("wishlistHint")}
+      />
 
-      <Link href="/stats" asChild>
-        <Pressable style={{ ...styles.statsBanner, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
-          <View style={styles.statsBannerIcon}>
-            <Text style={styles.statsBannerIconText}>⊞</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ ...styles.statsBannerTitle, color: theme.text }}>{t("statsTitle")}</Text>
-            <Text style={{ ...styles.statsBannerHint, color: theme.meta }}>{t("statsSubtitle")}</Text>
-          </View>
-          <Text style={{ ...styles.statsBannerArrow, color: theme.meta }}>›</Text>
-        </Pressable>
-      </Link>
+      <DashboardBanner
+        href="/stats"
+        icon="⊞"
+        title={t("statsTitle")}
+        hint={t("statsSubtitle")}
+      />
 
       {recentItems.length > 0 ? (
         <View style={styles.section}>
@@ -643,80 +632,5 @@ const styles = StyleSheet.create({
   recentMeta: {
     fontSize: 12,
     fontFamily: FONT_BODY,
-  },
-  wishlistBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-  },
-  wishlistBannerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS_CARD,
-    backgroundColor: AMBER_ACCENT,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  wishlistBannerIconText: {
-    color: TEXT_ON_DARK_5,
-    fontSize: 22,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  wishlistBannerTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  wishlistBannerHint: {
-    fontSize: 13,
-    marginTop: 2,
-    fontFamily: FONT_BODY,
-  },
-  wishlistBannerArrow: {
-    fontSize: 28,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  statsBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-  },
-  statsBannerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS_CARD,
-    backgroundColor: HERO_DARK,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statsBannerIconText: {
-    color: TEXT_ON_DARK,
-    fontSize: 20,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  statsBannerTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  statsBannerHint: {
-    fontSize: 13,
-    marginTop: 2,
-    fontFamily: FONT_BODY,
-  },
-  statsBannerArrow: {
-    fontSize: 28,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
   },
 });

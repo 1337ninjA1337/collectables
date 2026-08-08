@@ -844,7 +844,6 @@ describe("design-tokens adoption", () => {
     assert.match(src, /BORDER\b/);
     assert.match(src, /CARD_BG\b/);
     assert.match(src, /CARD_BG_9/);
-    assert.match(src, /HERO_DARK\b/);
     assert.match(src, /HERO_DARK_2/);
     // HERO_DARK_4 / HERO_DARK_5 left with the hero banner when it moved into
     // HERO_DARK_GRADIENT (lib/gradients.ts) — pinned by gradients.test.ts.
@@ -860,6 +859,9 @@ describe("design-tokens adoption", () => {
     assert.match(src, /TEXT_ON_DARK_5/);
     assert.match(src, /TEXT_ON_DARK_7/);
     assert.match(src, /TEXT_ON_DARK_8/);
+    // HERO_DARK left with the wishlist + stats rows when they moved into
+    // <DashboardBanner> (components/dashboard-banner.tsx) — pinned by
+    // dashboard-banner.test.ts.
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -882,9 +884,11 @@ describe("design-tokens adoption", () => {
     assert.match(src, /FONT_DISPLAY_EDITORIAL/);
     // body surfaces read their colors from the theme rather than fixed tokens
     assert.match(src, /backgroundColor:\s*theme\.card/);
-    assert.match(src, /backgroundColor:\s*theme\.bannerBg/);
     assert.match(src, /color:\s*theme\.text\b/);
     assert.match(src, /color:\s*theme\.meta\b/);
+    // theme.bannerBg left with the wishlist + stats rows when they moved into
+    // <DashboardBanner> (components/dashboard-banner.tsx) — pinned by
+    // dashboard-banner.test.ts.
   });
 
   // PR6 (visual-upgrade `redesign-collection-detail`): app/collection/[id].tsx
@@ -955,6 +959,26 @@ describe("design-tokens adoption", () => {
     assert.match(src, /borderColor:\s*theme\.border/);
     assert.match(src, /color:\s*theme\.text\b/);
     assert.match(src, /color:\s*theme\.meta\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/dashboard-banner.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/dashboard-banner.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bAMBER_ACCENT\b/);
+    assert.match(src, /\bAMBER_SOFT\b/);
+    assert.match(src, /\bHERO_DARK\b/);
+    assert.match(src, /\bRADIUS_CARD\b/);
+    assert.match(src, /\bRADIUS_CARD_SM\b/);
+    assert.match(src, /\bSHADOW_SOFT\b/);
+    assert.match(src, /\bSPACING_SECTION\b/);
+    assert.match(src, /\bTEXT_ON_DARK\b/);
+    assert.match(src, /\bTEXT_ON_DARK_5\b/);
+    // surfaces come from the theme, not from fixed tokens
+    assert.match(src, /from\s+"@\/components\/use-app-theme"/);
+    assert.match(src, /theme\.bannerBg/);
+    assert.match(src, /theme\.card/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

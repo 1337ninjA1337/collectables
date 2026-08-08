@@ -246,8 +246,12 @@ describe("hero-banner — adoption across the UI", () => {
   });
 
   it("no gradient consumer passes a tone, so the default stays exercised", () => {
+    // Scoped to the <HeroBanner> element: `app/index.tsx` also renders
+    // <DashboardBanner tone="amber">, which is a different component's tone.
     for (const file of GRADIENT_CONSUMERS) {
-      assert.doesNotMatch(read(file), /tone=/, file);
+      const element = read(file).match(/<HeroBanner[\s\S]*?>/)?.[0] ?? "";
+      assert.ok(element.length > 0, `${file} renders no <HeroBanner>`);
+      assert.doesNotMatch(element, /tone=/, file);
     }
   });
 
