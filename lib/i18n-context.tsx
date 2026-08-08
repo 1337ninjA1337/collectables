@@ -345,6 +345,8 @@ const en = {
   sortAcquiredAsc: "Oldest first",
   sortChipClear: (params?: TranslationParams) =>
     `Sorted: ${params?.sort ?? ""} — tap to clear`,
+  queryChipClear: (params?: TranslationParams) =>
+    `Searching for ${params?.query ?? ""} — tap to clear`,
   filterHasPhotos: "With photos only",
   filterApply: "Apply",
   filterReset: "Reset",
@@ -920,6 +922,8 @@ const ru: TranslationMap = {
   sortAcquiredAsc: "Сначала старые",
   sortChipClear: (params?: TranslationParams) =>
     `Сортировка: ${params?.sort ?? ""} — нажмите, чтобы сбросить`,
+  queryChipClear: (params?: TranslationParams) =>
+    `Поиск: ${params?.query ?? ""} — нажмите, чтобы сбросить`,
   filterHasPhotos: "Только с фото",
   filterApply: "Применить",
   filterReset: "Сбросить",
@@ -1153,6 +1157,8 @@ const be: TranslationMap = {
   sortAcquiredAsc: "Спачатку старыя",
   sortChipClear: (params?: TranslationParams) =>
     `Сартаванне: ${params?.sort ?? ""} — націсніце, каб скінуць`,
+  queryChipClear: (params?: TranslationParams) =>
+    `Пошук: ${params?.query ?? ""} — націсніце, каб скінуць`,
   collectionCurrencyHint: "Валюта, у якой паказваюцца сумы па гэтай калекцыі. Пакіньце пустым, каб выкарыстаць валюту па змаўчанні.",
   collectionCurrencyAuto: "Па змаўчанні",
   collectionCurrencyA11y: (params?: TranslationParams) => `Сума ў валюце ${params?.currency ?? ""} — націсніце, каб змяніць валюту`,
@@ -1382,6 +1388,8 @@ const pl: TranslationMap = {
   sortAcquiredAsc: "Najstarsze najpierw",
   sortChipClear: (params?: TranslationParams) =>
     `Sortowanie: ${params?.sort ?? ""} — dotknij, aby wyczyścić`,
+  queryChipClear: (params?: TranslationParams) =>
+    `Szukanie: ${params?.query ?? ""} — dotknij, aby wyczyścić`,
   collectionCurrencyHint: "Waluta, w której wyświetlane są sumy dla tej kolekcji. Pozostaw puste, aby użyć waluty domyślnej.",
   collectionCurrencyAuto: "Domyślna",
   collectionCurrencyA11y: (params?: TranslationParams) => `Suma w walucie ${params?.currency ?? ""} — dotknij, aby zmienić walutę`,
@@ -1601,6 +1609,8 @@ const de: TranslationMap = {
   sortAcquiredAsc: "Älteste zuerst",
   sortChipClear: (params?: TranslationParams) =>
     `Sortierung: ${params?.sort ?? ""} — zum Zurücksetzen tippen`,
+  queryChipClear: (params?: TranslationParams) =>
+    `Suche: ${params?.query ?? ""} — zum Zurücksetzen tippen`,
   collectionCurrencyHint: "Währung, in der die Summen dieser Sammlung angezeigt werden. Leer lassen, um die App-Standardwährung zu verwenden.",
   collectionCurrencyAuto: "App-Standard",
   collectionCurrencyA11y: (params?: TranslationParams) => `Gesamtkosten in ${params?.currency ?? ""} — tippen, um die Währung zu ändern`,
@@ -1816,6 +1826,8 @@ const es: TranslationMap = {
   sortAcquiredAsc: "Más antiguos primero",
   sortChipClear: (params?: TranslationParams) =>
     `Orden: ${params?.sort ?? ""} — toca para borrar`,
+  queryChipClear: (params?: TranslationParams) =>
+    `Búsqueda: ${params?.query ?? ""} — toca para borrar`,
   collectionCurrencyHint: "Moneda en la que se muestran los totales de esta colección. Déjalo en blanco para usar la moneda predeterminada.",
   collectionCurrencyAuto: "Predeterminada",
   collectionCurrencyA11y: (params?: TranslationParams) => `Total en ${params?.currency ?? ""} — toca para cambiar la moneda`,
