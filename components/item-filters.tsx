@@ -127,6 +127,19 @@ export function ItemFilterBar({ filters, onChange }: Props) {
     onChange({ ...filters, sort: "default" });
   }
 
+  // Same problem the sort chip had, and worse: a search query narrows the
+  // collection to a handful of items with nothing on screen naming the needle,
+  // so a user who filtered by "penny" yesterday reopens the collection and
+  // sees an apparently half-empty shelf. The chip renders the trimmed query
+  // because that is what `applyItemFilters` actually matches on — showing the
+  // raw value would claim a leading space is part of the needle.
+  const queryChip = filters.query.trim();
+
+  // Clears ONLY the query, mirroring `clearSort`.
+  function clearQuery() {
+    onChange({ ...filters, query: "" });
+  }
+
   return (
     <>
       <ScrollView
@@ -159,6 +172,36 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             </Text>
           </Pressable>
         ))}
+
+        {queryChip.length > 0 ? (
+          <Pressable
+            style={styles.queryQuickChip}
+            onPress={clearQuery}
+            accessibilityRole="button"
+            accessibilityLabel={t("queryChipClear", { query: queryChip })}
+          >
+            <Ionicons
+              name="search"
+              size={14}
+              color={TEXT_ON_DARK_5}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
+            {/* One line, ellipsised: a long needle would otherwise push the
+                sort and reset chips off the end of the horizontal scroll,
+                where nothing hints they exist. */}
+            <Text style={styles.queryQuickChipText} numberOfLines={1}>
+              {queryChip}
+            </Text>
+            <Ionicons
+              name="close-circle"
+              size={14}
+              color={TEXT_ON_DARK_5}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
+          </Pressable>
+        ) : null}
 
         {sortChip ? (
           <Pressable
@@ -430,6 +473,30 @@ const styles = StyleSheet.create({
     color: TEXT_ON_DARK_5,
     fontWeight: "700",
     fontSize: 12,
+  },
+  // Shares the sort chip's "applied value" amber fill so the two read as one
+  // family of active-narrowing chips rather than two unrelated widgets.
+  queryQuickChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: RADIUS_PILL,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: AMBER_ACCENT,
+    borderWidth: 1,
+    borderColor: AMBER_ACCENT,
+    // The needle is user input of unbounded length; without a cap one long
+    // query becomes a chip wider than the screen.
+    maxWidth: 180,
+  },
+  queryQuickChipText: {
+    color: TEXT_ON_DARK_5,
+    fontWeight: "700",
+    fontSize: 12,
+    // Lets `numberOfLines={1}` ellipsise instead of the text forcing the
+    // flex row past its maxWidth.
+    flexShrink: 1,
   },
   resetChip: {
     flexDirection: "row",

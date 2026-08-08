@@ -182,3 +182,75 @@ describe("i18n — search a11y keys across all 6 supported languages", () => {
     }
   });
 });
+
+describe("components/item-filters.tsx — active query quick chip", () => {
+  const src = read("components/item-filters.tsx");
+
+  it("renders the chip only when the query has non-whitespace content", () => {
+    // A whitespace-only query matches nothing in `applyItemFilters`, so a
+    // chip for it would name a narrowing that isn't happening.
+    assert.match(src, /const queryChip = filters\.query\.trim\(\);/);
+    assert.match(src, /\{\s*queryChip\.length\s*>\s*0\s*\?\s*\(\s*<Pressable/);
+  });
+
+  it("shows the trimmed needle, matching what applyItemFilters actually matches on", () => {
+    assert.match(src, /<Text style=\{styles\.queryQuickChipText\} numberOfLines=\{1\}>\s*\{queryChip\}/);
+  });
+
+  it("clears ONLY the query, leaving sort and the other filters intact", () => {
+    // `reset()` wipes everything; this chip's ✕ must undo the chip alone.
+    assert.match(src, /function clearQuery\(\) \{\s*onChange\(\{ \.\.\.filters, query: "" \}\);\s*\}/);
+  });
+
+  it("reads the query back from `filters`, not from the sheet's `draft`", () => {
+    // `draft` is uncommitted sheet state — a chip driven by it would name a
+    // narrowing the user typed but never applied.
+    assert.doesNotMatch(src, /const queryChip = draft/);
+  });
+
+  it("is announced with the needle in its label", () => {
+    assert.match(src, /accessibilityLabel=\{\s*t\("queryChipClear", \{ query: queryChip \}\)\s*\}/);
+  });
+
+  it("caps the chip width and ellipsises, so a long needle can't push the other chips off-screen", () => {
+    assert.match(src, /queryQuickChip:\s*\{[\s\S]*?maxWidth:\s*\d+/);
+    assert.match(src, /queryQuickChipText:\s*\{[\s\S]*?flexShrink:\s*1/);
+  });
+
+  it("sits before the sort chip in the quickChips row", () => {
+    // Narrowing-by-content is the more surprising state to forget, so it
+    // reads first in the scroll order.
+    const queryIdx = src.indexOf("styles.queryQuickChip");
+    const sortIdx = src.indexOf("styles.sortQuickChip");
+    assert.ok(queryIdx > 0 && sortIdx > 0);
+    assert.ok(queryIdx < sortIdx, "the query chip should render before the sort chip");
+  });
+});
+
+describe("i18n — queryChipClear across all 6 supported languages", () => {
+  const src = read("lib/i18n-context.tsx");
+
+  it("declares queryChipClear exactly 6 times (en base + 5 overrides)", () => {
+    const matches = src.match(/queryChipClear:\s*\(params\?: TranslationParams\)/g) ?? [];
+    assert.equal(matches.length, 6, `expected 6 queryChipClear declarations, got ${matches.length}`);
+  });
+
+  it("interpolates the needle in every language rather than dropping it", () => {
+    // A label that says only "tap to clear" tells a non-visual user that
+    // something is narrowing the list but not what.
+    const bodies = src.match(/queryChipClear:\s*\(params\?: TranslationParams\)\s*=>\s*\n?\s*`[^`]+`/g) ?? [];
+    assert.equal(bodies.length, 6);
+    for (const body of bodies) {
+      assert.match(body, /\$\{params\?\.query \?\? ""\}/, `missing query interpolation: ${body}`);
+    }
+  });
+
+  it("localizes queryChipClear in ru / be / pl / de / es", () => {
+    for (const lang of ["ru", "be", "pl", "de", "es"]) {
+      const re = new RegExp(
+        `const\\s+${lang}:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?queryChipClear:[\\s\\S]*?\\};`,
+      );
+      assert.match(src, re, `${lang} table is missing a localized queryChipClear override`);
+    }
+  });
+});
