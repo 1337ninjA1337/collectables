@@ -101,12 +101,17 @@ describe("gradients — adoption across the UI", () => {
     );
   });
 
-  it("the three hero screens all spread the shared bundle", () => {
-    for (const file of ["app/index.tsx", "app/settings.tsx", "components/login-screen.tsx"]) {
-      const src = read(file);
-      assert.match(src, /import \{ HERO_DARK_GRADIENT \} from "@\/lib\/gradients";/, file);
-      assert.match(src, /<LinearGradient \{\.\.\.HERO_DARK_GRADIENT\}/, file);
-    }
+  it("HERO_DARK_GRADIENT has exactly one consumer — the shared <HeroBanner>", () => {
+    // The three hero screens used to spread the bundle themselves. They now
+    // render <HeroBanner>, which owns the whole recipe (gradient + padding +
+    // typography), so a screen reaching for the gradient directly is a screen
+    // rebuilding the banner by hand.
+    const consumers = UI_FILES.filter((f) => /\bHERO_DARK_GRADIENT\b/.test(read(f)));
+    assert.deepEqual(consumers, ["components/hero-banner.tsx"]);
+
+    const src = read("components/hero-banner.tsx");
+    assert.match(src, /import \{ HERO_DARK_GRADIENT \} from "@\/lib\/gradients";/);
+    assert.match(src, /<LinearGradient \{\.\.\.HERO_DARK_GRADIENT\}/);
   });
 
   it("both cover-photo surfaces spread the shared scrim", () => {
@@ -119,7 +124,9 @@ describe("gradients — adoption across the UI", () => {
 
   it("the hero screens no longer import the tokens that left with the recipe", () => {
     // A leftover HERO_DARK_4/_5 import is the tell that a second inline copy
-    // is being reintroduced.
+    // is being reintroduced. `components/hero-banner.tsx` is intentionally not
+    // in this list — it imports them transitively via lib/gradients.ts, never
+    // by name.
     for (const file of ["app/index.tsx", "app/settings.tsx", "components/login-screen.tsx"]) {
       const src = read(file);
       assert.doesNotMatch(src, /\bHERO_DARK_4\b/, `${file} still references HERO_DARK_4`);

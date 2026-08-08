@@ -1,6 +1,7 @@
 import { Link } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { HeroBanner } from "@/components/hero-banner";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { EmptyState } from "@/components/empty-state";
@@ -8,7 +9,6 @@ import { Screen } from "@/components/screen";
 import { SkeletonProfileList } from "@/components/skeleton";
 import { useAppTheme } from "@/components/use-app-theme";
 import {
-  AMBER_LIGHT,
   AMBER_MUTED,
   AMBER_SOFT,
   BORDER,
@@ -26,16 +26,13 @@ import {
   MUTED_16,
   PLACEHOLDER,
   PURE_WHITE,
-  RADIUS_HERO_LG,
   RADIUS_CARD_LG,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
   SPACING_LIST,
   TEXT_DARK,
-  TEXT_ON_DARK_3,
   TEXT_ON_DARK_4,
-  TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
@@ -209,11 +206,12 @@ export default function PeopleScreen() {
 
   return (
     <Screen refreshing={refreshing} onRefresh={handleRefresh}>
-      <View style={styles.hero}>
-        <Text style={styles.eyebrow}>{t("community")}</Text>
-        <Text style={styles.title}>{t("searchTitle")}</Text>
-        <Text style={styles.subtitle}>{t("searchSubtitle")}</Text>
-      </View>
+      <HeroBanner
+        tone="solid"
+        eyebrow={t("community")}
+        title={t("searchTitle")}
+        subtitle={t("searchSubtitle")}
+      />
 
       <View style={{ ...styles.searchCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
         <Text style={{ ...styles.searchLabel, color: theme.meta }}>{t("searchByProfileId")}</Text>
@@ -271,32 +269,6 @@ export default function PeopleScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: HERO_DARK,
-    borderRadius: RADIUS_HERO_LG,
-    padding: 24,
-    gap: SPACING_LIST,
-  },
-  eyebrow: {
-    color: AMBER_LIGHT,
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  title: {
-    color: TEXT_ON_DARK_3,
-    fontSize: 28,
-    fontWeight: "800",
-    lineHeight: 36,
-    fontFamily: FONT_DISPLAY_EDITORIAL,
-  },
-  subtitle: {
-    color: TEXT_ON_DARK_SOFT,
-    lineHeight: 22,
-    fontFamily: FONT_BODY,
-  },
   searchCard: {
     borderRadius: RADIUS_ITEM_AIRY,
     backgroundColor: CARD_BG,

@@ -1,12 +1,12 @@
 import { Link, router } from "expo-router";
 import { Stack } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NestableDraggableFlatList, ScaleDecorator, RenderItemParams } from "../components/DraggableList";
 
 import { CollectionCard } from "@/components/collection-card";
 import { EmptyState } from "@/components/empty-state";
+import { HeroBanner } from "@/components/hero-banner";
 import { Screen, useResponsive } from "@/components/screen";
 import { Skeleton } from "@/components/skeleton";
 import { SwipeTabs } from "@/components/swipe-tabs";
@@ -35,19 +35,15 @@ import {
   RADIUS_PILL,
   SHADOW_SOFT,
   SPACING_CARD,
-  SPACING_GUTTER,
   SPACING_INLINE,
   SPACING_LIST,
   TEXT_DARK,
   TEXT_DARK_2,
   TEXT_ON_DARK,
-  TEXT_ON_DARK_3,
   TEXT_ON_DARK_5,
   TEXT_ON_DARK_7,
   TEXT_ON_DARK_8,
-  TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
-import { HERO_DARK_GRADIENT } from "@/lib/gradients";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
@@ -135,39 +131,42 @@ export default function HomeScreen() {
     <Screen nestable refreshing={refreshing} onRefresh={handleRefresh}>
       <Stack.Screen options={{ title: "Collectables" }} />
       {isPhone ? null : (
-      <LinearGradient {...HERO_DARK_GRADIENT} style={styles.hero}>
-        <Text style={styles.eyebrow}>{t("appName")}</Text>
-        <View style={styles.profileRow}>
-          {myProfile ? (
-            <Link href={`/profile/${myProfile.id}` as never} asChild>
-              <Pressable style={styles.profileCard}>
+      <HeroBanner
+        eyebrow={t("appName")}
+        title={t("homeTitle")}
+        subtitle={t("homeSubtitle")}
+        headerSlot={
+          <View style={styles.profileRow}>
+            {myProfile ? (
+              <Link href={`/profile/${myProfile.id}` as never} asChild>
+                <Pressable style={styles.profileCard}>
+                  <Text style={styles.profileLabel}>{t("profile")}</Text>
+                  <Text style={styles.profileValue}>{myProfile.displayName}</Text>
+                </Pressable>
+              </Link>
+            ) : (
+              <View style={styles.profileCard}>
                 <Text style={styles.profileLabel}>{t("profile")}</Text>
-                <Text style={styles.profileValue}>{myProfile.displayName}</Text>
+                <Text style={styles.profileValue}>{user?.email ?? t("noEmail")}</Text>
+              </View>
+            )}
+            <View style={styles.headerButtons}>
+              <Link href="/settings" asChild>
+                <Pressable style={styles.settingsButton}>
+                  <Text style={styles.settingsButtonText}>{t("settings")}</Text>
+                </Pressable>
+              </Link>
+              <Pressable
+                style={{...styles.signOutButton, ...(pending ? styles.signOutButtonDisabled : {})}}
+                onPress={() => void signOut()}
+                disabled={pending}
+              >
+                <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
               </Pressable>
-            </Link>
-          ) : (
-            <View style={styles.profileCard}>
-              <Text style={styles.profileLabel}>{t("profile")}</Text>
-              <Text style={styles.profileValue}>{user?.email ?? t("noEmail")}</Text>
             </View>
-          )}
-          <View style={styles.headerButtons}>
-            <Link href="/settings" asChild>
-              <Pressable style={styles.settingsButton}>
-                <Text style={styles.settingsButtonText}>{t("settings")}</Text>
-              </Pressable>
-            </Link>
-            <Pressable
-              style={{...styles.signOutButton, ...(pending ? styles.signOutButtonDisabled : {})}}
-              onPress={() => void signOut()}
-              disabled={pending}
-            >
-              <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
-            </Pressable>
           </View>
-        </View>
-        <Text style={styles.title}>{t("homeTitle")}</Text>
-        <Text style={styles.subtitle}>{t("homeSubtitle")}</Text>
+        }
+      >
         <View style={styles.actionsRow}>
           <Link href="/create" asChild>
             <Pressable style={styles.cta}>
@@ -190,7 +189,7 @@ export default function HomeScreen() {
             </Pressable>
           </Link>
         </View>
-      </LinearGradient>
+      </HeroBanner>
       )}
 
       {!isPhone && (
@@ -389,30 +388,10 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    borderRadius: RADIUS_HERO_LG,
-    padding: SPACING_GUTTER,
-    gap: SPACING_CARD,
-  },
   phoneActionsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING_CARD,
-  },
-  eyebrow: {
-    color: AMBER_LIGHT,
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  title: {
-    color: TEXT_ON_DARK_3,
-    fontSize: 32,
-    lineHeight: 38,
-    fontWeight: "700",
-    fontFamily: FONT_DISPLAY_EDITORIAL,
   },
   profileRow: {
     flexDirection: "row",
@@ -477,12 +456,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
-  },
-  subtitle: {
-    color: TEXT_ON_DARK_SOFT,
-    fontSize: 15,
-    lineHeight: 23,
-    fontFamily: FONT_BODY,
   },
   actionsRow: {
     flexDirection: "row",

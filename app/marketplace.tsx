@@ -3,30 +3,26 @@ import { useCallback, useMemo } from "react";
 import { DimensionValue, Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
+import { HeroBanner } from "@/components/hero-banner";
 import { RealtimeStatusPill } from "@/components/realtime-status-pill";
 import { Screen, useResponsive } from "@/components/screen";
 import { useAppTheme } from "@/components/use-app-theme";
 import { useCollections } from "@/lib/collections-context";
 import {
   AMBER_ACCENT,
-  AMBER_LIGHT,
   AMBER_MUTED_3,
   BORDER,
   CARD_BG,
   HERO_DARK,
   MUTED,
-  PAGE_BG,
-  RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
   SPACING_CARD,
   SPACING_INLINE,
-  SPACING_LIST,
   SUCCESS_GREEN,
   TEXT_DARK,
   TEXT_ON_DARK,
-  TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
 import { FONT_DISPLAY_EDITORIAL } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
@@ -105,11 +101,12 @@ export default function MarketplaceScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: t("marketplaceTitle") }} />
-      <View style={styles.hero}>
-        <Text style={styles.eyebrow}>{t("marketplaceEyebrow")}</Text>
-        <Text style={styles.title}>{t("marketplaceTitle")}</Text>
-        <Text style={styles.subtitle}>{t("marketplaceSubtitle")}</Text>
-      </View>
+      <HeroBanner
+        tone="solid"
+        eyebrow={t("marketplaceEyebrow")}
+        title={t("marketplaceTitle")}
+        subtitle={t("marketplaceSubtitle")}
+      />
 
       <RealtimeStatusPill />
 
@@ -312,30 +309,6 @@ function ListingCard({
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: HERO_DARK,
-    borderRadius: RADIUS_HERO_LG,
-    padding: 24,
-    gap: SPACING_LIST,
-  },
-  eyebrow: {
-    color: AMBER_LIGHT,
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    fontWeight: "800",
-  },
-  title: {
-    color: PAGE_BG,
-    fontSize: 28,
-    fontWeight: "800",
-    lineHeight: 36,
-    fontFamily: FONT_DISPLAY_EDITORIAL,
-  },
-  subtitle: {
-    color: TEXT_ON_DARK_SOFT,
-    lineHeight: 22,
-  },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",

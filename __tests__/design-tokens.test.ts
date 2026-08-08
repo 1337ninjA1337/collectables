@@ -596,7 +596,6 @@ describe("design-tokens adoption", () => {
     // the theme hook, airy hero/card radii + soft shadow, and the editorial font.
     assert.match(src, /from\s+"@\/components\/use-app-theme"/);
     assert.match(src, /useAppTheme\(\)/);
-    assert.match(src, /\bRADIUS_HERO_LG\b/);
     assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
     assert.match(src, /\bSHADOW_SOFT\b/);
     assert.match(src, /\bFONT_DISPLAY_EDITORIAL\b/);
@@ -604,6 +603,8 @@ describe("design-tokens adoption", () => {
     assert.match(src, /borderColor:\s*theme\.border/);
     assert.match(src, /color:\s*theme\.text\b/);
     assert.match(src, /color:\s*theme\.meta\b/);
+    // RADIUS_HERO_LG left with the hero banner when it moved into <HeroBanner>
+    // (components/hero-banner.tsx) — pinned by hero-banner.test.ts.
   });
 
   it("components/bottom-nav.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
@@ -641,18 +642,13 @@ describe("design-tokens adoption", () => {
   it("app/chats.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("app/chats.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
-    assert.match(src, /HERO_DARK\b/);
     assert.match(src, /HERO_DARK_3/);
-    assert.match(src, /AMBER_LIGHT/);
     assert.match(src, /AMBER_MUTED/);
-    assert.match(src, /TEXT_ON_DARK_3/);
-    assert.match(src, /TEXT_ON_DARK_SOFT/);
     assert.match(src, /DANGER/);
     // PR8e (visual-upgrade `redesign-secondary`): the chats screen adopts the
     // theme hook, airy hero/card radii + soft shadow, and the editorial display font.
     assert.match(src, /from\s+"@\/components\/use-app-theme"/);
     assert.match(src, /useAppTheme\(\)/);
-    assert.match(src, /\bRADIUS_HERO_LG\b/);
     assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
     assert.match(src, /\bSHADOW_SOFT\b/);
     assert.match(src, /\bFONT_DISPLAY_EDITORIAL\b/);
@@ -661,6 +657,8 @@ describe("design-tokens adoption", () => {
     assert.match(src, /color:\s*theme\.text\b/);
     assert.match(src, /color:\s*theme\.meta\b/);
     assert.match(src, /color:\s*theme\.muted\b/);
+    // HERO_DARK / AMBER_LIGHT / TEXT_ON_DARK_3 / TEXT_ON_DARK_SOFT / RADIUS_HERO_LG left with the hero banner when it moved into <HeroBanner>
+    // (components/hero-banner.tsx) — pinned by hero-banner.test.ts.
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -707,14 +705,14 @@ describe("design-tokens adoption", () => {
     // three ONLY in that gradient. Pinned by gradients.test.ts.
     assert.match(src, /HERO_DARK_6/);
     assert.match(src, /AMBER_ACCENT/);
-    assert.match(src, /AMBER_LIGHT/);
     assert.match(src, /CARD_BG\b/);
     assert.match(src, /BORDER\b/);
     assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_DARK_2/);
-    assert.match(src, /TEXT_ON_DARK_3/);
+    // AMBER_LIGHT / TEXT_ON_DARK_3 / TEXT_ON_DARK_SOFT left with the eyebrow +
+    // title + subtitle when they moved into <HeroBanner>
+    // (components/hero-banner.tsx) — pinned by hero-banner.test.ts.
     assert.match(src, /TEXT_ON_DARK_4/);
-    assert.match(src, /TEXT_ON_DARK_SOFT/);
     assert.match(src, /MUTED_6/);
     assert.match(src, /MUTED_7/);
     assert.match(src, /PLACEHOLDER/);
@@ -727,7 +725,6 @@ describe("design-tokens adoption", () => {
   it("app/people.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("app/people.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
-    assert.match(src, /AMBER_LIGHT/);
     assert.match(src, /AMBER_MUTED/);
     assert.match(src, /AMBER_SOFT\b/);
     assert.match(src, /BORDER\b/);
@@ -746,14 +743,11 @@ describe("design-tokens adoption", () => {
     assert.match(src, /PLACEHOLDER/);
     assert.match(src, /PURE_WHITE/);
     assert.match(src, /TEXT_DARK\b/);
-    assert.match(src, /TEXT_ON_DARK_3/);
     assert.match(src, /TEXT_ON_DARK_4/);
-    assert.match(src, /TEXT_ON_DARK_SOFT/);
     // PR8b (visual-upgrade `redesign-secondary`): the people screen adopts the
     // theme hook, airy hero/card radii + soft shadow, and the editorial font.
     assert.match(src, /from\s+"@\/components\/use-app-theme"/);
     assert.match(src, /useAppTheme\(\)/);
-    assert.match(src, /\bRADIUS_HERO_LG\b/);
     assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
     assert.match(src, /\bSHADOW_SOFT\b/);
     assert.match(src, /\bFONT_DISPLAY_EDITORIAL\b/);
@@ -762,6 +756,8 @@ describe("design-tokens adoption", () => {
     assert.match(src, /color:\s*theme\.text\b/);
     assert.match(src, /color:\s*theme\.meta\b/);
     assert.match(src, /color:\s*theme\.muted\b/);
+    // AMBER_LIGHT / TEXT_ON_DARK_3 / TEXT_ON_DARK_SOFT / RADIUS_HERO_LG left with the hero banner when it moved into <HeroBanner>
+    // (components/hero-banner.tsx) — pinned by hero-banner.test.ts.
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -821,7 +817,6 @@ describe("design-tokens adoption", () => {
     assert.match(src, /HERO_DARK\b/);
     assert.match(src, /HERO_DARK_2/);
     assert.match(src, /HERO_DARK_3/);
-    assert.match(src, /AMBER_LIGHT/);
     assert.match(src, /AMBER_MUTED/);
     assert.match(src, /AMBER_SOFT/);
     assert.match(src, /BORDER\b/);
@@ -832,9 +827,9 @@ describe("design-tokens adoption", () => {
     assert.match(src, /MUTED_2/);
     assert.match(src, /MUTED_10/);
     assert.match(src, /TEXT_DARK\b/);
-    assert.match(src, /TEXT_ON_DARK_3/);
     assert.match(src, /TEXT_ON_DARK_4/);
-    assert.match(src, /TEXT_ON_DARK_SOFT/);
+    // AMBER_LIGHT / TEXT_ON_DARK_3 / TEXT_ON_DARK_SOFT left with the hero banner when it moved into <HeroBanner>
+    // (components/hero-banner.tsx) — pinned by hero-banner.test.ts.
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -859,11 +854,12 @@ describe("design-tokens adoption", () => {
     assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_DARK_2/);
     assert.match(src, /TEXT_ON_DARK\b/);
-    assert.match(src, /TEXT_ON_DARK_3/);
+    // TEXT_ON_DARK_3 / TEXT_ON_DARK_SOFT left with the hero title + subtitle
+    // when they moved into <HeroBanner> (components/hero-banner.tsx) — pinned
+    // by hero-banner.test.ts.
     assert.match(src, /TEXT_ON_DARK_5/);
     assert.match(src, /TEXT_ON_DARK_7/);
     assert.match(src, /TEXT_ON_DARK_8/);
-    assert.match(src, /TEXT_ON_DARK_SOFT/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -880,7 +876,8 @@ describe("design-tokens adoption", () => {
     assert.match(src, /RADIUS_CARD_AIRY/);
     assert.match(src, /RADIUS_ITEM_AIRY/);
     assert.match(src, /RADIUS_AVATAR\b/);
-    assert.match(src, /SPACING_GUTTER/);
+    // SPACING_GUTTER was this screen's hero padding and left with <HeroBanner>,
+    // which still declares it — pinned by hero-banner.test.ts.
     assert.match(src, /SHADOW_SOFT/);
     assert.match(src, /FONT_DISPLAY_EDITORIAL/);
     // body surfaces read their colors from the theme rather than fixed tokens
@@ -937,6 +934,8 @@ describe("design-tokens adoption", () => {
     // HERO_DARK_4 / HERO_DARK_5 left with the hero banner when it moved into
     // HERO_DARK_GRADIENT (lib/gradients.ts) — pinned by gradients.test.ts.
     assert.match(src, /HERO_DARK_7/);
+    // RADIUS_HERO_LG was this screen's hero radius and left with <HeroBanner>
+    // (components/hero-banner.tsx) — pinned by hero-banner.test.ts.
     assert.match(src, /MUTED_2\b/);
     assert.match(src, /MUTED_11/);
     assert.match(src, /STATUS_ONLINE/);
@@ -949,7 +948,6 @@ describe("design-tokens adoption", () => {
     // theme hook, airy hero/card radii + soft shadow, and the editorial display font.
     assert.match(src, /from\s+"@\/components\/use-app-theme"/);
     assert.match(src, /useAppTheme\(\)/);
-    assert.match(src, /\bRADIUS_HERO_LG\b/);
     assert.match(src, /\bRADIUS_ITEM_AIRY\b/);
     assert.match(src, /\bSHADOW_SOFT\b/);
     assert.match(src, /\bFONT_DISPLAY_EDITORIAL\b/);
@@ -957,6 +955,22 @@ describe("design-tokens adoption", () => {
     assert.match(src, /borderColor:\s*theme\.border/);
     assert.match(src, /color:\s*theme\.text\b/);
     assert.match(src, /color:\s*theme\.meta\b/);
+    const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
+    assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
+  });
+
+  it("components/hero-banner.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    const src = read("components/hero-banner.tsx");
+    assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    assert.match(src, /\bAMBER_LIGHT\b/);
+    assert.match(src, /\bRADIUS_HERO_LG\b/);
+    assert.match(src, /\bSPACING_CARD\b/);
+    assert.match(src, /\bSPACING_GUTTER\b/);
+    assert.match(src, /\bTEXT_ON_DARK_3\b/);
+    assert.match(src, /\bTEXT_ON_DARK_SOFT\b/);
+    assert.match(src, /\bFONT_BODY\b/);
+    assert.match(src, /\bFONT_BODY_EXTRABOLD\b/);
+    assert.match(src, /\bFONT_DISPLAY_EDITORIAL\b/);
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -1414,10 +1428,8 @@ describe("design-tokens adoption", () => {
   it("app/collections-feed.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("app/collections-feed.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
-    assert.match(src, /\bAMBER_LIGHT\b/);
-    assert.match(src, /\bHERO_DARK\b/);
-    assert.match(src, /\bTEXT_ON_DARK_3\b/);
-    assert.match(src, /\bTEXT_ON_DARK_SOFT\b/);
+    // AMBER_LIGHT / HERO_DARK / TEXT_ON_DARK_3 / TEXT_ON_DARK_SOFT left with the hero banner when it moved into <HeroBanner>
+    // (components/hero-banner.tsx) — pinned by hero-banner.test.ts.
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

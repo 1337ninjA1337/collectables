@@ -36,13 +36,15 @@ const MIGRATED_FILES: ReadonlyArray<{
   { rel: "app/profile/[id].tsx", list: true, card: true, inline: true },
   { rel: "app/chat/[id].tsx", list: true, card: true, inline: true },
   { rel: "app/chats.tsx", list: true, card: false, inline: true },
-  { rel: "app/marketplace.tsx", list: true, card: true, inline: true },
+  // list: false since 2026-08-08 — the hero gap left with <HeroBanner>
+  { rel: "app/marketplace.tsx", list: false, card: true, inline: true },
   // batch 4/6 — app/ now greps clean for gap: 10 / 12 / 8
   { rel: "app/create-collection.tsx", list: true, card: false, inline: true },
   { rel: "app/people.tsx", list: true, card: false, inline: false },
   { rel: "app/friends.tsx", list: true, card: false, inline: false },
   { rel: "app/stats.tsx", list: true, card: false, inline: true },
-  { rel: "app/collections-feed.tsx", list: true, card: false, inline: false },
+  // list: false since 2026-08-08 — the hero gap left with <HeroBanner>
+  { rel: "app/collections-feed.tsx", list: false, card: false, inline: false },
   { rel: "app/auth/callback.tsx", list: false, card: true, inline: false },
   { rel: "app/_layout.tsx", list: false, card: true, inline: true },
   // batch 5/6
@@ -63,6 +65,8 @@ const MIGRATED_FILES: ReadonlyArray<{
   { rel: "components/swipe-tabs.tsx", list: false, card: false, inline: true },
   { rel: "components/currency-input.tsx", list: false, card: false, inline: true },
   { rel: "lib/toast-context.tsx", list: false, card: false, inline: true },
+  // the shared banner the eight hero screens now render (2026-08-08)
+  { rel: "components/hero-banner.tsx", list: true, card: false, inline: false },
 ];
 
 const TOKEN_BY_GAP = [

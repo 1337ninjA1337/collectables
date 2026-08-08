@@ -1,9 +1,9 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { Stack, router } from "expo-router";
 import { useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CurrencySheet } from "@/components/currency-sheet";
+import { HeroBanner } from "@/components/hero-banner";
 import { Screen } from "@/components/screen";
 import { useAppTheme } from "@/components/use-app-theme";
 import { useAuth } from "@/lib/auth-context";
@@ -31,7 +31,6 @@ import {
   MUTED_2,
   MUTED_11,
   PURE_WHITE,
-  RADIUS_HERO_LG,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SHADOW_SOFT,
@@ -45,7 +44,6 @@ import {
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
-import { HERO_DARK_GRADIENT } from "@/lib/gradients";
 import { getAnalyticsEventCatalog } from "@/lib/analytics";
 import { isDevEnvironment } from "@/lib/dev-menu";
 import { useDiagnostics } from "@/lib/diagnostics-context";
@@ -174,10 +172,7 @@ export default function SettingsScreen() {
     <Screen>
       <Stack.Screen options={{ title: t("settings") }} />
 
-      <LinearGradient {...HERO_DARK_GRADIENT} style={styles.hero}>
-        <Text style={styles.eyebrow}>{t("settings")}</Text>
-        <Text style={styles.title}>{t("settingsTitle")}</Text>
-      </LinearGradient>
+      <HeroBanner eyebrow={t("settings")} title={t("settingsTitle")} />
 
       <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>{t("language")}</Text>
@@ -375,26 +370,6 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    borderRadius: RADIUS_HERO_LG,
-    padding: 24,
-    gap: SPACING_LIST,
-  },
-  eyebrow: {
-    color: AMBER_LIGHT,
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  title: {
-    color: TEXT_ON_DARK_3,
-    fontSize: 28,
-    fontWeight: "800",
-    fontFamily: FONT_DISPLAY_EDITORIAL,
-    lineHeight: 36,
-  },
   card: {
     borderRadius: RADIUS_ITEM_AIRY,
     borderWidth: 1,

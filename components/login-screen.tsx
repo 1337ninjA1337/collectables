@@ -1,13 +1,12 @@
-import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
+import { HeroBanner } from "@/components/hero-banner";
 import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth-context";
 import {
   AMBER_ACCENT,
-  AMBER_LIGHT,
   BORDER,
   CARD_BG,
   DANGER_DEEP,
@@ -20,11 +19,8 @@ import {
   SPACING_CARD,
   TEXT_DARK,
   TEXT_DARK_2,
-  TEXT_ON_DARK_3,
   TEXT_ON_DARK_4,
-  TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
-import { HERO_DARK_GRADIENT } from "@/lib/gradients";
 import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -82,11 +78,11 @@ export function LoginScreen() {
 
   return (
     <Screen>
-      <LinearGradient {...HERO_DARK_GRADIENT} style={styles.hero}>
-        <Text style={styles.eyebrow}>{t("authAccount")}</Text>
-        <Text style={styles.title}>{t("authTitle")}</Text>
-        <Text style={styles.subtitle}>{t("authSubtitle")}</Text>
-      </LinearGradient>
+      <HeroBanner
+        eyebrow={t("authAccount")}
+        title={t("authTitle")}
+        subtitle={t("authSubtitle")}
+      />
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>{t("emailLoginTitle")}</Text>
@@ -143,32 +139,6 @@ export function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    borderRadius: 32,
-    padding: 24,
-    gap: SPACING_CARD,
-  },
-  eyebrow: {
-    color: AMBER_LIGHT,
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  title: {
-    color: TEXT_ON_DARK_3,
-    fontSize: 30,
-    lineHeight: 38,
-    fontWeight: "800",
-    fontFamily: FONT_DISPLAY,
-  },
-  subtitle: {
-    color: TEXT_ON_DARK_SOFT,
-    fontSize: 15,
-    lineHeight: 23,
-    fontFamily: FONT_BODY,
-  },
   card: {
     borderRadius: 28,
     padding: 20,

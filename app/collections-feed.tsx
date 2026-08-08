@@ -4,19 +4,15 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CollectionCard } from "@/components/collection-card";
 import { EmptyState } from "@/components/empty-state";
+import { HeroBanner } from "@/components/hero-banner";
 import { Screen } from "@/components/screen";
 import { SwipeTabs } from "@/components/swipe-tabs";
 import { useCollections } from "@/lib/collections-context";
 import {
-  AMBER_LIGHT,
   AMBER_SOFT,
   CARD_BG_3,
-  HERO_DARK,
   MUTED_3,
   RADIUS_CARD,
-  SPACING_LIST,
-  TEXT_ON_DARK_3,
-  TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
 import { FONT_BODY_BOLD } from "@/lib/fonts";
 import { useChunkedList } from "@/lib/use-chunked-list";
@@ -73,11 +69,12 @@ export default function CollectionsFeedScreen() {
 
   return (
     <Screen>
-      <View style={styles.hero}>
-        <Text style={styles.eyebrow}>{t("collectionsFeed")}</Text>
-        <Text style={styles.title}>{t("collectionsFeedTitle")}</Text>
-        <Text style={styles.subtitle}>{t("collectionsFeedSubtitle")}</Text>
-      </View>
+      <HeroBanner
+        tone="solid"
+        eyebrow={t("collectionsFeed")}
+        title={t("collectionsFeedTitle")}
+        subtitle={t("collectionsFeedSubtitle")}
+      />
 
       <SwipeTabs
         tabs={[
@@ -145,29 +142,6 @@ export default function CollectionsFeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: HERO_DARK,
-    borderRadius: 32,
-    padding: 24,
-    gap: SPACING_LIST,
-  },
-  eyebrow: {
-    color: AMBER_LIGHT,
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    fontWeight: "800",
-  },
-  title: {
-    color: TEXT_ON_DARK_3,
-    fontSize: 28,
-    fontWeight: "800",
-    lineHeight: 36,
-  },
-  subtitle: {
-    color: TEXT_ON_DARK_SOFT,
-    lineHeight: 22,
-  },
   tabPanel: {
     gap: 14,
   },

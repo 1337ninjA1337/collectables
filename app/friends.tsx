@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
 
+import { HeroBanner } from "@/components/hero-banner";
 import { EmptyState } from "@/components/empty-state";
 import { SkeletonProfileList } from "@/components/skeleton";
 
@@ -13,9 +14,8 @@ import { useChat } from "@/lib/chat-context";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { UserProfile } from "@/lib/types";
-import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import {
-  AMBER_LIGHT,
   AMBER_MUTED,
   AMBER_SOFT,
   BORDER,
@@ -34,9 +34,7 @@ import {
   RADIUS_PILL,
   SPACING_LIST,
   TEXT_DARK,
-  TEXT_ON_DARK_3,
   TEXT_ON_DARK_4,
-  TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
 
 type Tab = "friends" | "following";
@@ -141,11 +139,12 @@ export default function FriendsScreen() {
 
   return (
     <Screen>
-      <View style={styles.hero}>
-        <Text style={styles.eyebrow}>{t("community")}</Text>
-        <Text style={styles.title}>{t("friendsTitle")}</Text>
-        <Text style={styles.subtitle}>{t("friendsSubtitle")}</Text>
-      </View>
+      <HeroBanner
+        tone="solid"
+        eyebrow={t("community")}
+        title={t("friendsTitle")}
+        subtitle={t("friendsSubtitle")}
+      />
 
       <Pressable style={styles.chatsLink} onPress={() => router.push("/chats")}>
         <View style={styles.chatsLinkIcon}>
@@ -232,34 +231,8 @@ export default function FriendsScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: HERO_DARK,
-    borderRadius: 32,
-    padding: 24,
-    gap: SPACING_LIST,
-  },
   tabPanel: {
     gap: 14,
-  },
-  eyebrow: {
-    color: AMBER_LIGHT,
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  title: {
-    color: TEXT_ON_DARK_3,
-    fontSize: 28,
-    fontWeight: "800",
-    lineHeight: 36,
-    fontFamily: FONT_DISPLAY,
-  },
-  subtitle: {
-    color: TEXT_ON_DARK_SOFT,
-    lineHeight: 22,
-    fontFamily: FONT_BODY,
   },
   chatsLink: {
     flexDirection: "row",
