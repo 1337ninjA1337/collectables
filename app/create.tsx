@@ -6,6 +6,7 @@ import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text,
 import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { CurrencySheet } from "@/components/currency-sheet";
+import { SheetSearchRow } from "@/components/sheet-search-row";
 import { ErrorPill } from "@/components/error-pill";
 import { PhotoPreview } from "@/components/photo-preview";
 import { Screen } from "@/components/screen";
@@ -29,7 +30,7 @@ import {
 } from "@/lib/locale-helpers";
 import { useToast } from "@/lib/toast-context";
 import { ItemCondition, ItemTag } from "@/lib/types";
-import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import {
   AMBER_ACCENT,
   AMBER_MUTED_6,
@@ -47,8 +48,6 @@ import {
   MUTED_3,
   MUTED_8,
   MUTED_10,
-  MUTED_13,
-  MUTED_15,
   PAGE_BG_2,
   PLACEHOLDER,
   PURE_WHITE,
@@ -505,23 +504,12 @@ function CollectionSheet({
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>{t("collectionFieldLabel")}</Text>
 
-          <View style={styles.sheetSearchRow}>
-            <Ionicons name="search" size={18} color={MUTED_13} />
-            <MaskedTextInput
-              style={styles.sheetSearchInput}
-              value={query}
-              onChangeText={onQueryChange}
-              placeholder={t("searchPlaceholder")}
-              placeholderTextColor={PLACEHOLDER}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {query.length > 0 ? (
-              <Pressable onPress={() => onQueryChange("")} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color={MUTED_15} />
-              </Pressable>
-            ) : null}
-          </View>
+          <SheetSearchRow
+            value={query}
+            onChange={onQueryChange}
+            placeholder={t("searchPlaceholder")}
+            accessibilityLabel={t("collectionPickerSearchA11y")}
+          />
 
           <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
             {filtered.length === 0 ? (
@@ -729,24 +717,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: TEXT_DARK_3,
     fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  sheetSearchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING_LIST,
-    backgroundColor: CARD_BG_3,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-  },
-  sheetSearchInput: {
-    flex: 1,
-    color: TEXT_DARK,
-    fontSize: 15,
-    fontWeight: "600",
-    fontFamily: FONT_BODY_SEMIBOLD,
   },
   sheetList: {
     maxHeight: 340,

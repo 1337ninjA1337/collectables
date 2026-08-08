@@ -194,9 +194,21 @@ export function SearchOverlay({ visible, onClose }: Props) {
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          {/* Search input */}
+          {/* Search input.
+
+              Not `<SheetSearchRow>`: this row carries a trailing "close the
+              overlay" button the shared component has no slot for, and its
+              chrome is a size up (icon 20 vs 18, autoFocus). It does mirror
+              the same accessibility contract by hand — every icon hidden with
+              BOTH platform props, every icon-only Pressable named. */}
           <View style={styles.inputRow}>
-            <Ionicons name="search" size={20} color={MUTED_13} />
+            <Ionicons
+              name="search"
+              size={20}
+              color={MUTED_13}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
             <MaskedTextInput
               value={query}
               onChangeText={setQuery}
@@ -206,14 +218,40 @@ export function SearchOverlay({ visible, onClose }: Props) {
               autoFocus
               autoCapitalize="none"
               autoCorrect={false}
+              accessibilityRole="search"
+              accessibilityLabel={t("searchOverlayA11y")}
             />
             {query.length > 0 ? (
-              <Pressable onPress={() => setQuery("")} style={styles.clearBtn} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color={MUTED_15} />
+              <Pressable
+                onPress={() => setQuery("")}
+                style={styles.clearBtn}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={t("filterClearSearch")}
+              >
+                <Ionicons
+                  name="close-circle"
+                  size={18}
+                  color={MUTED_15}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                />
               </Pressable>
             ) : null}
-            <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={8}>
-              <Ionicons name="close" size={22} color={MUTED_13} />
+            <Pressable
+              onPress={onClose}
+              style={styles.closeBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t("searchClose")}
+            >
+              <Ionicons
+                name="close"
+                size={22}
+                color={MUTED_13}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              />
             </Pressable>
           </View>
 
