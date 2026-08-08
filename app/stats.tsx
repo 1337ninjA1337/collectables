@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Screen } from "@/components/screen";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { useCollections } from "@/lib/collections-context";
+import { ownedCollectionIds } from "@/lib/recent-items";
 import {
   AMBER_ACCENT,
   BORDER,
@@ -41,10 +42,19 @@ export default function StatsScreen() {
   // hold and not a leading debounce.
   const showRefreshing = useMinimumVisible(refreshing);
 
-  const ownedCollections = collections.filter((c) => c.role === "owner");
+  // Depend on `collections`, not on a `.filter()` result computed during
+  // render: that array is a fresh reference every pass, so the memo below used
+  // to recompute on every render (including every keystroke elsewhere on the
+  // screen) despite looking memoized. `ownedCollectionIds` also turns the old
+  // O(items x collections) `.some()` scan into a Set lookup.
+  //
+  // Archived items are deliberately NOT excluded here — unlike the home rail,
+  // stats keep sold/archived rows so totals and the growth chart stay honest
+  // about history (see the `archivedAt` field doc on `CollectableItem`).
+  const ownedIds = useMemo(() => ownedCollectionIds(collections), [collections]);
   const ownedItems = useMemo(
-    () => items.filter((i) => !i.isWishlist && ownedCollections.some((c) => c.id === i.collectionId)),
-    [items, ownedCollections],
+    () => items.filter((i) => !i.isWishlist && ownedIds.has(i.collectionId)),
+    [items, ownedIds],
   );
 
   const totalValue = useMemo(
@@ -87,7 +97,7 @@ export default function StatsScreen() {
           <Text style={styles.summaryLabel}>{t("statsTotalValue")}</Text>
         </View>
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryNumber}>{ownedCollections.length}</Text>
+          <Text style={styles.summaryNumber}>{ownedIds.size}</Text>
           <Text style={styles.summaryLabel}>{t("statsTotalCollections")}</Text>
         </View>
       </View>
