@@ -198,9 +198,21 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             >
               <Text style={styles.sheetTitle}>{t("filterTitle")}</Text>
 
-              {/* Search by title */}
+              {/* Search by title.
+
+                  The magnifier is decorative — the affordance is announced by
+                  the input's own label, so leaving the icon focusable would
+                  make a screen-reader user swipe past an unnamed element to
+                  reach the field. Same for the clear button's icon, which is
+                  named by its parent Pressable. */}
               <View style={styles.sheetSearchRow}>
-                <Ionicons name="search" size={18} color={MUTED_15} />
+                <Ionicons
+                  name="search"
+                  size={18}
+                  color={MUTED_15}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                />
                 <MaskedTextInput
                   style={styles.sheetSearchInput}
                   value={draft.query}
@@ -209,10 +221,26 @@ export function ItemFilterBar({ filters, onChange }: Props) {
                   placeholderTextColor={PLACEHOLDER}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  // Without these VoiceOver reads only "edit text" until the
+                  // placeholder is announced on focus, so the field is
+                  // undiscoverable while swiping through the sheet.
+                  accessibilityRole="search"
+                  accessibilityLabel={t("searchInCollectionA11y")}
                 />
                 {draft.query.length > 0 ? (
-                  <Pressable onPress={() => setDraft({ ...draft, query: "" })} hitSlop={8}>
-                    <Ionicons name="close-circle" size={18} color={MUTED_15} />
+                  <Pressable
+                    onPress={() => setDraft({ ...draft, query: "" })}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("filterClearSearch")}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={18}
+                      color={MUTED_15}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    />
                   </Pressable>
                 ) : null}
               </View>
