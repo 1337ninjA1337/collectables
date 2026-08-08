@@ -41,6 +41,8 @@ import {
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
+import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useI18n } from "@/lib/i18n-context";
 import { fetchProfiles, searchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
@@ -114,25 +116,27 @@ export function SearchOverlay({ visible, onClose }: Props) {
 
   // Server-side people search: the 100-row snapshot fetched on open misses
   // any profile beyond it, so the query also hits the whole table (debounced).
+  //
+  // As on the people screen, the settle lags a cleared field by the debounce
+  // window — harmless because `matchedProfiles` below returns `[]` while the
+  // raw `q` is empty, so the stale matches are never rendered.
+  const debouncedQuery = useDebouncedValue(q, PROFILE_SEARCH_DEBOUNCE_MS);
   const [remoteMatches, setRemoteMatches] = useState<UserProfile[]>([]);
   useEffect(() => {
-    if (!q || filter === "collections" || filter === "items") {
+    if (!debouncedQuery || filter === "collections" || filter === "items") {
       setRemoteMatches([]);
       return;
     }
     let cancelled = false;
-    const timer = setTimeout(() => {
-      searchProfiles(q, 20)
-        .then((results) => {
-          if (!cancelled) setRemoteMatches(results);
-        })
-        .catch(() => {});
-    }, 300);
+    searchProfiles(debouncedQuery, 20)
+      .then((results) => {
+        if (!cancelled) setRemoteMatches(results);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
-  }, [q, filter]);
+  }, [debouncedQuery, filter]);
 
   const matchedProfiles = useMemo(() => {
     if (!q || filter === "collections" || filter === "items") return [];

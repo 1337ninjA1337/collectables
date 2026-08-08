@@ -37,6 +37,8 @@ import {
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
+import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { fetchProfiles, searchProfiles } from "@/lib/supabase-profiles";
@@ -84,26 +86,28 @@ export default function PeopleScreen() {
   // Server-side search: the loaded page only holds PAGE_SIZE profiles, so
   // filtering it client-side made anyone beyond the current page unfindable.
   // Debounced ilike query against the whole profiles table.
+  //
+  // Clearing the field does NOT clear `searchResults` until the debounce
+  // settles, which is invisible: `filteredPeople` below returns `others`
+  // untouched while the raw `query` is empty, so the stale remote matches are
+  // never read during that window.
+  const debouncedQuery = useDebouncedValue(query.trim(), PROFILE_SEARCH_DEBOUNCE_MS);
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   useEffect(() => {
-    const normalized = query.trim();
-    if (!normalized) {
+    if (!debouncedQuery) {
       setSearchResults([]);
       return;
     }
     let cancelled = false;
-    const timer = setTimeout(() => {
-      searchProfiles(normalized, 50)
-        .then((results) => {
-          if (!cancelled) setSearchResults(results);
-        })
-        .catch(() => {});
-    }, 300);
+    searchProfiles(debouncedQuery, 50)
+      .then((results) => {
+        if (!cancelled) setSearchResults(results);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
-  }, [query]);
+  }, [debouncedQuery]);
 
   useEffect(() => {
     void loadPage(page);

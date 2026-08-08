@@ -51,12 +51,16 @@ describe("people/search UI uses the server-side search", () => {
   it("app/people.tsx queries searchProfiles when the box is non-empty", () => {
     const src = readFileSync(path.join(ROOT, "app/people.tsx"), "utf8");
     assert.match(src, /import \{ fetchProfiles, searchProfiles \} from "@\/lib\/supabase-profiles"/);
-    assert.match(src, /searchProfiles\(normalized, 50\)/);
+    // The needle is the settled value from `useDebouncedValue`; the trimming
+    // it used to do inline now happens at the hook's input.
+    assert.match(src, /searchProfiles\(debouncedQuery, 50\)/);
+    assert.match(src, /useDebouncedValue\(query\.trim\(\), PROFILE_SEARCH_DEBOUNCE_MS\)/);
   });
 
   it("components/search-overlay.tsx queries searchProfiles for the people section", () => {
     const src = readFileSync(path.join(ROOT, "components/search-overlay.tsx"), "utf8");
-    assert.match(src, /searchProfiles\(q, 20\)/);
+    assert.match(src, /searchProfiles\(debouncedQuery, 20\)/);
+    assert.match(src, /useDebouncedValue\(q, PROFILE_SEARCH_DEBOUNCE_MS\)/);
   });
 
   it("app/people.tsx catches fetchProfiles failures instead of blanking silently", () => {
