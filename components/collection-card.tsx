@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VisibilityBadge } from "@/components/visibility-badge";
 import { MUTED_26, PURE_WHITE, RADIUS_CARD_AIRY, SPACING_CARD, SPACING_INLINE, TEXT_ON_DARK_10, TEXT_ON_DARK_11, TEXT_ON_DARK_12, TEXT_ON_DARK_13 } from "@/lib/design-tokens";
+import { PHOTO_SCRIM_GRADIENT } from "@/lib/gradients";
 import { formatCostAmount } from "@/lib/format-cost";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
@@ -28,10 +29,7 @@ export function CollectionCard({
     <Link href={`/collection/${collection.id}`} asChild>
       <Pressable style={{...styles.card, ...(!hasCover ? { backgroundColor: placeholderColor(collection.id) } : {})}}>
         {hasCover ? <Image source={{ uri: collection.coverPhoto }} style={styles.image} /> : null}
-        <LinearGradient
-          colors={["rgba(34, 24, 17, 0.08)", "rgba(34, 24, 17, 0.55)"]}
-          style={styles.overlay}
-        />
+        <LinearGradient {...PHOTO_SCRIM_GRADIENT} style={styles.overlay} />
         <View style={styles.content}>
           <View style={styles.topRow}>
             <VisibilityBadge collection={collection} />

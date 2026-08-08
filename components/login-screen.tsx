@@ -11,9 +11,6 @@ import {
   BORDER,
   CARD_BG,
   DANGER_DEEP,
-  HERO_DARK,
-  HERO_DARK_4,
-  HERO_DARK_5,
   HERO_DARK_6,
   MUTED_6,
   MUTED_7,
@@ -27,6 +24,7 @@ import {
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
+import { HERO_DARK_GRADIENT } from "@/lib/gradients";
 import { useI18n } from "@/lib/i18n-context";
 import { useToast } from "@/lib/toast-context";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -84,12 +82,7 @@ export function LoginScreen() {
 
   return (
     <Screen>
-      <LinearGradient
-        colors={[HERO_DARK_4, HERO_DARK, HERO_DARK_5]}
-        start={{ x: 0.2, y: 0.6 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.hero}
-      >
+      <LinearGradient {...HERO_DARK_GRADIENT} style={styles.hero}>
         <Text style={styles.eyebrow}>{t("authAccount")}</Text>
         <Text style={styles.title}>{t("authTitle")}</Text>
         <Text style={styles.subtitle}>{t("authSubtitle")}</Text>

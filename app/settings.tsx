@@ -27,8 +27,6 @@ import {
   DANGER_SOFT_3,
   HERO_DARK,
   HERO_DARK_2,
-  HERO_DARK_4,
-  HERO_DARK_5,
   HERO_DARK_7,
   MUTED_2,
   MUTED_11,
@@ -47,6 +45,7 @@ import {
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_SOFT,
 } from "@/lib/design-tokens";
+import { HERO_DARK_GRADIENT } from "@/lib/gradients";
 import { getAnalyticsEventCatalog } from "@/lib/analytics";
 import { isDevEnvironment } from "@/lib/dev-menu";
 import { useDiagnostics } from "@/lib/diagnostics-context";
@@ -175,12 +174,7 @@ export default function SettingsScreen() {
     <Screen>
       <Stack.Screen options={{ title: t("settings") }} />
 
-      <LinearGradient
-        colors={[HERO_DARK_4, HERO_DARK, HERO_DARK_5]}
-        start={{ x: 0.2, y: 0.6 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.hero}
-      >
+      <LinearGradient {...HERO_DARK_GRADIENT} style={styles.hero}>
         <Text style={styles.eyebrow}>{t("settings")}</Text>
         <Text style={styles.title}>{t("settingsTitle")}</Text>
       </LinearGradient>

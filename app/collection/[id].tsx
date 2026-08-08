@@ -72,6 +72,7 @@ import {
   TEXT_ON_DARK_4,
   TEXT_ON_DARK_9,
 } from "@/lib/design-tokens";
+import { PHOTO_SCRIM_GRADIENT } from "@/lib/gradients";
 
 export default function CollectionDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -751,10 +752,7 @@ export default function CollectionDetailsScreen() {
               style={styles.heroImage}
             />
           ) : null}
-          <LinearGradient
-            colors={["rgba(34, 24, 17, 0.08)", "rgba(34, 24, 17, 0.55)"]}
-            style={styles.heroOverlay}
-          />
+          <LinearGradient {...PHOTO_SCRIM_GRADIENT} style={styles.heroOverlay} />
           <View style={styles.heroContent}>
             <VisibilityBadge collection={collection} variant="hero" />
             <Text style={styles.heroTitle}>{collection.name}</Text>
