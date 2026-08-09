@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/screen";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
+import { selectOwnedActiveItems } from "@/lib/collections-helpers";
 import { useCollections } from "@/lib/collections-context";
 import {
   AMBER_ACCENT,
@@ -41,10 +42,16 @@ export default function StatsScreen() {
   // hold and not a leading debounce.
   const showRefreshing = useMinimumVisible(refreshing);
 
-  const ownedCollections = collections.filter((c) => c.role === "owner");
+  const ownedCollections = useMemo(
+    () => collections.filter((c) => c.role === "owner"),
+    [collections],
+  );
+  // Archived (sold / retired) items must not count toward totals — see the
+  // `archivedAt` contract in lib/types.ts. They used to, because this screen
+  // filtered on `isWishlist` alone.
   const ownedItems = useMemo(
-    () => items.filter((i) => !i.isWishlist && ownedCollections.some((c) => c.id === i.collectionId)),
-    [items, ownedCollections],
+    () => selectOwnedActiveItems(items, collections),
+    [items, collections],
   );
 
   const totalValue = useMemo(
