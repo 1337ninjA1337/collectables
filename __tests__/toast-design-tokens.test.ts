@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { luminance } from "@/lib/color-luminance";
 import {
   AMBER_ACCENT,
   AMBER_SOFT_3,
@@ -113,12 +114,6 @@ describe("tokens shipped for the toast migration", () => {
   it("orders each new soft/deep pair the way its family name claims", () => {
     // `_SOFT` must be lighter than `_DEEP` within a family, otherwise the
     // suffix stops describing the value and the next contributor picks wrong.
-    const luminance = (hex: string): number => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return (r * 299 + g * 587 + b * 114) / 1000;
-    };
     assert.ok(
       luminance(DANGER_SOFT_6) > luminance(DANGER_SOFT_7),
       "DANGER_SOFT_6 (surface) should be lighter than DANGER_SOFT_7 (border)",

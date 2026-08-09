@@ -12,6 +12,14 @@
  *   `DANGER_*` — destructive / error states
  *   `COOL_*`   — cool-tone neutrals for system / diagnostic / disabled UI,
  *                deliberately outside the warm-brown families above
+ *
+ * Numeric suffixes (`_2`, `_3`, …) are IDs, not ranks: each shade landed with
+ * the screen that needed it, so `DANGER_DEEP_3` is not darker than `_2` and no
+ * family sorts by its digits. Word suffixes DO rank — `_SOFT` is lighter than
+ * `_MEDIUM` is lighter than `_DEEP` — and `__tests__/design-tokens-danger-family.test.ts`
+ * pins that split, plus the light→dark ranking of every red, via the shared
+ * luma helpers in `lib/color-luminance.ts`. Pick a shade by looking at it in
+ * `app/_dev/tokens`, not by reading the number.
  */
 
 export const HERO_DARK = "#261b14";

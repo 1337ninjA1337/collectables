@@ -46,6 +46,9 @@ import {
   designTokens,
 } from "@/lib/design-tokens";
 import { IconBadge } from "@/components/icon-badge";
+// Shared with the palette family tests, so the preview's idea of "light" and
+// the tests' idea of "lighter than" cannot drift apart.
+import { isLightHex } from "@/lib/color-luminance";
 import { isDevEnvironment } from "@/lib/dev-menu";
 import {
   FONT_BODY,
@@ -106,19 +109,6 @@ const RING_TOKENS = [
   { name: "RING_MIDDLE_SIZE", value: RING_MIDDLE_SIZE },
   { name: "RING_INNER_SIZE", value: RING_INNER_SIZE },
 ] as const;
-
-function isLightHex(hex: string): boolean {
-  // Quick luminance approximation so the swatch label picks a readable colour.
-  const cleaned = hex.startsWith("#") ? hex.slice(1) : hex;
-  if (cleaned.length !== 6) return true;
-  const r = parseInt(cleaned.slice(0, 2), 16);
-  const g = parseInt(cleaned.slice(2, 4), 16);
-  const b = parseInt(cleaned.slice(4, 6), 16);
-  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return true;
-  // Rec. 601 luma — works well enough for a swatch label.
-  const luma = (r * 299 + g * 587 + b * 114) / 1000;
-  return luma > 160;
-}
 
 function groupColorTokens(): { id: ColorGroupId; entries: { name: string; value: string }[] }[] {
   const allEntries = Object.entries(designTokens).filter(([, value]) => typeof value === "string");

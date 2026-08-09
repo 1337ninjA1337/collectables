@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { luminance, rgbChannels } from "@/lib/color-luminance";
 import {
   COOL_GRAY,
   COOL_GRAY_DARK,
@@ -27,20 +28,11 @@ function read(rel: string): string {
 
 const HEX = /^#[0-9a-f]{6}$/;
 
-/** YIQ luminance, the same cheap approximation the toast family test uses. */
-function luminance(hex: string): number {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000;
-}
-
+/** Non-null channel read — every value in this file is a checked 6-digit hex. */
 function rgb(hex: string): [number, number, number] {
-  return [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ];
+  const channels = rgbChannels(hex);
+  assert.ok(channels, `${hex} is not a hex colour`);
+  return channels;
 }
 
 const FAMILY = [
