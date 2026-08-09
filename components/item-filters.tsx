@@ -36,20 +36,26 @@ import {
   applyItemFilters,
   applySortMode,
   countActiveFilters,
+  DATE_RANGE_ERROR_I18N_KEY,
   EMPTY_FILTERS,
   getTitleCollator,
   hasActiveMatchers,
+  parseDateBound,
   parsePriceBound,
   PRICE_RANGE_ERROR_I18N_KEY,
   SORT_CHIP_ICONS,
   SORT_MODE_PARTS,
   SORT_OPTIONS,
+  validateDateRange,
   validatePriceRange,
   type ActiveSortChip,
+  type DateBoundError,
+  type DateRangeError,
   type ItemFilters,
   type ItemSortAxis,
   type ItemSortDirection,
   type ItemSortMode,
+  type ParsedDateBound,
   type ParsedPriceBound,
   type PriceBoundError,
   type PriceRangeError,
@@ -70,22 +76,28 @@ export {
   applyItemFilters,
   applySortMode,
   countActiveFilters,
+  DATE_RANGE_ERROR_I18N_KEY,
   EMPTY_FILTERS,
   getTitleCollator,
   hasActiveMatchers,
+  parseDateBound,
   parsePriceBound,
   PRICE_RANGE_ERROR_I18N_KEY,
   SORT_CHIP_ICONS,
   SORT_MODE_PARTS,
   SORT_OPTIONS,
+  validateDateRange,
   validatePriceRange,
 };
 export type {
   ActiveSortChip,
+  DateBoundError,
+  DateRangeError,
   ItemFilters,
   ItemSortAxis,
   ItemSortDirection,
   ItemSortMode,
+  ParsedDateBound,
   ParsedPriceBound,
   PriceBoundError,
   PriceRangeError,
@@ -131,6 +143,14 @@ export function ItemFilterBar({ filters, onChange }: Props) {
     () => validatePriceRange(draft.priceFrom, draft.priceTo),
     [draft.priceFrom, draft.priceTo],
   );
+  const dateError = useMemo(
+    () => validateDateRange(draft.dateFrom, draft.dateTo),
+    [draft.dateFrom, draft.dateTo],
+  );
+  // Each range gets its own inline slot under its own row, so both can be
+  // wrong at once and the user fixes them without a message swapping out from
+  // under them. Apply is gated on either.
+  const applyBlocked = priceError !== null || dateError !== null;
 
   function apply() {
     // The `disabled` prop already blocks the press on every platform RN
@@ -138,7 +158,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
     // keyboard "submit", a future call site wiring Apply to something else.
     // `onChange` writing an unappliable range is the bug worth being
     // paranoid about, because the draft is sticky and it would stay.
-    if (priceError) return;
+    if (applyBlocked) return;
     onChange(draft);
     setModalOpen(false);
   }
@@ -322,9 +342,9 @@ export function ItemFilterBar({ filters, onChange }: Props) {
                 </View>
               </View>
 
-              {/* One inline slot for the whole range — the message names the
-                  offending end itself, and a per-field slot would reflow the
-                  two-column row every time a digit made it briefly invalid. */}
+              {/* One inline slot per RANGE — the message names the offending
+                  end itself, and a per-FIELD slot would reflow the two-column
+                  row every time a digit made it briefly invalid. */}
               {priceError ? (
                 <Text style={styles.fieldError} accessibilityLiveRegion="polite" role="alert">
                   {t(PRICE_RANGE_ERROR_I18N_KEY[priceError])}
@@ -354,6 +374,12 @@ export function ItemFilterBar({ filters, onChange }: Props) {
                   />
                 </View>
               </View>
+
+              {dateError ? (
+                <Text style={styles.fieldError} accessibilityLiveRegion="polite" role="alert">
+                  {t(DATE_RANGE_ERROR_I18N_KEY[dateError])}
+                </Text>
+              ) : null}
 
               {/* Source */}
               <View style={styles.field}>
@@ -409,14 +435,14 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               {/* Actions */}
               <View style={styles.sheetActions}>
                 <Pressable
-                  style={[styles.applyButton, priceError !== null && styles.applyButtonDisabled]}
+                  style={[styles.applyButton, applyBlocked && styles.applyButtonDisabled]}
                   onPress={apply}
-                  disabled={priceError !== null}
+                  disabled={applyBlocked}
                   // `disabled` on a Pressable stops the press but does not
                   // reach the accessibility tree on its own, so a screen
                   // reader would still offer a button that does nothing.
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: priceError !== null }}
+                  accessibilityState={{ disabled: applyBlocked }}
                 >
                   <Text style={styles.applyButtonText}>{t("filterApply")}</Text>
                 </Pressable>

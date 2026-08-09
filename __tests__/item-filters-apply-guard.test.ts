@@ -99,10 +99,21 @@ function sheetResetButton(tree: RenderResult): TestNode {
   );
 }
 
-/** The inline error line, or null when the range is valid. */
+/** Search row, price from/to, date from/to, source. */
+function dateField(tree: RenderResult, end: "from" | "to"): TestNode {
+  const field = fields(tree)[end === "from" ? 3 : 4];
+  assert.ok(field, `the sheet renders a date-${end} field`);
+  return field;
+}
+
+/** Every inline error slot currently rendered, in document order. */
+function errorLines(tree: RenderResult): TestNode[] {
+  return tree.findAll((node) => node.props.role === "alert");
+}
+
+/** The first inline error line, or null when every range is valid. */
 function errorLine(tree: RenderResult): TestNode | null {
-  const matches = tree.findAll((node) => node.props.role === "alert");
-  return matches[0] ?? null;
+  return errorLines(tree)[0] ?? null;
 }
 
 function textOf(node: TestNode): string {
@@ -223,7 +234,7 @@ describe("<ItemFilterBar> — the inline error names the failure", () => {
       assert.ok(message.length > 0, `${from}/${to} rendered an empty error line`);
       // A raw i18n key on screen means the key was never translated.
       assert.ok(
-        !Object.values(PRICE_RANGE_ERROR_I18N_KEY).includes(message),
+        !(Object.values(PRICE_RANGE_ERROR_I18N_KEY) as string[]).includes(message),
         `${from}/${to} rendered the i18n KEY instead of its translation`,
       );
       messages.push(message);
@@ -254,6 +265,87 @@ describe("<ItemFilterBar> — the inline error names the failure", () => {
   it("announces the error politely rather than interrupting on every keystroke", async () => {
     const app = await openWith("20", "10");
     assert.equal(errorLine(app.tree)?.props.accessibilityLiveRegion, "polite");
+  });
+});
+
+describe("<ItemFilterBar> — Apply is disabled on an invalid date range too", () => {
+  async function openDates(from: string, to: string) {
+    const app = await mount();
+    app.tree.press(filterButton(app.tree));
+    if (from) type(app.tree, dateField(app.tree, "from"), from);
+    if (to) type(app.tree, dateField(app.tree, "to"), to);
+    return app;
+  }
+
+  it("enables Apply for a valid range and applies it", async () => {
+    const app = await openDates("2024-01-01", "2024-12-31");
+    assert.equal(applyButton(app.tree).props.disabled, false);
+    assert.equal(errorLine(app.tree), null);
+
+    app.tree.press(applyButton(app.tree));
+    assert.equal(app.filters.dateFrom, "2024-01-01");
+  });
+
+  it("accepts an unpadded date rather than blocking on it", async () => {
+    // Normalisation happens in the matcher, not the field, so what the user
+    // typed is what stays on screen and in `filters`.
+    const app = await openDates("2024-1-1", "");
+    assert.equal(applyButton(app.tree).props.disabled, false);
+
+    app.tree.press(applyButton(app.tree));
+    assert.equal(app.filters.dateFrom, "2024-1-1");
+  });
+
+  it("disables Apply on an inverted, unparseable or impossible date", async () => {
+    for (const [from, to] of [
+      ["2024-12-31", "2024-01-01"],
+      ["tomorrow", ""],
+      ["2024-02-30", ""],
+      ["", "01/02/2024"],
+    ] as [string, string][]) {
+      const app = await openDates(from, to);
+      assert.equal(
+        applyButton(app.tree).props.disabled,
+        true,
+        `${from || "∅"} → ${to || "∅"} must block Apply`,
+      );
+      assert.ok(errorLine(app.tree), `${from || "∅"} → ${to || "∅"} must explain the block`);
+    }
+  });
+
+  it("shows both slots at once when the price AND the date range are wrong", async () => {
+    const app = await mount();
+    app.tree.press(filterButton(app.tree));
+    type(app.tree, priceField(app.tree, "from"), "20");
+    type(app.tree, priceField(app.tree, "to"), "10");
+    type(app.tree, dateField(app.tree, "from"), "tomorrow");
+
+    // One slot per range, each under its own row, so fixing one does not
+    // swap the other's message out from under the user.
+    assert.equal(errorLines(app.tree).length, 2);
+    assert.equal(applyButton(app.tree).props.disabled, true);
+  });
+
+  it("stays blocked while the OTHER range is still invalid", async () => {
+    const app = await mount();
+    app.tree.press(filterButton(app.tree));
+    type(app.tree, priceField(app.tree, "from"), "20");
+    type(app.tree, priceField(app.tree, "to"), "10");
+    type(app.tree, dateField(app.tree, "from"), "tomorrow");
+
+    type(app.tree, priceField(app.tree, "to"), "30");
+    assert.equal(errorLines(app.tree).length, 1, "the price error is gone");
+    assert.equal(applyButton(app.tree).props.disabled, true, "the date error still blocks");
+
+    type(app.tree, dateField(app.tree, "from"), "2024-01-01");
+    assert.equal(errorLines(app.tree).length, 0);
+    assert.equal(applyButton(app.tree).props.disabled, false);
+  });
+
+  it("does not commit an invalid date range through the direct onPress path", async () => {
+    const app = await openDates("2024-12-31", "2024-01-01");
+    (applyButton(app.tree).props.onPress as () => void)();
+    assert.equal(app.changes, 0);
   });
 });
 

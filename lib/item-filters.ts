@@ -436,6 +436,105 @@ export const PRICE_RANGE_ERROR_I18N_KEY = {
   inverted: "filterPriceRangeInverted",
 } as const satisfies Record<PriceRangeError, string>;
 
+/**
+ * Why one bound of the acquisition-date range failed.
+ *
+ * `"unparseable"` is the wrong SHAPE (`"tomorrow"`, `"01/02/2024"`);
+ * `"not_a_date"` is the right shape naming a day that does not exist
+ * (`"2024-02-30"`, `"2024-13-01"`). Worth separating because the fix differs:
+ * one is "use this format", the other is "check the calendar".
+ */
+export type DateBoundError = "empty" | "unparseable" | "not_a_date";
+
+export type ParsedDateBound =
+  | { value: string; error: null }
+  | { value: null; error: DateBoundError };
+
+/** `YYYY-M-D` with the month and day allowed to be written unpadded. */
+const DATE_BOUND_PATTERN = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
+
+/** Days in `month` (1-indexed) of `year`, Gregorian leap rule included. */
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) {
+    const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    return leap ? 29 : 28;
+  }
+  return month === 4 || month === 6 || month === 9 || month === 11 ? 30 : 31;
+}
+
+/**
+ * Parse one end of the date range into a ZERO-PADDED `YYYY-MM-DD` string.
+ *
+ * The padding is the point, not a cosmetic touch. `applyItemFilters` compares
+ * these bounds against `item.acquiredAt` with a raw string `<`/`>` — correct
+ * and timezone-free for padded ISO dates, silently wrong for anything else,
+ * because `"2024-01-15" < "2024-1-1"` is TRUE (`"0"` sorts before `"1"`). A
+ * user who typed the perfectly reasonable `2024-1-1` therefore filtered out
+ * most of the year it was supposed to include, with the range looking right
+ * on screen. Normalising here means the matcher only ever sees the shape its
+ * comparison is valid for.
+ *
+ * Calendar validity is checked arithmetically rather than by round-tripping
+ * through `Date`: `new Date("2024-02-30")` does not throw, it rolls over to
+ * March 1st, so a `Date`-based check would accept the typo and quietly filter
+ * by a different day than the one on screen.
+ */
+export function parseDateBound(raw: string): ParsedDateBound {
+  const trimmed = raw.trim();
+  if (!trimmed) return { value: null, error: "empty" };
+  const match = DATE_BOUND_PATTERN.exec(trimmed);
+  if (!match) return { value: null, error: "unparseable" };
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12) return { value: null, error: "not_a_date" };
+  if (day < 1 || day > daysInMonth(year, month)) return { value: null, error: "not_a_date" };
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return { value: `${match[1]}-${pad(month)}-${pad(day)}`, error: null };
+}
+
+/**
+ * Why the acquisition-date range cannot be applied, or `null` when it can.
+ *
+ * Same three silent failures the price range had — a bound that does not
+ * parse is skipped while still counted by the filter badge, an unpadded one
+ * excludes days it names, and an inverted range matches nothing — reported
+ * with the same precedence: `from` before `to`, a parse failure before the
+ * inversion it would otherwise imply.
+ */
+export type DateRangeError =
+  | "from_unparseable"
+  | "to_unparseable"
+  | "from_not_a_date"
+  | "to_not_a_date"
+  | "inverted";
+
+export function validateDateRange(from: string, to: string): DateRangeError | null {
+  const lo = parseDateBound(from);
+  if (lo.error === "unparseable") return "from_unparseable";
+  if (lo.error === "not_a_date") return "from_not_a_date";
+  const hi = parseDateBound(to);
+  if (hi.error === "unparseable") return "to_unparseable";
+  if (hi.error === "not_a_date") return "to_not_a_date";
+  // Both ends are normalised, so the lexicographic compare is chronological.
+  if (lo.value !== null && hi.value !== null && lo.value > hi.value) return "inverted";
+  return null;
+}
+
+/**
+ * i18n key per date-range error, exhaustive over `DateRangeError` for the
+ * same reason `PRICE_RANGE_ERROR_I18N_KEY` is. The two `*_not_a_date` codes
+ * share one string: which end holds "2024-02-30" is obvious from the field
+ * the user is looking at, and the format hint is what they need either way.
+ */
+export const DATE_RANGE_ERROR_I18N_KEY = {
+  from_unparseable: "filterDateFromInvalid",
+  to_unparseable: "filterDateToInvalid",
+  from_not_a_date: "filterDateNotReal",
+  to_not_a_date: "filterDateNotReal",
+  inverted: "filterDateRangeInverted",
+} as const satisfies Record<DateRangeError, string>;
+
 export function applyItemFilters(items: CollectableItem[], filters: ItemFilters): CollectableItem[] {
   // Identity path on the no-op input, mirroring `applySortMode(items,
   // "default")`. `.filter()` ALWAYS allocates a fresh array, even when the
@@ -474,11 +573,20 @@ export function applyItemFilters(items: CollectableItem[], filters: ItemFilters)
       const max = parsePriceBound(filters.priceTo).value;
       if (max !== null && (typeof item.cost !== "number" || item.cost > max)) return false;
     }
+    // Normalised through `parseDateBound` for the same reason the price
+    // bounds are: the raw `<`/`>` below is only a chronological comparison
+    // when BOTH sides are zero-padded `YYYY-MM-DD`, and a bound typed
+    // `2024-1-1` sorts after `2024-01-15`. An unparseable bound is skipped
+    // rather than treated as no-matches, matching the price bounds and
+    // keeping filters persisted before this shipped from emptying a
+    // collection on upgrade.
     if (filters.dateFrom) {
-      if (!item.acquiredAt || item.acquiredAt < filters.dateFrom) return false;
+      const since = parseDateBound(filters.dateFrom).value;
+      if (since !== null && (!item.acquiredAt || item.acquiredAt < since)) return false;
     }
     if (filters.dateTo) {
-      if (!item.acquiredAt || item.acquiredAt > filters.dateTo) return false;
+      const until = parseDateBound(filters.dateTo).value;
+      if (until !== null && (!item.acquiredAt || item.acquiredAt > until)) return false;
     }
     if (filters.source) {
       const needle = filters.source.toLowerCase();
