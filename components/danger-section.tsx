@@ -2,13 +2,10 @@ import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
-  CARD_BG_10,
   CARD_BG_11,
   DANGER_DEEP_2,
-  DANGER_DEEP_4,
   DANGER_DEEP_5,
   DANGER_MEDIUM,
-  DANGER_SOFT_2,
   DANGER_SOFT_3,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
@@ -16,6 +13,10 @@ import {
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import {
+  SOFT_DESTRUCTIVE_FOREGROUND,
+  SOFT_DESTRUCTIVE_SURFACE,
+} from "@/lib/danger-surface";
 
 /**
  * `"soft"` is the reversible destructive action — sign out, leave a collection,
@@ -102,15 +103,15 @@ export const DangerSection = memo(function DangerSection({
 const styles = StyleSheet.create({
   softButton: {
     borderRadius: RADIUS_PILL,
-    borderWidth: 1,
-    borderColor: DANGER_SOFT_2,
-    backgroundColor: CARD_BG_10,
     paddingHorizontal: 16,
     paddingVertical: 14,
     alignItems: "center",
+    // Same treatment as <SoftDestructiveChip>, one size up — see there for why
+    // the colours are shared but the geometry is not.
+    ...SOFT_DESTRUCTIVE_SURFACE,
   },
   softButtonText: {
-    color: DANGER_DEEP_4,
+    color: SOFT_DESTRUCTIVE_FOREGROUND,
     fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,

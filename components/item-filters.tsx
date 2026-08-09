@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 import { SheetSearchRow } from "@/components/sheet-search-row";
+import { SoftDestructiveChip } from "@/components/soft-destructive-chip";
 
 import {
   AMBER_ACCENT,
@@ -10,9 +11,6 @@ import {
   BORDER,
   CARD_BG,
   CARD_BG_3,
-  CARD_BG_10,
-  DANGER_DEEP_4,
-  DANGER_SOFT_2,
   HERO_DARK,
   MUTED_2,
   MUTED_3,
@@ -218,10 +216,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
         ) : null}
 
         {activeCount > 0 ? (
-          <Pressable style={styles.resetChip} onPress={reset}>
-            <Ionicons name="close-circle" size={14} color={DANGER_DEEP_4} />
-            <Text style={styles.resetChipText}>{t("filterReset")}</Text>
-          </Pressable>
+          <SoftDestructiveChip label={t("filterReset")} onPress={reset} />
         ) : null}
       </ScrollView>
 
@@ -461,22 +456,6 @@ const styles = StyleSheet.create({
     // Lets `numberOfLines={1}` ellipsise instead of the text forcing the
     // flex row past its maxWidth.
     flexShrink: 1,
-  },
-  resetChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    borderRadius: RADIUS_PILL,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: CARD_BG_10,
-    borderWidth: 1,
-    borderColor: DANGER_SOFT_2,
-  },
-  resetChipText: {
-    color: DANGER_DEEP_4,
-    fontWeight: "700",
-    fontSize: 12,
   },
   backdrop: {
     flex: 1,

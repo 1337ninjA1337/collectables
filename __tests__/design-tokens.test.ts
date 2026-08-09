@@ -1021,9 +1021,9 @@ describe("design-tokens adoption", () => {
     assert.match(src, /BORDER\b/);
     assert.match(src, /CARD_BG\b/);
     assert.match(src, /CARD_BG_3/);
-    assert.match(src, /CARD_BG_10/);
-    assert.match(src, /DANGER_DEEP_4/);
-    assert.match(src, /DANGER_SOFT_2/);
+    // CARD_BG_10 / DANGER_SOFT_2 / DANGER_DEEP_4 left with <SoftDestructiveChip>
+    // (same pattern as the tokens that left with <HeroBanner> and
+    // <DangerSection>); they are pinned in soft-destructive-chip.test.ts now.
     assert.match(src, /HERO_DARK/);
     assert.match(src, /MUTED_2\b/);
     assert.match(src, /MUTED_3\b/);

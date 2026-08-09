@@ -59,10 +59,18 @@ describe("<DangerSection> owns both destructive tones", () => {
     assert.match(src, /tone = "soft"/);
   });
 
-  it("keeps the soft pill's three tokens on the slots settings used", () => {
-    assert.match(src, /softButton: \{[\s\S]*?borderColor: DANGER_SOFT_2,/);
-    assert.match(src, /softButton: \{[\s\S]*?backgroundColor: CARD_BG_10,/);
-    assert.match(src, /softButtonText: \{\s*color: DANGER_DEEP_4,/);
+  it("takes the soft pill's surface and foreground from the shared recipe", () => {
+    // The three tokens moved to <SoftDestructiveChip>, which owns the same
+    // treatment at chip size; spreading the shared constant is what keeps the
+    // two from drifting when one gets a design tweak. Their VALUES are pinned
+    // in soft-destructive-chip.test.ts — pinning them here too would just be
+    // two places to update.
+    assert.match(src, /softButton: \{[\s\S]*?\.\.\.SOFT_DESTRUCTIVE_SURFACE,/);
+    assert.match(src, /softButtonText: \{\s*color: SOFT_DESTRUCTIVE_FOREGROUND,/);
+    assert.match(
+      src,
+      /import \{[\s\S]*?SOFT_DESTRUCTIVE_SURFACE[\s\S]*?\} from "@\/lib\/danger-surface";/,
+    );
   });
 
   it("keeps the hard button filled with DANGER_DEEP_2 and cream-on-red text", () => {
@@ -103,13 +111,13 @@ describe("<DangerSection> owns both destructive tones", () => {
 
   it("imports every token it references", () => {
     for (const name of [
-      "CARD_BG_10",
+      // CARD_BG_10 / DANGER_DEEP_4 / DANGER_SOFT_2 left with the shared soft
+      // recipe in <SoftDestructiveChip>; what remains is the hard tone and the
+      // zone card, which this component still owns outright.
       "CARD_BG_11",
       "DANGER_DEEP_2",
-      "DANGER_DEEP_4",
       "DANGER_DEEP_5",
       "DANGER_MEDIUM",
-      "DANGER_SOFT_2",
       "DANGER_SOFT_3",
       "TEXT_ON_DARK_4",
     ]) {
