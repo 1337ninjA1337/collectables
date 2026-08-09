@@ -33,10 +33,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Node 22, not 20: __tests__/helpers/render.ts mounts components using
+      # `module.registerHooks`, which landed in 22.15. On 20 every suite that
+      # imports the harness fails at load with "registerHooks is not a
+      # function" — and `ci-node-version.test.ts` fails this file back if the
+      # pin is ever lowered.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -56,7 +61,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Cache Expo/Metro build cache

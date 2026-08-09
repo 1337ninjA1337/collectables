@@ -152,9 +152,20 @@ function writeMockModule(specifier: string, exports: Record<string, unknown>): s
 
 let stubsInstalled = false;
 
+/** Node version that first shipped `module.registerHooks`. */
+export const MINIMUM_NODE_VERSION = 22;
+
 /** Idempotent — safe to call from every test file that needs a render. */
 export function installNativeModuleStubs(): void {
   if (stubsInstalled) return;
+  if (typeof registerHooks !== "function") {
+    // Without this the failure is `registerHooks is not a function` from a
+    // helper nobody was looking at, on a runner whose Node version is not in
+    // the error. CI pins Node 22 for exactly this reason.
+    throw new Error(
+      `the render harness needs Node >= ${MINIMUM_NODE_VERSION} for module.registerHooks; this is Node ${process.versions.node}`,
+    );
+  }
   stubsInstalled = true;
   installClassicJsxGlobal();
   registerHooks({
