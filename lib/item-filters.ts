@@ -335,6 +335,107 @@ export function applySortMode(
   });
 }
 
+/**
+ * Why a single price bound (`priceFrom` / `priceTo`) failed to become a
+ * number. Deliberately the same `"empty" | "unparseable"` vocabulary as
+ * `CurrencyValueError` (lib/format-currency-input.ts) so the two amount
+ * parsers in the app never name the same failure differently — the third
+ * member differs on purpose: a LISTING price of 0 is meaningless
+ * (`non_positive`), while a filter bound of 0 is a legitimate "from free",
+ * so only a genuinely NEGATIVE bound is rejected here.
+ */
+export type PriceBoundError = "empty" | "unparseable" | "negative";
+
+export type ParsedPriceBound =
+  | { value: number; error: null }
+  | { value: null; error: PriceBoundError };
+
+/**
+ * Digits with at most one decimal point and an optional leading sign. The
+ * shape check exists because `Number` is too permissive at both ends for a
+ * price field: `Number("0x10")` is 16 and `Number("1e3")` is 1000, so a
+ * typo'd bound would silently filter by a number the user never typed.
+ * Anything this rejects becomes `"unparseable"` and is surfaced inline.
+ */
+const PRICE_BOUND_PATTERN = /^-?\d*(?:\.\d*)?$/;
+
+/**
+ * Parse one bound of the price range.
+ *
+ * Gate order mirrors `parseCurrencyValueDetailed`: empty → unparseable →
+ * out-of-domain, so the two can never accept different strings for the same
+ * reason. The comma → dot normalisation matches `sanitizeCurrencyInput`; five
+ * of the app's six locales write "12,50" and `parseFloat("12,5")` returns 12,
+ * which is the quiet kind of wrong — the filter applies, just at the wrong
+ * price.
+ *
+ * `""` is `"empty"`, NOT an error the UI shows: an unset bound is the normal
+ * half-open range ("from 10, no ceiling"). Only `validatePriceRange` decides
+ * which errors are worth blocking on.
+ */
+export function parsePriceBound(raw: string): ParsedPriceBound {
+  const trimmed = raw.trim();
+  if (!trimmed) return { value: null, error: "empty" };
+  const normalised = trimmed.replace(",", ".");
+  if (!PRICE_BOUND_PATTERN.test(normalised)) return { value: null, error: "unparseable" };
+  const n = Number(normalised);
+  // Catches the shapes the pattern lets through that are still not numbers:
+  // `"."`, `"-"`, `"-."`.
+  if (!Number.isFinite(n)) return { value: null, error: "unparseable" };
+  if (n < 0) return { value: null, error: "negative" };
+  return { value: n, error: null };
+}
+
+/**
+ * Why the price range as a whole cannot be applied, or `null` when it can.
+ *
+ * Both failure modes are silent without this. A bound that does not parse is
+ * SKIPPED by `applyItemFilters` but still counted by `countActiveFilters`, so
+ * the bar reads "Filters (1)" over a list nothing was filtered out of; an
+ * inverted range (`from > to`) parses fine and matches no item at all, so the
+ * collection renders empty with nothing on screen explaining why. Since the
+ * sheet's draft is sticky, either state now PERSISTS across a dismiss instead
+ * of being discarded on reopen — which is what makes blocking Apply worth the
+ * extra state rather than a nicety.
+ *
+ * Bounds are reported one at a time, `from` first, because the inline slot
+ * under the price row shows a single message.
+ */
+export type PriceRangeError =
+  | "from_unparseable"
+  | "to_unparseable"
+  | "from_negative"
+  | "to_negative"
+  | "inverted";
+
+export function validatePriceRange(from: string, to: string): PriceRangeError | null {
+  const lo = parsePriceBound(from);
+  if (lo.error === "unparseable") return "from_unparseable";
+  if (lo.error === "negative") return "from_negative";
+  const hi = parsePriceBound(to);
+  if (hi.error === "unparseable") return "to_unparseable";
+  if (hi.error === "negative") return "to_negative";
+  // An unset bound is a half-open range, not an inversion.
+  if (lo.value !== null && hi.value !== null && lo.value > hi.value) return "inverted";
+  return null;
+}
+
+/**
+ * i18n key per range error. Exhaustive over `PriceRangeError` on purpose
+ * (same forcing function as `SORT_CHIP_ICONS`): adding a code without a
+ * message is a type error here rather than a blank error line in the sheet.
+ * The two `*_negative` codes share one string — "a price cannot be negative"
+ * reads the same for either end, and naming the field would be noise next to
+ * the field the caret is already in.
+ */
+export const PRICE_RANGE_ERROR_I18N_KEY = {
+  from_unparseable: "filterPriceFromInvalid",
+  to_unparseable: "filterPriceToInvalid",
+  from_negative: "filterPriceNegative",
+  to_negative: "filterPriceNegative",
+  inverted: "filterPriceRangeInverted",
+} as const satisfies Record<PriceRangeError, string>;
+
 export function applyItemFilters(items: CollectableItem[], filters: ItemFilters): CollectableItem[] {
   // Identity path on the no-op input, mirroring `applySortMode(items,
   // "default")`. `.filter()` ALWAYS allocates a fresh array, even when the
@@ -354,13 +455,24 @@ export function applyItemFilters(items: CollectableItem[], filters: ItemFilters)
   // filter pass. Trim outside the loop too; whitespace-only is "no search".
   const queryNeedle = filters.query.trim().toLowerCase();
   return items.filter((item) => {
+    // Both bounds go through `parsePriceBound` — the SAME parser
+    // `validatePriceRange` gates Apply on — so a range the sheet accepted can
+    // never be matched on a different number than the one it validated. The
+    // old `parseFloat` disagreed with it twice over: `parseFloat("12,50")` is
+    // 12 (five of six locales write the comma), and `parseFloat("12abc")` is
+    // 12, so a bound the user could not have meant filtered anyway.
+    //
+    // A bound that does not parse is SKIPPED rather than treated as
+    // no-matches, preserving the previous `!isNaN` behaviour: filters
+    // persisted before this validation shipped must not empty a collection on
+    // upgrade. The sheet no longer lets a new one through.
     if (filters.priceFrom) {
-      const min = parseFloat(filters.priceFrom);
-      if (!isNaN(min) && (typeof item.cost !== "number" || item.cost < min)) return false;
+      const min = parsePriceBound(filters.priceFrom).value;
+      if (min !== null && (typeof item.cost !== "number" || item.cost < min)) return false;
     }
     if (filters.priceTo) {
-      const max = parseFloat(filters.priceTo);
-      if (!isNaN(max) && (typeof item.cost !== "number" || item.cost > max)) return false;
+      const max = parsePriceBound(filters.priceTo).value;
+      if (max !== null && (typeof item.cost !== "number" || item.cost > max)) return false;
     }
     if (filters.dateFrom) {
       if (!item.acquiredAt || item.acquiredAt < filters.dateFrom) return false;

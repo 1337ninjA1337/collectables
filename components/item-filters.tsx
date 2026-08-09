@@ -11,6 +11,7 @@ import {
   BORDER,
   CARD_BG,
   CARD_BG_3,
+  DANGER_DEEP_2,
   HERO_DARK,
   MUTED_2,
   MUTED_3,
@@ -38,14 +39,20 @@ import {
   EMPTY_FILTERS,
   getTitleCollator,
   hasActiveMatchers,
+  parsePriceBound,
+  PRICE_RANGE_ERROR_I18N_KEY,
   SORT_CHIP_ICONS,
   SORT_MODE_PARTS,
   SORT_OPTIONS,
+  validatePriceRange,
   type ActiveSortChip,
   type ItemFilters,
   type ItemSortAxis,
   type ItemSortDirection,
   type ItemSortMode,
+  type ParsedPriceBound,
+  type PriceBoundError,
+  type PriceRangeError,
 } from "@/lib/item-filters";
 
 // Re-export the pure filter helpers + types so existing call sites that
@@ -66,11 +73,23 @@ export {
   EMPTY_FILTERS,
   getTitleCollator,
   hasActiveMatchers,
+  parsePriceBound,
+  PRICE_RANGE_ERROR_I18N_KEY,
   SORT_CHIP_ICONS,
   SORT_MODE_PARTS,
   SORT_OPTIONS,
+  validatePriceRange,
 };
-export type { ActiveSortChip, ItemFilters, ItemSortAxis, ItemSortDirection, ItemSortMode };
+export type {
+  ActiveSortChip,
+  ItemFilters,
+  ItemSortAxis,
+  ItemSortDirection,
+  ItemSortMode,
+  ParsedPriceBound,
+  PriceBoundError,
+  PriceRangeError,
+};
 
 type Props = {
   filters: ItemFilters;
@@ -104,7 +123,22 @@ export function ItemFilterBar({ filters, onChange }: Props) {
     setModalOpen(true);
   }
 
+  // Recomputed from the draft, not stored: an error derived into state would
+  // need clearing on every field write, on the `filters` resync AND on reset,
+  // and the one path that forgot would leave Apply dead with nothing wrong on
+  // screen.
+  const priceError = useMemo(
+    () => validatePriceRange(draft.priceFrom, draft.priceTo),
+    [draft.priceFrom, draft.priceTo],
+  );
+
   function apply() {
+    // The `disabled` prop already blocks the press on every platform RN
+    // supports; this guard is for the paths that bypass it — a hardware
+    // keyboard "submit", a future call site wiring Apply to something else.
+    // `onChange` writing an unappliable range is the bug worth being
+    // paranoid about, because the draft is sticky and it would stay.
+    if (priceError) return;
     onChange(draft);
     setModalOpen(false);
   }
@@ -288,6 +322,15 @@ export function ItemFilterBar({ filters, onChange }: Props) {
                 </View>
               </View>
 
+              {/* One inline slot for the whole range — the message names the
+                  offending end itself, and a per-field slot would reflow the
+                  two-column row every time a digit made it briefly invalid. */}
+              {priceError ? (
+                <Text style={styles.fieldError} accessibilityLiveRegion="polite" role="alert">
+                  {t(PRICE_RANGE_ERROR_I18N_KEY[priceError])}
+                </Text>
+              ) : null}
+
               {/* Date range */}
               <View style={styles.fieldRow}>
                 <View style={styles.fieldHalf}>
@@ -365,7 +408,16 @@ export function ItemFilterBar({ filters, onChange }: Props) {
 
               {/* Actions */}
               <View style={styles.sheetActions}>
-                <Pressable style={styles.applyButton} onPress={apply}>
+                <Pressable
+                  style={[styles.applyButton, priceError !== null && styles.applyButtonDisabled]}
+                  onPress={apply}
+                  disabled={priceError !== null}
+                  // `disabled` on a Pressable stops the press but does not
+                  // reach the accessibility tree on its own, so a screen
+                  // reader would still offer a button that does nothing.
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: priceError !== null }}
+                >
                   <Text style={styles.applyButtonText}>{t("filterApply")}</Text>
                 </Pressable>
                 <Pressable style={styles.resetButton} onPress={reset}>
@@ -565,10 +617,25 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
   },
+  // Disabled is expressed by opacity rather than a flat grey fill so the CTA
+  // keeps its shape and position — the button is unreachable, not gone, and
+  // the inline error directly above it says why.
+  applyButtonDisabled: {
+    opacity: 0.5,
+  },
   applyButtonText: {
     color: TEXT_ON_DARK_4,
     fontWeight: "800",
     fontSize: 15,
+  },
+  // Sits between the price row and the date row; `marginTop: -10` pulls it
+  // against the field it describes, out of the 16pt gap the sheet's content
+  // container puts between every child.
+  fieldError: {
+    color: DANGER_DEEP_2,
+    fontWeight: "700",
+    fontSize: 12,
+    marginTop: -10,
   },
   resetButton: {
     borderRadius: 18,
