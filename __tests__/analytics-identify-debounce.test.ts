@@ -3,11 +3,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-// Structural only — importing lib/analytics-provider.tsx at runtime would pull
-// the react-native context tree (AsyncStorage, supabase) into node. The
-// debounce/reset SEMANTICS are functionally covered by the mock-timer suite in
-// __tests__/identify-scheduler.test.ts; this file pins that the provider
-// actually delegates to that scheduler instead of re-rolling an inline timer.
+// Structural only, and deliberately still so. The provider IS mountable now —
+// __tests__/analytics-provider-strict-mode.test.ts renders it through the
+// render harness with its four sibling contexts mocked — and that suite covers
+// the observable behaviour. What a render cannot see is HOW the behaviour is
+// achieved, and the wiring below is the part that must not drift: a provider
+// that re-rolled an inline `setTimeout` with the same window would pass every
+// runtime assertion while dropping the shared scheduler's reset semantics.
+// The debounce/reset SEMANTICS themselves are covered by the mock-timer suite
+// in __tests__/identify-scheduler.test.ts.
 const ROOT = join(__dirname, "..");
 const src = readFileSync(join(ROOT, "lib/analytics-provider.tsx"), "utf8");
 

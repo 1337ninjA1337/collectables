@@ -1,4 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import * as React from "react";
@@ -32,11 +34,17 @@ import * as React from "react";
  * ## What it is not
  *
  * This is a render harness, not a reconciler. There is no diffing, no commit
- * phase, no concurrent behaviour, no `StrictMode` double-invoke. Effects are
- * queued and flushed synchronously after the tree is built, and a `setState`
- * marks the tree dirty for the next explicit `rerender()`. It is enough to
- * answer "what does this component actually render, with these props" — which
- * is the question the source-text scans were approximating.
+ * phase, no concurrent behaviour, no Suspense. Effects are queued and flushed
+ * synchronously after the tree is built, and a `setState` marks the tree dirty
+ * for the next explicit `rerender()`. It is enough to answer "what does this
+ * component actually render, with these props" — which is the question the
+ * source-text scans were approximating.
+ *
+ * `<StrictMode>` IS reproduced, because the bugs it exists to surface are
+ * exactly the ones a source scan cannot see: inside a strict subtree each
+ * component body runs twice per pass, and each effect is mounted, cleaned up
+ * and mounted again. An effect that is not idempotent fails here the same way
+ * it does in a dev build.
  *
  * ## Ordering constraint
  *
@@ -62,6 +70,86 @@ const STUBBED_MODULES: Readonly<Record<string, string>> = {
   "@react-native-async-storage/async-storage": "async-storage.mjs",
 };
 
+/**
+ * Per-test module doubles, registered with {@link mockModule}.
+ *
+ * A provider under test usually pulls in three or four sibling contexts
+ * (`useAuth`, `usePremium`, …) whose real modules reach supabase and the
+ * network — mounting the real thing to observe one effect would be testing the
+ * whole app. Aliasing those specifiers onto plain objects keeps the component
+ * under test real and everything around it inert.
+ *
+ * Held on `globalThis` because the synthesized module source has to reach them
+ * from its own scope, which is not this module's.
+ */
+const MOCK_REGISTRY_KEY = "__renderHarnessModuleMocks__";
+
+type MockRegistry = Record<string, Record<string, unknown>>;
+
+function mockRegistry(): MockRegistry {
+  const scope = globalThis as Record<string, unknown>;
+  scope[MOCK_REGISTRY_KEY] ??= {};
+  return scope[MOCK_REGISTRY_KEY] as MockRegistry;
+}
+
+const VALID_EXPORT_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+/**
+ * Replaces a module for the rest of the process with the given exports.
+ *
+ * Call at module scope, before the dynamic `import()` of the code under test —
+ * ESM caches a module the first time it is evaluated, so mocking a specifier
+ * something has already loaded silently does nothing.
+ *
+ * Export values are read once, when the mocked module first evaluates. Pass
+ * stable functions that close over mutable state (a spy that pushes into an
+ * array, a hook that reads a `let` the test reassigns) rather than swapping the
+ * exported value itself.
+ */
+export function mockModule(specifier: string, exports: Record<string, unknown>): void {
+  for (const name of Object.keys(exports)) {
+    if (name !== "default" && !VALID_EXPORT_NAME.test(name)) {
+      throw new Error(`mockModule: "${name}" is not a valid export identifier`);
+    }
+  }
+  mockRegistry()[specifier] = exports;
+  mockUrls[specifier] = writeMockModule(specifier, exports);
+}
+
+/** specifier → `file:` URL of the generated `.mjs` shim. */
+const mockUrls: Record<string, string> = {};
+
+let mockDir: string | null = null;
+
+/**
+ * Mocks are written to a real `.mjs` file in a temp dir rather than served
+ * from a `data:` URL or a synchronous `load` hook.
+ *
+ * A `load` hook is out because the synchronous chain has to return a source
+ * for EVERY module it sees, which short-circuits the async tsx loader that
+ * compiles this repo's TypeScript. A `data:` URL is out because that same tsx
+ * loader treats the URL as a path and reports `ENOENT: … open
+ * 'data:text/javascript;base64,…'`. A plain `.mjs` file needs no transform, so
+ * it travels the whole chain untouched.
+ */
+function writeMockModule(specifier: string, exports: Record<string, unknown>): string {
+  if (!mockDir) {
+    mockDir = mkdtempSync(path.join(os.tmpdir(), "render-harness-mocks-"));
+    const dir = mockDir;
+    process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
+  }
+  const named = Object.keys(exports).filter((name) => name !== "default");
+  const lines = [
+    `const mock = globalThis[${JSON.stringify(MOCK_REGISTRY_KEY)}][${JSON.stringify(specifier)}];`,
+  ];
+  if (named.length > 0) lines.push(`export const { ${named.join(", ")} } = mock;`);
+  if ("default" in exports) lines.push(`export default mock.default;`);
+
+  const file = path.join(mockDir, `${specifier.replace(/[^A-Za-z0-9]+/g, "_")}.mjs`);
+  writeFileSync(file, `${lines.join("\n")}\n`, "utf8");
+  return pathToFileURL(file).href;
+}
+
 let stubsInstalled = false;
 
 /** Idempotent — safe to call from every test file that needs a render. */
@@ -71,6 +159,10 @@ export function installNativeModuleStubs(): void {
   installClassicJsxGlobal();
   registerHooks({
     resolve(specifier, context, nextResolve) {
+      const mocked = mockUrls[specifier];
+      if (mocked) {
+        return { url: mocked, shortCircuit: true };
+      }
       const stub = STUBBED_MODULES[specifier];
       if (stub) {
         return { url: pathToFileURL(path.join(STUB_DIR, stub)).href, shortCircuit: true };
@@ -154,7 +246,20 @@ export function styleOf(node: TestNode): Record<string, unknown> {
 type HookCell = { value: unknown; deps?: unknown[] };
 type Instance = { hooks: HookCell[] };
 
-type PendingEffect = () => void;
+type EffectFn = () => void | (() => void);
+
+/**
+ * One queued effect, carrying enough to replay it. `strict` marks effects
+ * queued inside a `<StrictMode>` subtree, which React dev-mode mounts, tears
+ * down and mounts again — the double-invoke this harness reproduces.
+ */
+type QueuedEffect = {
+  effect: EffectFn;
+  cell: HookCell;
+  strict: boolean;
+  mount: () => void;
+  cleanup: () => void;
+};
 
 const REACT_INTERNALS = (
   React as unknown as {
@@ -177,7 +282,7 @@ class RenderPass {
    */
   readonly instances = new Map<string, Instance>();
   readonly contextStack = new Map<unknown, unknown[]>();
-  effects: PendingEffect[] = [];
+  effects: QueuedEffect[] = [];
   dirty = false;
 
   private current: Instance | null = null;
@@ -235,14 +340,14 @@ class RenderPass {
     },
     useRef: (initial: unknown) => this.cell(() => ({ current: initial })).value,
     useContext: (context: unknown) => this.readContext(context),
-    useEffect: (effect: PendingEffect, deps?: unknown[]) => {
+    useEffect: (effect: EffectFn, deps?: unknown[]) => {
       const cell = this.cell(() => undefined);
       if (!("deps" in cell) || depsChanged(cell.deps, deps)) {
         cell.deps = deps ?? [];
-        this.effects.push(effect);
+        this.queueEffect(effect, cell);
       }
     },
-    useLayoutEffect: (effect: PendingEffect, deps?: unknown[]) => {
+    useLayoutEffect: (effect: EffectFn, deps?: unknown[]) => {
       this.dispatcher.useEffect(effect, deps);
     },
     useInsertionEffect: () => {},
@@ -254,6 +359,33 @@ class RenderPass {
     useTransition: () => [false, (scope: () => void) => scope()],
     useOptimistic: (passthrough: unknown) => [passthrough, () => {}],
   };
+
+  /**
+   * Depth of `<StrictMode>` wrappers around whatever is currently rendering.
+   * Non-zero means: invoke this component's body twice per pass, and mount →
+   * clean up → mount its effects, exactly as React does in dev.
+   */
+  strictDepth = 0;
+
+  private queueEffect(effect: EffectFn, cell: HookCell): void {
+    const queued: QueuedEffect = {
+      effect,
+      cell,
+      strict: this.strictDepth > 0,
+      mount: () => {
+        const cleanup = effect();
+        cell.value = typeof cleanup === "function" ? cleanup : undefined;
+      },
+      cleanup: () => {
+        if (typeof cell.value === "function") (cell.value as () => void)();
+        cell.value = undefined;
+      },
+    };
+    // A dep change re-runs the effect, so the previous cleanup must fire first
+    // — a subscription that never unsubscribes is the classic leak this guards.
+    queued.cleanup();
+    this.effects.push(queued);
+  }
 
   readContext(context: unknown): unknown {
     const stack = this.contextStack.get(context);
@@ -274,6 +406,17 @@ class RenderPass {
     this.hookIndex = 0;
     REACT_INTERNALS.H = this.dispatcher;
     try {
+      // StrictMode invokes the body twice per pass to surface render-phase side
+      // effects. The hook cursor MUST rewind between the two calls — cells are
+      // addressed by call order, so a second pass starting at index N would
+      // allocate a fresh set and hand the component a brand-new `useRef`,
+      // exactly the state-identity bug StrictMode exists to catch. With the
+      // rewind, the second call reuses every cell and re-queues no effect:
+      // two renders, one commit, same as React.
+      if (this.strictDepth > 0) {
+        component(props);
+        this.hookIndex = 0;
+      }
       return component(props);
     } finally {
       REACT_INTERNALS.H = previousDispatcher;
@@ -287,6 +430,7 @@ class RenderPass {
 // Element walking
 // ---------------------------------------------------------------------------
 
+const STRICT_MODE_TYPE = Symbol.for("react.strict_mode");
 const MEMO_TYPE = Symbol.for("react.memo");
 const FORWARD_REF_TYPE = Symbol.for("react.forward_ref");
 const FRAGMENT_TYPE = Symbol.for("react.fragment");
@@ -351,6 +495,15 @@ function renderNode(pass: RenderPass, node: unknown, keyPath: string): TestNode[
 
   if (type === FRAGMENT_TYPE) {
     return renderNode(pass, props.children, `${keyPath}/frag`);
+  }
+
+  if (type === STRICT_MODE_TYPE) {
+    pass.strictDepth += 1;
+    try {
+      return renderNode(pass, props.children, `${keyPath}/strict`);
+    } finally {
+      pass.strictDepth -= 1;
+    }
   }
 
   if (typeof type === "function") {
@@ -461,7 +614,14 @@ export function render(element: React.ReactElement): RenderResult {
     const children = renderNode(pass, current, "root");
     const queued = pass.effects;
     pass.effects = [];
-    for (const effect of queued) effect();
+    for (const queuedEffect of queued) queuedEffect.mount();
+    // React's StrictMode remount: every effect inside a <StrictMode> subtree is
+    // torn down and set up again immediately after the first commit. This is
+    // the pass that catches an effect which is not idempotent — a duplicated
+    // subscription, a second analytics identify, a doubled network call.
+    const strict = queued.filter((queuedEffect) => queuedEffect.strict);
+    for (const queuedEffect of strict) queuedEffect.cleanup();
+    for (const queuedEffect of strict) queuedEffect.mount();
     return { type: "#root", props: {}, children };
   }
 

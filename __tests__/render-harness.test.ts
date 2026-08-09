@@ -1,16 +1,37 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createElement, Fragment, createContext, memo, forwardRef, useState, useMemo, useEffect, useRef } from "react";
+import {
+  createElement,
+  createContext,
+  forwardRef,
+  Fragment,
+  memo,
+  StrictMode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import {
   flattenStyle,
   installNativeModuleStubs,
+  mockModule,
   render,
   styleOf,
   stubbedModuleSpecifiers,
 } from "./helpers/render";
 
 installNativeModuleStubs();
+
+// A synthetic specifier, so mocking it cannot disturb any real module this
+// suite (or a suite sharing the process) also loads.
+const spyCalls: string[] = [];
+mockModule("virtual:harness-fixture", {
+  greet: (name: string) => spyCalls.push(name),
+  ANSWER: 42,
+  default: "fixture-default",
+});
 
 /**
  * Contract tests for `__tests__/helpers/render.ts`, the in-repo React render
@@ -235,6 +256,83 @@ describe("render harness — hooks", () => {
       ),
     );
     assert.deepEqual(tree.texts(), ["inner", "outer"]);
+  });
+});
+
+describe("render harness — mockModule", () => {
+  it("serves named exports, a default, and non-function values", async () => {
+    const fixture = (await import("virtual:harness-fixture" as string)) as Record<string, unknown>;
+    assert.equal(fixture.ANSWER, 42);
+    assert.equal(fixture.default, "fixture-default");
+    (fixture.greet as (n: string) => void)("world");
+    assert.deepEqual(spyCalls, ["world"]);
+  });
+
+  it("rejects an export name that is not a valid identifier", () => {
+    assert.throws(
+      () => mockModule("virtual:bad", { "not-an-identifier": 1 }),
+      /not a valid export identifier/,
+    );
+  });
+});
+
+describe("render harness — StrictMode", () => {
+  it("invokes the body twice but rewinds the hook cursor, so useRef stays identical", () => {
+    const bodies: unknown[] = [];
+    function Once() {
+      const ref = useRef({ built: Symbol("instance") });
+      bodies.push(ref);
+      return null;
+    }
+    render(createElement(StrictMode, null, createElement(Once)));
+    assert.equal(bodies.length, 2, "StrictMode double-invokes the body");
+    assert.equal(bodies[0], bodies[1], "a fresh ref on the second call is the bug this catches");
+  });
+
+  it("mounts, cleans up and mounts each effect again — the remount React does in dev", () => {
+    const log: string[] = [];
+    function Subscriber() {
+      useEffect(() => {
+        log.push("subscribe");
+        return () => {
+          log.push("unsubscribe");
+        };
+      }, []);
+      return null;
+    }
+    render(createElement(StrictMode, null, createElement(Subscriber)));
+    assert.deepEqual(log, ["subscribe", "unsubscribe", "subscribe"]);
+  });
+
+  it("leaves effects outside a strict subtree mounted exactly once", () => {
+    const log: string[] = [];
+    function Subscriber() {
+      useEffect(() => {
+        log.push("subscribe");
+        return () => {
+          log.push("unsubscribe");
+        };
+      }, []);
+      return null;
+    }
+    render(createElement(Subscriber));
+    assert.deepEqual(log, ["subscribe"]);
+  });
+
+  it("runs the previous cleanup before re-running an effect whose deps changed", () => {
+    const log: string[] = [];
+    function Watcher({ topic }: { topic: string }) {
+      useEffect(() => {
+        log.push(`open:${topic}`);
+        return () => {
+          log.push(`close:${topic}`);
+        };
+      }, [topic]);
+      return null;
+    }
+    const tree = render(createElement(Watcher, { topic: "a" }));
+    tree.rerender(createElement(Watcher, { topic: "b" }));
+    assert.deepEqual(log, ["open:a", "close:a", "open:b"]);
   });
 });
 
