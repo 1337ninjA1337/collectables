@@ -1,6 +1,21 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Platform, Pressable, StatusBar, StyleSheet, Text, View } from "react-native";
-import { SPACING_INLINE } from "@/lib/design-tokens";
+import {
+  AMBER_ACCENT,
+  AMBER_SOFT_3,
+  CARD_BG_15,
+  DANGER_DEEP_7,
+  DANGER_DEEP_8,
+  DANGER_SOFT_6,
+  DANGER_SOFT_7,
+  HERO_DARK_2,
+  HERO_DARK_9,
+  SPACING_INLINE,
+  SUCCESS_DEEP,
+  SUCCESS_GREEN_3,
+  SUCCESS_SOFT,
+  SUCCESS_SOFT_2,
+} from "@/lib/design-tokens";
 import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
 
 export type ToastType = "success" | "error" | "info";
@@ -117,9 +132,24 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
 }
 
 const PALETTES: Record<ToastType, { bg: string; border: string; accent: string; text: string }> = {
-  success: { bg: "#eef7e0", border: "#c5e39a", accent: "#5f9a2f", text: "#2a3b16" },
-  error: { bg: "#fbe7e1", border: "#f0b8ac", accent: "#c94a2a", text: "#3d1a11" },
-  info: { bg: "#fff4e0", border: "#f0d6a1", accent: "#d89c5b", text: "#2a1d15" },
+  success: {
+    bg: SUCCESS_SOFT_2,
+    border: SUCCESS_SOFT,
+    accent: SUCCESS_GREEN_3,
+    text: SUCCESS_DEEP,
+  },
+  error: {
+    bg: DANGER_SOFT_6,
+    border: DANGER_SOFT_7,
+    accent: DANGER_DEEP_7,
+    text: DANGER_DEEP_8,
+  },
+  info: {
+    bg: CARD_BG_15,
+    border: AMBER_SOFT_3,
+    accent: AMBER_ACCENT,
+    text: HERO_DARK_2,
+  },
 };
 
 const TOP_INSET =
@@ -146,7 +176,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     overflow: "hidden",
-    shadowColor: "#1a0e06",
+    shadowColor: HERO_DARK_9,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.18,
     shadowRadius: 14,
