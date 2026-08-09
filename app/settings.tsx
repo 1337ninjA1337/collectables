@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CurrencySheet } from "@/components/currency-sheet";
+import { DangerSection } from "@/components/danger-section";
 import { HeroBanner } from "@/components/hero-banner";
 import { Screen } from "@/components/screen";
 import { useAppTheme } from "@/components/use-app-theme";
@@ -16,15 +17,7 @@ import {
   BORDER_5,
   BORDER_6,
   CARD_BG_3,
-  CARD_BG_10,
-  CARD_BG_11,
   COOL_GRAY,
-  DANGER_DEEP_2,
-  DANGER_DEEP_4,
-  DANGER_DEEP_5,
-  DANGER_MEDIUM,
-  DANGER_SOFT_2,
-  DANGER_SOFT_3,
   HERO_DARK,
   HERO_DARK_2,
   HERO_DARK_7,
@@ -344,27 +337,20 @@ export default function SettingsScreen() {
         )}
       </View>
 
-      <Pressable
-        style={{...styles.signOutButton, ...(pending ? styles.signOutButtonDisabled : {})}}
-        onPress={() => void signOut()}
+      <DangerSection
+        actionLabel={t("signOut")}
+        onAction={() => void signOut()}
         disabled={pending}
-      >
-        <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
-      </Pressable>
+      />
 
-      <View style={styles.dangerZone}>
-        <Text style={styles.dangerTitle}>{t("deleteAccountSection")}</Text>
-        <Text style={styles.dangerText}>{t("deleteAccountHint")}</Text>
-        <Pressable
-          style={{...styles.deleteButton, ...((pending || deleting) ? styles.deleteButtonDisabled : {})}}
-          onPress={handleDeleteAccount}
-          disabled={pending || deleting}
-        >
-          <Text style={styles.deleteButtonText}>
-            {deleting ? t("deleteAccountDeleting") : t("deleteAccount")}
-          </Text>
-        </Pressable>
-      </View>
+      <DangerSection
+        tone="hard"
+        title={t("deleteAccountSection")}
+        hint={t("deleteAccountHint")}
+        actionLabel={deleting ? t("deleteAccountDeleting") : t("deleteAccount")}
+        onAction={handleDeleteAccount}
+        disabled={pending || deleting}
+      />
     </Screen>
   );
 }
@@ -518,59 +504,6 @@ const styles = StyleSheet.create({
   diagnosticsToggleText: {
     color: PURE_WHITE,
     fontSize: 13,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  signOutButton: {
-    borderRadius: RADIUS_PILL,
-    borderWidth: 1,
-    borderColor: DANGER_SOFT_2,
-    backgroundColor: CARD_BG_10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  signOutButtonDisabled: {
-    opacity: 0.6,
-  },
-  signOutButtonText: {
-    color: DANGER_DEEP_4,
-    fontSize: 15,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  dangerZone: {
-    borderRadius: RADIUS_ITEM_AIRY,
-    backgroundColor: CARD_BG_11,
-    borderWidth: 1,
-    borderColor: DANGER_SOFT_3,
-    padding: 18,
-    gap: SPACING_CARD,
-  },
-  dangerTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: DANGER_DEEP_5,
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  dangerText: {
-    color: DANGER_MEDIUM,
-    lineHeight: 22,
-    fontFamily: FONT_BODY,
-  },
-  deleteButton: {
-    alignSelf: "flex-start",
-    borderRadius: RADIUS_PILL,
-    backgroundColor: DANGER_DEEP_2,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  deleteButtonDisabled: {
-    opacity: 0.6,
-  },
-  deleteButtonText: {
-    color: TEXT_ON_DARK_4,
-    fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },

@@ -924,15 +924,11 @@ describe("design-tokens adoption", () => {
     assert.match(src, /BORDER_5/);
     assert.match(src, /BORDER_6/);
     assert.match(src, /CARD_BG_3/);
-    assert.match(src, /CARD_BG_10/);
-    assert.match(src, /CARD_BG_11/);
     assert.match(src, /COOL_GRAY/);
-    assert.match(src, /DANGER_DEEP_2/);
-    assert.match(src, /DANGER_DEEP_4/);
-    assert.match(src, /DANGER_DEEP_5/);
-    assert.match(src, /DANGER_MEDIUM/);
-    assert.match(src, /DANGER_SOFT_2/);
-    assert.match(src, /DANGER_SOFT_3/);
+    // CARD_BG_10 / CARD_BG_11 and the whole DANGER_* set (DEEP_2, DEEP_4,
+    // DEEP_5, MEDIUM, SOFT_2, SOFT_3) left with the sign-out pill and the
+    // delete-account zone when both moved into <DangerSection>
+    // (components/danger-section.tsx) — pinned by danger-section.test.ts.
     assert.match(src, /HERO_DARK\b/);
     assert.match(src, /HERO_DARK_2/);
     // HERO_DARK_4 / HERO_DARK_5 left with the hero banner when it moved into
