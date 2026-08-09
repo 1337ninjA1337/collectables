@@ -10,6 +10,8 @@
  *   `TEXT_*`   — foreground colors (dark on cream, cream on dark)
  *   `MUTED_*`  — secondary / placeholder text
  *   `DANGER_*` — destructive / error states
+ *   `COOL_*`   — cool-tone neutrals for system / diagnostic / disabled UI,
+ *                deliberately outside the warm-brown families above
  */
 
 export const HERO_DARK = "#261b14";
@@ -139,7 +141,30 @@ export const DANGER_SOFT_6 = "#fbe7e1";
 export const DANGER_SOFT_7 = "#f0b8ac";
 export const DANGER_DEEP_7 = "#c94a2a";
 export const DANGER_DEEP_8 = "#3d1a11";
+
+/**
+ * Cool-tone neutral axis — the one deliberately non-warm family in the palette.
+ *
+ * Everything else here is warm brown / cream, which is right for content but
+ * wrong for the UI that is *about* the app rather than part of it: an off
+ * toggle, a disabled control, a diagnostic readout. Tinting those amber makes
+ * them read as brand accents. `COOL_GRAY` (Tailwind slate-400) arrived alone
+ * for the settings diagnostics toggle; the light/dark pair exists so the next
+ * such surface has a shade to reach for instead of inventing a fourth grey.
+ *
+ * The three are Tailwind slate-300 / 400 / 500, so the steps are perceptually
+ * even and a designer can extend the axis in either direction from a known
+ * ramp. Order is light → dark, pinned by test.
+ *
+ * Named `_LIGHT` / `_DARK` rather than the `COOL_SLATE` / `COOL_OFFLINE` the
+ * suggestion floated: "slate" would name the hue twice and an offline colour
+ * already exists as `STATUS_OFFLINE`, which is amber on purpose (offline is a
+ * warning, not a neutral).
+ */
+export const COOL_GRAY_LIGHT = "#cbd5e1";
 export const COOL_GRAY = "#94a3b8";
+export const COOL_GRAY_DARK = "#64748b";
+
 export const SUCCESS_GREEN = "#3a7d4f";
 export const SUCCESS_GREEN_2 = "#4a7c59";
 export const SUCCESS_GREEN_3 = "#5f9a2f";
@@ -403,7 +428,9 @@ export const designTokens = Object.freeze({
   DANGER_SOFT_7,
   DANGER_DEEP_7,
   DANGER_DEEP_8,
+  COOL_GRAY_LIGHT,
   COOL_GRAY,
+  COOL_GRAY_DARK,
   SUCCESS_GREEN,
   SUCCESS_GREEN_2,
   SUCCESS_GREEN_3,
