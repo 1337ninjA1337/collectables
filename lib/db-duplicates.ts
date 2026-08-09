@@ -18,6 +18,8 @@
  * (chat_reads, subscriptions) cannot hold duplicates and are skipped.
  */
 
+import { compareKeysAsc } from "@/lib/sort-helpers";
+
 export type DuplicateSpec = {
   /** PostgREST table name. */
   table: string;
@@ -178,7 +180,7 @@ export function findDuplicateGroups(spec: DuplicateSpec, rows: DbRow[]): TableDu
     if (list.length < 2) continue;
     groups.push({ key: key.split("\u0000").join(" | "), rows: list });
   }
-  groups.sort((a, b) => b.rows.length - a.rows.length || (a.key < b.key ? -1 : 1));
+  groups.sort((a, b) => b.rows.length - a.rows.length || compareKeysAsc(a.key, b.key));
   return { spec, scannedRows: rows.length, groups };
 }
 

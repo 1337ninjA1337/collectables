@@ -1,4 +1,5 @@
 import { MarketplaceListing, MarketplaceMode } from "@/lib/types";
+import { byCreatedAtDesc, compareIsoDesc } from "@/lib/sort-helpers";
 
 /**
  * Pure helpers for the marketplace feature so they're testable without
@@ -6,6 +7,18 @@ import { MarketplaceListing, MarketplaceMode } from "@/lib/types";
  */
 
 export const FREE_LISTING_CAP = 1;
+
+/**
+ * Newest sale first, falling back to `createdAt` for a listing whose `soldAt`
+ * is missing — a legacy row, or one whose sale was recorded before the column
+ * existed. Five surfaces sort this way (recently-sold, purchases, awaiting
+ * arrival, sales, price history), so the fallback lives here rather than being
+ * re-derived; a site that forgot it would sort those rows to one end as if
+ * they were the oldest in the list.
+ */
+function bySoldAtDesc(a: MarketplaceListing, b: MarketplaceListing): number {
+  return compareIsoDesc(a.soldAt ?? a.createdAt, b.soldAt ?? b.createdAt);
+}
 
 /**
  * Ensures every `MarketplaceListing` shape has the optional `buyerUserId`
@@ -174,7 +187,7 @@ export function activeListings(
   return listings
     .filter((l) => !l.soldAt)
     .slice()
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    .sort(byCreatedAtDesc);
 }
 
 /**
@@ -187,7 +200,7 @@ export function listingsForUser(
   return listings
     .filter((l) => l.ownerUserId === userId)
     .slice()
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    .sort(byCreatedAtDesc);
 }
 
 /**
@@ -205,11 +218,7 @@ export function recentlySoldListings(
   return listings
     .filter((l) => l.soldAt != null && l.buyerUserId != null)
     .slice()
-    .sort((a, b) => {
-      const aAt = a.soldAt ?? a.createdAt;
-      const bAt = b.soldAt ?? b.createdAt;
-      return aAt < bAt ? 1 : -1;
-    })
+    .sort(bySoldAtDesc)
     .slice(0, limit);
 }
 
@@ -238,11 +247,7 @@ export function purchasesForUser(
       return true;
     })
     .slice()
-    .sort((a, b) => {
-      const aAt = a.soldAt ?? a.createdAt;
-      const bAt = b.soldAt ?? b.createdAt;
-      return aAt < bAt ? 1 : -1;
-    });
+    .sort(bySoldAtDesc);
 }
 
 /**
@@ -272,11 +277,7 @@ export function purchasesAwaitingArrival(
   return listings
     .filter((l) => l.buyerUserId === userId && l.soldAt != null && l.arrivedAt == null)
     .slice()
-    .sort((a, b) => {
-      const aAt = a.soldAt ?? a.createdAt;
-      const bAt = b.soldAt ?? b.createdAt;
-      return aAt < bAt ? 1 : -1;
-    });
+    .sort(bySoldAtDesc);
 }
 
 /**
@@ -293,7 +294,7 @@ export function listingsAcquiredByUser(
   return listings
     .filter((l) => l.buyerUserId === userId && l.soldAt != null)
     .slice()
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    .sort(byCreatedAtDesc);
 }
 
 /**
@@ -309,11 +310,7 @@ export function salesForUser(
   return listings
     .filter((l) => l.ownerUserId === userId && l.soldAt != null)
     .slice()
-    .sort((a, b) => {
-      const aAt = a.soldAt ?? a.createdAt;
-      const bAt = b.soldAt ?? b.createdAt;
-      return aAt < bAt ? 1 : -1;
-    });
+    .sort(bySoldAtDesc);
 }
 
 /**
@@ -441,6 +438,6 @@ export function priceHistoryForTitle(
       similarity: sim,
     });
   }
-  out.sort((a, b) => (a.recordedAt < b.recordedAt ? 1 : -1));
+  out.sort((a, b) => compareIsoDesc(a.recordedAt, b.recordedAt));
   return out.slice(0, limit);
 }

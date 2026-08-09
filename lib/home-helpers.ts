@@ -6,6 +6,7 @@
  */
 
 import { selectOwnedActiveItems } from "./collections-helpers";
+import { byCreatedAtDesc } from "./sort-helpers";
 import { CollectableItem, Collection } from "./types";
 
 /**
@@ -24,8 +25,10 @@ export const RECENT_ITEMS_LIMIT = 10;
  * why each one is load-bearing.
  *
  * Sorting is on the ISO `createdAt` string, which orders lexicographically for
- * a fixed-offset format — no `Date` parsing needed, and stable for items that
- * share a timestamp because `Array.prototype.sort` is stable in ES2019+.
+ * a fixed-offset format — no `Date` parsing needed. Items sharing a timestamp
+ * keep their input order: `Array.prototype.sort` has been stable since ES2019,
+ * but only for a consistent comparator, which is why this goes through
+ * `byCreatedAtDesc` rather than the inline `? -1 : 1` it used to inline.
  * `selectOwnedActiveItems` returns a fresh array, so the sort never touches the
  * caller's (context-owned) `items`.
  */
@@ -35,6 +38,6 @@ export function selectRecentItems(
   limit: number = RECENT_ITEMS_LIMIT,
 ): CollectableItem[] {
   return selectOwnedActiveItems(items, collections)
-    .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
+    .sort(byCreatedAtDesc)
     .slice(0, Math.max(0, limit));
 }

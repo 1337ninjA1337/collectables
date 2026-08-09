@@ -1,4 +1,5 @@
 import { ChatMessage } from "@/lib/types";
+import { byCreatedAtAsc, compareIsoDesc } from "@/lib/sort-helpers";
 
 /**
  * Chat id is deterministic from the two participant user ids
@@ -26,7 +27,7 @@ export function appendMessage(messages: ChatMessage[], message: ChatMessage): Ch
   if (messages.some((m) => m.id === message.id)) {
     return messages;
   }
-  return [...messages, message].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+  return [...messages, message].sort(byCreatedAtAsc);
 }
 
 /**
@@ -65,7 +66,7 @@ export function buildChatPreviews(
     const other = getOtherParticipantId(chatId, selfId);
     if (!other) continue;
 
-    const sorted = [...msgs].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+    const sorted = [...msgs].sort(byCreatedAtAsc);
     const last = sorted[sorted.length - 1];
     const lastRead = lastReadByChat[chatId] ?? "";
     const unreadCount = sorted.filter((m) => m.fromUserId !== selfId && m.createdAt > lastRead).length;
@@ -79,7 +80,7 @@ export function buildChatPreviews(
     });
   }
 
-  previews.sort((a, b) => (a.lastMessageAt < b.lastMessageAt ? 1 : -1));
+  previews.sort((a, b) => compareIsoDesc(a.lastMessageAt, b.lastMessageAt));
   return previews;
 }
 
