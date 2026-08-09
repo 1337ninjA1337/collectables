@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 import { SheetSearchRow } from "@/components/sheet-search-row";
@@ -84,8 +84,23 @@ export function ItemFilterBar({ filters, onChange }: Props) {
 
   const activeCount = useMemo(() => countActiveFilters(filters), [filters]);
 
-  function openModal() {
+  // The draft is sticky: it survives a backdrop tap and is still there on the
+  // next open. Resetting it on OPEN (which is what this used to do) threw away
+  // half-typed input the moment a user missed the sheet and hit the backdrop,
+  // and the snapshot it reset to was the pre-edit `filters` — so the sheet
+  // reopened claiming nothing had been typed at all.
+  //
+  // Syncing on `filters` instead keeps the draft honest when the state moves
+  // WITHOUT the sheet: the reset chip, the quick chips and the sort/query chip
+  // clears all write through `onChange`, and the sheet must reopen showing what
+  // those left behind rather than a stale edit of a filter set that no longer
+  // exists. `filters` is the caller's `useState` value, so this fires on a real
+  // change and not on every render.
+  useEffect(() => {
     setDraft(filters);
+  }, [filters]);
+
+  function openModal() {
     setModalOpen(true);
   }
 
