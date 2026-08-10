@@ -148,47 +148,12 @@ jobs:
       - name: Bundle size within budget
         run: npm run lint:bundle-size
 
-      - name: Bundle smoke check
-        run: |
-          BUNDLE=$(ls dist/_expo/static/js/web/*.js 2>/dev/null | head -1)
-          if [ -z "$BUNDLE" ]; then
-            echo "ERROR: no web bundle found in dist/_expo/static/js/web/" >&2
-            exit 1
-          fi
-          echo "Checking bundle: $BUNDLE"
-          # Verify key i18n keys are present in the bundle (catches missing provider or stale key regressions)
-          for KEY in marketplaceListOnMarketplace marketplaceTitle addItem createCollection signOut; do
-            if ! grep -q "$KEY" "$BUNDLE"; then
-              echo "ERROR: expected key '$KEY' not found in bundle" >&2
-              exit 1
-            fi
-          done
-          # Verify core providers are wired in the bundle
-          for PROVIDER in MarketplaceProvider CollectionsProvider SocialProvider AuthProvider; do
-            if ! grep -q "$PROVIDER" "$BUNDLE"; then
-              echo "ERROR: expected provider '$PROVIDER' not found in bundle" >&2
-              exit 1
-            fi
-          done
-          # Verify all six i18n language translation maps are present (catches tree-shaking regressions)
-          for LANG in '"ru"' '"en"' '"be"' '"pl"' '"de"' '"es"'; do
-            if ! grep -q "$LANG" "$BUNDLE"; then
-              echo "ERROR: i18n language code $LANG not found in bundle" >&2
-              exit 1
-            fi
-          done
-          echo "Bundle smoke check passed."
-
-      - name: Privacy page smoke check
-        # npm run build runs build-spa-fallback.ts, which emits the static
-        # /privacy page from PRIVACY.md — verify the rendered output survived.
-        run: |
-          if [ ! -f dist/privacy/index.html ]; then
-            echo "ERROR: dist/privacy/index.html missing — /privacy page not emitted" >&2
-            exit 1
-          fi
-          if ! grep -q "Privacy Policy" dist/privacy/index.html; then
-            echo "ERROR: dist/privacy/index.html does not contain 'Privacy Policy'" >&2
-            exit 1
-          fi
-          echo "Privacy page smoke check passed."
+      # Watched i18n keys / providers / language codes are still in the bundle,
+      # and the static /privacy page (emitted from PRIVACY.md by
+      # build-spa-fallback.ts) survived the build. Previously two inline shell
+      # steps; they are one script so they share assertBundlePremise with the
+      # two guards above — neither shell version checked that dist/ was newer
+      # than the source tree, so both would grep a stale bundle and pass — and
+      # so the watched token lists are testable instead of living in YAML.
+      - name: Bundle + privacy page smoke check
+        run: npm run lint:bundle-smoke
