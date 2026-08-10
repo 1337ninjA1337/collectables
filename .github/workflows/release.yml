@@ -34,8 +34,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `npm run typecheck`, not `npx tsc`: npx resolves the pinned
+      # devDependency only when node_modules is populated, and otherwise
+      # fetches whatever TypeScript is latest on the registry — a different
+      # major reports errors the pinned compiler does not. The npm script
+      # can only ever run node_modules/.bin/tsc.
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Run tests
         run: npm test
