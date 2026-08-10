@@ -10,14 +10,22 @@ import {
   BUNDLE_SMOKE_TOKENS,
   PRIVACY_PAGE_MARKER,
   PRIVACY_PAGE_RELATIVE_PATH,
+  PRIVACY_PAGE_TARGETS,
   evaluateBundleSmoke,
   evaluatePrivacyPage,
+  evaluatePrivacyPages,
   formatBundleSmokeReport,
   formatPrivacyPageFailure,
+  formatPrivacyPagesReport,
   type BundleSmokeToken,
   type PrivacyPageFailureCode,
+  type PrivacyPageInput,
 } from "../lib/bundle-smoke";
 import { LINT_ALL_EXEMPT } from "../lib/lint-guards";
+import {
+  PRIVACY_PAGE_LANGUAGES,
+  renderPrivacyPage,
+} from "../lib/privacy-page";
 
 /**
  * Pins the post-build smoke check that replaced ci.yml's and deploy.yml's
@@ -178,39 +186,228 @@ describe("formatBundleSmokeReport", () => {
   });
 });
 
+const EN_TARGET = PRIVACY_PAGE_TARGETS.find((t) => t.code === "en");
+const RU_TARGET = PRIVACY_PAGE_TARGETS.find((t) => t.code === "ru");
+
+/** A page that passes every gate, for the language given. */
+const renderedPage = (code: string): string =>
+  `<html lang="${code}"><title>Collectables — ${PRIVACY_PAGE_MARKER}</title><h1>Policy</h1></html>`;
+
+describe("PRIVACY_PAGE_TARGETS", () => {
+  it("covers every language the page is offered in", () => {
+    assert.deepEqual(
+      PRIVACY_PAGE_TARGETS.map((target) => target.code),
+      PRIVACY_PAGE_LANGUAGES.map((language) => language.code),
+    );
+  });
+
+  it("checks all six pages, not only the English one", () => {
+    // The shell version looked at dist/privacy/index.html alone while
+    // build-spa-fallback.ts emits six — so the five GDPR Art. 12 disclosure
+    // translations were the one surface with a legal edge that nothing gated.
+    assert.equal(PRIVACY_PAGE_TARGETS.length, 6);
+  });
+
+  it("puts English at the canonical path and translations one level down", () => {
+    assert.equal(EN_TARGET?.relativePath, PRIVACY_PAGE_RELATIVE_PATH);
+    assert.equal(RU_TARGET?.relativePath, "dist/privacy/ru/index.html");
+  });
+
+  it("matches the paths build-spa-fallback.ts writes", () => {
+    const builder = read("scripts/build-spa-fallback.ts");
+    assert.ok(builder.includes('path.join(privacyDir, "index.html")'));
+    assert.ok(builder.includes('path.join(langDir, "index.html")'));
+    assert.ok(builder.includes("PRIVACY_PAGE_LANGUAGES"));
+  });
+});
+
 describe("evaluatePrivacyPage", () => {
-  it("passes on a rendered page carrying the marker", () => {
+  it("passes on a rendered page in the expected language", () => {
+    assert.ok(EN_TARGET);
     const verdict = evaluatePrivacyPage({
+      target: EN_TARGET,
       exists: true,
-      text: `<title>Collectables — ${PRIVACY_PAGE_MARKER}</title>`,
+      text: renderedPage("en"),
     });
     assert.equal(verdict.ok, true);
   });
 
   it("fails when the file is absent", () => {
-    const verdict = evaluatePrivacyPage({ exists: false, text: null });
+    assert.ok(EN_TARGET);
+    const verdict = evaluatePrivacyPage({
+      target: EN_TARGET,
+      exists: false,
+      text: null,
+    });
     assert.equal(verdict.ok, false);
     assert.equal(verdict.ok === false && verdict.code, "missing_file");
   });
 
   it("reports an unreadable file as missing_file — same fix, one message", () => {
-    const verdict = evaluatePrivacyPage({ exists: true, text: null });
+    assert.ok(EN_TARGET);
+    const verdict = evaluatePrivacyPage({
+      target: EN_TARGET,
+      exists: true,
+      text: null,
+    });
     assert.equal(verdict.ok === false && verdict.code, "missing_file");
   });
 
-  it("fails when the page rendered empty", () => {
-    const verdict = evaluatePrivacyPage({ exists: true, text: "<html></html>" });
+  it("fails when the file is not a privacy page at all", () => {
+    assert.ok(EN_TARGET);
+    const verdict = evaluatePrivacyPage({
+      target: EN_TARGET,
+      exists: true,
+      text: "<html></html>",
+    });
     assert.equal(verdict.ok === false && verdict.code, "missing_marker");
   });
 
+  it("fails when the WRONG translation was written to the path", () => {
+    // renderPrivacyPage's <title> is the English string in every language, so
+    // a marker-only check passes on the English page copied into /privacy/ru/.
+    // The <html lang> attribute is what distinguishes them.
+    assert.ok(RU_TARGET);
+    const verdict = evaluatePrivacyPage({
+      target: RU_TARGET,
+      exists: true,
+      text: renderedPage("en"),
+    });
+    assert.equal(verdict.ok === false && verdict.code, "wrong_language");
+  });
+
+  it("is not satisfied by the language picker's own lang= attributes", () => {
+    // Every page renders `<a lang="ru" hreflang="ru">` for the picker, so a
+    // bare `lang="ru"` substring is present in all six — the first draft of
+    // this check used exactly that and passed a deliberately mis-copied page.
+    assert.ok(RU_TARGET);
+    const englishPageWithPicker = `<html lang="en"><title>${PRIVACY_PAGE_MARKER}</title><nav><a href="ru/" lang="ru" hreflang="ru">Русский</a></nav><h1>Policy</h1></html>`;
+    const verdict = evaluatePrivacyPage({
+      target: RU_TARGET,
+      exists: true,
+      text: englishPageWithPicker,
+    });
+    assert.equal(verdict.ok === false && verdict.code, "wrong_language");
+  });
+
+  it("accepts the REAL renderer's output for every language", () => {
+    // The gates are substring checks against a template this suite does not
+    // own; a renderer reword (a self-closing <html>, a reordered attribute)
+    // would break all six at once, and only running the real thing notices.
+    for (const target of PRIVACY_PAGE_TARGETS) {
+      const verdict = evaluatePrivacyPage({
+        target,
+        exists: true,
+        text: renderPrivacyPage("# Policy\n\nBody text.\n", target.code),
+      });
+      assert.equal(
+        verdict.ok,
+        true,
+        `${target.code}: ${verdict.ok === false ? verdict.code : ""}`,
+      );
+    }
+  });
+
+  it("fails when the chrome rendered but the policy body did not", () => {
+    // renderPrivacyPage("") emits the title and the language picker and no
+    // policy — a page that passes a title grep and contains no policy.
+    assert.ok(EN_TARGET);
+    const verdict = evaluatePrivacyPage({
+      target: EN_TARGET,
+      exists: true,
+      text: `<html lang="en"><title>${PRIVACY_PAGE_MARKER}</title></html>`,
+    });
+    assert.equal(verdict.ok === false && verdict.code, "empty_body");
+  });
+
   it("has a distinct message per failure code", () => {
-    const codes: PrivacyPageFailureCode[] = ["missing_file", "missing_marker"];
-    const messages = codes.map((code) => formatPrivacyPageFailure("c", code));
+    assert.ok(EN_TARGET);
+    const codes: PrivacyPageFailureCode[] = [
+      "missing_file",
+      "missing_marker",
+      "wrong_language",
+      "empty_body",
+    ];
+    const messages = codes.map((code) =>
+      formatPrivacyPageFailure("c", { target: EN_TARGET, code }),
+    );
     assert.equal(new Set(messages).size, codes.length);
     for (const message of messages) {
       assert.match(message, /^c: ERROR — /);
       assert.ok(message.includes(PRIVACY_PAGE_RELATIVE_PATH));
     }
+  });
+
+  it("names the offending path, not always the English one", () => {
+    assert.ok(RU_TARGET);
+    const message = formatPrivacyPageFailure("c", {
+      target: RU_TARGET,
+      code: "missing_file",
+    });
+    assert.ok(message.includes("dist/privacy/ru/index.html"));
+  });
+});
+
+describe("evaluatePrivacyPages", () => {
+  const allGood = (): PrivacyPageInput[] =>
+    PRIVACY_PAGE_TARGETS.map((target) => ({
+      target,
+      exists: true,
+      text: renderedPage(target.code),
+    }));
+
+  it("passes when every page rendered", () => {
+    const result = evaluatePrivacyPages(allGood());
+    assert.equal(result.ok, true);
+    assert.equal(result.checked, PRIVACY_PAGE_TARGETS.length);
+    assert.deepEqual(result.failures, []);
+  });
+
+  it("reports EVERY broken page, not just the first", () => {
+    const inputs = allGood().map((input) => ({
+      ...input,
+      exists: false,
+      text: null,
+    }));
+    const result = evaluatePrivacyPages(inputs);
+    assert.equal(result.failures.length, PRIVACY_PAGE_TARGETS.length);
+  });
+
+  it("fails the run when one translation is missing", () => {
+    const inputs = allGood();
+    const result = evaluatePrivacyPages(
+      inputs.map((input) =>
+        input.target.code === "de"
+          ? { ...input, exists: false, text: null }
+          : input,
+      ),
+    );
+    assert.equal(result.ok, false);
+    assert.deepEqual(
+      result.failures.map((failure) => failure.target.code),
+      ["de"],
+    );
+  });
+
+  it("refuses an empty input list rather than passing vacuously", () => {
+    const result = evaluatePrivacyPages([]);
+    assert.equal(result.ok, false);
+    assert.equal(result.checked, 0);
+  });
+
+  it("says how many pages it checked on success", () => {
+    const message = formatPrivacyPagesReport(
+      "c",
+      evaluatePrivacyPages(allGood()),
+    );
+    assert.match(message, /6 privacy page\(s\)/);
+    assert.doesNotMatch(message, /ERROR/);
+  });
+
+  it("names zero-page runs explicitly", () => {
+    const message = formatPrivacyPagesReport("c", evaluatePrivacyPages([]));
+    assert.match(message, /ERROR/);
+    assert.match(message, /0 privacy pages/);
   });
 });
 
@@ -241,12 +438,17 @@ describe("scripts/check-bundle-smoke.ts", () => {
 
   it("reports both halves before exiting", () => {
     const exit = SCRIPT.indexOf("process.exit(1)");
-    const privacyReport = SCRIPT.indexOf("formatPrivacyPageFailure");
+    const privacyReport = SCRIPT.indexOf("formatPrivacyPagesReport");
     assert.ok(privacyReport !== -1 && exit !== -1);
     assert.ok(
       privacyReport < exit,
       "a fail-fast chain would hide the privacy failure behind a token failure",
     );
+  });
+
+  it("reads every emitted privacy page, not just the English one", () => {
+    assert.match(SCRIPT, /PRIVACY_PAGE_TARGETS\.map\(/);
+    assert.doesNotMatch(SCRIPT, /PRIVACY_PAGE_RELATIVE_PATH/);
   });
 
   it("exits non-zero when either half fails", () => {

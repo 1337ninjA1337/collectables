@@ -30,6 +30,11 @@
  * add a token.
  */
 
+import {
+  PRIVACY_DEFAULT_LANGUAGE,
+  PRIVACY_PAGE_LANGUAGES,
+} from "./privacy-page";
+
 export type BundleSmokeTokenKind = "i18n-key" | "provider" | "language";
 
 export type BundleSmokeToken = {
@@ -140,12 +145,58 @@ export function formatBundleSmokeReport(
 /** Emitted by `scripts/build-spa-fallback.ts` from the tracked `PRIVACY.md`. */
 export const PRIVACY_PAGE_RELATIVE_PATH = "dist/privacy/index.html";
 
-/** Title `renderPrivacyPage` always writes — its absence means an empty render. */
+/** Title `renderPrivacyPage` always writes, in every language. */
 export const PRIVACY_PAGE_MARKER = "Privacy Policy";
 
-export type PrivacyPageFailureCode = "missing_file" | "missing_marker";
+/**
+ * `renderMarkdownBody` emits the source file's leading `# …` as an `<h1>`, and
+ * the page chrome (language picker, style block) contains no heading — so this
+ * is the cheapest "the markdown actually rendered" signal.
+ *
+ * It is what {@link PRIVACY_PAGE_MARKER} alone cannot prove: the title lives in
+ * the template, so `renderPrivacyPage("")` produces a page carrying the marker
+ * and no policy at all. A check that passed on that would be the vacuous-green
+ * shape this whole guard exists to close.
+ */
+export const PRIVACY_PAGE_BODY_MARKER = "<h1";
+
+export type PrivacyPageTarget = {
+  /** BCP-47-ish language code the page was rendered for. */
+  readonly code: string;
+  readonly relativePath: string;
+};
+
+/**
+ * Every privacy page the build emits: the canonical English policy at
+ * `/privacy/` plus one translated Sentry-disclosure page per non-English
+ * language at `/privacy/<code>/`.
+ *
+ * DERIVED from `PRIVACY_PAGE_LANGUAGES` rather than listed, so a seventh
+ * language is covered the moment `lib/privacy-page.ts` learns about it. That
+ * module is node-pure (the build scripts import it), so unlike
+ * `lib/i18n-context.tsx` it can simply be imported here.
+ *
+ * The five translated pages are the GDPR Art. 12 disclosure surface and were
+ * previously unchecked by anything — the shell version looked at the English
+ * page alone, while `build-spa-fallback.ts` emits all six.
+ */
+export const PRIVACY_PAGE_TARGETS: readonly PrivacyPageTarget[] =
+  PRIVACY_PAGE_LANGUAGES.map(({ code }) => ({
+    code,
+    relativePath:
+      code === PRIVACY_DEFAULT_LANGUAGE
+        ? PRIVACY_PAGE_RELATIVE_PATH
+        : `dist/privacy/${code}/index.html`,
+  }));
+
+export type PrivacyPageFailureCode =
+  | "missing_file"
+  | "missing_marker"
+  | "wrong_language"
+  | "empty_body";
 
 export type PrivacyPageInput = {
+  readonly target: PrivacyPageTarget;
   readonly exists: boolean;
   /** File contents, or null when it could not be read. */
   readonly text: string | null;
@@ -159,15 +210,28 @@ export type PrivacyPageVerdict =
  * Exhaustive over {@link PrivacyPageFailureCode} so a new code cannot ship
  * without a message, matching `lib/bundle-premise.ts`'s table.
  */
-const PRIVACY_PAGE_MESSAGE: Record<PrivacyPageFailureCode, string> = {
-  missing_file: `${PRIVACY_PAGE_RELATIVE_PATH} missing — /privacy page not emitted. App Store review links to it, so a build without it is not shippable.`,
-  missing_marker: `${PRIVACY_PAGE_RELATIVE_PATH} does not contain ${JSON.stringify(PRIVACY_PAGE_MARKER)} — the page was emitted but rendered empty.`,
+const PRIVACY_PAGE_MESSAGE: Record<
+  PrivacyPageFailureCode,
+  (target: PrivacyPageTarget) => string
+> = {
+  missing_file: (target) =>
+    `${target.relativePath} missing — the /privacy page for "${target.code}" was not emitted. App Store review links to the English one and the translations are the GDPR Art. 12 disclosure, so a build without them is not shippable.`,
+  missing_marker: (target) =>
+    `${target.relativePath} does not contain ${JSON.stringify(PRIVACY_PAGE_MARKER)} — the file exists but is not a rendered privacy page.`,
+  wrong_language: (target) =>
+    `${target.relativePath} is not marked \`<html lang="${target.code}">\` — the wrong translation was written to this path, which a title-only check cannot see.`,
+  empty_body: (target) =>
+    `${target.relativePath} carries the page chrome but no ${PRIVACY_PAGE_BODY_MARKER}…> heading — the policy body rendered empty.`,
 };
 
 /**
  * An unreadable file is reported as `missing_file` rather than as its own code:
  * from the reader's side "it is not there" and "I could not open it" have the
  * same fix, and a third message would only make the log harder to scan.
+ *
+ * Gate order is most-specific-last: "there is no file" explains every other
+ * symptom, and "this is not a privacy page at all" explains the two content
+ * checks, so each failure names the smallest thing that is wrong.
  */
 export function evaluatePrivacyPage(
   input: PrivacyPageInput,
@@ -178,12 +242,70 @@ export function evaluatePrivacyPage(
   if (!input.text.includes(PRIVACY_PAGE_MARKER)) {
     return { ok: false, code: "missing_marker" };
   }
+  // `<html lang=…>`, not a bare `lang="de"`: the language picker renders an
+  // `<a lang="de" hreflang="de">` link on EVERY page, so the loose form is
+  // present in all six and the check would never fire. Caught by running it —
+  // the first draft passed a deliberately mis-copied page.
+  if (!input.text.includes(`<html lang="${input.target.code}">`)) {
+    return { ok: false, code: "wrong_language" };
+  }
+  if (!input.text.includes(PRIVACY_PAGE_BODY_MARKER)) {
+    return { ok: false, code: "empty_body" };
+  }
   return { ok: true };
+}
+
+export type PrivacyPageFailure = {
+  readonly target: PrivacyPageTarget;
+  readonly code: PrivacyPageFailureCode;
+};
+
+export type PrivacyPagesResult = {
+  readonly ok: boolean;
+  readonly failures: readonly PrivacyPageFailure[];
+  readonly checked: number;
+};
+
+/**
+ * Every page is evaluated — a fail-fast loop would report the English page and
+ * hide the five translations behind it, costing a CI run per language.
+ *
+ * An empty input list is NOT ok: it is the same "checked nothing, reported
+ * success" shape {@link evaluateBundleSmoke} refuses.
+ */
+export function evaluatePrivacyPages(
+  inputs: readonly PrivacyPageInput[],
+): PrivacyPagesResult {
+  const failures: PrivacyPageFailure[] = [];
+  for (const input of inputs) {
+    const verdict = evaluatePrivacyPage(input);
+    if (!verdict.ok) failures.push({ target: input.target, code: verdict.code });
+  }
+  return {
+    ok: inputs.length > 0 && failures.length === 0,
+    failures,
+    checked: inputs.length,
+  };
 }
 
 export function formatPrivacyPageFailure(
   checkName: string,
-  code: PrivacyPageFailureCode,
+  failure: PrivacyPageFailure,
 ): string {
-  return `${checkName}: ERROR — ${PRIVACY_PAGE_MESSAGE[code]}`;
+  return `${checkName}: ERROR — ${PRIVACY_PAGE_MESSAGE[failure.code](failure.target)}`;
+}
+
+export function formatPrivacyPagesReport(
+  checkName: string,
+  result: PrivacyPagesResult,
+): string {
+  if (result.ok) {
+    return `${checkName}: ${result.checked} privacy page(s) present and rendered.`;
+  }
+  if (result.checked === 0) {
+    return `${checkName}: ERROR — checked 0 privacy pages; a pass over zero pages is not a pass.`;
+  }
+  return result.failures
+    .map((failure) => formatPrivacyPageFailure(checkName, failure))
+    .join("\n");
 }

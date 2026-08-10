@@ -15,24 +15,28 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
-  PRIVACY_PAGE_RELATIVE_PATH,
+  PRIVACY_PAGE_TARGETS,
   evaluateBundleSmoke,
-  evaluatePrivacyPage,
+  evaluatePrivacyPages,
   formatBundleSmokeReport,
-  formatPrivacyPageFailure,
+  formatPrivacyPagesReport,
+  type PrivacyPageInput,
 } from "../lib/bundle-smoke";
 import { REPO_ROOT, assertBundlePremise } from "./bundle-premise";
 
 const CHECK_NAME = "check-bundle-smoke";
 
-function readPrivacyPage(root: string): { exists: boolean; text: string | null } {
-  const full = path.join(root, ...PRIVACY_PAGE_RELATIVE_PATH.split("/"));
-  if (!fs.existsSync(full)) return { exists: false, text: null };
-  try {
-    return { exists: true, text: fs.readFileSync(full, "utf8") };
-  } catch {
-    return { exists: true, text: null };
-  }
+/** All six emitted pages — the English policy and the five translations. */
+function readPrivacyPages(root: string): PrivacyPageInput[] {
+  return PRIVACY_PAGE_TARGETS.map((target) => {
+    const full = path.join(root, ...target.relativePath.split("/"));
+    if (!fs.existsSync(full)) return { target, exists: false, text: null };
+    try {
+      return { target, exists: true, text: fs.readFileSync(full, "utf8") };
+    } catch {
+      return { target, exists: true, text: null };
+    }
+  });
 }
 
 function main(): void {
@@ -44,7 +48,7 @@ function main(): void {
   const chunkTexts = bundlePaths.map((full) => fs.readFileSync(full, "utf8"));
   const smoke = evaluateBundleSmoke(chunkTexts);
 
-  const privacy = evaluatePrivacyPage(readPrivacyPage(REPO_ROOT));
+  const privacy = evaluatePrivacyPages(readPrivacyPages(REPO_ROOT));
 
   // Both halves are reported before exiting — a fail-fast chain would hide a
   // missing privacy page behind a missing i18n key and cost a second CI run to
@@ -52,11 +56,9 @@ function main(): void {
   console[smoke.ok ? "log" : "error"](
     formatBundleSmokeReport(CHECK_NAME, smoke),
   );
-  if (privacy.ok) {
-    console.log(`${CHECK_NAME}: ${PRIVACY_PAGE_RELATIVE_PATH} present.`);
-  } else {
-    console.error(formatPrivacyPageFailure(CHECK_NAME, privacy.code));
-  }
+  console[privacy.ok ? "log" : "error"](
+    formatPrivacyPagesReport(CHECK_NAME, privacy),
+  );
 
   if (!smoke.ok || !privacy.ok) process.exit(1);
 }
