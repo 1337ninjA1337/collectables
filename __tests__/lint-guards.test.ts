@@ -124,9 +124,23 @@ describe("formatLintAllReport / lintAllExitCode", () => {
 describe("lint:all — wiring", () => {
   it("package.json declares lint:all and lint:ci delegates to it", () => {
     assert.equal(pkg.scripts["lint:all"], "tsx scripts/lint-all.ts");
-    assert.equal(
-      pkg.scripts["lint:ci"],
-      "npx tsc --noEmit && npm run lint:all && npm test",
+    // Asserted as composition rather than a byte-for-byte string: the
+    // typecheck leg moved from an inline `npx tsc --noEmit` to `npm run
+    // typecheck` when the pretest hook landed, and an exact-match assertion
+    // fails a refactor that changed nothing about what runs. The ORDER is the
+    // part worth pinning — see __tests__/test-typecheck-prelude.test.ts.
+    const ci = pkg.scripts["lint:ci"];
+    const legs = ["typecheck", "lint:all", "test"].map((leg) => ({
+      leg,
+      at: ci.indexOf(leg),
+    }));
+    for (const { leg, at } of legs) {
+      assert.ok(at >= 0, `lint:ci must still run ${leg}; got "${ci}"`);
+    }
+    assert.deepEqual(
+      [...legs].sort((a, b) => a.at - b.at).map((l) => l.leg),
+      ["typecheck", "lint:all", "test"],
+      "lint:ci must stay fail-fast: typecheck, then the guards, then the suites",
     );
   });
 

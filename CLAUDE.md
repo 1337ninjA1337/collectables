@@ -29,7 +29,20 @@ npm run web        # browser
 npm run lint       # expo lint (ESLint under the hood)
 ```
 
-There is no test suite. TypeScript type-checking is done via `tsc --noEmit` (use `npx tsc --noEmit` to check types manually).
+Tests run on the built-in `node:test` runner via `tsx`:
+
+```bash
+npm test           # typechecks first (pretest hook), then runs __tests__/*.test.ts
+npm run typecheck  # tsc --noEmit on its own
+npm run test:only  # same suites, skipping the typecheck (tight iteration loop)
+npm run lint:all   # every pure code-style guard in lib/lint-guards.ts
+npm run lint:ci    # typecheck → lint:all → test, the full local gate
+```
+
+`npm test` runs `tsc --noEmit` first because `tsx` strips types without
+checking them: a type-broken test file passes the runner and fails CI. Prefer
+`npm run typecheck` over `npx tsc` — npx falls back to fetching a newer
+TypeScript major from the registry when `node_modules` is missing.
 
 ## Environment
 

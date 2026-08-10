@@ -367,7 +367,8 @@ app:
 
 Run through this list before each `eas submit`:
 
-- [ ] `npx tsc --noEmit && npm test` clean (this is `npm run lint:ci`).
+- [ ] `npm run lint:ci` clean (typecheck → `lint:all` → tests; `npm test`
+      also typechecks on its own via the `pretest` hook).
 - [ ] `app.json` `version` bumped if user-visible changes.
 - [ ] `app.json` `infoPlist` strings present and translated for all six
       `CFBundleLocalizations`.

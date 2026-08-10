@@ -16,10 +16,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Node 22, not 20: this job runs `npm test`, and every suite importing
+      # __tests__/helpers/render.ts needs `module.registerHooks` (Node 22.15).
+      # On 20 those suites die at LOAD — 7 reported failures standing in for
+      # 127 suites that never ran, with the total count silently 79 lower.
+      # ci-node-version.test.ts now fails this file back if the pin drops.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Cache Expo/Metro build cache
@@ -34,8 +39,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `npm run typecheck`, not `npx tsc`: npx resolves the pinned
+      # devDependency only when node_modules is populated, and otherwise
+      # fetches whatever TypeScript is latest on the registry — a different
+      # major reports errors the pinned compiler does not. The npm script
+      # can only ever run node_modules/.bin/tsc.
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Run tests
         run: npm test

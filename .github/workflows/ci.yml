@@ -89,8 +89,11 @@ jobs:
       - name: Expo-recommended versions (posthog-* watched)
         run: npm run lint:expo-install
 
+      # Kept as its own step even though `npm test` now runs `pretest` →
+      # `npm run typecheck`: this fails the run in ~5s instead of after the
+      # much slower lint:all fan-out, and gives the failure a named step.
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       # All pure code-style guards (inline hex/geometry literals, env
       # inlining, analytics imports, Clarity input masking, migration
