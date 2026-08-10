@@ -18,9 +18,12 @@ import {
   scanForSecrets,
   type SecretMatch,
 } from "../lib/secret-scan";
+import { assertBundlePremise, assertScannedFiles } from "./bundle-premise";
 
 const REPO_ROOT = path.join(__dirname, "..");
 const DIST_DIR = path.join(REPO_ROOT, "dist");
+
+const CHECK_NAME = "check-bundle-secrets";
 
 /** Bundle artifacts that could embed a leaked credential. */
 const SCAN_EXTENSIONS = new Set([".js", ".html", ".json", ".map", ".css"]);
@@ -43,16 +46,19 @@ function walk(dir: string, out: string[]): void {
 }
 
 function main(): void {
-  if (!fs.existsSync(DIST_DIR)) {
-    console.error(
-      "check-bundle-secrets: dist/ not found. Run `npm run build` first.",
-    );
-    process.exit(1);
-  }
+  // Shared premise: dist/ exists, carries at least one exported chunk, and is
+  // newer than the source tree. Without it this scan reports "no secrets
+  // leaked" over zero bytes, or over a bundle exported before the leak.
+  assertBundlePremise(CHECK_NAME);
 
   const files: string[] = [];
   walk(DIST_DIR, files);
   files.sort();
+
+  // A second, narrower premise: the walk above matches five artifact
+  // extensions, not just the *.js chunks the shared check counts, so an
+  // extension list that stops matching is a distinct way to scan nothing.
+  assertScannedFiles(CHECK_NAME, files.length, "bundle file");
 
   const matches: SecretMatch[] = [];
   for (const file of files) {

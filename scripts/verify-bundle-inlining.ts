@@ -17,29 +17,17 @@ import {
   formatBundleInliningReport,
   WATCHED_INLINED_VAR_NAMES,
 } from "../lib/bundle-inlining";
+import { assertBundlePremise } from "./bundle-premise";
 
-const REPO_ROOT = path.join(__dirname, "..");
-const BUNDLE_DIR = path.join(REPO_ROOT, "dist", "_expo", "static", "js", "web");
+const CHECK_NAME = "verify-bundle-inlining";
 
 function main(): void {
-  let bundleFiles: string[];
-  try {
-    bundleFiles = fs
-      .readdirSync(BUNDLE_DIR)
-      .filter((name) => name.endsWith(".js"))
-      .map((name) => path.join(BUNDLE_DIR, name));
-  } catch {
-    console.error(
-      `verify-bundle-inlining: no exported bundle at ${BUNDLE_DIR} — run \`npm run build\` first.`,
-    );
-    process.exit(1);
-    return;
-  }
-  if (bundleFiles.length === 0) {
-    console.error(`verify-bundle-inlining: no .js bundles found in ${BUNDLE_DIR}.`);
-    process.exit(1);
-    return;
-  }
+  // Shared premise (dist/ present, at least one chunk, newer than the source
+  // tree). This check is the most exposed of the three: "the secret is not in
+  // the bundle" is its FAILURE signal, so scanning a stale or empty bundle
+  // reports the exact symptom of the bug it exists to catch — but from the
+  // wrong cause, which is worse than reporting nothing at all.
+  const bundleFiles = assertBundlePremise(CHECK_NAME);
 
   const bundleSource = bundleFiles
     .map((file) => fs.readFileSync(file, "utf8"))
