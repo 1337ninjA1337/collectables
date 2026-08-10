@@ -54,6 +54,45 @@ describe("ci.yml — sentry-sdk-absent smoke job", () => {
       "the sentry run must follow the deletion in the same step — a run before it proves nothing",
     );
   });
+
+  // `rm -rf` exits 0 on a path that was never there, so without these two
+  // checks an install-layout change (a hoist, a rename, a different package
+  // manager) leaves the SDK in place and the job reports success having
+  // exercised nothing — the vacuous-green shape the Node 20 pin belonged to.
+  it("asserts the SDK resolves BEFORE the delete, so a no-op deletion cannot pass", () => {
+    const deleteAt = ci.indexOf("rm -rf node_modules/@sentry");
+    const before = ci.slice(0, deleteAt);
+    assert.match(
+      before,
+      /node -e "require\.resolve\('@sentry\/react-native'\)"/,
+      "the step must prove there was something to delete",
+    );
+  });
+
+  it("asserts the SDK no longer resolves AFTER the delete", () => {
+    const deleteAt = ci.indexOf("rm -rf node_modules/@sentry");
+    const runAt = ci.indexOf("npm run test:sentry", deleteAt);
+    const between = ci.slice(deleteAt, runAt);
+    assert.match(
+      between,
+      /if node -e "require\.resolve\('@sentry\/react-native'\)"/,
+      "the step must prove the deletion actually took effect before running the suites",
+    );
+    assert.match(between, /exit 1/, "a surviving SDK must fail the job, not just print");
+  });
+
+  it("checks by RESOLUTION rather than by directory path", () => {
+    // A nested copy (node_modules/<pkg>/node_modules/@sentry) resolves fine
+    // with the top-level scope gone, so `test -d node_modules/@sentry` would
+    // report absence that the module loader does not agree with.
+    const deleteAt = ci.indexOf("rm -rf node_modules/@sentry");
+    const runAt = ci.indexOf("npm run test:sentry", deleteAt);
+    assert.doesNotMatch(
+      ci.slice(deleteAt, runAt),
+      /test\s+!?-[de]\s+node_modules\/@sentry/,
+      "a path check cannot see a nested copy — use require.resolve",
+    );
+  });
 });
 
 describe("test:sentry shares its runner flags with npm test", () => {
