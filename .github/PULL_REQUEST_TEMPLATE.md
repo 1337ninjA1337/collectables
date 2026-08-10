@@ -32,7 +32,6 @@ When in doubt, request another pass with `@claude /security-review` in a comment
 
 ## Checklist
 
-- [ ] `npm run lint:ci` is green (tsc + hex + migration-docs + secrets + tests)
-- [ ] `npm run build` succeeds
+- [ ] `npm run verify` is green (typecheck + code-style guards + tests + web build)
 - [ ] DB/SQL changes (if any) are mirrored into `MANUAL-TASKS.md`
 - [ ] No credentials are committed

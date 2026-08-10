@@ -36,8 +36,15 @@ npm test           # typechecks first (pretest hook), then runs __tests__/*.test
 npm run typecheck  # tsc --noEmit on its own
 npm run test:only  # same suites, skipping the typecheck (tight iteration loop)
 npm run lint:all   # every pure code-style guard in lib/lint-guards.ts
-npm run lint:ci    # typecheck → lint:all → test, the full local gate
+npm run lint:ci    # typecheck → lint:all → test
+npm run verify     # lint:ci → build, the full gate — run THIS before committing
 ```
+
+`npm run verify` is the single command to run before every commit. It chains
+the four legs CI runs (typecheck → lint:all → test → build) in the same order,
+fail-fast, so a green `verify` locally means the same four steps are green on
+CI. Running the legs by hand is only for iterating on one of them — a
+hand-assembled sequence is exactly how a leg gets silently skipped.
 
 `npm test` runs `tsc --noEmit` first because `tsx` strips types without
 checking them: a type-broken test file passes the runner and fails CI. Prefer
