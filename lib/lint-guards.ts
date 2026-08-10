@@ -109,6 +109,8 @@ export const LINT_ALL_EXEMPT: Readonly<Record<string, string>> = {
   "lint:all": "the aggregator itself",
   "lint:secrets:bundle": "needs the exported dist/ web bundle from npm run build",
   "lint:bundle-size": "needs the exported dist/ web bundle from npm run build",
+  "lint:bundle-smoke":
+    "needs the exported dist/ web bundle and dist/privacy/ from npm run build",
   "lint:peer-dep-free":
     "a node:test invocation — already part of the npm test suite",
   "lint:expo-install":

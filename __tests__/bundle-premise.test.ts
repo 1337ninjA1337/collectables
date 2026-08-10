@@ -199,14 +199,28 @@ describe("formatBundlePremiseFailure", () => {
 });
 
 describe("the declared bundle input", () => {
-  it("resolves to the same directory ci.yml globs", () => {
+  it("resolves to the directory the export writes", () => {
     assert.equal(WEB_BUNDLE_DIR, "dist/_expo/static/js/web");
     assert.equal(WEB_BUNDLE_DIR_SEGMENTS[0], "dist");
-    const ciYml = read(path.join(".github", "workflows", "ci.yml"));
-    assert.ok(
-      ciYml.includes(`${WEB_BUNDLE_DIR}/*.js`),
-      "the bundle smoke check must glob the same directory the guards assert on",
-    );
+  });
+
+  it("is the ONLY definition of the glob — no workflow hand-rolls it", () => {
+    // ci.yml used to `ls dist/_expo/static/js/web/*.js | head -1` inside the
+    // bundle smoke step: a second definition of the input that could drift
+    // from the guards' and, being shell, checked neither freshness nor the
+    // chunks past the first. That step is now `npm run lint:bundle-smoke`,
+    // which takes its chunk list from assertBundlePremise like the other
+    // three. Fail if the glob reappears in YAML.
+    for (const workflow of fs.readdirSync(
+      path.join(process.cwd(), ".github", "workflows"),
+    )) {
+      if (!workflow.endsWith(".yml") && !workflow.endsWith(".yaml")) continue;
+      const body = read(path.join(".github", "workflows", workflow));
+      assert.ok(
+        !body.includes(`${WEB_BUNDLE_DIR}/*.js`),
+        `${workflow} globs the bundle directory itself — route it through assertBundlePremise instead`,
+      );
+    }
   });
 
   it("covers the directories Metro actually bundles", () => {
