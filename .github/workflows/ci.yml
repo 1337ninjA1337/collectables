@@ -26,6 +26,16 @@ jobs:
   # node_modules (catching a transitive import via e.g. @sentry/core).
   # The --import setup file is load-bearing: without the global beforeEach
   # reset, module state leaks between suites and produces false failures.
+  # It lives in the `test:sentry` script rather than inline here so the
+  # flags cannot drift from `npm test`'s.
+  #
+  # This job deliberately does NOT typecheck, and that asymmetry with the
+  # `test` job is intentional in both directions: after `rm -rf`, tsc fails
+  # on lib/sentry.ts's `import("@sentry/react-native")` — the types resolve
+  # through node_modules even though the import is lazy — so a typecheck
+  # here would be red for a reason this job is not testing; and running it
+  # BEFORE the deletion only repeats the `test` job's Typecheck step, which
+  # covers these same files. Coverage: the `test` job.
   sentry-sdk-absent:
     name: Sentry tests with SDK absent
     runs-on: ubuntu-latest
@@ -50,7 +60,7 @@ jobs:
       - name: Delete the @sentry scope and run the sentry test surface
         run: |
           rm -rf node_modules/@sentry
-          npx tsx --import ./__tests__/test-globals.ts --test __tests__/sentry-*.test.ts
+          npm run test:sentry
 
   test:
     runs-on: ubuntu-latest
