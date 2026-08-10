@@ -59,7 +59,24 @@ jobs:
 
       - name: Delete the @sentry scope and run the sentry test surface
         run: |
+          # `rm -rf` exits 0 whether or not the path was there, so an install
+          # layout change (a hoist, a rename, a different package manager)
+          # would leave the SDK in place and this job would pass while
+          # proving nothing — a vacuous green, the same silent-coverage-loss
+          # shape as the Node 20 pin. Assert the premise, then assert the
+          # deletion took effect. Both checks go through require.resolve
+          # rather than `test -d`: a nested copy under another package
+          # resolves perfectly well with the top-level scope gone, which is
+          # exactly the case a path check would miss.
+          node -e "require.resolve('@sentry/react-native')" || {
+            echo "ERROR: @sentry/react-native did not resolve before the delete — nothing for this job to remove" >&2
+            exit 1
+          }
           rm -rf node_modules/@sentry
+          if node -e "require.resolve('@sentry/react-native')" 2>/dev/null; then
+            echo "ERROR: @sentry/react-native still resolves after deleting node_modules/@sentry — this job would prove nothing" >&2
+            exit 1
+          fi
           npm run test:sentry
 
   test:
