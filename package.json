@@ -13,6 +13,7 @@
     "pretest": "npm run typecheck",
     "test": "tsx --import ./__tests__/test-globals.ts --test __tests__/*.test.ts",
     "test:only": "tsx --import ./__tests__/test-globals.ts --test __tests__/*.test.ts",
+    "test:sentry": "tsx --import ./__tests__/test-globals.ts --test __tests__/sentry-*.test.ts",
     "build:powerbi": "tsx scripts/build-powerbi-template.ts",
     "lint:hex": "tsx scripts/check-inline-hex.ts",
     "lint:radius": "tsx scripts/check-inline-radius.ts",
