@@ -17,36 +17,20 @@ import {
   resolveBundleSizeBudget,
   type BundleFile,
 } from "../lib/bundle-size";
+import { REPO_ROOT, assertBundlePremise } from "./bundle-premise";
 
-const REPO_ROOT = path.join(__dirname, "..");
-const BUNDLE_DIR = path.join(REPO_ROOT, "dist", "_expo", "static", "js", "web");
+const CHECK_NAME = "check-bundle-size";
 
 function main(): void {
-  let entries: string[];
-  try {
-    entries = fs.readdirSync(BUNDLE_DIR);
-  } catch {
-    console.error(
-      `check-bundle-size: ERROR — ${path.relative(REPO_ROOT, BUNDLE_DIR)} not found. Run \`npm run build\` first.`,
-    );
-    process.exit(1);
-    return;
-  }
+  // Shared premise (dist/ present, at least one chunk, newer than the source
+  // tree). A budget check that matched no chunks is 0 bytes — comfortably
+  // under budget, and proof of nothing.
+  const bundlePaths = assertBundlePremise(CHECK_NAME);
 
-  const files: BundleFile[] = entries
-    .filter((name) => name.endsWith(".js"))
-    .map((name) => ({
-      path: path.relative(REPO_ROOT, path.join(BUNDLE_DIR, name)),
-      bytes: fs.statSync(path.join(BUNDLE_DIR, name)).size,
-    }));
-
-  if (files.length === 0) {
-    console.error(
-      "check-bundle-size: ERROR — no .js bundle files found. Run `npm run build` first.",
-    );
-    process.exit(1);
-    return;
-  }
+  const files: BundleFile[] = bundlePaths.map((full) => ({
+    path: path.relative(REPO_ROOT, full),
+    bytes: fs.statSync(full).size,
+  }));
 
   const budget = resolveBundleSizeBudget(process.env);
   const result = evaluateBundleSize(files, budget);
