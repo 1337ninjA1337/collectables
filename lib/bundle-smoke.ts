@@ -343,7 +343,15 @@ export type PrivacyPageInput = {
 };
 
 export type PrivacyPageVerdict =
-  | { readonly ok: true }
+  | {
+      readonly ok: true;
+      /**
+       * Words in the rendered body — measured to apply the floor, so returning
+       * it costs nothing and is the only number this check knows about a page
+       * that passed. See {@link PrivacyPagesResult.wordCounts}.
+       */
+      readonly wordCount: number;
+    }
   | {
       readonly ok: false;
       readonly code: PrivacyPageFailureCode;
@@ -429,7 +437,7 @@ export function evaluatePrivacyPage(
       detail: `${wordCount} word(s)`,
     };
   }
-  return { ok: true };
+  return { ok: true, wordCount };
 }
 
 export type PrivacyPageFailure = {
@@ -443,10 +451,32 @@ export type PrivacyPageFailure = {
   readonly detail?: string;
 };
 
+/** One page's measured body size, kept so the report can quote it. */
+export type PrivacyPageWordCount = {
+  readonly code: string;
+  readonly words: number;
+};
+
 export type PrivacyPagesResult = {
   readonly ok: boolean;
   readonly failures: readonly PrivacyPageFailure[];
   readonly checked: number;
+  /**
+   * Body word count per page that cleared the per-page gates, in input order.
+   *
+   * The floor already counts every page's words and used to throw the number
+   * away the moment it passed, which made a translation SHRINKING invisible
+   * until the commit that pushed it under
+   * {@link PRIVACY_BODY_SIMILARITY_MIN_WORDS} — at which point the build goes
+   * red with no history to read. Reporting the range on success turns that into
+   * a number that moves in the log commit by commit.
+   *
+   * Pages that FAILED contribute nothing: a page whose body did not render has
+   * no size worth quoting, and `body_too_short` already carries its own count
+   * into its message. So this is non-empty exactly when the run passed, which a
+   * test pins.
+   */
+  readonly wordCounts: readonly PrivacyPageWordCount[];
 };
 
 /** What a translated page is compared against: the English page's own prose. */
@@ -522,6 +552,7 @@ export function evaluatePrivacyPages(
 ): PrivacyPagesResult {
   const english = findDefaultLanguageBaseline(inputs);
   const failures: PrivacyPageFailure[] = [];
+  const wordCounts: PrivacyPageWordCount[] = [];
   for (const input of inputs) {
     const verdict = evaluatePrivacyPage(input);
     if (!verdict.ok) {
@@ -534,6 +565,11 @@ export function evaluatePrivacyPages(
       });
       continue;
     }
+    // Recorded before the cross-page comparisons: the count is a property of
+    // the page's own body, and a page that turns out to be a copy of the
+    // English one still has a size the reader may want to see next to the
+    // failure.
+    wordCounts.push({ code: input.target.code, words: verdict.wordCount });
     if (input.target.code === PRIVACY_DEFAULT_LANGUAGE) continue;
     if (input.text === null) continue;
     const heading = extractPrivacyPageHeading(input.text);
@@ -565,7 +601,27 @@ export function evaluatePrivacyPages(
     ok: inputs.length > 0 && failures.length === 0,
     failures,
     checked: inputs.length,
+    wordCounts,
   };
+}
+
+/**
+ * `169-1171 words`, or `169 words` when every page measured the same — the
+ * range is the point, and `169-169` reads like a bug.
+ *
+ * Returns null for an empty list so the caller prints the plain verdict rather
+ * than an empty parenthetical; that state is unreachable on a passing run (see
+ * {@link PrivacyPagesResult.wordCounts}) and is handled because a format helper
+ * crashing a build guard is the worse failure.
+ */
+export function formatPrivacyPageWordCounts(
+  counts: readonly PrivacyPageWordCount[],
+): string | null {
+  if (counts.length === 0) return null;
+  const words = counts.map((entry) => entry.words);
+  const min = Math.min(...words);
+  const max = Math.max(...words);
+  return min === max ? `${min} words` : `${min}-${max} words`;
 }
 
 export function formatPrivacyPageFailure(
@@ -580,7 +636,8 @@ export function formatPrivacyPagesReport(
   result: PrivacyPagesResult,
 ): string {
   if (result.ok) {
-    return `${checkName}: ${result.checked} privacy page(s) present and rendered.`;
+    const range = formatPrivacyPageWordCounts(result.wordCounts);
+    return `${checkName}: ${result.checked} privacy page(s) present and rendered${range === null ? "" : ` (${range})`}.`;
   }
   if (result.checked === 0) {
     return `${checkName}: ERROR — checked 0 privacy pages; a pass over zero pages is not a pass.`;

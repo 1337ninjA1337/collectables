@@ -20,6 +20,7 @@ import {
   extractPrivacyPageHeading,
   formatBundleSmokeReport,
   formatPrivacyPageFailure,
+  formatPrivacyPageWordCounts,
   formatPrivacyPagesReport,
   privacyBodySimilarity,
   privacyBodyWords,
@@ -408,6 +409,21 @@ describe("evaluatePrivacyPage", () => {
     assert.equal(verdict.ok, true);
   });
 
+  it("returns the body word count it measured, instead of discarding it", () => {
+    assert.ok(EN_TARGET);
+    const text = renderedPage("en");
+    const verdict = evaluatePrivacyPage({
+      target: EN_TARGET,
+      exists: true,
+      text,
+    });
+    assert.equal(verdict.ok, true);
+    assert.equal(
+      verdict.ok ? verdict.wordCount : -1,
+      privacyBodyWords(extractPrivacyPageBodyText(text) ?? "").length,
+    );
+  });
+
   it("guarantees every page it passes can be measured by the ratio", () => {
     // The invariant the shared constant buys: `privacyBodySimilarity` returning
     // null is what silently disables the near-copy gate, and nothing that
@@ -535,10 +551,102 @@ describe("evaluatePrivacyPages", () => {
     assert.doesNotMatch(message, /ERROR/);
   });
 
+  it("quotes the body word range on success", () => {
+    // The whole point of keeping the counts: a translation shrinking over
+    // several commits is visible here, rather than only on the commit that
+    // pushes it under the floor and turns the build red with no history.
+    const inputs = allGood().map((input) =>
+      input.target.code === "pl"
+        ? {
+            ...input,
+            text: renderedPage("pl").replace(
+              "</p>",
+              ` ${bodyWordsFor("plx")}</p>`,
+            ),
+          }
+        : input,
+    );
+    const result = evaluatePrivacyPages(inputs);
+    assert.equal(result.ok, true);
+    const short = PRIVACY_BODY_SIMILARITY_MIN_WORDS + 5;
+    assert.match(
+      formatPrivacyPagesReport("c", result),
+      new RegExp(`\\(${short}-${short * 2} words\\)`),
+    );
+  });
+
   it("names zero-page runs explicitly", () => {
     const message = formatPrivacyPagesReport("c", evaluatePrivacyPages([]));
     assert.match(message, /ERROR/);
     assert.match(message, /0 privacy pages/);
+  });
+
+  it("records one body word count per passing page, in input order", () => {
+    const result = evaluatePrivacyPages(allGood());
+    assert.deepEqual(
+      result.wordCounts.map((entry) => entry.code),
+      PRIVACY_PAGE_TARGETS.map((target) => target.code),
+    );
+    // Every fixture body is the same length, so the shape is checkable without
+    // restating the fixture's arithmetic anywhere but here.
+    for (const entry of result.wordCounts) {
+      assert.equal(entry.words, PRIVACY_BODY_SIMILARITY_MIN_WORDS + 5);
+    }
+  });
+
+  it("gives no word count to a page that failed its own gates", () => {
+    const result = evaluatePrivacyPages(
+      allGood().map((input) =>
+        input.target.code === "de"
+          ? { ...input, exists: false, text: null }
+          : input,
+      ),
+    );
+    assert.deepEqual(
+      result.wordCounts.map((entry) => entry.code),
+      PRIVACY_PAGE_TARGETS.map((target) => target.code).filter(
+        (code) => code !== "de",
+      ),
+    );
+  });
+
+  it("still counts a page that passed per-page and failed a cross-page gate", () => {
+    // The count is a property of the page's own body; being a copy of the
+    // English one does not make its size unknown.
+    const result = evaluatePrivacyPages(
+      allGood().map((input) =>
+        input.target.code === "de"
+          ? { ...input, text: renderedPage("en").replace('lang="en"', 'lang="de"') }
+          : input,
+      ),
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.failures.length, 1);
+    assert.equal(result.wordCounts.length, PRIVACY_PAGE_TARGETS.length);
+  });
+
+  it("has a non-empty word count list exactly when the run passed", () => {
+    // The invariant the success report leans on: a passing run always has
+    // numbers to quote, so the parenthetical can never go quietly missing.
+    const scenarios: PrivacyPageInput[][] = [
+      allGood(),
+      [],
+      allGood().map((input) => ({ ...input, exists: false, text: null })),
+      allGood().map((input) =>
+        input.target.code === "pl" ? { ...input, text: "<html></html>" } : input,
+      ),
+    ];
+    const verdicts = scenarios.map((inputs) => evaluatePrivacyPages(inputs));
+    for (const result of verdicts) {
+      if (!result.ok) continue;
+      assert.equal(result.wordCounts.length, result.checked);
+    }
+    // …and the scenario list actually exercises both sides, so the loop above
+    // cannot pass by never entering its body.
+    assert.deepEqual(
+      verdicts.map((result) => result.ok),
+      [true, false, false, false],
+    );
   });
 
   it("fails a translation that carries the ENGLISH heading", () => {
@@ -1011,6 +1119,72 @@ describe("privacyBodySimilarity", () => {
   it("keeps the threshold strictly between the real and the copied", () => {
     assert.ok(PRIVACY_BODY_SIMILARITY_THRESHOLD > 0.5);
     assert.ok(PRIVACY_BODY_SIMILARITY_THRESHOLD < 1);
+  });
+});
+
+describe("formatPrivacyPageWordCounts", () => {
+  it("renders the min and max of the set", () => {
+    assert.equal(
+      formatPrivacyPageWordCounts([
+        { code: "en", words: 1171 },
+        { code: "de", words: 169 },
+        { code: "es", words: 229 },
+      ]),
+      "169-1171 words",
+    );
+  });
+
+  it("renders one number when every page measured the same", () => {
+    // `169-169 words` reads like a bug in the formatter rather than a fact
+    // about the pages.
+    assert.equal(
+      formatPrivacyPageWordCounts([
+        { code: "en", words: 169 },
+        { code: "de", words: 169 },
+      ]),
+      "169 words",
+    );
+  });
+
+  it("returns null for an empty set rather than an empty range", () => {
+    assert.equal(formatPrivacyPageWordCounts([]), null);
+  });
+
+  it("leaves the verdict line clean when there is nothing to quote", () => {
+    // Unreachable on a passing run, handled anyway: a format helper is not
+    // where a build guard should crash.
+    const message = formatPrivacyPagesReport("c", {
+      ok: true,
+      failures: [],
+      checked: 6,
+      wordCounts: [],
+    });
+    assert.equal(message, "c: 6 privacy page(s) present and rendered.");
+  });
+
+  it("quotes the real shipped bodies' range", () => {
+    const result = evaluatePrivacyPages(
+      PRIVACY_PAGE_TARGETS.map((target) => ({
+        target,
+        exists: true,
+        text: renderPrivacyPage(
+          read(target.code === "en" ? "PRIVACY.md" : `PRIVACY.md.${target.code}`),
+          target.code,
+        ),
+      })),
+    );
+    assert.equal(result.ok, true);
+    // The six real pages are not all the same length — German compounds what
+    // Spanish spells out — so the report must show a range, not one number.
+    const range = formatPrivacyPageWordCounts(result.wordCounts);
+    assert.match(range ?? "", /^\d+-\d+ words$/);
+    assert.match(formatPrivacyPagesReport("c", result), /\(\d+-\d+ words\)\.$/);
+    for (const entry of result.wordCounts) {
+      assert.ok(
+        entry.words >= PRIVACY_BODY_SIMILARITY_MIN_WORDS,
+        `${entry.code}: ${entry.words} words is under the floor it passed`,
+      );
+    }
   });
 });
 
