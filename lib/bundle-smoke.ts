@@ -30,10 +30,18 @@
  * add a token.
  */
 
+import { PRIVACY_BODY_BASELINE_WORDS } from "./privacy-body-baselines";
 import {
   PRIVACY_DEFAULT_LANGUAGE,
   PRIVACY_PAGE_LANGUAGES,
 } from "./privacy-page";
+
+export {
+  PRIVACY_BODY_BASELINES,
+  PRIVACY_BODY_BASELINE_WORDS,
+  privacyPolicySourcePath,
+  type PrivacyBodyBaseline,
+} from "./privacy-body-baselines";
 
 export type BundleSmokeTokenKind = "i18n-key" | "provider" | "language";
 
@@ -337,8 +345,9 @@ export function privacyBodySimilarity(a: string, b: string): number | null {
   return shared / Math.min(wordsA.length, wordsB.length);
 }
 
-/**
- * The word count each policy file is EXPECTED to render to, per language.
+/*
+ * The word count each policy file is EXPECTED to render to lives in
+ * `lib/privacy-body-baselines.ts` and is re-exported at the top of this file.
  *
  * The floor above is a floor on nonsense: it catches a page truncated to
  * almost nothing and is silent on a page that lost two thirds of itself. The
@@ -350,25 +359,16 @@ export function privacyBodySimilarity(a: string, b: string): number | null {
  *
  * A tracked number per file is the only thing that notices, and the reason it
  * has to be tracked rather than derived is that there is nothing to derive it
- * from: the policy is the source of truth about itself. Updating this table is
+ * from: the policy is the source of truth about itself. Updating that table is
  * therefore part of amending a policy, not an obstacle to it — the failure
  * message quotes the measured count so the update is a copy-paste, and the
- * commit that changes a number here is the commit that says a disclosure
- * changed size on purpose.
- *
- * The values are the six shipped files as measured by
- * {@link privacyBodyWords} over {@link extractPrivacyPageBodyText}; a test
- * re-measures them from the tracked markdown, so a typo here fails immediately
- * rather than widening someone's band by accident.
+ * commit that changes a number there is the commit that says a disclosure
+ * changed size on purpose. Which is also why the table moved out: each entry
+ * now carries the DATE and REASON of its current value, and a guard compares
+ * the table against its own previous revision, so "paste the measured count in
+ * and move on" — the resolution that turns this gate into a rubber stamp — is
+ * itself a build failure. See that module's header.
  */
-export const PRIVACY_BODY_BASELINE_WORDS: Readonly<Record<string, number>> = {
-  en: 1171,
-  ru: 182,
-  be: 185,
-  pl: 188,
-  de: 169,
-  es: 229,
-};
 
 /**
  * How far a rendered body may sit from its baseline before the build fails,

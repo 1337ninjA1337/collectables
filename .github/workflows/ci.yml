@@ -82,8 +82,15 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      # Full history, not the default depth-1: lint:all's
+      # lint:baseline-provenance guard compares PRIVACY_BODY_BASELINES against
+      # its own previous revision, and a shallow clone has no previous
+      # revision to read. The guard FAILS rather than skipping in that case
+      # (a pass that checked nothing is not a pass), so this is load-bearing.
+      - name: Checkout (full history)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -125,7 +132,8 @@ jobs:
       # All pure code-style guards (inline hex/geometry literals, env
       # inlining, analytics imports, Clarity input masking, migration
       # docs/naming, committed secrets, App Store pre-flight, Sentry SDK
-      # pin, Power BI schema drift) run through one aggregator. The
+      # pin, privacy baseline provenance, Power BI schema drift) run through
+      # one aggregator. The
       # registry in lib/lint-guards.ts is the single source of truth —
       # a guard added there is automatically enforced here — and unlike a
       # step-per-guard chain the aggregator runs EVERY guard even after

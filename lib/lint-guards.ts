@@ -1,7 +1,8 @@
 /**
  * Single source of truth for the repo's pure code-style guards — the
- * lint scanners that need nothing but the working tree (no build output,
- * no network, no test runner). `scripts/lint-all.ts` fans out to every
+ * lint scanners that need nothing but the working tree, plus (for
+ * `lint:baseline-provenance`) the local git history that is already in it
+ * (no build output, no network, no test runner). `scripts/lint-all.ts` fans out to every
  * entry and reports the aggregate, `lint:ci` and the ci.yml "Code-style
  * guards" step run that aggregator, and `__tests__/lint-guards.test.ts`
  * pins the registry ↔ package.json ↔ ci.yml parity — so adding a guard
@@ -87,6 +88,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
     scriptPath: "scripts/check-sentry-version.ts",
     args: [],
     description: "Sentry SDK major stays pinned to the vetted range",
+  },
+  {
+    npmScript: "lint:baseline-provenance",
+    scriptPath: "scripts/check-privacy-baseline-provenance.ts",
+    args: [],
+    description:
+      "A PRIVACY_BODY_BASELINES word count may not change without a dated note saying why, and a policy file change to match",
   },
   {
     npmScript: "lint:powerbi-doc",
