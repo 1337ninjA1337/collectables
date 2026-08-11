@@ -307,6 +307,22 @@ describe("evaluatePrivacyBaselineDrift", () => {
     assert.match(failures[0].detail ?? "", /169/);
   });
 
+  it("does not accept the old count as a substring of a bigger number", () => {
+    // `1690` contains `169` and says nothing about the change.
+    const failures = evaluatePrivacyBaselineDrift(
+      previous,
+      {
+        de: baseline({
+          words: 140,
+          recordedOn: "2026-09-01",
+          note: "trimmed from about 1690 characters of boilerplate.",
+        }),
+      },
+      ["PRIVACY.md.de"],
+    );
+    assert.deepEqual(codesOf(failures), ["note_omits_previous_words"]);
+  });
+
   it("says nothing about a language that is new in this revision", () => {
     // A seventh language has no prior number to have moved away from; its note
     // and date are the shape half's business.

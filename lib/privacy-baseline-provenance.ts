@@ -153,7 +153,9 @@ export function evaluatePrivacyBaselineDrift(
         detail: `${baseline.recordedOn} is earlier than ${before.recordedOn}`,
       });
     }
-    if (!baseline.note.includes(String(before.words))) {
+    // Digit-bounded, not a substring: a note mentioning `1690` must not count
+    // as having named the `169` it replaced.
+    if (!new RegExp(`(?<!\\d)${before.words}(?!\\d)`).test(baseline.note)) {
       failures.push({
         language,
         code: "note_omits_previous_words",
