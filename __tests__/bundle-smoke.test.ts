@@ -14,6 +14,7 @@ import {
   evaluateBundleSmoke,
   evaluatePrivacyPage,
   evaluatePrivacyPages,
+  extractPrivacyPageBodyText,
   extractPrivacyPageHeading,
   formatBundleSmokeReport,
   formatPrivacyPageFailure,
@@ -192,13 +193,14 @@ const RU_TARGET = PRIVACY_PAGE_TARGETS.find((t) => t.code === "ru");
 const DE_TARGET = PRIVACY_PAGE_TARGETS.find((t) => t.code === "de");
 
 /**
- * A page that passes every gate, for the language given. The heading carries
- * the code because the gates are no longer per-page: a translation whose `<h1>`
- * equals the English one is an untranslated page, so a fixture that gave all
- * six the same heading would be a fixture that cannot pass.
+ * A page that passes every gate, for the language given. Heading AND body
+ * carry the code because the gates are no longer per-page: a translation whose
+ * `<h1>` or whose policy text equals the English one is an untranslated page,
+ * so a fixture that gave all six the same prose would be a fixture that cannot
+ * pass.
  */
 const renderedPage = (code: string): string =>
-  `<html lang="${code}"><title>Collectables — ${PRIVACY_PAGE_MARKER}</title><h1>Policy ${code}</h1></html>`;
+  `<html lang="${code}"><title>Collectables — ${PRIVACY_PAGE_MARKER}</title><h1>Policy ${code}</h1><p>Body ${code}.</p></html>`;
 
 describe("PRIVACY_PAGE_TARGETS", () => {
   it("covers every language the page is offered in", () => {
@@ -335,6 +337,7 @@ describe("evaluatePrivacyPage", () => {
       "wrong_language",
       "empty_body",
       "untranslated_heading",
+      "untranslated_body",
     ];
     const messages = codes.map((code) =>
       formatPrivacyPageFailure("c", { target: EN_TARGET, code }),
@@ -515,6 +518,57 @@ describe("evaluatePrivacyPages", () => {
     );
   });
 
+  it("fails a translated TITLE over an English body", () => {
+    // The state a half-finished translation is left in, and the one the
+    // heading check reads as done: `# Datenschutzerklärung` rendered over the
+    // English disclosure. The body is the half a reader is owed.
+    const englishBody =
+      renderedPage("en").match(/<\/h1>([\s\S]*)$/)?.[1] ?? "unreachable";
+    const result = evaluatePrivacyPages(
+      allGood().map((input) =>
+        input.target.code === "de"
+          ? {
+              ...input,
+              text: `<html lang="de"><title>${PRIVACY_PAGE_MARKER}</title><h1>Datenschutzerklärung</h1>${englishBody}`,
+            }
+          : input,
+      ),
+    );
+    assert.deepEqual(result.failures, [
+      { target: DE_TARGET, code: "untranslated_body" },
+    ]);
+  });
+
+  it("reports the HEADING, not the body, when the whole page is English", () => {
+    // A wholly-English translation fails both comparisons; one failure per
+    // page, and "the heading is English" is the smaller, truer thing to say.
+    const result = evaluatePrivacyPages(
+      allGood().map((input) =>
+        input.target.code === "de"
+          ? { ...input, text: renderedPage("en").replace('lang="en"', 'lang="de"') }
+          : input,
+      ),
+    );
+    assert.deepEqual(result.failures, [
+      { target: DE_TARGET, code: "untranslated_heading" },
+    ]);
+  });
+
+  it("does not compare bodies when the English body did not extract", () => {
+    // A heading-only English page gives no body baseline; two translations
+    // that also have no body must not be read as copies of it.
+    const headingOnly = (code: string): string =>
+      `<html lang="${code}"><title>${PRIVACY_PAGE_MARKER}</title><h1>Policy ${code}</h1></html>`;
+    const result = evaluatePrivacyPages(
+      PRIVACY_PAGE_TARGETS.map((target) => ({
+        target,
+        exists: true,
+        text: headingOnly(target.code),
+      })),
+    );
+    assert.equal(result.ok, true);
+  });
+
   it("would fail if a translated policy file were replaced by the English one", () => {
     // The mutation the previous test cannot make on its own: same real
     // renderer, same real English markdown, written to the Spanish path.
@@ -576,6 +630,56 @@ describe("extractPrivacyPageHeading", () => {
       extractPrivacyPageHeading(page),
       "Collectables — Datenschutzerklärung",
     );
+  });
+});
+
+describe("extractPrivacyPageBodyText", () => {
+  it("returns everything after the heading, as text", () => {
+    assert.equal(
+      extractPrivacyPageBodyText("<h1>Title</h1><p>One</p><ul><li>Two</li></ul>"),
+      "One Two",
+    );
+  });
+
+  it("does not run words together where a tag separated them", () => {
+    // Tags become a space, not nothing: `<p>a</p><p>b</p>` collapsing to "ab"
+    // would make two different documents compare equal often enough to matter.
+    assert.equal(extractPrivacyPageBodyText("<h1>T</h1><p>a</p><p>b</p>"), "a b");
+  });
+
+  it("excludes the heading and everything before it", () => {
+    // The language picker and the style block sit above the body, and they are
+    // byte-identical across all six pages — including them would make every
+    // comparison a comparison of the chrome.
+    const body = extractPrivacyPageBodyText(
+      '<style>body{color:red}</style><nav class="lang"><a href="ru/">Русский</a></nav><h1>Title</h1><p>Only this</p>',
+    );
+    assert.equal(body, "Only this");
+  });
+
+  it("is null when there is no heading to cut at, or nothing follows it", () => {
+    assert.equal(extractPrivacyPageBodyText("<p>no heading</p>"), null);
+    assert.equal(extractPrivacyPageBodyText("<h1>Title</h1>"), null);
+    assert.equal(extractPrivacyPageBodyText("<h1>Title</h1>\n  \n"), null);
+  });
+
+  it("gives the six REAL pages six different bodies", () => {
+    // The assertion the whole comparison rests on: the translations are
+    // Sentry-disclosure subsets, so their prose must differ from the English
+    // policy's and from each other's.
+    const bodies = PRIVACY_PAGE_TARGETS.map((target) =>
+      extractPrivacyPageBodyText(
+        renderPrivacyPage(
+          read(target.code === "en" ? "PRIVACY.md" : `PRIVACY.md.${target.code}`),
+          target.code,
+        ),
+      ),
+    );
+    assert.ok(
+      bodies.every((body) => body !== null && body.length > 200),
+      "every page has a substantial body",
+    );
+    assert.equal(new Set(bodies).size, PRIVACY_PAGE_TARGETS.length);
   });
 });
 
