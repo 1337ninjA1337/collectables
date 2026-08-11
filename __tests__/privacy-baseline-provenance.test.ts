@@ -6,11 +6,13 @@ import * as path from "node:path";
 import { LINT_GUARDS } from "../lib/lint-guards";
 import {
   PRIVACY_BASELINE_NOTE_MIN_WORDS,
+  classifyBaselineRevision,
   evaluatePrivacyBaselineDrift,
   evaluatePrivacyBaselineProvenance,
   evaluatePrivacyBaselineShape,
   formatBaselineProvenanceFailure,
   formatBaselineProvenanceReport,
+  formatBaselineRevisionUnparseable,
   type BaselineProvenanceFailureCode,
 } from "../lib/privacy-baseline-provenance";
 import {
@@ -133,6 +135,47 @@ describe("parsePrivacyBodyBaselines", () => {
       'export const PRIVACY_BODY_BASELINES = {\n  en: { words: 12, recordedOn: "2026-01-02", note: "a" },\n};\nexport const OTHER = {\n  de: { words: 9, recordedOn: "2026-01-02", note: "b" },\n};\n',
     );
     assert.deepEqual(Object.keys(parsed ?? {}), ["en"]);
+  });
+});
+
+describe("classifyBaselineRevision", () => {
+  const table =
+    'export const PRIVACY_BODY_BASELINES = {\n  en: { words: 12, recordedOn: "2026-01-02", note: "a" },\n};\n';
+
+  it("reads a table when the module was there and parses", () => {
+    const revision = classifyBaselineRevision(true, table);
+    assert.equal(revision.kind, "table");
+    assert.deepEqual(Object.keys(revision.kind === "table" ? revision.table : {}), [
+      "en",
+    ]);
+  });
+
+  it("calls a path that did not exist ABSENT — the guard predates it", () => {
+    // The only case a skip is correct for, including the commit that
+    // introduced the module (which would otherwise fail its own guard).
+    assert.deepEqual(classifyBaselineRevision(false, null), { kind: "absent" });
+  });
+
+  it("calls a path that existed and yielded nothing UNPARSEABLE, not absent", () => {
+    // A removal, a rename, or a reformat that defeats the parser — the way the
+    // drift half gets turned off for good, one skip line at a time.
+    assert.deepEqual(classifyBaselineRevision(true, "export const OTHER = {};"), {
+      kind: "unparseable",
+    });
+    assert.deepEqual(classifyBaselineRevision(true, null), {
+      kind: "unparseable",
+    });
+  });
+
+  it("explains an unparseable revision as a removal, not as history", () => {
+    const message = formatBaselineRevisionUnparseable(
+      "check",
+      "lib/privacy-body-baselines.ts",
+      "abc1234",
+    );
+    assert.match(message, /^check: ERROR — /);
+    assert.match(message, /lib\/privacy-body-baselines\.ts exists at abc1234/);
+    assert.match(message, /not the skip/);
   });
 });
 

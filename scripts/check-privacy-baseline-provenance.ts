@@ -27,21 +27,22 @@
  * post-build premise work exists to stamp out. The message names the fix. A
  * repository whose HEAD is the ROOT commit is a genuine skip — there is no
  * previous revision, so nothing could have changed a baseline — and so is a
- * base revision that predates the table module.
+ * base revision from before the table module existed. A base revision where
+ * the module DID exist and yields no table is a failure, not a skip: see
+ * {@link classifyBaselineRevision}.
  */
 
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 
 import {
+  classifyBaselineRevision,
   evaluatePrivacyBaselineProvenance,
   formatBaselineProvenanceReport,
+  formatBaselineRevisionUnparseable,
+  type BaselineRevision,
 } from "../lib/privacy-baseline-provenance";
-import {
-  PRIVACY_BODY_BASELINES,
-  parsePrivacyBodyBaselines,
-  type PrivacyBodyBaseline,
-} from "../lib/privacy-body-baselines";
+import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
 
 const CHECK_NAME = "check-privacy-baseline-provenance";
 const REPO_ROOT = path.join(__dirname, "..");
@@ -114,10 +115,19 @@ function resolveComparison(argv: readonly string[]): Comparison {
   return { kind: "skip", reason: "HEAD is the root commit" };
 }
 
-/** The table as it stood at `ref`, or null when it was not there / not parseable. */
-function baselinesAt(ref: string): Record<string, PrivacyBodyBaseline> | null {
-  const source = git("show", `${ref}:${BASELINE_MODULE}`);
-  return source === null ? null : parsePrivacyBodyBaselines(source);
+/**
+ * The table as it stood at `ref` — and, when there is none, WHICH kind of none.
+ *
+ * `git cat-file -e` is asked first and separately: "the module was not there
+ * yet" is a skip, "the module was there and no table came out of it" is a
+ * failure, and the parser cannot tell those apart.
+ */
+function baselinesAt(ref: string): BaselineRevision {
+  const present = git("cat-file", "-e", `${ref}:${BASELINE_MODULE}`) !== null;
+  return classifyBaselineRevision(
+    present,
+    present ? git("show", `${ref}:${BASELINE_MODULE}`) : null,
+  );
 }
 
 /**
@@ -138,13 +148,26 @@ function main(): void {
     process.exit(1);
   }
 
-  const previous =
-    comparison.kind === "compare" ? baselinesAt(comparison.ref) : null;
-  const baseRef = comparison.kind === "compare" ? comparison.ref : null;
+  const revision: BaselineRevision =
+    comparison.kind === "compare"
+      ? baselinesAt(comparison.ref)
+      : { kind: "absent" };
+  if (revision.kind === "unparseable" && comparison.kind === "compare") {
+    console.error(
+      formatBaselineRevisionUnparseable(
+        CHECK_NAME,
+        BASELINE_MODULE,
+        comparison.ref,
+      ),
+    );
+    process.exit(1);
+  }
+
+  const previous = revision.kind === "table" ? revision.table : null;
   const result = evaluatePrivacyBaselineProvenance({
     current: PRIVACY_BODY_BASELINES,
     previous,
-    baseRef,
+    baseRef: comparison.kind === "compare" ? comparison.ref : null,
     changedFiles:
       comparison.kind === "compare" ? changedFilesSince(comparison.ref) : [],
   });
@@ -155,7 +178,7 @@ function main(): void {
       console.log(`${CHECK_NAME}: drift half skipped — ${comparison.reason}.`);
     } else if (previous === null) {
       console.log(
-        `${CHECK_NAME}: drift half skipped — ${BASELINE_MODULE} has no parseable table at ${comparison.ref}.`,
+        `${CHECK_NAME}: drift half skipped — ${BASELINE_MODULE} did not exist at ${comparison.ref}, so the guard predates it.`,
       );
     }
     return;

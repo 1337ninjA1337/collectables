@@ -22,6 +22,7 @@
  */
 
 import {
+  parsePrivacyBodyBaselines,
   privacyPolicySourcePath,
   type PrivacyBodyBaseline,
 } from "./privacy-body-baselines";
@@ -185,6 +186,48 @@ const BASELINE_PROVENANCE_MESSAGE: Record<
   note_omits_previous_words: (language, detail) =>
     `PRIVACY_BODY_BASELINES["${language}"].note does not name the count it replaced (${detail ?? "no detail"}) — the convention is "1171 → 980 (dropped the analytics section)", so the size of the change is legible in the diff without checking out the parent commit. Include the old number in the note.`,
 };
+
+/**
+ * What the base revision holds where the baseline table should be.
+ *
+ * The distinction is the whole point. `parsePrivacyBodyBaselines` returning
+ * null reads as "nothing comparable there", and the caller skipping on it is
+ * right for exactly one case: a revision that PREDATES the module, which is
+ * every revision before the guard shipped and, unavoidably, the commit that
+ * introduced it. It is wrong for the case that looks identical from the
+ * parser's side — the module was there and is not any more, or is no longer
+ * parseable — because that is how the drift half gets turned off for good, one
+ * skip line at a time, in a log nobody reads twice.
+ *
+ * Only git can tell them apart (`git cat-file -e <ref>:<path>`), so the
+ * presence bit is an input rather than something inferred from the text.
+ */
+export type BaselineRevision =
+  | {
+      readonly kind: "table";
+      readonly table: Record<string, PrivacyBodyBaseline>;
+    }
+  /** The path did not exist at that revision — the guard predates it. */
+  | { readonly kind: "absent" }
+  /** The path existed and did not yield a table — a removal or a reformat. */
+  | { readonly kind: "unparseable" };
+
+export function classifyBaselineRevision(
+  present: boolean,
+  source: string | null,
+): BaselineRevision {
+  if (!present) return { kind: "absent" };
+  const table = source === null ? null : parsePrivacyBodyBaselines(source);
+  return table === null ? { kind: "unparseable" } : { kind: "table", table };
+}
+
+export function formatBaselineRevisionUnparseable(
+  checkName: string,
+  modulePath: string,
+  ref: string,
+): string {
+  return `${checkName}: ERROR — ${modulePath} exists at ${ref} but no PRIVACY_BODY_BASELINES table could be read from it. The drift half compares this file against its own previous revision, so a removal, a rename or a reformat that defeats the parser silently turns that half off — which is why this is a failure and not the skip a revision predating the module gets. If the table moved on purpose, update the guard with it.`;
+}
 
 export type BaselineProvenanceResult = {
   readonly ok: boolean;
