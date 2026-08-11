@@ -195,7 +195,8 @@ export type PrivacyPageFailureCode =
   | "wrong_language"
   | "empty_body"
   | "untranslated_heading"
-  | "untranslated_body";
+  | "untranslated_body"
+  | "near_english_body";
 
 /**
  * Markup out, comparable prose in: tags stripped, whitespace collapsed, empty
@@ -239,6 +240,90 @@ export function extractPrivacyPageBodyText(text: string): string | null {
   return normalizeMarkupText(text.slice(end + "</h1>".length));
 }
 
+/**
+ * Above this share of the shorter body's words, two policy bodies are the same
+ * document rather than two documents that happen to overlap.
+ *
+ * 0.9 is not a hedge, it is a wide margin measured against the shipped files:
+ * the six REAL rendered bodies sit between 0.157 and 0.280 against each other
+ * (they share proper nouns, URLs and the effective date and nothing else),
+ * while an exact copy is 1.0 and English-with-a-paragraph-appended is also 1.0
+ * — every word of the shorter document is accounted for. There is nothing in
+ * the 0.3–0.9 band today, and a translation that drifted into it would be a
+ * file worth looking at anyway. Pinned by a test that recomputes the real
+ * ratios, so shipping a translation close to the line fails here.
+ */
+export const PRIVACY_BODY_SIMILARITY_THRESHOLD = 0.9;
+
+/**
+ * Bodies shorter than this (in words) are compared for EQUALITY only.
+ *
+ * A ratio over a handful of words is noise: two unrelated short notices that
+ * share `Collectables`, `Sentry`, a URL and a date score 1.0 without being
+ * related at all, and the words a policy cannot avoid repeating are exactly the
+ * ones that survive translation. 40 sits an order of magnitude below the
+ * shortest shipped body (169 words) and far above the range where proper nouns
+ * dominate, so no real page is ever judged by a ratio it is too small for.
+ *
+ * The floor SKIPS the ratio; it never skips the exact comparison. A two-word
+ * body identical to the English two-word body is still a copy, and the check
+ * that shipped before this one already said so.
+ */
+export const PRIVACY_BODY_SIMILARITY_MIN_WORDS = 40;
+
+/**
+ * Comparable words: Unicode letters and digits, lowercased, punctuation and
+ * markup-shaped debris dropped.
+ *
+ * `\p{L}` rather than `\w` because four of the six languages are not ASCII and
+ * `ru`/`be` are not even Latin — `\w` would reduce a Cyrillic body to its
+ * digits and score every pair of them 1.0 on the numbers alone.
+ */
+export function privacyBodyWords(text: string): readonly string[] {
+  return text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+/**
+ * How much of the SHORTER body is accounted for by the longer one, 0..1, or
+ * null when either side is too short for the ratio to mean anything (see
+ * {@link PRIVACY_BODY_SIMILARITY_MIN_WORDS}).
+ *
+ * Two decisions:
+ *
+ *   1. Over the SHORTER body, not over the union. The failure being hunted is
+ *      "this page is the English document", and the cheapest way to dress an
+ *      English document up as a translation is to add to it — a German
+ *      paragraph appended to the English disclosure changes every symmetric
+ *      measure and changes this one not at all, because every English word is
+ *      still there. It also makes a TRUNCATED English body score 1.0, which is
+ *      right: half the English policy is still the English policy.
+ *   2. Multiset, not set. Counting `min(count_a, count_b)` per word means a
+ *      body that repeats `data` forty times cannot borrow forty matches from a
+ *      document that says it once. Set intersection scores that pair far higher
+ *      than the documents deserve, and short bodies are where it happens.
+ */
+export function privacyBodySimilarity(a: string, b: string): number | null {
+  const wordsA = privacyBodyWords(a);
+  const wordsB = privacyBodyWords(b);
+  if (
+    wordsA.length < PRIVACY_BODY_SIMILARITY_MIN_WORDS ||
+    wordsB.length < PRIVACY_BODY_SIMILARITY_MIN_WORDS
+  ) {
+    return null;
+  }
+  const counts = new Map<string, number>();
+  for (const word of wordsA) counts.set(word, (counts.get(word) ?? 0) + 1);
+  let shared = 0;
+  for (const word of wordsB) {
+    const left = counts.get(word) ?? 0;
+    if (left > 0) {
+      shared += 1;
+      counts.set(word, left - 1);
+    }
+  }
+  return shared / Math.min(wordsA.length, wordsB.length);
+}
+
 export type PrivacyPageInput = {
   readonly target: PrivacyPageTarget;
   readonly exists: boolean;
@@ -253,10 +338,17 @@ export type PrivacyPageVerdict =
 /**
  * Exhaustive over {@link PrivacyPageFailureCode} so a new code cannot ship
  * without a message, matching `lib/bundle-premise.ts`'s table.
+ *
+ * Each entry takes the whole failure rather than just its target, so a code
+ * that measured something can quote the measurement. Only
+ * `near_english_body` does today: "97% of its words" and "91% of its words"
+ * are the difference between a copy with edits and a page worth a second look,
+ * and a reader deciding which one they have should not have to re-run the
+ * check by hand.
  */
 const PRIVACY_PAGE_MESSAGE: Record<
   PrivacyPageFailureCode,
-  (target: PrivacyPageTarget) => string
+  (target: PrivacyPageTarget, detail: string | undefined) => string
 > = {
   missing_file: (target) =>
     `${target.relativePath} missing — the /privacy page for "${target.code}" was not emitted. App Store review links to the English one and the translations are the GDPR Art. 12 disclosure, so a build without them is not shippable.`,
@@ -270,6 +362,8 @@ const PRIVACY_PAGE_MESSAGE: Record<
     `${target.relativePath} renders the SAME <h1> as the English policy at ${PRIVACY_PAGE_RELATIVE_PATH} — the page is marked \`<html lang="${target.code}">\` but its text is English, so PRIVACY.md.${target.code} was never translated (or the English source was pasted through it).`,
   untranslated_body: (target) =>
     `${target.relativePath} has a translated heading but the SAME policy text as the English page at ${PRIVACY_PAGE_RELATIVE_PATH} — PRIVACY.md.${target.code} is a translated title over an English disclosure, which is the half of the file a reader actually needs.`,
+  near_english_body: (target, detail) =>
+    `${target.relativePath} has a translated heading but ${detail ?? "nearly all"} of its policy text is the English page at ${PRIVACY_PAGE_RELATIVE_PATH} — PRIVACY.md.${target.code} is the English disclosure with edits, not a translation. The shipped translations share ~20-30% of their words with English (proper nouns, URLs, the effective date); anything over ${Math.round(PRIVACY_BODY_SIMILARITY_THRESHOLD * 100)}% is the same document.`,
 };
 
 /**
@@ -306,6 +400,12 @@ export function evaluatePrivacyPage(
 export type PrivacyPageFailure = {
   readonly target: PrivacyPageTarget;
   readonly code: PrivacyPageFailureCode;
+  /**
+   * What the check measured, when it measured anything — spliced into the
+   * message. Left OFF (not set to undefined) by codes that measure nothing, so
+   * a `deepEqual` against `{ target, code }` still holds for them.
+   */
+  readonly detail?: string;
 };
 
 export type PrivacyPagesResult = {
@@ -366,9 +466,18 @@ function findDefaultLanguageBaseline(
  * half was not translated, and the body — the part a reader is actually owed
  * under GDPR Art. 12 — cannot pass on the strength of its title.
  *
- * At most ONE failure is reported per page: a wholly-English translation fails
- * both comparisons, and "the heading is English" is the smaller, truer thing to
- * say about it. The body message is for the case the heading check let through.
+ * The body is compared twice, exactly and then by ratio, because an equality
+ * test is one edit away from useless: `untranslated_body` fires only on a
+ * normalised byte match, so the English disclosure with a single German
+ * sentence appended — or one word changed, or a stray character — walks through
+ * it. {@link privacyBodySimilarity} turns "not literally identical" into
+ * "actually a different document", which is what the check meant all along.
+ *
+ * At most ONE failure is reported per page, in most-specific-first order
+ * (heading → identical body → near-identical body): a wholly-English
+ * translation fails all three, and "the heading is English" is the smallest,
+ * truest thing to say about it. Each later message is for the case the one
+ * before it let through.
  *
  * An empty input list is NOT ok: it is the same "checked nothing, reported
  * success" shape {@link evaluateBundleSmoke} refuses.
@@ -392,8 +501,18 @@ export function evaluatePrivacyPages(
       continue;
     }
     const body = extractPrivacyPageBodyText(input.text);
-    if (english.body !== null && body === english.body) {
+    if (english.body === null || body === null) continue;
+    if (body === english.body) {
       failures.push({ target: input.target, code: "untranslated_body" });
+      continue;
+    }
+    const similarity = privacyBodySimilarity(body, english.body);
+    if (similarity !== null && similarity >= PRIVACY_BODY_SIMILARITY_THRESHOLD) {
+      failures.push({
+        target: input.target,
+        code: "near_english_body",
+        detail: `${Math.round(similarity * 100)}%`,
+      });
     }
   }
   return {
@@ -407,7 +526,7 @@ export function formatPrivacyPageFailure(
   checkName: string,
   failure: PrivacyPageFailure,
 ): string {
-  return `${checkName}: ERROR — ${PRIVACY_PAGE_MESSAGE[failure.code](failure.target)}`;
+  return `${checkName}: ERROR — ${PRIVACY_PAGE_MESSAGE[failure.code](failure.target, failure.detail)}`;
 }
 
 export function formatPrivacyPagesReport(
