@@ -8,6 +8,8 @@ import {
   BUNDLE_SMOKE_LANGUAGE_CODES,
   BUNDLE_SMOKE_PROVIDERS,
   BUNDLE_SMOKE_TOKENS,
+  PRIVACY_BODY_SIMILARITY_MIN_WORDS,
+  PRIVACY_BODY_SIMILARITY_THRESHOLD,
   PRIVACY_PAGE_MARKER,
   PRIVACY_PAGE_RELATIVE_PATH,
   PRIVACY_PAGE_TARGETS,
@@ -19,6 +21,8 @@ import {
   formatBundleSmokeReport,
   formatPrivacyPageFailure,
   formatPrivacyPagesReport,
+  privacyBodySimilarity,
+  privacyBodyWords,
   type BundleSmokeToken,
   type PrivacyPageFailureCode,
   type PrivacyPageInput,
@@ -338,6 +342,7 @@ describe("evaluatePrivacyPage", () => {
       "empty_body",
       "untranslated_heading",
       "untranslated_body",
+      "near_english_body",
     ];
     const messages = codes.map((code) =>
       formatPrivacyPageFailure("c", { target: EN_TARGET, code }),
@@ -347,6 +352,28 @@ describe("evaluatePrivacyPage", () => {
       assert.match(message, /^c: ERROR — /);
       assert.ok(message.includes(PRIVACY_PAGE_RELATIVE_PATH));
     }
+  });
+
+  it("quotes the measurement in the message of the code that made one", () => {
+    // near_english_body is the only code that measures anything, and 97% vs
+    // 91% is the difference between a copy with edits and a page worth a
+    // second look — the reader should not have to re-run the check to see it.
+    assert.ok(DE_TARGET);
+    const message = formatPrivacyPageFailure("c", {
+      target: DE_TARGET,
+      code: "near_english_body",
+      detail: "97%",
+    });
+    assert.ok(message.includes("97%"));
+  });
+
+  it("still reads without a measurement, for a caller that has none", () => {
+    assert.ok(DE_TARGET);
+    const message = formatPrivacyPageFailure("c", {
+      target: DE_TARGET,
+      code: "near_english_body",
+    });
+    assert.doesNotMatch(message, /undefined/);
   });
 
   it("names the offending path, not always the English one", () => {
@@ -539,6 +566,173 @@ describe("evaluatePrivacyPages", () => {
     ]);
   });
 
+  /**
+   * The fixture pages above carry two-word bodies, which the word floor
+   * deliberately compares for equality only. These build bodies long enough
+   * for the ratio to apply.
+   */
+  const ENGLISH_WORDS = Array.from({ length: 80 }, (_, i) => `english${i}`);
+
+  const longPage = (code: string, words: readonly string[]): string =>
+    `<html lang="${code}"><title>Collectables — ${PRIVACY_PAGE_MARKER}</title><h1>Policy ${code}</h1><p>${words.join(" ")}</p></html>`;
+
+  /** allGood(), with a long English baseline and one long translation. */
+  const withLongBodies = (
+    code: string,
+    words: readonly string[],
+  ): PrivacyPageInput[] =>
+    allGood().map((input) => {
+      if (input.target.code === "en") {
+        return { ...input, text: longPage("en", ENGLISH_WORDS) };
+      }
+      if (input.target.code === code) {
+        return { ...input, text: longPage(code, words) };
+      }
+      return input;
+    });
+
+  it("fails the English body with one sentence appended", () => {
+    // The hole an equality test leaves: one changed character is enough to
+    // make two documents unequal, so `untranslated_body` never fires on the
+    // English disclosure with a German sentence pasted at the end.
+    const result = evaluatePrivacyPages(
+      withLongBodies("de", [
+        ...ENGLISH_WORDS,
+        "und",
+        "eine",
+        "deutsche",
+        "ergaenzung",
+      ]),
+    );
+    assert.deepEqual(
+      result.failures.map((f) => `${f.target.code}:${f.code}`),
+      ["de:near_english_body"],
+    );
+  });
+
+  it("reports the measured overlap so the log says how close it was", () => {
+    const result = evaluatePrivacyPages(
+      withLongBodies("de", [...ENGLISH_WORDS, "angehaengter", "satz"]),
+    );
+    assert.equal(result.failures[0]?.detail, "100%");
+    assert.ok(
+      formatPrivacyPagesReport("c", result).includes("100%"),
+      "the percentage has to reach the report, not just the failure",
+    );
+  });
+
+  it("fails a body that is the English one with a handful of words swapped", () => {
+    // 8 of 80 words changed — 90% shared, exactly at the threshold, which
+    // fails: the boundary belongs on the strict side or the constant is a
+    // suggestion rather than a limit.
+    const eightSwapped = [
+      ...ENGLISH_WORDS.slice(0, 72),
+      ...Array.from({ length: 8 }, (_, i) => `deutsch${i}`),
+    ];
+    const result = evaluatePrivacyPages(withLongBodies("pl", eightSwapped));
+    assert.deepEqual(
+      result.failures.map((f) => `${f.target.code}:${f.code}`),
+      ["pl:near_english_body"],
+    );
+    assert.equal(result.failures[0]?.detail, "90%");
+  });
+
+  it("passes a long body that is genuinely a different document", () => {
+    const result = evaluatePrivacyPages(
+      withLongBodies(
+        "es",
+        Array.from({ length: 80 }, (_, i) => `espanol${i}`),
+      ),
+    );
+    assert.equal(result.ok, true, JSON.stringify(result.failures));
+  });
+
+  it("reports untranslated_body, not near_english_body, on an exact copy", () => {
+    // Two codes because the diagnoses differ: "this file IS the English
+    // policy" and "this file is the English policy with edits" send the
+    // reader to different places. Exact is checked first.
+    const result = evaluatePrivacyPages(withLongBodies("de", ENGLISH_WORDS));
+    assert.deepEqual(
+      result.failures.map((f) => `${f.target.code}:${f.code}`),
+      ["de:untranslated_body"],
+    );
+  });
+
+  it("still catches an exact copy whose body is below the word floor", () => {
+    // The floor skips the RATIO, never the equality check — a short body
+    // identical to the English short body is a copy at any length, and the
+    // gate that shipped before this one already said so.
+    const shortEnglishBody =
+      renderedPage("en").match(/<\/h1>([\s\S]*)$/)?.[1] ?? "unreachable";
+    const result = evaluatePrivacyPages(
+      allGood().map((input) =>
+        input.target.code === "de"
+          ? {
+              ...input,
+              text: `<html lang="de"><title>${PRIVACY_PAGE_MARKER}</title><h1>Datenschutz</h1>${shortEnglishBody}`,
+            }
+          : input,
+      ),
+    );
+    assert.deepEqual(
+      result.failures.map((f) => `${f.target.code}:${f.code}`),
+      ["de:untranslated_body"],
+    );
+  });
+
+  it("keeps the REAL translations far from the threshold, not just under it", () => {
+    // A margin, not a pass: the shipped bodies share only proper nouns, URLs
+    // and the effective date with English. If a future translation drifts
+    // toward the line this fails while there is still room to think, rather
+    // than turning the gate red on a legitimate file one day.
+    const bodyOf = (code: string): string =>
+      extractPrivacyPageBodyText(
+        renderPrivacyPage(
+          read(code === "en" ? "PRIVACY.md" : `PRIVACY.md.${code}`),
+          code,
+        ),
+      ) ?? "";
+    const english = bodyOf("en");
+    for (const { code } of PRIVACY_PAGE_LANGUAGES) {
+      if (code === "en") continue;
+      const similarity = privacyBodySimilarity(bodyOf(code), english);
+      assert.ok(similarity !== null, `${code}: body too short to compare`);
+      assert.ok(
+        similarity < 0.5,
+        `${code}: ${similarity} shared with English — too close to the ${PRIVACY_BODY_SIMILARITY_THRESHOLD} threshold`,
+      );
+    }
+  });
+
+  it("would fail the REAL English policy retitled in Spanish and padded", () => {
+    // The mutation the equality check structurally cannot make: the real
+    // English markdown under a Spanish heading with one paragraph appended,
+    // rendered by the real renderer into the Spanish path. Before the ratio
+    // this passed every gate.
+    const englishMarkdown = read("PRIVACY.md");
+    const retitled = englishMarkdown.replace(
+      /^# .*$/m,
+      "# Política de privacidad",
+    );
+    const inputs: PrivacyPageInput[] = PRIVACY_PAGE_TARGETS.map((target) => ({
+      target,
+      exists: true,
+      text: renderPrivacyPage(
+        target.code === "en"
+          ? englishMarkdown
+          : target.code === "es"
+            ? `${retitled}\n\nUn párrafo añadido al final del documento.\n`
+            : read(`PRIVACY.md.${target.code}`),
+        target.code,
+      ),
+    }));
+    const result = evaluatePrivacyPages(inputs);
+    assert.deepEqual(
+      result.failures.map((f) => `${f.target.code}:${f.code}`),
+      ["es:near_english_body"],
+    );
+  });
+
   it("reports the HEADING, not the body, when the whole page is English", () => {
     // A wholly-English translation fails both comparisons; one failure per
     // page, and "the heading is English" is the smaller, truer thing to say.
@@ -588,6 +782,126 @@ describe("evaluatePrivacyPages", () => {
       result.failures.map((f) => `${f.target.code}:${f.code}`),
       ["es:untranslated_heading"],
     );
+  });
+});
+
+describe("privacyBodyWords", () => {
+  it("lowercases and splits on everything that is not a letter or digit", () => {
+    assert.deepEqual(privacyBodyWords("We store  Data, in 2026."), [
+      "we",
+      "store",
+      "data",
+      "in",
+      "2026",
+    ]);
+  });
+
+  it("keeps Cyrillic, which \\w would throw away", () => {
+    // ru and be are not Latin: a `\w`-based split reduces those bodies to
+    // their digits and scores every pair of them 1.0 on the numbers alone.
+    assert.deepEqual(privacyBodyWords("Мы храним данные"), [
+      "мы",
+      "храним",
+      "данные",
+    ]);
+  });
+
+  it("returns nothing for text with no words in it", () => {
+    assert.deepEqual(privacyBodyWords("—  … ,"), []);
+  });
+});
+
+describe("privacyBodySimilarity", () => {
+  const words = (prefix: string, n: number): string =>
+    Array.from({ length: n }, (_, i) => `${prefix}${i}`).join(" ");
+
+  it("scores an identical body 1", () => {
+    const body = words("w", 50);
+    assert.equal(privacyBodySimilarity(body, body), 1);
+  });
+
+  it("scores a body that is the other one PLUS additions 1", () => {
+    // The measure is over the shorter body on purpose: appending to the
+    // English disclosure is the cheapest way to dress it up as a translation,
+    // and it must not move the number at all.
+    const english = words("w", 50);
+    assert.equal(
+      privacyBodySimilarity(`${english} ${words("extra", 10)}`, english),
+      1,
+    );
+  });
+
+  it("scores a body that is the other one TRUNCATED 1", () => {
+    // Half the English policy is still the English policy.
+    const english = words("w", 80);
+    const half = words("w", 40);
+    assert.equal(privacyBodySimilarity(half, english), 1);
+  });
+
+  it("scores disjoint bodies 0", () => {
+    assert.equal(privacyBodySimilarity(words("a", 50), words("b", 50)), 0);
+  });
+
+  it("is symmetric — argument order is not a verdict", () => {
+    const a = `${words("w", 40)} ${words("extra", 20)}`;
+    const b = words("w", 45);
+    assert.equal(privacyBodySimilarity(a, b), privacyBodySimilarity(b, a));
+  });
+
+  it("counts words as a multiset, so repetition cannot borrow matches", () => {
+    // Set intersection scores this pair 1.0: every distinct word of the left
+    // body appears on the right. Counting min(count) per word gives the
+    // 50-word body 5 matches for its 5 occurrences and no more.
+    const repeated = `${"data ".repeat(45).trim()} ${words("x", 5)}`;
+    const sparse = `data ${words("y", 60)}`;
+    const similarity = privacyBodySimilarity(repeated, sparse);
+    assert.ok(similarity !== null);
+    assert.ok(
+      similarity < 0.1,
+      `expected the repetition not to dominate, got ${similarity}`,
+    );
+  });
+
+  it("refuses bodies below the word floor rather than guessing", () => {
+    // A ratio over a handful of words is noise: two unrelated notices sharing
+    // `Collectables`, a URL and a date score 1.0 without being related.
+    const short = words("w", PRIVACY_BODY_SIMILARITY_MIN_WORDS - 1);
+    assert.equal(privacyBodySimilarity(short, short), null);
+    assert.equal(privacyBodySimilarity(short, words("w", 100)), null);
+    assert.equal(privacyBodySimilarity(words("w", 100), short), null);
+  });
+
+  it("compares at exactly the floor", () => {
+    const atFloor = words("w", PRIVACY_BODY_SIMILARITY_MIN_WORDS);
+    assert.equal(privacyBodySimilarity(atFloor, atFloor), 1);
+  });
+
+  it("sits the floor well below the shortest shipped body", () => {
+    // The floor is only safe while no real page is judged by a ratio it is
+    // too small for — if a translation ever shrinks to the floor, the ratio
+    // silently stops running on it and the gate goes quiet.
+    const shortest = Math.min(
+      ...PRIVACY_PAGE_LANGUAGES.map(
+        ({ code }) =>
+          privacyBodyWords(
+            extractPrivacyPageBodyText(
+              renderPrivacyPage(
+                read(code === "en" ? "PRIVACY.md" : `PRIVACY.md.${code}`),
+                code,
+              ),
+            ) ?? "",
+          ).length,
+      ),
+    );
+    assert.ok(
+      shortest > PRIVACY_BODY_SIMILARITY_MIN_WORDS * 2,
+      `shortest shipped body is ${shortest} words against a ${PRIVACY_BODY_SIMILARITY_MIN_WORDS}-word floor`,
+    );
+  });
+
+  it("keeps the threshold strictly between the real and the copied", () => {
+    assert.ok(PRIVACY_BODY_SIMILARITY_THRESHOLD > 0.5);
+    assert.ok(PRIVACY_BODY_SIMILARITY_THRESHOLD < 1);
   });
 });
 
