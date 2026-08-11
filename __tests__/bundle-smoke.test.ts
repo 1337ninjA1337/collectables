@@ -8,6 +8,8 @@ import {
   BUNDLE_SMOKE_LANGUAGE_CODES,
   BUNDLE_SMOKE_PROVIDERS,
   BUNDLE_SMOKE_TOKENS,
+  PRIVACY_BODY_BASELINE_TOLERANCE,
+  PRIVACY_BODY_BASELINE_WORDS,
   PRIVACY_BODY_SIMILARITY_MIN_WORDS,
   PRIVACY_BODY_SIMILARITY_THRESHOLD,
   PRIVACY_PAGE_MARKER,
@@ -205,11 +207,19 @@ const DE_TARGET = PRIVACY_PAGE_TARGETS.find((t) => t.code === "de");
  * this file trip `near_english_body`. The words carry the code so no two pages
  * overlap at all, which is the fixture equivalent of six real translations.
  */
+const wordSequence = (prefix: string, count: number): string =>
+  Array.from({ length: count }, (_, i) => `${prefix}word${i}`).join(" ");
+
+/**
+ * Sized from the language's recorded baseline, so a fixture page is the size
+ * the drift gate expects that language to be. Codes with no baseline (the
+ * synthetic ones a few cases use) fall back to just over the floor.
+ */
 const bodyWordsFor = (code: string): string =>
-  Array.from(
-    { length: PRIVACY_BODY_SIMILARITY_MIN_WORDS + 5 },
-    (_, i) => `${code}word${i}`,
-  ).join(" ");
+  wordSequence(
+    code,
+    PRIVACY_BODY_BASELINE_WORDS[code] ?? PRIVACY_BODY_SIMILARITY_MIN_WORDS + 5,
+  );
 
 /**
  * A page that passes every gate, for the language given. Heading AND body
@@ -555,23 +565,14 @@ describe("evaluatePrivacyPages", () => {
     // The whole point of keeping the counts: a translation shrinking over
     // several commits is visible here, rather than only on the commit that
     // pushes it under the floor and turns the build red with no history.
-    const inputs = allGood().map((input) =>
-      input.target.code === "pl"
-        ? {
-            ...input,
-            text: renderedPage("pl").replace(
-              "</p>",
-              ` ${bodyWordsFor("plx")}</p>`,
-            ),
-          }
-        : input,
-    );
-    const result = evaluatePrivacyPages(inputs);
+    const result = evaluatePrivacyPages(allGood());
     assert.equal(result.ok, true);
-    const short = PRIVACY_BODY_SIMILARITY_MIN_WORDS + 5;
+    const sizes = PRIVACY_PAGE_TARGETS.map(
+      (target) => PRIVACY_BODY_BASELINE_WORDS[target.code],
+    );
     assert.match(
       formatPrivacyPagesReport("c", result),
-      new RegExp(`\\(${short}-${short * 2} words\\)`),
+      new RegExp(`\\(${Math.min(...sizes)}-${Math.max(...sizes)} words\\)`),
     );
   });
 
@@ -587,10 +588,10 @@ describe("evaluatePrivacyPages", () => {
       result.wordCounts.map((entry) => entry.code),
       PRIVACY_PAGE_TARGETS.map((target) => target.code),
     );
-    // Every fixture body is the same length, so the shape is checkable without
-    // restating the fixture's arithmetic anywhere but here.
+    // Each fixture body is sized from its language's baseline, so the counts
+    // are checkable without restating the fixture's arithmetic here.
     for (const entry of result.wordCounts) {
-      assert.equal(entry.words, PRIVACY_BODY_SIMILARITY_MIN_WORDS + 5);
+      assert.equal(entry.words, PRIVACY_BODY_BASELINE_WORDS[entry.code]);
     }
   });
 
@@ -777,6 +778,28 @@ describe("evaluatePrivacyPages", () => {
   const longPage = (code: string, words: readonly string[]): string =>
     `<html lang="${code}"><title>Collectables — ${PRIVACY_PAGE_MARKER}</title><h1>Policy ${code}</h1><p>${words.join(" ")}</p></html>`;
 
+  /**
+   * `evaluatePrivacyPages` with each page's own measured size as its baseline,
+   * which makes `body_size_drift` a no-op by construction.
+   *
+   * These cases are about PROSE, and their fixtures are deliberately the wrong
+   * size for their language (80-word bodies against real baselines of 169 and
+   * 1171). Neutralising the size gate here keeps each case asserting the one
+   * thing it was written for; the drift gate has its own cases below.
+   */
+  const evaluateProse = (inputs: readonly PrivacyPageInput[]) =>
+    evaluatePrivacyPages(
+      inputs,
+      Object.fromEntries(
+        inputs.map((input) => [
+          input.target.code,
+          privacyBodyWords(
+            extractPrivacyPageBodyText(input.text ?? "") ?? "",
+          ).length,
+        ]),
+      ),
+    );
+
   /** allGood(), with a long English baseline and one long translation. */
   const withLongBodies = (
     code: string,
@@ -796,7 +819,7 @@ describe("evaluatePrivacyPages", () => {
     // The hole an equality test leaves: one changed character is enough to
     // make two documents unequal, so `untranslated_body` never fires on the
     // English disclosure with a German sentence pasted at the end.
-    const result = evaluatePrivacyPages(
+    const result = evaluateProse(
       withLongBodies("de", [
         ...ENGLISH_WORDS,
         "und",
@@ -812,7 +835,7 @@ describe("evaluatePrivacyPages", () => {
   });
 
   it("reports the measured overlap so the log says how close it was", () => {
-    const result = evaluatePrivacyPages(
+    const result = evaluateProse(
       withLongBodies("de", [...ENGLISH_WORDS, "angehaengter", "satz"]),
     );
     assert.equal(result.failures[0]?.detail, "100%");
@@ -830,7 +853,7 @@ describe("evaluatePrivacyPages", () => {
       ...ENGLISH_WORDS.slice(0, 72),
       ...Array.from({ length: 8 }, (_, i) => `deutsch${i}`),
     ];
-    const result = evaluatePrivacyPages(withLongBodies("pl", eightSwapped));
+    const result = evaluateProse(withLongBodies("pl", eightSwapped));
     assert.deepEqual(
       result.failures.map((f) => `${f.target.code}:${f.code}`),
       ["pl:near_english_body"],
@@ -839,7 +862,7 @@ describe("evaluatePrivacyPages", () => {
   });
 
   it("passes a long body that is genuinely a different document", () => {
-    const result = evaluatePrivacyPages(
+    const result = evaluateProse(
       withLongBodies(
         "es",
         Array.from({ length: 80 }, (_, i) => `espanol${i}`),
@@ -852,7 +875,7 @@ describe("evaluatePrivacyPages", () => {
     // Two codes because the diagnoses differ: "this file IS the English
     // policy" and "this file is the English policy with edits" send the
     // reader to different places. Exact is checked first.
-    const result = evaluatePrivacyPages(withLongBodies("de", ENGLISH_WORDS));
+    const result = evaluateProse(withLongBodies("de", ENGLISH_WORDS));
     assert.deepEqual(
       result.failures.map((f) => `${f.target.code}:${f.code}`),
       ["de:untranslated_body"],
@@ -1119,6 +1142,180 @@ describe("privacyBodySimilarity", () => {
   it("keeps the threshold strictly between the real and the copied", () => {
     assert.ok(PRIVACY_BODY_SIMILARITY_THRESHOLD > 0.5);
     assert.ok(PRIVACY_BODY_SIMILARITY_THRESHOLD < 1);
+  });
+});
+
+describe("PRIVACY_BODY_BASELINE_WORDS", () => {
+  const measure = (code: string): number =>
+    privacyBodyWords(
+      extractPrivacyPageBodyText(
+        renderPrivacyPage(
+          read(code === "en" ? "PRIVACY.md" : `PRIVACY.md.${code}`),
+          code,
+        ),
+      ) ?? "",
+    ).length;
+
+  it("has an entry for every language the page is offered in", () => {
+    // A seventh language without a baseline would otherwise be exempt from the
+    // one check that notices a policy shrinking.
+    assert.deepEqual(
+      Object.keys(PRIVACY_BODY_BASELINE_WORDS).sort(),
+      PRIVACY_PAGE_LANGUAGES.map((language) => language.code).sort(),
+    );
+  });
+
+  it("matches what the tracked policy files actually render to", () => {
+    // The baselines are hand-written, so a typo here would silently widen or
+    // shift someone's band. Re-measuring from the source is what makes the
+    // table a fact rather than a claim.
+    for (const { code } of PRIVACY_PAGE_LANGUAGES) {
+      assert.equal(
+        PRIVACY_BODY_BASELINE_WORDS[code],
+        measure(code),
+        `${code}: baseline is stale — measured ${measure(code)}`,
+      );
+    }
+  });
+
+  it("keeps every baseline clear of the word floor's band", () => {
+    // The floor and the band are two gates on the same number; a baseline low
+    // enough that its lower bound fell under the floor would make the drift
+    // message unreachable for that language.
+    for (const [code, baseline] of Object.entries(
+      PRIVACY_BODY_BASELINE_WORDS,
+    )) {
+      assert.ok(
+        baseline * (1 - PRIVACY_BODY_BASELINE_TOLERANCE) >
+          PRIVACY_BODY_SIMILARITY_MIN_WORDS,
+        `${code}: a ±${PRIVACY_BODY_BASELINE_TOLERANCE} band around ${baseline} reaches under the ${PRIVACY_BODY_SIMILARITY_MIN_WORDS}-word floor`,
+      );
+    }
+  });
+
+  it("is a band, not an equality — ordinary wording work does not fail", () => {
+    assert.ok(PRIVACY_BODY_BASELINE_TOLERANCE > 0);
+    assert.ok(PRIVACY_BODY_BASELINE_TOLERANCE < 1);
+  });
+});
+
+describe("body_size_drift", () => {
+  const pageOf = (code: string, wordCount: number): string =>
+    `<html lang="${code}"><title>Collectables — ${PRIVACY_PAGE_MARKER}</title><h1>Policy ${code}</h1><p>${wordSequence(code, wordCount)}</p></html>`;
+
+  /** allGood(), with one language's body resized to `wordCount`. */
+  const resized = (code: string, wordCount: number): PrivacyPageInput[] =>
+    PRIVACY_PAGE_TARGETS.map((target) => ({
+      target,
+      exists: true,
+      text:
+        target.code === code
+          ? pageOf(code, wordCount)
+          : renderedPage(target.code),
+    }));
+
+  const codesOf = (result: {
+    failures: readonly { target: { code: string }; code: string }[];
+  }): string[] => result.failures.map((f) => `${f.target.code}:${f.code}`);
+
+  it("fails a policy that lost a third of itself", () => {
+    // The case the 40-word floor cannot see: 780 words is two thirds of the
+    // English policy and nineteen times the floor.
+    const result = evaluatePrivacyPages(resized("en", 780));
+    assert.deepEqual(codesOf(result), ["en:body_size_drift"]);
+  });
+
+  it("quotes the measurement, the baseline and the direction", () => {
+    const result = evaluatePrivacyPages(resized("de", 100));
+    assert.equal(
+      result.failures[0]?.detail,
+      "100 word(s) against a baseline of 169 (-41%)",
+    );
+    const message = formatPrivacyPagesReport("c", result);
+    assert.match(message, /-41%/);
+    // The fix has to be in the message: this gate is the one that goes red on
+    // a legitimate amendment, so it must say what to do about it.
+    assert.match(message, /PRIVACY_BODY_BASELINE_WORDS\["de"\]/);
+  });
+
+  it("marks growth with a + so the direction is readable at a glance", () => {
+    const result = evaluatePrivacyPages(resized("es", 400));
+    assert.match(result.failures[0]?.detail ?? "", /\(\+75%\)/);
+  });
+
+  it("accepts both edges of the band and rejects just outside them", () => {
+    for (const code of ["ru", "es"]) {
+      const baseline = PRIVACY_BODY_BASELINE_WORDS[code];
+      const low = Math.ceil(baseline * (1 - PRIVACY_BODY_BASELINE_TOLERANCE));
+      const high = Math.floor(baseline * (1 + PRIVACY_BODY_BASELINE_TOLERANCE));
+      assert.deepEqual(codesOf(evaluatePrivacyPages(resized(code, low))), []);
+      assert.deepEqual(codesOf(evaluatePrivacyPages(resized(code, high))), []);
+      assert.deepEqual(codesOf(evaluatePrivacyPages(resized(code, low - 1))), [
+        `${code}:body_size_drift`,
+      ]);
+      assert.deepEqual(codesOf(evaluatePrivacyPages(resized(code, high + 1))), [
+        `${code}:body_size_drift`,
+      ]);
+    }
+  });
+
+  it("reports the SHORTNESS of a stub, not its drift", () => {
+    // Both gates fire on a twelve-word page. `body_too_short` is the one that
+    // also explains why the near-copy ratio went quiet for it.
+    const result = evaluatePrivacyPages(resized("pl", 12));
+    assert.deepEqual(codesOf(result), ["pl:body_too_short"]);
+  });
+
+  it("reports the COPYING of an English paste, not its drift", () => {
+    // `PRIVACY.md.de` holding the English disclosure is both a copy and 593%
+    // of its recorded size; only one of those two sentences says what to do.
+    const result = evaluatePrivacyPages(
+      PRIVACY_PAGE_TARGETS.map((target) => ({
+        target,
+        exists: true,
+        text:
+          target.code === "de"
+            ? renderedPage("en").replace('lang="en"', 'lang="de"')
+            : renderedPage(target.code),
+      })),
+    );
+    assert.deepEqual(codesOf(result), ["de:untranslated_heading"]);
+  });
+
+  it("fails a language with no recorded baseline rather than exempting it", () => {
+    const target = { code: "zz", relativePath: "dist/privacy/zz/index.html" };
+    const result = evaluatePrivacyPages([
+      ...PRIVACY_PAGE_TARGETS.map((t) => ({
+        target: t,
+        exists: true,
+        text: renderedPage(t.code),
+      })),
+      { target, exists: true, text: renderedPage("zz") },
+    ]);
+    assert.deepEqual(codesOf(result), ["zz:missing_baseline"]);
+    assert.match(
+      formatPrivacyPagesReport("c", result),
+      /PRIVACY_BODY_BASELINE_WORDS/,
+    );
+  });
+
+  it("passes the six pages the build actually emits", () => {
+    // The table and the files have to agree end to end, not only per-page:
+    // this is the assertion that would go red on the merge that truncates a
+    // policy, in the second `verify` leg rather than after a 3-minute export.
+    const result = evaluatePrivacyPages(
+      PRIVACY_PAGE_TARGETS.map((target) => ({
+        target,
+        exists: true,
+        text: renderPrivacyPage(
+          read(
+            target.code === "en" ? "PRIVACY.md" : `PRIVACY.md.${target.code}`,
+          ),
+          target.code,
+        ),
+      })),
+    );
+    assert.equal(result.ok, true, JSON.stringify(result.failures));
   });
 });
 

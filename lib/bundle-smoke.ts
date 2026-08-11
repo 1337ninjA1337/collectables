@@ -197,7 +197,9 @@ export type PrivacyPageFailureCode =
   | "untranslated_heading"
   | "untranslated_body"
   | "near_english_body"
-  | "body_too_short";
+  | "body_too_short"
+  | "missing_baseline"
+  | "body_size_drift";
 
 /**
  * Markup out, comparable prose in: tags stripped, whitespace collapsed, empty
@@ -335,6 +337,70 @@ export function privacyBodySimilarity(a: string, b: string): number | null {
   return shared / Math.min(wordsA.length, wordsB.length);
 }
 
+/**
+ * The word count each policy file is EXPECTED to render to, per language.
+ *
+ * The floor above is a floor on nonsense: it catches a page truncated to
+ * almost nothing and is silent on a page that lost two thirds of itself. The
+ * canonical English policy at 1171 words cut to 400 by a bad merge clears the
+ * 40-word floor by an order of magnitude, differs from every translation, has a
+ * heading and a body, and passes every other gate — and then every content
+ * check downstream runs against a document that lost most of itself, quietly,
+ * because the translations still look nothing like it.
+ *
+ * A tracked number per file is the only thing that notices, and the reason it
+ * has to be tracked rather than derived is that there is nothing to derive it
+ * from: the policy is the source of truth about itself. Updating this table is
+ * therefore part of amending a policy, not an obstacle to it — the failure
+ * message quotes the measured count so the update is a copy-paste, and the
+ * commit that changes a number here is the commit that says a disclosure
+ * changed size on purpose.
+ *
+ * The values are the six shipped files as measured by
+ * {@link privacyBodyWords} over {@link extractPrivacyPageBodyText}; a test
+ * re-measures them from the tracked markdown, so a typo here fails immediately
+ * rather than widening someone's band by accident.
+ */
+export const PRIVACY_BODY_BASELINE_WORDS: Readonly<Record<string, number>> = {
+  en: 1171,
+  ru: 182,
+  be: 185,
+  pl: 188,
+  de: 169,
+  es: 229,
+};
+
+/**
+ * How far a rendered body may sit from its baseline before the build fails,
+ * as a share of the baseline.
+ *
+ * Symmetric on purpose, though the two directions catch different things.
+ * SHRINKING is the failure this exists for — a dropped section, a truncated
+ * merge, a half-finished re-translation. GROWTH is not a bug and is checked
+ * anyway, because the cheapest way for a translation to grow 40% is for
+ * someone to paste the English disclosure into it, and because a baseline that
+ * only ever constrains one direction quietly stops describing the file.
+ *
+ * 0.25 is loose enough to absorb ordinary wording work — the shortest file is
+ * 169 words, so it takes ~42 words, roughly two paragraphs, to trip — and
+ * tight enough that no single section of any of the six survives being
+ * dropped. A legitimate amendment past the band is expected to update
+ * {@link PRIVACY_BODY_BASELINE_WORDS}; that is the mechanism, not a side
+ * effect of it.
+ */
+export const PRIVACY_BODY_BASELINE_TOLERANCE = 0.25;
+
+/** Inclusive word band a page of the given language must land in. */
+export function privacyBodyBaselineBand(baseline: number): {
+  readonly min: number;
+  readonly max: number;
+} {
+  return {
+    min: baseline * (1 - PRIVACY_BODY_BASELINE_TOLERANCE),
+    max: baseline * (1 + PRIVACY_BODY_BASELINE_TOLERANCE),
+  };
+}
+
 export type PrivacyPageInput = {
   readonly target: PrivacyPageTarget;
   readonly exists: boolean;
@@ -384,6 +450,10 @@ const PRIVACY_PAGE_MESSAGE: Record<
     `${target.relativePath} carries the page chrome but no ${PRIVACY_PAGE_BODY_MARKER}…> heading — the policy body rendered empty.`,
   body_too_short: (target, detail) =>
     `${target.relativePath} renders a heading over ${detail ?? "almost no"} of policy text, under the ${PRIVACY_BODY_SIMILARITY_MIN_WORDS}-word floor — the shortest shipped translation is 169 words, so this is a truncated or half-written file. It also takes the near-copy comparison offline for this page, which is the second reason it is a failure and not a warning.`,
+  missing_baseline: (target) =>
+    `${target.relativePath} has no entry in PRIVACY_BODY_BASELINE_WORDS for "${target.code}" — a language was added to PRIVACY_PAGE_LANGUAGES without recording the size its policy renders to, and without one this page is exempt from the drift check every other page is held to. Measure it and add it (lib/bundle-smoke.ts).`,
+  body_size_drift: (target, detail) =>
+    `${target.relativePath} renders ${detail ?? "a body of an unexpected size"} — outside the ±${Math.round(PRIVACY_BODY_BASELINE_TOLERANCE * 100)}% band around its recorded baseline. Shrinking is the case this guard exists for: a section dropped in a merge clears the ${PRIVACY_BODY_SIMILARITY_MIN_WORDS}-word floor easily and still leaves the disclosure incomplete. If the policy was amended on purpose, update PRIVACY_BODY_BASELINE_WORDS["${target.code}"] in lib/bundle-smoke.ts to the measured count.`,
   untranslated_heading: (target) =>
     `${target.relativePath} renders the SAME <h1> as the English policy at ${PRIVACY_PAGE_RELATIVE_PATH} — the page is marked \`<html lang="${target.code}">\` but its text is English, so PRIVACY.md.${target.code} was never translated (or the English source was pasted through it).`,
   untranslated_body: (target) =>
@@ -486,6 +556,84 @@ type PrivacyPageBaseline = {
 };
 
 /**
+ * The cross-page half: is this translated page actually a translation, or is
+ * it the English document wearing a language attribute?
+ *
+ * Null for the English page itself (it is the baseline, not a candidate), for
+ * a page whose baseline half did not extract, and for a page that is genuinely
+ * its own document.
+ *
+ * At most ONE failure comes back, in most-specific-first order (heading →
+ * identical body → near-identical body): a wholly-English translation trips
+ * all three, and "the heading is English" is the smallest, truest thing to say
+ * about it. Each later check is for the case the one before it let through.
+ */
+function evaluatePrivacyPageProse(
+  input: PrivacyPageInput,
+  english: PrivacyPageBaseline,
+): PrivacyPageFailure | null {
+  if (input.target.code === PRIVACY_DEFAULT_LANGUAGE) return null;
+  if (input.text === null) return null;
+  const heading = extractPrivacyPageHeading(input.text);
+  if (english.heading !== null && heading === english.heading) {
+    return { target: input.target, code: "untranslated_heading" };
+  }
+  const body = extractPrivacyPageBodyText(input.text);
+  // Both are non-null for anything that got here — a page with no extractable
+  // body fails `empty_body` or `body_too_short` upstream, and the baseline is
+  // only taken from an English page that passed those same gates. Kept as a
+  // guard rather than an assertion because the alternative is a crash in a
+  // build guard, and "one comparison did not run" is the better failure.
+  if (english.body === null || body === null) return null;
+  if (body === english.body) {
+    return { target: input.target, code: "untranslated_body" };
+  }
+  const similarity = privacyBodySimilarity(body, english.body);
+  if (similarity !== null && similarity >= PRIVACY_BODY_SIMILARITY_THRESHOLD) {
+    return {
+      target: input.target,
+      code: "near_english_body",
+      detail: `${Math.round(similarity * 100)}%`,
+    };
+  }
+  return null;
+}
+
+/**
+ * The size half of the checks a single page cannot decide for itself — not
+ * because the measurement is cross-page (it is not; the count is the page's
+ * own) but because the ORDER is. `body_size_drift` and the prose comparisons
+ * both fire on the same input — `PRIVACY.md.de` holding the 1171-word English
+ * disclosure is 593% of its recorded size AND a copy of the English page — and
+ * "this is the English document" is the smaller, truer, more actionable thing
+ * to say. So the drift check runs last, after the prose gates, which is only
+ * expressible where those gates live.
+ *
+ * Returns null when the page is the size it should be.
+ */
+function evaluatePrivacyPageSize(
+  target: PrivacyPageTarget,
+  wordCount: number,
+  baselines: Readonly<Record<string, number>>,
+): PrivacyPageFailure | null {
+  const baseline = baselines[target.code];
+  // A language with no recorded baseline is a FAILURE, not a skip: the
+  // alternative is that adding a seventh language silently exempts its policy
+  // from the one check that would notice it shrinking.
+  if (baseline === undefined) {
+    return { target, code: "missing_baseline" };
+  }
+  const band = privacyBodyBaselineBand(baseline);
+  if (wordCount >= band.min && wordCount <= band.max) return null;
+  const drift = Math.round(((wordCount - baseline) / baseline) * 100);
+  return {
+    target,
+    code: "body_size_drift",
+    detail: `${wordCount} word(s) against a baseline of ${baseline} (${drift > 0 ? "+" : ""}${drift}%)`,
+  };
+}
+
+/**
  * The English page's heading and body text, taken only from a page that passed
  * its own gates — comparing against prose pulled out of a broken English page
  * would report six failures for one cause.
@@ -539,16 +687,20 @@ function findDefaultLanguageBaseline(
  * "actually a different document", which is what the check meant all along.
  *
  * At most ONE failure is reported per page, in most-specific-first order
- * (heading → identical body → near-identical body): a wholly-English
- * translation fails all three, and "the heading is English" is the smallest,
+ * (heading → identical body → near-identical body → size): a wholly-English
+ * translation fails all four, and "the heading is English" is the smallest,
  * truest thing to say about it. Each later message is for the case the one
- * before it let through.
+ * before it let through, which is also why `body_size_drift` sits at the end:
+ * `PRIVACY.md.de` holding the English disclosure is both a copy and 593% of
+ * its recorded size, and only one of those two sentences tells anyone what to
+ * do.
  *
  * An empty input list is NOT ok: it is the same "checked nothing, reported
  * success" shape {@link evaluateBundleSmoke} refuses.
  */
 export function evaluatePrivacyPages(
   inputs: readonly PrivacyPageInput[],
+  baselines: Readonly<Record<string, number>> = PRIVACY_BODY_BASELINE_WORDS,
 ): PrivacyPagesResult {
   const english = findDefaultLanguageBaseline(inputs);
   const failures: PrivacyPageFailure[] = [];
@@ -570,32 +722,13 @@ export function evaluatePrivacyPages(
     // English one still has a size the reader may want to see next to the
     // failure.
     wordCounts.push({ code: input.target.code, words: verdict.wordCount });
-    if (input.target.code === PRIVACY_DEFAULT_LANGUAGE) continue;
-    if (input.text === null) continue;
-    const heading = extractPrivacyPageHeading(input.text);
-    if (english.heading !== null && heading === english.heading) {
-      failures.push({ target: input.target, code: "untranslated_heading" });
-      continue;
-    }
-    const body = extractPrivacyPageBodyText(input.text);
-    // Both are non-null for anything that got here — a page with no extractable
-    // body fails `empty_body` or `body_too_short` above, and the baseline is
-    // only taken from an English page that passed those same gates. Kept as a
-    // guard rather than an assertion because the alternative is a crash in a
-    // build guard, and "one comparison did not run" is the better failure.
-    if (english.body === null || body === null) continue;
-    if (body === english.body) {
-      failures.push({ target: input.target, code: "untranslated_body" });
-      continue;
-    }
-    const similarity = privacyBodySimilarity(body, english.body);
-    if (similarity !== null && similarity >= PRIVACY_BODY_SIMILARITY_THRESHOLD) {
-      failures.push({
-        target: input.target,
-        code: "near_english_body",
-        detail: `${Math.round(similarity * 100)}%`,
-      });
-    }
+    // Prose first, size last. The English page skips the prose half (it is the
+    // baseline) and is size-checked like everything else — it is the canonical
+    // document, so it is the one whose shrinking matters most.
+    const failure =
+      evaluatePrivacyPageProse(input, english) ??
+      evaluatePrivacyPageSize(input.target, verdict.wordCount, baselines);
+    if (failure) failures.push(failure);
   }
   return {
     ok: inputs.length > 0 && failures.length === 0,
