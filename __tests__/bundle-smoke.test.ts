@@ -197,14 +197,30 @@ const RU_TARGET = PRIVACY_PAGE_TARGETS.find((t) => t.code === "ru");
 const DE_TARGET = PRIVACY_PAGE_TARGETS.find((t) => t.code === "de");
 
 /**
+ * A body of distinct words, long enough to clear the word floor.
+ *
+ * Distinct rather than shared filler: 45 identical words plus one language
+ * marker scores 0.978 against every other page and would make every fixture in
+ * this file trip `near_english_body`. The words carry the code so no two pages
+ * overlap at all, which is the fixture equivalent of six real translations.
+ */
+const bodyWordsFor = (code: string): string =>
+  Array.from(
+    { length: PRIVACY_BODY_SIMILARITY_MIN_WORDS + 5 },
+    (_, i) => `${code}word${i}`,
+  ).join(" ");
+
+/**
  * A page that passes every gate, for the language given. Heading AND body
  * carry the code because the gates are no longer per-page: a translation whose
  * `<h1>` or whose policy text equals the English one is an untranslated page,
  * so a fixture that gave all six the same prose would be a fixture that cannot
- * pass.
+ * pass. The body clears `PRIVACY_BODY_SIMILARITY_MIN_WORDS` for the same
+ * reason it grew a heading and then a body in the two runs before this one —
+ * a fixture that cannot pass the check it feeds is worse than no fixture.
  */
 const renderedPage = (code: string): string =>
-  `<html lang="${code}"><title>Collectables — ${PRIVACY_PAGE_MARKER}</title><h1>Policy ${code}</h1><p>Body ${code}.</p></html>`;
+  `<html lang="${code}"><title>Collectables — ${PRIVACY_PAGE_MARKER}</title><h1>Policy ${code}</h1><p>${bodyWordsFor(code)}</p></html>`;
 
 describe("PRIVACY_PAGE_TARGETS", () => {
   it("covers every language the page is offered in", () => {
@@ -311,7 +327,10 @@ describe("evaluatePrivacyPage", () => {
       const verdict = evaluatePrivacyPage({
         target,
         exists: true,
-        text: renderPrivacyPage("# Policy\n\nBody text.\n", target.code),
+        text: renderPrivacyPage(
+          `# Policy ${target.code}\n\n${bodyWordsFor(target.code)}\n`,
+          target.code,
+        ),
       });
       assert.equal(
         verdict.ok,
@@ -333,6 +352,79 @@ describe("evaluatePrivacyPage", () => {
     assert.equal(verdict.ok === false && verdict.code, "empty_body");
   });
 
+  it("fails a page whose body is a heading and a dozen words", () => {
+    // `<h1` proves the heading rendered; the body under it is what the marker
+    // was named for and what it could never see. A truncated PRIVACY.md.pl
+    // ships as a title and one line and passed every gate before this.
+    assert.ok(EN_TARGET);
+    const verdict = evaluatePrivacyPage({
+      target: EN_TARGET,
+      exists: true,
+      text: `<html lang="en"><title>${PRIVACY_PAGE_MARKER}</title><h1>Policy</h1><p>We collect a little data and that is the whole policy.</p></html>`,
+    });
+    assert.equal(verdict.ok === false && verdict.code, "body_too_short");
+  });
+
+  it("counts the words it rejected, so the log says how short", () => {
+    assert.ok(EN_TARGET);
+    const verdict = evaluatePrivacyPage({
+      target: EN_TARGET,
+      exists: true,
+      text: `<html lang="en"><title>${PRIVACY_PAGE_MARKER}</title><h1>Policy</h1><p>one two three</p></html>`,
+    });
+    assert.equal(verdict.ok === false && verdict.detail, "3 word(s)");
+    assert.ok(
+      formatPrivacyPageFailure("c", {
+        target: EN_TARGET,
+        code: "body_too_short",
+        detail: "3 word(s)",
+      }).includes("3 word(s)"),
+    );
+  });
+
+  it("reports empty_body, not body_too_short, when nothing rendered at all", () => {
+    // Most-specific-last: a page with no heading has no body worth counting,
+    // and "the policy body rendered empty" is the truer thing to say.
+    assert.ok(EN_TARGET);
+    const verdict = evaluatePrivacyPage({
+      target: EN_TARGET,
+      exists: true,
+      text: `<html lang="en"><title>${PRIVACY_PAGE_MARKER}</title></html>`,
+    });
+    assert.equal(verdict.ok === false && verdict.code, "empty_body");
+  });
+
+  it("accepts a body at exactly the floor", () => {
+    assert.ok(EN_TARGET);
+    const atFloor = Array.from(
+      { length: PRIVACY_BODY_SIMILARITY_MIN_WORDS },
+      (_, i) => `w${i}`,
+    ).join(" ");
+    const verdict = evaluatePrivacyPage({
+      target: EN_TARGET,
+      exists: true,
+      text: `<html lang="en"><title>${PRIVACY_PAGE_MARKER}</title><h1>Policy</h1><p>${atFloor}</p></html>`,
+    });
+    assert.equal(verdict.ok, true);
+  });
+
+  it("guarantees every page it passes can be measured by the ratio", () => {
+    // The invariant the shared constant buys: `privacyBodySimilarity` returning
+    // null is what silently disables the near-copy gate, and nothing that
+    // clears these gates can produce it. If the two floors ever drift apart,
+    // this fails.
+    for (const target of PRIVACY_PAGE_TARGETS) {
+      const text = renderedPage(target.code);
+      assert.equal(evaluatePrivacyPage({ target, exists: true, text }).ok, true);
+      const body = extractPrivacyPageBodyText(text) ?? "";
+      assert.notEqual(
+        privacyBodySimilarity(body, body),
+        null,
+        `${target.code}: passed the gates but is too short to compare`,
+      );
+    }
+  });
+
   it("has a distinct message per failure code", () => {
     assert.ok(EN_TARGET);
     const codes: PrivacyPageFailureCode[] = [
@@ -343,6 +435,7 @@ describe("evaluatePrivacyPage", () => {
       "untranslated_heading",
       "untranslated_body",
       "near_english_body",
+      "body_too_short",
     ];
     const messages = codes.map((code) =>
       formatPrivacyPageFailure("c", { target: EN_TARGET, code }),
@@ -461,7 +554,7 @@ describe("evaluatePrivacyPages", () => {
         input.target.code === "de"
           ? {
               ...input,
-              text: `<html lang="de"><title>${PRIVACY_PAGE_MARKER}</title><h1>${englishHeading}</h1></html>`,
+              text: `<html lang="de"><title>${PRIVACY_PAGE_MARKER}</title><h1>${englishHeading}</h1><p>${bodyWordsFor("de")}</p></html>`,
             }
           : input,
       ),
@@ -490,14 +583,14 @@ describe("evaluatePrivacyPages", () => {
         input.target.code === "pl"
           ? {
               ...input,
-              text: `<html lang="pl"><title>${PRIVACY_PAGE_MARKER}</title><h1 id="top">  Policy\n  <strong>en</strong> </h1></html>`,
+              text: `<html lang="pl"><title>${PRIVACY_PAGE_MARKER}</title><h1 id="top">  Policy\n  <strong>en</strong> </h1><p>${bodyWordsFor("pl")}</p></html>`,
             }
           : input,
       ),
     );
     assert.deepEqual(
-      result.failures.map((f) => f.target.code),
-      ["pl"],
+      result.failures.map((f) => `${f.target.code}:${f.code}`),
+      ["pl:untranslated_heading"],
     );
   });
 
@@ -658,25 +751,24 @@ describe("evaluatePrivacyPages", () => {
     );
   });
 
-  it("still catches an exact copy whose body is below the word floor", () => {
-    // The floor skips the RATIO, never the equality check — a short body
-    // identical to the English short body is a copy at any length, and the
-    // gate that shipped before this one already said so.
-    const shortEnglishBody =
-      renderedPage("en").match(/<\/h1>([\s\S]*)$/)?.[1] ?? "unreachable";
+  it("reports the SHORTNESS of a short copy, not the copying", () => {
+    // A body under the floor is broken on its own terms, and saying "this is
+    // the English text" about twelve words sends the reader to diff two files
+    // when the real answer is that one of them is a stub. The floor gate runs
+    // first for that reason.
     const result = evaluatePrivacyPages(
       allGood().map((input) =>
         input.target.code === "de"
           ? {
               ...input,
-              text: `<html lang="de"><title>${PRIVACY_PAGE_MARKER}</title><h1>Datenschutz</h1>${shortEnglishBody}`,
+              text: `<html lang="de"><title>${PRIVACY_PAGE_MARKER}</title><h1>Datenschutz</h1><p>We collect a little data.</p></html>`,
             }
           : input,
       ),
     );
     assert.deepEqual(
       result.failures.map((f) => `${f.target.code}:${f.code}`),
-      ["de:untranslated_body"],
+      ["de:body_too_short"],
     );
   });
 
@@ -748,9 +840,12 @@ describe("evaluatePrivacyPages", () => {
     ]);
   });
 
-  it("does not compare bodies when the English body did not extract", () => {
-    // A heading-only English page gives no body baseline; two translations
-    // that also have no body must not be read as copies of it.
+  it("fails heading-only pages rather than quietly skipping their comparison", () => {
+    // This used to pass: six pages with a heading and no body extracted to six
+    // null bodies, the comparison was skipped as "nothing to compare", and the
+    // run reported six pages present and rendered. `empty_body` could not see
+    // it either — `<h1` proves a heading rendered, which is the half that DID
+    // work. The word floor is what turns that silence into six failures.
     const headingOnly = (code: string): string =>
       `<html lang="${code}"><title>${PRIVACY_PAGE_MARKER}</title><h1>Policy ${code}</h1></html>`;
     const result = evaluatePrivacyPages(
@@ -760,7 +855,21 @@ describe("evaluatePrivacyPages", () => {
         text: headingOnly(target.code),
       })),
     );
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, false);
+    assert.deepEqual(
+      result.failures.map((f) => f.code),
+      PRIVACY_PAGE_TARGETS.map(() => "body_too_short"),
+    );
+  });
+
+  it("still skips the comparison when the English page is absent entirely", () => {
+    // The null-baseline path the test above used to cover: it is now only
+    // reachable when the English page fails its own gates, and one cause must
+    // still produce one failure rather than six.
+    const translationsOnly = allGood().filter(
+      (input) => input.target.code !== "en",
+    );
+    assert.equal(evaluatePrivacyPages(translationsOnly).ok, true);
   });
 
   it("would fail if a translated policy file were replaced by the English one", () => {

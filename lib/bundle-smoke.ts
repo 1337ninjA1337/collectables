@@ -196,7 +196,8 @@ export type PrivacyPageFailureCode =
   | "empty_body"
   | "untranslated_heading"
   | "untranslated_body"
-  | "near_english_body";
+  | "near_english_body"
+  | "body_too_short";
 
 /**
  * Markup out, comparable prose in: tags stripped, whitespace collapsed, empty
@@ -256,18 +257,28 @@ export function extractPrivacyPageBodyText(text: string): string | null {
 export const PRIVACY_BODY_SIMILARITY_THRESHOLD = 0.9;
 
 /**
- * Bodies shorter than this (in words) are compared for EQUALITY only.
+ * The one word floor, used for two things on purpose.
  *
- * A ratio over a handful of words is noise: two unrelated short notices that
- * share `Collectables`, `Sentry`, a URL and a date score 1.0 without being
- * related at all, and the words a policy cannot avoid repeating are exactly the
- * ones that survive translation. 40 sits an order of magnitude below the
- * shortest shipped body (169 words) and far above the range where proper nouns
- * dominate, so no real page is ever judged by a ratio it is too small for.
+ * {@link privacyBodySimilarity} refuses to measure below it, because a ratio
+ * over a handful of words is noise: two unrelated short notices that share
+ * `Collectables`, `Sentry`, a URL and a date score 1.0 without being related at
+ * all, and the words a policy cannot avoid repeating are exactly the ones that
+ * survive translation.
  *
- * The floor SKIPS the ratio; it never skips the exact comparison. A two-word
- * body identical to the English two-word body is still a copy, and the check
- * that shipped before this one already said so.
+ * {@link evaluatePrivacyPage} FAILS below it, which is what makes the first
+ * half safe. A refusal that only skipped would be a gate that turns itself off
+ * on the pages least able to afford it: a `PRIVACY.md` truncated under the
+ * floor takes the near-copy comparison down for all five translations at once,
+ * silently, and the run still prints `6 privacy page(s) present and rendered`.
+ * Sharing the constant makes "no page that passes is too short to compare" an
+ * invariant rather than a hope — every page reaching the ratio has cleared the
+ * ratio's own floor, and a test asserts exactly that.
+ *
+ * 40 sits an order of magnitude below the shortest shipped body (169 words) and
+ * far above the range where proper nouns dominate. It is a floor on nonsense,
+ * not a judgement about how long a disclosure should be — the "is this
+ * translation suspiciously shorter than the English one" question is a
+ * different check with a different number.
  */
 export const PRIVACY_BODY_SIMILARITY_MIN_WORDS = 40;
 
@@ -333,7 +344,12 @@ export type PrivacyPageInput = {
 
 export type PrivacyPageVerdict =
   | { readonly ok: true }
-  | { readonly ok: false; readonly code: PrivacyPageFailureCode };
+  | {
+      readonly ok: false;
+      readonly code: PrivacyPageFailureCode;
+      /** Carried into the message; see {@link PrivacyPageFailure.detail}. */
+      readonly detail?: string;
+    };
 
 /**
  * Exhaustive over {@link PrivacyPageFailureCode} so a new code cannot ship
@@ -358,6 +374,8 @@ const PRIVACY_PAGE_MESSAGE: Record<
     `${target.relativePath} is not marked \`<html lang="${target.code}">\` — the wrong translation was written to this path, which a title-only check cannot see.`,
   empty_body: (target) =>
     `${target.relativePath} carries the page chrome but no ${PRIVACY_PAGE_BODY_MARKER}…> heading — the policy body rendered empty.`,
+  body_too_short: (target, detail) =>
+    `${target.relativePath} renders a heading over ${detail ?? "almost no"} of policy text, under the ${PRIVACY_BODY_SIMILARITY_MIN_WORDS}-word floor — the shortest shipped translation is 169 words, so this is a truncated or half-written file. It also takes the near-copy comparison offline for this page, which is the second reason it is a failure and not a warning.`,
   untranslated_heading: (target) =>
     `${target.relativePath} renders the SAME <h1> as the English policy at ${PRIVACY_PAGE_RELATIVE_PATH} — the page is marked \`<html lang="${target.code}">\` but its text is English, so PRIVACY.md.${target.code} was never translated (or the English source was pasted through it).`,
   untranslated_body: (target) =>
@@ -372,8 +390,10 @@ const PRIVACY_PAGE_MESSAGE: Record<
  * same fix, and a third message would only make the log harder to scan.
  *
  * Gate order is most-specific-last: "there is no file" explains every other
- * symptom, and "this is not a privacy page at all" explains the two content
- * checks, so each failure names the smallest thing that is wrong.
+ * symptom, and "this is not a privacy page at all" explains the content
+ * checks, so each failure names the smallest thing that is wrong. The word
+ * floor sits at the end for the same reason — a page with no heading has no
+ * body worth counting, and `empty_body` is the truer thing to say about it.
  */
 export function evaluatePrivacyPage(
   input: PrivacyPageInput,
@@ -393,6 +413,21 @@ export function evaluatePrivacyPage(
   }
   if (!input.text.includes(PRIVACY_PAGE_BODY_MARKER)) {
     return { ok: false, code: "empty_body" };
+  }
+  // `empty_body` proves a heading rendered, which is all `<h1` can prove — the
+  // body below it is what the marker was named for and never checked. A page
+  // whose policy text is a dozen words is broken on its own terms AND is the
+  // one input that can make the near-copy ratio go quiet, so it fails here
+  // rather than being tolerated and skipped downstream.
+  const wordCount = privacyBodyWords(
+    extractPrivacyPageBodyText(input.text) ?? "",
+  ).length;
+  if (wordCount < PRIVACY_BODY_SIMILARITY_MIN_WORDS) {
+    return {
+      ok: false,
+      code: "body_too_short",
+      detail: `${wordCount} word(s)`,
+    };
   }
   return { ok: true };
 }
@@ -490,7 +525,13 @@ export function evaluatePrivacyPages(
   for (const input of inputs) {
     const verdict = evaluatePrivacyPage(input);
     if (!verdict.ok) {
-      failures.push({ target: input.target, code: verdict.code });
+      failures.push({
+        target: input.target,
+        code: verdict.code,
+        // Spread rather than always-set, so codes that measured nothing keep
+        // the two-key shape their `deepEqual` pins expect.
+        ...(verdict.detail === undefined ? {} : { detail: verdict.detail }),
+      });
       continue;
     }
     if (input.target.code === PRIVACY_DEFAULT_LANGUAGE) continue;
@@ -501,6 +542,11 @@ export function evaluatePrivacyPages(
       continue;
     }
     const body = extractPrivacyPageBodyText(input.text);
+    // Both are non-null for anything that got here — a page with no extractable
+    // body fails `empty_body` or `body_too_short` above, and the baseline is
+    // only taken from an English page that passed those same gates. Kept as a
+    // guard rather than an assertion because the alternative is a crash in a
+    // build guard, and "one comparison did not run" is the better failure.
     if (english.body === null || body === null) continue;
     if (body === english.body) {
       failures.push({ target: input.target, code: "untranslated_body" });
