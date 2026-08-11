@@ -193,7 +193,26 @@ export type PrivacyPageFailureCode =
   | "missing_file"
   | "missing_marker"
   | "wrong_language"
-  | "empty_body";
+  | "empty_body"
+  | "untranslated_heading";
+
+/**
+ * The rendered `<h1>` text, tags stripped and whitespace collapsed, or null
+ * when the page carries no closed heading.
+ *
+ * Text, not markup: `renderMarkdownBody` runs `renderInline` over the heading,
+ * so a `**bold**` word in one source file and not in another would make two
+ * identical sentences compare unequal for a reason no reader cares about.
+ */
+export function extractPrivacyPageHeading(text: string): string | null {
+  const match = text.match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
+  if (!match) return null;
+  const inner = match[1]
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return inner === "" ? null : inner;
+}
 
 export type PrivacyPageInput = {
   readonly target: PrivacyPageTarget;
@@ -222,6 +241,8 @@ const PRIVACY_PAGE_MESSAGE: Record<
     `${target.relativePath} is not marked \`<html lang="${target.code}">\` — the wrong translation was written to this path, which a title-only check cannot see.`,
   empty_body: (target) =>
     `${target.relativePath} carries the page chrome but no ${PRIVACY_PAGE_BODY_MARKER}…> heading — the policy body rendered empty.`,
+  untranslated_heading: (target) =>
+    `${target.relativePath} renders the SAME <h1> as the English policy at ${PRIVACY_PAGE_RELATIVE_PATH} — the page is marked \`<html lang="${target.code}">\` but its text is English, so PRIVACY.md.${target.code} was never translated (or the English source was pasted through it).`,
 };
 
 /**
@@ -267,8 +288,38 @@ export type PrivacyPagesResult = {
 };
 
 /**
+ * The English page's heading, taken only from a page that passed its own
+ * gates — comparing against a heading pulled out of a broken English page
+ * would report six failures for one cause.
+ *
+ * Returns null when the English page is absent from the input, broken, or has
+ * no extractable heading; the cross-page check then does not run at all. That
+ * is deliberate: every one of those states is already reported by the per-page
+ * gates (or was never asked about), and inventing a comparison baseline out of
+ * one of them turns one clear failure into five confusing ones.
+ */
+function findDefaultLanguageHeading(
+  inputs: readonly PrivacyPageInput[],
+): string | null {
+  const english = inputs.find(
+    (input) => input.target.code === PRIVACY_DEFAULT_LANGUAGE,
+  );
+  if (!english || english.text === null) return null;
+  if (!evaluatePrivacyPage(english).ok) return null;
+  return extractPrivacyPageHeading(english.text);
+}
+
+/**
  * Every page is evaluated — a fail-fast loop would report the English page and
  * hide the five translations behind it, costing a CI run per language.
+ *
+ * The heading comparison is CROSS-page and so lives here rather than in
+ * {@link evaluatePrivacyPage}: it is the one thing a single page cannot know
+ * about itself. `<html lang="de">` comes from the renderer's argument, not from
+ * the content, so `PRIVACY.md.de` holding the English text satisfies every
+ * per-page gate — file present, title present, right lang attribute, body
+ * rendered — and ships an untranslated GDPR Art. 12 disclosure. The rendered
+ * `<h1>` is the cheapest piece of the page that MUST differ per language.
  *
  * An empty input list is NOT ok: it is the same "checked nothing, reported
  * success" shape {@link evaluateBundleSmoke} refuses.
@@ -276,10 +327,19 @@ export type PrivacyPagesResult = {
 export function evaluatePrivacyPages(
   inputs: readonly PrivacyPageInput[],
 ): PrivacyPagesResult {
+  const englishHeading = findDefaultLanguageHeading(inputs);
   const failures: PrivacyPageFailure[] = [];
   for (const input of inputs) {
     const verdict = evaluatePrivacyPage(input);
-    if (!verdict.ok) failures.push({ target: input.target, code: verdict.code });
+    if (!verdict.ok) {
+      failures.push({ target: input.target, code: verdict.code });
+      continue;
+    }
+    if (input.target.code === PRIVACY_DEFAULT_LANGUAGE) continue;
+    if (englishHeading === null || input.text === null) continue;
+    if (extractPrivacyPageHeading(input.text) === englishHeading) {
+      failures.push({ target: input.target, code: "untranslated_heading" });
+    }
   }
   return {
     ok: inputs.length > 0 && failures.length === 0,
