@@ -19,7 +19,9 @@
  *
  * In every case the comparison point is `git merge-base <base> HEAD`, so a base
  * branch that moved on does not present its own later commits as this diff's
- * changes.
+ * changes. `PRIVACY_BASELINE_REPO_ROOT` moves which repository those questions
+ * are asked of — see {@link REPO_ROOT}, and note that it is announced on stdout
+ * whenever it is set.
  *
  * A SHALLOW clone is a hard failure, not a skip: `actions/checkout` defaults to
  * `fetch-depth: 1`, which makes `HEAD~1` unresolvable, and a guard that reports
@@ -45,15 +47,52 @@ import {
 import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
 
 const CHECK_NAME = "check-privacy-baseline-provenance";
-const REPO_ROOT = path.join(__dirname, "..");
 const BASELINE_MODULE = "lib/privacy-body-baselines.ts";
 
-/** stdout on success, null on any non-zero exit — callers decide what that means. */
+/**
+ * Repository whose HISTORY is read. Overridable by
+ * `PRIVACY_BASELINE_REPO_ROOT` for exactly one reason: the three
+ * {@link classifyBaselineRevision} branches are unreachable from inside this
+ * repository, because `merge-base` is doing its job. A scratch commit that
+ * deletes or mangles the module resolves back to the fork point, which still
+ * holds a good table, so `absent` and `unparseable` can be reasoned about here
+ * and never executed. `__tests__/privacy-baseline-provenance-script.test.ts`
+ * builds a throwaway repository with the history each branch needs and points
+ * the script at it.
+ *
+ * The override moves the history half ONLY — the table being checked is always
+ * this repo's imported `PRIVACY_BODY_BASELINES`. It is announced on stdout
+ * whenever it is set, because an env var that silently redirects a guard at an
+ * empty repository is a green build that checked nothing, which is the failure
+ * mode this whole file was written against.
+ */
+const REPO_ROOT_OVERRIDE = process.env.PRIVACY_BASELINE_REPO_ROOT || null;
+const REPO_ROOT = REPO_ROOT_OVERRIDE ?? path.join(__dirname, "..");
+
+/**
+ * stdout on success, null on any non-zero exit — callers decide what that
+ * means.
+ *
+ * A git that could not be RUN is not one of those cases and does not get to be
+ * a `null`. Every branch below is an answer FROM git, so an ENOENT (no binary
+ * on PATH) or a signal death would read as "git said no" at each call site in
+ * turn, and the first one to be asked reports `HEAD` has no parent, which
+ * `resolveComparison` turns into "no commits in this repository yet" — a SKIP,
+ * printed as a pass, on a machine where the guard never ran at all.
+ */
 function git(...args: string[]): string | null {
   const run = spawnSync("git", args, {
     cwd: REPO_ROOT,
     encoding: "utf8",
   });
+  if (run.error !== undefined || run.status === null) {
+    const cause =
+      run.error?.message ?? `killed by ${run.signal ?? "an unknown signal"}`;
+    console.error(
+      `${CHECK_NAME}: ERROR — \`git ${args.join(" ")}\` could not be run in ${REPO_ROOT} (${cause}). This guard reads history and nothing else, so a missing or broken git makes every check below vacuous rather than green.`,
+    );
+    process.exit(1);
+  }
   if (run.status !== 0 || typeof run.stdout !== "string") return null;
   return run.stdout.trim();
 }
@@ -141,6 +180,11 @@ function changedFilesSince(ref: string): readonly string[] {
 }
 
 function main(): void {
+  if (REPO_ROOT_OVERRIDE !== null) {
+    console.log(
+      `${CHECK_NAME}: history read from ${REPO_ROOT_OVERRIDE} (PRIVACY_BASELINE_REPO_ROOT is set) — the table itself still comes from this checkout.`,
+    );
+  }
   const argv = process.argv.slice(2);
   const comparison = resolveComparison(argv);
   if (comparison.kind === "fail") {
