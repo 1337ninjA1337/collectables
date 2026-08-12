@@ -19,7 +19,9 @@ import {
   formatHexReport,
   type HexMatch,
 } from "../lib/check-inline-hex";
+import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 
+const CHECK_NAME = "check-inline-hex";
 const REPO_ROOT = path.join(__dirname, "..");
 const SCAN_ROOTS = ["app", "components", "lib"];
 const SOURCE_FILE_PATTERN = /\.tsx?$/;
@@ -48,6 +50,10 @@ function main(): void {
   }
   files.sort();
 
+  // Before reading a single byte: a walk that found nothing (or almost
+  // nothing) reports "no inline hex literals" just as cheerfully as a full one.
+  assertScannedFloor(CHECK_NAME, files.length);
+
   const allMatches: HexMatch[] = [];
   for (const file of files) {
     const source = fs.readFileSync(file, "utf8");
@@ -56,7 +62,7 @@ function main(): void {
   }
 
   if (allMatches.length === 0) {
-    console.log(`check-inline-hex: scanned ${files.length} file(s), no inline hex literals.`);
+    console.log(`${CHECK_NAME}: scanned ${files.length} file(s), no inline hex literals.`);
     return;
   }
 
@@ -70,4 +76,14 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  // The floor failure is a guard result, not a crash — print the one line,
+  // not a stack trace pointing at a helper the reader did not call.
+  if (error instanceof ScannedFloorError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  throw error;
+}

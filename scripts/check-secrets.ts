@@ -17,7 +17,9 @@ import {
   scanForSecrets,
   type SecretMatch,
 } from "../lib/secret-scan";
+import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 
+const CHECK_NAME = "check-secrets";
 const REPO_ROOT = path.join(__dirname, "..");
 
 /** Directories never worth scanning (build output, deps, vcs metadata). */
@@ -90,6 +92,10 @@ function main(): void {
   walk(REPO_ROOT, files);
   files.sort();
 
+  // "scanned 0 file(s), no committed secrets" is the report an unreadable
+  // repo root produces, and it exits 0. Assert the premise first.
+  assertScannedFloor(CHECK_NAME, files.length);
+
   const matches: SecretMatch[] = [];
   for (const file of files) {
     let source: string;
@@ -104,7 +110,7 @@ function main(): void {
 
   if (matches.length === 0) {
     console.log(
-      `check-secrets: scanned ${files.length} file(s), no committed secrets.`,
+      `${CHECK_NAME}: scanned ${files.length} file(s), no committed secrets.`,
     );
     return;
   }
@@ -113,4 +119,12 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  if (error instanceof ScannedFloorError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  throw error;
+}
