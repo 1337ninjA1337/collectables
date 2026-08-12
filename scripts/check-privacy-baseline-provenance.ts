@@ -20,8 +20,16 @@
  * In every case the comparison point is `git merge-base <base> HEAD`, so a base
  * branch that moved on does not present its own later commits as this diff's
  * changes. `PRIVACY_BASELINE_REPO_ROOT` moves which repository those questions
- * are asked of — see {@link REPO_ROOT}, and note that it is announced on stdout
- * whenever it is set.
+ * are asked of — see {@link REPO_ROOT}. It is announced on stdout whenever it is
+ * set (on the pass line as well as before the run), and it may not fall through
+ * to `HEAD~1`: a redirected history has to be given its base explicitly, since
+ * `HEAD~1` resolves in any repository at all.
+ *
+ * A root that is not a git work tree is a hard failure and the FIRST thing
+ * checked. Every branch below reads a null from git as an answer about history,
+ * and a directory with no `.git` answers null to all of them — which the old
+ * ordering reported as "no commits in this repository yet", a skip, printed as
+ * a pass. An exported copy of the sources is the ordinary way that happens.
  *
  * A SHALLOW clone is a hard failure, not a skip: `actions/checkout` defaults to
  * `fetch-depth: 1`, which makes `HEAD~1` unresolvable, and a guard that reports
@@ -124,7 +132,35 @@ type Comparison =
   | { readonly kind: "fail"; readonly reason: string };
 
 function resolveComparison(argv: readonly string[]): Comparison {
+  // Asked FIRST, because everything below reads a `null` from git as an answer
+  // about history, and a root that is not a work tree answers null to all of
+  // them: `HEAD~1` fails, `HEAD` fails, and the guard reports "no commits in
+  // this repository yet" — a skip, printed as a pass, over a directory that
+  // never had commits to begin with. That is not hypothetical: a source export
+  // without `.git` is the ordinary way it happens, and PRIVACY_BASELINE_REPO_ROOT
+  // is a second.
+  if (git("rev-parse", "--is-inside-work-tree") !== "true") {
+    return {
+      kind: "fail",
+      reason: `${REPO_ROOT} is not a git work tree, so there is no history to compare against and every check below would skip. ${
+        REPO_ROOT_OVERRIDE === null
+          ? "Run this guard from a checkout, not from an exported copy of the sources."
+          : "PRIVACY_BASELINE_REPO_ROOT is set — point it at a repository or unset it."
+      }`,
+    };
+  }
   const asked = requestedBase(argv);
+  // A redirected history may not ALSO guess its base. `HEAD~1` resolves in any
+  // repository at all, so an env var exported once at a workflow level would
+  // otherwise quietly compare this table against a stranger's parent commit and
+  // report the skip that comparison earns.
+  if (REPO_ROOT_OVERRIDE !== null && (asked === null || !asked.strict)) {
+    return {
+      kind: "fail",
+      reason:
+        "PRIVACY_BASELINE_REPO_ROOT is set without an explicit base — pass --base <ref> (or set PRIVACY_BASELINE_BASE_REF). Falling through to HEAD~1 in a redirected repository compares this table against an unrelated commit.",
+    };
+  }
   if (asked !== null) {
     const merged =
       git("merge-base", asked.ref, "HEAD") ?? git("rev-parse", asked.ref);
@@ -138,10 +174,13 @@ function resolveComparison(argv: readonly string[]): Comparison {
   }
   const parent = git("rev-parse", "--verify", "HEAD~1");
   if (parent !== null) return { kind: "compare", ref: parent };
+  // Reachable only in a real work tree now that the probe above runs first, so
+  // this genuinely means an unborn HEAD rather than "git answered null to
+  // everything and nobody asked why".
   if (git("rev-parse", "--verify", "HEAD") === null) {
     return {
       kind: "skip",
-      reason: "no commits in this repository yet",
+      reason: "no commits in this work tree yet",
     };
   }
   if (git("rev-parse", "--is-shallow-repository") === "true") {
@@ -223,6 +262,14 @@ function main(): void {
     } else if (previous === null) {
       console.log(
         `${CHECK_NAME}: drift half skipped — ${BASELINE_MODULE} did not exist at ${comparison.ref}, so the guard predates it.`,
+      );
+    }
+    if (REPO_ROOT_OVERRIDE !== null) {
+      // On the PASS line too, not only twenty lines above it: a green summary
+      // that does not mention where it read from is how a redirected guard
+      // becomes the guard.
+      console.log(
+        `${CHECK_NAME}: that pass read history from ${REPO_ROOT_OVERRIDE}, not from this checkout.`,
       );
     }
     return;

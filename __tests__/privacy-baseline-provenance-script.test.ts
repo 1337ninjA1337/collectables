@@ -209,21 +209,70 @@ describe("check-privacy-baseline-provenance against a scratch repository", () =>
     );
   });
 
-  it("fails when the root is not a repository at all", () => {
+  it("names the redirected history on the pass line, not only before the run", () => {
+    const { root, base } = repoWithBase({
+      [BASELINE_MODULE]: REAL_BASELINE_SOURCE,
+    });
+    const run = runGuard(root, base);
+    assert.equal(run.status, 0, `expected a pass:\n${run.stdout}${run.stderr}`);
+    assert.ok(
+      run.stdout.includes(
+        `that pass read history from ${root}, not from this checkout.`,
+      ),
+      `the green summary did not say where it read from:\n${run.stdout}`,
+    );
+  });
+
+  it("fails when the root is not a git work tree, rather than skipping as an empty repository", () => {
     const root = fs.realpathSync(
       fs.mkdtempSync(path.join(os.tmpdir(), "baseline-provenance-bare-")),
     );
     scratchRepos.push(root);
-    const base = "0000000000000000000000000000000000000000";
-    const run = runGuard(root, base);
+    fs.writeFileSync(path.join(root, "README.md"), "an exported copy\n");
+    const run = runGuard(root, "0000000000000000000000000000000000000000");
     assert.equal(
       run.status,
       1,
-      `a root with no history must not pass:\n${run.stdout}${run.stderr}`,
+      `a directory with no history must not pass:\n${run.stdout}${run.stderr}`,
     );
     assert.ok(
-      run.stderr.includes(`base revision "${base}" does not resolve`),
-      `expected the unresolvable-base error:\n${run.stderr}`,
+      run.stderr.includes(`${root} is not a git work tree`),
+      `expected the not-a-work-tree error:\n${run.stderr}`,
+    );
+    assert.ok(
+      !run.stdout.includes("no commits in this work tree yet"),
+      `a non-repository was mistaken for an unborn HEAD:\n${run.stdout}`,
+    );
+  });
+
+  it("refuses a redirected history that was given no explicit base", () => {
+    const { root } = repoWithBase({
+      [BASELINE_MODULE]: REAL_BASELINE_SOURCE,
+    });
+    // No `--base`, and both base env vars cleared: exactly the shape of a
+    // workflow that exported PRIVACY_BASELINE_REPO_ROOT once and left the
+    // guard to guess. HEAD~1 resolves in that repository, so without this the
+    // run would compare the table against an unrelated commit and pass.
+    const run = spawnSync(process.execPath, ["--import", "tsx", SCRIPT], {
+      cwd: ROOT,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PRIVACY_BASELINE_REPO_ROOT: root,
+        PRIVACY_BASELINE_BASE_REF: "",
+        GITHUB_BASE_REF: "",
+      },
+    });
+    assert.equal(
+      run.status,
+      1,
+      `a guessed base in a redirected repository must not pass:\n${run.stdout}${run.stderr}`,
+    );
+    assert.ok(
+      (run.stderr ?? "").includes(
+        "PRIVACY_BASELINE_REPO_ROOT is set without an explicit base",
+      ),
+      `expected the explicit-base error:\n${run.stderr}`,
     );
   });
 
