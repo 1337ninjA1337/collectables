@@ -292,8 +292,8 @@ export function evaluateParsedInputs(
  */
 export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
   "check-inline-hex": {
-    count: { label: "source file", minimum: 150 },
-    note: "app/ + components/ + lib/ held 212 .ts/.tsx files on 2026-08-12; 150 leaves room to delete a quarter of them, but losing any one of the three scan roots drops below it.",
+    count: { label: "source file", minimum: 160 },
+    note: "app/ + components/ + lib/ held 213 .ts/.tsx files on 2026-08-12 (app 19, components 44, lib 150); 160 leaves a quarter of them deletable. Raised from 150, which was exactly lib/'s own count — a walk that lost BOTH app/ and components/ passed at the boundary, and the note here claimed it would not. The property __tests__/lint-guard-partial-root.test.ts now enforces is the one a floor can hold: no single scan root clears it on its own. Losing app/ or components/ alone still passes, and that is the price of the slack.",
   },
   "check-secrets": {
     count: { label: "file", minimum: 500 },
