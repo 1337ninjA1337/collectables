@@ -20,21 +20,19 @@
 
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
-import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { GUARD_ROOT_ENV } from "../lib/guard-root";
-import { LINT_GUARDS, type LintGuard } from "../lib/lint-guards";
+import { LINT_GUARDS } from "../lib/lint-guards";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
-import { makePartialRoot, type PartialRoot } from "./helpers/guard-fixture";
+import {
+  checkNameOf,
+  makePartialRoot,
+  runGuardIn,
+  type PartialRoot,
+} from "./helpers/guard-fixture";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
-const TSX = path.join(REPO_ROOT, "node_modules", ".bin", "tsx");
-
-/** The check name a guard prints, derived from the path the registry pins. */
-const checkNameOf = (scriptPath: string) =>
-  scriptPath.replace(/^scripts\//, "").replace(/\.ts$/, "");
 
 /**
  * The first `take` repo-relative entries of a directory, sorted — so a fixture
@@ -107,8 +105,6 @@ const NO_REACHABLE_COUNT: Readonly<Record<string, string>> = {
     "counts ANALYTICS_EVENTS, which is imported TypeScript rather than a walk of the scan root — no fixture on disk can lower it, and its inputs half is covered by the empty-root harness",
 };
 
-type GuardRun = { readonly output: string; readonly status: number };
-
 /** One temp root per distinct spec, built on demand and reused. */
 const fixtures = new Map<string, PartialRoot>();
 
@@ -125,39 +121,6 @@ after(() => {
   for (const fixture of fixtures.values()) fixture.cleanup();
   fixtures.clear();
 });
-
-const runs = new Map<string, GuardRun>();
-
-function runGuard(guard: LintGuard, root: string): GuardRun {
-  const key = `${guard.scriptPath} ${guard.args.join(" ")} ${root}`;
-  const cached = runs.get(key);
-  if (cached) return cached;
-  let output = "";
-  let status = 0;
-  try {
-    output = execFileSync(
-      TSX,
-      [path.join(REPO_ROOT, guard.scriptPath), ...guard.args],
-      {
-        cwd: REPO_ROOT,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, [GUARD_ROOT_ENV]: root },
-      },
-    );
-  } catch (error) {
-    const failure = error as {
-      status?: number;
-      stdout?: string;
-      stderr?: string;
-    };
-    status = failure.status ?? 1;
-    output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
-  }
-  const run = { output, status };
-  runs.set(key, run);
-  return run;
-}
 
 /** The `below_floor` line, parsed back into the two numbers it carries. */
 function parseBelowFloor(
@@ -186,7 +149,7 @@ describe("every count-shaped guard refuses a partial scan root", () => {
     const spec = PARTIAL_FIXTURES[checkName];
     if (!spec) continue;
 
-    const run = () => runGuard(guard, fixtureFor(spec()).root);
+    const run = () => runGuardIn(guard, fixtureFor(spec()).root);
 
     describe(guard.npmScript, () => {
       it("exits 1 over a tree that holds only part of its walk", () => {
@@ -329,7 +292,7 @@ describe("no single scan root clears a multi-root guard's floor", () => {
 
       for (const root of roots) {
         it(`refuses a tree holding only ${root}/`, () => {
-          const run = runGuard(guard, fixtureFor([root]).root);
+          const run = runGuardIn(guard, fixtureFor([root]).root);
           const floor = SCANNED_FLOORS[checkName].count;
           assert.ok(floor, `${checkName} declares no count floor`);
           assert.equal(

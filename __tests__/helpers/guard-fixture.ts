@@ -27,9 +27,13 @@
  * glob, so it is a library, not a suite.
  */
 
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
+import { GUARD_ROOT_ENV } from "../../lib/guard-root";
+import type { LintGuard } from "../../lib/lint-guards";
 
 /** The repository this fixture copies out of. */
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
@@ -43,16 +47,25 @@ export type PartialRoot = {
 
 /**
  * A temp directory holding copies of `entries` (repo-relative files or
- * directories) at the same relative paths, and nothing else.
+ * directories) at the same relative paths, plus any literal `files`, and
+ * nothing else.
  *
  * Every parent directory is created for real, so a nested entry such as
  * `supabase/migrations` yields a real `supabase/` a top-level walk descends
  * into rather than skipping.
+ *
+ * `files` is the half `entries` cannot express: the `empty_input` failure is
+ * about a declared input that reads and parses FINE and carries nothing
+ * (`{}`, `""`), and no path in this repository is that file. A literal is the
+ * only way to hand a guard one.
  */
-export function makePartialRoot(entries: readonly string[]): PartialRoot {
-  if (entries.length === 0) {
+export function makePartialRoot(
+  entries: readonly string[],
+  files: Readonly<Record<string, string>> = {},
+): PartialRoot {
+  if (entries.length === 0 && Object.keys(files).length === 0) {
     throw new Error(
-      "makePartialRoot: a partial root with no entries is an EMPTY root — use the empty-root harness, which asserts the other failure code.",
+      "makePartialRoot: a partial root with no entries and no files is an EMPTY root — use the empty-root harness, which asserts the other failure code.",
     );
   }
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "lint-guard-partial-"));
@@ -72,8 +85,69 @@ export function makePartialRoot(entries: readonly string[]): PartialRoot {
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     fs.cpSync(source, destination, { recursive: true, dereference: true });
   }
+  for (const [relative, content] of Object.entries(files)) {
+    if (path.isAbsolute(relative)) {
+      throw new Error(
+        `makePartialRoot: "${relative}" must be a path inside the scratch root, not an absolute one.`,
+      );
+    }
+    const destination = path.join(root, relative);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.writeFileSync(destination, content, "utf8");
+  }
   return {
     root,
     cleanup: () => fs.rmSync(root, { recursive: true, force: true }),
   };
+}
+
+export type GuardRun = {
+  /** stdout and stderr together — the refusal lands on stderr. */
+  readonly output: string;
+  readonly status: number;
+};
+
+const runs = new Map<string, GuardRun>();
+
+/**
+ * A guard, run against a scratch root, memoised per (script, args, root) —
+ * every assertion about one run would otherwise pay its own ~430 ms tsx boot.
+ *
+ * Failure is the expected outcome here, so a non-zero exit is captured rather
+ * than thrown: the exit code and the message are both things to assert.
+ */
+export function runGuardIn(guard: LintGuard, root: string): GuardRun {
+  const key = `${guard.scriptPath} ${guard.args.join(" ")} ${root}`;
+  const cached = runs.get(key);
+  if (cached) return cached;
+  let output = "";
+  let status = 0;
+  try {
+    output = execFileSync(
+      path.join(REPO_ROOT, "node_modules", ".bin", "tsx"),
+      [path.join(REPO_ROOT, guard.scriptPath), ...guard.args],
+      {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, [GUARD_ROOT_ENV]: root },
+      },
+    );
+  } catch (error) {
+    const failure = error as {
+      status?: number;
+      stdout?: string;
+      stderr?: string;
+    };
+    status = failure.status ?? 1;
+    output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
+  }
+  const run = { output, status };
+  runs.set(key, run);
+  return run;
+}
+
+/** Every `LINT_GUARDS` entry prints this at the head of its own report. */
+export function checkNameOf(scriptPath: string): string {
+  return scriptPath.replace(/^scripts\//, "").replace(/\.ts$/, "");
 }
