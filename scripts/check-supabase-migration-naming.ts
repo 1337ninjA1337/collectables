@@ -9,34 +9,49 @@
  * unit-tested under `node --test` without touching the filesystem.
  */
 
-import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
   findMigrationNamingIssues,
   formatMigrationNamingReport,
 } from "../lib/check-migration-naming";
-import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import { GuardRootError } from "../lib/guard-root";
+import {
+  ScannedFloorError,
+  assertParsedInputs,
+  assertScannedFloor,
+} from "../lib/scanned-floor";
+import {
+  asText,
+  guardScanRoot,
+  listDirNames,
+  readTextInput,
+} from "./guard-io";
 
 const CHECK_NAME = "check-supabase-migration-naming";
-const REPO_ROOT = path.join(__dirname, "..");
-const MIGRATIONS_DIR = path.join(REPO_ROOT, "supabase", "migrations");
-const MANUAL_TASKS = path.join(REPO_ROOT, "MANUAL-TASKS.md");
+const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
 
 function main(): void {
-  const migrationFilenames = fs.readdirSync(MIGRATIONS_DIR);
-  const manualTasksContent = fs.readFileSync(MANUAL_TASKS, "utf8");
+  const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
+  const migrationFilenames = listDirNames(
+    path.join(repoRoot, "supabase", "migrations"),
+  );
 
   assertScannedFloor(CHECK_NAME, migrationFilenames.length);
 
+  const manualTasksContent = readTextInput(
+    path.join(repoRoot, "MANUAL-TASKS.md"),
+  );
+  assertParsedInputs(CHECK_NAME, { "MANUAL-TASKS.md": manualTasksContent });
+
   const issues = findMigrationNamingIssues({
     migrationFilenames,
-    manualTasksContent,
+    manualTasksContent: asText(manualTasksContent),
   });
 
   if (issues.length === 0) {
     console.log(
-      `${CHECK_NAME}: ${migrationFilenames.length} migration(s) all well-named and documented.`,
+      `${CHECK_NAME}: ${migrationFilenames.length} migration(s) all well-named and documented in MANUAL-TASKS.md.`,
     );
     return;
   }
@@ -48,7 +63,7 @@ function main(): void {
 try {
   main();
 } catch (error) {
-  if (error instanceof ScannedFloorError) {
+  if (error instanceof ScannedFloorError || error instanceof GuardRootError) {
     console.error(error.message);
     process.exit(1);
   }

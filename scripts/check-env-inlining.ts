@@ -18,23 +18,25 @@ import {
   formatEnvInliningReport,
   type EnvInliningMatch,
 } from "../lib/env-inlining";
+import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import { guardScanRoot, listDirNames } from "./guard-io";
 
 const CHECK_NAME = "check-env-inlining";
-const REPO_ROOT = path.join(__dirname, "..");
+const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
 const CONFIG_FILE_PATTERN = /-config\.ts$/;
 
-function listConfigFiles(): string[] {
-  const libDir = path.join(REPO_ROOT, "lib");
-  return fs
-    .readdirSync(libDir)
+function listConfigFiles(repoRoot: string): string[] {
+  const libDir = path.join(repoRoot, "lib");
+  return listDirNames(libDir)
     .filter((name) => CONFIG_FILE_PATTERN.test(name))
     .sort()
     .map((name) => path.join(libDir, name));
 }
 
 function main(): void {
-  const files = listConfigFiles();
+  const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
+  const files = listConfigFiles(repoRoot);
 
   // The narrowest scan in the fleet and the easiest to lose: `-config.ts` is
   // a filename suffix, so one rename drops a resolver out of it silently.
@@ -43,7 +45,7 @@ function main(): void {
   const allMatches: EnvInliningMatch[] = [];
   for (const file of files) {
     const source = fs.readFileSync(file, "utf8");
-    const rel = path.relative(REPO_ROOT, file);
+    const rel = path.relative(repoRoot, file);
     allMatches.push(...findWholeProcessEnvUsages(rel, source));
   }
 
@@ -61,7 +63,7 @@ function main(): void {
 try {
   main();
 } catch (error) {
-  if (error instanceof ScannedFloorError) {
+  if (error instanceof ScannedFloorError || error instanceof GuardRootError) {
     console.error(error.message);
     process.exit(1);
   }

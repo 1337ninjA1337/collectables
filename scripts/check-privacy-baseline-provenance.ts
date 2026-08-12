@@ -53,6 +53,13 @@ import {
   type BaselineRevision,
 } from "../lib/privacy-baseline-provenance";
 import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
+import {
+  GUARD_ROOT_ENV,
+  GuardRootError,
+  PRIVACY_BASELINE_ROOT_ENV,
+  resolveGuardRoot,
+  type GuardRootResolution,
+} from "../lib/guard-root";
 
 const CHECK_NAME = "check-privacy-baseline-provenance";
 const BASELINE_MODULE = "lib/privacy-body-baselines.ts";
@@ -74,8 +81,30 @@ const BASELINE_MODULE = "lib/privacy-body-baselines.ts";
  * empty repository is a green build that checked nothing, which is the failure
  * mode this whole file was written against.
  */
-const REPO_ROOT_OVERRIDE = process.env.PRIVACY_BASELINE_REPO_ROOT || null;
-const REPO_ROOT = REPO_ROOT_OVERRIDE ?? path.join(__dirname, "..");
+/**
+ * Resolved at module load because `git()` closes over the root, so the throw
+ * a bad override produces has nowhere else to be caught. `PRIVACY_BASELINE_REPO_ROOT`
+ * keeps precedence over the fleet-wide `LINT_GUARD_REPO_ROOT`: an invocation
+ * that named this guard's own variable still means exactly what it used to.
+ */
+function resolveRootOrExit(): GuardRootResolution {
+  try {
+    return resolveGuardRoot(CHECK_NAME, path.join(__dirname, ".."), process.env, [
+      PRIVACY_BASELINE_ROOT_ENV,
+      GUARD_ROOT_ENV,
+    ]);
+  } catch (error) {
+    if (error instanceof GuardRootError) {
+      console.error(error.message);
+      process.exit(1);
+    }
+    throw error;
+  }
+}
+
+const ROOT = resolveRootOrExit();
+const REPO_ROOT = ROOT.root;
+const REPO_ROOT_OVERRIDE = ROOT.source === null ? null : ROOT.root;
 
 /**
  * stdout on success, null on any non-zero exit — callers decide what that
@@ -145,7 +174,7 @@ function resolveComparison(argv: readonly string[]): Comparison {
       reason: `${REPO_ROOT} is not a git work tree, so there is no history to compare against and every check below would skip. ${
         REPO_ROOT_OVERRIDE === null
           ? "Run this guard from a checkout, not from an exported copy of the sources."
-          : "PRIVACY_BASELINE_REPO_ROOT is set — point it at a repository or unset it."
+          : `${ROOT.source} is set — point it at a repository or unset it.`
       }`,
     };
   }
@@ -157,8 +186,7 @@ function resolveComparison(argv: readonly string[]): Comparison {
   if (REPO_ROOT_OVERRIDE !== null && (asked === null || !asked.strict)) {
     return {
       kind: "fail",
-      reason:
-        "PRIVACY_BASELINE_REPO_ROOT is set without an explicit base — pass --base <ref> (or set PRIVACY_BASELINE_BASE_REF). Falling through to HEAD~1 in a redirected repository compares this table against an unrelated commit.",
+      reason: `${ROOT.source} is set without an explicit base — pass --base <ref> (or set PRIVACY_BASELINE_BASE_REF). Falling through to HEAD~1 in a redirected repository compares this table against an unrelated commit.`,
     };
   }
   if (asked !== null) {
@@ -221,7 +249,7 @@ function changedFilesSince(ref: string): readonly string[] {
 function main(): void {
   if (REPO_ROOT_OVERRIDE !== null) {
     console.log(
-      `${CHECK_NAME}: history read from ${REPO_ROOT_OVERRIDE} (PRIVACY_BASELINE_REPO_ROOT is set) — the table itself still comes from this checkout.`,
+      `${CHECK_NAME}: history read from ${REPO_ROOT_OVERRIDE} (${ROOT.source} is set) — the table itself still comes from this checkout.`,
     );
   }
   const argv = process.argv.slice(2);

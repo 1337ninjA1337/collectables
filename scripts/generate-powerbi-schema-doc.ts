@@ -16,29 +16,35 @@ import * as path from "node:path";
 
 import { ANALYTICS_EVENT_NAMES } from "../lib/analytics-events";
 import { injectPowerbiSchemaBlock } from "../lib/powerbi-schema-doc";
+import { GuardRootError } from "../lib/guard-root";
 import {
   ScannedFloorError,
   assertParsedInputs,
   assertScannedFloor,
 } from "../lib/scanned-floor";
+import { asText, guardScanRoot, readTextInput } from "./guard-io";
 
 const CHECK_NAME = "generate-powerbi-schema-doc";
-const DOC_PATH = path.join(__dirname, "..", "docs", "powerbi-connection.md");
+const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
+const DOC_RELATIVE_PATH = "docs/powerbi-connection.md";
 
 function main(): void {
+  const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
+  const docPath = path.join(repoRoot, "docs", "powerbi-connection.md");
   const checkOnly = process.argv.includes("--check");
-  const current = fs.readFileSync(DOC_PATH, "utf8");
+  const current = readTextInput(docPath);
 
   // Both halves of the premise, because this guard compares two things and
   // either one being empty makes them agree. An empty taxonomy renders a
   // header-only table that matches a header-only doc, and "up to date" is
   // what a drift check prints when there is no schema left to drift.
-  assertParsedInputs(CHECK_NAME, { "docs/powerbi-connection.md": current });
+  assertParsedInputs(CHECK_NAME, { [DOC_RELATIVE_PATH]: current });
   assertScannedFloor(CHECK_NAME, ANALYTICS_EVENT_NAMES.length);
 
-  const regenerated = injectPowerbiSchemaBlock(current);
+  const doc = asText(current);
+  const regenerated = injectPowerbiSchemaBlock(doc);
 
-  if (regenerated === current) {
+  if (regenerated === doc) {
     console.log(
       `${CHECK_NAME}: docs/powerbi-connection.md is up to date (${ANALYTICS_EVENT_NAMES.length} taxonomy event(s) checked).`,
     );
@@ -53,14 +59,14 @@ function main(): void {
     process.exit(1);
   }
 
-  fs.writeFileSync(DOC_PATH, regenerated);
-  console.log(`${CHECK_NAME}: rewrote ${DOC_PATH}`);
+  fs.writeFileSync(docPath, regenerated);
+  console.log(`${CHECK_NAME}: rewrote ${docPath}`);
 }
 
 try {
   main();
 } catch (error) {
-  if (error instanceof ScannedFloorError) {
+  if (error instanceof ScannedFloorError || error instanceof GuardRootError) {
     console.error(error.message);
     process.exit(1);
   }

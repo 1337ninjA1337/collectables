@@ -13,8 +13,18 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      # Full history, not the default depth-1: `npm test` runs
+      # __tests__/lint-guard-premise.test.ts, which executes every LINT_GUARDS
+      # entry — including lint:baseline-provenance, which compares
+      # PRIVACY_BODY_BASELINES against its own previous revision and FAILS in a
+      # shallow clone (a pass that checked nothing is not a pass). ci.yml's test
+      # job has said so since the guard landed; this job runs the same suites and
+      # needs the same history. ci-history-depth.test.ts fails this file back if
+      # the depth is ever dropped.
+      - name: Checkout (full history)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Node 22, not 20: this job runs `npm test`, and every suite importing
       # __tests__/helpers/render.ts needs `module.registerHooks` (Node 22.15).
