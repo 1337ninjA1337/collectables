@@ -17,7 +17,9 @@ import {
   findClarityMaskViolations,
   formatClarityMaskReport,
 } from "../lib/check-clarity-input-mask";
+import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 
+const CHECK_NAME = "check-clarity-input-mask";
 const REPO_ROOT = path.join(__dirname, "..");
 const SCAN_DIRS = ["app", "components"];
 
@@ -40,11 +42,13 @@ function main(): void {
     }
   }
 
+  assertScannedFloor(CHECK_NAME, Object.keys(files).length);
+
   const violations = findClarityMaskViolations(files);
 
   if (violations.length === 0) {
     console.log(
-      `check-clarity-input-mask: ${Object.keys(files).length} file(s) scanned, every input masked.`,
+      `${CHECK_NAME}: ${Object.keys(files).length} file(s) scanned, every input masked.`,
     );
     return;
   }
@@ -53,4 +57,12 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  if (error instanceof ScannedFloorError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  throw error;
+}

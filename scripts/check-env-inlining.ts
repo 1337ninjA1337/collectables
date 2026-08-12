@@ -18,7 +18,9 @@ import {
   formatEnvInliningReport,
   type EnvInliningMatch,
 } from "../lib/env-inlining";
+import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 
+const CHECK_NAME = "check-env-inlining";
 const REPO_ROOT = path.join(__dirname, "..");
 const CONFIG_FILE_PATTERN = /-config\.ts$/;
 
@@ -34,6 +36,10 @@ function listConfigFiles(): string[] {
 function main(): void {
   const files = listConfigFiles();
 
+  // The narrowest scan in the fleet and the easiest to lose: `-config.ts` is
+  // a filename suffix, so one rename drops a resolver out of it silently.
+  assertScannedFloor(CHECK_NAME, files.length);
+
   const allMatches: EnvInliningMatch[] = [];
   for (const file of files) {
     const source = fs.readFileSync(file, "utf8");
@@ -43,7 +49,7 @@ function main(): void {
 
   if (allMatches.length === 0) {
     console.log(
-      `check-env-inlining: scanned ${files.length} file(s), no whole-process.env usages.`,
+      `${CHECK_NAME}: scanned ${files.length} file(s), no whole-process.env usages.`,
     );
     return;
   }
@@ -52,4 +58,12 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  if (error instanceof ScannedFloorError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  throw error;
+}

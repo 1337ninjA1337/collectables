@@ -16,7 +16,9 @@ import {
   EXPECTED_SENTRY_MAJOR,
   findSentryVersionIssues,
 } from "../lib/check-sentry-version";
+import { ScannedFloorError, assertParsedInputs } from "../lib/scanned-floor";
 
+const CHECK_NAME = "check-sentry-version";
 const REPO_ROOT = path.join(__dirname, "..");
 
 function main(): void {
@@ -27,6 +29,11 @@ function main(): void {
     fs.readFileSync(path.join(REPO_ROOT, "package-lock.json"), "utf8"),
   );
 
+  assertParsedInputs(CHECK_NAME, {
+    "package.json": pkg,
+    "package-lock.json": lock,
+  });
+
   const declaredRange = pkg.dependencies?.["@sentry/react-native"];
   const lockedVersion =
     lock.packages?.["node_modules/@sentry/react-native"]?.version;
@@ -35,7 +42,7 @@ function main(): void {
 
   if (issues.length === 0) {
     console.log(
-      `check-sentry-version: @sentry/react-native ${lockedVersion} (declared ${declaredRange}) stays on major ${EXPECTED_SENTRY_MAJOR}.`,
+      `${CHECK_NAME}: @sentry/react-native ${lockedVersion} (declared ${declaredRange}) stays on major ${EXPECTED_SENTRY_MAJOR}.`,
     );
     return;
   }
@@ -47,4 +54,12 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  if (error instanceof ScannedFloorError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  throw error;
+}

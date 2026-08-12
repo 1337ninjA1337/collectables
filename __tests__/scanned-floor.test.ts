@@ -7,12 +7,17 @@ import {
   DEFAULT_SCANNED_LABEL,
   SCANNED_FLOORS,
   ScannedFloorError,
+  assertParsedInputs,
   assertScanned,
   assertScannedFloor,
+  countFloorFor,
+  evaluateParsedInputs,
   evaluateScannedFloor,
   formatScannedFloorFailure,
+  isNonEmptyInput,
   scannedFloorFor,
 } from "../lib/scanned-floor";
+import { LINT_GUARDS } from "../lib/lint-guards";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 const read = (rel: string) => readFileSync(path.join(REPO_ROOT, rel), "utf8");
@@ -148,19 +153,117 @@ describe("assertScanned", () => {
   });
 });
 
+describe("isNonEmptyInput", () => {
+  it("rejects the shapes a file that read fine can still parse to", () => {
+    for (const empty of [null, undefined, "", "   ", [], {}]) {
+      assert.equal(isNonEmptyInput(empty), false, JSON.stringify(empty) ?? "undefined");
+    }
+  });
+
+  it("accepts anything carrying content, including falsy scalars", () => {
+    // A number or boolean cannot be "empty" — presence is the whole question,
+    // and treating 0 as empty would reject a legitimately-zero reading.
+    for (const full of [0, false, "x", [1], { a: 1 }]) {
+      assert.equal(isNonEmptyInput(full), true, JSON.stringify(full));
+    }
+  });
+});
+
+describe("evaluateParsedInputs", () => {
+  it("passes when every declared input is present and non-empty", () => {
+    assert.deepEqual(
+      evaluateParsedInputs(["a.json", "b.json"], { "a.json": { x: 1 }, "b.json": "text" }),
+      { ok: true },
+    );
+  });
+
+  it("ignores undeclared extras — the table names the minimum, not the maximum", () => {
+    assert.deepEqual(
+      evaluateParsedInputs(["a.json"], { "a.json": { x: 1 }, "z.json": {} }),
+      { ok: true },
+    );
+  });
+
+  it("fails a declared input the wrapper never handed over", () => {
+    const verdict = evaluateParsedInputs(["a.json", "b.json"], { "a.json": { x: 1 } });
+    assert.equal(verdict.ok, false);
+    if (verdict.ok) throw new Error("unreachable");
+    assert.equal(verdict.failure.code, "missing_input");
+    assert.equal(verdict.failure.input, "b.json");
+  });
+
+  it("fails an input that parsed to nothing — the quiet case for fixed readers", () => {
+    const verdict = evaluateParsedInputs(["app.json"], { "app.json": {} });
+    assert.equal(verdict.ok, false);
+    if (verdict.ok) throw new Error("unreachable");
+    assert.equal(verdict.failure.code, "empty_input");
+    assert.equal(verdict.failure.input, "app.json");
+  });
+
+  it("treats an explicit undefined as missing content, not as an absent key", () => {
+    const verdict = evaluateParsedInputs(["a.json"], { "a.json": undefined });
+    assert.equal(verdict.ok, false);
+    if (verdict.ok) throw new Error("unreachable");
+    assert.equal(verdict.failure.code, "empty_input");
+  });
+
+  it("fails an empty declaration — an inputs guard that names none checks none", () => {
+    const verdict = evaluateParsedInputs([], { "a.json": { x: 1 } });
+    assert.equal(verdict.ok, false);
+    if (verdict.ok) throw new Error("unreachable");
+    assert.equal(verdict.failure.code, "invalid_floor");
+  });
+
+  it("names the offending input in both messages", () => {
+    const missing = evaluateParsedInputs(["b.json"], {});
+    const empty = evaluateParsedInputs(["b.json"], { "b.json": "" });
+    assert.ok(!missing.ok && !empty.ok);
+    if (missing.ok || empty.ok) throw new Error("unreachable");
+    assert.match(
+      formatScannedFloorFailure("g", missing.failure),
+      /declared input "b\.json" was never handed/,
+    );
+    assert.match(
+      formatScannedFloorFailure("g", empty.failure),
+      /input "b\.json" is empty/,
+    );
+  });
+});
+
 describe("SCANNED_FLOORS", () => {
-  it("gives every entry a positive integer floor", () => {
-    for (const [name, floor] of Object.entries(SCANNED_FLOORS)) {
+  const entries = Object.entries(SCANNED_FLOORS);
+
+  it("gives every count entry a positive integer floor and a label", () => {
+    for (const [name, floor] of entries) {
+      if (!floor.count) continue;
       assert.ok(
-        Number.isInteger(floor.minimum) && floor.minimum >= 1,
+        Number.isInteger(floor.count.minimum) && floor.count.minimum >= 1,
         `${name} floor must be a positive integer`,
+      );
+      assert.ok(floor.count.label.length > 0, `${name} needs a label`);
+    }
+  });
+
+  it("gives every inputs entry at least one named input", () => {
+    for (const [name, floor] of entries) {
+      if (!floor.inputs) continue;
+      assert.ok(floor.inputs.length > 0, `${name} declares an empty input list`);
+    }
+  });
+
+  it("gives every entry a shape — none may declare nothing at all", () => {
+    for (const [name, floor] of entries) {
+      assert.ok(
+        floor.count || floor.inputs || floor.delegatedTo,
+        `${name} declares no premise of any kind, which is the hole this table closes`,
       );
     }
   });
 
-  it("gives every entry a note that says when it was measured", () => {
-    for (const [name, floor] of Object.entries(SCANNED_FLOORS)) {
-      assert.ok(floor.label.length > 0, `${name} needs a label`);
+  it("gives every entry a note, dated when it carries a measurement", () => {
+    for (const [name, floor] of entries) {
+      assert.ok(floor.note.length > 0, `${name} needs a note`);
+      if (!floor.count) continue;
       assert.match(
         floor.note,
         /\d{4}-\d{2}-\d{2}/,
@@ -169,17 +272,35 @@ describe("SCANNED_FLOORS", () => {
     }
   });
 
-  it("covers the two guards wired so far", () => {
-    assert.ok(SCANNED_FLOORS["check-inline-hex"]);
-    assert.ok(SCANNED_FLOORS["check-secrets"]);
+  it("covers every guard in the LINT_GUARDS registry, keyed by check name", () => {
+    // The key is the guard's OWN name, so derive it from the script path the
+    // registry already pins rather than from a second hand-kept list.
+    for (const guard of LINT_GUARDS) {
+      const checkName = guard.scriptPath.replace(/^scripts\//, "").replace(/\.ts$/, "");
+      assert.ok(
+        SCANNED_FLOORS[checkName],
+        `${guard.npmScript} (${checkName}) has no entry in SCANNED_FLOORS`,
+      );
+    }
+  });
+
+  it("declares no floor for a guard that is not in the registry", () => {
+    const registered = new Set(
+      LINT_GUARDS.map((g) =>
+        g.scriptPath.replace(/^scripts\//, "").replace(/\.ts$/, ""),
+      ),
+    );
+    for (const [name] of entries) {
+      assert.ok(registered.has(name), `${name} is a floor for a guard that does not exist`);
+    }
   });
 });
 
 describe("scannedFloorFor", () => {
   it("returns the committed floor by check name", () => {
     assert.equal(
-      scannedFloorFor("check-inline-hex").minimum,
-      SCANNED_FLOORS["check-inline-hex"].minimum,
+      scannedFloorFor("check-inline-hex").count?.minimum,
+      SCANNED_FLOORS["check-inline-hex"].count?.minimum,
     );
   });
 
@@ -192,12 +313,23 @@ describe("scannedFloorFor", () => {
   });
 });
 
+describe("countFloorFor", () => {
+  it("narrows a count-shaped entry", () => {
+    assert.equal(countFloorFor("check-secrets").minimum, 500);
+  });
+
+  it("throws rather than inventing a floor for an inputs-shaped guard", () => {
+    assert.throws(
+      () => countFloorFor("check-appstore-config"),
+      /declares no count floor/,
+    );
+  });
+});
+
 describe("assertScannedFloor", () => {
   it("applies the guard's own committed floor", () => {
-    const floor = SCANNED_FLOORS["check-secrets"];
-    assert.doesNotThrow(() =>
-      assertScannedFloor("check-secrets", floor.minimum),
-    );
+    const floor = countFloorFor("check-secrets");
+    assert.doesNotThrow(() => assertScannedFloor("check-secrets", floor.minimum));
     assert.throws(
       () => assertScannedFloor("check-secrets", floor.minimum - 1),
       ScannedFloorError,
@@ -205,54 +337,117 @@ describe("assertScannedFloor", () => {
   });
 });
 
-describe("the wrappers actually call it", () => {
-  const WIRED: ReadonlyArray<readonly [string, string]> = [
-    ["scripts/check-inline-hex.ts", "check-inline-hex"],
-    ["scripts/check-secrets.ts", "check-secrets"],
-  ];
+describe("assertParsedInputs", () => {
+  it("applies the guard's own declared inputs", () => {
+    assert.doesNotThrow(() =>
+      assertParsedInputs("check-sentry-version", {
+        "package.json": { name: "collectables" },
+        "package-lock.json": { packages: {} },
+      }),
+    );
+    assert.throws(
+      () =>
+        assertParsedInputs("check-sentry-version", {
+          "package.json": { name: "collectables" },
+        }),
+      ScannedFloorError,
+    );
+  });
 
-  for (const [scriptPath, checkName] of WIRED) {
-    it(`${scriptPath} asserts its floor and prints the failure without a stack`, () => {
-      const source = read(scriptPath);
-      assert.match(
-        source,
-        new RegExp(`assertScannedFloor\\(\\s*CHECK_NAME`),
-        `${scriptPath} must assert the floor after its walk`,
-      );
-      assert.match(
-        source,
-        /const CHECK_NAME = "([^"]+)"/,
-        `${scriptPath} must name itself once`,
-      );
-      const declared = /const CHECK_NAME = "([^"]+)"/.exec(source)?.[1];
+  it("throws rather than passing vacuously for a count-shaped guard", () => {
+    assert.throws(
+      () => assertParsedInputs("check-secrets", {}),
+      /declares no fixed inputs/,
+    );
+  });
+});
+
+describe("the wrappers actually call it", () => {
+  /** Every registry guard, with the script that runs it. */
+  const WIRED = LINT_GUARDS.map((guard) => ({
+    scriptPath: guard.scriptPath,
+    checkName: guard.scriptPath.replace(/^scripts\//, "").replace(/\.ts$/, ""),
+    floor: SCANNED_FLOORS[
+      guard.scriptPath.replace(/^scripts\//, "").replace(/\.ts$/, "")
+    ],
+  }));
+
+  for (const { scriptPath, checkName, floor } of WIRED) {
+    it(`${scriptPath} names itself once, with the name its floor is keyed by`, () => {
+      const declared = /const CHECK_NAME = "([^"]+)"/.exec(read(scriptPath))?.[1];
       assert.equal(
         declared,
         checkName,
         "the name in the report and the SCANNED_FLOORS key have to be the same string",
       );
+    });
+
+    if (floor?.delegatedTo) {
+      it(`${scriptPath} enforces its premise where the table says it does`, () => {
+        // The one guard that keeps its own refusal; the table names where.
+        assert.match(floor.delegatedTo!, /\S/);
+        assert.doesNotMatch(read(scriptPath), /assertScannedFloor\(/);
+      });
+      continue;
+    }
+
+    it(`${scriptPath} asserts its floor and prints the failure without a stack`, () => {
+      const source = read(scriptPath);
+      if (floor?.count) {
+        assert.match(
+          source,
+          /assertScannedFloor\(\s*CHECK_NAME/,
+          `${scriptPath} must assert its count floor`,
+        );
+      }
+      if (floor?.inputs) {
+        assert.match(
+          source,
+          /assertParsedInputs\(\s*CHECK_NAME/,
+          `${scriptPath} must assert its declared inputs`,
+        );
+        for (const input of floor.inputs) {
+          assert.ok(
+            source.includes(`"${input}"`),
+            `${scriptPath} declares "${input}" but never hands it over under that name`,
+          );
+        }
+      }
       assert.match(
         source,
         /error instanceof ScannedFloorError/,
         `${scriptPath} must catch the floor error and exit 1 itself`,
       );
     });
-
-    it(`${checkName} has a committed floor in SCANNED_FLOORS`, () => {
-      assert.ok(SCANNED_FLOORS[checkName]);
-    });
   }
 
-  it("asserts the floor BEFORE reporting a clean scan", () => {
+  it("asserts the premise BEFORE reporting a clean run, in every wrapper", () => {
     // Order is the whole point: a floor checked after the "no findings"
     // early return never runs on the run that needed it.
-    for (const [scriptPath] of WIRED) {
+    for (const { scriptPath, floor } of WIRED) {
+      if (floor?.delegatedTo) continue;
       const source = read(scriptPath);
-      const assertAt = source.indexOf("assertScannedFloor(");
-      const reportAt = source.indexOf("scanned ${files.length}");
-      assert.ok(assertAt > 0 && reportAt > 0);
+      const assertAt = Math.min(
+        ...[source.indexOf("assertScannedFloor("), source.indexOf("assertParsedInputs(")]
+          .filter((i) => i >= 0),
+      );
+      const reportAt = source.indexOf("console.log(");
+      assert.ok(assertAt > 0, `${scriptPath} asserts nothing`);
+      assert.ok(reportAt > 0, `${scriptPath} prints nothing`);
       assert.ok(
         assertAt < reportAt,
-        `${scriptPath} asserts its floor after it prints the pass line`,
+        `${scriptPath} asserts its premise after it prints the pass line`,
+      );
+    }
+  });
+
+  it("catches the floor error in every wrapper that can throw one", () => {
+    for (const { scriptPath, floor } of WIRED) {
+      if (floor?.delegatedTo) continue;
+      assert.match(
+        read(scriptPath),
+        /if \(error instanceof ScannedFloorError\) \{\s*console\.error\(error\.message\);\s*process\.exit\(1\);/,
+        `${scriptPath} must turn the floor error into one line and exit 1`,
       );
     }
   });

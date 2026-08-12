@@ -16,7 +16,9 @@ import {
   formatRadiusReport,
   type RadiusMatch,
 } from "../lib/check-inline-radius";
+import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 
+const CHECK_NAME = "check-inline-radius";
 const REPO_ROOT = path.join(__dirname, "..");
 const SCANNED_DIRS = ["app", "components"] as const;
 const SOURCE_FILE_PATTERN = /\.tsx?$/;
@@ -36,6 +38,10 @@ function main(): void {
     listSourceFiles(path.join(REPO_ROOT, dir)),
   );
 
+  // A walk that lost a scan root reports "no inline geometry literals" in
+  // exactly the same words as a walk that read everything.
+  assertScannedFloor(CHECK_NAME, files.length);
+
   const allMatches: RadiusMatch[] = [];
   for (const file of files) {
     const source = fs.readFileSync(file, "utf8");
@@ -45,7 +51,7 @@ function main(): void {
 
   if (allMatches.length === 0) {
     console.log(
-      `check-inline-radius: scanned ${files.length} file(s), no inline geometry literals.`,
+      `${CHECK_NAME}: scanned ${files.length} file(s), no inline geometry literals.`,
     );
     return;
   }
@@ -54,4 +60,12 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  if (error instanceof ScannedFloorError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  throw error;
+}

@@ -14,13 +14,28 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { ANALYTICS_EVENT_NAMES } from "../lib/analytics-events";
 import { injectPowerbiSchemaBlock } from "../lib/powerbi-schema-doc";
+import {
+  ScannedFloorError,
+  assertParsedInputs,
+  assertScannedFloor,
+} from "../lib/scanned-floor";
 
+const CHECK_NAME = "generate-powerbi-schema-doc";
 const DOC_PATH = path.join(__dirname, "..", "docs", "powerbi-connection.md");
 
 function main(): void {
   const checkOnly = process.argv.includes("--check");
   const current = fs.readFileSync(DOC_PATH, "utf8");
+
+  // Both halves of the premise, because this guard compares two things and
+  // either one being empty makes them agree. An empty taxonomy renders a
+  // header-only table that matches a header-only doc, and "up to date" is
+  // what a drift check prints when there is no schema left to drift.
+  assertParsedInputs(CHECK_NAME, { "docs/powerbi-connection.md": current });
+  assertScannedFloor(CHECK_NAME, ANALYTICS_EVENT_NAMES.length);
+
   const regenerated = injectPowerbiSchemaBlock(current);
 
   if (regenerated === current) {
@@ -37,7 +52,15 @@ function main(): void {
   }
 
   fs.writeFileSync(DOC_PATH, regenerated);
-  console.log(`generate-powerbi-schema-doc: rewrote ${DOC_PATH}`);
+  console.log(`${CHECK_NAME}: rewrote ${DOC_PATH}`);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  if (error instanceof ScannedFloorError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  throw error;
+}

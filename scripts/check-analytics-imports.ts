@@ -14,7 +14,9 @@ import {
   formatAnalyticsImportReport,
   type AnalyticsImportMatch,
 } from "../lib/check-analytics-imports";
+import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 
+const CHECK_NAME = "check-analytics-imports";
 const REPO_ROOT = path.join(__dirname, "..");
 const SCANNED_DIRS = ["app", "components"] as const;
 const SOURCE_FILE_PATTERN = /\.tsx?$/;
@@ -34,6 +36,8 @@ function main(): void {
     listSourceFiles(path.join(REPO_ROOT, dir)),
   );
 
+  assertScannedFloor(CHECK_NAME, files.length);
+
   const allMatches: AnalyticsImportMatch[] = [];
   for (const file of files) {
     const source = fs.readFileSync(file, "utf8");
@@ -43,7 +47,7 @@ function main(): void {
 
   if (allMatches.length === 0) {
     console.log(
-      `check-analytics-imports: scanned ${files.length} file(s), no direct lib/analytics-events imports.`,
+      `${CHECK_NAME}: scanned ${files.length} file(s), no direct lib/analytics-events imports.`,
     );
     return;
   }
@@ -52,4 +56,12 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  if (error instanceof ScannedFloorError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  throw error;
+}

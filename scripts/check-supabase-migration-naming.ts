@@ -16,7 +16,9 @@ import {
   findMigrationNamingIssues,
   formatMigrationNamingReport,
 } from "../lib/check-migration-naming";
+import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 
+const CHECK_NAME = "check-supabase-migration-naming";
 const REPO_ROOT = path.join(__dirname, "..");
 const MIGRATIONS_DIR = path.join(REPO_ROOT, "supabase", "migrations");
 const MANUAL_TASKS = path.join(REPO_ROOT, "MANUAL-TASKS.md");
@@ -25,6 +27,8 @@ function main(): void {
   const migrationFilenames = fs.readdirSync(MIGRATIONS_DIR);
   const manualTasksContent = fs.readFileSync(MANUAL_TASKS, "utf8");
 
+  assertScannedFloor(CHECK_NAME, migrationFilenames.length);
+
   const issues = findMigrationNamingIssues({
     migrationFilenames,
     manualTasksContent,
@@ -32,7 +36,7 @@ function main(): void {
 
   if (issues.length === 0) {
     console.log(
-      `check-supabase-migration-naming: ${migrationFilenames.length} migration(s) all well-named and documented.`,
+      `${CHECK_NAME}: ${migrationFilenames.length} migration(s) all well-named and documented.`,
     );
     return;
   }
@@ -41,4 +45,12 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  if (error instanceof ScannedFloorError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  throw error;
+}

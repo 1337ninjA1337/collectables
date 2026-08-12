@@ -18,12 +18,19 @@ import {
   formatAppstoreConfigReport,
   REQUIRED_INFO_PLIST_KEYS,
 } from "../lib/check-appstore-config";
+import { ScannedFloorError, assertParsedInputs } from "../lib/scanned-floor";
 
+const CHECK_NAME = "check-appstore-config";
 const REPO_ROOT = path.join(__dirname, "..");
 const APP_JSON = path.join(REPO_ROOT, "app.json");
 
 function main(): void {
   const appJson = JSON.parse(fs.readFileSync(APP_JSON, "utf8"));
+
+  // readFileSync throws on a missing app.json; the quiet case is one that
+  // parses to {} and makes every required-key check report a consequence
+  // instead of the cause.
+  assertParsedInputs(CHECK_NAME, { "app.json": appJson });
 
   const issues = findAppstoreConfigIssues({
     appJson,
@@ -32,7 +39,7 @@ function main(): void {
 
   if (issues.length === 0) {
     console.log(
-      `check-appstore-config: app.json iOS block OK (bundleIdentifier + ${REQUIRED_INFO_PLIST_KEYS.length} required infoPlist keys).`,
+      `${CHECK_NAME}: app.json iOS block OK (bundleIdentifier + ${REQUIRED_INFO_PLIST_KEYS.length} required infoPlist keys).`,
     );
     return;
   }
@@ -41,4 +48,12 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  if (error instanceof ScannedFloorError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  throw error;
+}

@@ -15,7 +15,9 @@ import {
   findUndocumentedMigrations,
   formatMigrationDocsReport,
 } from "../lib/check-migration-docs";
+import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 
+const CHECK_NAME = "check-migration-docs";
 const REPO_ROOT = path.join(__dirname, "..");
 const MIGRATIONS_DIR = path.join(REPO_ROOT, "supabase", "migrations");
 const MANUAL_TASKS = path.join(REPO_ROOT, "MANUAL-TASKS.md");
@@ -26,6 +28,10 @@ function main(): void {
     .filter((f) => f.endsWith(".sql"));
   const manualTasksContent = fs.readFileSync(MANUAL_TASKS, "utf8");
 
+  // Migrations are append-only: a count under the floor means the directory
+  // moved, not that migrations were deleted.
+  assertScannedFloor(CHECK_NAME, migrationFilenames.length);
+
   const undocumented = findUndocumentedMigrations(
     migrationFilenames,
     manualTasksContent,
@@ -33,7 +39,7 @@ function main(): void {
 
   if (undocumented.length === 0) {
     console.log(
-      `check-migration-docs: ${migrationFilenames.length} migration(s) all documented in MANUAL-TASKS.md.`,
+      `${CHECK_NAME}: ${migrationFilenames.length} migration(s) all documented in MANUAL-TASKS.md.`,
     );
     return;
   }
@@ -42,4 +48,12 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  if (error instanceof ScannedFloorError) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  throw error;
+}
