@@ -42,7 +42,7 @@ function main(): void {
 
   if (issues.length === 0) {
     console.log(
-      `${CHECK_NAME}: @sentry/react-native ${lockedVersion} (declared ${declaredRange}) stays on major ${EXPECTED_SENTRY_MAJOR}.`,
+      `${CHECK_NAME}: @sentry/react-native ${lockedVersion} (declared ${declaredRange}) stays on major ${EXPECTED_SENTRY_MAJOR}, read from package.json + package-lock.json.`,
     );
     return;
   }

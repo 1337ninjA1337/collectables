@@ -39,7 +39,9 @@ function main(): void {
   const regenerated = injectPowerbiSchemaBlock(current);
 
   if (regenerated === current) {
-    console.log("generate-powerbi-schema-doc: docs/powerbi-connection.md is up to date");
+    console.log(
+      `${CHECK_NAME}: docs/powerbi-connection.md is up to date (${ANALYTICS_EVENT_NAMES.length} taxonomy event(s) checked).`,
+    );
     return;
   }
 
