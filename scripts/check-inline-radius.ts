@@ -16,16 +16,18 @@ import {
   formatRadiusReport,
   type RadiusMatch,
 } from "../lib/check-inline-radius";
+import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import { guardScanRoot, listDirEntries } from "./guard-io";
 
 const CHECK_NAME = "check-inline-radius";
-const REPO_ROOT = path.join(__dirname, "..");
+const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
 const SCANNED_DIRS = ["app", "components"] as const;
 const SOURCE_FILE_PATTERN = /\.tsx?$/;
 
 function listSourceFiles(dir: string): string[] {
   const out: string[] = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  for (const entry of listDirEntries(dir)) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...listSourceFiles(full));
     else if (SOURCE_FILE_PATTERN.test(entry.name)) out.push(full);
@@ -34,8 +36,9 @@ function listSourceFiles(dir: string): string[] {
 }
 
 function main(): void {
+  const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
   const files = SCANNED_DIRS.flatMap((dir) =>
-    listSourceFiles(path.join(REPO_ROOT, dir)),
+    listSourceFiles(path.join(repoRoot, dir)),
   );
 
   // A walk that lost a scan root reports "no inline geometry literals" in
@@ -45,7 +48,7 @@ function main(): void {
   const allMatches: RadiusMatch[] = [];
   for (const file of files) {
     const source = fs.readFileSync(file, "utf8");
-    const rel = path.relative(REPO_ROOT, file);
+    const rel = path.relative(repoRoot, file);
     allMatches.push(...findInlineRadiusLiterals(rel, source));
   }
 
@@ -63,7 +66,7 @@ function main(): void {
 try {
   main();
 } catch (error) {
-  if (error instanceof ScannedFloorError) {
+  if (error instanceof ScannedFloorError || error instanceof GuardRootError) {
     console.error(error.message);
     process.exit(1);
   }

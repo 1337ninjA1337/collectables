@@ -19,21 +19,17 @@ import {
   formatHexReport,
   type HexMatch,
 } from "../lib/check-inline-hex";
+import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import { guardScanRoot, listDirEntries } from "./guard-io";
 
 const CHECK_NAME = "check-inline-hex";
-const REPO_ROOT = path.join(__dirname, "..");
+const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
 const SCAN_ROOTS = ["app", "components", "lib"];
 const SOURCE_FILE_PATTERN = /\.tsx?$/;
 
 function walkSources(dir: string, out: string[]): void {
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
+  for (const entry of listDirEntries(dir)) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       walkSources(full, out);
@@ -44,9 +40,10 @@ function walkSources(dir: string, out: string[]): void {
 }
 
 function main(): void {
+  const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
   const files: string[] = [];
   for (const root of SCAN_ROOTS) {
-    walkSources(path.join(REPO_ROOT, root), files);
+    walkSources(path.join(repoRoot, root), files);
   }
   files.sort();
 
@@ -57,7 +54,7 @@ function main(): void {
   const allMatches: HexMatch[] = [];
   for (const file of files) {
     const source = fs.readFileSync(file, "utf8");
-    const rel = path.relative(REPO_ROOT, file);
+    const rel = path.relative(repoRoot, file);
     allMatches.push(...findInlineHexLiterals(rel, source));
   }
 
@@ -81,7 +78,7 @@ try {
 } catch (error) {
   // The floor failure is a guard result, not a crash — print the one line,
   // not a stack trace pointing at a helper the reader did not call.
-  if (error instanceof ScannedFloorError) {
+  if (error instanceof ScannedFloorError || error instanceof GuardRootError) {
     console.error(error.message);
     process.exit(1);
   }

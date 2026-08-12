@@ -15,7 +15,9 @@ import {
   evaluateScannedFloor,
   formatScannedFloorFailure,
   isNonEmptyInput,
+  isUnreadableInput,
   scannedFloorFor,
+  unreadableInput,
 } from "../lib/scanned-floor";
 import { LINT_GUARDS } from "../lib/lint-guards";
 
@@ -212,6 +214,32 @@ describe("evaluateParsedInputs", () => {
     assert.equal(verdict.ok, false);
     if (verdict.ok) throw new Error("unreachable");
     assert.equal(verdict.failure.code, "invalid_floor");
+  });
+
+  it("separates a file it could not read from one it never handed over", () => {
+    // Both used to be `missing_input`, which reads as a wiring bug and hides
+    // the ordinary cause: the scan root no longer holds the file.
+    const verdict = evaluateParsedInputs(["app.json"], {
+      "app.json": unreadableInput("ENOENT"),
+    });
+    assert.equal(verdict.ok, false);
+    if (verdict.ok) throw new Error("unreachable");
+    assert.equal(verdict.failure.code, "unreadable_input");
+    assert.equal(verdict.failure.reason, "ENOENT");
+    assert.match(
+      formatScannedFloorFailure("g", verdict.failure),
+      /input "app\.json" could not be read \(ENOENT\)/,
+    );
+  });
+
+  it("does not read the unreadable marker as content just because it is an object", () => {
+    // isNonEmptyInput answers true for any object with keys, so the marker
+    // has to be checked before it.
+    assert.equal(isUnreadableInput(unreadableInput("EACCES")), true);
+    assert.equal(isUnreadableInput({ unreadableInput: false }), false);
+    assert.equal(isUnreadableInput({ a: 1 }), false);
+    assert.equal(isUnreadableInput(null), false);
+    assert.equal(isUnreadableInput("ENOENT"), false);
   });
 
   it("names the offending input in both messages", () => {
@@ -446,8 +474,8 @@ describe("the wrappers actually call it", () => {
       if (floor?.delegatedTo) continue;
       assert.match(
         read(scriptPath),
-        /if \(error instanceof ScannedFloorError\) \{\s*console\.error\(error\.message\);\s*process\.exit\(1\);/,
-        `${scriptPath} must turn the floor error into one line and exit 1`,
+        /if \(error instanceof ScannedFloorError \|\| error instanceof GuardRootError\) \{\s*console\.error\(error\.message\);\s*process\.exit\(1\);/,
+        `${scriptPath} must turn BOTH premise failures — the floor and a bad scan-root override — into one line and exit 1`,
       );
     }
   });

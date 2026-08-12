@@ -39,6 +39,8 @@ export type ScannedFloorFailureCode =
   | "invalid_floor"
   /** A declared fixed input was never handed over by the wrapper. */
   | "missing_input"
+  /** A declared fixed input could not be read or parsed at all. */
+  | "unreadable_input"
   /** A declared fixed input parsed, but to nothing worth checking. */
   | "empty_input";
 
@@ -50,8 +52,10 @@ export type ScannedFloorFailure = {
   readonly minimum: number;
   /** Plural noun for what was counted, e.g. `"source file"`. */
   readonly label: string;
-  /** Set for the two input codes: which declared input went wrong. */
+  /** Set for the three input codes: which declared input went wrong. */
   readonly input?: string;
+  /** Set for `unreadable_input`: what the filesystem or parser said. */
+  readonly reason?: string;
 };
 
 export type ScannedFloorVerdict =
@@ -106,6 +110,8 @@ const FAILURE_MESSAGE: Record<
     `floor of ${f.minimum} is not a positive integer — a floor below 1 passes over an empty walk, which is the failure it is supposed to catch. ${REMEASURE_HINT}`,
   missing_input: (f) =>
     `declared input "${f.input}" was never handed to the floor check — the guard says it reads it, and this run did not. ${REMEASURE_HINT}`,
+  unreadable_input: (f) =>
+    `declared input "${f.input}" could not be read (${f.reason ?? "no reason given"}) — the guard proves a negative about a file it never opened, and every check against it would find nothing to complain about. Check the scan root still holds it.`,
   empty_input: (f) =>
     `input "${f.input}" is empty — it was read, so nothing crashed, and every check against it then found nothing to complain about. That is not a pass.`,
 };
@@ -178,6 +184,33 @@ export type ScannedFloor = {
   readonly note: string;
 };
 
+/**
+ * What a wrapper hands over for an input it tried to read and could not.
+ *
+ * Without it the two failures collapse: a wrapper that drops the key reports
+ * `missing_input` ("this run did not read it"), which is also what an absent
+ * FILE would produce, and the reader cannot tell a wiring bug from a moved
+ * file. With it, the message names the errno.
+ */
+export type UnreadableInput = {
+  readonly unreadableInput: true;
+  /** Errno, parser message — whatever the wrapper caught. */
+  readonly reason: string;
+};
+
+/** Marker constructor; see {@link UnreadableInput}. */
+export function unreadableInput(reason: string): UnreadableInput {
+  return { unreadableInput: true, reason };
+}
+
+export function isUnreadableInput(value: unknown): value is UnreadableInput {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { unreadableInput?: unknown }).unreadableInput === true
+  );
+}
+
 /** True when a parsed input carries something worth checking. */
 export function isNonEmptyInput(value: unknown): boolean {
   if (value === null || value === undefined) return false;
@@ -216,7 +249,21 @@ export function evaluateParsedInputs(
         },
       };
     }
-    if (!isNonEmptyInput(values[name])) {
+    const value = values[name];
+    if (isUnreadableInput(value)) {
+      return {
+        ok: false,
+        failure: {
+          code: "unreadable_input",
+          count: 0,
+          minimum: declared.length,
+          label: "input",
+          input: name,
+          reason: value.reason,
+        },
+      };
+    }
+    if (!isNonEmptyInput(value)) {
       return {
         ok: false,
         failure: {
@@ -270,11 +317,13 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
   },
   "check-migration-docs": {
     count: { label: "migration", minimum: 18 },
-    note: "supabase/migrations held 25 .sql files on 2026-08-12; migrations are append-only, so this floor only ever needs raising — a count BELOW it means the directory moved, not that migrations were deleted.",
+    inputs: ["MANUAL-TASKS.md"],
+    note: "supabase/migrations held 25 .sql files on 2026-08-12; migrations are append-only, so this floor only ever needs raising — a count BELOW it means the directory moved, not that migrations were deleted. MANUAL-TASKS.md is the other half of the comparison: an empty one makes every migration undocumented (a loud, correct failure), and an unreadable one used to be an ENOENT stack.",
   },
   "check-supabase-migration-naming": {
     count: { label: "migration", minimum: 18 },
-    note: "the same 25-file directory read without the .sql filter on 2026-08-12; append-only for the same reason.",
+    inputs: ["MANUAL-TASKS.md"],
+    note: "the same 25-file directory read without the .sql filter on 2026-08-12; append-only for the same reason. Same MANUAL-TASKS.md input as check-migration-docs, for the same reason.",
   },
   "check-appstore-config": {
     inputs: ["app.json"],

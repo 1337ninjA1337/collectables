@@ -8,33 +8,47 @@
  * unit-tested under `node --test` without touching the filesystem.
  */
 
-import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
   findUndocumentedMigrations,
   formatMigrationDocsReport,
 } from "../lib/check-migration-docs";
-import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import { GuardRootError } from "../lib/guard-root";
+import {
+  ScannedFloorError,
+  assertParsedInputs,
+  assertScannedFloor,
+} from "../lib/scanned-floor";
+import {
+  asText,
+  guardScanRoot,
+  listDirNames,
+  readTextInput,
+} from "./guard-io";
 
 const CHECK_NAME = "check-migration-docs";
-const REPO_ROOT = path.join(__dirname, "..");
-const MIGRATIONS_DIR = path.join(REPO_ROOT, "supabase", "migrations");
-const MANUAL_TASKS = path.join(REPO_ROOT, "MANUAL-TASKS.md");
+const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
 
 function main(): void {
-  const migrationFilenames = fs
-    .readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith(".sql"));
-  const manualTasksContent = fs.readFileSync(MANUAL_TASKS, "utf8");
+  const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
+  const migrationFilenames = listDirNames(
+    path.join(repoRoot, "supabase", "migrations"),
+  ).filter((f) => f.endsWith(".sql"));
 
   // Migrations are append-only: a count under the floor means the directory
-  // moved, not that migrations were deleted.
+  // moved, not that migrations were deleted. Asserted before MANUAL-TASKS.md
+  // is read, so a scan root that holds neither fails on the cause.
   assertScannedFloor(CHECK_NAME, migrationFilenames.length);
+
+  const manualTasksContent = readTextInput(
+    path.join(repoRoot, "MANUAL-TASKS.md"),
+  );
+  assertParsedInputs(CHECK_NAME, { "MANUAL-TASKS.md": manualTasksContent });
 
   const undocumented = findUndocumentedMigrations(
     migrationFilenames,
-    manualTasksContent,
+    asText(manualTasksContent),
   );
 
   if (undocumented.length === 0) {
@@ -51,7 +65,7 @@ function main(): void {
 try {
   main();
 } catch (error) {
-  if (error instanceof ScannedFloorError) {
+  if (error instanceof ScannedFloorError || error instanceof GuardRootError) {
     console.error(error.message);
     process.exit(1);
   }

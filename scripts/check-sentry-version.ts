@@ -9,34 +9,38 @@
  * under `node --test` without touching the filesystem.
  */
 
-import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
   EXPECTED_SENTRY_MAJOR,
   findSentryVersionIssues,
 } from "../lib/check-sentry-version";
+import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertParsedInputs } from "../lib/scanned-floor";
+import { guardScanRoot, readJsonInput } from "./guard-io";
 
 const CHECK_NAME = "check-sentry-version";
-const REPO_ROOT = path.join(__dirname, "..");
+const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
 
 function main(): void {
-  const pkg = JSON.parse(
-    fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf8"),
-  );
-  const lock = JSON.parse(
-    fs.readFileSync(path.join(REPO_ROOT, "package-lock.json"), "utf8"),
-  );
+  const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
+  const pkg = readJsonInput(path.join(repoRoot, "package.json"));
+  const lock = readJsonInput(path.join(repoRoot, "package-lock.json"));
 
   assertParsedInputs(CHECK_NAME, {
     "package.json": pkg,
     "package-lock.json": lock,
   });
 
-  const declaredRange = pkg.dependencies?.["@sentry/react-native"];
+  const manifest = pkg as {
+    dependencies?: Record<string, string | undefined>;
+  };
+  const lockfile = lock as {
+    packages?: Record<string, { version?: string } | undefined>;
+  };
+  const declaredRange = manifest.dependencies?.["@sentry/react-native"];
   const lockedVersion =
-    lock.packages?.["node_modules/@sentry/react-native"]?.version;
+    lockfile.packages?.["node_modules/@sentry/react-native"]?.version;
 
   const issues = findSentryVersionIssues({ declaredRange, lockedVersion });
 
@@ -57,7 +61,7 @@ function main(): void {
 try {
   main();
 } catch (error) {
-  if (error instanceof ScannedFloorError) {
+  if (error instanceof ScannedFloorError || error instanceof GuardRootError) {
     console.error(error.message);
     process.exit(1);
   }

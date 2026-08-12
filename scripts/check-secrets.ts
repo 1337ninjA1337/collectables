@@ -17,10 +17,12 @@ import {
   scanForSecrets,
   type SecretMatch,
 } from "../lib/secret-scan";
+import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import { guardScanRoot, listDirEntries } from "./guard-io";
 
 const CHECK_NAME = "check-secrets";
-const REPO_ROOT = path.join(__dirname, "..");
+const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
 
 /** Directories never worth scanning (build output, deps, vcs metadata). */
 const SKIP_DIRS = new Set([
@@ -65,21 +67,15 @@ const SKIP_FILES = new Set(
   ].map((p) => path.normalize(p)),
 );
 
-function walk(dir: string, out: string[]): void {
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
+function walk(repoRoot: string, dir: string, out: string[]): void {
+  for (const entry of listDirEntries(dir)) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
-      walk(full, out);
+      walk(repoRoot, full, out);
     } else if (entry.isFile()) {
       const ext = path.extname(entry.name);
-      const rel = path.relative(REPO_ROOT, full);
+      const rel = path.relative(repoRoot, full);
       if (!SCAN_EXTENSIONS.has(ext)) continue;
       if (SKIP_FILES.has(path.normalize(rel))) continue;
       out.push(full);
@@ -88,8 +84,9 @@ function walk(dir: string, out: string[]): void {
 }
 
 function main(): void {
+  const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
   const files: string[] = [];
-  walk(REPO_ROOT, files);
+  walk(repoRoot, repoRoot, files);
   files.sort();
 
   // "scanned 0 file(s), no committed secrets" is the report an unreadable
@@ -104,7 +101,7 @@ function main(): void {
     } catch {
       continue;
     }
-    const rel = path.relative(REPO_ROOT, file);
+    const rel = path.relative(repoRoot, file);
     matches.push(...scanForSecrets(rel, source));
   }
 
@@ -122,7 +119,7 @@ function main(): void {
 try {
   main();
 } catch (error) {
-  if (error instanceof ScannedFloorError) {
+  if (error instanceof ScannedFloorError || error instanceof GuardRootError) {
     console.error(error.message);
     process.exit(1);
   }
