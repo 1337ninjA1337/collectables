@@ -268,6 +268,22 @@ const PROBLEM_DETAIL: Record<ScannedFloorProblemCode, string> = {
     "carries a count floor whose note names no date — an undated measurement is a magic constant with prose around it",
 };
 
+/**
+ * The sentence this table gives one problem code.
+ *
+ * `PROBLEM_DETAIL` stays private — it is a record a caller could iterate and
+ * reformat — but the sentences themselves are what guards print, so a test
+ * asserting what a refusal SAYS should read them from here rather than re-type
+ * a fragment. A hand-copied clause drifts silently the first time a sentence
+ * is reworded, and turns into a failing assertion in a file that has nothing
+ * to do with the rewording.
+ */
+export function scannedFloorProblemDetail(
+  code: ScannedFloorProblemCode,
+): string {
+  return PROBLEM_DETAIL[code];
+}
+
 const MEASUREMENT_DATE = /\d{4}-\d{2}-\d{2}/;
 
 /** The structural problems with one entry, in declaration order. Empty when sound. */

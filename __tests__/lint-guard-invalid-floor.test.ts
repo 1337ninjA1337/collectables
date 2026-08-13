@@ -29,7 +29,10 @@ import assert from "node:assert/strict";
 import * as path from "node:path";
 
 import { LINT_GUARDS } from "../lib/lint-guards";
-import type { ScannedFloorProblemCode } from "../lib/scanned-floor";
+import {
+  scannedFloorProblemDetail,
+  type ScannedFloorProblemCode,
+} from "../lib/scanned-floor";
 import {
   assertNoStackTrace,
   checkNameOf,
@@ -77,7 +80,25 @@ function entryPatch(
     const open = `  "${checkName}": {`;
     const start = source.indexOf(open);
     assert.ok(start >= 0, `${checkName} has no entry in ${FLOOR_MODULE}`);
-    const end = source.indexOf("\n  },", start);
+    // Braces are counted from the opening one rather than scanning for the
+    // first `\n  },`. No entry nests today, so the two agree — and the day one
+    // does, the shortcut ends the slice early, the rewrite lands in the wrong
+    // half, and `runPatched`'s no-op check waves it through because the patch
+    // did change SOMETHING. The fixture's parse should be a fact about the
+    // text, not an assumption about the table's current formatting.
+    let depth = 0;
+    let end = -1;
+    for (let i = start + open.length - 1; i < source.length; i += 1) {
+      const char = source[i];
+      if (char === "{") depth += 1;
+      else if (char === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
     assert.ok(end > start, `${checkName}'s entry in ${FLOOR_MODULE} never closes`);
     const entry = source.slice(start, end);
     const rewritten = rewrite(entry);
@@ -103,8 +124,6 @@ type ProblemCase = {
   /** The guard whose entry is broken — and the guard that must refuse. */
   readonly checkName: string;
   readonly rewrite: (entry: string) => string;
-  /** A fragment of the sentence `PROBLEM_DETAIL` gives this code. */
-  readonly says: RegExp;
   /** Codes the rewrite must NOT also trip, where confusion is plausible. */
   readonly notAlso?: readonly RegExp[];
 };
@@ -115,27 +134,23 @@ const CASES: Record<ProblemCodeKey, ProblemCase> = {
   invalid_minimum: {
     checkName: "check-inline-hex",
     rewrite: (entry) => entry.replace(/minimum: 160/, "minimum: 0"),
-    says: /not a positive integer/,
   },
   // The label is the noun the failure line uses ("scanned 3 source file(s)");
   // without it the refusal names no unit for what it counted.
   empty_label: {
     checkName: "check-inline-hex",
     rewrite: (entry) => entry.replace(/label: "source file"/, 'label: ""'),
-    says: /no label/,
   },
   // An entry that declares nothing is the exact hole the table exists to
   // close: a guard nobody has to think about, listed as though covered.
   no_shape: {
     checkName: "check-appstore-config",
     rewrite: (entry) => entry.replace(/\n\s*inputs: \[[^\]]*\],/, ""),
-    says: /no premise of any kind/,
   },
   // An empty list makes the inputs assertion pass without reading anything.
   empty_inputs: {
     checkName: "check-appstore-config",
     rewrite: (entry) => entry.replace(/inputs: \[[^\]]*\]/, "inputs: []"),
-    says: /empty input list/,
     // The codes for a real file going wrong; this run has no file to blame.
     notAlso: [/was never handed to the floor check/, /is empty — it was read/],
   },
@@ -143,7 +158,6 @@ const CASES: Record<ProblemCodeKey, ProblemCase> = {
   blank_input: {
     checkName: "check-appstore-config",
     rewrite: (entry) => entry.replace(/inputs: \[[^\]]*\]/, 'inputs: [" "]'),
-    says: /blank input name/,
   },
   // The second copy is never reached, so a wrapper could drop it unnoticed —
   // which is precisely what the per-input empty-input fixtures exist to catch
@@ -151,7 +165,6 @@ const CASES: Record<ProblemCodeKey, ProblemCase> = {
   duplicate_input: {
     checkName: "check-sentry-version",
     rewrite: (entry) => entry.replace(/inputs: \["([^"]+)"/, 'inputs: ["$1", "$1"'),
-    says: /same input twice/,
   },
   // Two places claiming one premise, which is the shape that produces a guard
   // everybody believes is covered and nobody owns.
@@ -159,7 +172,6 @@ const CASES: Record<ProblemCodeKey, ProblemCase> = {
     checkName: "check-appstore-config",
     rewrite: (entry) =>
       entry.replace(/inputs: /, 'delegatedTo: "somewhere else",\n    inputs: '),
-    says: /two places claim to own one check/,
   },
   // Delegation with no destination is indistinguishable from opting out. Note
   // the guard: it is NOT the delegated one. `check-privacy-baseline-provenance`
@@ -171,21 +183,18 @@ const CASES: Record<ProblemCodeKey, ProblemCase> = {
     checkName: "check-appstore-config",
     rewrite: (entry) =>
       entry.replace(/inputs: \[[^\]]*\],/, 'delegatedTo: " ",'),
-    says: /without saying where/,
   },
   // A shape is a decision; a decision with no recorded reason is a number
   // nobody can re-measure.
   empty_note: {
     checkName: "check-analytics-imports",
     rewrite: (entry) => entry.replace(/note: "[\s\S]*"/, 'note: ""'),
-    says: /no note/,
   },
   // An undated measurement is a magic constant with prose around it: the tree
   // grows out from under it and the note still reads as true.
   undated_note: {
     checkName: "check-analytics-imports",
     rewrite: (entry) => entry.replace(/\d{4}-\d{2}-\d{2}/g, "some point"),
-    says: /names no date/,
   },
 };
 
@@ -232,7 +241,13 @@ describe("every way a SCANNED_FLOORS entry can be unusable, through a wrapper", 
         const { output } = runFor(code);
         assert.match(output, new RegExp(`^${problem.checkName}: ERROR — `, "m"));
         assert.match(output, /SCANNED_FLOORS entry/);
-        assert.match(output, problem.says);
+        // The sentence itself, read out of the table rather than re-typed: a
+        // fragment match would keep passing over a reworded clause, and a
+        // hand-copied clause is the thing that drifts.
+        assert.ok(
+          output.includes(scannedFloorProblemDetail(code)),
+          `${problem.checkName} refused without saying what ${code} means:\n${output}`,
+        );
       });
 
       it("points the reader at the file the declaration lives in", () => {

@@ -22,6 +22,7 @@ import {
   validateScannedFloorEntry,
   validateScannedFloors,
   type ScannedFloor,
+  scannedFloorProblemDetail,
   type ScannedFloorProblemCode,
 } from "../lib/scanned-floor";
 import { LINT_GUARDS } from "../lib/lint-guards";
@@ -325,6 +326,25 @@ describe("validateScannedFloorEntry", () => {
     );
     for (const code of covered) {
       assert.ok(produced.has(code), `${code} has a fixture that does not produce it`);
+    }
+  });
+
+  it("hands out the same sentence it puts in a problem, for every code", () => {
+    // `scannedFloorProblemDetail` exists so a test asserting what a refusal
+    // SAYS can read the sentence rather than re-type a fragment of it. That is
+    // only worth anything while the accessor and the problem agree, so the two
+    // are compared here rather than trusted to stay in step.
+    for (const [code, floor] of Object.entries(BROKEN) as [
+      ScannedFloorProblemCode,
+      ScannedFloor,
+    ][]) {
+      const detail = scannedFloorProblemDetail(code);
+      assert.ok(detail.trim().length > 0, `${code} carries no sentence`);
+      const problem = validateScannedFloorEntry("check-x", floor).find(
+        (candidate) => candidate.code === code,
+      );
+      assert.ok(problem, `${code} produced no problem to compare against`);
+      assert.equal(problem.detail, detail);
     }
   });
 
