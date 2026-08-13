@@ -80,8 +80,13 @@ export const DEFAULT_SCANNED_LABEL = "file";
  * ({@link NUMERIC_FLOOR_DETAIL}, about a number a caller passed) and the table
  * problem (`invalid_minimum`, about a number an entry declares) — so it lives
  * in one place rather than being typed twice and reworded once.
+ *
+ * Exported for the test that requires both messages to carry it: recovering
+ * the clause by slicing one of them on its em-dash would be an assertion about
+ * punctuation, and it would go quiet the day either sentence grew a second
+ * dash.
  */
-const FLOOR_BELOW_ONE_REASON =
+export const FLOOR_BELOW_ONE_REASON =
   "a floor below 1 passes over an empty walk, which is the failure it is supposed to catch";
 
 /**
@@ -246,17 +251,21 @@ export type ScannedFloorProblemCode =
   /** A `count` note carrying no date — a measurement nobody can re-take. */
   | "undated_note";
 
+/**
+ * WHICH entry is wrong and HOW — and deliberately not the words for it.
+ *
+ * This used to carry a `detail` string as well, always filled from
+ * `scannedFloorProblemDetail(code)` by the one producer. That made the object
+ * capable of lying: a problem built by hand could carry any sentence in the
+ * field, and every renderer would ignore it, because they all derive the words
+ * from `code`. A caller that wants the clause asks
+ * {@link scannedFloorProblemDetail}; a caller that wants a whole sentence asks
+ * {@link describeScannedFloorProblem}. Neither is a copy of the other.
+ */
 export type ScannedFloorProblem = {
   /** The `SCANNED_FLOORS` key the problem is about. */
   readonly checkName: string;
   readonly code: ScannedFloorProblemCode;
-  /**
-   * The clause `code` means, always `scannedFloorProblemDetail(code)`. Carried
-   * on the problem so a caller holding one does not have to go back to the
-   * table for the words; the SUBJECT is added by
-   * {@link describeScannedFloorProblem}, which is the only thing that varies.
-   */
-  readonly detail: string;
 };
 
 /** Exhaustive over {@link ScannedFloorProblemCode} — a new code needs a sentence. */
@@ -346,8 +355,7 @@ export function validateScannedFloorEntry(
   floor: ScannedFloor,
 ): readonly ScannedFloorProblem[] {
   const problems: ScannedFloorProblem[] = [];
-  const add = (code: ScannedFloorProblemCode) =>
-    problems.push({ checkName, code, detail: scannedFloorProblemDetail(code) });
+  const add = (code: ScannedFloorProblemCode) => problems.push({ checkName, code });
 
   if (!floor.count && !floor.inputs && !floor.delegatedTo) add("no_shape");
   if (floor.delegatedTo !== undefined) {

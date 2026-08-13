@@ -14,6 +14,7 @@ import {
   evaluateParsedInputs,
   evaluateScannedFloor,
   describeScannedFloorProblem,
+  FLOOR_BELOW_ONE_REASON,
   formatScannedFloorFailure,
   formatScannedFloorProblem,
   PARSED_INPUTS_CALLER_SUBJECT,
@@ -338,22 +339,20 @@ describe("validateScannedFloorEntry", () => {
     }
   });
 
-  it("hands out the same sentence it puts in a problem, for every code", () => {
-    // `scannedFloorProblemDetail` exists so a test asserting what a refusal
-    // SAYS can read the sentence rather than re-type a fragment of it. That is
-    // only worth anything while the accessor and the problem agree, so the two
-    // are compared here rather than trusted to stay in step.
+  it("has a sentence for every code it reports, reached through the code alone", () => {
+    // A problem carries WHICH entry and HOW, never the words — so the only
+    // route from a reported problem to what it says is the accessor, and the
+    // thing worth asserting is that the route arrives somewhere.
     for (const [code, floor] of Object.entries(BROKEN) as [
       ScannedFloorProblemCode,
       ScannedFloor,
     ][]) {
-      const detail = scannedFloorProblemDetail(code);
-      assert.ok(detail.trim().length > 0, `${code} carries no sentence`);
       const problem = validateScannedFloorEntry("check-x", floor).find(
         (candidate) => candidate.code === code,
       );
-      assert.ok(problem, `${code} produced no problem to compare against`);
-      assert.equal(problem.detail, detail);
+      assert.ok(problem, `${code} produced no problem to read a sentence from`);
+      const detail = scannedFloorProblemDetail(problem.code);
+      assert.ok(detail.trim().length > 0, `${code} carries no sentence`);
     }
   });
 
@@ -438,9 +437,8 @@ describe("one problem, one phrasing", () => {
 
   it("gives formatScannedFloorProblem the check name as its subject and nothing else", () => {
     for (const code of codes) {
-      const problem = { checkName: "check-x", code, detail: scannedFloorProblemDetail(code) };
       assert.equal(
-        formatScannedFloorProblem(problem),
+        formatScannedFloorProblem({ checkName: "check-x", code }),
         describeScannedFloorProblem("check-x", code),
       );
     }
@@ -472,6 +470,21 @@ describe("one problem, one phrasing", () => {
     }
   });
 
+  it("reports which entry and how, and carries no words of its own", () => {
+    // The field this replaces was always `scannedFloorProblemDetail(code)` and
+    // every renderer derived the words from `code` anyway — so a problem built
+    // by hand could carry a sentence that would never be printed. Now the only
+    // route from a problem to its words is the accessor.
+    const problems = validateScannedFloorEntry("check-x", {
+      count: { label: "", minimum: -3 },
+      note: "",
+    });
+    assert.ok(problems.length >= 3);
+    for (const problem of problems) {
+      assert.deepEqual(Object.keys(problem).sort(), ["checkName", "code"]);
+    }
+  });
+
   it("says why a floor below 1 is a bug in the same words from both sides", () => {
     // Two unrelated sentences shared this clause verbatim: the runtime failure
     // (a number a caller passed) and the table problem (a number an entry
@@ -484,10 +497,17 @@ describe("one problem, one phrasing", () => {
       minimum: 0,
       label: DEFAULT_SCANNED_LABEL,
     });
-    const declared = scannedFloorProblemDetail("invalid_minimum");
-    const reason = declared.slice(declared.indexOf("— ") + 2);
-    assert.ok(reason.length > 20, "the shared clause did not split out of the sentence");
-    assert.ok(runtime.includes(reason), `runtime failure lost the shared clause:\n${runtime}`);
+    assert.ok(
+      runtime.includes(FLOOR_BELOW_ONE_REASON),
+      `runtime failure lost the shared clause:\n${runtime}`,
+    );
+    assert.ok(
+      scannedFloorProblemDetail("invalid_minimum").includes(FLOOR_BELOW_ONE_REASON),
+      "the table problem lost the shared clause",
+    );
+    // Neither sentence may be JUST the shared clause, or "both say it" is
+    // satisfied by two messages that say nothing else.
+    assert.notEqual(scannedFloorProblemDetail("invalid_minimum"), FLOOR_BELOW_ONE_REASON);
   });
 
   it("leaves exactly one reader of the sentence table in the source", () => {
