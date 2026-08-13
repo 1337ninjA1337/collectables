@@ -75,6 +75,16 @@ const OK: ScannedFloorVerdict = { ok: true };
 export const DEFAULT_SCANNED_LABEL = "file";
 
 /**
+ * Why a floor below 1 is a bug and not a lenient setting. Said by two
+ * sentences that are otherwise unrelated — the runtime failure
+ * ({@link NUMERIC_FLOOR_DETAIL}, about a number a caller passed) and the table
+ * problem (`invalid_minimum`, about a number an entry declares) — so it lives
+ * in one place rather than being typed twice and reworded once.
+ */
+const FLOOR_BELOW_ONE_REASON =
+  "a floor below 1 passes over an empty walk, which is the failure it is supposed to catch";
+
+/**
  * A minimum below 1 is a bug in the CALLER, not a finding about the tree: a
  * floor of 0 passes over an empty walk, which is the exact hole this module
  * exists to close, and it would do it while looking like the hole was
@@ -82,7 +92,7 @@ export const DEFAULT_SCANNED_LABEL = "file";
  * message can name the guard alongside the other two.
  */
 const NUMERIC_FLOOR_DETAIL = (minimum: number) =>
-  `floor of ${minimum} is not a positive integer — a floor below 1 passes over an empty walk, which is the failure it is supposed to catch`;
+  `floor of ${minimum} is not a positive integer — ${FLOOR_BELOW_ONE_REASON}`;
 
 export function evaluateScannedFloor(
   count: number,
@@ -240,7 +250,12 @@ export type ScannedFloorProblem = {
   /** The `SCANNED_FLOORS` key the problem is about. */
   readonly checkName: string;
   readonly code: ScannedFloorProblemCode;
-  /** A whole sentence, ready to be handed to `invalid_floor`'s `detail`. */
+  /**
+   * The clause `code` means, always `scannedFloorProblemDetail(code)`. Carried
+   * on the problem so a caller holding one does not have to go back to the
+   * table for the words; the SUBJECT is added by
+   * {@link describeScannedFloorProblem}, which is the only thing that varies.
+   */
   readonly detail: string;
 };
 
@@ -248,8 +263,7 @@ export type ScannedFloorProblem = {
 const PROBLEM_DETAIL: Record<ScannedFloorProblemCode, string> = {
   no_shape:
     "declares no premise of any kind — no count to floor, no inputs to read, no delegation, which is the exact hole this table exists to close",
-  invalid_minimum:
-    "declares a count floor that is not a positive integer — a floor below 1 passes over an empty walk, which is the failure it is supposed to catch",
+  invalid_minimum: `declares a count floor that is not a positive integer — ${FLOOR_BELOW_ONE_REASON}`,
   empty_label:
     "declares a count floor with no label, so its failure line would name no noun for what it counted",
   empty_inputs:
@@ -277,11 +291,51 @@ const PROBLEM_DETAIL: Record<ScannedFloorProblemCode, string> = {
  * a fragment. A hand-copied clause drifts silently the first time a sentence
  * is reworded, and turns into a failing assertion in a file that has nothing
  * to do with the rewording.
+ *
+ * This is the raw clause — a predicate with no subject, so it composes with
+ * whichever subject the caller is talking about. Anything printing a whole
+ * sentence should go through {@link describeScannedFloorProblem} instead; this
+ * accessor exists for the assertions that want to match a substring of one.
  */
 export function scannedFloorProblemDetail(
   code: ScannedFloorProblemCode,
 ): string {
   return PROBLEM_DETAIL[code];
+}
+
+/**
+ * The subject {@link scannedFloorFor} speaks about: the guard's own row in
+ * {@link SCANNED_FLOORS}, not the tree it was pointed at. Exported so a test
+ * asserting the refusal can name the subject the guard actually uses rather
+ * than re-typing the phrase and drifting from it.
+ */
+export const SCANNED_FLOORS_ENTRY_SUBJECT = "its SCANNED_FLOORS entry";
+
+/**
+ * The subject {@link evaluateParsedInputs} speaks about when it is handed a
+ * declared-input list of nothing. Deliberately NOT the entry subject: the
+ * table path cannot reach that branch (`scannedFloorFor` rejects an
+ * `inputs: []` entry first), so the only way in is a direct call to the pure
+ * function, and pointing that reader at the table would send them to look at
+ * a row that is fine.
+ */
+export const PARSED_INPUTS_CALLER_SUBJECT = "the caller";
+
+/**
+ * One whole sentence about one problem, attributed to whoever it is about.
+ *
+ * The ONE place a subject and the table's clause are joined. Three call sites
+ * used to build this string themselves — `formatScannedFloorProblem` with the
+ * check name, `scannedFloorFor` with the entry, `evaluateParsedInputs` with
+ * the caller — which is three ways to phrase one problem, drifting apart the
+ * first time any of them is reworded and impossible to assert against as a
+ * group. The subject is what genuinely varies; the clause never does.
+ */
+export function describeScannedFloorProblem(
+  subject: string,
+  code: ScannedFloorProblemCode,
+): string {
+  return `${subject} ${scannedFloorProblemDetail(code)}`;
 }
 
 const MEASUREMENT_DATE = /\d{4}-\d{2}-\d{2}/;
@@ -293,7 +347,7 @@ export function validateScannedFloorEntry(
 ): readonly ScannedFloorProblem[] {
   const problems: ScannedFloorProblem[] = [];
   const add = (code: ScannedFloorProblemCode) =>
-    problems.push({ checkName, code, detail: PROBLEM_DETAIL[code] });
+    problems.push({ checkName, code, detail: scannedFloorProblemDetail(code) });
 
   if (!floor.count && !floor.inputs && !floor.delegatedTo) add("no_shape");
   if (floor.delegatedTo !== undefined) {
@@ -326,9 +380,16 @@ export function validateScannedFloors(
   );
 }
 
-/** One line per problem, prefixed with the entry it is about. */
+/**
+ * One line per problem, attributed to the entry it is about.
+ *
+ * Kept at arity one on purpose rather than growing an optional `subject`
+ * parameter: this is the shape `validateScannedFloors(...).map(...)` wants,
+ * and a second parameter there would silently receive the array INDEX. A
+ * caller with a different subject calls {@link describeScannedFloorProblem}.
+ */
 export function formatScannedFloorProblem(problem: ScannedFloorProblem): string {
-  return `${problem.checkName} ${problem.detail}`;
+  return describeScannedFloorProblem(problem.checkName, problem.code);
 }
 
 /**
@@ -388,7 +449,10 @@ export function evaluateParsedInputs(
         // The table path can no longer reach this — `scannedFloorFor` rejects
         // an `inputs: []` entry first — so the subject here is whoever called
         // the pure function with a list of nothing.
-        detail: `the caller ${PROBLEM_DETAIL.empty_inputs}`,
+        detail: describeScannedFloorProblem(
+          PARSED_INPUTS_CALLER_SUBJECT,
+          "empty_inputs",
+        ),
       },
     };
   }
@@ -527,7 +591,10 @@ export function scannedFloorFor(checkName: string): ScannedFloor {
       count: 0,
       minimum: floor.count?.minimum ?? 0,
       label: floor.count?.label ?? DEFAULT_SCANNED_LABEL,
-      detail: `its SCANNED_FLOORS entry ${problem.detail}`,
+      detail: describeScannedFloorProblem(
+        SCANNED_FLOORS_ENTRY_SUBJECT,
+        problem.code,
+      ),
     });
   }
   return floor;

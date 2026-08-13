@@ -13,8 +13,11 @@ import {
   countFloorFor,
   evaluateParsedInputs,
   evaluateScannedFloor,
+  describeScannedFloorProblem,
   formatScannedFloorFailure,
   formatScannedFloorProblem,
+  PARSED_INPUTS_CALLER_SUBJECT,
+  SCANNED_FLOORS_ENTRY_SUBJECT,
   isNonEmptyInput,
   isUnreadableInput,
   scannedFloorFor,
@@ -220,10 +223,16 @@ describe("evaluateParsedInputs", () => {
     assert.equal(verdict.ok, false);
     if (verdict.ok) throw new Error("unreachable");
     assert.equal(verdict.failure.code, "invalid_floor");
-    assert.match(
-      formatScannedFloorFailure("g", verdict.failure),
-      /the caller declares an empty input list/,
+    // The subject is the CALLER, not the table: `scannedFloorFor` rejects an
+    // `inputs: []` entry before a guard can reach this, so the only way in is
+    // a direct call. Both halves are read from the module rather than
+    // re-typed, which is the whole point of the accessor pair.
+    assert.ok(
+      formatScannedFloorFailure("g", verdict.failure).includes(
+        describeScannedFloorProblem(PARSED_INPUTS_CALLER_SUBJECT, "empty_inputs"),
+      ),
     );
+    assert.equal(PARSED_INPUTS_CALLER_SUBJECT, "the caller");
   });
 
   it("separates a file it could not read from one it never handed over", () => {
@@ -380,7 +389,7 @@ describe("scannedFloorFor rejects a bogus entry", () => {
       count: 0,
       minimum: 0,
       label: DEFAULT_SCANNED_LABEL,
-      detail: `its SCANNED_FLOORS entry ${problem.detail}`,
+      detail: describeScannedFloorProblem(SCANNED_FLOORS_ENTRY_SUBJECT, problem.code),
     });
     assert.match(line, /^check-x: ERROR — its SCANNED_FLOORS entry declares no premise/);
     assert.match(line, /lib\/scanned-floor\.ts/);
@@ -393,6 +402,108 @@ describe("scannedFloorFor rejects a bogus entry", () => {
       assert.ok(!(error instanceof ScannedFloorError));
       return /no committed floor/.test(error.message);
     });
+  });
+});
+
+describe("one problem, one phrasing", () => {
+  // Exhaustive by construction: a new ScannedFloorProblemCode fails to COMPILE
+  // here until it is listed, the same trick PROBLEM_DETAIL uses one file over.
+  const EVERY_CODE: Record<ScannedFloorProblemCode, true> = {
+    no_shape: true,
+    invalid_minimum: true,
+    empty_label: true,
+    empty_inputs: true,
+    blank_input: true,
+    duplicate_input: true,
+    delegation_with_shape: true,
+    empty_delegation: true,
+    empty_note: true,
+    undated_note: true,
+  };
+  const codes = Object.keys(EVERY_CODE) as ScannedFloorProblemCode[];
+
+  it("joins the subject to the table's own clause, leaving the clause untouched", () => {
+    for (const code of codes) {
+      const clause = scannedFloorProblemDetail(code);
+      assert.equal(describeScannedFloorProblem("check-x", code), `check-x ${clause}`);
+      // The accessor is the raw clause — a predicate with no subject — so it
+      // must not already carry one, or every sentence built from it reads
+      // "check-x check-x declares ...".
+      assert.ok(
+        !clause.startsWith("check-x"),
+        `${code}'s clause names its own subject`,
+      );
+    }
+  });
+
+  it("gives formatScannedFloorProblem the check name as its subject and nothing else", () => {
+    for (const code of codes) {
+      const problem = { checkName: "check-x", code, detail: scannedFloorProblemDetail(code) };
+      assert.equal(
+        formatScannedFloorProblem(problem),
+        describeScannedFloorProblem("check-x", code),
+      );
+    }
+  });
+
+  it("keeps the two subjects distinct — an entry's problem is not a caller's", () => {
+    // They differ because the reader's next move differs: one sends them to
+    // SCANNED_FLOORS, the other to whoever called the pure function with an
+    // empty list. Collapsing them would point half the readers at a sound row.
+    assert.notEqual(SCANNED_FLOORS_ENTRY_SUBJECT, PARSED_INPUTS_CALLER_SUBJECT);
+    for (const code of codes) {
+      assert.notEqual(
+        describeScannedFloorProblem(SCANNED_FLOORS_ENTRY_SUBJECT, code),
+        describeScannedFloorProblem(PARSED_INPUTS_CALLER_SUBJECT, code),
+      );
+    }
+  });
+
+  it("carries the clause the code declares, whichever subject is speaking", () => {
+    for (const code of codes) {
+      const clause = scannedFloorProblemDetail(code);
+      for (const subject of [
+        SCANNED_FLOORS_ENTRY_SUBJECT,
+        PARSED_INPUTS_CALLER_SUBJECT,
+        "check-x",
+      ]) {
+        assert.ok(describeScannedFloorProblem(subject, code).endsWith(clause));
+      }
+    }
+  });
+
+  it("says why a floor below 1 is a bug in the same words from both sides", () => {
+    // Two unrelated sentences shared this clause verbatim: the runtime failure
+    // (a number a caller passed) and the table problem (a number an entry
+    // declares). Two copies of one reason drift the first time either is
+    // reworded, and the reader who meets the second one has no way to tell it
+    // is the same rule. Read from both messages rather than re-typed here.
+    const runtime = formatScannedFloorFailure("check-x", {
+      code: "invalid_floor",
+      count: 3,
+      minimum: 0,
+      label: DEFAULT_SCANNED_LABEL,
+    });
+    const declared = scannedFloorProblemDetail("invalid_minimum");
+    const reason = declared.slice(declared.indexOf("— ") + 2);
+    assert.ok(reason.length > 20, "the shared clause did not split out of the sentence");
+    assert.ok(runtime.includes(reason), `runtime failure lost the shared clause:\n${runtime}`);
+  });
+
+  it("leaves exactly one reader of the sentence table in the source", () => {
+    // The drift guard, and the reason this block exists: three call sites used
+    // to build "<subject> <sentence>" themselves. A fourth would be invisible
+    // to every assertion above, because each of those only ever exercises the
+    // function it already goes through.
+    const source = read("lib/scanned-floor.ts");
+    // Both ways the record can be read — `PROBLEM_DETAIL[code]` and the
+    // `PROBLEM_DETAIL.empty_inputs` shape the caller branch used to carry.
+    const readers = source.match(/PROBLEM_DETAIL[.[]/g) ?? [];
+    assert.deepEqual(readers, ["PROBLEM_DETAIL["], "PROBLEM_DETAIL grew a second reader");
+    assert.ok(
+      !/\$\{problem\.detail\}/.test(source),
+      "a call site is interpolating problem.detail instead of calling describeScannedFloorProblem",
+    );
   });
 });
 

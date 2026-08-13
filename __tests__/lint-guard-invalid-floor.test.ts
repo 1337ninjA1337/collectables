@@ -30,7 +30,9 @@ import * as path from "node:path";
 
 import { LINT_GUARDS } from "../lib/lint-guards";
 import {
+  describeScannedFloorProblem,
   scannedFloorProblemDetail,
+  SCANNED_FLOORS_ENTRY_SUBJECT,
   type ScannedFloorProblemCode,
 } from "../lib/scanned-floor";
 import {
@@ -240,14 +242,20 @@ describe("every way a SCANNED_FLOORS entry can be unusable, through a wrapper", 
       it("names itself and says the declaration is the bug, not the tree", () => {
         const { output } = runFor(code);
         assert.match(output, new RegExp(`^${problem.checkName}: ERROR — `, "m"));
-        assert.match(output, /SCANNED_FLOORS entry/);
-        // The sentence itself, read out of the table rather than re-typed: a
-        // fragment match would keep passing over a reworded clause, and a
-        // hand-copied clause is the thing that drifts.
+        // The whole sentence — subject and clause — read out of the module
+        // rather than re-typed. The subject is the load-bearing half here: it
+        // is what says the DECLARATION is the bug rather than the tree, and
+        // asserting `/SCANNED_FLOORS entry/` beside a separate clause match
+        // would keep passing if the two ever stopped being one sentence.
         assert.ok(
-          output.includes(scannedFloorProblemDetail(code)),
+          output.includes(
+            describeScannedFloorProblem(SCANNED_FLOORS_ENTRY_SUBJECT, code),
+          ),
           `${problem.checkName} refused without saying what ${code} means:\n${output}`,
         );
+        // And the clause on its own, so a subject that swallowed the sentence
+        // could not satisfy the assertion above by itself.
+        assert.ok(output.includes(scannedFloorProblemDetail(code)));
       });
 
       it("points the reader at the file the declaration lives in", () => {
