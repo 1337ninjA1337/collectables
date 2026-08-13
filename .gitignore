@@ -18,10 +18,6 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
-# Patched checkouts built by __tests__/helpers/guard-fixture.ts (cleaned up
-# after each run; ignored so a killed run cannot leave a tracked mess).
-.guard-scratch/
-
 # Debug / logs
 npm-debug.*
 yarn-debug.*

@@ -52,20 +52,6 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const TSX_MODULE = path.join(REPO_ROOT, "node_modules", "tsx");
 
 /**
- * Patched checkouts live INSIDE the repository, not under `os.tmpdir()`.
- *
- * The other fixtures put a scratch SCAN ROOT in the temp dir, which is fine:
- * nothing is executed from there. A patched checkout is executed from there,
- * and a `.ts` entry point under `/tmp` has no `tsconfig.json` above it — the
- * loader walks to the filesystem root and finds nothing, so the copied wrapper
- * is resolved under different rules than the original it is supposed to be a
- * copy of. Keeping it under the repo means the walk finds the same
- * `tsconfig.json` the real script does, which is the whole premise of running
- * a copy at all. Gitignored, and removed by each fixture's cleanup.
- */
-const PATCHED_REPO_PARENT = path.join(REPO_ROOT, ".guard-scratch");
-
-/**
  * Fail on the missing install rather than on its symptom.
  *
  * Spawning against an absent loader exits non-zero with no stdout and no
@@ -112,15 +98,13 @@ export type PartialRoot = {
 export function makePartialRoot(
   entries: readonly string[],
   files: Readonly<Record<string, string>> = {},
-  parentDir: string = os.tmpdir(),
 ): PartialRoot {
   if (entries.length === 0 && Object.keys(files).length === 0) {
     throw new Error(
       "makePartialRoot: a partial root with no entries and no files is an EMPTY root — use the empty-root harness, which asserts the other failure code.",
     );
   }
-  fs.mkdirSync(parentDir, { recursive: true });
-  const root = fs.mkdtempSync(path.join(parentDir, "lint-guard-partial-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "lint-guard-partial-"));
   for (const entry of entries) {
     if (path.isAbsolute(entry)) {
       throw new Error(
@@ -178,7 +162,7 @@ export function makePatchedRepo(
   patches: Readonly<Record<string, (source: string) => string>>,
   entries: readonly string[] = ["lib", "scripts"],
 ): PartialRoot {
-  const patched = makePartialRoot(entries, {}, PATCHED_REPO_PARENT);
+  const patched = makePartialRoot(entries);
   for (const [relative, patch] of Object.entries(patches)) {
     const target = path.join(patched.root, relative);
     if (!fs.existsSync(target)) {
@@ -197,20 +181,7 @@ export function makePatchedRepo(
     }
     fs.writeFileSync(target, next, "utf8");
   }
-  return {
-    root: patched.root,
-    cleanup: () => {
-      patched.cleanup();
-      // Take the shared parent with the last copy, so a green run leaves the
-      // working tree exactly as it found it. `rmdir` fails while a sibling
-      // fixture still holds a root, which is the correct outcome.
-      try {
-        fs.rmdirSync(PATCHED_REPO_PARENT);
-      } catch {
-        // Still in use, or already gone. Either way there is nothing to do.
-      }
-    },
-  };
+  return patched;
 }
 
 export type GuardRun = {
