@@ -180,6 +180,25 @@ export type GuardRun = {
 const runs = new Map<string, GuardRun>();
 
 /**
+ * Ceiling on a single guard run, ~70x the ~430 ms a boot actually costs.
+ *
+ * `execFileSync` with no timeout waits forever, and forever inside a test
+ * runner is a CI job that burns its whole limit with no output and no failing
+ * assertion to point at — the worst possible shape for a harness whose entire
+ * job is turning silence into a stated result. A guard that has not answered
+ * in half a minute has not answered; the timeout turns that into a normal
+ * captured failure the assertions can read.
+ */
+const GUARD_RUN_TIMEOUT_MS = 30_000;
+
+/**
+ * Guards print reports, and a report over a broken tree can be long. Node's
+ * 1MB default would turn an overlong report into an ENOBUFS throw with the
+ * output discarded, which reads as a crash rather than as the finding it is.
+ */
+const GUARD_RUN_MAX_BUFFER = 16 * 1024 * 1024;
+
+/**
  * A guard, run against a scratch root, memoised per (script, args, root) —
  * every assertion about one run would otherwise pay its own ~430 ms tsx boot.
  *
@@ -215,16 +234,28 @@ export function runGuardFrom(
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
         env: { ...process.env, [GUARD_ROOT_ENV]: root },
+        timeout: GUARD_RUN_TIMEOUT_MS,
+        killSignal: "SIGKILL",
+        maxBuffer: GUARD_RUN_MAX_BUFFER,
       },
     );
   } catch (error) {
     const failure = error as {
       status?: number;
+      signal?: string;
+      code?: string;
       stdout?: string;
       stderr?: string;
     };
     status = failure.status ?? 1;
     output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
+    if (failure.signal === "SIGKILL" || failure.code === "ETIMEDOUT") {
+      // Say which run stalled and what it had managed to print. Without this
+      // the assertions downstream see an empty output and exit 1, which is
+      // exactly what a guard REFUSING looks like — the same confusion
+      // `tsxBinary()` exists to prevent, arriving by a different door.
+      output = `${output}\nguard-fixture: ${guard.scriptPath} (from ${scriptRoot}) did not finish within ${GUARD_RUN_TIMEOUT_MS}ms against ${root} and was killed. Everything it printed before that is above.`;
+    }
   }
   const run = { output, status };
   runs.set(key, run);
