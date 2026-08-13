@@ -1,5 +1,6 @@
 /**
- * The sixth failure code, produced by a real wrapper.
+ * The sixth failure code, produced by a real wrapper — and every way an entry
+ * can earn it.
  *
  * `no_files`, `below_floor`, `unreadable_input` and `empty_input` each get a
  * red run from a scratch SCAN ROOT (the empty-root, partial-root and
@@ -9,17 +10,18 @@
  * sound table stays sound.
  *
  * So this harness moves the other half. `makeSharedPatchedRepo` copies `lib/`
- * and `scripts/` into a scratch root ONCE; each case rewrites the table in
- * that copy, runs the copied wrapper against the REAL repository, and puts the
- * pristine bytes back. The scan root is a tree where every walk is full and
- * every input reads fine, so the broken declaration is the only thing left
- * that can fail.
+ * and `scripts/` into a scratch root ONCE; each case rewrites one entry of the
+ * table in that copy, runs the copied wrapper against the REAL repository, and
+ * puts the pristine bytes back. The scan root is a tree where every walk is
+ * full and every input reads fine, so the broken declaration is the only thing
+ * left that can fail.
  *
- * What that buys, concretely: the refusal is one line naming the guard, it
- * exits 1, and it carries no stack trace. Before this file, a floor of 0 was
- * caught by an assertion in `scanned-floor.test.ts` that never ran a guard,
- * and nothing at all established that a guard reaching a bogus floor REFUSES
- * rather than passing over the empty walk the floor was supposed to catch.
+ * `validateScannedFloorEntry` reports TEN ways an entry can be unusable and
+ * every one of them gets a run here, keyed by `ScannedFloorProblemCode` so a
+ * new code cannot ship without one. Two of them had a wrapper run before this
+ * file's second pass; the other eight were proven about the pure function and
+ * never about a guard, which is exactly the state `invalid_floor` itself was
+ * in before the first pass.
  */
 
 import { describe, it, after } from "node:test";
@@ -27,13 +29,14 @@ import assert from "node:assert/strict";
 import * as path from "node:path";
 
 import { LINT_GUARDS } from "../lib/lint-guards";
+import type { ScannedFloorProblemCode } from "../lib/scanned-floor";
 import {
   assertNoStackTrace,
   checkNameOf,
   makeSharedPatchedRepo,
   PATCHED_REPO_MARKER,
   runGuardWith,
-  type RepoPatches,
+  type GuardRun,
 } from "./helpers/guard-fixture";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -48,121 +51,224 @@ const guardFor = (checkName: string) => {
 /**
  * One copy of `lib/` + `scripts/` for the whole file, patched per case.
  *
- * Each copy is ~200 files. `SCANNED_FLOORS` reports ten problem codes and this
- * file runs two of them today, so a copy per case would have the harness
- * paying ten recursive copies to assert ten one-line declarations.
+ * Each copy is ~200 files, so a copy per case would have this file paying
+ * fourteen recursive copies to assert ten one-line declarations. `runPatched`
+ * writes the patch, spawns, and restores, which makes a case two writes.
  */
 const repo = makeSharedPatchedRepo();
 after(() => repo.cleanup());
 
 /**
- * A run of `checkName` against this repository, out of a copy in which the
- * table's `from` declaration has been swapped for `to`.
+ * Rewrites ONE entry of `SCANNED_FLOORS` and leaves the rest of the module
+ * alone.
  *
- * Both strings are whole declarations, so a formatting change in
- * `lib/scanned-floor.ts` fails the fixture loudly (`runPatched` refuses a
- * no-op patch) rather than silently running an unpatched guard. `label` is
- * what keeps the run memo from answering one case with another's result — the
- * scriptRoot is the same directory for every case here, and the bytes in it
- * are not.
+ * Scoping the rewrite to the entry is what lets a case anchor on
+ * `/minimum: 160/` instead of on a whole pretty-printed declaration: the key
+ * is the anchor, and the key is a thing `lib/scanned-floor.ts` declares rather
+ * than a thing this test remembers. `runPatched` refuses a patch that changed
+ * nothing, so a rewrite whose regex stops matching fails loudly here instead
+ * of quietly running an unpatched guard.
  */
-function patchedRun(label: string, from: string, to: string, checkName: string) {
-  const patches: RepoPatches = {
-    [FLOOR_MODULE]: (source) => {
-      assert.ok(
-        source.includes(from),
-        `the anchor ${JSON.stringify(from)} is no longer in ${FLOOR_MODULE}`,
-      );
-      return source.replace(from, to);
-    },
+function entryPatch(
+  checkName: string,
+  rewrite: (entry: string) => string,
+): (source: string) => string {
+  return (source) => {
+    const open = `  "${checkName}": {`;
+    const start = source.indexOf(open);
+    assert.ok(start >= 0, `${checkName} has no entry in ${FLOOR_MODULE}`);
+    const end = source.indexOf("\n  },", start);
+    assert.ok(end > start, `${checkName}'s entry in ${FLOOR_MODULE} never closes`);
+    const entry = source.slice(start, end);
+    const rewritten = rewrite(entry);
+    assert.notEqual(
+      rewritten,
+      entry,
+      `the rewrite for ${checkName} matched nothing in its entry — the anchor has drifted`,
+    );
+    return source.slice(0, start) + rewritten + source.slice(end);
   };
-  const guard = guardFor(checkName);
-  return () => repo.runPatched(label, patches, guard, REPO_ROOT);
 }
 
-describe("a count-shaped guard whose floor is not a positive integer", () => {
-  // check-inline-hex walks app/ + components/ + lib/ and floors at 160.
-  const run = patchedRun(
-    "inline-hex-zero-floor",
-    'count: { label: "source file", minimum: 160 }',
-    'count: { label: "source file", minimum: 0 }',
-    "check-inline-hex",
+/**
+ * A wrapper run whose only reason to fail is the problem the patch introduces.
+ *
+ * Each rewrite introduces EXACTLY ONE problem: `validateScannedFloorEntry`
+ * returns them in declaration order and `scannedFloorFor` raises the first, so
+ * a rewrite that tripped two codes would assert about whichever the validator
+ * happens to reach first and would silently stop testing the other when that
+ * order changes.
+ */
+type ProblemCase = {
+  /** The guard whose entry is broken — and the guard that must refuse. */
+  readonly checkName: string;
+  readonly rewrite: (entry: string) => string;
+  /** A fragment of the sentence `PROBLEM_DETAIL` gives this code. */
+  readonly says: RegExp;
+  /** Codes the rewrite must NOT also trip, where confusion is plausible. */
+  readonly notAlso?: readonly RegExp[];
+};
+
+const CASES: Record<ProblemCodeKey, ProblemCase> = {
+  // A count floor of 0 waves an empty walk through while making the hole look
+  // covered — the reason this is a floor rather than a `count > 0`.
+  invalid_minimum: {
+    checkName: "check-inline-hex",
+    rewrite: (entry) => entry.replace(/minimum: 160/, "minimum: 0"),
+    says: /not a positive integer/,
+  },
+  // The label is the noun the failure line uses ("scanned 3 source file(s)");
+  // without it the refusal names no unit for what it counted.
+  empty_label: {
+    checkName: "check-inline-hex",
+    rewrite: (entry) => entry.replace(/label: "source file"/, 'label: ""'),
+    says: /no label/,
+  },
+  // An entry that declares nothing is the exact hole the table exists to
+  // close: a guard nobody has to think about, listed as though covered.
+  no_shape: {
+    checkName: "check-appstore-config",
+    rewrite: (entry) => entry.replace(/\n\s*inputs: \[[^\]]*\],/, ""),
+    says: /no premise of any kind/,
+  },
+  // An empty list makes the inputs assertion pass without reading anything.
+  empty_inputs: {
+    checkName: "check-appstore-config",
+    rewrite: (entry) => entry.replace(/inputs: \[[^\]]*\]/, "inputs: []"),
+    says: /empty input list/,
+    // The codes for a real file going wrong; this run has no file to blame.
+    notAlso: [/was never handed to the floor check/, /is empty — it was read/],
+  },
+  // A name no wrapper can hand over and no message can name.
+  blank_input: {
+    checkName: "check-appstore-config",
+    rewrite: (entry) => entry.replace(/inputs: \[[^\]]*\]/, 'inputs: [" "]'),
+    says: /blank input name/,
+  },
+  // The second copy is never reached, so a wrapper could drop it unnoticed —
+  // which is precisely what the per-input empty-input fixtures exist to catch
+  // one level down.
+  duplicate_input: {
+    checkName: "check-sentry-version",
+    rewrite: (entry) => entry.replace(/inputs: \["([^"]+)"/, 'inputs: ["$1", "$1"'),
+    says: /same input twice/,
+  },
+  // Two places claiming one premise, which is the shape that produces a guard
+  // everybody believes is covered and nobody owns.
+  delegation_with_shape: {
+    checkName: "check-appstore-config",
+    rewrite: (entry) =>
+      entry.replace(/inputs: /, 'delegatedTo: "somewhere else",\n    inputs: '),
+    says: /two places claim to own one check/,
+  },
+  // Delegation with no destination is indistinguishable from opting out. Note
+  // the guard: it is NOT the delegated one. `check-privacy-baseline-provenance`
+  // is the only entry that really delegates, and its wrapper never reads the
+  // table — delegation means the premise is asserted elsewhere — so no run of
+  // it can produce this. The code is reachable only through a guard that does
+  // read its entry, which is what makes it worth a wrapper run at all.
+  empty_delegation: {
+    checkName: "check-appstore-config",
+    rewrite: (entry) =>
+      entry.replace(/inputs: \[[^\]]*\],/, 'delegatedTo: " ",'),
+    says: /without saying where/,
+  },
+  // A shape is a decision; a decision with no recorded reason is a number
+  // nobody can re-measure.
+  empty_note: {
+    checkName: "check-analytics-imports",
+    rewrite: (entry) => entry.replace(/note: "[\s\S]*"/, 'note: ""'),
+    says: /no note/,
+  },
+  // An undated measurement is a magic constant with prose around it: the tree
+  // grows out from under it and the note still reads as true.
+  undated_note: {
+    checkName: "check-analytics-imports",
+    rewrite: (entry) => entry.replace(/\d{4}-\d{2}-\d{2}/g, "some point"),
+    says: /names no date/,
+  },
+};
+
+/**
+ * Every `ScannedFloorProblemCode`, as a key. Written as a mapped type rather
+ * than a hand-kept list so a new code fails to compile until it has a case —
+ * the same trick `PROBLEM_DETAIL` uses one file over.
+ */
+type ProblemCodeKey = ScannedFloorProblemCode;
+
+const runFor = (code: ProblemCodeKey): GuardRun => {
+  const problem = CASES[code];
+  return repo.runPatched(
+    `problem-${code}`,
+    { [FLOOR_MODULE]: entryPatch(problem.checkName, problem.rewrite) },
+    guardFor(problem.checkName),
+    REPO_ROOT,
   );
+};
 
-  it("refuses instead of passing over the walk the floor was meant to defend", () => {
-    // The scan root is this repository, so the walk finds its usual ~213
-    // files. A floor of 0 would wave that through — and would wave through
-    // zero files just as happily, which is the whole point.
-    assert.equal(run().status, 1);
-  });
+describe("every way a SCANNED_FLOORS entry can be unusable, through a wrapper", () => {
+  for (const code of Object.keys(CASES) as ProblemCodeKey[]) {
+    const problem = CASES[code];
 
-  it("ran out of the patched copy, not out of this checkout", () => {
-    // Exit 1 alone does not establish that: a guard resolved against the real
-    // repository would have to fail for some OTHER reason to look like this,
-    // and the marker is a line the real repository cannot print.
-    assert.match(run().output, new RegExp(PATCHED_REPO_MARKER));
-  });
+    describe(`${code} (${problem.checkName})`, () => {
+      it("refuses instead of running on a premise it cannot trust", () => {
+        const { status, output } = runFor(code);
+        assert.equal(
+          status,
+          1,
+          `${problem.checkName} passed with a ${code} entry:\n${output}`,
+        );
+      });
 
-  it("names itself and says the declaration is the bug, not the tree", () => {
-    const { output } = run();
-    assert.match(output, /^check-inline-hex: ERROR — /m);
-    assert.match(output, /SCANNED_FLOORS entry/);
-    assert.match(output, /not a positive integer/);
-  });
+      it("ran out of the patched copy, not out of this checkout", () => {
+        // Exit 1 alone does not establish that: a guard resolved against the
+        // real repository would have to fail for some OTHER reason to look
+        // like this, and the marker is a line the real repository cannot
+        // print.
+        assert.match(runFor(code).output, new RegExp(PATCHED_REPO_MARKER));
+      });
 
-  it("points the reader at the file the number lives in", () => {
-    assert.match(run().output, /lib\/scanned-floor\.ts/);
-  });
+      it("names itself and says the declaration is the bug, not the tree", () => {
+        const { output } = runFor(code);
+        assert.match(output, new RegExp(`^${problem.checkName}: ERROR — `, "m"));
+        assert.match(output, /SCANNED_FLOORS entry/);
+        assert.match(output, problem.says);
+      });
 
-  it("does not blame the scan roots — the walk was fine", () => {
-    // no_files sends the reader to check the scan roots. Reusing that line
-    // here would send them to look for a broken walk that does not exist.
-    assert.doesNotMatch(run().output, /Check the scan roots/);
-  });
+      it("points the reader at the file the declaration lives in", () => {
+        assert.match(runFor(code).output, /lib\/scanned-floor\.ts/);
+      });
 
-  it("prints a refusal, not a crash", () => {
-    const { output } = run();
-    assert.doesNotMatch(output, /ScannedFloorError:/);
-    assertNoStackTrace(output, "check-inline-hex with a floor of 0");
-  });
+      it("does not blame the scan roots — the walk was fine", () => {
+        // no_files sends the reader to check the scan roots. Reusing that line
+        // here would send them to look for a broken walk that does not exist.
+        assert.doesNotMatch(runFor(code).output, /Check the scan roots/);
+      });
 
-  it("never reports a clean scan", () => {
-    // The failure has to beat the report, or the guard says "no inline hex
-    // literals" over a premise it never established.
-    assert.doesNotMatch(run().output, /no inline hex literals/);
-  });
-});
+      it("prints a refusal, not a crash", () => {
+        const { output } = runFor(code);
+        assert.doesNotMatch(output, /ScannedFloorError:/);
+        assertNoStackTrace(output, `${problem.checkName} with a ${code} entry`);
+      });
 
-describe("an inputs-shaped guard that declares no inputs", () => {
-  // check-appstore-config has no count at all; an empty list is the only way
-  // its half of the table can be bogus.
-  const run = patchedRun(
-    "appstore-config-no-inputs",
-    'inputs: ["app.json"],',
-    "inputs: [],",
-    "check-appstore-config",
-  );
+      it("never reports the clean scan it did not establish", () => {
+        // The failure has to beat the report, or the guard says "no inline hex
+        // literals" over a premise it never checked.
+        const { output } = runFor(code);
+        assert.doesNotMatch(output, /no inline hex literals/);
+        assert.doesNotMatch(output, /iOS block OK/);
+        for (const other of problem.notAlso ?? []) {
+          assert.doesNotMatch(output, other);
+        }
+      });
+    });
+  }
 
-  it("refuses rather than asserting nothing about the file it reads", () => {
-    assert.equal(run().status, 1);
-  });
-
-  it("ran out of the patched copy, not out of this checkout", () => {
-    assert.match(run().output, new RegExp(PATCHED_REPO_MARKER));
-  });
-
-  it("says the input list is empty, not that an input was missing", () => {
-    const { output } = run();
-    assert.match(output, /^check-appstore-config: ERROR — /m);
-    assert.match(output, /declares an empty input list/);
-    // missing_input and empty_input are the codes for a real file going
-    // wrong; this run has no file to blame.
-    assert.doesNotMatch(output, /was never handed to the floor check/);
-    assert.doesNotMatch(output, /is empty — it was read/);
-  });
-
-  it("prints a refusal, not a crash", () => {
-    assertNoStackTrace(run().output, "check-appstore-config with no inputs");
+  it("names a guard the registry actually declares, for every case", () => {
+    // A case pointed at a check name that is not in LINT_GUARDS would fail in
+    // `guardFor`, but only when its own describe block runs; this states the
+    // whole file's premise in one place.
+    for (const problem of Object.values(CASES)) guardFor(problem.checkName);
   });
 });
 
@@ -171,17 +277,21 @@ describe("the same copy, unpatched", () => {
   // at all (a bad path, a missing dependency in the copy) would look exactly
   // like a guard refusing for the right reason.
   const control = (checkName: string) =>
-    patchedRun(
+    repo.runPatched(
       `control-${checkName}`,
-      // A comment is the smallest change that proves the copy is a real,
-      // runnable checkout without altering a single declaration in it.
-      "export const SCANNED_FLOORS",
-      "// patched-repo control copy\nexport const SCANNED_FLOORS",
-      checkName,
-    )();
+      {
+        // A comment is the smallest change that proves the copy is a real,
+        // runnable checkout without altering a single declaration in it.
+        [FLOOR_MODULE]: (source) => `// patched-repo control copy\n${source}`,
+      },
+      guardFor(checkName),
+      REPO_ROOT,
+    );
 
-  for (const checkName of ["check-inline-hex", "check-appstore-config"]) {
-    it(`${checkName} passes, so the refusals above come from the patch and nothing else`, () => {
+  const patchedGuards = [...new Set(Object.values(CASES).map((c) => c.checkName))];
+
+  for (const checkName of patchedGuards) {
+    it(`${checkName} passes, so its refusals come from the patch and nothing else`, () => {
       const { status, output } = control(checkName);
       assert.equal(status, 0, `${checkName} failed in the control copy:\n${output}`);
     });
@@ -202,26 +312,11 @@ describe("the run memo keeps the cases apart", () => {
   // second case would be served the first's result — a CACHE HIT, not an
   // error, which is the kind of wrong that never announces itself.
   it("gives two patches of the same file to the same guard two answers", () => {
-    const guard = guardFor("check-inline-hex");
-    const broken = repo.runPatched(
-      "memo-broken-floor",
-      {
-        [FLOOR_MODULE]: (source) =>
-          source.replace(
-            'count: { label: "source file", minimum: 160 }',
-            'count: { label: "source file", minimum: 0 }',
-          ),
-      },
-      guard,
-      REPO_ROOT,
-    );
+    const broken = runFor("invalid_minimum");
     const sound = repo.runPatched(
       "memo-sound-floor",
-      {
-        [FLOOR_MODULE]: (source) =>
-          `// memo separation control\n${source}`,
-      },
-      guard,
+      { [FLOOR_MODULE]: (source) => `// memo separation control\n${source}` },
+      guardFor("check-inline-hex"),
       REPO_ROOT,
     );
     assert.equal(broken.status, 1);
@@ -230,25 +325,11 @@ describe("the run memo keeps the cases apart", () => {
 
   it("keeps a run from the copy apart from the same run out of this checkout", () => {
     // The other half of the key. `scriptRoot` is what makes a patched wrapper
-    // a different program from the committed one; without it in the key, the
-    // control below would be answered with the broken run's cached refusal —
-    // and, worse, the reverse: a green run of the real guard would certify a
-    // patch that never executed.
+    // a different program from the committed one; without it in the key, a
+    // green run of the real guard would certify a patch that never executed.
     const guard = guardFor("check-inline-hex");
-    const broken = repo.runPatched(
-      "memo-scriptroot-broken",
-      {
-        [FLOOR_MODULE]: (source) =>
-          source.replace(
-            'count: { label: "source file", minimum: 160 }',
-            'count: { label: "source file", minimum: 0 }',
-          ),
-      },
-      guard,
-      REPO_ROOT,
-    );
+    assert.equal(runFor("invalid_minimum").status, 1);
     const committed = runGuardWith(guard, { scanRoot: REPO_ROOT });
-    assert.equal(broken.status, 1);
     assert.equal(committed.status, 0, committed.output);
     assert.doesNotMatch(
       committed.output,
@@ -258,13 +339,13 @@ describe("the run memo keeps the cases apart", () => {
   });
 
   it("restores the copy after every case, so a patch cannot leak forwards", () => {
-    // The sound run above is only meaningful if the broken run's patch was
-    // written back — the same guard, the same copy, in the other order.
-    const guard = guardFor("check-appstore-config");
+    // Only meaningful because a broken run of this same guard ran first: the
+    // patch above has to have been written back for this to be green.
+    assert.equal(runFor("empty_inputs").status, 1);
     const sound = repo.runPatched(
       "leak-check-sound",
       { [FLOOR_MODULE]: (source) => `// leak check\n${source}` },
-      guard,
+      guardFor("check-appstore-config"),
       REPO_ROOT,
     );
     assert.equal(sound.status, 0, sound.output);
