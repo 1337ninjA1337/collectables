@@ -14,10 +14,15 @@ import {
   evaluateParsedInputs,
   evaluateScannedFloor,
   formatScannedFloorFailure,
+  formatScannedFloorProblem,
   isNonEmptyInput,
   isUnreadableInput,
   scannedFloorFor,
   unreadableInput,
+  validateScannedFloorEntry,
+  validateScannedFloors,
+  type ScannedFloor,
+  type ScannedFloorProblemCode,
 } from "../lib/scanned-floor";
 import { LINT_GUARDS } from "../lib/lint-guards";
 
@@ -214,6 +219,10 @@ describe("evaluateParsedInputs", () => {
     assert.equal(verdict.ok, false);
     if (verdict.ok) throw new Error("unreachable");
     assert.equal(verdict.failure.code, "invalid_floor");
+    assert.match(
+      formatScannedFloorFailure("g", verdict.failure),
+      /the caller declares an empty input list/,
+    );
   });
 
   it("separates a file it could not read from one it never handed over", () => {
@@ -258,46 +267,126 @@ describe("evaluateParsedInputs", () => {
   });
 });
 
+describe("validateScannedFloorEntry", () => {
+  const SOUND: ScannedFloor = {
+    count: { label: "source file", minimum: 10 },
+    note: "measured 2026-08-13",
+  };
+  const codesOf = (floor: ScannedFloor) =>
+    validateScannedFloorEntry("check-x", floor).map((p) => p.code);
+
+  it("finds nothing wrong with a sound entry, in each of the three shapes", () => {
+    assert.deepEqual(codesOf(SOUND), []);
+    assert.deepEqual(codesOf({ inputs: ["app.json"], note: "one fixed file" }), []);
+    assert.deepEqual(codesOf({ delegatedTo: "somewhere else", note: "why" }), []);
+    // The one guard that legitimately declares both shapes at once.
+    assert.deepEqual(
+      codesOf({ ...SOUND, inputs: ["docs/x.md"], note: "measured 2026-08-13" }),
+      [],
+    );
+  });
+
+  /** One fixture per problem code — the map the exhaustiveness test reads. */
+  const BROKEN: Record<ScannedFloorProblemCode, ScannedFloor> = {
+    no_shape: { note: "declares nothing" },
+    invalid_minimum: { count: { label: "file", minimum: 0 }, note: "2026-08-13" },
+    empty_label: { count: { label: " ", minimum: 10 }, note: "2026-08-13" },
+    empty_inputs: { inputs: [], note: "nothing named" },
+    blank_input: { inputs: ["app.json", "  "], note: "one is blank" },
+    duplicate_input: { inputs: ["app.json", "app.json"], note: "twice" },
+    delegation_with_shape: {
+      count: { label: "file", minimum: 10 },
+      delegatedTo: "elsewhere",
+      note: "2026-08-13",
+    },
+    empty_delegation: { delegatedTo: "  ", note: "where?" },
+    empty_note: { ...SOUND, note: "" },
+    undated_note: { ...SOUND, note: "measured recently" },
+  };
+
+  for (const [code, floor] of Object.entries(BROKEN) as [
+    ScannedFloorProblemCode,
+    ScannedFloor,
+  ][]) {
+    it(`reports ${code}`, () => {
+      assert.ok(
+        codesOf(floor).includes(code),
+        `expected ${code}, got ${codesOf(floor).join(", ") || "no problems"}`,
+      );
+    });
+  }
+
+  it("gives every problem code a fixture, so a new code cannot ship uncovered", () => {
+    // Mirrors the exhaustive FAILURE_MESSAGE record: a code with no fixture
+    // is a code nobody has ever seen fire.
+    const covered = Object.keys(BROKEN) as ScannedFloorProblemCode[];
+    const produced = new Set(
+      Object.values(BROKEN).flatMap((floor) => codesOf(floor)),
+    );
+    for (const code of covered) {
+      assert.ok(produced.has(code), `${code} has a fixture that does not produce it`);
+    }
+  });
+
+  it("names the entry and reads as a sentence about it", () => {
+    const [problem] = validateScannedFloorEntry("check-x", BROKEN.no_shape);
+    assert.equal(problem.checkName, "check-x");
+    assert.match(formatScannedFloorProblem(problem), /^check-x declares no premise/);
+  });
+
+  it("reports every problem with an entry, not just the first", () => {
+    const codes = codesOf({ count: { label: "", minimum: -3 }, note: "" });
+    assert.ok(codes.includes("invalid_minimum"));
+    assert.ok(codes.includes("empty_label"));
+    assert.ok(codes.includes("empty_note"));
+  });
+
+  it("does not ask an inputs-only or delegated entry to date its note", () => {
+    // Only a count carries a measurement; the other two shapes have no
+    // number to re-take, so a date would be decoration.
+    assert.deepEqual(codesOf({ inputs: ["app.json"], note: "no date here" }), []);
+    assert.deepEqual(codesOf({ delegatedTo: "elsewhere", note: "no date here" }), []);
+  });
+});
+
+describe("scannedFloorFor rejects a bogus entry", () => {
+  it("throws a ScannedFloorError so the wrapper prints it without a stack", () => {
+    // The real table is sound, so this reaches the branch through the same
+    // door a patched checkout does in lint-guard-invalid-floor.test.ts.
+    const [problem] = validateScannedFloorEntry("check-x", { note: "" });
+    assert.equal(problem.code, "no_shape");
+    const line = formatScannedFloorFailure("check-x", {
+      code: "invalid_floor",
+      count: 0,
+      minimum: 0,
+      label: DEFAULT_SCANNED_LABEL,
+      detail: `its SCANNED_FLOORS entry ${problem.detail}`,
+    });
+    assert.match(line, /^check-x: ERROR — its SCANNED_FLOORS entry declares no premise/);
+    assert.match(line, /lib\/scanned-floor\.ts/);
+  });
+
+  it("still throws a plain Error for a guard with no entry at all", () => {
+    // Unknown name and bogus entry are different bugs: one is a typo in the
+    // guard, the other is a mistake in the table.
+    assert.throws(() => scannedFloorFor("check-nothing"), (error: Error) => {
+      assert.ok(!(error instanceof ScannedFloorError));
+      return /no committed floor/.test(error.message);
+    });
+  });
+});
+
 describe("SCANNED_FLOORS", () => {
   const entries = Object.entries(SCANNED_FLOORS);
 
-  it("gives every count entry a positive integer floor and a label", () => {
-    for (const [name, floor] of entries) {
-      if (!floor.count) continue;
-      assert.ok(
-        Number.isInteger(floor.count.minimum) && floor.count.minimum >= 1,
-        `${name} floor must be a positive integer`,
-      );
-      assert.ok(floor.count.label.length > 0, `${name} needs a label`);
-    }
-  });
-
-  it("gives every inputs entry at least one named input", () => {
-    for (const [name, floor] of entries) {
-      if (!floor.inputs) continue;
-      assert.ok(floor.inputs.length > 0, `${name} declares an empty input list`);
-    }
-  });
-
-  it("gives every entry a shape — none may declare nothing at all", () => {
-    for (const [name, floor] of entries) {
-      assert.ok(
-        floor.count || floor.inputs || floor.delegatedTo,
-        `${name} declares no premise of any kind, which is the hole this table closes`,
-      );
-    }
-  });
-
-  it("gives every entry a note, dated when it carries a measurement", () => {
-    for (const [name, floor] of entries) {
-      assert.ok(floor.note.length > 0, `${name} needs a note`);
-      if (!floor.count) continue;
-      assert.match(
-        floor.note,
-        /\d{4}-\d{2}-\d{2}/,
-        `${name} note must date the measurement — a floor with no measurement is a magic constant`,
-      );
-    }
+  it("is structurally sound — no bogus floor, no shapeless entry, no undated note", () => {
+    // The four hand-rolled loops this replaces asserted the same properties
+    // the guards themselves now depend on, from a second copy that could
+    // drift. validateScannedFloors IS the contract; this reads it.
+    assert.deepEqual(
+      validateScannedFloors(SCANNED_FLOORS).map(formatScannedFloorProblem),
+      [],
+    );
   });
 
   it("covers every guard in the LINT_GUARDS registry, keyed by check name", () => {

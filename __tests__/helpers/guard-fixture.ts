@@ -38,6 +38,42 @@ import type { LintGuard } from "../../lib/lint-guards";
 /** The repository this fixture copies out of. */
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 
+/**
+ * The loader every guard in every one of these suites is spawned through.
+ *
+ * `node --import tsx <script>` rather than `node_modules/.bin/tsx <script>`,
+ * and the difference is not cosmetic: the `tsx` bin is a WRAPPER that spawns
+ * its own node child. `execFileSync` gives that child the same stdout pipe, so
+ * a `timeout` that kills the wrapper leaves the grandchild holding the write
+ * end open, the parent's read never sees EOF, and the call hangs anyway — the
+ * timeout below would be decoration. One process, no grandchild, and the
+ * ~430 ms wrapper boot goes with it.
+ */
+const TSX_MODULE = path.join(REPO_ROOT, "node_modules", "tsx");
+
+/**
+ * Fail on the missing install rather than on its symptom.
+ *
+ * Spawning against an absent loader exits non-zero with no stdout and no
+ * stderr, so `runGuardIn` captures `""` and exit 1 — which is byte-for-byte
+ * what a guard REFUSING looks like to these suites. Every assertion of the
+ * form "this run failed" then passes for the wrong reason, and every assertion
+ * of the form "this run passed" fails with a bare `1 !== 0` and no output to
+ * explain it. Four suites depend on this; the diagnosis is worth one
+ * `existsSync`.
+ */
+function tsxLoader(): string {
+  if (!fs.existsSync(TSX_MODULE)) {
+    throw new Error(
+      `guard-fixture: ${TSX_MODULE} does not exist, so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
+    );
+  }
+  // The bare specifier, not the directory: node resolves `--import tsx`
+  // against `cwd` (REPO_ROOT below) through the package's own exports map,
+  // while an absolute directory path is an ERR_UNSUPPORTED_DIR_IMPORT.
+  return "tsx";
+}
+
 export type PartialRoot = {
   /** Absolute path of the scratch root, for `LINT_GUARD_REPO_ROOT`. */
   readonly root: string;
@@ -110,13 +146,34 @@ export type GuardRun = {
 const runs = new Map<string, GuardRun>();
 
 /**
+ * Ceiling on a single guard run, ~70x the ~430 ms a boot actually costs.
+ *
+ * `execFileSync` with no timeout waits forever, and forever inside a test
+ * runner is a CI job that burns its whole limit with no output and no failing
+ * assertion to point at — the worst possible shape for a harness whose entire
+ * job is turning silence into a stated result. A guard that has not answered
+ * in half a minute has not answered; the timeout turns that into a normal
+ * captured failure the assertions can read.
+ */
+const GUARD_RUN_TIMEOUT_MS = 30_000;
+
+/**
+ * Guards print reports, and a report over a broken tree can be long. Node's
+ * 1MB default would turn an overlong report into an ENOBUFS throw with the
+ * output discarded, which reads as a crash rather than as the finding it is.
+ */
+const GUARD_RUN_MAX_BUFFER = 16 * 1024 * 1024;
+
+/**
  * A guard, run against a scratch root, memoised per (script, args, root) —
- * every assertion about one run would otherwise pay its own ~430 ms tsx boot.
+ * every assertion about one run would otherwise pay its own loader boot
+ * (~260 ms now that the `tsx` wrapper process is gone; it was ~430 ms).
  *
  * Failure is the expected outcome here, so a non-zero exit is captured rather
  * than thrown: the exit code and the message are both things to assert.
  */
 export function runGuardIn(guard: LintGuard, root: string): GuardRun {
+  const scriptRoot = REPO_ROOT;
   const key = `${guard.scriptPath} ${guard.args.join(" ")} ${root}`;
   const cached = runs.get(key);
   if (cached) return cached;
@@ -124,23 +181,40 @@ export function runGuardIn(guard: LintGuard, root: string): GuardRun {
   let status = 0;
   try {
     output = execFileSync(
-      path.join(REPO_ROOT, "node_modules", ".bin", "tsx"),
-      [path.join(REPO_ROOT, guard.scriptPath), ...guard.args],
+      process.execPath,
+      [
+        "--import",
+        tsxLoader(),
+        path.join(scriptRoot, guard.scriptPath),
+        ...guard.args,
+      ],
       {
         cwd: REPO_ROOT,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
         env: { ...process.env, [GUARD_ROOT_ENV]: root },
+        timeout: GUARD_RUN_TIMEOUT_MS,
+        killSignal: "SIGKILL",
+        maxBuffer: GUARD_RUN_MAX_BUFFER,
       },
     );
   } catch (error) {
     const failure = error as {
       status?: number;
+      signal?: string;
+      code?: string;
       stdout?: string;
       stderr?: string;
     };
     status = failure.status ?? 1;
     output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
+    if (failure.signal === "SIGKILL" || failure.code === "ETIMEDOUT") {
+      // Say which run stalled and what it had managed to print. Without this
+      // the assertions downstream see an empty output and exit 1, which is
+      // exactly what a guard REFUSING looks like — the same confusion
+      // `tsxBinary()` exists to prevent, arriving by a different door.
+      output = `${output}\nguard-fixture: ${guard.scriptPath} did not finish within ${GUARD_RUN_TIMEOUT_MS}ms against ${root} and was killed. Everything it printed before that is above.`;
+    }
   }
   const run = { output, status };
   runs.set(key, run);
