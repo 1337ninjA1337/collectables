@@ -38,6 +38,29 @@ import type { LintGuard } from "../../lib/lint-guards";
 /** The repository this fixture copies out of. */
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 
+/** The binary every guard in every one of these suites is spawned through. */
+const TSX_BIN = path.join(REPO_ROOT, "node_modules", ".bin", "tsx");
+
+/**
+ * Fail on the missing install rather than on its symptom.
+ *
+ * `execFileSync` on an absent binary throws ENOENT with no stdout and no
+ * stderr, so `runGuardFrom` captures `""` and exit 1 — which is byte-for-byte
+ * what a guard REFUSING looks like to these suites. Every assertion of the
+ * form "this run failed" then passes for the wrong reason, and every assertion
+ * of the form "this run passed" fails with a bare `1 !== 0` and no output to
+ * explain it. Four suites depend on this binary; the diagnosis is worth one
+ * `existsSync`.
+ */
+function tsxBinary(): string {
+  if (!fs.existsSync(TSX_BIN)) {
+    throw new Error(
+      `guard-fixture: ${TSX_BIN} does not exist, so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
+    );
+  }
+  return TSX_BIN;
+}
+
 export type PartialRoot = {
   /** Absolute path of the scratch root, for `LINT_GUARD_REPO_ROOT`. */
   readonly root: string;
@@ -101,6 +124,53 @@ export function makePartialRoot(
   };
 }
 
+/**
+ * A copy of the parts of this repository a guard needs to RUN, with named
+ * files rewritten on the way in.
+ *
+ * The other fixtures here move what a guard LOOKS AT. This one moves what a
+ * guard IS, which is the only way to produce `invalid_floor`: that code is
+ * about the guard's own declaration in `lib/scanned-floor.ts`, so the
+ * committed table has to be wrong for it to fire, and the committed table is —
+ * correctly — never wrong. Copy `lib/` and `scripts/`, patch the table in the
+ * copy, run the copy.
+ *
+ * `lib/` and `scripts/` are enough because every guard wrapper reaches its
+ * dependencies through relative imports; the tsx binary and `node_modules`
+ * stay in the real checkout, resolved from the absolute paths
+ * {@link runGuardFrom} passes.
+ *
+ * Each patch MUST change its file. A patch whose anchor string has drifted
+ * would otherwise copy the source verbatim, the guard would pass, and the test
+ * asserting a refusal would report the refusal it never got as a bug in the
+ * guard rather than as a stale fixture.
+ */
+export function makePatchedRepo(
+  patches: Readonly<Record<string, (source: string) => string>>,
+  entries: readonly string[] = ["lib", "scripts"],
+): PartialRoot {
+  const patched = makePartialRoot(entries);
+  for (const [relative, patch] of Object.entries(patches)) {
+    const target = path.join(patched.root, relative);
+    if (!fs.existsSync(target)) {
+      patched.cleanup();
+      throw new Error(
+        `makePatchedRepo: "${relative}" is not in the copied entries (${entries.join(", ")}), so the patch would land nowhere.`,
+      );
+    }
+    const source = fs.readFileSync(target, "utf8");
+    const next = patch(source);
+    if (next === source) {
+      patched.cleanup();
+      throw new Error(
+        `makePatchedRepo: the patch for "${relative}" changed nothing — its anchor has drifted, and the fixture would run an UNPATCHED guard while claiming to run a broken one.`,
+      );
+    }
+    fs.writeFileSync(target, next, "utf8");
+  }
+  return patched;
+}
+
 export type GuardRun = {
   /** stdout and stderr together — the refusal lands on stderr. */
   readonly output: string;
@@ -117,15 +187,29 @@ const runs = new Map<string, GuardRun>();
  * than thrown: the exit code and the message are both things to assert.
  */
 export function runGuardIn(guard: LintGuard, root: string): GuardRun {
-  const key = `${guard.scriptPath} ${guard.args.join(" ")} ${root}`;
+  return runGuardFrom(guard, REPO_ROOT, root);
+}
+
+/**
+ * {@link runGuardIn} with the guard's own source root split out from the tree
+ * it scans, so a copy patched by {@link makePatchedRepo} can be the thing that
+ * runs while a real, complete tree is the thing it walks — leaving the
+ * patched declaration as the only reason the run can fail.
+ */
+export function runGuardFrom(
+  guard: LintGuard,
+  scriptRoot: string,
+  root: string,
+): GuardRun {
+  const key = `${scriptRoot} ${guard.scriptPath} ${guard.args.join(" ")} ${root}`;
   const cached = runs.get(key);
   if (cached) return cached;
   let output = "";
   let status = 0;
   try {
     output = execFileSync(
-      path.join(REPO_ROOT, "node_modules", ".bin", "tsx"),
-      [path.join(REPO_ROOT, guard.scriptPath), ...guard.args],
+      tsxBinary(),
+      [path.join(scriptRoot, guard.scriptPath), ...guard.args],
       {
         cwd: REPO_ROOT,
         encoding: "utf8",

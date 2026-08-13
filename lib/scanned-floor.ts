@@ -56,6 +56,13 @@ export type ScannedFloorFailure = {
   readonly input?: string;
   /** Set for `unreadable_input`: what the filesystem or parser said. */
   readonly reason?: string;
+  /**
+   * Set for `invalid_floor` when the declaration is bogus in a way the bare
+   * `minimum` cannot describe (an empty input list, a delegation that also
+   * declares a count). A whole sentence, not a fragment — it REPLACES the
+   * default numeric clause in the message.
+   */
+  readonly detail?: string;
 };
 
 export type ScannedFloorVerdict =
@@ -74,13 +81,19 @@ export const DEFAULT_SCANNED_LABEL = "file";
  * covered. It is reported as its own failure code rather than thrown so the
  * message can name the guard alongside the other two.
  */
+const NUMERIC_FLOOR_DETAIL = (minimum: number) =>
+  `floor of ${minimum} is not a positive integer — a floor below 1 passes over an empty walk, which is the failure it is supposed to catch`;
+
 export function evaluateScannedFloor(
   count: number,
   minimum: number,
   label: string = DEFAULT_SCANNED_LABEL,
 ): ScannedFloorVerdict {
   if (!Number.isInteger(minimum) || minimum < 1) {
-    return { ok: false, failure: { code: "invalid_floor", count, minimum, label } };
+    return {
+      ok: false,
+      failure: { code: "invalid_floor", count, minimum, label, detail: NUMERIC_FLOOR_DETAIL(minimum) },
+    };
   }
   if (count <= 0) {
     return { ok: false, failure: { code: "no_files", count, minimum, label } };
@@ -106,8 +119,9 @@ const FAILURE_MESSAGE: Record<
     `scanned 0 ${f.label}(s) — a pass over zero ${f.label}s is not a pass, so this guard did not run. Expected at least ${f.minimum}. Check the scan roots still exist and are readable.`,
   below_floor: (f) =>
     `scanned ${f.count} ${f.label}(s), below the committed floor of ${f.minimum} — the walk is missing most of what it used to see, so a green result here proves nothing. ${REMEASURE_HINT}`,
-  invalid_floor: (f) =>
-    `floor of ${f.minimum} is not a positive integer — a floor below 1 passes over an empty walk, which is the failure it is supposed to catch. ${REMEASURE_HINT}`,
+  // The one code that is about the GUARD's own declaration rather than about
+  // the tree, so the sentence comes from whoever spotted the bogus floor.
+  invalid_floor: (f) => `${f.detail ?? NUMERIC_FLOOR_DETAIL(f.minimum)}. ${REMEASURE_HINT}`,
   missing_input: (f) =>
     `declared input "${f.input}" was never handed to the floor check — the guard says it reads it, and this run did not. ${REMEASURE_HINT}`,
   unreadable_input: (f) =>
@@ -185,6 +199,123 @@ export type ScannedFloor = {
 };
 
 /**
+ * What is structurally wrong with ONE {@link SCANNED_FLOORS} entry.
+ *
+ * These used to live as four hand-rolled loops in `__tests__/scanned-floor.test.ts`
+ * — a test asserting properties of a table, next to a runtime branch in
+ * `evaluateScannedFloor` asserting one of the same properties again. Two
+ * copies of one contract, neither of them the table's own, and the runtime
+ * half could never fire: every guard reaches its floor through
+ * {@link scannedFloorFor}, which reads this table, and the table is committed
+ * source. So the contract moved HERE, beside the table it is about, and both
+ * the test and the lookup now read it from one place.
+ *
+ * A problem is reported rather than thrown so the caller decides: the test
+ * lists every one of them at once, and {@link scannedFloorFor} raises the
+ * first as the `invalid_floor` failure the wrapper already knows how to print.
+ */
+export type ScannedFloorProblemCode =
+  /** Declares none of `count`, `inputs`, `delegatedTo` — a floor of nothing. */
+  | "no_shape"
+  /** `count.minimum` is not a positive integer. */
+  | "invalid_minimum"
+  /** `count.label` is blank, so the failure line would read "scanned 3 (s)". */
+  | "empty_label"
+  /** `inputs: []` — declared the shape and named nothing to check. */
+  | "empty_inputs"
+  /** A blank entry in `inputs`, which no wrapper can hand over under a name. */
+  | "blank_input"
+  /** The same input twice: the second is dead weight the message never names. */
+  | "duplicate_input"
+  /** `delegatedTo` alongside `count`/`inputs` — two premises, neither owned. */
+  | "delegation_with_shape"
+  /** `delegatedTo: ""` — says the premise lives elsewhere without saying where. */
+  | "empty_delegation"
+  /** No note, so the number is a magic constant again. */
+  | "empty_note"
+  /** A `count` note carrying no date — a measurement nobody can re-take. */
+  | "undated_note";
+
+export type ScannedFloorProblem = {
+  /** The `SCANNED_FLOORS` key the problem is about. */
+  readonly checkName: string;
+  readonly code: ScannedFloorProblemCode;
+  /** A whole sentence, ready to be handed to `invalid_floor`'s `detail`. */
+  readonly detail: string;
+};
+
+/** Exhaustive over {@link ScannedFloorProblemCode} — a new code needs a sentence. */
+const PROBLEM_DETAIL: Record<ScannedFloorProblemCode, string> = {
+  no_shape:
+    "declares no premise of any kind — no count to floor, no inputs to read, no delegation, which is the exact hole this table exists to close",
+  invalid_minimum:
+    "declares a count floor that is not a positive integer — a floor below 1 passes over an empty walk, which is the failure it is supposed to catch",
+  empty_label:
+    "declares a count floor with no label, so its failure line would name no noun for what it counted",
+  empty_inputs:
+    "declares an empty input list, so the inputs assertion passes without reading anything",
+  blank_input:
+    "declares a blank input name, which no wrapper can hand over and no message can name",
+  duplicate_input:
+    "declares the same input twice — the second copy is never reached, so a wrapper could drop it unnoticed",
+  delegation_with_shape:
+    "delegates its premise elsewhere AND declares a count or inputs here, so two places claim to own one check and neither is authoritative",
+  empty_delegation:
+    "delegates its premise without saying where, which is indistinguishable from opting out",
+  empty_note:
+    "carries no note, so its shape is a decision with no recorded reason",
+  undated_note:
+    "carries a count floor whose note names no date — an undated measurement is a magic constant with prose around it",
+};
+
+const MEASUREMENT_DATE = /\d{4}-\d{2}-\d{2}/;
+
+/** The structural problems with one entry, in declaration order. Empty when sound. */
+export function validateScannedFloorEntry(
+  checkName: string,
+  floor: ScannedFloor,
+): readonly ScannedFloorProblem[] {
+  const problems: ScannedFloorProblem[] = [];
+  const add = (code: ScannedFloorProblemCode) =>
+    problems.push({ checkName, code, detail: PROBLEM_DETAIL[code] });
+
+  if (!floor.count && !floor.inputs && !floor.delegatedTo) add("no_shape");
+  if (floor.delegatedTo !== undefined) {
+    if (floor.delegatedTo.trim().length === 0) add("empty_delegation");
+    if (floor.count || floor.inputs) add("delegation_with_shape");
+  }
+  if (floor.count) {
+    if (!Number.isInteger(floor.count.minimum) || floor.count.minimum < 1) {
+      add("invalid_minimum");
+    }
+    if (floor.count.label.trim().length === 0) add("empty_label");
+  }
+  if (floor.inputs) {
+    if (floor.inputs.length === 0) add("empty_inputs");
+    if (floor.inputs.some((input) => input.trim().length === 0)) add("blank_input");
+    if (new Set(floor.inputs).size !== floor.inputs.length) add("duplicate_input");
+  }
+  if (floor.note.trim().length === 0) add("empty_note");
+  else if (floor.count && !MEASUREMENT_DATE.test(floor.note)) add("undated_note");
+
+  return problems;
+}
+
+/** Every entry's problems, flattened. Empty means the whole table is sound. */
+export function validateScannedFloors(
+  table: Readonly<Record<string, ScannedFloor>>,
+): readonly ScannedFloorProblem[] {
+  return Object.entries(table).flatMap(([checkName, floor]) =>
+    validateScannedFloorEntry(checkName, floor),
+  );
+}
+
+/** One line per problem, prefixed with the entry it is about. */
+export function formatScannedFloorProblem(problem: ScannedFloorProblem): string {
+  return `${problem.checkName} ${problem.detail}`;
+}
+
+/**
  * What a wrapper hands over for an input it tried to read and could not.
  *
  * Without it the two failures collapse: a wrapper that drops the key reports
@@ -233,7 +364,16 @@ export function evaluateParsedInputs(
   if (declared.length === 0) {
     return {
       ok: false,
-      failure: { code: "invalid_floor", count: 0, minimum: 0, label: "input" },
+      failure: {
+        code: "invalid_floor",
+        count: 0,
+        minimum: 0,
+        label: "input",
+        // The table path can no longer reach this — `scannedFloorFor` rejects
+        // an `inputs: []` entry first — so the subject here is whoever called
+        // the pure function with a list of nothing.
+        detail: `the caller ${PROBLEM_DETAIL.empty_inputs}`,
+      },
     };
   }
   for (const name of declared) {
@@ -345,13 +485,34 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
   },
 };
 
-/** Throws if `checkName` has no committed floor — a guard cannot opt out silently. */
+/**
+ * Throws if `checkName` has no committed floor — a guard cannot opt out
+ * silently — or if the floor it does have is structurally unusable.
+ *
+ * The second half is why `invalid_floor` is not dead code. Every guard reads
+ * its floor through here, so a bogus entry is caught on the guard's own run,
+ * inside the `try` its wrapper already wraps `main()` in, and printed as the
+ * same one-line refusal as any other floor failure — rather than sailing past
+ * as a floor of 0 that greenlights an empty walk. It is thrown as a
+ * {@link ScannedFloorError} for exactly that reason: the wrapper catches that
+ * type and exits 1 without a stack trace.
+ */
 export function scannedFloorFor(checkName: string): ScannedFloor {
   const floor = SCANNED_FLOORS[checkName];
   if (!floor) {
     throw new Error(
       `scanned-floor: no committed floor for "${checkName}" — add one to SCANNED_FLOORS in lib/scanned-floor.ts.`,
     );
+  }
+  const [problem] = validateScannedFloorEntry(checkName, floor);
+  if (problem) {
+    throw new ScannedFloorError(checkName, {
+      code: "invalid_floor",
+      count: 0,
+      minimum: floor.count?.minimum ?? 0,
+      label: floor.count?.label ?? DEFAULT_SCANNED_LABEL,
+      detail: `its SCANNED_FLOORS entry ${problem.detail}`,
+    });
   }
   return floor;
 }
