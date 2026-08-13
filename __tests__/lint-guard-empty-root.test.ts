@@ -15,20 +15,21 @@
 
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 import { GUARD_ROOT_ENV } from "../lib/guard-root";
 import { LINT_GUARDS } from "../lib/lint-guards";
+import {
+  assertNoStackTrace,
+  checkNameOf,
+  runGuardIn,
+  runGuardWith,
+  type GuardRun,
+} from "./helpers/guard-fixture";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
-const TSX = path.join(REPO_ROOT, "node_modules", ".bin", "tsx");
-
-/** The check name a guard prints, derived from the path the registry pins. */
-const checkNameOf = (scriptPath: string) =>
-  scriptPath.replace(/^scripts\//, "").replace(/\.ts$/, "");
 
 /**
  * One empty directory, shared by all twelve: it is the whole fixture. Nothing
@@ -40,43 +41,15 @@ after(() => {
   fs.rmSync(EMPTY_ROOT, { recursive: true, force: true });
 });
 
-type GuardRun = { readonly output: string; readonly status: number };
-
-const runs = new Map<string, GuardRun>();
-
-function runGuard(
-  scriptPath: string,
-  args: readonly string[],
-  env: Record<string, string>,
-): GuardRun {
-  const key = [scriptPath, ...args, JSON.stringify(env)].join(" ");
-  const cached = runs.get(key);
-  if (cached) return cached;
-  let output = "";
-  let status = 0;
-  try {
-    output = execFileSync(TSX, [path.join(REPO_ROOT, scriptPath), ...args], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, ...env },
-    });
-  } catch (error) {
-    const failure = error as {
-      status?: number;
-      stdout?: string;
-      stderr?: string;
-    };
-    status = failure.status ?? 1;
-    output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
-  }
-  const run = { output, status };
-  runs.set(key, run);
-  return run;
-}
-
+// Spawning goes through the shared helper rather than the copy this file used
+// to keep. That copy still spawned `node_modules/.bin/tsx` — a WRAPPER process
+// that hands its own child the stdout pipe `execFileSync` reads — with no
+// timeout and no `maxBuffer`, which is precisely the shape that hung CI's
+// "Run tests" step for 25 minutes on a suite that takes seconds. Twelve guards
+// spawned that way is twelve chances at it, and the fix already existed one
+// directory over.
 const againstEmptyRoot = (guard: (typeof LINT_GUARDS)[number]): GuardRun =>
-  runGuard(guard.scriptPath, guard.args, { [GUARD_ROOT_ENV]: EMPTY_ROOT });
+  runGuardIn(guard, EMPTY_ROOT);
 
 describe("every guard refuses an empty scan root", () => {
   for (const guard of LINT_GUARDS) {
@@ -104,12 +77,7 @@ describe("every guard refuses an empty scan root", () => {
       it("prints no stack trace — a premise failure is a result, not a crash", () => {
         // An uncaught ENOENT from readdirSync also exits 1, so the exit code
         // alone cannot tell "refused" from "crashed".
-        const { output } = againstEmptyRoot(guard);
-        assert.doesNotMatch(
-          output,
-          /^\s+at .+:\d+:\d+\)?$/m,
-          `${guard.npmScript} crashed rather than refusing:\n${output}`,
-        );
+        assertNoStackTrace(againstEmptyRoot(guard).output, guard.npmScript);
       });
 
       it("announces that it was looking somewhere else", () => {
@@ -139,7 +107,7 @@ describe("the override itself", () => {
   const guard = LINT_GUARDS[0];
 
   it("is off by default — an ordinary run announces nothing", () => {
-    const run = runGuard(guard.scriptPath, guard.args, {});
+    const run = runGuardWith(guard);
     assert.equal(run.status, 0, run.output);
     assert.doesNotMatch(
       run.output,
@@ -149,18 +117,14 @@ describe("the override itself", () => {
   });
 
   it("refuses a relative root with one line rather than resolving it against cwd", () => {
-    const run = runGuard(guard.scriptPath, guard.args, {
-      [GUARD_ROOT_ENV]: "some/relative/path",
-    });
+    const run = runGuardWith(guard, { scanRoot: "some/relative/path" });
     assert.equal(run.status, 1, run.output);
     assert.match(run.output, /is not an absolute path/);
-    assert.doesNotMatch(run.output, /^\s+at .+:\d+:\d+\)?$/m);
+    assertNoStackTrace(run.output, `${guard.npmScript} with a relative root`);
   });
 
   it("is unset by a blank value, not pointed at the current directory", () => {
-    const run = runGuard(guard.scriptPath, guard.args, {
-      [GUARD_ROOT_ENV]: "",
-    });
+    const run = runGuardWith(guard, { scanRoot: "" });
     assert.equal(run.status, 0, run.output);
   });
 });

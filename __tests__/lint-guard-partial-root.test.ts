@@ -26,6 +26,7 @@ import * as path from "node:path";
 import { LINT_GUARDS } from "../lib/lint-guards";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
 import {
+  assertNoStackTrace,
   checkNameOf,
   makePartialRoot,
   runGuardIn,
@@ -186,12 +187,7 @@ describe("every count-shaped guard refuses a partial scan root", () => {
       });
 
       it("prints no stack trace — a premise failure is a result, not a crash", () => {
-        const { output } = run();
-        assert.doesNotMatch(
-          output,
-          /^\s+at .+:\d+:\d+\)?$/m,
-          `${guard.npmScript} crashed rather than refusing:\n${output}`,
-        );
+        assertNoStackTrace(run().output, guard.npmScript);
       });
     });
   }

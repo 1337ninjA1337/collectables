@@ -27,7 +27,8 @@
  * glob, so it is a library, not a suite.
  */
 
-import { execFileSync } from "node:child_process";
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -137,51 +138,131 @@ export function makePartialRoot(
   };
 }
 
+/** How a fixture rewrites one file of the copied checkout. */
+export type RepoPatches = Readonly<Record<string, (source: string) => string>>;
+
 /**
- * A copy of the parts of this repository a guard needs to RUN, with named
- * files rewritten on the way in.
+ * The line every guard run out of a {@link makeSharedPatchedRepo} copy prints
+ * before it does anything else.
+ *
+ * A patched fixture's whole claim is "the COPY ran". Exit 0 does not establish
+ * that: a bug that resolved the script path against the real checkout instead
+ * of the copy's root would produce the same green, and would make every case
+ * in the file silently exercise the committed table. The marker is a sentence
+ * the real checkout cannot say, so provenance becomes a thing each case can
+ * assert rather than a thing the fixture asks to be believed.
+ */
+export const PATCHED_REPO_MARKER = "patched-repo copy speaking";
+
+/** The file the marker is injected into — imported by every guard wrapper. */
+const MARKER_MODULE = "lib/scanned-floor.ts";
+
+export type SharedPatchedRepo = {
+  /** Absolute path of the copied checkout, for `scriptRoot`. */
+  readonly root: string;
+  /**
+   * Applies `patches`, runs `guard` against `scanRoot`, restores the copy.
+   * `label` identifies the patch in the run memo — see {@link runGuardWith}.
+   */
+  readonly runPatched: (
+    label: string,
+    patches: RepoPatches,
+    guard: LintGuard,
+    scanRoot: string,
+  ) => GuardRun;
+  /** Removes the copy. Safe to call twice. */
+  readonly cleanup: () => void;
+};
+
+/**
+ * ONE copy of the parts of this repository a guard needs to RUN, rewritten per
+ * case and restored afterwards.
  *
  * The other fixtures here move what a guard LOOKS AT. This one moves what a
- * guard IS, which is the only way to produce `invalid_floor`: that code is
- * about the guard's own declaration in `lib/scanned-floor.ts`, so the
- * committed table has to be wrong for it to fire, and the committed table is —
- * correctly — never wrong. Copy `lib/` and `scripts/`, patch the table in the
- * copy, run the copy.
+ * guard IS, which is the only way to produce `invalid_floor` and the nine
+ * other `SCANNED_FLOORS` problem codes: those are findings about the guard's
+ * own declaration, so the committed table has to be wrong for them to fire,
+ * and the committed table is — correctly — never wrong. Copy `lib/` and
+ * `scripts/`, patch the table in the copy, run the copy.
+ *
+ * Copied ONCE, not per case. Each copy is ~200 files, and a harness that grows
+ * a copy per problem code pays that ~10 times over to assert ten one-line
+ * declarations. `runPatched` writes the patch, spawns, and writes the pristine
+ * bytes back, so a case costs a couple of `writeFileSync` calls instead of a
+ * recursive copy. The restore is unconditional — a case that threw mid-run
+ * would otherwise leave its patch in place and hand the NEXT case a copy that
+ * is broken in a way its own patch never mentions.
  *
  * `lib/` and `scripts/` are enough because every guard wrapper reaches its
  * dependencies through relative imports; the tsx loader and `node_modules`
  * stay in the real checkout, resolved from the absolute paths
- * {@link runGuardFrom} passes.
- *
- * Each patch MUST change its file. A patch whose anchor string has drifted
- * would otherwise copy the source verbatim, the guard would pass, and the test
- * asserting a refusal would report the refusal it never got as a bug in the
- * guard rather than as a stale fixture.
+ * {@link runGuardWith} passes.
  */
-export function makePatchedRepo(
-  patches: Readonly<Record<string, (source: string) => string>>,
+export function makeSharedPatchedRepo(
   entries: readonly string[] = ["lib", "scripts"],
-): PartialRoot {
-  const patched = makePartialRoot(entries);
-  for (const [relative, patch] of Object.entries(patches)) {
-    const target = path.join(patched.root, relative);
-    if (!fs.existsSync(target)) {
-      patched.cleanup();
-      throw new Error(
-        `makePatchedRepo: "${relative}" is not in the copied entries (${entries.join(", ")}), so the patch would land nowhere.`,
-      );
-    }
-    const source = fs.readFileSync(target, "utf8");
-    const next = patch(source);
-    if (next === source) {
-      patched.cleanup();
-      throw new Error(
-        `makePatchedRepo: the patch for "${relative}" changed nothing — its anchor has drifted, and the fixture would run an UNPATCHED guard while claiming to run a broken one.`,
-      );
-    }
-    fs.writeFileSync(target, next, "utf8");
+): SharedPatchedRepo {
+  const copy = makePartialRoot(entries);
+  const markerTarget = path.join(copy.root, MARKER_MODULE);
+  if (!fs.existsSync(markerTarget)) {
+    copy.cleanup();
+    throw new Error(
+      `makeSharedPatchedRepo: ${MARKER_MODULE} is not in the copied entries (${entries.join(", ")}), so no run out of this copy could prove it came from the copy.`,
+    );
   }
-  return patched;
+  // Injected once and never restored: it is the copy's identity, not a case's
+  // patch. Top-level in a module every wrapper imports, so it lands before the
+  // guard's own first line whichever guard is spawned.
+  fs.writeFileSync(
+    markerTarget,
+    `console.error(${JSON.stringify(PATCHED_REPO_MARKER)});\n${fs.readFileSync(markerTarget, "utf8")}`,
+    "utf8",
+  );
+
+  /** Pristine bytes per patched file, captured the first time it is touched. */
+  const pristine = new Map<string, string>();
+
+  const applyPatches = (patches: RepoPatches): void => {
+    for (const [relative, patch] of Object.entries(patches)) {
+      const target = path.join(copy.root, relative);
+      if (!fs.existsSync(target)) {
+        throw new Error(
+          `runPatched: "${relative}" is not in the copied entries (${entries.join(", ")}), so the patch would land nowhere.`,
+        );
+      }
+      const source = fs.readFileSync(target, "utf8");
+      if (!pristine.has(relative)) pristine.set(relative, source);
+      const next = patch(source);
+      if (next === source) {
+        throw new Error(
+          `runPatched: the patch for "${relative}" changed nothing — its anchor has drifted, and the fixture would run an UNPATCHED guard while claiming to run a broken one.`,
+        );
+      }
+      fs.writeFileSync(target, next, "utf8");
+    }
+  };
+
+  const restore = (): void => {
+    for (const [relative, source] of pristine) {
+      fs.writeFileSync(path.join(copy.root, relative), source, "utf8");
+    }
+  };
+
+  return {
+    root: copy.root,
+    runPatched: (label, patches, guard, scanRoot) => {
+      applyPatches(patches);
+      try {
+        return runGuardWith(guard, {
+          scriptRoot: copy.root,
+          scanRoot,
+          label,
+        });
+      } finally {
+        restore();
+      }
+    },
+    cleanup: copy.cleanup,
+  };
 }
 
 export type GuardRun = {
@@ -211,80 +292,154 @@ const GUARD_RUN_TIMEOUT_MS = 30_000;
  */
 const GUARD_RUN_MAX_BUFFER = 16 * 1024 * 1024;
 
+export type GuardRunOptions = {
+  /** Checkout the wrapper's SOURCE is read from. Defaults to this repository. */
+  readonly scriptRoot?: string;
+  /** Tree the guard WALKS, handed over as `LINT_GUARD_REPO_ROOT`. */
+  readonly scanRoot?: string;
+  /** Extra environment. Wins over `scanRoot` when it names the same variable. */
+  readonly env?: Readonly<Record<string, string>>;
+  /**
+   * Distinguishes two runs that agree on everything above and disagree on the
+   * bytes at `scriptRoot` — the shared patched copy, rewritten per case.
+   *
+   * Without it the memo would answer the second case with the first case's
+   * result, and the wrong answer would be a CACHE HIT rather than an error: a
+   * green control would certify a patch that never ran.
+   */
+  readonly label?: string;
+};
+
 /**
- * A guard, run against a scratch root, memoised per (script, args, root) —
- * every assertion about one run would otherwise pay its own loader boot
- * (~260 ms now that the `tsx` wrapper process is gone; it was ~430 ms).
+ * A guard, run against a scratch root, memoised per
+ * (scriptRoot, script, args, env, label) — every assertion about one run would
+ * otherwise pay its own loader boot (~260 ms now that the `tsx` wrapper
+ * process is gone; it was ~430 ms).
  *
  * Failure is the expected outcome here, so a non-zero exit is captured rather
  * than thrown: the exit code and the message are both things to assert.
  */
+export function runGuardWith(
+  guard: LintGuard,
+  options: GuardRunOptions = {},
+): GuardRun {
+  const scriptRoot = options.scriptRoot ?? REPO_ROOT;
+  const extraEnv: Record<string, string> = {
+    ...(options.scanRoot === undefined
+      ? {}
+      : { [GUARD_ROOT_ENV]: options.scanRoot }),
+    ...(options.env ?? {}),
+  };
+  // Every field that can change what comes back is in the key, sorted so two
+  // equal environments cannot key differently by declaration order.
+  const key = JSON.stringify({
+    scriptRoot,
+    scriptPath: guard.scriptPath,
+    args: guard.args,
+    env: Object.keys(extraEnv)
+      .sort()
+      .map((name) => [name, extraEnv[name]]),
+    label: options.label ?? "",
+  });
+  const cached = runs.get(key);
+  if (cached) return cached;
+  const where = options.scanRoot ?? "the checkout it resolves for itself";
+  // Resolved BEFORE the spawn, so its diagnostic is a throw the caller sees
+  // rather than something folded into a captured failure — an absent loader
+  // exits non-zero with nothing on either pipe, which is byte-for-byte what a
+  // guard REFUSING looks like to these suites.
+  const loader = tsxLoader();
+  // `spawnSync`, not `execFileSync`, and the difference is one the harnesses
+  // depend on: `execFileSync` RETURNS stdout, so on a green run stderr is
+  // thrown away entirely. Guards print their premise notes there —
+  // `guard-io.ts` announces a redirected root with `console.error` — so an
+  // assertion about what a PASSING guard did or did not say was reading a
+  // string the note could never have been in. "An ordinary run announces
+  // nothing about the override" passed because the channel it would have been
+  // announced on was discarded, not because nothing was announced.
+  const result = spawnSync(
+    process.execPath,
+    ["--import", loader, path.join(scriptRoot, guard.scriptPath), ...guard.args],
+    {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, ...extraEnv },
+      timeout: GUARD_RUN_TIMEOUT_MS,
+      killSignal: "SIGKILL",
+      maxBuffer: GUARD_RUN_MAX_BUFFER,
+    },
+  );
+  let output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  // A killed process reports `status: null`; failure is the expected outcome
+  // here, so it is captured rather than thrown.
+  const status = result.status ?? 1;
+  const failure = result.error as (Error & { code?: string }) | undefined;
+  if (failure?.code === "ETIMEDOUT" || result.signal === "SIGKILL") {
+    // Say which run stalled and what it had managed to print. Without this the
+    // assertions downstream see an empty output and exit 1, which is exactly
+    // what a guard REFUSING looks like — the same confusion `tsxLoader()`
+    // exists to prevent, arriving by a different door.
+    output = `${output}\nguard-fixture: ${guard.scriptPath} (from ${scriptRoot}) did not finish within ${GUARD_RUN_TIMEOUT_MS}ms against ${where} and was killed. Everything it printed before that is above.`;
+  } else if (failure) {
+    // ENOBUFS and friends: the output is partial and the reason is not in it.
+    output = `${output}\nguard-fixture: spawning ${guard.scriptPath} (from ${scriptRoot}) failed with ${failure.code ?? failure.message}.`;
+  }
+  const run = { output, status };
+  runs.set(key, run);
+  return run;
+}
+
+/**
+ * A guard, run from this checkout against a scratch scan root — the shape the
+ * empty-root, partial-root and empty-input harnesses all want.
+ */
 export function runGuardIn(guard: LintGuard, root: string): GuardRun {
-  return runGuardFrom(guard, REPO_ROOT, root);
+  return runGuardWith(guard, { scanRoot: root });
 }
 
 /**
  * {@link runGuardIn} with the guard's own source root split out from the tree
- * it scans, so a copy patched by {@link makePatchedRepo} can be the thing that
- * runs while a real, complete tree is the thing it walks — leaving the
- * patched declaration as the only reason the run can fail.
+ * it scans, so a copy patched by {@link makeSharedPatchedRepo} can be the
+ * thing that runs while a real, complete tree is the thing it walks — leaving
+ * the patched declaration as the only reason the run can fail.
+ *
+ * Prefer `SharedPatchedRepo.runPatched`, which carries the patch label the
+ * memo needs; this is the unlabelled form, correct only while the bytes at
+ * `scriptRoot` stay put for the whole suite.
  */
 export function runGuardFrom(
   guard: LintGuard,
   scriptRoot: string,
   root: string,
 ): GuardRun {
-  const key = `${scriptRoot} ${guard.scriptPath} ${guard.args.join(" ")} ${root}`;
-  const cached = runs.get(key);
-  if (cached) return cached;
-  // Resolved BEFORE the try, not inside the argument list. The catch below
-  // turns any throw into `{ output: "", status: 1 }`, so a `tsxLoader()` call
-  // made inside it would have its diagnostic swallowed and reappear as the
-  // empty-output refusal it was written to distinguish itself from — the
-  // check would be dead code in the only situation it exists for.
-  const loader = tsxLoader();
-  let output = "";
-  let status = 0;
-  try {
-    output = execFileSync(
-      process.execPath,
-      [
-        "--import",
-        loader,
-        path.join(scriptRoot, guard.scriptPath),
-        ...guard.args,
-      ],
-      {
-        cwd: REPO_ROOT,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, [GUARD_ROOT_ENV]: root },
-        timeout: GUARD_RUN_TIMEOUT_MS,
-        killSignal: "SIGKILL",
-        maxBuffer: GUARD_RUN_MAX_BUFFER,
-      },
-    );
-  } catch (error) {
-    const failure = error as {
-      status?: number;
-      signal?: string;
-      code?: string;
-      stdout?: string;
-      stderr?: string;
-    };
-    status = failure.status ?? 1;
-    output = `${failure.stdout ?? ""}${failure.stderr ?? ""}`;
-    if (failure.signal === "SIGKILL" || failure.code === "ETIMEDOUT") {
-      // Say which run stalled and what it had managed to print. Without this
-      // the assertions downstream see an empty output and exit 1, which is
-      // exactly what a guard REFUSING looks like — the same confusion
-      // `tsxLoader()` exists to prevent, arriving by a different door.
-      output = `${output}\nguard-fixture: ${guard.scriptPath} (from ${scriptRoot}) did not finish within ${GUARD_RUN_TIMEOUT_MS}ms against ${root} and was killed. Everything it printed before that is above.`;
-    }
-  }
-  const run = { output, status };
-  runs.set(key, run);
-  return run;
+  return runGuardWith(guard, { scriptRoot, scanRoot: root });
+}
+
+/**
+ * A V8 stack frame, at the start of any line INCLUDING the first.
+ *
+ * Four harness suites need this and each had re-typed it: `/\n\s+at\s/` in one
+ * (blind to a frame on line one, and to `at` in ordinary prose it is not blind
+ * enough), `/^\s+at .+:\d+:\d+\)?$/m` in another. The `file:line:column` tail
+ * is what makes it a frame rather than an English sentence, and both frame
+ * shapes V8 emits — `at name (/path:1:2)` and the bare `at /path:1:2` — end in
+ * it.
+ */
+const STACK_FRAME = /^\s*at\s+(?:\S.*\s+\()?\S*:\d+:\d+\)?\s*$/m;
+
+/**
+ * A premise failure is a RESULT, not a crash — and both exit 1, so the exit
+ * code alone cannot tell them apart. Every guard harness asserts this; it is
+ * one thing they cite rather than four paraphrases that can each be subtly
+ * wrong.
+ */
+export function assertNoStackTrace(output: string, context = ""): void {
+  assert.doesNotMatch(
+    output,
+    STACK_FRAME,
+    `${context ? `${context}: ` : ""}crashed rather than refusing — a premise failure must print one line, not a stack:\n${output}`,
+  );
 }
 
 /** Every `LINT_GUARDS` entry prints this at the head of its own report. */

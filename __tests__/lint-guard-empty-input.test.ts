@@ -29,6 +29,7 @@ import { after, describe, it } from "node:test";
 import { LINT_GUARDS } from "../lib/lint-guards";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
 import {
+  assertNoStackTrace,
   checkNameOf,
   makePartialRoot,
   runGuardIn,
@@ -166,11 +167,7 @@ describe("every declared input gets a run where it reads fine and says nothing",
         });
 
         it("prints no stack trace — a premise failure is a result, not a crash", () => {
-          assert.doesNotMatch(
-            run().output,
-            /^\s+at .+:\d+:\d+\)?$/m,
-            `${guard.npmScript} crashed rather than refusing:\n${run().output}`,
-          );
+          assertNoStackTrace(run().output, guard.npmScript);
         });
       });
     }
