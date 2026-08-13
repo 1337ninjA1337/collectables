@@ -38,27 +38,40 @@ import type { LintGuard } from "../../lib/lint-guards";
 /** The repository this fixture copies out of. */
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 
-/** The binary every guard in every one of these suites is spawned through. */
-const TSX_BIN = path.join(REPO_ROOT, "node_modules", ".bin", "tsx");
+/**
+ * The loader every guard in every one of these suites is spawned through.
+ *
+ * `node --import tsx <script>` rather than `node_modules/.bin/tsx <script>`,
+ * and the difference is not cosmetic: the `tsx` bin is a WRAPPER that spawns
+ * its own node child. `execFileSync` gives that child the same stdout pipe, so
+ * a `timeout` that kills the wrapper leaves the grandchild holding the write
+ * end open, the parent's read never sees EOF, and the call hangs anyway — the
+ * timeout below would be decoration. One process, no grandchild, and the
+ * ~430 ms wrapper boot goes with it.
+ */
+const TSX_MODULE = path.join(REPO_ROOT, "node_modules", "tsx");
 
 /**
  * Fail on the missing install rather than on its symptom.
  *
- * `execFileSync` on an absent binary throws ENOENT with no stdout and no
+ * Spawning against an absent loader exits non-zero with no stdout and no
  * stderr, so `runGuardFrom` captures `""` and exit 1 — which is byte-for-byte
  * what a guard REFUSING looks like to these suites. Every assertion of the
  * form "this run failed" then passes for the wrong reason, and every assertion
  * of the form "this run passed" fails with a bare `1 !== 0` and no output to
- * explain it. Four suites depend on this binary; the diagnosis is worth one
+ * explain it. Four suites depend on this; the diagnosis is worth one
  * `existsSync`.
  */
-function tsxBinary(): string {
-  if (!fs.existsSync(TSX_BIN)) {
+function tsxLoader(): string {
+  if (!fs.existsSync(TSX_MODULE)) {
     throw new Error(
-      `guard-fixture: ${TSX_BIN} does not exist, so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
+      `guard-fixture: ${TSX_MODULE} does not exist, so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
     );
   }
-  return TSX_BIN;
+  // The bare specifier, not the directory: node resolves `--import tsx`
+  // against `cwd` (REPO_ROOT below) through the package's own exports map,
+  // while an absolute directory path is an ERR_UNSUPPORTED_DIR_IMPORT.
+  return "tsx";
 }
 
 export type PartialRoot = {
@@ -200,7 +213,8 @@ const GUARD_RUN_MAX_BUFFER = 16 * 1024 * 1024;
 
 /**
  * A guard, run against a scratch root, memoised per (script, args, root) —
- * every assertion about one run would otherwise pay its own ~430 ms tsx boot.
+ * every assertion about one run would otherwise pay its own loader boot
+ * (~260 ms now that the `tsx` wrapper process is gone; it was ~430 ms).
  *
  * Failure is the expected outcome here, so a non-zero exit is captured rather
  * than thrown: the exit code and the message are both things to assert.
@@ -227,8 +241,13 @@ export function runGuardFrom(
   let status = 0;
   try {
     output = execFileSync(
-      tsxBinary(),
-      [path.join(scriptRoot, guard.scriptPath), ...guard.args],
+      process.execPath,
+      [
+        "--import",
+        tsxLoader(),
+        path.join(scriptRoot, guard.scriptPath),
+        ...guard.args,
+      ],
       {
         cwd: REPO_ROOT,
         encoding: "utf8",
