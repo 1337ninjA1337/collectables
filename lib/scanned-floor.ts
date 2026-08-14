@@ -246,6 +246,14 @@ export type ScannedFloor = {
  * first as the `invalid_floor` failure the wrapper already knows how to print.
  */
 export type ScannedFloorProblemCode =
+  /**
+   * The entry's own KEY is blank — the one problem about the name rather than
+   * the declaration under it. A blank key is invisible from every other angle:
+   * the shape checks below all pass, `formatScannedFloorProblem` renders the
+   * key as the sentence's subject, and the reader gets a line that starts with
+   * a space where the guard's name should be.
+   */
+  | "empty_check_name"
   /** Declares none of `count`, `inputs`, `delegatedTo` — a floor of nothing. */
   | "no_shape"
   /** `count.minimum` is not a positive integer. */
@@ -286,6 +294,8 @@ export type ScannedFloorProblem = {
 
 /** Exhaustive over {@link ScannedFloorProblemCode} — a new code needs a sentence. */
 const PROBLEM_DETAIL: Record<ScannedFloorProblemCode, string> = {
+  empty_check_name:
+    "is keyed by a blank name, so no wrapper can look its floor up and every sentence about it opens with a space where the guard's name belongs",
   no_shape:
     "declares no premise of any kind — no count to floor, no inputs to read, no delegation, which is the exact hole this table exists to close",
   invalid_minimum: `declares a count floor that is not a positive integer — ${FLOOR_BELOW_ONE_REASON}`,
@@ -394,6 +404,13 @@ export function scannedFloorProblemSubject(
  * the caller — which is three ways to phrase one problem, drifting apart the
  * first time any of them is reworded and impossible to assert against as a
  * group. The subject is what genuinely varies; the clause never does.
+ *
+ * `subject` is a bare string rather than a {@link ScannedFloorProblemSubject}
+ * because one of the three call sites passes a `SCANNED_FLOORS` key, which is
+ * not one of the two travelling ids. A BLANK subject would render a sentence
+ * with a missing first word; that is not defended here but at the source —
+ * {@link validateScannedFloorEntry} reports `empty_check_name` for the one
+ * input that could produce it.
  */
 export function describeScannedFloorProblem(
   subject: string,
@@ -427,6 +444,11 @@ export function validateScannedFloorEntry(
   const problems: ScannedFloorProblem[] = [];
   const add = (code: ScannedFloorProblemCode) => problems.push({ checkName, code });
 
+  // First, because it is the only check about the entry's NAME: every problem
+  // below is rendered as a sentence whose subject is that name, so a blank one
+  // turns each of them into a line with a missing first word. Caught here, at
+  // the source, rather than left for a renderer to paper over.
+  if (checkName.trim().length === 0) add("empty_check_name");
   if (!floor.count && !floor.inputs && !floor.delegatedTo) add("no_shape");
   if (floor.delegatedTo !== undefined) {
     if (floor.delegatedTo.trim().length === 0) add("empty_delegation");
