@@ -35,6 +35,7 @@ import {
   makePartialRoot,
   makeSharedPatchedRepo,
   PATCHED_REPO_MARKER,
+  tsxLoaderIn,
 } from "./helpers/guard-fixture";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -68,6 +69,38 @@ function assertRefusesWithoutLeaking(body: () => unknown, message: RegExp): void
     `the refusal left ${leaked.length} scratch root(s) in ${os.tmpdir()}: ${leaked.join(", ")}`,
   );
 }
+
+describe("the loader check", () => {
+  it("refuses a checkout with no install, and says how to fix it", () => {
+    // The refusal with the strongest claim on a run: an absent loader exits
+    // non-zero with BOTH pipes empty, which is byte-for-byte what a guard
+    // refusing looks like to these suites. Without this check every "the run
+    // failed" assertion in five files would pass for the wrong reason. It fired
+    // for real on the checkout this case was written on, which is exactly why
+    // its wording — the path, and `npm ci` — should be pinned rather than
+    // rediscovered by whoever next forgets to install.
+    const bare = fs.mkdtempSync(path.join(os.tmpdir(), "no-install-"));
+    try {
+      assert.throws(() => tsxLoaderIn(bare), (error: Error) => {
+        assert.match(error.message, /does not exist, so no guard can be spawned/);
+        assert.match(error.message, /npm ci/);
+        assert.ok(
+          error.message.includes(path.join(bare, "node_modules", "tsx")),
+          `the diagnosis does not name the path it looked at:\n${error.message}`,
+        );
+        return true;
+      });
+    } finally {
+      fs.rmSync(bare, { recursive: true, force: true });
+    }
+  });
+
+  it("answers with the bare specifier, not the directory it checked", () => {
+    // `--import /abs/node_modules/tsx` is an ERR_UNSUPPORTED_DIR_IMPORT; the
+    // bare name resolves through the package's own exports map.
+    assert.equal(tsxLoaderIn(REPO_ROOT), "tsx");
+  });
+});
 
 describe("makePartialRoot refusals", () => {
   // The two specs that carry no copies at all — `([], {})` and an absolute
