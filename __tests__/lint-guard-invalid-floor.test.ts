@@ -201,11 +201,26 @@ const CASES: Record<ProblemCodeKey, ProblemCase> = {
 };
 
 /**
- * Every `ScannedFloorProblemCode`, as a key. Written as a mapped type rather
- * than a hand-kept list so a new code fails to compile until it has a case —
- * the same trick `PROBLEM_DETAIL` uses one file over.
+ * Problem codes no wrapper run can produce, each with the reason written down.
+ *
+ * `Extract` rather than a bare string union, so a code cannot be excused under
+ * a name the module does not have. The value is the argument, and it has to be
+ * an argument about REACHABILITY — "hard to set up" is not one.
  */
-type ProblemCodeKey = ScannedFloorProblemCode;
+type WrapperUnreachableCode = Extract<ScannedFloorProblemCode, "empty_check_name">;
+
+const WRAPPER_UNREACHABLE: Record<WrapperUnreachableCode, string> = {
+  empty_check_name:
+    "a wrapper asks for its floor under a string literal in its own source, so it can only ever reach the entry it is named after; a blank KEY is not a row any guard can request, and the pass that finds it is validateScannedFloors over the whole table",
+};
+
+/**
+ * Every `ScannedFloorProblemCode` that a wrapper CAN produce, as a key.
+ * Written as a mapped type rather than a hand-kept list so a new code fails to
+ * compile until it has a case — the same trick `PROBLEM_DETAIL` uses one file
+ * over. The only escape is `WRAPPER_UNREACHABLE`, which costs a written reason.
+ */
+type ProblemCodeKey = Exclude<ScannedFloorProblemCode, WrapperUnreachableCode>;
 
 const runFor = (code: ProblemCodeKey): GuardRun => {
   const problem = CASES[code];
@@ -292,6 +307,18 @@ describe("every way a SCANNED_FLOORS entry can be unusable, through a wrapper", 
     // `guardFor`, but only when its own describe block runs; this states the
     // whole file's premise in one place.
     for (const problem of Object.values(CASES)) guardFor(problem.checkName);
+  });
+
+  it("excuses a code only with a reason, and never one it also runs", () => {
+    // The exclusion is a compile-time hole in an otherwise exhaustive record,
+    // so the thing left to state at runtime is that the hole was paid for: an
+    // excused code carries an argument, and it is not quietly listed on both
+    // sides where the exhaustiveness check would stop noticing it.
+    const cased = new Set(Object.keys(CASES));
+    for (const [code, reason] of Object.entries(WRAPPER_UNREACHABLE)) {
+      assert.ok(reason.trim().length > 0, `${code} is excused with no reason`);
+      assert.ok(!cased.has(code), `${code} is excused AND has a wrapper case`);
+    }
   });
 });
 

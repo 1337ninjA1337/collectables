@@ -65,6 +65,7 @@ const inputFailureOf = (
  * words.
  */
 const EVERY_PROBLEM_CODE: Record<ScannedFloorProblemCode, true> = {
+  empty_check_name: true,
   no_shape: true,
   invalid_minimum: true,
   empty_label: true,
@@ -321,8 +322,19 @@ describe("validateScannedFloorEntry", () => {
     count: { label: "source file", minimum: 10 },
     note: "measured 2026-08-13",
   };
-  const codesOf = (floor: ScannedFloor) =>
-    validateScannedFloorEntry("check-x", floor).map((p) => p.code);
+  const codesOf = (floor: ScannedFloor, checkName = "check-x") =>
+    validateScannedFloorEntry(checkName, floor).map((p) => p.code);
+
+  /**
+   * The key a fixture is validated under. Only `empty_check_name` needs one:
+   * it is the single problem about the entry's NAME rather than the
+   * declaration under it, so its fixture varies the key and reuses a sound
+   * floor — the point being that nothing else about the entry is wrong.
+   */
+  const BROKEN_UNDER: Partial<Record<ScannedFloorProblemCode, string>> = {
+    empty_check_name: "  ",
+  };
+  const nameFor = (code: ScannedFloorProblemCode) => BROKEN_UNDER[code] ?? "check-x";
 
   it("finds nothing wrong with a sound entry, in each of the three shapes", () => {
     assert.deepEqual(codesOf(SOUND), []);
@@ -337,6 +349,8 @@ describe("validateScannedFloorEntry", () => {
 
   /** One fixture per problem code — the map the exhaustiveness test reads. */
   const BROKEN: Record<ScannedFloorProblemCode, ScannedFloor> = {
+    // Sound in every other respect; the key it is validated under is the bug.
+    empty_check_name: SOUND,
     no_shape: { note: "declares nothing" },
     invalid_minimum: { count: { label: "file", minimum: 0 }, note: "2026-08-13" },
     empty_label: { count: { label: " ", minimum: 10 }, note: "2026-08-13" },
@@ -358,9 +372,10 @@ describe("validateScannedFloorEntry", () => {
     ScannedFloor,
   ][]) {
     it(`reports ${code}`, () => {
+      const codes = codesOf(floor, nameFor(code));
       assert.ok(
-        codesOf(floor).includes(code),
-        `expected ${code}, got ${codesOf(floor).join(", ") || "no problems"}`,
+        codes.includes(code),
+        `expected ${code}, got ${codes.join(", ") || "no problems"}`,
       );
     });
   }
@@ -370,7 +385,7 @@ describe("validateScannedFloorEntry", () => {
     // is a code nobody has ever seen fire.
     const covered = Object.keys(BROKEN) as ScannedFloorProblemCode[];
     const produced = new Set(
-      Object.values(BROKEN).flatMap((floor) => codesOf(floor)),
+      covered.flatMap((code) => codesOf(BROKEN[code], nameFor(code))),
     );
     for (const code of covered) {
       assert.ok(produced.has(code), `${code} has a fixture that does not produce it`);
@@ -385,7 +400,7 @@ describe("validateScannedFloorEntry", () => {
       ScannedFloorProblemCode,
       ScannedFloor,
     ][]) {
-      const problem = validateScannedFloorEntry("check-x", floor).find(
+      const problem = validateScannedFloorEntry(nameFor(code), floor).find(
         (candidate) => candidate.code === code,
       );
       assert.ok(problem, `${code} produced no problem to read a sentence from`);
@@ -398,6 +413,34 @@ describe("validateScannedFloorEntry", () => {
     const [problem] = validateScannedFloorEntry("check-x", BROKEN.no_shape);
     assert.equal(problem.checkName, "check-x");
     assert.match(formatScannedFloorProblem(problem), /^check-x declares no premise/);
+  });
+
+  it("reports a blank key on an otherwise sound entry, and only that", () => {
+    // The one problem about the entry's NAME. Everything under the key is
+    // fine, which is exactly what makes it invisible to the other ten checks.
+    assert.deepEqual(codesOf(SOUND, ""), ["empty_check_name"]);
+    assert.deepEqual(codesOf(SOUND, "   "), ["empty_check_name"]);
+    assert.deepEqual(codesOf(SOUND, "check-x"), []);
+  });
+
+  it("reports the blank key first, so a wrapper raises the missing name", () => {
+    // `scannedFloorFor` raises the FIRST problem. A blank key reported second
+    // would be printed as whatever else the entry got wrong, under a subject
+    // that is a space — the failure mode this code exists to end.
+    const [first] = validateScannedFloorEntry("", { note: "" });
+    assert.equal(first.code, "empty_check_name");
+  });
+
+  it("catches a blank key through the whole-table validator too", () => {
+    // The route it actually travels: no wrapper asks for its floor under a
+    // blank literal, so the table-wide pass is where an empty key surfaces.
+    assert.deepEqual(
+      validateScannedFloors({ "": SOUND }).map((p) => p.code),
+      ["empty_check_name"],
+    );
+    for (const checkName of Object.keys(SCANNED_FLOORS)) {
+      assert.ok(checkName.trim().length > 0, `SCANNED_FLOORS has a blank key`);
+    }
   });
 
   it("reports every problem with an entry, not just the first", () => {
@@ -457,6 +500,17 @@ describe("one problem, one phrasing", () => {
         `${code}'s clause names its own subject`,
       );
     }
+  });
+
+  it("makes the one blank-subject sentence explain itself", () => {
+    // `formatScannedFloorProblem` renders the entry's key as the subject, so
+    // the single problem whose subject IS blank cannot be joined into a
+    // headless sentence quietly: its clause has to say that the missing first
+    // word is the finding. The line still opens with a space — and now that
+    // space is what the sentence is about.
+    const line = formatScannedFloorProblem({ checkName: "", code: "empty_check_name" });
+    assert.equal(line, ` ${scannedFloorProblemDetail("empty_check_name")}`);
+    assert.match(line, /blank name/);
   });
 
   it("gives formatScannedFloorProblem the check name as its subject and nothing else", () => {
