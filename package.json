@@ -20,6 +20,7 @@
     "lint:env-inlining": "tsx scripts/check-env-inlining.ts",
     "lint:analytics-imports": "tsx scripts/check-analytics-imports.ts",
     "verify:bundle-inlining": "tsx scripts/verify-bundle-inlining.ts",
+    "lint:problem-phrasing": "tsx scripts/check-problem-phrasing-imports.ts",
     "lint:clarity-mask": "tsx scripts/check-clarity-input-mask.ts",
     "lint:migration-docs": "tsx scripts/check-migration-docs.ts",
     "lint:migration-naming": "tsx scripts/check-supabase-migration-naming.ts",

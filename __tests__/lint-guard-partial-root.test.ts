@@ -70,6 +70,10 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // Both walk app + components.
   "check-inline-radius": () => ["app"],
   "check-analytics-imports": () => ["app"],
+  // Walks app + components + lib + scripts + __tests__. Its floor rides above
+  // what __tests__/ alone contributes, so app/ — the smallest of the five — is
+  // a long way short of it.
+  "check-problem-phrasing-imports": () => ["app"],
   // Same walk, .tsx only.
   "check-clarity-input-mask": () => ["app"],
   // Walks the whole tree; app/ is a few dozen of the several hundred files.
