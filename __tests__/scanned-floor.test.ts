@@ -14,6 +14,8 @@ import {
   evaluateParsedInputs,
   evaluateScannedFloor,
   describeScannedFloorProblem,
+  describeScannedFloorProblemRef,
+  scannedFloorProblemSubject,
   FLOOR_BELOW_ONE_REASON,
   formatScannedFloorFailure,
   formatScannedFloorProblem,
@@ -27,7 +29,11 @@ import {
   validateScannedFloors,
   type ScannedFloor,
   scannedFloorProblemDetail,
+  type ScannedFloorFailure,
+  type ScannedFloorFailureCode,
+  type ScannedFloorProblem,
   type ScannedFloorProblemCode,
+  type ScannedFloorProblemSubject,
 } from "../lib/scanned-floor";
 import { LINT_GUARDS } from "../lib/lint-guards";
 
@@ -40,6 +46,38 @@ const failureOf = (count: number, minimum: number, label?: string) => {
   if (verdict.ok) throw new Error("unreachable");
   return verdict.failure;
 };
+
+const inputFailureOf = (
+  declared: readonly string[],
+  values: Readonly<Record<string, unknown>>,
+) => {
+  const verdict = evaluateParsedInputs(declared, values);
+  assert.equal(verdict.ok, false, `expected ${declared.join(", ")} to fail`);
+  if (verdict.ok) throw new Error("unreachable");
+  return verdict.failure;
+};
+
+/**
+ * Exhaustive by construction: a new ScannedFloorProblemCode fails to COMPILE
+ * here until it is listed, the same trick PROBLEM_DETAIL uses one file over.
+ * Module-scope because two blocks need it — the phrasing assertions and the
+ * failure-surface ones, which is the whole set of places a code turns into
+ * words.
+ */
+const EVERY_PROBLEM_CODE: Record<ScannedFloorProblemCode, true> = {
+  no_shape: true,
+  invalid_minimum: true,
+  empty_label: true,
+  empty_inputs: true,
+  blank_input: true,
+  duplicate_input: true,
+  delegation_with_shape: true,
+  empty_delegation: true,
+  empty_note: true,
+  undated_note: true,
+};
+
+const PROBLEM_CODES = Object.keys(EVERY_PROBLEM_CODE) as ScannedFloorProblemCode[];
 
 describe("evaluateScannedFloor", () => {
   it("passes when the count meets the floor exactly", () => {
@@ -388,7 +426,7 @@ describe("scannedFloorFor rejects a bogus entry", () => {
       count: 0,
       minimum: 0,
       label: DEFAULT_SCANNED_LABEL,
-      detail: describeScannedFloorProblem(SCANNED_FLOORS_ENTRY_SUBJECT, problem.code),
+      problem: { subject: "entry", code: problem.code },
     });
     assert.match(line, /^check-x: ERROR — its SCANNED_FLOORS entry declares no premise/);
     assert.match(line, /lib\/scanned-floor\.ts/);
@@ -405,21 +443,7 @@ describe("scannedFloorFor rejects a bogus entry", () => {
 });
 
 describe("one problem, one phrasing", () => {
-  // Exhaustive by construction: a new ScannedFloorProblemCode fails to COMPILE
-  // here until it is listed, the same trick PROBLEM_DETAIL uses one file over.
-  const EVERY_CODE: Record<ScannedFloorProblemCode, true> = {
-    no_shape: true,
-    invalid_minimum: true,
-    empty_label: true,
-    empty_inputs: true,
-    blank_input: true,
-    duplicate_input: true,
-    delegation_with_shape: true,
-    empty_delegation: true,
-    empty_note: true,
-    undated_note: true,
-  };
-  const codes = Object.keys(EVERY_CODE) as ScannedFloorProblemCode[];
+  const codes = PROBLEM_CODES;
 
   it("joins the subject to the table's own clause, leaving the clause untouched", () => {
     for (const code of codes) {
@@ -475,13 +499,25 @@ describe("one problem, one phrasing", () => {
     // every renderer derived the words from `code` anyway — so a problem built
     // by hand could carry a sentence that would never be printed. Now the only
     // route from a problem to its words is the accessor.
+    //
+    // The claim is about the TYPE, not about one fixture: `keyof` makes a
+    // re-added words field fail to compile here, which a runtime key check
+    // over produced problems cannot see (a declared-but-never-populated field
+    // is invisible to it). The runtime half then pins that the producer fills
+    // exactly the fields the type declares — neither claim implies the other.
+    const EVERY_PROBLEM_FIELD: Record<keyof ScannedFloorProblem, true> = {
+      checkName: true,
+      code: true,
+    };
+    const declared = Object.keys(EVERY_PROBLEM_FIELD).sort();
+    assert.deepEqual(declared, ["checkName", "code"]);
     const problems = validateScannedFloorEntry("check-x", {
       count: { label: "", minimum: -3 },
       note: "",
     });
     assert.ok(problems.length >= 3);
     for (const problem of problems) {
-      assert.deepEqual(Object.keys(problem).sort(), ["checkName", "code"]);
+      assert.deepEqual(Object.keys(problem).sort(), declared);
     }
   });
 
@@ -523,6 +559,170 @@ describe("one problem, one phrasing", () => {
     assert.ok(
       !/\$\{problem\.detail\}/.test(source),
       "a call site is interpolating problem.detail instead of calling describeScannedFloorProblem",
+    );
+  });
+});
+
+describe("a failure carries a problem, not a sentence about one", () => {
+  /**
+   * One producer per failure code, so the surface assertions below run over
+   * everything a caller can actually receive rather than over the one code
+   * this change is about. A new `ScannedFloorFailureCode` fails to compile
+   * here until it names the call that produces it.
+   */
+  const EVERY_FAILURE: Record<ScannedFloorFailureCode, () => ScannedFloorFailure> = {
+    no_files: () => failureOf(0, 150, "source file"),
+    below_floor: () => failureOf(3, 150, "source file"),
+    invalid_floor: () => failureOf(10, 0),
+    missing_input: () => inputFailureOf(["a.json"], {}),
+    unreadable_input: () =>
+      inputFailureOf(["a.json"], { "a.json": unreadableInput("EACCES") }),
+    empty_input: () => inputFailureOf(["a.json"], { "a.json": {} }),
+  };
+  const failureCodes = Object.keys(EVERY_FAILURE) as ScannedFloorFailureCode[];
+
+  it("produces the code each fixture claims, so the surface checks are about it", () => {
+    for (const code of failureCodes) {
+      assert.equal(EVERY_FAILURE[code]().code, code);
+    }
+  });
+
+  it("never carries a rendered problem sentence on any failure code", () => {
+    // The property the `detail` field could not have: a failure crosses from
+    // the pure function that found the problem to the wrapper that prints it,
+    // and along the way there is nowhere to put words this module did not
+    // write. Checked against every clause in the table, on every value of
+    // every failure — a producer that started pasting one in would fail here
+    // whichever field it chose.
+    for (const code of failureCodes) {
+      const failure = EVERY_FAILURE[code]();
+      for (const [field, value] of Object.entries(failure)) {
+        if (typeof value !== "string") continue;
+        for (const problemCode of PROBLEM_CODES) {
+          assert.ok(
+            !value.includes(scannedFloorProblemDetail(problemCode)),
+            `${code}.${field} carries the ${problemCode} sentence verbatim`,
+          );
+        }
+      }
+    }
+  });
+
+  it("declares no field a caller could fill with prose", () => {
+    // `keyof`, so a re-added words field is a compile error rather than
+    // something the runtime loop above has to happen to catch.
+    const EVERY_FAILURE_FIELD: Record<keyof ScannedFloorFailure, true> = {
+      code: true,
+      count: true,
+      minimum: true,
+      label: true,
+      input: true,
+      reason: true,
+      problem: true,
+    };
+    assert.deepEqual(Object.keys(EVERY_FAILURE_FIELD).sort(), [
+      "code",
+      "count",
+      "input",
+      "label",
+      "minimum",
+      "problem",
+      "reason",
+    ]);
+    for (const code of failureCodes) {
+      for (const field of Object.keys(EVERY_FAILURE[code]())) {
+        assert.ok(
+          field in EVERY_FAILURE_FIELD,
+          `${code} carries an undeclared field "${field}"`,
+        );
+      }
+    }
+  });
+
+  it("attaches a problem to invalid_floor and to nothing else", () => {
+    // `problem` is optional because ONE invalid_floor is not about a
+    // declaration at all (a bogus number straight from a caller); it must
+    // still be impossible for a tree-shaped failure to claim a structural one.
+    for (const code of failureCodes) {
+      if (code === "invalid_floor") continue;
+      assert.equal(EVERY_FAILURE[code]().problem, undefined, code);
+    }
+  });
+
+  it("renders a table problem from its code, in the entry's voice", () => {
+    // Every one of the ten codes, through the failure path — the sentence a
+    // guard prints for a bogus entry is now derived, so this is a claim about
+    // all of them rather than about whichever ones a fixture produces.
+    for (const code of PROBLEM_CODES) {
+      const line = formatScannedFloorFailure("check-x", {
+        code: "invalid_floor",
+        count: 0,
+        minimum: 0,
+        label: DEFAULT_SCANNED_LABEL,
+        problem: { subject: "entry", code },
+      });
+      assert.ok(
+        line.includes(describeScannedFloorProblem(SCANNED_FLOORS_ENTRY_SUBJECT, code)),
+        `invalid_floor lost the ${code} sentence:\n${line}`,
+      );
+      assert.match(line, /^check-x: ERROR — /);
+    }
+  });
+
+  it("says the same thing whichever subject the ref names", () => {
+    for (const code of PROBLEM_CODES) {
+      for (const subject of ["entry", "caller"] as ScannedFloorProblemSubject[]) {
+        assert.equal(
+          describeScannedFloorProblemRef({ subject, code }),
+          describeScannedFloorProblem(scannedFloorProblemSubject(subject), code),
+        );
+      }
+    }
+  });
+
+  it("resolves the two subject ids to the two exported phrases and no others", () => {
+    // The ids exist so a failure can travel without words; the constants exist
+    // so a test can name a subject without re-typing it. Read from both sides
+    // here, or the record and the constants drift into two vocabularies.
+    const EVERY_SUBJECT: Record<ScannedFloorProblemSubject, string> = {
+      entry: SCANNED_FLOORS_ENTRY_SUBJECT,
+      caller: PARSED_INPUTS_CALLER_SUBJECT,
+    };
+    for (const [subject, words] of Object.entries(EVERY_SUBJECT) as [
+      ScannedFloorProblemSubject,
+      string,
+    ][]) {
+      assert.equal(scannedFloorProblemSubject(subject), words);
+      assert.ok(words.trim().length > 0, `${subject} resolves to nothing`);
+    }
+    assert.notEqual(
+      scannedFloorProblemSubject("entry"),
+      scannedFloorProblemSubject("caller"),
+    );
+  });
+
+  it("keeps the numeric branch reachable, and about the number", () => {
+    // The branch is not a fallback for a missing sentence any more — it is the
+    // one invalid_floor that has no entry to blame, so it must name the number
+    // the caller passed and must NOT sound like a finding about the table.
+    const line = formatScannedFloorFailure("check-x", failureOf(10, 0));
+    assert.match(line, /floor of 0 is not a positive integer/);
+    assert.ok(line.includes(FLOOR_BELOW_ONE_REASON));
+    assert.ok(
+      !line.includes(SCANNED_FLOORS_ENTRY_SUBJECT),
+      `a bogus number was reported as an entry problem:\n${line}`,
+    );
+  });
+
+  it("leaves exactly one reader of the subject table in the source", () => {
+    // Same drift guard as PROBLEM_DETAIL's, for the same reason: a second
+    // reader is a second phrasing of "who this is about" waiting to happen.
+    const source = read("lib/scanned-floor.ts");
+    const readers = source.match(/PROBLEM_SUBJECT[.[]/g) ?? [];
+    assert.deepEqual(readers, ["PROBLEM_SUBJECT["], "PROBLEM_SUBJECT grew a second reader");
+    assert.ok(
+      !/\bf\.detail\b|failure\.detail\b/.test(source),
+      "a renderer is reading a words field off the failure again",
     );
   });
 });

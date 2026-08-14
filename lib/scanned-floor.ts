@@ -59,10 +59,16 @@ export type ScannedFloorFailure = {
   /**
    * Set for `invalid_floor` when the declaration is bogus in a way the bare
    * `minimum` cannot describe (an empty input list, a delegation that also
-   * declares a count). A whole sentence, not a fragment — it REPLACES the
-   * default numeric clause in the message.
+   * declares a count).
+   *
+   * This used to be a rendered SENTENCE, which meant the words a guard printed
+   * for `invalid_floor` were chosen by whichever of three call sites built the
+   * failure — the one code in the table whose message came from outside
+   * {@link FAILURE_MESSAGE}. It is two enums now: WHICH structural problem and
+   * WHO it is about. Both are rendered here, so the failure carries facts and
+   * this module still owns every word.
    */
-  readonly detail?: string;
+  readonly problem?: ScannedFloorProblemRef;
 };
 
 export type ScannedFloorVerdict =
@@ -95,6 +101,13 @@ export const FLOOR_BELOW_ONE_REASON =
  * exists to close, and it would do it while looking like the hole was
  * covered. It is reported as its own failure code rather than thrown so the
  * message can name the guard alongside the other two.
+ *
+ * The one `invalid_floor` sentence that is NOT about a {@link SCANNED_FLOORS}
+ * entry: the number came straight from a caller, so there is no entry to send
+ * the reader to and no problem code that fits — the message quotes the number
+ * instead. That is why {@link ScannedFloorFailure.problem} is optional: a
+ * failure either names a structural problem or reports this bare number, never
+ * both, and never neither.
  */
 const NUMERIC_FLOOR_DETAIL = (minimum: number) =>
   `floor of ${minimum} is not a positive integer — ${FLOOR_BELOW_ONE_REASON}`;
@@ -107,7 +120,7 @@ export function evaluateScannedFloor(
   if (!Number.isInteger(minimum) || minimum < 1) {
     return {
       ok: false,
-      failure: { code: "invalid_floor", count, minimum, label, detail: NUMERIC_FLOOR_DETAIL(minimum) },
+      failure: { code: "invalid_floor", count, minimum, label },
     };
   }
   if (count <= 0) {
@@ -134,9 +147,12 @@ const FAILURE_MESSAGE: Record<
     `scanned 0 ${f.label}(s) — a pass over zero ${f.label}s is not a pass, so this guard did not run. Expected at least ${f.minimum}. Check the scan roots still exist and are readable.`,
   below_floor: (f) =>
     `scanned ${f.count} ${f.label}(s), below the committed floor of ${f.minimum} — the walk is missing most of what it used to see, so a green result here proves nothing. ${REMEASURE_HINT}`,
-  // The one code that is about the GUARD's own declaration rather than about
-  // the tree, so the sentence comes from whoever spotted the bogus floor.
-  invalid_floor: (f) => `${f.detail ?? NUMERIC_FLOOR_DETAIL(f.minimum)}. ${REMEASURE_HINT}`,
+  // The one code that is about a DECLARATION rather than about the tree. Both
+  // branches render here, from the failure's own fields, like the other five:
+  // a structural problem when the failure names one, the bare number when the
+  // minimum itself is what a caller got wrong.
+  invalid_floor: (f) =>
+    `${f.problem ? describeScannedFloorProblemRef(f.problem) : NUMERIC_FLOOR_DETAIL(f.minimum)}. ${REMEASURE_HINT}`,
   missing_input: (f) =>
     `declared input "${f.input}" was never handed to the floor check — the guard says it reads it, and this run did not. ${REMEASURE_HINT}`,
   unreadable_input: (f) =>
@@ -331,6 +347,45 @@ export const SCANNED_FLOORS_ENTRY_SUBJECT = "its SCANNED_FLOORS entry";
 export const PARSED_INPUTS_CALLER_SUBJECT = "the caller";
 
 /**
+ * WHO a reported problem is about, as an id rather than as its words.
+ *
+ * A {@link ScannedFloorFailure} travels from the pure function that found the
+ * problem to the wrapper that prints it, and along the way it must not be able
+ * to carry a sentence nobody in this module wrote. The subject is the only
+ * part that genuinely varies between producers, so it crosses that gap as one
+ * of two ids and is turned into words here.
+ */
+export type ScannedFloorProblemSubject =
+  /** The guard's own row in {@link SCANNED_FLOORS}. */
+  | "entry"
+  /** Whoever called a pure function directly with an unusable argument. */
+  | "caller";
+
+/** WHICH problem and WHO it is about — two enums, no prose. */
+export type ScannedFloorProblemRef = {
+  readonly subject: ScannedFloorProblemSubject;
+  readonly code: ScannedFloorProblemCode;
+};
+
+/** Exhaustive over {@link ScannedFloorProblemSubject} — a new subject needs words. */
+const PROBLEM_SUBJECT: Record<ScannedFloorProblemSubject, string> = {
+  entry: SCANNED_FLOORS_ENTRY_SUBJECT,
+  caller: PARSED_INPUTS_CALLER_SUBJECT,
+};
+
+/**
+ * The words for a subject id. Kept as the single reader of
+ * {@link PROBLEM_SUBJECT}, for the same reason
+ * {@link scannedFloorProblemDetail} is the single reader of the sentence
+ * table: a second reader is a second phrasing waiting to happen.
+ */
+export function scannedFloorProblemSubject(
+  subject: ScannedFloorProblemSubject,
+): string {
+  return PROBLEM_SUBJECT[subject];
+}
+
+/**
  * One whole sentence about one problem, attributed to whoever it is about.
  *
  * The ONE place a subject and the table's clause are joined. Three call sites
@@ -345,6 +400,21 @@ export function describeScannedFloorProblem(
   code: ScannedFloorProblemCode,
 ): string {
   return `${subject} ${scannedFloorProblemDetail(code)}`;
+}
+
+/**
+ * The same sentence, for a problem that travelled on a failure: the id is
+ * resolved to its words and joined by {@link describeScannedFloorProblem}, so
+ * a failure rendered by a wrapper and a problem listed by a test say the same
+ * thing about the same code.
+ */
+export function describeScannedFloorProblemRef(
+  ref: ScannedFloorProblemRef,
+): string {
+  return describeScannedFloorProblem(
+    scannedFloorProblemSubject(ref.subject),
+    ref.code,
+  );
 }
 
 const MEASUREMENT_DATE = /\d{4}-\d{2}-\d{2}/;
@@ -457,10 +527,7 @@ export function evaluateParsedInputs(
         // The table path can no longer reach this — `scannedFloorFor` rejects
         // an `inputs: []` entry first — so the subject here is whoever called
         // the pure function with a list of nothing.
-        detail: describeScannedFloorProblem(
-          PARSED_INPUTS_CALLER_SUBJECT,
-          "empty_inputs",
-        ),
+        problem: { subject: "caller", code: "empty_inputs" },
       },
     };
   }
@@ -599,10 +666,7 @@ export function scannedFloorFor(checkName: string): ScannedFloor {
       count: 0,
       minimum: floor.count?.minimum ?? 0,
       label: floor.count?.label ?? DEFAULT_SCANNED_LABEL,
-      detail: describeScannedFloorProblem(
-        SCANNED_FLOORS_ENTRY_SUBJECT,
-        problem.code,
-      ),
+      problem: { subject: "entry", code: problem.code },
     });
   }
   return floor;
