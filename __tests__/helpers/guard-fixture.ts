@@ -106,31 +106,40 @@ export function makePartialRoot(
     );
   }
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "lint-guard-partial-"));
-  for (const entry of entries) {
-    if (path.isAbsolute(entry)) {
-      throw new Error(
-        `makePartialRoot: "${entry}" must be repo-relative — an absolute path would copy from outside this checkout.`,
-      );
+  // Every refusal below happens AFTER the scratch directory exists, so each one
+  // has to take it back down again: a suite that asserts a bad spec is refused
+  // would otherwise leave a directory in `os.tmpdir()` per assertion, and the
+  // leak is invisible because the throw it rides on is the expected outcome.
+  try {
+    for (const entry of entries) {
+      if (path.isAbsolute(entry)) {
+        throw new Error(
+          `makePartialRoot: "${entry}" must be repo-relative — an absolute path would copy from outside this checkout.`,
+        );
+      }
+      const source = path.join(REPO_ROOT, entry);
+      if (!fs.existsSync(source)) {
+        throw new Error(
+          `makePartialRoot: "${entry}" does not exist in this repository, so the fixture would be empty and the guard would fail on the wrong code.`,
+        );
+      }
+      const destination = path.join(root, entry);
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.cpSync(source, destination, { recursive: true, dereference: true });
     }
-    const source = path.join(REPO_ROOT, entry);
-    if (!fs.existsSync(source)) {
-      throw new Error(
-        `makePartialRoot: "${entry}" does not exist in this repository, so the fixture would be empty and the guard would fail on the wrong code.`,
-      );
+    for (const [relative, content] of Object.entries(files)) {
+      if (path.isAbsolute(relative)) {
+        throw new Error(
+          `makePartialRoot: "${relative}" must be a path inside the scratch root, not an absolute one.`,
+        );
+      }
+      const destination = path.join(root, relative);
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.writeFileSync(destination, content, "utf8");
     }
-    const destination = path.join(root, entry);
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    fs.cpSync(source, destination, { recursive: true, dereference: true });
-  }
-  for (const [relative, content] of Object.entries(files)) {
-    if (path.isAbsolute(relative)) {
-      throw new Error(
-        `makePartialRoot: "${relative}" must be a path inside the scratch root, not an absolute one.`,
-      );
-    }
-    const destination = path.join(root, relative);
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    fs.writeFileSync(destination, content, "utf8");
+  } catch (error) {
+    fs.rmSync(root, { recursive: true, force: true });
+    throw error;
   }
   return {
     root,
@@ -250,8 +259,14 @@ export function makeSharedPatchedRepo(
   return {
     root: copy.root,
     runPatched: (label, patches, guard, scanRoot) => {
-      applyPatches(patches);
+      // `applyPatches` is INSIDE the try, not before it. It writes file by file
+      // and refuses a patch whose anchor has drifted, so a multi-file patch can
+      // throw with its earlier files already rewritten — and a throw before the
+      // `finally` would hand the next case a copy that is broken in a way its
+      // own patch never mentions. `pristine` is captured per file as it is
+      // touched, so a partially applied patch restores exactly as far as it got.
       try {
+        applyPatches(patches);
         return runGuardWith(guard, {
           scriptRoot: copy.root,
           scanRoot,
