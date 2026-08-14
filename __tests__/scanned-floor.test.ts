@@ -21,6 +21,7 @@ import {
   formatScannedFloorProblem,
   PARSED_INPUTS_CALLER_SUBJECT,
   SCANNED_FLOORS_ENTRY_SUBJECT,
+  SHAPE_MISMATCH_REASON,
   isNonEmptyInput,
   isUnreadableInput,
   scannedFloorFor,
@@ -55,6 +56,28 @@ const inputFailureOf = (
   assert.equal(verdict.ok, false, `expected ${declared.join(", ")} to fail`);
   if (verdict.ok) throw new Error("unreachable");
   return verdict.failure;
+};
+
+/**
+ * The failure a lookup THREW, for the three codes no pure evaluator returns.
+ *
+ * `scannedFloorFor`, `countFloorFor` and `assertParsedInputs` do not hand back
+ * a verdict — an unusable premise stops the guard — so the only way to get at
+ * the failure they build is to catch it. Insisting on `ScannedFloorError` here
+ * is half the point of these codes existing: a bare `Error` would sail past the
+ * wrapper's handler as a stack trace.
+ */
+const failureFromThrow = (call: () => unknown): ScannedFloorFailure => {
+  try {
+    call();
+  } catch (error) {
+    assert.ok(
+      error instanceof ScannedFloorError,
+      `expected a ScannedFloorError, got ${String(error)}`,
+    );
+    return error.failure;
+  }
+  throw new Error("expected the lookup to throw, and it returned");
 };
 
 /**
@@ -475,13 +498,44 @@ describe("scannedFloorFor rejects a bogus entry", () => {
     assert.match(line, /lib\/scanned-floor\.ts/);
   });
 
-  it("still throws a plain Error for a guard with no entry at all", () => {
-    // Unknown name and bogus entry are different bugs: one is a typo in the
-    // guard, the other is a mistake in the table.
+  it("throws a ScannedFloorError for a guard with no entry at all, too", () => {
+    // Unknown name and bogus entry are different bugs — one is a typo in the
+    // guard, the other a mistake in the table — and they used to print
+    // differently for no better reason than that one of them predated the
+    // failure table. A missing entry was a bare `Error`, which the wrapper's
+    // handler does not recognise and re-throws as a node stack.
     assert.throws(() => scannedFloorFor("check-nothing"), (error: Error) => {
-      assert.ok(!(error instanceof ScannedFloorError));
-      return /no committed floor/.test(error.message);
+      assert.ok(error instanceof ScannedFloorError);
+      assert.equal(error.failure.code, "no_floor_declared");
+      assert.equal(error.checkName, "check-nothing");
+      return /^check-nothing: ERROR — no committed floor/.test(error.message);
     });
+  });
+
+  it("prints the two unusable-premise failures in the same shape", () => {
+    // The point of the change: whichever way this guard's premise is
+    // unusable — absent from the table or bogus in it — the reader gets one
+    // line, headed by the guard's name, pointing at the same file.
+    const lines = [
+      formatScannedFloorFailure("check-x", {
+        code: "no_floor_declared",
+        count: 0,
+        minimum: 0,
+        label: DEFAULT_SCANNED_LABEL,
+      }),
+      formatScannedFloorFailure("check-x", {
+        code: "invalid_floor",
+        count: 0,
+        minimum: 0,
+        label: DEFAULT_SCANNED_LABEL,
+        problem: { subject: "entry", code: "no_shape" },
+      }),
+    ];
+    for (const line of lines) {
+      assert.match(line, /^check-x: ERROR — /);
+      assert.match(line, /lib\/scanned-floor\.ts/);
+      assert.equal(line.split("\n").length, 1);
+    }
   });
 });
 
@@ -632,6 +686,13 @@ describe("a failure carries a problem, not a sentence about one", () => {
     unreadable_input: () =>
       inputFailureOf(["a.json"], { "a.json": unreadableInput("EACCES") }),
     empty_input: () => inputFailureOf(["a.json"], { "a.json": {} }),
+    // The three lookup codes have no pure evaluator to produce them: they are
+    // raised by the table lookups, so the producer is the throw itself.
+    no_floor_declared: () => failureFromThrow(() => scannedFloorFor("check-nothing")),
+    no_count_floor: () =>
+      failureFromThrow(() => countFloorFor("check-appstore-config")),
+    no_inputs_floor: () =>
+      failureFromThrow(() => assertParsedInputs("check-secrets", {})),
   };
   const failureCodes = Object.keys(EVERY_FAILURE) as ScannedFloorFailureCode[];
 
@@ -830,7 +891,7 @@ describe("scannedFloorFor", () => {
     // Defaulting would let a guard opt out of the floor by typo.
     assert.throws(
       () => scannedFloorFor("check-nothing"),
-      /no committed floor for "check-nothing"/,
+      /^ScannedFloorError: check-nothing: ERROR — no committed floor/,
     );
   });
 });
@@ -843,7 +904,7 @@ describe("countFloorFor", () => {
   it("throws rather than inventing a floor for an inputs-shaped guard", () => {
     assert.throws(
       () => countFloorFor("check-appstore-config"),
-      /declares no count floor/,
+      /^ScannedFloorError: check-appstore-config: ERROR — asked for a count floor/,
     );
   });
 });
@@ -879,7 +940,94 @@ describe("assertParsedInputs", () => {
   it("throws rather than passing vacuously for a count-shaped guard", () => {
     assert.throws(
       () => assertParsedInputs("check-secrets", {}),
-      /declares no fixed inputs/,
+      /^ScannedFloorError: check-secrets: ERROR — asked for its declared inputs/,
+    );
+  });
+});
+
+describe("an unusable premise refuses in one line, whichever way it is unusable", () => {
+  /**
+   * The three lookup failures and the call that raises each. Not derived from
+   * a fixture: the whole claim is about what these three CALLS do when a
+   * wrapper asks for something the table cannot give it.
+   */
+  const LOOKUPS: readonly {
+    readonly code: ScannedFloorFailureCode;
+    readonly checkName: string;
+    readonly call: () => unknown;
+  }[] = [
+    {
+      code: "no_floor_declared",
+      checkName: "check-nothing",
+      call: () => scannedFloorFor("check-nothing"),
+    },
+    {
+      code: "no_count_floor",
+      checkName: "check-appstore-config",
+      call: () => countFloorFor("check-appstore-config"),
+    },
+    {
+      code: "no_inputs_floor",
+      checkName: "check-secrets",
+      call: () => assertParsedInputs("check-secrets", {}),
+    },
+  ];
+
+  for (const { code, checkName, call } of LOOKUPS) {
+    it(`raises ${code} as a ScannedFloorError the wrapper can print`, () => {
+      // The bug this closes: all three were bare `Error`s, and every wrapper's
+      // handler catches `ScannedFloorError` and re-throws anything else. So the
+      // three most likely consequences of a rename printed as node stacks
+      // while the ten ways an entry can be malformed printed as one line.
+      const failure = failureFromThrow(call);
+      assert.equal(failure.code, code);
+      const line = formatScannedFloorFailure(checkName, failure);
+      assert.match(line, new RegExp(`^${checkName}: ERROR — `));
+      assert.equal(line.split("\n").length, 1, `${code} prints more than one line`);
+      assert.match(line, /lib\/scanned-floor\.ts/);
+    });
+
+    it(`says nothing about the tree on a ${code} failure`, () => {
+      // None of the three is a finding about a walk: the numbers on the
+      // failure are placeholders, so a message quoting one would be inventing
+      // a measurement nobody took, and the remeasure hint would send the
+      // reader to change a number that is not the problem.
+      const line = formatScannedFloorFailure(checkName, failureFromThrow(call));
+      assert.doesNotMatch(line, /Check the scan roots/);
+      assert.doesNotMatch(line, /re-measure the floor/);
+      assert.doesNotMatch(line, /scanned 0/);
+    });
+  }
+
+  it("says why a shape mismatch is a bug in the same words from both sides", () => {
+    // Two sentences about one disagreement, one per direction. Read from the
+    // messages rather than re-typed here, so a rewording of either has to keep
+    // the shared reason or fail.
+    const lines = [
+      formatScannedFloorFailure("check-x", failureFromThrow(LOOKUPS[1].call)),
+      formatScannedFloorFailure("check-x", failureFromThrow(LOOKUPS[2].call)),
+    ];
+    for (const line of lines) {
+      assert.ok(line.includes(SHAPE_MISMATCH_REASON), `lost the shared clause:\n${line}`);
+      // Neither may be JUST the shared clause, or "both say it" is satisfied
+      // by two messages that say nothing else — and the two directions differ
+      // in which assertion the wrapper should have called instead.
+      assert.notEqual(line, SHAPE_MISMATCH_REASON);
+    }
+    assert.notEqual(lines[0], lines[1]);
+    assert.match(lines[0], /assertParsedInputs/);
+    assert.match(lines[1], /assertScannedFloor/);
+  });
+
+  it("leaves no bare Error on the lookup path in the source", () => {
+    // The drift guard. Every assertion above goes through a call that throws
+    // today; a FOURTH lookup added later could reintroduce the bare `Error`
+    // and no test above would be able to see it.
+    const source = read("lib/scanned-floor.ts");
+    const table = source.slice(source.indexOf("export const SCANNED_FLOORS"));
+    assert.ok(
+      !/throw new Error\(/.test(table),
+      "a lookup below SCANNED_FLOORS throws a bare Error — the wrapper re-throws those as a stack trace",
     );
   });
 });

@@ -42,7 +42,17 @@ export type ScannedFloorFailureCode =
   /** A declared fixed input could not be read or parsed at all. */
   | "unreadable_input"
   /** A declared fixed input parsed, but to nothing worth checking. */
-  | "empty_input";
+  | "empty_input"
+  /**
+   * The guard asked for a floor and {@link SCANNED_FLOORS} has no entry under
+   * its name at all — the likeliest of these three after a rename, and the one
+   * that used to arrive as a bare `Error` with a node stack.
+   */
+  | "no_floor_declared"
+  /** The entry exists and is not count-shaped, but the wrapper asked for one. */
+  | "no_count_floor"
+  /** The entry exists and declares no fixed inputs, but the wrapper asked for them. */
+  | "no_inputs_floor";
 
 export type ScannedFloorFailure = {
   readonly code: ScannedFloorFailureCode;
@@ -112,6 +122,20 @@ export const FLOOR_BELOW_ONE_REASON =
 const NUMERIC_FLOOR_DETAIL = (minimum: number) =>
   `floor of ${minimum} is not a positive integer — ${FLOOR_BELOW_ONE_REASON}`;
 
+/**
+ * Why a wrapper asking for a shape its entry does not declare is a wiring bug
+ * rather than a guard with nothing to check. Said by the two sentences that
+ * report it — `no_count_floor` and `no_inputs_floor`, one per direction of the
+ * same disagreement — so the reason lives in one place instead of being typed
+ * twice and reworded once, the same treatment {@link FLOOR_BELOW_ONE_REASON}
+ * gets one table over.
+ *
+ * Exported for the test that requires both messages to carry it: recovering the
+ * clause by slicing either sentence would be an assertion about punctuation.
+ */
+export const SHAPE_MISMATCH_REASON =
+  "the wrapper and the table disagree about which shape this guard's premise has, so the assertion it just made has nothing in the entry to apply to";
+
 export function evaluateScannedFloor(
   count: number,
   minimum: number,
@@ -159,6 +183,17 @@ const FAILURE_MESSAGE: Record<
     `declared input "${f.input}" could not be read (${f.reason ?? "no reason given"}) — the guard proves a negative about a file it never opened, and every check against it would find nothing to complain about. Check the scan root still holds it.`,
   empty_input: (f) =>
     `input "${f.input}" is empty — it was read, so nothing crashed, and every check against it then found nothing to complain about. That is not a pass.`,
+  // The three "this guard's premise is not usable" codes. They are about the
+  // LOOKUP rather than about a declaration or a tree: the entry is absent, or
+  // it is present and shaped unlike what the wrapper asked for. Each was a bare
+  // `Error` until this table learned to say it, which meant the reader got a
+  // node stack for the same class of failure the other six print in one line.
+  no_floor_declared: () =>
+    `no committed floor — this guard has no SCANNED_FLOORS entry in lib/scanned-floor.ts, so nothing says what a complete run of it looks like and the negative it proves is over however many files it happened to find. Add an entry keyed by this name: a guard cannot opt out of its own premise by being absent from the table.`,
+  no_count_floor: () =>
+    `asked for a count floor and its SCANNED_FLOORS entry declares none — ${SHAPE_MISMATCH_REASON}. Either this wrapper wants assertParsedInputs, or the entry in lib/scanned-floor.ts is missing its count.`,
+  no_inputs_floor: () =>
+    `asked for its declared inputs and its SCANNED_FLOORS entry declares none — ${SHAPE_MISMATCH_REASON}. Either this wrapper wants assertScannedFloor, or the entry in lib/scanned-floor.ts is missing its inputs.`,
 };
 
 /** One-line, prefixed with the guard's own name so the log says who failed. */
@@ -667,6 +702,18 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
 };
 
 /**
+ * A failure about the LOOKUP rather than about a walk: there is no count and
+ * no minimum to report, because the entry that would have named them is
+ * missing or shaped otherwise. The numeric fields are zero and the messages for
+ * these three codes read none of them — they are here because
+ * {@link ScannedFloorFailure} is one flat type, and giving them made-up values
+ * would be worse than giving them empty ones.
+ */
+function lookupFailure(code: ScannedFloorFailureCode): ScannedFloorFailure {
+  return { code, count: 0, minimum: 0, label: DEFAULT_SCANNED_LABEL };
+}
+
+/**
  * Throws if `checkName` has no committed floor — a guard cannot opt out
  * silently — or if the floor it does have is structurally unusable.
  *
@@ -677,14 +724,16 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
  * as a floor of 0 that greenlights an empty walk. It is thrown as a
  * {@link ScannedFloorError} for exactly that reason: the wrapper catches that
  * type and exits 1 without a stack trace.
+ *
+ * So is the FIRST half, now. A missing entry used to be a bare `Error`, which
+ * the wrapper's handler does not recognise and re-throws: no `ERROR —` prefix,
+ * no check-name head, and a node stack, for the failure a rename produces most
+ * often. Both halves are the same thing from the reader's side — this guard's
+ * premise is not usable — so both print alike.
  */
 export function scannedFloorFor(checkName: string): ScannedFloor {
   const floor = SCANNED_FLOORS[checkName];
-  if (!floor) {
-    throw new Error(
-      `scanned-floor: no committed floor for "${checkName}" — add one to SCANNED_FLOORS in lib/scanned-floor.ts.`,
-    );
-  }
+  if (!floor) throw new ScannedFloorError(checkName, lookupFailure("no_floor_declared"));
   const [problem] = validateScannedFloorEntry(checkName, floor);
   if (problem) {
     throw new ScannedFloorError(checkName, {
@@ -698,14 +747,15 @@ export function scannedFloorFor(checkName: string): ScannedFloor {
   return floor;
 }
 
-/** The `count` half, or a throw naming the guard that does not declare one. */
+/**
+ * The `count` half, or a {@link ScannedFloorError} naming the guard that does
+ * not declare one — a wrapper asking for a shape its entry does not have is a
+ * wiring mistake, and it is printed as one line like every other unusable
+ * premise rather than as a stack.
+ */
 export function countFloorFor(checkName: string): ScannedCountFloor {
   const floor = scannedFloorFor(checkName);
-  if (!floor.count) {
-    throw new Error(
-      `scanned-floor: "${checkName}" declares no count floor — it is an inputs-shaped guard.`,
-    );
-  }
+  if (!floor.count) throw new ScannedFloorError(checkName, lookupFailure("no_count_floor"));
   return floor.count;
 }
 
@@ -729,11 +779,7 @@ export function assertParsedInputs(
   values: Readonly<Record<string, unknown>>,
 ): void {
   const floor = scannedFloorFor(checkName);
-  if (!floor.inputs) {
-    throw new Error(
-      `scanned-floor: "${checkName}" declares no fixed inputs — it is a count-shaped guard.`,
-    );
-  }
+  if (!floor.inputs) throw new ScannedFloorError(checkName, lookupFailure("no_inputs_floor"));
   const verdict = evaluateParsedInputs(floor.inputs, values);
   if (!verdict.ok) throw new ScannedFloorError(checkName, verdict.failure);
 }
