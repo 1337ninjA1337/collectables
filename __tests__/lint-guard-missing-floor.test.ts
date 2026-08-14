@@ -36,6 +36,7 @@ import {
 import {
   assertNoStackTrace,
   checkNameOf,
+  entryPatch,
   makeSharedPatchedRepo,
   PATCHED_REPO_MARKER,
   type GuardRun,
@@ -158,36 +159,7 @@ const runFor = (code: LookupFailureCode): GuardRun => {
   const lookup = CASES[code];
   return repo.runPatched(
     `lookup-${code}`,
-    {
-      [FLOOR_MODULE]: (source) => {
-        const open = `  "${lookup.checkName}": {`;
-        const start = source.indexOf(open);
-        assert.ok(start >= 0, `${lookup.checkName} has no entry in ${FLOOR_MODULE}`);
-        // Braces counted from the opening one, so an entry that ever nests is
-        // sliced whole instead of ending at the first `\n  },`.
-        let depth = 0;
-        let end = -1;
-        for (let i = start + open.length - 1; i < source.length; i += 1) {
-          if (source[i] === "{") depth += 1;
-          else if (source[i] === "}") {
-            depth -= 1;
-            if (depth === 0) {
-              end = i;
-              break;
-            }
-          }
-        }
-        assert.ok(end > start, `${lookup.checkName}'s entry never closes`);
-        const entry = source.slice(start, end);
-        const rewritten = lookup.rewrite(entry);
-        assert.notEqual(
-          rewritten,
-          entry,
-          `the rewrite for ${code} matched nothing — its anchor has drifted`,
-        );
-        return source.slice(0, start) + rewritten + source.slice(end);
-      },
-    },
+    { [FLOOR_MODULE]: entryPatch(lookup.checkName, lookup.rewrite) },
     guardFor(lookup.checkName),
     REPO_ROOT,
   );
