@@ -38,6 +38,7 @@ import {
 import {
   assertNoStackTrace,
   checkNameOf,
+  entryPatch,
   makeSharedPatchedRepo,
   PATCHED_REPO_MARKER,
   runGuardWith,
@@ -62,56 +63,6 @@ const guardFor = (checkName: string) => {
  */
 const repo = makeSharedPatchedRepo();
 after(() => repo.cleanup());
-
-/**
- * Rewrites ONE entry of `SCANNED_FLOORS` and leaves the rest of the module
- * alone.
- *
- * Scoping the rewrite to the entry is what lets a case anchor on
- * `/minimum: 160/` instead of on a whole pretty-printed declaration: the key
- * is the anchor, and the key is a thing `lib/scanned-floor.ts` declares rather
- * than a thing this test remembers. `runPatched` refuses a patch that changed
- * nothing, so a rewrite whose regex stops matching fails loudly here instead
- * of quietly running an unpatched guard.
- */
-function entryPatch(
-  checkName: string,
-  rewrite: (entry: string) => string,
-): (source: string) => string {
-  return (source) => {
-    const open = `  "${checkName}": {`;
-    const start = source.indexOf(open);
-    assert.ok(start >= 0, `${checkName} has no entry in ${FLOOR_MODULE}`);
-    // Braces are counted from the opening one rather than scanning for the
-    // first `\n  },`. No entry nests today, so the two agree — and the day one
-    // does, the shortcut ends the slice early, the rewrite lands in the wrong
-    // half, and `runPatched`'s no-op check waves it through because the patch
-    // did change SOMETHING. The fixture's parse should be a fact about the
-    // text, not an assumption about the table's current formatting.
-    let depth = 0;
-    let end = -1;
-    for (let i = start + open.length - 1; i < source.length; i += 1) {
-      const char = source[i];
-      if (char === "{") depth += 1;
-      else if (char === "}") {
-        depth -= 1;
-        if (depth === 0) {
-          end = i;
-          break;
-        }
-      }
-    }
-    assert.ok(end > start, `${checkName}'s entry in ${FLOOR_MODULE} never closes`);
-    const entry = source.slice(start, end);
-    const rewritten = rewrite(entry);
-    assert.notEqual(
-      rewritten,
-      entry,
-      `the rewrite for ${checkName} matched nothing in its entry — the anchor has drifted`,
-    );
-    return source.slice(0, start) + rewritten + source.slice(end);
-  };
-}
 
 /**
  * A wrapper run whose only reason to fail is the problem the patch introduces.
