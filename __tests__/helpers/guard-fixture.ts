@@ -50,7 +50,7 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..");
  * timeout below would be decoration. One process, no grandchild, and the
  * ~430 ms wrapper boot goes with it.
  */
-const TSX_MODULE = path.join(REPO_ROOT, "node_modules", "tsx");
+const TSX_MODULE = path.join("node_modules", "tsx");
 
 /**
  * Fail on the missing install rather than on its symptom.
@@ -60,19 +60,30 @@ const TSX_MODULE = path.join(REPO_ROOT, "node_modules", "tsx");
  * what a guard REFUSING looks like to these suites. Every assertion of the
  * form "this run failed" then passes for the wrong reason, and every assertion
  * of the form "this run passed" fails with a bare `1 !== 0` and no output to
- * explain it. Four suites depend on this; the diagnosis is worth one
+ * explain it. Five suites depend on this; the diagnosis is worth one
  * `existsSync`.
+ *
+ * Takes the checkout to look in rather than closing over `REPO_ROOT`, for the
+ * same reason every other refusal here is reachable from a test: this one is
+ * the diagnosis a fresh checkout gets, so "it names `npm ci`" should be a case
+ * rather than a thing observed once by whoever forgot to install.
  */
-function tsxLoader(): string {
-  if (!fs.existsSync(TSX_MODULE)) {
+export function tsxLoaderIn(root: string): string {
+  const module = path.join(root, TSX_MODULE);
+  if (!fs.existsSync(module)) {
     throw new Error(
-      `guard-fixture: ${TSX_MODULE} does not exist, so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
+      `guard-fixture: ${module} does not exist, so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
     );
   }
   // The bare specifier, not the directory: node resolves `--import tsx`
   // against `cwd` (REPO_ROOT below) through the package's own exports map,
   // while an absolute directory path is an ERR_UNSUPPORTED_DIR_IMPORT.
   return "tsx";
+}
+
+/** {@link tsxLoaderIn} against the checkout the guards are actually spawned from. */
+function tsxLoader(): string {
+  return tsxLoaderIn(REPO_ROOT);
 }
 
 export type PartialRoot = {
