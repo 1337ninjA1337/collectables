@@ -52,6 +52,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "No direct analytics-events imports from UI code — the taxonomy is consumed via lib/analytics.ts",
   },
   {
+    npmScript: "lint:problem-phrasing",
+    scriptPath: "scripts/check-problem-phrasing-imports.ts",
+    args: [],
+    description:
+      "No scanned-floor phrasing part read without a sentence-joining function in scope — one problem, one phrasing",
+  },
+  {
     npmScript: "lint:clarity-mask",
     scriptPath: "scripts/check-clarity-input-mask.ts",
     args: [],

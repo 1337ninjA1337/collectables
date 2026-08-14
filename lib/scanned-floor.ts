@@ -624,6 +624,10 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     count: { label: "source file", minimum: 45 },
     note: "same app/ + components/ walk as check-inline-radius, 63 files on 2026-08-12; same 45 for the same reason.",
   },
+  "check-problem-phrasing-imports": {
+    count: { label: "source file", minimum: 450 },
+    note: "app/ + components/ + lib/ + scripts/ + __tests__/ held 635 .ts/.tsx files on 2026-08-14 (app 19, components 44, lib 150, scripts 26, tests 396); 450 rides above the 396 that __tests__/ alone contributes, so no single root clears this floor on its own — the property check-inline-hex's note names, and the one that matters most here because __tests__/ is where a hand-joined sentence is likeliest to appear.",
+  },
   "check-clarity-input-mask": {
     count: { label: "screen file", minimum: 45 },
     note: "app/ + components/ held 62 .tsx files on 2026-08-12 (one fewer than the radius walk, which also takes .ts); 45 keeps the two floors aligned since the walks differ by a single extension.",
