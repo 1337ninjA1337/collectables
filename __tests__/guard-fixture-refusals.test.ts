@@ -32,6 +32,7 @@ import { LINT_GUARDS } from "../lib/lint-guards";
 import {
   assertNoStackTrace,
   checkNameOf,
+  describeResolveFailure,
   entryPatch,
   makePartialRoot,
   makeSharedPatchedRepo,
@@ -380,12 +381,96 @@ describe("the loader check", () => {
     }
   });
 
+  it("renders three distinct refusals, so no two of them can drift together", () => {
+    // Each of the three is pinned by its own `assert.match` in its own case,
+    // which says nothing about the three being DIFFERENT — and the first draft
+    // of the unreadable-link message repeated `npm ci` from the global-folder
+    // one, which is exactly the drift an individual match cannot see. The
+    // reader's whole map of what went wrong is which sentence they got.
+    const planted = (globals: string): void => {
+      const fake = path.join(globals, "tsx");
+      fs.mkdirSync(fake, { recursive: true });
+      fs.writeFileSync(
+        path.join(fake, "package.json"),
+        JSON.stringify({ name: "tsx", version: "0.0.0", main: "index.js" }),
+      );
+      fs.writeFileSync(path.join(fake, "index.js"), "module.exports = {};\n");
+    };
+    inScratchCheckout((globals) => {
+      planted(globals);
+      inScratchCheckout((absent) => {
+        inScratchCheckout((looping) => {
+          fs.symlinkSync("node_modules", path.join(looping, "node_modules"));
+          const rendered = [
+            refusalFor(absent),
+            resolveInChild(absent, { NODE_PATH: globals }),
+            resolveInChild(looping, { NODE_PATH: globals }),
+          ].map((message) =>
+            // The roots are mkdtemp names, so they differ on every run and
+            // would make three identical sentences look distinct.
+            [absent, looping, globals].reduce(
+              (text, root) => text.split(root).join("<root>"),
+              message,
+            ),
+          );
+          assert.equal(
+            new Set(rendered).size,
+            rendered.length,
+            `two of the three loader refusals render the same sentence, so the reader cannot tell which finding they got:\n${rendered.join("\n---\n")}`,
+          );
+        });
+      });
+    });
+  });
+
   it("answers with the bare specifier, not the file the resolver named", () => {
     // `--import /abs/node_modules/tsx` is an ERR_UNSUPPORTED_DIR_IMPORT, and
     // the CJS resolution may name a different entry than the `import`
     // condition the spawn gets; the bare name resolves through the package's
     // own exports map either way.
     assert.equal(tsxLoaderIn(REPO_ROOT), "tsx");
+  });
+});
+
+describe("describeResolveFailure", () => {
+  // The whole classification behind the unreadable-link report, and a pure
+  // function of one argument — so the rows that would each need their own
+  // kernel state (an unreadable directory, a name too long for the
+  // filesystem, an `fs` that throws something without a `code`) are a table.
+
+  it("stays silent for the two codes that mean the path is simply not there", () => {
+    // The ordinary state of nearly every ancestor's `node_modules`. Reporting
+    // these would bury the real finding under one line per ancestor.
+    for (const code of ["ENOENT", "ENOTDIR"]) {
+      assert.equal(
+        describeResolveFailure(Object.assign(new Error("boom"), { code })),
+        null,
+        `${code} is reported as unreadable, which would fire on every checkout`,
+      );
+    }
+  });
+
+  it("reports the errno for every other code", () => {
+    for (const code of ["EACCES", "ELOOP", "ENAMETOOLONG", "EPERM"]) {
+      assert.equal(describeResolveFailure(Object.assign(new Error("boom"), { code })), code);
+    }
+  });
+
+  it("says so in words when the error carries no code, rather than inventing one", () => {
+    // `UNKNOWN` in the slot where every other row prints an errno reads like a
+    // real filesystem code, and the reader spends the next minute looking it
+    // up. The message is the only thing actually known here.
+    const detail = describeResolveFailure(new Error("realpath went sideways\n    at frame"));
+    assert.equal(detail, "no errno: realpath went sideways");
+    assert.doesNotMatch(String(detail), /UNKNOWN/);
+  });
+
+  it("survives a thrown non-error", () => {
+    // `catch` binds whatever was thrown, and this one is rendered straight
+    // into a refusal — a `String(...)` away from a TypeError inside the
+    // diagnosis that was supposed to explain the failure.
+    assert.equal(describeResolveFailure("not an error"), "no errno: not an error");
+    assert.equal(describeResolveFailure(null), "no errno: null");
   });
 });
 
