@@ -100,25 +100,44 @@ function isUnder(parent: string, child: string): boolean {
   return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
 }
 
+/** `fs.realpathSync(target)`, or null for a path that does not resolve. */
+function realpathOrNull(target: string): string | null {
+  try {
+    return fs.realpathSync(target);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Whether the resolver's answer came out of the checkout's own dependency
  * chain rather than out of a global folder.
  *
- * Two ways to be satisfied, because a resolved path is REALPATHED and an
- * install need not be a plain directory:
+ * Everything is compared REALPATHED, because `require.resolve` answers with a
+ * real path and neither side of the comparison need be one: a root reached
+ * through a symlinked ancestor (`/var` → `/private/var` on macOS) and an
+ * install symlinked into the tree (pnpm, `npm link`, a workspace) are both
+ * ordinary, and both would look like a global answer to a plain string prefix.
  *
- * - the file lies under one of the chain's `node_modules`, the ordinary case;
- * - a `node_modules/<specifier>` entry exists on the chain. The chain is
- *   searched BEFORE the global folders, so if such an entry exists the
- *   successful resolution above necessarily came through it — which is how a
- *   symlinked or store-backed install (pnpm, `npm link`, a workspace) stays
- *   accepted even though its realpath lands outside the tree, and how a `root`
- *   reached through a symlinked ancestor (`/var` → `/private/var` on macOS)
- *   does too.
+ * So two places per chain link, and the second is why this is not a bare "is
+ * the file under the root": the `node_modules` itself, and the package entry
+ * inside it, whose realpath is where a symlinked install actually lives.
+ *
+ * What this deliberately does NOT do is take the EXISTENCE of a chain entry as
+ * proof that the entry answered. The chain is searched first, so an entry that
+ * resolves must have won — but one that does not (an empty `node_modules/tsx`
+ * from an interrupted `npm ci`, a broken symlink, a manifest whose `main` was
+ * never written) is skipped by the resolver, which then falls through to the
+ * global folders and succeeds there. That combination — a half-written install
+ * in the checkout and a good one on `$NODE_PATH` — is exactly the case this
+ * check exists for, and an existence test waves it through.
  */
 function resolvedFromCheckout(root: string, resolved: string): boolean {
-  return nodeModulesChain(root).some(
-    (dir) => isUnder(dir, resolved) || fs.existsSync(path.join(dir, TSX_SPECIFIER)),
+  return nodeModulesChain(root).some((dir) =>
+    [dir, path.join(dir, TSX_SPECIFIER)].some((candidate) => {
+      const real = realpathOrNull(candidate);
+      return real !== null && isUnder(real, resolved);
+    }),
   );
 }
 
