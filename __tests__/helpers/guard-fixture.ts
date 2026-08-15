@@ -135,40 +135,83 @@ export function describeResolveFailure(error: unknown): string | null {
   return `no errno: ${describeThrown(error)}`;
 }
 
+/**
+ * Something occupying a chain path that cannot hold an install.
+ *
+ * Distinct from {@link UnreadableLink}, which is about not knowing: this walk
+ * knows exactly what is there and knows node will skip it, so the refusal
+ * stands. What the finding buys is the reason — otherwise the reader is told
+ * their checkout has no install at a path their own `ls` shows occupied.
+ */
+type ChainObstruction = { path: string; what: string };
+
 /** What one chain path turned out to be. */
 type ChainLink = {
-  /** Its real path, or null when it is absent or could not be read. */
+  /** Its real path, or null when it is absent, occupied or unreadable. */
   real: string | null;
   /** Why it could not be read, when that is what happened. */
   unreadable: UnreadableLink | null;
-  /** Whether the thing at `real` can hold an install at all. */
-  directory: boolean;
+  /** What is in the way, when something is. */
+  obstruction: ChainObstruction | null;
 };
 
 /**
- * `fs.realpathSync(target)`, keeping the reason it failed and what it is.
+ * `fs.realpathSync(target)`, keeping the reason it failed and what is there.
  *
- * The entry type is asked for because a chain link that is a FILE resolves
- * perfectly well: `realpath` only reports `ENOTDIR` when a path component
- * short of the last one is not a directory, and every chain link is an
- * ancestor directory plus the name `node_modules`. So a stray `node_modules`
- * FILE — a botched `npm ci`, a download that landed under the wrong name —
- * comes back as a clean success that then matches nothing, and the walk moves
- * on without a word. node skips it too, so the refusal that follows is right;
- * the reason is the part worth one `statSync`.
+ * Two shapes reach the walk as a silent nothing and are worth one extra
+ * syscall each, because both are a thing a person made rather than a state of
+ * the machine.
+ *
+ * A chain link that is a FILE resolves perfectly well: `realpath` reports
+ * `ENOTDIR` only when a path component SHORT of the last one is not a
+ * directory, and every chain link is an ancestor directory plus the name
+ * `node_modules`. So a stray file under that name — a botched `npm ci`, a
+ * download that landed wrong — comes back as a clean success that then matches
+ * nothing. One `statSync` on the answer, which is already realpathed, so there
+ * is no second resolution and no symlink question left in it.
+ *
+ * A chain link that is a DANGLING SYMLINK fails with `ENOENT`, which the
+ * classification treats as absence — correct for the ancestors of any
+ * checkout, which simply have no `node_modules`, and wrong for this one: the
+ * path exists, someone created it (`ln -s ../shared/node_modules`, target
+ * since moved), and it is the reason the install the reader believes they
+ * linked is not being found. `lstatSync` tells the two `ENOENT`s apart, and it
+ * runs only in the branch where the answer was already "not there".
  */
 function probeChainLink(target: string): ChainLink {
   try {
     const real = fs.realpathSync(target);
-    return { real, unreadable: null, directory: fs.statSync(real).isDirectory() };
+    if (fs.statSync(real).isDirectory()) return { real, unreadable: null, obstruction: null };
+    return {
+      real: null,
+      unreadable: null,
+      obstruction: { path: real, what: "is not a directory" },
+    };
   } catch (error) {
     const detail = describeResolveFailure(error);
     return {
       real: null,
       unreadable: detail === null ? null : { path: target, detail },
-      directory: false,
+      obstruction: detail === null ? danglingLink(target) : null,
     };
   }
+}
+
+/**
+ * The finding for a path that is absent because a symlink points at nothing,
+ * or null for the ordinary absence every ancestor has.
+ *
+ * `lstat` rather than `exists`: the question is whether the LINK is there, and
+ * every call that follows the link has already answered "no".
+ */
+function danglingLink(target: string): ChainObstruction | null {
+  try {
+    if (!fs.lstatSync(target).isSymbolicLink()) return null;
+  } catch {
+    // Not there at all, which is what nearly every ancestor looks like.
+    return null;
+  }
+  return { path: target, what: "is a symlink whose target does not exist" };
 }
 
 /**
@@ -201,27 +244,27 @@ function probeChainLink(target: string): ChainLink {
  * Collected all the way along and returned even on success, so the caller
  * decides — a chain that contains the resolution has nothing left to explain.
  *
- * A link that is a FILE is collected too, and it is a different kind of
- * finding from either: it is not a reason to doubt the answer, because node
- * skips a non-directory exactly as this walk does. It is the reason the
- * checkout has no install where it looks like it has one, and without it the
- * reader is told their checkout resolves through a global folder while a
- * `node_modules` sits right there in the listing.
+ * A link that is OCCUPIED — a file, a symlink pointing at nothing — is
+ * collected too, and it is a different kind of finding from either: it is not
+ * a reason to doubt the answer, because node skips it exactly as this walk
+ * does. It is the reason the checkout has no install where it looks like it
+ * has one, and without it the reader is told their checkout resolves through a
+ * global folder while a `node_modules` sits right there in the listing.
  */
 type ChainProvenance = {
   fromCheckout: boolean;
   unreadable: UnreadableLink[];
-  /** Chain links that exist and cannot hold an install, realpathed. */
-  notDirectories: string[];
+  /** Chain links occupied by something that cannot hold an install. */
+  obstructed: ChainObstruction[];
 };
 
 function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
   const unreadable: UnreadableLink[] = [];
-  const notDirectories: string[] = [];
+  const obstructed: ChainObstruction[] = [];
   const answer = (fromCheckout: boolean): ChainProvenance => ({
     fromCheckout,
     unreadable,
-    notDirectories,
+    obstructed,
   });
   for (const dir of nodeModulesChain(root)) {
     const link = probeChainLink(dir);
@@ -232,13 +275,14 @@ function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
       unreadable.push(link.unreadable);
       continue;
     }
-    if (link.real === null) continue;
-    if (!link.directory) {
-      // Nothing can be under a file, so this link answers nothing and the
-      // entry probe below would only ask the same question one name deeper.
-      notDirectories.push(link.real);
+    if (link.obstruction) {
+      // Nothing lives under a file or behind a dangling link, so this one
+      // answers nothing and the entry probe below would ask the same question
+      // one name deeper.
+      obstructed.push(link.obstruction);
       continue;
     }
+    if (link.real === null) continue;
     if (isUnder(link.real, resolved)) return answer(true);
     const entry = probeChainLink(path.join(dir, TSX_SPECIFIER));
     if (entry.unreadable) {
@@ -253,20 +297,24 @@ function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
 }
 
 /**
- * The clause naming chain links that exist and are not directories, or none.
+ * The clause naming chain links something is standing in, or none at all.
  *
- * Appended to whichever refusal fires rather than replacing it: a file where
- * `node_modules` belongs does not make the answer uncertain — node skips it
- * too, so the refusal above it is right — it explains WHY the checkout has no
- * install at a path the reader can see in their own listing. Left out of the
- * message entirely, the two facts contradict each other on the reader's screen
- * and the sentence looks wrong.
+ * Appended to whichever refusal fires rather than replacing it: something in
+ * the way does not make the answer uncertain — node skips it too, so the
+ * refusal above it is right — it explains WHY the checkout has no install at a
+ * path the reader can see in their own listing. Left out of the message
+ * entirely, the two facts contradict each other on the reader's screen and the
+ * sentence looks wrong.
+ *
+ * Empty for a healthy chain, which is the case that matters most: a clause
+ * that shows up when nothing is wrong teaches the reader to skip the tail of
+ * every message, including the one that names their actual problem.
  */
-function notDirectoryClause(paths: readonly string[]): string {
-  if (paths.length === 0) return "";
-  const one = paths.length === 1;
-  const state = one ? "exists and is not a directory" : "exist and are not directories";
-  return ` Note also: ${paths.join(", ")} ${state}, so node skipped ${one ? "it" : "them"} — a file under that name (a stray download, a botched \`npm ci\`) cannot hold an install, and none can land there until it is removed.`;
+function obstructionClause(items: readonly ChainObstruction[]): string {
+  if (items.length === 0) return "";
+  const listed = items.map((item) => `${item.path} (${item.what})`).join(", ");
+  const one = items.length === 1;
+  return ` Note also: ${listed} — ${one ? "that path is" : "those paths are"} in the chain node searches and cannot hold an install, so node skipped ${one ? "it" : "them"}; nothing can be installed there until ${one ? "it is" : "they are"} removed.`;
 }
 
 /**
@@ -320,13 +368,13 @@ export function tsxLoaderIn(root: string): string {
       .map((link) => `${link.path} (${link.detail})`)
       .join(", ");
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, and whether that is the checkout's own install could not be decided: ${provenance.unreadable.length} of the \`node_modules\` directories node would search from that checkout could not be read — ${links}. That is not "this checkout has no install", and re-installing will not change it; a link that cannot be traversed (permissions), a symlink cycle or a path too long for the filesystem all land here, and any of them may be the install the resolver actually loaded. Fix the paths above, then re-run.${notDirectoryClause(provenance.notDirectories)}`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, and whether that is the checkout's own install could not be decided: ${provenance.unreadable.length} of the \`node_modules\` directories node would search from that checkout could not be read — ${links}. That is not "this checkout has no install", and re-installing will not change it; a link that cannot be traversed (permissions), a symlink cycle or a path too long for the filesystem all land here, and any of them may be the install the resolver actually loaded. Fix the paths above, then re-run.${obstructionClause(provenance.obstructed)}`,
     );
   }
   if (!provenance.fromCheckout) {
     const chain = nodeModulesChain(root);
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${notDirectoryClause(provenance.notDirectories)}`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${obstructionClause(provenance.obstructed)}`,
     );
   }
   // The bare specifier, not the file the resolver answered with: node resolves

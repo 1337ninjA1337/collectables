@@ -417,6 +417,51 @@ describe("the loader check", () => {
     });
   });
 
+  it("says a chain link is a symlink pointing at nothing, instead of calling it absent", () => {
+    // `realpath` on a dangling link is ENOENT, which is also what every
+    // ancestor without a `node_modules` reports — and the classification is
+    // right to stay silent for those. This one is not the same finding: the
+    // path exists, a person made it (`ln -s ../shared/node_modules`, target
+    // since moved), and it is the whole reason the install they believe they
+    // linked is not being found. An `lstat` in the branch that already said
+    // "not there" is what tells the two apart.
+    inScratchCheckout((globals) => {
+      plantGlobalTsx(globals);
+      inScratchCheckout((root) => {
+        const link = path.join(root, "node_modules");
+        fs.symlinkSync(path.join(root, "target-that-was-moved"), link);
+        const answer = resolveInChild(root, { NODE_PATH: globals });
+        assert.match(answer, /^REFUSED /, `a dangling chain link answered the check:\n${answer}`);
+        assert.ok(
+          answer.includes(link),
+          `the diagnosis does not name the link standing where the install belongs:\n${answer}`,
+        );
+        assert.match(
+          answer,
+          /symlink whose target does not exist/,
+          `a dangling link is reported as plain absence, which is what every ancestor looks like:\n${answer}`,
+        );
+      });
+    });
+  });
+
+  it("says nothing extra when nothing is standing in the chain", () => {
+    // The negative half of the two cases above, and the one that keeps them
+    // worth reading: a clause that appears when nothing is wrong teaches the
+    // reader to skip the tail of every message, including the one that names
+    // their actual problem. A checkout with a plainly absent install is the
+    // ordinary refusal and must stay one sentence shorter.
+    inScratchCheckout((bare) => {
+      const message = refusalFor(bare);
+      assert.doesNotMatch(
+        message,
+        /Note also/,
+        `an ordinary missing install carries the standing-in-the-way clause:\n${message}`,
+      );
+      assert.doesNotMatch(message, /is not a directory|symlink whose target/, message);
+    });
+  });
+
   it("accepts an install found past a link it could not read", () => {
     // The other side of that line: an unreadable link is a reason to withhold
     // the answer, not to refuse. The chain is walked nearest-first, so a cycle
