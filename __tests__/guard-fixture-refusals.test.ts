@@ -107,6 +107,27 @@ describe("the loader check", () => {
   }
 
   /**
+   * A loadable package named `tsx` inside `dir`, for a `NODE_PATH` that has to
+   * answer.
+   *
+   * Four cases need one and each used to spell it out — `mkdirSync`, a
+   * manifest, an `index.js` — which says how a package is shaped four times
+   * over and what the case is testing nowhere. Loadable rather than empty on
+   * purpose: an empty directory is skipped by the resolver, so the global
+   * folder would not answer and the case would assert the absent-install
+   * refusal while looking like it tested a global one.
+   */
+  function plantGlobalTsx(dir: string): void {
+    const pkg = path.join(dir, "tsx");
+    fs.mkdirSync(pkg, { recursive: true });
+    fs.writeFileSync(
+      path.join(pkg, "package.json"),
+      JSON.stringify({ name: "tsx", version: "0.0.0", main: "index.js" }),
+    );
+    fs.writeFileSync(path.join(pkg, "index.js"), "module.exports = {};\n");
+  }
+
+  /**
    * `tsxLoaderIn(root)` run in a fresh node process carrying `env`, reported as
    * `"ANSWERED <specifier>"` or `"REFUSED <message>"`.
    *
@@ -253,13 +274,7 @@ describe("the loader check", () => {
     // on a global path is a child process that starts with one.
     inScratchCheckout((bare) => {
       inScratchCheckout((globals) => {
-        const fake = path.join(globals, "tsx");
-        fs.mkdirSync(fake, { recursive: true });
-        fs.writeFileSync(
-          path.join(fake, "package.json"),
-          JSON.stringify({ name: "tsx", version: "0.0.0", main: "index.js" }),
-        );
-        fs.writeFileSync(path.join(fake, "index.js"), "module.exports = {};\n");
+        plantGlobalTsx(globals);
         const answer = resolveInChild(bare, { NODE_PATH: globals });
         assert.match(
           answer,
@@ -287,13 +302,7 @@ describe("the loader check", () => {
     inScratchCheckout((half) => {
       inScratchCheckout((globals) => {
         fs.mkdirSync(path.join(half, "node_modules", "tsx"), { recursive: true });
-        const fake = path.join(globals, "tsx");
-        fs.mkdirSync(fake, { recursive: true });
-        fs.writeFileSync(
-          path.join(fake, "package.json"),
-          JSON.stringify({ name: "tsx", version: "0.0.0", main: "index.js" }),
-        );
-        fs.writeFileSync(path.join(fake, "index.js"), "module.exports = {};\n");
+        plantGlobalTsx(globals);
         const answer = resolveInChild(half, { NODE_PATH: globals });
         assert.match(
           answer,
@@ -321,13 +330,7 @@ describe("the loader check", () => {
       inScratchCheckout((globals) => {
         const chainLink = path.join(looping, "node_modules");
         fs.symlinkSync("node_modules", chainLink);
-        const fake = path.join(globals, "tsx");
-        fs.mkdirSync(fake, { recursive: true });
-        fs.writeFileSync(
-          path.join(fake, "package.json"),
-          JSON.stringify({ name: "tsx", version: "0.0.0", main: "index.js" }),
-        );
-        fs.writeFileSync(path.join(fake, "index.js"), "module.exports = {};\n");
+        plantGlobalTsx(globals);
         const answer = resolveInChild(looping, { NODE_PATH: globals });
         assert.match(
           answer,
@@ -347,6 +350,68 @@ describe("the loader check", () => {
           answer,
           /npm ci/,
           `the diagnosis prescribes \`npm ci\`, which changes nothing about a link this process cannot read:\n${answer}`,
+        );
+      });
+    });
+  });
+
+  it("names every unreadable link, not just the first one", () => {
+    // The walk collects a list and every case until this one planted exactly
+    // one link, so a `[0]` in place of the join, a de-dup that kept the first,
+    // or a `break` on the first finding would all pass while telling the
+    // reader to fix one of two paths — and the second is discovered only after
+    // the re-run they were told would work.
+    inScratchCheckout((globals) => {
+      plantGlobalTsx(globals);
+      inScratchCheckout((outer) => {
+        const nearer = path.join(outer, "inner");
+        fs.mkdirSync(nearer, { recursive: true });
+        const links = [path.join(nearer, "node_modules"), path.join(outer, "node_modules")];
+        for (const link of links) fs.symlinkSync("node_modules", link);
+        const answer = resolveInChild(nearer, { NODE_PATH: globals });
+        assert.match(answer, /^REFUSED /, `two unreadable links satisfied the check:\n${answer}`);
+        for (const link of links) {
+          assert.ok(
+            answer.includes(`${link} (ELOOP)`),
+            `the report names ${links.length} unreadable links and omits ${link}:\n${answer}`,
+          );
+        }
+        assert.match(
+          answer,
+          /2 of the `node_modules` directories/,
+          `the count and the list disagree, so one of them is guessing:\n${answer}`,
+        );
+      });
+    });
+  });
+
+  it("says a chain link is a file, instead of leaving a `node_modules` in the listing unexplained", () => {
+    // `realpath` reports ENOTDIR only for a component short of the last, and
+    // every chain link is an ancestor directory plus the name `node_modules` —
+    // so a stray FILE under that name resolves cleanly, matches nothing, and
+    // used to leave the walk without a word. node skips it too, so the refusal
+    // is right; what was missing is the reason, which the reader can otherwise
+    // see contradicted by their own `ls`.
+    inScratchCheckout((globals) => {
+      plantGlobalTsx(globals);
+      inScratchCheckout((root) => {
+        const stray = path.join(root, "node_modules");
+        fs.writeFileSync(stray, "not a directory\n");
+        const answer = resolveInChild(root, { NODE_PATH: globals });
+        assert.match(answer, /^REFUSED /, `a file named node_modules answered the check:\n${answer}`);
+        assert.ok(
+          answer.includes(stray),
+          `the diagnosis does not name the file standing where the install belongs:\n${answer}`,
+        );
+        assert.match(
+          answer,
+          /is not a directory/,
+          `the diagnosis names the path without saying what is wrong with it:\n${answer}`,
+        );
+        assert.match(
+          answer,
+          /GLOBAL_FOLDERS/,
+          `the file finding replaced the global-folder one, which is still the answer to where the loader came from:\n${answer}`,
         );
       });
     });
@@ -403,17 +468,8 @@ describe("the loader check", () => {
     // of the unreadable-link message repeated `npm ci` from the global-folder
     // one, which is exactly the drift an individual match cannot see. The
     // reader's whole map of what went wrong is which sentence they got.
-    const planted = (globals: string): void => {
-      const fake = path.join(globals, "tsx");
-      fs.mkdirSync(fake, { recursive: true });
-      fs.writeFileSync(
-        path.join(fake, "package.json"),
-        JSON.stringify({ name: "tsx", version: "0.0.0", main: "index.js" }),
-      );
-      fs.writeFileSync(path.join(fake, "index.js"), "module.exports = {};\n");
-    };
     inScratchCheckout((globals) => {
-      planted(globals);
+      plantGlobalTsx(globals);
       inScratchCheckout((absent) => {
         inScratchCheckout((looping) => {
           fs.symlinkSync("node_modules", path.join(looping, "node_modules"));

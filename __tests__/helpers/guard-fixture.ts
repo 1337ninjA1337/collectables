@@ -135,13 +135,39 @@ export function describeResolveFailure(error: unknown): string | null {
   return `no errno: ${describeThrown(error)}`;
 }
 
-/** `fs.realpathSync(target)`, keeping the reason it failed. */
-function probeChainLink(target: string): { real: string | null; unreadable: UnreadableLink | null } {
+/** What one chain path turned out to be. */
+type ChainLink = {
+  /** Its real path, or null when it is absent or could not be read. */
+  real: string | null;
+  /** Why it could not be read, when that is what happened. */
+  unreadable: UnreadableLink | null;
+  /** Whether the thing at `real` can hold an install at all. */
+  directory: boolean;
+};
+
+/**
+ * `fs.realpathSync(target)`, keeping the reason it failed and what it is.
+ *
+ * The entry type is asked for because a chain link that is a FILE resolves
+ * perfectly well: `realpath` only reports `ENOTDIR` when a path component
+ * short of the last one is not a directory, and every chain link is an
+ * ancestor directory plus the name `node_modules`. So a stray `node_modules`
+ * FILE — a botched `npm ci`, a download that landed under the wrong name —
+ * comes back as a clean success that then matches nothing, and the walk moves
+ * on without a word. node skips it too, so the refusal that follows is right;
+ * the reason is the part worth one `statSync`.
+ */
+function probeChainLink(target: string): ChainLink {
   try {
-    return { real: fs.realpathSync(target), unreadable: null };
+    const real = fs.realpathSync(target);
+    return { real, unreadable: null, directory: fs.statSync(real).isDirectory() };
   } catch (error) {
     const detail = describeResolveFailure(error);
-    return { real: null, unreadable: detail === null ? null : { path: target, detail } };
+    return {
+      real: null,
+      unreadable: detail === null ? null : { path: target, detail },
+      directory: false,
+    };
   }
 }
 
@@ -174,11 +200,29 @@ function probeChainLink(target: string): { real: string | null; unreadable: Unre
  * hand the reader the GLOBAL_FOLDERS sentence for a permissions problem.
  * Collected all the way along and returned even on success, so the caller
  * decides — a chain that contains the resolution has nothing left to explain.
+ *
+ * A link that is a FILE is collected too, and it is a different kind of
+ * finding from either: it is not a reason to doubt the answer, because node
+ * skips a non-directory exactly as this walk does. It is the reason the
+ * checkout has no install where it looks like it has one, and without it the
+ * reader is told their checkout resolves through a global folder while a
+ * `node_modules` sits right there in the listing.
  */
-type ChainProvenance = { fromCheckout: boolean; unreadable: UnreadableLink[] };
+type ChainProvenance = {
+  fromCheckout: boolean;
+  unreadable: UnreadableLink[];
+  /** Chain links that exist and cannot hold an install, realpathed. */
+  notDirectories: string[];
+};
 
 function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
   const unreadable: UnreadableLink[] = [];
+  const notDirectories: string[] = [];
+  const answer = (fromCheckout: boolean): ChainProvenance => ({
+    fromCheckout,
+    unreadable,
+    notDirectories,
+  });
   for (const dir of nodeModulesChain(root)) {
     const link = probeChainLink(dir);
     if (link.unreadable) {
@@ -189,17 +233,40 @@ function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
       continue;
     }
     if (link.real === null) continue;
-    if (isUnder(link.real, resolved)) return { fromCheckout: true, unreadable };
+    if (!link.directory) {
+      // Nothing can be under a file, so this link answers nothing and the
+      // entry probe below would only ask the same question one name deeper.
+      notDirectories.push(link.real);
+      continue;
+    }
+    if (isUnder(link.real, resolved)) return answer(true);
     const entry = probeChainLink(path.join(dir, TSX_SPECIFIER));
     if (entry.unreadable) {
       unreadable.push(entry.unreadable);
       continue;
     }
     if (entry.real !== null && isUnder(entry.real, resolved)) {
-      return { fromCheckout: true, unreadable };
+      return answer(true);
     }
   }
-  return { fromCheckout: false, unreadable };
+  return answer(false);
+}
+
+/**
+ * The clause naming chain links that exist and are not directories, or none.
+ *
+ * Appended to whichever refusal fires rather than replacing it: a file where
+ * `node_modules` belongs does not make the answer uncertain — node skips it
+ * too, so the refusal above it is right — it explains WHY the checkout has no
+ * install at a path the reader can see in their own listing. Left out of the
+ * message entirely, the two facts contradict each other on the reader's screen
+ * and the sentence looks wrong.
+ */
+function notDirectoryClause(paths: readonly string[]): string {
+  if (paths.length === 0) return "";
+  const one = paths.length === 1;
+  const state = one ? "exists and is not a directory" : "exist and are not directories";
+  return ` Note also: ${paths.join(", ")} ${state}, so node skipped ${one ? "it" : "them"} — a file under that name (a stray download, a botched \`npm ci\`) cannot hold an install, and none can land there until it is removed.`;
 }
 
 /**
@@ -253,13 +320,13 @@ export function tsxLoaderIn(root: string): string {
       .map((link) => `${link.path} (${link.detail})`)
       .join(", ");
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, and whether that is the checkout's own install could not be decided: ${provenance.unreadable.length} of the \`node_modules\` directories node would search from that checkout could not be read — ${links}. That is not "this checkout has no install", and re-installing will not change it; a link that cannot be traversed (permissions), a symlink cycle or a path too long for the filesystem all land here, and any of them may be the install the resolver actually loaded. Fix the paths above, then re-run.`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, and whether that is the checkout's own install could not be decided: ${provenance.unreadable.length} of the \`node_modules\` directories node would search from that checkout could not be read — ${links}. That is not "this checkout has no install", and re-installing will not change it; a link that cannot be traversed (permissions), a symlink cycle or a path too long for the filesystem all land here, and any of them may be the install the resolver actually loaded. Fix the paths above, then re-run.${notDirectoryClause(provenance.notDirectories)}`,
     );
   }
   if (!provenance.fromCheckout) {
     const chain = nodeModulesChain(root);
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${notDirectoryClause(provenance.notDirectories)}`,
     );
   }
   // The bare specifier, not the file the resolver answered with: node resolves
