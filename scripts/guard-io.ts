@@ -18,6 +18,7 @@ import * as fs from "node:fs";
 
 import { formatGuardRootNotice, resolveGuardRoot } from "../lib/guard-root";
 import { unreadableInput, type UnreadableInput } from "../lib/scanned-floor";
+import { describeThrownReason } from "../lib/thrown-value";
 
 /**
  * The one line every wrapper runs before it walks anything: resolve the root
@@ -36,12 +37,17 @@ export function guardScanRoot(
   return resolution.root;
 }
 
-/** Whatever the OS or the parser called it, in one string. */
-function reasonOf(error: unknown): string {
-  const code = (error as { code?: string } | null)?.code;
-  if (typeof code === "string") return code;
-  return error instanceof Error ? error.message : String(error);
-}
+/**
+ * Whatever the OS or the parser called it, in one string.
+ *
+ * The rendering lives in `lib/thrown-value.ts` rather than here because the
+ * guard fixture had a second copy of it, and the two copies shared both of the
+ * bugs it fixes: a blank `code` returned as the whole reason, and a thrown
+ * non-Error rendered through `String(...)`, which answers `[object Object]`
+ * for an object and throws for one with no prototype — inside the catch that
+ * was reporting a different failure.
+ */
+const reasonOf = describeThrownReason;
 
 /**
  * Directory entries, or none. An unreadable directory is not an error here on

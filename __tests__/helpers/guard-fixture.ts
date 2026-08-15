@@ -36,6 +36,7 @@ import * as path from "node:path";
 
 import { GUARD_ROOT_ENV } from "../../lib/guard-root";
 import type { LintGuard } from "../../lib/lint-guards";
+import { describeThrown } from "../../lib/thrown-value";
 
 /** The repository this fixture copies out of. */
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
@@ -103,6 +104,7 @@ function isUnder(parent: string, child: string): boolean {
 /** A chain path the process could not resolve for a reason other than absence. */
 type UnreadableLink = { path: string; detail: string };
 
+
 /**
  * How a failed `realpath` should be reported, or null for plain absence.
  *
@@ -117,7 +119,9 @@ type UnreadableLink = { path: string; detail: string };
  *
  * An error carrying no `code` is reported in words rather than as a fabricated
  * one: printing `UNKNOWN` in the slot where every other case prints an errno
- * reads like a real filesystem code and sends the reader looking it up.
+ * reads like a real filesystem code and sends the reader looking it up. What
+ * fills that slot is {@link describeThrown}, so the value gets a rendering
+ * whatever it turns out to be — see there for why `String(...)` is not enough.
  *
  * Exported because it is the whole classification and it is a pure function of
  * one argument — the cases that matter (a code that is not absence, the two
@@ -128,8 +132,7 @@ export function describeResolveFailure(error: unknown): string | null {
   const code = (error as NodeJS.ErrnoException | null)?.code;
   if (code === "ENOENT" || code === "ENOTDIR") return null;
   if (typeof code === "string" && code !== "") return code;
-  const message = error instanceof Error ? error.message.split("\n")[0] : String(error);
-  return `no errno: ${message}`;
+  return `no errno: ${describeThrown(error)}`;
 }
 
 /** `fs.realpathSync(target)`, keeping the reason it failed. */
@@ -231,8 +234,11 @@ export function tsxLoaderIn(root: string): string {
     // The resolver's own first line, so a half-written install ("Cannot find
     // module 'tsx/dist/loader.mjs'") reads differently from an absent one —
     // the two want different fixes and the message is the only place the
-    // reader can tell them apart.
-    const reason = error instanceof Error ? error.message.split("\n")[0] : String(error);
+    // reader can tell them apart. Through the shared renderer, because a
+    // resolver hook (a loader, a patched `Module._resolveFilename`) can throw
+    // anything at all, and this catch had its own copy of the rendering that
+    // does not survive that.
+    const reason = describeThrown(error);
     throw new Error(
       `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
     );

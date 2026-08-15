@@ -44,6 +44,22 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const FLOOR_MODULE = "lib/scanned-floor.ts";
 
 /**
+ * The opening sentence of a refusal — up to and including the first period
+ * that ends a word rather than sitting inside a path or a filename.
+ *
+ * Every refusal here is a paragraph: a finding, then what it is not, then what
+ * to do about it. The finding is the first sentence, and it is the part that
+ * gets read, quoted into an issue and searched for, so it is the part two
+ * messages must not share. A period followed by whitespace (or the end) is the
+ * boundary; `index.js` and `~/.node_modules` appear in these messages and are
+ * not sentence ends.
+ */
+function leadingSentence(message: string): string {
+  const match = /^[\s\S]*?\.(?=\s|$)/.exec(message);
+  return match ? match[0] : message;
+}
+
+/**
  * Names of the scratch roots the fixture has open right now.
  *
  * Every refusal in `makePartialRoot` happens after `mkdtempSync`, so "it threw
@@ -418,6 +434,26 @@ describe("the loader check", () => {
             rendered.length,
             `two of the three loader refusals render the same sentence, so the reader cannot tell which finding they got:\n${rendered.join("\n---\n")}`,
           );
+          // Whole-string distinctness is the weakest form of the property this
+          // case is named for, and not the shape the drift it was written for
+          // actually had: the `npm ci` repeat arrived as one clause, in
+          // messages that still differed by a path further down. Two refusals
+          // that have converged on the same OPENING are two refusals a reader
+          // stops distinguishing, whatever their tails do — the first sentence
+          // is what gets read, quoted into an issue and searched for.
+          const openings = rendered.map(leadingSentence);
+          assert.equal(
+            new Set(openings).size,
+            openings.length,
+            `two of the three loader refusals open with the same sentence, so the finding a reader takes away is the same one:\n${openings.join("\n---\n")}`,
+          );
+          for (const [index, opening] of openings.entries()) {
+            assert.notEqual(
+              opening,
+              rendered[index],
+              `refusal ${index + 1} is one unbroken sentence, so the opening compared above is its whole text and the check is the whole-string one again:\n${opening}`,
+            );
+          }
         });
       });
     });
@@ -469,8 +505,24 @@ describe("describeResolveFailure", () => {
     // `catch` binds whatever was thrown, and this one is rendered straight
     // into a refusal — a `String(...)` away from a TypeError inside the
     // diagnosis that was supposed to explain the failure.
-    assert.equal(describeResolveFailure("not an error"), "no errno: not an error");
+    assert.equal(describeResolveFailure("not an error"), "no errno: 'not an error'");
     assert.equal(describeResolveFailure(null), "no errno: null");
+  });
+
+  it("describes a thrown object, rather than naming the language's fallback", () => {
+    // `[object Object]` in this slot tells the reader strictly less than the
+    // word "unknown" would: it is what every object without a `toString`
+    // renders as, so it says the throw happened and nothing about what threw.
+    const detail = String(describeResolveFailure({ errno: -13, syscall: "realpath" }));
+    assert.doesNotMatch(
+      detail,
+      /\[object Object\]/,
+      `a thrown object is rendered as the fallback every object shares:\n${detail}`,
+    );
+    assert.ok(
+      detail.includes("realpath"),
+      `the rendering drops the fields that say what was thrown:\n${detail}`,
+    );
   });
 });
 
