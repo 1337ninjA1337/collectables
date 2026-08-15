@@ -101,10 +101,10 @@ function isUnder(parent: string, child: string): boolean {
 }
 
 /** A chain path the process could not resolve for a reason other than absence. */
-type UnreadableLink = { path: string; code: string };
+type UnreadableLink = { path: string; detail: string };
 
 /**
- * `fs.realpathSync(target)`, keeping the reason it failed.
+ * How a failed `realpath` should be reported, or null for plain absence.
  *
  * "It is not there" and "this process cannot look at it" are different
  * findings with different fixes, and collapsing both into `null` sends the
@@ -114,14 +114,31 @@ type UnreadableLink = { path: string; code: string };
  *
  * `ENOENT` and `ENOTDIR` are the ordinary answer for nearly every ancestor of
  * a checkout, so those stay silent; everything else is reported.
+ *
+ * An error carrying no `code` is reported in words rather than as a fabricated
+ * one: printing `UNKNOWN` in the slot where every other case prints an errno
+ * reads like a real filesystem code and sends the reader looking it up.
+ *
+ * Exported because it is the whole classification and it is a pure function of
+ * one argument — the cases that matter (a code that is not absence, the two
+ * that are, an error with no code at all) are a table, and reaching them
+ * through the filesystem would mean arranging three kernel states instead.
  */
+export function describeResolveFailure(error: unknown): string | null {
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  if (code === "ENOENT" || code === "ENOTDIR") return null;
+  if (typeof code === "string" && code !== "") return code;
+  const message = error instanceof Error ? error.message.split("\n")[0] : String(error);
+  return `no errno: ${message}`;
+}
+
+/** `fs.realpathSync(target)`, keeping the reason it failed. */
 function probeChainLink(target: string): { real: string | null; unreadable: UnreadableLink | null } {
   try {
     return { real: fs.realpathSync(target), unreadable: null };
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code ?? "UNKNOWN";
-    const absent = code === "ENOENT" || code === "ENOTDIR";
-    return { real: null, unreadable: absent ? null : { path: target, code } };
+    const detail = describeResolveFailure(error);
+    return { real: null, unreadable: detail === null ? null : { path: target, detail } };
   }
 }
 
@@ -227,7 +244,7 @@ export function tsxLoaderIn(root: string): string {
     // the honest report is "cannot tell", with the errno that stopped it and
     // WITHOUT `npm ci`, which is the one thing that will not help.
     const links = provenance.unreadable
-      .map((link) => `${link.path} (${link.code})`)
+      .map((link) => `${link.path} (${link.detail})`)
       .join(", ");
     throw new Error(
       `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, and whether that is the checkout's own install could not be decided: ${provenance.unreadable.length} of the \`node_modules\` directories node would search from that checkout could not be read — ${links}. That is not "this checkout has no install", and re-installing will not change it; a link that cannot be traversed (permissions), a symlink cycle or a path too long for the filesystem all land here, and any of them may be the install the resolver actually loaded. Fix the paths above, then re-run.`,
