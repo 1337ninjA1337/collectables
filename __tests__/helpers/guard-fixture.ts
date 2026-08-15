@@ -100,12 +100,28 @@ function isUnder(parent: string, child: string): boolean {
   return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
 }
 
-/** `fs.realpathSync(target)`, or null for a path that does not resolve. */
-function realpathOrNull(target: string): string | null {
+/** A chain path the process could not resolve for a reason other than absence. */
+type UnreadableLink = { path: string; code: string };
+
+/**
+ * `fs.realpathSync(target)`, keeping the reason it failed.
+ *
+ * "It is not there" and "this process cannot look at it" are different
+ * findings with different fixes, and collapsing both into `null` sends the
+ * caller down the GLOBAL_FOLDERS path for an `EACCES` on a directory the
+ * runner cannot traverse, an `ELOOP` on a symlink cycle or an `ENAMETOOLONG`
+ * — a diagnosis that is wrong, and whose fix (`npm ci`) changes nothing.
+ *
+ * `ENOENT` and `ENOTDIR` are the ordinary answer for nearly every ancestor of
+ * a checkout, so those stay silent; everything else is reported.
+ */
+function probeChainLink(target: string): { real: string | null; unreadable: UnreadableLink | null } {
   try {
-    return fs.realpathSync(target);
-  } catch {
-    return null;
+    return { real: fs.realpathSync(target), unreadable: null };
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? "UNKNOWN";
+    const absent = code === "ENOENT" || code === "ENOTDIR";
+    return { real: null, unreadable: absent ? null : { path: target, code } };
   }
 }
 
@@ -131,14 +147,39 @@ function realpathOrNull(target: string): string | null {
  * global folders and succeeds there. That combination — a half-written install
  * in the checkout and a good one on `$NODE_PATH` — is exactly the case this
  * check exists for, and an existence test waves it through.
+ *
+ * A link this process could not READ is reported rather than counted as a
+ * miss, because "no" and "cannot tell" are different answers: the unreadable
+ * link may be the very install the resolver loaded, so a bare `false` would
+ * hand the reader the GLOBAL_FOLDERS sentence for a permissions problem.
+ * Collected all the way along and returned even on success, so the caller
+ * decides — a chain that contains the resolution has nothing left to explain.
  */
-function resolvedFromCheckout(root: string, resolved: string): boolean {
-  return nodeModulesChain(root).some((dir) =>
-    [dir, path.join(dir, TSX_SPECIFIER)].some((candidate) => {
-      const real = realpathOrNull(candidate);
-      return real !== null && isUnder(real, resolved);
-    }),
-  );
+type ChainProvenance = { fromCheckout: boolean; unreadable: UnreadableLink[] };
+
+function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
+  const unreadable: UnreadableLink[] = [];
+  for (const dir of nodeModulesChain(root)) {
+    const link = probeChainLink(dir);
+    if (link.unreadable) {
+      // The entry inside it is reached THROUGH this path, so it cannot answer
+      // anything the directory could not; probing it would only repeat the
+      // errno under a longer name.
+      unreadable.push(link.unreadable);
+      continue;
+    }
+    if (link.real === null) continue;
+    if (isUnder(link.real, resolved)) return { fromCheckout: true, unreadable };
+    const entry = probeChainLink(path.join(dir, TSX_SPECIFIER));
+    if (entry.unreadable) {
+      unreadable.push(entry.unreadable);
+      continue;
+    }
+    if (entry.real !== null && isUnder(entry.real, resolved)) {
+      return { fromCheckout: true, unreadable };
+    }
+  }
+  return { fromCheckout: false, unreadable };
 }
 
 /**
@@ -179,7 +220,20 @@ export function tsxLoaderIn(root: string): string {
       `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
     );
   }
-  if (!resolvedFromCheckout(root, resolved)) {
+  const provenance = resolvedFromCheckout(root, resolved);
+  if (!provenance.fromCheckout && provenance.unreadable.length > 0) {
+    // Not the global-folder finding, and it must not be printed as one: a link
+    // this process cannot read may be exactly the install that answered, so
+    // the honest report is "cannot tell", with the errno that stopped it and
+    // WITHOUT `npm ci`, which is the one thing that will not help.
+    const links = provenance.unreadable
+      .map((link) => `${link.path} (${link.code})`)
+      .join(", ");
+    throw new Error(
+      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, and whether that is the checkout's own install could not be decided: ${provenance.unreadable.length} of the \`node_modules\` directories node would search from that checkout could not be read — ${links}. That is not "this checkout has no install", and re-installing will not change it; a link that cannot be traversed (permissions), a symlink cycle or a path too long for the filesystem all land here, and any of them may be the install the resolver actually loaded. Fix the paths above, then re-run.`,
+    );
+  }
+  if (!provenance.fromCheckout) {
     const chain = nodeModulesChain(root);
     throw new Error(
       `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.`,

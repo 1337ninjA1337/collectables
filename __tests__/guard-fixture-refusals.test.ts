@@ -288,6 +288,68 @@ describe("the loader check", () => {
     });
   });
 
+  it("names the errno for a chain link it could not read, instead of blaming a global folder", () => {
+    // "It is not there" and "this process cannot look at it" are different
+    // findings: an `EACCES` on a directory the runner cannot traverse, an
+    // `ELOOP` on a symlink cycle and an `ENAMETOOLONG` all used to arrive as
+    // the GLOBAL_FOLDERS sentence, which names a rule that had nothing to do
+    // with it and prescribes `npm ci`, which cannot fix any of the three. The
+    // unreadable link may be the very install the resolver loaded, so the only
+    // honest report is that the question could not be decided.
+    //
+    // A symlink cycle rather than a chmod, because this suite runs as root in
+    // CI containers and root traverses an `EACCES` directory anyway — the
+    // permissions case would pass without ever producing an errno.
+    inScratchCheckout((looping) => {
+      inScratchCheckout((globals) => {
+        const chainLink = path.join(looping, "node_modules");
+        fs.symlinkSync("node_modules", chainLink);
+        const fake = path.join(globals, "tsx");
+        fs.mkdirSync(fake, { recursive: true });
+        fs.writeFileSync(
+          path.join(fake, "package.json"),
+          JSON.stringify({ name: "tsx", version: "0.0.0", main: "index.js" }),
+        );
+        fs.writeFileSync(path.join(fake, "index.js"), "module.exports = {};\n");
+        const answer = resolveInChild(looping, { NODE_PATH: globals });
+        assert.match(
+          answer,
+          /^REFUSED /,
+          `a checkout whose own chain could not be read satisfied the check:\n${answer}`,
+        );
+        assert.ok(
+          answer.includes(`${chainLink} (ELOOP)`),
+          `the diagnosis names neither the unreadable link nor why it could not be read:\n${answer}`,
+        );
+        assert.doesNotMatch(
+          answer,
+          /GLOBAL_FOLDERS/,
+          `an unreadable chain link is reported as the global-folder finding, which is a different problem with a different fix:\n${answer}`,
+        );
+        assert.doesNotMatch(
+          answer,
+          /npm ci/,
+          `the diagnosis prescribes \`npm ci\`, which changes nothing about a link this process cannot read:\n${answer}`,
+        );
+      });
+    });
+  });
+
+  it("accepts an install found past a link it could not read", () => {
+    // The other side of that line: an unreadable link is a reason to withhold
+    // the answer, not to refuse. The chain is walked nearest-first, so a cycle
+    // at the nearest link followed by the real hoisted install one directory up
+    // is a checkout node resolves perfectly well — reporting the errno there
+    // would refuse an install the spawn goes on to load.
+    const nested = fs.mkdtempSync(path.join(REPO_ROOT, "guard-fixture-nested-"));
+    try {
+      fs.symlinkSync("node_modules", path.join(nested, "node_modules"));
+      assert.equal(tsxLoaderIn(nested), "tsx");
+    } finally {
+      fs.rmSync(nested, { recursive: true, force: true });
+    }
+  });
+
   it("accepts an install the checkout owns but does not contain", () => {
     // The other side of the same line, and the reason the check is not a plain
     // "is the resolved file under the root": a resolved path is REALPATHED, so
