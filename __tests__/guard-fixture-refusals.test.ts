@@ -71,6 +71,36 @@ function assertRefusesWithoutLeaking(body: () => unknown, message: RegExp): void
 }
 
 describe("the loader check", () => {
+  /**
+   * A scratch checkout, `body` run against it, and the directory taken back
+   * down afterwards.
+   *
+   * Every case here needs a root that is NOT this repository, and two of them
+   * need to plant files under it, so the mkdtemp/rmSync pair is worth one
+   * helper rather than three `finally` blocks.
+   */
+  function inScratchCheckout(body: (root: string) => void): void {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "no-install-"));
+    try {
+      body(root);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  /** The fixture's refusal for `root`, or a failure saying it did not refuse. */
+  function refusalFor(root: string): string {
+    let loader: string | undefined;
+    try {
+      loader = tsxLoaderIn(root);
+    } catch (error) {
+      return (error as Error).message;
+    }
+    assert.fail(
+      `tsxLoaderIn answered "${loader}" for ${root}, which has no loadable tsx — a guard spawned against it exits 1 with both pipes empty, the one failure this check exists to tell apart from a refusal.`,
+    );
+  }
+
   it("refuses a checkout with no install, and says how to fix it", () => {
     // The refusal with the strongest claim on a run: an absent loader exits
     // non-zero with BOTH pipes empty, which is byte-for-byte what a guard
@@ -79,25 +109,86 @@ describe("the loader check", () => {
     // for real on the checkout this case was written on, which is exactly why
     // its wording — the path, and `npm ci` — should be pinned rather than
     // rediscovered by whoever next forgets to install.
-    const bare = fs.mkdtempSync(path.join(os.tmpdir(), "no-install-"));
-    try {
-      assert.throws(() => tsxLoaderIn(bare), (error: Error) => {
-        assert.match(error.message, /does not exist, so no guard can be spawned/);
-        assert.match(error.message, /npm ci/);
-        assert.ok(
-          error.message.includes(path.join(bare, "node_modules", "tsx")),
-          `the diagnosis does not name the path it looked at:\n${error.message}`,
-        );
-        return true;
-      });
-    } finally {
-      fs.rmSync(bare, { recursive: true, force: true });
-    }
+    inScratchCheckout((bare) => {
+      const message = refusalFor(bare);
+      assert.match(message, /does not resolve from .+, so no guard can be spawned/s);
+      assert.match(message, /npm ci/);
+      assert.ok(
+        message.includes(bare),
+        `the diagnosis does not name the checkout it looked in:\n${message}`,
+      );
+      assert.ok(
+        message.includes(path.join(bare, "node_modules")),
+        `the diagnosis does not name the directory it looked under:\n${message}`,
+      );
+    });
   });
 
-  it("answers with the bare specifier, not the directory it checked", () => {
-    // `--import /abs/node_modules/tsx` is an ERR_UNSUPPORTED_DIR_IMPORT; the
-    // bare name resolves through the package's own exports map.
+  it("refuses a half-written install, where the directory is there and the package is not", () => {
+    // The case the `existsSync` this replaced could not see, and the reason it
+    // was replaced: an interrupted `npm ci` leaves `node_modules/tsx` behind
+    // with nothing loadable in it. A path check calls that an install and hands
+    // the suites a loader specifier that resolves to nothing, which is the
+    // empty-pipes failure the check exists to prevent, arriving through the
+    // check itself.
+    inScratchCheckout((root) => {
+      fs.mkdirSync(path.join(root, "node_modules", "tsx"), { recursive: true });
+      const message = refusalFor(root);
+      assert.match(message, /npm ci/);
+      assert.ok(
+        message.includes(root),
+        `the diagnosis does not name the checkout it looked in:\n${message}`,
+      );
+    });
+  });
+
+  it("refuses a package whose declared entry point is missing", () => {
+    // The other half of a half-written install, and the one a `package.json`
+    // check would also wave through: the manifest is there, well-formed and
+    // pointing at a file the store never finished writing. Only asking the
+    // resolver catches it.
+    inScratchCheckout((root) => {
+      const pkg = path.join(root, "node_modules", "tsx");
+      fs.mkdirSync(pkg, { recursive: true });
+      fs.writeFileSync(
+        path.join(pkg, "package.json"),
+        JSON.stringify({ name: "tsx", version: "0.0.0", main: "dist/loader.mjs" }),
+      );
+      const message = refusalFor(root);
+      assert.match(message, /npm ci/);
+    });
+  });
+
+  it("names the resolver's own reason, so the two broken installs read differently", () => {
+    // A half-written install and an absent one want different fixes, and the
+    // sentence is the only place the reader can tell them apart — the tail
+    // ("run `npm ci`") is identical by design.
+    inScratchCheckout((absent) => {
+      inScratchCheckout((half) => {
+        fs.mkdirSync(path.join(half, "node_modules", "tsx"), { recursive: true });
+        const missing = refusalFor(absent);
+        const broken = refusalFor(half);
+        for (const message of [missing, broken]) {
+          assert.match(
+            message,
+            /Cannot find module/,
+            `the diagnosis drops the resolver's own reason:\n${message}`,
+          );
+        }
+        assert.notEqual(
+          missing.replace(absent, "<root>"),
+          broken.replace(half, "<root>"),
+          "an absent install and a half-written one produce the same sentence, so the message says nothing the root did not already say",
+        );
+      });
+    });
+  });
+
+  it("answers with the bare specifier, not the file the resolver named", () => {
+    // `--import /abs/node_modules/tsx` is an ERR_UNSUPPORTED_DIR_IMPORT, and
+    // the CJS resolution may name a different entry than the `import`
+    // condition the spawn gets; the bare name resolves through the package's
+    // own exports map either way.
     assert.equal(tsxLoaderIn(REPO_ROOT), "tsx");
   });
 });
