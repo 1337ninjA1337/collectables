@@ -30,6 +30,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
+import { createRequire } from "node:module";
 import * as os from "node:os";
 import * as path from "node:path";
 
@@ -50,7 +51,17 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..");
  * timeout below would be decoration. One process, no grandchild, and the
  * ~430 ms wrapper boot goes with it.
  */
-const TSX_MODULE = path.join("node_modules", "tsx");
+const TSX_SPECIFIER = "tsx";
+
+/**
+ * The resolver the check below asks, rather than the filesystem.
+ *
+ * `createRequire` is bound to this file only so the returned `resolve` exists;
+ * every call passes `paths` explicitly, which replaces the resolution roots
+ * entirely, so the answer is about the checkout named in the argument and not
+ * about where this helper happens to live.
+ */
+const resolver = createRequire(__filename);
 
 /**
  * Fail on the missing install rather than on its symptom.
@@ -61,7 +72,15 @@ const TSX_MODULE = path.join("node_modules", "tsx");
  * form "this run failed" then passes for the wrong reason, and every assertion
  * of the form "this run passed" fails with a bare `1 !== 0` and no output to
  * explain it. Five suites depend on this; the diagnosis is worth one
- * `existsSync`.
+ * resolution.
+ *
+ * RESOLVED, not `existsSync`-ed. The spawn below depends on node being able to
+ * load `tsx` from `REPO_ROOT`, and a directory named `node_modules/tsx` is not
+ * that: an interrupted `npm ci`, a pruned store or a half-restored cache all
+ * leave the directory in place with the package's entry points missing, so the
+ * path check passes and the spawn fails anyway — with the empty-pipes signature
+ * the check exists to prevent, which is the one failure mode it must not let
+ * through. `require.resolve` asks the question node will ask.
  *
  * Takes the checkout to look in rather than closing over `REPO_ROOT`, for the
  * same reason every other refusal here is reachable from a test: this one is
@@ -69,16 +88,23 @@ const TSX_MODULE = path.join("node_modules", "tsx");
  * rather than a thing observed once by whoever forgot to install.
  */
 export function tsxLoaderIn(root: string): string {
-  const module = path.join(root, TSX_MODULE);
-  if (!fs.existsSync(module)) {
+  try {
+    resolver.resolve(TSX_SPECIFIER, { paths: [root] });
+  } catch (error) {
+    // The resolver's own first line, so a half-written install ("Cannot find
+    // module 'tsx/dist/loader.mjs'") reads differently from an absent one —
+    // the two want different fixes and the message is the only place the
+    // reader can tell them apart.
+    const reason = error instanceof Error ? error.message.split("\n")[0] : String(error);
     throw new Error(
-      `guard-fixture: ${module} does not exist, so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
     );
   }
-  // The bare specifier, not the directory: node resolves `--import tsx`
-  // against `cwd` (REPO_ROOT below) through the package's own exports map,
-  // while an absolute directory path is an ERR_UNSUPPORTED_DIR_IMPORT.
-  return "tsx";
+  // The bare specifier, not the file the resolver answered with: node resolves
+  // `--import tsx` against `cwd` (REPO_ROOT below) through the package's own
+  // exports map, and the CJS resolution above may well name a different entry
+  // than the `import` condition the spawn gets. Presence is the question here.
+  return TSX_SPECIFIER;
 }
 
 /** {@link tsxLoaderIn} against the checkout the guards are actually spawned from. */
