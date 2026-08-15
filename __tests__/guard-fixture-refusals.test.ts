@@ -259,6 +259,35 @@ describe("the loader check", () => {
     });
   });
 
+  it("refuses a half-written install that a global folder finishes for it", () => {
+    // The combination the two halves above cannot show on their own, and the
+    // one an existence test on the chain entry waves through: `node_modules/
+    // tsx` is there and unloadable (an interrupted `npm ci`), so the resolver
+    // skips it, falls through to `$NODE_PATH` and succeeds — in a checkout
+    // whose own install is broken. Taking the entry's presence as proof it
+    // answered would clear this, and the spawn would then fail with the empty
+    // pipes both halves exist to prevent.
+    inScratchCheckout((half) => {
+      inScratchCheckout((globals) => {
+        fs.mkdirSync(path.join(half, "node_modules", "tsx"), { recursive: true });
+        const fake = path.join(globals, "tsx");
+        fs.mkdirSync(fake, { recursive: true });
+        fs.writeFileSync(
+          path.join(fake, "package.json"),
+          JSON.stringify({ name: "tsx", version: "0.0.0", main: "index.js" }),
+        );
+        fs.writeFileSync(path.join(fake, "index.js"), "module.exports = {};\n");
+        const answer = resolveInChild(half, { NODE_PATH: globals });
+        assert.match(
+          answer,
+          /^REFUSED /,
+          `an unloadable chain entry was read as the install that answered:\n${answer}`,
+        );
+        assert.match(answer, /GLOBAL_FOLDERS/);
+      });
+    });
+  });
+
   it("accepts an install the checkout owns but does not contain", () => {
     // The other side of the same line, and the reason the check is not a plain
     // "is the resolved file under the root": a resolved path is REALPATHED, so
