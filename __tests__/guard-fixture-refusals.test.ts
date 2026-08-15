@@ -23,6 +23,7 @@
 
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -86,6 +87,44 @@ describe("the loader check", () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  }
+
+  /**
+   * `tsxLoaderIn(root)` run in a fresh node process carrying `env`, reported as
+   * `"ANSWERED <specifier>"` or `"REFUSED <message>"`.
+   *
+   * A child rather than a call because the environment that matters here —
+   * `NODE_PATH` — is read once, when node builds its global module paths at
+   * startup; assigning it in this process changes nothing about how this
+   * process resolves. `--import tsx` so the child can require the helper's TS,
+   * the same loader every guard is spawned through, and `cwd` is this checkout
+   * so that resolution is about the installed loader rather than about the
+   * scratch root under test.
+   */
+  function resolveInChild(root: string, env: Record<string, string>): string {
+    const helper = path.join(__dirname, "helpers", "guard-fixture.ts");
+    const script = `
+      const { tsxLoaderIn } = require(${JSON.stringify(helper)});
+      try {
+        process.stdout.write("ANSWERED " + tsxLoaderIn(${JSON.stringify(root)}));
+      } catch (error) {
+        process.stdout.write("REFUSED " + error.message);
+      }
+    `;
+    const result = spawnSync(process.execPath, ["--import", "tsx", "-e", script], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, ...env },
+      timeout: 60_000,
+      killSignal: "SIGKILL",
+    });
+    const stdout = result.stdout ?? "";
+    assert.ok(
+      stdout.startsWith("ANSWERED ") || stdout.startsWith("REFUSED "),
+      `the child never reported: status ${result.status}, stdout "${stdout}", stderr "${result.stderr ?? ""}"`,
+    );
+    return stdout;
   }
 
   /** The fixture's refusal for `root`, or a failure saying it did not refuse. */
@@ -182,6 +221,72 @@ describe("the loader check", () => {
         );
       });
     });
+  });
+
+  it("refuses a loader that only a global folder can see", () => {
+    // `require.resolve`'s `paths` replaces the resolution roots "with the
+    // exception of GLOBAL_FOLDERS", so `$NODE_PATH` answers for a checkout with
+    // no install of its own — and the spawn this check clears is `node --import
+    // tsx`, an ESM resolution, which consults no global folder at all. That is
+    // the empty-pipes failure the check exists to prevent, arriving through a
+    // green check: the developer with a global `tsx` gets the confusing run and
+    // nothing tells them their checkout was never installed.
+    //
+    // NODE_PATH is read once at startup, so the only honest way to put a loader
+    // on a global path is a child process that starts with one.
+    inScratchCheckout((bare) => {
+      inScratchCheckout((globals) => {
+        const fake = path.join(globals, "tsx");
+        fs.mkdirSync(fake, { recursive: true });
+        fs.writeFileSync(
+          path.join(fake, "package.json"),
+          JSON.stringify({ name: "tsx", version: "0.0.0", main: "index.js" }),
+        );
+        fs.writeFileSync(path.join(fake, "index.js"), "module.exports = {};\n");
+        const answer = resolveInChild(bare, { NODE_PATH: globals });
+        assert.match(
+          answer,
+          /^REFUSED /,
+          `a loader reachable only through $NODE_PATH satisfied the check:\n${answer}`,
+        );
+        assert.match(answer, /GLOBAL_FOLDERS/);
+        assert.match(answer, /npm ci/);
+        assert.ok(
+          answer.includes(path.join(bare, "node_modules")),
+          `the diagnosis does not name the directory that should have answered:\n${answer}`,
+        );
+      });
+    });
+  });
+
+  it("accepts an install the checkout owns but does not contain", () => {
+    // The other side of the same line, and the reason the check is not a plain
+    // "is the resolved file under the root": a resolved path is REALPATHED, so
+    // a symlinked or store-backed install (pnpm, `npm link`, a workspace) lands
+    // outside the tree while being exactly the install the spawn loads.
+    // Refusing it would be a refusal nobody could act on — `npm ci` is already
+    // what produced it.
+    inScratchCheckout((root) => {
+      fs.mkdirSync(path.join(root, "node_modules"), { recursive: true });
+      fs.symlinkSync(
+        path.join(REPO_ROOT, "node_modules", "tsx"),
+        path.join(root, "node_modules", "tsx"),
+      );
+      assert.equal(tsxLoaderIn(root), "tsx");
+    });
+  });
+
+  it("accepts a hoisted install one directory up, which the spawn would load", () => {
+    // A checkout with no `node_modules` of its own is not the same as one with
+    // no install: node walks every ancestor for a bare specifier, and so does
+    // the ESM resolver the spawn uses. A subdirectory of this repository is the
+    // real shape of that, and it must not be read as the global-folder case.
+    const nested = fs.mkdtempSync(path.join(REPO_ROOT, "guard-fixture-nested-"));
+    try {
+      assert.equal(tsxLoaderIn(nested), "tsx");
+    } finally {
+      fs.rmSync(nested, { recursive: true, force: true });
+    }
   });
 
   it("answers with the bare specifier, not the file the resolver named", () => {

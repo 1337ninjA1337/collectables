@@ -57,11 +57,70 @@ const TSX_SPECIFIER = "tsx";
  * The resolver the check below asks, rather than the filesystem.
  *
  * `createRequire` is bound to this file only so the returned `resolve` exists;
- * every call passes `paths` explicitly, which replaces the resolution roots
- * entirely, so the answer is about the checkout named in the argument and not
- * about where this helper happens to live.
+ * every call passes `paths` explicitly, which replaces the resolution roots, so
+ * the answer is about the checkout named in the argument and not about where
+ * this helper happens to live.
+ *
+ * With one exception, which is why {@link resolvedFromCheckout} exists: `paths`
+ * replaces them "with the exception of GLOBAL_FOLDERS", so `$NODE_PATH` and
+ * `~/.node_modules` answer for a checkout that has no install of its own.
  */
 const resolver = createRequire(__filename);
+
+/**
+ * The `node_modules` directories node searches for a bare specifier from
+ * `root`, nearest first.
+ *
+ * `root/node_modules`, then every ancestor's, which is both what CJS walks and
+ * what the ESM resolver walks — a hoisted install one directory up is a real
+ * install and the spawn loads it. What is NOT in this list is the set node
+ * calls GLOBAL_FOLDERS (`$NODE_PATH`, `~/.node_modules`, `$PREFIX/lib/node`):
+ * `require.resolve` still consults those after the chain, and the ESM resolver
+ * never does.
+ *
+ * Directories already inside a `node_modules` are skipped, the same way node
+ * skips them.
+ */
+function nodeModulesChain(root: string): string[] {
+  const chain: string[] = [];
+  let dir = path.resolve(root);
+  for (;;) {
+    if (path.basename(dir) !== "node_modules") {
+      chain.push(path.join(dir, "node_modules"));
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) return chain;
+    dir = parent;
+  }
+}
+
+/** Whether `child` is inside `parent` — not equal to it, and not a sibling. */
+function isUnder(parent: string, child: string): boolean {
+  const rel = path.relative(parent, child);
+  return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+}
+
+/**
+ * Whether the resolver's answer came out of the checkout's own dependency
+ * chain rather than out of a global folder.
+ *
+ * Two ways to be satisfied, because a resolved path is REALPATHED and an
+ * install need not be a plain directory:
+ *
+ * - the file lies under one of the chain's `node_modules`, the ordinary case;
+ * - a `node_modules/<specifier>` entry exists on the chain. The chain is
+ *   searched BEFORE the global folders, so if such an entry exists the
+ *   successful resolution above necessarily came through it — which is how a
+ *   symlinked or store-backed install (pnpm, `npm link`, a workspace) stays
+ *   accepted even though its realpath lands outside the tree, and how a `root`
+ *   reached through a symlinked ancestor (`/var` → `/private/var` on macOS)
+ *   does too.
+ */
+function resolvedFromCheckout(root: string, resolved: string): boolean {
+  return nodeModulesChain(root).some(
+    (dir) => isUnder(dir, resolved) || fs.existsSync(path.join(dir, TSX_SPECIFIER)),
+  );
+}
 
 /**
  * Fail on the missing install rather than on its symptom.
@@ -88,8 +147,9 @@ const resolver = createRequire(__filename);
  * rather than a thing observed once by whoever forgot to install.
  */
 export function tsxLoaderIn(root: string): string {
+  let resolved: string;
   try {
-    resolver.resolve(TSX_SPECIFIER, { paths: [root] });
+    resolved = resolver.resolve(TSX_SPECIFIER, { paths: [root] });
   } catch (error) {
     // The resolver's own first line, so a half-written install ("Cannot find
     // module 'tsx/dist/loader.mjs'") reads differently from an absent one —
@@ -98,6 +158,12 @@ export function tsxLoaderIn(root: string): string {
     const reason = error instanceof Error ? error.message.split("\n")[0] : String(error);
     throw new Error(
       `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
+    );
+  }
+  if (!resolvedFromCheckout(root, resolved)) {
+    const chain = nodeModulesChain(root);
+    throw new Error(
+      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.`,
     );
   }
   // The bare specifier, not the file the resolver answered with: node resolves
