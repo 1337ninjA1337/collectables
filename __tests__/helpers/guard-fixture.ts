@@ -388,18 +388,38 @@ type ChainProvenance = {
   unreadable: UnreadableLink[];
   /** Chain links occupied by something that cannot hold an install. */
   obstructed: ChainObstruction[];
+  /**
+   * The nearest chain link, exactly as this walk saw it.
+   *
+   * Carried out rather than re-probed by the message builder, which is what the
+   * refusal used to do: the walk probes the nearest link to decide, and the
+   * clause probed it again one syscall later with no memory of the answer. The
+   * two can disagree — an install landing between them is what a slow `npm ci`
+   * in another terminal produces — so the sentence could describe a state that
+   * no longer held when the decision was made, which is the one thing a
+   * diagnosis must not do.
+   *
+   * Null when the chain is empty, which the root of a filesystem is.
+   */
+  nearest: ProbedLink | null;
 };
+
+/** A chain path and what probing it turned up. */
+export type ProbedLink = { path: string; link: ChainLink };
 
 function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
   const unreadable: UnreadableLink[] = [];
   const obstructed: ChainObstruction[] = [];
+  let nearest: ProbedLink | null = null;
   const answer = (fromCheckout: boolean): ChainProvenance => ({
     fromCheckout,
     unreadable,
     obstructed,
+    nearest,
   });
   for (const dir of nodeModulesChain(root)) {
     const link = probeChainLink(dir);
+    nearest ??= { path: dir, link };
     if (link.unreadable) {
       // The entry inside it is reached THROUGH this path, so it cannot answer
       // anything the directory could not; probing it would only repeat the
@@ -535,21 +555,43 @@ export function looksLikePackageEntry(entry: string): boolean {
  * `readdirSync` failing is not this function's finding: the link is then
  * unreadable, which has its own sentence and its own list, and answering here
  * as well would name the same path twice with two different explanations.
+ *
+ * Takes the link the WALK probed rather than a root to probe again. The clause
+ * used to re-run `probeChainLink` on the same path one syscall after the walk
+ * had, with no memory of the answer, so a refusal could describe a state that
+ * no longer held when the decision was made. `readdir` is injectable for the
+ * same reason the other syscalls are: the failure branch above is a real
+ * decision — it declines to speak for a link somebody else's finding owns —
+ * and as root in a CI container there is no way to arrange it for real.
  */
-function nearestEmptyLink(root: string): EmptyLink | null {
-  const [nearest] = nodeModulesChain(root);
-  if (nearest === undefined) return null;
-  const link = probeChainLink(nearest);
-  if (link.real === null) return null;
+export function emptyLinkFrom(
+  nearest: ProbedLink | null,
+  readdir: (path: string) => string[] = fs.readdirSync,
+): EmptyLink | null {
+  if (nearest === null || nearest.link.real === null) return null;
   let entries: string[];
   try {
-    entries = fs.readdirSync(link.real);
+    entries = readdir(nearest.link.real);
   } catch {
     return null;
   }
-  if (entries.length === 0) return { path: nearest, kind: "empty" };
+  if (entries.length === 0) return { path: nearest.path, kind: "empty" };
   if (entries.some(looksLikePackageEntry)) return null;
-  return { path: nearest, kind: "no-packages" };
+  return { path: nearest.path, kind: "no-packages" };
+}
+
+/**
+ * The nearest chain link, probed fresh.
+ *
+ * For the ONE refusal that has no walk behind it: when `require.resolve` itself
+ * throws there is no provenance to carry the probe out of, so the message has
+ * to ask. Every other caller passes the walk's own answer to
+ * {@link emptyLinkFrom} instead.
+ */
+function probeNearestLink(root: string): ProbedLink | null {
+  const [nearest] = nodeModulesChain(root);
+  if (nearest === undefined) return null;
+  return { path: nearest, link: probeChainLink(nearest) };
 }
 
 /**
@@ -675,7 +717,7 @@ export function tsxLoaderIn(root: string): string {
     // does not survive that.
     const reason = describeThrown(error);
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.${emptyLinkClause(nearestEmptyLink(root), "absent-install")}`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.${emptyLinkClause(emptyLinkFrom(probeNearestLink(root)), "absent-install")}`,
     );
   }
   const provenance = resolvedFromCheckout(root, resolved);
@@ -692,7 +734,7 @@ export function tsxLoaderIn(root: string): string {
   if (!provenance.fromCheckout) {
     const chain = nodeModulesChain(root);
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${emptyLinkClause(nearestEmptyLink(root), "global-folder")}${obstructionClause(provenance.obstructed)}`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${emptyLinkClause(emptyLinkFrom(provenance.nearest), "global-folder")}${obstructionClause(provenance.obstructed)}`,
     );
   }
   // The bare specifier, not the file the resolver answered with: node resolves

@@ -36,6 +36,7 @@ import {
   EMPTY_LINK_PHRASE,
   EMPTY_LINK_TAIL,
   emptyLinkClause,
+  emptyLinkFrom,
   entryPatch,
   looksLikePackageEntry,
   makePartialRoot,
@@ -1021,6 +1022,60 @@ describe("the clause builders", () => {
           `the ${host} clause names ${LINK} more than once: ${clause}`,
         );
       }
+    });
+  });
+
+  describe("emptyLinkFrom", () => {
+    // The probe half, now taking the link the WALK saw rather than re-probing
+    // the same path one syscall later. The two could disagree — an install
+    // landing between them is what a slow `npm ci` in another terminal produces
+    // — and the refusal would then describe a state that no longer held when
+    // the decision was made.
+
+    const probed = (real: string | null): { path: string; link: ChainLink } => ({
+      path: LINK,
+      link: { real, unreadable: null, obstruction: null },
+    });
+    type ChainLink = { real: string | null; unreadable: null; obstruction: null };
+
+    it("says nothing when the walk found no chain at all", () => {
+      // The filesystem root has no chain, and a message about a link that does
+      // not exist is worse than no message.
+      assert.equal(emptyLinkFrom(null), null);
+    });
+
+    it("says nothing when the walk could not resolve the nearest link", () => {
+      // An absent, occupied or unreadable link is somebody else's finding, each
+      // with its own sentence; answering here too would name one path twice
+      // with two explanations.
+      assert.equal(emptyLinkFrom(probed(null)), null);
+    });
+
+    it("reads the link the walk resolved, not the path it was asked about", () => {
+      // The realpath is where the entries actually are — a symlinked install
+      // (pnpm, a workspace) resolves elsewhere — while the path the READER
+      // recognises is the one they can see in their own listing, so the finding
+      // has to carry that one.
+      const real = "/elsewhere/store/node_modules";
+      const seen: string[] = [];
+      const finding = emptyLinkFrom({ path: LINK, link: { real, unreadable: null, obstruction: null } }, (dir) => {
+        seen.push(dir);
+        return [];
+      });
+      assert.deepEqual(seen, [real], "the probe read a path other than the one the walk resolved");
+      assert.deepEqual(finding, { path: LINK, kind: "empty" });
+    });
+
+    it("declines to speak when the listing itself fails", () => {
+      // A link that cannot be read is the unreadable finding's path and its
+      // sentence; this probe reporting on it as well would tell the reader to
+      // fix one directory for two different reasons.
+      assert.equal(
+        emptyLinkFrom(probed("/checkout/node_modules"), () => {
+          throw Object.assign(new Error("boom"), { code: "EACCES" });
+        }),
+        null,
+      );
     });
   });
 
