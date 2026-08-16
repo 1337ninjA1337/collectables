@@ -42,6 +42,8 @@ import {
   OBSTRUCTION_PHRASE,
   PATCHED_REPO_MARKER,
   probeAbsentLink,
+  probeResolvedLink,
+  SYSCALL_IMPLICATION,
   tsxLoaderIn,
 } from "./helpers/guard-fixture";
 import { assertPhraseTable } from "./helpers/phrase-table";
@@ -344,8 +346,8 @@ describe("the loader check", () => {
           `a checkout whose own chain could not be read satisfied the check:\n${answer}`,
         );
         assert.ok(
-          answer.includes(`${chainLink} (ELOOP)`),
-          `the diagnosis names neither the unreadable link nor why it could not be read:\n${answer}`,
+          answer.includes(`${chainLink} (ELOOP on realpath — ${SYSCALL_IMPLICATION.realpath})`),
+          `the diagnosis names neither the unreadable link, nor why it could not be read, nor which call said so:\n${answer}`,
         );
         assert.doesNotMatch(
           answer,
@@ -378,7 +380,7 @@ describe("the loader check", () => {
         assert.match(answer, /^REFUSED /, `two unreadable links satisfied the check:\n${answer}`);
         for (const link of links) {
           assert.ok(
-            answer.includes(`${link} (ELOOP)`),
+            answer.includes(`${link} (ELOOP on realpath`),
             `the report names ${links.length} unreadable links and omits ${link}:\n${answer}`,
           );
         }
@@ -945,6 +947,107 @@ describe("the empty-link tail table", () => {
   });
 });
 
+describe("probeResolvedLink", () => {
+  // The half of the chain probe that runs once `realpath` has answered. It used
+  // to share that call's `try`, so a `stat` that failed landed in the handler
+  // written to classify the FIRST syscall and the reader was handed an errno
+  // attributed to a call that had already succeeded — a race whose only
+  // artifact is the message, pointed at the wrong place.
+
+  const REAL = "/checkout/node_modules";
+  const throwing = (code: string) => (): fs.Stats => {
+    throw Object.assign(new Error("boom"), { code });
+  };
+
+  it("reports a `stat` failure against `stat`, not against the `realpath` that succeeded", () => {
+    for (const code of ["EACCES", "ELOOP", "ENAMETOOLONG"]) {
+      assert.deepEqual(
+        probeResolvedLink(REAL, throwing(code)),
+        { real: null, unreadable: { path: REAL, detail: code, syscall: "stat" }, obstruction: null },
+        `${code} from the stat is attributed to the wrong syscall, or dropped entirely`,
+      );
+    }
+  });
+
+  it("says nothing when the target vanished between the two calls", () => {
+    // The same race, ending the other way: `realpath` resolved and the path is
+    // gone by the time `stat` looks. Absent is then the truth as of the second
+    // observation, and it is what every ancestor of every checkout looks like —
+    // a finding here would fire constantly and mean nothing.
+    for (const code of ["ENOENT", "ENOTDIR"]) {
+      assert.deepEqual(
+        probeResolvedLink(REAL, throwing(code)),
+        { real: null, unreadable: null, obstruction: null },
+        `${code} from the stat produced a finding for a path that is simply no longer there`,
+      );
+    }
+  });
+
+  it("defaults to the real stat, and tells a directory from a file", () => {
+    // The parameter exists for the rows above; a default that had drifted to a
+    // stub would make all of them a test of the test. Both answers in one case,
+    // because they are the two the walk actually branches on.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "resolved-link-"));
+    try {
+      const dir = path.join(root, "node_modules");
+      const file = path.join(root, "not-a-dir");
+      fs.mkdirSync(dir);
+      fs.writeFileSync(file, "");
+      assert.deepEqual(probeResolvedLink(dir), {
+        real: dir,
+        unreadable: null,
+        obstruction: null,
+      });
+      assert.deepEqual(probeResolvedLink(file), {
+        real: null,
+        unreadable: null,
+        obstruction: { path: file, kind: "not-directory" },
+      });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the syscall implication table", () => {
+  // Three syscalls report the same errno for three different problems, and the
+  // path printed beside it is the link in every case. Until the syscall was
+  // carried, an `EACCES` from `lstat` — which reads the link's PARENT — told
+  // the reader to fix the link, which is the one directory that may be
+  // perfectly fine.
+
+  it("still carries one implication per syscall the probes can blame", () => {
+    assert.deepEqual(Object.keys(SYSCALL_IMPLICATION).sort(), ["lstat", "realpath", "stat"]);
+  });
+
+  it("reads as a clause the parenthesis can hold", () => {
+    assertPhraseTable(SYSCALL_IMPLICATION, {
+      // Rendered after an em-dash inside `(<detail> on <syscall> — <clause>)`,
+      // so a row opens with its subject rather than with punctuation.
+      opens: /^[a-z]/,
+      // Inside a parenthesis the sentence continues past, so a period anywhere
+      // closes it early — and nothing here names a dotted file.
+      periods: "never",
+      template: "<path> (<detail> on <syscall> — <implication>)",
+    });
+  });
+
+  it("sends the reader to a different directory for each syscall", () => {
+    // The whole reason the syscall is carried: `realpath` implicates the link,
+    // `lstat` implicates its parent, and `stat` implicates neither — it says
+    // the link resolved and then stopped answering. A table whose rows differed
+    // only in wording would print three sentences and give one instruction.
+    assert.match(SYSCALL_IMPLICATION.realpath, /link itself/);
+    assert.match(SYSCALL_IMPLICATION.lstat, /PARENT/);
+    assert.match(
+      SYSCALL_IMPLICATION.lstat,
+      /may be fine/,
+      "the `lstat` row does not say the link may be innocent, which is the misdirection it exists to undo",
+    );
+    assert.match(SYSCALL_IMPLICATION.stat, /resolved/);
+  });
+});
+
 describe("probeAbsentLink", () => {
   // The branch reached once `realpath` has answered "not there". Its catch
   // used to swallow every `lstat` failure as ordinary absence, which is the
@@ -955,8 +1058,29 @@ describe("probeAbsentLink", () => {
   // `realpath` reports with a non-absence code is answered before this runs.
 
   const LINK = "/checkout/node_modules";
-  const asSymlink = (isLink: boolean) => () => ({ isSymbolicLink: () => isLink });
-  const throwing = (error: unknown) => () => {
+
+  // Real `fs.Stats`, taken once from a planted symlink and a planted file,
+  // rather than an object answering the one method the probe happens to call
+  // today. The seam asks for the whole shape on purpose — a stub that answers
+  // `isSymbolicLink` and nothing else compiles until the probe reads a second
+  // field and then throws `is not a function` on every row at once — and these
+  // are the cheapest honest way to supply it.
+  const STATS = (() => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "absent-link-stats-"));
+    try {
+      fs.symlinkSync(path.join(root, "gone"), path.join(root, "link"));
+      fs.writeFileSync(path.join(root, "file"), "");
+      return {
+        symlink: fs.lstatSync(path.join(root, "link")),
+        file: fs.lstatSync(path.join(root, "file")),
+      };
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  })();
+
+  const asSymlink = (isLink: boolean) => () => (isLink ? STATS.symlink : STATS.file);
+  const throwing = (error: unknown) => (): fs.Stats => {
     throw error;
   };
 
@@ -984,7 +1108,7 @@ describe("probeAbsentLink", () => {
     for (const code of ["EACCES", "ELOOP", "ENAMETOOLONG"]) {
       assert.deepEqual(
         probeAbsentLink(LINK, throwing(Object.assign(new Error("boom"), { code }))),
-        { unreadable: { path: LINK, detail: code }, obstruction: null },
+        { unreadable: { path: LINK, detail: code, syscall: "lstat" }, obstruction: null },
         `${code} on the lstat was swallowed as ordinary absence`,
       );
     }

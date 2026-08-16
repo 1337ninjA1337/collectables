@@ -101,8 +101,34 @@ function isUnder(parent: string, child: string): boolean {
   return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
 }
 
+/**
+ * Which syscall produced an unreadable finding — and therefore WHICH directory
+ * the reader has to fix.
+ *
+ * The three sources report the same errno for three different problems, and
+ * until the syscall was carried the message printed `<path> (EACCES)` for all
+ * of them with the link as the path. That sends a reader to `chmod` the thing
+ * that is not the problem in two cases out of three: an `EACCES` from `realpath`
+ * means the link itself cannot be traversed, and the same code from `lstat`
+ * means its PARENT could not be read — the link may be perfectly fine.
+ */
+export type LinkSyscall = "realpath" | "stat" | "lstat";
+
+/**
+ * What a failure of each syscall implicates, in the one place that decides.
+ *
+ * Rendered inside `<path> (<detail> on <syscall> — <implication>)`, so each row
+ * is a clause with no punctuation of its own; the shared phrase rulebook pins
+ * exactly that.
+ */
+export const SYSCALL_IMPLICATION: Record<LinkSyscall, string> = {
+  realpath: "the link itself could not be traversed",
+  stat: "the link resolved and then could not be inspected, so something changed it mid-walk",
+  lstat: "its PARENT directory could not be read, so the link itself may be fine",
+};
+
 /** A chain path the process could not resolve for a reason other than absence. */
-type UnreadableLink = { path: string; detail: string };
+type UnreadableLink = { path: string; detail: string; syscall: LinkSyscall };
 
 
 /**
@@ -208,21 +234,62 @@ type ChainLink = {
  * runs only in the branch where the answer was already "not there".
  */
 function probeChainLink(target: string): ChainLink {
+  let real: string;
   try {
-    const real = fs.realpathSync(target);
-    if (fs.statSync(real).isDirectory()) return { real, unreadable: null, obstruction: null };
-    return {
-      real: null,
-      unreadable: null,
-      obstruction: { path: real, kind: "not-directory" },
-    };
+    real = fs.realpathSync(target);
   } catch (error) {
     const detail = describeResolveFailure(error);
     if (detail !== null) {
-      return { real: null, unreadable: { path: target, detail }, obstruction: null };
+      return {
+        real: null,
+        unreadable: { path: target, detail, syscall: "realpath" },
+        obstruction: null,
+      };
     }
     return { real: null, ...probeAbsentLink(target) };
   }
+  return probeResolvedLink(real);
+}
+
+/**
+ * What a chain link that RESOLVED turns out to be.
+ *
+ * Split out of the try above rather than sharing its catch, which is the bug
+ * this replaces: both syscalls sat in one block, so a `stat` that failed landed
+ * in the handler written to classify the FIRST call, and the reader was handed
+ * an errno attributed to a syscall that had already succeeded. The window is a
+ * race — a target removed between the two calls, a filesystem that answers
+ * `realpath` and then refuses `stat` — and the message is the only artifact of
+ * it, so pointing it at the wrong call is the whole cost.
+ *
+ * A `stat` reporting plain ABSENCE is the same race and gets no finding: the
+ * path is genuinely gone as of the second observation, which is what "no
+ * install here" means and what every ancestor of every checkout looks like.
+ * Anything else is unreadable, tagged with the syscall so the sentence can say
+ * the link resolved before it stopped answering.
+ *
+ * `stat` is a parameter, defaulted, for the same reason `lstat` is one on
+ * {@link probeAbsentLink}: the race cannot be arranged from a test, and the
+ * branch that reports it is worth more than one that exists only in the source.
+ */
+export function probeResolvedLink(
+  real: string,
+  stat: (path: string) => fs.Stats = fs.statSync,
+): ChainLink {
+  let stats: fs.Stats;
+  try {
+    stats = stat(real);
+  } catch (error) {
+    const detail = describeResolveFailure(error);
+    if (detail === null) return { real: null, unreadable: null, obstruction: null };
+    return { real: null, unreadable: { path: real, detail, syscall: "stat" }, obstruction: null };
+  }
+  if (stats.isDirectory()) return { real, unreadable: null, obstruction: null };
+  return {
+    real: null,
+    unreadable: null,
+    obstruction: { path: real, kind: "not-directory" },
+  };
 }
 
 /** What an lstat of the link itself turned out to say. */
@@ -251,18 +318,27 @@ type AbsentLinkFinding = Pick<ChainLink, "unreadable" | "obstruction">;
  * containers (root traverses an unreadable directory), and every state a
  * non-root reader could arrange that `realpath` reports as a non-absence code
  * is answered by the branch above, before this one is reached.
+ *
+ * It returns `fs.Stats` rather than the one method this reads. A structural
+ * `{ isSymbolicLink(): boolean }` is satisfied by the real syscall AND by a
+ * two-line stub, which is the point of the seam — what it also allows is this
+ * probe growing an `.isFile()` or a `.mode` check that compiles against `fs`
+ * and throws `is not a function` on every injected row at once. Asking for the
+ * whole shape costs the callers nothing real: a stub can be a `Stats` taken
+ * from a planted path, which is a more honest fixture than an object that
+ * answers one question.
  */
 export function probeAbsentLink(
   target: string,
-  lstat: (path: string) => { isSymbolicLink: () => boolean } = fs.lstatSync,
+  lstat: (path: string) => fs.Stats = fs.lstatSync,
 ): AbsentLinkFinding {
-  let link: { isSymbolicLink: () => boolean };
+  let link: fs.Stats;
   try {
     link = lstat(target);
   } catch (error) {
     const detail = describeResolveFailure(error);
     return {
-      unreadable: detail === null ? null : { path: target, detail },
+      unreadable: detail === null ? null : { path: target, detail, syscall: "lstat" },
       obstruction: null,
     };
   }
@@ -573,8 +649,13 @@ export function tsxLoaderIn(root: string): string {
     // this process cannot read may be exactly the install that answered, so
     // the honest report is "cannot tell", with the errno that stopped it and
     // WITHOUT `npm ci`, which is the one thing that will not help.
+    // The syscall and what it implicates, not just the errno: the same `EACCES`
+    // means "this link cannot be traversed" from `realpath` and "its parent
+    // could not be read" from `lstat`, and the path printed is the link in both
+    // cases — so without the attribution the reader is sent to `chmod` the one
+    // directory that is not the problem.
     const links = provenance.unreadable
-      .map((link) => `${link.path} (${link.detail})`)
+      .map((link) => `${link.path} (${link.detail} on ${link.syscall} — ${SYSCALL_IMPLICATION[link.syscall]})`)
       .join(", ");
     throw new Error(
       `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, and whether that is the checkout's own install could not be decided: ${provenance.unreadable.length} of the \`node_modules\` directories node would search from that checkout could not be read — ${links}. That is not "this checkout has no install", and re-installing will not change it; a link that cannot be traversed (permissions), a symlink cycle or a path too long for the filesystem all land here, and any of them may be the install the resolver actually loaded. Fix the paths above, then re-run.${obstructionClause(provenance.obstructed)}`,
