@@ -645,27 +645,27 @@ export function evaluateParsedInputs(
 export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
   "check-inline-hex": {
     count: { label: "source file", minimum: 160 },
-    note: "app/ + components/ + lib/ held 213 .ts/.tsx files on 2026-08-12 (app 19, components 44, lib 150); 160 leaves a quarter of them deletable. Raised from 150, which was exactly lib/'s own count — a walk that lost BOTH app/ and components/ passed at the boundary, and the note here claimed it would not. The property __tests__/lint-guard-partial-root.test.ts now enforces is the one a floor can hold: no single scan root clears it on its own. Losing app/ or components/ alone still passes, and that is the price of the slack.",
+    note: "app/ + components/ + lib/ held 216 .ts/.tsx files on 2026-08-16 (app 19, components 45, lib 152); 160 leaves a quarter of them deletable. Raised from 150, which was exactly lib/'s own count — a walk that lost BOTH app/ and components/ passed at the boundary, and the note here claimed it would not. The property __tests__/lint-guard-partial-root.test.ts now enforces is the one a floor can hold: no single scan root clears it on its own. Losing app/ or components/ alone still passes, and that is the price of the slack.",
   },
   "check-secrets": {
     count: { label: "file", minimum: 500 },
     note: "the whole-tree walk (minus node_modules/.git/dist and non-text extensions) held 713 files on 2026-08-12; 500 survives ordinary pruning while a walk that lost __tests__/ or lib/ does not.",
   },
   "check-inline-radius": {
-    count: { label: "source file", minimum: 45 },
-    note: "app/ + components/ held 63 .ts/.tsx files on 2026-08-12; 45 rides above the 44 that components/ alone contributes, so losing app/ — the root that holds most of the geometry literals — fails rather than passes.",
+    count: { label: "source file", minimum: 46 },
+    note: "app/ + components/ held 64 .ts/.tsx files on 2026-08-16; 46 rides above the 45 that components/ alone contributes, so losing app/ — the root that holds most of the geometry literals — fails rather than passes. Raised from 45 when <DangerIconButton> made components/ a 45th file and drew level with the floor: the floor was measured to sit ABOVE that root's own count, so a component landing is exactly the ordinary event it has to be re-measured for. 18 files of slack, the same ~28% it shipped with.",
   },
   "check-analytics-imports": {
-    count: { label: "source file", minimum: 45 },
-    note: "same app/ + components/ walk as check-inline-radius, 63 files on 2026-08-12; same 45 for the same reason.",
+    count: { label: "source file", minimum: 46 },
+    note: "same app/ + components/ walk as check-inline-radius, 64 files on 2026-08-16; same 46 for the same reason, raised alongside it.",
   },
   "check-problem-phrasing-imports": {
     count: { label: "source file", minimum: 450 },
-    note: "app/ + components/ + lib/ + scripts/ + __tests__/ held 635 .ts/.tsx files on 2026-08-14 (app 19, components 44, lib 150, scripts 26, tests 396); 450 rides above the 396 that __tests__/ alone contributes, so no single root clears this floor on its own — the property check-inline-hex's note names, and the one that matters most here because __tests__/ is where a hand-joined sentence is likeliest to appear.",
+    note: "app/ + components/ + lib/ + scripts/ + __tests__/ held 645 .ts/.tsx files on 2026-08-16 (app 19, components 45, lib 152, scripts 27, tests 402); 450 rides above the 396 that __tests__/ alone contributes, so no single root clears this floor on its own — the property check-inline-hex's note names, and the one that matters most here because __tests__/ is where a hand-joined sentence is likeliest to appear.",
   },
   "check-clarity-input-mask": {
-    count: { label: "screen file", minimum: 45 },
-    note: "app/ + components/ held 62 .tsx files on 2026-08-12 (one fewer than the radius walk, which also takes .ts); 45 keeps the two floors aligned since the walks differ by a single extension.",
+    count: { label: "screen file", minimum: 46 },
+    note: "app/ + components/ held 63 .tsx files on 2026-08-16 (one fewer than the radius walk, which also takes .ts); 46 keeps the two floors aligned since the walks differ by a single extension, and still rides above the 44 .tsx files components/ alone contributes. Raised from 45 with check-inline-radius rather than because this walk drew level — alignment is the point, and two floors that used to be one number are two numbers the moment one of them moves alone.",
   },
   "check-env-inlining": {
     count: { label: "config file", minimum: 3 },

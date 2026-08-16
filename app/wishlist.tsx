@@ -21,6 +21,7 @@ import {
 import { MaskedTextInput } from "@/components/masked-text-input";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { DangerIconButton } from "@/components/danger-icon-button";
 import { EmptyState } from "@/components/empty-state";
 import { PhotoPreview } from "@/components/photo-preview";
 import { Screen } from "@/components/screen";
@@ -38,10 +39,7 @@ import {
   BORDER,
   CARD_BG,
   CARD_BG_7,
-  CARD_BG_8,
   CARD_BG_9,
-  DANGER_DEEP_3,
-  DANGER_SOFT,
   MUTED,
   MUTED_2,
   MUTED_20,
@@ -251,9 +249,10 @@ export default function WishlistScreen() {
                 <Ionicons name="arrow-forward" size={16} color={TEXT_ON_DARK_5} />
                 <Text style={styles.promoteButtonText}>{t("wishlistPromote")}</Text>
               </Pressable>
-              <Pressable style={styles.deleteButton} onPress={() => confirmDelete(item)}>
-                <Ionicons name="trash-outline" size={16} color={DANGER_DEEP_3} />
-              </Pressable>
+              <DangerIconButton
+                onPress={() => confirmDelete(item)}
+                accessibilityLabel={t("deleteItem")}
+              />
             </View>
           </View>
         </View>
@@ -561,14 +560,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 13,
     fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  deleteButton: {
-    borderRadius: RADIUS_PILL,
-    borderWidth: 1,
-    borderColor: DANGER_SOFT,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: CARD_BG_8,
   },
   sheetBackdrop: {
     flex: 1,

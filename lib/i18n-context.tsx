@@ -1388,6 +1388,7 @@ const be: TranslationMap = {
 
 const pl: TranslationMap = {
   ...en,
+  deleteItem: "Usuń przedmiot",
   diagnosticsTitle: "Diagnostyka i raporty o awariach",
   diagnosticsHint:
     "Gdy włączone, anonimowe raporty o awariach pomagają nam szybciej naprawiać błędy. Wyłącz, aby nie wysyłać diagnostyki.",
@@ -1613,6 +1614,7 @@ const pl: TranslationMap = {
 
 const de: TranslationMap = {
   ...en,
+  deleteItem: "Objekt löschen",
   diagnosticsTitle: "Diagnose & Absturzberichte",
   diagnosticsHint:
     "Wenn aktiviert, helfen uns anonyme Absturzberichte, Fehler schneller zu beheben. Deaktivieren, um keine Diagnosedaten zu senden.",
@@ -1834,6 +1836,7 @@ const de: TranslationMap = {
 
 const es: TranslationMap = {
   ...en,
+  deleteItem: "Eliminar objeto",
   diagnosticsTitle: "Diagnóstico e informes de fallos",
   diagnosticsHint:
     "Si está activado, los informes anónimos de fallos nos ayudan a corregir errores más rápido. Desactívalo para no enviar diagnósticos.",

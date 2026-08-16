@@ -1049,10 +1049,14 @@ describe("design-tokens adoption", () => {
     assert.match(src, /BORDER\b/);
     assert.match(src, /CARD_BG\b/);
     assert.match(src, /CARD_BG_7/);
-    assert.match(src, /CARD_BG_8/);
     assert.match(src, /CARD_BG_9/);
-    assert.match(src, /DANGER_DEEP_3/);
-    assert.match(src, /DANGER_SOFT/);
+    // CARD_BG_8 / DANGER_SOFT / DANGER_DEEP_3 left with the delete button:
+    // they are `DESTRUCTIVE_ICON_SURFACE` inside <DangerIconButton> now, so a
+    // screen importing them again is a screen re-deriving the widget.
+    assert.doesNotMatch(src, /\bCARD_BG_8\b/);
+    assert.doesNotMatch(src, /\bDANGER_SOFT\b/);
+    assert.doesNotMatch(src, /\bDANGER_DEEP_3\b/);
+    assert.match(src, /from\s+"@\/components\/danger-icon-button"/);
     assert.match(src, /MUTED\b/);
     assert.match(src, /MUTED_2\b/);
     assert.match(src, /MUTED_20/);
