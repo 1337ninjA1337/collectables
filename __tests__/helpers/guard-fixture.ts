@@ -353,12 +353,50 @@ function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
 }
 
 /**
- * The nearest chain link when it is there, readable, and holds nothing.
+ * The two ways the nearest `node_modules` can be there and hold no install.
+ *
+ * `empty` is the literal one. `no-packages` is the same failure wearing a hat:
+ * npm writes `.package-lock.json` before it restores the store and leaves
+ * `.bin`, `.cache`, `.modules.yaml` behind on a prune, so an interrupted
+ * install commonly ends with a directory that is not empty by `readdirSync`
+ * and still holds nothing node can load. Counting entries alone sends that
+ * reader back to the refusal this finding exists to replace, with the extra
+ * confusion of a message that explicitly declined to call the directory empty.
+ *
+ * A dotted name is the line, and it is node's line rather than a guess: a
+ * package directory is the specifier, and every specifier node will resolve
+ * from here is either a plain name or a `@scope` — never a leading dot.
+ */
+export type EmptyLinkKind = "empty" | "no-packages";
+
+/**
+ * How each kind is said, in the one place that decides.
+ *
+ * Extracted for the same reason {@link OBSTRUCTION_PHRASE} was: the cases that
+ * assert this clause read the phrase from here, so a rewording either updates
+ * its pins or fails them, rather than leaving a green suite asserting the
+ * absence of prose the fixture stopped printing.
+ *
+ * Each row completes "<path> …" and is followed by ", so node had nothing to
+ * search in it" — so no trailing punctuation and no capital, and the tests pin
+ * exactly that.
+ */
+export const EMPTY_LINK_PHRASE: Record<EmptyLinkKind, string> = {
+  empty: "is there and is empty",
+  "no-packages":
+    "is there and holds no packages, only bookkeeping entries such as `.package-lock.json` or `.bin`",
+};
+
+/** The nearest chain link, when it is there, readable, and holds no install. */
+type EmptyLink = { path: string; kind: EmptyLinkKind };
+
+/**
+ * The nearest chain link when it is there, readable, and holds no install.
  *
  * The most common real version of "the install is not where you think": an
  * interrupted `npm ci`, a pruned store, a cleaned cache all leave the directory
- * behind with nothing in it. The walk above cannot see this — it asks only
- * whether `tsx` is under each link, and an empty directory answers that with
+ * behind with nothing loadable in it. The walk above cannot see this — it asks
+ * only whether `tsx` is under each link, and such a directory answers that with
  * the same silence as a healthy one that simply lost a single package.
  *
  * The nearest link only. An ancestor's empty `node_modules` is somebody else's
@@ -370,21 +408,24 @@ function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
  * unreadable, which has its own sentence and its own list, and answering here
  * as well would name the same path twice with two different explanations.
  */
-function nearestEmptyLink(root: string): string | null {
+function nearestEmptyLink(root: string): EmptyLink | null {
   const [nearest] = nodeModulesChain(root);
   if (nearest === undefined) return null;
   const link = probeChainLink(nearest);
   if (link.real === null) return null;
+  let entries: string[];
   try {
-    if (fs.readdirSync(link.real).length > 0) return null;
+    entries = fs.readdirSync(link.real);
   } catch {
     return null;
   }
-  return nearest;
+  if (entries.length === 0) return { path: nearest, kind: "empty" };
+  if (entries.some((entry) => !entry.startsWith("."))) return null;
+  return { path: nearest, kind: "no-packages" };
 }
 
 /**
- * The clause saying the nearest `node_modules` is there and holds nothing.
+ * The clause saying the nearest `node_modules` is there and holds no install.
  *
  * Its own sentence rather than a row in {@link OBSTRUCTION_PHRASE}, because the
  * two findings end in opposite advice: something standing in a chain path has
@@ -402,7 +443,7 @@ function nearestEmptyLink(root: string): string | null {
 function emptyLinkClause(root: string): string {
   const empty = nearestEmptyLink(root);
   if (empty === null) return "";
-  return ` Note also: ${empty} is there and is empty, so node had nothing to search in it and this refusal reads exactly like one for a checkout with no \`node_modules\` at all — an interrupted \`npm ci\`, a pruned store or a cleaned cache is what leaves that behind.`;
+  return ` Note also: ${empty.path} ${EMPTY_LINK_PHRASE[empty.kind]}, so node had nothing to search in it and this refusal reads exactly like one for a checkout with no \`node_modules\` at all — an interrupted \`npm ci\`, a pruned store or a cleaned cache is what leaves that behind.`;
 }
 
 /**

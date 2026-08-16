@@ -33,6 +33,7 @@ import {
   assertNoStackTrace,
   checkNameOf,
   describeResolveFailure,
+  EMPTY_LINK_PHRASE,
   entryPatch,
   makePartialRoot,
   makeSharedPatchedRepo,
@@ -461,9 +462,8 @@ describe("the loader check", () => {
         message.includes(link),
         `the diagnosis does not name the empty directory:\n${message}`,
       );
-      assert.match(
-        message,
-        /is there and is empty/,
+      assert.ok(
+        message.includes(EMPTY_LINK_PHRASE.empty),
         `an empty install directory is reported as a plainly absent one:\n${message}`,
       );
     });
@@ -483,10 +483,54 @@ describe("the loader check", () => {
         assert.match(answer, /^REFUSED /, `an empty install satisfied the check:\n${answer}`);
         assert.match(answer, /GLOBAL_FOLDERS/);
         assert.ok(
-          answer.includes(`${link} is there and is empty`),
+          answer.includes(`${link} ${EMPTY_LINK_PHRASE.empty}`),
           `the global-folder refusal drops the reason the checkout's own directory said nothing:\n${answer}`,
         );
       });
+    });
+  });
+
+  it("says a `node_modules` holding only npm's own bookkeeping holds no packages", () => {
+    // The same failure wearing a hat, and the one a bare entry COUNT waves
+    // through: npm writes `.package-lock.json` before it restores the store,
+    // and a prune leaves `.bin` and `.cache` behind, so an interrupted install
+    // commonly ends with a directory that is not empty and still holds nothing
+    // node can load. Counting entries sends that reader back to the refusal
+    // this finding exists to replace, with the added confusion of a message
+    // that explicitly declined to call the directory empty.
+    for (const bookkeeping of [[".package-lock.json"], [".bin", ".cache"]]) {
+      inScratchCheckout((root) => {
+        const link = path.join(root, "node_modules");
+        fs.mkdirSync(link);
+        for (const entry of bookkeeping) fs.writeFileSync(path.join(link, entry), "{}\n");
+        const message = refusalFor(root);
+        assert.ok(
+          message.includes(`${link} ${EMPTY_LINK_PHRASE["no-packages"]}`),
+          `a \`node_modules\` holding only ${bookkeeping.join(", ")} is reported as a healthy one:\n${message}`,
+        );
+        assert.ok(
+          !message.includes(EMPTY_LINK_PHRASE.empty),
+          `a directory with entries in it is called empty, which its owner's own \`ls\` contradicts:\n${message}`,
+        );
+      });
+    }
+  });
+
+  it("says nothing about a `node_modules` holding a scoped package", () => {
+    // The negative the dotted-name rule has to survive: a package directory IS
+    // the specifier, and `@scope` is the one shape that is neither a plain name
+    // nor a dotfile. A rule written as "no plain names" rather than "no
+    // undotted names" would tell a workspace with only scoped dependencies
+    // installed that it holds no packages at all.
+    inScratchCheckout((root) => {
+      fs.mkdirSync(path.join(root, "node_modules", "@scope", "thing"), { recursive: true });
+      const message = refusalFor(root);
+      for (const phrase of Object.values(EMPTY_LINK_PHRASE)) {
+        assert.ok(
+          !message.includes(phrase),
+          `a \`node_modules\` holding a scoped package is reported as holding none ("${phrase}"):\n${message}`,
+        );
+      }
     });
   });
 
@@ -499,11 +543,12 @@ describe("the loader check", () => {
     inScratchCheckout((root) => {
       fs.mkdirSync(path.join(root, "node_modules", "tsx"), { recursive: true });
       const message = refusalFor(root);
-      assert.doesNotMatch(
-        message,
-        /is empty/,
-        `a populated \`node_modules\` is reported as empty:\n${message}`,
-      );
+      for (const phrase of Object.values(EMPTY_LINK_PHRASE)) {
+        assert.ok(
+          !message.includes(phrase),
+          `a populated \`node_modules\` is reported as holding no install ("${phrase}"):\n${message}`,
+        );
+      }
     });
   });
 
@@ -517,11 +562,12 @@ describe("the loader check", () => {
         fs.mkdirSync(path.join(empty, "node_modules"));
         const absent = refusalFor(bare);
         const hollow = refusalFor(empty);
-        assert.doesNotMatch(
-          absent,
-          /is empty/,
-          `a checkout with no \`node_modules\` is told its \`node_modules\` is empty:\n${absent}`,
-        );
+        for (const phrase of Object.values(EMPTY_LINK_PHRASE)) {
+          assert.ok(
+            !absent.includes(phrase),
+            `a checkout with no \`node_modules\` is told about the contents of one ("${phrase}"):\n${absent}`,
+          );
+        }
         assert.notEqual(
           absent.split(bare).join("<root>"),
           hollow.split(empty).join("<root>"),
@@ -770,6 +816,42 @@ describe("the obstruction phrasing table", () => {
     // act on differently — a file to delete and a link to repoint.
     const phrases = KINDS.map((kind) => OBSTRUCTION_PHRASE[kind]);
     assert.equal(new Set(phrases).size, phrases.length, phrases.join(" / "));
+  });
+});
+
+describe("the empty-link phrasing table", () => {
+  // Same treatment as the obstruction table, for the same reason: the cases
+  // that assert this clause read the phrase from here, so a rewording either
+  // updates its pins or fails them — rather than leaving a suite green while
+  // it asserts the absence of prose the fixture no longer prints.
+
+  const KINDS = Object.keys(EMPTY_LINK_PHRASE) as (keyof typeof EMPTY_LINK_PHRASE)[];
+
+  it("still carries the two ways a link can be there and hold no install", () => {
+    assert.deepEqual(KINDS.sort(), ["empty", "no-packages"]);
+  });
+
+  it("reads as a verb phrase the clause can continue", () => {
+    // Rendered as `<path> <phrase>, so node had nothing to search in it` — so a
+    // capital, a trailing period or padding each break the sentence.
+    for (const kind of KINDS) {
+      const phrase = EMPTY_LINK_PHRASE[kind];
+      assert.match(phrase, /^is /, `${kind} does not complete "<path> …": ${phrase}`);
+      assert.doesNotMatch(phrase, /[.\n]$/, `${kind} punctuates itself: ${phrase}`);
+      assert.equal(phrase.trim(), phrase, `${kind} is padded: "${phrase}"`);
+    }
+  });
+
+  it("says something different for each kind", () => {
+    // A directory with nothing in it and one holding only npm's bookkeeping
+    // are the same fix and different `ls` output; a reader who is told the
+    // wrong one starts by doubting the message.
+    const phrases = KINDS.map((kind) => EMPTY_LINK_PHRASE[kind]);
+    assert.equal(new Set(phrases).size, phrases.length, phrases.join(" / "));
+    assert.ok(
+      !phrases.some((phrase) => phrases.some((other) => other !== phrase && other.includes(phrase))),
+      `one phrase contains another, so an \`includes\` pin on the shorter one is satisfied by the longer: ${phrases.join(" / ")}`,
+    );
   });
 });
 
