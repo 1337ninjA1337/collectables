@@ -136,6 +136,35 @@ export function describeResolveFailure(error: unknown): string | null {
 }
 
 /**
+ * The shapes a chain path can take that cannot hold an install.
+ *
+ * A closed union rather than a free-text fragment written at the throw-adjacent
+ * sites: the phrasing below is grammatical only because it was written to fit
+ * the one template that renders it (`<path> (<phrase>)`, then "those paths are
+ * in the chain node searches"), and a third shape added by someone reading only
+ * the probe — a socket, a FIFO, a directory with no execute bit — would produce
+ * a sentence that does not parse. With the kind closed, adding one is a
+ * compile error until the phrase is written here, beside the two it has to read
+ * like.
+ */
+export type ObstructionKind = "not-directory" | "dangling-link";
+
+/**
+ * How each kind is said, in the one place that decides.
+ *
+ * Every phrase is a verb phrase completing "<path> …", present tense, with no
+ * trailing period — the clause supplies its own punctuation — and the tests
+ * pin exactly that, so the table cannot grow a row that reads wrong in the
+ * sentence it is dropped into. Exported so the cases that assert the message
+ * read the phrase from here rather than retyping it: a reworded row should not
+ * be able to leave a green suite asserting prose the fixture no longer prints.
+ */
+export const OBSTRUCTION_PHRASE: Record<ObstructionKind, string> = {
+  "not-directory": "is not a directory",
+  "dangling-link": "is a symlink whose target does not exist",
+};
+
+/**
  * Something occupying a chain path that cannot hold an install.
  *
  * Distinct from {@link UnreadableLink}, which is about not knowing: this walk
@@ -143,7 +172,7 @@ export function describeResolveFailure(error: unknown): string | null {
  * stands. What the finding buys is the reason — otherwise the reader is told
  * their checkout has no install at a path their own `ls` shows occupied.
  */
-type ChainObstruction = { path: string; what: string };
+type ChainObstruction = { path: string; kind: ObstructionKind };
 
 /** What one chain path turned out to be. */
 type ChainLink = {
@@ -185,33 +214,60 @@ function probeChainLink(target: string): ChainLink {
     return {
       real: null,
       unreadable: null,
-      obstruction: { path: real, what: "is not a directory" },
+      obstruction: { path: real, kind: "not-directory" },
     };
   } catch (error) {
     const detail = describeResolveFailure(error);
-    return {
-      real: null,
-      unreadable: detail === null ? null : { path: target, detail },
-      obstruction: detail === null ? danglingLink(target) : null,
-    };
+    if (detail !== null) {
+      return { real: null, unreadable: { path: target, detail }, obstruction: null };
+    }
+    return { real: null, ...probeAbsentLink(target) };
   }
 }
 
+/** What an lstat of the link itself turned out to say. */
+type AbsentLinkFinding = Pick<ChainLink, "unreadable" | "obstruction">;
+
 /**
- * The finding for a path that is absent because a symlink points at nothing,
- * or null for the ordinary absence every ancestor has.
+ * The finding for a path `realpath` called absent — a dangling symlink, an
+ * lstat that failed for its own reason, or nothing at all.
  *
  * `lstat` rather than `exists`: the question is whether the LINK is there, and
  * every call that follows the link has already answered "no".
+ *
+ * The catch goes back through {@link describeResolveFailure} rather than
+ * swallowing everything as "not there". `lstat` reads the PARENT directory, so
+ * an `EACCES` there makes it throw for a link that may well exist, and
+ * answering ordinary-absence to that is exactly the collapse the unreadable
+ * finding was created to stop, one level down: the reader would be told their
+ * checkout has no install when the truth is that this process could not look.
+ * A non-absence code is routed into the unreadable list, where "cannot tell"
+ * already has a sentence; `ENOENT`/`ENOTDIR` stay silent, which is what nearly
+ * every ancestor looks like.
+ *
+ * `lstat` is a parameter, defaulted, purely so that catch has a table. The
+ * interesting rows are an `EACCES` on the parent and an `ELOOP`, and neither
+ * can be arranged through the filesystem here: these suites run as root in CI
+ * containers (root traverses an unreadable directory), and every state a
+ * non-root reader could arrange that `realpath` reports as a non-absence code
+ * is answered by the branch above, before this one is reached.
  */
-function danglingLink(target: string): ChainObstruction | null {
+export function probeAbsentLink(
+  target: string,
+  lstat: (path: string) => { isSymbolicLink: () => boolean } = fs.lstatSync,
+): AbsentLinkFinding {
+  let link: { isSymbolicLink: () => boolean };
   try {
-    if (!fs.lstatSync(target).isSymbolicLink()) return null;
-  } catch {
-    // Not there at all, which is what nearly every ancestor looks like.
-    return null;
+    link = lstat(target);
+  } catch (error) {
+    const detail = describeResolveFailure(error);
+    return {
+      unreadable: detail === null ? null : { path: target, detail },
+      obstruction: null,
+    };
   }
-  return { path: target, what: "is a symlink whose target does not exist" };
+  if (!link.isSymbolicLink()) return { unreadable: null, obstruction: null };
+  return { unreadable: null, obstruction: { path: target, kind: "dangling-link" } };
 }
 
 /**
@@ -312,7 +368,9 @@ function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
  */
 function obstructionClause(items: readonly ChainObstruction[]): string {
   if (items.length === 0) return "";
-  const listed = items.map((item) => `${item.path} (${item.what})`).join(", ");
+  const listed = items
+    .map((item) => `${item.path} (${OBSTRUCTION_PHRASE[item.kind]})`)
+    .join(", ");
   const one = items.length === 1;
   return ` Note also: ${listed} — ${one ? "that path is" : "those paths are"} in the chain node searches and cannot hold an install, so node skipped ${one ? "it" : "them"}; nothing can be installed there until ${one ? "it is" : "they are"} removed.`;
 }

@@ -36,7 +36,9 @@ import {
   entryPatch,
   makePartialRoot,
   makeSharedPatchedRepo,
+  OBSTRUCTION_PHRASE,
   PATCHED_REPO_MARKER,
+  probeAbsentLink,
   tsxLoaderIn,
 } from "./helpers/guard-fixture";
 
@@ -403,9 +405,8 @@ describe("the loader check", () => {
           answer.includes(stray),
           `the diagnosis does not name the file standing where the install belongs:\n${answer}`,
         );
-        assert.match(
-          answer,
-          /is not a directory/,
+        assert.ok(
+          answer.includes(OBSTRUCTION_PHRASE["not-directory"]),
           `the diagnosis names the path without saying what is wrong with it:\n${answer}`,
         );
         assert.match(
@@ -436,29 +437,53 @@ describe("the loader check", () => {
           answer.includes(link),
           `the diagnosis does not name the link standing where the install belongs:\n${answer}`,
         );
-        assert.match(
-          answer,
-          /symlink whose target does not exist/,
+        assert.ok(
+          answer.includes(OBSTRUCTION_PHRASE["dangling-link"]),
           `a dangling link is reported as plain absence, which is what every ancestor looks like:\n${answer}`,
         );
       });
     });
   });
 
-  it("says nothing extra when nothing is standing in the chain", () => {
+  it("says nothing extra when nothing is standing in the chain, in any of the three refusals", () => {
     // The negative half of the two cases above, and the one that keeps them
     // worth reading: a clause that appears when nothing is wrong teaches the
     // reader to skip the tail of every message, including the one that names
     // their actual problem. A checkout with a plainly absent install is the
     // ordinary refusal and must stay one sentence shorter.
-    inScratchCheckout((bare) => {
-      const message = refusalFor(bare);
-      assert.doesNotMatch(
-        message,
-        /Note also/,
-        `an ordinary missing install carries the standing-in-the-way clause:\n${message}`,
-      );
-      assert.doesNotMatch(message, /is not a directory|symlink whose target/, message);
+    //
+    // All THREE refusals, not just the absent-install one this case used to
+    // read. The clause is appended to the global-folder and unreadable-link
+    // messages as well, so a regression that made it unconditional in either
+    // of those would have left the old single-message version green — while
+    // every reader of the two messages it does reach gets a paragraph about
+    // paths that are perfectly fine. Each root here is refused for its own
+    // reason and has nothing standing in its chain.
+    inScratchCheckout((globals) => {
+      plantGlobalTsx(globals);
+      inScratchCheckout((absent) => {
+        inScratchCheckout((looping) => {
+          fs.symlinkSync("node_modules", path.join(looping, "node_modules"));
+          const refusals = [
+            ["absent install", refusalFor(absent)],
+            ["global folder", resolveInChild(absent, { NODE_PATH: globals })],
+            ["unreadable link", resolveInChild(looping, { NODE_PATH: globals })],
+          ] as const;
+          for (const [name, message] of refusals) {
+            assert.doesNotMatch(
+              message,
+              /Note also/,
+              `the ${name} refusal carries the standing-in-the-way clause for a chain with nothing in the way:\n${message}`,
+            );
+            for (const phrase of Object.values(OBSTRUCTION_PHRASE)) {
+              assert.ok(
+                !message.includes(phrase),
+                `the ${name} refusal says "${phrase}" about a chain with nothing in the way:\n${message}`,
+              );
+            }
+          }
+        });
+      });
     });
   });
 
@@ -624,6 +649,127 @@ describe("describeResolveFailure", () => {
       detail.includes("realpath"),
       `the rendering drops the fields that say what was thrown:\n${detail}`,
     );
+  });
+});
+
+describe("the obstruction phrasing table", () => {
+  // The phrases used to be free-text fragments written at the two sites that
+  // build the finding, and they were grammatical only because both were typed
+  // to fit the one template that renders them. Closing the union moved the
+  // wording here; these rows are what stops the next one being added without
+  // reading the sentence it lands in.
+
+  const KINDS = Object.keys(OBSTRUCTION_PHRASE) as (keyof typeof OBSTRUCTION_PHRASE)[];
+
+  it("still carries the two kinds the walk can produce", () => {
+    // A rename that dropped a row would otherwise show up only as a refusal
+    // that suddenly renders `undefined` next to a path.
+    assert.deepEqual(KINDS.sort(), ["dangling-link", "not-directory"]);
+  });
+
+  it("reads as a verb phrase completing the path it follows", () => {
+    // The clause renders `<path> (<phrase>)` and then says "those paths are in
+    // the chain node searches", so a noun ("a file"), a capital or a trailing
+    // period each break the sentence at a different seam.
+    for (const kind of KINDS) {
+      const phrase = OBSTRUCTION_PHRASE[kind];
+      assert.match(phrase, /^is /, `${kind} does not complete "<path> …": ${phrase}`);
+      assert.doesNotMatch(phrase, /[.\n]/, `${kind} punctuates itself: ${phrase}`);
+      assert.equal(phrase.trim(), phrase, `${kind} is padded: "${phrase}"`);
+    }
+  });
+
+  it("says something different for each kind", () => {
+    // Two kinds rendering the same words is two findings the reader cannot
+    // act on differently — a file to delete and a link to repoint.
+    const phrases = KINDS.map((kind) => OBSTRUCTION_PHRASE[kind]);
+    assert.equal(new Set(phrases).size, phrases.length, phrases.join(" / "));
+  });
+});
+
+describe("probeAbsentLink", () => {
+  // The branch reached once `realpath` has answered "not there". Its catch
+  // used to swallow every `lstat` failure as ordinary absence, which is the
+  // same collapse the unreadable finding exists to stop, one level down: an
+  // `EACCES` on the PARENT directory makes `lstat` throw for a link that may
+  // well exist. `lstat` is injectable here for exactly this table — as root in
+  // a CI container the permission rows cannot be arranged, and every state
+  // `realpath` reports with a non-absence code is answered before this runs.
+
+  const LINK = "/checkout/node_modules";
+  const asSymlink = (isLink: boolean) => () => ({ isSymbolicLink: () => isLink });
+  const throwing = (error: unknown) => () => {
+    throw error;
+  };
+
+  it("reports a dangling symlink as something standing in the chain", () => {
+    assert.deepEqual(probeAbsentLink(LINK, asSymlink(true)), {
+      unreadable: null,
+      obstruction: { path: LINK, kind: "dangling-link" },
+    });
+  });
+
+  it("reports nothing for a path that is simply not there", () => {
+    for (const code of ["ENOENT", "ENOTDIR"]) {
+      assert.deepEqual(
+        probeAbsentLink(LINK, throwing(Object.assign(new Error("boom"), { code }))),
+        { unreadable: null, obstruction: null },
+        `${code} on the lstat produced a finding, which would fire on every ancestor of every checkout`,
+      );
+    }
+  });
+
+  it("routes an lstat that failed for its own reason into the unreadable list", () => {
+    // The whole point of the change: "this process cannot look at the link"
+    // must not arrive as "the link is not there", because the two have
+    // different fixes and only one of them is the reader's fault.
+    for (const code of ["EACCES", "ELOOP", "ENAMETOOLONG"]) {
+      assert.deepEqual(
+        probeAbsentLink(LINK, throwing(Object.assign(new Error("boom"), { code }))),
+        { unreadable: { path: LINK, detail: code }, obstruction: null },
+        `${code} on the lstat was swallowed as ordinary absence`,
+      );
+    }
+  });
+
+  it("keeps a thrown value with no errno readable rather than dropping it", () => {
+    // Same classification as everywhere else, so a patched `fs` or a thrown
+    // non-Error cannot make this the one place that says nothing.
+    const finding = probeAbsentLink(LINK, throwing("lstat exploded"));
+    assert.equal(finding.obstruction, null);
+    assert.ok(
+      finding.unreadable?.detail.includes("lstat exploded"),
+      `the thrown value is dropped from the finding: ${JSON.stringify(finding)}`,
+    );
+  });
+
+  it("reports nothing for a path that is there and is not a link", () => {
+    // A race — `realpath` said absent and the path was created in between —
+    // and the one case where saying nothing is right.
+    assert.deepEqual(probeAbsentLink(LINK, asSymlink(false)), {
+      unreadable: null,
+      obstruction: null,
+    });
+  });
+
+  it("defaults to the real lstat, so callers get the filesystem", () => {
+    // The parameter exists for the table above; a default that had drifted to
+    // a stub would make every case here a test of the test.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "absent-link-"));
+    try {
+      const link = path.join(root, "node_modules");
+      fs.symlinkSync(path.join(root, "gone"), link);
+      assert.deepEqual(probeAbsentLink(link), {
+        unreadable: null,
+        obstruction: { path: link, kind: "dangling-link" },
+      });
+      assert.deepEqual(probeAbsentLink(path.join(root, "nothing-here")), {
+        unreadable: null,
+        obstruction: null,
+      });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
