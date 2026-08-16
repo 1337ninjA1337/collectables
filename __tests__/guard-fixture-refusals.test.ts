@@ -35,16 +35,19 @@ import {
   describeResolveFailure,
   EMPTY_LINK_PHRASE,
   EMPTY_LINK_TAIL,
+  emptyLinkClause,
   entryPatch,
   looksLikePackageEntry,
   makePartialRoot,
   makeSharedPatchedRepo,
   OBSTRUCTION_PHRASE,
+  obstructionClause,
   PATCHED_REPO_MARKER,
   probeAbsentLink,
   probeResolvedLink,
   SYSCALL_IMPLICATION,
   tsxLoaderIn,
+  unreadableList,
 } from "./helpers/guard-fixture";
 import { assertPhraseTable } from "./helpers/phrase-table";
 
@@ -847,6 +850,13 @@ describe("the obstruction phrasing table", () => {
     // copied from predated it.
     assertPhraseTable(OBSTRUCTION_PHRASE, {
       opens: /^is /,
+      // Every kind, rendered by the builder the refusals call. Until the clause
+      // was exported this cost a planted filesystem and a spawned child per
+      // row, which is why the table's rows were pinned for how they READ and
+      // never for whether anything prints them — a kind sketched ahead
+      // ("socket", "no-execute-bit") passed every assertion and shipped as dead
+      // prose that reads like a finding the walk knows how to make.
+      renderedIn: KINDS.map((kind) => obstructionClause([{ path: "/checkout/node_modules", kind }])),
       // Rendered as `<path> (<phrase>)` with the clause continuing on the far
       // side of the parenthesis, so a period anywhere ends the sentence inside
       // it. Nothing in this table names a dotted file, so the strict rule costs
@@ -876,6 +886,9 @@ describe("the empty-link phrasing table", () => {
     // shorter row with `includes`.
     assertPhraseTable(EMPTY_LINK_PHRASE, {
       opens: /^is /,
+      renderedIn: KINDS.map((kind) =>
+        emptyLinkClause({ path: "/checkout/node_modules", kind }, "absent-install"),
+      ),
       // Not "never": the `no-packages` row names `.package-lock.json` and
       // `.bin`, which is the whole point of that row — the reader recognises
       // their own listing in it. Only a period at the END would close the
@@ -934,6 +947,9 @@ describe("the empty-link tail table", () => {
 
   it("reads as a clause continuing the sentence that renders it", () => {
     assertPhraseTable(EMPTY_LINK_TAIL, {
+      renderedIn: (Object.keys(EMPTY_LINK_TAIL) as (keyof typeof EMPTY_LINK_TAIL)[]).map((host) =>
+        emptyLinkClause({ path: "/checkout/node_modules", kind: "empty" }, host),
+      ),
       // A subject rather than a verb — these complete "… and <tail>", not
       // "<path> …" — so the rule is only that a row does not open mid-word or
       // with the punctuation the template supplies.
@@ -943,6 +959,89 @@ describe("the empty-link tail table", () => {
       // continuation is the same shape the phrase table has.
       periods: "not-at-the-end",
       template: "so node had nothing to search in it and <tail> — an interrupted `npm ci` …",
+    });
+  });
+});
+
+describe("the clause builders", () => {
+  // All three are pure, and until they were exported the only way to reach any
+  // of them was through a refusal — so "no findings in, no clause out", which
+  // is a one-row table, was proved by spawning node twice with a planted
+  // `NODE_PATH` and a symlink cycle. The spawns are still worth paying for the
+  // claim that genuinely needs them (the clause reaches a message a REAL walk
+  // produced, which the loader-check suite asserts); these rows are the ones
+  // that never needed a filesystem at all.
+
+  const LINK = "/checkout/node_modules";
+  const OTHER = "/checkout/../shared/node_modules";
+
+  describe("obstructionClause", () => {
+    it("says nothing for a chain with nothing in the way", () => {
+      // The case that keeps the clause worth reading, and the reason it is a
+      // row rather than two child processes.
+      assert.equal(obstructionClause([]), "");
+    });
+
+    it("speaks of one path in the singular and of two in the plural", () => {
+      // Four agreements in one sentence — "that path is"/"those paths are",
+      // "skipped it"/"skipped them", "until it is"/"until they are" — and a
+      // count that has to match the list beside it.
+      const one = obstructionClause([{ path: LINK, kind: "not-directory" }]);
+      assert.match(one, /that path is in the chain/);
+      assert.match(one, /skipped it/);
+      assert.match(one, /until it is removed/);
+
+      const two = obstructionClause([
+        { path: LINK, kind: "not-directory" },
+        { path: OTHER, kind: "dangling-link" },
+      ]);
+      assert.match(two, /those paths are in the chain/);
+      assert.match(two, /skipped them/);
+      assert.match(two, /until they are removed/);
+      for (const listed of [LINK, OTHER]) {
+        assert.ok(two.includes(listed), `the clause lists two findings and omits ${listed}: ${two}`);
+      }
+    });
+  });
+
+  describe("emptyLinkClause", () => {
+    it("says nothing when the nearest link holds something", () => {
+      assert.equal(emptyLinkClause(null, "absent-install"), "");
+      assert.equal(emptyLinkClause(null, "global-folder"), "");
+    });
+
+    it("names the path once, whichever refusal it is landing in", () => {
+      // The path is the actionable half and the tail is the reading; a clause
+      // that named the directory twice would read like two findings about it.
+      for (const host of ["absent-install", "global-folder"] as const) {
+        const clause = emptyLinkClause({ path: LINK, kind: "empty" }, host);
+        assert.equal(
+          clause.split(LINK).length - 1,
+          1,
+          `the ${host} clause names ${LINK} more than once: ${clause}`,
+        );
+      }
+    });
+  });
+
+  describe("unreadableList", () => {
+    it("says nothing for a walk that read every link", () => {
+      assert.equal(unreadableList([]), "");
+    });
+
+    it("joins the findings so the count beside it can agree with them", () => {
+      // The sentence renders the count from the array and the list from this
+      // join, so the two agree by construction — which is exactly why the
+      // separator has to stay a separator: a newline or a bullet here would
+      // survive every existing pin and break the paragraph it is spliced into.
+      const listed = unreadableList([
+        { path: LINK, detail: "ELOOP", syscall: "realpath" },
+        { path: OTHER, detail: "EACCES", syscall: "lstat" },
+      ]);
+      assert.equal(listed.split(", ").length >= 2, true, listed);
+      assert.doesNotMatch(listed, /\n/, `the list spans lines and the message is a paragraph: ${listed}`);
+      assert.ok(listed.includes("ELOOP on realpath"), listed);
+      assert.ok(listed.includes("EACCES on lstat"), listed);
     });
   });
 });
@@ -1022,6 +1121,9 @@ describe("the syscall implication table", () => {
 
   it("reads as a clause the parenthesis can hold", () => {
     assertPhraseTable(SYSCALL_IMPLICATION, {
+      renderedIn: (Object.keys(SYSCALL_IMPLICATION) as (keyof typeof SYSCALL_IMPLICATION)[]).map(
+        (syscall) => unreadableList([{ path: "/checkout/node_modules", detail: "EACCES", syscall }]),
+      ),
       // Rendered after an em-dash inside `(<detail> on <syscall> — <clause>)`,
       // so a row opens with its subject rather than with punctuation.
       opens: /^[a-z]/,

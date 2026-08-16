@@ -57,6 +57,22 @@ export type PhraseTableRules = {
    * a red run shows what the row has to fit rather than only what it is.
    */
   readonly template: string;
+  /**
+   * Messages the caller has actually rendered, in which every row must appear.
+   *
+   * The shape rules say how a row READS and nothing about whether it is ever
+   * PRINTED, which is the gap every one of these tables has carried since it
+   * was closed: a row added by someone sketching ahead — a `"socket"`
+   * obstruction, a third host — satisfies every assertion, ships as dead prose,
+   * and reads to the next person as a finding the walk knows how to make. A row
+   * no renderer can produce is a promise the code does not keep.
+   *
+   * Optional because supplying it means the caller can produce every row, which
+   * is a real cost for a table whose renderer needs a filesystem — and is
+   * exactly why the clause builders were made pure and exported: rendering all
+   * of them is now a `map`.
+   */
+  readonly renderedIn?: readonly string[];
 };
 
 /**
@@ -101,6 +117,19 @@ export function assertPhraseTable(
         phrase,
         /\.$/,
         `${key} ends the sentence "${rules.template}" means to continue: ${phrase}`,
+      );
+    }
+  }
+
+  if (rules.renderedIn !== undefined) {
+    assert.ok(
+      rules.renderedIn.length > 0,
+      "renderedIn is an empty corpus, which would make every row vacuously covered — omit it instead of passing nothing",
+    );
+    for (const [key, phrase] of entries) {
+      assert.ok(
+        rules.renderedIn.some((message) => message.includes(phrase)),
+        `${key} is in the table and no renderer produces it, so it reads as a finding the code knows how to make and never does: ${phrase}`,
       );
     }
   }

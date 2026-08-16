@@ -494,7 +494,7 @@ export const EMPTY_LINK_TAIL: Record<EmptyLinkHost, string> = {
 };
 
 /** The nearest chain link, when it is there, readable, and holds no install. */
-type EmptyLink = { path: string; kind: EmptyLinkKind };
+export type EmptyLink = { path: string; kind: EmptyLinkKind };
 
 /**
  * Whether a `node_modules` entry is a name node could load a package from.
@@ -572,9 +572,14 @@ function nearestEmptyLink(root: string): EmptyLink | null {
  * is shared between them — what it means for the reader is not, and the tail
  * that says so was true of one message and false of the other for as long as
  * the two shared a sentence. See {@link EMPTY_LINK_TAIL}.
+ *
+ * Takes the finding rather than the root it was probed from, so it is pure and
+ * exported: every row it can render — each kind against each host, and the
+ * empty string for no finding at all — is then a table, where it used to cost a
+ * planted directory and a spawned child per row. The probe stays with the
+ * caller, which is the half that genuinely needs a filesystem.
  */
-function emptyLinkClause(root: string, host: EmptyLinkHost): string {
-  const empty = nearestEmptyLink(root);
+export function emptyLinkClause(empty: EmptyLink | null, host: EmptyLinkHost): string {
   if (empty === null) return "";
   return ` Note also: ${empty.path} ${EMPTY_LINK_PHRASE[empty.kind]}, so node had nothing to search in it and ${EMPTY_LINK_TAIL[host]} — an interrupted \`npm ci\`, a pruned store or a cleaned cache is what leaves that behind.`;
 }
@@ -592,14 +597,44 @@ function emptyLinkClause(root: string, host: EmptyLinkHost): string {
  * Empty for a healthy chain, which is the case that matters most: a clause
  * that shows up when nothing is wrong teaches the reader to skip the tail of
  * every message, including the one that names their actual problem.
+ *
+ * Pure and exported for the same reason {@link emptyLinkClause} is. "No
+ * findings in, no clause out" is a one-row table, and it used to be proved by
+ * spawning node twice with a planted `NODE_PATH` and a symlink cycle, because
+ * the only way to reach the function was through a refusal. The spawns are
+ * still worth paying where the claim needs them — that the clause reaches a
+ * message a REAL walk produced — and nowhere else.
  */
-function obstructionClause(items: readonly ChainObstruction[]): string {
+export function obstructionClause(items: readonly ChainObstruction[]): string {
   if (items.length === 0) return "";
   const listed = items
     .map((item) => `${item.path} (${OBSTRUCTION_PHRASE[item.kind]})`)
     .join(", ");
   const one = items.length === 1;
   return ` Note also: ${listed} — ${one ? "that path is" : "those paths are"} in the chain node searches and cannot hold an install, so node skipped ${one ? "it" : "them"}; nothing can be installed there until ${one ? "it is" : "they are"} removed.`;
+}
+
+/**
+ * The links a walk could not read, each with the errno, the call that produced
+ * it, and which directory that call implicates.
+ *
+ * The syscall and its implication, not just the errno: the same `EACCES` means
+ * "this link cannot be traversed" from `realpath` and "its PARENT could not be
+ * read" from `lstat`, and the path printed is the link either way — so without
+ * the attribution the reader is sent to `chmod` the one directory that is not
+ * the problem.
+ *
+ * The third of the three clause builders, pure and exported like the other two,
+ * so the rows of {@link SYSCALL_IMPLICATION} can be rendered without arranging
+ * three kernel states that this suite cannot arrange at all.
+ */
+export function unreadableList(links: readonly UnreadableLink[]): string {
+  return links
+    .map(
+      (link) =>
+        `${link.path} (${link.detail} on ${link.syscall} — ${SYSCALL_IMPLICATION[link.syscall]})`,
+    )
+    .join(", ");
 }
 
 /**
@@ -640,7 +675,7 @@ export function tsxLoaderIn(root: string): string {
     // does not survive that.
     const reason = describeThrown(error);
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.${emptyLinkClause(root, "absent-install")}`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.${emptyLinkClause(nearestEmptyLink(root), "absent-install")}`,
     );
   }
   const provenance = resolvedFromCheckout(root, resolved);
@@ -649,14 +684,7 @@ export function tsxLoaderIn(root: string): string {
     // this process cannot read may be exactly the install that answered, so
     // the honest report is "cannot tell", with the errno that stopped it and
     // WITHOUT `npm ci`, which is the one thing that will not help.
-    // The syscall and what it implicates, not just the errno: the same `EACCES`
-    // means "this link cannot be traversed" from `realpath` and "its parent
-    // could not be read" from `lstat`, and the path printed is the link in both
-    // cases — so without the attribution the reader is sent to `chmod` the one
-    // directory that is not the problem.
-    const links = provenance.unreadable
-      .map((link) => `${link.path} (${link.detail} on ${link.syscall} — ${SYSCALL_IMPLICATION[link.syscall]})`)
-      .join(", ");
+    const links = unreadableList(provenance.unreadable);
     throw new Error(
       `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, and whether that is the checkout's own install could not be decided: ${provenance.unreadable.length} of the \`node_modules\` directories node would search from that checkout could not be read — ${links}. That is not "this checkout has no install", and re-installing will not change it; a link that cannot be traversed (permissions), a symlink cycle or a path too long for the filesystem all land here, and any of them may be the install the resolver actually loaded. Fix the paths above, then re-run.${obstructionClause(provenance.obstructed)}`,
     );
@@ -664,7 +692,7 @@ export function tsxLoaderIn(root: string): string {
   if (!provenance.fromCheckout) {
     const chain = nodeModulesChain(root);
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${emptyLinkClause(root, "global-folder")}${obstructionClause(provenance.obstructed)}`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${emptyLinkClause(nearestEmptyLink(root), "global-folder")}${obstructionClause(provenance.obstructed)}`,
     );
   }
   // The bare specifier, not the file the resolver answered with: node resolves
