@@ -1159,6 +1159,23 @@ describe("nodeModulesChain", () => {
     }
   });
 
+  it("never repeats a link, which is what lets the walk reuse a probe by position", () => {
+    // The walk probes the nearest link once and reuses that answer for the
+    // first iteration. It used to find that iteration by string match, which is
+    // right only while no link appears twice — true here because every entry is
+    // `join(dir, "node_modules")` for a strictly ascending `dir`, and stated
+    // nowhere until this row. A normalisation or de-dup pass is what would
+    // break it.
+    for (const root of [REPO_ROOT, "/a/b/c/d", path.join("/a", "node_modules"), FS_ROOT]) {
+      const chain = nodeModulesChain(root);
+      assert.equal(
+        new Set(chain).size,
+        chain.length,
+        `the chain for ${root} lists a link twice: ${chain.join(", ")}`,
+      );
+    }
+  });
+
   it("gives the filesystem root the chain the deleted branch said it had none of", () => {
     // The whole argument in one row. `path.basename` of the filesystem root is
     // `""` — never `node_modules` — so the last iteration always pushes, and

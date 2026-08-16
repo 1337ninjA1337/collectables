@@ -69,16 +69,25 @@ const TSX_SPECIFIER = "tsx";
 const resolver = createRequire(__filename);
 
 /**
- * A chain, typed as what it always is: at least one link, nearest first.
+ * A chain, typed as what it always is: some links, then the filesystem root's.
  *
  * The tuple is the whole point. Three call sites read the first entry as "the
  * nearest link" and each was a bare `chain[0]` whose correctness came from a
  * sentence in {@link nodeModulesChain}'s doc comment — a reordering there
  * (sorting, de-duplicating, dropping roots) would have made all three wrong
  * with nothing to catch it. Saying it in the type puts the claim where the
- * readers are.
+ * readers are, and a `[…, string]` still gives them a `chain[0]` that is a
+ * string rather than a maybe.
+ *
+ * The rest comes FIRST and the guaranteed link comes last, which is the shape
+ * of the argument rather than a shape chosen to be convenient: what makes a
+ * chain non-empty is that the walk ends at the filesystem root and that root's
+ * link is always pushed. Written as `[string, ...string[]]` the same guarantee
+ * has to be re-established after the fact — by a check the caller cannot reach
+ * or by a cast — and that is a branch this file has now deleted three times
+ * over for being unreachable.
  */
-export type ChainLinks = readonly [string, ...string[]];
+export type ChainLinks = readonly [...string[], string];
 
 /**
  * The `node_modules` directories node searches for a bare specifier from
@@ -108,26 +117,22 @@ export type ChainLinks = readonly [string, ...string[]];
  * empty — are pinned by cases rather than by a doc comment nothing checks.
  */
 export function nodeModulesChain(root: string): ChainLinks {
-  const chain: string[] = [];
+  // Everything BELOW the filesystem root, nearest first. The loop stops one
+  // directory short deliberately: the root's own link is the one the argument
+  // above guarantees, so it is appended outside the loop where the guarantee
+  // can be read, rather than pushed by an iteration and then re-established
+  // afterwards by a check no caller can reach.
+  const below: string[] = [];
   let dir = path.resolve(root);
   for (;;) {
-    if (path.basename(dir) !== "node_modules") {
-      chain.push(path.join(dir, "node_modules"));
-    }
     const parent = path.dirname(dir);
     if (parent === dir) break;
+    if (path.basename(dir) !== "node_modules") {
+      below.push(path.join(dir, "node_modules"));
+    }
     dir = parent;
   }
-  const [nearest, ...rest] = chain;
-  if (nearest === undefined) {
-    // Unreachable by the argument above, and checked rather than asserted: the
-    // alternative is a cast, which would let a future edit to the walk hand
-    // every caller an undefined "nearest link" with the types still green.
-    throw new Error(
-      `guard-fixture: the \`node_modules\` chain for ${root} came back empty, which the walk cannot produce — it ends at the filesystem root, whose basename is never \`node_modules\`. Something changed the walk; the callers below all read its first entry as the nearest link.`,
-    );
-  }
-  return [nearest, ...rest];
+  return [...below, path.join(dir, "node_modules")];
 }
 
 /**
@@ -477,8 +482,13 @@ function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
     obstructed,
     nearest,
   });
-  for (const dir of chain) {
-    const link = dir === nearestPath ? nearest.link : probeChainLink(dir);
+  for (const [index, dir] of chain.entries()) {
+    // The index, not `dir === nearestPath`: reusing the probe on a string match
+    // is right only while no link appears in the chain twice, which is true, is
+    // stated nowhere, and is exactly the property a normalisation or de-dup pass
+    // would be added to guarantee. "The first iteration is the nearest one" is
+    // what is meant and it cannot come apart.
+    const link = index === 0 ? nearest.link : probeChainLink(dir);
     if (link.unreadable) {
       // The entry inside it is reached THROUGH this path, so it cannot answer
       // anything the directory could not; probing it would only repeat the
