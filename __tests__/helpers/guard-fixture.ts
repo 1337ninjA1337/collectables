@@ -353,6 +353,59 @@ function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
 }
 
 /**
+ * The nearest chain link when it is there, readable, and holds nothing.
+ *
+ * The most common real version of "the install is not where you think": an
+ * interrupted `npm ci`, a pruned store, a cleaned cache all leave the directory
+ * behind with nothing in it. The walk above cannot see this — it asks only
+ * whether `tsx` is under each link, and an empty directory answers that with
+ * the same silence as a healthy one that simply lost a single package.
+ *
+ * The nearest link only. An ancestor's empty `node_modules` is somebody else's
+ * project and says nothing about this checkout, and reporting one per ancestor
+ * would bury the finding under the noise the classification already refuses to
+ * make.
+ *
+ * `readdirSync` failing is not this function's finding: the link is then
+ * unreadable, which has its own sentence and its own list, and answering here
+ * as well would name the same path twice with two different explanations.
+ */
+function nearestEmptyLink(root: string): string | null {
+  const [nearest] = nodeModulesChain(root);
+  if (nearest === undefined) return null;
+  const link = probeChainLink(nearest);
+  if (link.real === null) return null;
+  try {
+    if (fs.readdirSync(link.real).length > 0) return null;
+  } catch {
+    return null;
+  }
+  return nearest;
+}
+
+/**
+ * The clause saying the nearest `node_modules` is there and holds nothing.
+ *
+ * Its own sentence rather than a row in {@link OBSTRUCTION_PHRASE}, because the
+ * two findings end in opposite advice: something standing in a chain path has
+ * to be REMOVED before anything can be installed there, and an empty directory
+ * is the thing `npm ci` fills. Folding it into that table would produce "…
+ * nothing can be installed there until it is removed" about the one directory
+ * the reader must keep.
+ *
+ * Appended to the refusals whose finding is "this checkout has no install",
+ * and deliberately not to the unreadable-link one: that refusal's whole point
+ * is that the question could not be decided, and the nearest link is the one it
+ * could not read, so this probe has nothing to add there but a second sentence
+ * about the same path.
+ */
+function emptyLinkClause(root: string): string {
+  const empty = nearestEmptyLink(root);
+  if (empty === null) return "";
+  return ` Note also: ${empty} is there and is empty, so node had nothing to search in it and this refusal reads exactly like one for a checkout with no \`node_modules\` at all — an interrupted \`npm ci\`, a pruned store or a cleaned cache is what leaves that behind.`;
+}
+
+/**
  * The clause naming chain links something is standing in, or none at all.
  *
  * Appended to whichever refusal fires rather than replacing it: something in
@@ -413,7 +466,7 @@ export function tsxLoaderIn(root: string): string {
     // does not survive that.
     const reason = describeThrown(error);
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.${emptyLinkClause(root)}`,
     );
   }
   const provenance = resolvedFromCheckout(root, resolved);
@@ -432,7 +485,7 @@ export function tsxLoaderIn(root: string): string {
   if (!provenance.fromCheckout) {
     const chain = nodeModulesChain(root);
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${obstructionClause(provenance.obstructed)}`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${emptyLinkClause(root)}${obstructionClause(provenance.obstructed)}`,
     );
   }
   // The bare specifier, not the file the resolver answered with: node resolves

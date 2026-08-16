@@ -445,6 +445,92 @@ describe("the loader check", () => {
     });
   });
 
+  it("says the nearest `node_modules` is empty, instead of reading like an absent one", () => {
+    // The most common real version of "the install is not where you think" —
+    // an interrupted `npm ci`, a pruned store, a cleaned cache — and until now
+    // the one the walk could not see at all: it asks only whether `tsx` is
+    // under each link, so an empty directory answers with the same silence as
+    // a healthy one. Byte for byte, the refusal was the one for a checkout
+    // with no `node_modules` whatsoever, which sends the reader looking for a
+    // directory that is sitting right there in their listing.
+    inScratchCheckout((root) => {
+      const link = path.join(root, "node_modules");
+      fs.mkdirSync(link);
+      const message = refusalFor(root);
+      assert.ok(
+        message.includes(link),
+        `the diagnosis does not name the empty directory:\n${message}`,
+      );
+      assert.match(
+        message,
+        /is there and is empty/,
+        `an empty install directory is reported as a plainly absent one:\n${message}`,
+      );
+    });
+  });
+
+  it("carries the empty-directory finding into the global-folder refusal too", () => {
+    // The combination the case above cannot show: an empty local install plus
+    // a loadable `$NODE_PATH` resolves, so the refusal is the global-folder
+    // one — and that message's whole claim is "your own `node_modules` did not
+    // answer", which the reader is entitled to see a reason for.
+    inScratchCheckout((globals) => {
+      plantGlobalTsx(globals);
+      inScratchCheckout((root) => {
+        const link = path.join(root, "node_modules");
+        fs.mkdirSync(link);
+        const answer = resolveInChild(root, { NODE_PATH: globals });
+        assert.match(answer, /^REFUSED /, `an empty install satisfied the check:\n${answer}`);
+        assert.match(answer, /GLOBAL_FOLDERS/);
+        assert.ok(
+          answer.includes(`${link} is there and is empty`),
+          `the global-folder refusal drops the reason the checkout's own directory said nothing:\n${answer}`,
+        );
+      });
+    });
+  });
+
+  it("says nothing about emptiness when the nearest link holds something", () => {
+    // The negative that keeps the sentence worth reading, and the one a bare
+    // `existsSync`-shaped probe would get wrong: a `node_modules` with a
+    // half-written `tsx` in it is not empty, and telling its owner it is sends
+    // them to fix the wrong thing. `readdirSync` has to be asked, and its
+    // answer has to be used.
+    inScratchCheckout((root) => {
+      fs.mkdirSync(path.join(root, "node_modules", "tsx"), { recursive: true });
+      const message = refusalFor(root);
+      assert.doesNotMatch(
+        message,
+        /is empty/,
+        `a populated \`node_modules\` is reported as empty:\n${message}`,
+      );
+    });
+  });
+
+  it("says nothing about emptiness when there is no `node_modules` at all", () => {
+    // The other negative, and the finding's whole reason for existing: these
+    // two refusals used to be identical and now must differ. A probe that
+    // reported absence as emptiness would make them identical again, in the
+    // other direction.
+    inScratchCheckout((bare) => {
+      inScratchCheckout((empty) => {
+        fs.mkdirSync(path.join(empty, "node_modules"));
+        const absent = refusalFor(bare);
+        const hollow = refusalFor(empty);
+        assert.doesNotMatch(
+          absent,
+          /is empty/,
+          `a checkout with no \`node_modules\` is told its \`node_modules\` is empty:\n${absent}`,
+        );
+        assert.notEqual(
+          absent.split(bare).join("<root>"),
+          hollow.split(empty).join("<root>"),
+          "an absent `node_modules` and an empty one produce the same refusal, so the reader cannot tell which of the two they have",
+        );
+      });
+    });
+  });
+
   it("says nothing extra when nothing is standing in the chain, in any of the three refusals", () => {
     // The negative half of the two cases above, and the one that keeps them
     // worth reading: a clause that appears when nothing is wrong teaches the
