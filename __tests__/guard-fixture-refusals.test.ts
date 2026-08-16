@@ -59,6 +59,15 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const FLOOR_MODULE = "lib/scanned-floor.ts";
 
 /**
+ * The filesystem root, and the `node_modules` link every chain ends with.
+ *
+ * The one fixture in this file that needs no plant, used by three blocks below
+ * and spelled once here so the fourth does not invent a fourth spelling.
+ */
+const FS_ROOT = path.parse(path.resolve("/")).root;
+const FS_ROOT_LINK = path.join(FS_ROOT, "node_modules");
+
+/**
  * The opening sentence of a refusal — up to and including the first period
  * that ends a word rather than sitting inside a path or a filename.
  *
@@ -1117,9 +1126,6 @@ describe("nodeModulesChain", () => {
   // an empty-chain branch documented as "the root of a filesystem", and the
   // root of a filesystem is precisely the root that disproves it.
 
-  const FS_ROOT = path.parse(path.resolve("/")).root;
-  const rootLink = path.join(FS_ROOT, "node_modules");
-
   it("puts the checkout's own `node_modules` first", () => {
     assert.equal(nodeModulesChain("/a/b/c")[0], path.join("/a", "b", "c", "node_modules"));
   });
@@ -1127,7 +1133,7 @@ describe("nodeModulesChain", () => {
   it("climbs one directory at a time, ending at the filesystem root", () => {
     assert.deepEqual(
       [...nodeModulesChain("/a/b")],
-      [path.join("/a", "b", "node_modules"), path.join("/a", "node_modules"), rootLink],
+      [path.join("/a", "b", "node_modules"), path.join("/a", "node_modules"), FS_ROOT_LINK],
     );
   });
 
@@ -1148,12 +1154,12 @@ describe("nodeModulesChain", () => {
   });
 
   it("never comes back empty, so no caller needs a branch for a root without a nearest link", () => {
-    for (const root of [FS_ROOT, rootLink, "/a/b", REPO_ROOT, path.join(REPO_ROOT, "node_modules")]) {
+    for (const root of [FS_ROOT, FS_ROOT_LINK, "/a/b", REPO_ROOT, path.join(REPO_ROOT, "node_modules")]) {
       const chain = nodeModulesChain(root);
       assert.ok(chain.length >= 1, `${root} produced an empty chain`);
       assert.equal(
         chain[chain.length - 1],
-        rootLink,
+        FS_ROOT_LINK,
         `the chain for ${root} does not end at the filesystem root, which is what makes it non-empty`,
       );
     }
@@ -1180,12 +1186,12 @@ describe("nodeModulesChain", () => {
     // The whole argument in one row. `path.basename` of the filesystem root is
     // `""` — never `node_modules` — so the last iteration always pushes, and
     // `/` comes back with a chain of exactly one link rather than with nothing.
-    assert.deepEqual([...nodeModulesChain(FS_ROOT)], [rootLink]);
+    assert.deepEqual([...nodeModulesChain(FS_ROOT)], [FS_ROOT_LINK]);
   });
 
   it("skips a directory that is itself a `node_modules`, the way node does", () => {
     const chain = nodeModulesChain(path.join("/a", "node_modules"));
-    assert.deepEqual([...chain], [path.join("/a", "node_modules"), rootLink]);
+    assert.deepEqual([...chain], [path.join("/a", "node_modules"), FS_ROOT_LINK]);
     assert.ok(
       !chain.includes(path.join("/a", "node_modules", "node_modules")),
       `the chain searches inside a \`node_modules\`, which node never does: ${chain.join(", ")}`,
@@ -1195,6 +1201,17 @@ describe("nodeModulesChain", () => {
   it("resolves a relative root before walking it", () => {
     assert.deepEqual([...nodeModulesChain(".")], [...nodeModulesChain(path.resolve("."))]);
   });
+
+  it("rests on a filesystem root whose basename is never `node_modules`", () => {
+    // The premise, pinned rather than restated: it is what makes the chain
+    // non-empty (the root's link is appended unconditionally) AND what makes
+    // `nearestChainLink`'s climb terminate. Both read as assertions about node's
+    // resolution and are really assertions about `path`, so the platform is
+    // where they should fail if they ever do.
+    assert.equal(path.basename(FS_ROOT), "");
+    assert.notEqual(path.basename(FS_ROOT), "node_modules");
+    assert.equal(path.dirname(FS_ROOT), FS_ROOT, "the walk up would not terminate");
+  });
 });
 
 describe("nearestChainLink", () => {
@@ -1202,16 +1219,34 @@ describe("nearestChainLink", () => {
   // is the nearest one. Two of them read the walk's own answer now; this is the
   // reader for the refusal that has no walk behind it.
 
-  const FS_ROOT = path.parse(path.resolve("/")).root;
-
   it("is the chain's first entry, for every shape of root the walk has", () => {
-    for (const root of ["/a/b/c", path.join("/a", "node_modules"), FS_ROOT, REPO_ROOT]) {
+    // Worth running only because the two sides are derived differently. While
+    // this was `return nodeModulesChain(root)[0]` the comparison was the same
+    // expression twice, and the rule it names had exactly as much defence as
+    // the doc comment it replaced.
+    for (const root of ["/a/b/c", path.join("/a", "node_modules"), FS_ROOT, REPO_ROOT, "."]) {
       assert.equal(nearestChainLink(root), nodeModulesChain(root)[0], root);
     }
   });
 
+  it("climbs out of a root that is itself a `node_modules`, however deep", () => {
+    // The one case where the nearest link is not the root's own: node never
+    // searches inside a `node_modules`, so `/a/node_modules` is nearest to
+    // itself rather than to a `node_modules` one level further down.
+    assert.equal(nearestChainLink(path.join("/a", "node_modules")), path.join("/a", "node_modules"));
+    assert.equal(
+      nearestChainLink(path.join("/a", "node_modules", "node_modules")),
+      path.join("/a", "node_modules"),
+    );
+  });
+
   it("answers for the filesystem root rather than declining to", () => {
-    assert.equal(nearestChainLink(FS_ROOT), path.join(FS_ROOT, "node_modules"));
+    assert.equal(nearestChainLink(FS_ROOT), FS_ROOT_LINK);
+    assert.equal(nearestChainLink(FS_ROOT_LINK), FS_ROOT_LINK);
+  });
+
+  it("resolves a relative root, so it answers about a checkout and not about a string", () => {
+    assert.equal(nearestChainLink("."), path.join(path.resolve("."), "node_modules"));
   });
 });
 

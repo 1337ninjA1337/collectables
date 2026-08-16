@@ -144,11 +144,31 @@ export function nodeModulesChain(root: string): ChainLinks {
  * ChainProvenance.nearest}); this is for the one caller that has no walk behind
  * it.
  *
+ * Derived rather than read off the chain, which is the point. `return
+ * nodeModulesChain(root)[0]` makes the case that checks the two against each
+ * other a tautology — the same expression twice — so the rule this function
+ * names would have had exactly as much defence as the doc comment it replaced.
+ * Two statements that can disagree are what makes the comparison worth running:
+ * a change to the chain walk that moved the nearest link now fails here rather
+ * than silently redefining what "nearest" means for both readers at once.
+ *
+ * The climb is the one thing it shares with the walk: a root that IS a
+ * `node_modules` has no link of its own, because node never searches inside one
+ * — so `/a/node_modules` is nearest to `/a/node_modules`, not to
+ * `/a/node_modules/node_modules`. It terminates on the same premise the chain's
+ * non-emptiness rests on, that the filesystem root's basename is `""` and never
+ * `node_modules`, which is why that premise is pinned by a case of its own
+ * rather than left as a sentence in two places.
+ *
  * Returns a string rather than a maybe — see {@link nodeModulesChain} for why
  * there is always one.
  */
 export function nearestChainLink(root: string): string {
-  return nodeModulesChain(root)[0];
+  let dir = path.resolve(root);
+  while (path.basename(dir) === "node_modules") {
+    dir = path.dirname(dir);
+  }
+  return path.join(dir, "node_modules");
 }
 
 /** Whether `child` is inside `parent` — not equal to it, and not a sibling. */
