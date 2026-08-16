@@ -41,10 +41,13 @@ import {
   looksLikePackageEntry,
   makePartialRoot,
   makeSharedPatchedRepo,
+  nearestChainLink,
+  nodeModulesChain,
   OBSTRUCTION_PHRASE,
   obstructionClause,
   PATCHED_REPO_MARKER,
   probeAbsentLink,
+  probeNearestLink,
   probeResolvedLink,
   SYSCALL_IMPLICATION,
   tsxLoaderIn,
@@ -1038,11 +1041,10 @@ describe("the clause builders", () => {
     });
     type ChainLink = { real: string | null; unreadable: null; obstruction: null };
 
-    it("says nothing when the walk found no chain at all", () => {
-      // The filesystem root has no chain, and a message about a link that does
-      // not exist is worse than no message.
-      assert.equal(emptyLinkFrom(null), null);
-    });
+    // There is no "the walk found no chain at all" row any more, and the one
+    // that used to be here is why: it read as coverage of the filesystem root
+    // and the filesystem root has a chain (`["/node_modules"]`), so it asserted
+    // a state no root can be in. `nodeModulesChain` below pins the reason.
 
     it("says nothing when the walk could not resolve the nearest link", () => {
       // An absent, occupied or unreadable link is somebody else's finding, each
@@ -1059,7 +1061,7 @@ describe("the clause builders", () => {
       const real = "/elsewhere/store/node_modules";
       const seen: string[] = [];
       const finding = emptyLinkFrom({ path: LINK, link: { real, unreadable: null, obstruction: null } }, (dir) => {
-        seen.push(dir);
+        seen.push(String(dir));
         return [];
       });
       assert.deepEqual(seen, [real], "the probe read a path other than the one the walk resolved");
@@ -1097,6 +1099,155 @@ describe("the clause builders", () => {
       assert.doesNotMatch(listed, /\n/, `the list spans lines and the message is a paragraph: ${listed}`);
       assert.ok(listed.includes("ELOOP on realpath"), listed);
       assert.ok(listed.includes("EACCES on lstat"), listed);
+    });
+  });
+});
+
+describe("nodeModulesChain", () => {
+  // The two properties three readers depend on, neither of which anything
+  // checked. "The first entry is the NEAREST link" was a sentence in a doc
+  // comment, and it was where `nearest ??= …` in the walk, `chain[0]` in the
+  // global-folder refusal and `probeNearestLink` all got their correctness
+  // from — a reordering here (sorting, de-duplicating, dropping roots) would
+  // have made all three wrong at once with every assertion still green,
+  // because the fixtures that reach them have one-link chains.
+  //
+  // "There is always a first entry" is the other, and it was not merely
+  // unchecked but WRONG in the direction that mattered: three functions carried
+  // an empty-chain branch documented as "the root of a filesystem", and the
+  // root of a filesystem is precisely the root that disproves it.
+
+  const FS_ROOT = path.parse(path.resolve("/")).root;
+  const rootLink = path.join(FS_ROOT, "node_modules");
+
+  it("puts the checkout's own `node_modules` first", () => {
+    assert.equal(nodeModulesChain("/a/b/c")[0], path.join("/a", "b", "c", "node_modules"));
+  });
+
+  it("climbs one directory at a time, ending at the filesystem root", () => {
+    assert.deepEqual(
+      [...nodeModulesChain("/a/b")],
+      [path.join("/a", "b", "node_modules"), path.join("/a", "node_modules"), rootLink],
+    );
+  });
+
+  it("orders every chain nearest first, which is what its first entry being the nearest means", () => {
+    // The property in the form the readers actually depend on: each link's
+    // directory strictly CONTAINS the next one's. A sort by name, a reverse or
+    // a de-duplication that lost the order would fail here rather than in five
+    // suites' worth of refusal text a year later.
+    const chain = nodeModulesChain("/a/b/c/d");
+    for (let i = 1; i < chain.length; i += 1) {
+      const closer = path.dirname(chain[i - 1]);
+      const further = path.dirname(chain[i]);
+      assert.ok(
+        closer.startsWith(further) && further.length < closer.length,
+        `${chain[i]} is not an ancestor of ${chain[i - 1]}: the chain is not nearest-first`,
+      );
+    }
+  });
+
+  it("never comes back empty, so no caller needs a branch for a root without a nearest link", () => {
+    for (const root of [FS_ROOT, rootLink, "/a/b", REPO_ROOT, path.join(REPO_ROOT, "node_modules")]) {
+      const chain = nodeModulesChain(root);
+      assert.ok(chain.length >= 1, `${root} produced an empty chain`);
+      assert.equal(
+        chain[chain.length - 1],
+        rootLink,
+        `the chain for ${root} does not end at the filesystem root, which is what makes it non-empty`,
+      );
+    }
+  });
+
+  it("gives the filesystem root the chain the deleted branch said it had none of", () => {
+    // The whole argument in one row. `path.basename` of the filesystem root is
+    // `""` — never `node_modules` — so the last iteration always pushes, and
+    // `/` comes back with a chain of exactly one link rather than with nothing.
+    assert.deepEqual([...nodeModulesChain(FS_ROOT)], [rootLink]);
+  });
+
+  it("skips a directory that is itself a `node_modules`, the way node does", () => {
+    const chain = nodeModulesChain(path.join("/a", "node_modules"));
+    assert.deepEqual([...chain], [path.join("/a", "node_modules"), rootLink]);
+    assert.ok(
+      !chain.includes(path.join("/a", "node_modules", "node_modules")),
+      `the chain searches inside a \`node_modules\`, which node never does: ${chain.join(", ")}`,
+    );
+  });
+
+  it("resolves a relative root before walking it", () => {
+    assert.deepEqual([...nodeModulesChain(".")], [...nodeModulesChain(path.resolve("."))]);
+  });
+});
+
+describe("nearestChainLink", () => {
+  // The name three call sites used to spell `chain[0]` without saying why that
+  // is the nearest one. Two of them read the walk's own answer now; this is the
+  // reader for the refusal that has no walk behind it.
+
+  const FS_ROOT = path.parse(path.resolve("/")).root;
+
+  it("is the chain's first entry, for every shape of root the walk has", () => {
+    for (const root of ["/a/b/c", path.join("/a", "node_modules"), FS_ROOT, REPO_ROOT]) {
+      assert.equal(nearestChainLink(root), nodeModulesChain(root)[0], root);
+    }
+  });
+
+  it("answers for the filesystem root rather than declining to", () => {
+    assert.equal(nearestChainLink(FS_ROOT), path.join(FS_ROOT, "node_modules"));
+  });
+});
+
+describe("probeNearestLink", () => {
+  // The fresh probe, for the ONE refusal with no walk behind it: when
+  // `require.resolve` itself throws there is no provenance to carry a probe out
+  // of. Its claim has two halves — the path named is the nearest link, and what
+  // is reported is a probe of THAT path — and until it was exported both were
+  // reachable only by arranging a checkout the resolver refuses.
+
+  const inScratch = (body: (root: string) => void): void => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "nearest-chain-link-"));
+    try {
+      body(root);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  };
+
+  it("names the nearest link and reports what is really there", () => {
+    inScratch((root) => {
+      const link = path.join(root, "node_modules");
+      fs.mkdirSync(link);
+      const probed = probeNearestLink(root);
+      assert.equal(probed.path, link, "the probe named a link other than the nearest one");
+      assert.equal(probed.link.real, fs.realpathSync(link));
+      assert.equal(probed.link.unreadable, null);
+      assert.equal(probed.link.obstruction, null);
+    });
+  });
+
+  it("carries the probe of a link that is not there rather than declining to answer", () => {
+    // The absent-install refusal's own case: nothing is planted, so the nearest
+    // link has no realpath, and the clause has to stay silent about it — which
+    // is now the `real === null` line rather than the null the caller used to
+    // be able to pass.
+    inScratch((root) => {
+      const probed = probeNearestLink(root);
+      assert.equal(probed.path, path.join(root, "node_modules"));
+      assert.equal(probed.link.real, null);
+      assert.equal(emptyLinkFrom(probed), null);
+    });
+  });
+
+  it("feeds the finding the absent-install refusal is built on", () => {
+    // The two halves joined, without the spawn: an empty `node_modules` in the
+    // checkout, probed fresh, is the finding the clause renders. A swap between
+    // this probe and the walk's answer at either throw site changes which link
+    // is reported, and this is the end that has no walk to compare against.
+    inScratch((root) => {
+      const link = path.join(root, "node_modules");
+      fs.mkdirSync(link);
+      assert.deepEqual(emptyLinkFrom(probeNearestLink(root)), { path: link, kind: "empty" });
     });
   });
 });

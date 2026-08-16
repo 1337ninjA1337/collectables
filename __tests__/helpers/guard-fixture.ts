@@ -69,6 +69,18 @@ const TSX_SPECIFIER = "tsx";
 const resolver = createRequire(__filename);
 
 /**
+ * A chain, typed as what it always is: at least one link, nearest first.
+ *
+ * The tuple is the whole point. Three call sites read the first entry as "the
+ * nearest link" and each was a bare `chain[0]` whose correctness came from a
+ * sentence in {@link nodeModulesChain}'s doc comment — a reordering there
+ * (sorting, de-duplicating, dropping roots) would have made all three wrong
+ * with nothing to catch it. Saying it in the type puts the claim where the
+ * readers are.
+ */
+export type ChainLinks = readonly [string, ...string[]];
+
+/**
  * The `node_modules` directories node searches for a bare specifier from
  * `root`, nearest first.
  *
@@ -81,8 +93,21 @@ const resolver = createRequire(__filename);
  *
  * Directories already inside a `node_modules` are skipped, the same way node
  * skips them.
+ *
+ * There is ALWAYS at least one link, which is why the return type says so and
+ * why three functions here stopped carrying an "empty chain" branch. The walk
+ * climbs until `dirname` stops moving, and that last directory is the
+ * filesystem root, whose `basename` is `""` on every platform node runs on —
+ * never `node_modules` — so its own link is pushed by every chain, including
+ * the chain of a root that IS a `node_modules` and the chain of `/` itself.
+ * The branch those functions carried was documented as "the root of a
+ * filesystem", which is exactly the root that disproves it: `/` has a chain,
+ * and it is `["/node_modules"]`.
+ *
+ * Exported so the two properties the readers depend on — nearest first, never
+ * empty — are pinned by cases rather than by a doc comment nothing checks.
  */
-function nodeModulesChain(root: string): string[] {
+export function nodeModulesChain(root: string): ChainLinks {
   const chain: string[] = [];
   let dir = path.resolve(root);
   for (;;) {
@@ -90,9 +115,35 @@ function nodeModulesChain(root: string): string[] {
       chain.push(path.join(dir, "node_modules"));
     }
     const parent = path.dirname(dir);
-    if (parent === dir) return chain;
+    if (parent === dir) break;
     dir = parent;
   }
+  const [nearest, ...rest] = chain;
+  if (nearest === undefined) {
+    // Unreachable by the argument above, and checked rather than asserted: the
+    // alternative is a cast, which would let a future edit to the walk hand
+    // every caller an undefined "nearest link" with the types still green.
+    throw new Error(
+      `guard-fixture: the \`node_modules\` chain for ${root} came back empty, which the walk cannot produce — it ends at the filesystem root, whose basename is never \`node_modules\`. Something changed the walk; the callers below all read its first entry as the nearest link.`,
+    );
+  }
+  return [nearest, ...rest];
+}
+
+/**
+ * The nearest `node_modules` node would search from `root`.
+ *
+ * The chain's first entry, said once and in a name, because three places used
+ * to spell it `chain[0]` and none of them said why that is the nearest. Two of
+ * them have since been given the walk's own answer instead ({@link
+ * ChainProvenance.nearest}); this is for the one caller that has no walk behind
+ * it.
+ *
+ * Returns a string rather than a maybe — see {@link nodeModulesChain} for why
+ * there is always one.
+ */
+export function nearestChainLink(root: string): string {
+  return nodeModulesChain(root)[0];
 }
 
 /** Whether `child` is inside `parent` — not equal to it, and not a sibling. */
@@ -399,9 +450,11 @@ type ChainProvenance = {
    * no longer held when the decision was made, which is the one thing a
    * diagnosis must not do.
    *
-   * Null when the chain is empty, which the root of a filesystem is.
+   * Never null. It used to be, "when the chain is empty, which the root of a
+   * filesystem is" — and the root of a filesystem has a chain, so that branch
+   * was for a state no root can be in. See {@link nodeModulesChain}.
    */
-  nearest: ProbedLink | null;
+  nearest: ProbedLink;
 };
 
 /** A chain path and what probing it turned up. */
@@ -410,16 +463,22 @@ export type ProbedLink = { path: string; link: ChainLink };
 function resolvedFromCheckout(root: string, resolved: string): ChainProvenance {
   const unreadable: UnreadableLink[] = [];
   const obstructed: ChainObstruction[] = [];
-  let nearest: ProbedLink | null = null;
+  const chain = nodeModulesChain(root);
+  // The first entry, taken as the nearest because the chain's type says it is
+  // one — rather than the `nearest ??= …` this replaces, which was correct only
+  // because the loop happened to run nearest-first and said so nowhere. Probed
+  // here and reused below, so the link that decides is the link the message
+  // reports and neither costs a second syscall.
+  const [nearestPath] = chain;
+  const nearest: ProbedLink = { path: nearestPath, link: probeChainLink(nearestPath) };
   const answer = (fromCheckout: boolean): ChainProvenance => ({
     fromCheckout,
     unreadable,
     obstructed,
     nearest,
   });
-  for (const dir of nodeModulesChain(root)) {
-    const link = probeChainLink(dir);
-    nearest ??= { path: dir, link };
+  for (const dir of chain) {
+    const link = dir === nearestPath ? nearest.link : probeChainLink(dir);
     if (link.unreadable) {
       // The entry inside it is reached THROUGH this path, so it cannot answer
       // anything the directory could not; probing it would only repeat the
@@ -559,16 +618,27 @@ export function looksLikePackageEntry(entry: string): boolean {
  * Takes the link the WALK probed rather than a root to probe again. The clause
  * used to re-run `probeChainLink` on the same path one syscall after the walk
  * had, with no memory of the answer, so a refusal could describe a state that
- * no longer held when the decision was made. `readdir` is injectable for the
- * same reason the other syscalls are: the failure branch above is a real
- * decision — it declines to speak for a link somebody else's finding owns —
- * and as root in a CI container there is no way to arrange it for real.
+ * no longer held when the decision was made.
+ *
+ * A `ProbedLink` and not a `ProbedLink | null`: there is no root without a
+ * nearest link (see {@link nodeModulesChain}), so the null a caller could pass
+ * was a state nothing could be in, and the case that covered it read as
+ * coverage of the filesystem root while asserting something the filesystem root
+ * does not do. "There is a link and it answered nothing" is still here, and it
+ * is the `real === null` line below.
+ *
+ * `readdir` is injectable for the same reason the other syscalls are: the
+ * failure branch above is a real decision — it declines to speak for a link
+ * somebody else's finding owns — and as root in a CI container there is no way
+ * to arrange it for real. Typed as the no-options overload it actually calls,
+ * `fs.PathLike` included, so a row that stands in for the real syscall is
+ * refused by the compiler in exactly the cases the real one would refuse.
  */
 export function emptyLinkFrom(
-  nearest: ProbedLink | null,
-  readdir: (path: string) => string[] = fs.readdirSync,
+  nearest: ProbedLink,
+  readdir: (path: fs.PathLike) => string[] = fs.readdirSync,
 ): EmptyLink | null {
-  if (nearest === null || nearest.link.real === null) return null;
+  if (nearest.link.real === null) return null;
   let entries: string[];
   try {
     entries = readdir(nearest.link.real);
@@ -587,10 +657,14 @@ export function emptyLinkFrom(
  * throws there is no provenance to carry the probe out of, so the message has
  * to ask. Every other caller passes the walk's own answer to
  * {@link emptyLinkFrom} instead.
+ *
+ * Exported because it is now the only reader of {@link nearestChainLink} and
+ * the one place the two halves of the absent-install clause are joined; its
+ * claim — the link named is the nearest one and the probe is of THAT path — was
+ * previously reachable only by arranging a checkout `require.resolve` refuses.
  */
-function probeNearestLink(root: string): ProbedLink | null {
-  const [nearest] = nodeModulesChain(root);
-  if (nearest === undefined) return null;
+export function probeNearestLink(root: string): ProbedLink {
+  const nearest = nearestChainLink(root);
   return { path: nearest, link: probeChainLink(nearest) };
 }
 
@@ -732,9 +806,13 @@ export function tsxLoaderIn(root: string): string {
     );
   }
   if (!provenance.fromCheckout) {
-    const chain = nodeModulesChain(root);
+    // The walk's own nearest link, not a second `nodeModulesChain(root)[0]`
+    // beside it: the same path arrived at twice is how the two halves of one
+    // sentence come to disagree, and the clause at the end of this message
+    // already reports on THIS link. Naming a different one in the opening would
+    // be the sharpest version of that.
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${emptyLinkClause(emptyLinkFrom(provenance.nearest), "global-folder")}${obstructionClause(provenance.obstructed)}`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${provenance.nearest.path}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${emptyLinkClause(emptyLinkFrom(provenance.nearest), "global-folder")}${obstructionClause(provenance.obstructed)}`,
     );
   }
   // The bare specifier, not the file the resolver answered with: node resolves
