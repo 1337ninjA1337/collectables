@@ -69,6 +69,14 @@ const TSX_SPECIFIER = "tsx";
 const resolver = createRequire(__filename);
 
 /**
+ * A `path` namespace — `path` itself, or `path.win32` / `path.posix`.
+ *
+ * Spelled as the type of one of them rather than as `path.PlatformPath`, which
+ * this repository's `@types/node` does not export under a namespace import.
+ */
+type PathNamespace = typeof path.posix;
+
+/**
  * A chain, typed as what it always is: some links, then the filesystem root's.
  *
  * The tuple is the whole point. Three call sites read the first entry as "the
@@ -90,6 +98,27 @@ const resolver = createRequire(__filename);
 export type ChainLinks = readonly [...string[], string];
 
 /**
+ * Whether node would refuse to search from inside this directory.
+ *
+ * One home for the test both readers of the chain make. {@link
+ * nodeModulesChain} skips such a directory and {@link nearestChainLink} climbs
+ * out of it, which is the same rule serving two derivations that are compared
+ * against each other — and while each spelled it `path.basename(dir) ===
+ * "node_modules"` for itself, the comparison looked like it checked the rule
+ * and could only ever check that the two copies had not drifted apart. They
+ * cannot drift now, and what the comparison is left checking is the part worth
+ * checking: that a climb and a skip agree about where the nearest link is.
+ *
+ * The shared assumption stays shared, which is the honest outcome — a directory
+ * genuinely NAMED `node_modules` that is not one is invisible to both, and
+ * nothing in this file can tell the difference. Naming it at least gives that
+ * assumption one place to be found.
+ */
+export function isNodeModulesDir(dir: string, p: PathNamespace = path): boolean {
+  return p.basename(dir) === "node_modules";
+}
+
+/**
  * The `node_modules` directories node searches for a bare specifier from
  * `root`, nearest first.
  *
@@ -105,34 +134,46 @@ export type ChainLinks = readonly [...string[], string];
  *
  * There is ALWAYS at least one link, which is why the return type says so and
  * why three functions here stopped carrying an "empty chain" branch. The walk
- * climbs until `dirname` stops moving, and that last directory is the
- * filesystem root, whose `basename` is `""` on every platform node runs on —
- * never `node_modules` — so its own link is pushed by every chain, including
- * the chain of a root that IS a `node_modules` and the chain of `/` itself.
+ * climbs until `dirname` stops moving, and that last directory — the filesystem
+ * root — has its link appended UNCONDITIONALLY, outside the loop and without
+ * consulting {@link isNodeModulesDir}. That is what makes the guarantee
+ * structural, and it is why this half survived a discovery the climb in
+ * {@link nearestChainLink} did not: the premise both were written on, that a
+ * filesystem root's basename is `""` and so never `node_modules`, is false for
+ * a Windows UNC root, where it is the share name. A chain rooted at
+ * `\\server\node_modules\` is still one link long; a climb written to stop at
+ * the first non-`node_modules` directory was still climbing.
  * The branch those functions carried was documented as "the root of a
  * filesystem", which is exactly the root that disproves it: `/` has a chain,
  * and it is `["/node_modules"]`.
  *
  * Exported so the two properties the readers depend on — nearest first, never
  * empty — are pinned by cases rather than by a doc comment nothing checks.
+ *
+ * `p` is the path namespace, defaulted, and it is a seam of exactly the kind
+ * the syscalls here have: the claims both this and {@link nearestChainLink}
+ * make are about "every platform node runs on", and a suite that runs on one of
+ * them can otherwise only assert the platform it booted with. `path.win32` and
+ * `path.posix` need no filesystem and no spawn, so the roots that disprove a
+ * premise — a UNC share among them — are rows.
  */
-export function nodeModulesChain(root: string): ChainLinks {
+export function nodeModulesChain(root: string, p: PathNamespace = path): ChainLinks {
   // Everything BELOW the filesystem root, nearest first. The loop stops one
   // directory short deliberately: the root's own link is the one the argument
   // above guarantees, so it is appended outside the loop where the guarantee
   // can be read, rather than pushed by an iteration and then re-established
   // afterwards by a check no caller can reach.
   const below: string[] = [];
-  let dir = path.resolve(root);
+  let dir = p.resolve(root);
   for (;;) {
-    const parent = path.dirname(dir);
+    const parent = p.dirname(dir);
     if (parent === dir) break;
-    if (path.basename(dir) !== "node_modules") {
-      below.push(path.join(dir, "node_modules"));
+    if (!isNodeModulesDir(dir, p)) {
+      below.push(p.join(dir, "node_modules"));
     }
     dir = parent;
   }
-  return [...below, path.join(dir, "node_modules")];
+  return [...below, p.join(dir, "node_modules")];
 }
 
 /**
@@ -155,20 +196,32 @@ export function nodeModulesChain(root: string): ChainLinks {
  * The climb is the one thing it shares with the walk: a root that IS a
  * `node_modules` has no link of its own, because node never searches inside one
  * — so `/a/node_modules` is nearest to `/a/node_modules`, not to
- * `/a/node_modules/node_modules`. It terminates on the same premise the chain's
- * non-emptiness rests on, that the filesystem root's basename is `""` and never
- * `node_modules`, which is why that premise is pinned by a case of its own
- * rather than left as a sentence in two places.
+ * `/a/node_modules/node_modules`.
+ *
+ * It stops climbing at the FIXED POINT of `dirname` and not at a directory that
+ * fails {@link isNodeModulesDir}, which reads like belt and braces and is the
+ * difference between terminating and not. The premise this was written on — the
+ * filesystem root's basename is `""`, so the loop always finds a non-`node_modules`
+ * directory to stop at — holds for POSIX roots and for Windows drive roots and
+ * is FALSE for a Windows UNC root: `path.win32.basename("\\\\server\\share\\")`
+ * is `"share"`, and a share named `node_modules` is a legal share. `dirname` of
+ * that root is the root, so the climb had nowhere to go and went there forever.
+ * The fixed point is what "there is nothing above this" actually means, on
+ * every platform, and it is the same test the chain walk stops on — which is
+ * why the two still agree about such a root, both answering with a link under
+ * it rather than one of them hanging.
  *
  * Returns a string rather than a maybe — see {@link nodeModulesChain} for why
  * there is always one.
  */
-export function nearestChainLink(root: string): string {
-  let dir = path.resolve(root);
-  while (path.basename(dir) === "node_modules") {
-    dir = path.dirname(dir);
+export function nearestChainLink(root: string, p: PathNamespace = path): string {
+  let dir = p.resolve(root);
+  while (isNodeModulesDir(dir, p)) {
+    const parent = p.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
-  return path.join(dir, "node_modules");
+  return p.join(dir, "node_modules");
 }
 
 /** Whether `child` is inside `parent` — not equal to it, and not a sibling. */

@@ -38,6 +38,7 @@ import {
   emptyLinkClause,
   emptyLinkFrom,
   entryPatch,
+  isNodeModulesDir,
   looksLikePackageEntry,
   makePartialRoot,
   makeSharedPatchedRepo,
@@ -1202,15 +1203,78 @@ describe("nodeModulesChain", () => {
     assert.deepEqual([...nodeModulesChain(".")], [...nodeModulesChain(path.resolve("."))]);
   });
 
-  it("rests on a filesystem root whose basename is never `node_modules`", () => {
-    // The premise, pinned rather than restated: it is what makes the chain
-    // non-empty (the root's link is appended unconditionally) AND what makes
-    // `nearestChainLink`'s climb terminate. Both read as assertions about node's
-    // resolution and are really assertions about `path`, so the platform is
-    // where they should fail if they ever do.
-    assert.equal(path.basename(FS_ROOT), "");
-    assert.notEqual(path.basename(FS_ROOT), "node_modules");
-    assert.equal(path.dirname(FS_ROOT), FS_ROOT, "the walk up would not terminate");
+  it("ends at a root that is its own parent, on every platform node runs on", () => {
+    // The premise the walk actually stops on, asserted against both `path`
+    // namespaces rather than against whichever one the runner booted with. It
+    // is the only one of the two that holds everywhere — see the row below for
+    // the one that does not — and it is what makes `parent === dir` a
+    // termination test rather than a hopeful one.
+    const roots: [string, string][] = [
+      ["posix", "/"],
+      ["win32", "C:\\"],
+      ["win32", "\\\\server\\share\\"],
+      ["win32", "\\"],
+    ];
+    for (const [namespace, root] of roots) {
+      const p = namespace === "posix" ? path.posix : path.win32;
+      assert.equal(p.dirname(root), root, `${namespace} ${root} has a parent above the root`);
+    }
+  });
+
+  it("does not rest on the root's basename, which a UNC share disproves", () => {
+    // The premise both functions were WRITTEN on — "a filesystem root's
+    // basename is `\"\"`, so it is never `node_modules`" — pinned where it holds
+    // and pinned where it fails, because a sentence in a doc comment claiming
+    // "every platform node runs on" was true of the two roots anyone tests on
+    // and false of the third. `nodeModulesChain` survives it by appending the
+    // root's link unconditionally; the climb in `nearestChainLink` did not, and
+    // stops at the fixed point now instead.
+    assert.equal(path.posix.basename("/"), "");
+    assert.equal(path.win32.basename("C:\\"), "");
+    assert.equal(
+      path.win32.basename("\\\\server\\share\\"),
+      "share",
+      "a UNC root's basename is the share name, which is what makes a share named `node_modules` legal",
+    );
+  });
+
+  it("stays one link long for a root the disproved premise would have hung on", () => {
+    // The chain half of the same finding: the root's link is appended outside
+    // the loop, so a root whose own basename IS `node_modules` still gets a
+    // chain rather than an empty list. This is as close as a POSIX runner can
+    // get to the UNC share that disproved the premise — there the same shape is
+    // a filesystem ROOT, and only the unconditional append saves it.
+    assert.deepEqual([...nodeModulesChain(FS_ROOT_LINK)], [FS_ROOT_LINK]);
+  });
+});
+
+describe("isNodeModulesDir", () => {
+  // The rule the chain's two derivations share. While each spelled it for
+  // itself, the case comparing them looked like it checked the rule and could
+  // only ever check that the two copies had not drifted; with one home, the
+  // comparison is left checking the part worth checking — that a climb and a
+  // skip agree about where the nearest link is.
+
+  it("is about the last segment, not about being anywhere inside one", () => {
+    assert.equal(isNodeModulesDir(path.join("/a", "node_modules")), true);
+    assert.equal(isNodeModulesDir(path.join("/a", "node_modules", "tsx")), false);
+    assert.equal(isNodeModulesDir(path.join("/a", "b")), false);
+  });
+
+  it("does not match a name that merely contains it", () => {
+    // The two derivations are compared against each other and would agree just
+    // as happily on a widened rule, so the line is pinned here instead.
+    assert.equal(isNodeModulesDir(path.join("/a", "my-node_modules")), false);
+    assert.equal(isNodeModulesDir(path.join("/a", "node_modules-old")), false);
+  });
+
+  it("says nothing about a filesystem root, which is the assumption that bit", () => {
+    // `false` here is what a POSIX root gives and what a Windows UNC root
+    // named `node_modules` would not, and neither reader may lean on it: the
+    // chain appends the root's link unconditionally, and the climb stops at the
+    // fixed point of `dirname`.
+    assert.equal(isNodeModulesDir(FS_ROOT), false);
+    assert.equal(isNodeModulesDir(FS_ROOT_LINK), true);
   });
 });
 
@@ -1243,6 +1307,67 @@ describe("nearestChainLink", () => {
   it("answers for the filesystem root rather than declining to", () => {
     assert.equal(nearestChainLink(FS_ROOT), FS_ROOT_LINK);
     assert.equal(nearestChainLink(FS_ROOT_LINK), FS_ROOT_LINK);
+  });
+
+  it("has a hazard to terminate on: a root that is a `node_modules` and its own parent", () => {
+    // The premise this was written on — a filesystem root's basename is `""`,
+    // so a climb that tests only the name always finds somewhere to stop — is
+    // false here: `\\server\node_modules\` is a legal UNC share, its basename is
+    // `node_modules`, and its `dirname` is itself. Pinned separately from the
+    // answer below because it is the part that says WHY the fixed-point test is
+    // load-bearing rather than belt and braces.
+    const UNC = "\\\\server\\node_modules\\";
+    assert.equal(path.win32.dirname(UNC), UNC, "the fixture is not a fixed point of dirname");
+    assert.equal(isNodeModulesDir(UNC, path.win32), true);
+  });
+
+  it("terminates on that root, which the climb this replaced did not", () => {
+    // In a CHILD, with a timeout, because the failure mode is a hang and not a
+    // wrong answer: the loop is synchronous, so `node:test`'s own per-case
+    // timeout never gets a turn and a regression takes the whole run down
+    // instead of reddening one row. That is the same reasoning the loader spawn
+    // above is built on — a timeout that cannot fire is decoration.
+    const UNC = "\\\\server\\node_modules\\";
+    const script = [
+      'const path = require("node:path");',
+      'const fixture = require("./__tests__/helpers/guard-fixture.ts");',
+      `const root = ${JSON.stringify(UNC)};`,
+      // Both derivations, in the one place that can survive either of them
+      // failing to return: the chain stops at the same fixed point, so their
+      // agreement about this root belongs here rather than in the in-process
+      // comparison below, which a regression would hang rather than redden.
+      "const answers = [fixture.nearestChainLink(root, path.win32), fixture.nodeModulesChain(root, path.win32)[0]];",
+      "process.stdout.write(JSON.stringify(answers));",
+    ].join("\n");
+    const run = spawnSync(process.execPath, ["--import", "tsx", "-e", script], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      timeout: 20_000,
+    });
+    assert.equal(
+      run.signal,
+      null,
+      `the climb did not terminate on ${UNC} — killed by ${run.signal}: ${run.stderr}`,
+    );
+    assert.equal(run.status, 0, run.stderr);
+    const under = path.win32.join(UNC, "node_modules");
+    assert.deepEqual(JSON.parse(run.stdout), [under, under]);
+  });
+
+  it("agrees with the chain on the root that disproved the premise", () => {
+    // The comparison, run on the platform whose roots the two were never tried
+    // against. Both stop at the fixed point of `dirname`, so both answer with a
+    // link under the share rather than one of them hanging.
+    // The UNC share named `node_modules` is deliberately NOT here: it is the
+    // root a regression stops returning from, and an in-process row would take
+    // the whole run down with it. The child above owns that one.
+    for (const root of ["\\\\server\\share\\", "C:\\", "C:\\a\\node_modules", "C:\\a\\b"]) {
+      assert.equal(
+        nearestChainLink(root, path.win32),
+        nodeModulesChain(root, path.win32)[0],
+        root,
+      );
+    }
   });
 
   it("resolves a relative root, so it answers about a checkout and not about a string", () => {
