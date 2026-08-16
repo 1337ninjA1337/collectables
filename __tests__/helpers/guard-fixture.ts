@@ -387,8 +387,60 @@ export const EMPTY_LINK_PHRASE: Record<EmptyLinkKind, string> = {
     "is there and holds no packages, only bookkeeping entries such as `.package-lock.json` or `.bin`",
 };
 
+/**
+ * Which refusal the empty-link clause is being appended to.
+ *
+ * The clause's tail used to be one sentence written for the absent-install
+ * message and carried into the global-folder one by the same interpolation,
+ * where it is simply false: "this refusal reads exactly like one for a checkout
+ * with no `node_modules` at all" is precisely right above a message that opens
+ * by failing to resolve, and wrong above one that opens by naming a path it
+ * resolved through `$NODE_PATH` — which reads nothing like the absent case, as
+ * its reader can see for themselves. A message that makes a checkable claim and
+ * gets it wrong costs more than the sentence was buying.
+ */
+export type EmptyLinkHost = "absent-install" | "global-folder";
+
+/**
+ * What the finding means for each refusal it lands in, in the one place that
+ * decides.
+ *
+ * Each row completes "… so node had nothing to search in it and <tail>" and is
+ * followed by " — an interrupted `npm ci` …", so no trailing punctuation and no
+ * capital, the same shape {@link EMPTY_LINK_PHRASE} rows have. Exported for the
+ * same reason too: the cases assert the tail landed in the right message and
+ * stayed out of the other, and neither pin should be able to survive a rewrite
+ * of the prose it is about.
+ */
+export const EMPTY_LINK_TAIL: Record<EmptyLinkHost, string> = {
+  "absent-install": "this refusal reads exactly like one for a checkout with no `node_modules` at all",
+  "global-folder": "the global answer above won by default rather than on merit",
+};
+
 /** The nearest chain link, when it is there, readable, and holds no install. */
 type EmptyLink = { path: string; kind: EmptyLinkKind };
+
+/**
+ * Whether a `node_modules` entry is a name node could load a package from.
+ *
+ * The rule is node's own rather than a guess about npm: a package directory IS
+ * the specifier, and every specifier node will resolve from here is either a
+ * plain name or a `@scope` — never a leading dot. Which is why this excludes
+ * npm's bookkeeping (`.package-lock.json`, `.bin`, `.cache`, `.modules.yaml`,
+ * whatever the next version writes) without naming any of it, and why the
+ * scoped case comes out right: `@scope` is neither a plain name nor a dotfile,
+ * and a rule written as "no plain names" would tell a workspace whose only
+ * installed dependencies are scoped that it holds no packages at all.
+ *
+ * Named and exported rather than left inline at its one call site, because it
+ * is a claim about how node resolves and not an expression: stated once, it can
+ * be read against the resolver's rules by the next person, and its interesting
+ * rows (`@scope`, `.bin`, a plain name, the dot directories) are a table rather
+ * than a filesystem fixture per shape.
+ */
+export function looksLikePackageEntry(entry: string): boolean {
+  return !entry.startsWith(".");
+}
 
 /**
  * The nearest chain link when it is there, readable, and holds no install.
@@ -420,7 +472,7 @@ function nearestEmptyLink(root: string): EmptyLink | null {
     return null;
   }
   if (entries.length === 0) return { path: nearest, kind: "empty" };
-  if (entries.some((entry) => !entry.startsWith("."))) return null;
+  if (entries.some(looksLikePackageEntry)) return null;
   return { path: nearest, kind: "no-packages" };
 }
 
@@ -439,11 +491,16 @@ function nearestEmptyLink(root: string): EmptyLink | null {
  * is that the question could not be decided, and the nearest link is the one it
  * could not read, so this probe has nothing to add there but a second sentence
  * about the same path.
+ *
+ * Which of the two it is landing in has to be passed, because only the FINDING
+ * is shared between them — what it means for the reader is not, and the tail
+ * that says so was true of one message and false of the other for as long as
+ * the two shared a sentence. See {@link EMPTY_LINK_TAIL}.
  */
-function emptyLinkClause(root: string): string {
+function emptyLinkClause(root: string, host: EmptyLinkHost): string {
   const empty = nearestEmptyLink(root);
   if (empty === null) return "";
-  return ` Note also: ${empty.path} ${EMPTY_LINK_PHRASE[empty.kind]}, so node had nothing to search in it and this refusal reads exactly like one for a checkout with no \`node_modules\` at all — an interrupted \`npm ci\`, a pruned store or a cleaned cache is what leaves that behind.`;
+  return ` Note also: ${empty.path} ${EMPTY_LINK_PHRASE[empty.kind]}, so node had nothing to search in it and ${EMPTY_LINK_TAIL[host]} — an interrupted \`npm ci\`, a pruned store or a cleaned cache is what leaves that behind.`;
 }
 
 /**
@@ -507,7 +564,7 @@ export function tsxLoaderIn(root: string): string {
     // does not survive that.
     const reason = describeThrown(error);
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.${emptyLinkClause(root)}`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` does not resolve from ${root} (looked under ${path.join(root, "node_modules")}; ${reason}), so no guard can be spawned. Run \`npm ci\` — without it these suites fail with an empty output and a bare exit 1, which is indistinguishable from the refusals they are asserting.${emptyLinkClause(root, "absent-install")}`,
     );
   }
   const provenance = resolvedFromCheckout(root, resolved);
@@ -526,7 +583,7 @@ export function tsxLoaderIn(root: string): string {
   if (!provenance.fromCheckout) {
     const chain = nodeModulesChain(root);
     throw new Error(
-      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${emptyLinkClause(root)}${obstructionClause(provenance.obstructed)}`,
+      `guard-fixture: \`${TSX_SPECIFIER}\` resolves from ${root} to ${resolved}, which is under none of the \`node_modules\` directories node would search from that checkout (nearest: ${chain[0]}). \`require.resolve\` keeps GLOBAL_FOLDERS — \`$NODE_PATH\`, \`~/.node_modules\` — even when \`paths\` is passed, and the spawn below is \`node --import ${TSX_SPECIFIER}\`, an ESM resolution, which consults none of them. Run \`npm ci\` in that checkout — a globally installed loader answers this check and not the spawn, which then fails with an empty output and a bare exit 1, indistinguishable from the refusals these suites are asserting.${emptyLinkClause(root, "global-folder")}${obstructionClause(provenance.obstructed)}`,
     );
   }
   // The bare specifier, not the file the resolver answered with: node resolves

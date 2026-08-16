@@ -34,7 +34,9 @@ import {
   checkNameOf,
   describeResolveFailure,
   EMPTY_LINK_PHRASE,
+  EMPTY_LINK_TAIL,
   entryPatch,
+  looksLikePackageEntry,
   makePartialRoot,
   makeSharedPatchedRepo,
   OBSTRUCTION_PHRASE,
@@ -42,6 +44,7 @@ import {
   probeAbsentLink,
   tsxLoaderIn,
 } from "./helpers/guard-fixture";
+import { assertPhraseTable } from "./helpers/phrase-table";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 const FLOOR_MODULE = "lib/scanned-floor.ts";
@@ -490,6 +493,40 @@ describe("the loader check", () => {
     });
   });
 
+  it("tells each refusal what the empty directory means for IT, not what it means for the other one", () => {
+    // One finding, two refusals, and only the finding is shared. The tail used
+    // to be a single sentence — "this refusal reads exactly like one for a
+    // checkout with no `node_modules` at all" — written for the absent-install
+    // message and carried into the global-folder one by the same interpolation.
+    // In the second it is a claim the reader can check and disprove in the
+    // paragraph above it, which opens by naming the path `$NODE_PATH` answered
+    // with; a message that gets a checkable claim wrong is worse than one that
+    // makes none, because it costs the rest of the message its credit.
+    inScratchCheckout((globals) => {
+      plantGlobalTsx(globals);
+      inScratchCheckout((root) => {
+        fs.mkdirSync(path.join(root, "node_modules"));
+        const refusals = [
+          ["absent-install", refusalFor(root)],
+          ["global-folder", resolveInChild(root, { NODE_PATH: globals })],
+        ] as const;
+        for (const [host, message] of refusals) {
+          assert.ok(
+            message.includes(EMPTY_LINK_TAIL[host]),
+            `the ${host} refusal drops its own reading of the empty directory:\n${message}`,
+          );
+          for (const [other, tail] of Object.entries(EMPTY_LINK_TAIL)) {
+            if (other === host) continue;
+            assert.ok(
+              !message.includes(tail),
+              `the ${host} refusal carries the ${other} tail ("${tail}"), which is not true of it:\n${message}`,
+            );
+          }
+        }
+      });
+    });
+  });
+
   it("says a `node_modules` holding only npm's own bookkeeping holds no packages", () => {
     // The same failure wearing a hat, and the one a bare entry COUNT waves
     // through: npm writes `.package-lock.json` before it restores the store,
@@ -801,21 +838,20 @@ describe("the obstruction phrasing table", () => {
 
   it("reads as a verb phrase completing the path it follows", () => {
     // The clause renders `<path> (<phrase>)` and then says "those paths are in
-    // the chain node searches", so a noun ("a file"), a capital or a trailing
-    // period each break the sentence at a different seam.
-    for (const kind of KINDS) {
-      const phrase = OBSTRUCTION_PHRASE[kind];
-      assert.match(phrase, /^is /, `${kind} does not complete "<path> …": ${phrase}`);
-      assert.doesNotMatch(phrase, /[.\n]/, `${kind} punctuates itself: ${phrase}`);
-      assert.equal(phrase.trim(), phrase, `${kind} is padded: "${phrase}"`);
-    }
-  });
-
-  it("says something different for each kind", () => {
-    // Two kinds rendering the same words is two findings the reader cannot
-    // act on differently — a file to delete and a link to repoint.
-    const phrases = KINDS.map((kind) => OBSTRUCTION_PHRASE[kind]);
-    assert.equal(new Set(phrases).size, phrases.length, phrases.join(" / "));
+    // the chain node searches", so a noun ("a file"), a capital or a period
+    // anywhere at all break the sentence at a different seam. Distinctness and
+    // containment ride along with the shape rules now — this table went without
+    // the containment check for no reason other than that the suite it was
+    // copied from predated it.
+    assertPhraseTable(OBSTRUCTION_PHRASE, {
+      opens: /^is /,
+      // Rendered as `<path> (<phrase>)` with the clause continuing on the far
+      // side of the parenthesis, so a period anywhere ends the sentence inside
+      // it. Nothing in this table names a dotted file, so the strict rule costs
+      // it nothing.
+      periods: "never",
+      template: "<path> (<phrase>) — those paths are in the chain node searches",
+    });
   });
 });
 
@@ -832,26 +868,80 @@ describe("the empty-link phrasing table", () => {
   });
 
   it("reads as a verb phrase the clause can continue", () => {
-    // Rendered as `<path> <phrase>, so node had nothing to search in it` — so a
-    // capital, a trailing period or padding each break the sentence.
-    for (const kind of KINDS) {
-      const phrase = EMPTY_LINK_PHRASE[kind];
-      assert.match(phrase, /^is /, `${kind} does not complete "<path> …": ${phrase}`);
-      assert.doesNotMatch(phrase, /[.\n]$/, `${kind} punctuates itself: ${phrase}`);
-      assert.equal(phrase.trim(), phrase, `${kind} is padded: "${phrase}"`);
-    }
+    // A directory with nothing in it and one holding only npm's bookkeeping are
+    // the same fix and different `ls` output, so the rows have to stay distinct
+    // — and non-containing, since the negative cases pin the absence of the
+    // shorter row with `includes`.
+    assertPhraseTable(EMPTY_LINK_PHRASE, {
+      opens: /^is /,
+      // Not "never": the `no-packages` row names `.package-lock.json` and
+      // `.bin`, which is the whole point of that row — the reader recognises
+      // their own listing in it. Only a period at the END would close the
+      // sentence the clause carries on.
+      periods: "not-at-the-end",
+      template: "<path> <phrase>, so node had nothing to search in it",
+    });
+  });
+});
+
+describe("looksLikePackageEntry", () => {
+  // The rule the emptiness probe is built on, which used to be a doc comment
+  // over an inline `!entry.startsWith(".")` at one call site — a claim about
+  // how node resolves, stated in prose and enforced in an expression, with no
+  // way to read the two against each other. Named, it gets the rows that
+  // matter as a table: reaching them through the probe means planting a
+  // directory and spawning a child per shape, which is why only two of these
+  // were ever covered.
+
+  const ROWS: readonly [entry: string, loadable: boolean, why: string][] = [
+    ["tsx", true, "a plain name is a specifier node resolves directly"],
+    ["react-native", true, "a hyphen is ordinary in a package name"],
+    ["@scope", true, "a scope directory holds packages, and is neither a plain name nor a dotfile"],
+    [".package-lock.json", false, "npm writes this BEFORE it restores the store"],
+    [".bin", false, "a prune leaves the shim directory behind"],
+    [".cache", false, "so does a cleaned cache"],
+    [".modules.yaml", false, "pnpm's own bookkeeping, and the reason the rule is dots and not a list"],
+  ];
+
+  for (const [entry, loadable, why] of ROWS) {
+    it(`${loadable ? "counts" : "does not count"} \`${entry}\``, () => {
+      assert.equal(looksLikePackageEntry(entry), loadable, why);
+    });
+  }
+
+  it("draws the line at the dot rather than at a list of npm's filenames", () => {
+    // The rule has to survive names nobody here has seen: a bookkeeping file
+    // some future npm writes is excluded because it is dotted, not because it
+    // was enumerated, and a package named after one of them is still a package.
+    assert.equal(looksLikePackageEntry(".whatever-npm-writes-next"), false);
+    assert.equal(looksLikePackageEntry("bin"), true, "an undotted `bin` is a package, not npm's shim directory");
+  });
+});
+
+describe("the empty-link tail table", () => {
+  // What the finding MEANS, which is the half that is not shared between the
+  // two refusals it lands in. The tail was one sentence written for the
+  // absent-install message and carried into the global-folder one by the same
+  // interpolation, where it claimed something the reader could see was false:
+  // that message opens by naming a path it resolved through `$NODE_PATH`, and
+  // reads nothing like a refusal for a checkout with no `node_modules` at all.
+
+  it("still carries one tail per refusal the clause is appended to", () => {
+    assert.deepEqual(Object.keys(EMPTY_LINK_TAIL).sort(), ["absent-install", "global-folder"]);
   });
 
-  it("says something different for each kind", () => {
-    // A directory with nothing in it and one holding only npm's bookkeeping
-    // are the same fix and different `ls` output; a reader who is told the
-    // wrong one starts by doubting the message.
-    const phrases = KINDS.map((kind) => EMPTY_LINK_PHRASE[kind]);
-    assert.equal(new Set(phrases).size, phrases.length, phrases.join(" / "));
-    assert.ok(
-      !phrases.some((phrase) => phrases.some((other) => other !== phrase && other.includes(phrase))),
-      `one phrase contains another, so an \`includes\` pin on the shorter one is satisfied by the longer: ${phrases.join(" / ")}`,
-    );
+  it("reads as a clause continuing the sentence that renders it", () => {
+    assertPhraseTable(EMPTY_LINK_TAIL, {
+      // A subject rather than a verb — these complete "… and <tail>", not
+      // "<path> …" — so the rule is only that a row does not open mid-word or
+      // with the punctuation the template supplies.
+      opens: /^[a-z]/,
+      // Continued by " — an interrupted `npm ci` …", so a trailing period
+      // orphans that half; nothing here names a dotted file, but the em-dash
+      // continuation is the same shape the phrase table has.
+      periods: "not-at-the-end",
+      template: "so node had nothing to search in it and <tail> — an interrupted `npm ci` …",
+    });
   });
 });
 
