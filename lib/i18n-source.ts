@@ -28,6 +28,15 @@
  * `TranslationMap`; and declarations other than a top-level `const`. It is a
  * scanner for the shapes this repository writes, not a JavaScript parser, and
  * the cases that pin those absences live in `__tests__/i18n-source.test.ts`.
+ *
+ * Two failure shapes, and which one a reader gets depends on the question it
+ * asked. The `find*` readers return NULL, because "there is no such
+ * declaration" is an answer a caller can act on — that is what
+ * `findLocaleBlock(source, "fr")` means. {@link localeKeys} THROWS, because its
+ * callers are asserting parity with the file: an empty set there would report a
+ * renamed or deleted map as every key being untranslated, which reads as a
+ * finding about the translations. Ask with `find*` when the absence is the
+ * question; ask with `localeKeys` when the map's existence is a premise.
  */
 
 /** The map every other locale spreads, and the denominator of every ratio. */
@@ -87,6 +96,30 @@ type ScanResult = ParsedObjectLiteral & {
 const DIVISION_FOLLOWS = /[A-Za-z0-9_$)\]}"'`]/;
 
 /**
+ * …except after one of these. A keyword ends in an identifier character, so the
+ * one-character rule above calls `return /}/.test(s)` a division and reads the
+ * pattern as structure — the exact failure the regex branch exists to prevent,
+ * one keyword away. `x / 2` and `returnValue / 2` are still divisions: what
+ * matters is the whole word before the slash, not its last letter.
+ */
+const REGEXP_FOLLOWS_KEYWORD = new Set([
+  "await",
+  "case",
+  "delete",
+  "do",
+  "else",
+  "in",
+  "instanceof",
+  "new",
+  "of",
+  "return",
+  "throw",
+  "typeof",
+  "void",
+  "yield",
+]);
+
+/**
  * Scans a literal body and reports what it declares at its OWN level.
  *
  * A brace counter is not enough on its own: the values here are strings and
@@ -106,6 +139,9 @@ function scanLiteral(
   start: number,
   close: Closer = "}",
 ): ScanResult {
+  /** Element spans are what {@link findArrayLiteral} wants; nothing reads an
+   * object literal's nested values, so they are not collected for one. */
+  const collectElements = close === "]";
   const keys: string[] = [];
   const spreads: string[] = [];
   const elements: string[] = [];
@@ -121,6 +157,8 @@ function scanLiteral(
   let elementStart: number | null = null;
   /** Last significant character consumed — only `/` disambiguation reads it. */
   let prev = "";
+  /** Last identifier consumed, cleared by any other token. Same reader. */
+  let prevWord = "";
 
   const atTopLevel = () => depth === 0 && frames.length === 0 && !inTemplate;
 
@@ -135,6 +173,7 @@ function scanLiteral(
       if (ch === "`") {
         inTemplate = false;
         prev = "`";
+        prevWord = "";
         i += 1;
         continue;
       }
@@ -143,6 +182,7 @@ function scanLiteral(
         depth = 0;
         inTemplate = false;
         prev = "{";
+        prevWord = "";
         i += 2;
         continue;
       }
@@ -160,9 +200,13 @@ function scanLiteral(
       i = closeAt === -1 ? source.length : closeAt + 2;
       continue;
     }
-    if (ch === "/" && !DIVISION_FOLLOWS.test(prev)) {
+    if (
+      ch === "/" &&
+      (!DIVISION_FOLLOWS.test(prev) || REGEXP_FOLLOWS_KEYWORD.has(prevWord))
+    ) {
       i = skipRegExpLiteral(source, i);
       prev = "/";
+      prevWord = "";
       expectKey = false;
       continue;
     }
@@ -173,12 +217,14 @@ function scanLiteral(
       }
       i += 1;
       prev = ch;
+      prevWord = "";
       expectKey = false;
       continue;
     }
     if (ch === "`") {
       inTemplate = true;
       prev = "`";
+      prevWord = "";
       i += 1;
       expectKey = false;
       continue;
@@ -187,9 +233,10 @@ function scanLiteral(
       return { keys, spreads, elements, end: i };
     }
     if (ch === "{" || ch === "[") {
-      if (ch === "{" && atTopLevel()) elementStart = i + 1;
+      if (ch === "{" && collectElements && atTopLevel()) elementStart = i + 1;
       depth += 1;
       prev = ch;
+      prevWord = "";
       i += 1;
       continue;
     }
@@ -204,6 +251,7 @@ function scanLiteral(
             depth = frame;
             inTemplate = true;
             prev = "}";
+            prevWord = "";
             i += 1;
             continue;
           }
@@ -216,12 +264,14 @@ function scanLiteral(
         elementStart = null;
       }
       prev = ch;
+      prevWord = "";
       i += 1;
       continue;
     }
     if (ch === ",") {
       if (atTopLevel()) expectKey = true;
       prev = ",";
+      prevWord = "";
       i += 1;
       continue;
     }
@@ -231,6 +281,7 @@ function scanLiteral(
       if (atTopLevel() && spread) spreads.push(spread);
       i += spread.length;
       prev = spread.length > 0 ? spread[spread.length - 1] : ".";
+      prevWord = "";
       expectKey = false;
       continue;
     }
@@ -238,6 +289,7 @@ function scanLiteral(
       const name = readIdentifier(source, i);
       i += name.length;
       prev = name[name.length - 1];
+      prevWord = name;
       if (atTopLevel() && expectKey) {
         let j = i;
         while (j < source.length && /\s/.test(source[j])) j += 1;
@@ -245,6 +297,7 @@ function scanLiteral(
           keys.push(name);
           i = j + 1;
           prev = ":";
+          prevWord = "";
         } else if (
           source[j] === "," ||
           source[j] === close ||
@@ -260,7 +313,10 @@ function scanLiteral(
       expectKey = false;
       continue;
     }
-    prev = /\s/.test(ch) ? prev : ch;
+    if (!/\s/.test(ch)) {
+      prev = ch;
+      prevWord = "";
+    }
     i += 1;
   }
 

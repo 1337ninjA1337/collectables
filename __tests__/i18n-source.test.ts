@@ -147,6 +147,22 @@ describe("translation literal parser", () => {
     assert.deepEqual(parsed.keys, ["half", "paren", "after"]);
   });
 
+  it("opens a regex after a keyword and still divides after an identifier", () => {
+    // A keyword ends in an identifier character, so the one-character rule
+    // that tells a regex from a division reads `return /}/` as a division and
+    // the `}` as structure — closing the function body early and taking every
+    // key below it. `returnValue / 2` is the other side of the same rule: what
+    // decides is the whole word before the slash, not its last letter.
+    const parsed = parseObjectLiteral(`
+  guard: (p) => {
+    return /}/.test(String(p.s)) ? "1" : "2";
+  },
+  ratio: (p) => \`\${p.returnValue / 2}\`,
+  after: "still here",
+`);
+    assert.deepEqual(parsed.keys, ["guard", "ratio", "after"]);
+  });
+
   it("reads shorthand properties, which is how the translations record is written", () => {
     // `const translations: Record<AppLanguage, TranslationMap> = { en, ru, … }`
     // declares six keys and writes not one colon.
