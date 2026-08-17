@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { localeKeys } from "@/lib/i18n-source";
+
 const settingsSrc = readFileSync(
   path.join(process.cwd(), "app", "settings.tsx"),
   "utf8",
@@ -19,17 +21,6 @@ const FOOTER_KEYS = [
 ] as const;
 
 const LANGUAGES = ["en", "ru", "be", "pl", "de", "es"] as const;
-
-/** Slice one language's object literal out of the i18n source. */
-function languageBlock(code: string): string {
-  const decl =
-    code === "en" ? "const en = {" : `const ${code}: TranslationMap = {`;
-  const start = i18nSrc.indexOf(decl);
-  assert.ok(start >= 0, `declaration for '${code}' not found`);
-  const rest = i18nSrc.slice(start + decl.length);
-  const next = rest.search(/\nconst \w+(?:: \w+)? = \{|\nconst \w+: TranslationMap = \{/);
-  return next >= 0 ? rest.slice(0, next) : rest;
-}
 
 describe("settings — diagnostics crash-report footer", () => {
   it("reads the Sentry snapshot via getSentryStatus and ticks with useNow", () => {
@@ -73,10 +64,10 @@ describe("settings — diagnostics crash-report footer", () => {
 
   it("declares the footer keys in every language map (no en fallback)", () => {
     for (const code of LANGUAGES) {
-      const block = languageBlock(code);
+      const declared = localeKeys(i18nSrc, code);
       for (const key of FOOTER_KEYS) {
         assert.ok(
-          block.includes(`${key}:`),
+          declared.has(key),
           `${code} must declare ${key} directly`,
         );
       }
@@ -85,7 +76,7 @@ describe("settings — diagnostics crash-report footer", () => {
 
   it("declares the four base diagnostics keys in every non-EN language (regression: EN-only card)", () => {
     for (const code of LANGUAGES.filter((c) => c !== "en")) {
-      const block = languageBlock(code);
+      const declared = localeKeys(i18nSrc, code);
       for (const key of [
         "diagnosticsTitle",
         "diagnosticsHint",
@@ -93,7 +84,7 @@ describe("settings — diagnostics crash-report footer", () => {
         "diagnosticsDisabled",
       ]) {
         assert.ok(
-          block.includes(`${key}:`),
+          declared.has(key),
           `${code} must declare ${key} directly instead of inheriting English`,
         );
       }

@@ -26,14 +26,19 @@
  * of keys, and the honest thing to publish is the count of decisions not made,
  * which is why {@link TranslationCoverage.inherited} carries the names.
  *
- * Node-pure on purpose, and a PARSER rather than an import: `lib/i18n-context.tsx`
- * pulls React Native peers, so the existing i18n suites read its source too
- * (`i18n-translations.test.ts`, `i18n-locale-map-parity.test.ts`). This module
- * is the parsing those suites do by regex, done once and against the syntax.
+ * Node-pure on purpose, and measured from the source rather than from an
+ * import: `lib/i18n-context.tsx` pulls React Native peers. The reading itself
+ * lives in `lib/i18n-source.ts` — one parser for that file, shared with the
+ * three other suites that used to match it by regex — so what is left here is
+ * arithmetic over what the parser found.
  */
 
-/** The map every other locale spreads, and the denominator of every ratio. */
-export const TRANSLATION_BASE_LANGUAGE = "en";
+import {
+  TRANSLATION_BASE_LANGUAGE,
+  findLocaleBlock,
+} from "./i18n-source";
+
+export { TRANSLATION_BASE_LANGUAGE };
 
 /**
  * The languages this module expects to find, in picker order.
@@ -46,221 +51,6 @@ export const TRANSLATION_BASE_LANGUAGE = "en";
 export const TRANSLATION_LANGUAGES = ["ru", "en", "be", "pl", "de", "es"] as const;
 
 export type TranslationLanguage = (typeof TRANSLATION_LANGUAGES)[number];
-
-/** What one object literal declares: its own keys, and what it spread in. */
-export type ParsedObjectLiteral = {
-  /** Keys written at the literal's own level, in source order. */
-  readonly keys: readonly string[];
-  /** Identifiers spread at that level, e.g. `en` for `...en`. */
-  readonly spreads: readonly string[];
-};
-
-/**
- * One locale map located in the source: the text between its braces, plus what
- * that text declares.
- */
-export type LocaleBlock = ParsedObjectLiteral & {
-  readonly language: string;
-  /** The literal's body — brace-to-brace, exclusive. */
-  readonly body: string;
-  /** True when the map spreads {@link TRANSLATION_BASE_LANGUAGE}. */
-  readonly inheritsBase: boolean;
-};
-
-/**
- * Scans an object literal body and reports what it declares at its OWN level.
- *
- * A brace counter is not enough on its own: the values here are strings and
- * template-literal arrow functions, so `{`, `}` and `:` all appear inside text
- * the parser must not read as structure — a ternary in a `${...}` slot
- * (`Number(count) === 1 ? "item" : "items"`) is a colon at what a naive scan
- * would call the top level. The scan therefore tracks string, template and
- * comment context, and treats a template's `${` as a nested code frame, which
- * is what it is.
- *
- * Depth is relative to `start`, so callers pass the index just after the
- * literal's opening brace and get back the index of the brace that closes it.
- */
-function scanObjectLiteral(
-  source: string,
-  start: number,
-): ParsedObjectLiteral & { readonly end: number } {
-  const keys: string[] = [];
-  const spreads: string[] = [];
-  /** Frames of `${`-nested code inside template literals; empty = top level. */
-  const frames: number[] = [];
-  let depth = 0;
-  let i = start;
-  /** True while the next identifier at the top level would be a key. */
-  let expectKey = true;
-  /** True while inside a template literal (its `${` slots push a frame). */
-  let inTemplate = false;
-
-  const atTopLevel = () => depth === 0 && frames.length === 0 && !inTemplate;
-
-  while (i < source.length) {
-    const ch = source[i];
-
-    if (inTemplate) {
-      if (ch === "\\") {
-        i += 2;
-        continue;
-      }
-      if (ch === "`") {
-        inTemplate = false;
-        i += 1;
-        continue;
-      }
-      if (ch === "$" && source[i + 1] === "{") {
-        frames.push(depth);
-        depth = 0;
-        inTemplate = false;
-        i += 2;
-        continue;
-      }
-      i += 1;
-      continue;
-    }
-
-    if (ch === "/" && source[i + 1] === "/") {
-      const newline = source.indexOf("\n", i);
-      i = newline === -1 ? source.length : newline + 1;
-      continue;
-    }
-    if (ch === "/" && source[i + 1] === "*") {
-      const close = source.indexOf("*/", i + 2);
-      i = close === -1 ? source.length : close + 2;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      i += 1;
-      while (i < source.length && source[i] !== ch) {
-        i += source[i] === "\\" ? 2 : 1;
-      }
-      i += 1;
-      expectKey = false;
-      continue;
-    }
-    if (ch === "`") {
-      inTemplate = true;
-      i += 1;
-      expectKey = false;
-      continue;
-    }
-    if (ch === "{") {
-      depth += 1;
-      i += 1;
-      continue;
-    }
-    if (ch === "}") {
-      if (depth === 0) {
-        // Closing the frame this scan was started on, or returning to the
-        // template literal whose `${` opened the frame above it.
-        const frame = frames.pop();
-        if (frame === undefined) return { keys, spreads, end: i };
-        depth = frame;
-        inTemplate = true;
-        i += 1;
-        continue;
-      }
-      depth -= 1;
-      i += 1;
-      continue;
-    }
-    if (ch === ",") {
-      if (atTopLevel()) expectKey = true;
-      i += 1;
-      continue;
-    }
-    if (ch === "." && source.startsWith("...", i)) {
-      i += 3;
-      const spread = readIdentifier(source, i);
-      if (atTopLevel() && spread) spreads.push(spread);
-      i += spread.length;
-      expectKey = false;
-      continue;
-    }
-    if (isIdentifierStart(ch)) {
-      const name = readIdentifier(source, i);
-      i += name.length;
-      if (atTopLevel() && expectKey) {
-        let j = i;
-        while (j < source.length && /\s/.test(source[j])) j += 1;
-        if (source[j] === ":") {
-          keys.push(name);
-          i = j + 1;
-        }
-      }
-      expectKey = false;
-      continue;
-    }
-    i += 1;
-  }
-
-  return { keys, spreads, end: source.length };
-}
-
-function isIdentifierStart(ch: string): boolean {
-  return /[A-Za-z_$]/.test(ch);
-}
-
-function readIdentifier(source: string, at: number): string {
-  let end = at;
-  while (end < source.length && /[A-Za-z0-9_$]/.test(source[end])) end += 1;
-  return source.slice(at, end);
-}
-
-/**
- * The keys and spreads of one object literal body — the syntax-aware
- * derivation, and the one {@link translationCoverage} counts.
- */
-export function parseObjectLiteral(body: string): ParsedObjectLiteral {
-  const { keys, spreads } = scanObjectLiteral(body, 0);
-  return { keys, spreads };
-}
-
-/**
- * The same question answered from FORMATTING: a key is a line indented by
- * exactly two spaces. True of this file because prettier writes it that way,
- * and false of the language in general — which is the point. It is a second
- * statement of "what does this literal declare", derived from something the
- * scanner above does not look at, so the case comparing them can fail. A
- * scanner bug that swallows entries (an unbalanced template, a string quote it
- * mishandles) shows up as a disagreement rather than as a smaller number that
- * still looks plausible.
- */
-export function declaredKeysByIndentation(body: string): readonly string[] {
-  const keys: string[] = [];
-  for (const line of body.split("\n")) {
-    const match = line.match(/^ {2}([A-Za-z_$][A-Za-z0-9_$]*):/);
-    if (match) keys.push(match[1]);
-  }
-  return keys;
-}
-
-/**
- * Locates `const <language> = {` / `const <language>: TranslationMap = {` and
- * reads the literal that follows. Null when the language has no map at all,
- * which is a different finding from a map that declares nothing.
- */
-export function findLocaleBlock(
-  source: string,
-  language: string,
-): LocaleBlock | null {
-  const declaration = new RegExp(
-    `\\bconst\\s+${language}(?:\\s*:\\s*TranslationMap)?\\s*=\\s*\\{`,
-  ).exec(source);
-  if (!declaration) return null;
-  const bodyStart = declaration.index + declaration[0].length;
-  const { keys, spreads, end } = scanObjectLiteral(source, bodyStart);
-  return {
-    language,
-    body: source.slice(bodyStart, end),
-    keys,
-    spreads,
-    inheritsBase: spreads.includes(TRANSLATION_BASE_LANGUAGE),
-  };
-}
 
 /** One language's standing against the base map. */
 export type TranslationCoverage = {

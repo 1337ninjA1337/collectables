@@ -3,10 +3,21 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { TRANSLATION_BASE_LANGUAGE } from "@/lib/i18n-coverage";
+import {
+  findLocaleBlock,
+  findObjectLiteral,
+  languageOptionCodes,
+} from "@/lib/i18n-source";
+
 /**
  * Structural tests over the translations file without importing the React
- * context module (which pulls in React Native peers). We parse the source of
- * lib/i18n-context.tsx and verify coverage of the six supported languages.
+ * context module (which pulls in React Native peers). The source of
+ * `lib/i18n-context.tsx` is read through `lib/i18n-source.ts` — the one parser
+ * for that file — rather than matched here: this suite used to carry three
+ * regexes of its own, including a `([^}]+)` for the `translations` record that
+ * read to the first `}` in the file and a "slice to the next `const`" that
+ * attributed a key to a language by declaration order.
  */
 
 const SOURCE = readFileSync(
@@ -16,34 +27,48 @@ const SOURCE = readFileSync(
 
 const EXPECTED_LANGUAGES = ["ru", "en", "be", "pl", "de", "es"] as const;
 
+const blockFor = (code: string) => {
+  const block = findLocaleBlock(SOURCE, code);
+  assert.ok(block, `missing translation map for '${code}'`);
+  return block!;
+};
+
 describe("i18n translations", () => {
   it("declares every expected language object", () => {
     for (const code of EXPECTED_LANGUAGES) {
       // The base language ('en') is declared as a plain object; others receive
       // the TranslationMap annotation once the shape is locked in.
-      const pattern = new RegExp(`const\\s+${code}(?::\\s*TranslationMap)?\\s*=\\s*{`);
-      assert.match(SOURCE, pattern, `missing translation map for '${code}'`);
+      assert.ok(blockFor(code).keys.length > 0, `'${code}' declares no keys`);
     }
   });
 
   it("registers all six languages in the translations record", () => {
-    const declaration = SOURCE.match(
-      /const\s+translations\s*:\s*Record<AppLanguage,\s*TranslationMap>\s*=\s*{([^}]+)}/,
-    );
-    assert.ok(declaration, "translations record not found");
+    const record = findObjectLiteral(SOURCE, "translations");
+    assert.ok(record, "translations record not found");
     for (const code of EXPECTED_LANGUAGES) {
       assert.ok(
-        new RegExp(`\\b${code}\\b`).test(declaration![1]),
+        record!.keys.includes(code),
         `language '${code}' missing from translations record`,
       );
     }
   });
 
+  it("has a declared map behind every entry of the translations record", () => {
+    // The other direction: an entry registered with no map behind it is a
+    // `ReferenceError` at import, and a shorthand entry naming the wrong
+    // identifier is what would produce one.
+    for (const code of findObjectLiteral(SOURCE, "translations")!.keys) {
+      assert.ok(
+        findLocaleBlock(SOURCE, code),
+        `the record registers '${code}' and no \`const ${code}\` map declares it`,
+      );
+    }
+  });
+
   it("registers all six languages in the language options", () => {
-    const block = SOURCE.match(/languageOptions\s*:\s*\{\s*code[\s\S]*?\}\s*\[\s*\]\s*=\s*\[([\s\S]*?)\];/);
-    assert.ok(block, "languageOptions declaration not found");
+    const codes = languageOptionCodes(SOURCE);
     for (const code of EXPECTED_LANGUAGES) {
-      assert.match(block![1], new RegExp(`code:\\s*"${code}"`));
+      assert.ok(codes.includes(code), `language '${code}' missing from the picker`);
     }
   });
 
@@ -64,13 +89,10 @@ describe("i18n translations", () => {
       "sharedWithPeople",
     ];
 
-    const enBlock = SOURCE.match(/const\s+en\s*:?\s*(?:TranslationMap)?\s*=\s*{([\s\S]*?)\n};/);
-    assert.ok(enBlock, "could not locate English translation map");
-
+    const declared = new Set(blockFor(TRANSLATION_BASE_LANGUAGE).keys);
     for (const key of requiredKeys) {
-      assert.match(
-        enBlock![1],
-        new RegExp(`\\b${key}\\s*:`),
+      assert.ok(
+        declared.has(key),
         `English translation map is missing key '${key}'`,
       );
     }
@@ -78,32 +100,25 @@ describe("i18n translations", () => {
 });
 
 describe("i18n premium-gate key coverage", () => {
-  // Slice each language's object literal body so a key can be attributed to a
-  // single language map. Declarations are sequential (en, then ru/be/pl/de/es),
-  // so each block runs from its `const <code> ... = {` to the next declaration.
-  function languageBlock(code: string): string {
-    const start = SOURCE.search(
-      new RegExp(`const\\s+${code}\\s*:?\\s*(?:TranslationMap)?\\s*=\\s*{`),
-    );
-    assert.ok(start >= 0, `could not locate translation map for '${code}'`);
-    const rest = SOURCE.slice(start + 1);
-    const nextDecl = rest.search(
-      /const\s+(?:ru|en|be|pl|de|es)\s*:?\s*(?:TranslationMap)?\s*=\s*{/,
-    );
-    return nextDecl >= 0 ? rest.slice(0, nextDecl) : rest;
-  }
-
+  // Each key is attributed to the map that declares it, brace to brace — the
+  // version of this suite that sliced "from this declaration to the next one"
+  // attributed by declaration ORDER, so a map moved below another would have
+  // taken its keys with it.
   it("English declares visibilityPrivatePremiumOnly directly", () => {
-    assert.match(languageBlock("en"), /visibilityPrivatePremiumOnly\s*:/);
+    assert.ok(
+      blockFor(TRANSLATION_BASE_LANGUAGE).keys.includes(
+        "visibilityPrivatePremiumOnly",
+      ),
+    );
   });
 
   it("every language either declares visibilityPrivatePremiumOnly or inherits it via ...en", () => {
     // A regression here would silently render the English string for non-English
     // users on the private-locked toast (create + edit collection screens).
     for (const code of EXPECTED_LANGUAGES) {
-      const block = languageBlock(code);
-      const declares = /visibilityPrivatePremiumOnly\s*:/.test(block);
-      const inheritsEn = code === "en" ? true : /\.\.\.en\b/.test(block);
+      const block = blockFor(code);
+      const declares = block.keys.includes("visibilityPrivatePremiumOnly");
+      const inheritsEn = code === TRANSLATION_BASE_LANGUAGE || block.inheritsBase;
       assert.ok(
         declares || inheritsEn,
         `language '${code}' neither declares visibilityPrivatePremiumOnly nor spreads ...en`,

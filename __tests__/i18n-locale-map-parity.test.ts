@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { languageOptionCodes } from "@/lib/i18n-source";
 import { languageCurrencyMap, languageLocaleMap } from "@/lib/locale-helpers";
 
 /**
@@ -14,8 +15,10 @@ import { languageCurrencyMap, languageLocaleMap } from "@/lib/locale-helpers";
  * silently fall back to USD (currency) or to a bare language tag (locale) —
  * this test fails closed so the drift is caught at PR time.
  *
- * `lib/i18n-context.tsx` imports react-native peers, so we parse the source
- * file rather than importing it (same pattern as `i18n-translations.test.ts`).
+ * `lib/i18n-context.tsx` imports react-native peers, so the source file is read
+ * rather than imported — through `lib/i18n-source.ts`, the one parser for that
+ * file (this suite used to carry its own copy of the `languageOptions` regex,
+ * as did three others).
  */
 
 const SOURCE = readFileSync(
@@ -23,19 +26,7 @@ const SOURCE = readFileSync(
   "utf8",
 );
 
-function parseLanguageOptionCodes(): string[] {
-  const block = SOURCE.match(
-    /languageOptions\s*:\s*\{\s*code[\s\S]*?\}\s*\[\s*\]\s*=\s*\[([\s\S]*?)\];/,
-  );
-  assert.ok(block, "languageOptions declaration not found in lib/i18n-context.tsx");
-  const codes: string[] = [];
-  const codeRegex = /code:\s*"([^"]+)"/g;
-  let match: RegExpExecArray | null;
-  while ((match = codeRegex.exec(block![1])) !== null) {
-    codes.push(match[1]);
-  }
-  return codes;
-}
+const parseLanguageOptionCodes = () => languageOptionCodes(SOURCE);
 
 describe("i18n languageOptions ↔ locale-helpers parity", () => {
   it("languageOptions declares at least one language", () => {

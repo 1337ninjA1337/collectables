@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { localeKeys } from "@/lib/i18n-source";
+
 /**
  * Structural tests for the marketplace screen and its bottom-nav entry. We
  * grep the source to avoid pulling in React Native peers in node:test.
@@ -105,17 +107,10 @@ describe("marketplace translations", () => {
       "marketplaceMyPurchasesEmpty",
     ];
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
-      // Match `const <lang>: TranslationMap = {` (or the en literal) until the
-      // matching closing `};` so we can scan only that language's block.
-      const blockMatch =
-        lang === "en"
-          ? src.match(/const\s+en\s*=\s*{([\s\S]*?)\n}\s*as\s+const;/)
-          : src.match(new RegExp(`const\\s+${lang}\\s*:\\s*TranslationMap\\s*=\\s*{([\\s\\S]*?)\\n};`));
-      assert.ok(blockMatch, `could not locate language block for '${lang}'`);
+      const declared = localeKeys(src, lang);
       for (const key of requiredKeys) {
-        assert.match(
-          blockMatch![1],
-          new RegExp(`\\b${key}\\s*:`),
+        assert.ok(
+          declared.has(key),
           `language '${lang}' missing key '${key}'`,
         );
       }

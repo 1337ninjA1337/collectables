@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { localeKeys } from "@/lib/i18n-source";
+
 const settingsSrc = readFileSync(
   path.join(process.cwd(), "app", "settings.tsx"),
   "utf8",
@@ -13,17 +15,6 @@ const i18nSrc = readFileSync(
 );
 
 const LANGUAGES = ["en", "ru", "be", "pl", "de", "es"] as const;
-
-/** Slice one language's object literal out of the i18n source. */
-function languageBlock(code: string): string {
-  const decl =
-    code === "en" ? "const en = {" : `const ${code}: TranslationMap = {`;
-  const start = i18nSrc.indexOf(decl);
-  assert.ok(start >= 0, `declaration for '${code}' not found`);
-  const rest = i18nSrc.slice(start + decl.length);
-  const next = rest.search(/\nconst \w+(?:: \w+)? = \{|\nconst \w+: TranslationMap = \{/);
-  return next >= 0 ? rest.slice(0, next) : rest;
-}
 
 describe("settings — Sentry DSN inlined diagnostics row", () => {
   it("gates the row on dev builds or admins, never plain production users", () => {
@@ -64,9 +55,8 @@ describe("settings — Sentry DSN inlined diagnostics row", () => {
 
   it("has a diagnosticsDsnInlined translation in every language", () => {
     for (const code of LANGUAGES) {
-      assert.match(
-        languageBlock(code),
-        /diagnosticsDsnInlined:/,
+      assert.ok(
+        localeKeys(i18nSrc, code).has("diagnosticsDsnInlined"),
         `language '${code}' is missing the diagnosticsDsnInlined key`,
       );
     }

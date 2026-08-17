@@ -8,12 +8,10 @@ import {
   TRANSLATION_FLOORS,
   TRANSLATION_LANGUAGES,
   coveragePercent,
-  declaredKeysByIndentation,
-  findLocaleBlock,
   formatCoverageRow,
-  parseObjectLiteral,
   translationCoverage,
 } from "@/lib/i18n-coverage";
+import { findLocaleBlock, languageOptionCodes } from "@/lib/i18n-source";
 
 /**
  * The silent-fallback gap, turned into a number.
@@ -32,9 +30,10 @@ import {
  * on every feature PR (see the reasoning on `TRANSLATION_FLOORS`).
  *
  * `lib/i18n-context.tsx` pulls React Native peers, so the source is parsed
- * rather than imported — the same pattern as `i18n-translations.test.ts` and
- * `i18n-locale-map-parity.test.ts`, with the regex replaced by a scanner that
- * understands strings and template literals.
+ * rather than imported. The parsing is `lib/i18n-source.ts` — one reader for
+ * that file, shared with the three other suites that ask questions about it,
+ * and defended in `__tests__/i18n-source.test.ts`. What is counted here is what
+ * that parser found.
  */
 
 const SOURCE = readFileSync(
@@ -49,150 +48,11 @@ const rowFor = (language: string) => {
   return row!;
 };
 
-describe("translation literal parser", () => {
-  it("reads the keys and the spread of a plain map", () => {
-    const parsed = parseObjectLiteral(`
-  ...en,
-  first: "one",
-  second: "two",
-`);
-    assert.deepEqual(parsed.keys, ["first", "second"]);
-    assert.deepEqual(parsed.spreads, ["en"]);
-  });
-
-  it("does not read braces inside a string value as structure", () => {
-    // The brace-counting version of this parser reported one key here and then
-    // ran off the end of the literal looking for a close.
-    const parsed = parseObjectLiteral(`
-  opener: "a { brace",
-  closer: "a } brace",
-  after: "still here",
-`);
-    assert.deepEqual(parsed.keys, ["opener", "closer", "after"]);
-  });
-
-  it("does not read a template ternary's colon as a key separator", () => {
-    // `Number(count) === 1 ? "item" : "items"` is a colon inside a `${}` slot,
-    // which a line-oriented scan sees at the literal's own level.
-    const parsed = parseObjectLiteral(`
-  plural: (params?: TranslationParams) =>
-    \`Delete \${params?.count ?? 0} \${Number(params?.count) === 1 ? "item" : "items"}?\`,
-  after: "still here",
-`);
-    assert.deepEqual(parsed.keys, ["plural", "after"]);
-  });
-
-  it("treats a template's `${}` slot as code rather than as more text", () => {
-    // The one input that tells the two readings apart. A slot holding a NESTED
-    // template balances either way — backticks come in pairs, so a scan that
-    // reads the slot as text still ends the outer literal in the right place by
-    // luck. A slot holding a string that CONTAINS a backtick does not: read as
-    // text, that backtick closes the outer template, the `}` after it is taken
-    // for the literal's own closing brace, and every key below this one
-    // disappears from the count without anything looking wrong.
-    const parsed = parseObjectLiteral(
-      '\n  nested: (p) => `a ${p.n ? "`" : ""} b`,\n  after: "still here",\n',
-    );
-    assert.deepEqual(parsed.keys, ["nested", "after"]);
-  });
-
-  it("does not read a function body's own keys", () => {
-    const parsed = parseObjectLiteral(`
-  outer: (params?: TranslationParams) => {
-    const inner = { nested: 1, alsoNested: 2 };
-    return \`\${inner.nested}\`;
-  },
-  after: "still here",
-`);
-    assert.deepEqual(parsed.keys, ["outer", "after"]);
-  });
-
-  it("does not read a URL inside a string as a comment", () => {
-    // Real row: `runtimeConfigUrlPlaceholder: "https://your-project.supabase.co"`.
-    const parsed = parseObjectLiteral(`
-  url: "https://your-project.supabase.co",
-  after: "still here",
-`);
-    assert.deepEqual(parsed.keys, ["url", "after"]);
-  });
-
-  it("skips comments and escaped quotes", () => {
-    const parsed = parseObjectLiteral(`
-  // leading: "not a key",
-  real: "value",
-  /* blockKey: "also not a key" */
-  quoted: "she said \\"hi: there\\"",
-  after: "still here",
-`);
-    assert.deepEqual(parsed.keys, ["real", "quoted", "after"]);
-  });
-
-  it("stops at the brace that closes the literal", () => {
-    const source = `const a = {\n  only: "1",\n};\n\nconst b = {\n  ...en,\n  other: "2",\n};\n`;
-    const a = findLocaleBlock(source, "a");
-    assert.ok(a);
-    assert.deepEqual(a!.keys, ["only"]);
-    assert.equal(a!.body.includes("other"), false);
-    const b = findLocaleBlock(source, "b");
-    assert.deepEqual(b!.keys, ["other"]);
-  });
-
-  it("returns null for a language with no map", () => {
-    assert.equal(findLocaleBlock(`const en = {\n  a: "1",\n};\n`, "fr"), null);
-  });
-
-  it("reads the TranslationMap annotation the non-base maps carry", () => {
-    const block = findLocaleBlock(
-      `const ru: TranslationMap = {\n  ...en,\n  a: "1",\n};\n`,
-      "ru",
-    );
-    assert.ok(block);
-    assert.equal(block!.inheritsBase, true);
-    assert.deepEqual(block!.keys, ["a"]);
-  });
-});
-
-describe("translation literal parser — second derivation", () => {
-  // The scanner reads syntax; `declaredKeysByIndentation` reads prettier's
-  // output. Two statements of "what does this literal declare" that can
-  // disagree, which is the point: a scanner bug that swallows entries shows up
-  // here rather than as a smaller number that still looks plausible.
-  for (const language of TRANSLATION_LANGUAGES) {
-    it(`agrees with the indentation derivation for '${language}'`, () => {
-      const block = findLocaleBlock(SOURCE, language);
-      assert.ok(block, `no '${language}' map`);
-      assert.deepEqual(
-        [...block!.keys],
-        [...declaredKeysByIndentation(block!.body)],
-        `the two derivations disagree about what '${language}' declares`,
-      );
-    });
-  }
-
-  it("the two derivations can disagree, so the agreement above is worth asserting", () => {
-    // A continuation line inside a multi-line template: the indentation rule
-    // reads `fake` as a key, the scanner reads it as text.
-    const spanning = "\n  note: `line one\n  fake: still inside the template`,\n";
-    assert.deepEqual(parseObjectLiteral(spanning).keys, ["note"]);
-    assert.deepEqual(declaredKeysByIndentation(spanning), ["note", "fake"]);
-
-    // And the other direction: two entries on one line, which the indentation
-    // rule can only ever see the first of.
-    const packed = `\n  first: "one", second: "two",\n`;
-    assert.deepEqual(parseObjectLiteral(packed).keys, ["first", "second"]);
-    assert.deepEqual(declaredKeysByIndentation(packed), ["first"]);
-  });
-});
-
 describe("translation coverage", () => {
   it("covers every language the picker offers, and no others", () => {
     // `languageOptions` is what the UI actually surfaces; a language added
     // there and not here would never be measured.
-    const block = SOURCE.match(
-      /languageOptions\s*:\s*\{\s*code[\s\S]*?\}\s*\[\s*\]\s*=\s*\[([\s\S]*?)\];/,
-    );
-    assert.ok(block, "languageOptions declaration not found");
-    const offered = [...block![1].matchAll(/code:\s*"([a-z-]+)"/g)].map((m) => m[1]);
+    const offered = languageOptionCodes(SOURCE);
     assert.deepEqual([...offered].sort(), [...TRANSLATION_LANGUAGES].sort());
   });
 

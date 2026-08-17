@@ -9,6 +9,7 @@ import {
   titleSimilarity,
 } from "@/lib/marketplace-helpers";
 import { MarketplaceListing } from "@/lib/types";
+import { localeKeys } from "@/lib/i18n-source";
 
 function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
@@ -122,15 +123,10 @@ describe("listing detail: price history wiring", () => {
       "marketplacePriceHistoryHint",
     ];
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
-      const block =
-        lang === "en"
-          ? src.match(/const\s+en\s*=\s*{([\s\S]*?)\n}\s*as\s+const;/)
-          : src.match(new RegExp(`const\\s+${lang}\\s*:\\s*TranslationMap\\s*=\\s*{([\\s\\S]*?)\\n};`));
-      assert.ok(block, `could not locate language block for '${lang}'`);
+      const declared = localeKeys(src, lang);
       for (const key of requiredKeys) {
-        assert.match(
-          block![1],
-          new RegExp(`\\b${key}\\s*:`),
+        assert.ok(
+          declared.has(key),
           `language '${lang}' missing key '${key}'`,
         );
       }

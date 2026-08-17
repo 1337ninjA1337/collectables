@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { findLocaleBlock, localeKeys } from "@/lib/i18n-source";
+
 const i18nSrc = readFileSync(
   path.join(process.cwd(), "lib", "i18n-context.tsx"),
   "utf8",
@@ -24,12 +26,8 @@ const LANGUAGES = ["en", "ru", "be", "pl", "de", "es"] as const;
 describe("Crash #13 — i18n keys present in English master map", () => {
   for (const key of REQUIRED_KEYS) {
     it(`'${key}' is declared in en`, () => {
-      // Match against the en object literal: opens at "const en = {", closes at the first "} as const;"
-      const enBlock = i18nSrc.match(/const\s+en\s*=\s*\{[\s\S]*?\}\s*as const/);
-      assert.ok(enBlock, "could not locate the 'const en' map");
-      assert.match(
-        enBlock[0],
-        new RegExp(`${key}:\\s*`),
+      assert.ok(
+        localeKeys(i18nSrc, "en").has(key),
         `'${key}' must be declared inside the en map`,
       );
     });
@@ -40,17 +38,13 @@ describe("Crash #13 — every locale either spreads ...en or declares the key", 
   for (const lang of LANGUAGES) {
     if (lang === "en") continue;
     it(`'${lang}' inherits or overrides every fallback key`, () => {
-      const block = i18nSrc.match(
-        new RegExp(`const\\s+${lang}\\s*:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?\\n\\};`),
-      );
+      const block = findLocaleBlock(i18nSrc, lang);
       assert.ok(block, `could not locate '${lang}' map`);
       // Either the language spreads ...en (then inheritance is automatic) or
       // it declares the key inline.
-      const spreadsEn = /\.\.\.en/.test(block[0]);
       for (const key of REQUIRED_KEYS) {
-        const hasInline = new RegExp(`${key}:\\s*`).test(block[0]);
         assert.ok(
-          spreadsEn || hasInline,
+          block!.inheritsBase || block!.keys.includes(key),
           `'${lang}' must spread ...en or declare '${key}' inline`,
         );
       }
@@ -63,13 +57,8 @@ describe("Crash #13 — non-English locales declare localised crash strings", ()
   const localised = ["ru", "be", "pl", "de", "es"] as const;
   for (const lang of localised) {
     it(`'${lang}' declares its own crashFallbackTitle override`, () => {
-      const block = i18nSrc.match(
-        new RegExp(`const\\s+${lang}\\s*:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?\\n\\};`),
-      );
-      assert.ok(block);
-      assert.match(
-        block[0],
-        /crashFallbackTitle:\s*"/,
+      assert.ok(
+        localeKeys(i18nSrc, lang).has("crashFallbackTitle"),
         `'${lang}' must override crashFallbackTitle`,
       );
     });

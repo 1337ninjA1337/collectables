@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { localeKeys } from "@/lib/i18n-source";
+
 /**
  * Structural tests for the buyer "Mark as received" affordance on the
  * marketplace purchases grid and the listing-detail screen. We grep the
@@ -73,15 +75,10 @@ describe("mark-received translations", () => {
       "marketplaceMarkReceivedSuccess",
     ];
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
-      const blockMatch =
-        lang === "en"
-          ? src.match(/const\s+en\s*=\s*{([\s\S]*?)\n}\s*as\s+const;/)
-          : src.match(new RegExp(`const\\s+${lang}\\s*:\\s*TranslationMap\\s*=\\s*{([\\s\\S]*?)\\n};`));
-      assert.ok(blockMatch, `could not locate language block for '${lang}'`);
+      const declared = localeKeys(src, lang);
       for (const key of requiredKeys) {
-        assert.match(
-          blockMatch![1],
-          new RegExp(`\\b${key}\\s*:`),
+        assert.ok(
+          declared.has(key),
           `language '${lang}' missing key '${key}'`,
         );
       }

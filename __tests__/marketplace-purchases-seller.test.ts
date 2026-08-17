@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { localeKeys } from "@/lib/i18n-source";
+
 function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
 }
@@ -42,14 +44,9 @@ describe("marketplaceBoughtFrom i18n parity", () => {
 
   it("declares marketplaceBoughtFrom in every supported language map", () => {
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
-      const block =
-        lang === "en"
-          ? src.match(/const\s+en\s*=\s*{([\s\S]*?)\n}\s*as\s+const;/)
-          : src.match(new RegExp(`const\\s+${lang}\\s*:\\s*TranslationMap\\s*=\\s*{([\\s\\S]*?)\\n};`));
-      assert.ok(block, `could not locate language block for '${lang}'`);
-      assert.match(
-        block![1],
-        /\bmarketplaceBoughtFrom\s*:/,
+      const declared = localeKeys(src, lang);
+      assert.ok(
+        declared.has("marketplaceBoughtFrom"),
         `language '${lang}' missing marketplaceBoughtFrom`,
       );
     }

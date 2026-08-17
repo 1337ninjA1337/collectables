@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { localeKeys } from "@/lib/i18n-source";
+
 /**
  * Structural tests for the seller-side "Delivery confirmed {when}" indicator
  * on the My-sales card. We grep the source to avoid pulling React Native peers
@@ -47,14 +49,9 @@ describe("delivery-confirmed translations", () => {
   it("declares marketplaceDeliveryConfirmed in every language map", () => {
     const src = read("lib/i18n-context.tsx");
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
-      const blockMatch =
-        lang === "en"
-          ? src.match(/const\s+en\s*=\s*{([\s\S]*?)\n}\s*as\s+const;/)
-          : src.match(new RegExp(`const\\s+${lang}\\s*:\\s*TranslationMap\\s*=\\s*{([\\s\\S]*?)\\n};`));
-      assert.ok(blockMatch, `could not locate language block for '${lang}'`);
-      assert.match(
-        blockMatch![1],
-        /\bmarketplaceDeliveryConfirmed\s*:/,
+      const declared = localeKeys(src, lang);
+      assert.ok(
+        declared.has("marketplaceDeliveryConfirmed"),
         `language '${lang}' missing key 'marketplaceDeliveryConfirmed'`,
       );
     }

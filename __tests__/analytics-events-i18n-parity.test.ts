@@ -8,6 +8,8 @@ import {
   ANALYTICS_EVENT_NAMES,
 } from "../lib/analytics-events";
 
+import { localeKeys } from "@/lib/i18n-source";
+
 /**
  * Event descriptions are EN-only by design today — they live in
  * `ANALYTICS_EVENTS[name].description` and surface in the Power BI schema doc
@@ -27,19 +29,6 @@ const i18nSrc = readFileSync(
 
 const LANGUAGES = ["en", "ru", "be", "pl", "de", "es"] as const;
 
-/** Slice one language's object literal out of the i18n source. */
-function languageBlock(code: string): string {
-  const decl =
-    code === "en" ? "const en = {" : `const ${code}: TranslationMap = {`;
-  const start = i18nSrc.indexOf(decl);
-  assert.ok(start >= 0, `declaration for '${code}' not found`);
-  const rest = i18nSrc.slice(start + decl.length);
-  const next = rest.search(
-    /\nconst \w+(?:: \w+)? = \{|\nconst \w+: TranslationMap = \{/,
-  );
-  return next >= 0 ? rest.slice(0, next) : rest;
-}
-
 describe("analytics event descriptions — i18n parity", () => {
   it("every event has a non-empty English description in the taxonomy", () => {
     for (const name of ANALYTICS_EVENT_NAMES) {
@@ -52,9 +41,9 @@ describe("analytics event descriptions — i18n parity", () => {
 
   it("a translated description exists in all languages or none", () => {
     for (const name of ANALYTICS_EVENT_NAMES) {
-      const key = `analyticsEventDesc_${name}:`;
+      const key = `analyticsEventDesc_${name}`;
       const present = LANGUAGES.filter((code) =>
-        languageBlock(code).includes(key),
+        localeKeys(i18nSrc, code).has(key),
       );
       assert.ok(
         present.length === 0 || present.length === LANGUAGES.length,

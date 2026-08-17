@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 
+import { findLanguageOptions } from "@/lib/i18n-source";
 import {
   PRIVACY_DEFAULT_LANGUAGE,
   PRIVACY_PAGE_LANGUAGES,
@@ -16,9 +17,9 @@ import {
  * surfaces):
  *
  * 1. `PRIVACY_PAGE_LANGUAGES` stays in lockstep with the i18n
- *    `languageOptions` picker (parsed from source — `lib/i18n-context.tsx`
- *    imports react-native peers, same pattern as
- *    `i18n-locale-map-parity.test.ts`).
+ *    `languageOptions` picker (read from source through `lib/i18n-source.ts` —
+ *    `lib/i18n-context.tsx` imports react-native peers, and that module is the
+ *    one parser for it).
  * 2. Every non-English language has a tracked `PRIVACY.md.<code>` whose
  *    Sentry paragraph keeps the disclosure-critical facts (sub-processor
  *    links, PII strip, retention window, opt-out path).
@@ -31,19 +32,7 @@ const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
 
 const I18N_SOURCE = read("lib/i18n-context.tsx");
 
-function parseLanguageOptions(): { code: string; label: string }[] {
-  const block = I18N_SOURCE.match(
-    /languageOptions\s*:\s*\{\s*code[\s\S]*?\}\s*\[\s*\]\s*=\s*\[([\s\S]*?)\];/,
-  );
-  assert.ok(block, "languageOptions declaration not found in lib/i18n-context.tsx");
-  const options: { code: string; label: string }[] = [];
-  const entryRegex = /code:\s*"([^"]+)",\s*label:\s*"([^"]+)"/g;
-  let match: RegExpExecArray | null;
-  while ((match = entryRegex.exec(block![1])) !== null) {
-    options.push({ code: match[1], label: match[2] });
-  }
-  return options;
-}
+const parseLanguageOptions = () => findLanguageOptions(I18N_SOURCE);
 
 describe("PRIVACY_PAGE_LANGUAGES ↔ i18n languageOptions parity", () => {
   const i18nOptions = parseLanguageOptions();
