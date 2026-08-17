@@ -1245,6 +1245,8 @@ const be: TranslationMap = {
   saveItem: "Захаваць прадмет",
   deleteCollection: "Выдаліць калекцыю",
   deleteItem: "Выдаліць прадмет",
+  deleteItemTitle: "Выдаліць прадмет?",
+  deleteItemText: "Ён знікне з гэтай калекцыі назаўсёды.",
   settings: "Налады",
   settingsTitle: "Налады праграмы",
   language: "Мова",
@@ -1389,6 +1391,8 @@ const be: TranslationMap = {
 const pl: TranslationMap = {
   ...en,
   deleteItem: "Usuń przedmiot",
+  deleteItemTitle: "Usunąć przedmiot?",
+  deleteItemText: "Zniknie z tej kolekcji na zawsze.",
   diagnosticsTitle: "Diagnostyka i raporty o awariach",
   diagnosticsHint:
     "Gdy włączone, anonimowe raporty o awariach pomagają nam szybciej naprawiać błędy. Wyłącz, aby nie wysyłać diagnostyki.",
@@ -1615,6 +1619,8 @@ const pl: TranslationMap = {
 const de: TranslationMap = {
   ...en,
   deleteItem: "Objekt löschen",
+  deleteItemTitle: "Objekt löschen?",
+  deleteItemText: "Es verschwindet dauerhaft aus dieser Sammlung.",
   diagnosticsTitle: "Diagnose & Absturzberichte",
   diagnosticsHint:
     "Wenn aktiviert, helfen uns anonyme Absturzberichte, Fehler schneller zu beheben. Deaktivieren, um keine Diagnosedaten zu senden.",
@@ -1837,6 +1843,8 @@ const de: TranslationMap = {
 const es: TranslationMap = {
   ...en,
   deleteItem: "Eliminar objeto",
+  deleteItemTitle: "¿Eliminar objeto?",
+  deleteItemText: "Desaparecerá de esta colección de forma permanente.",
   diagnosticsTitle: "Diagnóstico e informes de fallos",
   diagnosticsHint:
     "Si está activado, los informes anónimos de fallos nos ayudan a corregir errores más rápido. Desactívalo para no enviar diagnósticos.",
