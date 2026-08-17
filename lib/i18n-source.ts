@@ -95,6 +95,14 @@ type ScanResult = ParsedObjectLiteral &
  * regex, and a scanner that reads it as structure ends the literal early and
  * loses every key below it.
  *
+ * The `.` is in the class for one shape and one only: a trailing-dot numeric
+ * literal. `2. / 2` is a division, and `.` was outside the class, so the `/`
+ * opened a regex and ate the rest of its line — `1.5 / 2` escaped it by ending
+ * in a DIGIT, which is why the hole stayed invisible while every decimal in
+ * the file went through. A `.` can be the token before a `/` in no other valid
+ * program (`p./re/` is a syntax error, and no statement begins with a dot), so
+ * reading it as end-of-expression is unconditional rather than a guess.
+ *
  * What a misread costs, since it decides how much the two rules below have to
  * be right about: {@link skipRegExpLiteral} stops at a NEWLINE, so a `/` read
  * as a regex opener swallows the rest of its line and the scan resyncs on the
@@ -102,7 +110,7 @@ type ScanResult = ParsedObjectLiteral &
  * than a truncated literal — and it is also why a stale-word bug cannot be
  * caught by counting keys from outside on a file prettier has wrapped.
  */
-const DIVISION_FOLLOWS = /[A-Za-z0-9_$)\]}"'`]/;
+const DIVISION_FOLLOWS = /[A-Za-z0-9_$)\]}"'`.]/;
 
 /**
  * …except after one of these words, which end in an identifier character and
@@ -125,14 +133,29 @@ const DIVISION_FOLLOWS = /[A-Za-z0-9_$)\]}"'`]/;
  * Every row therefore carries the shape that puts one there, and three of them
  * (`extends`, `instanceof`, `new`) are rows the PARSER accepts and the runtime
  * then rejects — which changes nothing here, since a tokeniser has to read the
- * literal either way. Words that end an expression (`this`, `true`, `null`,
- * `super`) are deliberately absent, and so are the ones a punctuator always
- * follows: `if`, `while`, `for` and `switch` take a `(`, and a `/` after the
- * matching `)` is the ambiguity this scanner cannot resolve without a parser.
+ * literal either way. Three more (`break`, `continue`, `debugger`) put their
+ * regex on the NEXT LINE, because that is the only place one can stand: each
+ * ends a statement, so no valid program writes a `/` straight after them, and
+ * ASI closes the statement at the line break so the `/re/` below opens a new
+ * one. A row costs nothing where there is no division to get wrong, and
+ * leaving them out is exactly how a word ends up in neither the table nor the
+ * audit.
+ *
+ * Words that end an expression (`this`, `true`, `null`, `super`) are
+ * deliberately absent, and so are the ones a punctuator or a binding name
+ * always follows: `if`, `while`, `for` and `switch` take a `(`, and a `/`
+ * after the matching `)` is the ambiguity this scanner cannot resolve without
+ * a parser. Which side each word of the language falls on is checked
+ * exhaustively against ECMA-262's `ReservedWord` production in
+ * `__tests__/i18n-source.test.ts`, so a word in NEITHER list is a red case
+ * rather than an invisible one.
  */
 export const REGEXP_FOLLOWS_KEYWORD: Readonly<Record<string, string>> = {
-  await: 'await /re/.test(s)',
-  case: 'case /re/.test(s):',
+  await: "await /re/.test(s)",
+  break: "break\n/re/.test(s);",
+  case: "case /re/.test(s):",
+  continue: "continue\n/re/.test(s);",
+  debugger: "debugger\n/re/.test(s);",
   default: "export default /re/;",
   delete: "delete /re/.lastIndex",
   do: "do /re/.test(s); while (next())",
@@ -149,9 +172,16 @@ export const REGEXP_FOLLOWS_KEYWORD: Readonly<Record<string, string>> = {
   yield: "yield /re/",
 };
 
-const REGEXP_KEYWORDS: ReadonlySet<string> = new Set(
-  Object.keys(REGEXP_FOLLOWS_KEYWORD),
-);
+/**
+ * Membership is read off the table itself rather than off a `Set` rebuilt from
+ * its keys at import: a second structure derived from the first cannot drift on
+ * the day it is written and is precisely what a later hand-edit drifts, with
+ * every membership case still green — they read the record, and the scanner
+ * read the set. `Object.hasOwn` rather than `in`, so a value named
+ * `constructor` or `toString` is not a keyword by inheritance.
+ */
+const followsRegExpKeyword = (word: string): boolean =>
+  Object.hasOwn(REGEXP_FOLLOWS_KEYWORD, word);
 
 /**
  * Scans a literal body and reports what it declares at its OWN level.
@@ -246,7 +276,7 @@ function scanLiteral(
     }
     if (
       ch === "/" &&
-      (!DIVISION_FOLLOWS.test(prev) || REGEXP_KEYWORDS.has(prevWord))
+      (!DIVISION_FOLLOWS.test(prev) || followsRegExpKeyword(prevWord))
     ) {
       i = skipRegExpLiteral(source, i);
       consumed("/");
@@ -328,6 +358,11 @@ function scanLiteral(
       // last word would open a regex and swallow the rest of that line — the
       // stale-word failure, arriving through a member access rather than
       // through a branch that forgot to clear. `?.` ends in the same `.`.
+      //
+      // This clause never runs for a NUMBER: a digit is not an identifier
+      // start, so `1.5 / 2` reaches the `/` rule with a digit recorded, not a
+      // dot. What the two dots share is {@link DIVISION_FOLLOWS}, which is
+      // where the trailing-dot literal is handled.
       const afterMemberDot = prev === ".";
       const name = readIdentifier(source, i);
       i += name.length;
