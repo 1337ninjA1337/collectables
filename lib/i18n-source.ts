@@ -94,32 +94,64 @@ type ScanResult = ParsedObjectLiteral &
  * all: a value like `(p) => p.name.replace(/}/g, "")` puts a brace inside a
  * regex, and a scanner that reads it as structure ends the literal early and
  * loses every key below it.
+ *
+ * What a misread costs, since it decides how much the two rules below have to
+ * be right about: {@link skipRegExpLiteral} stops at a NEWLINE, so a `/` read
+ * as a regex opener swallows the rest of its line and the scan resyncs on the
+ * next one. That bound is why every hazard here is a lost key or two rather
+ * than a truncated literal — and it is also why a stale-word bug cannot be
+ * caught by counting keys from outside on a file prettier has wrapped.
  */
 const DIVISION_FOLLOWS = /[A-Za-z0-9_$)\]}"'`]/;
 
 /**
- * …except after one of these. A keyword ends in an identifier character, so the
- * one-character rule above calls `return /}/.test(s)` a division and reads the
- * pattern as structure — the exact failure the regex branch exists to prevent,
- * one keyword away. `x / 2` and `returnValue / 2` are still divisions: what
- * matters is the whole word before the slash, not its last letter.
+ * …except after one of these words, which end in an identifier character and
+ * still leave the grammar expecting an expression — so the one-character rule
+ * above calls `return /}/.test(s)` a division and reads the pattern as
+ * structure, the exact failure the regex branch exists to prevent, one keyword
+ * away. `x / 2` and `returnValue / 2` are still divisions: what matters is the
+ * whole word before the slash, not its last letter.
+ *
+ * The list is derived rather than recalled, because a list written from memory
+ * is the kind that is wrong in one row nobody checks. ECMA-262 tokenises with
+ * two goal symbols — `InputElementRegExp`, where a `/` starts a
+ * `RegularExpressionLiteral`, and `InputElementDiv`, where it is the division
+ * operator — and the goal is chosen by whether the grammar is at the START of
+ * an expression. `DIVISION_FOLLOWS` approximates "the previous token ended an
+ * expression"; a reserved word is where that approximation breaks, so the
+ * membership rule is not "is this a keyword" but "can an expression begin
+ * immediately after this word".
+ *
+ * Every row therefore carries the shape that puts one there, and three of them
+ * (`extends`, `instanceof`, `new`) are rows the PARSER accepts and the runtime
+ * then rejects — which changes nothing here, since a tokeniser has to read the
+ * literal either way. Words that end an expression (`this`, `true`, `null`,
+ * `super`) are deliberately absent, and so are the ones a punctuator always
+ * follows: `if`, `while`, `for` and `switch` take a `(`, and a `/` after the
+ * matching `)` is the ambiguity this scanner cannot resolve without a parser.
  */
-const REGEXP_FOLLOWS_KEYWORD = new Set([
-  "await",
-  "case",
-  "delete",
-  "do",
-  "else",
-  "in",
-  "instanceof",
-  "new",
-  "of",
-  "return",
-  "throw",
-  "typeof",
-  "void",
-  "yield",
-]);
+export const REGEXP_FOLLOWS_KEYWORD: Readonly<Record<string, string>> = {
+  await: 'await /re/.test(s)',
+  case: 'case /re/.test(s):',
+  default: "export default /re/;",
+  delete: "delete /re/.lastIndex",
+  do: "do /re/.test(s); while (next())",
+  else: "else /re/.test(s);",
+  extends: "class R extends /re/ {}",
+  in: '"source" in /re/',
+  instanceof: "s instanceof /re/",
+  new: "new /re/()",
+  of: "for (const m of /re/)",
+  return: "return /re/.test(s)",
+  throw: "throw /re/",
+  typeof: "typeof /re/",
+  void: "void /re/",
+  yield: "yield /re/",
+};
+
+const REGEXP_KEYWORDS: ReadonlySet<string> = new Set(
+  Object.keys(REGEXP_FOLLOWS_KEYWORD),
+);
 
 /**
  * Scans a literal body and reports what it declares at its OWN level.
@@ -214,7 +246,7 @@ function scanLiteral(
     }
     if (
       ch === "/" &&
-      (!DIVISION_FOLLOWS.test(prev) || REGEXP_FOLLOWS_KEYWORD.has(prevWord))
+      (!DIVISION_FOLLOWS.test(prev) || REGEXP_KEYWORDS.has(prevWord))
     ) {
       i = skipRegExpLiteral(source, i);
       consumed("/");
@@ -290,15 +322,26 @@ function scanLiteral(
       continue;
     }
     if (isIdentifierStart(ch)) {
+      // A word reached through a `.` is a PROPERTY NAME and not a keyword, and
+      // the difference is the whole point of the word rule: `p.return` ends an
+      // expression, so `p.return / 2` divides, while recording `return` as the
+      // last word would open a regex and swallow the rest of that line — the
+      // stale-word failure, arriving through a member access rather than
+      // through a branch that forgot to clear. `?.` ends in the same `.`.
+      const afterMemberDot = prev === ".";
       const name = readIdentifier(source, i);
       i += name.length;
-      consumed(name, name);
+      consumed(name, afterMemberDot ? "" : name);
       if (atTopLevel() && expectKey) {
         let j = i;
         while (j < source.length && /\s/.test(source[j])) j += 1;
         if (source[j] === ":") {
           keys.push(name);
           i = j + 1;
+          // The second call on this path, and still one per TOKEN: the
+          // lookahead consumed a `:` of its own, and a key's colon has to
+          // clear the word the same way any other punctuation does —
+          // `{ return: 1, half: (p) => p.n / 2 }` divides.
           consumed(":");
         } else if (
           source[j] === "," ||

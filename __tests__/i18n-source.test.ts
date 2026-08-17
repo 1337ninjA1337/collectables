@@ -12,6 +12,7 @@ import {
   languageOptionCodes,
   localeKeys,
   parseObjectLiteral,
+  REGEXP_FOLLOWS_KEYWORD,
 } from "@/lib/i18n-source";
 import { TRANSLATION_LANGUAGES } from "@/lib/i18n-coverage";
 
@@ -189,6 +190,24 @@ describe("translation literal parser", () => {
     ]);
   });
 
+  it("divides after a property whose name happens to be a keyword", () => {
+    // The word rule reads the last identifier, and a member access puts a
+    // keyword there stripped of everything that made it one: `p.return` ENDS
+    // an expression, so the `/` after it divides. Recorded as a keyword it
+    // opens a regex instead, and the misread runs to the end of the line —
+    // taking the `${}` slot's close, the template and the `,` with it, so the
+    // scan spends the rest of the literal inside a frame that never closed and
+    // every key below is silently not a key. Same stale-word failure
+    // `consumed()` was written to make unreachable, arriving through a member
+    // access rather than through a branch that forgot to clear.
+    const parsed = parseObjectLiteral(`
+  ratio: (p) => \`\${p.return / 2}\`,
+  chained: (p) => \`\${p?.of / 2}\`,
+  after: "still here",
+`);
+    assert.deepEqual(parsed.keys, ["ratio", "chained", "after"]);
+  });
+
   it("reads shorthand properties, which is how the translations record is written", () => {
     // `const translations: Record<AppLanguage, TranslationMap> = { en, ru, … }`
     // declares six keys and writes not one colon.
@@ -241,6 +260,111 @@ describe("translation literal parser", () => {
       "",
     ].join("\n");
     assert.deepEqual(findObjectLiteral(source, "en")!.keys, ["real"]);
+  });
+});
+
+/**
+ * The keyword list was fourteen entries written from memory, and one of them
+ * was exercised. A list recalled rather than derived is wrong in the row nobody
+ * checks, so it is a table now — each row carrying the shape that puts a regex
+ * after the word — and these cases check it against the rule it is derived
+ * from (can an expression BEGIN after this word) rather than against the same
+ * memory that produced it.
+ */
+describe("the keyword table the regex rule is read from", () => {
+  const ROWS = Object.entries(REGEXP_FOLLOWS_KEYWORD);
+  const KEYWORDS = Object.keys(REGEXP_FOLLOWS_KEYWORD);
+
+  it("shows, for every row, a regex standing where the word puts one", () => {
+    // A row whose example does not put a `/` after its own word is a row
+    // somebody added on the strength of it being a keyword.
+    for (const [word, example] of ROWS) {
+      assert.ok(
+        example.includes(`${word} /`),
+        `\`${word}\` row does not show the word before a slash: ${example}`,
+      );
+      assert.ok(
+        example.includes("/re/"),
+        `\`${word}\` row does not show a regex literal: ${example}`,
+      );
+    }
+  });
+
+  it("is lowercase and alphabetical, so a new row lands where it is looked for", () => {
+    // Duplicates cannot survive an object literal, which is half the reason
+    // this stopped being a `Set([...])` of bare strings.
+    assert.deepEqual(KEYWORDS, [...KEYWORDS].sort());
+    for (const word of KEYWORDS) assert.match(word, /^[a-z]+$/);
+  });
+
+  it("leaves out the words that end an expression", () => {
+    // These end in identifier characters too, and `DIVISION_FOLLOWS` is RIGHT
+    // about them: `this / 2` divides. A row here would turn every such
+    // division into a regex that eats its line.
+    for (const word of ["this", "super", "true", "false", "null"]) {
+      assert.ok(!KEYWORDS.includes(word), `\`${word}\` ends an expression`);
+    }
+  });
+
+  it("leaves out the words a punctuator always follows", () => {
+    // `if`/`while`/`for`/`switch` take a `(`, `try`/`finally` a `{`,
+    // `var`/`let`/`const` a binding name, `break`/`continue` a label. None of
+    // them can be the word immediately before a `/` — and `export` is the row
+    // that shows why the table keys on the LAST word: `export default /re/`
+    // belongs to `default`.
+    for (const word of [
+      "break",
+      "class",
+      "const",
+      "continue",
+      "debugger",
+      "export",
+      "finally",
+      "for",
+      "function",
+      "if",
+      "import",
+      "let",
+      "switch",
+      "try",
+      "var",
+      "while",
+      "with",
+    ]) {
+      assert.ok(!KEYWORDS.includes(word), `\`${word}\` takes a punctuator`);
+    }
+  });
+
+  it("consults every row, and a word outside the table divides", () => {
+    // Each row driven through the scanner, which is what makes the table a
+    // rule the code obeys rather than documentation beside it: with the word
+    // recognised, `/}/` is a pattern and both keys survive. The control is the
+    // same fixture with a non-row word — the `}` is read as the literal's
+    // close and everything below it is lost, which is the cost of a row that
+    // should be here and is not.
+    for (const word of KEYWORDS) {
+      const parsed = parseObjectLiteral(`
+  a: (p) => ${word} /}/.test(p.s),
+  after: "still here",
+`);
+      assert.deepEqual(parsed.keys, ["a", "after"], `after \`${word}\``);
+    }
+
+    const control = parseObjectLiteral(`
+  a: (p) => returnValue /}/.test(p.s),
+  after: "still here",
+`);
+    assert.deepEqual(control.keys, ["a"]);
+  });
+
+  it("carries the three rows the parser accepts and the runtime does not", () => {
+    // `new /re/()`, `s instanceof /re/` and `class R extends /re/ {}` all
+    // throw when they run, and all three are still regex literals a tokeniser
+    // has to read past. Pinned because "that would crash" is exactly the
+    // argument for deleting them from the table.
+    for (const word of ["extends", "instanceof", "new"]) {
+      assert.ok(KEYWORDS.includes(word), `\`${word}\` row missing`);
+    }
   });
 });
 
