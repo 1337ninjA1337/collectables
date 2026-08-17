@@ -163,6 +163,32 @@ describe("translation literal parser", () => {
     assert.deepEqual(parsed.keys, ["guard", "ratio", "after"]);
   });
 
+  it("keeps the keyword across whitespace and across a comment", () => {
+    // The word before the slash is what decides, and it has to survive what
+    // prettier puts between the two — spaces, and a comment it wrapped a long
+    // ternary around. The other direction cannot be pinned from out here: a
+    // stale word would misread a division as a regex, and `skipRegExpLiteral`
+    // stops at the line end, so the scan resyncs on the next line with the
+    // count unchanged. That the pair moves together is a property of
+    // `consumed()` having one call site per token, not of an assertion.
+    const parsed = parseObjectLiteral(`
+  spaced: (p) => {
+    return  /}/.test(String(p.s)) ? "1" : "2";
+  },
+  commented: (p) => {
+    return /* keep */ /}/.test(String(p.s)) ? "3" : "4";
+  },
+  divided: (p) => \`\${p.a / p.b}\`,
+  after: "still here",
+`);
+    assert.deepEqual(parsed.keys, [
+      "spaced",
+      "commented",
+      "divided",
+      "after",
+    ]);
+  });
+
   it("reads shorthand properties, which is how the translations record is written", () => {
     // `const translations: Record<AppLanguage, TranslationMap> = { en, ru, … }`
     // declares six keys and writes not one colon.

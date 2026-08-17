@@ -79,12 +79,14 @@ export type ArrayLiteralBlock = {
 /** The character that ends the literal a scan was started on. */
 type Closer = "}" | "]";
 
-type ScanResult = ParsedObjectLiteral & {
-  /** Bodies of the object literals at the scanned literal's own level. */
-  readonly elements: readonly string[];
-  /** Index of the {@link Closer} that ended the scan, or the source length. */
-  readonly end: number;
-};
+/** Where a scan stopped: the index of its {@link Closer}, or the source length. */
+type ScanEnd = { readonly end: number };
+
+type ScanResult = ParsedObjectLiteral &
+  ScanEnd & {
+    /** Bodies of the object literals at the scanned literal's own level. */
+    readonly elements: readonly string[];
+  };
 
 /**
  * After one of these, a `/` is division; anywhere else it opens a regular
@@ -155,10 +157,22 @@ function scanLiteral(
   let inTemplate = false;
   /** Start of the top-level object literal currently open, if any. */
   let elementStart: number | null = null;
-  /** Last significant character consumed — only `/` disambiguation reads it. */
+  /** Last significant character consumed — only the `/` rule reads it. */
   let prev = "";
   /** Last identifier consumed, cleared by any other token. Same reader. */
   let prevWord = "";
+
+  /**
+   * Records the token just consumed: its last character, and the whole word
+   * when the token WAS an identifier. One call rather than two assignments,
+   * because the pair has to move together — a branch that recorded the
+   * character and forgot the word would leave a stale keyword one token too
+   * long, and `return "x" / 2` would open a regex.
+   */
+  const consumed = (token: string, word = "") => {
+    prev = token.length > 0 ? token[token.length - 1] : prev;
+    prevWord = word;
+  };
 
   const atTopLevel = () => depth === 0 && frames.length === 0 && !inTemplate;
 
@@ -172,8 +186,7 @@ function scanLiteral(
       }
       if (ch === "`") {
         inTemplate = false;
-        prev = "`";
-        prevWord = "";
+        consumed("`");
         i += 1;
         continue;
       }
@@ -181,8 +194,7 @@ function scanLiteral(
         frames.push(depth);
         depth = 0;
         inTemplate = false;
-        prev = "{";
-        prevWord = "";
+        consumed("{");
         i += 2;
         continue;
       }
@@ -205,8 +217,7 @@ function scanLiteral(
       (!DIVISION_FOLLOWS.test(prev) || REGEXP_FOLLOWS_KEYWORD.has(prevWord))
     ) {
       i = skipRegExpLiteral(source, i);
-      prev = "/";
-      prevWord = "";
+      consumed("/");
       expectKey = false;
       continue;
     }
@@ -216,15 +227,13 @@ function scanLiteral(
         i += source[i] === "\\" ? 2 : 1;
       }
       i += 1;
-      prev = ch;
-      prevWord = "";
+      consumed(ch);
       expectKey = false;
       continue;
     }
     if (ch === "`") {
       inTemplate = true;
-      prev = "`";
-      prevWord = "";
+      consumed("`");
       i += 1;
       expectKey = false;
       continue;
@@ -235,8 +244,7 @@ function scanLiteral(
     if (ch === "{" || ch === "[") {
       if (ch === "{" && collectElements && atTopLevel()) elementStart = i + 1;
       depth += 1;
-      prev = ch;
-      prevWord = "";
+      consumed(ch);
       i += 1;
       continue;
     }
@@ -250,8 +258,7 @@ function scanLiteral(
           if (frame !== undefined) {
             depth = frame;
             inTemplate = true;
-            prev = "}";
-            prevWord = "";
+            consumed("}");
             i += 1;
             continue;
           }
@@ -263,15 +270,13 @@ function scanLiteral(
         elements.push(source.slice(elementStart, i));
         elementStart = null;
       }
-      prev = ch;
-      prevWord = "";
+      consumed(ch);
       i += 1;
       continue;
     }
     if (ch === ",") {
       if (atTopLevel()) expectKey = true;
-      prev = ",";
-      prevWord = "";
+      consumed(",");
       i += 1;
       continue;
     }
@@ -280,24 +285,21 @@ function scanLiteral(
       const spread = readIdentifier(source, i);
       if (atTopLevel() && spread) spreads.push(spread);
       i += spread.length;
-      prev = spread.length > 0 ? spread[spread.length - 1] : ".";
-      prevWord = "";
+      consumed(spread.length > 0 ? spread : ".");
       expectKey = false;
       continue;
     }
     if (isIdentifierStart(ch)) {
       const name = readIdentifier(source, i);
       i += name.length;
-      prev = name[name.length - 1];
-      prevWord = name;
+      consumed(name, name);
       if (atTopLevel() && expectKey) {
         let j = i;
         while (j < source.length && /\s/.test(source[j])) j += 1;
         if (source[j] === ":") {
           keys.push(name);
           i = j + 1;
-          prev = ":";
-          prevWord = "";
+          consumed(":");
         } else if (
           source[j] === "," ||
           source[j] === close ||
@@ -313,14 +315,30 @@ function scanLiteral(
       expectKey = false;
       continue;
     }
-    if (!/\s/.test(ch)) {
-      prev = ch;
-      prevWord = "";
-    }
+    if (!/\s/.test(ch)) consumed(ch);
     i += 1;
   }
 
   return { keys, spreads, elements, end: source.length };
+}
+
+/**
+ * What one object literal declares, and where it ended. Element spans are not
+ * offered: an object scan does not collect them, and a type that carried the
+ * field would hand a future reader an empty list instead of a compile error.
+ */
+function scanObjectBody(source: string, start: number): ParsedObjectLiteral & ScanEnd {
+  const { keys, spreads, end } = scanLiteral(source, start, "}");
+  return { keys, spreads, end };
+}
+
+/** The object literals written at one array literal's own level, and its end. */
+function scanArrayBody(
+  source: string,
+  start: number,
+): { readonly elements: readonly string[] } & ScanEnd {
+  const { elements, end } = scanLiteral(source, start, "]");
+  return { elements, end };
 }
 
 /**
@@ -377,7 +395,7 @@ function readIdentifier(source: string, at: number): string {
  * from.
  */
 export function parseObjectLiteral(body: string): ParsedObjectLiteral {
-  const { keys, spreads } = scanLiteral(body, 0);
+  const { keys, spreads } = scanObjectBody(body, 0);
   return { keys, spreads };
 }
 
@@ -432,7 +450,7 @@ export function findObjectLiteral(
   const declaration = declarationPattern(name, "{").exec(source);
   if (!declaration) return null;
   const bodyStart = declaration.index + declaration[0].length;
-  const { keys, spreads, end } = scanLiteral(source, bodyStart, "}");
+  const { keys, spreads, end } = scanObjectBody(source, bodyStart);
   return { name, body: source.slice(bodyStart, end), keys, spreads };
 }
 
@@ -447,7 +465,7 @@ export function findArrayLiteral(
   const declaration = declarationPattern(name, "[").exec(source);
   if (!declaration) return null;
   const bodyStart = declaration.index + declaration[0].length;
-  const { elements, end } = scanLiteral(source, bodyStart, "]");
+  const { elements, end } = scanArrayBody(source, bodyStart);
   return { name, body: source.slice(bodyStart, end), elements };
 }
 
