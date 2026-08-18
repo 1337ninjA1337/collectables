@@ -162,3 +162,23 @@ export const REGEXP_FOLLOWS_KEYWORD: Readonly<Record<string, KeywordRegExpRow>> 
  */
 export const followsRegExpKeyword = (word: string): boolean =>
   Object.hasOwn(REGEXP_FOLLOWS_KEYWORD, word);
+
+/**
+ * The rule itself: given the previous token, does a `/` here open a pattern?
+ *
+ * `prev` is the previous token's LAST character and `prevWord` is the previous
+ * token when it was an identifier, empty otherwise. Both callers had this
+ * expression written out — `!DIVISION_FOLLOWS.test(prev) ||
+ * followsRegExpKeyword(prevWord)` — which is the rule spelled twice in the two
+ * modules that exist so it is spelled once.
+ *
+ * `prevWord` must be EMPTY for a word reached through a `.`, and that is the
+ * caller's job because only the caller knows where a token began: `p.return`
+ * ends an expression, so `p.return / 2` divides, while recording `return` as
+ * the last word opens a regex and swallows the rest of the line. That was live
+ * in `stripComments` — `lib/i18n-source.ts` had cleared the word after a
+ * member dot since its own scanner shipped, and the stripper's smaller copy of
+ * the same tracking never did.
+ */
+export const opensRegExp = (prev: string, prevWord: string): boolean =>
+  !DIVISION_FOLLOWS.test(prev) || followsRegExpKeyword(prevWord);

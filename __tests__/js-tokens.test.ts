@@ -5,6 +5,7 @@ import {
   DIVISION_FOLLOWS,
   REGEXP_FOLLOWS_KEYWORD,
   followsRegExpKeyword,
+  opensRegExp,
 } from "@/lib/js-tokens";
 
 import { readRepoFile } from "./helpers/repo-file";
@@ -361,5 +362,49 @@ describe("followsRegExpKeyword — membership, read off the table itself", () =>
     // the record and the scanner read the set.
     assert.doesNotMatch(SOURCE, /new Set\(/);
     assert.match(SOURCE, /Object\.hasOwn\(REGEXP_FOLLOWS_KEYWORD, word\)/);
+  });
+});
+
+
+describe("opensRegExp — the rule both scanners branch on", () => {
+  it("opens after a character no expression can end with", () => {
+    for (const prev of ["(", "[", "{", ",", ";", "=", "+", "!", "?", ":", "&", "|", ""]) {
+      assert.ok(opensRegExp(prev, ""), `a regex can begin after \`${prev}\``);
+    }
+  });
+
+  it("divides after a character that ends an expression", () => {
+    for (const prev of ["a", "7", ")", "]", "}", '"', "'", "`", ".", "_", "$"]) {
+      assert.ok(!opensRegExp(prev, ""), `\`${prev}\` ends an expression`);
+    }
+  });
+
+  it("opens after a keyword even though the keyword ends in an identifier character", () => {
+    // The whole reason the word half exists: `return` ends in `n`, which
+    // `DIVISION_FOLLOWS` covers, and `return /}/.test(s)` is still a pattern.
+    for (const word of ["return", "typeof", "case", "of", "in", "new"]) {
+      assert.ok(opensRegExp(word[word.length - 1], word), `\`${word}\` puts a regex after it`);
+    }
+  });
+
+  it("takes an EMPTY word for a name reached through a `.`, and that is the caller's job", () => {
+    // The function cannot see where a token began, so a caller that records
+    // `return` for `p.return` gets a regex — which is what `stripComments` did
+    // until the member-dot flag landed. Stated here as the contract rather
+    // than left implicit in two loops.
+    assert.ok(opensRegExp("n", "return"));
+    assert.ok(!opensRegExp("n", ""));
+  });
+
+  it("is what both scanners call, rather than each spelling the rule", () => {
+    for (const caller of ["lib/strip-comments.ts", "lib/i18n-source.ts"]) {
+      const source = readRepoFile(caller);
+      assert.match(source, /\bopensRegExp\(prev, prevWord\)/, `${caller} does not call the rule`);
+      assert.doesNotMatch(
+        source,
+        /!DIVISION_FOLLOWS\.test\(prev\)/,
+        `${caller} still spells the rule out`,
+      );
+    }
   });
 });

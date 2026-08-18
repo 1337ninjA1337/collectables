@@ -122,6 +122,46 @@ describe("stripComments", () => {
     assert.ok(!stripComments("const re = /[/]/; // gone").includes("gone"));
   });
 
+  it("does not read a keyword reached through a `.` as a keyword", () => {
+    // `p.return` is a PROPERTY NAME and ends an expression, so `p.return / 2`
+    // divides. Recording `return` as the last word opened a regex and blanked
+    // the rest of the line — after which the comment below survived into what
+    // a guard reads as code, which is the failure this module exists to
+    // prevent. `lib/i18n-source.ts` cleared the word after a member dot when
+    // its scanner shipped; this module's smaller copy of the same tracking
+    // never did, and shared the rule without sharing that.
+    for (const access of ["a.return", "q.delete", "a?.return", "a . return", "o.typeof"]) {
+      const stripped = stripComments(`const n = ${access} / 2; // gone\nconst b = 1;`);
+      assert.ok(stripped.includes(`const n = ${access} / 2;`), access);
+      assert.ok(!stripped.includes("gone"), `${access}: the comment survived as code`);
+      assert.ok(stripped.includes("const b = 1;"), `${access}: the next line was eaten`);
+    }
+  });
+
+  it("still opens a regex after a BARE keyword", () => {
+    // The other direction, and the reason the word rule exists at all: clearing
+    // the word too eagerly would make `return /}/` a division, read the `}` as
+    // structure, and blank real code — a guard going silently blind rather than
+    // loudly wrong.
+    assert.ok(!stripComments("return /[a-z]/.test(s); // gone").includes("gone"));
+    assert.ok(!stripComments("case /re/.test(s):  // gone").includes("gone"));
+    // A word merely ENDING in a keyword is not one.
+    assert.ok(stripComments("const n = myreturn / 2; // gone").includes("const n = myreturn / 2;"));
+    assert.ok(!stripComments("const n = myreturn / 2; // gone").includes("gone"));
+  });
+
+  it("reads a numeric literal's last character, not a digit in the middle", () => {
+    // The `.` inside `1.5` breaks the identifier run, so the digits after it
+    // start a new one whose first character follows a `.` — the same shape as
+    // a member access, and it must still divide. All four literal forms end in
+    // a character `DIVISION_FOLLOWS` covers.
+    for (const literal of [".5", "2.", "0x1f", "1_000n", "1e5"]) {
+      const stripped = stripComments(`const n = ${literal} / 2; // gone\nconst b = 1;`);
+      assert.ok(!stripped.includes("gone"), `${literal}: the comment survived`);
+      assert.ok(stripped.includes("const b = 1;"), `${literal}: the next line was eaten`);
+    }
+  });
+
   it("leaves no comment in the repository surviving as code", () => {
     // The sweep that found it, kept as the regression — and widened past the
     // suite directory, because half the twenty were in `lib/`: a sweep that

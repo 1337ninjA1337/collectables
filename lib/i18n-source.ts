@@ -40,7 +40,7 @@
  */
 
 /** The map every other locale spreads, and the denominator of every ratio. */
-import { DIVISION_FOLLOWS, followsRegExpKeyword } from "./js-tokens";
+import { DIVISION_FOLLOWS, opensRegExp } from "./js-tokens";
 
 export const TRANSLATION_BASE_LANGUAGE = "en";
 
@@ -246,10 +246,7 @@ function scanLiteral(
       i = closeAt === -1 ? source.length : closeAt + 2;
       continue;
     }
-    if (
-      ch === "/" &&
-      (!DIVISION_FOLLOWS.test(prev) || followsRegExpKeyword(prevWord))
-    ) {
+    if (ch === "/" && opensRegExp(prev, prevWord)) {
       i = skipRegExpLiteral(source, i);
       consumed("/");
       expectKey = false;

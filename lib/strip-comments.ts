@@ -32,14 +32,25 @@
  * lines in `chat-context-uuid.test.ts`, `i18n-source.test.ts`,
  * `lib/privacy-page.ts` and `lib/spa-fallback.ts`, all of them downstream of a
  * single unpaired backtick or quote inside a pattern. The regex-versus-
- * division rule is {@link startsRegExp}'s, shared with the scanner in
- * `lib/i18n-source.ts` that needed the same answer first.
+ * division rule is `opensRegExp`'s, in `lib/js-tokens.ts`, shared with the
+ * scanner in `lib/i18n-source.ts` that needed the same answer first.
  *
  * It is still not a parser. It tracks the previous token approximately — the
  * last non-space character, and the last identifier word — which is what the
  * shared rule takes, and which is wrong only where a full parse is required
  * (a `/` after the `)` of an `if (…)`). `lib/js-tokens.ts` says where that
  * line is.
+ *
+ * Sharing the rule is not the same as sharing the tracking, and the difference
+ * was a live hazard here: `lib/i18n-source.ts` clears the word for a name
+ * reached through a `.`, because `p.return` is a property name that ends an
+ * expression and `p.return / 2` divides. This module's smaller copy did not,
+ * so it opened a pattern there and blanked the rest of the line — a comment
+ * below it surviving into what a guard reads as code, which is the one thing
+ * stripping exists to prevent. Nothing in the tree triggered it, which is why
+ * it was a hazard rather than a failure; the cases pin both directions, since
+ * clearing the word too eagerly makes `return /}/` a division and blanks real
+ * code instead.
  *
  * A caller has to decide one more thing after stripping — whether to flatten
  * whitespace as well — and the eleven that call this had each decided it
@@ -68,7 +79,7 @@
  * a reader opens first.
  */
 
-import { DIVISION_FOLLOWS, followsRegExpKeyword } from "./js-tokens";
+import { opensRegExp } from "./js-tokens";
 
 /**
  * Comment bodies replaced by spaces, newlines and string literals preserved.
@@ -81,6 +92,18 @@ export function stripComments(source: string): string {
   let prev = "";
   /** The identifier run ending at {@link prev}, for the keyword rows. */
   let prevWord = "";
+  /** Whether {@link prev} is inside an identifier run rather than ending one. */
+  let inWord = false;
+  /**
+   * Whether the run being accumulated began right after a `.`.
+   *
+   * A word reached through a member access is a PROPERTY NAME, not a keyword:
+   * `p.return` ends an expression, so `p.return / 2` divides. Recording
+   * `return` as the last word opens a regex and blanks the rest of the line —
+   * a comment below it then survives into what a guard reads as code, which is
+   * the failure this module exists to prevent. `?.` ends in the same `.`.
+   */
+  let afterMemberDot = false;
   for (let i = 0; i < source.length; i++) {
     const c = source[i];
     const next = source[i + 1];
@@ -90,12 +113,23 @@ export function stripComments(source: string): string {
       else if (c === "'") mode = "single";
       else if (c === '"') mode = "double";
       else if (c === "`") mode = "template";
-      else if (c === "/" && (!DIVISION_FOLLOWS.test(prev) || followsRegExpKeyword(prevWord))) {
-        mode = "regex";
-      }
+      else if (c === "/" && opensRegExp(prev, prevWord)) mode = "regex";
       if (mode === "line" || mode === "block") out[i] = " ";
       if (mode === "code" && !/\s/.test(c)) {
-        prevWord = /[A-Za-z0-9_$]/.test(c) ? prevWord + c : "";
+        if (/[A-Za-z0-9_$]/.test(c)) {
+          // The flag is read at the START of a run and held for the rest of
+          // it: recomputing it per character would answer `prev === "."` only
+          // for the first one, which is the same bug one character narrower.
+          // Whitespace does not break a run here because it does not move
+          // `prev` — `p . return` is still a member access.
+          if (!inWord) afterMemberDot = prev === ".";
+          inWord = true;
+          prevWord = afterMemberDot ? "" : prevWord + c;
+        } else {
+          inWord = false;
+          afterMemberDot = false;
+          prevWord = "";
+        }
         prev = c;
       }
     } else if (mode === "regex") {
@@ -111,6 +145,7 @@ export function stripComments(source: string): string {
         mode = "code";
         prev = "/";
         prevWord = "";
+        inWord = false;
       }
     } else if (mode === "line") {
       if (c === "\n") mode = "code";
@@ -135,6 +170,7 @@ export function stripComments(source: string): string {
       if (mode === "code") {
         prev = c === "\n" ? prev : c;
         prevWord = "";
+        inWord = false;
       }
     }
   }
