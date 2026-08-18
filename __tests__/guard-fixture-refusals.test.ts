@@ -57,6 +57,7 @@ import {
 import { assertPhraseTable } from "./helpers/phrase-table";
 
 import { REPO_ROOT, readRepoFile, repoPath } from "./helpers/repo-file";
+import { SUITES_REL } from "./helpers/suite-files";
 
 const FLOOR_MODULE = "lib/scanned-floor.ts";
 
@@ -166,7 +167,7 @@ describe("the loader check", () => {
    * scratch root under test.
    */
   function resolveInChild(root: string, env: Record<string, string>): string {
-    const helper = repoPath("__tests__", "helpers", "guard-fixture.ts");
+    const helper = repoPath(SUITES_REL, "helpers", "guard-fixture.ts");
     const script = `
       const { tsxLoaderIn } = require(${JSON.stringify(helper)});
       try {

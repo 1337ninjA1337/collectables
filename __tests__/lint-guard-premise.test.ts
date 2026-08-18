@@ -25,10 +25,7 @@ import { LINT_GUARDS, type LintGuard } from "../lib/lint-guards";
 import { SCANNED_FLOORS, scannedFloorFor } from "../lib/scanned-floor";
 import { checkNameOf, runGuardWith } from "./helpers/guard-fixture";
 
-import { repoPath } from "./helpers/repo-file";
-
-/** The suite glob `npm test` runs, and the set this file's drift guard reads. */
-const SUITE_DIR = repoPath("__tests__");
+import { suiteCode, topLevelSuites } from "./helpers/suite-files";
 
 /**
  * The spawn shape no suite may carry, assembled from two halves.
@@ -145,14 +142,9 @@ describe("every guard reports what it examined", () => {
     // already — in a file whose siblings had been fixed a day earlier — because
     // nothing said it must not. Comments are stripped first: two files explain
     // this in prose and must stay able to.
-    const offenders = fs
-      .readdirSync(SUITE_DIR)
-      .filter((entry) => entry.endsWith(".test.ts"))
-      .filter((entry) =>
-        TSX_BIN_SPAWN.test(
-          stripComments(fs.readFileSync(path.join(SUITE_DIR, entry), "utf8")),
-        ),
-      );
+    const offenders = topLevelSuites().filter((entry) =>
+      TSX_BIN_SPAWN.test(suiteCode(entry)),
+    );
     assert.deepEqual(
       offenders,
       [],

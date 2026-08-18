@@ -1,0 +1,151 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import path from "node:path";
+
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+import {
+  SUITES_DIR,
+  SUITES_REL,
+  readSuite,
+  suiteCode,
+  suiteFiles,
+  suiteText,
+  topLevelSuites,
+} from "./helpers/suite-files";
+
+/**
+ * One walk over the suite directory.
+ *
+ * Seven suites sweep their siblings, because a guard that says "no suite does
+ * X" cannot be written against a list — the list is the thing that goes stale.
+ * Each had the walk written out, and four of the copies were byte-identical,
+ * three of those added on the same day by the runs that removed exactly this
+ * duplication one level down. The reason to consolidate at four rather than at
+ * forty is that four copies in one day is a rate, not a count.
+ *
+ * The sweep below is the same shape as the ones it serves, and is deliberately
+ * not exempted from itself: this suite calls the helper like everyone else.
+ */
+
+/** The one file allowed to walk the directory itself. */
+const HELPER = path.join("helpers", "suite-files.ts");
+
+/**
+ * {@link HELPER}, and this suite, which pins the value it resolves to.
+ *
+ * Two entries and no more. Every other suite that named the directory — the
+ * bundler's exclusion list, the stub directory, the fixture's path to
+ * `guard-fixture.ts`, the recursive walk that looks for strays below one level
+ * — takes `SUITES_REL` now, including the one whose whole subject is what this
+ * module's one-level walk MISSES.
+ */
+const ALLOWED_TO_NAME_THE_DIRECTORY: readonly string[] = [
+  HELPER,
+  "suite-files-helper.test.ts",
+];
+
+describe("the suite directory, walked once", () => {
+  it("resolves to the directory the suites are actually in", () => {
+    assert.equal(SUITES_REL, "__tests__");
+    assert.equal(SUITES_DIR, repoPath(SUITES_REL));
+    assert.equal(SUITES_DIR, path.dirname(new URL(import.meta.url).pathname));
+  });
+
+  it("walks one level deep, and returns paths relative to the directory", () => {
+    const files = suiteFiles();
+    // Relative, because that is what an offender list should print and what an
+    // exemption entry is written as — an absolute path in a failure message
+    // spends the reader's eye on the runner's checkout prefix.
+    assert.ok(files.every((relative) => !path.isAbsolute(relative)));
+    assert.ok(files.includes("suite-files-helper.test.ts"), "misses this file");
+    assert.ok(files.includes(HELPER), "misses the nested helper");
+    assert.ok(files.every((relative) => relative.endsWith(".ts")));
+    // One level and no further: nothing reads a third today, and a suite that
+    // appeared at one should turn a guard red rather than be quietly skipped.
+    assert.ok(
+      files.every((relative) => relative.split(path.sep).length <= 2),
+      "the walk returned a path more than one level deep",
+    );
+    assert.ok(files.length > 200, `only ${files.length} suite files walked`);
+  });
+
+  it("separates what is WRITTEN from what npm test actually RUNS", () => {
+    const top = topLevelSuites();
+    assert.ok(top.every((name) => name.endsWith(".test.ts")));
+    assert.ok(top.every((name) => !name.includes(path.sep)));
+    assert.ok(top.includes("suite-files-helper.test.ts"));
+    // The difference is the whole reason for two functions: `helpers/` is in
+    // one and not the other, and a suite parked in a subdirectory typechecks
+    // while never executing — the silent-coverage-loss shape that
+    // `test-typecheck-prelude.test.ts` exists to catch.
+    assert.ok(suiteFiles().includes(HELPER));
+    assert.ok(!top.includes(HELPER));
+    assert.ok(top.length < suiteFiles().length);
+    // And the glob in package.json is the claim this set is standing in for.
+    const pkg = JSON.parse(readRepoFile("package.json")) as {
+      scripts: { test: string };
+    };
+    assert.match(pkg.scripts.test, /__tests__\/\*\.test\.ts/);
+  });
+
+  it("reads a suite three ways, and the normalising is the rule not a detail", () => {
+    const raw = readSuite(HELPER);
+    assert.ok(raw.includes("export function suiteFiles"));
+    // Flattened: a shape survives being found across a prettier rewrap, which
+    // is how a guard once read three suites clean while they still did the
+    // thing it forbade.
+    assert.ok(!/\s\s/.test(suiteText(HELPER)));
+    assert.equal(suiteText(HELPER), raw.replace(/\s+/g, " "));
+    // Stripped: the helper's own doc comment quotes shapes that guards retire,
+    // so prose can explain a thing the code must not do.
+    assert.ok(suiteText(HELPER).includes("* Two shapes"));
+    assert.ok(!suiteCode(HELPER).includes("* Two shapes"));
+    assert.ok(suiteCode(HELPER).includes("export function suiteFiles"));
+  });
+
+  it("throws on a name that is not a suite rather than answering with nothing", () => {
+    assert.throws(() => readSuite("no-such-suite.test.ts"), /ENOENT/);
+  });
+
+  it("leaves no suite walking the directory for itself", () => {
+    // Matches the walk's anchor rather than its body: every copy has to start
+    // by naming the directory, however the recursion below it is written. With
+    // `SUITES_REL` exported there is nothing left that a suite needs the
+    // literal for — and `test-typecheck-prelude.test.ts` is NOT exempt, because
+    // it was migrated onto the constant too; only its recursion is its own, on
+    // purpose, since its subject is the files a one-level walk would miss.
+    const offenders = suiteFiles().filter((relative) => {
+      if (ALLOWED_TO_NAME_THE_DIRECTORY.includes(relative)) return false;
+      return /"__tests__"|'__tests__'/.test(suiteCode(relative));
+    });
+    assert.deepEqual(
+      offenders,
+      [],
+      `these suites name the suite directory instead of importing SUITES_REL: ${offenders.join(", ")}`,
+    );
+  });
+
+  it("keeps the exemption list to the two files that have to say the name", () => {
+    assert.deepEqual(ALLOWED_TO_NAME_THE_DIRECTORY, [
+      HELPER,
+      "suite-files-helper.test.ts",
+    ]);
+    for (const allowed of ALLOWED_TO_NAME_THE_DIRECTORY) {
+      assert.ok(suiteFiles().includes(allowed), `exempted file ${allowed} is not in the walk`);
+      assert.ok(
+        suiteCode(allowed).includes('"__tests__"'),
+        `${allowed} is exempted but no longer names the directory — drop the entry`,
+      );
+    }
+  });
+
+  it("has enough callers that the sweep above is not scanning an empty room", () => {
+    const readers = suiteFiles().filter((relative) =>
+      suiteText(relative).includes("helpers/suite-files"),
+    );
+    assert.ok(
+      readers.length >= 7,
+      `only ${readers.length} suites walk through the helper — seven had their own copy`,
+    );
+  });
+});

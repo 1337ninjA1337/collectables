@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import path from "node:path";
 import { readRepoFile as read, repoPath, repoRelative } from "./helpers/repo-file";
+import { SUITES_REL } from "./helpers/suite-files";
 
 /**
  * Pins the typecheck to the front of `npm test`.
@@ -169,7 +170,7 @@ describe("the typecheck actually covers the test files", () => {
     // this whole prelude exists to catch.
     for (const pattern of tsconfig.exclude ?? []) {
       assert.ok(
-        !pattern.includes("__tests__"),
+        !pattern.includes(SUITES_REL),
         `tsconfig excludes ${pattern}, which would hide type errors in test files`,
       );
     }
@@ -180,7 +181,7 @@ describe("the typecheck actually covers the test files", () => {
     // subdirectory typechecks (the tsconfig glob is recursive) but never
     // EXECUTES — the same silent-coverage-loss shape as the Node 20 pin.
     const { readdirSync } = await import("node:fs");
-    const testsDir = repoPath("__tests__");
+    const testsDir = repoPath(SUITES_REL);
     const stray: string[] = [];
     const walk = (dir: string, depth: number) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {

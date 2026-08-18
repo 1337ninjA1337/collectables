@@ -1,9 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
-
-import { stripComments } from "@/lib/env-inlining";
 
 import {
   I18N_SOURCE_REL,
@@ -15,6 +12,7 @@ import {
   repoPath,
   repoRelative,
 } from "./helpers/repo-file";
+import { SUITES_REL, suiteCode, suiteFiles, suiteText } from "./helpers/suite-files";
 
 /**
  * One definition of "read a file out of the repository".
@@ -56,7 +54,6 @@ import {
  * first time you meet it.
  */
 
-const TESTS_DIR = repoPath("__tests__");
 /** The one file allowed to open a repo-relative path itself. */
 const HELPER = path.join("helpers", "repo-file.ts");
 
@@ -80,37 +77,6 @@ const ALLOWED_TO_SPELL_THE_SHAPE: readonly string[] = [
 
 /** The two ways a suite used to derive the root, and the rule is neither. */
 const ROOT_DERIVATIONS: readonly string[] = ["process.cwd()", "__dirname"];
-
-/** Every `.ts` under `__tests__`, one level of subdirectory included. */
-function suiteFiles(): readonly string[] {
-  const found: string[] = [];
-  for (const entry of readdirSync(TESTS_DIR)) {
-    const full = path.join(TESTS_DIR, entry);
-    if (statSync(full).isDirectory()) {
-      for (const nested of readdirSync(full)) {
-        if (nested.endsWith(".ts")) found.push(path.join(entry, nested));
-      }
-      continue;
-    }
-    if (entry.endsWith(".ts")) found.push(entry);
-  }
-  return found;
-}
-
-/** Source with runs of whitespace flattened, so a reformat cannot hide one. */
-const flattened = (relative: string): string =>
-  readRepoFile("__tests__", relative).replace(/\s+/g, " ");
-
-/**
- * The same with comments removed first.
- *
- * The `process.cwd()` rule is about what a suite DOES, and prose is where the
- * decision gets explained — the helper's own doc comment quotes the shape it
- * retired, and so does this one. Stripping comments is what lets the rule stay
- * "not at all" instead of growing an exemption per file that mentions it.
- */
-const code = (relative: string): string =>
-  stripComments(readRepoFile("__tests__", relative)).replace(/\s+/g, " ");
 
 describe("reading a repo file, said once", () => {
   it("reads a real file, resolved from the repository root", () => {
@@ -138,7 +104,7 @@ describe("reading a repo file, said once", () => {
     // coming back.
     const offenders = suiteFiles().filter((relative) => {
       if (ALLOWED_TO_SPELL_THE_SHAPE.includes(relative)) return false;
-      const text = flattened(relative);
+      const text = suiteText(relative);
       return (
         text.includes('(rel: string) => readFileSync(') ||
         text.includes('(rel: string): string => readFileSync(') ||
@@ -165,7 +131,7 @@ describe("reading a repo file, said once", () => {
     for (const derivation of ROOT_DERIVATIONS) {
       const offenders = suiteFiles().filter((relative) => {
         if (ALLOWED_TO_SPELL_THE_SHAPE.includes(relative)) return false;
-        return code(relative).includes(derivation);
+        return suiteCode(relative).includes(derivation);
       });
       assert.deepEqual(
         offenders,
@@ -182,7 +148,7 @@ describe("reading a repo file, said once", () => {
     // If it ever stops holding, this fails here rather than as forty-three
     // ENOENTs with no indication that they are one fact.
     assert.equal(REPO_ROOT, process.cwd());
-    assert.equal(repoPath("__tests__"), path.dirname(new URL(import.meta.url).pathname));
+    assert.equal(repoPath(SUITES_REL), path.dirname(new URL(import.meta.url).pathname));
   });
 
   it("joins segments or a slash-joined string to the same path, either helper", () => {
@@ -236,7 +202,7 @@ describe("reading a repo file, said once", () => {
       // string to search for. An entry that stopped using it is an exemption
       // standing open for the next suite to walk through.
       assert.ok(
-        ROOT_DERIVATIONS.some((derivation) => code(allowed).includes(derivation)),
+        ROOT_DERIVATIONS.some((derivation) => suiteCode(allowed).includes(derivation)),
         `${allowed} is exempted from the root rule but no longer names the root — drop the entry`,
       );
     }
@@ -247,7 +213,7 @@ describe("reading a repo file, said once", () => {
     assert.ok(files.length > 200, `only ${files.length} suite files walked`);
     assert.ok(files.includes(HELPER), "the walk misses the helper itself");
     const readers = files.filter((relative) =>
-      flattened(relative).includes("helpers/repo-file"),
+      suiteText(relative).includes("helpers/repo-file"),
     );
     // Raised from 120 when the `process.cwd()` sweep landed and another ~85
     // suites came through the helper. Deliberately well under the ~290 that

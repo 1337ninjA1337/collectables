@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { findLanguageOptions, localeKeys } from "@/lib/i18n-source";
@@ -9,6 +9,7 @@ import {
   readI18nSource,
 } from "./helpers/i18n-source-file";
 import { repoPath } from "./helpers/repo-file";
+import { suiteFiles, suiteText } from "./helpers/suite-files";
 
 /**
  * One statement of where `lib/i18n-context.tsx` is.
@@ -37,7 +38,6 @@ import { repoPath } from "./helpers/repo-file";
  * quote the retired shape as a string in order to search for it.
  */
 
-const TESTS_DIR = repoPath("__tests__");
 /** The one file allowed to name the translations module's location. */
 const HELPER = path.join("helpers", "i18n-source-file.ts");
 
@@ -46,26 +46,6 @@ const ALLOWED_TO_SPELL_THE_PATH: readonly string[] = [
   HELPER,
   "i18n-source-file.test.ts",
 ];
-
-/** Every `.ts` under `__tests__`, one level of subdirectory included. */
-function suiteFiles(): readonly string[] {
-  const found: string[] = [];
-  for (const entry of readdirSync(TESTS_DIR)) {
-    const full = path.join(TESTS_DIR, entry);
-    if (statSync(full).isDirectory()) {
-      for (const nested of readdirSync(full)) {
-        if (nested.endsWith(".ts")) found.push(path.join(entry, nested));
-      }
-      continue;
-    }
-    if (entry.endsWith(".ts")) found.push(entry);
-  }
-  return found;
-}
-
-/** Source with runs of whitespace flattened, so a reformat cannot hide a join. */
-const flattened = (relative: string): string =>
-  readFileSync(path.join(TESTS_DIR, relative), "utf8").replace(/\s+/g, " ");
 
 describe("the translations module's path, said once", () => {
   it("reads the real file, and the parser can answer questions about it", () => {
@@ -102,7 +82,7 @@ describe("the translations module's path, said once", () => {
     // is how a copy of it would be — is caught the same as a one-liner.
     const offenders = suiteFiles().filter((relative) => {
       if (ALLOWED_TO_SPELL_THE_PATH.includes(relative)) return false;
-      const text = flattened(relative);
+      const text = suiteText(relative);
       return (
         // `path.join(process.cwd(), "lib", "i18n-context.tsx")`, and the
         // inline `require("node:path").join(…)` one suite reached for.
@@ -145,7 +125,7 @@ describe("the translations module's path, said once", () => {
     assert.ok(files.length > 200, `only ${files.length} suite files walked`);
     assert.ok(files.includes(HELPER), "the walk misses the helper itself");
     const readers = files.filter((relative) =>
-      flattened(relative).includes("readI18nSource"),
+      suiteText(relative).includes("readI18nSource"),
     );
     assert.ok(
       readers.length >= 40,

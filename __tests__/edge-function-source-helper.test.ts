@@ -1,16 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import path from "node:path";
-
-import { stripComments } from "@/lib/env-inlining";
 
 import {
   edgeFunctionPath,
   edgeFunctionRel,
   readEdgeFunction,
 } from "./helpers/edge-function-source";
-import { REPO_ROOT, readRepoFile, repoPath } from "./helpers/repo-file";
+import { REPO_ROOT, repoPath } from "./helpers/repo-file";
+import { suiteCode, suiteFiles } from "./helpers/suite-files";
 
 /**
  * One statement of `supabase/functions/<name>/index.ts`.
@@ -27,31 +26,11 @@ import { REPO_ROOT, readRepoFile, repoPath } from "./helpers/repo-file";
  * offenders and a walk that is broken look identical from here.
  */
 
-const TESTS_DIR = repoPath("__tests__");
 /** The one file allowed to render the layout, and this suite, which quotes it. */
 const ALLOWED_TO_SPELL_THE_LAYOUT: readonly string[] = [
   path.join("helpers", "edge-function-source.ts"),
   "edge-function-source-helper.test.ts",
 ];
-
-/** Every `.ts` under `__tests__`, one level of subdirectory included. */
-function suiteFiles(): readonly string[] {
-  const found: string[] = [];
-  for (const entry of readdirSync(TESTS_DIR)) {
-    const full = path.join(TESTS_DIR, entry);
-    if (statSync(full).isDirectory()) {
-      for (const nested of readdirSync(full)) {
-        if (nested.endsWith(".ts")) found.push(path.join(entry, nested));
-      }
-      continue;
-    }
-    if (entry.endsWith(".ts")) found.push(entry);
-  }
-  return found;
-}
-
-const code = (relative: string): string =>
-  stripComments(readRepoFile("__tests__", relative)).replace(/\s+/g, " ");
 
 describe("an Edge Function's source, by name", () => {
   it("renders the layout every function in the repo actually uses", () => {
@@ -94,7 +73,7 @@ describe("an Edge Function's source, by name", () => {
     // already at three copies.
     const offenders = suiteFiles().filter((relative) => {
       if (ALLOWED_TO_SPELL_THE_LAYOUT.includes(relative)) return false;
-      return /supabase\/functions\/\$\{|"supabase", "functions", [a-z]/.test(code(relative));
+      return /supabase\/functions\/\$\{|"supabase", "functions", [a-z]/.test(suiteCode(relative));
     });
     assert.deepEqual(
       offenders,

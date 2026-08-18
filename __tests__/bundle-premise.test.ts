@@ -16,6 +16,7 @@ import {
 } from "../lib/bundle-premise";
 import { collectBundlePremise } from "../scripts/bundle-premise";
 import { readRepoFile as read, repoPath } from "./helpers/repo-file";
+import { SUITES_REL } from "./helpers/suite-files";
 
 /**
  * Pins the shared "the input exists and is fresh" premise the three
@@ -233,7 +234,7 @@ describe("the declared bundle input", () => {
   it("excludes the trees Metro never bundles", () => {
     // A test or a lint guard changing must not make a perfectly current
     // bundle look stale — a freshness check that cries wolf gets turned off.
-    for (const excluded of ["__tests__", "scripts", "dist", ".github"]) {
+    for (const excluded of [SUITES_REL, "scripts", "dist", ".github"]) {
       assert.ok(
         !(BUNDLE_SOURCE_PATHS as readonly string[]).includes(excluded),
         `${excluded}/ is not bundled; listing it would produce false staleness`,

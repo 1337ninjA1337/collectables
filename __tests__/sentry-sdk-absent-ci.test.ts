@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { readRepoFile as read, repoPath } from "./helpers/repo-file";
+import { readRepoFile as read } from "./helpers/repo-file";
+import { topLevelSuites } from "./helpers/suite-files";
 
 
 /**
@@ -121,9 +121,7 @@ describe("test:sentry shares its runner flags with npm test", () => {
     // absent but never with it present.
     const glob = /__tests__\/([^\s]+)\.test\.ts/.exec(pkg.scripts["test:sentry"])?.[1];
     assert.equal(glob, "sentry-*", "`test:sentry` must run the sentry-* glob");
-    const files = readdirSync(repoPath("__tests__")).filter((n) =>
-      /^sentry-.*\.test\.ts$/.test(n),
-    );
+    const files = topLevelSuites().filter((n) => /^sentry-.*\.test\.ts$/.test(n));
     assert.ok(files.length > 0, "the sentry-* glob must match at least one suite");
     // `npm test`'s glob is one level deep too, so every match above is also
     // run by the main suite — assert the shape rather than trusting it.

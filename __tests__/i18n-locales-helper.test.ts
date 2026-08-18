@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import path from "node:path";
 
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
@@ -16,7 +14,7 @@ import {
 } from "./helpers/i18n-locales";
 import { localeKeys } from "@/lib/i18n-source";
 
-import { repoPath } from "./helpers/repo-file";
+import { readSuite, topLevelSuites } from "./helpers/suite-files";
 
 /** A locale's own declared keys, as an array — `localeKeys` returns a Set. */
 const localeKeysOf = (source: string, code: string): readonly string[] => [
@@ -425,15 +423,9 @@ describe("the habit stays retired", () => {
   const EXEMPT = ["bundle-smoke.test.ts"];
 
   it("leaves no suite counting locale hits across the whole translations file", () => {
-    const dir = repoPath("__tests__");
-    const suites = readdirSync(dir).filter(
-      (entry) =>
-        entry.endsWith(".test.ts") &&
-        statSync(path.join(dir, entry)).isFile() &&
-        !EXEMPT.includes(entry),
-    );
+    const suites = topLevelSuites().filter((entry) => !EXEMPT.includes(entry));
     const offenders = suites.filter((entry) => {
-      const text = readFileSync(path.join(dir, entry), "utf8");
+      const text = readSuite(entry);
       // `\\s*` rather than a single space: the habit survives prettier
       // wrapping `assert.equal(\n  matches.length,\n  6,\n)`, and the first
       // draft of this guard matched only the one-line form — which left three
