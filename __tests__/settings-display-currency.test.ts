@@ -5,7 +5,7 @@ import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
-  assertMatchesInEveryLocale,
+  assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
 
 /**
@@ -88,10 +88,10 @@ describe("i18n — bug-2d display-currency keys in all 6 languages", () => {
   }
 
   it("declares currencyRatesUpdated as a {when} formatter in all 6 tables", () => {
-    assertDeclaredInEveryLocale(src, "currencyRatesUpdated");
-    assertMatchesInEveryLocale(
+    assertValueInEveryLocale(
       src,
-      /currencyRatesUpdated:\s*\(params\?:\s*TranslationParams\)\s*=>/,
+      "currencyRatesUpdated",
+      /^\(params\?:\s*TranslationParams\)\s*=>/,
       "currencyRatesUpdated is a {when} formatter",
     );
   });

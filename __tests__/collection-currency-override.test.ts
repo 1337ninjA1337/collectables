@@ -4,9 +4,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
-  assertDeclaredInEveryLocale,
-  assertMatchesInEveryLocale,
   assertMatchesInEveryNonBaseLocale,
+  assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
 
 /**
@@ -173,10 +172,12 @@ describe("i18n — collection currency keys across all 6 languages", () => {
   it("collectionCurrencyA11y formatter routes params?.currency through a `?? ''` fallback in all 6 locales", () => {
     // Per locale, not six-anywhere: the count was satisfied by any arrangement
     // summing to six, and named no language when it was not.
-    assertDeclaredInEveryLocale(src, "collectionCurrencyA11y");
-    assertMatchesInEveryLocale(
+    // Against the key's own VALUE. The body-wide form this replaces could be
+    // satisfied by any LATER key in the same map carrying the fallback.
+    assertValueInEveryLocale(
       src,
-      /collectionCurrencyA11y:[\s\S]*?params\?\.currency\s*\?\?\s*""/,
+      "collectionCurrencyA11y",
+      /params\?\.currency\s*\?\?\s*""/,
       "collectionCurrencyA11y routes currency through a `?? \"\"` fallback",
     );
   });

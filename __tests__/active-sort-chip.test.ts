@@ -12,9 +12,8 @@ import {
 } from "@/lib/item-filters";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
-  assertDeclaredInEveryLocale,
-  assertMatchesInEveryLocale,
-  localeValues,
+  assertValueInEveryLocale,
+  localeValuesOf,
 } from "./helpers/i18n-locales";
 
 /**
@@ -212,20 +211,16 @@ describe("i18n — sortChipClear across all 6 supported languages", () => {
     // each locale map in turn rather than counted over the file: six hits
     // anywhere is satisfied by a locale declaring it twice while another does
     // not declare it at all.
-    assertDeclaredInEveryLocale(src, "sortChipClear");
-    assertMatchesInEveryLocale(
+    assertValueInEveryLocale(
       src,
-      /sortChipClear:\s*\(params\?: TranslationParams\)\s*=>\s*\n?\s*`[^`]*\$\{params\?\.sort \?\? ""\}[^`]*`/,
-      "sortChipClear interpolates { sort }",
+      "sortChipClear",
+      /^\(params\?: TranslationParams\)\s*=>\s*`[^`]*\$\{params\?\.sort \?\? ""\}[^`]*`$/,
+      "sortChipClear is a { sort } formatter",
     );
   });
 
   it("gives each locale distinct copy (no untranslated en fallbacks)", () => {
-    const bodies = localeValues(
-      src,
-      /sortChipClear:\s*\(params\?: TranslationParams\)\s*=>\s*\n?\s*`([^`]+)`/,
-      "sortChipClear",
-    );
+    const bodies = localeValuesOf(src, "sortChipClear");
     assert.equal(
       new Set(bodies.values()).size,
       bodies.size,

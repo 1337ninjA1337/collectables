@@ -48,6 +48,23 @@ export type ParsedObjectLiteral = {
   readonly keys: readonly string[];
   /** Identifiers spread at that level, e.g. `en` for `...en`. */
   readonly spreads: readonly string[];
+  /**
+   * Each `name:` key's VALUE, trimmed — colon to the comma that ends the entry,
+   * or to the end of the body for the last one.
+   *
+   * The exact span, which is the point. A caller that wants to say something
+   * about a value ("this one is a formatter", "it routes `count` through a
+   * `?? 0`") otherwise writes `key:[\s\S]*?SHAPE` against the whole map and
+   * gets an assertion that is satisfied by the SHAPE appearing under any LATER
+   * key — the same lazy-crossing mistake that made the per-locale slice match
+   * across maps, one level down. Match against this and the value is all there
+   * is to match.
+   *
+   * Shorthand keys (`{ en, ru }`) are in {@link keys} and not here: they have
+   * no value written at this level, and an empty string would be a claim about
+   * one.
+   */
+  readonly values: ReadonlyMap<string, string>;
 };
 
 /** A `const <name> = { … }` located in the source. */
@@ -253,9 +270,24 @@ function scanLiteral(
   const keys: string[] = [];
   const spreads: string[] = [];
   const elements: string[] = [];
+  const values = new Map<string, string>();
   /** Frames of `${`-nested code inside template literals; empty = top level. */
-  const frames: number[] = [];
+  const frames: { readonly depth: number; readonly parens: number }[] = [];
   let depth = 0;
+  /**
+   * Open `(` at the current level.
+   *
+   * Brace depth alone was enough while the scan only had to find KEYS: a comma
+   * inside a call's arguments set `expectKey` at what the scan called the top
+   * level, and the identifier after it was not followed by a `:`, so nothing
+   * was recorded and the mistake cost nothing. It stops being free once value
+   * SPANS are collected — `(p) => String(p.name).replace(/}/g, "")` ends at
+   * that comma, and the value is reported as the text up to it. Parentheses
+   * are counted separately from `depth` because the two closers are not
+   * interchangeable: a `}` may not close the literal from inside an open call
+   * either, which is why {@link atTopLevel} reads both.
+   */
+  let parens = 0;
   let i = start;
   /** True while the next identifier at the top level would be a key. */
   let expectKey = true;
@@ -267,6 +299,27 @@ function scanLiteral(
   let prev = "";
   /** Last identifier consumed, cleared by any other token. Same reader. */
   let prevWord = "";
+  /** The `name:` key whose value is currently being scanned, if any. */
+  let valueKey: string | null = null;
+  /** Where that value's text began — just past its colon. */
+  let valueStart = 0;
+
+  /**
+   * Closes the value span open at `at`, if one is.
+   *
+   * Called from every place a top-level entry can end — the separating comma,
+   * the literal's own closer, an unbalanced closer, and the end of the text —
+   * because a value that is never closed is a key silently absent from
+   * {@link ParsedObjectLiteral.values}, which reads as "no such key" rather
+   * than as a scan that stopped early. The LAST entry of a body handed to
+   * `parseObjectLiteral` has no comma after it, so the end-of-text call is the
+   * ordinary case and not the defensive one.
+   */
+  const closeValue = (at: number) => {
+    if (valueKey === null) return;
+    values.set(valueKey, source.slice(valueStart, at).trim());
+    valueKey = null;
+  };
 
   /**
    * Records the token just consumed: its last character, and the whole word
@@ -289,7 +342,8 @@ function scanLiteral(
     prevWord = word;
   };
 
-  const atTopLevel = () => depth === 0 && frames.length === 0 && !inTemplate;
+  const atTopLevel = () =>
+    depth === 0 && parens === 0 && frames.length === 0 && !inTemplate;
 
   while (i < source.length) {
     const ch = source[i];
@@ -306,8 +360,9 @@ function scanLiteral(
         continue;
       }
       if (ch === "$" && source[i + 1] === "{") {
-        frames.push(depth);
+        frames.push({ depth, parens });
         depth = 0;
+        parens = 0;
         inTemplate = false;
         consumed("{");
         i += 2;
@@ -354,7 +409,8 @@ function scanLiteral(
       continue;
     }
     if (ch === close && atTopLevel()) {
-      return { keys, spreads, elements, end: i };
+      closeValue(i);
+      return { keys, spreads, values, elements, end: i };
     }
     if (ch === "{" || ch === "[") {
       if (ch === "{" && collectElements && atTopLevel()) elementStart = i + 1;
@@ -371,14 +427,16 @@ function scanLiteral(
         if (ch === "}") {
           const frame = frames.pop();
           if (frame !== undefined) {
-            depth = frame;
+            depth = frame.depth;
+            parens = frame.parens;
             inTemplate = true;
             consumed("}");
             i += 1;
             continue;
           }
         }
-        return { keys, spreads, elements, end: i };
+        closeValue(i);
+        return { keys, spreads, values, elements, end: i };
       }
       depth -= 1;
       if (ch === "}" && depth === 0 && elementStart !== null && atTopLevel()) {
@@ -389,8 +447,26 @@ function scanLiteral(
       i += 1;
       continue;
     }
+    if (ch === "(") {
+      parens += 1;
+      consumed("(");
+      i += 1;
+      continue;
+    }
+    if (ch === ")") {
+      // Floored at zero: an unbalanced `)` is a scan that was started inside a
+      // call, and going negative would make `atTopLevel()` false for the rest
+      // of the body — one stray character silencing every key below it.
+      if (parens > 0) parens -= 1;
+      consumed(")");
+      i += 1;
+      continue;
+    }
     if (ch === ",") {
-      if (atTopLevel()) expectKey = true;
+      if (atTopLevel()) {
+        closeValue(i);
+        expectKey = true;
+      }
       consumed(",");
       i += 1;
       continue;
@@ -445,6 +521,8 @@ function scanLiteral(
         if (source[j] === ":") {
           keys.push(name);
           i = j + 1;
+          valueKey = name;
+          valueStart = i;
           // The second call on this path, and still one per TOKEN: the
           // lookahead consumed a `:` of its own, and a key's colon has to
           // clear the word the same way any other punctuation does —
@@ -469,7 +547,8 @@ function scanLiteral(
     i += 1;
   }
 
-  return { keys, spreads, elements, end: source.length };
+  closeValue(source.length);
+  return { keys, spreads, values, elements, end: source.length };
 }
 
 /**
@@ -478,8 +557,8 @@ function scanLiteral(
  * field would hand a future reader an empty list instead of a compile error.
  */
 function scanObjectBody(source: string, start: number): ParsedObjectLiteral & ScanEnd {
-  const { keys, spreads, end } = scanLiteral(source, start, "}");
-  return { keys, spreads, end };
+  const { keys, spreads, values, end } = scanLiteral(source, start, "}");
+  return { keys, spreads, values, end };
 }
 
 /** The object literals written at one array literal's own level, and its end. */
@@ -579,8 +658,8 @@ function readIdentifier(source: string, at: number): string {
  * from.
  */
 export function parseObjectLiteral(body: string): ParsedObjectLiteral {
-  const { keys, spreads } = scanObjectBody(body, 0);
-  return { keys, spreads };
+  const { keys, spreads, values } = scanObjectBody(body, 0);
+  return { keys, spreads, values };
 }
 
 /**
@@ -634,8 +713,8 @@ export function findObjectLiteral(
   const declaration = declarationPattern(name, "{").exec(source);
   if (!declaration) return null;
   const bodyStart = declaration.index + declaration[0].length;
-  const { keys, spreads, end } = scanObjectBody(source, bodyStart);
-  return { name, body: source.slice(bodyStart, end), keys, spreads };
+  const { keys, spreads, values, end } = scanObjectBody(source, bodyStart);
+  return { name, body: source.slice(bodyStart, end), keys, spreads, values };
 }
 
 /**

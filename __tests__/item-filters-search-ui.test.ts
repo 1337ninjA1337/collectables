@@ -6,8 +6,9 @@ import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocale,
-  localeValues,
   assertMatchesInEveryNonBaseLocale,
+  assertValueInEveryLocale,
+  localeStrings,
 } from "./helpers/i18n-locales";
 
 /**
@@ -160,16 +161,8 @@ describe("i18n — search a11y keys across all 6 supported languages", () => {
     // either key shifted every later comparison by one and compared a Polish
     // label against a German placeholder — a pass or a failure decided by
     // declaration order.
-    const labels = localeValues(
-      src,
-      /searchInCollectionA11y:\s*"([^"]+)"/,
-      "searchInCollectionA11y",
-    );
-    const placeholders = localeValues(
-      src,
-      /searchInCollectionPlaceholder:\s*"([^"]+)"/,
-      "searchInCollectionPlaceholder",
-    );
+    const labels = localeStrings(src, "searchInCollectionA11y");
+    const placeholders = localeStrings(src, "searchInCollectionPlaceholder");
     for (const [code, label] of labels) {
       const placeholder = placeholders.get(code)!;
       assert.notEqual(label, placeholder, `${code}: label duplicates the placeholder: "${label}"`);
@@ -229,10 +222,10 @@ describe("i18n — queryChipClear across all 6 supported languages", () => {
   const src = readI18nSource();
 
   it("declares queryChipClear exactly 6 times (en base + 5 overrides)", () => {
-    assertDeclaredInEveryLocale(src, "queryChipClear");
-    assertMatchesInEveryLocale(
+    assertValueInEveryLocale(
       src,
-      /queryChipClear:\s*\(params\?: TranslationParams\)/,
+      "queryChipClear",
+      /^\(params\?: TranslationParams\)/,
       "queryChipClear is a parameterised formatter",
     );
   });
@@ -240,14 +233,12 @@ describe("i18n — queryChipClear across all 6 supported languages", () => {
   it("interpolates the needle in every language rather than dropping it", () => {
     // A label that says only "tap to clear" tells a non-visual user that
     // something is narrowing the list but not what.
-    const bodies = localeValues(
+    assertValueInEveryLocale(
       src,
-      /queryChipClear:\s*\(params\?: TranslationParams\)\s*=>\s*\n?\s*`([^`]+)`/,
       "queryChipClear",
+      /\$\{params\?\.query \?\? ""\}/,
+      "queryChipClear interpolates the needle",
     );
-    for (const [code, body] of bodies) {
-      assert.match(body, /\$\{params\?\.query \?\? ""\}/, `${code}: missing query interpolation: ${body}`);
-    }
   });
 
   it("localizes queryChipClear in ru / be / pl / de / es", () => {

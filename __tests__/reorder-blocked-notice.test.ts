@@ -21,7 +21,7 @@ import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocale,
-  localeValues,
+  localeStrings,
 } from "./helpers/i18n-locales";
 
 function readScreenSrc(): string {
@@ -147,7 +147,7 @@ describe("reorder-blocked-by-sort notice — i18n", () => {
   it("translates each key rather than copying the English string six times", () => {
     const src = readI18nSource();
     for (const key of NOTICE_KEYS) {
-      const values = localeValues(src, new RegExp(`\\b${key}: "([^"]+)",`), key);
+      const values = localeStrings(src, key);
       assert.equal(
         new Set(values.values()).size,
         values.size,

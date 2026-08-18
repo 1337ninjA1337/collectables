@@ -134,31 +134,80 @@ export function assertMatchesInEveryNonBaseLocale(
 }
 
 /**
- * One capture group, taken from each locale's map: the locale's own copy for a
- * key, for the cases asserting the six are different strings rather than the
- * English one pasted six times.
+ * One key's declared VALUE in each locale, exactly — the parser's span, not a
+ * regex's guess at where the entry ends.
  *
- * Throws when a locale does not match at all, so "distinct" is never proved
- * over a short list — five values from six locales are trivially distinct.
+ * The pattern-taking helpers above match against a whole map body, which
+ * leaves the `key:[\s\S]*?SHAPE` idiom able to stride from its own key to a
+ * LATER key's value and call that a match. That is the same lazy-crossing
+ * mistake as the per-locale slice, one level down, and it is why the scanner
+ * now returns value spans: matched against this, the value is all there is to
+ * match.
+ *
+ * Throws when a locale does not declare the key, rather than omitting it — the
+ * callers are asserting something about every locale, and a short map would
+ * make the loop that follows quietly weaker.
  */
-export function localeValues(
+export function localeValuesOf(
   source: string,
+  key: string,
+): ReadonlyMap<string, string> {
+  const values = new Map<string, string>();
+  for (const code of locales(source)) {
+    const block = findLocaleBlock(source, code);
+    assert.ok(block, `no translation map for '${code}'`);
+    const value = block!.values.get(key);
+    assert.ok(
+      value !== undefined,
+      `'${key}' is not declared in ${code} — that locale serves the English string`,
+    );
+    values.set(code, value!);
+  }
+  return values;
+}
+
+/**
+ * Asserts every locale's declared value for `key` matches `pattern`.
+ *
+ * The exact-span counterpart of {@link assertMatchesInEveryLocale}: use this
+ * whenever the claim is about ONE key's value, and reach for the body-matching
+ * form only when the claim is genuinely about the map.
+ */
+export function assertValueInEveryLocale(
+  source: string,
+  key: string,
   pattern: RegExp,
   label: string,
-): ReadonlyMap<string, string> {
+): void {
   assert.ok(
     !pattern.global,
     `${label}: pass a non-global pattern — a /g regex carries lastIndex between locales`,
   );
-  const values = new Map<string, string>();
-  for (const [code, body] of localeBodies(source)) {
-    const match = pattern.exec(body);
-    assert.ok(match, `${label}: no match in '${code}'`);
-    assert.ok(
-      match![1] !== undefined,
-      `${label}: pattern has no capture group for the value`,
-    );
-    values.set(code, match![1]);
+  const wrong: string[] = [];
+  for (const [code, value] of localeValuesOf(source, key)) {
+    if (!pattern.test(value)) wrong.push(`${code} (${value})`);
   }
-  return values;
+  assert.deepEqual(wrong, [], `${label} — wrong in ${wrong.join("; ")}`);
+}
+
+/**
+ * Each locale's copy for a key that is declared as a plain string literal, with
+ * the quotes off — for the cases asserting the locales carry different words
+ * rather than the English one pasted six times.
+ *
+ * Throws on a locale whose value is not a string literal, so a key that became
+ * a formatter in one language is a named failure rather than a silently
+ * skipped comparison.
+ */
+export function localeStrings(
+  source: string,
+  key: string,
+): ReadonlyMap<string, string> {
+  const strings = new Map<string, string>();
+  for (const [code, value] of localeValuesOf(source, key)) {
+    const match = /^"([^"]*)"$/.exec(value);
+    assert.ok(match, `${code}: '${key}' is not a plain string literal: ${value}`);
+    strings.set(code, match![1]);
+  }
+  return strings;
 }

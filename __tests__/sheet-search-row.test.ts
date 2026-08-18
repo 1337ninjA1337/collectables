@@ -6,8 +6,8 @@ import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocale,
-  localeValues,
   assertMatchesInEveryNonBaseLocale,
+  localeStrings,
 } from "./helpers/i18n-locales";
 
 /**
@@ -241,7 +241,7 @@ describe("i18n — the two new per-sheet a11y labels across all 6 languages", ()
     it(`keeps ${key} longer than the shared searchPlaceholder it labels`, () => {
       // Both picker sheets show the generic `searchPlaceholder`; the spoken
       // label exists precisely to say more than the field can fit.
-      const labels = localeValues(src, new RegExp(`\\b${key}:\\s*"([^"]+)"`), key);
+      const labels = localeStrings(src, key);
       for (const [code, label] of labels) {
         assert.ok(
           label.length > 12,

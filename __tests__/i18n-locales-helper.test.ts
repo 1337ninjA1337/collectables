@@ -8,8 +8,10 @@ import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocale,
   assertMatchesInEveryNonBaseLocale,
+  assertValueInEveryLocale,
   localeBodies,
-  localeValues,
+  localeValuesOf,
+  localeStrings,
   locales,
 } from "./helpers/i18n-locales";
 import { localeKeys } from "@/lib/i18n-source";
@@ -161,20 +163,21 @@ describe("the value-shape half", () => {
       () => assertMatchesInEveryLocale(TWO_LOCALES, /greeting/g, "greeting"),
       /non-global/,
     );
-    assert.throws(
-      () => localeValues(TWO_LOCALES, /greeting: "([^"]+)"/g, "greeting"),
-      /non-global/,
-    );
   });
 
   it("returns one value per locale, keyed by code rather than by position", () => {
     // The habit this replaces zipped two whole-file sweeps by index, so one
     // locale missing either key shifted every later pair by one and compared a
     // Polish label against a German placeholder.
-    const values = localeValues(TWO_LOCALES, /greeting: "([^"]+)"/, "greeting");
-    assert.deepEqual([...values], [
+    assert.deepEqual([...localeStrings(TWO_LOCALES, "greeting")], [
       ["en", "Hello"],
       ["ru", "Привет"],
+    ]);
+    // The raw spans keep their quotes; `localeStrings` is the unwrapped view,
+    // and refuses a value that is not a plain string literal at all.
+    assert.deepEqual([...localeValuesOf(TWO_LOCALES, "greeting")], [
+      ["en", '"Hello"'],
+      ["ru", '"Привет"'],
     ]);
   });
 
@@ -182,8 +185,8 @@ describe("the value-shape half", () => {
     // Five values from six locales are trivially distinct. A missing locale has
     // to be an error here, not a smaller `Set`.
     assert.throws(
-      () => localeValues(SUMS_BUT_DOES_NOT_COVER, /greeting: "([^"]+)"/, "greeting"),
-      /no match in 'ru'/,
+      () => localeValuesOf(SUMS_BUT_DOES_NOT_COVER, "greeting"),
+      /not declared in ru/,
     );
   });
 });
@@ -270,6 +273,106 @@ describe("overrides, asked of the map that is supposed to have them", () => {
     assert.throws(
       () =>
         assertMatchesInEveryNonBaseLocale(TWO_LOCALES, /greeting/g, "greeting"),
+      /non-global/,
+    );
+  });
+});
+
+/**
+ * `greeting` is a plain string in both maps and a LATER key carries the shape a
+ * body-wide pattern would be looking for. The `key:[\s\S]*?SHAPE` idiom starts
+ * at `greeting:` and strides to `count` two entries down — inside the same map,
+ * so scoping to a locale did not close it.
+ */
+const SHAPE_UNDER_A_LATER_KEY = `
+const languageOptions: { code: AppLanguage; label: string }[] = [
+  { code: "en", label: "English" },
+];
+
+const en = {
+  greeting: "Hello",
+  middle: "in between",
+  counted: (params?: TranslationParams) => \`\${params?.count ?? 0} left\`,
+};
+`;
+
+describe("matching a value rather than the map it sits in", () => {
+  it("catches the shape that belonged to a later key", () => {
+    // The body-wide rule first, so the fixture is shown to fool it: `greeting`
+    // is the string "Hello" and the pattern says it routes a count.
+    assert.match(
+      SHAPE_UNDER_A_LATER_KEY,
+      /greeting:[\s\S]*?params\?\.count \?\? 0/,
+    );
+    assert.doesNotThrow(() =>
+      assertMatchesInEveryLocale(
+        SHAPE_UNDER_A_LATER_KEY,
+        /greeting:[\s\S]*?params\?\.count \?\? 0/,
+        "greeting routes a count",
+      ),
+    );
+
+    // …and the exact-span rule on the same text.
+    assert.throws(
+      () =>
+        assertValueInEveryLocale(
+          SHAPE_UNDER_A_LATER_KEY,
+          "greeting",
+          /params\?\.count \?\? 0/,
+          "greeting routes a count",
+        ),
+      /wrong in en \("Hello"\)/,
+    );
+  });
+
+  it("names the locale AND shows the value it rejected", () => {
+    // "not matched in de" sends a reader to the file; "de (\"Suchen\")" ends the
+    // question where it is asked.
+    assertValueInEveryLocale(
+      TWO_LOCALES,
+      "greeting",
+      /^"[^"]+"$/,
+      "greeting is a non-empty string",
+    );
+    assert.throws(
+      () =>
+        assertValueInEveryLocale(
+          TWO_LOCALES,
+          "greeting",
+          /^\(params/,
+          "greeting is a formatter",
+        ),
+      /en \("Hello"\).*ru \("Привет"\)/s,
+    );
+  });
+
+  it("throws on a locale that does not declare the key at all", () => {
+    assert.throws(
+      () =>
+        assertValueInEveryLocale(
+          SUMS_BUT_DOES_NOT_COVER,
+          "greeting",
+          /./,
+          "greeting",
+        ),
+      /not declared in ru/,
+    );
+  });
+
+  it("refuses a value that is not a plain string where one is asked for", () => {
+    // `localeStrings` is for the "six distinct words" comparisons. A key that
+    // became a formatter in one language has to be a named failure there, not
+    // a silently skipped comparison that leaves the set smaller and still
+    // distinct.
+    assert.throws(
+      () => localeStrings(SHAPE_UNDER_A_LATER_KEY, "counted"),
+      /is not a plain string literal/,
+    );
+  });
+
+  it("refuses a global pattern here too", () => {
+    assert.throws(
+      () => assertValueInEveryLocale(TWO_LOCALES, "greeting", /Hello/g, "greeting"),
       /non-global/,
     );
   });

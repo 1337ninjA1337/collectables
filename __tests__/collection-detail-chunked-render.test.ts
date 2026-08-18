@@ -4,9 +4,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
-  assertDeclaredInEveryLocale,
-  assertMatchesInEveryLocale,
   assertMatchesInEveryNonBaseLocale,
+  assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
 
 /**
@@ -193,8 +192,14 @@ describe("i18n — loadMoreItems key across all 6 supported languages", () => {
     // any later map carrying the key.
     assertMatchesInEveryNonBaseLocale(
       src,
-      /loadMoreItems:[^\n]*\n?[^\n]*params\?\.count/,
-      "loadMoreItems is overridden with a count placeholder",
+      /\bloadMoreItems:/,
+      "loadMoreItems is overridden",
+    );
+    assertValueInEveryLocale(
+      src,
+      "loadMoreItems",
+      /params\?\.count/,
+      "loadMoreItems carries a count placeholder",
     );
   });
 
@@ -203,10 +208,12 @@ describe("i18n — loadMoreItems key across all 6 supported languages", () => {
     // "Load more (undefined remaining)" in production.
     // Asked of each locale map, so a language missing the fallback is named
     // rather than hidden behind another language declaring the key twice.
-    assertDeclaredInEveryLocale(src, "loadMoreItems");
-    assertMatchesInEveryLocale(
+    // Against the key's own VALUE, so the `?? 0` cannot be supplied by a later
+    // key in the same map.
+    assertValueInEveryLocale(
       src,
-      /loadMoreItems:[\s\S]*?params\?\.count\s*\?\?\s*0/,
+      "loadMoreItems",
+      /params\?\.count\s*\?\?\s*0/,
       "loadMoreItems routes count through a `?? 0` fallback",
     );
   });

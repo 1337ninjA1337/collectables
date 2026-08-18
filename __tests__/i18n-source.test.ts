@@ -292,6 +292,85 @@ describe("translation literal parser", () => {
     assert.deepEqual(parsed.keys, ["real"]);
   });
 
+  it("reports each key's value as its exact span, not as text up to a guess", () => {
+    // The reason the scanner keeps spans at all: a caller saying something
+    // about a value ("this one is a formatter", "it routes count through a
+    // `?? 0`") otherwise writes `key:[\s\S]*?SHAPE` against the whole map,
+    // which is satisfied by the shape appearing under any LATER key. Given the
+    // span, the value is all there is to match — so the assertions below are
+    // deliberately anchored at both ends.
+    const parsed = parseObjectLiteral(`
+  plain: "one",
+  fn: (params?: TranslationParams) =>
+    \`Delete \${params?.count ?? 0} \${Number(params?.count) === 1 ? "item" : "items"}?\`,
+  last: "end",
+`);
+    assert.deepEqual([...parsed.values.keys()], ["plain", "fn", "last"]);
+    assert.equal(parsed.values.get("plain"), '"one"');
+    assert.match(parsed.values.get("fn")!, /^\(params\?: TranslationParams\) =>/);
+    assert.match(parsed.values.get("fn")!, /items"\}\?`$/);
+    // The last entry has no comma after it — `parseObjectLiteral` is handed the
+    // text between the braces, so end-of-body is the ordinary terminator and
+    // not the defensive one.
+    assert.equal(parsed.values.get("last"), '"end"');
+  });
+
+  it("does not end a value at a comma inside its own call arguments", () => {
+    // Brace depth alone was enough while only KEYS were collected: a comma in
+    // an argument list set `expectKey` at what the scan called the top level,
+    // the identifier after it was not followed by a `:`, and nothing was
+    // recorded. Value spans made it cost something — `replace(/}/g, "")` ends
+    // at that comma and the value is reported as the text up to it, silently
+    // truncated mid-call. Parentheses are counted now, separately from braces.
+    const parsed = parseObjectLiteral(`
+  tidy: (p) => String(p.name).replace(/}/g, ""),
+  joined: (p) => [p.a, p.b].join(", "),
+  after: "still here",
+`);
+    assert.deepEqual(parsed.keys, ["tidy", "joined", "after"]);
+    assert.equal(parsed.values.get("tidy"), '(p) => String(p.name).replace(/}/g, "")');
+    assert.equal(parsed.values.get("joined"), '(p) => [p.a, p.b].join(", ")');
+  });
+
+  it("gives a shorthand key no value rather than an empty one", () => {
+    // `{ en, ru }` declares keys and writes no colon, so there is no value at
+    // this level to report. An empty string would be a claim about one.
+    const parsed = parseObjectLiteral(` en, ru, named: "x" `);
+    assert.deepEqual(parsed.keys, ["en", "ru", "named"]);
+    assert.deepEqual([...parsed.values.keys()], ["named"]);
+    assert.equal(parsed.values.has("en"), false);
+  });
+
+  it("keeps a value's own braces and parens out of the literal's structure", () => {
+    // The span is taken from the same scan that finds the keys, so everything
+    // the scanner already refuses to read as structure — strings, templates,
+    // regexes, nested objects — stays inside the value it belongs to.
+    const parsed = parseObjectLiteral(`
+  nested: (p) => ({ a: 1, b: 2 }),
+  regexy: (p) => /a,b/.test(p.s) ? "1" : "2",
+  after: "still here",
+`);
+    assert.deepEqual(parsed.keys, ["nested", "regexy", "after"]);
+    assert.equal(parsed.values.get("nested"), "(p) => ({ a: 1, b: 2 })");
+    assert.equal(parsed.values.get("regexy"), '(p) => /a,b/.test(p.s) ? "1" : "2"');
+  });
+
+  it("declares a value for every key of every real locale map", () => {
+    // Against the file rather than a fixture: a key with no span would be a
+    // scan that stopped early, and it would reach callers as "this locale does
+    // not declare that key" — a translation finding, not a parser bug.
+    for (const language of TRANSLATION_LANGUAGES) {
+      const block = findLocaleBlock(SOURCE, language);
+      assert.ok(block, `no map for ${language}`);
+      const withoutValue = block!.keys.filter((key) => !block!.values.has(key));
+      assert.deepEqual(withoutValue, [], `${language}: keys with no value span`);
+      assert.equal(block!.values.size, block!.keys.length);
+      for (const [key, value] of block!.values) {
+        assert.ok(value.length > 0, `${language}.${key} has an empty value`);
+      }
+    }
+  });
+
   it("reads shorthand properties, which is how the translations record is written", () => {
     // `const translations: Record<AppLanguage, TranslationMap> = { en, ru, … }`
     // declares six keys and writes not one colon.

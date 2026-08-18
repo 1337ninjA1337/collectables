@@ -5,7 +5,7 @@ import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
-  assertMatchesInEveryLocale,
+  assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
 
 /**
@@ -173,9 +173,10 @@ describe("gallery i18n keys", () => {
   });
 
   it("renders the counter from current/total params in every locale", () => {
-    assertMatchesInEveryLocale(
+    assertValueInEveryLocale(
       i18nSrc,
-      /galleryCounter: \(params\?: TranslationParams\) => `\$\{params\?\.current \?\? 1\} \/ \$\{params\?\.total \?\? 1\}`/,
+      "galleryCounter",
+      /^\(params\?: TranslationParams\) => `\$\{params\?\.current \?\? 1\} \/ \$\{params\?\.total \?\? 1\}`$/,
       "galleryCounter renders current / total",
     );
   });
