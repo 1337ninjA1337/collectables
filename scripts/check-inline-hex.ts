@@ -21,31 +21,15 @@ import {
 } from "../lib/check-inline-hex";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
-import { guardScanRoot, listDirEntries } from "./guard-io";
+import { guardScanRoot, listSourceFiles } from "./guard-io";
 
 const CHECK_NAME = "check-inline-hex";
 const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
-const SCAN_ROOTS = ["app", "components", "lib"];
-const SOURCE_FILE_PATTERN = /\.tsx?$/;
-
-function walkSources(dir: string, out: string[]): void {
-  for (const entry of listDirEntries(dir)) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      walkSources(full, out);
-    } else if (entry.isFile() && SOURCE_FILE_PATTERN.test(entry.name)) {
-      out.push(full);
-    }
-  }
-}
+const SCANNED_DIRS = ["app", "components", "lib"] as const;
 
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
-  const files: string[] = [];
-  for (const root of SCAN_ROOTS) {
-    walkSources(path.join(repoRoot, root), files);
-  }
-  files.sort();
+  const files = listSourceFiles(repoRoot, SCANNED_DIRS);
 
   // Before reading a single byte: a walk that found nothing (or almost
   // nothing) reports "no inline hex literals" just as cheerfully as a full one.
@@ -53,9 +37,8 @@ function main(): void {
 
   const allMatches: HexMatch[] = [];
   for (const file of files) {
-    const source = fs.readFileSync(file, "utf8");
-    const rel = path.relative(repoRoot, file);
-    allMatches.push(...findInlineHexLiterals(rel, source));
+    const source = fs.readFileSync(path.join(repoRoot, file), "utf8");
+    allMatches.push(...findInlineHexLiterals(file, source));
   }
 
   if (allMatches.length === 0) {

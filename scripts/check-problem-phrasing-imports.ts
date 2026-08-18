@@ -21,36 +21,21 @@ import {
 } from "../lib/check-problem-phrasing-imports";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
-import { guardScanRoot, listDirEntries } from "./guard-io";
+import { guardScanRoot, listSourceFiles } from "./guard-io";
 
 const CHECK_NAME = "check-problem-phrasing-imports";
 const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
 const SCANNED_DIRS = ["app", "components", "lib", "scripts", "__tests__"] as const;
-const SOURCE_FILE_PATTERN = /\.tsx?$/;
-
-function listSourceFiles(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of listDirEntries(dir)) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listSourceFiles(full));
-    else if (SOURCE_FILE_PATTERN.test(entry.name)) out.push(full);
-  }
-  return out.sort();
-}
-
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
-  const files = SCANNED_DIRS.flatMap((dir) =>
-    listSourceFiles(path.join(repoRoot, dir)),
-  );
+  const files = listSourceFiles(repoRoot, SCANNED_DIRS);
 
   assertScannedFloor(CHECK_NAME, files.length);
 
   const allMatches: ProblemPhrasingMatch[] = [];
   for (const file of files) {
-    const source = fs.readFileSync(file, "utf8");
-    const rel = path.relative(repoRoot, file);
-    allMatches.push(...findUnjoinedProblemPhrasingImports(rel, source));
+    const source = fs.readFileSync(path.join(repoRoot, file), "utf8");
+    allMatches.push(...findUnjoinedProblemPhrasingImports(file, source));
   }
 
   if (allMatches.length === 0) {

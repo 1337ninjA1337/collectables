@@ -15,8 +15,10 @@
  */
 
 import * as fs from "node:fs";
+import * as path from "node:path";
 
 import { formatGuardRootNotice, resolveGuardRoot } from "../lib/guard-root";
+import { SOURCE_EXTENSIONS } from "../lib/source-dirs";
 import { unreadableInput, type UnreadableInput } from "../lib/scanned-floor";
 import { describeThrownReason } from "../lib/thrown-value";
 
@@ -70,6 +72,45 @@ export function listDirNames(dir: string): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Every source file under the given directories, repo-relative and sorted.
+ *
+ * Five guards had written this walk out, under three names and with four
+ * differences nobody chose: three returned a sorted array and two appended to
+ * an out-param the caller sorted afterwards, three matched `/\.tsx?$/` and one
+ * `.endsWith(".tsx")`, three checked `entry.isFile()` and two took anything
+ * that was not a directory (which counts a symlink or a fifo as source). The
+ * shapes agreed on every tree this repo has, which is exactly why the drift
+ * was free to continue.
+ *
+ * Repo-relative forward-slash paths rather than absolute ones, because that is
+ * what every caller needs next: four of the five ran `path.relative(repoRoot,
+ * file)` on the very next line to report a finding, and the fifth keyed a
+ * record by it. `path.join(repoRoot, relative)` is the read.
+ *
+ * Built on {@link listDirEntries}, so a scan root that is not there is a count
+ * of zero rather than an `ENOENT` — the floor is what should say a run
+ * examined nothing, in the guard's own words.
+ */
+export function listSourceFiles(
+  repoRoot: string,
+  dirs: readonly string[],
+  extensions: readonly string[] = SOURCE_EXTENSIONS,
+): string[] {
+  const found: string[] = [];
+  const walk = (relative: string): void => {
+    for (const entry of listDirEntries(path.join(repoRoot, relative))) {
+      const child = `${relative}/${entry.name}`;
+      if (entry.isDirectory()) walk(child);
+      else if (entry.isFile() && extensions.some((ext) => entry.name.endsWith(ext))) {
+        found.push(child);
+      }
+    }
+  };
+  for (const dir of dirs) walk(dir);
+  return found.sort();
 }
 
 /**

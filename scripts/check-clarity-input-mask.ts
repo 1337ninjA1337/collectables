@@ -19,30 +19,18 @@ import {
 } from "../lib/check-clarity-input-mask";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
-import { guardScanRoot, listDirEntries } from "./guard-io";
+import { MARKUP_EXTENSIONS } from "../lib/source-dirs";
+import { guardScanRoot, listSourceFiles } from "./guard-io";
 
 const CHECK_NAME = "check-clarity-input-mask";
 const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
-const SCAN_DIRS = ["app", "components"];
-
-function collectTsxFiles(dir: string, out: string[]): void {
-  for (const entry of listDirEntries(dir)) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) collectTsxFiles(full, out);
-    else if (entry.isFile() && entry.name.endsWith(".tsx")) out.push(full);
-  }
-}
+const SCANNED_DIRS = ["app", "components"] as const;
 
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
   const files: Record<string, string> = {};
-  for (const dir of SCAN_DIRS) {
-    const paths: string[] = [];
-    collectTsxFiles(path.join(repoRoot, dir), paths);
-    for (const full of paths) {
-      const relative = path.relative(repoRoot, full).split(path.sep).join("/");
-      files[relative] = fs.readFileSync(full, "utf8");
-    }
+  for (const relative of listSourceFiles(repoRoot, SCANNED_DIRS, MARKUP_EXTENSIONS)) {
+    files[relative] = fs.readFileSync(path.join(repoRoot, relative), "utf8");
   }
 
   assertScannedFloor(CHECK_NAME, Object.keys(files).length);

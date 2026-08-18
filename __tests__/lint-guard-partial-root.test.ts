@@ -275,11 +275,12 @@ describe("no single scan root clears a multi-root guard's floor", () => {
 
     describe(guard.npmScript, () => {
       it("still walks exactly the roots these fixtures are built from", () => {
-        // The three wrappers spell the constant three different ways
-        // (SCAN_ROOTS / SCANNED_DIRS / SCAN_DIRS), so pin the literal rather
-        // than the name — a root added or dropped here must fail loudly,
-        // because the fixtures below stop meaning anything the moment the
-        // walk covers something they do not.
+        // The literal rather than the name: `guard-scan-dirs.test.ts` is what
+        // holds the wrappers to one spelling (`SCANNED_DIRS`, since the three
+        // they used to use made a diff between two guards read as a rename),
+        // and this case is about the CONTENT — a root added or dropped here
+        // must fail loudly, because the fixtures below stop meaning anything
+        // the moment the walk covers something they do not.
         const source = readRepoFile("scripts", `${checkName}.ts`);
         assert.match(
           source,

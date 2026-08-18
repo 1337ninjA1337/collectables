@@ -4,9 +4,9 @@ import path from "node:path";
 
 import { readRepoFile } from "./helpers/repo-file";
 import { SUITES_REL, assertExemptionsHonest, suiteCode, suiteFiles } from "./helpers/suite-files";
+import { NON_APP_TS_DIRS, SOURCE_DIRS } from "@/lib/source-dirs";
+
 import {
-  NON_APP_TS_DIRS,
-  SOURCE_DIRS,
   __resetSourceFilesCacheForTests,
   assertSourceDirsCoverTheTree,
   readSource,
@@ -167,8 +167,14 @@ describe("no suite walks a source directory by hand", () => {
    * this module would never return. Banning the call outright would have taken
    * thirty exemptions, which is not a rule, it is a list. Banning "walks a
    * directory AND names one of the source directories" is the shape that was
-   * actually written eighteen times, and it leaves eleven exemptions that each
+   * actually written eighteen times, and it leaves ten exemptions that each
    * walk something genuinely different.
+   *
+   * `helpers/source-files.ts` is NOT among them, and did not need to be once
+   * the directory list moved to `lib/source-dirs.ts`: the helper takes its
+   * roots as an argument, so it walks the source tree without ever naming it.
+   * The rule's target was always a suite hardcoding a directory into a walk of
+   * its own.
    */
   const SOURCE_DIR_LITERAL = new RegExp(`["'](${SOURCE_DIRS.join("|")})["']`);
 
@@ -179,8 +185,7 @@ describe("no suite walks a source directory by hand", () => {
   };
 
   /**
-   * The suites that walk something that is not the source tree, plus the
-   * helper that owns the one sanctioned walk over it.
+   * The suites that walk something that is not the source tree at all.
    */
   const WALKS_SOMETHING_ELSE: readonly string[] = [
     "bundle-premise.test.ts",
@@ -190,7 +195,6 @@ describe("no suite walks a source directory by hand", () => {
     "fonts-assets.test.ts",
     "guard-fixture-refusals.test.ts",
     "helpers/guard-fixture.ts",
-    "helpers/source-files.ts",
     "lint-guard-partial-root.test.ts",
     "runtime-config-parity.test.ts",
     "security-review-wiring.test.ts",
@@ -218,7 +222,6 @@ describe("no suite walks a source directory by hand", () => {
         "fonts-assets.test.ts",
         "guard-fixture-refusals.test.ts",
         "helpers/guard-fixture.ts",
-        "helpers/source-files.ts",
         "lint-guard-partial-root.test.ts",
         "runtime-config-parity.test.ts",
         "security-review-wiring.test.ts",

@@ -13,6 +13,7 @@ import {
   isHexAllowlisted,
 } from "../lib/check-inline-hex";
 import { LINT_GUARDS } from "../lib/lint-guards";
+import { SOURCE_EXTENSIONS } from "../lib/source-dirs";
 import { readRepoFile as read, repoPath, repoRelative } from "./helpers/repo-file";
 
 
@@ -311,7 +312,7 @@ describe("check-inline-hex script wiring", () => {
 
   it("scripts/check-inline-hex.ts scans app/, components/ AND lib/", () => {
     const src = read("scripts/check-inline-hex.ts");
-    // The SCAN_ROOTS literal — keep the test loose enough to survive a future
+    // The SCANNED_DIRS literal — keep the test loose enough to survive a future
     // refactor (e.g. adding `hooks/`) but strict enough to catch a missing root.
     assert.match(src, /["']app["']/);
     assert.match(src, /["']components["']/);
@@ -331,11 +332,16 @@ describe("check-inline-hex script wiring", () => {
   });
 
   it("scripts/check-inline-hex.ts walks .ts AND .tsx files", () => {
-    // The walker matches both extensions so utility modules that hard-code
-    // a color value are caught too (the intentional producers are exempted
-    // via HEX_ALLOWLIST instead of being skipped by extension).
+    // The walk covers both extensions so utility modules that hard-code a
+    // color value are caught too (the intentional producers are exempted via
+    // HEX_ALLOWLIST instead of being skipped by extension). The pattern itself
+    // moved to `guard-io.ts`'s shared walk, so what this pins now is that the
+    // guard takes the DEFAULT extension set rather than narrowing to markup —
+    // which is the mistake available at the call site.
     const src = read("scripts/check-inline-hex.ts");
-    assert.match(src, /\\\.tsx\?\$/);
+    assert.match(src, /listSourceFiles\(repoRoot, SCANNED_DIRS\)/);
+    assert.doesNotMatch(src, /MARKUP_EXTENSIONS/);
+    assert.deepEqual([...SOURCE_EXTENSIONS], [".ts", ".tsx"]);
   });
 
   it("allowlisted files are skipped by the matcher itself", () => {
