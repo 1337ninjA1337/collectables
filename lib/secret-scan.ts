@@ -25,8 +25,36 @@
  * (use for fixtures/placeholders that legitimately resemble a secret).
  */
 
+import { NEVER_WALKED } from "./source-dirs";
+
 /** Marker that suppresses scanning for the line it appears on. */
 export const IGNORE_MARKER = "secret-scan-ignore";
+
+/**
+ * Directories the source-tree scan never descends into.
+ *
+ * Spread rather than restated, because the overlap was invisible: this list
+ * used to be six names in `scripts/check-secrets.ts` and three of them were
+ * {@link import("./source-dirs").NEVER_WALKED} spelled again, so a reader of
+ * either could not tell which entries are the shared "never holds source"
+ * rule and which are this scan's own. Written this way, the first three move
+ * when the shared rule does and the last three are visibly a decision made
+ * here: `.git` is object storage rather than text, and `coverage/` and
+ * `web-build/` are generated outputs this scan would otherwise read a copy of
+ * every source file through.
+ *
+ * Here rather than in the wrapper so a suite can compare it BY VALUE — the
+ * wrapper runs `main()` at import and cannot be loaded from a test, which is
+ * why the check on this list was a regex over the guard's own source. Walking
+ * still lives in the wrapper; what a walk skips is policy, and this module is
+ * where this scan's policy already lives.
+ */
+export const SECRET_SKIP_DIRS: readonly string[] = [
+  ...NEVER_WALKED,
+  ".git",
+  "coverage",
+  "web-build",
+];
 
 export type SecretRule = {
   /** Stable identifier, surfaced in the report. */

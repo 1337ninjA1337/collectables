@@ -64,15 +64,64 @@ export const SOURCE_EXTENSIONS: readonly string[] = [".ts", ".tsx"];
 export const MARKUP_EXTENSIONS: readonly string[] = [".tsx"];
 
 /**
- * Directory names no scan of source ever descends into.
+ * Directory names no scan of source ever descends into, one reason each.
  *
- * None of these can appear under a source directory in a healthy checkout,
- * which is exactly why they are worth naming: a stray `npm install` inside
- * `components/` turns a 64-file scan into a several-thousand-file one, and the
- * guard then reports findings in vendored code. The two walks — the guards' in
- * `scripts/guard-io.ts` and the suites' in `__tests__/helpers/source-files.ts`
- * — took this list separately, which is the drift the shared module removes:
- * `guard-io-walk.test.ts` asserts the two answer the same over one tree, and
- * that case could only hold by luck while each had its own list.
+ * The list shipped as three names under one sentence, which left the question
+ * its next reader asks unanswered: only `node_modules` realistically turns up
+ * UNDER a source directory, so does this mean "never inside source" (one
+ * entry) or "never in any scan" (three)? It means the second, and the reason
+ * is {@link import("../__tests__/helpers/source-files").assertSourceDirsCoverTheTree}
+ * — that walk starts at the repository ROOT, where `dist/` is a minified copy
+ * of every source file and `.expo/` is a per-checkout cache. Narrowed to
+ * `node_modules`, it would walk the whole build output on every run and then
+ * report `dist` as a top-level directory of TypeScript nobody had accounted
+ * for.
+ *
+ * A reason per entry rather than one sentence for all three, because the three
+ * are here for different reasons and a fourth would otherwise arrive with
+ * none — which is how a skip list stops being reviewable.
  */
-export const NEVER_WALKED: readonly string[] = ["node_modules", "dist", ".expo"];
+export const NEVER_WALKED_REASONS: Readonly<Record<string, string>> = {
+  node_modules:
+    "installed dependencies — the one name that realistically appears under a source directory, one stray `npm install` away, and the one that turns a 64-file scan into a several-thousand-file one",
+  dist: "the exported web build: a minified copy of every source file, so a rule matched there is matched twice and reported against generated code",
+  ".expo": "Expo's per-checkout cache, rewritten by every dev server run and in no commit",
+};
+
+/**
+ * The same as a list, derived rather than restated.
+ *
+ * Two structures spelling one membership rule is the pair a later hand-edit
+ * drifts — the lesson `lib/js-tokens.ts` already paid for with its keyword
+ * `Set`. There is one authority here, so there is nothing to keep in step: an
+ * entry added to {@link NEVER_WALKED_REASONS} is skipped by both walks, and an
+ * entry cannot be added without saying why.
+ *
+ * The two walks — the guards' in `scripts/guard-io.ts` and the suites' in
+ * `__tests__/helpers/source-files.ts` — take this rather than each carrying a
+ * copy, which is what lets `guard-io-walk.test.ts` assert the two answer the
+ * same over one tree: while each had its own list that case could only hold by
+ * luck.
+ */
+export const NEVER_WALKED: readonly string[] = Object.keys(NEVER_WALKED_REASONS);
+
+/**
+ * Whether a directory found at the REPOSITORY ROOT is outside the source tree.
+ *
+ * Two mechanisms had grown for one question and only one of them had a name:
+ * the root walk skipped {@link NEVER_WALKED} and, inline and unnamed, anything
+ * whose name starts with a dot. So `.expo` was excluded twice, `.github` and
+ * `.tasks` by a rule nothing pointed at, and a directory that stopped being
+ * hidden would have moved between the two silently.
+ *
+ * They are not the same rule and both are kept, which is why this states them
+ * together instead of merging the lists. {@link NEVER_WALKED} is about
+ * generated and vendored trees WHEREVER they appear, so the source walks take
+ * it at every level. The dot rule is about tooling directories at the root
+ * (`.git`, `.github`, `.vscode`, `.tasks`) and deliberately does NOT apply
+ * inside a source directory: a dot-named directory under `app/` is unusual
+ * enough that a scan should report what is in it rather than skip it.
+ */
+export function outsideSourceTree(name: string): boolean {
+  return name.startsWith(".") || NEVER_WALKED.includes(name);
+}

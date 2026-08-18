@@ -15,6 +15,7 @@ import * as path from "node:path";
 import {
   formatSecretReport,
   scanForSecrets,
+  SECRET_SKIP_DIRS,
   type SecretMatch,
 } from "../lib/secret-scan";
 import { GuardRootError } from "../lib/guard-root";
@@ -23,16 +24,6 @@ import { guardScanRoot, listFilesUnder } from "./guard-io";
 
 const CHECK_NAME = "check-secrets";
 const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
-
-/** Directories never worth scanning (build output, deps, vcs metadata). */
-const SKIP_DIRS = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  ".expo",
-  "coverage",
-  "web-build",
-]);
 
 /** Only text formats that could plausibly carry a pasted credential. */
 const SCAN_EXTENSIONS = new Set([
@@ -74,7 +65,7 @@ function main(): void {
   // second rule in it.
   const files = listFilesUnder(repoRoot, {
     extensions: SCAN_EXTENSIONS,
-    skipDirs: SKIP_DIRS,
+    skipDirs: SECRET_SKIP_DIRS,
   }).filter((rel) => !SKIP_FILES.has(path.normalize(rel)));
 
   // "scanned 0 file(s), no committed secrets" is the report an unreadable
