@@ -19,6 +19,7 @@ import {
   type SecretMatch,
 } from "../lib/secret-scan";
 import { assertBundlePremise, assertScannedFiles } from "./bundle-premise";
+import { listFilesUnder } from "./guard-io";
 
 const REPO_ROOT = path.join(__dirname, "..");
 const DIST_DIR = path.join(REPO_ROOT, "dist");
@@ -28,32 +29,13 @@ const CHECK_NAME = "check-bundle-secrets";
 /** Bundle artifacts that could embed a leaked credential. */
 const SCAN_EXTENSIONS = new Set([".js", ".html", ".json", ".map", ".css"]);
 
-function walk(dir: string, out: string[]): void {
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      walk(full, out);
-    } else if (entry.isFile() && SCAN_EXTENSIONS.has(path.extname(entry.name))) {
-      out.push(full);
-    }
-  }
-}
-
 function main(): void {
   // Shared premise: dist/ exists, carries at least one exported chunk, and is
   // newer than the source tree. Without it this scan reports "no secrets
   // leaked" over zero bytes, or over a bundle exported before the leak.
   assertBundlePremise(CHECK_NAME);
 
-  const files: string[] = [];
-  walk(DIST_DIR, files);
-  files.sort();
+  const files = listFilesUnder(DIST_DIR, { extensions: SCAN_EXTENSIONS });
 
   // A second, narrower premise: the walk above matches five artifact
   // extensions, not just the *.js chunks the shared check counts, so an
@@ -64,12 +46,13 @@ function main(): void {
   for (const file of files) {
     let source: string;
     try {
-      source = fs.readFileSync(file, "utf8");
+      source = fs.readFileSync(path.join(DIST_DIR, file), "utf8");
     } catch {
       continue;
     }
-    const rel = path.relative(REPO_ROOT, file);
-    matches.push(...scanForSecrets(rel, source));
+    // Reported under `dist/`, which is where a reader of this guard looks —
+    // the walk returns paths relative to the root it was given.
+    matches.push(...scanForSecrets(path.join("dist", file), source));
   }
 
   if (matches.length === 0) {

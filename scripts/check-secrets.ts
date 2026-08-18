@@ -19,7 +19,7 @@ import {
 } from "../lib/secret-scan";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
-import { guardScanRoot, listDirEntries } from "./guard-io";
+import { guardScanRoot, listFilesUnder } from "./guard-io";
 
 const CHECK_NAME = "check-secrets";
 const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
@@ -67,41 +67,28 @@ const SKIP_FILES = new Set(
   ].map((p) => path.normalize(p)),
 );
 
-function walk(repoRoot: string, dir: string, out: string[]): void {
-  for (const entry of listDirEntries(dir)) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name)) continue;
-      walk(repoRoot, full, out);
-    } else if (entry.isFile()) {
-      const ext = path.extname(entry.name);
-      const rel = path.relative(repoRoot, full);
-      if (!SCAN_EXTENSIONS.has(ext)) continue;
-      if (SKIP_FILES.has(path.normalize(rel))) continue;
-      out.push(full);
-    }
-  }
-}
-
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
-  const files: string[] = [];
-  walk(repoRoot, repoRoot, files);
-  files.sort();
+  // The skip list is applied after the walk rather than inside it: it names
+  // FILES, and a walk that knows about individual files is a walk with a
+  // second rule in it.
+  const files = listFilesUnder(repoRoot, {
+    extensions: SCAN_EXTENSIONS,
+    skipDirs: SKIP_DIRS,
+  }).filter((rel) => !SKIP_FILES.has(path.normalize(rel)));
 
   // "scanned 0 file(s), no committed secrets" is the report an unreadable
   // repo root produces, and it exits 0. Assert the premise first.
   assertScannedFloor(CHECK_NAME, files.length);
 
   const matches: SecretMatch[] = [];
-  for (const file of files) {
+  for (const rel of files) {
     let source: string;
     try {
-      source = fs.readFileSync(file, "utf8");
+      source = fs.readFileSync(path.join(repoRoot, rel), "utf8");
     } catch {
       continue;
     }
-    const rel = path.relative(repoRoot, file);
     matches.push(...scanForSecrets(rel, source));
   }
 

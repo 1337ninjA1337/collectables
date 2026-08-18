@@ -75,6 +75,49 @@ export function listDirNames(dir: string): string[] {
 }
 
 /**
+ * Every file under one root, recursively — relative to that root, and sorted.
+ *
+ * The walk seven guards had each written out. Five of them are the source scans
+ * {@link listSourceFiles} now serves; the other two are the secret scanners,
+ * which are the widest walks in the repository and were the two with the least
+ * in common with anything: `check-secrets` covers the whole tree across
+ * fourteen text extensions, and `check-bundle-secrets` covers `dist/` across
+ * five artifact extensions. They shared the shape and none of the arguments,
+ * which is why they each grew a copy — and one of the copies had its own
+ * `try`/`catch` around `readdirSync`, the exact silent-pass hazard
+ * {@link listDirEntries} exists to hold in one place.
+ *
+ * Relative to the ROOT it was given, not to the repository: `check-bundle-
+ * secrets` walks `dist/` and reports `_expo/static/js/web/entry-….js`, which
+ * is the name a reader of that guard wants. A caller reading the file joins
+ * the root back on.
+ *
+ * `skipDirs` is matched on the directory's own NAME rather than its path, so
+ * `node_modules` is skipped wherever it turns up. Nothing here skips by path,
+ * and a guard that needs to would be saying something about one tree rather
+ * than about a kind of directory.
+ */
+export function listFilesUnder(
+  root: string,
+  options: { readonly extensions: Iterable<string>; readonly skipDirs?: Iterable<string> },
+): string[] {
+  const extensions = new Set(options.extensions);
+  const skipDirs = new Set(options.skipDirs ?? []);
+  const found: string[] = [];
+  const walk = (relative: string): void => {
+    for (const entry of listDirEntries(relative === "" ? root : path.join(root, relative))) {
+      if (entry.isDirectory()) {
+        if (!skipDirs.has(entry.name)) walk(relative === "" ? entry.name : `${relative}/${entry.name}`);
+      } else if (entry.isFile() && extensions.has(path.extname(entry.name))) {
+        found.push(relative === "" ? entry.name : `${relative}/${entry.name}`);
+      }
+    }
+  };
+  walk("");
+  return found.sort();
+}
+
+/**
  * Every source file under the given directories, repo-relative and sorted.
  *
  * Five guards had written this walk out, under three names and with four
@@ -90,27 +133,24 @@ export function listDirNames(dir: string): string[] {
  * file)` on the very next line to report a finding, and the fifth keyed a
  * record by it. `path.join(repoRoot, relative)` is the read.
  *
- * Built on {@link listDirEntries}, so a scan root that is not there is a count
+ * Built on {@link listFilesUnder}, so a scan root that is not there is a count
  * of zero rather than an `ENOENT` — the floor is what should say a run
  * examined nothing, in the guard's own words.
+ *
+ * One call per process, so no cache: each guard is its own `tsx` invocation
+ * and calls this once. The suite-side walk in `__tests__/helpers/source-files.
+ * ts` memoises for the opposite reason — eighteen suites sweep the same tree.
  */
 export function listSourceFiles(
   repoRoot: string,
   dirs: readonly string[],
   extensions: readonly string[] = SOURCE_EXTENSIONS,
 ): string[] {
-  const found: string[] = [];
-  const walk = (relative: string): void => {
-    for (const entry of listDirEntries(path.join(repoRoot, relative))) {
-      const child = `${relative}/${entry.name}`;
-      if (entry.isDirectory()) walk(child);
-      else if (entry.isFile() && extensions.some((ext) => entry.name.endsWith(ext))) {
-        found.push(child);
-      }
-    }
-  };
-  for (const dir of dirs) walk(dir);
-  return found.sort();
+  return dirs
+    .flatMap((dir) =>
+      listFilesUnder(path.join(repoRoot, dir), { extensions }).map((rel) => `${dir}/${rel}`),
+    )
+    .sort();
 }
 
 /**
