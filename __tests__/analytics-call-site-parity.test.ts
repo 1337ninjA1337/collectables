@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import path from "node:path";
 import { describe, it } from "node:test";
 
 import { ANALYTICS_EVENTS } from "../lib/analytics-events";
 
-import { repoPath, repoRelative } from "./helpers/repo-file";
+import { readSource, sourceFiles } from "./helpers/source-files";
 
 /**
  * Walks every `trackEvent("...")` call site in app code and asserts the
@@ -17,38 +15,17 @@ import { repoPath, repoRelative } from "./helpers/repo-file";
  * disclosure still describe the old name.
  */
 
-const SCAN_ROOTS = ["app", "components", "lib", "data"];
-
-function walkSources(dir: string, out: string[]): void {
-  let entries: string[];
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    const full = path.join(dir, entry);
-    if (statSync(full).isDirectory()) walkSources(full, out);
-    else if (/\.tsx?$/.test(entry)) out.push(full);
-  }
-}
+const SCAN_ROOTS = ["app", "components", "lib", "data"] as const;
 
 function collectCallSites(): { file: string; line: number; name: string }[] {
-  const files: string[] = [];
-  for (const root of SCAN_ROOTS) walkSources(repoPath(root), files);
   const sites: { file: string; line: number; name: string }[] = [];
-  for (const file of files.sort()) {
-    const source = readFileSync(file, "utf8");
-    const lines = source.split("\n");
+  for (const file of sourceFiles(...SCAN_ROOTS)) {
+    const lines = readSource(file).split("\n");
     for (let i = 0; i < lines.length; i++) {
       const re = /trackEvent\(\s*"([^"]+)"/g;
       let m: RegExpExecArray | null;
       while ((m = re.exec(lines[i])) !== null) {
-        sites.push({
-          file: repoRelative(file),
-          line: i + 1,
-          name: m[1],
-        });
+        sites.push({ file, line: i + 1, name: m[1] });
       }
     }
   }

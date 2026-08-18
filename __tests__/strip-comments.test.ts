@@ -1,10 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync } from "node:fs";
 
 import { stripComments } from "@/lib/strip-comments";
 
-import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { readRepoFile } from "./helpers/repo-file";
+import { readSource, sourceFiles } from "./helpers/source-files";
 import { readSuite, suiteFiles, suiteText } from "./helpers/suite-files";
 
 /**
@@ -37,20 +37,6 @@ const QUOTED_SOURCE: readonly string[] = [
   "i18n-source.test.ts",
   "lib/spa-fallback.ts",
 ];
-
-/** Every `.ts`/`.tsx` under a repo directory, recursively. */
-function sourceFilesUnder(dir: string): readonly string[] {
-  const found: string[] = [];
-  const walk = (relative: string) => {
-    for (const entry of readdirSync(repoPath(relative), { withFileTypes: true })) {
-      const child = `${relative}/${entry.name}`;
-      if (entry.isDirectory()) walk(child);
-      else if (/\.tsx?$/.test(entry.name)) found.push(child);
-    }
-  };
-  walk(dir);
-  return found;
-}
 
 describe("stripComments", () => {
   it("blanks a line comment and keeps the code after it", () => {
@@ -153,9 +139,10 @@ describe("stripComments", () => {
       });
     };
     for (const relative of suiteFiles()) scan(relative, readSuite(relative));
-    for (const dir of ["lib", "app", "components", "scripts"]) {
-      for (const file of sourceFilesUnder(dir)) scan(file, readRepoFile(file));
-    }
+    // `sourceFiles()` with no argument is every source directory, checked
+    // against the tree by `source-files-helper.test.ts` — the literal list
+    // this loop used to carry would have stopped covering a new one silently.
+    for (const relative of sourceFiles()) scan(relative, readSource(relative));
     assert.deepEqual(
       survivors.filter(
         (where) => !QUOTED_SOURCE.some((holder) => where.startsWith(`${holder}:`)),

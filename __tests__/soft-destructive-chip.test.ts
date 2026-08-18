@@ -1,14 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import path from "node:path";
 
 import { CARD_BG_10, DANGER_DEEP_4, DANGER_SOFT_2 } from "@/lib/design-tokens";
 import {
   SOFT_DESTRUCTIVE_FOREGROUND,
   SOFT_DESTRUCTIVE_SURFACE,
 } from "@/lib/danger-surface";
-import { readRepoFile as read, repoPath, repoRelative } from "./helpers/repo-file";
+import { readRepoFile as read } from "./helpers/repo-file";
+import { readSource, sourceFiles } from "./helpers/source-files";
 
 /**
  * `<SoftDestructiveChip>` is the chip half of the "reversible destructive
@@ -96,23 +95,12 @@ describe("adoption", () => {
   it("leaves one screen importing the trio directly, and it is a known exception", () => {
     // The point of the extraction: a component importing the pair straight
     // from the palette is one that should be reaching for a widget instead.
-    function walk(dir: string): string[] {
-      const out: string[] = [];
-      for (const entry of readdirSync(dir)) {
-        const full = path.join(dir, entry);
-        if (statSync(full).isDirectory()) out.push(...walk(full));
-        else if (/\.tsx?$/.test(entry)) out.push(full);
-      }
-      return out;
-    }
     const importers: string[] = [];
-    for (const dir of ["app", "components"]) {
-      for (const file of walk(repoPath(dir))) {
-        const source = readFileSync(file, "utf8");
-        const importBlock = source.match(/import \{[\s\S]*?\} from "@\/lib\/design-tokens";/)?.[0] ?? "";
-        if (/\bCARD_BG_10\b/.test(importBlock) && /\bDANGER_SOFT_2\b/.test(importBlock)) {
-          importers.push(repoRelative(file));
-        }
+    for (const file of sourceFiles("app", "components")) {
+      const importBlock =
+        readSource(file).match(/import \{[\s\S]*?\} from "@\/lib\/design-tokens";/)?.[0] ?? "";
+      if (/\bCARD_BG_10\b/.test(importBlock) && /\bDANGER_SOFT_2\b/.test(importBlock)) {
+        importers.push(file);
       }
     }
     // `app/collection/[id].tsx` is the one holdout: its delete button is the

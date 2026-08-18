@@ -1,11 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import path from "node:path";
 
-import { stripComments } from "@/lib/strip-comments";
-
-import { repoPath, repoRelative } from "./helpers/repo-file";
+import { sourceCode, sourceFiles } from "./helpers/source-files";
 
 /**
  * Repo-wide masonry-caller sweep (the VM-A guardrail bullet): no screen or
@@ -16,33 +12,18 @@ import { repoPath, repoRelative } from "./helpers/repo-file";
  * in `collection-detail-flatlist-viewer.test.ts` covers the one historic
  * offender; this walk covers everywhere else the shape could land next.
  *
- * Sources are comment-stripped (shared `stripComments`) so prose like
- * "the old i % 2 split" can't false-positive.
+ * Sources are comment-stripped (`sourceCode`, which is the shared
+ * `stripComments` behind the shared walk) so prose like "the old i % 2 split"
+ * can't false-positive.
  */
-const ROOTS = ["app", "components"];
-
-function walk(dir: string, out: string[] = []): string[] {
-  for (const entry of readdirSync(dir)) {
-    const full = path.join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      walk(full, out);
-    } else if (/\.tsx?$/.test(entry)) {
-      out.push(full);
-    }
-  }
-  return out;
-}
-
-function sourceFiles(): string[] {
-  return ROOTS.flatMap((root) => walk(repoPath(root)));
-}
+const ROOTS = ["app", "components"] as const;
 
 describe("masonry callers — no inline modulo column split anywhere in app/ or components/", () => {
   it("walks a sane file set (scanner self-guard)", () => {
     // A broken walker returning [] would make the sweep pass vacuously.
-    const files = sourceFiles();
+    const files = sourceFiles(...ROOTS);
     assert.ok(files.length >= 40, `expected >= 40 source files, walked ${files.length}`);
-    assert.ok(files.some((f) => f.endsWith(path.join("collection", "[id].tsx"))));
+    assert.ok(files.includes("app/collection/[id].tsx"));
   });
 
   it("no identifier-mod-2 in any screen or component", () => {
@@ -51,11 +32,8 @@ describe("masonry callers — no inline modulo column split anywhere in app/ or 
     // by 2 legitimately today; if something ever must, rewriting this pin
     // is the deliberate act the guard exists to force.
     const offenders: string[] = [];
-    for (const file of sourceFiles()) {
-      const src = stripComments(readFileSync(file, "utf8"));
-      if (/[A-Za-z_$][\w$]*\s*%\s*2\b/.test(src)) {
-        offenders.push(repoRelative(file));
-      }
+    for (const file of sourceFiles(...ROOTS)) {
+      if (/[A-Za-z_$][\w$]*\s*%\s*2\b/.test(sourceCode(file))) offenders.push(file);
     }
     assert.deepEqual(offenders, []);
   });
@@ -65,10 +43,9 @@ describe("masonry callers — no inline modulo column split anywhere in app/ or 
     // same bug wearing the responsive column counts. Column distribution
     // belongs to FlatList numColumns or lib/masonry's distributors.
     const offenders: string[] = [];
-    for (const file of sourceFiles()) {
-      const src = stripComments(readFileSync(file, "utf8"));
-      if (/\.filter\(\s*\([^)]*\)\s*=>\s*[A-Za-z_$][\w$]*\s*%\s*\d/.test(src)) {
-        offenders.push(repoRelative(file));
+    for (const file of sourceFiles(...ROOTS)) {
+      if (/\.filter\(\s*\([^)]*\)\s*=>\s*[A-Za-z_$][\w$]*\s*%\s*\d/.test(sourceCode(file))) {
+        offenders.push(file);
       }
     }
     assert.deepEqual(offenders, []);

@@ -1,10 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
 
 import { HERO_DARK, HERO_DARK_4, HERO_DARK_5 } from "@/lib/design-tokens";
 import { HERO_DARK_GRADIENT, PHOTO_SCRIM_GRADIENT } from "@/lib/gradients";
-import { readRepoFile as read, repoPath } from "./helpers/repo-file";
+import { readRepoFile as read } from "./helpers/repo-file";
+import { tsxFiles } from "./helpers/source-files";
 
 /**
  * Pins for `lib/gradients.ts` — the shared `<LinearGradient>` recipes.
@@ -19,17 +19,7 @@ import { readRepoFile as read, repoPath } from "./helpers/repo-file";
  * property of the repo, not of the constant.
  */
 
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(repoPath(dir))) {
-    const rel = `${dir}/${entry}`;
-    if (statSync(repoPath(rel)).isDirectory()) out.push(...walk(rel));
-    else if (rel.endsWith(".tsx")) out.push(rel);
-  }
-  return out;
-}
-
-const UI_FILES = ["app", "components"].flatMap(walk);
+const UI_FILES = tsxFiles("app", "components");
 
 describe("lib/gradients.ts — HERO_DARK_GRADIENT", () => {
   it("keeps the three stops in dark → mid → light order", () => {

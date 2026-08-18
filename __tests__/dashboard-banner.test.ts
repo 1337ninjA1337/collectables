@@ -1,9 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
 
 import { RADIUS_CARD_SM, SPACING_SECTION } from "@/lib/design-tokens";
-import { readRepoFile as read, repoPath } from "./helpers/repo-file";
+import { readRepoFile as read } from "./helpers/repo-file";
+import { tsxFiles } from "./helpers/source-files";
 
 /**
  * Structural pins for `<DashboardBanner>` — the "icon disc + title + hint +
@@ -17,18 +17,8 @@ import { readRepoFile as read, repoPath } from "./helpers/repo-file";
  * that is easy to lose when markup moves between files.
  */
 
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(repoPath(dir))) {
-    const rel = `${dir}/${entry}`;
-    if (statSync(repoPath(rel)).isDirectory()) out.push(...walk(rel));
-    else if (rel.endsWith(".tsx")) out.push(rel);
-  }
-  return out;
-}
-
 const COMPONENT = "components/dashboard-banner.tsx";
-const UI_FILES = ["app", "components"].flatMap(walk);
+const UI_FILES = tsxFiles("app", "components");
 
 describe("components/dashboard-banner.tsx — markup", () => {
   const src = read(COMPONENT);

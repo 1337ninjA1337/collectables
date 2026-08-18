@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { ANALYTICS_EVENTS } from "../lib/analytics-events";
@@ -10,27 +8,11 @@ import {
   isPiiPropKey,
   findPiiPropKeys,
 } from "../lib/analytics-pii";
-import { readRepoFile as read, repoPath, repoRelative } from "./helpers/repo-file";
+import { readRepoFile as read } from "./helpers/repo-file";
+import { readSource, sourceFiles } from "./helpers/source-files";
 
-
-// Directories that hold telemetry call sites. node_modules / dist excluded.
-const SCAN_DIRS = ["lib", "components", "app"];
-
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    if (entry === "node_modules" || entry === "dist") continue;
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      out.push(...walk(full));
-    } else if (/\.tsx?$/.test(entry)) {
-      out.push(full);
-    }
-  }
-  return out;
-}
-
-const SOURCE_FILES = SCAN_DIRS.flatMap((d) => walk(repoPath(d)));
+// Directories that hold telemetry call sites.
+const SOURCE_FILES = sourceFiles("lib", "components", "app");
 
 /**
  * Extracts the property KEYS from a flat object-literal body (no nested
@@ -135,9 +117,8 @@ describe("PII guard — trackEvent call sites stay within the taxonomy", () => {
   it("every call site uses a known event with only allow-listed, non-PII keys", () => {
     let callsChecked = 0;
     for (const file of SOURCE_FILES) {
-      const src = readFileSync(file, "utf8");
-      if (file.endsWith(join("lib", "analytics.ts"))) continue; // wrapper itself
-      const rel = repoRelative(file);
+      if (file === "lib/analytics.ts") continue; // wrapper itself
+      const src = readSource(file);
 
       // name + object-literal props
       for (const m of src.matchAll(
@@ -148,17 +129,17 @@ describe("PII guard — trackEvent call sites stay within the taxonomy", () => {
         const def = (ANALYTICS_EVENTS as Record<string, { props: readonly string[] }>)[
           name
         ];
-        assert.ok(def, `${rel}: trackEvent("${name}") is not in the taxonomy`);
+        assert.ok(def, `${file}: trackEvent("${name}") is not in the taxonomy`);
         const allowed = new Set(def.props);
         for (const key of extractObjectKeys(body)) {
           assert.ok(
             allowed.has(key),
-            `${rel}: trackEvent("${name}") passes undeclared prop "${key}" (allowed: ${[...allowed].join(", ")})`,
+            `${file}: trackEvent("${name}") passes undeclared prop "${key}" (allowed: ${[...allowed].join(", ")})`,
           );
           assert.equal(
             isPiiPropKey(key),
             false,
-            `${rel}: trackEvent("${name}") passes PII-shaped prop "${key}"`,
+            `${file}: trackEvent("${name}") passes PII-shaped prop "${key}"`,
           );
         }
       }
@@ -168,7 +149,7 @@ describe("PII guard — trackEvent call sites stay within the taxonomy", () => {
         const name = m[1];
         assert.ok(
           (ANALYTICS_EVENTS as Record<string, unknown>)[name],
-          `${rel}: trackEvent("${name}") is not in the taxonomy`,
+          `${file}: trackEvent("${name}") is not in the taxonomy`,
         );
       }
     }
@@ -190,9 +171,8 @@ describe("PII guard — breadcrumb call sites carry no user input", () => {
   it("addBreadcrumb data objects only use route allow-listed keys", () => {
     let calls = 0;
     for (const file of SOURCE_FILES) {
-      const src = readFileSync(file, "utf8");
-      if (file.endsWith(join("lib", "sentry.ts"))) continue; // wrapper itself
-      const rel = repoRelative(file);
+      if (file === "lib/sentry.ts") continue; // wrapper itself
+      const src = readSource(file);
       for (const m of src.matchAll(
         /addBreadcrumb\([\s\S]*?\{([\s\S]*?)\}\s*\)/g,
       )) {
@@ -200,12 +180,12 @@ describe("PII guard — breadcrumb call sites carry no user input", () => {
         for (const key of extractObjectKeys(m[1])) {
           assert.ok(
             BREADCRUMB_ALLOWED_DATA_KEYS.has(key),
-            `${rel}: addBreadcrumb passes non-allow-listed data key "${key}" (allowed: ${[...BREADCRUMB_ALLOWED_DATA_KEYS].join(", ")})`,
+            `${file}: addBreadcrumb passes non-allow-listed data key "${key}" (allowed: ${[...BREADCRUMB_ALLOWED_DATA_KEYS].join(", ")})`,
           );
           assert.equal(
             isPiiPropKey(key),
             false,
-            `${rel}: addBreadcrumb passes PII-shaped data key "${key}"`,
+            `${file}: addBreadcrumb passes PII-shaped data key "${key}"`,
           );
         }
       }
@@ -217,9 +197,8 @@ describe("PII guard — breadcrumb call sites carry no user input", () => {
 describe("PII guard — captureException context is a constant label", () => {
   it("every captureException context value is a plain string literal", () => {
     for (const file of SOURCE_FILES) {
-      const src = readFileSync(file, "utf8");
-      if (file.endsWith(join("lib", "sentry.ts"))) continue; // wrapper itself
-      const rel = repoRelative(file);
+      if (file === "lib/sentry.ts") continue; // wrapper itself
+      const src = readSource(file);
       for (const m of src.matchAll(
         /captureException\([\s\S]*?context:\s*([^,}\n]+)/g,
       )) {
@@ -227,7 +206,7 @@ describe("PII guard — captureException context is a constant label", () => {
         assert.match(
           value,
           /^["'][^"']*["']$/,
-          `${rel}: captureException context must be a constant string literal, got \`${value}\` (no interpolated user data)`,
+          `${file}: captureException context must be a constant string literal, got \`${value}\` (no interpolated user data)`,
         );
       }
     }

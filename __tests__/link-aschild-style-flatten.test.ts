@@ -1,9 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
-import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { readRepoFile } from "./helpers/repo-file";
+import { readSource, tsxFiles } from "./helpers/source-files";
 
 /**
  * Regression guard for the web-only crash:
@@ -30,20 +29,7 @@ import { readRepoFile, repoPath } from "./helpers/repo-file";
  * literal) so `Slot` spreads a flat object.
  */
 
-const SCAN_DIRS = ["app", "components"];
-
-function collectTsxFiles(dir: string): string[] {
-  const abs = repoPath(dir);
-  if (!fs.existsSync(abs)) return [];
-  const out: string[] = [];
-  for (const entry of fs.readdirSync(abs, { withFileTypes: true })) {
-    if (entry.name === "node_modules") continue;
-    const rel = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...collectTsxFiles(rel));
-    else if (entry.name.endsWith(".tsx")) out.push(rel);
-  }
-  return out;
-}
+const SCAN_DIRS = ["app", "components"] as const;
 
 /**
  * Every `style={[` that appears on the direct child element of a `<Link …
@@ -108,12 +94,9 @@ describe("findArrayStylesUnderAsChild", () => {
 describe("<Link asChild> style merging", () => {
   it("no direct child of <Link asChild> passes a bare array style", () => {
     const offenders: string[] = [];
-    for (const dir of SCAN_DIRS) {
-      for (const rel of collectTsxFiles(dir)) {
-        const source = readRepoFile(rel);
-        for (const hit of findArrayStylesUnderAsChild(source)) {
-          offenders.push(`${rel} ${hit}`);
-        }
+    for (const rel of tsxFiles(...SCAN_DIRS)) {
+      for (const hit of findArrayStylesUnderAsChild(readSource(rel))) {
+        offenders.push(`${rel} ${hit}`);
       }
     }
     assert.deepEqual(

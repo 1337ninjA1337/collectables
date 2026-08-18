@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import path from "node:path";
 
 import {
   byCreatedAtAsc,
@@ -10,7 +8,8 @@ import {
   compareIsoDesc,
   compareKeysAsc,
 } from "@/lib/sort-helpers";
-import { readRepoFile, repoPath, repoRelative } from "./helpers/repo-file";
+import { readRepoFile } from "./helpers/repo-file";
+import { readSource, sourceFiles } from "./helpers/source-files";
 
 /**
  * `lib/sort-helpers.ts` exists to close a bug class: fifteen call sites had
@@ -143,34 +142,21 @@ describe("compareKeysAsc", () => {
 });
 
 describe("no lib/ module re-inlines an inconsistent timestamp comparator", () => {
-  function walk(dir: string): string[] {
-    const out: string[] = [];
-    for (const entry of readdirSync(dir)) {
-      const full = path.join(dir, entry);
-      if (statSync(full).isDirectory()) out.push(...walk(full));
-      else if (/\.tsx?$/.test(entry)) out.push(full);
-    }
-    return out;
-  }
-
   it("finds no `? 1 : -1` / `? -1 : 1` timestamp ternary left in lib/, app/ or components/", () => {
     // The exact shape that was wrong at fifteen sites. Matching on the
     // timestamp field names keeps this from firing on the legitimate
     // null-sinking branch in `lib/item-filters.ts`, which handles its own tie.
     const pattern = /(createdAt|soldAt|lastMessageAt|recordedAt|arrivedAt|updatedAt)\s*[<>]\s*\w+\.\w+\s*\?\s*-?1\s*:\s*-?1/;
     const offenders: string[] = [];
-    for (const dir of ["lib", "app", "components"]) {
-      for (const file of walk(repoPath(dir))) {
-        // The helper's own doc comment quotes the bad shape on purpose — it is
-        // the thing being explained. Everywhere else, quoting it means using it.
-        if (file.endsWith("sort-helpers.ts")) continue;
-        const source = readFileSync(file, "utf8");
-        source.split("\n").forEach((line, index) => {
-          if (pattern.test(line)) {
-            offenders.push(`${repoRelative(file)}:${index + 1}  ${line.trim()}`);
-          }
+    for (const file of sourceFiles("lib", "app", "components")) {
+      // The helper's own doc comment quotes the bad shape on purpose — it is
+      // the thing being explained. Everywhere else, quoting it means using it.
+      if (file.endsWith("sort-helpers.ts")) continue;
+      readSource(file)
+        .split("\n")
+        .forEach((line, index) => {
+          if (pattern.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`);
         });
-      }
     }
     assert.deepEqual(
       offenders,

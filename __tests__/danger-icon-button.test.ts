@@ -1,6 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
 import { createElement, type ReactElement } from "react";
 
 import { installNativeModuleStubs, render, styleOf, type RenderResult } from "./helpers/render";
@@ -11,7 +10,8 @@ import {
   SOFT_DESTRUCTIVE_SURFACE,
 } from "@/lib/danger-surface";
 import { CARD_BG_8, DANGER_DEEP_3, DANGER_SOFT, RADIUS_PILL } from "@/lib/design-tokens";
-import { readRepoFile as read, repoPath } from "./helpers/repo-file";
+import { readRepoFile as read } from "./helpers/repo-file";
+import { sourceFiles } from "./helpers/source-files";
 
 installNativeModuleStubs();
 
@@ -34,16 +34,6 @@ installNativeModuleStubs();
  * element or a style array whose later entry wins. See that file for why the
  * component has to come in through a dynamic `import()`.
  */
-
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(repoPath(dir))) {
-    const rel = `${dir}/${entry}`;
-    if (statSync(repoPath(rel)).isDirectory()) out.push(...walk(rel));
-    else if (/\.tsx?$/.test(rel)) out.push(rel);
-  }
-  return out;
-}
 
 type MountOptions = {
   icon?: string;
@@ -217,7 +207,7 @@ describe("adoption", () => {
     // A screen importing CARD_BG_8 + DANGER_SOFT together is a screen building
     // this button by hand, which is the drift the extraction exists to stop.
     const importers: string[] = [];
-    for (const file of ["app", "components"].flatMap(walk)) {
+    for (const file of sourceFiles("app", "components")) {
       const source = read(file);
       const importBlock = source.match(/import \{[\s\S]*?\} from "@\/lib\/design-tokens";/)?.[0] ?? "";
       if (/\bCARD_BG_8\b/.test(importBlock) && /\bDANGER_SOFT\b/.test(importBlock)) {

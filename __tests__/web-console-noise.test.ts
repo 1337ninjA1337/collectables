@@ -1,8 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync } from "node:fs";
-import path from "node:path";
-import { readRepoFile as read, repoPath } from "./helpers/repo-file";
+
+import { readRepoFile as read } from "./helpers/repo-file";
+import { sourceFiles } from "./helpers/source-files";
 
 /**
  * Two classes of avoidable console noise on the deployed web build, both
@@ -24,19 +24,7 @@ import { readRepoFile as read, repoPath } from "./helpers/repo-file";
  * nothing fails when they come back, they just bury real errors in the console.
  */
 
-function collectSourceFiles(dir: string): string[] {
-  const abs = repoPath(dir);
-  const out: string[] = [];
-  for (const entry of readdirSync(abs, { withFileTypes: true })) {
-    if (entry.name === "node_modules") continue;
-    const rel = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...collectSourceFiles(rel));
-    else if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) out.push(rel);
-  }
-  return out;
-}
-
-const SOURCE_FILES = ["app", "components", "lib"].flatMap(collectSourceFiles);
+const SOURCE_FILES = sourceFiles("app", "components", "lib");
 
 describe("expo-image-picker — no deprecated MediaTypeOptions", () => {
   it("no source file reaches for the deprecated enum", () => {

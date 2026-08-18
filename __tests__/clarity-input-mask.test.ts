@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import path from "node:path";
+import { statSync } from "node:fs";
 
 import {
   CLARITY_MASK_ALLOWED_FILES,
@@ -10,7 +9,8 @@ import {
   formatClarityMaskReport,
 } from "../lib/check-clarity-input-mask";
 
-import { readRepoFile, repoPath, repoRelative } from "./helpers/repo-file";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { readSource, tsxFiles } from "./helpers/source-files";
 
 describe("check-clarity-input-mask", () => {
   it("flags a raw <TextInput> with no mask attribute", () => {
@@ -100,19 +100,9 @@ describe("check-clarity-input-mask", () => {
   });
 
   it("the real app/ + components/ trees pass the scan", () => {
-    const files: Record<string, string> = {};
-    const walk = (dir: string) => {
-      for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) walk(full);
-        else if (entry.name.endsWith(".tsx")) {
-          files[repoRelative(full).split(path.sep).join("/")] =
-            readFileSync(full, "utf8");
-        }
-      }
-    };
-    walk(repoPath("app"));
-    walk(repoPath("components"));
+    const files = Object.fromEntries(
+      tsxFiles("app", "components").map((relative) => [relative, readSource(relative)]),
+    );
     assert.deepEqual(findClarityMaskViolations(files), []);
   });
 

@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 import {
   ALLOWED_WRAPPER_BACKGROUNDS,
@@ -9,18 +7,8 @@ import {
   formatEmptyStateWrapperReport,
 } from "../lib/check-empty-state-wrappers";
 
-import { readRepoFile, repoPath, repoRelative } from "./helpers/repo-file";
-
-
-function listSourceFiles(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...listSourceFiles(full));
-    else if (/\.tsx?$/.test(entry.name)) out.push(full);
-  }
-  return out.sort();
-}
+import { readRepoFile } from "./helpers/repo-file";
+import { readSource, sourceFiles } from "./helpers/source-files";
 
 describe("findEmptyStateWrapperOverrides — matcher", () => {
   it("flags an EmptyState wrapped in a View with a card-colored StyleSheet background", () => {
@@ -145,15 +133,11 @@ describe("findEmptyStateWrapperOverrides — matcher", () => {
 });
 
 describe("EmptyState wrapper audit — codebase sweep", () => {
-  const files = ["app", "components"].flatMap((dir) =>
-    listSourceFiles(repoPath(dir)),
-  );
+  const files = sourceFiles("app", "components");
 
   it("finds the component and real callers to scan", () => {
     assert.ok(files.length > 10, "expected app/ + components/ sources");
-    const callers = files.filter((f) =>
-      fs.readFileSync(f, "utf8").includes("<EmptyState"),
-    );
+    const callers = files.filter((f) => readSource(f).includes("<EmptyState"));
     assert.ok(
       callers.length >= 5,
       "expected several <EmptyState> call sites — did the component get renamed?",
@@ -161,12 +145,7 @@ describe("EmptyState wrapper audit — codebase sweep", () => {
   });
 
   it("no caller wraps <EmptyState> in a custom-colored container", () => {
-    const findings = files.flatMap((f) =>
-      findEmptyStateWrapperOverrides(
-        repoRelative(f),
-        fs.readFileSync(f, "utf8"),
-      ),
-    );
+    const findings = files.flatMap((f) => findEmptyStateWrapperOverrides(f, readSource(f)));
     assert.deepEqual(
       findings,
       [],

@@ -40,6 +40,32 @@
  * shared rule takes, and which is wrong only where a full parse is required
  * (a `/` after the `)` of an `if (…)`). `lib/js-tokens.ts` says where that
  * line is.
+ *
+ * A caller has to decide one more thing after stripping — whether to flatten
+ * whitespace as well — and the eleven that call this had each decided it
+ * separately with nothing stating the three shapes together. They are:
+ *
+ * 1. **Stripped, offsets intact** (`sourceCode` in
+ *    `__tests__/helpers/source-files.ts`). The default, and what the four lint
+ *    guards under `scripts/` want: comment bodies become spaces, so a match
+ *    index here is a match index in the original and a reported `file:line` is
+ *    the real one. Reach for this whenever the finding is printed with a
+ *    location.
+ * 2. **Stripped then flattened** (`suiteCode` in `helpers/suite-files.ts`,
+ *    `sourceCodeFlat` in `helpers/source-files.ts`). For a rule that matches a
+ *    SHAPE rather than reporting a place — a shape spanning lines otherwise
+ *    hides behind a prettier rewrap, which is how three suites once read clean
+ *    while still doing the thing. Offsets do not survive, so a caller that
+ *    prints a line number wants the first form.
+ * 3. **Split by line first** (`scripts/check-inline-hex.ts`). A per-line scan,
+ *    which is the same answer as the first form arrived at differently; it is
+ *    that way because its pattern carries `g` at module scope. New scanners
+ *    should take the first form instead.
+ *
+ * A scanner that flattens when it meant to report, or reports offsets from
+ * flattened text, is wrong in a way that still passes on a clean tree — which
+ * is why the choice is written down here rather than left to whichever caller
+ * a reader opens first.
  */
 
 import { DIVISION_FOLLOWS, followsRegExpKeyword } from "./js-tokens";

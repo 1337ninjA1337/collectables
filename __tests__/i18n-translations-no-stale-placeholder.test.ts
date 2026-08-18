@@ -1,8 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
 import { readI18nSource } from "./helpers/i18n-source-file";
-import { readRepoFile as read, repoPath } from "./helpers/repo-file";
+import { readRepoFile as read } from "./helpers/repo-file";
+import { tsxFiles } from "./helpers/source-files";
+
+/** The two trees that hold rendered markup. */
+const SCAN_DIRS = ["app", "components"] as const;
 
 /**
  * Structural audit over every i18n string that is rendered as a `placeholder`.
@@ -33,17 +36,6 @@ import { readRepoFile as read, repoPath } from "./helpers/repo-file";
  * `.` or contains a `?` — because that is the shape that runs long.
  */
 
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(repoPath(dir))) {
-    const rel = `${dir}/${entry}`;
-    if (statSync(repoPath(rel)).isDirectory()) out.push(...walk(rel));
-    else if (rel.endsWith(".tsx")) out.push(rel);
-  }
-  return out;
-}
-
-const SOURCE_DIRS = ["app", "components"];
 
 type Usage = { key: string; file: string; multiline: boolean };
 
@@ -60,7 +52,7 @@ type Usage = { key: string; file: string; multiline: boolean };
  */
 function collectUsages(): Usage[] {
   const usages: Usage[] = [];
-  for (const file of SOURCE_DIRS.flatMap(walk)) {
+  for (const file of tsxFiles(...SCAN_DIRS)) {
     const src = read(file);
     const re = /placeholder=\{t\("([A-Za-z0-9_]+)"\)\}/g;
     let match: RegExpExecArray | null;
@@ -93,7 +85,7 @@ describe("i18n placeholders — the audit sees every placeholder in the UI", () 
     // A refactor that moved every input behind one wrapper, or a regex that
     // stopped matching, would leave this suite passing vacuously.
     assert.ok(USAGES.length >= 20, `only ${USAGES.length} placeholder usages found — scan is broken`);
-    for (const dir of SOURCE_DIRS) {
+    for (const dir of SCAN_DIRS) {
       assert.ok(
         USAGES.some((u) => u.file.startsWith(`${dir}/`)),
         `no placeholder usages found under ${dir}/`,

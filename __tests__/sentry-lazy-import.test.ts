@@ -1,9 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
-import path from "node:path";
 
-import { readRepoFile, repoPath, repoRelative } from "./helpers/repo-file";
+import { readRepoFile } from "./helpers/repo-file";
+import { readSource, sourceFiles } from "./helpers/source-files";
 
 /**
  * Hard requirement: the ~120 KB `@sentry/react-native` native bridge is only
@@ -22,20 +21,8 @@ const sentrySource = readRepoFile("lib", "sentry.ts");
 const STATIC_IMPORT = /import[^;]*from\s+["']@sentry\/react-native["']/;
 const ALLOWLIST = ["app/_layout.tsx"];
 
-/** Recursively list .ts/.tsx files under the app-code directories. */
-function appCodeFiles(): string[] {
-  const dirs = ["app", "components", "lib", "data"];
-  const out: string[] = [];
-  const walk = (dir: string) => {
-    for (const entry of readdirSync(dir)) {
-      const full = path.join(dir, entry);
-      if (statSync(full).isDirectory()) walk(full);
-      else if (/\.tsx?$/.test(entry)) out.push(repoRelative(full));
-    }
-  };
-  for (const d of dirs) walk(repoPath(d));
-  return out;
-}
+/** The app-code directories a static SDK import would cost startup in. */
+const APP_CODE_DIRS = ["app", "components", "lib", "data"] as const;
 
 describe("sentry lazy-import invariant", () => {
   it("lib/sentry.ts loads the SDK via dynamic import only", () => {
@@ -64,9 +51,8 @@ describe("sentry lazy-import invariant", () => {
   });
 
   it("no app code statically imports the SDK outside the allowlist", () => {
-    const offenders = appCodeFiles()
-      .filter((rel) => STATIC_IMPORT.test(readRepoFile(rel)))
-      .map((rel) => rel.split(path.sep).join("/"))
+    const offenders = sourceFiles(...APP_CODE_DIRS)
+      .filter((rel) => STATIC_IMPORT.test(readSource(rel)))
       .sort();
     assert.deepEqual(
       offenders,

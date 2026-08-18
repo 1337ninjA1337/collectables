@@ -1,6 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
 
 import {
   CARD_BG_10,
@@ -13,7 +12,8 @@ import {
   DANGER_SOFT_3,
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
-import { readRepoFile as read, repoPath } from "./helpers/repo-file";
+import { readRepoFile as read } from "./helpers/repo-file";
+import { tsxFiles } from "./helpers/source-files";
 
 /**
  * Structural pins for `<DangerSection>` — the destructive-action widget
@@ -32,18 +32,8 @@ import { readRepoFile as read, repoPath } from "./helpers/repo-file";
  * the assertions are source-level.
  */
 
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(repoPath(dir))) {
-    const rel = `${dir}/${entry}`;
-    if (statSync(repoPath(rel)).isDirectory()) out.push(...walk(rel));
-    else if (rel.endsWith(".tsx")) out.push(rel);
-  }
-  return out;
-}
-
 const COMPONENT = "components/danger-section.tsx";
-const UI_FILES = ["app", "components"].flatMap(walk);
+const UI_FILES = tsxFiles("app", "components");
 
 describe("<DangerSection> owns both destructive tones", () => {
   const src = read(COMPONENT);

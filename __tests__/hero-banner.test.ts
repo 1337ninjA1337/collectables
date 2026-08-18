@@ -1,9 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
 
 import { RADIUS_HERO_LG, SPACING_CARD, SPACING_GUTTER, SPACING_LIST } from "@/lib/design-tokens";
-import { readRepoFile as read, repoPath } from "./helpers/repo-file";
+import { readRepoFile as read } from "./helpers/repo-file";
+import { tsxFiles } from "./helpers/source-files";
 
 /**
  * Structural pins for `<HeroBanner>` — the dark banner extracted from the
@@ -22,18 +22,8 @@ import { readRepoFile as read, repoPath } from "./helpers/repo-file";
  * contributor cannot recover from the diff.
  */
 
-function walk(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(repoPath(dir))) {
-    const rel = `${dir}/${entry}`;
-    if (statSync(repoPath(rel)).isDirectory()) out.push(...walk(rel));
-    else if (rel.endsWith(".tsx")) out.push(rel);
-  }
-  return out;
-}
-
 const COMPONENT = "components/hero-banner.tsx";
-const UI_FILES = ["app", "components"].flatMap(walk);
+const UI_FILES = tsxFiles("app", "components");
 
 /** Every screen that renders the gradient banner. */
 const GRADIENT_CONSUMERS = ["app/index.tsx", "app/settings.tsx", "components/login-screen.tsx"];

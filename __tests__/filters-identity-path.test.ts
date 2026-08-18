@@ -22,8 +22,6 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   applyItemFilters,
@@ -33,7 +31,8 @@ import {
   type ItemFilters,
 } from "@/lib/item-filters";
 import type { CollectableItem } from "@/lib/types";
-import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { readRepoFile } from "./helpers/repo-file";
+import { readSource, sourceFiles } from "./helpers/source-files";
 
 function item(title: string, overrides: Partial<CollectableItem> = {}): CollectableItem {
   return {
@@ -178,32 +177,15 @@ describe("the audit the task asked for — other pure-helper array modules", () 
    * returning the input is not even type-legal — and each runs once per user
    * action, not once per render, so the copy is not on a hot path.
    */
-  const SCREEN_DIRS = ["app", "components"];
-
-  function sourceFiles(dir: string): string[] {
-    const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
-    const out: string[] = [];
-    const walk = (d: string) => {
-      for (const entry of readdirSync(d)) {
-        const full = path.join(d, entry);
-        if (statSync(full).isDirectory()) walk(full);
-        else if (/\.tsx?$/.test(entry)) out.push(full);
-      }
-    };
-    walk(repoPath(dir));
-    return out;
-  }
+  const SCREEN_DIRS = ["app", "components"] as const;
 
   it("applyItemFilters is still the only lib array helper wrapped in a useMemo", () => {
     // If a second one appears, it inherits this task: decide whether it needs
     // an identity path before the allocation reaches a render loop.
     const memoized = new Set<string>();
-    for (const dir of SCREEN_DIRS) {
-      for (const file of sourceFiles(dir)) {
-        const src = readFileSync(file, "utf8");
-        for (const m of src.matchAll(/useMemo\(\(\)\s*=>\s*([a-zA-Z_$][\w$]*)\(/g)) {
-          memoized.add(m[1]);
-        }
+    for (const file of sourceFiles(...SCREEN_DIRS)) {
+      for (const m of readSource(file).matchAll(/useMemo\(\(\)\s*=>\s*([a-zA-Z_$][\w$]*)\(/g)) {
+        memoized.add(m[1]);
       }
     }
     assert.ok(memoized.has("applyItemFilters"), "applyItemFilters is no longer memoized — re-audit");
