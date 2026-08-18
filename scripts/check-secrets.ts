@@ -17,6 +17,7 @@ import {
   scanForSecrets,
   SECRET_SKIP_DIRS,
   SECRET_SKIP_FILES,
+  SOURCE_SCAN_EXTENSIONS,
   type SecretMatch,
 } from "../lib/secret-scan";
 import { GuardRootError } from "../lib/guard-root";
@@ -25,24 +26,6 @@ import { guardScanRoot, listFilesUnder } from "./guard-io";
 
 const CHECK_NAME = "check-secrets";
 const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
-
-/** Only text formats that could plausibly carry a pasted credential. */
-const SCAN_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".json",
-  ".md",
-  ".yml",
-  ".yaml",
-  ".sql",
-  ".sh",
-  ".html",
-  ".txt",
-]);
 
 /**
  * The exempt files, in this platform's separator.
@@ -60,7 +43,7 @@ function main(): void {
   // FILES, and a walk that knows about individual files is a walk with a
   // second rule in it.
   const files = listFilesUnder(repoRoot, {
-    extensions: SCAN_EXTENSIONS,
+    extensions: SOURCE_SCAN_EXTENSIONS,
     skipDirs: SECRET_SKIP_DIRS,
   }).filter((rel) => !SKIP_FILES.has(path.normalize(rel)));
 

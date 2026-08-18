@@ -96,19 +96,35 @@ export function listDirNames(dir: string): string[] {
  * `node_modules` is skipped wherever it turns up. Nothing here skips by path,
  * and a guard that needs to would be saying something about one tree rather
  * than about a kind of directory.
+ *
+ * The extension test is case-FOLDED, and it was not: a stray uppercase copy of
+ * the manual-tasks document sat in this repository unscanned by the secret
+ * guard for as long as it existed, because `path.extname` answers `.MD` and
+ * the set holds `.md`. Every set passed here is written in lower case, and a
+ * rule that reads `Foo.TSX` as a non-source file is a rule with a hole one
+ * shift key wide.
+ *
+ * Omitting `extensions` returns EVERY file. One caller wants that — the case
+ * that asks which extensions the tree actually holds, so a new one cannot join
+ * it without a decision about whether the secret scan reads it — and an
+ * absent filter is a clearer way to say "all of them" than a list that has to
+ * be kept exhaustive.
  */
 export function listFilesUnder(
   root: string,
-  options: { readonly extensions: Iterable<string>; readonly skipDirs?: Iterable<string> },
+  options: { readonly extensions?: Iterable<string>; readonly skipDirs?: Iterable<string> },
 ): string[] {
-  const extensions = new Set(options.extensions);
+  const extensions = options.extensions === undefined ? null : new Set(options.extensions);
   const skipDirs = new Set(options.skipDirs ?? []);
   const found: string[] = [];
   const walk = (relative: string): void => {
     for (const entry of listDirEntries(relative === "" ? root : path.join(root, relative))) {
       if (entry.isDirectory()) {
         if (!skipDirs.has(entry.name)) walk(relative === "" ? entry.name : `${relative}/${entry.name}`);
-      } else if (entry.isFile() && extensions.has(path.extname(entry.name))) {
+      } else if (
+        entry.isFile() &&
+        (extensions === null || extensions.has(path.extname(entry.name).toLowerCase()))
+      ) {
         found.push(relative === "" ? entry.name : `${relative}/${entry.name}`);
       }
     }

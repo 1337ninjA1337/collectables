@@ -6,9 +6,11 @@ import {
   BUNDLE_SKIP_DIRS,
   DEFAULT_SECRET_RULES,
   IGNORE_MARKER,
+  NOT_SCANNED_EXTENSION_REASONS,
   SECRET_SKIP_DIRS,
   SECRET_SKIP_FILES,
   SECRET_SKIP_FILE_REASONS,
+  SOURCE_SCAN_EXTENSIONS,
   decodeBase64Url,
   formatSecretReport,
   isPrivilegedSupabaseJwt,
@@ -16,7 +18,8 @@ import {
   scanForSecrets,
 } from "../lib/secret-scan";
 import { LINT_GUARDS } from "../lib/lint-guards";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, REPO_ROOT } from "./helpers/repo-file";
+import { listFilesUnder } from "../scripts/guard-io";
 
 const b64url = (obj: unknown) =>
   Buffer.from(JSON.stringify(obj)).toString("base64url");
@@ -229,6 +232,50 @@ describe("what the source scan does not read", () => {
         [],
         `${rel} now matches a rule — silence one line with a \`${IGNORE_MARKER}\` comment where it happens, rather than exempting the whole file`,
       );
+    }
+  });
+
+  it("accounts for every extension in the repository, one way or the other", () => {
+    // The check that makes the extension list a statement rather than a
+    // memory — the same partition `assertSourceDirsCoverTheTree` makes one
+    // level up, and it found three holes the moment it was written:
+    // `.env.example`, `queries.m` and `measures.dax` were all unread.
+    const present = new Set(
+      listFilesUnder(REPO_ROOT, { skipDirs: SECRET_SKIP_DIRS }).map((rel) =>
+        path.extname(rel).toLowerCase(),
+      ),
+    );
+    assert.ok(present.size > 5, `only ${present.size} extensions walked — the walk is broken, not the tree`);
+    const scanned = new Set(SOURCE_SCAN_EXTENSIONS);
+    const unaccounted = [...present].filter(
+      (ext) => !scanned.has(ext) && !(ext in NOT_SCANNED_EXTENSION_REASONS),
+    );
+    assert.deepEqual(
+      unaccounted,
+      [],
+      `the repository holds these extensions and the secret scan neither reads them nor says why: ${unaccounted.join(", ")}`,
+    );
+    for (const [ext, reason] of Object.entries(NOT_SCANNED_EXTENSION_REASONS)) {
+      assert.ok(
+        present.has(ext),
+        `${ext || '""'} is excused from the scan and no file in the tree has it — drop the entry rather than keeping a reason for nothing`,
+      );
+      assert.ok(reason.length >= 30, `${ext || '""'} is excluded for a reason shorter than a reason`);
+      assert.ok(!scanned.has(ext), `${ext || '""'} is both scanned and excused`);
+    }
+  });
+
+  it("reads the two files that tell their reader to paste credentials in", () => {
+    // `.env.example` documents the shape of every credential this app takes,
+    // and `docs/powerbi/queries.m` instructs the reader to replace four
+    // literals with their Supabase session pooler values — a database
+    // password, in a committed file. Both were outside the extension list.
+    for (const rel of [".env.example", "docs/powerbi/queries.m", "docs/powerbi/measures.dax"]) {
+      assert.ok(
+        SOURCE_SCAN_EXTENSIONS.includes(path.extname(rel)),
+        `${rel} is not covered by the scan's extension list`,
+      );
+      assert.deepEqual(scanForSecrets(rel, read(rel)), [], `${rel} carries a matching secret`);
     }
   });
 

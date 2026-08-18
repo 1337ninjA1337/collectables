@@ -14,6 +14,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
+  BUNDLE_SCAN_EXTENSIONS,
   BUNDLE_SKIP_DIRS,
   formatSecretReport,
   scanForSecrets,
@@ -27,9 +28,6 @@ const DIST_DIR = path.join(REPO_ROOT, "dist");
 
 const CHECK_NAME = "check-bundle-secrets";
 
-/** Bundle artifacts that could embed a leaked credential. */
-const SCAN_EXTENSIONS = new Set([".js", ".html", ".json", ".map", ".css"]);
-
 function main(): void {
   // Shared premise: dist/ exists, carries at least one exported chunk, and is
   // newer than the source tree. Without it this scan reports "no secrets
@@ -41,7 +39,7 @@ function main(): void {
   // oversight rather than as the decision it is. `lib/secret-scan.ts` says why
   // nothing under `dist/` may be skipped.
   const files = listFilesUnder(DIST_DIR, {
-    extensions: SCAN_EXTENSIONS,
+    extensions: BUNDLE_SCAN_EXTENSIONS,
     skipDirs: BUNDLE_SKIP_DIRS,
   });
 

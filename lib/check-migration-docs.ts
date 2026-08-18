@@ -9,7 +9,7 @@
  *
  * CLAUDE.md mandates: "IN CASE THERE ARE ANY REQ CHANGES INTO DB (supabase sql
  * commands) ADD EVERYTHING THAT I NEED TO IMPLEMENT MANUALLY IN
- * MANUAL-TASKS.MD". This guard enforces it in CI: every committed migration
+ * MANUAL-TASKS.md". This guard enforces it in CI: every committed migration
  * file must have a matching `## <filename>` H2 section in MANUAL-TASKS.md, so a
  * new migration can never land without its manual-apply instructions.
  */

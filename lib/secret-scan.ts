@@ -95,6 +95,77 @@ export const SECRET_SKIP_FILE_REASONS: Readonly<Record<string, string>> = {
 /** The same as a list, derived rather than restated. */
 export const SECRET_SKIP_FILES: readonly string[] = Object.keys(SECRET_SKIP_FILE_REASONS);
 
+/**
+ * The text formats the source scan reads.
+ *
+ * It was fourteen extensions in the wrapper and nothing checked it against the
+ * tree, which is how three holes stayed open: `.env.example` — the one file
+ * whose entire subject is credential SHAPE, and therefore the likeliest place
+ * a real one is pasted by accident — `docs/powerbi/queries.m`, which tells its
+ * reader in a comment to replace four literals with their Supabase session
+ * pooler values (a database password, in a committed file), and `measures.dax`
+ * beside it. All three are read now, and
+ * `__tests__/secret-scan.test.ts` partitions every extension in the
+ * repository against this list, so the next format to arrive is a decision
+ * rather than a silence.
+ *
+ * Lower case, because the walk folds case before the membership test.
+ */
+export const SOURCE_SCAN_EXTENSIONS: readonly string[] = [
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".json",
+  ".md",
+  ".yml",
+  ".yaml",
+  ".sql",
+  ".sh",
+  ".html",
+  ".txt",
+  // `.env.example`, and any other `*.example`: `path.extname` answers
+  // `.example`, so a file that documents the shape of every credential this
+  // app takes was the one text file at the root nothing read.
+  ".example",
+  // Power BI sources under `docs/powerbi/`: Power Query M and DAX are text,
+  // and the M file's own comments instruct the reader to paste connection
+  // values into it.
+  ".m",
+  ".dax",
+  // Apple's privacy manifest — XML, small, and config is where a key lands.
+  ".xcprivacy",
+  // `PRIVACY.md.<lang>`: the extension of a doubly-suffixed name is the
+  // language code, so each translation reads as its own format. Six policy
+  // files that are markdown in everything but the name.
+  ".be",
+  ".de",
+  ".es",
+  ".pl",
+  ".ru",
+];
+
+/** Bundle artifacts that could embed a leaked credential. */
+export const BUNDLE_SCAN_EXTENSIONS: readonly string[] = [".js", ".html", ".json", ".map", ".css"];
+
+/**
+ * The extensions in this repository the source scan deliberately does not
+ * read, one reason each.
+ *
+ * The other half of the partition, and the half that makes it a statement: an
+ * extension is either scanned or it is here saying why not, so a new format
+ * cannot arrive unscanned by nobody noticing. All three are binary — this
+ * scan reads text, and a credential inside a compressed archive is not a
+ * string this matcher could find anyway.
+ */
+export const NOT_SCANNED_EXTENSION_REASONS: Readonly<Record<string, string>> = {
+  "": "no extension at all — `path.extname` answers this for a dotfile like `.hw-fix`, and an entry of \"\" in the scan list would also pull in every extensionless binary",
+  ".ttf": "font binaries under `assets/`, shipped as-is and never edited by hand",
+  ".pbit": "the Power BI template beside the M and DAX sources: a zip archive, so its text is compressed and unreadable to a line scanner",
+};
+
 export type SecretRule = {
   /** Stable identifier, surfaced in the report. */
   id: string;

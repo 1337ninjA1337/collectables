@@ -150,7 +150,10 @@ describe("a guard's report names a file its reader can open", () => {
     // is asserted at the source instead: whatever the walk returns, the
     // reported path is joined back under `dist/`.
     const source = readRepoFile("scripts/check-bundle-secrets.ts");
-    assert.match(source, /listFilesUnder\(DIST_DIR, \{\s*extensions: SCAN_EXTENSIONS,\s*skipDirs: BUNDLE_SKIP_DIRS,\s*\}\)/);
+    assert.match(
+      source,
+      /listFilesUnder\(DIST_DIR, \{\s*extensions: BUNDLE_SCAN_EXTENSIONS,\s*skipDirs: BUNDLE_SKIP_DIRS,\s*\}\)/,
+    );
     assert.match(source, /scanForSecrets\(path\.join\("dist", file\), source\)/);
     assert.match(source, /readFileSync\(path\.join\(DIST_DIR, file\), "utf8"\)/);
   });

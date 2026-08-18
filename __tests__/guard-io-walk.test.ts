@@ -118,6 +118,36 @@ describe("listFilesUnder", () => {
     }
   });
 
+  it("folds case before the extension test, and matches everything when asked for nothing", () => {
+    // A stray `MANUAL-TASKS.MD` sat at the root of this repository outside the
+    // secret scan for as long as it existed: `path.extname` answers `.MD` and
+    // the scan's set is written in lower case, so the file with the manual DB
+    // steps in it was the one text file at the root nothing read.
+    const root = fixture();
+    try {
+      writeFileSync(path.join(root, "app", "NOTES.MD"), "x");
+      writeFileSync(path.join(root, "app", "SCREEN.TSX"), "x");
+      assert.deepEqual(listFilesUnder(path.join(root, "app"), { extensions: [".md"] }), [
+        "NOTES.MD",
+        "notes.md",
+      ]);
+      assert.ok(
+        listFilesUnder(path.join(root, "app"), { extensions: MARKUP_EXTENSIONS }).includes(
+          "SCREEN.TSX",
+        ),
+      );
+      // No extension list at all is every file, which is what the census in
+      // `secret-scan.test.ts` asks for — an absent filter says "all of them"
+      // more clearly than a list that has to be kept exhaustive.
+      const everything = listFilesUnder(path.join(root, "app"), {});
+      assert.ok(everything.includes("LICENSE"), "a file with no extension was dropped");
+      assert.ok(everything.includes("notes.md"));
+      assert.ok(everything.includes("index.tsx"));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("does not return a symlink as a source file", () => {
     // A symlink is neither `isFile()` nor `isDirectory()` to `readdirSync`'s
     // dirents, so it falls out — which is the answer a secret scanner wants:
