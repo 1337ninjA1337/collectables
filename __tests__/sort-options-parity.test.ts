@@ -36,7 +36,7 @@ import type { CollectableItem } from "@/lib/types";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
-  assertMatchesInEveryLocale,
+  assertMatchesInEveryLocaleBody,
 } from "./helpers/i18n-locales";
 
 function readComponentSrc(): string {
@@ -102,7 +102,7 @@ describe("SORT_OPTIONS table", () => {
     const src = readI18nSource();
     for (const opt of SORT_OPTIONS) {
       assertDeclaredInEveryLocale(src, opt.labelKey);
-      assertMatchesInEveryLocale(
+      assertMatchesInEveryLocaleBody(
         src,
         new RegExp(`\\b${opt.labelKey}: "[^"]+",`),
         `${opt.labelKey} is a non-empty string`,

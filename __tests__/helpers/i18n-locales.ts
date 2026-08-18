@@ -20,6 +20,27 @@
  *    wrong rather than as twenty assertions needing their number bumped. The
  *    locales are read from the PICKER here (`languageOptionCodes`), so a
  *    seventh is checked rather than counted.
+ *
+ * Seven exports now, which is enough that picking the wrong one is easy — and
+ * the one that is easiest to reach for is the one that should be reached for
+ * last. In order of what to try first:
+ *
+ *  1. {@link assertDeclaredInEveryLocale} — "every locale writes this key".
+ *     The commonest claim, and it needs no pattern at all.
+ *  2. {@link assertValueInEveryLocale} — "and its value looks like this".
+ *     Matches the key's OWN span, so nothing a neighbouring key writes can
+ *     satisfy it.
+ *  3. {@link localeStrings} / {@link localeValuesOf} — when the case wants the
+ *     values themselves (are the six copies distinct? is one longer than
+ *     another?) rather than a yes/no.
+ *  4. {@link assertMatchesInEveryNonBaseLocaleBody} — the same question asked
+ *     of the inheriting locales only, for "overrides X rather than falling
+ *     back to en".
+ *  5. {@link assertMatchesInEveryLocaleBody} — LAST. It matches a whole map,
+ *     so `key:[\s\S]*?SHAPE` here is satisfied by SHAPE under any later key.
+ *     Correct only when the claim is genuinely about the map and not about one
+ *     of its entries; both body-matching names end in `Body` to say so at the
+ *     call site.
  */
 
 import assert from "node:assert/strict";
@@ -86,7 +107,7 @@ export function assertDeclaredInEveryLocale(
  * flag: a global regex keeps `lastIndex` between calls, which would make this
  * report failures depending on the order the locales happen to be walked in.
  */
-export function assertMatchesInEveryLocale(
+export function assertMatchesInEveryLocaleBody(
   source: string,
   pattern: RegExp,
   label: string,
@@ -103,7 +124,7 @@ export function assertMatchesInEveryLocale(
 }
 
 /**
- * {@link assertMatchesInEveryLocale} over the locales that INHERIT — every one
+ * {@link assertMatchesInEveryLocaleBody} over the locales that INHERIT — every one
  * but {@link TRANSLATION_BASE_LANGUAGE}.
  *
  * The suites' phrasing for this is "overrides X in ru / be / pl / de / es
@@ -116,7 +137,7 @@ export function assertMatchesInEveryLocale(
  * had only to exist somewhere at or below the named locale, which for `ru` —
  * the first map in the file — meant anywhere at all.
  */
-export function assertMatchesInEveryNonBaseLocale(
+export function assertMatchesInEveryNonBaseLocaleBody(
   source: string,
   pattern: RegExp,
   label: string,
@@ -167,9 +188,22 @@ export function localeValuesOf(
 }
 
 /**
+ * A value, short enough to read at the end of an assertion message.
+ *
+ * Printing the rejected value is the whole improvement over "not matched in
+ * de" — it ends the question where it is asked instead of sending a reader to
+ * the file. Several translation values are multi-line templates, though, and
+ * six of them inlined is a wall rather than an answer.
+ */
+const abbreviate = (value: string): string => {
+  const oneLine = value.replace(/\s+/g, " ").trim();
+  return oneLine.length > 72 ? `${oneLine.slice(0, 69)}…` : oneLine;
+};
+
+/**
  * Asserts every locale's declared value for `key` matches `pattern`.
  *
- * The exact-span counterpart of {@link assertMatchesInEveryLocale}: use this
+ * The exact-span counterpart of {@link assertMatchesInEveryLocaleBody}: use this
  * whenever the claim is about ONE key's value, and reach for the body-matching
  * form only when the claim is genuinely about the map.
  */
@@ -185,9 +219,9 @@ export function assertValueInEveryLocale(
   );
   const wrong: string[] = [];
   for (const [code, value] of localeValuesOf(source, key)) {
-    if (!pattern.test(value)) wrong.push(`${code} (${value})`);
+    if (!pattern.test(value)) wrong.push(`${code} (${abbreviate(value)})`);
   }
-  assert.deepEqual(wrong, [], `${label} — wrong in ${wrong.join("; ")}`);
+  assert.deepEqual(wrong, [], `${label} — wrong in\n  ${wrong.join("\n  ")}`);
 }
 
 /**
@@ -205,9 +239,17 @@ export function localeStrings(
 ): ReadonlyMap<string, string> {
   const strings = new Map<string, string>();
   for (const [code, value] of localeValuesOf(source, key)) {
-    const match = /^"([^"]*)"$/.exec(value);
-    assert.ok(match, `${code}: '${key}' is not a plain string literal: ${value}`);
-    strings.set(code, match![1]);
+    // Either quote. The file is all double quotes today because prettier
+    // normalises them, which is a fact about the formatter and not about the
+    // language — the same reasoning that moved key-finding off the two-space
+    // indent. Accepting both costs one alternation and removes a dependency
+    // nobody would think to check when changing the prettier config.
+    const match = /^"([^"]*)"$|^'([^']*)'$/.exec(value);
+    assert.ok(
+      match,
+      `${code}: '${key}' is not a plain string literal: ${abbreviate(value)}`,
+    );
+    strings.set(code, match![1] ?? match![2]);
   }
   return strings;
 }

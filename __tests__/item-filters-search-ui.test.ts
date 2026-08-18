@@ -5,8 +5,8 @@ import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
-  assertMatchesInEveryLocale,
-  assertMatchesInEveryNonBaseLocale,
+  assertMatchesInEveryLocaleBody,
+  assertMatchesInEveryNonBaseLocaleBody,
   assertValueInEveryLocale,
   localeStrings,
 } from "./helpers/i18n-locales";
@@ -92,7 +92,7 @@ describe("i18n — searchInCollectionPlaceholder key across all 6 supported lang
     // Per body. The slice this replaces did not slice: `[\s\S]*?` crosses
     // `};`, so the named map's brace could run through however many later maps
     // it took to find the key — `ru` being the first map, effectively the file.
-    assertMatchesInEveryNonBaseLocale(
+    assertMatchesInEveryNonBaseLocaleBody(
       src,
       /searchInCollectionPlaceholder:\s*"[^"]+"/,
       "searchInCollectionPlaceholder is overridden",
@@ -101,7 +101,7 @@ describe("i18n — searchInCollectionPlaceholder key across all 6 supported lang
 
   it("declares searchInCollectionPlaceholder in every locale, as a non-empty string", () => {
     assertDeclaredInEveryLocale(src, "searchInCollectionPlaceholder");
-    assertMatchesInEveryLocale(
+    assertMatchesInEveryLocaleBody(
       src,
       /searchInCollectionPlaceholder:\s*"[^"]+"/,
       "searchInCollectionPlaceholder is a non-empty string",
@@ -137,7 +137,7 @@ describe("i18n — search a11y keys across all 6 supported languages", () => {
   for (const key of ["searchInCollectionA11y", "filterClearSearch"]) {
     it(`declares ${key} in every locale, as a plain string`, () => {
       assertDeclaredInEveryLocale(src, key);
-      assertMatchesInEveryLocale(
+      assertMatchesInEveryLocaleBody(
         src,
         new RegExp(`\\b${key}:\\s*"[^"]+"`),
         `${key} is a non-empty string`,
@@ -145,7 +145,7 @@ describe("i18n — search a11y keys across all 6 supported languages", () => {
     });
 
     it(`localizes ${key} in ru / be / pl / de / es rather than falling back to en`, () => {
-      assertMatchesInEveryNonBaseLocale(
+      assertMatchesInEveryNonBaseLocaleBody(
         src,
         new RegExp(`\\b${key}:\\s*"[^"]+"`),
         `${key} is overridden`,
@@ -242,7 +242,7 @@ describe("i18n — queryChipClear across all 6 supported languages", () => {
   });
 
   it("localizes queryChipClear in ru / be / pl / de / es", () => {
-    assertMatchesInEveryNonBaseLocale(
+    assertMatchesInEveryNonBaseLocaleBody(
       src,
       /queryChipClear:\s*\(params\?: TranslationParams\)/,
       "queryChipClear is overridden",

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
-  assertMatchesInEveryNonBaseLocale,
+  assertMatchesInEveryNonBaseLocaleBody,
   assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
 
@@ -162,7 +162,7 @@ describe("i18n — collection currency keys across all 6 languages", () => {
     // `};`, so the match ran from the named map's opening brace through
     // whatever later map happened to carry the key — for `ru`, the first map
     // in the file, that was the whole rest of it.
-    assertMatchesInEveryNonBaseLocale(
+    assertMatchesInEveryNonBaseLocaleBody(
       src,
       /collectionCurrencyHint:\s*"[^"]+"/,
       "collectionCurrencyHint is overridden",

@@ -6,8 +6,8 @@ import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
-  assertMatchesInEveryLocale,
-  assertMatchesInEveryNonBaseLocale,
+  assertMatchesInEveryLocaleBody,
+  assertMatchesInEveryNonBaseLocaleBody,
   assertValueInEveryLocale,
   localeBodies,
   localeValuesOf,
@@ -139,14 +139,14 @@ describe("asking each locale instead of counting the file", () => {
 
 describe("the value-shape half", () => {
   it("matches each locale's own map and names the ones that miss", () => {
-    assertMatchesInEveryLocale(
+    assertMatchesInEveryLocaleBody(
       TWO_LOCALES,
       /greeting: "[^"]+"/,
       "greeting is a non-empty string",
     );
     assert.throws(
       () =>
-        assertMatchesInEveryLocale(
+        assertMatchesInEveryLocaleBody(
           TWO_LOCALES,
           /greeting: \(params\?: TranslationParams\)/,
           "greeting is a formatter",
@@ -160,7 +160,7 @@ describe("the value-shape half", () => {
     // pass for one locale and fail for the next depending on walk order —
     // a flake that reads as a translation finding.
     assert.throws(
-      () => assertMatchesInEveryLocale(TWO_LOCALES, /greeting/g, "greeting"),
+      () => assertMatchesInEveryLocaleBody(TWO_LOCALES, /greeting/g, "greeting"),
       /non-global/,
     );
   });
@@ -236,7 +236,7 @@ describe("overrides, asked of the map that is supposed to have them", () => {
     // …and the new rule on the same text.
     assert.throws(
       () =>
-        assertMatchesInEveryNonBaseLocale(
+        assertMatchesInEveryNonBaseLocaleBody(
           RU_MISSING_ES_HAS,
           /greeting: "[^"]+"/,
           "greeting is overridden",
@@ -253,14 +253,14 @@ describe("overrides, asked of the map that is supposed to have them", () => {
       'greeting: "Hello",',
       "greeting: (params?: TranslationParams) => `Hello ${params?.name ?? \"\"}`,",
     ).replace("const ru: TranslationMap = {\n  ...en,", 'const ru: TranslationMap = {\n  ...en,\n  greeting: "Привет",');
-    assertMatchesInEveryNonBaseLocale(
+    assertMatchesInEveryNonBaseLocaleBody(
       baseDiffers,
       /greeting: "[^"]+"/,
       "greeting is overridden",
     );
     assert.throws(
       () =>
-        assertMatchesInEveryLocale(
+        assertMatchesInEveryLocaleBody(
           baseDiffers,
           /greeting: "[^"]+"/,
           "greeting is a string",
@@ -272,7 +272,7 @@ describe("overrides, asked of the map that is supposed to have them", () => {
   it("refuses a global pattern here too", () => {
     assert.throws(
       () =>
-        assertMatchesInEveryNonBaseLocale(TWO_LOCALES, /greeting/g, "greeting"),
+        assertMatchesInEveryNonBaseLocaleBody(TWO_LOCALES, /greeting/g, "greeting"),
       /non-global/,
     );
   });
@@ -305,7 +305,7 @@ describe("matching a value rather than the map it sits in", () => {
       /greeting:[\s\S]*?params\?\.count \?\? 0/,
     );
     assert.doesNotThrow(() =>
-      assertMatchesInEveryLocale(
+      assertMatchesInEveryLocaleBody(
         SHAPE_UNDER_A_LATER_KEY,
         /greeting:[\s\S]*?params\?\.count \?\? 0/,
         "greeting routes a count",
@@ -321,7 +321,7 @@ describe("matching a value rather than the map it sits in", () => {
           /params\?\.count \?\? 0/,
           "greeting routes a count",
         ),
-      /wrong in en \("Hello"\)/,
+      /wrong in[\s\S]*en \("Hello"\)/,
     );
   });
 
@@ -342,7 +342,7 @@ describe("matching a value rather than the map it sits in", () => {
           /^\(params/,
           "greeting is a formatter",
         ),
-      /en \("Hello"\).*ru \("Привет"\)/s,
+      /en \("Hello"\)[\s\S]*ru \("Привет"\)/,
     );
   });
 
@@ -375,6 +375,41 @@ describe("matching a value rather than the map it sits in", () => {
       () => assertValueInEveryLocale(TWO_LOCALES, "greeting", /Hello/g, "greeting"),
       /non-global/,
     );
+  });
+});
+
+describe("what the failure message says", () => {
+  it("abbreviates a long value instead of pasting six templates into one line", () => {
+    // Printing the rejected value is the whole gain over "not matched in de";
+    // several translation values are multi-line templates, and six of them
+    // inlined is a wall rather than an answer.
+    const long = TWO_LOCALES.replace(
+      '"Привет"',
+      "`" + "очень длинное приветствие ".repeat(8) + "`",
+    );
+    assert.throws(
+      () =>
+        assertValueInEveryLocale(long, "greeting", /^"[^"]+"$/, "greeting is a string"),
+      (error: Error) => {
+        const line = error.message
+          .split("\n")
+          .find((l) => l.includes("ru ("));
+        assert.ok(line, `no ru line in: ${error.message}`);
+        assert.ok(line!.length < 120, `ru line is ${line!.length} chars`);
+        assert.match(line!, /…/);
+        return true;
+      },
+    );
+  });
+
+  it("accepts either quote for a string value, since the choice is prettier's", () => {
+    // The file is all double quotes because the formatter normalises them,
+    // which is a fact about the config and not about the language.
+    const singles = TWO_LOCALES.replace('"Привет"', "'Привет'");
+    assert.deepEqual([...localeStrings(singles, "greeting")], [
+      ["en", "Hello"],
+      ["ru", "Привет"],
+    ]);
   });
 });
 

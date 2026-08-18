@@ -371,6 +371,44 @@ describe("translation literal parser", () => {
     }
   });
 
+  it("does not read a parenthesised annotation's colon as a key", () => {
+    // True before the paren counter and true after it, for different reasons,
+    // which is why it is worth writing down. It used to hold because
+    // `expectKey` is false once a value has begun — an accident of where the
+    // arrow sits. It now holds structurally: `atTopLevel()` reads the paren
+    // count, so nothing inside a call or a parameter list is at the literal's
+    // own level whatever `expectKey` says.
+    const parsed = parseObjectLiteral(`
+  fn: (params?: TranslationParams) => \`\${params?.count ?? 0}\`,
+  after: "still here",
+`);
+    assert.deepEqual(parsed.keys, ["fn", "after"]);
+    assert.ok(!parsed.keys.includes("params"));
+  });
+
+  it("gives every `name:` key a value, across the shapes that could truncate one", () => {
+    // The agreement between `keys` and `values` is the invariant the span
+    // collector has to hold: a key with no value is a scan that stopped early,
+    // and it reaches a caller as "this locale does not declare that key" — a
+    // translation finding rather than a parser bug. Swept over the shapes that
+    // put a terminator inside a value, since those are the ones that truncate.
+    const bodies = [
+      '  a: "one",\n  b: "two",\n',
+      '  trailing: "no comma after me"\n',
+      "  call: (p) => [p.a, p.b].join(\", \"),\n  after: \"x\",\n",
+      '  regexy: (p) => /a,b/.test(p.s),\n  after: "x",\n',
+      '  nested: (p) => ({ a: 1, b: 2 }),\n  after: "x",\n',
+      "  tpl: (p) => `a ${p.n ? \"}\" : \"\"} b`,\n  after: \"x\",\n",
+      '  ...en,\n  spread: "after a spread",\n',
+    ];
+    for (const body of bodies) {
+      const parsed = parseObjectLiteral(body);
+      const withoutValue = parsed.keys.filter((key) => !parsed.values.has(key));
+      assert.deepEqual(withoutValue, [], `keys with no value span in: ${body}`);
+      assert.equal(parsed.values.size, parsed.keys.length);
+    }
+  });
+
   it("reads shorthand properties, which is how the translations record is written", () => {
     // `const translations: Record<AppLanguage, TranslationMap> = { en, ru, … }`
     // declares six keys and writes not one colon.

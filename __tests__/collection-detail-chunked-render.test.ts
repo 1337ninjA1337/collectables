@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
-  assertMatchesInEveryNonBaseLocale,
+  assertMatchesInEveryNonBaseLocaleBody,
   assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
 
@@ -190,7 +190,7 @@ describe("i18n — loadMoreItems key across all 6 supported languages", () => {
     // remaining-count formatting works.
     // Per body — the slice this replaces crossed `};` and so was satisfied by
     // any later map carrying the key.
-    assertMatchesInEveryNonBaseLocale(
+    assertMatchesInEveryNonBaseLocaleBody(
       src,
       /\bloadMoreItems:/,
       "loadMoreItems is overridden",

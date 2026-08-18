@@ -5,8 +5,8 @@ import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
-  assertMatchesInEveryLocale,
-  assertMatchesInEveryNonBaseLocale,
+  assertMatchesInEveryLocaleBody,
+  assertMatchesInEveryNonBaseLocaleBody,
 } from "./helpers/i18n-locales";
 
 /**
@@ -150,7 +150,7 @@ describe("i18n — sort* keys across all 6 supported languages", () => {
     // Per body — the slice this replaces crossed `};`, so a key present in any
     // later map satisfied every earlier locale.
     for (const key of ["sortLabel", "sortDefault", "sortNameAsc", "sortNameDesc"]) {
-      assertMatchesInEveryNonBaseLocale(
+      assertMatchesInEveryNonBaseLocaleBody(
         src,
         new RegExp(`\\b${key}:\\s*"[^"]+"`),
         `${key} is overridden`,
@@ -161,7 +161,7 @@ describe("i18n — sort* keys across all 6 supported languages", () => {
   it("declares each key in every locale, as a non-empty string", () => {
     for (const key of ["sortLabel", "sortDefault", "sortNameAsc", "sortNameDesc"]) {
       assertDeclaredInEveryLocale(src, key);
-      assertMatchesInEveryLocale(
+      assertMatchesInEveryLocaleBody(
         src,
         new RegExp(`\\b${key}:\\s*"[^"]+"`),
         `${key} is a non-empty string`,

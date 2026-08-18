@@ -20,7 +20,7 @@ import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
-  assertMatchesInEveryLocale,
+  assertMatchesInEveryLocaleBody,
   localeStrings,
 } from "./helpers/i18n-locales";
 
@@ -136,7 +136,7 @@ describe("reorder-blocked-by-sort notice — i18n", () => {
     const src = readI18nSource();
     for (const key of NOTICE_KEYS) {
       assertDeclaredInEveryLocale(src, key);
-      assertMatchesInEveryLocale(
+      assertMatchesInEveryLocaleBody(
         src,
         new RegExp(`\\b${key}: "[^"]+",`),
         `${key} is a non-empty string`,

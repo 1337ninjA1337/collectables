@@ -5,8 +5,8 @@ import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
-  assertMatchesInEveryLocale,
-  assertMatchesInEveryNonBaseLocale,
+  assertMatchesInEveryLocaleBody,
+  assertMatchesInEveryNonBaseLocaleBody,
   localeStrings,
 } from "./helpers/i18n-locales";
 
@@ -221,7 +221,7 @@ describe("i18n — the two new per-sheet a11y labels across all 6 languages", ()
   ]) {
     it(`declares ${key} in every locale, as a plain string`, () => {
       assertDeclaredInEveryLocale(src, key);
-      assertMatchesInEveryLocale(
+      assertMatchesInEveryLocaleBody(
         src,
         new RegExp(`\\b${key}:\\s*"[^"]+"`),
         `${key} is a non-empty string`,
@@ -231,7 +231,7 @@ describe("i18n — the two new per-sheet a11y labels across all 6 languages", ()
     it(`localizes ${key} in ru / be / pl / de / es rather than falling back to en`, () => {
       // Per body. The slice this replaces crossed `};`, so the key had only to
       // exist somewhere at or below the named locale to satisfy it.
-      assertMatchesInEveryNonBaseLocale(
+      assertMatchesInEveryNonBaseLocaleBody(
         src,
         new RegExp(`\\b${key}:\\s*"[^"]+"`),
         `${key} is overridden`,
@@ -253,12 +253,12 @@ describe("i18n — the two new per-sheet a11y labels across all 6 languages", ()
 
   it("declares searchClose exactly 6 times, localized in every language", () => {
     assertDeclaredInEveryLocale(src, "searchClose");
-    assertMatchesInEveryLocale(
+    assertMatchesInEveryLocaleBody(
       src,
       /searchClose:\s*"[^"]+"/,
       "searchClose is a non-empty string",
     );
-    assertMatchesInEveryNonBaseLocale(
+    assertMatchesInEveryNonBaseLocaleBody(
       src,
       /searchClose:\s*"[^"]+"/,
       "searchClose is overridden",
