@@ -1,9 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readdirSync } from "node:fs";
 
 import { stripComments } from "@/lib/strip-comments";
 
-import { readRepoFile } from "./helpers/repo-file";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 import { readSuite, suiteFiles, suiteText } from "./helpers/suite-files";
 
 /**
@@ -21,6 +22,35 @@ import { readSuite, suiteFiles, suiteText } from "./helpers/suite-files";
  * The last one is the whole reason the "said once" guards can state their rule
  * as "not at all" rather than as an exemption per file that explains itself.
  */
+
+/**
+ * The two files that hold JavaScript inside a template literal, where a `//`
+ * line is string content and the stripper is right to leave it standing.
+ *
+ * `lib/spa-fallback.ts` emits the service worker as a string, and
+ * `i18n-source.test.ts`'s fixtures are source the parser is asked to read.
+ * `lib/privacy-page.ts` was a third until the regex fix landed — its survivor
+ * was a real comment below a pattern, not quoted source, which is why the
+ * "still holds one" check below is worth having.
+ */
+const QUOTED_SOURCE: readonly string[] = [
+  "i18n-source.test.ts",
+  "lib/spa-fallback.ts",
+];
+
+/** Every `.ts`/`.tsx` under a repo directory, recursively. */
+function sourceFilesUnder(dir: string): readonly string[] {
+  const found: string[] = [];
+  const walk = (relative: string) => {
+    for (const entry of readdirSync(repoPath(relative), { withFileTypes: true })) {
+      const child = `${relative}/${entry.name}`;
+      if (entry.isDirectory()) walk(child);
+      else if (/\.tsx?$/.test(entry.name)) found.push(child);
+    }
+  };
+  walk(dir);
+  return found;
+}
 
 describe("stripComments", () => {
   it("blanks a line comment and keeps the code after it", () => {
@@ -107,30 +137,40 @@ describe("stripComments", () => {
   });
 
   it("leaves no comment in the repository surviving as code", () => {
-    // The sweep that found it, kept as the regression. Every `// ` line in a
-    // suite must differ from its stripped form — unless the suite is quoting
-    // source inside a template literal, which is a fixture and not a comment.
+    // The sweep that found it, kept as the regression — and widened past the
+    // suite directory, because half the twenty were in `lib/`: a sweep that
+    // only walks `__tests__` would have documented the bug rather than found
+    // it. Every `// ` line must differ from its stripped form, unless it is
+    // JavaScript quoted INSIDE a template literal, which is a fixture (the
+    // parser's) or an emitted artifact (the service worker) and not a comment
+    // in the file that holds it.
     const survivors: string[] = [];
-    for (const relative of suiteFiles()) {
-      const source = readSuite(relative);
+    const scan = (label: string, source: string) => {
       const stripped = stripComments(source).split("\n");
       source.split("\n").forEach((line, index) => {
         if (!/^\s*\/\/ /.test(line) || stripped[index] !== line) return;
-        survivors.push(`${relative}:${index + 1}`);
+        survivors.push(`${label}:${index + 1}`);
       });
+    };
+    for (const relative of suiteFiles()) scan(relative, readSuite(relative));
+    for (const dir of ["lib", "app", "components", "scripts"]) {
+      for (const file of sourceFilesUnder(dir)) scan(file, readRepoFile(file));
     }
     assert.deepEqual(
-      survivors.filter((where) => !where.startsWith("i18n-source.test.ts")),
+      survivors.filter(
+        (where) => !QUOTED_SOURCE.some((holder) => where.startsWith(`${holder}:`)),
+      ),
       [],
       `these comments survive stripping and reach every guard as code: ${survivors.join(", ")}`,
     );
-    // `i18n-source.test.ts` is the exception and stays one: its fixtures are
-    // JavaScript source inside template literals, so a `//` line there is
-    // string content the stripper is right to leave alone.
-    assert.ok(
-      survivors.some((where) => where.startsWith("i18n-source.test.ts")),
-      "the fixture exception stopped applying — check whether it should still be one",
-    );
+    // And each holder still HOLDS quoted source — an entry that stopped would
+    // be an exemption standing open, the same hole the sweeps' own lists have.
+    for (const holder of QUOTED_SOURCE) {
+      assert.ok(
+        survivors.some((where) => where.startsWith(`${holder}:`)),
+        `${holder} no longer quotes source in a template literal — drop it from the list`,
+      );
+    }
   });
 
   it("is what the suite readers are layered on rather than a second stripper", () => {

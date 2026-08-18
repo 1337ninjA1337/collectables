@@ -17,6 +17,8 @@
  * alpha overlays (pending the OVERLAY_* family) are still exempt by design.
  */
 
+import { stripComments } from "./strip-comments";
+
 /** Regex matching a 6-digit hex literal (case-insensitive, no word boundary). */
 export const INLINE_HEX_PATTERN = /#[0-9a-fA-F]{6}/g;
 
@@ -71,11 +73,22 @@ export type HexMatch = {
  * Scan a single source string for 6-digit hex literals and quoted 3/4-digit
  * shorthands. Returns one entry per occurrence (line + column 1-indexed,
  * column pointing at the leading `#`), sorted by position within each line.
+ *
+ * Comments are removed first, and `stripComments` blanks rather than deletes —
+ * every offset and newline survives, so the line and column reported here
+ * still point at the original source. Until this guard was the last scanner in
+ * the repo not doing it, the quote requirement on the SHORTHAND pattern was
+ * carrying the whole load: it kept `#fff` in prose from being flagged, and
+ * nothing protected the 6-digit pattern, which has no quotes to require. A
+ * comment reading "was #1a2b3c before the token migration" would have failed
+ * CI on prose. The quote requirement stays — an unquoted hex in real code is
+ * still not a style value — but it is no longer the only thing standing
+ * between a doc block and a red build.
  */
 export function findInlineHexLiterals(file: string, source: string): HexMatch[] {
   const matches: HexMatch[] = [];
   if (isHexAllowlisted(file)) return matches;
-  const lines = source.split("\n");
+  const lines = stripComments(source).split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const perLine: HexMatch[] = [];

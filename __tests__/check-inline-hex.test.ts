@@ -148,6 +148,38 @@ describe("findInlineHexLiterals", () => {
     assert.deepEqual(findInlineHexLiterals("foo.tsx", source), []);
   });
 
+  it("does NOT flag a SIX-digit hex in comment prose either", () => {
+    // The half the quote requirement could not carry: the 6-digit pattern has
+    // no quotes to require, so until the scan stripped comments a doc block
+    // reading "was #1a2b3c before the token migration" failed CI on prose.
+    assert.deepEqual(
+      findInlineHexLiterals("foo.tsx", "// was #1a2b3c before the token migration"),
+      [],
+    );
+    assert.deepEqual(
+      findInlineHexLiterals("foo.tsx", "/**\n * The old cover was #aabbcc.\n */"),
+      [],
+    );
+  });
+
+  it("still reports the real line and column after stripping", () => {
+    // `stripComments` blanks rather than deletes, which is the property this
+    // scan depends on: it reports a position and the caller prints the
+    // original line at it.
+    const source = ['// #ffffff in prose', 'const bg = "#123456";'].join("\n");
+    const matches = findInlineHexLiterals("foo.tsx", source);
+    assert.equal(matches.length, 1);
+    assert.equal(matches[0].line, 2);
+    assert.equal(source.split("\n")[matches[0].line - 1][matches[0].column - 1], "#");
+  });
+
+  it("still flags a hex on a line that also carries a comment", () => {
+    // Stripping must not take the code with it — the failure that would make
+    // this guard go quiet rather than loud.
+    const matches = findInlineHexLiterals("foo.tsx", 'const bg = "#123456"; // was #ffffff');
+    assert.deepEqual(matches.map((m) => m.value), ["#123456"]);
+  });
+
   it("flags JSX-literal gradient stops (<LinearGradient colors={[...]}>)", () => {
     // The scanner is line-based, not StyleSheet-based, so inline JSX hex
     // arrays are caught too — pinned here so a future "only scan
