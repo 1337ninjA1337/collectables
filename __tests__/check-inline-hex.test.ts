@@ -13,9 +13,8 @@ import {
   isHexAllowlisted,
 } from "../lib/check-inline-hex";
 import { LINT_GUARDS } from "../lib/lint-guards";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath, repoRelative } from "./helpers/repo-file";
 
-const REPO_ROOT = path.resolve(__dirname, "..");
 
 describe("INLINE_HEX_PATTERN", () => {
   it("matches 6-digit hex literals", () => {
@@ -313,14 +312,14 @@ describe("check-inline-hex script wiring", () => {
         if (entry.isDirectory()) walk(full);
         else if (entry.isFile() && /\.tsx?$/.test(entry.name)) {
           const source = fs.readFileSync(full, "utf8");
-          const rel = path.relative(REPO_ROOT, full);
+          const rel = repoRelative(full);
           allMatches.push(...findInlineHexLiterals(rel, source));
         }
       }
     };
-    walk(path.join(REPO_ROOT, "app"));
-    walk(path.join(REPO_ROOT, "components"));
-    walk(path.join(REPO_ROOT, "lib"));
+    walk(repoPath("app"));
+    walk(repoPath("components"));
+    walk(repoPath("lib"));
     assert.deepEqual(
       allMatches,
       [],

@@ -3,8 +3,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-const ROOT = join(__dirname, "..");
-const LIB = join(ROOT, "lib");
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+
+const LIB = repoPath("lib");
 
 /**
  * Scans `lib/*-config.ts` for every `EXPO_PUBLIC_*` env var the runtime config
@@ -38,7 +39,7 @@ describe("runtime-config ↔ README-DEPLOY parity", () => {
   });
 
   it("documents every lib/*-config.ts EXPO_PUBLIC_* var in README-DEPLOY.md", () => {
-    const docs = readFileSync(join(ROOT, "README-DEPLOY.md"), "utf8");
+    const docs = readRepoFile("README-DEPLOY.md");
     const missing = configEnvVars().filter(
       (name) => !new RegExp(`\`${name}\``).test(docs),
     );

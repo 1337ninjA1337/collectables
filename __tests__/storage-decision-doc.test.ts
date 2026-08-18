@@ -1,21 +1,21 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 
-const ROOT = join(__dirname, "..");
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+
 const DOC = "docs/storage-decision.md";
 
 describe("docs/storage-decision.md (BE-24) decision record", () => {
   it("file exists at the canonical path", () => {
     assert.ok(
-      existsSync(join(ROOT, DOC)),
+      existsSync(repoPath(DOC)),
       "docs/storage-decision.md must be checked into the repo so the BE-24 storage decision is auditable",
     );
   });
 
   it("records the chosen option: keep Cloudinary with a signed upload path", () => {
-    const src = readFileSync(join(ROOT, DOC), "utf8");
+    const src = readRepoFile(DOC);
     assert.match(src, /Cloudinary/, "Doc must name Cloudinary as the chosen backend");
     assert.match(
       src,
@@ -30,13 +30,13 @@ describe("docs/storage-decision.md (BE-24) decision record", () => {
   });
 
   it("documents the rejected alternative (Supabase Storage + RLS)", () => {
-    const src = readFileSync(join(ROOT, DOC), "utf8");
+    const src = readRepoFile(DOC);
     assert.match(src, /Supabase Storage/, "Doc must name the Supabase Storage alternative");
     assert.match(src, /RLS/, "Doc must reference the RLS-mirrored visibility rationale for option (b)");
   });
 
   it("calls out the residual abuse surface: the unsigned upload preset", () => {
-    const src = readFileSync(join(ROOT, DOC), "utf8");
+    const src = readRepoFile(DOC);
     assert.match(
       src,
       /unsigned/i,
@@ -50,7 +50,7 @@ describe("docs/storage-decision.md (BE-24) decision record", () => {
   });
 
   it("documents the retention / orphan-cleanup story", () => {
-    const src = readFileSync(join(ROOT, DOC), "utf8");
+    const src = readRepoFile(DOC);
     assert.match(
       src,
       /orphan/i,
@@ -74,7 +74,7 @@ describe("docs/storage-decision.md (BE-24) decision record", () => {
   });
 
   it("records a revisit trigger so the decision is not treated as permanent", () => {
-    const src = readFileSync(join(ROOT, DOC), "utf8");
+    const src = readRepoFile(DOC);
     assert.match(
       src,
       /revisit/i,

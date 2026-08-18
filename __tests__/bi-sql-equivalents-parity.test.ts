@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
-const ROOT = join(__dirname, "..");
 const PGTAP = "supabase/tests/03_bi_sql_equivalents.sql";
 
 // The executable half runs in the Supabase Tests workflow (Docker pgTAP);
@@ -12,7 +10,7 @@ const PGTAP = "supabase/tests/03_bi_sql_equivalents.sql";
 // test and the documented Metabase SQL so the two can't silently diverge.
 describe("supabase/tests/03_bi_sql_equivalents.sql (offline parity)", () => {
   it("pgTAP file exists so `supabase test db` picks it up", () => {
-    assert.ok(existsSync(join(ROOT, PGTAP)));
+    assert.ok(existsSync(repoPath(PGTAP)));
   });
 
   const pgtap = read(PGTAP);

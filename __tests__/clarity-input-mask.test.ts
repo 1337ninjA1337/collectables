@@ -10,6 +10,8 @@ import {
   formatClarityMaskReport,
 } from "../lib/check-clarity-input-mask";
 
+import { readRepoFile, repoPath, repoRelative } from "./helpers/repo-file";
+
 describe("check-clarity-input-mask", () => {
   it("flags a raw <TextInput> with no mask attribute", () => {
     const source = `<TextInput value={email} onChangeText={setEmail} style={styles.input} />`;
@@ -92,34 +94,30 @@ describe("check-clarity-input-mask", () => {
   it("the allow-list names files that exist", () => {
     for (const file of CLARITY_MASK_ALLOWED_FILES) {
       assert.doesNotThrow(() =>
-        statSync(path.join(__dirname, "..", file)),
+        statSync(repoPath(file)),
       );
     }
   });
 
   it("the real app/ + components/ trees pass the scan", () => {
-    const repoRoot = path.join(__dirname, "..");
     const files: Record<string, string> = {};
     const walk = (dir: string) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) walk(full);
         else if (entry.name.endsWith(".tsx")) {
-          files[path.relative(repoRoot, full).split(path.sep).join("/")] =
+          files[repoRelative(full).split(path.sep).join("/")] =
             readFileSync(full, "utf8");
         }
       }
     };
-    walk(path.join(repoRoot, "app"));
-    walk(path.join(repoRoot, "components"));
+    walk(repoPath("app"));
+    walk(repoPath("components"));
     assert.deepEqual(findClarityMaskViolations(files), []);
   });
 
   it("the wrapper itself carries the mask marker (fail-closed on refactor)", () => {
-    const wrapper = readFileSync(
-      path.join(__dirname, "..", "components", "masked-text-input.tsx"),
-      "utf8",
-    );
+    const wrapper = readRepoFile("components", "masked-text-input.tsx");
     assert.match(wrapper, /clarity-mask/);
   });
 });

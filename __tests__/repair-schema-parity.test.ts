@@ -10,6 +10,8 @@ import {
 } from "../lib/supabase-profiles-shapes";
 import { MARKETPLACE_COLUMNS } from "../lib/supabase-marketplace-shapes";
 
+import { readRepoFile } from "./helpers/repo-file";
+
 /**
  * `supabase/repair-schema.sql` exists because PostgREST fails a whole request
  * with `400 … 42703 column … does not exist` when ONE projected column is
@@ -22,11 +24,7 @@ import { MARKETPLACE_COLUMNS } from "../lib/supabase-marketplace-shapes";
  * query) must learn about it too, or this fails.
  */
 
-const repoRoot = path.join(__dirname, "..");
-const sql = fs.readFileSync(
-  path.join(repoRoot, "supabase/repair-schema.sql"),
-  "utf8",
-);
+const sql = readRepoFile("supabase/repair-schema.sql");
 
 /** Columns PostgREST is asked for, minus the ones it never selects by name. */
 function columnsOf(projection: string): string[] {

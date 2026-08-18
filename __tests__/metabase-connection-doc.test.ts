@@ -1,16 +1,14 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
-const ROOT = join(__dirname, "..");
 const DOC = "docs/metabase-connection.md";
 
 describe("docs/metabase-connection.md (Power BI platform-parity fallback)", () => {
   it("file exists at the canonical path", () => {
     assert.ok(
-      existsSync(join(ROOT, DOC)),
+      existsSync(repoPath(DOC)),
       "docs/metabase-connection.md must be checked in so Linux engineers have a documented BI path",
     );
   });

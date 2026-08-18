@@ -11,7 +11,8 @@ import {
   normalizeSpaBaseUrl,
 } from "@/lib/spa-fallback";
 
-const repoRoot = path.join(__dirname, "..");
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+
 
 describe("normalizeSpaBaseUrl", () => {
   it("returns '/' for empty input", () => {
@@ -39,7 +40,7 @@ describe("normalizeSpaBaseUrl", () => {
 describe("expo web config (GitHub Pages SPA)", () => {
   it("uses output:single so one route-agnostic shell renders every route", () => {
     const appJson = JSON.parse(
-      fs.readFileSync(path.join(repoRoot, "app.json"), "utf8"),
+      readRepoFile("app.json"),
     ) as { expo: { web?: { output?: string } } };
     assert.equal(
       appJson.expo.web?.output,
@@ -154,7 +155,7 @@ describe("injectServiceWorkerRegistration", () => {
 });
 
 describe("build-spa-fallback script wiring", () => {
-  const scriptPath = path.join(repoRoot, "scripts", "build-spa-fallback.ts");
+  const scriptPath = repoPath("scripts", "build-spa-fallback.ts");
   const source = fs.readFileSync(scriptPath, "utf8");
 
   it("ships scripts/build-spa-fallback.ts", () => {
@@ -186,17 +187,14 @@ describe("build-spa-fallback script wiring", () => {
   });
 
   it("lib/spa-fallback no longer exports the redirect/restore API", () => {
-    const lib = fs.readFileSync(
-      path.join(repoRoot, "lib", "spa-fallback.ts"),
-      "utf8",
-    );
+    const lib = readRepoFile("lib", "spa-fallback.ts");
     assert.doesNotMatch(lib, /export function build404Html/);
     assert.doesNotMatch(lib, /export function injectSpaRestoreScript/);
   });
 
   it("package.json build + deploy invoke the helper instead of `cp`", () => {
     const pkg = JSON.parse(
-      fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"),
+      readRepoFile("package.json"),
     ) as { scripts: Record<string, string> };
     assert.match(pkg.scripts.build, /tsx scripts\/build-spa-fallback\.ts/);
     assert.match(pkg.scripts.deploy, /tsx scripts\/build-spa-fallback\.ts/);
@@ -205,10 +203,7 @@ describe("build-spa-fallback script wiring", () => {
   });
 
   it("deploy.yml runs the post-build helper instead of `cp`", () => {
-    const workflow = fs.readFileSync(
-      path.join(repoRoot, ".github", "workflows", "deploy.yml"),
-      "utf8",
-    );
+    const workflow = readRepoFile(".github", "workflows", "deploy.yml");
     assert.match(workflow, /scripts\/build-spa-fallback\.ts/);
     assert.doesNotMatch(workflow, /cp dist\/index\.html dist\/404\.html/);
   });

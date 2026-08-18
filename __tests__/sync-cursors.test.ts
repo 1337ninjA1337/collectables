@@ -1,9 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { maxUpdatedAt } from "@/lib/sync-cursors";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 // --- maxUpdatedAt (pure delta-cursor reducer) ---
 describe("maxUpdatedAt", () => {
@@ -66,8 +66,7 @@ describe("maxUpdatedAt", () => {
 });
 
 // --- structural: storage key + wiring (file-scan, no AsyncStorage needed) ---
-const repoRoot = path.resolve(__dirname, "..");
-const read = (p: string) => readFileSync(path.join(repoRoot, p), "utf8");
+const read = (p: string) => readRepoFile(p);
 
 describe("sync-cursors storage + context wiring", () => {
   it("keys cursors per entity + user under collectables-sync-cursor-v1", () => {

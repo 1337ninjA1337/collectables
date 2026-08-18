@@ -5,6 +5,8 @@ import { describe, it } from "node:test";
 
 import { ANALYTICS_EVENTS } from "../lib/analytics-events";
 
+import { repoPath, repoRelative } from "./helpers/repo-file";
+
 /**
  * Walks every `trackEvent("...")` call site in app code and asserts the
  * first-arg literal is a registered event name. The type system already
@@ -15,7 +17,6 @@ import { ANALYTICS_EVENTS } from "../lib/analytics-events";
  * disclosure still describe the old name.
  */
 
-const ROOT = path.join(__dirname, "..");
 const SCAN_ROOTS = ["app", "components", "lib", "data"];
 
 function walkSources(dir: string, out: string[]): void {
@@ -34,7 +35,7 @@ function walkSources(dir: string, out: string[]): void {
 
 function collectCallSites(): { file: string; line: number; name: string }[] {
   const files: string[] = [];
-  for (const root of SCAN_ROOTS) walkSources(path.join(ROOT, root), files);
+  for (const root of SCAN_ROOTS) walkSources(repoPath(root), files);
   const sites: { file: string; line: number; name: string }[] = [];
   for (const file of files.sort()) {
     const source = readFileSync(file, "utf8");
@@ -44,7 +45,7 @@ function collectCallSites(): { file: string; line: number; name: string }[] {
       let m: RegExpExecArray | null;
       while ((m = re.exec(lines[i])) !== null) {
         sites.push({
-          file: path.relative(ROOT, file),
+          file: repoRelative(file),
           line: i + 1,
           name: m[1],
         });

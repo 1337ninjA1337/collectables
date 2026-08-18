@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
-const ROOT = join(__dirname, "..");
 
 describe("SEC-1 — Cloudinary secret is gone from the client", () => {
   const src = read("lib/cloudinary.ts");
@@ -45,7 +43,7 @@ describe("SEC-1 — Cloudinary secret is gone from the client", () => {
 
   it("no .env / .env.example commits the secret", () => {
     for (const f of [".env", ".env.example"]) {
-      if (existsSync(join(ROOT, f))) {
+      if (existsSync(repoPath(f))) {
         assert.doesNotMatch(
           read(f),
           /CLOUDINARY_API_SECRET\s*=\s*\S/,
@@ -61,7 +59,7 @@ describe("SEC-1 — delete-image Edge Function holds the secret server-side", ()
 
   it("the function file exists", () => {
     assert.ok(
-      existsSync(join(ROOT, fnPath)),
+      existsSync(repoPath(fnPath)),
       `${fnPath} must exist`,
     );
   });

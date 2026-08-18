@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 
-const ROOT = join(__dirname, "..");
-const SECURITY = readFileSync(join(ROOT, "SECURITY.md"), "utf8");
+import { readRepoFile } from "./helpers/repo-file";
+
+const SECURITY = readRepoFile("SECURITY.md");
 
 describe("SEC-21: SECURITY.md", () => {
   it("declares supported versions and a private reporting channel", () => {

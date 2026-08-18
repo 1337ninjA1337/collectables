@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 
-const ROOT = join(__dirname, "..");
-const CI = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
-const SECURITY = readFileSync(join(ROOT, "SECURITY.md"), "utf8");
+import { readRepoFile } from "./helpers/repo-file";
+
+const CI = readRepoFile(".github/workflows/ci.yml");
+const SECURITY = readRepoFile("SECURITY.md");
 
 describe("SEC-8: npm audit triage", () => {
   it("CI runs a high-level dependency audit", () => {

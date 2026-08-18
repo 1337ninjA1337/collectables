@@ -10,9 +10,8 @@ import {
   isPiiPropKey,
   findPiiPropKeys,
 } from "../lib/analytics-pii";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath, repoRelative } from "./helpers/repo-file";
 
-const ROOT = join(__dirname, "..");
 
 // Directories that hold telemetry call sites. node_modules / dist excluded.
 const SCAN_DIRS = ["lib", "components", "app"];
@@ -31,7 +30,7 @@ function walk(dir: string): string[] {
   return out;
 }
 
-const SOURCE_FILES = SCAN_DIRS.flatMap((d) => walk(join(ROOT, d)));
+const SOURCE_FILES = SCAN_DIRS.flatMap((d) => walk(repoPath(d)));
 
 /**
  * Extracts the property KEYS from a flat object-literal body (no nested
@@ -138,7 +137,7 @@ describe("PII guard — trackEvent call sites stay within the taxonomy", () => {
     for (const file of SOURCE_FILES) {
       const src = readFileSync(file, "utf8");
       if (file.endsWith(join("lib", "analytics.ts"))) continue; // wrapper itself
-      const rel = file.slice(ROOT.length + 1);
+      const rel = repoRelative(file);
 
       // name + object-literal props
       for (const m of src.matchAll(
@@ -193,7 +192,7 @@ describe("PII guard — breadcrumb call sites carry no user input", () => {
     for (const file of SOURCE_FILES) {
       const src = readFileSync(file, "utf8");
       if (file.endsWith(join("lib", "sentry.ts"))) continue; // wrapper itself
-      const rel = file.slice(ROOT.length + 1);
+      const rel = repoRelative(file);
       for (const m of src.matchAll(
         /addBreadcrumb\([\s\S]*?\{([\s\S]*?)\}\s*\)/g,
       )) {
@@ -220,7 +219,7 @@ describe("PII guard — captureException context is a constant label", () => {
     for (const file of SOURCE_FILES) {
       const src = readFileSync(file, "utf8");
       if (file.endsWith(join("lib", "sentry.ts"))) continue; // wrapper itself
-      const rel = file.slice(ROOT.length + 1);
+      const rel = repoRelative(file);
       for (const m of src.matchAll(
         /captureException\([\s\S]*?context:\s*([^,}\n]+)/g,
       )) {

@@ -45,7 +45,8 @@ import {
   type GuardRun,
 } from "./helpers/guard-fixture";
 
-const REPO_ROOT = path.resolve(__dirname, "..");
+import { REPO_ROOT } from "./helpers/repo-file";
+
 const FLOOR_MODULE = "lib/scanned-floor.ts";
 
 const guardFor = (checkName: string) => {

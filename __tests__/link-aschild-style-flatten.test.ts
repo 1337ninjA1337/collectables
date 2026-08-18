@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+
 /**
  * Regression guard for the web-only crash:
  *
@@ -28,11 +30,10 @@ import * as path from "node:path";
  * literal) so `Slot` spreads a flat object.
  */
 
-const repoRoot = path.join(__dirname, "..");
 const SCAN_DIRS = ["app", "components"];
 
 function collectTsxFiles(dir: string): string[] {
-  const abs = path.join(repoRoot, dir);
+  const abs = repoPath(dir);
   if (!fs.existsSync(abs)) return [];
   const out: string[] = [];
   for (const entry of fs.readdirSync(abs, { withFileTypes: true })) {
@@ -109,7 +110,7 @@ describe("<Link asChild> style merging", () => {
     const offenders: string[] = [];
     for (const dir of SCAN_DIRS) {
       for (const rel of collectTsxFiles(dir)) {
-        const source = fs.readFileSync(path.join(repoRoot, rel), "utf8");
+        const source = readRepoFile(rel);
         for (const hit of findArrayStylesUnderAsChild(source)) {
           offenders.push(`${rel} ${hit}`);
         }
@@ -134,10 +135,7 @@ describe("<Link asChild> style merging", () => {
   // in the file. The repo-wide `findArrayStylesUnderAsChild` scan above is what
   // guards the general shape.
   it("item-card keeps its forwarded style flattened on both Link children", () => {
-    const source = fs.readFileSync(
-      path.join(repoRoot, "components/item-card.tsx"),
-      "utf8",
-    );
+    const source = readRepoFile("components/item-card.tsx");
     assert.equal(
       findArrayStylesUnderAsChild(source).length,
       0,

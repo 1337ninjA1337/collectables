@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
-const ROOT = join(__dirname, "..");
 const DOC = "docs/analytics-cost-projection.md";
 
 describe("docs/analytics-cost-projection.md", () => {
   it("file exists at the canonical path", () => {
-    assert.ok(existsSync(join(ROOT, DOC)));
+    assert.ok(existsSync(repoPath(DOC)));
   });
 
   const src = read(DOC);

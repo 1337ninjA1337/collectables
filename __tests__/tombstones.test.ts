@@ -1,13 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   partitionByTombstone,
   applyTombstones,
   mergeTombstoneIds,
 } from "@/lib/tombstones";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 // --- partitionByTombstone (pure split alive vs tombstoned) ---
 describe("partitionByTombstone", () => {
@@ -114,8 +114,7 @@ describe("mergeTombstoneIds", () => {
 });
 
 // --- structural: storage key + reset wiring (file-scan, no AsyncStorage) ---
-const repoRoot = path.resolve(__dirname, "..");
-const read = (p: string) => readFileSync(path.join(repoRoot, p), "utf8");
+const read = (p: string) => readRepoFile(p);
 
 describe("tombstones storage + key wiring", () => {
   it("keys tombstone sets per entity + user under collectables-tombstones-v1", () => {

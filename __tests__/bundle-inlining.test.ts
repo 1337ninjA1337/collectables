@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -9,7 +7,8 @@ import {
   WATCHED_INLINED_VAR_NAMES,
 } from "../lib/bundle-inlining";
 
-const ROOT = join(__dirname, "..");
+import { readRepoFile } from "./helpers/repo-file";
+
 
 describe("checkBundleInlining", () => {
   it("reports inlined when the set value appears in the bundle", () => {
@@ -94,7 +93,7 @@ describe("formatBundleInliningReport", () => {
 });
 
 describe("deploy workflow wiring", () => {
-  const deployYml = readFileSync(join(ROOT, ".github/workflows/deploy.yml"), "utf8");
+  const deployYml = readRepoFile(".github/workflows/deploy.yml");
 
   it("runs the verifier after the web build", () => {
     assert.match(deployYml, /scripts\/verify-bundle-inlining\.ts/);

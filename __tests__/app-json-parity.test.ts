@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Generic app.json plugin/extra parity walker.
@@ -19,8 +19,7 @@ import { describe, it } from "node:test";
  * free; nothing needs registering here.
  */
 
-const ROOT = join(__dirname, "..");
-const appJson = JSON.parse(readFileSync(join(ROOT, "app.json"), "utf8")) as {
+const appJson = JSON.parse(readRepoFile("app.json")) as {
   expo: {
     plugins?: Array<string | [string, Record<string, unknown>?]>;
     extra?: Record<string, unknown>;

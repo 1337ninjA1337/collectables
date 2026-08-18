@@ -16,6 +16,8 @@ import {
   zipStore,
 } from "@/lib/powerbi-template";
 
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+
 /**
  * Analytics #15b — structural assertions over the generated .pbit. The binary
  * can only be open-tested in Power BI Desktop, so CI validates the OPC/ZIP
@@ -23,10 +25,9 @@ import {
  * CI-verifiable text assets (docs/powerbi/measures.dax + queries.m).
  */
 
-const ROOT = join(__dirname, "..");
-const PBIT = join(ROOT, "docs", "powerbi", "Collectables-Starter.pbit");
-const measuresDax = readFileSync(join(ROOT, "docs/powerbi/measures.dax"), "utf8");
-const queriesM = readFileSync(join(ROOT, "docs/powerbi/queries.m"), "utf8");
+const PBIT = repoPath("docs", "powerbi", "Collectables-Starter.pbit");
+const measuresDax = readRepoFile("docs/powerbi/measures.dax");
+const queriesM = readRepoFile("docs/powerbi/queries.m");
 
 function decodeUtf16(buf: Buffer): string {
   // parts are written UTF-16 LE with a BOM

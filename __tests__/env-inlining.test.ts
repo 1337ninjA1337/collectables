@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { readdirSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { readCloudinaryEnvFromProcess } from "../lib/cloudinary-config";
@@ -9,7 +8,8 @@ import {
   formatEnvInliningReport,
 } from "../lib/env-inlining";
 
-const ROOT = join(__dirname, "..");
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+
 
 describe("findWholeProcessEnvUsages", () => {
   it("flags `process.env as Record<...>` casts", () => {
@@ -96,12 +96,12 @@ describe("formatEnvInliningReport", () => {
 
 describe("lib/*-config.ts resolvers (the CI guard, run in-process)", () => {
   it("no config module passes process.env whole", () => {
-    const files = readdirSync(join(ROOT, "lib"))
+    const files = readdirSync(repoPath("lib"))
       .filter((name) => /-config\.ts$/.test(name))
       .sort();
     assert.ok(files.length >= 4, `expected several lib/*-config.ts files, got ${files.length}`);
     for (const name of files) {
-      const src = readFileSync(join(ROOT, "lib", name), "utf8");
+      const src = readRepoFile("lib", name);
       const matches = findWholeProcessEnvUsages(`lib/${name}`, src);
       assert.deepEqual(
         matches,
@@ -114,7 +114,7 @@ describe("lib/*-config.ts resolvers (the CI guard, run in-process)", () => {
 
 describe("cloudinary env-var inlining (Metro/babel)", () => {
   it("readCloudinaryEnvFromProcess reads each EXPO_PUBLIC_* var as a literal member access", () => {
-    const src = readFileSync(join(ROOT, "lib/cloudinary-config.ts"), "utf8");
+    const src = readRepoFile("lib/cloudinary-config.ts");
     for (const name of [
       "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME",
       "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET",

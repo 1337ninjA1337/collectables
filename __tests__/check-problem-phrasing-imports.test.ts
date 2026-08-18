@@ -22,7 +22,8 @@ import {
   PROBLEM_SENTENCE_JOINERS,
 } from "../lib/check-problem-phrasing-imports";
 
-const REPO_ROOT = path.resolve(__dirname, "..");
+import { readRepoFile } from "./helpers/repo-file";
+
 
 const find = (source: string) =>
   findUnjoinedProblemPhrasingImports("f.ts", source);
@@ -192,7 +193,7 @@ describe("the repository itself", () => {
 
   for (const file of READERS) {
     it(`${file} is clean under the rule it is subject to`, () => {
-      const source = fs.readFileSync(path.join(REPO_ROOT, file), "utf8");
+      const source = readRepoFile(file);
       assert.deepEqual(findUnjoinedProblemPhrasingImports(file, source), []);
     });
   }
@@ -200,7 +201,7 @@ describe("the repository itself", () => {
   it("exempts lib/scanned-floor.ts by construction, not by a special case", () => {
     // The declaring module imports none of these names from itself, so the
     // guard has no exemption list to fall out of date.
-    const source = fs.readFileSync(path.join(REPO_ROOT, "lib/scanned-floor.ts"), "utf8");
+    const source = readRepoFile("lib/scanned-floor.ts");
     assert.doesNotMatch(source, /from\s*["'][^"']*\/scanned-floor["']/);
   });
 });

@@ -33,7 +33,8 @@ import {
   type PartialRoot,
 } from "./helpers/guard-fixture";
 
-const REPO_ROOT = path.resolve(__dirname, "..");
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+
 
 /**
  * The first `take` repo-relative entries of a directory, sorted — so a fixture
@@ -46,7 +47,7 @@ function firstEntriesOf(
   filter: (name: string) => boolean = () => true,
 ): string[] {
   const names = fs
-    .readdirSync(path.join(REPO_ROOT, relativeDir))
+    .readdirSync(repoPath(relativeDir))
     .filter(filter)
     .sort()
     .slice(0, take);
@@ -279,10 +280,7 @@ describe("no single scan root clears a multi-root guard's floor", () => {
         // than the name — a root added or dropped here must fail loudly,
         // because the fixtures below stop meaning anything the moment the
         // walk covers something they do not.
-        const source = fs.readFileSync(
-          path.join(REPO_ROOT, "scripts", `${checkName}.ts`),
-          "utf8",
-        );
+        const source = readRepoFile("scripts", `${checkName}.ts`);
         assert.match(
           source,
           new RegExp(`\\[${roots.map((r) => `"${r}"`).join(", ")}\\]`),

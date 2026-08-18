@@ -14,9 +14,8 @@ import {
   selectColumns,
   type DuplicateSpec,
 } from "../lib/db-duplicates";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
-const ROOT = path.resolve(__dirname, "..");
 
 const TEST_SPEC: DuplicateSpec = {
   table: "widgets",
@@ -130,7 +129,7 @@ describe("report + SQL rendering", () => {
 });
 
 describe("DUPLICATE_SPECS — schema drift guards", () => {
-  const migrations = readdirSync(path.join(ROOT, "supabase", "migrations"))
+  const migrations = readdirSync(repoPath("supabase", "migrations"))
     .filter((f) => f.endsWith(".sql"))
     .map((f) => read(path.join("supabase", "migrations", f)))
     .join("\n");

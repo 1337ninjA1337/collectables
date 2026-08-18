@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
-const ROOT = join(__dirname, "..");
 
 /**
  * Crash #16 test-coverage guarantees the sentry test suite never depends on
@@ -20,7 +18,7 @@ const ROOT = join(__dirname, "..");
 
 // Fail-closed glob: every __tests__/sentry-*.test.ts file is guarded
 // automatically, so a new Sentry test can't be forgotten off a hand list.
-const SENTRY_TEST_FILES = readdirSync(join(ROOT, "__tests__"))
+const SENTRY_TEST_FILES = readdirSync(repoPath("__tests__"))
   .filter((name) => /^sentry-.*\.test\.ts$/.test(name))
   .sort()
   .map((name) => `__tests__/${name}`);

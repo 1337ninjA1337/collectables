@@ -42,7 +42,8 @@ import {
   type GuardRun,
 } from "./helpers/guard-fixture";
 
-const REPO_ROOT = path.resolve(__dirname, "..");
+import { REPO_ROOT, repoPath } from "./helpers/repo-file";
+
 const FLOOR_MODULE = "lib/scanned-floor.ts";
 
 const guardFor = (checkName: string) => {
@@ -232,7 +233,7 @@ describe("a floor a guard cannot look up, through a wrapper", () => {
       assert.ok(named.length > 0, `${code} is excused without naming a harness`);
       for (const file of named) {
         assert.ok(
-          fs.existsSync(path.join(REPO_ROOT, file)),
+          fs.existsSync(repoPath(file)),
           `${code} is excused by ${file}, which does not exist`,
         );
       }

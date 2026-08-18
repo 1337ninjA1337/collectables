@@ -38,8 +38,7 @@ import { GUARD_ROOT_ENV } from "../../lib/guard-root";
 import type { LintGuard } from "../../lib/lint-guards";
 import { describeThrown } from "../../lib/thrown-value";
 
-/** The repository this fixture copies out of. */
-const REPO_ROOT = path.resolve(__dirname, "..", "..");
+import { REPO_ROOT, repoPath } from "./repo-file";
 
 /**
  * The loader every guard in every one of these suites is spawned through.
@@ -952,7 +951,7 @@ export function makePartialRoot(
           `makePartialRoot: "${entry}" must be repo-relative — an absolute path would copy from outside this checkout.`,
         );
       }
-      const source = path.join(REPO_ROOT, entry);
+      const source = repoPath(entry);
       if (!fs.existsSync(source)) {
         throw new Error(
           `makePartialRoot: "${entry}" does not exist in this repository, so the fixture would be empty and the guard would fail on the wrong code.`,

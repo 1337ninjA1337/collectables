@@ -56,7 +56,8 @@ import {
 } from "./helpers/guard-fixture";
 import { assertPhraseTable } from "./helpers/phrase-table";
 
-const REPO_ROOT = path.resolve(__dirname, "..");
+import { REPO_ROOT, readRepoFile, repoPath } from "./helpers/repo-file";
+
 const FLOOR_MODULE = "lib/scanned-floor.ts";
 
 /**
@@ -165,7 +166,7 @@ describe("the loader check", () => {
    * scratch root under test.
    */
   function resolveInChild(root: string, env: Record<string, string>): string {
-    const helper = path.join(__dirname, "helpers", "guard-fixture.ts");
+    const helper = repoPath("__tests__", "helpers", "guard-fixture.ts");
     const script = `
       const { tsxLoaderIn } = require(${JSON.stringify(helper)});
       try {
@@ -681,7 +682,7 @@ describe("the loader check", () => {
     // at the nearest link followed by the real hoisted install one directory up
     // is a checkout node resolves perfectly well — reporting the errno there
     // would refuse an install the spawn goes on to load.
-    const nested = fs.mkdtempSync(path.join(REPO_ROOT, "guard-fixture-nested-"));
+    const nested = fs.mkdtempSync(repoPath("guard-fixture-nested-"));
     try {
       fs.symlinkSync("node_modules", path.join(nested, "node_modules"));
       assert.equal(tsxLoaderIn(nested), "tsx");
@@ -700,7 +701,7 @@ describe("the loader check", () => {
     inScratchCheckout((root) => {
       fs.mkdirSync(path.join(root, "node_modules"), { recursive: true });
       fs.symlinkSync(
-        path.join(REPO_ROOT, "node_modules", "tsx"),
+        repoPath("node_modules", "tsx"),
         path.join(root, "node_modules", "tsx"),
       );
       assert.equal(tsxLoaderIn(root), "tsx");
@@ -712,7 +713,7 @@ describe("the loader check", () => {
     // no install: node walks every ancestor for a bare specifier, and so does
     // the ESM resolver the spawn uses. A subdirectory of this repository is the
     // real shape of that, and it must not be read as the global-folder case.
-    const nested = fs.mkdtempSync(path.join(REPO_ROOT, "guard-fixture-nested-"));
+    const nested = fs.mkdtempSync(repoPath("guard-fixture-nested-"));
     try {
       assert.equal(tsxLoaderIn(nested), "tsx");
     } finally {
@@ -1155,7 +1156,7 @@ describe("nodeModulesChain", () => {
   });
 
   it("never comes back empty, so no caller needs a branch for a root without a nearest link", () => {
-    for (const root of [FS_ROOT, FS_ROOT_LINK, "/a/b", REPO_ROOT, path.join(REPO_ROOT, "node_modules")]) {
+    for (const root of [FS_ROOT, FS_ROOT_LINK, "/a/b", REPO_ROOT, repoPath("node_modules")]) {
       const chain = nodeModulesChain(root);
       assert.ok(chain.length >= 1, `${root} produced an empty chain`);
       assert.equal(
@@ -1648,7 +1649,7 @@ describe("makePartialRoot refusals", () => {
 
   it("refuses an absolute entry, which would copy from outside this checkout", () => {
     assertRefusesWithoutLeaking(
-      () => makePartialRoot([path.join(REPO_ROOT, "lib")]),
+      () => makePartialRoot([repoPath("lib")]),
       /must be repo-relative/,
     );
   });
@@ -1723,7 +1724,7 @@ describe("the shared patched copy", () => {
     assert.equal(firstLine, `console.error(${JSON.stringify(PATCHED_REPO_MARKER)});`);
     // The sentence the real checkout cannot say — which is the whole point.
     assert.doesNotMatch(
-      fs.readFileSync(path.join(REPO_ROOT, FLOOR_MODULE), "utf8"),
+      readRepoFile(FLOOR_MODULE),
       new RegExp(PATCHED_REPO_MARKER),
     );
   });
@@ -1866,7 +1867,7 @@ describe("entryPatch refusals", () => {
   it("reads the committed table, not just the fixture's idea of one", () => {
     // The cases above pin the parser; this pins the assumption it rests on —
     // that a real `SCANNED_FLOORS` entry is shaped the way they say.
-    const source = fs.readFileSync(path.join(REPO_ROOT, FLOOR_MODULE), "utf8");
+    const source = readRepoFile(FLOOR_MODULE);
     const patched = entryPatch("check-inline-hex", (entry) =>
       entry.replace(/minimum: \d+/, "minimum: 999999"),
     )(source);

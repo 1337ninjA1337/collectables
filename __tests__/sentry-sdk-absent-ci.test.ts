@@ -2,9 +2,8 @@ import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
-const ROOT = join(__dirname, "..");
 
 /**
  * The `sentry-sdk-absent` CI job runs the sentry test surface with the whole
@@ -122,7 +121,7 @@ describe("test:sentry shares its runner flags with npm test", () => {
     // absent but never with it present.
     const glob = /__tests__\/([^\s]+)\.test\.ts/.exec(pkg.scripts["test:sentry"])?.[1];
     assert.equal(glob, "sentry-*", "`test:sentry` must run the sentry-* glob");
-    const files = readdirSync(join(ROOT, "__tests__")).filter((n) =>
+    const files = readdirSync(repoPath("__tests__")).filter((n) =>
       /^sentry-.*\.test\.ts$/.test(n),
     );
     assert.ok(files.length > 0, "the sentry-* glob must match at least one suite");

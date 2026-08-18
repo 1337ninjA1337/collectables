@@ -5,6 +5,8 @@ import * as path from "node:path";
 
 import { fetchWithRetry, isSafariLoadFailed } from "@/lib/fetch-retry";
 
+import { readRepoFile } from "./helpers/repo-file";
+
 describe("isSafariLoadFailed", () => {
   it("matches the canonical iOS Safari 18 fetch flake", () => {
     assert.equal(isSafariLoadFailed(new TypeError("Load failed")), true);
@@ -135,38 +137,36 @@ describe("fetchWithRetry", () => {
 });
 
 describe("supabase fetch retry wiring", () => {
-  const repoRoot = path.join(__dirname, "..");
 
   it("supabase-profiles.ts imports fetchWithRetry", () => {
-    const source = fs.readFileSync(path.join(repoRoot, "lib", "supabase-profiles.ts"), "utf8");
+    const source = readRepoFile("lib", "supabase-profiles.ts");
     assert.match(source, /from "@\/lib\/fetch-retry"/);
     assert.match(source, /fetchWithRetry/);
   });
 
   it("supabaseRest no longer sends empty Prefer or Content-Type on GET", () => {
-    const source = fs.readFileSync(path.join(repoRoot, "lib", "supabase-profiles.ts"), "utf8");
+    const source = readRepoFile("lib", "supabase-profiles.ts");
     assert.doesNotMatch(source, /Prefer: options\.method === "POST" \?/);
     // The new branch only sets Content-Type when there is a body.
     assert.match(source, /if \(options\.body !== undefined\)/);
   });
 
   it("supabase-chat.ts imports fetchWithRetry and defaults its fetcher to it", () => {
-    const source = fs.readFileSync(path.join(repoRoot, "lib", "supabase-chat.ts"), "utf8");
+    const source = readRepoFile("lib", "supabase-chat.ts");
     assert.match(source, /from "@\/lib\/fetch-retry"/);
     assert.match(source, /fetcher = fetchWithRetry as FetchFn/);
   });
 });
 
 describe("chat-context unhandled rejection guards", () => {
-  const repoRoot = path.join(__dirname, "..");
 
   it("imports captureException", () => {
-    const source = fs.readFileSync(path.join(repoRoot, "lib", "chat-context.tsx"), "utf8");
+    const source = readRepoFile("lib", "chat-context.tsx");
     assert.match(source, /import \{ captureException \} from "@\/lib\/sentry"/);
   });
 
   it("wraps both cloud-fetch async IIFEs in try/catch", () => {
-    const source = fs.readFileSync(path.join(repoRoot, "lib", "chat-context.tsx"), "utf8");
+    const source = readRepoFile("lib", "chat-context.tsx");
     const matches = source.match(/captureException\(err, \{ scope: "chat-context\./g);
     assert.ok(matches && matches.length >= 2, "expected at least two captureException calls in chat-context");
   });

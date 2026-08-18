@@ -25,8 +25,10 @@ import { LINT_GUARDS, type LintGuard } from "../lib/lint-guards";
 import { SCANNED_FLOORS, scannedFloorFor } from "../lib/scanned-floor";
 import { checkNameOf, runGuardWith } from "./helpers/guard-fixture";
 
+import { repoPath } from "./helpers/repo-file";
+
 /** The suite glob `npm test` runs, and the set this file's drift guard reads. */
-const SUITE_DIR = __dirname;
+const SUITE_DIR = repoPath("__tests__");
 
 /**
  * The spawn shape no suite may carry, assembled from two halves.

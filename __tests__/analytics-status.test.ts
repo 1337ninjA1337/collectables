@@ -1,7 +1,5 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import {
   getAnalyticsStatus,
   initAnalytics,
@@ -9,7 +7,8 @@ import {
   __resetAnalyticsForTests,
 } from "../lib/analytics";
 
-const ROOT = path.join(__dirname, "..");
+import { readRepoFile } from "./helpers/repo-file";
+
 
 function makeLoader() {
   const sdk = {
@@ -102,7 +101,7 @@ describe("getAnalyticsStatus", () => {
   });
 
   it("is registered as a devtools global in app/_layout.tsx", () => {
-    const layoutSrc = readFileSync(path.join(ROOT, "app/_layout.tsx"), "utf8");
+    const layoutSrc = readRepoFile("app/_layout.tsx");
     assert.match(layoutSrc, /scope\.__analyticsStatus = getAnalyticsStatus/);
     assert.match(layoutSrc, /import \{[^}]*\bgetAnalyticsStatus\b[^}]*\} from "@\/lib\/analytics"/);
   });

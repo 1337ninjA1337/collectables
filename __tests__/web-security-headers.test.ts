@@ -15,7 +15,8 @@ import {
 import { RATES_ENDPOINT_URL } from "../lib/currency-rates";
 import { injectServiceWorkerRegistration } from "../lib/spa-fallback";
 
-const repoRoot = path.join(__dirname, "..");
+import { readRepoFile } from "./helpers/repo-file";
+
 
 /** Minimal stand-in for the Expo metro single-output shell. */
 const EXPO_SHELL = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>collectables</title><style id="expo-reset">html{height:100%}</style></head><body><div id="root"></div><script src="/collectables/_expo/static/js/web/entry-abc.js" defer></script></body></html>`;
@@ -228,10 +229,7 @@ describe("end-to-end build transform (mirrors scripts/build-spa-fallback.ts)", (
 
 describe("structural wiring", () => {
   it("scripts/build-spa-fallback.ts injects the security headers", () => {
-    const source = fs.readFileSync(
-      path.join(repoRoot, "scripts", "build-spa-fallback.ts"),
-      "utf8",
-    );
+    const source = readRepoFile("scripts", "build-spa-fallback.ts");
     assert.match(source, /injectSecurityMetaTags/);
     assert.match(source, /extractInlineScriptBodies/);
     assert.match(source, /buildContentSecurityPolicy/);

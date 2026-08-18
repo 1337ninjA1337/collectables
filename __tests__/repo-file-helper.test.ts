@@ -31,14 +31,23 @@ import {
  * than over a list, and carries a floor — a walk that finds no offenders is
  * indistinguishable from a walk that is broken.
  *
- * The rule the sweep states is now the simplest one available: a suite does
- * not say `process.cwd()`. Its two predecessors each enumerated a SHAPE — a
- * `(rel: string) => readFileSync(...)` helper, then `readFileSync( path.join(
- * process.cwd(), "` — and each had a next near-miss waiting (`fs.readFileSync`,
- * a `const cwd = process.cwd()` assigned first, a `readdirSync` walk that
- * never reads a file at all). Naming the root is the one thing all of them do,
- * and with `repoPath`/`repoRelative` beside the reader there is nothing left
- * that a suite legitimately needs it for.
+ * The rule the sweep states is the simplest one available: a suite does not
+ * DERIVE the repository root, by either route. Its predecessors each
+ * enumerated a SHAPE — a `(rel: string) => readFileSync(...)` helper, then
+ * `readFileSync( path.join( process.cwd(), "` — and each had a next near-miss
+ * waiting (`fs.readFileSync`, a `const cwd = process.cwd()` assigned first, a
+ * `readdirSync` walk that never reads a file at all). Naming the root is the
+ * one thing all of them do, and with `repoPath`/`repoRelative` beside the
+ * reader there is nothing left that a suite legitimately needs it for.
+ *
+ * BOTH routes, because banning only `process.cwd()` left the near-miss the
+ * rule was meant to end: forty-three suites derived the same root as
+ * `path.join(__dirname, "..")` and the sweep waved every one of them through.
+ * They agree — `tsx --test` runs each suite from the repository root, which is
+ * the premise the first case below pins — so this is a spelling being reduced
+ * to one, not a resolution being changed. `__dirname` also stops meaning the
+ * repo root the moment a suite moves into a subdirectory, which the
+ * `helpers/` files had already had to write as `"..", ".."`.
  *
  * Note for whoever turns this red: a case HERE that names a specific file is
  * caught by `i18n-source-file.test.ts`'s own "said once" sweep if that file is
@@ -52,15 +61,25 @@ const TESTS_DIR = repoPath("__tests__");
 const HELPER = path.join("helpers", "repo-file.ts");
 
 /**
- * {@link HELPER}, and the two suites that have to quote the retired shapes to
- * search for them. Asserted below rather than assumed, so a fourth entry is a
- * decision someone made out loud instead of a hole someone widened.
+ * {@link HELPER}, and the three suites that have to quote a retired shape to
+ * search for it. Asserted below rather than assumed — including that each
+ * entry still NEEDS the exemption — so a fifth is a decision someone made out
+ * loud instead of a hole someone widened.
+ *
+ * `lint-guard-empty-root.test.ts` is here for a different reason than the
+ * others: it is not about suites at all. It matches `path.join(__dirname,
+ * "..")` inside the guard SCRIPTS under `scripts/`, where that shape is the
+ * sanctioned default root and appearing twice is the bug it looks for.
  */
 const ALLOWED_TO_SPELL_THE_SHAPE: readonly string[] = [
   HELPER,
   "repo-file-helper.test.ts",
   "i18n-source-file.test.ts",
+  "lint-guard-empty-root.test.ts",
 ];
+
+/** The two ways a suite used to derive the root, and the rule is neither. */
+const ROOT_DERIVATIONS: readonly string[] = ["process.cwd()", "__dirname"];
 
 /** Every `.ts` under `__tests__`, one level of subdirectory included. */
 function suiteFiles(): readonly string[] {
@@ -134,7 +153,7 @@ describe("reading a repo file, said once", () => {
     );
   });
 
-  it("leaves no suite naming the repository root at all", () => {
+  it("leaves no suite deriving the repository root, by either route", () => {
     // The rule that replaced two shape lists. `readFileSync( path.join(
     // process.cwd(), "app", "index.tsx"), "utf8")` was the shape the previous
     // sweep matched, and it walked straight past `fs.readFileSync`, past a
@@ -143,15 +162,27 @@ describe("reading a repo file, said once", () => {
     // anchoring a walk, `path.relative(process.cwd(), file)` turning a hit
     // back into a reportable name. Those are `repoPath` and `repoRelative`
     // now, which is what makes "not at all" a rule a suite can actually keep.
-    const offenders = suiteFiles().filter((relative) => {
-      if (ALLOWED_TO_SPELL_THE_SHAPE.includes(relative)) return false;
-      return code(relative).includes("process.cwd()");
-    });
-    assert.deepEqual(
-      offenders,
-      [],
-      `these suites name the repo root instead of going through repoPath/readRepoFile/repoRelative: ${offenders.join(", ")}`,
-    );
+    for (const derivation of ROOT_DERIVATIONS) {
+      const offenders = suiteFiles().filter((relative) => {
+        if (ALLOWED_TO_SPELL_THE_SHAPE.includes(relative)) return false;
+        return code(relative).includes(derivation);
+      });
+      assert.deepEqual(
+        offenders,
+        [],
+        `these suites derive the repo root via ${derivation} instead of going through repoPath/readRepoFile/repoRelative: ${offenders.join(", ")}`,
+      );
+    }
+  });
+
+  it("pins the premise that makes the two derivations one path", () => {
+    // The migration folded `path.join(__dirname, "..")` into `REPO_ROOT`
+    // across forty-three suites, which is only a spelling change while this
+    // holds: `tsx --test` starts every suite with the repository root as cwd.
+    // If it ever stops holding, this fails here rather than as forty-three
+    // ENOENTs with no indication that they are one fact.
+    assert.equal(REPO_ROOT, process.cwd());
+    assert.equal(repoPath("__tests__"), path.dirname(new URL(import.meta.url).pathname));
   });
 
   it("joins segments or a slash-joined string to the same path, either helper", () => {
@@ -188,11 +219,12 @@ describe("reading a repo file, said once", () => {
     assert.equal(readI18nSource(), readRepoFile(I18N_SOURCE_REL));
   });
 
-  it("keeps the exemption list to the three files that have to name the shape", () => {
+  it("keeps the exemption list to the four files that have to name the shape", () => {
     assert.deepEqual(ALLOWED_TO_SPELL_THE_SHAPE, [
       HELPER,
       "repo-file-helper.test.ts",
       "i18n-source-file.test.ts",
+      "lint-guard-empty-root.test.ts",
     ]);
     for (const allowed of ALLOWED_TO_SPELL_THE_SHAPE) {
       assert.ok(
@@ -200,11 +232,11 @@ describe("reading a repo file, said once", () => {
         `exempted file ${allowed} is not in the walk — a stale entry exempts nothing and hides that it is stale`,
       );
       // And each one still NEEDS the exemption: the helper declares the root,
-      // this suite pins it, and `i18n-source-file.test.ts` quotes the retired
-      // shape as a string to search for. An entry that stopped using it is an
-      // exemption standing open for the next suite to walk through.
+      // this suite pins it, and the other two quote a retired shape as a
+      // string to search for. An entry that stopped using it is an exemption
+      // standing open for the next suite to walk through.
       assert.ok(
-        code(allowed).includes("process.cwd()"),
+        ROOT_DERIVATIONS.some((derivation) => code(allowed).includes(derivation)),
         `${allowed} is exempted from the root rule but no longer names the root — drop the entry`,
       );
     }

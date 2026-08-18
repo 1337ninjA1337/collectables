@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
+
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
 /**
  * Structural assertions over the Power BI starter assets (Analytics #15a).
@@ -10,16 +11,15 @@ import { describe, it } from "node:test";
  * source of truth and the copy-paste fallback.
  */
 
-const ROOT = join(__dirname, "..");
 const M = "docs/powerbi/queries.m";
 const DAX = "docs/powerbi/measures.dax";
 const README = "docs/powerbi/README.md";
 
-const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
+const read = (p: string) => readRepoFile(p);
 
 describe("docs/powerbi/queries.m (Analytics #15a)", () => {
   it("exists at the canonical path", () => {
-    assert.ok(existsSync(join(ROOT, M)), `${M} must be checked in`);
+    assert.ok(existsSync(repoPath(M)), `${M} must be checked in`);
   });
 
   it("exposes the four Supabase connection parameters", () => {
@@ -57,7 +57,7 @@ describe("docs/powerbi/queries.m (Analytics #15a)", () => {
 
 describe("docs/powerbi/measures.dax (Analytics #15a)", () => {
   it("exists at the canonical path", () => {
-    assert.ok(existsSync(join(ROOT, DAX)), `${DAX} must be checked in`);
+    assert.ok(existsSync(repoPath(DAX)), `${DAX} must be checked in`);
   });
 
   it("declares all three starter measure groups verbatim", () => {
@@ -97,7 +97,7 @@ describe("docs/powerbi/measures.dax (Analytics #15a)", () => {
 
 describe("docs/powerbi/README.md (Analytics #15a)", () => {
   it("exists and links the two importable assets", () => {
-    assert.ok(existsSync(join(ROOT, README)), `${README} must be checked in`);
+    assert.ok(existsSync(repoPath(README)), `${README} must be checked in`);
     const src = read(README);
     assert.match(src, /queries\.m/);
     assert.match(src, /measures\.dax/);

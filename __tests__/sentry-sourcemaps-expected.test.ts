@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -9,14 +7,10 @@ import {
 } from "../lib/sentry-config";
 import { initSentry, getSentryStatus } from "../lib/sentry";
 
-const deployYml = readFileSync(
-  join(__dirname, "..", ".github", "workflows", "deploy.yml"),
-  "utf8",
-);
-const configSrc = readFileSync(
-  join(__dirname, "..", "lib", "sentry-config.ts"),
-  "utf8",
-);
+import { readRepoFile } from "./helpers/repo-file";
+
+const deployYml = readRepoFile(".github", "workflows", "deploy.yml");
+const configSrc = readRepoFile("lib", "sentry-config.ts");
 
 describe("resolveSourcemapsExpected", () => {
   it("accepts '1' and 'true' (any case)", () => {

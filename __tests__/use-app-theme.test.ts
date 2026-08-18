@@ -1,10 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
-const REPO_ROOT = path.resolve(__dirname, "..");
-const src = readFileSync(path.join(REPO_ROOT, "components/use-app-theme.ts"), "utf8");
+import { readRepoFile } from "./helpers/repo-file";
+
+const src = readRepoFile("components/use-app-theme.ts");
 
 describe("useAppTheme", () => {
   it("imports useColorScheme from react-native", () => {

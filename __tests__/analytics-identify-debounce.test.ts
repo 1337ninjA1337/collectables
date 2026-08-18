@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 // Structural only, and deliberately still so. The provider IS mountable now —
 // __tests__/analytics-provider-strict-mode.test.ts renders it through the
@@ -12,8 +12,7 @@ import { describe, it } from "node:test";
 // runtime assertion while dropping the shared scheduler's reset semantics.
 // The debounce/reset SEMANTICS themselves are covered by the mock-timer suite
 // in __tests__/identify-scheduler.test.ts.
-const ROOT = join(__dirname, "..");
-const src = readFileSync(join(ROOT, "lib/analytics-provider.tsx"), "utf8");
+const src = readRepoFile("lib/analytics-provider.tsx");
 
 describe("AnalyticsProvider — identify debounce via createIdentifyScheduler", () => {
   it("re-exports the scheduler's default as IDENTIFY_DEBOUNCE_MS (no drift)", () => {
