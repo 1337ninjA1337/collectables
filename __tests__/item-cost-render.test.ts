@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { formatCostAmount } from "@/lib/item-cost";
 import { formatCostAmount as canonicalFormatCostAmount } from "@/lib/format-cost";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
@@ -79,7 +80,7 @@ describe("item detail — cost meta row via <CostBadge> + long-press original", 
 });
 
 describe("i18n — itemValueApprox key in all 6 languages", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   it("declares itemValueApprox as an ≈ {amount} {currency} formatter 6 times (one per table)", () => {
     const matches = src.match(

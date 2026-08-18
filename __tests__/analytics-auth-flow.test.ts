@@ -8,6 +8,7 @@ import {
   shouldTrackSignupOnAuthEvent,
   signupEventProps,
 } from "../lib/auth-helpers";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 const ROOT = join(__dirname, "..");
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -232,7 +233,7 @@ describe("auth-context — signup_completed wiring", () => {
 });
 
 describe("i18n-context — language_switched wiring", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   it("imports trackEvent from @/lib/analytics", () => {
     assert.match(

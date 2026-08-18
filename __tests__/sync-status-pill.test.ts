@@ -10,6 +10,7 @@ import {
   type PendingUpsertQueue,
 } from "@/lib/pending-upserts";
 import { countPendingSocial } from "@/lib/pending-social";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * BE-16: the "syncing…" pending-mutations pill. The pure count helpers are
@@ -125,7 +126,7 @@ describe("SyncStatusPill wiring", () => {
   });
 
   it("ships the syncingPill i18n key (en + ru)", () => {
-    const i18n = read("lib/i18n-context.tsx");
+    const i18n = readI18nSource();
     assert.match(i18n, /syncingPill:\s*\(params\?:/);
     assert.match(i18n, /Синхронизация/);
   });

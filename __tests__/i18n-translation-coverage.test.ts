@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   TRANSLATION_BASE_LANGUAGE,
@@ -12,6 +10,7 @@ import {
   translationCoverage,
 } from "@/lib/i18n-coverage";
 import { findLocaleBlock, languageOptionCodes } from "@/lib/i18n-source";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * The silent-fallback gap, turned into a number.
@@ -36,10 +35,7 @@ import { findLocaleBlock, languageOptionCodes } from "@/lib/i18n-source";
  * that parser found.
  */
 
-const SOURCE = readFileSync(
-  path.join(process.cwd(), "lib", "i18n-context.tsx"),
-  "utf8",
-);
+const SOURCE = readI18nSource();
 
 const COVERAGE = translationCoverage(SOURCE);
 const rowFor = (language: string) => {

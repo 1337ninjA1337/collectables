@@ -10,6 +10,7 @@ import {
   languageCurrencyMap,
   languageLocaleMap,
 } from "@/lib/locale-helpers";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
@@ -79,7 +80,7 @@ describe("getDefaultLocaleForLanguage", () => {
   });
 
   it("i18n-context.tsx delegates to getDefaultLocaleForLanguage (no local LOCALE_MAP)", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     assert.match(
       src,
       /import\s*\{\s*getDefaultLocaleForLanguage\s*\}\s*from\s*"@\/lib\/locale-helpers"/,

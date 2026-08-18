@@ -1,9 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { formatRelativeDate } from "../lib/i18n-context";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 const NOW_MS = Date.parse("2026-05-21T12:00:00Z");
 
@@ -24,12 +23,8 @@ function iso(offsetMs: number): string {
  * pins both the structural contract (the cache + getter are wired correctly)
  * and the behavioural contract (formatting is unchanged after the rewrite).
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
-
 describe("formatRelativeDate — Intl.RelativeTimeFormat memoization", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   it("declares a module-scope cache keyed by BCP-47 tag", () => {
     assert.match(

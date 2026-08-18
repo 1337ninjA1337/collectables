@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural pins for the in-collection search row added to the
@@ -71,7 +72,7 @@ describe("components/item-filters.tsx — search row UI", () => {
 });
 
 describe("i18n — searchInCollectionPlaceholder key across all 6 supported languages", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   it("declares searchInCollectionPlaceholder in the en base table", () => {
     // The en table defines the TranslationKey union (keyof typeof en),
@@ -126,7 +127,7 @@ describe("components/item-filters.tsx — search row accessibility", () => {
 });
 
 describe("i18n — search a11y keys across all 6 supported languages", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   for (const key of ["searchInCollectionA11y", "filterClearSearch"]) {
     it(`declares ${key} exactly 6 times (en base + 5 overrides)`, () => {
@@ -204,7 +205,7 @@ describe("components/item-filters.tsx — active query quick chip", () => {
 });
 
 describe("i18n — queryChipClear across all 6 supported languages", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   it("declares queryChipClear exactly 6 times (en base + 5 overrides)", () => {
     const matches = src.match(/queryChipClear:\s*\(params\?: TranslationParams\)/g) ?? [];

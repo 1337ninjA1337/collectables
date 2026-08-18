@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
@@ -50,7 +51,7 @@ describe("listing-detail absolute-date tooltip wiring", () => {
 });
 
 describe("formatAbsoluteDate context wiring", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   it("is exported from lib/i18n-context.tsx", () => {
     assert.match(src, /export\s+function\s+formatAbsoluteDate\s*\(/);

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { localeKeys } from "@/lib/i18n-source";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural tests for the "List on marketplace" UI inside app/item/[id].tsx
@@ -63,7 +64,7 @@ describe("item detail: marketplace listing UI", () => {
 
 describe("marketplace listing translations", () => {
   it("declares listing-form keys in every language map", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     const requiredKeys = [
       "marketplaceListOnMarketplace",
       "marketplaceRemoveListing",

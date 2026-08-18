@@ -11,15 +11,13 @@ import {
   ANALYTICS_EVENTS,
   ANALYTICS_EVENT_NAMES,
 } from "../lib/analytics-events";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 const settingsSrc = readFileSync(
   path.join(process.cwd(), "app", "settings.tsx"),
   "utf8",
 );
-const i18nSrc = readFileSync(
-  path.join(process.cwd(), "lib", "i18n-context.tsx"),
-  "utf8",
-);
+const i18nSrc = readI18nSource();
 
 describe("getAnalyticsEventCatalog", () => {
   it("returns one entry per taxonomy event, in sorted-name order", () => {

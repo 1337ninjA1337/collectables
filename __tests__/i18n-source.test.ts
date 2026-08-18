@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   declaredKeysByFormatting,
@@ -15,6 +13,7 @@ import {
   REGEXP_FOLLOWS_KEYWORD,
 } from "@/lib/i18n-source";
 import { TRANSLATION_LANGUAGES } from "@/lib/i18n-coverage";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * The one parser for `lib/i18n-context.tsx`, and the shapes it does not read.
@@ -30,10 +29,7 @@ import { TRANSLATION_LANGUAGES } from "@/lib/i18n-coverage";
  * refuses — asserted absent from the real file rather than assumed absent.
  */
 
-const SOURCE = readFileSync(
-  path.join(process.cwd(), "lib", "i18n-context.tsx"),
-  "utf8",
-);
+const SOURCE = readI18nSource();
 
 describe("translation literal parser", () => {
   it("reads the keys and the spread of a plain map", () => {

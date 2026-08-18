@@ -4,11 +4,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { findLocaleBlock, localeKeys } from "@/lib/i18n-source";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
-const i18nSrc = readFileSync(
-  path.join(process.cwd(), "lib", "i18n-context.tsx"),
-  "utf8",
-);
+const i18nSrc = readI18nSource();
 
 const layoutSrc = readFileSync(
   path.join(process.cwd(), "app", "_layout.tsx"),

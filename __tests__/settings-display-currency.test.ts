@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural pins for bug-2d — the Settings "Display currency" picker, the
@@ -66,7 +67,7 @@ describe("settings screen — display currency picker", () => {
 });
 
 describe("i18n — bug-2d display-currency keys in all 6 languages", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   for (const key of [
     "displayCurrencyTitle",

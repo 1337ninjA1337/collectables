@@ -35,6 +35,7 @@ import {
   PRIVACY_PAGE_LANGUAGES,
   renderPrivacyPage,
 } from "../lib/privacy-page";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Pins the post-build smoke check that replaced ci.yml's and deploy.yml's
@@ -1589,7 +1590,7 @@ describe("token parity with the app", () => {
     // lib/i18n-context.tsx imports react-native, so it cannot be imported
     // here — parse the union instead. A seventh language added to the app
     // and not to the watch list would otherwise never be smoke-checked.
-    const source = read("lib/i18n-context.tsx");
+    const source = readI18nSource();
     const match = source.match(/export type AppLanguage =([^;]+);/);
     assert.ok(match, "AppLanguage union found");
     const declared = [...(match?.[1] ?? "").matchAll(/"([a-z-]+)"/g)].map(
@@ -1612,7 +1613,7 @@ describe("token parity with the app", () => {
   });
 
   it("watches only i18n keys the translation table declares", () => {
-    const source = read("lib/i18n-context.tsx");
+    const source = readI18nSource();
     for (const key of BUNDLE_SMOKE_I18N_KEYS) {
       assert.ok(
         source.includes(`${key}:`),

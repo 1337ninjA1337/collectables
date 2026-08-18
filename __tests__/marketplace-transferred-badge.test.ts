@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural tests for the new "Transferred" pill that surfaces on sold
@@ -20,7 +21,7 @@ function read(rel: string): string {
 
 describe("marketplaceTransferredBadge i18n parity", () => {
   it("declares marketplaceTransferredBadge in every supported language", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     const languages = ["en", "ru", "be", "pl", "de", "es"] as const;
     for (const code of languages) {
       const blockMatch = src.match(

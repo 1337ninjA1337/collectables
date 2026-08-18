@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { TRANSLATION_BASE_LANGUAGE } from "@/lib/i18n-coverage";
 import {
@@ -9,6 +7,7 @@ import {
   findObjectLiteral,
   languageOptionCodes,
 } from "@/lib/i18n-source";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural tests over the translations file without importing the React
@@ -20,10 +19,7 @@ import {
  * attributed a key to a language by declaration order.
  */
 
-const SOURCE = readFileSync(
-  path.join(process.cwd(), "lib", "i18n-context.tsx"),
-  "utf8",
-);
+const SOURCE = readI18nSource();
 
 const EXPECTED_LANGUAGES = ["ru", "en", "be", "pl", "de", "es"] as const;
 

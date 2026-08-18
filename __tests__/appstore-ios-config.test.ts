@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural guards over the iOS submission block in app.json. The strings
@@ -21,10 +22,7 @@ const guide = readFileSync(
   "utf8",
 );
 
-const i18nSource = readFileSync(
-  path.join(process.cwd(), "lib", "i18n-context.tsx"),
-  "utf8",
-);
+const i18nSource = readI18nSource();
 
 describe("app.json iOS submission config", () => {
   it("declares every required Info.plist usage-description key", () => {

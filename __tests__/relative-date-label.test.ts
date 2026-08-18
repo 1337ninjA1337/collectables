@@ -1,13 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { relativeDateLabel } from "@/lib/i18n-context";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 describe("relativeDateLabel helper", () => {
   it("joins prefix and when with a single space", () => {
@@ -49,19 +44,19 @@ describe("relativeDateLabel helper", () => {
 
 describe("relativeDateLabel context wiring", () => {
   it("is exported from lib/i18n-context.tsx so app code can import it directly", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     assert.match(src, /export\s+function\s+relativeDateLabel\s*\(/);
   });
 
   it("is published on the I18nContext value shape so `useI18n()` consumers can call it", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     // The provider value object spreads it next to formatRelativeDate.
     assert.match(src, /relativeDateLabel:\s*\(prefix:\s*string,\s*when:\s*string\)\s*=>\s*string/);
     assert.match(src, /relativeDateLabel,\s*\n\s*languageOptions/);
   });
 
   it("jsdoc references the six supported locales so the prefix-only contract is documented", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     // Spot-check the jsdoc snippet near the function declaration.
     assert.match(src, /Russian\s+"Размещено вчера"/);
     assert.match(src, /English\s+"Listed yesterday"/);

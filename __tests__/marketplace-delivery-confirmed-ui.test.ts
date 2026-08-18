@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { localeKeys } from "@/lib/i18n-source";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural tests for the seller-side "Delivery confirmed {when}" indicator
@@ -47,7 +48,7 @@ describe("marketplace My-sales — delivery confirmed indicator", () => {
 
 describe("delivery-confirmed translations", () => {
   it("declares marketplaceDeliveryConfirmed in every language map", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
       const declared = localeKeys(src, lang);
       assert.ok(

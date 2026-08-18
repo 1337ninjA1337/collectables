@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 // `lib/env.ts` and `lib/social-context.tsx` both import react-native at module
 // scope (Platform / hooks) so they can't be imported by the node test runner.
@@ -98,7 +99,7 @@ describe("Social context wires the low-TTL warning toast", () => {
 });
 
 describe("i18n keys for the low-TTL warning", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   it("declares profileCacheTtlLowTitle in the English source map", () => {
     assert.match(src, /profileCacheTtlLowTitle:\s*"Profile cache TTL too low"/);

@@ -11,6 +11,7 @@ import {
   type PriceRangeError,
 } from "@/lib/item-filters";
 import type { CollectableItem } from "@/lib/types";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * The price range accepted anything the user could type and failed silently
@@ -174,10 +175,7 @@ describe("PRICE_RANGE_ERROR_I18N_KEY", () => {
   });
 
   it("declares every key in the English translation map", () => {
-    const source = require("node:fs").readFileSync(
-      require("node:path").join(process.cwd(), "lib", "i18n-context.tsx"),
-      "utf8",
-    ) as string;
+    const source = readI18nSource();
     for (const key of Object.values(PRICE_RANGE_ERROR_I18N_KEY)) {
       assert.match(source, new RegExp(`\\b${key}:`), `translation key '${key}' is not declared`);
     }

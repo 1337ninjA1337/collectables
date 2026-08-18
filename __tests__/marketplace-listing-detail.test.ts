@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { localeKeys } from "@/lib/i18n-source";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
@@ -205,7 +206,7 @@ describe("collections context: transferItemToBuyer", () => {
 
 describe("listing detail translations", () => {
   it("declares listing-detail keys in every language map", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     const requiredKeys = [
       "marketplaceMessageOwner",
       "marketplaceOwnerLabel",

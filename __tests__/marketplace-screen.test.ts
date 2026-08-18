@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { localeKeys } from "@/lib/i18n-source";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural tests for the marketplace screen and its bottom-nav entry. We
@@ -93,7 +94,7 @@ describe("bottom-nav marketplace tab", () => {
 
 describe("marketplace translations", () => {
   it("declares marketplace keys in every language map", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     const requiredKeys = [
       "marketplaceTitle",
       "marketplaceEmpty",

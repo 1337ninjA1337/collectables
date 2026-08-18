@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { localeKeys } from "@/lib/i18n-source";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural tests for the buyer "Mark as received" affordance on the
@@ -68,7 +69,7 @@ describe("listing detail — buyer mark as received", () => {
 
 describe("mark-received translations", () => {
   it("declares the new keys in every language map", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     const requiredKeys = [
       "marketplaceMarkReceived",
       "marketplaceReceivedBadge",

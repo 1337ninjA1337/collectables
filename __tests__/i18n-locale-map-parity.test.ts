@@ -1,10 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { languageOptionCodes } from "@/lib/i18n-source";
 import { languageCurrencyMap, languageLocaleMap } from "@/lib/locale-helpers";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural parity guard between the i18n `languageOptions` picker (the
@@ -21,10 +20,7 @@ import { languageCurrencyMap, languageLocaleMap } from "@/lib/locale-helpers";
  * as did three others).
  */
 
-const SOURCE = readFileSync(
-  path.join(process.cwd(), "lib", "i18n-context.tsx"),
-  "utf8",
-);
+const SOURCE = readI18nSource();
 
 const parseLanguageOptionCodes = () => languageOptionCodes(SOURCE);
 

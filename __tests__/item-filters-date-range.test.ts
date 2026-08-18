@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   applyItemFilters,
@@ -13,6 +11,7 @@ import {
   type ItemFilters,
 } from "@/lib/item-filters";
 import type { CollectableItem } from "@/lib/types";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * The acquisition-date range carried every failure the price range did, plus
@@ -179,7 +178,7 @@ describe("DATE_RANGE_ERROR_I18N_KEY", () => {
   });
 
   it("declares every key in the English translation map", () => {
-    const source = readFileSync(path.join(process.cwd(), "lib", "i18n-context.tsx"), "utf8");
+    const source = readI18nSource();
     for (const key of Object.values(DATE_RANGE_ERROR_I18N_KEY)) {
       assert.match(source, new RegExp(`\\b${key}:`), `translation key '${key}' is not declared`);
     }

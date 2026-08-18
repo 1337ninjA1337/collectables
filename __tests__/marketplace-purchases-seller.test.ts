@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { localeKeys } from "@/lib/i18n-source";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
@@ -40,7 +41,7 @@ describe("marketplace screen — purchases 'From @seller' chip", () => {
 });
 
 describe("marketplaceBoughtFrom i18n parity", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   it("declares marketplaceBoughtFrom in every supported language map", () => {
     for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {

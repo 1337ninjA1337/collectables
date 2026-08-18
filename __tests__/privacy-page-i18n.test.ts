@@ -10,6 +10,7 @@ import {
   renderLanguagePicker,
   renderPrivacyPage,
 } from "@/lib/privacy-page";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Guards the translated /privacy pages (GDPR Art. 12 — the Sentry
@@ -30,7 +31,7 @@ import {
 const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
 
-const I18N_SOURCE = read("lib/i18n-context.tsx");
+const I18N_SOURCE = readI18nSource();
 
 const parseLanguageOptions = () => findLanguageOptions(I18N_SOURCE);
 

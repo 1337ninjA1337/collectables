@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
@@ -57,7 +58,7 @@ describe("collection edit modal: editing visibility public→private requires pr
 
 describe("collection-edit premium-gate translations", () => {
   it("declares the premium-required visibility hint key in English", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     assert.match(src, /visibilityPrivatePremiumOnly:/);
   });
 });

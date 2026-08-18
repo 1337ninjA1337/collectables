@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   ANALYTICS_EVENTS,
@@ -9,6 +7,7 @@ import {
 } from "../lib/analytics-events";
 
 import { localeKeys } from "@/lib/i18n-source";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Event descriptions are EN-only by design today — they live in
@@ -22,10 +21,7 @@ import { localeKeys } from "@/lib/i18n-source";
  * user.
  */
 
-const i18nSrc = readFileSync(
-  path.join(process.cwd(), "lib", "i18n-context.tsx"),
-  "utf8",
-);
+const i18nSrc = readI18nSource();
 
 const LANGUAGES = ["en", "ru", "be", "pl", "de", "es"] as const;
 

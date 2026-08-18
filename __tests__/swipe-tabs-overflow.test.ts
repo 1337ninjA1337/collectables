@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Guards the localization-overflow fix on the home-screen collection tabs.
@@ -29,7 +30,7 @@ describe("SwipeTabs — labels stay inside their chips", () => {
 
 describe("i18n — overly long tab label shortened to fit", () => {
   it("ru tabSubscribedCollections is a short single word (was the overflowing 'Отслеживаемые')", () => {
-    const src = read("lib/i18n-context.tsx");
+    const src = readI18nSource();
     assert.match(src, /tabSubscribedCollections:\s*"Подписки"/);
     assert.doesNotMatch(src, /tabSubscribedCollections:\s*"Отслеживаемые"/);
   });

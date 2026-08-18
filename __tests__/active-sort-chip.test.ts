@@ -10,6 +10,7 @@ import {
   SORT_OPTIONS,
   type ItemSortMode,
 } from "@/lib/item-filters";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * The removable "active sort" quick-chip in `<ItemFilterBar>`.
@@ -195,7 +196,7 @@ describe("components/item-filters.tsx — chip render + tap-to-clear wiring", ()
 });
 
 describe("i18n — sortChipClear across all 6 supported languages", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   it("declares sortChipClear in the en base table (it defines TranslationKey)", () => {
     assert.match(src, /sortChipClear:\s*\(params\?: TranslationParams\)\s*=>/);

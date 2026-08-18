@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 const ROOT = join(__dirname, "..");
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -34,7 +35,7 @@ describe("CurrencyInput — error prop", () => {
 });
 
 describe("i18n — currency error keys", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   it("defines all three keys in all 6 languages", () => {
     for (const key of ["currencyErrorEmpty", "currencyErrorUnparseable", "currencyErrorNonPositive"]) {

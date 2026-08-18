@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Trading-card `<ItemCard>` + the fullscreen `<PhotoLightbox>` gallery.
@@ -28,7 +29,7 @@ function read(rel: string): string {
 const cardSrc = read("components/item-card.tsx");
 const lightboxSrc = read("components/photo-lightbox.tsx");
 const itemDetailSrc = read("app/item/[id].tsx");
-const i18nSrc = read("lib/i18n-context.tsx");
+const i18nSrc = readI18nSource();
 
 const GALLERY_KEYS = [
   "galleryOpen",

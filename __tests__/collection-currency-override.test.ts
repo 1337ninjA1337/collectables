@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural pins for the per-collection currency override shipped in
@@ -144,7 +145,7 @@ describe("Collection edit modal — currency picker UI wiring", () => {
 });
 
 describe("i18n — collection currency keys across all 6 languages", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   it("declares the 3 new keys in the en base table", () => {
     assert.match(src, /collectionCurrencyHint:\s*"[^"]+"/);

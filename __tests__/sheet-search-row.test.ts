@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural pins for `<SheetSearchRow>` — the "🔎 [input] ✕" row extracted
@@ -205,7 +206,7 @@ describe("search affordances outside <SheetSearchRow> — accessibility parity",
 });
 
 describe("i18n — the two new per-sheet a11y labels across all 6 languages", () => {
-  const src = read("lib/i18n-context.tsx");
+  const src = readI18nSource();
 
   for (const key of [
     "collectionPickerSearchA11y",

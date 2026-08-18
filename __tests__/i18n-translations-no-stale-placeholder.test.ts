@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
  * Structural audit over every i18n string that is rendered as a `placeholder`.
@@ -88,7 +89,7 @@ const SINGLE_LINE_MAX = 40;
 const MULTILINE_MAX = 90;
 
 const USAGES = collectUsages();
-const I18N = read("lib/i18n-context.tsx");
+const I18N = readI18nSource();
 
 describe("i18n placeholders — the audit sees every placeholder in the UI", () => {
   it("finds placeholder keys in both source dirs", () => {
