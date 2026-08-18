@@ -14,7 +14,11 @@ import {
 } from "./helpers/i18n-locales";
 import { localeKeys } from "@/lib/i18n-source";
 
-import { readSuite, topLevelSuites } from "./helpers/suite-files";
+import {
+  assertExemptionsHonest,
+  readSuite,
+  topLevelSuites,
+} from "./helpers/suite-files";
 
 /** A locale's own declared keys, as an array — `localeKeys` returns a Set. */
 const localeKeysOf = (source: string, code: string): readonly string[] => [
@@ -438,5 +442,22 @@ describe("the habit stays retired", () => {
       `these suites count locale declarations instead of asking each map: ${offenders.join(", ")}`,
     );
     assert.ok(suites.length > 200, `only ${suites.length} suites walked`);
+  });
+
+  it("holds the exemption to the file that still earns it", () => {
+    // The list had no assertion around it at all, which is the hole the
+    // convention closes: an entry that stopped doing the thing looks exactly
+    // like one that still does, and the next suite parked behind it inherits
+    // a pass nobody granted.
+    assertExemptionsHonest({
+      exemptions: EXEMPT,
+      expected: ["bundle-smoke.test.ts"],
+      rule: "the locale-counting rule",
+      // Still both halves of what the sweep would catch it for — the six is
+      // about build outputs, and it sits in a file that reads the source.
+      stillNeeded: (relative) =>
+        readSuite(relative).includes("readI18nSource") &&
+        /\.(length|size),\s*6\b/.test(readSuite(relative)),
+    });
   });
 });

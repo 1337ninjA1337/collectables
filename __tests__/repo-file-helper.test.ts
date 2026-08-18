@@ -12,7 +12,13 @@ import {
   repoPath,
   repoRelative,
 } from "./helpers/repo-file";
-import { SUITES_REL, suiteCode, suiteFiles, suiteText } from "./helpers/suite-files";
+import {
+  SUITES_REL,
+  assertExemptionsHonest,
+  suiteCode,
+  suiteFiles,
+  suiteText,
+} from "./helpers/suite-files";
 
 /**
  * One definition of "read a file out of the repository".
@@ -186,26 +192,20 @@ describe("reading a repo file, said once", () => {
   });
 
   it("keeps the exemption list to the four files that have to name the shape", () => {
-    assert.deepEqual(ALLOWED_TO_SPELL_THE_SHAPE, [
-      HELPER,
-      "repo-file-helper.test.ts",
-      "i18n-source-file.test.ts",
-      "lint-guard-empty-root.test.ts",
-    ]);
-    for (const allowed of ALLOWED_TO_SPELL_THE_SHAPE) {
-      assert.ok(
-        suiteFiles().includes(allowed),
-        `exempted file ${allowed} is not in the walk — a stale entry exempts nothing and hides that it is stale`,
-      );
-      // And each one still NEEDS the exemption: the helper declares the root,
-      // this suite pins it, and the other two quote a retired shape as a
-      // string to search for. An entry that stopped using it is an exemption
-      // standing open for the next suite to walk through.
-      assert.ok(
-        ROOT_DERIVATIONS.some((derivation) => suiteCode(allowed).includes(derivation)),
-        `${allowed} is exempted from the root rule but no longer names the root — drop the entry`,
-      );
-    }
+    assertExemptionsHonest({
+      exemptions: ALLOWED_TO_SPELL_THE_SHAPE,
+      expected: [
+        HELPER,
+        "repo-file-helper.test.ts",
+        "i18n-source-file.test.ts",
+        "lint-guard-empty-root.test.ts",
+      ],
+      rule: "the repo-root rule",
+      // The helper declares the root, this suite pins it, and the other two
+      // quote a retired shape as a string in order to search for it.
+      stillNeeded: (relative) =>
+        ROOT_DERIVATIONS.some((derivation) => suiteCode(relative).includes(derivation)),
+    });
   });
 
   it("has enough readers that the sweep above is not scanning an empty room", () => {

@@ -9,7 +9,7 @@ import {
   readEdgeFunction,
 } from "./helpers/edge-function-source";
 import { REPO_ROOT, repoPath } from "./helpers/repo-file";
-import { suiteCode, suiteFiles } from "./helpers/suite-files";
+import { assertExemptionsHonest, suiteCode, suiteFiles } from "./helpers/suite-files";
 
 /**
  * One statement of `supabase/functions/<name>/index.ts`.
@@ -85,8 +85,17 @@ describe("an Edge Function's source, by name", () => {
   it("has enough suites in the walk that the sweep is not scanning an empty room", () => {
     const files = suiteFiles();
     assert.ok(files.length > 200, `only ${files.length} suite files walked`);
-    for (const allowed of ALLOWED_TO_SPELL_THE_LAYOUT) {
-      assert.ok(files.includes(allowed), `exempted file ${allowed} is not in the walk`);
-    }
+  });
+
+  it("holds the exemption list to the two files that have to render the layout", () => {
+    assertExemptionsHonest({
+      exemptions: ALLOWED_TO_SPELL_THE_LAYOUT,
+      expected: [
+        path.join("helpers", "edge-function-source.ts"),
+        "edge-function-source-helper.test.ts",
+      ],
+      rule: "the function-layout rule",
+      stillNeeded: (relative) => suiteCode(relative).includes("supabase/functions/"),
+    });
   });
 });

@@ -6,6 +6,7 @@ import { readRepoFile, repoPath } from "./helpers/repo-file";
 import {
   SUITES_DIR,
   SUITES_REL,
+  assertExemptionsHonest,
   readSuite,
   suiteCode,
   suiteFiles,
@@ -107,6 +108,62 @@ describe("the suite directory, walked once", () => {
     assert.throws(() => readSuite("no-such-suite.test.ts"), /ENOENT/);
   });
 
+  it("answers the walk and the reads once per process, not once per sweep", () => {
+    // Memoised where `readRepoFile` deliberately is not, and the difference is
+    // what a hit is worth: a sweep reads every file, and six of them run
+    // across four guards. Identity rather than equality, so this fails if the
+    // cache is quietly removed rather than passing on a re-derived answer.
+    assert.equal(suiteFiles(), suiteFiles());
+    assert.equal(readSuite(HELPER), readSuite(HELPER));
+    assert.equal(suiteText(HELPER), suiteText(HELPER));
+    assert.equal(suiteCode(HELPER), suiteCode(HELPER));
+    // A miss still throws rather than caching the failure as an empty answer.
+    assert.throws(() => readSuite("no-such-suite.test.ts"), /ENOENT/);
+  });
+
+  it("holds an exemption list to four things, and says which one broke", () => {
+    // The convention four guards had each written around their own list. Its
+    // failure modes are the point, so they are exercised rather than assumed —
+    // a checker that cannot fail is the same as no checker.
+    const honest = {
+      exemptions: [HELPER],
+      expected: [HELPER],
+      rule: "the example rule",
+      stillNeeded: () => true,
+    };
+    assert.doesNotThrow(() => assertExemptionsHonest(honest));
+    assert.throws(
+      () => assertExemptionsHonest({ ...honest, expected: [HELPER, "extra.test.ts"] }),
+      /exemption list changed/,
+    );
+    assert.throws(
+      () => assertExemptionsHonest({ ...honest, exemptions: [], expected: [] }),
+      /is empty — delete it instead/,
+    );
+    assert.throws(
+      () =>
+        assertExemptionsHonest({
+          ...honest,
+          exemptions: [HELPER, HELPER],
+          expected: [HELPER, HELPER],
+        }),
+      /repeats an entry/,
+    );
+    assert.throws(
+      () =>
+        assertExemptionsHonest({
+          ...honest,
+          exemptions: ["deleted-suite.test.ts"],
+          expected: ["deleted-suite.test.ts"],
+        }),
+      /is not in the walk/,
+    );
+    assert.throws(
+      () => assertExemptionsHonest({ ...honest, stillNeeded: () => false }),
+      /no longer needs it/,
+    );
+  });
+
   it("leaves no suite walking the directory for itself", () => {
     // Matches the walk's anchor rather than its body: every copy has to start
     // by naming the directory, however the recursion below it is written. With
@@ -126,17 +183,12 @@ describe("the suite directory, walked once", () => {
   });
 
   it("keeps the exemption list to the two files that have to say the name", () => {
-    assert.deepEqual(ALLOWED_TO_NAME_THE_DIRECTORY, [
-      HELPER,
-      "suite-files-helper.test.ts",
-    ]);
-    for (const allowed of ALLOWED_TO_NAME_THE_DIRECTORY) {
-      assert.ok(suiteFiles().includes(allowed), `exempted file ${allowed} is not in the walk`);
-      assert.ok(
-        suiteCode(allowed).includes('"__tests__"'),
-        `${allowed} is exempted but no longer names the directory — drop the entry`,
-      );
-    }
+    assertExemptionsHonest({
+      exemptions: ALLOWED_TO_NAME_THE_DIRECTORY,
+      expected: [HELPER, "suite-files-helper.test.ts"],
+      rule: "the suite-directory rule",
+      stillNeeded: (relative) => suiteCode(relative).includes('"__tests__"'),
+    });
   });
 
   it("has enough callers that the sweep above is not scanning an empty room", () => {

@@ -38,6 +38,7 @@
  * sharing the walk would make it agree with itself.
  */
 
+import assert from "node:assert/strict";
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
@@ -52,6 +53,24 @@ export const SUITES_REL = "__tests__";
 export const SUITES_DIR = repoPath(SUITES_REL);
 
 /**
+ * The walk and the reads, held for the life of the process.
+ *
+ * Memoised where the modules below it deliberately are not, and the difference
+ * is what a hit is worth. `readRepoFile` is asked for one file per suite, so a
+ * cache there could only ever hit within one process and the suites that read
+ * twice already hold a `const`. A SWEEP reads every file, and there are six of
+ * them across four guards — `repo-file-helper.test.ts` alone runs three, one
+ * of which strips comments from ~290 files character by character. The tree
+ * cannot change mid-run (each suite is its own process, and nothing here
+ * writes to the repository), so one answer per process is also the only
+ * correct answer.
+ */
+let walked: readonly string[] | null = null;
+const readCache = new Map<string, string>();
+const textCache = new Map<string, string>();
+const codeCache = new Map<string, string>();
+
+/**
  * Every `.ts` under `__tests__`, one level of subdirectory included.
  *
  * One level rather than fully recursive because that is the tree that exists —
@@ -61,6 +80,7 @@ export const SUITES_DIR = repoPath(SUITES_REL);
  * skipped.
  */
 export function suiteFiles(): readonly string[] {
+  if (walked) return walked;
   const found: string[] = [];
   for (const entry of readdirSync(SUITES_DIR)) {
     const full = path.join(SUITES_DIR, entry);
@@ -72,7 +92,8 @@ export function suiteFiles(): readonly string[] {
     }
     if (entry.endsWith(".ts")) found.push(entry);
   }
-  return found;
+  walked = found;
+  return walked;
 }
 
 /**
@@ -90,7 +111,11 @@ export function topLevelSuites(): readonly string[] {
 
 /** One suite's source text, by the relative path the walks return. */
 export function readSuite(relative: string): string {
-  return readRepoFile(SUITES_REL, relative);
+  const cached = readCache.get(relative);
+  if (cached !== undefined) return cached;
+  const source = readRepoFile(SUITES_REL, relative);
+  readCache.set(relative, source);
+  return source;
 }
 
 /**
@@ -102,7 +127,11 @@ export function readSuite(relative: string): string {
  * clean while still doing the thing.
  */
 export function suiteText(relative: string): string {
-  return readSuite(relative).replace(/\s+/g, " ");
+  const cached = textCache.get(relative);
+  if (cached !== undefined) return cached;
+  const flattened = readSuite(relative).replace(/\s+/g, " ");
+  textCache.set(relative, flattened);
+  return flattened;
 }
 
 /**
@@ -115,5 +144,61 @@ export function suiteText(relative: string): string {
  * that mentions it.
  */
 export function suiteCode(relative: string): string {
-  return stripComments(readSuite(relative)).replace(/\s+/g, " ");
+  const cached = codeCache.get(relative);
+  if (cached !== undefined) return cached;
+  const stripped = stripComments(readSuite(relative)).replace(/\s+/g, " ");
+  codeCache.set(relative, stripped);
+  return stripped;
+}
+
+/**
+ * An allow-list is a hole, so hold it to the four things that keep it honest.
+ *
+ * Every sweep here needs exemptions — the helper a rule is about has to name
+ * the shape, and so does the guard that quotes it to search for it — and four
+ * guards had each written the same check around theirs, in the same order, in
+ * nearly the same words. The fourth part (does the entry still NEED it?) was
+ * written twice today, independently, which is the part most worth having in
+ * one place: an entry that stopped doing the thing is a hole standing open for
+ * whoever writes the next suite, and nothing about it looks stale.
+ *
+ * - `expected` is passed separately from `exemptions` ON PURPOSE. It is the
+ *   tripwire: the list lives at module scope and this call sits in a case a
+ *   hundred lines down, so widening the hole means finding both. Folding them
+ *   into one literal would make the check agree with itself.
+ * - `rule` names what the entries are exempt FROM, so the failure reads as a
+ *   sentence rather than as a variable name.
+ * - `stillNeeded` is the guard's own predicate — usually "its source still
+ *   contains the shape" — because only the guard knows what its exemption is
+ *   for.
+ */
+export function assertExemptionsHonest(options: {
+  readonly exemptions: readonly string[];
+  readonly expected: readonly string[];
+  readonly rule: string;
+  readonly stillNeeded: (relative: string) => boolean;
+}): void {
+  const { exemptions, expected, rule, stillNeeded } = options;
+  assert.deepEqual(
+    exemptions,
+    expected,
+    `the ${rule} exemption list changed — widening it is a decision to make out loud`,
+  );
+  assert.ok(exemptions.length > 0, `the ${rule} exemption list is empty — delete it instead`);
+  assert.equal(
+    new Set(exemptions).size,
+    exemptions.length,
+    `the ${rule} exemption list repeats an entry, which hides how wide it is`,
+  );
+  const walk = suiteFiles();
+  for (const allowed of exemptions) {
+    assert.ok(
+      walk.includes(allowed),
+      `${allowed} is exempted from ${rule} but is not in the walk — a stale entry exempts nothing and hides that it is stale`,
+    );
+    assert.ok(
+      stillNeeded(allowed),
+      `${allowed} is exempted from ${rule} but no longer needs it — drop the entry rather than leaving the hole open`,
+    );
+  }
 }

@@ -9,7 +9,7 @@ import {
   readI18nSource,
 } from "./helpers/i18n-source-file";
 import { repoPath } from "./helpers/repo-file";
-import { suiteFiles, suiteText } from "./helpers/suite-files";
+import { assertExemptionsHonest, suiteFiles, suiteText } from "./helpers/suite-files";
 
 /**
  * One statement of where `lib/i18n-context.tsx` is.
@@ -103,16 +103,12 @@ describe("the translations module's path, said once", () => {
     // helper, because it is the one statement, and this suite, because pinning
     // the value is what the case above it does. A third entry means someone
     // widened the hole instead of importing the helper.
-    assert.deepEqual(ALLOWED_TO_SPELL_THE_PATH, [
-      HELPER,
-      "i18n-source-file.test.ts",
-    ]);
-    for (const allowed of ALLOWED_TO_SPELL_THE_PATH) {
-      assert.ok(
-        suiteFiles().includes(allowed),
-        `exempted file ${allowed} is not in the walk — a stale entry exempts nothing and hides that it is stale`,
-      );
-    }
+    assertExemptionsHonest({
+      exemptions: ALLOWED_TO_SPELL_THE_PATH,
+      expected: [HELPER, "i18n-source-file.test.ts"],
+      rule: "the translations-path rule",
+      stillNeeded: (relative) => suiteText(relative).includes("i18n-context.tsx"),
+    });
   });
 
   it("has enough readers that the sweep above is not scanning an empty room", () => {
