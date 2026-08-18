@@ -150,17 +150,17 @@ describe("a guard's report names a file its reader can open", () => {
     // is asserted at the source instead: whatever the walk returns, the
     // reported path is joined back under `dist/`.
     const source = readRepoFile("scripts/check-bundle-secrets.ts");
-    assert.match(source, /listFilesUnder\(DIST_DIR, \{ extensions: SCAN_EXTENSIONS \}\)/);
+    assert.match(source, /listFilesUnder\(DIST_DIR, \{\s*extensions: SCAN_EXTENSIONS,\s*skipDirs: BUNDLE_SKIP_DIRS,\s*\}\)/);
     assert.match(source, /scanForSecrets\(path\.join\("dist", file\), source\)/);
     assert.match(source, /readFileSync\(path\.join\(DIST_DIR, file\), "utf8"\)/);
   });
 
   it("keeps check-secrets' report repo-relative, which is what its own skip list is written in", () => {
     // Two things read the same string here: the report, and `SKIP_FILES`,
-    // which names `lib/secret-scan.ts` and four others. A walk whose base
-    // moved would break the skip list silently — the scanner's own sources
-    // would start being scanned and reporting themselves — so the two are
-    // pinned together rather than one at a time.
+    // which is written in repo-relative paths. A walk whose base moved would
+    // break the skip list silently — the matcher's own fixtures would start
+    // being scanned and reported as findings — so the two are pinned together
+    // rather than one at a time.
     const source = readRepoFile("scripts/check-secrets.ts");
     assert.match(source, /listFilesUnder\(repoRoot, \{/);
     assert.match(source, /SKIP_FILES\.has\(path\.normalize\(rel\)\)/);

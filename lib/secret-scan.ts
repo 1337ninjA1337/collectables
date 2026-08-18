@@ -56,6 +56,45 @@ export const SECRET_SKIP_DIRS: readonly string[] = [
   "web-build",
 ];
 
+/**
+ * The same for the bundle scan, and it is empty on purpose.
+ *
+ * Written out rather than left as an omitted argument, because the two scans
+ * sit beside each other and "skips six names" versus "the option is not there"
+ * reads as an oversight in the second one. `dist/` is generated whole by
+ * `expo export` and holds exactly what was shipped — a vendored tree under it
+ * would be a tree that went to the browser, which is the one thing this scan
+ * must NOT skip.
+ */
+export const BUNDLE_SKIP_DIRS: readonly string[] = [];
+
+/**
+ * Files the source-tree scan does not read, and why each is exempt.
+ *
+ * The list held five entries and four of them were dead. The stated reason —
+ * "the scanner's own sources and tests embed the patterns by definition" — is
+ * true of the fixtures and false of the code: a rule carries a REGEXP, and
+ * `/\bAKIA[0-9A-Z]{16}\b/` does not match itself. Measured rather than
+ * reasoned about: `lib/secret-scan.ts`, `scripts/check-secrets.ts` and
+ * `scripts/check-bundle-secrets.ts` produce zero matches, so the exemption
+ * bought nothing and cost the coverage of the three files a sample credential
+ * is most likely to be pasted into. `package-lock.json` produced zero too, and
+ * reading it costs 23ms.
+ *
+ * What remains is the one file where the exemption is load-bearing, and the
+ * suite asserts it still is — an exemption that stops being needed is a hole
+ * standing open. The way to earn a new entry is a demonstrated match; the way
+ * to silence one line is {@link IGNORE_MARKER}, which says so where it happens
+ * rather than in a list at the top of a module.
+ */
+export const SECRET_SKIP_FILE_REASONS: Readonly<Record<string, string>> = {
+  "__tests__/secret-scan.test.ts":
+    "the matcher's own fixtures — real-shaped sample secrets the scanner is supposed to find, and does: two of them match",
+};
+
+/** The same as a list, derived rather than restated. */
+export const SECRET_SKIP_FILES: readonly string[] = Object.keys(SECRET_SKIP_FILE_REASONS);
+
 export type SecretRule = {
   /** Stable identifier, surfaced in the report. */
   id: string;

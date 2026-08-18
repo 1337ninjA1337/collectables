@@ -14,6 +14,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
+  BUNDLE_SKIP_DIRS,
   formatSecretReport,
   scanForSecrets,
   type SecretMatch,
@@ -35,7 +36,14 @@ function main(): void {
   // leaked" over zero bytes, or over a bundle exported before the leak.
   assertBundlePremise(CHECK_NAME);
 
-  const files = listFilesUnder(DIST_DIR, { extensions: SCAN_EXTENSIONS });
+  // `BUNDLE_SKIP_DIRS` is empty, and passing it is the point: the source scan
+  // beside this one skips six names, so an omitted argument here reads as an
+  // oversight rather than as the decision it is. `lib/secret-scan.ts` says why
+  // nothing under `dist/` may be skipped.
+  const files = listFilesUnder(DIST_DIR, {
+    extensions: SCAN_EXTENSIONS,
+    skipDirs: BUNDLE_SKIP_DIRS,
+  });
 
   // A second, narrower premise: the walk above matches five artifact
   // extensions, not just the *.js chunks the shared check counts, so an

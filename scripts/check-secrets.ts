@@ -16,6 +16,7 @@ import {
   formatSecretReport,
   scanForSecrets,
   SECRET_SKIP_DIRS,
+  SECRET_SKIP_FILES,
   type SecretMatch,
 } from "../lib/secret-scan";
 import { GuardRootError } from "../lib/guard-root";
@@ -44,19 +45,14 @@ const SCAN_EXTENSIONS = new Set([
 ]);
 
 /**
- * Files exempt from scanning: the scanner's own sources and tests embed the
- * patterns and sample strings by definition. `package-lock.json` carries
- * opaque integrity hashes and is machine-generated.
+ * The exempt files, in this platform's separator.
+ *
+ * The list and the reason for each entry live in `lib/secret-scan.ts` beside
+ * the rules they are exemptions from, where a suite can read them; what
+ * happens here is the normalisation, because that is a fact about the walk's
+ * output rather than about the policy.
  */
-const SKIP_FILES = new Set(
-  [
-    "lib/secret-scan.ts",
-    "scripts/check-secrets.ts",
-    "scripts/check-bundle-secrets.ts",
-    "__tests__/secret-scan.test.ts",
-    "package-lock.json",
-  ].map((p) => path.normalize(p)),
-);
+const SKIP_FILES = new Set(SECRET_SKIP_FILES.map((p) => path.normalize(p)));
 
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);

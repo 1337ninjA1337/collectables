@@ -311,7 +311,7 @@ describe("the two widest walks say what they skip", () => {
   });
 
   it("keeps the file-level skips out of the walk", () => {
-    // `SKIP_FILES` names four sources and a lockfile, which is a rule about
+    // `SKIP_FILES` names the matcher's own fixtures, which is a rule about
     // FILES; applying it after the walk keeps the walk about directories and
     // extensions, and keeps a second rule from hiding inside a recursion.
     const source = readRepoFile("scripts/check-secrets.ts");

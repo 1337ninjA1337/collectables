@@ -3,8 +3,12 @@ import assert from "node:assert/strict";
 import path from "node:path";
 
 import {
+  BUNDLE_SKIP_DIRS,
   DEFAULT_SECRET_RULES,
   IGNORE_MARKER,
+  SECRET_SKIP_DIRS,
+  SECRET_SKIP_FILES,
+  SECRET_SKIP_FILE_REASONS,
   decodeBase64Url,
   formatSecretReport,
   isPrivilegedSupabaseJwt,
@@ -181,6 +185,60 @@ describe("rule set integrity", () => {
       ids.add(rule.id);
       assert.ok(rule.pattern.global, `${rule.id} pattern must be global`);
     }
+  });
+});
+
+describe("what the source scan does not read", () => {
+  it("keeps only the exemptions that are still load-bearing", () => {
+    // The convention `assertExemptionsHonest` states one directory over: an
+    // exemption that has stopped being needed is a hole standing open, and
+    // nothing here could say so while the list was five names and a sentence.
+    assert.ok(SECRET_SKIP_FILES.length > 0, "an empty list should be deleted, not left");
+    assert.deepEqual(SECRET_SKIP_FILES, Object.keys(SECRET_SKIP_FILE_REASONS));
+    for (const rel of SECRET_SKIP_FILES) {
+      const reason = SECRET_SKIP_FILE_REASONS[rel];
+      assert.ok(
+        reason !== undefined && reason.length >= 30,
+        `${rel} is exempt for a reason shorter than a reason: ${JSON.stringify(reason)}`,
+      );
+      const found = scanForSecrets(rel, read(rel));
+      assert.ok(
+        found.length > 0,
+        `${rel} is exempt from the secret scan and the scanner finds nothing in it — drop the entry rather than leaving the file unscanned`,
+      );
+    }
+  });
+
+  it("scans the scanner's own sources and the lockfile, which never needed exempting", () => {
+    // The four entries this list used to carry, and the measurement that
+    // retired them: a rule holds a REGEXP, and `/\bAKIA[0-9A-Z]{16}\b/` does
+    // not match itself. The exemption bought nothing and cost the coverage of
+    // the three files a sample credential is most likely to be pasted into.
+    // Asserted rather than assumed both ways — they are out of the list, and
+    // the scan over them is clean, so dropping them cannot have turned the
+    // guard red for a reason nobody checked.
+    for (const rel of [
+      "lib/secret-scan.ts",
+      "scripts/check-secrets.ts",
+      "scripts/check-bundle-secrets.ts",
+      "package-lock.json",
+    ]) {
+      assert.ok(!SECRET_SKIP_FILES.includes(rel), `${rel} was exempted again without a demonstrated match`);
+      assert.deepEqual(
+        scanForSecrets(rel, read(rel)),
+        [],
+        `${rel} now matches a rule — silence one line with a \`${IGNORE_MARKER}\` comment where it happens, rather than exempting the whole file`,
+      );
+    }
+  });
+
+  it("states both scans' directory policy in one place, and passes it", () => {
+    // The bundle scan's list is empty and written out anyway: beside a source
+    // scan that skips six names, an omitted argument reads as an oversight.
+    assert.deepEqual(BUNDLE_SKIP_DIRS, []);
+    assert.ok(SECRET_SKIP_DIRS.length > 0);
+    assert.match(read("scripts/check-secrets.ts"), /skipDirs: SECRET_SKIP_DIRS/);
+    assert.match(read("scripts/check-bundle-secrets.ts"), /skipDirs: BUNDLE_SKIP_DIRS/);
   });
 });
 
