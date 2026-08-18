@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -7,9 +6,7 @@ import {
   scrubAuthParamsFromLocation,
   stripAuthParamsFromHref,
 } from "../lib/auth-callback-scrub";
-
-const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("SEC-7 — stripAuthParamsFromHref removes credential params", () => {
   it("strips implicit-flow tokens from the hash fragment", () => {

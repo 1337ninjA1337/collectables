@@ -10,9 +10,9 @@ import {
   isPiiPropKey,
   findPiiPropKeys,
 } from "../lib/analytics-pii";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 // Directories that hold telemetry call sites. node_modules / dist excluded.
 const SCAN_DIRS = ["lib", "components", "app"];

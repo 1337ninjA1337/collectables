@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural guard for the global test bootstrap shipped in
@@ -25,10 +24,6 @@ import path from "node:path";
  *  - The beforeEach uses the cache-lookup pattern (no static import that
  *    would fail at preload time under node-tests).
  */
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("test-globals bootstrap (package.json wiring)", () => {
   const pkg = JSON.parse(read("package.json")) as { scripts: { test: string } };

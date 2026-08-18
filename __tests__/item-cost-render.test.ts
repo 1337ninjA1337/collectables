@@ -1,16 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { formatCostAmount } from "@/lib/item-cost";
 import { formatCostAmount as canonicalFormatCostAmount } from "@/lib/format-cost";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { assertValueInEveryLocale } from "./helpers/i18n-locales";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("formatCostAmount (re-exported via lib/item-cost)", () => {
   it("is the exact same function as lib/format-cost's (no drift possible)", () => {

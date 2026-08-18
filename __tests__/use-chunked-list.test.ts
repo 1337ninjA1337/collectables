@@ -1,13 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   clampCount,
   DEFAULT_CHUNK_PAGE_SIZE,
   resolvePageSize,
 } from "@/lib/use-chunked-list";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * `useChunkedList` returns a windowed slice of an in-memory array so the
@@ -16,9 +15,6 @@ import {
  * under node-tests (no React renderer wired here); we cover the pure
  * helpers behaviourally and the hook structurally.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("clampCount (pure window math)", () => {
   it("returns current when it sits inside [pageSize, total]", () => {

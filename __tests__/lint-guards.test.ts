@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -11,10 +11,9 @@ import {
   lintAllExitCode,
   type LintGuardResult,
 } from "../lib/lint-guards";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 const ROOT = process.cwd();
-
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
 
 const pkg = JSON.parse(read("package.json")) as {
   scripts: Record<string, string>;

@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural pins for bug-2c — syncing the user's app-wide display currency
@@ -9,9 +8,6 @@ import path from "node:path";
  * is nullable: existing rows keep NULL and fall back to the device-local
  * AsyncStorage preference, then the language default.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("UserProfile type — displayCurrency field", () => {
   const src = read("lib/types.ts");

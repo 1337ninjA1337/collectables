@@ -1,12 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { isRuntimeConfigOverrideAllowed } from "../lib/runtime-config-gate";
-
-const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("SEC-4 — runtime Supabase config override is gated", () => {
   it("is allowed in a dev build", () => {

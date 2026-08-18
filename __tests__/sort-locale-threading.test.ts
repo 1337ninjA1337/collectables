@@ -1,11 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { applySortMode, getTitleCollator } from "@/lib/item-filters";
 import { getDefaultLocaleForLanguage, languageLocaleMap } from "@/lib/locale-helpers";
 import type { CollectableItem } from "@/lib/types";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * `applySortMode(items, sort)` used to collate with `locale = undefined`, i.e.
@@ -21,9 +20,6 @@ import type { CollectableItem } from "@/lib/types";
  * since "just import the map" is the obvious-looking refactor that breaks the
  * whole suite.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 function item(id: string, title: string): CollectableItem {
   return {

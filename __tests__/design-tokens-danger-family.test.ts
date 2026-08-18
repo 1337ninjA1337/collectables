@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   findBandOverlaps,
@@ -13,6 +11,7 @@ import {
   type ColorEntry,
 } from "@/lib/color-luminance";
 import { designTokens } from "@/lib/design-tokens";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * The `DANGER_*` family — 17 red shades whose suffixes carry a promise.
@@ -43,9 +42,6 @@ import { designTokens } from "@/lib/design-tokens";
  * to `MUTED_*` / `HERO_DARK_*` / `CARD_BG_*` — see the cross-family block at
  * the bottom, which pins the three-band ladder those families form.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 const HEX = /^#[0-9a-f]{6}$/;
 

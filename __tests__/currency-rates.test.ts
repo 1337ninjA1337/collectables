@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   convertAmount,
@@ -12,10 +10,7 @@ import {
   sumConverted,
 } from "@/lib/currency-rates";
 import { CURRENCY_RATES_KEY } from "@/lib/storage-keys";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("parseRatesResponse", () => {
   it("returns a frozen payload with USD anchor when given a valid response", () => {

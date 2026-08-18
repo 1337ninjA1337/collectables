@@ -1,8 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Guards the localization-overflow fix on the home-screen collection tabs.
@@ -10,9 +9,6 @@ import { readI18nSource } from "./helpers/i18n-source-file";
  * the screen edge on web. The flex items must be allowed to shrink and the
  * labels must scale/wrap instead of overflowing.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("SwipeTabs — labels stay inside their chips", () => {
   const src = read("components/swipe-tabs.tsx");

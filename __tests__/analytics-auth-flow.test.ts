@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -9,9 +8,7 @@ import {
   signupEventProps,
 } from "../lib/auth-helpers";
 import { readI18nSource } from "./helpers/i18n-source-file";
-
-const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("isFreshlyCreatedUser — 5-minute window detector", () => {
   const now = Date.parse("2026-05-08T12:00:00.000Z");

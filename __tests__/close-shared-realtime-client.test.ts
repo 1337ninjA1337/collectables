@@ -1,17 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural guards for `closeSharedRealtimeClient` — `lib/supabase-realtime.ts`
  * imports `@/lib/supabase` which pulls in react-native peers, so the actual
  * module can't run under node-tests. Same pattern as `realtime-kill-switch.test.ts`.
  */
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("closeSharedRealtimeClient (lib/supabase-realtime.ts)", () => {
   const src = read("lib/supabase-realtime.ts");

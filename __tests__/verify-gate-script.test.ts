@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Pins `npm run verify` as the ONE command that runs the full gate.
@@ -25,10 +25,6 @@ import path from "node:path";
  *   3. the chain losing its fail-fast `&&`, which would let a red leg be
  *      masked by a later green one.
  */
-
-const ROOT = process.cwd();
-
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
 
 const pkg = JSON.parse(read("package.json")) as {
   scripts: Record<string, string>;

@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it, beforeEach, afterEach } from "node:test";
 
@@ -17,9 +16,7 @@ import {
 } from "../lib/clarity";
 import { __resetSentryForTests, initSentry } from "../lib/sentry";
 import { setupFakeDom } from "./helpers/fake-dom";
-
-const ROOT = path.join(__dirname, "..");
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 const enabledRuntime = (overrides?: Partial<ClarityRuntime>): ClarityRuntime => ({
   isBrowser: true,
@@ -28,7 +25,6 @@ const enabledRuntime = (overrides?: Partial<ClarityRuntime>): ClarityRuntime => 
   enabled: true,
   ...overrides,
 });
-
 
 describe("lib/clarity — shouldLoadClarity gates", () => {
   beforeEach(() => __resetClarityForTests());

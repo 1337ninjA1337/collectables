@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 const ROOT = join(__dirname, "..");
 const PGTAP = "supabase/tests/03_bi_sql_equivalents.sql";
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 // The executable half runs in the Supabase Tests workflow (Docker pgTAP);
 // this offline test pins the token-level parity between the pgTAP fixture

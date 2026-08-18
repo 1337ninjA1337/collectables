@@ -12,6 +12,7 @@ import {
   SOFT_DESTRUCTIVE_SURFACE,
 } from "@/lib/danger-surface";
 import { CARD_BG_8, DANGER_DEEP_3, DANGER_SOFT, RADIUS_PILL } from "@/lib/design-tokens";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 installNativeModuleStubs();
 
@@ -34,9 +35,6 @@ installNativeModuleStubs();
  * element or a style array whose later entry wins. See that file for why the
  * component has to come in through a dynamic `import()`.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 function walk(dir: string): string[] {
   const out: string[] = [];

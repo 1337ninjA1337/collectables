@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
@@ -10,6 +8,7 @@ import {
   assertValueInEveryLocale,
   localeStrings,
 } from "./helpers/i18n-locales";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural pins for the in-collection search row added to the
@@ -18,9 +17,6 @@ import {
  * guard the UI plumbing so a future refactor can't silently disconnect
  * the TextInput from `draft.query` or drop the i18n placeholder key.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("components/item-filters.tsx — search row UI", () => {
   const src = read("components/item-filters.tsx");

@@ -1,14 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 
 import { ANALYTICS_EVENTS } from "../lib/analytics-events";
 import { findPiiPropKeys } from "../lib/analytics-pii";
 import { DWELL_TIME_DEFAULT_MS } from "../lib/use-dwell-time";
-
-const ROOT = path.join(__dirname, "..");
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("lib/use-dwell-time.ts — shared dwell gate contract", () => {
   const src = read("lib/use-dwell-time.ts");

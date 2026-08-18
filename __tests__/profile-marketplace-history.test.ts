@@ -1,20 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { localeKeys } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural tests for the "Marketplace history" section on
  * `app/profile/[id].tsx`. We grep the source to avoid pulling in
  * React Native peers in node:test.
  */
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("profile marketplace history section", () => {
   const src = read("app/profile/[id].tsx");

@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   ACCENT_DEEP,
@@ -139,10 +137,7 @@ import {
   SPACING_CARD,
   SPACING_SECTION,
 } from "@/lib/design-tokens";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("design-tokens module", () => {
   it("exposes the documented brand palette as 6-digit hex strings", () => {

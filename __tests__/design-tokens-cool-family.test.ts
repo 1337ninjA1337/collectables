@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { luminance, rgbChannels } from "@/lib/color-luminance";
 import {
@@ -11,6 +9,7 @@ import {
   STATUS_OFFLINE,
   designTokens,
 } from "@/lib/design-tokens";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * The `COOL_*` family — the palette's only deliberately non-warm axis.
@@ -22,9 +21,6 @@ import {
  * one — a family whose ordering and hue are conventions in a comment drifts the
  * first time someone appends a fourth value.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 const HEX = /^#[0-9a-f]{6}$/;
 

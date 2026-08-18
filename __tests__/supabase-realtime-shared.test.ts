@@ -1,11 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("shared realtime client", () => {
   it("lib/supabase-realtime.ts exposes getSharedRealtimeClient", () => {

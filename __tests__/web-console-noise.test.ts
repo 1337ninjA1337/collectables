@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Two classes of avoidable console noise on the deployed web build, both
@@ -37,10 +38,6 @@ function collectSourceFiles(dir: string): string[] {
 }
 
 const SOURCE_FILES = ["app", "components", "lib"].flatMap(collectSourceFiles);
-
-function read(rel: string): string {
-  return readFileSync(path.join(repoRoot, rel), "utf8");
-}
 
 describe("expo-image-picker — no deprecated MediaTypeOptions", () => {
   it("no source file reaches for the deprecated enum", () => {

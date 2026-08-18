@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { HERO_DARK, HERO_DARK_4, HERO_DARK_5 } from "@/lib/design-tokens";
 import { HERO_DARK_GRADIENT, PHOTO_SCRIM_GRADIENT } from "@/lib/gradients";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Pins for `lib/gradients.ts` — the shared `<LinearGradient>` recipes.
@@ -18,9 +19,6 @@ import { HERO_DARK_GRADIENT, PHOTO_SCRIM_GRADIENT } from "@/lib/gradients";
  * point is that no sixth site re-declares the recipe inline, and that is a
  * property of the repo, not of the constant.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 function walk(dir: string): string[] {
   const out: string[] = [];

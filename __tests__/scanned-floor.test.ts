@@ -1,6 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -37,9 +36,7 @@ import {
   type ScannedFloorProblemSubject,
 } from "../lib/scanned-floor";
 import { LINT_GUARDS } from "../lib/lint-guards";
-
-const REPO_ROOT = path.resolve(__dirname, "..");
-const read = (rel: string) => readFileSync(path.join(REPO_ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 const failureOf = (count: number, minimum: number, label?: string) => {
   const verdict = evaluateScannedFloor(count, minimum, label);

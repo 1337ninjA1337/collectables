@@ -13,9 +13,9 @@ import {
   isHexAllowlisted,
 } from "../lib/check-inline-hex";
 import { LINT_GUARDS } from "../lib/lint-guards";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 const REPO_ROOT = path.resolve(__dirname, "..");
-const read = (rel: string) => readFileSync(path.join(REPO_ROOT, rel), "utf8");
 
 describe("INLINE_HEX_PATTERN", () => {
   it("matches 6-digit hex literals", () => {

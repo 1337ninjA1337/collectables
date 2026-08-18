@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Rationale pins for the drag-corruption gate in `app/collection/[id].tsx`.
@@ -23,9 +22,6 @@ import path from "node:path";
  * (`sortOrder`, corruption, visible-order) rather than an exact sentence, so
  * rewording stays free while deleting the warning fails.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 const SRC = read("app/collection/[id].tsx");
 

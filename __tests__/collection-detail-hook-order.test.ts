@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Regression for the iOS Safari crash captured at session a1e290cb:
@@ -20,9 +19,6 @@ import path from "node:path";
  * `CollectionDetailsScreen` must appear ABOVE the first early return so
  * the hook order is stable across the loading→loaded transition.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 function offsetsOf(src: string, re: RegExp): number[] {
   const out: number[] = [];

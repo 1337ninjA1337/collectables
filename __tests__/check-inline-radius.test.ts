@@ -1,17 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   findInlineRadiusLiterals,
   formatRadiusReport,
 } from "../lib/check-inline-radius";
 import { LINT_GUARDS } from "../lib/lint-guards";
-
-const ROOT = process.cwd();
-
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("findInlineRadiusLiterals — matcher", () => {
   it("flags StyleSheet and JSX-inline pill-radius literals", () => {

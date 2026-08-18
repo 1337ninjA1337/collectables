@@ -15,6 +15,7 @@ import {
   type BundlePremiseInput,
 } from "../lib/bundle-premise";
 import { collectBundlePremise } from "../scripts/bundle-premise";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Pins the shared "the input exists and is fresh" premise the three
@@ -38,9 +39,6 @@ import { collectBundlePremise } from "../scripts/bundle-premise";
  * `scripts/` would make every guard fail on an unrelated edit, and a literal
  * would never notice.
  */
-
-const ROOT = process.cwd();
-const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
 /** Drops block and line comments so a source scan reads executable code only. */
 const stripComments = (source: string): string =>

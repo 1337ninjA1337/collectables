@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 
@@ -11,6 +11,7 @@ import {
   renderPrivacyPage,
 } from "@/lib/privacy-page";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Guards the translated /privacy pages (GDPR Art. 12 — the Sentry
@@ -29,7 +30,6 @@ import { readI18nSource } from "./helpers/i18n-source-file";
  */
 
 const ROOT = process.cwd();
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
 
 const I18N_SOURCE = readI18nSource();
 

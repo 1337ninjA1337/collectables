@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-
-const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("Sentry privacy declarations (App Store Connect + public policy)", () => {
   it("APPSTORE-SUBMISSION.md flips the Crash data / diagnostics row to Yes", () => {

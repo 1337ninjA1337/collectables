@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -7,9 +6,7 @@ import {
   readSentryEnvFromProcess,
   resolveSentryConfig,
 } from "../lib/sentry-config";
-
-const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("sentry env-var inlining (Metro/babel)", () => {
   it("readSentryEnvFromProcess reads each EXPO_PUBLIC_* var as a literal member access", () => {

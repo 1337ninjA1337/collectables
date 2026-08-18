@@ -36,6 +36,7 @@ import {
   renderPrivacyPage,
 } from "../lib/privacy-page";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Pins the post-build smoke check that replaced ci.yml's and deploy.yml's
@@ -50,8 +51,6 @@ import { readI18nSource } from "./helpers/i18n-source-file";
  * from `AppLanguage` and the provider list from `app/_layout.tsx`.
  */
 
-const read = (rel: string): string =>
-  fs.readFileSync(path.join(process.cwd(), rel), "utf8");
 
 const SCRIPT = read("scripts/check-bundle-smoke.ts");
 

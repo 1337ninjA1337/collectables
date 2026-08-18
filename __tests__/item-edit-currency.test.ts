@@ -1,16 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural guard for the item-detail edit form being able to change an
  * item's value currency (bug-1). The screen can't be mounted in node:test
  * (RN peers), so we grep the source to pin the wiring.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("item edit form — value currency", () => {
   const src = read("app/item/[id].tsx");

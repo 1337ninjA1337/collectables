@@ -1,12 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertMatchesInEveryNonBaseLocaleBody,
   assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural pins for the per-collection currency override shipped in
@@ -14,9 +13,6 @@ import {
  * `collections.currency` means "fall back to the user's app-wide
  * displayCurrency", so legacy rows must keep rendering unchanged.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("Collection type — currency override field", () => {
   const src = read("lib/types.ts");

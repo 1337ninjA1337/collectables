@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * `components/item-filters.tsx` re-exports the pure helpers from
@@ -20,9 +19,6 @@ import path from "node:path";
  * react-native, so it cannot be imported under `tsx --test`. Both files are
  * parsed as text instead.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 const LIB = read("lib/item-filters.ts");
 const COMPONENT = read("components/item-filters.tsx");

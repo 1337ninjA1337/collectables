@@ -1,12 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { ANALYTICS_EVENTS } from "../lib/analytics-events";
-
-const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("lib/premium-context.tsx — lastPremiumIntent ref", () => {
   const src = read("lib/premium-context.tsx");

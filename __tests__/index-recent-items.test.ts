@@ -1,10 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { RECENT_ITEMS_LIMIT, selectRecentItems } from "@/lib/home-helpers";
 import { CollectableItem, Collection } from "@/lib/types";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * The home dashboard's "Recently added" rail.
@@ -19,9 +18,6 @@ import { CollectableItem, Collection } from "@/lib/types";
  * structurally, since the screen pulls react-native + expo-router and cannot be
  * mounted under `tsx --test`.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 function collection(id: string, role: Collection["role"]): Collection {
   return {

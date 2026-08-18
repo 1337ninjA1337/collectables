@@ -1,19 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
 } from "./helpers/i18n-locales";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 // `lib/env.ts` and `lib/social-context.tsx` both import react-native at module
 // scope (Platform / hooks) so they can't be imported by the node test runner.
 // We mirror the structural test pattern used by `viewer-profile-ttl.test.ts`
 // and `env-resolve-numeric.test.ts`.
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("EXPO_PUBLIC_PROFILE_CACHE_TTL_MS low-TTL helper (lib/env.ts)", () => {
   const src = read("lib/env.ts");

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural audit over every i18n string that is rendered as a `placeholder`.
@@ -32,9 +33,6 @@ import { readI18nSource } from "./helpers/i18n-source-file";
  * banned is a placeholder written as a SENTENCE — one that ends in a single
  * `.` or contains a `?` — because that is the shape that runs long.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 function walk(dir: string): string[] {
   const out: string[] = [];

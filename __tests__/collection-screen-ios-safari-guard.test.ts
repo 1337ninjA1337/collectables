@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural pins for the iOS Safari "A problem repeatedly occurred" fix in
@@ -21,10 +20,6 @@ import path from "node:path";
  *    the (potentially multi-MB) cover photo is fetched at hero-sized
  *    dimensions instead of full resolution.
  */
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("app/collection/[id].tsx — iOS Safari crash guards", () => {
   const src = read("app/collection/[id].tsx");

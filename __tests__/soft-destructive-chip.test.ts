@@ -8,6 +8,7 @@ import {
   SOFT_DESTRUCTIVE_FOREGROUND,
   SOFT_DESTRUCTIVE_SURFACE,
 } from "@/lib/danger-surface";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * `<SoftDestructiveChip>` is the chip half of the "reversible destructive
@@ -17,9 +18,6 @@ import {
  * into the shared constant, or that re-inlines the colours into one of the two,
  * is what these assertions are here to stop.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("SOFT_DESTRUCTIVE_SURFACE", () => {
   it("is the CARD_BG_10 / DANGER_SOFT_2 / DANGER_DEEP_4 trio and nothing else", () => {

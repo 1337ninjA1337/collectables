@@ -1,14 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
-const GLOBALS_PATH = path.join(process.cwd(), "types", "globals.d.ts");
-const DEV_MENU_PATH = path.join(process.cwd(), "lib", "dev-menu.ts");
+// Repo-relative, because `readRepoFile` joins the root itself. This suite was
+// the one copy of the read helper that took an ABSOLUTE path — same two lines
+// as the other 146, one `path.join` short, and nothing said which convention a
+// reader was looking at.
+const GLOBALS_PATH = "types/globals.d.ts";
+const DEV_MENU_PATH = "lib/dev-menu.ts";
 
-function read(rel: string): string {
-  return readFileSync(rel, "utf8");
-}
 
 describe("types/globals.d.ts ambient declarations", () => {
   it("declares __DEV__ as a boolean global", () => {
@@ -21,7 +22,7 @@ describe("types/globals.d.ts ambient declarations", () => {
   });
 
   it("is picked up by `**/*.ts` in tsconfig.json (no explicit entry needed)", () => {
-    const tsconfig = JSON.parse(read(path.join(process.cwd(), "tsconfig.json"))) as {
+    const tsconfig = JSON.parse(read("tsconfig.json")) as {
       include?: string[];
     };
     const include = tsconfig.include ?? [];

@@ -1,14 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { canCreateAnotherListing } from "@/lib/marketplace-helpers";
 import { MarketplaceListing } from "@/lib/types";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 function listing(overrides: Partial<MarketplaceListing> = {}): MarketplaceListing {
   return {

@@ -1,13 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocaleBody,
   assertMatchesInEveryNonBaseLocaleBody,
 } from "./helpers/i18n-locales";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural pins for the sort UI + drag-corruption gate added in
@@ -19,9 +18,6 @@ import {
  * the visible (alphabetical) order and corrupt the user's manual
  * ordering. This file's first test is the regression guard for that.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("app/collection/[id].tsx — drag-mode sort gate (corruption fix)", () => {
   const src = read("app/collection/[id].tsx");

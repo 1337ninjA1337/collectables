@@ -1,13 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { getCurrencySymbol, CURRENCY_CHIPS } from "@/lib/locale-helpers";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("getCurrencySymbol", () => {
   it("derives the narrow Unicode glyph for symbol-bearing currencies", () => {

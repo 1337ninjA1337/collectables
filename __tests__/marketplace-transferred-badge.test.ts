@@ -1,8 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural tests for the new "Transferred" pill that surfaces on sold
@@ -14,10 +13,6 @@ import { readI18nSource } from "./helpers/i18n-source-file";
  * contract (the badge depends on BOTH `soldAt !== null` AND
  * `buyerUserId !== null`) regression-proof.
  */
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("marketplaceTransferredBadge i18n parity", () => {
   it("declares marketplaceTransferredBadge in every supported language", () => {

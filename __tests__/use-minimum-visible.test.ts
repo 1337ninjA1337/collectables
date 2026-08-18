@@ -1,13 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   MIN_SPINNER_VISIBLE_MS,
   remainingHold,
   resolveHoldDelay,
 } from "@/lib/minimum-visible-helpers";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Pins for the pull-to-refresh spinner hold.
@@ -23,9 +22,6 @@ import {
  * structurally, since `tsx --test` has no React mounting harness (the same
  * constraint the `[needs-dev-dep]` analytics tasks are blocked on).
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 const HOOK = "lib/use-minimum-visible.ts";
 

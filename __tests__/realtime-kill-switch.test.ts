@@ -1,15 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 // `lib/supabase-realtime.ts` imports the Supabase realtime SDK + the supabase
 // client (which has react-native deps) at module scope so it can't run under
 // the node test runner. Structural assertions guard the wiring instead — same
 // pattern used by `supabase-realtime-shared.test.ts`.
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("EXPO_PUBLIC_REALTIME_DISABLED kill-switch (lib/supabase-realtime.ts)", () => {
   const src = read("lib/supabase-realtime.ts");

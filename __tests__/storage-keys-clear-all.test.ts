@@ -1,9 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { COLLECTABLES_STORAGE_PREFIX } from "../lib/storage-keys";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * `clearAllCollectablesStorage` and `getAllCollectablesKeys` depend on the
@@ -12,9 +11,6 @@ import { COLLECTABLES_STORAGE_PREFIX } from "../lib/storage-keys";
  * (same shape as `__tests__/dev-menu-wiring.test.ts`) and verify the only
  * pure constant the module exports.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("collectables storage prefix", () => {
   it("exports the canonical 'collectables-' prefix", () => {

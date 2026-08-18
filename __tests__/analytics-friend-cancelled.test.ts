@@ -1,14 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { ANALYTICS_EVENTS } from "../lib/analytics-events";
 import { findPiiPropKeys } from "../lib/analytics-pii";
 import { classifyRequestRemoval } from "../lib/social-helpers";
-
-const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("lib/social-helpers.ts — classifyRequestRemoval", () => {
   it("outgoing-only removal is a cancelled request (the churn arm)", () => {

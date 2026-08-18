@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
@@ -9,6 +7,7 @@ import {
   assertMatchesInEveryNonBaseLocaleBody,
   localeStrings,
 } from "./helpers/i18n-locales";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural pins for `<SheetSearchRow>` — the "🔎 [input] ✕" row extracted
@@ -23,9 +22,6 @@ import {
  *   2. no consumer has re-grown a private copy, which is exactly how the
  *      three originals drifted apart before the extraction.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 const COMPONENT = "components/sheet-search-row.tsx";
 

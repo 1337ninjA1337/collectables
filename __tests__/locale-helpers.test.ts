@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   CURRENCY_CHIPS,
@@ -11,10 +9,7 @@ import {
   languageLocaleMap,
 } from "@/lib/locale-helpers";
 import { readI18nSource } from "./helpers/i18n-source-file";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("getDefaultCurrencyForLanguage", () => {
   it("maps each supported language to its expected currency", () => {

@@ -1,20 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { localeKeys } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural tests for the buyer "Mark as received" affordance on the
  * marketplace purchases grid and the listing-detail screen. We grep the
  * source to avoid pulling React Native peers into node:test.
  */
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("marketplace purchases — mark as received", () => {
   const src = read("app/marketplace.tsx");

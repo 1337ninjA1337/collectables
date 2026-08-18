@@ -1,6 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -13,9 +12,7 @@ import {
   scanForSecrets,
 } from "../lib/secret-scan";
 import { LINT_GUARDS } from "../lib/lint-guards";
-
-const REPO_ROOT = path.resolve(__dirname, "..");
-const read = (rel: string) => readFileSync(path.join(REPO_ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 const b64url = (obj: unknown) =>
   Buffer.from(JSON.stringify(obj)).toString("base64url");

@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
-const ROOT = process.cwd();
-
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 // No React mounting harness in the repo (see the [needs-dev-dep] tasks), so
 // these are structural pins on the component contract + the ItemCard adoption.

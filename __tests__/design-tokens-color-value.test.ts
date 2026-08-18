@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   designTokens,
@@ -16,10 +14,7 @@ import {
   type ColorValue,
   type DesignToken,
 } from "@/lib/design-tokens";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("design-tokens color-value types", () => {
   it("exports the four new type aliases for component prop typing", () => {

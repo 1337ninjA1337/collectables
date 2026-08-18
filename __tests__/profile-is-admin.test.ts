@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * BE-11b structural pins — threading the server-authoritative
@@ -11,9 +10,6 @@ import path from "node:path";
  * RLS migration (20260616_core_tables_rls.sql) REVOKEs UPDATE(is_admin), so
  * `upsertProfileBody` must never write it.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("UserProfile type — isAdmin field", () => {
   const src = read("lib/types.ts");

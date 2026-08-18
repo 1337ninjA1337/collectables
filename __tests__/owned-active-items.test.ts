@@ -1,13 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   ownedCollectionIds,
   selectOwnedActiveItems,
 } from "@/lib/collections-helpers";
 import { CollectableItem, Collection } from "@/lib/types";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * The shared "what do I actually have" predicate.
@@ -23,9 +22,6 @@ import { CollectableItem, Collection } from "@/lib/types";
  * adoption is pinned structurally, since the screens pull react-native and
  * cannot be mounted under `tsx --test`.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 function collection(id: string, role: Collection["role"]): Collection {
   return {

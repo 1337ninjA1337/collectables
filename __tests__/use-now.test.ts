@@ -1,9 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { resolveInterval, USE_NOW_DEFAULT_TICK_MS } from "@/lib/use-now";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * `useNow` exposes a `Date.now()` snapshot that re-emits on a fixed cadence
@@ -13,9 +12,6 @@ import { resolveInterval, USE_NOW_DEFAULT_TICK_MS } from "@/lib/use-now";
  * renderer wired in this repo); we cover the pure `resolveInterval` clamp
  * behaviourally and the hook structurally.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("resolveInterval (pure clamp)", () => {
   it("returns the input when it's a positive finite number", () => {

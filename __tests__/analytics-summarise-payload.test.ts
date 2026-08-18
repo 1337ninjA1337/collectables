@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -8,9 +7,7 @@ import {
   summarisePayload,
 } from "../lib/analytics-helpers";
 import { isPiiPropKey } from "../lib/analytics-pii";
-
-const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("summarisePayload — canonical has-X booleans", () => {
   it("derives hasPhoto from a non-empty photo list", () => {

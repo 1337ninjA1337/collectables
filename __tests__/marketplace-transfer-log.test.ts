@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   isTransferLogEntry,
@@ -10,10 +8,7 @@ import {
   type MarketplaceTransferLogEntry,
 } from "@/lib/marketplace-transfer-log";
 import { marketplaceTransferLogKey } from "@/lib/storage-keys";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 function entry(overrides: Partial<MarketplaceTransferLogEntry> = {}): MarketplaceTransferLogEntry {
   const listingId = overrides.listingId ?? "l-1";

@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -8,10 +6,7 @@ import {
   isFreshlyCreatedUser,
   shouldTrackSignupOnAuthEvent,
 } from "../lib/auth-helpers";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 // EXPO_PUBLIC_SIGNUP_FRESHNESS_WINDOW_MS — env-tunable signup-freshness
 // window. The env read lives in lib/auth-context.tsx (react module, mirrors

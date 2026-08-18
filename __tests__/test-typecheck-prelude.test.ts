@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Pins the typecheck to the front of `npm test`.
@@ -28,8 +28,6 @@ import path from "node:path";
  */
 
 const ROOT = process.cwd();
-
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
 
 const pkg = JSON.parse(read("package.json")) as {
   scripts: Record<string, string>;

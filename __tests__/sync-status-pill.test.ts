@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   PENDING_UPSERT_GROUP,
@@ -11,6 +9,7 @@ import {
 } from "@/lib/pending-upserts";
 import { countPendingSocial } from "@/lib/pending-social";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * BE-16: the "syncing…" pending-mutations pill. The pure count helpers are
@@ -70,10 +69,6 @@ describe("countPendingSocial (BE-16)", () => {
     );
   });
 });
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("SyncStatusPill component (components/sync-status-pill.tsx)", () => {
   const src = read("components/sync-status-pill.tsx");

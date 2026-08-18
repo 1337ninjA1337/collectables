@@ -14,6 +14,7 @@ import {
   DANGER_SOFT_3,
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural pins for `<DangerSection>` — the destructive-action widget
@@ -31,9 +32,6 @@ import {
  * The provider pulls react-native and cannot be mounted under `tsx --test`, so
  * the assertions are source-level.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 function walk(dir: string): string[] {
   const out: string[] = [];

@@ -1,10 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import path from "node:path";
-
-const REPO_ROOT = path.resolve(__dirname, "..");
-const read = (rel: string) => readFileSync(path.join(REPO_ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 // PR7 (visual-upgrade `redesign-item-detail`): app/item/[id].tsx gets the
 // editorial cover treatment — an edge-to-edge hero photo, a serif title block,

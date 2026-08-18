@@ -1,6 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -9,10 +7,7 @@ import {
   parsePinnedCurrencies,
 } from "@/lib/locale-helpers";
 import { PINNED_CURRENCIES_KEY } from "@/lib/storage-keys";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("PINNED_CURRENCIES_KEY", () => {
   it("uses the collectables-pinned-currencies-v1 slot", () => {

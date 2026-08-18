@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 /**
  * Crash #16 test-coverage guarantees the sentry test suite never depends on

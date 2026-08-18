@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -10,9 +9,7 @@ import {
   type ListingDraft,
 } from "../lib/analytics-helpers";
 import { ANALYTICS_EVENTS } from "../lib/analytics-events";
-
-const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 const pristine: ListingDraft = {
   mode: LISTING_DRAFT_DEFAULTS.mode,

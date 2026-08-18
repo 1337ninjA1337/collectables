@@ -4,6 +4,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 import { RADIUS_CARD_SM, SPACING_SECTION } from "@/lib/design-tokens";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural pins for `<DashboardBanner>` — the "icon disc + title + hint +
@@ -16,9 +17,6 @@ import { RADIUS_CARD_SM, SPACING_SECTION } from "@/lib/design-tokens";
  * and both extracted call sites were previously flattened by hand — a property
  * that is easy to lose when markup moves between files.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 function walk(dir: string): string[] {
   const out: string[] = [];

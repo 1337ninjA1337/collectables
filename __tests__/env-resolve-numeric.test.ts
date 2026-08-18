@@ -1,14 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 // `lib/env.ts` imports react-native (`Platform`) at module scope, so it can't
 // be imported in the node test runner. Mirrors the structural-test pattern
 // already used by `sentry-env-inlining.test.ts` / `viewer-profile-ttl.test.ts`.
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("resolveNumericEnv (lib/env.ts)", () => {
   const src = read("lib/env.ts");

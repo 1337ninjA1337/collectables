@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -21,9 +20,7 @@ import type {
   MarketplaceMode,
   ProfileRelationship,
 } from "../lib/types";
-
-const ROOT = path.join(__dirname, "..");
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 type Capture = { event: string; props: Record<string, unknown> };
 

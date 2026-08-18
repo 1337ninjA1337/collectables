@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -9,9 +8,7 @@ import {
   renderMarkdownBody,
   renderPrivacyPage,
 } from "../lib/privacy-page";
-
-const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("renderMarkdownBody", () => {
   it("escapes HTML before any inline formatting (no markup injection)", () => {

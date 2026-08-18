@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 describe("SEC-1 — Cloudinary secret is gone from the client", () => {
   const src = read("lib/cloudinary.ts");

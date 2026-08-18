@@ -1,10 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { applySortMode, getTitleCollator } from "@/lib/item-filters";
 import type { CollectableItem } from "@/lib/types";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * `applySortMode` used to call `a.title.localeCompare(b.title, undefined, {…})`
@@ -18,9 +17,6 @@ import type { CollectableItem } from "@/lib/types";
  * the caching, because a dropped option compiles fine and quietly reshuffles
  * every sorted collection.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 function item(id: string, title: string): CollectableItem {
   return {

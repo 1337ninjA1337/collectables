@@ -1,13 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { CURRENCIES, findCurrency, isCurrencyCode } from "@/lib/currencies";
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("CURRENCIES list", () => {
   it("is a comprehensive ISO 4217 list (at least 150 entries)", () => {

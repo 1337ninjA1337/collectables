@@ -1,17 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   findAnalyticsEventsImports,
   formatAnalyticsImportReport,
 } from "../lib/check-analytics-imports";
 import { LINT_GUARDS } from "../lib/lint-guards";
-
-const ROOT = process.cwd();
-
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("findAnalyticsEventsImports — matcher", () => {
   it("flags the alias import, relative paths, require and dynamic import", () => {

@@ -1,15 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { isRisingEdge } from "../lib/use-transition-event";
-
-const ROOT = process.cwd();
-
-function read(rel: string): string {
-  return readFileSync(path.join(ROOT, rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("isRisingEdge — pure edge predicate", () => {
   it("true only for the false → true transition", () => {

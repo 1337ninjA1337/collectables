@@ -1,12 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
   assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural pins for bug-2d — the Settings "Display currency" picker, the
@@ -14,9 +13,6 @@ import {
  * unavailable" hint. All wired to the synced preference + rate freshness
  * exposed by collections-context (bug-2c / bug-2a infra).
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("collections-context — rate freshness exposure", () => {
   const src = read("lib/collections-context.tsx");

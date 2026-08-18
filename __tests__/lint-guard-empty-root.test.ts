@@ -28,8 +28,7 @@ import {
   runGuardWith,
   type GuardRun,
 } from "./helpers/guard-fixture";
-
-const REPO_ROOT = path.resolve(__dirname, "..");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * One empty directory, shared by all twelve: it is the whole fixture. Nothing
@@ -130,8 +129,6 @@ describe("the override itself", () => {
 });
 
 describe("the wrappers all resolve their root the same way", () => {
-  const read = (rel: string) =>
-    fs.readFileSync(path.join(REPO_ROOT, rel), "utf8");
 
   for (const guard of LINT_GUARDS) {
     it(`${guard.scriptPath} takes its root from the shared resolver`, () => {

@@ -1,20 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { localeKeys } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Structural tests for the "List on marketplace" UI inside app/item/[id].tsx
  * and the corresponding new translation keys. We grep the source files so the
  * test runs under node --test without RN peers.
  */
-
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 describe("item detail: marketplace listing UI", () => {
   it("imports the marketplace context", () => {

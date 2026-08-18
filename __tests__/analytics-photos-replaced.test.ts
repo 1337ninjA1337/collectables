@@ -1,16 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { hasReplacedPhotoSet } from "../lib/analytics-helpers";
 import { ANALYTICS_EVENTS } from "../lib/analytics-events";
-
-const ROOT = process.cwd();
-
-function read(rel: string): string {
-  return readFileSync(path.join(ROOT, rel), "utf8");
-}
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("hasReplacedPhotoSet — pure replacement predicate", () => {
   it("true when a URI is swapped at the same count", () => {

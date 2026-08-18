@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { luminance } from "@/lib/color-luminance";
 import {
@@ -21,6 +19,7 @@ import {
   designTokens,
 } from "@/lib/design-tokens";
 import { HEX_ALLOWLIST, findInlineHexLiterals } from "@/lib/check-inline-hex";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * `lib/toast-context.tsx` design-tokens migration (2026-08-09).
@@ -37,9 +36,6 @@ import { HEX_ALLOWLIST, findInlineHexLiterals } from "@/lib/check-inline-hex";
  * `tsx --test`, so adoption is pinned at the source level — plus the real
  * guarantee, which is that the hex lint now covers the file.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 const HEX = /^#[0-9a-f]{6}$/;
 

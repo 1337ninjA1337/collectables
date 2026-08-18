@@ -1,12 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
   assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * Trading-card `<ItemCard>` + the fullscreen `<PhotoLightbox>` gallery.
@@ -26,9 +25,6 @@ import {
  *    mis-page after a web resize / rotation);
  *  - every user-visible string goes through `t()`.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 const cardSrc = read("components/item-card.tsx");
 const lightboxSrc = read("components/photo-lightbox.tsx");

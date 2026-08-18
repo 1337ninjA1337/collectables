@@ -1,6 +1,5 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   initAnalytics,
@@ -14,6 +13,7 @@ import {
   __resetAnalyticsForTests,
   type AnalyticsEventName,
 } from "../lib/analytics";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 type Call = { method: string; args: unknown[] };
 
@@ -44,9 +44,6 @@ function makeFakeCtor(sdkRef: ReturnType<typeof makeFakeSdk>) {
   } as unknown as new (apiKey: string, options?: unknown) => unknown;
   return { Ctor, ctorCalls };
 }
-
-const ROOT = path.join(__dirname, "..");
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
 
 describe("lib/analytics — disabled paths", () => {
   beforeEach(() => __resetAnalyticsForTests());

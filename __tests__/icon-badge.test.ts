@@ -1,16 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   RING_INNER_SIZE,
   RING_MIDDLE_SIZE,
   RING_OUTER_SIZE,
 } from "../lib/design-tokens";
-
-const ROOT = process.cwd();
-const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("IconBadge — concentric-ring extraction", () => {
   const src = read("components/icon-badge.tsx");

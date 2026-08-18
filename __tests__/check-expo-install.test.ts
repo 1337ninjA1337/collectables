@@ -1,6 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -11,9 +10,7 @@ import {
   parseExpoInstallDrifts,
   splitWatchedDrifts,
 } from "../lib/check-expo-install";
-
-const REPO_ROOT = path.resolve(__dirname, "..");
-const read = (rel: string) => readFileSync(path.join(REPO_ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 const DRIFT_OUTPUT = [
   "The following packages should be updated for best compatibility with the installed expo version:",

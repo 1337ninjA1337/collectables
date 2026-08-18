@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -7,9 +6,7 @@ import {
   parseCurrencyValue,
   parseCurrencyValueDetailed,
 } from "../lib/format-currency-input";
-
-const ROOT = join(__dirname, "..");
-const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+import { readRepoFile as read } from "./helpers/repo-file";
 
 // Both parsers now live in the pure lib/format-currency-input.ts (no
 // react-native at module scope), so the truth tables below run against the

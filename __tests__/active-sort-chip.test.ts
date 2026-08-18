@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   activeSortChip,
@@ -15,6 +13,7 @@ import {
   assertValueInEveryLocale,
   localeValuesOf,
 } from "./helpers/i18n-locales";
+import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
  * The removable "active sort" quick-chip in `<ItemFilterBar>`.
@@ -29,9 +28,6 @@ import {
  * wiring is pinned structurally, since `<ItemFilterBar>` pulls react-native and
  * cannot be mounted under `tsx --test`.
  */
-function read(rel: string): string {
-  return readFileSync(path.join(process.cwd(), rel), "utf8");
-}
 
 const ALL_MODES: ItemSortMode[] = [
   "default",
