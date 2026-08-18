@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { MARKUP_EXTENSIONS, SOURCE_EXTENSIONS } from "@/lib/source-dirs";
+import { MARKUP_EXTENSIONS, NEVER_WALKED, SOURCE_EXTENSIONS } from "@/lib/source-dirs";
 
 import { readRepoFile, REPO_ROOT } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
@@ -31,6 +31,7 @@ function fixture(): string {
   const root = mkdtempSync(path.join(tmpdir(), "guard-io-walk-"));
   mkdirSync(path.join(root, "app", "collection"), { recursive: true });
   mkdirSync(path.join(root, "node_modules", "pkg"), { recursive: true });
+  mkdirSync(path.join(root, "app", "node_modules", "pkg"), { recursive: true });
   mkdirSync(path.join(root, "app", "weird.ts"), { recursive: true });
   writeFileSync(path.join(root, "app", "index.tsx"), "x");
   writeFileSync(path.join(root, "app", "helpers.ts"), "x");
@@ -39,6 +40,7 @@ function fixture(): string {
   writeFileSync(path.join(root, "app", "collection", "[id].tsx"), "x");
   writeFileSync(path.join(root, "app", "weird.ts", "inner.ts"), "x");
   writeFileSync(path.join(root, "node_modules", "pkg", "index.ts"), "x");
+  writeFileSync(path.join(root, "app", "node_modules", "pkg", "index.ts"), "x");
   return root;
 }
 
@@ -50,6 +52,10 @@ describe("listFilesUnder", () => {
         "collection/[id].tsx",
         "helpers.ts",
         "index.tsx",
+        // Walked, because nothing told this call to skip it: `listFilesUnder`
+        // descends into everything and `skipDirs` is the caller's decision.
+        // `listSourceFiles` is the one that passes NEVER_WALKED.
+        "node_modules/pkg/index.ts",
         "weird.ts/inner.ts",
       ]);
     } finally {
@@ -157,6 +163,29 @@ describe("listSourceFiles", () => {
     assert.ok(markup.length < all.length, "components/ holds no .ts, so the narrowing proves nothing");
     assert.ok(markup.every((f) => f.endsWith(".tsx")));
     assert.ok(all.some((f) => f.endsWith(".ts")));
+  });
+
+  it("skips the never-walked names, so a stray install cannot flood a scan", () => {
+    // The list is shared with the suite-side walk rather than restated, which
+    // is what lets the agreement case below be a check rather than a
+    // coincidence. `node_modules` under `components/` is one `npm install`
+    // away and would turn a 64-file scan into a several-thousand-file one.
+    const root = fixture();
+    try {
+      assert.ok(NEVER_WALKED.includes("node_modules"));
+      const found = listSourceFiles(root, ["app"]);
+      assert.ok(found.includes("app/index.tsx"), "the scan root itself was not walked");
+      assert.ok(
+        !found.some((f) => f.includes("node_modules")),
+        `the shared source walk descended into a nested node_modules: ${found.join(", ")}`,
+      );
+      // The skip is about a directory FOUND during the walk, not about the
+      // roots a caller names: asking to walk `node_modules` walks it, because
+      // a caller that names it has said what it means.
+      assert.deepEqual(listSourceFiles(root, ["node_modules"]), ["node_modules/pkg/index.ts"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("agrees with the suite-side walk over the same directories", () => {

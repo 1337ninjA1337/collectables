@@ -18,7 +18,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { formatGuardRootNotice, resolveGuardRoot } from "../lib/guard-root";
-import { SOURCE_EXTENSIONS } from "../lib/source-dirs";
+import { NEVER_WALKED, SOURCE_EXTENSIONS } from "../lib/source-dirs";
 import { unreadableInput, type UnreadableInput } from "../lib/scanned-floor";
 import { describeThrownReason } from "../lib/thrown-value";
 
@@ -148,7 +148,9 @@ export function listSourceFiles(
 ): string[] {
   return dirs
     .flatMap((dir) =>
-      listFilesUnder(path.join(repoRoot, dir), { extensions }).map((rel) => `${dir}/${rel}`),
+      listFilesUnder(path.join(repoRoot, dir), { extensions, skipDirs: NEVER_WALKED }).map(
+        (rel) => `${dir}/${rel}`,
+      ),
     )
     .sort();
 }

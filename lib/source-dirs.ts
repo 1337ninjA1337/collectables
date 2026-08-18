@@ -62,3 +62,17 @@ export const SOURCE_EXTENSIONS: readonly string[] = [".ts", ".tsx"];
 
 /** Markup only — the files that can render an element. */
 export const MARKUP_EXTENSIONS: readonly string[] = [".tsx"];
+
+/**
+ * Directory names no scan of source ever descends into.
+ *
+ * None of these can appear under a source directory in a healthy checkout,
+ * which is exactly why they are worth naming: a stray `npm install` inside
+ * `components/` turns a 64-file scan into a several-thousand-file one, and the
+ * guard then reports findings in vendored code. The two walks — the guards' in
+ * `scripts/guard-io.ts` and the suites' in `__tests__/helpers/source-files.ts`
+ * — took this list separately, which is the drift the shared module removes:
+ * `guard-io-walk.test.ts` asserts the two answer the same over one tree, and
+ * that case could only hold by luck while each had its own list.
+ */
+export const NEVER_WALKED: readonly string[] = ["node_modules", "dist", ".expo"];
