@@ -6,6 +6,7 @@ import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocale,
+  assertMatchesInEveryNonBaseLocale,
 } from "./helpers/i18n-locales";
 
 /**
@@ -188,10 +189,13 @@ describe("i18n — loadMoreItems key across all 6 supported languages", () => {
     // matter for the user-facing CTA (the user's primary language is
     // ru). The overrides must include the `{count}` placeholder so the
     // remaining-count formatting works.
-    for (const lang of ["ru", "be", "pl", "de", "es"]) {
-      const re = new RegExp(`const\\s+${lang}:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?loadMoreItems:[\\s\\S]*?params\\?\\.count[\\s\\S]*?\\};`);
-      assert.match(src, re, `${lang} table is missing a localized loadMoreItems override with a count placeholder`);
-    }
+    // Per body — the slice this replaces crossed `};` and so was satisfied by
+    // any later map carrying the key.
+    assertMatchesInEveryNonBaseLocale(
+      src,
+      /loadMoreItems:[^\n]*\n?[^\n]*params\?\.count/,
+      "loadMoreItems is overridden with a count placeholder",
+    );
   });
 
   it("loadMoreItems formatter routes the count placeholder through params?.count ?? 0", () => {

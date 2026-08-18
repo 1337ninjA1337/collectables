@@ -7,10 +7,17 @@ import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocale,
+  assertMatchesInEveryNonBaseLocale,
   localeBodies,
   localeValues,
   locales,
 } from "./helpers/i18n-locales";
+import { localeKeys } from "@/lib/i18n-source";
+
+/** A locale's own declared keys, as an array — `localeKeys` returns a Set. */
+const localeKeysOf = (source: string, code: string): readonly string[] => [
+  ...localeKeys(source, code),
+];
 
 /**
  * The helpers that replaced "count the hits, assert six".
@@ -181,6 +188,93 @@ describe("the value-shape half", () => {
   });
 });
 
+/**
+ * `ru` is declared BEFORE `es` and does not override `greeting`; `es` does.
+ * The per-locale slice the suites used runs from `const ru … = {` lazily to
+ * the first `greeting:` it can find — which is in `es`, two maps down — and
+ * then out to the next `};`. It matches, so `ru` was reported as overriding a
+ * key it does not declare. Declaration ORDER decided the answer: the first map
+ * in the file was checked against the whole rest of it.
+ */
+const RU_MISSING_ES_HAS = `
+const languageOptions: { code: AppLanguage; label: string }[] = [
+  { code: "ru", label: "Русский" },
+  { code: "en", label: "English" },
+  { code: "es", label: "Español" },
+];
+
+const en = {
+  greeting: "Hello",
+  farewell: "Bye",
+};
+
+const ru: TranslationMap = {
+  ...en,
+  farewell: "Пока",
+};
+
+const es: TranslationMap = {
+  ...en,
+  greeting: "Hola",
+  farewell: "Adiós",
+};
+`;
+
+describe("overrides, asked of the map that is supposed to have them", () => {
+  it("catches the locale the slice skipped over", () => {
+    // The old rule first, so the fixture is shown to fool it rather than
+    // asserted to: `ru` declares no `greeting` and the slice says it does.
+    const slice = new RegExp(
+      `const\\s+ru:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?greeting:\\s*"[^"]+"[\\s\\S]*?\\};`,
+    );
+    assert.match(RU_MISSING_ES_HAS, slice);
+    assert.ok(!localeKeysOf(RU_MISSING_ES_HAS, "ru").includes("greeting"));
+
+    // …and the new rule on the same text.
+    assert.throws(
+      () =>
+        assertMatchesInEveryNonBaseLocale(
+          RU_MISSING_ES_HAS,
+          /greeting: "[^"]+"/,
+          "greeting is overridden",
+        ),
+      /not overridden in ru/,
+    );
+  });
+
+  it("skips the base map, which cannot fall back to itself", () => {
+    // `en` writes `greeting` as a formatter here and the others as strings, so
+    // the string pattern is false of the base map and true of every inheriting
+    // one — which is exactly the difference between the two helpers.
+    const baseDiffers = RU_MISSING_ES_HAS.replace(
+      'greeting: "Hello",',
+      "greeting: (params?: TranslationParams) => `Hello ${params?.name ?? \"\"}`,",
+    ).replace("const ru: TranslationMap = {\n  ...en,", 'const ru: TranslationMap = {\n  ...en,\n  greeting: "Привет",');
+    assertMatchesInEveryNonBaseLocale(
+      baseDiffers,
+      /greeting: "[^"]+"/,
+      "greeting is overridden",
+    );
+    assert.throws(
+      () =>
+        assertMatchesInEveryLocale(
+          baseDiffers,
+          /greeting: "[^"]+"/,
+          "greeting is a string",
+        ),
+      /not matched in en/,
+    );
+  });
+
+  it("refuses a global pattern here too", () => {
+    assert.throws(
+      () =>
+        assertMatchesInEveryNonBaseLocale(TWO_LOCALES, /greeting/g, "greeting"),
+      /non-global/,
+    );
+  });
+});
+
 describe("the habit stays retired", () => {
   /**
    * `bundle-smoke.test.ts` counts `PRIVACY_PAGE_TARGETS`, a local table of the
@@ -200,7 +294,11 @@ describe("the habit stays retired", () => {
     );
     const offenders = suites.filter((entry) => {
       const text = readFileSync(path.join(dir, entry), "utf8");
-      return text.includes("readI18nSource") && /\.(length|size), 6\b/.test(text);
+      // `\\s*` rather than a single space: the habit survives prettier
+      // wrapping `assert.equal(\n  matches.length,\n  6,\n)`, and the first
+      // draft of this guard matched only the one-line form — which left three
+      // suites reported clean while still counting.
+      return text.includes("readI18nSource") && /\.(length|size),\s*6\b/.test(text);
     });
     assert.deepEqual(
       offenders,

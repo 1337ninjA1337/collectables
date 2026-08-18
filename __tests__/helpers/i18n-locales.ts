@@ -28,6 +28,7 @@ import {
   findLocaleBlock,
   languageOptionCodes,
   localeKeys,
+  TRANSLATION_BASE_LANGUAGE,
 } from "@/lib/i18n-source";
 
 /** The picker's language codes — what "every locale" means, in picker order. */
@@ -99,6 +100,37 @@ export function assertMatchesInEveryLocale(
     if (!pattern.test(body)) missing.push(code);
   }
   assert.deepEqual(missing, [], `${label} — not matched in ${missing.join(", ")}`);
+}
+
+/**
+ * {@link assertMatchesInEveryLocale} over the locales that INHERIT — every one
+ * but {@link TRANSLATION_BASE_LANGUAGE}.
+ *
+ * The suites' phrasing for this is "overrides X in ru / be / pl / de / es
+ * rather than falling back to en", and the base map is excluded because it
+ * cannot fall back to itself. What it replaces is a per-locale slice —
+ * `const ${lang}: TranslationMap = \\{[\\s\\S]*?KEY:[\\s\\S]*?\\};` — that did
+ * not slice: `[\\s\\S]*?` crosses `};` as happily as any other character, so
+ * the match ran from the named map's opening brace, through however many later
+ * maps it took to find the key, and out to the next `};` after THAT. The key
+ * had only to exist somewhere at or below the named locale, which for `ru` —
+ * the first map in the file — meant anywhere at all.
+ */
+export function assertMatchesInEveryNonBaseLocale(
+  source: string,
+  pattern: RegExp,
+  label: string,
+): void {
+  assert.ok(
+    !pattern.global,
+    `${label}: pass a non-global pattern — a /g regex carries lastIndex between locales`,
+  );
+  const missing: string[] = [];
+  for (const [code, body] of localeBodies(source)) {
+    if (code === TRANSLATION_BASE_LANGUAGE) continue;
+    if (!pattern.test(body)) missing.push(code);
+  }
+  assert.deepEqual(missing, [], `${label} — not overridden in ${missing.join(", ")}`);
 }
 
 /**

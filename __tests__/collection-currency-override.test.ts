@@ -6,6 +6,7 @@ import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocale,
+  assertMatchesInEveryNonBaseLocale,
 } from "./helpers/i18n-locales";
 
 /**
@@ -158,10 +159,15 @@ describe("i18n — collection currency keys across all 6 languages", () => {
   });
 
   it("ru / be / pl / de / es each override collectionCurrencyHint with a native string", () => {
-    for (const lang of ["ru", "be", "pl", "de", "es"]) {
-      const re = new RegExp(`const\\s+${lang}:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?collectionCurrencyHint:[\\s\\S]*?\\};`);
-      assert.match(src, re, `${lang} table missing localized collectionCurrencyHint`);
-    }
+    // Per body. The slice this replaces did not slice: `[\s\S]*?` crosses
+    // `};`, so the match ran from the named map's opening brace through
+    // whatever later map happened to carry the key — for `ru`, the first map
+    // in the file, that was the whole rest of it.
+    assertMatchesInEveryNonBaseLocale(
+      src,
+      /collectionCurrencyHint:\s*"[^"]+"/,
+      "collectionCurrencyHint is overridden",
+    );
   });
 
   it("collectionCurrencyA11y formatter routes params?.currency through a `?? ''` fallback in all 6 locales", () => {

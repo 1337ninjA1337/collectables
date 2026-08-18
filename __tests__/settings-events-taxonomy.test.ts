@@ -12,6 +12,7 @@ import {
   ANALYTICS_EVENT_NAMES,
 } from "../lib/analytics-events";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { assertDeclaredInEveryLocale } from "./helpers/i18n-locales";
 
 const settingsSrc = readFileSync(
   path.join(process.cwd(), "app", "settings.tsx"),
@@ -84,12 +85,7 @@ describe("settings — Events captured by this app list", () => {
   });
 
   it("has a diagnosticsEventsTitle translation in every language block", () => {
-    const occurrences = i18nSrc.match(/diagnosticsEventsTitle:/g) ?? [];
-    assert.equal(
-      occurrences.length,
-      6,
-      "diagnosticsEventsTitle must exist in en, ru, be, pl, de, es",
-    );
+    assertDeclaredInEveryLocale(i18nSrc, "diagnosticsEventsTitle");
     assert.match(settingsSrc, /t\("diagnosticsEventsTitle"\)/);
   });
 });

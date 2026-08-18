@@ -7,6 +7,7 @@ import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocale,
   localeValues,
+  assertMatchesInEveryNonBaseLocale,
 } from "./helpers/i18n-locales";
 
 /**
@@ -87,24 +88,22 @@ describe("i18n — searchInCollectionPlaceholder key across all 6 supported lang
   });
 
   it("overrides searchInCollectionPlaceholder in ru / be / pl / de / es so each language has a native string", () => {
-    for (const lang of ["ru", "be", "pl", "de", "es"]) {
-      const re = new RegExp(
-        `const\\s+${lang}:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?searchInCollectionPlaceholder:\\s*"[^"]+"[\\s\\S]*?\\};`,
-      );
-      assert.match(
-        src,
-        re,
-        `${lang} table is missing a localized searchInCollectionPlaceholder override`,
-      );
-    }
+    // Per body. The slice this replaces did not slice: `[\s\S]*?` crosses
+    // `};`, so the named map's brace could run through however many later maps
+    // it took to find the key — `ru` being the first map, effectively the file.
+    assertMatchesInEveryNonBaseLocale(
+      src,
+      /searchInCollectionPlaceholder:\s*"[^"]+"/,
+      "searchInCollectionPlaceholder is overridden",
+    );
   });
 
-  it("exactly 6 searchInCollectionPlaceholder declarations across the file (en + 5 overrides)", () => {
-    const matches = src.match(/searchInCollectionPlaceholder:\s*"[^"]+"/g) ?? [];
-    assert.equal(
-      matches.length,
-      6,
-      `expected 6 searchInCollectionPlaceholder declarations, got ${matches.length}`,
+  it("declares searchInCollectionPlaceholder in every locale, as a non-empty string", () => {
+    assertDeclaredInEveryLocale(src, "searchInCollectionPlaceholder");
+    assertMatchesInEveryLocale(
+      src,
+      /searchInCollectionPlaceholder:\s*"[^"]+"/,
+      "searchInCollectionPlaceholder is a non-empty string",
     );
   });
 });
@@ -145,12 +144,11 @@ describe("i18n — search a11y keys across all 6 supported languages", () => {
     });
 
     it(`localizes ${key} in ru / be / pl / de / es rather than falling back to en`, () => {
-      for (const lang of ["ru", "be", "pl", "de", "es"]) {
-        const re = new RegExp(
-          `const\\s+${lang}:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?${key}:\\s*"[^"]+"[\\s\\S]*?\\};`,
-        );
-        assert.match(src, re, `${lang} table is missing a localized ${key} override`);
-      }
+      assertMatchesInEveryNonBaseLocale(
+        src,
+        new RegExp(`\\b${key}:\\s*"[^"]+"`),
+        `${key} is overridden`,
+      );
     });
   }
 
@@ -253,11 +251,10 @@ describe("i18n — queryChipClear across all 6 supported languages", () => {
   });
 
   it("localizes queryChipClear in ru / be / pl / de / es", () => {
-    for (const lang of ["ru", "be", "pl", "de", "es"]) {
-      const re = new RegExp(
-        `const\\s+${lang}:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?queryChipClear:[\\s\\S]*?\\};`,
-      );
-      assert.match(src, re, `${lang} table is missing a localized queryChipClear override`);
-    }
+    assertMatchesInEveryNonBaseLocale(
+      src,
+      /queryChipClear:\s*\(params\?: TranslationParams\)/,
+      "queryChipClear is overridden",
+    );
   });
 });

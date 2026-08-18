@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+  assertMatchesInEveryNonBaseLocale,
+} from "./helpers/i18n-locales";
 
 /**
  * Structural pins for the sort UI + drag-corruption gate added in
@@ -142,28 +147,24 @@ describe("i18n — sort* keys across all 6 supported languages", () => {
   });
 
   it("overrides each of the 4 sort keys in ru / be / pl / de / es with a localized string", () => {
-    for (const lang of ["ru", "be", "pl", "de", "es"]) {
-      for (const key of ["sortLabel", "sortDefault", "sortNameAsc", "sortNameDesc"]) {
-        const re = new RegExp(
-          `const\\s+${lang}:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?${key}:\\s*"[^"]+"[\\s\\S]*?\\};`,
-        );
-        assert.match(
-          src,
-          re,
-          `${lang} table is missing a localized ${key} override`,
-        );
-      }
+    // Per body — the slice this replaces crossed `};`, so a key present in any
+    // later map satisfied every earlier locale.
+    for (const key of ["sortLabel", "sortDefault", "sortNameAsc", "sortNameDesc"]) {
+      assertMatchesInEveryNonBaseLocale(
+        src,
+        new RegExp(`\\b${key}:\\s*"[^"]+"`),
+        `${key} is overridden`,
+      );
     }
   });
 
-  it("exactly 6 declarations per key (en + 5 localized overrides)", () => {
+  it("declares each key in every locale, as a non-empty string", () => {
     for (const key of ["sortLabel", "sortDefault", "sortNameAsc", "sortNameDesc"]) {
-      const re = new RegExp(`${key}:\\s*"[^"]+"`, "g");
-      const matches = src.match(re) ?? [];
-      assert.equal(
-        matches.length,
-        6,
-        `expected 6 ${key} declarations, got ${matches.length}`,
+      assertDeclaredInEveryLocale(src, key);
+      assertMatchesInEveryLocale(
+        src,
+        new RegExp(`\\b${key}:\\s*"[^"]+"`),
+        `${key} is a non-empty string`,
       );
     }
   });

@@ -7,6 +7,7 @@ import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocale,
   localeValues,
+  assertMatchesInEveryNonBaseLocale,
 } from "./helpers/i18n-locales";
 
 /**
@@ -228,12 +229,13 @@ describe("i18n — the two new per-sheet a11y labels across all 6 languages", ()
     });
 
     it(`localizes ${key} in ru / be / pl / de / es rather than falling back to en`, () => {
-      for (const lang of ["ru", "be", "pl", "de", "es"]) {
-        const re = new RegExp(
-          `const\\s+${lang}:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?${key}:\\s*"[^"]+"[\\s\\S]*?\\};`,
-        );
-        assert.match(src, re, `${lang} table is missing a localized ${key} override`);
-      }
+      // Per body. The slice this replaces crossed `};`, so the key had only to
+      // exist somewhere at or below the named locale to satisfy it.
+      assertMatchesInEveryNonBaseLocale(
+        src,
+        new RegExp(`\\b${key}:\\s*"[^"]+"`),
+        `${key} is overridden`,
+      );
     });
 
     it(`keeps ${key} longer than the shared searchPlaceholder it labels`, () => {
@@ -256,12 +258,11 @@ describe("i18n — the two new per-sheet a11y labels across all 6 languages", ()
       /searchClose:\s*"[^"]+"/,
       "searchClose is a non-empty string",
     );
-    for (const lang of ["ru", "be", "pl", "de", "es"]) {
-      const re = new RegExp(
-        `const\\s+${lang}:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?searchClose:\\s*"[^"]+"[\\s\\S]*?\\};`,
-      );
-      assert.match(src, re, `${lang} table is missing a localized searchClose override`);
-    }
+    assertMatchesInEveryNonBaseLocale(
+      src,
+      /searchClose:\s*"[^"]+"/,
+      "searchClose is overridden",
+    );
   });
 
   it("gives the two pickers distinct labels rather than one generic string", () => {
