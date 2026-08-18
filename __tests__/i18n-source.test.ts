@@ -10,8 +10,8 @@ import {
   languageOptionCodes,
   localeKeys,
   parseObjectLiteral,
-  REGEXP_FOLLOWS_KEYWORD,
 } from "@/lib/i18n-source";
+import { REGEXP_FOLLOWS_KEYWORD } from "@/lib/js-tokens";
 import { TRANSLATION_LANGUAGES } from "@/lib/i18n-coverage";
 import { readI18nSource } from "./helpers/i18n-source-file";
 

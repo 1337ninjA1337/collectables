@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { stripComments } from "@/lib/strip-comments";
 
 import { readRepoFile } from "./helpers/repo-file";
-import { suiteFiles, suiteText } from "./helpers/suite-files";
+import { readSuite, suiteFiles, suiteText } from "./helpers/suite-files";
 
 /**
  * The comment stripper, on its own, with the properties its callers assume.
@@ -71,6 +71,66 @@ describe("stripComments", () => {
     const stripped = stripComments("const a = 'oops\nconst b = 1; // note");
     assert.ok(stripped.includes("const b = 1;"));
     assert.ok(!stripped.includes("note"));
+  });
+
+  it("reads a regex literal as a pattern, not as an open string", () => {
+    // The bug this closed. A single unpaired backtick or quote inside a
+    // pattern put the stripper into string mode, and template mode does not
+    // end at a newline — so everything below it, comments included, survived
+    // into what a guard reads as code.
+    const backtick = "assert.doesNotMatch(SRC, /`msg-\\$\\{Date\\.now\\(\\)\\}/);\n// gone\nconst a = 1;";
+    const strippedBacktick = stripComments(backtick);
+    assert.ok(!strippedBacktick.includes("gone"), "a comment below a regex with a backtick survived");
+    assert.ok(strippedBacktick.includes("const a = 1;"));
+    // The other half of the same shape, and the one that appears ~30 times
+    // here: a character class holding both quote characters.
+    const quotes = 'assert.match(block, /["\']source["\']/); // gone\nconst b = 2;';
+    const strippedQuotes = stripComments(quotes);
+    assert.ok(!strippedQuotes.includes("gone"), "a trailing comment after a quote-class regex survived");
+    assert.ok(strippedQuotes.includes("const b = 2;"));
+  });
+
+  it("does not mistake a division for a regex, or eat the line after one", () => {
+    // The failure in the other direction: reading `a / b` as an opening
+    // pattern would blank real code until the next `/`, which is a guard going
+    // silently blind rather than loudly wrong.
+    const division = "const ratio = total / count; // gone\nconst c = 3;";
+    const stripped = stripComments(division);
+    assert.ok(stripped.includes("const ratio = total / count;"));
+    assert.ok(!stripped.includes("gone"));
+    assert.ok(stripped.includes("const c = 3;"));
+    // And the keyword rows the shared rule carries: `return /re/` is a regex
+    // even though `n` is an identifier character.
+    assert.ok(!stripComments("return /[a-z]/.test(s); // gone").includes("gone"));
+    // A `/` inside a character class does not close the pattern.
+    assert.ok(!stripComments("const re = /[/]/; // gone").includes("gone"));
+  });
+
+  it("leaves no comment in the repository surviving as code", () => {
+    // The sweep that found it, kept as the regression. Every `// ` line in a
+    // suite must differ from its stripped form — unless the suite is quoting
+    // source inside a template literal, which is a fixture and not a comment.
+    const survivors: string[] = [];
+    for (const relative of suiteFiles()) {
+      const source = readSuite(relative);
+      const stripped = stripComments(source).split("\n");
+      source.split("\n").forEach((line, index) => {
+        if (!/^\s*\/\/ /.test(line) || stripped[index] !== line) return;
+        survivors.push(`${relative}:${index + 1}`);
+      });
+    }
+    assert.deepEqual(
+      survivors.filter((where) => !where.startsWith("i18n-source.test.ts")),
+      [],
+      `these comments survive stripping and reach every guard as code: ${survivors.join(", ")}`,
+    );
+    // `i18n-source.test.ts` is the exception and stays one: its fixtures are
+    // JavaScript source inside template literals, so a `//` line there is
+    // string content the stripper is right to leave alone.
+    assert.ok(
+      survivors.some((where) => where.startsWith("i18n-source.test.ts")),
+      "the fixture exception stopped applying — check whether it should still be one",
+    );
   });
 
   it("is what the suite readers are layered on rather than a second stripper", () => {

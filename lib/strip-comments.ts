@@ -25,20 +25,36 @@
  * A reader deleting env-inlining's last bundle caller would not have expected
  * six guards to go red.
  *
- * Not a parser and not trying to be. It does not know about regex literals —
- * a `/` that opens one, or a quote inside one — which is exactly the ambiguity
- * `lib/i18n-source.ts` had to build a real token scanner for when its question
- * needed it. This is the cheap answer, and it is the right one for source a
- * human wrote and a formatter normalised.
+ * It DOES know about regex literals, and has to: a quote or a backtick inside
+ * a pattern (`/["']key["']/`, ``/`msg-\$\{x\}/``) puts a stripper without that
+ * knowledge into string mode, after which every comment below survives into
+ * what a guard reads as code. That was live in four files — twenty comment
+ * lines in `chat-context-uuid.test.ts`, `i18n-source.test.ts`,
+ * `lib/privacy-page.ts` and `lib/spa-fallback.ts`, all of them downstream of a
+ * single unpaired backtick or quote inside a pattern. The regex-versus-
+ * division rule is {@link startsRegExp}'s, shared with the scanner in
+ * `lib/i18n-source.ts` that needed the same answer first.
+ *
+ * It is still not a parser. It tracks the previous token approximately — the
+ * last non-space character, and the last identifier word — which is what the
+ * shared rule takes, and which is wrong only where a full parse is required
+ * (a `/` after the `)` of an `if (…)`). `lib/js-tokens.ts` says where that
+ * line is.
  */
+
+import { DIVISION_FOLLOWS, followsRegExpKeyword } from "./js-tokens";
 
 /**
  * Comment bodies replaced by spaces, newlines and string literals preserved.
  */
 export function stripComments(source: string): string {
   const out = source.split("");
-  type Mode = "code" | "line" | "block" | "single" | "double" | "template";
+  type Mode = "code" | "line" | "block" | "single" | "double" | "template" | "regex";
   let mode: Mode = "code";
+  /** Last non-whitespace character seen in code — the `/` rule's left side. */
+  let prev = "";
+  /** The identifier run ending at {@link prev}, for the keyword rows. */
+  let prevWord = "";
   for (let i = 0; i < source.length; i++) {
     const c = source[i];
     const next = source[i + 1];
@@ -48,7 +64,28 @@ export function stripComments(source: string): string {
       else if (c === "'") mode = "single";
       else if (c === '"') mode = "double";
       else if (c === "`") mode = "template";
+      else if (c === "/" && (!DIVISION_FOLLOWS.test(prev) || followsRegExpKeyword(prevWord))) {
+        mode = "regex";
+      }
       if (mode === "line" || mode === "block") out[i] = " ";
+      if (mode === "code" && !/\s/.test(c)) {
+        prevWord = /[A-Za-z0-9_$]/.test(c) ? prevWord + c : "";
+        prev = c;
+      }
+    } else if (mode === "regex") {
+      // A character class may hold an unescaped `/`, so track it: `/[/]/` is
+      // one literal and not two. A newline cannot appear in a pattern, so it
+      // is the resync point if this was a division after all.
+      if (c === "\\") i++;
+      else if (c === "[") {
+        while (i < source.length && source[i] !== "]" && source[i] !== "\n") {
+          i += source[i] === "\\" ? 2 : 1;
+        }
+      } else if (c === "/" || c === "\n") {
+        mode = "code";
+        prev = "/";
+        prevWord = "";
+      }
     } else if (mode === "line") {
       if (c === "\n") mode = "code";
       else out[i] = " ";
@@ -67,6 +104,12 @@ export function stripComments(source: string): string {
       else if (mode === "single" && (c === "'" || c === "\n")) mode = "code";
       else if (mode === "double" && (c === '"' || c === "\n")) mode = "code";
       else if (mode === "template" && c === "`") mode = "code";
+      // A closing quote ends an expression, so a `/` after it is division —
+      // which is what `DIVISION_FOLLOWS` says about all three characters.
+      if (mode === "code") {
+        prev = c === "\n" ? prev : c;
+        prevWord = "";
+      }
     }
   }
   return out.join("");
