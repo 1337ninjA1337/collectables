@@ -1,13 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   DEFAULT_INSERT_TIMEOUT_MS,
   resolveInsertTimeoutMs,
   withTimeout,
 } from "../supabase/functions/_shared/insert-timeout";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Shared webhook insert-timeout gate
@@ -77,16 +76,7 @@ describe("withTimeout", () => {
   it("a fast win does not leave the process hanging on the timer", async () => {
     // clearTimeout in the finally means this test file itself exits promptly;
     // structurally pin the cleanup too.
-    const source = readFileSync(
-      path.join(
-        process.cwd(),
-        "supabase",
-        "functions",
-        "_shared",
-        "insert-timeout.ts",
-      ),
-      "utf8",
-    );
+    const source = readRepoFile("supabase/functions/_shared/insert-timeout.ts");
     assert.match(source, /finally\s*\{\s*clearTimeout\(timer\);/);
     const result = await withTimeout(Promise.resolve(1), 60_000);
     assert.equal(result.timedOut, false);
@@ -94,16 +84,7 @@ describe("withTimeout", () => {
 });
 
 describe("insert-timeout — structural adoption (analytics-mirror)", () => {
-  const FN_SOURCE = readFileSync(
-    path.join(
-      process.cwd(),
-      "supabase",
-      "functions",
-      "analytics-mirror",
-      "index.ts",
-    ),
-    "utf8",
-  );
+  const FN_SOURCE = readRepoFile("supabase/functions/analytics-mirror/index.ts");
 
   it("imports the shared gate and reads the POSTHOG_WEBHOOK_TIMEOUT_MS secret", () => {
     assert.match(FN_SOURCE, /from\s+['"]\.\.\/_shared\/insert-timeout\.ts['"]/);

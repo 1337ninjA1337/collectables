@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * WLF-C structural pins: `app/collections-feed.tsx` bounds its per-tab card
@@ -14,7 +13,7 @@ import path from "node:path";
  * peers so assertions are regex-based.
  */
 function readSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collections-feed.tsx"), "utf8");
+  return readRepoFile("app/collections-feed.tsx");
 }
 
 describe("app/collections-feed.tsx — WLF-C chunked tab mounts", () => {

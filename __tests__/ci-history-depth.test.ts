@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Pins every workflow that runs the test harness to a FULL checkout.
@@ -143,10 +144,7 @@ describe("workflow checkout depth vs the guards npm test runs", () => {
     // The requirement is not a style rule about checkouts; it is one guard's
     // stated precondition. If that sentence ever leaves the script, this test
     // is measuring nothing.
-    const guard = readFileSync(
-      path.join(process.cwd(), "scripts", "check-privacy-baseline-provenance.ts"),
-      "utf8",
-    );
+    const guard = readRepoFile("scripts/check-privacy-baseline-provenance.ts");
     assert.match(guard, /SHALLOW clone/);
     assert.match(guard, /fetch-depth: 0/);
   });

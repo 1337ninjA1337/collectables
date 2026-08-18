@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Structural / wiring tests for `lib/supabase-chat.ts`.
@@ -15,10 +14,7 @@ import path from "node:path";
  * realtime/presence channel construction without spinning up fetch mocks.
  */
 
-const SOURCE = readFileSync(
-  path.join(process.cwd(), "lib", "supabase-chat.ts"),
-  "utf8",
-);
+const SOURCE = readRepoFile("lib/supabase-chat.ts");
 
 describe("supabase-chat.ts wiring", () => {
   it("imports each shape helper it relies on", () => {

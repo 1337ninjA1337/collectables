@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Selection-mode FlatList `getItemLayout` pins (as amended by BB-B): rows
@@ -23,11 +22,11 @@ import path from "node:path";
  *      `getItemLayout={getSelectableRowLayout}`.
  */
 function readCollectionSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 function readRowSrc(): string {
-  return readFileSync(path.join(process.cwd(), "components", "selectable-item-row.tsx"), "utf8");
+  return readRepoFile("components/selectable-item-row.tsx");
 }
 
 describe("selection-mode FlatList getItemLayout", () => {

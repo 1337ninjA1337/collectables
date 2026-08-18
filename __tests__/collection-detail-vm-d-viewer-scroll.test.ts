@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * VM-D structural pins: the viewer/read-only branch in
@@ -18,7 +18,7 @@ import path from "node:path";
  * can't be loaded under `node --test`, so the assertions are regex-based.
  */
 function readSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
@@ -140,7 +140,7 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // there so the style can be tweaked from one place.
     // The style moved to the shared lib/flat-list-styles.ts (WLF-A).
     assert.match(src, /<FlatList[\s\S]*?style=\{\s*flatListStyles\.viewerFlatList\s*\}[\s\S]*?\/>/);
-    const sharedSrc = readFileSync(path.join(process.cwd(), "lib", "flat-list-styles.ts"), "utf8");
+    const sharedSrc = readRepoFile("lib/flat-list-styles.ts");
     assert.match(sharedSrc, /viewerFlatList:\s*\{[\s\S]*?flex:\s*1[\s\S]*?\}/);
   });
 
@@ -189,7 +189,7 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // must apply `flex:1` so a child FlatList/SectionList can size its
     // scrollable viewport. Without flex:1 the View shrinks to its intrinsic
     // size, the FlatList renders with height 0, and nothing scrolls.
-    const screenSrc = readFileSync(path.join(process.cwd(), "components", "screen.tsx"), "utf8");
+    const screenSrc = readRepoFile("components/screen.tsx");
     assert.match(screenSrc, /fillContent:\s*\{[\s\S]*?flex:\s*1[\s\S]*?\}/);
     assert.match(screenSrc, /<View\s+style=\{\s*staticInnerStyle\s*\}\s*>/);
     assert.match(screenSrc, /staticInnerStyle\s*=\s*\[\s*innerStyle\s*,\s*styles\.fillContent\s*\]/);

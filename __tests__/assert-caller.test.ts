@@ -1,13 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   assertCaller,
   jsonError,
   type GetUserResult,
 } from "../supabase/functions/_shared/assert-caller";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * SEC-9 — shared `assertCaller` caller-authentication gate.
@@ -157,10 +156,7 @@ const ADOPTERS = [
 ];
 
 function fnSource(name: string): string {
-  return readFileSync(
-    path.join(process.cwd(), "supabase", "functions", name, "index.ts"),
-    "utf8",
-  );
+  return readRepoFile(`supabase/functions/${name}/index.ts`);
 }
 
 describe("assertCaller — adoption across Edge Functions (structural)", () => {

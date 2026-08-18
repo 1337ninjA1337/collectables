@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * HM-C3 structural pins: the edit-collection form lives in
@@ -14,11 +13,11 @@ import path from "node:path";
  * scroll-driven parent re-renders.
  */
 function readModalSrc(): string {
-  return readFileSync(path.join(process.cwd(), "components", "edit-collection-modal.tsx"), "utf8");
+  return readRepoFile("components/edit-collection-modal.tsx");
 }
 
 function readCollectionSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 describe("HM-C3 — EditCollectionModal extraction", () => {

@@ -1,10 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { stripComments } from "@/lib/env-inlining";
 import { COPIED_RESET_MS, buildSharePayload } from "@/lib/share-link-helpers";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * `lib/use-share-link.ts` holds the share-a-deep-link ceremony every share
@@ -19,7 +18,7 @@ import { COPIED_RESET_MS, buildSharePayload } from "@/lib/share-link-helpers";
  * in `Platform`/`Share` and cannot be loaded outside a react-native runtime.
  */
 function readHookSrc(): string {
-  return readFileSync(path.join(process.cwd(), "lib", "use-share-link.ts"), "utf8");
+  return readRepoFile("lib/use-share-link.ts");
 }
 
 describe("buildSharePayload", () => {
@@ -65,7 +64,7 @@ describe("useShareLink — structure", () => {
     assert.match(src, /export function useShareLink\(/);
     assert.match(src, /export \{ COPIED_RESET_MS, buildSharePayload \};/);
     assert.match(src, /export const CAN_COPY_TO_CLIPBOARD = Platform\.OS === "web";/);
-    const helpers = readFileSync(path.join(process.cwd(), "lib", "share-link-helpers.ts"), "utf8");
+    const helpers = readRepoFile("lib/share-link-helpers.ts");
     assert.match(helpers, /export const COPIED_RESET_MS = 2000;/);
     assert.match(helpers, /export function buildSharePayload\(/);
     assert.doesNotMatch(helpers, /from "react-native"/, "the pure half must stay node-importable");

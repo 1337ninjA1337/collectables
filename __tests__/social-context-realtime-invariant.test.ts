@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Guardrail for the "one socket per app" invariant in `lib/social-context.tsx`.
@@ -29,10 +29,7 @@ import path from "node:path";
  */
 
 describe("social-context realtime invariant", () => {
-  const source = readFileSync(
-    path.join(process.cwd(), "lib", "social-context.tsx"),
-    "utf8",
-  );
+  const source = readRepoFile("lib/social-context.tsx");
 
   it("must not construct a RealtimeClient directly", () => {
     assert.doesNotMatch(

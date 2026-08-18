@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Structural pins for `lib/use-masonry-columns.ts`. The hook can't be
@@ -11,7 +10,7 @@ import path from "node:path";
  * functionally covered by `masonry.test.ts`.
  */
 function readHookSrc(): string {
-  return readFileSync(path.join(process.cwd(), "lib", "use-masonry-columns.ts"), "utf8");
+  return readRepoFile("lib/use-masonry-columns.ts");
 }
 
 describe("lib/use-masonry-columns.ts — useMasonryColumns hook", () => {

@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Responsive masonry column count (Masonry VM-B follow-up): the viewer
@@ -23,7 +22,7 @@ import path from "node:path";
  * collection-detail pins.
  */
 function readSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 describe("app/collection/[id].tsx — responsive masonry column count", () => {

@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Wiring tests for the client-generated-uuid message identity in
@@ -15,10 +14,7 @@ import path from "node:path";
  *     previously-stuck offline message can finally reach the server
  */
 
-const SRC = readFileSync(
-  path.join(process.cwd(), "lib", "chat-context.tsx"),
-  "utf8",
-);
+const SRC = readRepoFile("lib/chat-context.tsx");
 
 describe("chat-context uuid message identity", () => {
   it("imports the uuid mint + the shared sync-engine (BE-13b)", () => {

@@ -23,8 +23,6 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   applySortMode,
@@ -38,9 +36,10 @@ import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocaleBody,
 } from "./helpers/i18n-locales";
+import { readRepoFile } from "./helpers/repo-file";
 
 function readComponentSrc(): string {
-  return readFileSync(path.join(process.cwd(), "components", "item-filters.tsx"), "utf8");
+  return readRepoFile("components/item-filters.tsx");
 }
 
 function item(id: string, title: string): CollectableItem {

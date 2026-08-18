@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   SUB_PROCESSORS,
@@ -9,11 +7,9 @@ import {
   subProcessorSummaryLines,
 } from "../lib/privacy-disclosure";
 import { PRIVACY_MANIFEST } from "../lib/privacy-manifest";
+import { readRepoFile } from "./helpers/repo-file";
 
-const privacyMd = readFileSync(
-  path.join(process.cwd(), "PRIVACY.md"),
-  "utf8",
-);
+const privacyMd = readRepoFile("PRIVACY.md");
 
 describe("sub-processor disclosure shape", () => {
   it("declares unique ids and non-empty facts for every sub-processor", () => {

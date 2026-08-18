@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   assertColumns,
@@ -12,6 +10,7 @@ import {
   assertRlsEnabled,
   loadMigrationSource,
 } from "./helpers/sql-migration-asserts";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Functional coverage for the shared migration-assert helpers, so a future
@@ -106,10 +105,7 @@ describe("sql-migration-asserts helpers", () => {
 
   it("loadMigrationSource reads from supabase/migrations and throws on a missing file", () => {
     const viaHelper = loadMigrationSource("20260424_chat_messages.sql");
-    const direct = readFileSync(
-      path.join(process.cwd(), "supabase", "migrations", "20260424_chat_messages.sql"),
-      "utf8",
-    );
+    const direct = readRepoFile("supabase/migrations/20260424_chat_messages.sql");
     assert.equal(viaHelper, direct);
     assert.throws(() => loadMigrationSource("20990101_missing.sql"));
   });
@@ -126,10 +122,7 @@ describe("sql-migration-asserts helpers", () => {
       "analytics-events-migration.test.ts",
       "chat-messages-migration.test.ts",
     ]) {
-      const source = readFileSync(
-        path.join(process.cwd(), "__tests__", file),
-        "utf8",
-      );
+      const source = readRepoFile(`__tests__/${file}`);
       assert.match(
         source,
         /from "\.\/helpers\/sql-migration-asserts"/,

@@ -1,11 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import {
   initSentry,
   setSentryUser,
 } from "../lib/sentry";
+import { readRepoFile } from "./helpers/repo-file";
 
 type Call = { method: string; args: unknown[] };
 
@@ -115,10 +114,7 @@ describe("setSentryUser — enabled paths", () => {
 });
 
 describe("Crash #5 — auth-context wiring", () => {
-  const src = readFileSync(
-    path.join(process.cwd(), "lib", "auth-context.tsx"),
-    "utf8",
-  );
+  const src = readRepoFile("lib/auth-context.tsx");
 
   it("imports setSentryUser from @/lib/sentry", () => {
     assert.match(

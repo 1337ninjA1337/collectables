@@ -1,12 +1,11 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import {
   initSentry,
   triggerSentryTestError,
   __resetSentryRateLimitForTests,
 } from "../lib/sentry";
+import { readRepoFile } from "./helpers/repo-file";
 
 type Call = { method: string; args: unknown[] };
 
@@ -94,10 +93,7 @@ describe("triggerSentryTestError", () => {
 });
 
 describe("Crash #11/#12 — _layout.tsx exposes the test helper globally", () => {
-  const layoutSrc = readFileSync(
-    path.join(process.cwd(), "app", "_layout.tsx"),
-    "utf8",
-  );
+  const layoutSrc = readRepoFile("app/_layout.tsx");
 
   it("imports triggerSentryTestError", () => {
     assert.match(

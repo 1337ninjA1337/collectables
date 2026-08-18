@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./repo-file";
 
 /**
  * Shared structural assertions for Supabase migration tests. The actual SQL is
@@ -18,10 +17,7 @@ function escapeRegExp(literal: string): string {
 
 /** Read a migration file from supabase/migrations/ relative to the repo root. */
 export function loadMigrationSource(fileName: string): string {
-  return readFileSync(
-    path.join(process.cwd(), "supabase", "migrations", fileName),
-    "utf8",
-  );
+  return readRepoFile(`supabase/migrations/${fileName}`);
 }
 
 /** Assert the migration creates the table (idempotently) in the public schema. */
@@ -92,10 +88,7 @@ export function assertManualTasksDocuments(
   migrationFile: string,
   alsoMentions: string[] = [],
 ): void {
-  const manualTasks = readFileSync(
-    path.join(process.cwd(), "MANUAL-TASKS.md"),
-    "utf8",
-  );
+  const manualTasks = readRepoFile("MANUAL-TASKS.md");
   assert.match(
     manualTasks,
     new RegExp(escapeRegExp(migrationFile)),

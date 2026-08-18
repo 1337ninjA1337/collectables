@@ -10,6 +10,7 @@ import {
   compareIsoDesc,
   compareKeysAsc,
 } from "@/lib/sort-helpers";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * `lib/sort-helpers.ts` exists to close a bug class: fifteen call sites had
@@ -202,7 +203,7 @@ describe("no lib/ module re-inlines an inconsistent timestamp comparator", () =>
   it("keeps the marketplace soldAt fallback in one place", () => {
     // Five surfaces sort by `soldAt ?? createdAt`; the fallback is defined once
     // as `bySoldAtDesc`. A sixth site re-deriving it would drift.
-    const source = readFileSync(path.join(process.cwd(), "lib/marketplace-helpers.ts"), "utf8");
+    const source = readRepoFile("lib/marketplace-helpers.ts");
     assert.equal(
       (source.match(/function bySoldAtDesc\b/g) ?? []).length,
       1,

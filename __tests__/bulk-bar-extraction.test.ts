@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * BB-A structural pins: the selection-mode bulk-bar lives in
@@ -11,11 +10,11 @@ import path from "node:path";
  * keeps only the spacer that reserves scroll room under the bar.
  */
 function readBulkBarSrc(): string {
-  return readFileSync(path.join(process.cwd(), "components", "bulk-bar.tsx"), "utf8");
+  return readRepoFile("components/bulk-bar.tsx");
 }
 
 function readCollectionSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 describe("BB-A — BulkBar extraction", () => {

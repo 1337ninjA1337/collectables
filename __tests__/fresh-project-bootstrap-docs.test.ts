@@ -1,16 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 // BE-4 — the offline (doc) half: README-DEPLOY.md must document how to
 // bootstrap a fresh Supabase project from the committed migrations alone,
 // run them in order, point a build at it, and confirm end-to-end.
 
-const readme = readFileSync(
-  path.join(process.cwd(), "README-DEPLOY.md"),
-  "utf8",
-);
+const readme = readRepoFile("README-DEPLOY.md");
 
 const bootstrapSection = (() => {
   const start = readme.indexOf(

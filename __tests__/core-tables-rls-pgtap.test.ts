@@ -1,17 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 // BE-12b — structural guard for the executable pgTAP RLS test that runs in the
 // BE-31 `supabase test db` harness (Docker runner only). This offline test
 // just asserts the SQL file exists and exercises the right surface; the actual
 // assertions are validated on the PR's Supabase-test CI, not here.
 
-const sql = readFileSync(
-  path.join(process.cwd(), "supabase", "tests", "01_core_tables_rls.sql"),
-  "utf8",
-);
+const sql = readRepoFile("supabase/tests/01_core_tables_rls.sql");
 
 describe("BE-12b — core-tables RLS pgTAP test", () => {
   it("is a self-contained pgTAP plan", () => {

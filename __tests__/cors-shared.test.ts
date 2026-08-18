@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   evaluateCors,
@@ -11,6 +9,7 @@ import {
   GITHUB_PAGES_ORIGIN,
   DEEP_LINK_ORIGIN,
 } from "../supabase/functions/_shared/cors";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * SEC-10 — centralised Edge Function CORS.
@@ -142,10 +141,7 @@ const FUNCTIONS = [
 ];
 
 function fnSource(name: string): string {
-  return readFileSync(
-    path.join(process.cwd(), "supabase", "functions", name, "index.ts"),
-    "utf8",
-  );
+  return readRepoFile(`supabase/functions/${name}/index.ts`);
 }
 
 describe("cors — adoption across Edge Functions (structural)", () => {

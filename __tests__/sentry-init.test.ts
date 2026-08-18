@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import {
   initSentry,
   captureException,
@@ -10,6 +8,7 @@ import {
   getSentryLastInitError,
   toSentryCaptureContext,
 } from "../lib/sentry";
+import { readRepoFile } from "./helpers/repo-file";
 
 type Call = { method: string; args: unknown[] };
 
@@ -337,10 +336,7 @@ describe("lib/sentry — concurrent init dedup", () => {
 
 describe("lib/sentry — module shape", () => {
   it("does not import @sentry/react-native at the top level", () => {
-    const src = readFileSync(
-      path.join(process.cwd(), "lib", "sentry.ts"),
-      "utf8",
-    );
+    const src = readRepoFile("lib/sentry.ts");
     // Top-level static import would look like: import ... from "@sentry/react-native";
     assert.doesNotMatch(
       src,
@@ -356,10 +352,7 @@ describe("lib/sentry — module shape", () => {
   });
 
   it("guards every wrapper with both sdk and enabled checks", () => {
-    const src = readFileSync(
-      path.join(process.cwd(), "lib", "sentry.ts"),
-      "utf8",
-    );
+    const src = readRepoFile("lib/sentry.ts");
     const guardCount = (src.match(/!sdk\s*\|\|\s*!activeConfig\?\.enabled/g) ?? []).length;
     assert.ok(
       guardCount >= 2,

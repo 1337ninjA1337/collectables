@@ -1,17 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
-const breadcrumbsSrc = readFileSync(
-  path.join(process.cwd(), "components", "navigation-breadcrumbs.tsx"),
-  "utf8",
-);
+const breadcrumbsSrc = readRepoFile("components/navigation-breadcrumbs.tsx");
 
-const layoutSrc = readFileSync(
-  path.join(process.cwd(), "app", "_layout.tsx"),
-  "utf8",
-);
+const layoutSrc = readRepoFile("app/_layout.tsx");
 
 describe("Crash #6 — NavigationBreadcrumbs component", () => {
   it("imports usePathname from expo-router", () => {

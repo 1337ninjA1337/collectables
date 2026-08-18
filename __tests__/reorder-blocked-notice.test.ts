@@ -15,17 +15,16 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocaleBody,
   localeStrings,
 } from "./helpers/i18n-locales";
+import { readRepoFile } from "./helpers/repo-file";
 
 function readScreenSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 const NOTICE_KEYS = ["reorderBlockedBySort", "reorderResetSort"] as const;

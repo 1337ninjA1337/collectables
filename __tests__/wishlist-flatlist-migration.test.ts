@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * WLF-B structural pins: `app/wishlist.tsx` no longer renders its card list
@@ -13,11 +12,11 @@ import path from "node:path";
  * are regex-based.
  */
 function readSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "wishlist.tsx"), "utf8");
+  return readRepoFile("app/wishlist.tsx");
 }
 
 function readContextSrc(): string {
-  return readFileSync(path.join(process.cwd(), "lib", "collections-context.tsx"), "utf8");
+  return readRepoFile("lib/collections-context.tsx");
 }
 
 describe("app/wishlist.tsx — WLF-B FlatList migration", () => {

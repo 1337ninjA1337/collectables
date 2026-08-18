@@ -1,12 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   encodeUtf8,
   timingSafeEqualStrings,
 } from "../supabase/functions/_shared/timing-safe-equal";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Shared constant-time secret comparison
@@ -70,16 +69,7 @@ describe("timingSafeEqualStrings", () => {
 });
 
 describe("timing-safe-equal — structural", () => {
-  const HELPER_SOURCE = readFileSync(
-    path.join(
-      process.cwd(),
-      "supabase",
-      "functions",
-      "_shared",
-      "timing-safe-equal.ts",
-    ),
-    "utf8",
-  );
+  const HELPER_SOURCE = readRepoFile("supabase/functions/_shared/timing-safe-equal.ts");
 
   it("delegates to the crypto primitive instead of a hand-rolled loop", () => {
     assert.match(HELPER_SOURCE, /from\s+['"]node:crypto['"]/);
@@ -90,16 +80,7 @@ describe("timing-safe-equal — structural", () => {
   });
 
   it("is adopted by analytics-mirror (no local re-roll left behind)", () => {
-    const fnSource = readFileSync(
-      path.join(
-        process.cwd(),
-        "supabase",
-        "functions",
-        "analytics-mirror",
-        "index.ts",
-      ),
-      "utf8",
-    );
+    const fnSource = readRepoFile("supabase/functions/analytics-mirror/index.ts");
     assert.match(
       fnSource,
       /from\s+['"]\.\.\/_shared\/timing-safe-equal\.ts['"]/,

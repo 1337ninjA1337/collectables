@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 // BE-36 — structural guard for the executable pgTAP FK/cascade test that runs
 // in the BE-31 `supabase test db` harness (Docker runner only). This offline
@@ -9,10 +8,7 @@ import path from "node:path";
 // referential-integrity assertions are validated on the PR's Supabase-test CI,
 // not here (mirrors core-tables-rls-pgtap.test.ts).
 
-const sql = readFileSync(
-  path.join(process.cwd(), "supabase", "tests", "02_fk_cascade.sql"),
-  "utf8",
-);
+const sql = readRepoFile("supabase/tests/02_fk_cascade.sql");
 
 describe("BE-36 — FK / cascade pgTAP test", () => {
   it("is a self-contained pgTAP plan", () => {

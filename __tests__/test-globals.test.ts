@@ -1,8 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { initSentry, isSentryReady } from "../lib/sentry";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Guards the global test bootstrap (`__tests__/test-globals.ts`, preloaded via
@@ -26,10 +25,7 @@ const BOOT_OPTIONS = {
 };
 
 describe("test-globals — Sentry reset wiring (structural)", () => {
-  const source = readFileSync(
-    path.join(process.cwd(), "__tests__", "test-globals.ts"),
-    "utf8",
-  );
+  const source = readRepoFile("__tests__/test-globals.ts");
 
   it("statically imports the Sentry reset helper", () => {
     assert.match(

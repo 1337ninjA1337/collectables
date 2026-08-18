@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * onEndReached pagination pins: the two scroll-owning FlatList branches in
@@ -16,7 +15,7 @@ import path from "node:path";
  * `node --test`, so the assertions are regex-based.
  */
 function readSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 describe("app/collection/[id].tsx — onEndReached pagination", () => {

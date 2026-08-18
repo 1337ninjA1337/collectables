@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, it } from "node:test";
 
 import { isFreshlyCreatedUser } from "../lib/auth-helpers";
 import { isWithinDuration } from "../lib/time-helpers";
+import { readRepoFile } from "./helpers/repo-file";
 
 const now = Date.parse("2026-05-08T12:00:00.000Z");
 const MINUTE = 60_000;
@@ -59,10 +58,7 @@ describe("isWithinDuration — generic recency predicate", () => {
 
 describe("isFreshlyCreatedUser — delegates to isWithinDuration", () => {
   it("source delegates instead of re-rolling Date.parse arithmetic", () => {
-    const src = readFileSync(
-      path.join(process.cwd(), "lib/auth-helpers.ts"),
-      "utf8",
-    );
+    const src = readRepoFile("lib/auth-helpers.ts");
     assert.match(
       src,
       /return isWithinDuration\(user\?\.created_at, windowMs, now\)/,

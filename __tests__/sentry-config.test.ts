@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import {
   resolveSentryConfig,
   isValidSentryDsn,
@@ -9,9 +7,10 @@ import {
   DEFAULT_TRACES_SAMPLE_RATE,
   __resetSentryConfigWarningForTests,
 } from "../lib/sentry-config";
+import { readRepoFile } from "./helpers/repo-file";
 
 const packageJson = JSON.parse(
-  readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+  readRepoFile("package.json"),
 );
 const APP_VERSION: string = packageJson.version;
 
@@ -244,10 +243,7 @@ describe("resolveSentryConfig — DSN validation gate", () => {
 
 describe("lib/sentry-config.ts purity", () => {
   it("does not import react-native or any RN module", () => {
-    const src = readFileSync(
-      path.join(process.cwd(), "lib", "sentry-config.ts"),
-      "utf8",
-    );
+    const src = readRepoFile("lib/sentry-config.ts");
     assert.doesNotMatch(
       src,
       /from\s+["']react-native["']/,

@@ -1,12 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
-const workflow = readFileSync(
-  path.join(process.cwd(), ".github", "workflows", "deploy.yml"),
-  "utf8",
-);
+const workflow = readRepoFile(".github/workflows/deploy.yml");
 
 describe("Crash #8 — deploy workflow injects Sentry env into build", () => {
   it("passes EXPO_PUBLIC_SENTRY_DSN to the build step", () => {
@@ -87,10 +83,7 @@ describe("Crash #10 — release tagging by commit SHA", () => {
 });
 
 describe("Crash #10 — sentry-config honours EXPO_PUBLIC_SENTRY_RELEASE", () => {
-  const cfgSrc = readFileSync(
-    path.join(process.cwd(), "lib", "sentry-config.ts"),
-    "utf8",
-  );
+  const cfgSrc = readRepoFile("lib/sentry-config.ts");
 
   it("reads EXPO_PUBLIC_SENTRY_RELEASE first when present", () => {
     assert.match(

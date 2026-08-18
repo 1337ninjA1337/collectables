@@ -1,8 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Structural guards over the iOS submission block in app.json. The strings
@@ -12,15 +11,12 @@ import { readI18nSource } from "./helpers/i18n-source-file";
  */
 
 const appJson = JSON.parse(
-  readFileSync(path.join(process.cwd(), "app.json"), "utf8"),
+  readRepoFile("app.json"),
 );
 const ios = appJson?.expo?.ios ?? {};
 const infoPlist = ios.infoPlist ?? {};
 
-const guide = readFileSync(
-  path.join(process.cwd(), "APPSTORE-SUBMISSION.md"),
-  "utf8",
-);
+const guide = readRepoFile("APPSTORE-SUBMISSION.md");
 
 const i18nSource = readI18nSource();
 

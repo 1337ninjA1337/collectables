@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * WLF-A structural pins: the two VM-D "screen-owning FlatList" styles
@@ -13,11 +12,11 @@ import path from "node:path";
  * regex-based.
  */
 function readSharedSrc(): string {
-  return readFileSync(path.join(process.cwd(), "lib", "flat-list-styles.ts"), "utf8");
+  return readRepoFile("lib/flat-list-styles.ts");
 }
 
 function readCollectionSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 describe("lib/flat-list-styles.ts (WLF-A shared styles)", () => {

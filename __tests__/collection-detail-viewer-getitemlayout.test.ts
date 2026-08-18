@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Viewer-branch FlatList `getItemLayout` pins: the 2-column masonry rows are
@@ -23,11 +22,11 @@ import path from "node:path";
  *      because breaking any of them silently corrupts the scroll math.
  */
 function readCollectionSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 function readCardSrc(): string {
-  return readFileSync(path.join(process.cwd(), "components", "item-card.tsx"), "utf8");
+  return readRepoFile("components/item-card.tsx");
 }
 
 describe("viewer FlatList getItemLayout", () => {
@@ -100,7 +99,7 @@ describe("viewer FlatList getItemLayout", () => {
       /contentContainerStyle=\{\s*flatListStyles\.viewerFlatListContent\s*\}/,
       "viewer FlatList must take its content style from the shared flatListStyles",
     );
-    const sharedSrc = readFileSync(path.join(process.cwd(), "lib", "flat-list-styles.ts"), "utf8");
+    const sharedSrc = readRepoFile("lib/flat-list-styles.ts");
     const m = sharedSrc.match(/viewerFlatListContent:\s*\{\s*gap:\s*SPACING_LIST\s*,?\s*\}/);
     assert.ok(m, "flatListStyles.viewerFlatListContent must keep gap: SPACING_LIST (or update getMasonryRowLayout's stride)");
   });

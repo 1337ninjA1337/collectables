@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   acceptFriendRequestPayload,
@@ -31,6 +29,7 @@ import {
   REACTION_COLUMNS,
 } from "@/lib/supabase-profiles-shapes";
 import { Collection, UserProfile } from "@/lib/types";
+import { readRepoFile } from "./helpers/repo-file";
 
 const BASE = "https://demo.supabase.co";
 
@@ -375,10 +374,7 @@ describe("acceptFriendRequestPayload", () => {
 
 // --- Wiring: supabase-profiles.ts uses the shape helpers ---
 describe("supabase-profiles.ts wiring", () => {
-  const SOURCE = readFileSync(
-    path.join(process.cwd(), "lib", "supabase-profiles.ts"),
-    "utf8",
-  );
+  const SOURCE = readRepoFile("lib/supabase-profiles.ts");
 
   it("imports the shape helpers from supabase-profiles-shapes", () => {
     assert.match(SOURCE, /from "@\/lib\/supabase-profiles-shapes"/);
@@ -416,10 +412,7 @@ describe("supabase-profiles.ts wiring", () => {
 
 // --- BE-28c explicit column projections (no more select=*) ---
 describe("BE-28c column projections", () => {
-  const SOURCE = readFileSync(
-    path.join(process.cwd(), "lib", "supabase-profiles.ts"),
-    "utf8",
-  );
+  const SOURCE = readRepoFile("lib/supabase-profiles.ts");
 
   // Snake-case columns each coercer in supabase-row-coerce.ts reads, plus the
   // sync-metadata columns the read paths depend on (created_at keyset cursor,

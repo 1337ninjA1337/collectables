@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * HM-A/HM-B header-fragment memoization pins: `listTitleAndFilters`,
@@ -27,11 +26,11 @@ import path from "node:path";
  * `node --test`, so the assertions are regex-based.
  */
 function readScreenSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 function readHookSrc(): string {
-  return readFileSync(path.join(process.cwd(), "lib", "use-chunked-list.ts"), "utf8");
+  return readRepoFile("lib/use-chunked-list.ts");
 }
 
 describe("app/collection/[id].tsx — HM-A header-fragment memoization", () => {

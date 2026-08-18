@@ -1,9 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { convertItemCost } from "@/lib/item-cost";
+import { readRepoFile } from "./helpers/repo-file";
 
 // USD-base rates: 1 USD = 0.9 EUR = 90 RUB. "XYZ" intentionally absent so we
 // can exercise the missing-rate branch.
@@ -58,7 +57,7 @@ describe("convertItemCost — per-item currency conversion", () => {
 });
 
 describe("collections-context — convertItemCost wiring", () => {
-  const src = readFileSync(path.join(process.cwd(), "lib/collections-context.tsx"), "utf8");
+  const src = readRepoFile("lib/collections-context.tsx");
 
   it("imports the pure helper from lib/item-cost", () => {
     assert.match(src, /import\s*\{\s*convertItemCost,\s*type\s+ConvertedItemCost\s*\}\s*from\s*"@\/lib\/item-cost"/);

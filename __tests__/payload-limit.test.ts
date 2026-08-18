@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   MAX_PAYLOAD_BYTES,
@@ -9,6 +7,7 @@ import {
   exceedsPayloadLimit,
   utf8ByteLength,
 } from "../supabase/functions/_shared/payload-limit";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Shared webhook body-size gate (`supabase/functions/_shared/payload-limit.ts`).
@@ -70,16 +69,7 @@ describe("exceedsPayloadLimit", () => {
 });
 
 describe("payload-limit — structural adoption (analytics-mirror)", () => {
-  const FN_SOURCE = readFileSync(
-    path.join(
-      process.cwd(),
-      "supabase",
-      "functions",
-      "analytics-mirror",
-      "index.ts",
-    ),
-    "utf8",
-  );
+  const FN_SOURCE = readRepoFile("supabase/functions/analytics-mirror/index.ts");
 
   it("imports the shared gate", () => {
     assert.match(FN_SOURCE, /from\s+['"]\.\.\/_shared\/payload-limit\.ts['"]/);

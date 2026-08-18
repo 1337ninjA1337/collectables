@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   buildAnomalyEnvelope,
@@ -9,6 +7,7 @@ import {
   reportMirrorAnomaly,
   type MirrorAnomaly,
 } from "../supabase/functions/_shared/sentry-report";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Edge Function → Sentry anomaly reporting
@@ -105,10 +104,7 @@ describe("reportMirrorAnomaly", () => {
 });
 
 describe("sentry-report — structural adoption (analytics-mirror)", () => {
-  const FN_SOURCE = readFileSync(
-    path.join(process.cwd(), "supabase", "functions", "analytics-mirror", "index.ts"),
-    "utf8",
-  );
+  const FN_SOURCE = readRepoFile("supabase/functions/analytics-mirror/index.ts");
 
   it("fires the report on the partial-success path, gated on errors and fire-and-forget", () => {
     assert.match(FN_SOURCE, /from\s+['"]\.\.\/_shared\/sentry-report\.ts['"]/);

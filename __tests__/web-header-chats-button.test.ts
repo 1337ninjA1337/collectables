@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Structural test for the new "Chats" entry point in the desktop/web header.
@@ -13,10 +12,7 @@ import path from "node:path";
  * pins the new header button so it can't silently disappear.
  */
 
-const LAYOUT_SRC = readFileSync(
-  path.join(process.cwd(), "app", "_layout.tsx"),
-  "utf8",
-);
+const LAYOUT_SRC = readRepoFile("app/_layout.tsx");
 
 describe("web header chats button", () => {
   it("imports useChat to read unread count for the badge", () => {

@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import {
   initSentry,
   captureException,
@@ -14,6 +12,7 @@ import {
 } from "../lib/sentry";
 import { parseStoredDiagnostics } from "../lib/diagnostics-context";
 import { DIAGNOSTICS_KEY } from "../lib/storage-keys";
+import { readRepoFile } from "./helpers/repo-file";
 
 type Call = { method: string; args: unknown[] };
 
@@ -186,10 +185,7 @@ describe("Crash #15 — storage key", () => {
 });
 
 describe("Crash #15 — settings UI wiring", () => {
-  const settingsSrc = readFileSync(
-    path.join(process.cwd(), "app", "settings.tsx"),
-    "utf8",
-  );
+  const settingsSrc = readRepoFile("app/settings.tsx");
 
   it("imports useDiagnostics", () => {
     assert.match(
@@ -221,10 +217,7 @@ describe("Crash #15 — settings UI wiring", () => {
 });
 
 describe("Crash #15 — devtools globals", () => {
-  const layoutSrc = readFileSync(
-    path.join(process.cwd(), "app", "_layout.tsx"),
-    "utf8",
-  );
+  const layoutSrc = readRepoFile("app/_layout.tsx");
 
   it("registers __sentryStatus on globalThis", () => {
     assert.match(layoutSrc, /__sentryStatus\s*=\s*getSentryStatus/);

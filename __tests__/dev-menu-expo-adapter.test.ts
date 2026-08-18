@@ -1,9 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { adaptExpoDevMenu, registerDevMenu } from "../lib/dev-menu";
+import { readRepoFile } from "./helpers/repo-file";
 
 describe("adaptExpoDevMenu", () => {
   it("returns null when the module is missing or has no registerDevMenuItems", () => {
@@ -79,7 +78,7 @@ describe("adaptExpoDevMenu", () => {
 describe("expo-dev-menu peer dep + plugin wiring", () => {
   it("declares expo-dev-menu in package.json dependencies", () => {
     const pkg = JSON.parse(
-      readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+      readRepoFile("package.json"),
     ) as { dependencies?: Record<string, string> };
     assert.ok(
       pkg.dependencies && typeof pkg.dependencies["expo-dev-menu"] === "string",
@@ -89,7 +88,7 @@ describe("expo-dev-menu peer dep + plugin wiring", () => {
 
   it("registers expo-dev-menu in the app.json plugins array", () => {
     const appJson = JSON.parse(
-      readFileSync(path.join(process.cwd(), "app.json"), "utf8"),
+      readRepoFile("app.json"),
     ) as { expo?: { plugins?: Array<string | [string, unknown]> } };
     const plugins = appJson.expo?.plugins ?? [];
     const flat = plugins.map((p) => (Array.isArray(p) ? p[0] : p));

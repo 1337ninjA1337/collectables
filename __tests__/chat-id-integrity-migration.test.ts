@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Structural assertions over the chat_id-integrity migration. The SQL runs
@@ -10,15 +9,7 @@ import path from "node:path";
  * migration into one that fails on a live DB with legacy rows.
  */
 
-const SOURCE = readFileSync(
-  path.join(
-    process.cwd(),
-    "supabase",
-    "migrations",
-    "20260516_chat_id_integrity.sql",
-  ),
-  "utf8",
-);
+const SOURCE = readRepoFile("supabase/migrations/20260516_chat_id_integrity.sql");
 
 describe("chat_id integrity migration", () => {
   it("adds a CHECK constraint to chat_messages", () => {
@@ -42,10 +33,7 @@ describe("chat_id integrity migration", () => {
   });
 
   it("is documented in MANUAL-TASKS.md with the validate-later step", () => {
-    const manual = readFileSync(
-      path.join(process.cwd(), "MANUAL-TASKS.md"),
-      "utf8",
-    );
+    const manual = readRepoFile("MANUAL-TASKS.md");
     assert.match(manual, /20260516_chat_id_integrity\.sql/);
     assert.match(
       manual,

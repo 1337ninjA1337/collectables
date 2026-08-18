@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * ItemCard memoization pins (the VM-F recipe applied to the viewer branch):
@@ -20,11 +19,11 @@ import path from "node:path";
  * Reverting either leg silently regresses the perf win — pinned separately.
  */
 function readCollectionSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 function readCardSrc(): string {
-  return readFileSync(path.join(process.cwd(), "components", "item-card.tsx"), "utf8");
+  return readRepoFile("components/item-card.tsx");
 }
 
 describe("ItemCard memoization end-to-end", () => {

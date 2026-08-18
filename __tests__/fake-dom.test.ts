@@ -1,9 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { setupFakeDom, type FakeNode } from "./helpers/fake-dom";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Regression coverage for the shared fake-DOM helper so future web-only
@@ -100,10 +99,7 @@ describe("__tests__/helpers/fake-dom", () => {
   });
 
   it("clarity.test.ts consumes the shared helper instead of a local re-roll", () => {
-    const source = readFileSync(
-      path.join(process.cwd(), "__tests__", "clarity.test.ts"),
-      "utf8",
-    );
+    const source = readRepoFile("__tests__/clarity.test.ts");
     assert.match(source, /from "\.\/helpers\/fake-dom"/);
     assert.doesNotMatch(source, /function setupFakeDom/);
   });

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -9,6 +9,7 @@ import {
   REQUIRED_INFO_PLIST_KEYS,
 } from "../lib/check-appstore-config";
 import { LINT_GUARDS } from "../lib/lint-guards";
+import { readRepoFile } from "./helpers/repo-file";
 
 /** A minimal valid config mirroring app.json's real shape. */
 function validAppJson() {
@@ -171,7 +172,7 @@ describe("findAppstoreConfigIssues", () => {
 
   it("passes against the real app.json on disk", () => {
     const real = JSON.parse(
-      readFileSync(path.join(process.cwd(), "app.json"), "utf8"),
+      readRepoFile("app.json"),
     );
     assert.deepEqual(
       findAppstoreConfigIssues({
@@ -195,7 +196,7 @@ describe("formatAppstoreConfigReport", () => {
 describe("lint wiring", () => {
   it("registers lint:appstore in package.json and the lint:all registry", () => {
     const pkg = JSON.parse(
-      readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+      readRepoFile("package.json"),
     );
     assert.equal(
       pkg.scripts["lint:appstore"],

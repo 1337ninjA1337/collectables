@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
+import {
+  I18N_SOURCE_REL,
+  readI18nSource,
+} from "./helpers/i18n-source-file";
 import { REPO_ROOT, readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -94,6 +98,40 @@ describe("reading a repo file, said once", () => {
       [],
       `these suites declare their own read helper instead of importing readRepoFile: ${offenders.join(", ")}`,
     );
+  });
+
+  it("leaves no suite opening a literal repo path inline either", () => {
+    // The other half of the same habit, and the one the first sweep was
+    // deliberately blind to while it existed: `readFileSync(path.join(
+    // process.cwd(), "app", "index.tsx"), "utf8")` at the top of a suite is
+    // not a duplicated HELPER, and it is the root spelled again — a hundred
+    // and fourteen times, across seventy-two files. With those routed through
+    // the helper the rule can be the simple one: a suite does not open a
+    // literal path of its own.
+    const offenders = suiteFiles().filter((relative) => {
+      if (ALLOWED_TO_SPELL_THE_SHAPE.includes(relative)) return false;
+      return /readFileSync\( path\.join\( process\.cwd\(\), "/.test(
+        flattened(relative),
+      );
+    });
+    assert.deepEqual(
+      offenders,
+      [],
+      `these suites open a literal repo path instead of calling readRepoFile: ${offenders.join(", ")}`,
+    );
+  });
+
+  it("is what the i18n reader is layered on, rather than a second opener", () => {
+    // `readI18nSource` reached for `node:fs` directly when it shipped this
+    // morning, which made two independent openers of one tree — the
+    // duplication one level up from the one it removed. Its subject is WHICH
+    // file; this module's is how the suites reach the tree.
+    const helper = readRepoFile("__tests__/helpers/i18n-source-file.ts");
+    assert.match(helper, /from "\.\/repo-file"/);
+    assert.doesNotMatch(helper, /from "node:fs"/);
+    // Through the module's own constant, not a second literal — the path is
+    // said once and this case is about the layering, not about the name.
+    assert.equal(readI18nSource(), readRepoFile(I18N_SOURCE_REL));
   });
 
   it("keeps the exemption list to the two files that have to name the shape", () => {

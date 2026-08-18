@@ -1,17 +1,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { APP_VERSION } from "../lib/app-version";
 import appConfig from "../app.config";
 import { resolveSentryConfig } from "../lib/sentry-config";
+import { readRepoFile } from "./helpers/repo-file";
 
 const packageJson = JSON.parse(
-  readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+  readRepoFile("package.json"),
 );
 const appJson = JSON.parse(
-  readFileSync(path.join(process.cwd(), "app.json"), "utf8"),
+  readRepoFile("app.json"),
 );
 
 describe("lib/app-version", () => {

@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * VM-C structural pins: the viewer/read-only branch in
@@ -18,7 +17,7 @@ import path from "node:path";
  * not retested here.
  */
 function readSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 describe("app/collection/[id].tsx — FlatList viewer-masonry migration (VM-C)", () => {

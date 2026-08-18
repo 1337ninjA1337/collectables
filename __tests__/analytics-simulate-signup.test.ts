@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   initAnalytics,
@@ -10,6 +8,7 @@ import {
   __resetAnalyticsForTests,
 } from "../lib/analytics";
 import { ANALYTICS_EVENTS } from "../lib/analytics-events";
+import { readRepoFile } from "./helpers/repo-file";
 
 async function initWithFakeSdk() {
   const calls: { method: string; args: unknown[] }[] = [];
@@ -73,10 +72,7 @@ describe("simulateSignupEvent — dev smoke test for the PostHog wire", () => {
 });
 
 describe("app/_layout.tsx ↔ simulateSignupEvent wiring", () => {
-  const layoutSrc = readFileSync(
-    path.join(process.cwd(), "app", "_layout.tsx"),
-    "utf8",
-  );
+  const layoutSrc = readRepoFile("app/_layout.tsx");
 
   it("imports simulateSignupEvent from @/lib/analytics", () => {
     assert.match(

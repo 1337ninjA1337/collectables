@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * ItemCard `style` prop (VM-C follow-up): the masonry cell's `flex: 1` used
@@ -12,11 +11,11 @@ import path from "node:path";
  * directly. Sources pull in react-native peers — assertions are regex-based.
  */
 function readCardSrc(): string {
-  return readFileSync(path.join(process.cwd(), "components", "item-card.tsx"), "utf8");
+  return readRepoFile("components/item-card.tsx");
 }
 
 function readCollectionSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 describe("ItemCard style prop — masonry wrapper collapse", () => {

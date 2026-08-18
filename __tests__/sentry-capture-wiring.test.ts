@@ -1,20 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
-const profilesSrc = readFileSync(
-  path.join(process.cwd(), "lib", "supabase-profiles.ts"),
-  "utf8",
-);
-const chatSrc = readFileSync(
-  path.join(process.cwd(), "lib", "supabase-chat.ts"),
-  "utf8",
-);
-const marketplaceSrc = readFileSync(
-  path.join(process.cwd(), "lib", "supabase-marketplace.ts"),
-  "utf8",
-);
+const profilesSrc = readRepoFile("lib/supabase-profiles.ts");
+const chatSrc = readRepoFile("lib/supabase-chat.ts");
+const marketplaceSrc = readRepoFile("lib/supabase-marketplace.ts");
 
 describe("Crash #7 — capture in supabase-profiles.ts", () => {
   it("imports captureException", () => {

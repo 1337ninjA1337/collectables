@@ -21,6 +21,11 @@
  * single file — a suite that reads the source twice in one process is welcome
  * to hold the string in a `const`, which is what they all already do.
  *
+ * Layered on {@link readRepoFile} rather than reaching for `node:fs` itself:
+ * this module's subject is WHICH file, and the general reader's is how the
+ * suites reach the tree. Two independent openers of the same tree is the
+ * duplication one level up from the one this file removed.
+ *
  * Why here and not beside the parser, which is where a first reading of the
  * suggestion would put it: `lib/i18n-source.ts` takes source TEXT and returns
  * what it found, and `lib/i18n-coverage.ts` is written the same way and says
@@ -31,15 +36,15 @@
  * so the path lives on the suites' side of that line.
  */
 
-import { readFileSync } from "node:fs";
 import path from "node:path";
 
-/** Absolute path to the translations module, resolved from the repo root. */
-export const I18N_SOURCE_PATH = path.join(
-  process.cwd(),
-  "lib",
-  "i18n-context.tsx",
-);
+import { REPO_ROOT, readRepoFile } from "./repo-file";
+
+/** The module's location, repo-relative — the one statement of it. */
+export const I18N_SOURCE_REL = "lib/i18n-context.tsx";
+
+/** The same location absolute, for the case that pins what it resolves to. */
+export const I18N_SOURCE_PATH = path.join(REPO_ROOT, I18N_SOURCE_REL);
 
 /**
  * The translations module's source text.
@@ -50,5 +55,5 @@ export const I18N_SOURCE_PATH = path.join(
  * parser already knows, which is the habit that parser exists to end.
  */
 export function readI18nSource(): string {
-  return readFileSync(I18N_SOURCE_PATH, "utf8");
+  return readRepoFile(I18N_SOURCE_REL);
 }

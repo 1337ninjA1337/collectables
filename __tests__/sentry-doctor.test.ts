@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   envelopeUrl,
@@ -12,6 +10,7 @@ import {
   runSentryDoctor,
   type DoctorFetcher,
 } from "../lib/sentry-doctor";
+import { readRepoFile } from "./helpers/repo-file";
 
 const DSN = "https://abc123@o450.ingest.sentry.io/4509";
 const FULL_ENV = {
@@ -189,7 +188,7 @@ describe("runSentryDoctor", () => {
 describe("script wiring", () => {
   it("registers sentry:check in package.json", () => {
     const pkg = JSON.parse(
-      readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+      readRepoFile("package.json"),
     );
     assert.equal(pkg.scripts["sentry:check"], "tsx scripts/sentry-doctor.ts");
   });

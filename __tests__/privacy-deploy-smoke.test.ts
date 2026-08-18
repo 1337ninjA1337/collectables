@@ -1,21 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   PRIVACY_PAGE_MARKER,
   PRIVACY_PAGE_RELATIVE_PATH,
 } from "../lib/bundle-smoke";
+import { readRepoFile } from "./helpers/repo-file";
 
-const deploy = readFileSync(
-  path.join(process.cwd(), ".github", "workflows", "deploy.yml"),
-  "utf8",
-);
-const ci = readFileSync(
-  path.join(process.cwd(), ".github", "workflows", "ci.yml"),
-  "utf8",
-);
+const deploy = readRepoFile(".github/workflows/deploy.yml");
+const ci = readRepoFile(".github/workflows/ci.yml");
 
 const SMOKE_STEP = "- name: Bundle + privacy page smoke check";
 const SMOKE_COMMAND = "npm run lint:bundle-smoke";
@@ -105,20 +98,14 @@ describe("privacy page smoke check — no workflow re-implements it", () => {
 
 describe("privacy page smoke check — grep marker stays valid", () => {
   it("PRIVACY.md contains the marker the smoke check looks for", () => {
-    const privacyMd = readFileSync(
-      path.join(process.cwd(), "PRIVACY.md"),
-      "utf8",
-    );
+    const privacyMd = readRepoFile("PRIVACY.md");
     assert.ok(privacyMd.includes(PRIVACY_PAGE_MARKER));
   });
 
   it("renderPrivacyPage always emits the marker, independent of PRIVACY.md", () => {
     // The marker is in the <title> the renderer writes, not only in the
     // markdown it was handed — so the check survives a PRIVACY.md reword.
-    const renderer = readFileSync(
-      path.join(process.cwd(), "lib", "privacy-page.ts"),
-      "utf8",
-    );
+    const renderer = readRepoFile("lib/privacy-page.ts");
     assert.ok(renderer.includes(PRIVACY_PAGE_MARKER));
   });
 });

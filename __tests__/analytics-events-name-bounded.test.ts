@@ -1,9 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { ANALYTICS_EVENT_NAMES } from "../lib/analytics-events";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * The analytics_events migration enforces `CHECK (length(name) > 0 AND
@@ -18,15 +17,7 @@ const NAME_CAP = 200;
 
 describe("analytics event names fit the DB CHECK bound", () => {
   it("the migration still declares the expected cap (lock-step guard)", () => {
-    const migration = readFileSync(
-      path.join(
-        process.cwd(),
-        "supabase",
-        "migrations",
-        "20260508_analytics_events.sql",
-      ),
-      "utf8",
-    );
+    const migration = readRepoFile("supabase/migrations/20260508_analytics_events.sql");
     assert.match(
       migration,
       new RegExp(

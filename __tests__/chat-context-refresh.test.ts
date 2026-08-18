@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Wiring tests for the `refreshFromCloud` helper added to `lib/chat-context.tsx`
@@ -15,18 +14,9 @@ import path from "node:path";
  *   - the helper composes `cloudFetchMessagesForChat` + `buildChatId`
  */
 
-const CONTEXT_SRC = readFileSync(
-  path.join(process.cwd(), "lib", "chat-context.tsx"),
-  "utf8",
-);
-const CHATS_SCREEN_SRC = readFileSync(
-  path.join(process.cwd(), "app", "chats.tsx"),
-  "utf8",
-);
-const CHAT_DETAIL_SRC = readFileSync(
-  path.join(process.cwd(), "app", "chat", "[id].tsx"),
-  "utf8",
-);
+const CONTEXT_SRC = readRepoFile("lib/chat-context.tsx");
+const CHATS_SCREEN_SRC = readRepoFile("app/chats.tsx");
+const CHAT_DETAIL_SRC = readRepoFile("app/chat/[id].tsx");
 
 describe("chat-context refreshFromCloud wiring", () => {
   it("declares refreshFromCloud on the ChatContextValue type", () => {

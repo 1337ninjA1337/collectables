@@ -1,15 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { localeKeys } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { readRepoFile } from "./helpers/repo-file";
 
-const settingsSrc = readFileSync(
-  path.join(process.cwd(), "app", "settings.tsx"),
-  "utf8",
-);
+const settingsSrc = readRepoFile("app/settings.tsx");
 const i18nSrc = readI18nSource();
 
 const FOOTER_KEYS = [

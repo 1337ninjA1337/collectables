@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * HM-C2 structural pins: the collection share sheet lives in
@@ -13,11 +12,11 @@ import path from "node:path";
  * state lives inside the component — flipping it re-renders only the sheet.
  */
 function readSheetSrc(): string {
-  return readFileSync(path.join(process.cwd(), "components", "collection-share-sheet.tsx"), "utf8");
+  return readRepoFile("components/collection-share-sheet.tsx");
 }
 
 function readCollectionSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 describe("HM-C2 — CollectionShareSheet extraction", () => {

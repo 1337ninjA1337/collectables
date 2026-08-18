@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * HM-C4 structural pins: `CurrencySheet` is memoized (named form) and the
@@ -12,11 +11,11 @@ import path from "node:path";
  * receiving referentially stable props.
  */
 function readSheetSrc(): string {
-  return readFileSync(path.join(process.cwd(), "components", "currency-sheet.tsx"), "utf8");
+  return readRepoFile("components/currency-sheet.tsx");
 }
 
 function readCollectionSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 describe("HM-C4 — CurrencySheet memoization + stable call site", () => {

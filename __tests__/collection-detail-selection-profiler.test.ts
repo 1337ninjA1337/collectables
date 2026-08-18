@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * __DEV__-only Profiler telemetry pins for the selection-mode FlatList:
@@ -13,7 +12,7 @@ import path from "node:path";
  * while just browsing).
  */
 function readCollectionSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 describe("selection-mode FlatList Profiler telemetry", () => {

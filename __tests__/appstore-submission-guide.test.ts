@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 const guidePath = path.join(process.cwd(), "APPSTORE-SUBMISSION.md");
 const guide = readFileSync(guidePath, "utf8");
@@ -9,7 +10,7 @@ const guide = readFileSync(guidePath, "utf8");
 describe("APPSTORE-SUBMISSION.md", () => {
   it("documents the bundle identifier from app.json", () => {
     const appJson = JSON.parse(
-      readFileSync(path.join(process.cwd(), "app.json"), "utf8"),
+      readRepoFile("app.json"),
     );
     const bundleId = appJson?.expo?.ios?.bundleIdentifier;
     assert.ok(bundleId, "app.json must declare ios.bundleIdentifier");
@@ -96,10 +97,7 @@ describe("APPSTORE-SUBMISSION.md", () => {
 
 describe("README-DEPLOY.md", () => {
   it("links to the App Store submission guide", () => {
-    const readme = readFileSync(
-      path.join(process.cwd(), "README-DEPLOY.md"),
-      "utf8",
-    );
+    const readme = readRepoFile("README-DEPLOY.md");
     assert.match(
       readme,
       /APPSTORE-SUBMISSION\.md/,

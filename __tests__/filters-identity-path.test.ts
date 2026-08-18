@@ -33,6 +33,7 @@ import {
   type ItemFilters,
 } from "@/lib/item-filters";
 import type { CollectableItem } from "@/lib/types";
+import { readRepoFile } from "./helpers/repo-file";
 
 function item(title: string, overrides: Partial<CollectableItem> = {}): CollectableItem {
   return {
@@ -224,7 +225,7 @@ describe("the audit the task asked for — other pure-helper array modules", () 
     // The line is a one-liner that reads like a micro-optimisation; without
     // the note explaining the useChunkedList reset it is a prime candidate for
     // a "simplify" pass to delete.
-    const src = readFileSync(path.join(process.cwd(), "lib", "item-filters.ts"), "utf8");
+    const src = readRepoFile("lib/item-filters.ts");
     const idx = src.indexOf("if (!hasActiveMatchers(filters)) return items;");
     assert.ok(idx > 0, "the identity short-circuit is gone");
     const doc = src.slice(Math.max(0, idx - 1200), idx).replace(/\s+/g, " ");

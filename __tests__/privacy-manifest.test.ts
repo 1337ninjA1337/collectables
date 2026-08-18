@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   ACCESSED_API_TYPES,
@@ -9,11 +7,9 @@ import {
   renderPrivacyInfoPlist,
   renderPrivacyMarkdownTable,
 } from "../lib/privacy-manifest";
+import { readRepoFile } from "./helpers/repo-file";
 
-const guide = readFileSync(
-  path.join(process.cwd(), "APPSTORE-SUBMISSION.md"),
-  "utf8",
-);
+const guide = readRepoFile("APPSTORE-SUBMISSION.md");
 
 describe("privacy manifest declarations", () => {
   it("declares no tracking anywhere", () => {
@@ -85,10 +81,7 @@ describe("Markdown table parity", () => {
 
 describe("PrivacyInfo.xcprivacy parity", () => {
   it("the committed plist matches the rendered plist", () => {
-    const committed = readFileSync(
-      path.join(process.cwd(), "PrivacyInfo.xcprivacy"),
-      "utf8",
-    );
+    const committed = readRepoFile("PrivacyInfo.xcprivacy");
     assert.equal(
       committed,
       renderPrivacyInfoPlist(),
@@ -152,7 +145,7 @@ describe("PrivacyInfo.xcprivacy parity", () => {
 describe("script wiring", () => {
   it("registers privacy:generate in package.json", () => {
     const pkg = JSON.parse(
-      readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+      readRepoFile("package.json"),
     );
     assert.equal(
       pkg.scripts["privacy:generate"],

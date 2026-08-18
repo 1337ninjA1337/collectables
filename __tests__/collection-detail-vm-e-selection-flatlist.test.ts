@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * VM-E (as amended by BB-B) structural pins: the owner+selection-mode
@@ -20,7 +19,7 @@ import path from "node:path";
  * Drag-mode keeps `NestableDraggableFlatList` as before.
  */
 function readSrc(): string {
-  return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
+  return readRepoFile("app/collection/[id].tsx");
 }
 
 function selectionBranch(src: string): string {
