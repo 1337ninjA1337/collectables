@@ -109,8 +109,51 @@ type ScanResult = ParsedObjectLiteral &
  * next one. That bound is why every hazard here is a lost key or two rather
  * than a truncated literal — and it is also why a stale-word bug cannot be
  * caught by counting keys from outside on a file prettier has wrapped.
+ *
+ * The `.` argument is the third claim in this file that is load-bearing and
+ * unassertable, and they are worth naming together because each is defended
+ * only by the comment above it:
+ *  1. this one — the counter-example (`p./re/`) is a SYNTAX ERROR, so it
+ *     cannot be written into a fixture that compiles, and the scanner would
+ *     read the fixture the same way whichever side of the class the `.` sat on;
+ *  2. the ASI rows of {@link REGEXP_FOLLOWS_KEYWORD} — `break`, `continue` and
+ *     `debugger` cost nothing because no valid program puts a `/` on their
+ *     line, which is again a statement about the grammar and not about a scan;
+ *  3. the newline bound just described — it is why every misread here is
+ *     survivable, and a case asserting it would be asserting that a bug this
+ *     scanner does not have would have been cheap.
+ * A reader tempted to delete any of the three for want of a test should read
+ * that absence as the claim being about JavaScript rather than about this file.
  */
 const DIVISION_FOLLOWS = /[A-Za-z0-9_$)\]}"'`.]/;
+
+/**
+ * One row of {@link REGEXP_FOLLOWS_KEYWORD}: the shape that puts a regex after
+ * the word, and — separately — what stands between the two.
+ *
+ * The separator is its own field because the two claims are not the same one
+ * and only one of them is about a division this scanner can get wrong. An
+ * `"inline"` row asserts the strong thing: a `/` can follow the word on the
+ * SAME line, so a program really can write `return /re/.test(s)` and a scanner
+ * reading that `/` as division loses the rest of the line. A `"newline"` row
+ * asserts the weak one: the word ends a statement, so the only place its regex
+ * can stand is the line below, and the row exists to keep the word out of the
+ * "in neither list" hole rather than to describe a hazard.
+ *
+ * Collapsing them is how the row-shape case quietly stopped checking anything:
+ * it matched the word and its regex with a single space until the three ASI
+ * rows arrived, then loosened to "any whitespace" for every row at once —
+ * after which a `return` row rewritten across a line break would still have
+ * passed, and the distinction that decides whether there is a division to get
+ * wrong was no longer stated anywhere. With the field, the inline rows are
+ * checked strictly again.
+ */
+export type KeywordRegExpRow = {
+  /** A valid fragment in which a regex stands immediately after the word. */
+  readonly example: string;
+  /** Whether {@link example} separates word from `/` by spaces or a newline. */
+  readonly separator: "inline" | "newline";
+};
 
 /**
  * …except after one of these words, which end in an identifier character and
@@ -137,9 +180,10 @@ const DIVISION_FOLLOWS = /[A-Za-z0-9_$)\]}"'`.]/;
  * regex on the NEXT LINE, because that is the only place one can stand: each
  * ends a statement, so no valid program writes a `/` straight after them, and
  * ASI closes the statement at the line break so the `/re/` below opens a new
- * one. A row costs nothing where there is no division to get wrong, and
- * leaving them out is exactly how a word ends up in neither the table nor the
- * audit.
+ * one. Those three say so in their {@link KeywordRegExpRow.separator}, which is
+ * what keeps the other sixteen checkable as the same-line claim they are. A row
+ * costs nothing where there is no division to get wrong, and leaving them out
+ * is exactly how a word ends up in neither the table nor the audit.
  *
  * Words that end an expression (`this`, `true`, `null`, `super`) are
  * deliberately absent, and so are the ones a punctuator or a binding name
@@ -150,26 +194,26 @@ const DIVISION_FOLLOWS = /[A-Za-z0-9_$)\]}"'`.]/;
  * `__tests__/i18n-source.test.ts`, so a word in NEITHER list is a red case
  * rather than an invisible one.
  */
-export const REGEXP_FOLLOWS_KEYWORD: Readonly<Record<string, string>> = {
-  await: "await /re/.test(s)",
-  break: "break\n/re/.test(s);",
-  case: "case /re/.test(s):",
-  continue: "continue\n/re/.test(s);",
-  debugger: "debugger\n/re/.test(s);",
-  default: "export default /re/;",
-  delete: "delete /re/.lastIndex",
-  do: "do /re/.test(s); while (next())",
-  else: "else /re/.test(s);",
-  extends: "class R extends /re/ {}",
-  in: '"source" in /re/',
-  instanceof: "s instanceof /re/",
-  new: "new /re/()",
-  of: "for (const m of /re/)",
-  return: "return /re/.test(s)",
-  throw: "throw /re/",
-  typeof: "typeof /re/",
-  void: "void /re/",
-  yield: "yield /re/",
+export const REGEXP_FOLLOWS_KEYWORD: Readonly<Record<string, KeywordRegExpRow>> = {
+  await: { example: "await /re/.test(s)", separator: "inline" },
+  break: { example: "break\n/re/.test(s);", separator: "newline" },
+  case: { example: "case /re/.test(s):", separator: "inline" },
+  continue: { example: "continue\n/re/.test(s);", separator: "newline" },
+  debugger: { example: "debugger\n/re/.test(s);", separator: "newline" },
+  default: { example: "export default /re/;", separator: "inline" },
+  delete: { example: "delete /re/.lastIndex", separator: "inline" },
+  do: { example: "do /re/.test(s); while (next())", separator: "inline" },
+  else: { example: "else /re/.test(s);", separator: "inline" },
+  extends: { example: "class R extends /re/ {}", separator: "inline" },
+  in: { example: '"source" in /re/', separator: "inline" },
+  instanceof: { example: "s instanceof /re/", separator: "inline" },
+  new: { example: "new /re/()", separator: "inline" },
+  of: { example: "for (const m of /re/)", separator: "inline" },
+  return: { example: "return /re/.test(s)", separator: "inline" },
+  throw: { example: "throw /re/", separator: "inline" },
+  typeof: { example: "typeof /re/", separator: "inline" },
+  void: { example: "void /re/", separator: "inline" },
+  yield: { example: "yield /re/", separator: "inline" },
 };
 
 /**
@@ -230,6 +274,15 @@ function scanLiteral(
    * because the pair has to move together — a branch that recorded the
    * character and forgot the word would leave a stale keyword one token too
    * long, and `return "x" / 2` would open a regex.
+   *
+   * One call per TOKEN, with one deliberate exception at the bottom of the
+   * loop: the tail fires per CHARACTER for the punctuation no branch claims,
+   * so `===` is three calls. Harmless — only the last character survives and
+   * the word is cleared either way — and it is why an operator needs no branch
+   * of its own. Numbers used to ride that same tail (`1_000n` was six calls),
+   * which made the invariant false for a whole class of literal that
+   * {@link DIVISION_FOLLOWS} then had to be right about one character at a
+   * time; they get {@link readNumericLiteral} instead.
    */
   const consumed = (token: string, word = "") => {
     prev = token.length > 0 ? token[token.length - 1] : prev;
@@ -351,6 +404,24 @@ function scanLiteral(
       expectKey = false;
       continue;
     }
+    if (startsNumericLiteral(source, i)) {
+      // Read whole rather than character by character, so `consumed()` sees one
+      // token and `prev` is the literal's LAST character — which is the one the
+      // `/` rule needs: `n` for `1_000n`, `f` for `0x1f`, `5` for `1e5`, and a
+      // `.` for `2.`, the trailing-dot form {@link DIVISION_FOLLOWS} carries
+      // the `.` for. The tail below reached the same answer by consuming every
+      // character in turn; what it did not do is say that a number is a token.
+      //
+      // Reached for a leading-dot number (`.5`) as well, which is why the test
+      // is a helper and not `/[0-9]/`: that `.` must not be mistaken for the
+      // member-access dot the identifier branch reads back, and `p.5` is not a
+      // program, so a digit after the dot settles it.
+      const literal = readNumericLiteral(source, i);
+      i += literal.length;
+      consumed(literal);
+      expectKey = false;
+      continue;
+    }
     if (isIdentifierStart(ch)) {
       // A word reached through a `.` is a PROPERTY NAME and not a keyword, and
       // the difference is the whole point of the word rule: `p.return` ends an
@@ -360,9 +431,10 @@ function scanLiteral(
       // through a branch that forgot to clear. `?.` ends in the same `.`.
       //
       // This clause never runs for a NUMBER: a digit is not an identifier
-      // start, so `1.5 / 2` reaches the `/` rule with a digit recorded, not a
-      // dot. What the two dots share is {@link DIVISION_FOLLOWS}, which is
-      // where the trailing-dot literal is handled.
+      // start, and the branch above has already taken the whole literal, so
+      // `1.5 / 2` reaches the `/` rule with a digit recorded, not a dot. What
+      // the two dots share is {@link DIVISION_FOLLOWS}, which is where the
+      // trailing-dot literal is handled.
       const afterMemberDot = prev === ".";
       const name = readIdentifier(source, i);
       i += name.length;
@@ -459,6 +531,40 @@ function skipRegExpLiteral(source: string, at: number): number {
 
 function isIdentifierStart(ch: string): boolean {
   return /[A-Za-z_$]/.test(ch);
+}
+
+/**
+ * Every numeric form the language writes, anchored (`y`) so it can only match
+ * where the scan already stands. Binary/octal/hex first, because `0x1f` would
+ * otherwise be read as the decimal `0` and leave `x1f` behind as an
+ * identifier — which is exactly the kind of resync that turns a following `/`
+ * into a regex opener.
+ *
+ * Deliberately permissive about separator placement (`1__0`, `1_` both match).
+ * This is a scanner, not a validator: its only job is to consume the run of
+ * characters that is one token, and a malformed literal is a compile error
+ * long before it reaches here.
+ */
+const NUMERIC_LITERAL =
+  /0[xX][0-9a-fA-F_]+n?|0[oO][0-7_]+n?|0[bB][01_]+n?|(?:[0-9][0-9_]*(?:\.[0-9_]*)?|\.[0-9][0-9_]*)(?:[eE][+-]?[0-9_]+)?n?/y;
+
+/**
+ * True where a numeric literal begins: a digit, or the `.` of a leading-dot
+ * form. The dot is admitted only when a digit follows it, which is what keeps
+ * `p.name` and `...en` out — no member access reaches a digit.
+ */
+function startsNumericLiteral(source: string, at: number): boolean {
+  const ch = source[at];
+  if (/[0-9]/.test(ch)) return true;
+  return ch === "." && /[0-9]/.test(source[at + 1] ?? "");
+}
+
+/** The numeric literal starting at `at`, whole. Never empty — callers gate on
+ * {@link startsNumericLiteral}, and a lone digit matches. */
+function readNumericLiteral(source: string, at: number): string {
+  NUMERIC_LITERAL.lastIndex = at;
+  const match = NUMERIC_LITERAL.exec(source);
+  return match ? match[0] : source[at];
 }
 
 function readIdentifier(source: string, at: number): string {

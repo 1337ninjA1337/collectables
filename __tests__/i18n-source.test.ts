@@ -226,6 +226,76 @@ describe("translation literal parser", () => {
     assert.deepEqual(parsed.keys, ["half", "trailing", "after"]);
   });
 
+  it("divides after every numeric form, not just the ones ending in a digit", () => {
+    // Numbers used to ride the loop's per-character tail, which reached the
+    // right answer for the decimal forms by accident of their last character
+    // and is why the trailing-dot hole above stayed invisible. They are one
+    // token now, and this is the sweep the tail never had: a division after a
+    // hex, octal, binary, BigInt, exponent, separator-bearing and leading-dot
+    // literal in turn. A form the reader stops short of resyncs mid-token, the
+    // `/` opens a regex, and the `}` closing the `${}` slot is swallowed with
+    // every key below it.
+    const parsed = parseObjectLiteral(`
+  hex: (p) => \`\${p.n * 0x1f / 2}\`,
+  octal: (p) => \`\${p.n * 0o17 / 2}\`,
+  binary: (p) => \`\${p.n * 0b1011 / 2}\`,
+  big: (p) => \`\${p.n * 1_000n / 2n}\`,
+  exponent: (p) => \`\${p.n * 1e5 / 2}\`,
+  signedExponent: (p) => \`\${p.n * 1.5e-3 / 2}\`,
+  leadingDot: (p) => \`\${p.n * .5 / 2}\`,
+  after: "still here",
+`);
+    assert.deepEqual(parsed.keys, [
+      "hex",
+      "octal",
+      "binary",
+      "big",
+      "exponent",
+      "signedExponent",
+      "leadingDot",
+      "after",
+    ]);
+  });
+
+  it("reads a number as one token without letting its dot look like a member access", () => {
+    // The leading-dot form is the reason the numeric branch is gated on a
+    // helper rather than on `/[0-9]/`: `.5` starts with the same character a
+    // property access does. If the gate ever widened to a bare `.`, `p.return`
+    // would stop clearing the recorded word — the stale-keyword failure — and
+    // `p.return / 2` would open a regex and eat the rest of its line.
+    const parsed = parseObjectLiteral(`
+  member: (p) => \`\${p.return / 2}\`,
+  spread: (p) => ({ ...p, n: p.n }),
+  mixed: (p) => \`\${p.of * .25 / 2}\`,
+  after: "still here",
+`);
+    assert.deepEqual(parsed.keys, ["member", "spread", "mixed", "after"]);
+  });
+
+  it("does not invent a key out of the letters inside a numeric key", () => {
+    // The bug the per-character tail was hiding, and the reason reading a
+    // number whole is more than a tidy-up. A numeric property name is legal
+    // JavaScript and this scanner deliberately does not read one — same family
+    // as the quoted and computed keys it declines. But the tail resynced INSIDE
+    // the literal: `0x2f:` was consumed as the digit `0`, after which `x2f` hit
+    // the identifier branch with `expectKey` still true, found the colon a
+    // lookahead away, and was pushed as a key named `x2f`. Not a key it
+    // declined to read — a key that is not in the file at all, invented from
+    // the middle of a number and reported to every caller counting keys.
+    //
+    // Every form carrying a letter or an underscore had it: radix prefixes,
+    // exponents, BigInt suffixes, separators. Plain `1:` never did, which is
+    // why nothing caught it.
+    const parsed = parseObjectLiteral(`
+  0x2f: "hex",
+  1e5: "exponent",
+  1_000: "separator",
+  0b11n: "big",
+  real: "still here",
+`);
+    assert.deepEqual(parsed.keys, ["real"]);
+  });
+
   it("reads shorthand properties, which is how the translations record is written", () => {
     // `const translations: Record<AppLanguage, TranslationMap> = { en, ru, … }`
     // declares six keys and writes not one colon.
@@ -343,6 +413,25 @@ const RESERVED_WORDS: readonly string[] = [
  * to reach past the spec's list. Scoped to the ones that can stand as the word
  * immediately before a `/`; a modifier like `implements` or `package` only
  * appears in positions where a `/` cannot follow at all.
+ *
+ * This list is the recall problem one level down, and cannot be fixed the way
+ * the reserved half was: `RESERVED_WORDS` is a spec production and is
+ * exhaustive by construction, while these eight are a judgement call, so the
+ * exhaustiveness case proves the partition covers `RESERVED_WORDS ∪
+ * CONTEXTUAL_KEYWORDS` and says nothing about whether that union is the
+ * language. What can be done is to name the productions that were read, so an
+ * omission is reviewable instead of invisible — a word from a production NOT on
+ * this list is the shape of the next hole:
+ *  - `ForInOfStatement` (§14.7.5) — `of`, and `await` in `for await`;
+ *  - `MethodDefinition` accessor names (§15.4) — `get`, `set`;
+ *  - `ImportDeclaration` / `ExportDeclaration` clauses (§16.2) — `as`, `from`;
+ *  - `AsyncFunctionDefinitions` (§15.8) — `async`;
+ *  - `ClassElement` modifiers (§15.7) — `static`;
+ *  - `LexicalDeclaration` (§14.3.1) — `let`.
+ * Deliberately not consulted, because no `/` can stand after the word in them:
+ * the strict-mode `FutureReservedWord` modifiers (`implements`, `interface`,
+ * `package`, `private`, `protected`, `public`), and `accessor`, which takes a
+ * class element name.
  */
 const CONTEXTUAL_KEYWORDS: readonly string[] = [
   "as",
@@ -397,16 +486,57 @@ describe("the keyword table the regex rule is read from", () => {
 
   it("shows, for every row, a regex standing where the word puts one", () => {
     // A row whose example does not put a `/` after its own word is a row
-    // somebody added on the strength of it being a keyword. The separator may
-    // be a NEWLINE — `break`, `continue` and `debugger` end a statement, so the
-    // only place their regex can stand is the line below, which is still the
-    // next token the scanner sees.
-    for (const [word, example] of ROWS) {
+    // somebody added on the strength of it being a keyword. Each row is checked
+    // against the separator it DECLARES rather than against `\s*`, which is
+    // where this case had drifted: `\s*` was adopted so the three ASI rows
+    // would pass and it loosened all nineteen at once, after which a `return`
+    // row rewritten across a line break would still have been green — and
+    // whether a `/` can stand on the word's own line is the only part of a row
+    // that describes a division this scanner can get wrong.
+    for (const [word, row] of ROWS) {
+      const between = row.separator === "inline" ? " +" : "\\n";
       assert.match(
-        example,
-        new RegExp(`\\b${word}\\s*/re/`),
-        `\`${word}\` row does not show a regex standing after the word: ${example}`,
+        row.example,
+        new RegExp(`\\b${word}${between}/re/`),
+        `\`${word}\` row does not show a regex standing ${row.separator} after the word: ${row.example}`,
       );
+    }
+  });
+
+  it("declares a separator per row, and the newline ones are the statement-enders", () => {
+    // The weak claim has to stay rare and stay justified: a `"newline"` row
+    // says only that the word cannot be followed by a `/` on its own line, so
+    // the row is there to keep the word out of the "in neither list" hole
+    // rather than to describe a hazard. Exactly three words in the language
+    // qualify — the ones that END a statement and take no operand — and any
+    // future row that reaches for `"newline"` to avoid writing a same-line
+    // example turns this red.
+    const newline = ROWS.filter(([, row]) => row.separator === "newline").map(
+      ([word]) => word,
+    );
+    assert.deepEqual(newline, ["break", "continue", "debugger"]);
+    for (const [word, row] of ROWS) {
+      assert.ok(
+        row.separator === "inline" || row.separator === "newline",
+        `\`${word}\` declares an unknown separator`,
+      );
+      assert.equal(typeof row.example, "string");
+    }
+  });
+
+  it("checks the inline rows strictly enough to catch a reformatted example", () => {
+    // The point of the field, stated as the mutation it catches: taking any
+    // inline row's example and breaking the line — which the old `\s*` match
+    // accepted — must now fail, because the row still claims `"inline"`.
+    for (const [word, row] of ROWS) {
+      if (row.separator !== "inline") continue;
+      const reformatted = row.example.replace(`${word} /re/`, `${word}\n/re/`);
+      assert.notEqual(
+        reformatted,
+        row.example,
+        `\`${word}\` inline row does not write its regex a space after the word`,
+      );
+      assert.doesNotMatch(reformatted, new RegExp(`\\b${word} +/re/`));
     }
   });
 
