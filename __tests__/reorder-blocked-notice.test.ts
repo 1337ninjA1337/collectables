@@ -18,6 +18,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+  localeValues,
+} from "./helpers/i18n-locales";
 
 function readScreenSrc(): string {
   return readFileSync(path.join(process.cwd(), "app", "collection", "[id].tsx"), "utf8");
@@ -130,18 +135,24 @@ describe("reorder-blocked-by-sort notice — i18n", () => {
   it("declares both keys in every locale", () => {
     const src = readI18nSource();
     for (const key of NOTICE_KEYS) {
-      const hits = src.match(new RegExp(`^  ${key}: "[^"]+",$`, "gm")) ?? [];
-      assert.equal(hits.length, 6, `${key} must exist, non-empty, in all six locales (got ${hits.length})`);
+      assertDeclaredInEveryLocale(src, key);
+      assertMatchesInEveryLocale(
+        src,
+        new RegExp(`\\b${key}: "[^"]+",`),
+        `${key} is a non-empty string`,
+      );
     }
   });
 
   it("translates each key rather than copying the English string six times", () => {
     const src = readI18nSource();
     for (const key of NOTICE_KEYS) {
-      const values = (src.match(new RegExp(`^  ${key}: "([^"]+)",$`, "gm")) ?? []).map((line) =>
-        line.slice(line.indexOf('"') + 1, -2),
+      const values = localeValues(src, new RegExp(`\\b${key}: "([^"]+)",`), key);
+      assert.equal(
+        new Set(values.values()).size,
+        values.size,
+        `${key} has duplicate copy across locales: ${JSON.stringify([...values])}`,
       );
-      assert.equal(new Set(values).size, 6, `${key} has duplicate copy across locales: ${values.join(" | ")}`);
     }
   });
 

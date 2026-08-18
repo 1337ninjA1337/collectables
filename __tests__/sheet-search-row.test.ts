@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+  localeValues,
+} from "./helpers/i18n-locales";
 
 /**
  * Structural pins for `<SheetSearchRow>` — the "🔎 [input] ✕" row extracted
@@ -213,9 +218,13 @@ describe("i18n — the two new per-sheet a11y labels across all 6 languages", ()
     "currencyPickerSearchA11y",
     "searchOverlayA11y",
   ]) {
-    it(`declares ${key} exactly 6 times (en base + 5 overrides)`, () => {
-      const matches = src.match(new RegExp(`${key}:\\s*"[^"]+"`, "g")) ?? [];
-      assert.equal(matches.length, 6, `expected 6 ${key} declarations, got ${matches.length}`);
+    it(`declares ${key} in every locale, as a plain string`, () => {
+      assertDeclaredInEveryLocale(src, key);
+      assertMatchesInEveryLocale(
+        src,
+        new RegExp(`\\b${key}:\\s*"[^"]+"`),
+        `${key} is a non-empty string`,
+      );
     });
 
     it(`localizes ${key} in ru / be / pl / de / es rather than falling back to en`, () => {
@@ -230,19 +239,23 @@ describe("i18n — the two new per-sheet a11y labels across all 6 languages", ()
     it(`keeps ${key} longer than the shared searchPlaceholder it labels`, () => {
       // Both picker sheets show the generic `searchPlaceholder`; the spoken
       // label exists precisely to say more than the field can fit.
-      const labels = (src.match(new RegExp(`${key}:\\s*"([^"]+)"`, "g")) ?? []).map(
-        (m) => m.split('"')[1],
-      );
-      assert.equal(labels.length, 6);
-      for (const label of labels) {
-        assert.ok(label.length > 12, `${key} is too terse to be worth a separate key: "${label}"`);
+      const labels = localeValues(src, new RegExp(`\\b${key}:\\s*"([^"]+)"`), key);
+      for (const [code, label] of labels) {
+        assert.ok(
+          label.length > 12,
+          `${code}: ${key} is too terse to be worth a separate key: "${label}"`,
+        );
       }
     });
   }
 
   it("declares searchClose exactly 6 times, localized in every language", () => {
-    const matches = src.match(/searchClose:\s*"[^"]+"/g) ?? [];
-    assert.equal(matches.length, 6, `expected 6 searchClose declarations, got ${matches.length}`);
+    assertDeclaredInEveryLocale(src, "searchClose");
+    assertMatchesInEveryLocale(
+      src,
+      /searchClose:\s*"[^"]+"/,
+      "searchClose is a non-empty string",
+    );
     for (const lang of ["ru", "be", "pl", "de", "es"]) {
       const re = new RegExp(
         `const\\s+${lang}:\\s*TranslationMap\\s*=\\s*\\{[\\s\\S]*?searchClose:\\s*"[^"]+"[\\s\\S]*?\\};`,

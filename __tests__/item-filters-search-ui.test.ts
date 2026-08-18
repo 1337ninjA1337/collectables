@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+  localeValues,
+} from "./helpers/i18n-locales";
 
 /**
  * Structural pins for the in-collection search row added to the
@@ -130,9 +135,13 @@ describe("i18n — search a11y keys across all 6 supported languages", () => {
   const src = readI18nSource();
 
   for (const key of ["searchInCollectionA11y", "filterClearSearch"]) {
-    it(`declares ${key} exactly 6 times (en base + 5 overrides)`, () => {
-      const matches = src.match(new RegExp(`${key}:\\s*"[^"]+"`, "g")) ?? [];
-      assert.equal(matches.length, 6, `expected 6 ${key} declarations, got ${matches.length}`);
+    it(`declares ${key} in every locale, as a plain string`, () => {
+      assertDeclaredInEveryLocale(src, key);
+      assertMatchesInEveryLocale(
+        src,
+        new RegExp(`\\b${key}:\\s*"[^"]+"`),
+        `${key} is a non-empty string`,
+      );
     });
 
     it(`localizes ${key} in ru / be / pl / de / es rather than falling back to en`, () => {
@@ -148,14 +157,28 @@ describe("i18n — search a11y keys across all 6 supported languages", () => {
   it("keeps the spoken label distinct from the placeholder in every language", () => {
     // Identical strings would mean VoiceOver reads the same phrase twice —
     // once as the label, once as the placeholder value.
-    const labels = src.match(/searchInCollectionA11y:\s*"([^"]+)"/g) ?? [];
-    const placeholders = src.match(/searchInCollectionPlaceholder:\s*"([^"]+)"/g) ?? [];
-    assert.equal(labels.length, placeholders.length);
-    for (let i = 0; i < labels.length; i += 1) {
-      const label = labels[i].split('"')[1];
-      const placeholder = placeholders[i].split('"')[1];
-      assert.notEqual(label, placeholder, `label duplicates the placeholder: "${label}"`);
-      assert.ok(label.length > placeholder.length, `the spoken label should be the fuller phrase: "${label}"`);
+    // Paired by LOCALE rather than by position. The two whole-file sweeps this
+    // replaces zipped `labels[i]` with `placeholders[i]`, so one locale missing
+    // either key shifted every later comparison by one and compared a Polish
+    // label against a German placeholder — a pass or a failure decided by
+    // declaration order.
+    const labels = localeValues(
+      src,
+      /searchInCollectionA11y:\s*"([^"]+)"/,
+      "searchInCollectionA11y",
+    );
+    const placeholders = localeValues(
+      src,
+      /searchInCollectionPlaceholder:\s*"([^"]+)"/,
+      "searchInCollectionPlaceholder",
+    );
+    for (const [code, label] of labels) {
+      const placeholder = placeholders.get(code)!;
+      assert.notEqual(label, placeholder, `${code}: label duplicates the placeholder: "${label}"`);
+      assert.ok(
+        label.length > placeholder.length,
+        `${code}: the spoken label should be the fuller phrase: "${label}"`,
+      );
     }
   });
 });
@@ -208,17 +231,24 @@ describe("i18n — queryChipClear across all 6 supported languages", () => {
   const src = readI18nSource();
 
   it("declares queryChipClear exactly 6 times (en base + 5 overrides)", () => {
-    const matches = src.match(/queryChipClear:\s*\(params\?: TranslationParams\)/g) ?? [];
-    assert.equal(matches.length, 6, `expected 6 queryChipClear declarations, got ${matches.length}`);
+    assertDeclaredInEveryLocale(src, "queryChipClear");
+    assertMatchesInEveryLocale(
+      src,
+      /queryChipClear:\s*\(params\?: TranslationParams\)/,
+      "queryChipClear is a parameterised formatter",
+    );
   });
 
   it("interpolates the needle in every language rather than dropping it", () => {
     // A label that says only "tap to clear" tells a non-visual user that
     // something is narrowing the list but not what.
-    const bodies = src.match(/queryChipClear:\s*\(params\?: TranslationParams\)\s*=>\s*\n?\s*`[^`]+`/g) ?? [];
-    assert.equal(bodies.length, 6);
-    for (const body of bodies) {
-      assert.match(body, /\$\{params\?\.query \?\? ""\}/, `missing query interpolation: ${body}`);
+    const bodies = localeValues(
+      src,
+      /queryChipClear:\s*\(params\?: TranslationParams\)\s*=>\s*\n?\s*`([^`]+)`/,
+      "queryChipClear",
+    );
+    for (const [code, body] of bodies) {
+      assert.match(body, /\$\{params\?\.query \?\? ""\}/, `${code}: missing query interpolation: ${body}`);
     }
   });
 

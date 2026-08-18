@@ -11,6 +11,11 @@ import {
   type ItemSortMode,
 } from "@/lib/item-filters";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+  localeValues,
+} from "./helpers/i18n-locales";
 
 /**
  * The removable "active sort" quick-chip in `<ItemFilterBar>`.
@@ -203,19 +208,28 @@ describe("i18n — sortChipClear across all 6 supported languages", () => {
   });
 
   it("is a parameterised function taking { sort }, not a static string", () => {
-    // The chip names the active mode, so the copy has to interpolate.
-    const matches = src.match(/sortChipClear:\s*\(params\?: TranslationParams\)\s*=>\s*\n?\s*`[^`]+`/g) ?? [];
-    assert.equal(matches.length, 6, `expected 6 sortChipClear declarations, got ${matches.length}`);
-    for (const m of matches) {
-      assert.match(m, /\$\{params\?\.sort \?\? ""\}/, `missing sort interpolation in: ${m}`);
-    }
+    // The chip names the active mode, so the copy has to interpolate. Asked of
+    // each locale map in turn rather than counted over the file: six hits
+    // anywhere is satisfied by a locale declaring it twice while another does
+    // not declare it at all.
+    assertDeclaredInEveryLocale(src, "sortChipClear");
+    assertMatchesInEveryLocale(
+      src,
+      /sortChipClear:\s*\(params\?: TranslationParams\)\s*=>\s*\n?\s*`[^`]*\$\{params\?\.sort \?\? ""\}[^`]*`/,
+      "sortChipClear interpolates { sort }",
+    );
   });
 
   it("gives each locale distinct copy (no untranslated en fallbacks)", () => {
-    const bodies = (src.match(/sortChipClear:\s*\(params\?: TranslationParams\)\s*=>\s*\n?\s*`([^`]+)`/g) ?? []).map(
-      (m) => m.slice(m.indexOf("`") + 1, -1),
+    const bodies = localeValues(
+      src,
+      /sortChipClear:\s*\(params\?: TranslationParams\)\s*=>\s*\n?\s*`([^`]+)`/,
+      "sortChipClear",
     );
-    assert.equal(bodies.length, 6);
-    assert.equal(new Set(bodies).size, 6, `expected 6 distinct translations, got ${new Set(bodies).size}`);
+    assert.equal(
+      new Set(bodies.values()).size,
+      bodies.size,
+      `expected distinct translations, got ${JSON.stringify([...bodies])}`,
+    );
   });
 });

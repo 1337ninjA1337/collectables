@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+} from "./helpers/i18n-locales";
 
 /**
  * Trading-card `<ItemCard>` + the fullscreen `<PhotoLightbox>` gallery.
@@ -162,17 +166,18 @@ describe("item detail — hero opens the same gallery", () => {
 
 describe("gallery i18n keys", () => {
   it("is declared in every one of the six locales", () => {
-    for (const key of GALLERY_KEYS) {
-      const hits = i18nSrc.match(new RegExp(`^  ${key}:`, "gm")) ?? [];
-      assert.equal(hits.length, 6, `${key} must exist in en/ru/be/pl/de/es (got ${hits.length})`);
-    }
+    // Asked of each map. The `^  key:` count this replaces leaned on prettier's
+    // two-space indent AND summed to six, so it was both formatting-dependent
+    // and blind to a locale declaring one key twice while another declared none.
+    for (const key of GALLERY_KEYS) assertDeclaredInEveryLocale(i18nSrc, key);
   });
 
   it("renders the counter from current/total params in every locale", () => {
-    const hits = i18nSrc.match(
-      /galleryCounter: \(params\?: TranslationParams\) => `\$\{params\?\.current \?\? 1\} \/ \$\{params\?\.total \?\? 1\}`/g,
-    ) ?? [];
-    assert.equal(hits.length, 6);
+    assertMatchesInEveryLocale(
+      i18nSrc,
+      /galleryCounter: \(params\?: TranslationParams\) => `\$\{params\?\.current \?\? 1\} \/ \$\{params\?\.total \?\? 1\}`/,
+      "galleryCounter renders current / total",
+    );
   });
 });
 
@@ -226,8 +231,7 @@ describe("app/collection/[id].tsx — grid by default, reorder on demand", () =>
 
   it("declares reorderItems/reorderItemsDone in every locale", () => {
     for (const key of ["reorderItems", "reorderItemsDone"]) {
-      const hits = i18nSrc.match(new RegExp(`^  ${key}:`, "gm")) ?? [];
-      assert.equal(hits.length, 6, `${key} must exist in all six locales (got ${hits.length})`);
+      assertDeclaredInEveryLocale(i18nSrc, key);
     }
   });
 });

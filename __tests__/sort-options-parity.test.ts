@@ -34,6 +34,10 @@ import {
 } from "@/lib/item-filters";
 import type { CollectableItem } from "@/lib/types";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+} from "./helpers/i18n-locales";
 
 function readComponentSrc(): string {
   return readFileSync(path.join(process.cwd(), "components", "item-filters.tsx"), "utf8");
@@ -97,8 +101,12 @@ describe("SORT_OPTIONS table", () => {
   it("declares every label key in all six locales", () => {
     const src = readI18nSource();
     for (const opt of SORT_OPTIONS) {
-      const hits = src.match(new RegExp(`^  ${opt.labelKey}: "[^"]+",$`, "gm")) ?? [];
-      assert.equal(hits.length, 6, `${opt.labelKey} must exist in all six locales (got ${hits.length})`);
+      assertDeclaredInEveryLocale(src, opt.labelKey);
+      assertMatchesInEveryLocale(
+        src,
+        new RegExp(`\\b${opt.labelKey}: "[^"]+",`),
+        `${opt.labelKey} is a non-empty string`,
+      );
     }
   });
 

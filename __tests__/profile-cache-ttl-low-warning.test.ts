@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+} from "./helpers/i18n-locales";
 
 // `lib/env.ts` and `lib/social-context.tsx` both import react-native at module
 // scope (Platform / hooks) so they can't be imported by the node test runner.
@@ -112,12 +115,10 @@ describe("i18n keys for the low-TTL warning", () => {
   it("each non-English language explicitly translates the title", () => {
     // ru, be, pl, de, es each carry their own override; English is the only
     // language that may rely on the `...en` spread for fallback.
-    const matches = src.match(/profileCacheTtlLowTitle:/g) ?? [];
-    assert.equal(matches.length, 6, "expected 6 profileCacheTtlLowTitle entries (en + 5 translations)");
+    assertDeclaredInEveryLocale(src, "profileCacheTtlLowTitle");
   });
 
   it("each non-English language explicitly translates the message", () => {
-    const matches = src.match(/profileCacheTtlLowMessage:/g) ?? [];
-    assert.equal(matches.length, 6, "expected 6 profileCacheTtlLowMessage entries (en + 5 translations)");
+    assertDeclaredInEveryLocale(src, "profileCacheTtlLowMessage");
   });
 });

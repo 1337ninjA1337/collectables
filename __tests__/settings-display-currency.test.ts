@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+} from "./helpers/i18n-locales";
 
 /**
  * Structural pins for bug-2d — the Settings "Display currency" picker, the
@@ -75,14 +79,20 @@ describe("i18n — bug-2d display-currency keys in all 6 languages", () => {
     "currencyRatesRefresh",
     "currencyRatesUnavailable",
   ]) {
-    it(`declares ${key} in all 6 tables`, () => {
-      const matches = src.match(new RegExp(`${key}:`, "g")) ?? [];
-      assert.equal(matches.length, 6, `expected 6 ${key} entries, got ${matches.length}`);
+    it(`declares ${key} in every locale`, () => {
+      // The count this replaces matched `key:` ANYWHERE, so a mention inside a
+      // template counted as a declaration, and it summed to six across the
+      // file rather than asking each map.
+      assertDeclaredInEveryLocale(src, key);
     });
   }
 
   it("declares currencyRatesUpdated as a {when} formatter in all 6 tables", () => {
-    const matches = src.match(/currencyRatesUpdated:\s*\(params\?:\s*TranslationParams\)\s*=>/g) ?? [];
-    assert.equal(matches.length, 6, `expected 6 currencyRatesUpdated formatters, got ${matches.length}`);
+    assertDeclaredInEveryLocale(src, "currencyRatesUpdated");
+    assertMatchesInEveryLocale(
+      src,
+      /currencyRatesUpdated:\s*\(params\?:\s*TranslationParams\)\s*=>/,
+      "currencyRatesUpdated is a {when} formatter",
+    );
   });
 });

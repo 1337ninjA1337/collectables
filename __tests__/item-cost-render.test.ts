@@ -6,6 +6,10 @@ import path from "node:path";
 import { formatCostAmount } from "@/lib/item-cost";
 import { formatCostAmount as canonicalFormatCostAmount } from "@/lib/format-cost";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+} from "./helpers/i18n-locales";
 
 function read(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
@@ -82,10 +86,12 @@ describe("item detail — cost meta row via <CostBadge> + long-press original", 
 describe("i18n — itemValueApprox key in all 6 languages", () => {
   const src = readI18nSource();
 
-  it("declares itemValueApprox as an ≈ {amount} {currency} formatter 6 times (one per table)", () => {
-    const matches = src.match(
-      /itemValueApprox:\s*\(params\?:\s*TranslationParams\)\s*=>\s*`≈ \$\{params\?\.amount \?\? ""\} \$\{params\?\.currency \?\? ""\}`/g,
-    ) ?? [];
-    assert.equal(matches.length, 6, `expected 6 itemValueApprox formatters, got ${matches.length}`);
+  it("declares itemValueApprox as an ≈ {amount} {currency} formatter in every locale", () => {
+    assertDeclaredInEveryLocale(src, "itemValueApprox");
+    assertMatchesInEveryLocale(
+      src,
+      /itemValueApprox:\s*\(params\?:\s*TranslationParams\)\s*=>\s*`≈ \$\{params\?\.amount \?\? ""\} \$\{params\?\.currency \?\? ""\}`/,
+      "itemValueApprox is the ≈ {amount} {currency} formatter",
+    );
   });
 });

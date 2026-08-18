@@ -1,0 +1,212 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
+
+import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+  localeBodies,
+  localeValues,
+  locales,
+} from "./helpers/i18n-locales";
+
+/**
+ * The helpers that replaced "count the hits, assert six".
+ *
+ * Twenty-two cases in eleven suites asked "is this key translated everywhere?"
+ * by matching `key:` against the whole of `lib/i18n-context.tsx` and asserting
+ * the count was 6. It reads as a parity check and it is a SUM: any arrangement
+ * adding to six satisfies it, so a key declared twice in one locale and
+ * missing from another passed — which is exactly the state the check existed
+ * to find. The fixtures below are built to be green under the old rule and red
+ * under the new one, because "stronger" is a claim that has to be shown rather
+ * than asserted.
+ */
+
+/**
+ * A translations file in miniature: two locales in the picker, and a base map
+ * the second spreads. Real enough for the parser, small enough to state the
+ * whole disagreement in one screen.
+ */
+const TWO_LOCALES = `
+const languageOptions: { code: AppLanguage; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "ru", label: "Русский" },
+];
+
+const en = {
+  greeting: "Hello",
+  farewell: "Bye",
+};
+
+const ru: TranslationMap = {
+  ...en,
+  greeting: "Привет",
+  farewell: "Пока",
+};
+`;
+
+/**
+ * The arrangement the count could not see: `en` declares `greeting` twice, `ru`
+ * declares it not at all. Two hits, two locales — the old rule's sum is
+ * satisfied and `ru` silently serves the English string.
+ */
+const SUMS_BUT_DOES_NOT_COVER = `
+const languageOptions: { code: AppLanguage; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "ru", label: "Русский" },
+];
+
+const en = {
+  greeting: "Hello",
+  greeting: "Hello again",
+};
+
+const ru: TranslationMap = {
+  ...en,
+  farewell: "Пока",
+};
+`;
+
+describe("asking each locale instead of counting the file", () => {
+  it("reads the locale list from the picker rather than from a literal six", () => {
+    // The `6` in twenty-two assertions was a literal, so a seventh language
+    // turned every one of them red at once with "expected 6, got 7" — which
+    // reads as the new locale being wrong rather than as the assertions needing
+    // their number bumped. Derived from `languageOptions`, a seventh is checked.
+    assert.deepEqual(locales(readI18nSource()), [
+      "ru",
+      "en",
+      "be",
+      "pl",
+      "de",
+      "es",
+    ]);
+    assert.deepEqual(locales(TWO_LOCALES), ["en", "ru"]);
+  });
+
+  it("passes when every locale declares the key for itself", () => {
+    assertDeclaredInEveryLocale(TWO_LOCALES, "greeting");
+    assertDeclaredInEveryLocale(TWO_LOCALES, "farewell");
+  });
+
+  it("catches the arrangement that summed correctly and covered nothing", () => {
+    // The whole point, shown both ways round. The old rule first, so the
+    // fixture is not just asserted to fool it:
+    const hits = SUMS_BUT_DOES_NOT_COVER.match(/greeting:/g) ?? [];
+    assert.equal(hits.length, locales(SUMS_BUT_DOES_NOT_COVER).length);
+
+    // …and the new rule on the same text, naming the locale that is missing.
+    assert.throws(
+      () => assertDeclaredInEveryLocale(SUMS_BUT_DOES_NOT_COVER, "greeting"),
+      /ru/,
+    );
+  });
+
+  it("reports an inherited key as undeclared, which is the distinction at issue", () => {
+    // `ru` spreads `...en`, so `farewell` RESOLVES for Russian — it renders,
+    // it fits, `t()` returns a non-empty string. Nothing at runtime tells an
+    // inherited key from a translated one, which is why the suites ask the
+    // source in the first place.
+    assert.throws(
+      () => assertDeclaredInEveryLocale(SUMS_BUT_DOES_NOT_COVER, "farewell"),
+      /en/,
+    );
+  });
+
+  it("does not count a key mentioned inside a value as a declaration", () => {
+    // Several of the migrated cases matched a bare `key:` anywhere in the file,
+    // so a key named in a template counted toward the six.
+    const mentioned = TWO_LOCALES.replace(
+      'farewell: "Bye",',
+      'farewell: "Bye",\n  note: `see farewell: below`,',
+    );
+    assert.deepEqual([...localeBodies(mentioned).keys()], ["en", "ru"]);
+    assert.throws(() => assertDeclaredInEveryLocale(mentioned, "note"), /ru/);
+  });
+});
+
+describe("the value-shape half", () => {
+  it("matches each locale's own map and names the ones that miss", () => {
+    assertMatchesInEveryLocale(
+      TWO_LOCALES,
+      /greeting: "[^"]+"/,
+      "greeting is a non-empty string",
+    );
+    assert.throws(
+      () =>
+        assertMatchesInEveryLocale(
+          TWO_LOCALES,
+          /greeting: \(params\?: TranslationParams\)/,
+          "greeting is a formatter",
+        ),
+      /en.*ru|ru.*en/s,
+    );
+  });
+
+  it("refuses a global pattern, which would carry lastIndex between locales", () => {
+    // A /g regex is stateful across `.test()` calls, so the same pattern would
+    // pass for one locale and fail for the next depending on walk order —
+    // a flake that reads as a translation finding.
+    assert.throws(
+      () => assertMatchesInEveryLocale(TWO_LOCALES, /greeting/g, "greeting"),
+      /non-global/,
+    );
+    assert.throws(
+      () => localeValues(TWO_LOCALES, /greeting: "([^"]+)"/g, "greeting"),
+      /non-global/,
+    );
+  });
+
+  it("returns one value per locale, keyed by code rather than by position", () => {
+    // The habit this replaces zipped two whole-file sweeps by index, so one
+    // locale missing either key shifted every later pair by one and compared a
+    // Polish label against a German placeholder.
+    const values = localeValues(TWO_LOCALES, /greeting: "([^"]+)"/, "greeting");
+    assert.deepEqual([...values], [
+      ["en", "Hello"],
+      ["ru", "Привет"],
+    ]);
+  });
+
+  it("throws rather than returning a short list, so distinctness is never vacuous", () => {
+    // Five values from six locales are trivially distinct. A missing locale has
+    // to be an error here, not a smaller `Set`.
+    assert.throws(
+      () => localeValues(SUMS_BUT_DOES_NOT_COVER, /greeting: "([^"]+)"/, "greeting"),
+      /no match in 'ru'/,
+    );
+  });
+});
+
+describe("the habit stays retired", () => {
+  /**
+   * `bundle-smoke.test.ts` counts `PRIVACY_PAGE_TARGETS`, a local table of the
+   * six privacy pages `build-spa-fallback.ts` emits. It is a six about build
+   * outputs that happens to sit in a file that also reads the translations —
+   * not a locale count, and not something the helpers above can answer.
+   */
+  const EXEMPT = ["bundle-smoke.test.ts"];
+
+  it("leaves no suite counting locale hits across the whole translations file", () => {
+    const dir = path.join(process.cwd(), "__tests__");
+    const suites = readdirSync(dir).filter(
+      (entry) =>
+        entry.endsWith(".test.ts") &&
+        statSync(path.join(dir, entry)).isFile() &&
+        !EXEMPT.includes(entry),
+    );
+    const offenders = suites.filter((entry) => {
+      const text = readFileSync(path.join(dir, entry), "utf8");
+      return text.includes("readI18nSource") && /\.(length|size), 6\b/.test(text);
+    });
+    assert.deepEqual(
+      offenders,
+      [],
+      `these suites count locale declarations instead of asking each map: ${offenders.join(", ")}`,
+    );
+    assert.ok(suites.length > 200, `only ${suites.length} suites walked`);
+  });
+});

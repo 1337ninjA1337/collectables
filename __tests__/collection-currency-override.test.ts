@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+} from "./helpers/i18n-locales";
 
 /**
  * Structural pins for the per-collection currency override shipped in
@@ -161,8 +165,14 @@ describe("i18n — collection currency keys across all 6 languages", () => {
   });
 
   it("collectionCurrencyA11y formatter routes params?.currency through a `?? ''` fallback in all 6 locales", () => {
-    const matches = src.match(/collectionCurrencyA11y:[\s\S]*?params\?\.currency\s*\?\?\s*""/g) ?? [];
-    assert.equal(matches.length, 6, `expected 6 collectionCurrencyA11y formatters with currency fallback, got ${matches.length}`);
+    // Per locale, not six-anywhere: the count was satisfied by any arrangement
+    // summing to six, and named no language when it was not.
+    assertDeclaredInEveryLocale(src, "collectionCurrencyA11y");
+    assertMatchesInEveryLocale(
+      src,
+      /collectionCurrencyA11y:[\s\S]*?params\?\.currency\s*\?\?\s*""/,
+      "collectionCurrencyA11y routes currency through a `?? \"\"` fallback",
+    );
   });
 });
 

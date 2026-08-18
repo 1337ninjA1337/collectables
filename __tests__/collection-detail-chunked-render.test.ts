@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import {
+  assertDeclaredInEveryLocale,
+  assertMatchesInEveryLocale,
+} from "./helpers/i18n-locales";
 
 /**
  * Structural pins for the chunked-rendering wiring in `app/collection/[id].tsx`.
@@ -193,8 +197,13 @@ describe("i18n — loadMoreItems key across all 6 supported languages", () => {
   it("loadMoreItems formatter routes the count placeholder through params?.count ?? 0", () => {
     // Without the `?? 0` fallback, a stray `undefined` would render
     // "Load more (undefined remaining)" in production.
-    const matches = src.match(/loadMoreItems:[\s\S]*?params\?\.count\s*\?\?\s*0/g) ?? [];
-    // 6 languages (en + 5 overrides).
-    assert.equal(matches.length, 6, `expected 6 loadMoreItems formatters with count fallback, got ${matches.length}`);
+    // Asked of each locale map, so a language missing the fallback is named
+    // rather than hidden behind another language declaring the key twice.
+    assertDeclaredInEveryLocale(src, "loadMoreItems");
+    assertMatchesInEveryLocale(
+      src,
+      /loadMoreItems:[\s\S]*?params\?\.count\s*\?\?\s*0/,
+      "loadMoreItems routes count through a `?? 0` fallback",
+    );
   });
 });
