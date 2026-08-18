@@ -86,37 +86,56 @@ export type HexMatch = {
  * between a doc block and a red build.
  */
 export function findInlineHexLiterals(file: string, source: string): HexMatch[] {
-  const matches: HexMatch[] = [];
-  if (isHexAllowlisted(file)) return matches;
-  const lines = stripComments(source).split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const perLine: HexMatch[] = [];
-    // Reset regex state per-line because we use `g` flag at the module scope.
-    const re = new RegExp(INLINE_HEX_PATTERN.source, "g");
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(line)) !== null) {
-      perLine.push({
-        file,
-        line: i + 1,
-        column: m.index + 1,
-        value: m[0],
-      });
-    }
-    const shortRe = new RegExp(INLINE_HEX_SHORT_PATTERN.source, "g");
-    while ((m = shortRe.exec(line)) !== null) {
-      perLine.push({
-        file,
-        line: i + 1,
-        // +1 for 1-indexing, +1 to skip the opening quote onto the `#`.
-        column: m.index + 2,
-        value: m[0].slice(1, -1),
-      });
-    }
-    perLine.sort((a, b) => a.column - b.column);
-    matches.push(...perLine);
+  if (isHexAllowlisted(file)) return [];
+  const code = stripComments(source);
+  const at = lineColumnLookup(code);
+  /** Offset kept beside the match, because it is what the sort orders by. */
+  const found: { offset: number; value: string }[] = [];
+  for (const m of code.matchAll(new RegExp(INLINE_HEX_PATTERN.source, "g"))) {
+    found.push({ offset: m.index, value: m[0] });
   }
-  return matches;
+  for (const m of code.matchAll(new RegExp(INLINE_HEX_SHORT_PATTERN.source, "g"))) {
+    // +1 to step past the opening quote onto the `#`, so the reported column
+    // points at the hash for both patterns rather than at the delimiter.
+    found.push({ offset: m.index + 1, value: m[0].slice(1, -1) });
+  }
+  // By offset, which orders by line and then by column in one comparison —
+  // the two per-line arrays this used to merge were the same order arrived at
+  // in two steps.
+  found.sort((a, b) => a.offset - b.offset);
+  return found.map(({ offset, value }) => ({ file, ...at(offset), value }));
+}
+
+/**
+ * An offset → `{ line, column }` reader over one file, both 1-indexed.
+ *
+ * The scan used to split into lines and run a fresh `RegExp` per line, because
+ * the two patterns carry `g` at module scope and `exec` state would otherwise
+ * carry across files. `matchAll` on a per-call clone answers that without the
+ * split, which leaves one pass over the whole text and this lookup as the only
+ * thing the split was buying. It is also how the four `stripComments` lint
+ * guards already report, so the last scanner not doing it now agrees with the
+ * rest.
+ *
+ * Binary search rather than a scan, so a file with a match near the end costs
+ * the same as one with a match near the start; and the offsets are the
+ * ORIGINAL ones, because `stripComments` blanks rather than deletes.
+ */
+function lineColumnLookup(code: string): (offset: number) => { line: number; column: number } {
+  const lineStarts = [0];
+  for (let i = 0; i < code.length; i++) {
+    if (code[i] === "\n") lineStarts.push(i + 1);
+  }
+  return (offset) => {
+    let low = 0;
+    let high = lineStarts.length - 1;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      if (lineStarts[mid] <= offset) low = mid;
+      else high = mid - 1;
+    }
+    return { line: low + 1, column: offset - lineStarts[low] + 1 };
+  };
 }
 
 /**

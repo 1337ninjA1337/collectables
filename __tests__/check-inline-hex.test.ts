@@ -173,6 +173,54 @@ describe("findInlineHexLiterals", () => {
     assert.equal(source.split("\n")[matches[0].line - 1][matches[0].column - 1], "#");
   });
 
+  it("locates a match on the first line, the last line, and at column 1", () => {
+    // The one pass over the stripped text converts an offset back to a line
+    // and a column by binary search, where the split-by-line loop got both for
+    // free. Both ends of the search and the boundary just past a newline are
+    // the three places that arithmetic is wrong, so each is a position rather
+    // than a count.
+    const source = ['const a = "#111111";', ...Array(40).fill("// filler"), '"#222222";'].join(
+      "\n",
+    );
+    const matches = findInlineHexLiterals("foo.tsx", source);
+    assert.deepEqual(
+      matches.map((m) => [m.line, m.column, m.value]),
+      [
+        [1, 12, "#111111"],
+        [42, 2, "#222222"],
+      ],
+    );
+    for (const m of matches) {
+      assert.equal(source.split("\n")[m.line - 1][m.column - 1], "#");
+    }
+  });
+
+  it("finds a hex at offset 0, where the line lookup has nothing before it", () => {
+    assert.deepEqual(findInlineHexLiterals("foo.tsx", '"#abcdef"').map((m) => [m.line, m.column]), [
+      [1, 2],
+    ]);
+    assert.deepEqual(findInlineHexLiterals("foo.tsx", "#abcdef").map((m) => [m.line, m.column]), [
+      [1, 1],
+    ]);
+  });
+
+  it("orders findings across lines, not only within one", () => {
+    // The per-line loop sorted each line's matches and appended, which made
+    // the cross-line order a consequence of the walk. One pass sorts by
+    // offset, and this is what says the two orders are the same: a shorthand
+    // on an EARLIER line must come before a 6-digit one on a later line, which
+    // the old merge got right by construction and a sort could get wrong.
+    const source = ['const a = "#fff";', 'const b = "#123456";', 'const c = "#abc";'].join("\n");
+    assert.deepEqual(
+      findInlineHexLiterals("foo.tsx", source).map((m) => [m.line, m.value]),
+      [
+        [1, "#fff"],
+        [2, "#123456"],
+        [3, "#abc"],
+      ],
+    );
+  });
+
   it("still flags a hex on a line that also carries a comment", () => {
     // Stripping must not take the code with it — the failure that would make
     // this guard go quiet rather than loud.

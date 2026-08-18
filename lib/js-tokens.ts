@@ -18,7 +18,7 @@
  *
  * The table below is derived from the grammar rather than recalled, and
  * audited exhaustively against ECMA-262's `ReservedWord` production in
- * `__tests__/i18n-source.test.ts` — a word in NEITHER list is a red case there
+ * `__tests__/js-tokens.test.ts` — a word in NEITHER list is a red case there
  * rather than an invisible one here.
  */
 
@@ -125,8 +125,10 @@ export type KeywordRegExpRow = {
  * after the matching `)` is the ambiguity this scanner cannot resolve without
  * a parser. Which side each word of the language falls on is checked
  * exhaustively against ECMA-262's `ReservedWord` production in
- * `__tests__/i18n-source.test.ts`, so a word in NEITHER list is a red case
- * rather than an invisible one.
+ * `__tests__/js-tokens.test.ts`, so a word in NEITHER list is a red case
+ * rather than an invisible one. That suite audits the table; each CALLER's
+ * suite separately drives its own scanner over every row, because a table
+ * nobody consults is documentation.
  */
 export const REGEXP_FOLLOWS_KEYWORD: Readonly<Record<string, KeywordRegExpRow>> = {
   await: { example: "await /re/.test(s)", separator: "inline" },

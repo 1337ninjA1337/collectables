@@ -465,193 +465,17 @@ describe("translation literal parser", () => {
 });
 
 /**
- * The keyword list was fourteen entries written from memory, and one of them
- * was exercised. A list recalled rather than derived is wrong in the row nobody
- * checks, so it is a table now — each row carrying the shape that puts a regex
- * after the word — and these cases check it against the rule it is derived
- * from (can an expression BEGIN after this word) rather than against the same
- * memory that produced it.
- */
-/**
- * ECMA-262 §12.7.2, the `ReservedWord` production, verbatim and alphabetical.
- * The independent authority the table is audited against: `REGEXP_FOLLOWS_KEYWORD`
- * says which words let a regex follow, and a list derived from the same memory
- * could only ever confirm it.
- */
-const RESERVED_WORDS: readonly string[] = [
-  "await",
-  "break",
-  "case",
-  "catch",
-  "class",
-  "const",
-  "continue",
-  "debugger",
-  "default",
-  "delete",
-  "do",
-  "else",
-  "enum",
-  "export",
-  "extends",
-  "false",
-  "finally",
-  "for",
-  "function",
-  "if",
-  "import",
-  "in",
-  "instanceof",
-  "new",
-  "null",
-  "return",
-  "super",
-  "switch",
-  "this",
-  "throw",
-  "true",
-  "try",
-  "typeof",
-  "var",
-  "void",
-  "while",
-  "with",
-  "yield",
-];
-
-/**
- * Words that are ordinary identifiers except inside one production. They are
- * not reserved — `const from = 1` is legal — so `ReservedWord` does not cover
- * them, and one of them (`of`) is a table row, which is why the partition has
- * to reach past the spec's list. Scoped to the ones that can stand as the word
- * immediately before a `/`; a modifier like `implements` or `package` only
- * appears in positions where a `/` cannot follow at all.
+ * The scanner obeying the table, which is a fact about this parser.
  *
- * This list is the recall problem one level down, and cannot be fixed the way
- * the reserved half was: `RESERVED_WORDS` is a spec production and is
- * exhaustive by construction, while these eight are a judgement call, so the
- * exhaustiveness case proves the partition covers `RESERVED_WORDS ∪
- * CONTEXTUAL_KEYWORDS` and says nothing about whether that union is the
- * language. What can be done is to name the productions that were read, so an
- * omission is reviewable instead of invisible — a word from a production NOT on
- * this list is the shape of the next hole:
- *  - `ForInOfStatement` (§14.7.5) — `of`, and `await` in `for await`;
- *  - `MethodDefinition` accessor names (§15.4) — `get`, `set`;
- *  - `ImportDeclaration` / `ExportDeclaration` clauses (§16.2) — `as`, `from`;
- *  - `AsyncFunctionDefinitions` (§15.8) — `async`;
- *  - `ClassElement` modifiers (§15.7) — `static`;
- *  - `LexicalDeclaration` (§14.3.1) — `let`.
- * Deliberately not consulted, because no `/` can stand after the word in them:
- * the strict-mode `FutureReservedWord` modifiers (`implements`, `interface`,
- * `package`, `private`, `protected`, `public`), and `accessor`, which takes a
- * class element name.
+ * The table itself — its row shapes, the ECMA-262 partition, the reserved-word
+ * authority the two sides are derived from — is audited in
+ * `__tests__/js-tokens.test.ts`, beside the module that holds it. What belongs
+ * here is the pair of cases that drive `parseObjectLiteral` over every row: a
+ * table nobody consults is documentation, and these are what make it a rule
+ * this scanner obeys.
  */
-const CONTEXTUAL_KEYWORDS: readonly string[] = [
-  "as",
-  "async",
-  "from",
-  "get",
-  "let",
-  "of",
-  "set",
-  "static",
-];
-
-/**
- * The other side of the partition: every word of the language that is NOT a
- * table row, and the reason a `/` after it is a division (or cannot occur).
- * A record rather than a list, because the reason is the part worth reviewing
- * — "it is not a keyword" is not a reason, and half of these ARE keywords.
- */
-const DIVIDES_AFTER: Readonly<Record<string, string>> = {
-  as: "an import/export clause follows it with a binding name",
-  async: "an identifier here, or `function`/`(` — never a regex",
-  catch: "takes a `(` or a `{`",
-  class: "takes a name, a `{`, or `extends`",
-  const: "takes a binding name",
-  enum: "reserved with no production at all",
-  export: "takes a declaration, a `{`, a `*`, or `default` — which is the row",
-  false: "ends an expression",
-  finally: "takes a `{`",
-  for: "takes a `(` (or `await`, which is the row)",
-  from: "an identifier, or a module specifier string",
-  function: "takes a name or a `(`",
-  get: "an identifier, or an accessor's property name",
-  if: "takes a `(`",
-  import: "takes a specifier, a `(`, or a `.`",
-  let: "takes a binding name, and is an identifier everywhere else",
-  null: "ends an expression",
-  set: "an identifier, or an accessor's property name",
-  static: "takes a class element name",
-  super: "ends an expression",
-  switch: "takes a `(`",
-  this: "ends an expression",
-  true: "ends an expression",
-  try: "takes a `{`",
-  var: "takes a binding name",
-  while: "takes a `(`",
-  with: "takes a `(`",
-};
-
-describe("the keyword table the regex rule is read from", () => {
-  const ROWS = Object.entries(REGEXP_FOLLOWS_KEYWORD);
+describe("the keyword table, as this scanner reads it", () => {
   const KEYWORDS = Object.keys(REGEXP_FOLLOWS_KEYWORD);
-
-  it("shows, for every row, a regex standing where the word puts one", () => {
-    // A row whose example does not put a `/` after its own word is a row
-    // somebody added on the strength of it being a keyword. Each row is checked
-    // against the separator it DECLARES rather than against `\s*`, which is
-    // where this case had drifted: `\s*` was adopted so the three ASI rows
-    // would pass and it loosened all nineteen at once, after which a `return`
-    // row rewritten across a line break would still have been green — and
-    // whether a `/` can stand on the word's own line is the only part of a row
-    // that describes a division this scanner can get wrong.
-    for (const [word, row] of ROWS) {
-      const between = row.separator === "inline" ? " +" : "\\n";
-      assert.match(
-        row.example,
-        new RegExp(`\\b${word}${between}/re/`),
-        `\`${word}\` row does not show a regex standing ${row.separator} after the word: ${row.example}`,
-      );
-    }
-  });
-
-  it("declares a separator per row, and the newline ones are the statement-enders", () => {
-    // The weak claim has to stay rare and stay justified: a `"newline"` row
-    // says only that the word cannot be followed by a `/` on its own line, so
-    // the row is there to keep the word out of the "in neither list" hole
-    // rather than to describe a hazard. Exactly three words in the language
-    // qualify — the ones that END a statement and take no operand — and any
-    // future row that reaches for `"newline"` to avoid writing a same-line
-    // example turns this red.
-    const newline = ROWS.filter(([, row]) => row.separator === "newline").map(
-      ([word]) => word,
-    );
-    assert.deepEqual(newline, ["break", "continue", "debugger"]);
-    for (const [word, row] of ROWS) {
-      assert.ok(
-        row.separator === "inline" || row.separator === "newline",
-        `\`${word}\` declares an unknown separator`,
-      );
-      assert.equal(typeof row.example, "string");
-    }
-  });
-
-  it("checks the inline rows strictly enough to catch a reformatted example", () => {
-    // The point of the field, stated as the mutation it catches: taking any
-    // inline row's example and breaking the line — which the old `\s*` match
-    // accepted — must now fail, because the row still claims `"inline"`.
-    for (const [word, row] of ROWS) {
-      if (row.separator !== "inline") continue;
-      const reformatted = row.example.replace(`${word} /re/`, `${word}\n/re/`);
-      assert.notEqual(
-        reformatted,
-        row.example,
-        `\`${word}\` inline row does not write its regex a space after the word`,
-      );
-      assert.doesNotMatch(reformatted, new RegExp(`\\b${word} +/re/`));
-    }
-  });
 
   it("is the only structure the scanner reads membership from", () => {
     // The rule used to be a `Set` rebuilt from these keys at import: two
@@ -677,54 +501,6 @@ describe("the keyword table the regex rule is read from", () => {
     assert.deepEqual(parsed.keys, ["a"]);
   });
 
-  it("is lowercase and alphabetical, so a new row lands where it is looked for", () => {
-    // Duplicates cannot survive an object literal, which is half the reason
-    // this stopped being a `Set([...])` of bare strings.
-    assert.deepEqual(KEYWORDS, [...KEYWORDS].sort());
-    for (const word of KEYWORDS) assert.match(word, /^[a-z]+$/);
-  });
-
-  it("leaves out every other word of the language, with a reason each", () => {
-    // The exclusions used to be two hand-typed lists, which is the same recall
-    // problem the table itself escaped one level up: a word in NEITHER list is
-    // invisible — no case mentions it, so nothing says whether a `/` after it
-    // divides or opens. Both sides are read off one authority now
-    // ({@link RESERVED_WORDS}), and the exhaustiveness case below is what makes
-    // an unclassified word red rather than absent.
-    for (const [word, reason] of Object.entries(DIVIDES_AFTER)) {
-      assert.ok(!KEYWORDS.includes(word), `\`${word}\` is a row: ${reason}`);
-    }
-  });
-
-  it("partitions ECMA-262's reserved words, and the contextual ones, in two", () => {
-    // Exhaustive AND disjoint: every word of the language is either a row (an
-    // expression can begin after it) or an exclusion carrying why it cannot
-    // be, and none is both. Adding a row without deleting its exclusion, or
-    // adding a word to neither, turns this red — which is the whole point of
-    // deriving the two sides from one list instead of recalling each.
-    const classified = [...KEYWORDS, ...Object.keys(DIVIDES_AFTER)].sort();
-    const language = [...RESERVED_WORDS, ...CONTEXTUAL_KEYWORDS].sort();
-    assert.deepEqual(classified, language);
-    assert.equal(new Set(classified).size, classified.length);
-  });
-
-  it("holds the reserved-word list ECMA-262 states, not one filtered to taste", () => {
-    // The authority both sides are derived from, pinned so a future edit
-    // cannot make the partition exhaustive by deleting the word that broke it.
-    // 38 entries is the `ReservedWord` production of §12.7.2 verbatim.
-    assert.equal(RESERVED_WORDS.length, 38);
-    assert.deepEqual([...RESERVED_WORDS], [...RESERVED_WORDS].sort());
-    assert.equal(new Set(RESERVED_WORDS).size, RESERVED_WORDS.length);
-    for (const word of ["enum", "with", "debugger", "await", "yield"]) {
-      assert.ok(RESERVED_WORDS.includes(word), `\`${word}\` is reserved`);
-    }
-    // `of` is the reason the contextual list has to exist at all: it is a row,
-    // and it is not a reserved word — `const of = 1` is legal.
-    assert.ok(!RESERVED_WORDS.includes("of"));
-    assert.ok(CONTEXTUAL_KEYWORDS.includes("of"));
-    assert.ok(KEYWORDS.includes("of"));
-  });
-
   it("consults every row, and a word outside the table divides", () => {
     // Each row driven through the scanner, which is what makes the table a
     // rule the code obeys rather than documentation beside it: with the word
@@ -745,16 +521,6 @@ describe("the keyword table the regex rule is read from", () => {
   after: "still here",
 `);
     assert.deepEqual(control.keys, ["a"]);
-  });
-
-  it("carries the three rows the parser accepts and the runtime does not", () => {
-    // `new /re/()`, `s instanceof /re/` and `class R extends /re/ {}` all
-    // throw when they run, and all three are still regex literals a tokeniser
-    // has to read past. Pinned because "that would crash" is exactly the
-    // argument for deleting them from the table.
-    for (const word of ["extends", "instanceof", "new"]) {
-      assert.ok(KEYWORDS.includes(word), `\`${word}\` row missing`);
-    }
   });
 });
 
