@@ -1,7 +1,5 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   subscribeShared,
@@ -9,6 +7,8 @@ import {
   getRegistryStatusSnapshot,
   __resetChannelRegistryForTests,
 } from "@/lib/realtime-channel-registry";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Tests for the fan-out subscriber registry that sits on top of
@@ -439,16 +439,9 @@ describe("subscribeRegistryStatus — aggregate status fan-out", () => {
 });
 
 describe("realtime-channel-registry wiring", () => {
-  const root = process.cwd();
-  const chatSource = readFileSync(path.join(root, "lib", "supabase-chat.ts"), "utf8");
-  const marketplaceSource = readFileSync(
-    path.join(root, "lib", "supabase-marketplace.ts"),
-    "utf8",
-  );
-  const registrySource = readFileSync(
-    path.join(root, "lib", "realtime-channel-registry.ts"),
-    "utf8",
-  );
+  const chatSource = readRepoFile("lib", "supabase-chat.ts");
+  const marketplaceSource = readRepoFile("lib", "supabase-marketplace.ts");
+  const registrySource = readRepoFile("lib", "realtime-channel-registry.ts");
 
   it("supabase-chat.ts routes subscribeToInbox through subscribeShared", () => {
     assert.match(chatSource, /from\s+"@\/lib\/realtime-channel-registry"/);

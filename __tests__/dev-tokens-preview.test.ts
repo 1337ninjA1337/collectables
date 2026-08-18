@@ -1,11 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { designTokens } from "@/lib/design-tokens";
 
-const ROUTE_PATH = path.join(process.cwd(), "app", "_dev", "tokens.tsx");
+import { repoPath } from "./helpers/repo-file";
+
+const ROUTE_PATH = repoPath("app", "_dev", "tokens.tsx");
 
 function readRoute(): string {
   return readFileSync(ROUTE_PATH, "utf8");

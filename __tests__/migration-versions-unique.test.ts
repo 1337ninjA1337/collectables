@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * Supabase derives a migration's `schema_migrations.version` from the leading
@@ -12,7 +13,7 @@ import path from "node:path";
  * both resolved to version `20260527`. This guard keeps every version unique.
  */
 describe("supabase migration versions", () => {
-  const dir = path.join(process.cwd(), "supabase", "migrations");
+  const dir = repoPath("supabase", "migrations");
   const files = readdirSync(dir).filter((f) => f.endsWith(".sql"));
 
   it("every migration filename starts with a numeric version + underscore", () => {

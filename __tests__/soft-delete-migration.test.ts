@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * BE-15a — `20260623_soft_delete_deleted_at.sql` adds the soft-delete
@@ -19,14 +19,10 @@ import path from "node:path";
  *   (7) the conflict-policy doc explains LWW + soft-delete/tombstones.
  */
 
-const ROOT = process.cwd();
-const MIGRATION = readFileSync(
-  path.join(ROOT, "supabase", "migrations", "20260623_soft_delete_deleted_at.sql"),
-  "utf8",
-);
-const MANUAL = readFileSync(path.join(ROOT, "MANUAL-TASKS.md"), "utf8");
-const README = readFileSync(path.join(ROOT, "README-DEPLOY.md"), "utf8");
-const POLICY = readFileSync(path.join(ROOT, "docs", "CONFLICT-POLICY.md"), "utf8");
+const MIGRATION = readRepoFile("supabase", "migrations", "20260623_soft_delete_deleted_at.sql");
+const MANUAL = readRepoFile("MANUAL-TASKS.md");
+const README = readRepoFile("README-DEPLOY.md");
+const POLICY = readRepoFile("docs", "CONFLICT-POLICY.md");
 
 // strip `-- ...` line comments so prose doesn't trip the SQL assertions.
 const SQL = MIGRATION.replace(/--.*$/gm, "");

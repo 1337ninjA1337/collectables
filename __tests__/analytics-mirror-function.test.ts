@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * Structural assertions on the analytics-mirror Edge Function. The function
@@ -13,13 +14,7 @@ import path from "node:path";
  * under Node) lives in `__tests__/analytics-mirror-payload.test.ts`.
  */
 
-const FUNCTION_PATH = path.join(
-  process.cwd(),
-  "supabase",
-  "functions",
-  "analytics-mirror",
-  "index.ts",
-);
+const FUNCTION_PATH = repoPath("supabase", "functions", "analytics-mirror", "index.ts");
 
 const SOURCE = readFileSync(FUNCTION_PATH, "utf8");
 

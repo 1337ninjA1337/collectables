@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import path from "node:path";
+import { existsSync, readdirSync } from "node:fs";
+
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
 /**
  * BE-31 — a PR-time GitHub Actions job that applies every committed migration
@@ -14,11 +15,7 @@ import path from "node:path";
  * run. Mirrors the structural-assertion style of sentry-deploy-workflow.test.ts
  * and migration-versions-unique.test.ts.
  */
-const root = process.cwd();
-const workflow = readFileSync(
-  path.join(root, ".github", "workflows", "supabase-test.yml"),
-  "utf8",
-);
+const workflow = readRepoFile(".github", "workflows", "supabase-test.yml");
 
 describe("BE-31 — Supabase Tests workflow", () => {
   it("runs on pull_request", () => {
@@ -65,13 +62,13 @@ describe("BE-31 — config.toml is generated at runtime, never committed", () =>
   // runner instead and git-ignored.
   it("does NOT commit supabase/config.toml", () => {
     assert.ok(
-      !existsSync(path.join(root, "supabase", "config.toml")),
+      !existsSync(repoPath("supabase", "config.toml")),
       "supabase/config.toml must not be committed — it is generated at runtime",
     );
   });
 
   it("git-ignores supabase/config.toml", () => {
-    const gitignore = readFileSync(path.join(root, ".gitignore"), "utf8");
+    const gitignore = readRepoFile(".gitignore");
     assert.match(gitignore, /^supabase\/config\.toml\s*$/m);
   });
 
@@ -87,17 +84,14 @@ describe("BE-31 — config.toml is generated at runtime, never committed", () =>
   });
 
   it("ships at least one pgTAP test for `supabase test db` to run", () => {
-    const testsDir = path.join(root, "supabase", "tests");
+    const testsDir = repoPath("supabase", "tests");
     assert.ok(existsSync(testsDir), "supabase/tests/ must exist");
     const sqlTests = readdirSync(testsDir).filter((f) => f.endsWith(".sql"));
     assert.ok(sqlTests.length > 0, "expected at least one .sql pgTAP test");
   });
 
   it("the smoke test asserts the four core tables and folded-in columns", () => {
-    const smoke = readFileSync(
-      path.join(root, "supabase", "tests", "00_smoke_test.sql"),
-      "utf8",
-    );
+    const smoke = readRepoFile("supabase", "tests", "00_smoke_test.sql");
     assert.match(smoke, /select plan\(/i);
     for (const table of ["profiles", "collections", "items", "friend_requests"]) {
       assert.match(

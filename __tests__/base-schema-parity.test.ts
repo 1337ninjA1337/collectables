@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
-import path from "node:path";
+import { readdirSync } from "node:fs";
 
 import {
   collectionByIdUrl,
@@ -40,6 +39,8 @@ import type {
   UserProfile,
 } from "@/lib/types";
 
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+
 /**
  * BE-3 / BE-37 — schema-parity guard across EVERY `*-shapes.ts` module.
  *
@@ -56,7 +57,6 @@ import type {
  * their backing tables.
  */
 
-const ROOT = process.cwd();
 
 // Every committed migration, comment-stripped so prose mentioning a column
 // name can't satisfy an assertion the executable SQL doesn't actually back.
@@ -64,10 +64,10 @@ const ROOT = process.cwd();
 // marketplace creates, and later `ALTER … ADD COLUMN` additions like
 // `is_admin` / `updated_at` / `deleted_at` / `buyer_user_id`), so the parity
 // check works against the full concatenation rather than a single file.
-const ALL_MIGRATIONS_SQL = readdirSync(path.join(ROOT, "supabase", "migrations"))
+const ALL_MIGRATIONS_SQL = readdirSync(repoPath("supabase", "migrations"))
   .filter((f) => f.endsWith(".sql"))
   .map((f) =>
-    readFileSync(path.join(ROOT, "supabase", "migrations", f), "utf8").replace(/--.*$/gm, ""),
+    readRepoFile("supabase", "migrations", f).replace(/--.*$/gm, ""),
   )
   .join("\n");
 

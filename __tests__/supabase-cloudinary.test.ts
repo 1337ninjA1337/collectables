@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * SEC-5a — structural assertions on the `cloudSignUpload` client wrapper in
@@ -13,7 +14,7 @@ import path from "node:path";
  * session / when Supabase is unconfigured / on any error.
  */
 
-const WRAPPER_PATH = path.join(process.cwd(), "lib", "supabase-cloudinary.ts");
+const WRAPPER_PATH = repoPath("lib", "supabase-cloudinary.ts");
 
 function readSrc(): string {
   return readFileSync(WRAPPER_PATH, "utf8");

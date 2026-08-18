@@ -8,7 +8,7 @@ import {
   SOFT_DESTRUCTIVE_FOREGROUND,
   SOFT_DESTRUCTIVE_SURFACE,
 } from "@/lib/danger-surface";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath, repoRelative } from "./helpers/repo-file";
 
 /**
  * `<SoftDestructiveChip>` is the chip half of the "reversible destructive
@@ -107,11 +107,11 @@ describe("adoption", () => {
     }
     const importers: string[] = [];
     for (const dir of ["app", "components"]) {
-      for (const file of walk(path.join(process.cwd(), dir))) {
+      for (const file of walk(repoPath(dir))) {
         const source = readFileSync(file, "utf8");
         const importBlock = source.match(/import \{[\s\S]*?\} from "@\/lib\/design-tokens";/)?.[0] ?? "";
         if (/\bCARD_BG_10\b/.test(importBlock) && /\bDANGER_SOFT_2\b/.test(importBlock)) {
-          importers.push(path.relative(process.cwd(), file));
+          importers.push(repoRelative(file));
         }
       }
     }

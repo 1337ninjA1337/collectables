@@ -1,14 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { contentKey, dedupeItems } from "@/lib/dedupe-items";
 import { normalizeOwnItemIds } from "@/lib/item-id";
 import type { CollectableItem } from "@/lib/types";
 import { deterministicUuidV4, isUuidV4 } from "@/lib/uuid";
 
-const ROOT = path.join(process.cwd());
+import { readRepoFile } from "./helpers/repo-file";
+
 
 function makeItem(overrides: Partial<CollectableItem>): CollectableItem {
   return {
@@ -142,7 +141,7 @@ describe("dedupeItems — content pass (duplicates with divergent createdAt)", (
 
 describe("wishlist collection id (uuid column compliance)", () => {
   it("lib/supabase-profiles.ts no longer builds the non-uuid `wishlist-<userId>` id", () => {
-    const src = readFileSync(path.join(ROOT, "lib/supabase-profiles.ts"), "utf8");
+    const src = readRepoFile("lib/supabase-profiles.ts");
     assert.doesNotMatch(
       src,
       /`wishlist-\$\{userId\}`/,

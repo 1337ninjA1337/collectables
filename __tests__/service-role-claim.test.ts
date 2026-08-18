@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, statSync } from "node:fs";
-import path from "node:path";
+import { statSync } from "node:fs";
 
 import {
   assertServiceRoleKey,
@@ -9,6 +8,9 @@ import {
   decodeJwtRole,
   ServiceRoleClaimError,
 } from "../lib/service-role-claim";
+
+import { readEdgeFunction } from "./helpers/edge-function-source";
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * BE-23 — service_role-claim self-check.
@@ -114,11 +116,8 @@ describe("assertAnonKey", () => {
 });
 
 describe("Edge Functions wire in the self-check (structural)", () => {
-  const fn = (name: string) =>
-    path.join(process.cwd(), "supabase", "functions", name, "index.ts");
-
   it("delete-account asserts the service-role claim before privileged deletes", () => {
-    const src = readFileSync(fn("delete-account"), "utf8");
+    const src = readEdgeFunction("delete-account");
     assert.match(src, /from\s+['"][^'"]*lib\/service-role-claim\.ts['"]/);
     assert.match(src, /assertServiceRoleKey\(serviceRoleKey,\s*["']delete-account["']\)/);
     // The check must precede the admin client construction.
@@ -129,7 +128,7 @@ describe("Edge Functions wire in the self-check (structural)", () => {
   });
 
   it("analytics-mirror asserts the service-role claim before the privileged insert", () => {
-    const src = readFileSync(fn("analytics-mirror"), "utf8");
+    const src = readEdgeFunction("analytics-mirror");
     assert.match(src, /assertServiceRoleKey\(serviceRoleKey,\s*["']analytics-mirror["']\)/);
     assert.ok(
       src.indexOf("assertServiceRoleKey") < src.indexOf("adminClient = createClient"),
@@ -138,7 +137,7 @@ describe("Edge Functions wire in the self-check (structural)", () => {
   });
 
   it("delete-image asserts the anon claim before verifying the session", () => {
-    const src = readFileSync(fn("delete-image"), "utf8");
+    const src = readEdgeFunction("delete-image");
     assert.match(src, /assertAnonKey\(anonKey,\s*["']delete-image["']\)/);
     // SEC-9: the session-verification client is now built inside the shared
     // assertCaller gate; the anon-key self-check must still precede that gate.
@@ -150,7 +149,7 @@ describe("Edge Functions wire in the self-check (structural)", () => {
 
   it("all three functions return 500 (fail closed) on a misconfigured secret", () => {
     for (const name of ["delete-account", "analytics-mirror", "delete-image"]) {
-      const src = readFileSync(fn(name), "utf8");
+      const src = readEdgeFunction(name);
       assert.match(src, /ServiceRoleClaimError/, `${name} catches the typed error`);
       assert.match(src, /misconfigured/, `${name} responds with a misconfigured error`);
     }
@@ -158,7 +157,7 @@ describe("Edge Functions wire in the self-check (structural)", () => {
 
   it("the shared helper module exists", () => {
     assert.ok(
-      statSync(path.join(process.cwd(), "lib", "service-role-claim.ts")).isFile(),
+      statSync(repoPath("lib", "service-role-claim.ts")).isFile(),
     );
   });
 });

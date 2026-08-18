@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Analytics #16 — the RLS leak check is executed against Supabase out-of-band;
@@ -11,12 +11,8 @@ import path from "node:path";
  * the verification step can't silently disappear.
  */
 
-const ROOT = process.cwd();
-const MIGRATION = readFileSync(
-  path.join(ROOT, "supabase", "migrations", "20260508_analytics_events.sql"),
-  "utf8",
-);
-const MANUAL = readFileSync(path.join(ROOT, "MANUAL-TASKS.md"), "utf8");
+const MIGRATION = readRepoFile("supabase", "migrations", "20260508_analytics_events.sql");
+const MANUAL = readRepoFile("MANUAL-TASKS.md");
 
 // strip `-- ...` line comments so "No CREATE POLICY ... on purpose" prose
 // doesn't trip the executable-SQL assertion below.

@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Structural / wiring tests for `lib/social-context.tsx`.
@@ -13,8 +13,7 @@ import path from "node:path";
  * profile lookups through the new `ensureProfilesLoaded` helper.
  */
 
-const ROOT = process.cwd();
-const SOURCE = readFileSync(path.join(ROOT, "lib", "social-context.tsx"), "utf8");
+const SOURCE = readRepoFile("lib", "social-context.tsx");
 
 describe("social-context.tsx viewer-profile cache", () => {
   it("declares the centralised viewerProfiles map and an in-flight ref", () => {
@@ -87,7 +86,7 @@ describe("consumers route profile lookups through ensureProfilesLoaded", () => {
 
   for (const rel of consumers) {
     it(`${rel} no longer imports fetchProfileById directly`, () => {
-      const src = readFileSync(path.join(ROOT, rel), "utf8");
+      const src = readRepoFile(rel);
       assert.doesNotMatch(
         src,
         /import\s*\{[^}]*\bfetchProfileById\b[^}]*\}\s*from\s*"@\/lib\/supabase-profiles"/,
@@ -96,7 +95,7 @@ describe("consumers route profile lookups through ensureProfilesLoaded", () => {
     });
 
     it(`${rel} uses ensureProfilesLoaded from useSocial()`, () => {
-      const src = readFileSync(path.join(ROOT, rel), "utf8");
+      const src = readRepoFile(rel);
       assert.match(
         src,
         /\bensureProfilesLoaded\b/,

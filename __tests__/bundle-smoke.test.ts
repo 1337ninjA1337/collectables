@@ -36,7 +36,7 @@ import {
   renderPrivacyPage,
 } from "../lib/privacy-page";
 import { readI18nSource } from "./helpers/i18n-source-file";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
 /**
  * Pins the post-build smoke check that replaced ci.yml's and deploy.yml's
@@ -1566,7 +1566,7 @@ describe("wiring", () => {
   });
 
   it("leaves no workflow grepping the bundle for a watched token by hand", () => {
-    const dir = path.join(process.cwd(), ".github", "workflows");
+    const dir = repoPath(".github", "workflows");
     for (const file of fs.readdirSync(dir)) {
       if (!file.endsWith(".yml") && !file.endsWith(".yaml")) continue;
       const body = read(path.join(".github", "workflows", file));

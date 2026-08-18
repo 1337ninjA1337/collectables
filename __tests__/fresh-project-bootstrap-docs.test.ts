@@ -1,8 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
-import path from "node:path";
-import { readRepoFile } from "./helpers/repo-file";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
 // BE-4 — the offline (doc) half: README-DEPLOY.md must document how to
 // bootstrap a fresh Supabase project from the committed migrations alone,
@@ -57,7 +56,7 @@ describe("BE-4 — fresh-project bootstrap docs", () => {
 
   it("lists every committed migration in the apply-order block", () => {
     const migrations = readdirSync(
-      path.join(process.cwd(), "supabase", "migrations"),
+      repoPath("supabase", "migrations"),
     ).filter((f) => f.endsWith(".sql"));
     assert.ok(migrations.length >= 12, "expected the full migration set");
     for (const file of migrations) {
@@ -71,7 +70,7 @@ describe("BE-4 — fresh-project bootstrap docs", () => {
 
   it("lists the migrations in true lexicographic apply order", () => {
     const migrations = readdirSync(
-      path.join(process.cwd(), "supabase", "migrations"),
+      repoPath("supabase", "migrations"),
     )
       .filter((f) => f.endsWith(".sql"))
       .sort();

@@ -1,7 +1,8 @@
 import { beforeEach } from "node:test";
 import { createRequire } from "node:module";
-import path from "node:path";
 import { __resetSentryForTests } from "../lib/sentry";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * Global test bootstrap, preloaded via `--import` from `package.json`'s `test`
@@ -39,11 +40,7 @@ import { __resetSentryForTests } from "../lib/sentry";
  */
 const require = createRequire(import.meta.url);
 
-const REALTIME_MODULE_PATH = path.join(
-  process.cwd(),
-  "lib",
-  "supabase-realtime.ts",
-);
+const REALTIME_MODULE_PATH = repoPath("lib", "supabase-realtime.ts");
 
 interface RealtimeModuleExports {
   __resetSharedRealtimeClientForTests?: () => void;

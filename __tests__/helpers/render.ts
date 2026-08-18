@@ -5,6 +5,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import * as React from "react";
 
+import { repoPath } from "./repo-file";
+
 /**
  * A dependency-free React render harness for `components/*.tsx`.
  *
@@ -56,7 +58,7 @@ import * as React from "react";
  * a dynamic `await import(...)` inside the test.
  */
 
-const STUB_DIR = path.join(process.cwd(), "__tests__", "helpers", "stubs");
+const STUB_DIR = repoPath("__tests__", "helpers", "stubs");
 
 /**
  * Specifier → stub file. Keyed by exact specifier: sub-path imports

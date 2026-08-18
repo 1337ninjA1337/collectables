@@ -1,7 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
+
+import { readRepoFile, repoPath, repoRelative } from "./helpers/repo-file";
 
 /**
  * Hard requirement: the ~120 KB `@sentry/react-native` native bridge is only
@@ -15,8 +17,7 @@ import path from "node:path";
  * is allowlisted. Everything else must go through `@/lib/sentry`.
  */
 
-const root = process.cwd();
-const sentrySource = readFileSync(path.join(root, "lib", "sentry.ts"), "utf8");
+const sentrySource = readRepoFile("lib", "sentry.ts");
 
 const STATIC_IMPORT = /import[^;]*from\s+["']@sentry\/react-native["']/;
 const ALLOWLIST = ["app/_layout.tsx"];
@@ -29,10 +30,10 @@ function appCodeFiles(): string[] {
     for (const entry of readdirSync(dir)) {
       const full = path.join(dir, entry);
       if (statSync(full).isDirectory()) walk(full);
-      else if (/\.tsx?$/.test(entry)) out.push(path.relative(root, full));
+      else if (/\.tsx?$/.test(entry)) out.push(repoRelative(full));
     }
   };
-  for (const d of dirs) walk(path.join(root, d));
+  for (const d of dirs) walk(repoPath(d));
   return out;
 }
 
@@ -64,7 +65,7 @@ describe("sentry lazy-import invariant", () => {
 
   it("no app code statically imports the SDK outside the allowlist", () => {
     const offenders = appCodeFiles()
-      .filter((rel) => STATIC_IMPORT.test(readFileSync(path.join(root, rel), "utf8")))
+      .filter((rel) => STATIC_IMPORT.test(readRepoFile(rel)))
       .map((rel) => rel.split(path.sep).join("/"))
       .sort();
     assert.deepEqual(
@@ -75,7 +76,7 @@ describe("sentry lazy-import invariant", () => {
   });
 
   it("the allowlisted layout uses the static import for wrap/boundary only", () => {
-    const layout = readFileSync(path.join(root, "app", "_layout.tsx"), "utf8");
+    const layout = readRepoFile("app", "_layout.tsx");
     assert.ok(layout.includes("Sentry.wrap("), "layout must use Sentry.wrap");
     assert.ok(layout.includes("<ErrorBoundary"), "layout must render the boundary");
     assert.ok(

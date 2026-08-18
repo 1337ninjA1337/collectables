@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
-import path from "node:path";
+import { readdirSync } from "node:fs";
+
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
 /**
  * BE-1 — the base-schema migration is the single authoritative, idempotent
@@ -16,11 +17,7 @@ import path from "node:path";
  * The broader column-by-column parity sweep lives in BE-3.
  */
 
-const ROOT = process.cwd();
-const MIGRATION = readFileSync(
-  path.join(ROOT, "supabase", "migrations", "20260423_base_schema.sql"),
-  "utf8",
-);
+const MIGRATION = readRepoFile("supabase", "migrations", "20260423_base_schema.sql");
 
 // strip `-- ...` line comments so prose doesn't trip the SQL assertions.
 const SQL = MIGRATION.replace(/--.*$/gm, "");
@@ -117,7 +114,7 @@ describe("base schema migration (BE-1)", () => {
   // core tables, so the base schema MUST sort first or the replay fails with
   // "relation does not exist".
   it("sorts before every other migration so it applies first on a fresh DB", () => {
-    const files = readdirSync(path.join(ROOT, "supabase", "migrations"))
+    const files = readdirSync(repoPath("supabase", "migrations"))
       .filter((f) => f.endsWith(".sql"))
       .sort();
     assert.equal(files[0], "20260423_base_schema.sql");

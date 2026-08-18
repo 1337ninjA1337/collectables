@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import path from "node:path";
 
 import {
   findAppstoreConfigIssues,
@@ -9,7 +8,7 @@ import {
   REQUIRED_INFO_PLIST_KEYS,
 } from "../lib/check-appstore-config";
 import { LINT_GUARDS } from "../lib/lint-guards";
-import { readRepoFile } from "./helpers/repo-file";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
 /** A minimal valid config mirroring app.json's real shape. */
 function validAppJson() {
@@ -177,7 +176,7 @@ describe("findAppstoreConfigIssues", () => {
     assert.deepEqual(
       findAppstoreConfigIssues({
         appJson: real,
-        iconExists: (p) => existsSync(path.join(process.cwd(), p)),
+        iconExists: (p) => existsSync(repoPath(p)),
       }),
       [],
     );

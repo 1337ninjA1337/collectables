@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * BE-26 — structural assertions on the `cloudExportData` client wrapper in
@@ -12,7 +13,7 @@ import path from "node:path";
  * without a real session.
  */
 
-const WRAPPER_PATH = path.join(process.cwd(), "lib", "supabase-data-export.ts");
+const WRAPPER_PATH = repoPath("lib", "supabase-data-export.ts");
 
 function readSrc(): string {
   return readFileSync(WRAPPER_PATH, "utf8");

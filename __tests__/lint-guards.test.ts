@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { existsSync } from "node:fs";
-import path from "node:path";
 
 import {
   LINT_ALL_EXEMPT,
@@ -11,9 +10,8 @@ import {
   lintAllExitCode,
   type LintGuardResult,
 } from "../lib/lint-guards";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
-const ROOT = process.cwd();
 
 const pkg = JSON.parse(read("package.json")) as {
   scripts: Record<string, string>;
@@ -32,7 +30,7 @@ describe("LINT_GUARDS — registry shape", () => {
   it("every guard's script file exists on disk", () => {
     for (const guard of LINT_GUARDS) {
       assert.ok(
-        existsSync(path.join(ROOT, guard.scriptPath)),
+        existsSync(repoPath(guard.scriptPath)),
         `${guard.npmScript} points at a missing file: ${guard.scriptPath}`,
       );
     }

@@ -9,7 +9,7 @@ import {
   GITHUB_PAGES_ORIGIN,
   DEEP_LINK_ORIGIN,
 } from "../supabase/functions/_shared/cors";
-import { readRepoFile } from "./helpers/repo-file";
+import { readEdgeFunction } from "./helpers/edge-function-source";
 
 /**
  * SEC-10 — centralised Edge Function CORS.
@@ -140,14 +140,10 @@ const FUNCTIONS = [
   "analytics-mirror",
 ];
 
-function fnSource(name: string): string {
-  return readRepoFile(`supabase/functions/${name}/index.ts`);
-}
-
 describe("cors — adoption across Edge Functions (structural)", () => {
   for (const name of FUNCTIONS) {
     describe(name, () => {
-      const src = fnSource(name);
+      const src = readEdgeFunction(name);
 
       it("imports the shared cors gate", () => {
         assert.match(

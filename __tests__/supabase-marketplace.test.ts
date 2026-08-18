@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   buildMarketplaceWriteHeaders,
@@ -10,6 +9,8 @@ import {
   markSoldPayload,
   markSoldUrl,
 } from "@/lib/supabase-marketplace-shapes";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * Guards the contract that `cloudMarkSold` in `lib/supabase-marketplace.ts`
@@ -26,11 +27,7 @@ import {
  *      literal in place of `markSoldPayload(...)`) is caught immediately.
  */
 
-const SUPABASE_MARKETPLACE_PATH = path.join(
-  process.cwd(),
-  "lib",
-  "supabase-marketplace.ts",
-);
+const SUPABASE_MARKETPLACE_PATH = repoPath("lib", "supabase-marketplace.ts");
 
 function readSrc(): string {
   return readFileSync(SUPABASE_MARKETPLACE_PATH, "utf8");
@@ -282,7 +279,7 @@ describe("cloudMarkReceived — structural composition (lib/supabase-marketplace
 });
 
 describe("markListingReceived syncs the receipt stamp to the cloud", () => {
-  const CONTEXT_PATH = path.join(process.cwd(), "lib", "marketplace-context.tsx");
+  const CONTEXT_PATH = repoPath("lib", "marketplace-context.tsx");
   const ctxSrc = readFileSync(CONTEXT_PATH, "utf8");
 
   it("imports cloudMarkReceived from the cloud wrapper", () => {
@@ -332,7 +329,7 @@ describe("cloudClaimListing — structural composition (BE-20)", () => {
 });
 
 describe("markListingSold routes buyer claims through the atomic Edge Function (BE-20)", () => {
-  const CONTEXT_PATH = path.join(process.cwd(), "lib", "marketplace-context.tsx");
+  const CONTEXT_PATH = repoPath("lib", "marketplace-context.tsx");
   const ctxSrc = readFileSync(CONTEXT_PATH, "utf8");
 
   it("calls cloudClaimListing for a buyer claim and cloudMarkSold for a seller mark-sold", () => {

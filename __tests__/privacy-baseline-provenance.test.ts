@@ -24,6 +24,8 @@ import {
 } from "../lib/privacy-body-baselines";
 import { PRIVACY_PAGE_LANGUAGES } from "../lib/privacy-page";
 
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+
 /**
  * Pins the guard that stops a policy-size baseline changing quietly.
  *
@@ -37,7 +39,6 @@ import { PRIVACY_PAGE_LANGUAGES } from "../lib/privacy-page";
  * its previous revision.
  */
 
-const ROOT = process.cwd();
 
 const baseline = (over: Partial<PrivacyBodyBaseline> = {}): PrivacyBodyBaseline => ({
   words: 200,
@@ -81,7 +82,7 @@ describe("PRIVACY_BODY_BASELINES — the shipped table", () => {
       const rel = privacyPolicySourcePath(code);
       assert.equal(rel, code === "en" ? "PRIVACY.md" : `PRIVACY.md.${code}`);
       assert.ok(
-        fs.existsSync(path.join(ROOT, rel)),
+        fs.existsSync(repoPath(rel)),
         `${code}: baseline describes a missing file (${rel})`,
       );
     }
@@ -94,10 +95,7 @@ describe("parsePrivacyBodyBaselines", () => {
     // reformat that defeats the regex would silently turn the drift half off.
     // Parsing the file on disk and comparing against the imported object makes
     // that reformat fail on the commit that does it.
-    const source = fs.readFileSync(
-      path.join(ROOT, "lib/privacy-body-baselines.ts"),
-      "utf8",
-    );
+    const source = readRepoFile("lib/privacy-body-baselines.ts");
     assert.deepEqual(parsePrivacyBodyBaselines(source), {
       ...PRIVACY_BODY_BASELINES,
     });
@@ -525,10 +523,7 @@ describe("the guard is wired into lint:all", () => {
     // The script's own vacuous-green defence: actions/checkout defaults to
     // fetch-depth 1, and a guard that passes because it could not see the
     // previous revision is worse than no guard.
-    const source = fs.readFileSync(
-      path.join(ROOT, "scripts/check-privacy-baseline-provenance.ts"),
-      "utf8",
-    );
+    const source = readRepoFile("scripts/check-privacy-baseline-provenance.ts");
     assert.match(source, /is-shallow-repository/);
     assert.match(source, /fetch-depth: 0/);
   });
@@ -536,7 +531,7 @@ describe("the guard is wired into lint:all", () => {
   it("gets the full history it needs from ci.yml's test job", () => {
     // The guard is in the lint:all fan-out, which only the `test` job runs;
     // at the default depth-1 it would fail on every CI run.
-    const ci = fs.readFileSync(path.join(ROOT, ".github/workflows/ci.yml"), "utf8");
+    const ci = readRepoFile(".github/workflows/ci.yml");
     const testJob = ci.slice(ci.indexOf("\n  test:"));
     assert.match(
       testJob.slice(0, testJob.indexOf("Setup Node.js")),
@@ -545,10 +540,7 @@ describe("the guard is wired into lint:all", () => {
   });
 
   it("resolves its base from all four documented sources", () => {
-    const source = fs.readFileSync(
-      path.join(ROOT, "scripts/check-privacy-baseline-provenance.ts"),
-      "utf8",
-    );
+    const source = readRepoFile("scripts/check-privacy-baseline-provenance.ts");
     for (const token of [
       "--base",
       "PRIVACY_BASELINE_BASE_REF",

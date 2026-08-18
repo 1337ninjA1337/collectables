@@ -67,7 +67,7 @@ describe("test-globals bootstrap (file contract)", () => {
     assert.match(src, /createRequire/);
     assert.match(src, /require\.cache/);
     // The cache key is the resolved absolute path; the bootstrap derives it
-    // from process.cwd() so it works in any working directory CI uses.
+    // through `repoPath`, so it works in any working directory CI uses.
     assert.match(src, /supabase-realtime\.ts/);
     assert.match(src, /__resetSharedRealtimeClientForTests/);
   });

@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * SEC-ADMIN-1 — `20260617_profiles_admin_update_grant.sql` closes the
@@ -17,17 +17,10 @@ import path from "node:path";
  *       grant is replayed (defense in depth).
  */
 
-const ROOT = process.cwd();
 const MIGRATION_FILE = "20260617_profiles_admin_update_grant.sql";
-const MIGRATION = readFileSync(
-  path.join(ROOT, "supabase", "migrations", MIGRATION_FILE),
-  "utf8",
-);
-const MANUAL = readFileSync(path.join(ROOT, "MANUAL-TASKS.md"), "utf8");
-const PGTAP = readFileSync(
-  path.join(ROOT, "supabase", "tests", "01_core_tables_rls.sql"),
-  "utf8",
-);
+const MIGRATION = readRepoFile("supabase", "migrations", MIGRATION_FILE);
+const MANUAL = readRepoFile("MANUAL-TASKS.md");
+const PGTAP = readRepoFile("supabase", "tests", "01_core_tables_rls.sql");
 
 // strip `-- ...` line comments so prose doesn't trip the SQL assertions.
 const SQL = MIGRATION.replace(/--.*$/gm, "");

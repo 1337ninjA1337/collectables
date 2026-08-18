@@ -1,13 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
-import path from "node:path";
+import { readdirSync } from "node:fs";
 
 import {
   findUndocumentedMigrations,
   formatMigrationDocsReport,
   manualTaskSections,
 } from "../lib/check-migration-docs";
+
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
 /**
  * BE-32: every `supabase/migrations/*.sql` must carry a matching
@@ -67,14 +68,10 @@ describe("check-migration-docs matcher", () => {
 });
 
 describe("repo migrations are all documented in MANUAL-TASKS.md", () => {
-  const root = process.cwd();
   const migrationFilenames = readdirSync(
-    path.join(root, "supabase", "migrations"),
+    repoPath("supabase", "migrations"),
   ).filter((f) => f.endsWith(".sql"));
-  const manualTasks = readFileSync(
-    path.join(root, "MANUAL-TASKS.md"),
-    "utf8",
-  );
+  const manualTasks = readRepoFile("MANUAL-TASKS.md");
 
   it("has at least one migration to check (guards a no-op scan)", () => {
     assert.ok(migrationFilenames.length > 0);

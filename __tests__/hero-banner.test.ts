@@ -1,10 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import path from "node:path";
+import { readdirSync, statSync } from "node:fs";
 
 import { RADIUS_HERO_LG, SPACING_CARD, SPACING_GUTTER, SPACING_LIST } from "@/lib/design-tokens";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
 /**
  * Structural pins for `<HeroBanner>` — the dark banner extracted from the
@@ -25,9 +24,9 @@ import { readRepoFile as read } from "./helpers/repo-file";
 
 function walk(dir: string): string[] {
   const out: string[] = [];
-  for (const entry of readdirSync(path.join(process.cwd(), dir))) {
+  for (const entry of readdirSync(repoPath(dir))) {
     const rel = `${dir}/${entry}`;
-    if (statSync(path.join(process.cwd(), rel)).isDirectory()) out.push(...walk(rel));
+    if (statSync(repoPath(rel)).isDirectory()) out.push(...walk(rel));
     else if (rel.endsWith(".tsx")) out.push(rel);
   }
   return out;

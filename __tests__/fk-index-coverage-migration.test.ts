@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+
 /**
  * BE-8 — `20260620_fk_index_coverage.sql` closes the one gap in foreign-key
  * index coverage: `chat_messages.from_user_id`, whose FK to `auth.users` had no
@@ -18,14 +20,13 @@ import path from "node:path";
  *   (3) the migration is documented in MANUAL-TASKS.md + the README apply order.
  */
 
-const ROOT = process.cwd();
-const MIGRATIONS_DIR = path.join(ROOT, "supabase", "migrations");
+const MIGRATIONS_DIR = repoPath("supabase", "migrations");
 const MIGRATION = readFileSync(
   path.join(MIGRATIONS_DIR, "20260620_fk_index_coverage.sql"),
   "utf8",
 );
-const MANUAL = readFileSync(path.join(ROOT, "MANUAL-TASKS.md"), "utf8");
-const README = readFileSync(path.join(ROOT, "README-DEPLOY.md"), "utf8");
+const MANUAL = readRepoFile("MANUAL-TASKS.md");
+const README = readRepoFile("README-DEPLOY.md");
 
 // All migration SQL concatenated (comment-stripped) — used to verify that every
 // FK column is covered by some leading-column index somewhere in the schema.

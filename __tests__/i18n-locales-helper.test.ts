@@ -16,6 +16,8 @@ import {
 } from "./helpers/i18n-locales";
 import { localeKeys } from "@/lib/i18n-source";
 
+import { repoPath } from "./helpers/repo-file";
+
 /** A locale's own declared keys, as an array — `localeKeys` returns a Set. */
 const localeKeysOf = (source: string, code: string): readonly string[] => [
   ...localeKeys(source, code),
@@ -423,7 +425,7 @@ describe("the habit stays retired", () => {
   const EXEMPT = ["bundle-smoke.test.ts"];
 
   it("leaves no suite counting locale hits across the whole translations file", () => {
-    const dir = path.join(process.cwd(), "__tests__");
+    const dir = repoPath("__tests__");
     const suites = readdirSync(dir).filter(
       (entry) =>
         entry.endsWith(".test.ts") &&

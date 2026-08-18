@@ -33,7 +33,7 @@ import {
   type ItemFilters,
 } from "@/lib/item-filters";
 import type { CollectableItem } from "@/lib/types";
-import { readRepoFile } from "./helpers/repo-file";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
 function item(title: string, overrides: Partial<CollectableItem> = {}): CollectableItem {
   return {
@@ -190,7 +190,7 @@ describe("the audit the task asked for — other pure-helper array modules", () 
         else if (/\.tsx?$/.test(entry)) out.push(full);
       }
     };
-    walk(path.join(process.cwd(), dir));
+    walk(repoPath(dir));
     return out;
   }
 

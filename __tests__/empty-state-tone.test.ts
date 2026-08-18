@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
-const ROOT = process.cwd();
-const src = readFileSync(path.join(ROOT, "components/empty-state.tsx"), "utf8");
+import { readRepoFile } from "./helpers/repo-file";
+
+const src = readRepoFile("components/empty-state.tsx");
 
 describe("EmptyState tone prop", () => {
   it("exports the EmptyStateTone union with exactly the three tones", () => {

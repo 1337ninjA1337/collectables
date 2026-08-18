@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+
 /**
  * BE-25 — verify `delete-account` cascades through EVERY table that references
  * `auth.users`, and guard against future drift.
@@ -24,16 +26,9 @@ import path from "node:path";
  * fails here until its cascade coverage is added — the gap BE-25 closes.
  */
 
-const ROOT = process.cwd();
-const MIGRATIONS_DIR = path.join(ROOT, "supabase", "migrations");
-const PGTAP = readFileSync(
-  path.join(ROOT, "supabase", "tests", "02_fk_cascade.sql"),
-  "utf8",
-);
-const DELETE_ACCOUNT = readFileSync(
-  path.join(ROOT, "supabase", "functions", "delete-account", "index.ts"),
-  "utf8",
-);
+const MIGRATIONS_DIR = repoPath("supabase", "migrations");
+const PGTAP = readRepoFile("supabase", "tests", "02_fk_cascade.sql");
+const DELETE_ACCOUNT = readRepoFile("supabase", "functions", "delete-account", "index.ts");
 
 type Action = "cascade" | "set null";
 

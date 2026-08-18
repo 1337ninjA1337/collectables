@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * BE-19 — `20260626_realtime_replica_identity.sql` makes UPDATE/DELETE realtime
@@ -18,13 +18,9 @@ import path from "node:path";
  *   (4) it is documented in MANUAL-TASKS.md + the README apply order.
  */
 
-const ROOT = process.cwd();
-const MIGRATION = readFileSync(
-  path.join(ROOT, "supabase", "migrations", "20260626_realtime_replica_identity.sql"),
-  "utf8",
-);
-const MANUAL = readFileSync(path.join(ROOT, "MANUAL-TASKS.md"), "utf8");
-const README = readFileSync(path.join(ROOT, "README-DEPLOY.md"), "utf8");
+const MIGRATION = readRepoFile("supabase", "migrations", "20260626_realtime_replica_identity.sql");
+const MANUAL = readRepoFile("MANUAL-TASKS.md");
+const README = readRepoFile("README-DEPLOY.md");
 
 // strip `-- ...` line comments so prose doesn't trip the SQL assertions.
 const SQL = MIGRATION.replace(/--.*$/gm, "");

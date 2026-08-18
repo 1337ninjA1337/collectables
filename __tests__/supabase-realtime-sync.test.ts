@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import type { RealtimeChannel, RealtimeClient } from "@supabase/realtime-js";
 
@@ -10,6 +9,8 @@ import {
   subscribeShared,
   __resetChannelRegistryForTests,
 } from "@/lib/realtime-channel-registry";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * BE-18: collections/items/friend_requests realtime routed through the shared
@@ -22,10 +23,10 @@ import {
  * runtime.
  */
 
-const SYNC_PATH = path.join(process.cwd(), "lib", "supabase-realtime-sync.ts");
-const COLLECTIONS_CTX_PATH = path.join(process.cwd(), "lib", "collections-context.tsx");
-const SOCIAL_CTX_PATH = path.join(process.cwd(), "lib", "social-context.tsx");
-const AUTH_CTX_PATH = path.join(process.cwd(), "lib", "auth-context.tsx");
+const SYNC_PATH = repoPath("lib", "supabase-realtime-sync.ts");
+const COLLECTIONS_CTX_PATH = repoPath("lib", "collections-context.tsx");
+const SOCIAL_CTX_PATH = repoPath("lib", "social-context.tsx");
+const AUTH_CTX_PATH = repoPath("lib", "auth-context.tsx");
 
 function read(p: string): string {
   return readFileSync(p, "utf8");

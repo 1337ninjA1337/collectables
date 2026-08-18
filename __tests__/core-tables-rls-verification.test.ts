@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * BE-12a — generalises the analytics anon/leak RLS verification
@@ -15,12 +15,8 @@ import path from "node:path";
  *   2. the server-authoritative `is_admin` column stays REVOKEd from end-user
  *      roles, and MANUAL-TASKS.md ships the operator-runnable leak check.
  */
-const ROOT = process.cwd();
-const MIGRATION = readFileSync(
-  path.join(ROOT, "supabase", "migrations", "20260616_core_tables_rls.sql"),
-  "utf8",
-);
-const MANUAL = readFileSync(path.join(ROOT, "MANUAL-TASKS.md"), "utf8");
+const MIGRATION = readRepoFile("supabase", "migrations", "20260616_core_tables_rls.sql");
+const MANUAL = readRepoFile("MANUAL-TASKS.md");
 
 // strip `-- ...` line comments so prose ("a policy ... would expose ...")
 // doesn't trip the executable-SQL assertions.

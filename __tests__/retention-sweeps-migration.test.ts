@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * BE-27 — `20260627_retention_sweeps.sql` adds daily `pg_cron` retention
@@ -21,14 +21,10 @@ import path from "node:path";
  *   (7) the privacy policy spells out all three windows.
  */
 
-const ROOT = process.cwd();
-const MIGRATION = readFileSync(
-  path.join(ROOT, "supabase", "migrations", "20260627_retention_sweeps.sql"),
-  "utf8",
-);
-const MANUAL = readFileSync(path.join(ROOT, "MANUAL-TASKS.md"), "utf8");
-const README = readFileSync(path.join(ROOT, "README-DEPLOY.md"), "utf8");
-const APPSTORE = readFileSync(path.join(ROOT, "APPSTORE-SUBMISSION.md"), "utf8");
+const MIGRATION = readRepoFile("supabase", "migrations", "20260627_retention_sweeps.sql");
+const MANUAL = readRepoFile("MANUAL-TASKS.md");
+const README = readRepoFile("README-DEPLOY.md");
+const APPSTORE = readRepoFile("APPSTORE-SUBMISSION.md");
 
 // strip `-- ...` line comments so prose doesn't trip the SQL assertions.
 const SQL = MIGRATION.replace(/--.*$/gm, "");

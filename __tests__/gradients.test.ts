@@ -1,11 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import path from "node:path";
+import { readdirSync, statSync } from "node:fs";
 
 import { HERO_DARK, HERO_DARK_4, HERO_DARK_5 } from "@/lib/design-tokens";
 import { HERO_DARK_GRADIENT, PHOTO_SCRIM_GRADIENT } from "@/lib/gradients";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
 /**
  * Pins for `lib/gradients.ts` — the shared `<LinearGradient>` recipes.
@@ -22,9 +21,9 @@ import { readRepoFile as read } from "./helpers/repo-file";
 
 function walk(dir: string): string[] {
   const out: string[] = [];
-  for (const entry of readdirSync(path.join(process.cwd(), dir))) {
+  for (const entry of readdirSync(repoPath(dir))) {
     const rel = `${dir}/${entry}`;
-    if (statSync(path.join(process.cwd(), rel)).isDirectory()) out.push(...walk(rel));
+    if (statSync(repoPath(rel)).isDirectory()) out.push(...walk(rel));
     else if (rel.endsWith(".tsx")) out.push(rel);
   }
   return out;

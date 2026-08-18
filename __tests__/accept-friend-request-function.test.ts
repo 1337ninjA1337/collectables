@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * BE-21 — structural assertions on the `accept-friend-request` Edge Function.
@@ -11,13 +12,7 @@ import path from "node:path";
  * "no pending request" rejection, auth gating, and CORS handling.
  */
 
-const FUNCTION_PATH = path.join(
-  process.cwd(),
-  "supabase",
-  "functions",
-  "accept-friend-request",
-  "index.ts",
-);
+const FUNCTION_PATH = repoPath("supabase", "functions", "accept-friend-request", "index.ts");
 
 const SOURCE = readFileSync(FUNCTION_PATH, "utf8");
 

@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
 import path from "node:path";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
 /**
  * Two classes of avoidable console noise on the deployed web build, both
@@ -23,10 +23,9 @@ import { readRepoFile as read } from "./helpers/repo-file";
  * Both are noise rather than breakage, which is exactly why they need a guard:
  * nothing fails when they come back, they just bury real errors in the console.
  */
-const repoRoot = process.cwd();
 
 function collectSourceFiles(dir: string): string[] {
-  const abs = path.join(repoRoot, dir);
+  const abs = repoPath(dir);
   const out: string[] = [];
   for (const entry of readdirSync(abs, { withFileTypes: true })) {
     if (entry.name === "node_modules") continue;

@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { readRepoFile } from "./helpers/repo-file";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
 /**
  * Pins every workflow that runs the test harness to a FULL checkout.
@@ -23,7 +23,7 @@ import { readRepoFile } from "./helpers/repo-file";
  * contents rather than a list someone has to remember to extend.
  */
 
-const WORKFLOWS_DIR = path.join(process.cwd(), ".github", "workflows");
+const WORKFLOWS_DIR = repoPath(".github", "workflows");
 
 /**
  * Commands that run the WHOLE suite, which is the thing that needs history —

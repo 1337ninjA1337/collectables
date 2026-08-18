@@ -10,7 +10,7 @@ import {
   compareIsoDesc,
   compareKeysAsc,
 } from "@/lib/sort-helpers";
-import { readRepoFile } from "./helpers/repo-file";
+import { readRepoFile, repoPath, repoRelative } from "./helpers/repo-file";
 
 /**
  * `lib/sort-helpers.ts` exists to close a bug class: fifteen call sites had
@@ -160,14 +160,14 @@ describe("no lib/ module re-inlines an inconsistent timestamp comparator", () =>
     const pattern = /(createdAt|soldAt|lastMessageAt|recordedAt|arrivedAt|updatedAt)\s*[<>]\s*\w+\.\w+\s*\?\s*-?1\s*:\s*-?1/;
     const offenders: string[] = [];
     for (const dir of ["lib", "app", "components"]) {
-      for (const file of walk(path.join(process.cwd(), dir))) {
+      for (const file of walk(repoPath(dir))) {
         // The helper's own doc comment quotes the bad shape on purpose — it is
         // the thing being explained. Everywhere else, quoting it means using it.
         if (file.endsWith("sort-helpers.ts")) continue;
         const source = readFileSync(file, "utf8");
         source.split("\n").forEach((line, index) => {
           if (pattern.test(line)) {
-            offenders.push(`${path.relative(process.cwd(), file)}:${index + 1}  ${line.trim()}`);
+            offenders.push(`${repoRelative(file)}:${index + 1}  ${line.trim()}`);
           }
         });
       }
@@ -191,7 +191,7 @@ describe("no lib/ module re-inlines an inconsistent timestamp comparator", () =>
       ["lib/db-duplicates.ts", "compareKeysAsc"],
     ];
     for (const [file, symbol] of expected) {
-      const source = readFileSync(path.join(process.cwd(), file), "utf8");
+      const source = readRepoFile(file);
       assert.match(
         source,
         new RegExp(`import\\s*\\{[^}]*\\b${symbol}\\b[^}]*\\}\\s*from\\s*"[^"]*sort-helpers"`),

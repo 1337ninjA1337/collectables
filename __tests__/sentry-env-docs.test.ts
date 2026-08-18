@@ -1,17 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
-const root = process.cwd();
+import { readRepoFile } from "./helpers/repo-file";
 
-const readme = readFileSync(path.join(root, "README-DEPLOY.md"), "utf8");
-const appstore = readFileSync(
-  path.join(root, "APPSTORE-SUBMISSION.md"),
-  "utf8",
-);
+
+const readme = readRepoFile("README-DEPLOY.md");
+const appstore = readRepoFile("APPSTORE-SUBMISSION.md");
 const packageJson = JSON.parse(
-  readFileSync(path.join(root, "package.json"), "utf8"),
+  readRepoFile("package.json"),
 );
 
 const SENTRY_ENV_VARS = [

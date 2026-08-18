@@ -15,7 +15,7 @@ import {
   type BundlePremiseInput,
 } from "../lib/bundle-premise";
 import { collectBundlePremise } from "../scripts/bundle-premise";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
 /**
  * Pins the shared "the input exists and is fresh" premise the three
@@ -210,7 +210,7 @@ describe("the declared bundle input", () => {
     // which takes its chunk list from assertBundlePremise like the other
     // three. Fail if the glob reappears in YAML.
     for (const workflow of fs.readdirSync(
-      path.join(process.cwd(), ".github", "workflows"),
+      repoPath(".github", "workflows"),
     )) {
       if (!workflow.endsWith(".yml") && !workflow.endsWith(".yaml")) continue;
       const body = read(path.join(".github", "workflows", workflow));

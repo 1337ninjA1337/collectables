@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import path from "node:path";
 import { describe, it } from "node:test";
 
 import { findLanguageOptions } from "@/lib/i18n-source";
@@ -11,7 +10,7 @@ import {
   renderPrivacyPage,
 } from "@/lib/privacy-page";
 import { readI18nSource } from "./helpers/i18n-source-file";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
 /**
  * Guards the translated /privacy pages (GDPR Art. 12 — the Sentry
@@ -29,7 +28,6 @@ import { readRepoFile as read } from "./helpers/repo-file";
  *    `default-src 'none'` CSP.
  */
 
-const ROOT = process.cwd();
 
 const I18N_SOURCE = readI18nSource();
 
@@ -72,7 +70,7 @@ describe("translated PRIVACY.md.<code> files", () => {
   it("covers every non-English language", () => {
     for (const { code } of translated) {
       assert.ok(
-        existsSync(path.join(ROOT, `PRIVACY.md.${code}`)),
+        existsSync(repoPath(`PRIVACY.md.${code}`)),
         `PRIVACY.md.${code} missing — the deploy script will fail the build`,
       );
     }

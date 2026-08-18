@@ -1,14 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   profilesSearchUrl,
   sanitizeProfileSearchQuery,
 } from "@/lib/supabase-profiles-shapes";
 
-const ROOT = process.cwd();
+import { readRepoFile } from "./helpers/repo-file";
+
 
 describe("sanitizeProfileSearchQuery", () => {
   it("strips a leading @ so pasted handles match", () => {
@@ -49,7 +48,7 @@ describe("profilesSearchUrl", () => {
 
 describe("people/search UI uses the server-side search", () => {
   it("app/people.tsx queries searchProfiles when the box is non-empty", () => {
-    const src = readFileSync(path.join(ROOT, "app/people.tsx"), "utf8");
+    const src = readRepoFile("app/people.tsx");
     assert.match(src, /import \{ fetchProfiles, searchProfiles \} from "@\/lib\/supabase-profiles"/);
     // The needle is the settled value from `useDebouncedValue`; the trimming
     // it used to do inline now happens at the hook's input.
@@ -58,13 +57,13 @@ describe("people/search UI uses the server-side search", () => {
   });
 
   it("components/search-overlay.tsx queries searchProfiles for the people section", () => {
-    const src = readFileSync(path.join(ROOT, "components/search-overlay.tsx"), "utf8");
+    const src = readRepoFile("components/search-overlay.tsx");
     assert.match(src, /searchProfiles\(debouncedQuery, 20\)/);
     assert.match(src, /useDebouncedValue\(q, PROFILE_SEARCH_DEBOUNCE_MS\)/);
   });
 
   it("app/people.tsx catches fetchProfiles failures instead of blanking silently", () => {
-    const src = readFileSync(path.join(ROOT, "app/people.tsx"), "utf8");
+    const src = readRepoFile("app/people.tsx");
     assert.match(src, /const result = await fetchProfiles\(pageNum, PAGE_SIZE\);[\s\S]*?\} catch \{/);
   });
 });

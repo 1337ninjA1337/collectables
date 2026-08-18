@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * BE-22b — structural assertions on the `validate-premium` Edge Function. It
@@ -12,13 +13,7 @@ import path from "node:path";
  * response is the narrow `{ isPremium, activatedAt, expiresAt }` entitlement.
  */
 
-const FUNCTION_PATH = path.join(
-  process.cwd(),
-  "supabase",
-  "functions",
-  "validate-premium",
-  "index.ts",
-);
+const FUNCTION_PATH = repoPath("supabase", "functions", "validate-premium", "index.ts");
 
 const SOURCE = readFileSync(FUNCTION_PATH, "utf8");
 

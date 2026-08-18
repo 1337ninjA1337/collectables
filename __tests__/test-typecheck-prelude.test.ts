@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import path from "node:path";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath, repoRelative } from "./helpers/repo-file";
 
 /**
  * Pins the typecheck to the front of `npm test`.
@@ -27,7 +27,6 @@ import { readRepoFile as read } from "./helpers/repo-file";
  * scripts.
  */
 
-const ROOT = process.cwd();
 
 const pkg = JSON.parse(read("package.json")) as {
   scripts: Record<string, string>;
@@ -181,7 +180,7 @@ describe("the typecheck actually covers the test files", () => {
     // subdirectory typechecks (the tsconfig glob is recursive) but never
     // EXECUTES — the same silent-coverage-loss shape as the Node 20 pin.
     const { readdirSync } = await import("node:fs");
-    const testsDir = path.join(ROOT, "__tests__");
+    const testsDir = repoPath("__tests__");
     const stray: string[] = [];
     const walk = (dir: string, depth: number) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -189,7 +188,7 @@ describe("the typecheck actually covers the test files", () => {
         if (entry.isDirectory()) {
           walk(full, depth + 1);
         } else if (entry.name.endsWith(".test.ts") && depth > 0) {
-          stray.push(path.relative(ROOT, full));
+          stray.push(repoRelative(full));
         }
       }
     };

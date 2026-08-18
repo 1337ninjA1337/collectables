@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * Structural integration test pinning that `app/_layout.tsx` uses the new
@@ -9,7 +10,7 @@ import path from "node:path";
  * native DevMenu surfaces "Clear runtime Supabase config" instead of the
  * camelCase identifier.
  */
-const LAYOUT_PATH = path.join(process.cwd(), "app", "_layout.tsx");
+const LAYOUT_PATH = repoPath("app", "_layout.tsx");
 
 describe("registerDevMenu per-action labels — wiring", () => {
   it("declares clearRuntimeSupabaseConfig as a { label, run } pair", () => {

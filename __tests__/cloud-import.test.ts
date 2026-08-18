@@ -1,11 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { selectOwnedForImport } from "@/lib/cloud-import";
 import { cloudImportedKey } from "@/lib/storage-keys";
 import type { CollectableItem, Collection } from "@/lib/types";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -120,19 +120,9 @@ describe("cloudImportedKey", () => {
 });
 
 // --- structural wiring guards ---
-const root = process.cwd();
-const cloudImportSrc = readFileSync(
-  path.join(root, "lib", "cloud-import.ts"),
-  "utf8",
-);
-const storageKeysSrc = readFileSync(
-  path.join(root, "lib", "storage-keys.ts"),
-  "utf8",
-);
-const contextSrc = readFileSync(
-  path.join(root, "lib", "collections-context.tsx"),
-  "utf8",
-);
+const cloudImportSrc = readRepoFile("lib", "cloud-import.ts");
+const storageKeysSrc = readRepoFile("lib", "storage-keys.ts");
+const contextSrc = readRepoFile("lib", "collections-context.tsx");
 
 describe("cloud-import flag helpers (structural)", () => {
   it("hasCloudImported / markCloudImported are keyed via cloudImportedKey", () => {

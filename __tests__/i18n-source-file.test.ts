@@ -8,6 +8,7 @@ import {
   I18N_SOURCE_PATH,
   readI18nSource,
 } from "./helpers/i18n-source-file";
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * One statement of where `lib/i18n-context.tsx` is.
@@ -26,9 +27,17 @@ import {
  * than over a list of files, and it carries a floor, because a guard that
  * scans a directory and finds nothing is indistinguishable from one whose
  * scan is broken.
+ *
+ * Note for whoever turns this red: `repo-file-helper.test.ts` sweeps the same
+ * directory for `process.cwd()`, so a case added HERE that reaches the tree
+ * itself turns THAT one red, and a case added there naming this module turns
+ * this one red. The two guards check each other's suites, which is intended
+ * and looks like a confusing unrelated failure the first time you meet it.
+ * This suite is on that one's exemption list precisely because it has to
+ * quote the retired shape as a string in order to search for it.
  */
 
-const TESTS_DIR = path.join(process.cwd(), "__tests__");
+const TESTS_DIR = repoPath("__tests__");
 /** The one file allowed to name the translations module's location. */
 const HELPER = path.join("helpers", "i18n-source-file.ts");
 
@@ -78,10 +87,7 @@ describe("the translations module's path, said once", () => {
     // cwd, which is why `process.cwd()` is the right anchor and why a helper
     // resolving from `import.meta.url` would answer a different question.
     assert.ok(path.isAbsolute(I18N_SOURCE_PATH));
-    assert.equal(
-      I18N_SOURCE_PATH,
-      path.join(process.cwd(), "lib", "i18n-context.tsx"),
-    );
+    assert.equal(I18N_SOURCE_PATH, repoPath("lib", "i18n-context.tsx"));
     assert.equal(readFileSync(I18N_SOURCE_PATH, "utf8"), readI18nSource());
   });
 

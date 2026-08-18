@@ -5,6 +5,8 @@ import path from "node:path";
 
 import { stripComments } from "@/lib/env-inlining";
 
+import { repoPath, repoRelative } from "./helpers/repo-file";
+
 /**
  * Repo-wide masonry-caller sweep (the VM-A guardrail bullet): no screen or
  * component may re-introduce an inline modulo column split — the
@@ -32,7 +34,7 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 function sourceFiles(): string[] {
-  return ROOTS.flatMap((root) => walk(path.join(process.cwd(), root)));
+  return ROOTS.flatMap((root) => walk(repoPath(root)));
 }
 
 describe("masonry callers — no inline modulo column split anywhere in app/ or components/", () => {
@@ -52,7 +54,7 @@ describe("masonry callers — no inline modulo column split anywhere in app/ or 
     for (const file of sourceFiles()) {
       const src = stripComments(readFileSync(file, "utf8"));
       if (/[A-Za-z_$][\w$]*\s*%\s*2\b/.test(src)) {
-        offenders.push(path.relative(process.cwd(), file));
+        offenders.push(repoRelative(file));
       }
     }
     assert.deepEqual(offenders, []);
@@ -66,7 +68,7 @@ describe("masonry callers — no inline modulo column split anywhere in app/ or 
     for (const file of sourceFiles()) {
       const src = stripComments(readFileSync(file, "utf8"));
       if (/\.filter\(\s*\([^)]*\)\s*=>\s*[A-Za-z_$][\w$]*\s*%\s*\d/.test(src)) {
-        offenders.push(path.relative(process.cwd(), file));
+        offenders.push(repoRelative(file));
       }
     }
     assert.deepEqual(offenders, []);

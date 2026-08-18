@@ -1,9 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { deriveConnectionState } from "@/lib/realtime-status-context";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Pure tests for the shared realtime-status surface. The React provider
@@ -53,21 +53,11 @@ describe("deriveConnectionState — pure status reducer", () => {
 });
 
 describe("realtime-status-context wiring", () => {
-  const root = process.cwd();
-  const layoutSource = readFileSync(path.join(root, "app", "_layout.tsx"), "utf8");
-  const marketplaceSource = readFileSync(path.join(root, "app", "marketplace.tsx"), "utf8");
-  const pillSource = readFileSync(
-    path.join(root, "components", "realtime-status-pill.tsx"),
-    "utf8",
-  );
-  const contextSource = readFileSync(
-    path.join(root, "lib", "realtime-status-context.tsx"),
-    "utf8",
-  );
-  const registrySource = readFileSync(
-    path.join(root, "lib", "realtime-channel-registry.ts"),
-    "utf8",
-  );
+  const layoutSource = readRepoFile("app", "_layout.tsx");
+  const marketplaceSource = readRepoFile("app", "marketplace.tsx");
+  const pillSource = readRepoFile("components", "realtime-status-pill.tsx");
+  const contextSource = readRepoFile("lib", "realtime-status-context.tsx");
+  const registrySource = readRepoFile("lib", "realtime-channel-registry.ts");
 
   it("app/_layout.tsx imports RealtimeStatusProvider", () => {
     assert.match(layoutSource, /from\s+"@\/lib\/realtime-status-context"/);

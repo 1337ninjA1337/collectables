@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * BE-22b — structural assertions on the `cloudValidatePremium` client wrapper
@@ -13,7 +14,7 @@ import path from "node:path";
  * real session.
  */
 
-const WRAPPER_PATH = path.join(process.cwd(), "lib", "supabase-subscriptions.ts");
+const WRAPPER_PATH = repoPath("lib", "supabase-subscriptions.ts");
 
 function readSrc(): string {
   return readFileSync(WRAPPER_PATH, "utf8");

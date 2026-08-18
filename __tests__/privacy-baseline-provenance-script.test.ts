@@ -11,6 +11,8 @@ import {
 } from "../lib/privacy-baseline-provenance";
 import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
 
+import { readRepoFile, REPO_ROOT, repoPath } from "./helpers/repo-file";
+
 /**
  * End-to-end cover for the GIT half of the baseline-provenance guard.
  *
@@ -30,14 +32,10 @@ import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
  */
 
 const CHECK_NAME = "check-privacy-baseline-provenance";
-const ROOT = process.cwd();
-const SCRIPT = path.join(ROOT, "scripts", "check-privacy-baseline-provenance.ts");
+const SCRIPT = repoPath("scripts", "check-privacy-baseline-provenance.ts");
 const BASELINE_MODULE = "lib/privacy-body-baselines.ts";
 
-const REAL_BASELINE_SOURCE = fs.readFileSync(
-  path.join(ROOT, BASELINE_MODULE),
-  "utf8",
-);
+const REAL_BASELINE_SOURCE = readRepoFile(BASELINE_MODULE);
 
 const scratchRepos: string[] = [];
 after(() => {
@@ -111,7 +109,7 @@ function runGuard(
     process.execPath,
     ["--import", "tsx", SCRIPT, "--base", base],
     {
-      cwd: ROOT,
+      cwd: REPO_ROOT,
       encoding: "utf8",
       env: {
         ...process.env,
@@ -254,7 +252,7 @@ describe("check-privacy-baseline-provenance against a scratch repository", () =>
     // guard to guess. HEAD~1 resolves in that repository, so without this the
     // run would compare the table against an unrelated commit and pass.
     const run = spawnSync(process.execPath, ["--import", "tsx", SCRIPT], {
-      cwd: ROOT,
+      cwd: REPO_ROOT,
       encoding: "utf8",
       env: {
         ...process.env,

@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import path from "node:path";
+import { readdirSync, statSync } from "node:fs";
 import { createElement, type ReactElement } from "react";
 
 import { installNativeModuleStubs, render, styleOf, type RenderResult } from "./helpers/render";
@@ -12,7 +11,7 @@ import {
   SOFT_DESTRUCTIVE_SURFACE,
 } from "@/lib/danger-surface";
 import { CARD_BG_8, DANGER_DEEP_3, DANGER_SOFT, RADIUS_PILL } from "@/lib/design-tokens";
-import { readRepoFile as read } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 
 installNativeModuleStubs();
 
@@ -38,9 +37,9 @@ installNativeModuleStubs();
 
 function walk(dir: string): string[] {
   const out: string[] = [];
-  for (const entry of readdirSync(path.join(process.cwd(), dir))) {
+  for (const entry of readdirSync(repoPath(dir))) {
     const rel = `${dir}/${entry}`;
-    if (statSync(path.join(process.cwd(), rel)).isDirectory()) out.push(...walk(rel));
+    if (statSync(repoPath(rel)).isDirectory()) out.push(...walk(rel));
     else if (/\.tsx?$/.test(rel)) out.push(rel);
   }
   return out;

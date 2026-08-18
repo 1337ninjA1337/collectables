@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * SEC-5a — structural assertions on the `sign-upload` Edge Function. It runs
@@ -11,13 +12,7 @@ import path from "node:path";
  * (never a body id), and that the API secret is used to sign but never returned.
  */
 
-const FUNCTION_PATH = path.join(
-  process.cwd(),
-  "supabase",
-  "functions",
-  "sign-upload",
-  "index.ts",
-);
+const FUNCTION_PATH = repoPath("supabase", "functions", "sign-upload", "index.ts");
 
 const SOURCE = readFileSync(FUNCTION_PATH, "utf8");
 

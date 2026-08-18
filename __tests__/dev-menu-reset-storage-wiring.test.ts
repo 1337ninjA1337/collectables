@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * Structural integration test — pins the wiring between `app/_layout.tsx`
@@ -9,7 +10,7 @@ import path from "node:path";
  * `__tests__/dev-menu-wiring.test.ts`: a regex scan against the source
  * string so the test stays peer-dep-free.
  */
-const LAYOUT_PATH = path.join(process.cwd(), "app", "_layout.tsx");
+const LAYOUT_PATH = repoPath("app", "_layout.tsx");
 
 function readLayout(): string {
   return readFileSync(LAYOUT_PATH, "utf8");

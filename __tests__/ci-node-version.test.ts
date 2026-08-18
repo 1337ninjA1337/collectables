@@ -5,6 +5,8 @@ import path from "node:path";
 
 import { MINIMUM_NODE_VERSION } from "./helpers/render";
 
+import { repoPath } from "./helpers/repo-file";
+
 /**
  * Pins every workflow that runs the test harness against the harness's own
  * Node floor.
@@ -29,7 +31,7 @@ import { MINIMUM_NODE_VERSION } from "./helpers/render";
  * has to remember to extend.
  */
 
-const WORKFLOWS_DIR = path.join(process.cwd(), ".github", "workflows");
+const WORKFLOWS_DIR = repoPath(".github", "workflows");
 
 /** Commands that put a test suite in front of the Node runtime. */
 const RUNS_THE_HARNESS = /(npm (run )?test\b|npm run lint:ci\b|tsx[^\n]*--test\b)/;

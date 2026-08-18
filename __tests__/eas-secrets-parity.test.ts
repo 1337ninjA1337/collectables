@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Cross-artefact parity for build-time env vars. The same `EXPO_PUBLIC_*`
@@ -16,14 +16,10 @@ import path from "node:path";
  * (already enforced against `lib/*-config.ts` by runtime-config-parity).
  */
 
-const root = process.cwd();
-const deployYml = readFileSync(
-  path.join(root, ".github", "workflows", "deploy.yml"),
-  "utf8",
-);
-const guide = readFileSync(path.join(root, "APPSTORE-SUBMISSION.md"), "utf8");
-const easJsonRaw = readFileSync(path.join(root, "eas.json"), "utf8");
-const readmeDeploy = readFileSync(path.join(root, "README-DEPLOY.md"), "utf8");
+const deployYml = readRepoFile(".github", "workflows", "deploy.yml");
+const guide = readRepoFile("APPSTORE-SUBMISSION.md");
+const easJsonRaw = readRepoFile("eas.json");
+const readmeDeploy = readRepoFile("README-DEPLOY.md");
 
 /**
  * Vars injected by the web deploy that are deliberately NOT EAS secrets.

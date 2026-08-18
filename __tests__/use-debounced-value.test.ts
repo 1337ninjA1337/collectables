@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { stripComments } from "@/lib/env-inlining";
 import {
@@ -11,6 +9,8 @@ import {
   isImmediateDelay,
   resolveDebounceDelay,
 } from "@/lib/debounce-helpers";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * `lib/use-debounced-value.ts` is the shared trailing-edge debounce that
@@ -23,12 +23,8 @@ import {
  * `use-share-link.test.ts` — the repo has no React mounting harness (see the
  * `[needs-dev-dep]` tasks in .tasks/.tasks.md).
  */
-function readSrc(...segments: string[]): string {
-  return readFileSync(path.join(process.cwd(), ...segments), "utf8");
-}
-
-const readHookSrc = () => readSrc("lib", "use-debounced-value.ts");
-const readHelpersSrc = () => readSrc("lib", "debounce-helpers.ts");
+const readHookSrc = () => readRepoFile("lib", "use-debounced-value.ts");
+const readHelpersSrc = () => readRepoFile("lib", "debounce-helpers.ts");
 
 describe("resolveDebounceDelay", () => {
   it("defaults to 150ms when no delay is given", () => {
@@ -209,9 +205,9 @@ describe("useDebouncedValue — structure", () => {
   });
 
   it("is only ever handed primitives by its current consumers", () => {
-    for (const file of [["app", "people.tsx"], ["components", "search-overlay.tsx"]]) {
-      const call = stripComments(readSrc(...file)).match(/useDebouncedValue\(([^,]+),/);
-      assert.ok(call, `useDebouncedValue call not found in ${file.join("/")}`);
+    for (const file of ["app/people.tsx", "components/search-overlay.tsx"]) {
+      const call = stripComments(readRepoFile(file)).match(/useDebouncedValue\(([^,]+),/);
+      assert.ok(call, `useDebouncedValue call not found in ${file}`);
       assert.doesNotMatch(call[1], /[{[]/, "a fresh object/array literal would never settle");
     }
   });
@@ -226,49 +222,49 @@ describe("useDebouncedValue — structure", () => {
 
 describe("useDebouncedValue — adoption", () => {
   const CONSUMERS = [
-    { file: ["app", "people.tsx"], limit: 50 },
-    { file: ["components", "search-overlay.tsx"], limit: 20 },
+    { file: "app/people.tsx", limit: 50 },
+    { file: "components/search-overlay.tsx", limit: 20 },
   ];
 
   for (const consumer of CONSUMERS) {
-    const label = consumer.file.join("/");
+    const label = consumer.file;
 
     it(`${label} debounces its searchProfiles round trip through the shared hook`, () => {
-      const code = stripComments(readSrc(...consumer.file));
+      const code = stripComments(readRepoFile(consumer.file));
       assert.match(code, /import \{ useDebouncedValue \} from "@\/lib\/use-debounced-value";/);
       assert.match(code, /useDebouncedValue\([\s\S]{0,40}PROFILE_SEARCH_DEBOUNCE_MS\)/);
       assert.match(code, new RegExp(`searchProfiles\\(debouncedQuery, ${consumer.limit}\\)`));
     });
 
     it(`${label} no longer hand-rolls a debounce timer`, () => {
-      const code = stripComments(readSrc(...consumer.file));
+      const code = stripComments(readRepoFile(consumer.file));
       assert.doesNotMatch(code, /setTimeout/, "the debounce timer belongs to the hook now");
       assert.doesNotMatch(code, /clearTimeout/);
     });
 
     it(`${label} imports the shared delay rather than a literal 300`, () => {
-      const code = stripComments(readSrc(...consumer.file));
+      const code = stripComments(readRepoFile(consumer.file));
       assert.match(code, /import \{ PROFILE_SEARCH_DEBOUNCE_MS \} from "@\/lib\/debounce-helpers";/);
       assert.doesNotMatch(code, /,\s*300\)/, "the 300ms literal must live in debounce-helpers only");
     });
 
     it(`${label} still cancels an in-flight response so a late resolve cannot overwrite a newer one`, () => {
-      const code = stripComments(readSrc(...consumer.file));
+      const code = stripComments(readRepoFile(consumer.file));
       assert.match(code, /let cancelled = false;/);
       assert.match(code, /if \(!cancelled\) set\w+\(results\);/);
       assert.match(code, /return \(\) => \{\s*cancelled = true;\s*\};/);
     });
 
     it(`${label} clears its remote matches when the settled query is empty`, () => {
-      const code = stripComments(readSrc(...consumer.file));
+      const code = stripComments(readRepoFile(consumer.file));
       assert.match(code, /if \(!debouncedQuery[\s\S]{0,60}\) \{[\s\S]{0,60}\(\[\]\);\s*return;\s*\}/);
     });
   }
 
   it("is the only debounce implementation left in the app — no stray keystroke timers", () => {
     // A third hand-rolled copy is exactly the drift this hook exists to stop.
-    for (const file of [["app", "people.tsx"], ["components", "search-overlay.tsx"]]) {
-      assert.doesNotMatch(stripComments(readSrc(...file)), /setTimeout\([\s\S]{0,80}\},\s*\d+\)/);
+    for (const file of ["app/people.tsx", "components/search-overlay.tsx"]) {
+      assert.doesNotMatch(stripComments(readRepoFile(file)), /setTimeout\([\s\S]{0,80}\},\s*\d+\)/);
     }
   });
 });
@@ -278,7 +274,7 @@ describe("ItemFilterBar — deliberate non-adoption", () => {
     // Debouncing `draft` would hand `onChange` a stale query to anyone who
     // taps Apply within the debounce window. The hook belongs on the live
     // filtering path when that path exists; the commit path must stay exact.
-    const code = stripComments(readSrc("components", "item-filters.tsx"));
+    const code = stripComments(readRepoFile("components", "item-filters.tsx"));
     assert.doesNotMatch(code, /useDebouncedValue/);
     assert.match(code, /onChange\(draft\);/);
   });

@@ -1,7 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
+
+import { readRepoFile, repoPath, repoRelative } from "./helpers/repo-file";
 
 /**
  * Structural tests over the bundled font assets. The design brief asked to keep
@@ -11,13 +13,9 @@ import path from "node:path";
  * into the tree) fails CI instead of silently bloating the web bundle.
  */
 
-const ROOT = process.cwd();
-const FONTS_DIR = path.join(ROOT, "assets", "fonts");
+const FONTS_DIR = repoPath("assets", "fonts");
 
-const LAYOUT_SOURCE = readFileSync(
-  path.join(ROOT, "app", "_layout.tsx"),
-  "utf8",
-);
+const LAYOUT_SOURCE = readRepoFile("app", "_layout.tsx");
 
 function requiredFontPaths(): string[] {
   const matches = [
@@ -33,7 +31,7 @@ function allTtfOnDisk(dir: string): string[] {
     if (entry.isDirectory()) {
       out.push(...allTtfOnDisk(full));
     } else if (entry.name.endsWith(".ttf")) {
-      out.push(path.relative(ROOT, full));
+      out.push(repoRelative(full));
     }
   }
   return out;
@@ -58,7 +56,7 @@ describe("font assets", () => {
 
   it("keeps every required font file present on disk", () => {
     for (const rel of requiredFontPaths()) {
-      assert.ok(existsSync(path.join(ROOT, rel)), `missing font asset ${rel}`);
+      assert.ok(existsSync(repoPath(rel)), `missing font asset ${rel}`);
     }
   });
 
@@ -82,7 +80,7 @@ describe("font assets", () => {
   });
 
   it("keeps lib/fonts constants aligned with the loaded file basenames", () => {
-    const fontsSource = readFileSync(path.join(ROOT, "lib", "fonts.ts"), "utf8");
+    const fontsSource = readRepoFile("lib", "fonts.ts");
     const basenames = requiredFontPaths().map((p) => path.basename(p, ".ttf"));
     // Every loaded weight's basename (e.g. "Syne-Bold") must appear as a
     // family-name constant so styles reference a real, bundled face.

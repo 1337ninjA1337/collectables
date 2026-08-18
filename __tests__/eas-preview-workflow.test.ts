@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Structural guards for the EAS iOS preview build-on-merge workflow. The
@@ -10,13 +10,9 @@ import path from "node:path";
  * burns runner minutes) would otherwise go unnoticed for weeks.
  */
 
-const root = process.cwd();
-const workflow = readFileSync(
-  path.join(root, ".github", "workflows", "eas-preview.yml"),
-  "utf8",
-);
-const easJson = JSON.parse(readFileSync(path.join(root, "eas.json"), "utf8"));
-const readmeDeploy = readFileSync(path.join(root, "README-DEPLOY.md"), "utf8");
+const workflow = readRepoFile(".github", "workflows", "eas-preview.yml");
+const easJson = JSON.parse(readRepoFile("eas.json"));
+const readmeDeploy = readRepoFile("README-DEPLOY.md");
 
 describe("eas-preview workflow", () => {
   it("triggers on main pushes and manual dispatch", () => {

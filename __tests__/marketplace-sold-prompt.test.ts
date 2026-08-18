@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * Locks the seller-side "your listing was claimed" prompt:
@@ -22,22 +23,10 @@ import path from "node:path";
  * peers, so we use source-grep here rather than instantiating it.
  */
 
-const MARKETPLACE_CONTEXT_PATH = path.join(
-  process.cwd(),
-  "lib",
-  "marketplace-context.tsx",
-);
-const COLLECTIONS_CONTEXT_PATH = path.join(
-  process.cwd(),
-  "lib",
-  "collections-context.tsx",
-);
-const SOLD_PROMPT_PATH = path.join(
-  process.cwd(),
-  "components",
-  "sold-listing-prompt.tsx",
-);
-const APP_LAYOUT_PATH = path.join(process.cwd(), "app", "_layout.tsx");
+const MARKETPLACE_CONTEXT_PATH = repoPath("lib", "marketplace-context.tsx");
+const COLLECTIONS_CONTEXT_PATH = repoPath("lib", "collections-context.tsx");
+const SOLD_PROMPT_PATH = repoPath("components", "sold-listing-prompt.tsx");
+const APP_LAYOUT_PATH = repoPath("app", "_layout.tsx");
 
 function readSrc(p: string): string {
   return readFileSync(p, "utf8");

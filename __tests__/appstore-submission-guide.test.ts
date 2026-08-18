@@ -1,10 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
-import { readRepoFile } from "./helpers/repo-file";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
-const guidePath = path.join(process.cwd(), "APPSTORE-SUBMISSION.md");
+const guidePath = repoPath("APPSTORE-SUBMISSION.md");
 const guide = readFileSync(guidePath, "utf8");
 
 describe("APPSTORE-SUBMISSION.md", () => {

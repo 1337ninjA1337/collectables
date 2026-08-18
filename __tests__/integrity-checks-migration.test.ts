@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * BE-7 — `20260619_integrity_checks.sql` backfills the data-integrity CHECK
@@ -14,12 +14,8 @@ import path from "node:path";
  *   (4) the migration is documented in MANUAL-TASKS.md.
  */
 
-const ROOT = process.cwd();
-const MIGRATION = readFileSync(
-  path.join(ROOT, "supabase", "migrations", "20260619_integrity_checks.sql"),
-  "utf8",
-);
-const MANUAL = readFileSync(path.join(ROOT, "MANUAL-TASKS.md"), "utf8");
+const MIGRATION = readRepoFile("supabase", "migrations", "20260619_integrity_checks.sql");
+const MANUAL = readRepoFile("MANUAL-TASKS.md");
 
 // strip `-- ...` line comments so prose doesn't trip the SQL assertions.
 const SQL = MIGRATION.replace(/--.*$/gm, "");

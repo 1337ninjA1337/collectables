@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * BE-20 — structural assertions on the `claim-listing` Edge Function. It runs
@@ -11,13 +12,7 @@ import path from "node:path";
  * and CORS handling.
  */
 
-const FUNCTION_PATH = path.join(
-  process.cwd(),
-  "supabase",
-  "functions",
-  "claim-listing",
-  "index.ts",
-);
+const FUNCTION_PATH = repoPath("supabase", "functions", "claim-listing", "index.ts");
 
 const SOURCE = readFileSync(FUNCTION_PATH, "utf8");
 

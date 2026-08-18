@@ -9,7 +9,8 @@ import {
   formatEmptyStateWrapperReport,
 } from "../lib/check-empty-state-wrappers";
 
-const ROOT = process.cwd();
+import { readRepoFile, repoPath, repoRelative } from "./helpers/repo-file";
+
 
 function listSourceFiles(dir: string): string[] {
   const out: string[] = [];
@@ -145,7 +146,7 @@ describe("findEmptyStateWrapperOverrides — matcher", () => {
 
 describe("EmptyState wrapper audit — codebase sweep", () => {
   const files = ["app", "components"].flatMap((dir) =>
-    listSourceFiles(path.join(ROOT, dir)),
+    listSourceFiles(repoPath(dir)),
   );
 
   it("finds the component and real callers to scan", () => {
@@ -162,7 +163,7 @@ describe("EmptyState wrapper audit — codebase sweep", () => {
   it("no caller wraps <EmptyState> in a custom-colored container", () => {
     const findings = files.flatMap((f) =>
       findEmptyStateWrapperOverrides(
-        path.relative(ROOT, f),
+        repoRelative(f),
         fs.readFileSync(f, "utf8"),
       ),
     );
@@ -174,10 +175,7 @@ describe("EmptyState wrapper audit — codebase sweep", () => {
   });
 
   it("CrashFallback's PAGE_BG_2 wrapper stays on the allowlist", () => {
-    const src = fs.readFileSync(
-      path.join(ROOT, "components/crash-fallback.tsx"),
-      "utf8",
-    );
+    const src = readRepoFile("components/crash-fallback.tsx");
     assert.match(
       src,
       /backgroundColor:\s*PAGE_BG_2/,

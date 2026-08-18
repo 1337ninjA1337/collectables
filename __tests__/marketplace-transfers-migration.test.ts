@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * Structural assertions over the marketplace_transfers migration. The actual
@@ -11,14 +12,9 @@ import path from "node:path";
  * the append-only-by-RLS contract (no UPDATE / DELETE policies).
  */
 
-const MIGRATION_PATH = path.join(
-  process.cwd(),
-  "supabase",
-  "migrations",
-  "20260527_marketplace_transfers.sql",
-);
+const MIGRATION_PATH = repoPath("supabase", "migrations", "20260527_marketplace_transfers.sql");
 
-const MANUAL_TASKS_PATH = path.join(process.cwd(), "MANUAL-TASKS.md");
+const MANUAL_TASKS_PATH = repoPath("MANUAL-TASKS.md");
 
 const SOURCE = readFileSync(MIGRATION_PATH, "utf8");
 const MANUAL_TASKS = readFileSync(MANUAL_TASKS_PATH, "utf8");

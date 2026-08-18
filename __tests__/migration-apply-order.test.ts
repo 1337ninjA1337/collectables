@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
-import path from "node:path";
 
 import {
   parseMigrationVersion,
@@ -10,6 +9,8 @@ import {
   computeApplyOrder,
   formatApplyOrderReport,
 } from "../lib/migration-apply-order";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * BE-34 — apply-order / timestamp-collision guard.
@@ -21,7 +22,7 @@ import {
  * and strictly increasing on disk.
  */
 describe("migration apply order (BE-34)", () => {
-  const dir = path.join(process.cwd(), "supabase", "migrations");
+  const dir = repoPath("supabase", "migrations");
   const files = readdirSync(dir).filter((f) => f.endsWith(".sql"));
 
   describe("parseMigrationVersion", () => {

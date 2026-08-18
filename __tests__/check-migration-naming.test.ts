@@ -1,7 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
-import path from "node:path";
 
 import {
   MIGRATION_NAME_PATTERN,
@@ -10,7 +9,7 @@ import {
   formatMigrationNamingReport,
 } from "../lib/check-migration-naming";
 import { LINT_GUARDS } from "../lib/lint-guards";
-import { readRepoFile } from "./helpers/repo-file";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
 
 describe("check-migration-naming", () => {
   it("accepts the two sanctioned version-prefix shapes", () => {
@@ -96,7 +95,7 @@ describe("check-migration-naming", () => {
 
   it("the real supabase/migrations directory passes the full scan", () => {
     const migrationFilenames = readdirSync(
-      path.join(process.cwd(), "supabase", "migrations"),
+      repoPath("supabase", "migrations"),
     );
     const manualTasksContent = readRepoFile("MANUAL-TASKS.md");
     assert.ok(migrationFilenames.length >= 25, "scanner sanity: migrations present");

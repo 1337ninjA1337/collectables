@@ -1,12 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   signedUploadFields,
   SignedUploadParams,
 } from "../lib/cloudinary-signed-upload";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * SEC-5b — structural assertions on `uploadImage` in `lib/cloudinary.ts`.
@@ -19,7 +20,7 @@ import {
  * `signedUploadFields` helper guards the field contract the wiring relies on.
  */
 
-const SRC_PATH = path.join(process.cwd(), "lib", "cloudinary.ts");
+const SRC_PATH = repoPath("lib", "cloudinary.ts");
 
 function readSrc(): string {
   return readFileSync(SRC_PATH, "utf8");

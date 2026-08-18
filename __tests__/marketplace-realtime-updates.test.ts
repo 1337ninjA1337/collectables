@@ -1,10 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { upsertListing } from "@/lib/marketplace-helpers";
 import { MarketplaceListing, MarketplaceMode } from "@/lib/types";
+
+import { repoPath } from "./helpers/repo-file";
 
 /**
  * Guards the realtime cross-device sync for marketplace listings.
@@ -19,16 +20,8 @@ import { MarketplaceListing, MarketplaceMode } from "@/lib/types";
  * wrapper with a pure runtime test for the upsert reducer behaviour.
  */
 
-const SUPABASE_MARKETPLACE_PATH = path.join(
-  process.cwd(),
-  "lib",
-  "supabase-marketplace.ts",
-);
-const MARKETPLACE_CONTEXT_PATH = path.join(
-  process.cwd(),
-  "lib",
-  "marketplace-context.tsx",
-);
+const SUPABASE_MARKETPLACE_PATH = repoPath("lib", "supabase-marketplace.ts");
+const MARKETPLACE_CONTEXT_PATH = repoPath("lib", "marketplace-context.tsx");
 
 function readSrc(p: string): string {
   return readFileSync(p, "utf8");

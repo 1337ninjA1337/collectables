@@ -6,7 +6,7 @@ import {
   jsonError,
   type GetUserResult,
 } from "../supabase/functions/_shared/assert-caller";
-import { readRepoFile } from "./helpers/repo-file";
+import { readEdgeFunction } from "./helpers/edge-function-source";
 
 /**
  * SEC-9 — shared `assertCaller` caller-authentication gate.
@@ -155,14 +155,10 @@ const ADOPTERS = [
   "export-data",
 ];
 
-function fnSource(name: string): string {
-  return readRepoFile(`supabase/functions/${name}/index.ts`);
-}
-
 describe("assertCaller — adoption across Edge Functions (structural)", () => {
   for (const name of ADOPTERS) {
     describe(name, () => {
-      const src = fnSource(name);
+      const src = readEdgeFunction(name);
 
       it("imports assertCaller from the shared module", () => {
         assert.match(

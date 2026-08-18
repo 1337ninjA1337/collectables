@@ -1,7 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import {
   EXPECTED_SENTRY_MAJOR,
@@ -10,6 +8,8 @@ import {
   majorOfVersion,
 } from "../lib/check-sentry-version";
 import { LINT_GUARDS } from "../lib/lint-guards";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 describe("majorOfRange / majorOfVersion", () => {
   it("parses tilde, caret, and exact ranges", () => {
@@ -86,12 +86,11 @@ describe("findSentryVersionIssues", () => {
 });
 
 describe("repository state", () => {
-  const root = process.cwd();
   const pkg = JSON.parse(
-    readFileSync(path.join(root, "package.json"), "utf8"),
+    readRepoFile("package.json"),
   );
   const lock = JSON.parse(
-    readFileSync(path.join(root, "package-lock.json"), "utf8"),
+    readRepoFile("package-lock.json"),
   );
 
   it("the real package.json + lockfile pass the guard", () => {

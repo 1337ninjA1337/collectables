@@ -1,9 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import { stripComments } from "@/lib/env-inlining";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * Structural pins for the shared deep-link share sheet
@@ -16,13 +16,9 @@ import { stripComments } from "@/lib/env-inlining";
  * contract: where the chrome lives, where the copy state lives, that the timer
  * is cleaned up, and that no consumer re-implements any of it.
  */
-function read(...segments: string[]): string {
-  return readFileSync(path.join(process.cwd(), ...segments), "utf8");
-}
-
-const shareSheetSrc = () => read("components", "share-sheet.tsx");
-const itemSrc = () => read("app", "item", "[id].tsx");
-const collectionSheetSrc = () => read("components", "collection-share-sheet.tsx");
+const shareSheetSrc = () => readRepoFile("components", "share-sheet.tsx");
+const itemSrc = () => readRepoFile("app", "item", "[id].tsx");
+const collectionSheetSrc = () => readRepoFile("components", "collection-share-sheet.tsx");
 
 describe("ShareSheet — shared deep-link sheet", () => {
   it("exports a named-form memo component", () => {
