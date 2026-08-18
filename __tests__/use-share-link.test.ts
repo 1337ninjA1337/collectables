@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { stripComments } from "@/lib/env-inlining";
+import { stripComments } from "@/lib/strip-comments";
 import { COPIED_RESET_MS, buildSharePayload } from "@/lib/share-link-helpers";
 import { readRepoFile } from "./helpers/repo-file";
 

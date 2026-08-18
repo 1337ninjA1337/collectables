@@ -1,4 +1,4 @@
-import { stripComments } from "@/lib/env-inlining";
+import { stripComments } from "@/lib/strip-comments";
 
 /**
  * Inline-geometry scanner behind `scripts/check-inline-radius.ts` (`npm run

@@ -6,6 +6,7 @@ import { readRepoFile, repoPath } from "./helpers/repo-file";
 import {
   SUITES_DIR,
   SUITES_REL,
+  __resetSuiteFilesCacheForTests,
   assertExemptionsHonest,
   readSuite,
   suiteCode,
@@ -119,6 +120,18 @@ describe("the suite directory, walked once", () => {
     assert.equal(suiteCode(HELPER), suiteCode(HELPER));
     // A miss still throws rather than caching the failure as an empty answer.
     assert.throws(() => readSuite("no-such-suite.test.ts"), /ENOENT/);
+  });
+
+  it("can forget the cache, for a suite that changes the tree under it", () => {
+    // Nothing calls the reset today; it exists because "nothing writes to the
+    // repository during a run" is a premise and not a law — the guard fixtures
+    // already create `guard-fixture-nested-*` directories under the repo root.
+    const before = suiteFiles();
+    __resetSuiteFilesCacheForTests();
+    const after = suiteFiles();
+    assert.notEqual(before, after, "the reset did not actually clear the walk");
+    assert.deepEqual(before, after, "the re-walk disagreed with the cached one");
+    assert.notEqual(suiteText(HELPER), undefined);
   });
 
   it("holds an exemption list to four things, and says which one broke", () => {

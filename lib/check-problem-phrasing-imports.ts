@@ -1,4 +1,4 @@
-import { stripComments } from "@/lib/env-inlining";
+import { stripComments } from "@/lib/strip-comments";
 
 /**
  * Scanner behind `scripts/check-problem-phrasing-imports.ts` (`npm run

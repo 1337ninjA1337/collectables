@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-import { stripComments } from "@/lib/env-inlining";
+import { stripComments } from "@/lib/strip-comments";
 
 import { repoPath, repoRelative } from "./helpers/repo-file";
 

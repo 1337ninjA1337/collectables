@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { stripComments } from "@/lib/env-inlining";
+import { stripComments } from "@/lib/strip-comments";
 import {
   DEFAULT_DEBOUNCE_MS,
   PROFILE_SEARCH_DEBOUNCE_MS,

@@ -18,6 +18,8 @@
  * structural test.
  */
 
+import { stripComments } from "./strip-comments";
+
 /**
  * Matches any `process.env` occurrence that is NOT a literal member access.
  * The lookahead tolerates whitespace/newlines before the `.` because babel
@@ -35,51 +37,6 @@ export type EnvInliningMatch = {
   /** The offending source line, trimmed, for the report. */
   snippet: string;
 };
-
-/**
- * Blank out `//` and `/* *\/` comment bodies with spaces, preserving every
- * newline so match offsets/line numbers still map to the original source.
- * Doc comments legitimately *mention* passing `process.env` whole (that is
- * the whole point of the pattern's documentation) and must not trip the
- * scan. String literals are tracked so a `"// not a comment"` string is
- * left intact.
- */
-export function stripComments(source: string): string {
-  const out = source.split("");
-  type Mode = "code" | "line" | "block" | "single" | "double" | "template";
-  let mode: Mode = "code";
-  for (let i = 0; i < source.length; i++) {
-    const c = source[i];
-    const next = source[i + 1];
-    if (mode === "code") {
-      if (c === "/" && next === "/") mode = "line";
-      else if (c === "/" && next === "*") mode = "block";
-      else if (c === "'") mode = "single";
-      else if (c === '"') mode = "double";
-      else if (c === "`") mode = "template";
-      if (mode === "line" || mode === "block") out[i] = " ";
-    } else if (mode === "line") {
-      if (c === "\n") mode = "code";
-      else out[i] = " ";
-    } else if (mode === "block") {
-      if (c === "*" && next === "/") {
-        out[i] = " ";
-        out[i + 1] = " ";
-        i++;
-        mode = "code";
-      } else if (c !== "\n") {
-        out[i] = " ";
-      }
-    } else {
-      // Inside a string literal: honour escapes, exit on the matching quote.
-      if (c === "\\") i++;
-      else if (mode === "single" && (c === "'" || c === "\n")) mode = "code";
-      else if (mode === "double" && (c === '"' || c === "\n")) mode = "code";
-      else if (mode === "template" && c === "`") mode = "code";
-    }
-  }
-  return out.join("");
-}
 
 /**
  * Scan a single source string for whole-`process.env` usages.

@@ -42,7 +42,7 @@ import assert from "node:assert/strict";
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
-import { stripComments } from "@/lib/env-inlining";
+import { stripComments } from "@/lib/strip-comments";
 
 import { readRepoFile, repoPath } from "./repo-file";
 
@@ -64,11 +64,33 @@ export const SUITES_DIR = repoPath(SUITES_REL);
  * cannot change mid-run (each suite is its own process, and nothing here
  * writes to the repository), so one answer per process is also the only
  * correct answer.
+ *
+ * "Nothing writes to the repository" is a premise, not a law — the guard
+ * fixtures write to `mkdtemp` roots, but `guard-fixture-refusals.test.ts`
+ * already creates `guard-fixture-nested-*` directories under the repo root —
+ * so {@link __resetSuiteFilesCacheForTests} exists for the case where a suite
+ * does. Same shape as `lib/sentry.ts` and `lib/supabase-realtime.ts`, for the
+ * same reason: a module-scope cache with no way to clear it is correct until
+ * it quietly is not.
  */
 let walked: readonly string[] | null = null;
 const readCache = new Map<string, string>();
 const textCache = new Map<string, string>();
 const codeCache = new Map<string, string>();
+
+/**
+ * Forget the walk and the reads, for a suite that changes the tree under them.
+ *
+ * Nothing calls this today. It is here because the alternative to a two-line
+ * escape hatch is a future suite discovering that the walk answers from before
+ * its fixture existed, which reads as the walk being broken.
+ */
+export function __resetSuiteFilesCacheForTests(): void {
+  walked = null;
+  readCache.clear();
+  textCache.clear();
+  codeCache.clear();
+}
 
 /**
  * Every `.ts` under `__tests__`, one level of subdirectory included.

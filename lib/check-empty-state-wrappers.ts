@@ -1,4 +1,4 @@
-import { stripComments } from "@/lib/env-inlining";
+import { stripComments } from "@/lib/strip-comments";
 
 /**
  * EmptyState wrapper audit (EmptyState design-tokens migration, 2026-05-25).
