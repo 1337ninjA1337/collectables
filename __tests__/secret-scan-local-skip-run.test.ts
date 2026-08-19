@@ -9,6 +9,7 @@ import {
   initGitRoot,
   makePartialRoot,
   runGuardIn,
+  stageConflicted,
   type PartialRoot,
 } from "./helpers/guard-fixture";
 import { SUITES_REL } from "./helpers/suite-files";
@@ -137,6 +138,26 @@ describe("check-secrets, run against a tree holding a local-only copy", () => {
     assert.match(run.output, /tracked by git AND skipped/);
     assert.match(run.output, /queries\.local\.m/);
     assert.doesNotMatch(run.output, /no committed secrets/);
+  });
+
+  it("names a mid-merge copy once in the refusal, not once per index stage", () => {
+    assert.ok(GUARD);
+    // The refusal opens with a COUNT, and `git ls-files` prints a conflicted
+    // path once per stage. Without the dedup this run reports `3 file(s) are
+    // tracked by git AND skipped` and lists one name three times — a guard
+    // overstating its own finding, in the report a reader acts on.
+    const fixture = rootWith("conflicted", { [IGNORED]: CREDENTIAL_FILE });
+    initGitRoot(fixture.root, `*${LOCAL_ONLY_MARKER}*\n`, { forceAdd: [IGNORED] });
+    stageConflicted(fixture.root, IGNORED, {
+      base: "-- ancestor\n",
+      ours: CREDENTIAL_FILE,
+      theirs: "-- incoming\n",
+    });
+
+    const run = runGuardIn(GUARD, fixture.root);
+    assert.equal(run.status, 1, `a conflicted, skipped credential file passed:\n${run.output}`);
+    assert.match(run.output, /1 file\(s\) are tracked by git AND skipped/);
+    assert.equal(run.output.match(/queries\.local\.m/g)?.length, 1);
   });
 
   it("reports the same credential in a misnamed copy, and prints the rule under it", () => {

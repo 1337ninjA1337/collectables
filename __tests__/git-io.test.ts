@@ -9,7 +9,7 @@ import { SECRET_SKIP_DIRS, SOURCE_SCAN_EXTENSIONS } from "@/lib/secret-scan";
 
 import { listCommittable, runGit, trackedAmong } from "../scripts/git-io";
 import { listFilesUnder, selectPaths } from "../scripts/guard-io";
-import { GitFixtureError, initGitRoot } from "./helpers/guard-fixture";
+import { GitFixtureError, initGitRoot, stageConflicted } from "./helpers/guard-fixture";
 import { REPO_ROOT } from "./helpers/repo-file";
 
 /**
@@ -53,6 +53,19 @@ function repoWithStagedLocal(): string {
   return dir;
 }
 
+/** A repository mid-merge, with `conflicted.local.m` at all three stages. */
+function repoMidMerge(): string {
+  const dir = tempDir("git-io-conflict-");
+  fs.writeFileSync(path.join(dir, "conflicted.local.m"), "Host = \"ours.example.invalid\"\n");
+  initGitRoot(dir, "*.local.*\n", { forceAdd: ["conflicted.local.m"] });
+  stageConflicted(dir, "conflicted.local.m", {
+    base: "Host = \"base.example.invalid\"\n",
+    ours: "Host = \"ours.example.invalid\"\n",
+    theirs: "Host = \"theirs.example.invalid\"\n",
+  });
+  return dir;
+}
+
 describe("asking git, from a guard", () => {
   it("answers with stdout when git ran", () => {
     const answer = runGit(REPO_ROOT, ["rev-parse", "--is-inside-work-tree"]);
@@ -91,6 +104,29 @@ describe("asking git, from a guard", () => {
     assert.deepEqual(answer.ok && answer.tracked, ["staged.local.m"]);
   });
 
+  it("names a path held at three merge stages once, not three times", () => {
+    // The caller is a refusal that COUNTS what it found, so an undeduplicated
+    // answer reads `3 file(s) are tracked by git AND skipped` over one file and
+    // sends its reader looking for two that do not exist.
+    const dir = repoMidMerge();
+    // The premise first: without this the case passes over a repository that
+    // was never conflicted, asserting a dedup that had nothing to remove.
+    const stages = spawnSync("git", ["ls-files", "-u", "--", "conflicted.local.m"], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(stages.status, 0, `git ls-files -u failed: ${stages.stderr}`);
+    assert.equal(
+      stages.stdout.split("\n").filter(Boolean).length,
+      3,
+      "the fixture is not actually mid-merge, so the dedup below is unexercised",
+    );
+
+    const answer = trackedAmong(dir, ["conflicted.local.m"]);
+    assert.ok(answer.ok);
+    assert.deepEqual(answer.ok && answer.tracked, ["conflicted.local.m"]);
+  });
+
   it("never asks bare `ls-files`, which would answer with the whole index", () => {
     // The difference between "none of these are tracked" and "everything is".
     const answer = trackedAmong(repoWithForcedLocal(), []);
@@ -123,6 +159,23 @@ describe("the set a scan of committed secrets is actually about", () => {
     // to avoid reporting.
     assert.ok(!files.includes("untracked.local.m"));
     assert.ok(!files.includes("ignored/scratch.md"));
+  });
+
+  it("lists a conflicted path once, which is what the count feeds", () => {
+    // `listCommittable`'s doc has always said `--cached` lists a path once per
+    // stage during a merge, and nothing ran it: no fixture could produce a
+    // conflicted index. Three entries for one file is three reads of it, three
+    // findings for one credential, and three toward the scanned floor — a
+    // minimum that exists to prove the walk covered the tree, cleared here by
+    // counting one file twice over.
+    const dir = repoMidMerge();
+    const answer = listCommittable(dir);
+    assert.ok(answer.ok);
+    const files = answer.ok ? answer.files : [];
+    assert.deepEqual(
+      files.filter((rel) => rel === "conflicted.local.m"),
+      ["conflicted.local.m"],
+    );
   });
 
   it("loses no committed file the walk would have found", () => {
