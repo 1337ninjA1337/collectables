@@ -7,7 +7,9 @@ import {
   LOCAL_ONLY_NAMES_SHOWN,
   formatLocalOnlyNote,
   formatLocalOnlySkips,
+  formatTrackedLocalOnly,
   isLocalOnlyPath,
+  partitionLocalOnly,
 } from "@/lib/local-only";
 import { readRepoFile as read, REPO_ROOT } from "./helpers/repo-file";
 
@@ -141,5 +143,48 @@ describe("what a run says about what it skipped", () => {
     const note = formatLocalOnlyNote(["docs/powerbi/queries.local.m"]);
     assert.match(note, /this run: docs\/powerbi\/queries\.local\.m/);
     assert.doesNotMatch(note, /none this run/);
+  });
+
+  it("hands back both halves of the walk, in order, rather than filtering", () => {
+    // The half a `filter` discards is the half the report needs, and an
+    // accumulator written from inside a predicate is state that double-counts
+    // the first time anything runs the walk twice.
+    const walked = ["lib/a.ts", "docs/queries.local.m", "lib/b.ts", ".env.local.example"];
+    assert.deepEqual(partitionLocalOnly(walked), {
+      scanned: ["lib/a.ts", "lib/b.ts"],
+      localOnly: ["docs/queries.local.m", ".env.local.example"],
+    });
+    assert.deepEqual(partitionLocalOnly([]), { scanned: [], localOnly: [] });
+  });
+
+  it("says on the pass line whether git was asked, and what it said", () => {
+    const skipped = ["docs/powerbi/queries.local.m"];
+    assert.match(formatLocalOnlySkips(skipped, { asked: true, tracked: [] }), /\(none tracked by git\)/);
+    assert.match(
+      formatLocalOnlySkips(skipped, { asked: false, reason: "not a git repository" }),
+      /\(not a git repository\)/,
+    );
+    // No probe at all is the old line, unchanged — a caller that cannot ask is
+    // not the same as one that asked and got nothing.
+    assert.ok(formatLocalOnlySkips(skipped).endsWith("docs/powerbi/queries.local.m"));
+  });
+});
+
+describe("a `.local.` file git is tracking anyway", () => {
+  it("is the one way this convention can hide a committed credential, and it fails", () => {
+    const message = formatTrackedLocalOnly({
+      asked: true,
+      tracked: ["docs/powerbi/z.local.m", "docs/powerbi/a.local.m"],
+    });
+    assert.match(message, /2 file\(s\) are tracked by git AND skipped/);
+    // Sorted and named: "your ignore rules are wrong somewhere" is not
+    // something a reader can act on.
+    assert.ok(message.indexOf("a.local.m") < message.indexOf("z.local.m"));
+    assert.match(message, /git rm --cached/);
+  });
+
+  it("says nothing when git found none, or could not be asked", () => {
+    assert.equal(formatTrackedLocalOnly({ asked: true, tracked: [] }), "");
+    assert.equal(formatTrackedLocalOnly({ asked: false, reason: "not a git repository" }), "");
   });
 });

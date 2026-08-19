@@ -44,6 +44,66 @@ export function isLocalOnlyPath(relative: string): boolean {
 }
 
 /**
+ * Split a walk's output into what a scan reads and what the convention took.
+ *
+ * A `filter` answers half the question and throws the other half away, and the
+ * half it throws away is the one a reader in front of a failure needs. Both
+ * halves come back here so the caller does not accumulate into module-level
+ * state from inside a predicate — which works exactly once per process and is
+ * the shape that silently double-counts the first time anything calls the
+ * walker twice.
+ */
+export function partitionLocalOnly(paths: readonly string[]): {
+  scanned: string[];
+  localOnly: string[];
+} {
+  const scanned: string[] = [];
+  const localOnly: string[] = [];
+  for (const rel of paths) (isLocalOnlyPath(rel) ? localOnly : scanned).push(rel);
+  return { scanned, localOnly };
+}
+
+/**
+ * What git said about the skipped names, or why it was not asked.
+ *
+ * The convention rests on a claim about git — that these files cannot be
+ * committed — and `git add -f` beats `.gitignore`, so a force-added `.local.`
+ * file is a COMMITTED credential sitting outside the scan. That claim was
+ * checked in `__tests__/local-only.test.ts`, which means `npm run lint:secrets`
+ * on its own would happily skip such a file in any checkout where the suite was
+ * not run. The guard asks it itself now.
+ *
+ * `asked: false` is a real answer rather than an error: the guard is spawned
+ * against scratch roots that are not work trees at all, and a scan that refused
+ * to run outside git would be a scan its own fixtures could not exercise. What
+ * it may not do is stay quiet about it, which is why the reason is carried.
+ */
+export type LocalOnlyTrackedProbe =
+  | { readonly asked: true; readonly tracked: readonly string[] }
+  | { readonly asked: false; readonly reason: string };
+
+/**
+ * The refusal text for skipped files git is tracking, empty when there are
+ * none or when git could not be asked.
+ *
+ * A tracked `.local.` file is the one way this convention can hide a real leak,
+ * so it fails the run rather than being reported as a curiosity — and it names
+ * the files, because "something is wrong with your ignore rules" is not a thing
+ * anybody can act on.
+ */
+export function formatTrackedLocalOnly(probe: LocalOnlyTrackedProbe): string {
+  if (!probe.asked || probe.tracked.length === 0) return "";
+  const sorted = [...probe.tracked].sort();
+  return [
+    `${sorted.length} file(s) are tracked by git AND skipped by the \`${LOCAL_ONLY_MARKER}\` ` +
+      `rule, so a committed credential in one of them would never be scanned:`,
+    ...sorted.map((rel) => `  ${rel}`),
+    `\`git rm --cached\` them, or rename them so they are scanned. \`.gitignore\` covers ` +
+      `\`*${LOCAL_ONLY_MARKER}*\`, so these were force-added.`,
+  ].join("\n");
+}
+
+/**
  * How many names a pass line spells out before it starts counting.
  *
  * A clean run's report is one line and stays one line; a checkout with a dozen
@@ -60,13 +120,21 @@ export const LOCAL_ONLY_NAMES_SHOWN = 5;
  * a branch and a normal run's line is unchanged. Names are sorted, because a
  * report that reads differently on two machines is a report nobody diffs.
  */
-export function formatLocalOnlySkips(skipped: readonly string[]): string {
+export function formatLocalOnlySkips(
+  skipped: readonly string[],
+  probe?: LocalOnlyTrackedProbe,
+): string {
   if (skipped.length === 0) return "";
   const sorted = [...skipped].sort();
   const shown = sorted.slice(0, LOCAL_ONLY_NAMES_SHOWN);
   const rest = sorted.length - shown.length;
   const names = rest > 0 ? `${shown.join(", ")}, +${rest} more` : shown.join(", ");
-  return `skipped ${sorted.length} local-only file(s): ${names}`;
+  // What the skip RESTS on, said in the same line as the skip. A pass line
+  // that reports "skipped 3" without saying whether git was asked leaves the
+  // reader unable to tell a verified exemption from an assumed one.
+  const verified =
+    probe === undefined ? "" : probe.asked ? " (none tracked by git)" : ` (${probe.reason})`;
+  return `skipped ${sorted.length} local-only file(s): ${names}${verified}`;
 }
 
 /**

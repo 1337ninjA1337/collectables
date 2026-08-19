@@ -1,5 +1,8 @@
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 import { LINT_GUARDS } from "@/lib/lint-guards";
 import { LOCAL_ONLY_MARKER } from "@/lib/local-only";
@@ -66,6 +69,33 @@ describe("check-secrets, run against a tree holding a local-only copy", () => {
     // The half a `filter` used to throw away: a run that skips silently is one
     // where a misnamed copy and a scanned one look identical from outside.
     assert.match(run.output, /skipped 1 local-only file\(s\): docs\/powerbi\/queries\.local\.m/);
+    // A scratch root is not a work tree, so the claim the skip rests on could
+    // not be checked here — and the run says so rather than implying it was.
+    assert.match(run.output, /not checked against git/);
+  });
+
+  it("refuses a `.local.` file git is tracking, which only the suite used to catch", () => {
+    assert.ok(GUARD);
+    // `git add -f` beats `.gitignore`, so this is a COMMITTED credential the
+    // scan skips: the one way the convention can hide a real leak, and
+    // `npm run lint:secrets` on its own used to walk straight past it because
+    // the check lived in a test file.
+    const fixture = rootWith("forced", { [IGNORED]: CREDENTIAL_FILE });
+    const git = (...args: string[]) => {
+      const run = spawnSync("git", args, { cwd: fixture.root, encoding: "utf8" });
+      assert.equal(run.status, 0, `git ${args.join(" ")} failed: ${run.stderr}`);
+    };
+    git("init", "-q");
+    git("config", "user.email", "fixture@example.invalid");
+    git("config", "user.name", "fixture");
+    fs.writeFileSync(path.join(fixture.root, ".gitignore"), "*.local.*\n");
+    git("add", "-f", IGNORED);
+
+    const run = runGuardIn(GUARD, fixture.root);
+    assert.equal(run.status, 1, `a tracked, skipped credential file passed:\n${run.output}`);
+    assert.match(run.output, /tracked by git AND skipped/);
+    assert.match(run.output, /queries\.local\.m/);
+    assert.doesNotMatch(run.output, /no committed secrets/);
   });
 
   it("reports the same credential in a misnamed copy, and prints the rule under it", () => {

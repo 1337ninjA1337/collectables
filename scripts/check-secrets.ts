@@ -22,7 +22,14 @@ import {
   SOURCE_SCAN_EXTENSIONS,
   type SecretMatch,
 } from "../lib/secret-scan";
-import { formatLocalOnlyNote, formatLocalOnlySkips, isLocalOnlyPath } from "../lib/local-only";
+import {
+  formatLocalOnlyNote,
+  formatLocalOnlySkips,
+  formatTrackedLocalOnly,
+  partitionLocalOnly,
+  type LocalOnlyTrackedProbe,
+} from "../lib/local-only";
+import { trackedAmong } from "./git-io";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 import { decodeZipEntryText, readZipEntries } from "../lib/zip-archive";
@@ -42,55 +49,75 @@ const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
 const SKIP_FILES = new Set(SECRET_SKIP_FILES.map((p) => path.normalize(p)));
 
 /**
- * The names the `.local.` rule took out, kept rather than discarded.
+ * The named exemptions, which is the half of the skip policy that is a
+ * decision this repository made and wrote a reason for.
  *
- * `filter` throws away the half of its answer this guard has to say out loud:
- * a reader who misnames their credential copy (`queries-local.m`) gets a red
- * run over their own pasted password with no hint that the NAME is why it was
- * read. Both walks record here, and both halves of the report — the pass line
- * and the failure note — are built from the one list.
+ * The other half — the `.local.` convention — is applied by
+ * {@link partitionLocalOnly}, which hands BOTH halves back: the names a rule
+ * removes are the ones a reader in front of a failure needs, and a `filter`
+ * throws them away.
  */
-const skippedLocal: string[] = [];
+const notExempt = (rel: string): boolean => !SKIP_FILES.has(path.normalize(rel));
 
 /**
- * The two rules that take a file out of the scan: the named exemptions above,
- * and the `.local.` convention for a file git will never take. One predicate so
- * the walks below cannot drift on which of the two they apply.
+ * Git's answer about the skipped names, in the shape the report takes.
  *
- * The `.local.` half is asked FIRST and records what it answered, so the two
- * exemptions stay distinguishable in the report: a file in `SKIP_FILES` is a
- * decision this repository made and wrote a reason for, and a `.local.` file is
- * one the reader in front of the failure created a minute ago.
+ * The translation is here rather than in `lib/local-only.ts` because "why git
+ * did not answer" is a fact about spawning a process, and the reason is
+ * PREFIXED rather than passed through: `not a git repository` on its own reads
+ * as a failure of the guard, where `not checked against git: not a git
+ * repository` reads as the check it actually is.
  */
-const scanned = (rel: string): boolean => {
-  if (isLocalOnlyPath(rel)) {
-    skippedLocal.push(rel);
-    return false;
-  }
-  return !SKIP_FILES.has(path.normalize(rel));
-};
+function probeTracked(root: string, skipped: readonly string[]): LocalOnlyTrackedProbe {
+  const answer = trackedAmong(root, skipped);
+  return answer.ok
+    ? { asked: true, tracked: answer.tracked }
+    : { asked: false, reason: `not checked against git: ${answer.reason}` };
+}
 
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
   // The skip list is applied after the walk rather than inside it: it names
   // FILES, and a walk that knows about individual files is a walk with a
   // second rule in it.
-  const files = listFilesUnder(repoRoot, {
+  const walkedFiles = listFilesUnder(repoRoot, {
     extensions: SOURCE_SCAN_EXTENSIONS,
     skipDirs: SECRET_SKIP_DIRS,
-  }).filter(scanned);
+  }).filter(notExempt);
 
   // The containers, walked separately because what happens to them is
   // different: they are opened and their entries decoded, rather than read as
   // one string. Same skip list, since it names files and an archive is one.
-  const archives = listFilesUnder(repoRoot, {
+  const walkedArchives = listFilesUnder(repoRoot, {
     extensions: ARCHIVE_SCAN_EXTENSIONS,
     skipDirs: SECRET_SKIP_DIRS,
-  }).filter(scanned);
+  }).filter(notExempt);
+
+  const text = partitionLocalOnly(walkedFiles);
+  const containers = partitionLocalOnly(walkedArchives);
+  const files = text.scanned;
+  const archives = containers.scanned;
+  const skippedLocal = [...text.localOnly, ...containers.localOnly];
 
   // "scanned 0 file(s), no committed secrets" is the report an unreadable
   // repo root produces, and it exits 0. Assert the premise first.
   assertScannedFloor(CHECK_NAME, files.length + archives.length);
+
+  // Asked ONLY when something was skipped, and only then: on a normal checkout
+  // this guard spawns no child process at all, and the claim the skip rests on
+  // — that git will never take these files — is checked exactly where it is
+  // being relied upon. `git add -f` beats `.gitignore`, so a tracked `.local.`
+  // file is a committed credential outside the scan; the suite could catch that
+  // and `npm run lint:secrets` on its own could not.
+  const probe = skippedLocal.length === 0 ? undefined : probeTracked(repoRoot, skippedLocal);
+
+  if (probe) {
+    const tracked = formatTrackedLocalOnly(probe);
+    if (tracked) {
+      console.error(`${CHECK_NAME}: ${tracked}`);
+      process.exit(1);
+    }
+  }
 
   const matches: SecretMatch[] = [];
   for (const rel of files) {
@@ -132,7 +159,7 @@ function main(): void {
   if (matches.length === 0) {
     // The clause is empty on a clean checkout, so the usual line is the usual
     // line; it appears only when there was something to say.
-    const skipped = formatLocalOnlySkips(skippedLocal);
+    const skipped = formatLocalOnlySkips(skippedLocal, probe);
     console.log(
       `${CHECK_NAME}: scanned ${files.length} file(s) plus ${entryCount} entr(ies) in ${archives.length} archive(s), no committed secrets` +
         `${skipped ? `, ${skipped}` : ""}.`,
