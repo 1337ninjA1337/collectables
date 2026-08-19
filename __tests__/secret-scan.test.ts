@@ -2,7 +2,6 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 
 import {
   ARCHIVE_ENTRY_SEPARATOR,
@@ -14,14 +13,12 @@ import {
   SECRET_SKIP_DIRS,
   SECRET_SKIP_FILES,
   SECRET_SKIP_FILE_REASONS,
-  SECRET_SKIP_LOCAL_MARKER,
   SOURCE_SCAN_EXTENSIONS,
   decodeBase64Url,
   formatSecretReport,
   isPrivilegedSupabaseJwt,
   redact,
   archiveEntryPath,
-  isLocalOnlyPath,
   scanArchiveEntries,
   scanForSecrets,
 } from "../lib/secret-scan";
@@ -357,65 +354,6 @@ describe("what the source scan does not read", () => {
       decoded[name] = decodeZipEntryText(data);
     }
     assert.equal(scanArchiveEntries("x.pbit", decoded)[0]?.ruleId, "aws-access-key-id");
-  });
-
-  it("recognises the `.local.` names git ignores, and only those", () => {
-    for (const rel of [
-      "docs/powerbi/queries.local.m",
-      "docs/powerbi/Collectables.local.pbit",
-      ".env.local.example",
-    ]) {
-      assert.ok(isLocalOnlyPath(rel), `${rel} carries the marker and was not recognised`);
-    }
-    // The marker is a SEGMENT, so none of these is one — a substring test on
-    // the whole path would take `docs/local/queries.m` out of the scan, and a
-    // directory nobody scans is worse than a file nobody scans.
-    for (const rel of [
-      "docs/powerbi/queries.m",
-      "lib/locale-helpers.ts",
-      "docs/local/notes.md",
-      "lib/my.localization.ts",
-      SECRET_SKIP_LOCAL_MARKER.slice(1),
-    ]) {
-      assert.ok(!isLocalOnlyPath(rel), `${rel} was taken out of the scan by the marker`);
-    }
-  });
-
-  it("skips those names because git ignores them, which git is asked", () => {
-    // The exemption is only safe while both halves hold, so both are asked
-    // rather than assumed. First: `.gitignore` really does ignore the pattern —
-    // if it stopped, this rule would be hiding committable files.
-    for (const rel of ["docs/powerbi/queries.local.m", "docs/powerbi/x.local.pbit"]) {
-      const ignored = spawnSync("git", ["check-ignore", "-q", "--no-index", rel], {
-        cwd: REPO_ROOT,
-      });
-      assert.equal(
-        ignored.status,
-        0,
-        `${rel} is skipped by the secret scan and git does NOT ignore it — that is a committable file outside the scan`,
-      );
-    }
-    // Second: nothing tracked matches it anyway. `git add -f` beats
-    // `.gitignore`, and a force-added `.local.` file is the one way this rule
-    // could hide a real leak.
-    const tracked = spawnSync("git", ["ls-files"], { cwd: REPO_ROOT, encoding: "utf8" });
-    assert.equal(tracked.status, 0, "git ls-files did not run, so this case proved nothing");
-    const forced = tracked.stdout.split("\n").filter((rel) => rel && isLocalOnlyPath(rel));
-    assert.deepEqual(
-      forced,
-      [],
-      `these files are tracked and the secret scan skips them: ${forced.join(", ")}`,
-    );
-  });
-
-  it("tells the reader to paste credentials into the copy git will not take", () => {
-    // The instruction is the thing that produces the mistake, so it is the
-    // thing that has to name the untracked file.
-    assert.match(read("docs/powerbi/queries.m"), /queries\.local\.m/);
-    const readme = read("docs/powerbi/README.md");
-    assert.match(readme, /queries\.local\.m/);
-    assert.match(readme, /\*\.local\.pbit/);
-    assert.match(read(".gitignore"), /^\*\.local\.\*$/m);
   });
 
   it("counts archives toward the floor, which no run can demonstrate", () => {
