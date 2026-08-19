@@ -224,23 +224,31 @@ describe("partitionRegularFiles", () => {
       // out of it: the target is walked on its own if it is in scope, and
       // reading it through the link too reports one credential twice, at a
       // path the repository never committed it to. Where it points is not the
-      // question — that it is not a file is.
-      assert.deepEqual(answer.irregular, ["inside.ts", "outside.ts"]);
+      // question — that it is not a file is. Both carry the same reason, and
+      // it is not the reason a missing path carries.
+      assert.deepEqual(answer.irregular, [
+        { rel: "inside.ts", kind: "not a regular file" },
+        { rel: "outside.ts", kind: "not a regular file" },
+      ]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it("treats a path that is not there, and a directory, as irregular", () => {
+  it("tells a path that is not there apart from one that is not a file", () => {
     // Git lists what the INDEX holds, which is not always what the working
-    // tree holds — a mid-checkout race, a file deleted on disk and not yet
-    // staged. `lstat` throwing is an answer here, not an error: not a file
-    // this scan can read, and not one it should be silent about.
+    // tree holds — a mid-checkout race, a `git rm` not yet committed. `lstat`
+    // throwing is an answer here, not an error, and it is a DIFFERENT answer
+    // from a directory or a symlink: one is a repository with something odd in
+    // it, the other is a committed file this scan did not read.
     const root = fixture();
     try {
       const answer = partitionRegularFiles(root, ["app/helpers.ts", "app/weird.ts", "gone.ts"]);
       assert.deepEqual(answer.files, ["app/helpers.ts"]);
-      assert.deepEqual(answer.irregular, ["app/weird.ts", "gone.ts"]);
+      assert.deepEqual(answer.irregular, [
+        { rel: "app/weird.ts", kind: "not a regular file" },
+        { rel: "gone.ts", kind: "missing from the working tree" },
+      ]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

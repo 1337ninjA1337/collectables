@@ -121,7 +121,7 @@ describe("check-secrets, and the set it says it is about", () => {
     assert.doesNotMatch(asked.output, /working-tree file\(s\) not in it/);
   });
 
-  it("does not read through a tracked symlink, and says how many it left", () => {
+  it("does not read through a tracked symlink, and names what it left", () => {
     assert.ok(GUARD);
     // The one entry the two candidate sources disagreed about. The walk never
     // returns a symlink (`entry.isFile()` is false for one); `git ls-files`
@@ -153,13 +153,42 @@ describe("check-secrets, and the set it says it is about", () => {
       // at all, so the finding's absence is asserted next to the count that
       // says the link was seen and deliberately not read.
       assert.doesNotMatch(run.output, /aws-access-key-id/);
-      assert.doesNotMatch(run.output, /linked\.md/);
-      assert.match(run.output, /1 listed path\(s\) not regular files/);
+      // NAMED, not just counted. A tracked symlink with a scanned extension is
+      // an odd thing for a repository to hold, and a run that reports only a
+      // number gives its reader nothing to go and look at.
+      assert.match(
+        run.output,
+        /1 listed path\(s\) not read: linked\.md \(not a regular file\)/,
+      );
       // And it stays a scan: the number the floor is about did not collapse.
       assert.match(run.output, /from git's committable set/);
     } finally {
       rmSync(outside, { recursive: true, force: true });
     }
+  });
+
+  it("says when git listed a committed file the working tree does not hold", () => {
+    assert.ok(GUARD);
+    // The other reason a listed candidate goes unread, and the one that
+    // deserves alarm rather than a shrug: git names the path, the working tree
+    // does not produce it, so a COMMITTED file went unscanned inside a run
+    // whose last words are "no committed secrets". Summing this with the
+    // symlink count would give the two the same weight.
+    const fixture = rootWith("index-only", { "notes.md": "nothing here\n" });
+    initGitRoot(fixture.root, "nothing-here\n", { forceAdd: ["notes.md"] });
+    // Committed, then removed from the working tree alone — `git rm --cached`
+    // in reverse, and the state a half-finished checkout leaves.
+    rmSync(path.join(fixture.root, "notes.md"), { force: true });
+
+    const run = runGuardIn(GUARD, fixture.root);
+    assert.equal(run.status, 0, `the scan failed over a path it simply could not read:\n${run.output}`);
+    assert.match(
+      run.output,
+      /1 listed path\(s\) not read: notes\.md \(missing from the working tree\)/,
+    );
+    // The reason is what makes this case distinct from the symlink one; before
+    // the two were told apart, both arrived as the same number.
+    assert.doesNotMatch(run.output, /not a regular file/);
   });
 
   it("falls back to the walk outside a work tree, and says that too", () => {

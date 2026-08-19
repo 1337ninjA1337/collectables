@@ -21,6 +21,7 @@ import {
   SECRET_SKIP_FILES,
   SOURCE_SCAN_EXTENSIONS,
   formatScanSubject,
+  formatUnreadCandidates,
   type ScanSubject,
   type SecretMatch,
 } from "../lib/secret-scan";
@@ -35,7 +36,13 @@ import { listCommittable, trackedAmong } from "./git-io";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 import { decodeZipEntryText, readZipEntries } from "../lib/zip-archive";
-import { guardScanRoot, listFilesUnder, partitionRegularFiles, selectPaths } from "./guard-io";
+import {
+  guardScanRoot,
+  listFilesUnder,
+  partitionRegularFiles,
+  selectPaths,
+  type IrregularPath,
+} from "./guard-io";
 
 const CHECK_NAME = "check-secrets";
 const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
@@ -99,11 +106,14 @@ function probeTracked(root: string, skipped: readonly string[]): LocalOnlyTracke
 type Candidates = {
   readonly files: string[];
   readonly archives: string[];
-  /**
-   * Which set the pass line says it read, what git's list left out, and what
-   * was in git's list without being a file this scan can read.
-   */
+  /** Which set the pass line says it read, and what git's list left out. */
   readonly subject: ScanSubject;
+  /**
+   * Candidates the listing held that the scan did not read, each with the
+   * reason. Empty under the walk, which never produces one: it answers the
+   * question while it recurses.
+   */
+  readonly unread: readonly IrregularPath[];
 };
 
 function candidatesIn(repoRoot: string): Candidates {
@@ -127,6 +137,7 @@ function candidatesIn(repoRoot: string): Candidates {
       files: picked,
       archives: pickedArchives,
       subject: { source: "walk", reason: committable.reason },
+      unread: [],
     };
   }
   // The walk answers this by construction — `entry.isFile()` on every entry it
@@ -134,7 +145,8 @@ function candidatesIn(repoRoot: string): Candidates {
   // symlink is in that list, and reading one follows it: out of the scan root
   // if it points there, with whatever it finds reported at the LINK's path as
   // a credential this repository committed. So the same question is put to the
-  // listed candidates, and the count of what it removed goes in the pass line.
+  // listed candidates, and what it removed is NAMED in the pass line — a count
+  // alone is enough to notice a change and not enough to act on one.
   const text = partitionRegularFiles(repoRoot, picked);
   const containers = partitionRegularFiles(repoRoot, pickedArchives);
   const files = text.files;
@@ -152,8 +164,12 @@ function candidatesIn(repoRoot: string): Candidates {
   const notListed = [...walk(SOURCE_SCAN_EXTENSIONS), ...walk(ARCHIVE_SCAN_EXTENSIONS)].filter(
     (rel) => notExempt(rel) && !listed.has(rel),
   ).length;
-  const irregular = text.irregular.length + containers.irregular.length;
-  return { files, archives, subject: { source: "git", notListed, irregular } };
+  return {
+    files,
+    archives,
+    subject: { source: "git", notListed },
+    unread: [...text.irregular, ...containers.irregular],
+  };
 }
 
 function main(): void {
@@ -226,12 +242,15 @@ function main(): void {
   }
 
   if (matches.length === 0) {
-    // The clause is empty on a clean checkout, so the usual line is the usual
-    // line; it appears only when there was something to say.
-    const skipped = formatLocalOnlySkips(skippedLocal, probe);
+    // Both clauses are empty on a clean checkout, so the usual line is the
+    // usual line; each appears only when there was something to say.
+    const clauses = [
+      formatLocalOnlySkips(skippedLocal, probe),
+      formatUnreadCandidates(candidates.unread),
+    ].filter(Boolean);
     console.log(
       `${CHECK_NAME}: scanned ${files.length} file(s) plus ${entryCount} entr(ies) in ${archives.length} archive(s) from ${formatScanSubject(candidates.subject)}, no committed secrets` +
-        `${skipped ? `, ${skipped}` : ""}.`,
+        `${clauses.map((clause) => `, ${clause}`).join("")}.`,
     );
     return;
   }

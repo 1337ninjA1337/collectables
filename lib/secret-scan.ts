@@ -415,29 +415,66 @@ export function scanArchiveEntries(
  * on a working checkout it is a handful of scratch files whose names are of no
  * interest — what is of interest is the day it becomes forty.
  *
- * `irregular` is the same number in the other direction: candidates git listed
- * that are not regular files, so the scan did not read them. A tracked symlink
- * is the one that occurs in practice, and the reason it is not read is that
- * `readFileSync` would follow it out of the repository and report whatever it
- * found there as a committed credential. Counted rather than dropped in
- * silence, for the reason every other number here exists: a candidate that
- * disappears without a word is indistinguishable from one that was clean.
+ * What the listing held and the scan did NOT read is a different sentence and
+ * lives in {@link formatUnreadCandidates}: this one answers "which set", and a
+ * parenthesis that also itemises the exceptions is a line nobody finishes
+ * reading.
  */
 export type ScanSubject =
-  | { readonly source: "git"; readonly notListed: number; readonly irregular: number }
+  | { readonly source: "git"; readonly notListed: number }
   | { readonly source: "walk"; readonly reason: string };
 
 export function formatScanSubject(subject: ScanSubject): string {
   if (subject.source === "walk") {
     return `the working tree (not checked against git: ${subject.reason})`;
   }
-  // Both clauses silent at zero, so a clean checkout's pass line is the line it
-  // has always been, and each appears the day something makes it true.
-  const clauses = [
-    subject.notListed > 0 ? `${subject.notListed} working-tree file(s) not in it` : "",
-    subject.irregular > 0 ? `${subject.irregular} listed path(s) not regular files` : "",
-  ].filter(Boolean);
-  return `git's committable set${clauses.length > 0 ? ` (${clauses.join(", ")})` : ""}`;
+  const dropped =
+    subject.notListed > 0 ? ` (${subject.notListed} working-tree file(s) not in it)` : "";
+  return `git's committable set${dropped}`;
+}
+
+/**
+ * How many candidates a pass line names before it starts counting.
+ *
+ * The same number {@link LOCAL_ONLY_NAMES_SHOWN} uses next door, for the same
+ * reason: a clean run's report is one line and a checkout with two dozen
+ * oddities in it should not turn that into a paragraph.
+ */
+export const UNREAD_NAMES_SHOWN = 5;
+
+/** A candidate git listed that the scan could not read, and why not. */
+export type UnreadCandidate = { readonly rel: string; readonly kind: string };
+
+/**
+ * The clause a run appends about candidates it listed and did not read.
+ *
+ * This started as a count — `1 listed path(s) not regular files` — which is
+ * enough to notice a change and not enough to act on one. A tracked symlink
+ * with a scanned extension is an odd thing for a repository to hold, and the
+ * run that first reports one gave its reader no name to go and look at.
+ *
+ * The KIND is carried per name because the two that occur are not the same
+ * event. A symlink is a repository that uses links: normal, and the reason it
+ * is not read is that following it would report a file the repository does not
+ * contain. A path git lists that the working tree does not hold is a checkout
+ * disagreeing with its own index — a COMMITTED file this scan did not read,
+ * inside a run whose last words are "no committed secrets". Summing them would
+ * give the second the weight of the first.
+ *
+ * Empty at zero so the caller appends it without a branch, and sorted by name,
+ * because a report that reads differently on two machines is one nobody diffs.
+ * By CODE UNIT, like every other sorted list in this scan, and not by
+ * `localeCompare` — which is the locale-aware comparison whose whole job is to
+ * differ between machines, and which puts `docs/x` before `PRIVACY.md` on one
+ * and not on another.
+ */
+export function formatUnreadCandidates(unread: readonly UnreadCandidate[]): string {
+  if (unread.length === 0) return "";
+  const sorted = [...unread].sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
+  const shown = sorted.slice(0, UNREAD_NAMES_SHOWN);
+  const rest = sorted.length - shown.length;
+  const names = shown.map(({ rel, kind }) => `${rel} (${kind})`).join(", ");
+  return `${sorted.length} listed path(s) not read: ${names}${rest > 0 ? `, +${rest} more` : ""}`;
 }
 
 /**

@@ -14,9 +14,11 @@ import {
   SECRET_SKIP_FILES,
   SECRET_SKIP_FILE_REASONS,
   SOURCE_SCAN_EXTENSIONS,
+  UNREAD_NAMES_SHOWN,
   decodeBase64Url,
   formatScanSubject,
   formatSecretReport,
+  formatUnreadCandidates,
   isPrivilegedSupabaseJwt,
   redact,
   archiveEntryPath,
@@ -361,26 +363,54 @@ describe("what the source scan does not read", () => {
     // Two runs reporting identically over different sets is the failure the
     // subject line exists to prevent: "no committed secrets" means one thing
     // over git's list and another over a walk of the working tree.
-    const git = (notListed: number, irregular = 0) =>
-      formatScanSubject({ source: "git", notListed, irregular });
+    const git = (notListed: number) => formatScanSubject({ source: "git", notListed });
     assert.equal(git(0), "git's committable set");
     assert.equal(git(4), "git's committable set (4 working-tree file(s) not in it)");
     // The count is the number an ignore rule moves. Zero is silent, because a
-    // clean checkout should not carry a clause about nothing.
-    //
-    // The second count is the other direction — candidates git listed that are
-    // not regular files, which is a tracked symlink in every case that has
-    // occurred. Silent at zero on its own, and joined into ONE parenthesis when
-    // both have something to say, so the line never grows a second bracket.
-    assert.equal(git(0, 2), "git's committable set (2 listed path(s) not regular files)");
-    assert.equal(
-      git(4, 2),
-      "git's committable set (4 working-tree file(s) not in it, 2 listed path(s) not regular files)",
-    );
+    // clean checkout should not carry a clause about nothing. What the listing
+    // held and the scan did not READ is a different sentence and has its own
+    // clause — this one answers "which set", and a parenthesis that also
+    // itemises the exceptions is a line nobody finishes.
     assert.match(
       formatScanSubject({ source: "walk", reason: "not a git repository" }),
       /^the working tree \(not checked against git: not a git repository\)$/,
     );
+  });
+
+  it("names the listed candidates it did not read, and why not, and then counts", () => {
+    // A count alone — `1 listed path(s) not regular files`, which is what this
+    // clause replaced — is enough to notice a change and not enough to act on
+    // one: a tracked symlink with a scanned extension is an odd thing for a
+    // repository to hold, and the run reporting one gave no name to look at.
+    assert.equal(formatUnreadCandidates([]), "");
+    assert.equal(
+      formatUnreadCandidates([{ rel: "docs/link.md", kind: "not a regular file" }]),
+      "1 listed path(s) not read: docs/link.md (not a regular file)",
+    );
+    // The two kinds are not the same event, so they are carried per name
+    // rather than summed. A symlink is a repository that uses links; a path
+    // git lists and the working tree does not hold is a COMMITTED file this
+    // scan did not read, inside a run whose last words are "no committed
+    // secrets".
+    assert.equal(
+      formatUnreadCandidates([
+        { rel: "docs/link.md", kind: "not a regular file" },
+        { rel: "PRIVACY.md", kind: "missing from the working tree" },
+      ]),
+      "2 listed path(s) not read: PRIVACY.md (missing from the working tree), " +
+        "docs/link.md (not a regular file)",
+    );
+    // Sorted by name, and the tail is COUNTED rather than dropped: a clause
+    // that quietly stops naming what it skipped is the silence it exists to
+    // end. Same five as the local-only clause next door.
+    const many = Array.from({ length: UNREAD_NAMES_SHOWN + 2 }, (_, i) => ({
+      rel: `docs/l${String(i)}.md`,
+      kind: "not a regular file",
+    }));
+    const line = formatUnreadCandidates(many);
+    assert.match(line, /^7 listed path\(s\) not read: docs\/l0\.md /);
+    assert.match(line, /, \+2 more$/);
+    assert.doesNotMatch(line, /docs\/l5\.md/);
   });
 
   it("counts archives toward the floor, which no run can demonstrate", () => {
