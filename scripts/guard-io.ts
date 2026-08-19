@@ -134,6 +134,36 @@ export function listFilesUnder(
 }
 
 /**
+ * The same two filters {@link listFilesUnder} applies, over a list somebody
+ * else produced.
+ *
+ * A scan can get its candidates from a walk or from `git ls-files`, and the
+ * two must agree on WHICH of the candidates it reads — extension in the set,
+ * no path segment in the skip list. Written once here rather than inline at
+ * the second source, because "the walk skips `.git/` and the git listing does
+ * not" is precisely the kind of disagreement that is invisible in a green run.
+ *
+ * Segments rather than a prefix test: `skipDirs` names directories WHEREVER
+ * they appear, which is the same rule the walk applies by never descending.
+ * The last segment is the file, so it is not consulted — a file called `dist`
+ * is a file.
+ */
+export function selectPaths(
+  paths: readonly string[],
+  options: { readonly extensions?: Iterable<string>; readonly skipDirs?: Iterable<string> },
+): string[] {
+  const extensions = options.extensions === undefined ? null : new Set(options.extensions);
+  const skipDirs = new Set(options.skipDirs ?? []);
+  return paths
+    .filter((rel) => {
+      const segments = rel.split(/[\\/]/);
+      if (segments.slice(0, -1).some((segment) => skipDirs.has(segment))) return false;
+      return extensions === null || extensions.has(path.extname(rel).toLowerCase());
+    })
+    .sort();
+}
+
+/**
  * Every source file under the given directories, repo-relative and sorted.
  *
  * Five guards had written this walk out, under three names and with four

@@ -29,11 +29,11 @@ import {
   partitionLocalOnly,
   type LocalOnlyTrackedProbe,
 } from "../lib/local-only";
-import { trackedAmong } from "./git-io";
+import { listCommittable, trackedAmong } from "./git-io";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 import { decodeZipEntryText, readZipEntries } from "../lib/zip-archive";
-import { guardScanRoot, listFilesUnder } from "./guard-io";
+import { guardScanRoot, listFilesUnder, selectPaths } from "./guard-io";
 
 const CHECK_NAME = "check-secrets";
 const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
@@ -75,23 +75,59 @@ function probeTracked(root: string, skipped: readonly string[]): LocalOnlyTracke
     : { asked: false, reason: `not checked against git: ${answer.reason}` };
 }
 
+/**
+ * The candidates, from git when git can answer and from a walk when it cannot.
+ *
+ * This guard's report says "no committed secrets", and a walk of the working
+ * tree is not that set: it reads a scratch `notes.md` with a pasted key, an
+ * editor backup, a half-finished migration — none of them committable, all of
+ * them reported with the same severity as a file in the index. `git ls-files
+ * --cached --others --exclude-standard` is the set the sentence is about, and
+ * it keeps the half that matters most: a file created a minute ago and not yet
+ * added is one `git add -A` away from being committed, so it stays in scope.
+ *
+ * The fallback is not a fallback for exotic cases. Every guard fixture under
+ * `__tests__/helpers/guard-fixture.ts` is a temp directory with no `.git`
+ * anywhere above it, and an export of this repository unpacked from a tarball
+ * is another; a guard that refused to run outside git would be a guard its own
+ * harness could not exercise. So the walk stays, and the run SAYS which of the
+ * two it used — the alternative is two scans that report identically over
+ * different sets.
+ */
+type Candidates = {
+  readonly files: string[];
+  readonly archives: string[];
+  /** How the pass line describes what it looked at. */
+  readonly subject: string;
+};
+
+function candidatesIn(repoRoot: string): Candidates {
+  const committable = listCommittable(repoRoot);
+  const pick = (extensions: readonly string[]): string[] =>
+    committable.ok
+      ? selectPaths(committable.files, { extensions, skipDirs: SECRET_SKIP_DIRS })
+      : listFilesUnder(repoRoot, { extensions, skipDirs: SECRET_SKIP_DIRS });
+  return {
+    // The skip list is applied after the listing rather than inside it: it
+    // names FILES, and a walk that knows about individual files is a walk with
+    // a second rule in it.
+    files: pick(SOURCE_SCAN_EXTENSIONS).filter(notExempt),
+    // The containers, listed separately because what happens to them is
+    // different: they are opened and their entries decoded, rather than read
+    // as one string. Same skip list, since it names files and an archive is
+    // one.
+    archives: pick(ARCHIVE_SCAN_EXTENSIONS).filter(notExempt),
+    subject: committable.ok
+      ? "git's committable set"
+      : `the working tree (not checked against git: ${committable.reason})`,
+  };
+}
+
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
-  // The skip list is applied after the walk rather than inside it: it names
-  // FILES, and a walk that knows about individual files is a walk with a
-  // second rule in it.
-  const walkedFiles = listFilesUnder(repoRoot, {
-    extensions: SOURCE_SCAN_EXTENSIONS,
-    skipDirs: SECRET_SKIP_DIRS,
-  }).filter(notExempt);
-
-  // The containers, walked separately because what happens to them is
-  // different: they are opened and their entries decoded, rather than read as
-  // one string. Same skip list, since it names files and an archive is one.
-  const walkedArchives = listFilesUnder(repoRoot, {
-    extensions: ARCHIVE_SCAN_EXTENSIONS,
-    skipDirs: SECRET_SKIP_DIRS,
-  }).filter(notExempt);
+  const candidates = candidatesIn(repoRoot);
+  const walkedFiles = candidates.files;
+  const walkedArchives = candidates.archives;
 
   const text = partitionLocalOnly(walkedFiles);
   const containers = partitionLocalOnly(walkedArchives);
@@ -161,7 +197,7 @@ function main(): void {
     // line; it appears only when there was something to say.
     const skipped = formatLocalOnlySkips(skippedLocal, probe);
     console.log(
-      `${CHECK_NAME}: scanned ${files.length} file(s) plus ${entryCount} entr(ies) in ${archives.length} archive(s), no committed secrets` +
+      `${CHECK_NAME}: scanned ${files.length} file(s) plus ${entryCount} entr(ies) in ${archives.length} archive(s) from ${candidates.subject}, no committed secrets` +
         `${skipped ? `, ${skipped}` : ""}.`,
     );
     return;

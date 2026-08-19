@@ -63,6 +63,36 @@ export function runGit(cwd: string, args: readonly string[]): GitAnswer {
  * would return the ENTIRE index, which is the difference between "none of
  * these are tracked" and "everything is".
  */
+/**
+ * Every file in `cwd` that git would take: tracked, plus untracked ones no
+ * ignore rule covers.
+ *
+ * This is the set a scan reporting on "committed secrets" is actually about.
+ * A walk of the working tree is a different set in both directions — it reads
+ * a scratch `notes.md`, an editor backup and a half-finished migration, none of
+ * which can be committed, and it reads them with the same severity as a file in
+ * the index. `--others` keeps the half that matters: a file created a minute ago
+ * and not yet added is one `git add -A` from being committed, so it stays in
+ * scope. `--exclude-standard` is what drops the rest.
+ *
+ * `-z` because git QUOTES unusual names otherwise (`"a\nb.ts"`), and a scan
+ * that opens the quoted spelling reads nothing and reports nothing.
+ *
+ * Deduplicated: during a merge conflict `--cached` lists a path once per stage,
+ * which would otherwise scan the same file three times and count it three times
+ * toward the floor.
+ */
+export type CommittableAnswer =
+  | { readonly ok: true; readonly files: readonly string[] }
+  | { readonly ok: false; readonly reason: string };
+
+export function listCommittable(cwd: string): CommittableAnswer {
+  const answer = runGit(cwd, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"]);
+  if (!answer.ok) return { ok: false, reason: answer.reason };
+  const unique = new Set(answer.stdout.split("\0").filter(Boolean));
+  return { ok: true, files: [...unique].sort() };
+}
+
 export type TrackedAnswer =
   | { readonly ok: true; readonly tracked: readonly string[] }
   | { readonly ok: false; readonly reason: string };

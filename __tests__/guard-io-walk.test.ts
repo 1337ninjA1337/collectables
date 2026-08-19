@@ -340,12 +340,17 @@ describe("the two widest walks say what they skip", () => {
     }
   });
 
-  it("keeps the file-level skips out of the walk", () => {
+  it("keeps the file-level skips out of the listing", () => {
     // `SKIP_FILES` names the matcher's own fixtures, which is a rule about
-    // FILES; applying it after the walk keeps the walk about directories and
+    // FILES; applying it after the listing keeps the walk about directories and
     // extensions, and keeps a second rule from hiding inside a recursion.
+    //
+    // "the listing" rather than "the walk", because `check-secrets` has two
+    // candidate sources now — git's committable set when git can answer, the
+    // walk when it cannot — and both go through one `pick`, so the exemption
+    // is applied to its RESULT and cannot end up on one source only.
     const source = readRepoFile("scripts/check-secrets.ts");
-    assert.match(source, /listFilesUnder\(repoRoot, \{[\s\S]*?\}\)\.filter\(/);
+    assert.match(source, /pick\([A-Z_]+\)\.filter\(notExempt\)/);
     assert.match(source, /SKIP_FILES\.has\(path\.normalize\(rel\)\)/);
   });
 });
