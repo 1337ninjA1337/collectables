@@ -20,6 +20,8 @@ import {
   SECRET_SKIP_DIRS,
   SECRET_SKIP_FILES,
   SOURCE_SCAN_EXTENSIONS,
+  formatScanSubject,
+  type ScanSubject,
   type SecretMatch,
 } from "../lib/secret-scan";
 import {
@@ -97,30 +99,39 @@ function probeTracked(root: string, skipped: readonly string[]): LocalOnlyTracke
 type Candidates = {
   readonly files: string[];
   readonly archives: string[];
-  /** How the pass line describes what it looked at. */
-  readonly subject: string;
+  /** Which set the pass line says it read, and what git's list left out. */
+  readonly subject: ScanSubject;
 };
 
 function candidatesIn(repoRoot: string): Candidates {
   const committable = listCommittable(repoRoot);
+  const walk = (extensions: readonly string[]): string[] =>
+    listFilesUnder(repoRoot, { extensions, skipDirs: SECRET_SKIP_DIRS });
   const pick = (extensions: readonly string[]): string[] =>
     committable.ok
       ? selectPaths(committable.files, { extensions, skipDirs: SECRET_SKIP_DIRS })
-      : listFilesUnder(repoRoot, { extensions, skipDirs: SECRET_SKIP_DIRS });
-  return {
-    // The skip list is applied after the listing rather than inside it: it
-    // names FILES, and a walk that knows about individual files is a walk with
-    // a second rule in it.
-    files: pick(SOURCE_SCAN_EXTENSIONS).filter(notExempt),
-    // The containers, listed separately because what happens to them is
-    // different: they are opened and their entries decoded, rather than read
-    // as one string. Same skip list, since it names files and an archive is
-    // one.
-    archives: pick(ARCHIVE_SCAN_EXTENSIONS).filter(notExempt),
-    subject: committable.ok
-      ? "git's committable set"
-      : `the working tree (not checked against git: ${committable.reason})`,
-  };
+      : walk(extensions);
+  // The skip list is applied after the listing rather than inside it: it names
+  // FILES, and a walk that knows about individual files is a walk with a second
+  // rule in it.
+  const files = pick(SOURCE_SCAN_EXTENSIONS).filter(notExempt);
+  // The containers, listed separately because what happens to them is
+  // different: they are opened and their entries decoded, rather than read as
+  // one string. Same skip list, since it names files and an archive is one.
+  const archives = pick(ARCHIVE_SCAN_EXTENSIONS).filter(notExempt);
+  if (!committable.ok) {
+    return { files, archives, subject: { source: "walk", reason: committable.reason } };
+  }
+  // The walk is run a second time under git, purely to COUNT what git's list
+  // left out. It costs one traversal of a tree the skip list has already
+  // narrowed to a few hundred entries, and it buys the only number that moves
+  // when an ignore rule starts covering something real — without it, the run
+  // that introduces such a rule reads exactly like the run before it.
+  const listed = new Set([...files, ...archives]);
+  const notListed = [...walk(SOURCE_SCAN_EXTENSIONS), ...walk(ARCHIVE_SCAN_EXTENSIONS)].filter(
+    (rel) => notExempt(rel) && !listed.has(rel),
+  ).length;
+  return { files, archives, subject: { source: "git", notListed } };
 }
 
 function main(): void {
@@ -197,7 +208,7 @@ function main(): void {
     // line; it appears only when there was something to say.
     const skipped = formatLocalOnlySkips(skippedLocal, probe);
     console.log(
-      `${CHECK_NAME}: scanned ${files.length} file(s) plus ${entryCount} entr(ies) in ${archives.length} archive(s) from ${candidates.subject}, no committed secrets` +
+      `${CHECK_NAME}: scanned ${files.length} file(s) plus ${entryCount} entr(ies) in ${archives.length} archive(s) from ${formatScanSubject(candidates.subject)}, no committed secrets` +
         `${skipped ? `, ${skipped}` : ""}.`,
     );
     return;

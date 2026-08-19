@@ -15,6 +15,7 @@ import {
   SECRET_SKIP_FILE_REASONS,
   SOURCE_SCAN_EXTENSIONS,
   decodeBase64Url,
+  formatScanSubject,
   formatSecretReport,
   isPrivilegedSupabaseJwt,
   redact,
@@ -354,6 +355,23 @@ describe("what the source scan does not read", () => {
       decoded[name] = decodeZipEntryText(data);
     }
     assert.equal(scanArchiveEntries("x.pbit", decoded)[0]?.ruleId, "aws-access-key-id");
+  });
+
+  it("names which set of files a run examined, and what git's list left out", () => {
+    // Two runs reporting identically over different sets is the failure the
+    // subject line exists to prevent: "no committed secrets" means one thing
+    // over git's list and another over a walk of the working tree.
+    assert.equal(formatScanSubject({ source: "git", notListed: 0 }), "git's committable set");
+    assert.equal(
+      formatScanSubject({ source: "git", notListed: 4 }),
+      "git's committable set (4 working-tree file(s) not in it)",
+    );
+    // The count is the number an ignore rule moves. Zero is silent, because a
+    // clean checkout should not carry a clause about nothing.
+    assert.match(
+      formatScanSubject({ source: "walk", reason: "not a git repository" }),
+      /^the working tree \(not checked against git: not a git repository\)$/,
+    );
   });
 
   it("counts archives toward the floor, which no run can demonstrate", () => {

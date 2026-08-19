@@ -399,6 +399,36 @@ export function scanArchiveEntries(
 }
 
 /**
+ * Which set of files a run examined, in the run's own words.
+ *
+ * The report ends "no committed secrets" and there are two sets it can mean:
+ * git's committable list (tracked plus untracked-and-not-ignored) when git can
+ * answer, and a walk of the working tree when it cannot. Two runs reporting
+ * identically over different sets is the failure this whole line of work is
+ * about, so the sentence names which one — and, under git, how many candidates
+ * the working tree held that git's list did not.
+ *
+ * That number is the one an ignore rule moves. `*.local.*` is meant to move it
+ * and does; a `.gitignore` line that quietly takes a real directory out of the
+ * scan moves it too, and without a count the run that introduced it looks
+ * exactly like the run before. Reported as a COUNT rather than a list because
+ * on a working checkout it is a handful of scratch files whose names are of no
+ * interest — what is of interest is the day it becomes forty.
+ */
+export type ScanSubject =
+  | { readonly source: "git"; readonly notListed: number }
+  | { readonly source: "walk"; readonly reason: string };
+
+export function formatScanSubject(subject: ScanSubject): string {
+  if (subject.source === "walk") {
+    return `the working tree (not checked against git: ${subject.reason})`;
+  }
+  const dropped =
+    subject.notListed > 0 ? ` (${subject.notListed} working-tree file(s) not in it)` : "";
+  return `git's committable set${dropped}`;
+}
+
+/**
  * Format a list of matches as a human-readable error message. Returns an
  * empty string when there are no matches so callers can short-circuit.
  */

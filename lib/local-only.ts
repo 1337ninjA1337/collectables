@@ -17,6 +17,20 @@
  * `NEVER_WALKED` had before `lib/source-dirs.ts`: one rule written out twice,
  * drifting at the point where nobody looks.
  *
+ * Where this rule is load-bearing is worth stating, because it changed and the
+ * code does not show it. `check-secrets` takes its candidates from `git
+ * ls-files --cached --others --exclude-standard` when git can answer, and that
+ * listing already drops everything `.gitignore` covers — so on a normal
+ * checkout {@link partitionLocalOnly} removes nothing and the pass line's skip
+ * clause never appears. The rule carries the whole weight in the WALK
+ * fallback: a tarball export, a scratch fixture root, a checkout with no git
+ * binary. That is not dead code and neither is the clause; they are the half of
+ * the guard that runs where git cannot be asked.
+ *
+ * {@link formatTrackedLocalOnly} is the opposite — it matters MORE under the
+ * git listing, because a force-added `.local.` file is IN that listing, and the
+ * only reason it is not scanned is this rule removing it again.
+ *
  * Pure: no filesystem, no `node:` imports, so a suite can take it and so can a
  * guard wrapper. Whether git really ignores the pattern is not something this
  * module can know — that is asserted in `__tests__/local-only.test.ts`, which

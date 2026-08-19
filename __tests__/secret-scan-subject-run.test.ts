@@ -76,6 +76,10 @@ describe("check-secrets, and the set it says it is about", () => {
     );
     assert.match(run.output, /from git's committable set/);
     assert.doesNotMatch(run.output, /aws-access-key-id/);
+    // And it counts what it left out. Without this number, the run that
+    // introduces an ignore rule covering something real reads exactly like the
+    // run before it — one file here, `notes.md`, is the whole point.
+    assert.match(run.output, /\(1 working-tree file\(s\) not in it\)/);
   });
 
   it("still reads a file that is merely untracked, which is one `add` from committed", () => {
