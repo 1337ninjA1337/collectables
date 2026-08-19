@@ -35,7 +35,7 @@ import { listCommittable, trackedAmong } from "./git-io";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 import { decodeZipEntryText, readZipEntries } from "../lib/zip-archive";
-import { guardScanRoot, listFilesUnder, selectPaths } from "./guard-io";
+import { guardScanRoot, listFilesUnder, partitionRegularFiles, selectPaths } from "./guard-io";
 
 const CHECK_NAME = "check-secrets";
 const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
@@ -99,7 +99,10 @@ function probeTracked(root: string, skipped: readonly string[]): LocalOnlyTracke
 type Candidates = {
   readonly files: string[];
   readonly archives: string[];
-  /** Which set the pass line says it read, and what git's list left out. */
+  /**
+   * Which set the pass line says it read, what git's list left out, and what
+   * was in git's list without being a file this scan can read.
+   */
   readonly subject: ScanSubject;
 };
 
@@ -114,24 +117,43 @@ function candidatesIn(repoRoot: string): Candidates {
   // The skip list is applied after the listing rather than inside it: it names
   // FILES, and a walk that knows about individual files is a walk with a second
   // rule in it.
-  const files = pick(SOURCE_SCAN_EXTENSIONS).filter(notExempt);
+  const picked = pick(SOURCE_SCAN_EXTENSIONS).filter(notExempt);
   // The containers, listed separately because what happens to them is
   // different: they are opened and their entries decoded, rather than read as
   // one string. Same skip list, since it names files and an archive is one.
-  const archives = pick(ARCHIVE_SCAN_EXTENSIONS).filter(notExempt);
+  const pickedArchives = pick(ARCHIVE_SCAN_EXTENSIONS).filter(notExempt);
   if (!committable.ok) {
-    return { files, archives, subject: { source: "walk", reason: committable.reason } };
+    return {
+      files: picked,
+      archives: pickedArchives,
+      subject: { source: "walk", reason: committable.reason },
+    };
   }
+  // The walk answers this by construction — `entry.isFile()` on every entry it
+  // meets — and a list from `git ls-files` has never been asked. A tracked
+  // symlink is in that list, and reading one follows it: out of the scan root
+  // if it points there, with whatever it finds reported at the LINK's path as
+  // a credential this repository committed. So the same question is put to the
+  // listed candidates, and the count of what it removed goes in the pass line.
+  const text = partitionRegularFiles(repoRoot, picked);
+  const containers = partitionRegularFiles(repoRoot, pickedArchives);
+  const files = text.files;
+  const archives = containers.files;
   // The walk is run a second time under git, purely to COUNT what git's list
   // left out. It costs one traversal of a tree the skip list has already
   // narrowed to a few hundred entries, and it buys the only number that moves
   // when an ignore rule starts covering something real — without it, the run
   // that introduces such a rule reads exactly like the run before it.
-  const listed = new Set([...files, ...archives]);
+  // Built from the picked lists rather than the scanned ones, so the two
+  // numbers stay about two different things: a symlink is in git's list and
+  // never in the walk, and counting it here as well would report it twice
+  // under two names.
+  const listed = new Set([...picked, ...pickedArchives]);
   const notListed = [...walk(SOURCE_SCAN_EXTENSIONS), ...walk(ARCHIVE_SCAN_EXTENSIONS)].filter(
     (rel) => notExempt(rel) && !listed.has(rel),
   ).length;
-  return { files, archives, subject: { source: "git", notListed } };
+  const irregular = text.irregular.length + containers.irregular.length;
+  return { files, archives, subject: { source: "git", notListed, irregular } };
 }
 
 function main(): void {

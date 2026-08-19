@@ -164,6 +164,48 @@ export function selectPaths(
 }
 
 /**
+ * Which of `paths` are REGULAR files, and which are something else.
+ *
+ * The other half of the agreement {@link selectPaths} exists for, and the half
+ * it cannot make: name and extension are decidable from the string, and
+ * "symlink or not" is a question for the disk. {@link listFilesUnder} asks it
+ * on every entry it walks (`entry.isFile()`, which is false for a symlink, a
+ * fifo and a socket alike), so a candidate list from `git ls-files` that skips
+ * the question does not agree with the walk — it is WIDER, in the one direction
+ * that leaves the scan reading files the repository does not contain.
+ *
+ * A tracked symlink is the case that matters. Git commits its TARGET PATH, a
+ * few dozen bytes; `readFileSync` follows it, so a scan handed `docs/link.md`
+ * reads whatever it points at — a file elsewhere in the tree, or `../../../
+ * secrets/real.env`, or anything at all outside the root the guard was told to
+ * scan. What comes back is reported at the link's path, as a credential this
+ * repository committed, which it did not.
+ *
+ * `lstat` rather than `stat`, since following the link is the thing being
+ * avoided. Anything that cannot be stat'd at all — a path git holds and the
+ * working tree does not, a dangling link, a race with a checkout — is
+ * irregular too: not a file this scan can read, and not one it should be
+ * silent about.
+ */
+export function partitionRegularFiles(
+  root: string,
+  paths: readonly string[],
+): { files: string[]; irregular: string[] } {
+  const files: string[] = [];
+  const irregular: string[] = [];
+  for (const rel of paths) {
+    let regular = false;
+    try {
+      regular = fs.lstatSync(path.join(root, rel)).isFile();
+    } catch {
+      regular = false;
+    }
+    (regular ? files : irregular).push(rel);
+  }
+  return { files, irregular };
+}
+
+/**
  * Every source file under the given directories, repo-relative and sorted.
  *
  * Five guards had written this walk out, under three names and with four

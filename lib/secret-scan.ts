@@ -414,18 +414,30 @@ export function scanArchiveEntries(
  * exactly like the run before. Reported as a COUNT rather than a list because
  * on a working checkout it is a handful of scratch files whose names are of no
  * interest — what is of interest is the day it becomes forty.
+ *
+ * `irregular` is the same number in the other direction: candidates git listed
+ * that are not regular files, so the scan did not read them. A tracked symlink
+ * is the one that occurs in practice, and the reason it is not read is that
+ * `readFileSync` would follow it out of the repository and report whatever it
+ * found there as a committed credential. Counted rather than dropped in
+ * silence, for the reason every other number here exists: a candidate that
+ * disappears without a word is indistinguishable from one that was clean.
  */
 export type ScanSubject =
-  | { readonly source: "git"; readonly notListed: number }
+  | { readonly source: "git"; readonly notListed: number; readonly irregular: number }
   | { readonly source: "walk"; readonly reason: string };
 
 export function formatScanSubject(subject: ScanSubject): string {
   if (subject.source === "walk") {
     return `the working tree (not checked against git: ${subject.reason})`;
   }
-  const dropped =
-    subject.notListed > 0 ? ` (${subject.notListed} working-tree file(s) not in it)` : "";
-  return `git's committable set${dropped}`;
+  // Both clauses silent at zero, so a clean checkout's pass line is the line it
+  // has always been, and each appears the day something makes it true.
+  const clauses = [
+    subject.notListed > 0 ? `${subject.notListed} working-tree file(s) not in it` : "",
+    subject.irregular > 0 ? `${subject.irregular} listed path(s) not regular files` : "",
+  ].filter(Boolean);
+  return `git's committable set${clauses.length > 0 ? ` (${clauses.join(", ")})` : ""}`;
 }
 
 /**

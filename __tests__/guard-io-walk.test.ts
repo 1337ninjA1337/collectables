@@ -17,7 +17,12 @@ import { SECRET_SKIP_DIRS } from "@/lib/secret-scan";
 
 import { readRepoFile, REPO_ROOT } from "./helpers/repo-file";
 import { sourceFiles, tsxFiles } from "./helpers/source-files";
-import { listFilesUnder, listSourceFiles } from "../scripts/guard-io";
+import {
+  listFilesUnder,
+  listSourceFiles,
+  partitionRegularFiles,
+  selectPaths,
+} from "../scripts/guard-io";
 
 /**
  * `scripts/guard-io.ts`'s two walks, against a tree built for the purpose.
@@ -184,6 +189,87 @@ describe("listFilesUnder", () => {
       }),
       [],
     );
+  });
+});
+
+describe("partitionRegularFiles", () => {
+  /**
+   * The half of the walk's answer a list of names cannot carry.
+   *
+   * `selectPaths` applies the two decidable filters — extension, skip-list
+   * segment — to candidates from `git ls-files`, and the walk applies a third
+   * that is not in the string: `entry.isFile()`. Nothing asked it of the git
+   * listing, so a tracked symlink went into a scan that reads with
+   * `readFileSync`, which follows it.
+   */
+  it("keeps a regular file and drops a symlink, wherever it points", () => {
+    const root = fixture();
+    try {
+      symlinkSync(path.join(root, "app", "helpers.ts"), path.join(root, "app", "inside.ts"));
+      symlinkSync(path.join(root, "..", "elsewhere.ts"), path.join(root, "app", "outside.ts"));
+    } catch {
+      // Same privilege caveat as the walk's own symlink case: bail rather than
+      // assert something this is not about.
+      rmSync(root, { recursive: true, force: true });
+      return;
+    }
+    try {
+      const answer = partitionRegularFiles(path.join(root, "app"), [
+        "helpers.ts",
+        "inside.ts",
+        "outside.ts",
+      ]);
+      assert.deepEqual(answer.files, ["helpers.ts"]);
+      // A link into the tree is dropped for the same reason as one pointing
+      // out of it: the target is walked on its own if it is in scope, and
+      // reading it through the link too reports one credential twice, at a
+      // path the repository never committed it to. Where it points is not the
+      // question — that it is not a file is.
+      assert.deepEqual(answer.irregular, ["inside.ts", "outside.ts"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("treats a path that is not there, and a directory, as irregular", () => {
+    // Git lists what the INDEX holds, which is not always what the working
+    // tree holds — a mid-checkout race, a file deleted on disk and not yet
+    // staged. `lstat` throwing is an answer here, not an error: not a file
+    // this scan can read, and not one it should be silent about.
+    const root = fixture();
+    try {
+      const answer = partitionRegularFiles(root, ["app/helpers.ts", "app/weird.ts", "gone.ts"]);
+      assert.deepEqual(answer.files, ["app/helpers.ts"]);
+      assert.deepEqual(answer.irregular, ["app/weird.ts", "gone.ts"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("brings the listing's answer back to the walk's, over the same tree", () => {
+    // The claim the two halves exist to keep true, asserted as an equality
+    // rather than as two separate behaviours: whatever a candidate list holds,
+    // the filters applied to it must select what the walk selects. A symlink
+    // with a scanned extension is the one entry that made them differ.
+    const root = fixture();
+    try {
+      symlinkSync(path.join(root, "app", "helpers.ts"), path.join(root, "app", "linked.ts"));
+    } catch {
+      rmSync(root, { recursive: true, force: true });
+      return;
+    }
+    try {
+      const app = path.join(root, "app");
+      const walked = listFilesUnder(app, { extensions: SOURCE_EXTENSIONS });
+      // What git would hand over: everything in the tree, link included, with
+      // no opinion about what kind of thing each name is.
+      const listed = [...walked, "linked.ts", "LICENSE", "notes.md"];
+      const selected = selectPaths(listed, { extensions: SOURCE_EXTENSIONS });
+      assert.ok(selected.includes("linked.ts"), "the name filters alone cannot drop a symlink");
+      assert.deepEqual(partitionRegularFiles(app, selected).files, walked);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
