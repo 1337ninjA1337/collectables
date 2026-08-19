@@ -44,6 +44,15 @@ function repoWithForcedLocal(): string {
   return dir;
 }
 
+/** The same repository with `staged.local.m` in the index and not in HEAD. */
+function repoWithStagedLocal(): string {
+  const dir = tempDir("git-io-staged-");
+  fs.writeFileSync(path.join(dir, "staged.local.m"), "Host = \"db.example.invalid\"\n");
+  fs.writeFileSync(path.join(dir, "untracked.local.m"), "Host = \"db.example.invalid\"\n");
+  initGitRoot(dir, "*.local.*\n", { stage: ["staged.local.m"] });
+  return dir;
+}
+
 describe("asking git, from a guard", () => {
   it("answers with stdout when git ran", () => {
     const answer = runGit(REPO_ROOT, ["rev-parse", "--is-inside-work-tree"]);
@@ -69,6 +78,17 @@ describe("asking git, from a guard", () => {
     ]);
     assert.ok(answer.ok);
     assert.deepEqual(answer.ok && answer.tracked, ["tracked.local.m"]);
+  });
+
+  it("counts a file that is staged and not committed as tracked", () => {
+    // The state between the two the other cases build, and the one a developer
+    // is in a minute after force-adding by mistake. `git ls-files` reads the
+    // INDEX, so the answer is the same as for a committed file — which is the
+    // premise `formatTrackedLocalOnly`'s refusal rests on and which nothing
+    // asserted, because no fixture could produce this state.
+    const answer = trackedAmong(repoWithStagedLocal(), ["staged.local.m", "untracked.local.m"]);
+    assert.ok(answer.ok);
+    assert.deepEqual(answer.ok && answer.tracked, ["staged.local.m"]);
   });
 
   it("never asks bare `ls-files`, which would answer with the whole index", () => {
@@ -166,6 +186,37 @@ describe("the scratch repository these cases ask about", () => {
       ".gitignore",
       "tracked.local.m",
     ]);
+  });
+
+  it("puts `stage` paths in the index and leaves them out of HEAD", () => {
+    const dir = repoWithStagedLocal();
+    const head = spawnSync("git", ["ls-tree", "-r", "--name-only", "HEAD"], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(head.status, 0, `git ls-tree failed: ${head.stderr}`);
+    // Only `.gitignore` was committed — so the case above is about the index
+    // and not about a second spelling of `forceAdd`.
+    assert.deepEqual(head.stdout.split("\n").filter(Boolean), [".gitignore"]);
+    const committable = listCommittable(dir);
+    assert.ok(committable.ok);
+    assert.ok(
+      (committable.ok ? committable.files : []).includes("staged.local.m"),
+      "an ignored file in the index is committable and must stay in the candidate set",
+    );
+  });
+
+  it("refuses one path named as both committed and staged", () => {
+    // Two different states asked for at once. Committing and then re-adding is
+    // the committed state, so silently picking it would hand a case a fixture
+    // it did not ask for.
+    const dir = tempDir("git-io-both-");
+    fs.writeFileSync(path.join(dir, "x.local.m"), "Host = \"db.example.invalid\"\n");
+    assert.throws(
+      () => initGitRoot(dir, "*.local.*\n", { forceAdd: ["x.local.m"], stage: ["x.local.m"] }),
+      (error: unknown) =>
+        error instanceof GitFixtureError && /both `forceAdd` and `stage`/.test(error.message),
+    );
   });
 
   it("refuses a force-added path that does not exist, and says which", () => {
