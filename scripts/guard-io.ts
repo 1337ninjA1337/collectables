@@ -186,21 +186,36 @@ export function selectPaths(
  * working tree does not, a dangling link, a race with a checkout — is
  * irregular too: not a file this scan can read, and not one it should be
  * silent about.
+ *
+ * Those last two are one number and two events, which is why each one carries
+ * its reason. A symlink is a repository that uses links, and normal. A path
+ * git lists that is NOT on disk is a checkout that disagrees with its own
+ * index — a committed file this scan did not read, reported by a run that
+ * otherwise says it read the committed set. The second deserves more alarm
+ * than the first, and a single count gives them the same.
  */
+export type IrregularKind = "not a regular file" | "missing from the working tree";
+export type IrregularPath = { readonly rel: string; readonly kind: IrregularKind };
+
 export function partitionRegularFiles(
   root: string,
   paths: readonly string[],
-): { files: string[]; irregular: string[] } {
+): { files: string[]; irregular: IrregularPath[] } {
   const files: string[] = [];
-  const irregular: string[] = [];
+  const irregular: IrregularPath[] = [];
   for (const rel of paths) {
-    let regular = false;
+    let kind: IrregularKind | null = null;
     try {
-      regular = fs.lstatSync(path.join(root, rel)).isFile();
+      if (!fs.lstatSync(path.join(root, rel)).isFile()) kind = "not a regular file";
     } catch {
-      regular = false;
+      // Every errno lands here — `ENOENT` for the state this is about, and
+      // `EACCES` or `ELOOP` for a root the guard cannot traverse. All of them
+      // mean the same thing to a scan: git named this path and the working
+      // tree did not produce it.
+      kind = "missing from the working tree";
     }
-    (regular ? files : irregular).push(rel);
+    if (kind === null) files.push(rel);
+    else irregular.push({ rel, kind });
   }
   return { files, irregular };
 }
