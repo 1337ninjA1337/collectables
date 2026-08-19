@@ -361,13 +361,22 @@ describe("what the source scan does not read", () => {
     // Two runs reporting identically over different sets is the failure the
     // subject line exists to prevent: "no committed secrets" means one thing
     // over git's list and another over a walk of the working tree.
-    assert.equal(formatScanSubject({ source: "git", notListed: 0 }), "git's committable set");
-    assert.equal(
-      formatScanSubject({ source: "git", notListed: 4 }),
-      "git's committable set (4 working-tree file(s) not in it)",
-    );
+    const git = (notListed: number, irregular = 0) =>
+      formatScanSubject({ source: "git", notListed, irregular });
+    assert.equal(git(0), "git's committable set");
+    assert.equal(git(4), "git's committable set (4 working-tree file(s) not in it)");
     // The count is the number an ignore rule moves. Zero is silent, because a
     // clean checkout should not carry a clause about nothing.
+    //
+    // The second count is the other direction — candidates git listed that are
+    // not regular files, which is a tracked symlink in every case that has
+    // occurred. Silent at zero on its own, and joined into ONE parenthesis when
+    // both have something to say, so the line never grows a second bracket.
+    assert.equal(git(0, 2), "git's committable set (2 listed path(s) not regular files)");
+    assert.equal(
+      git(4, 2),
+      "git's committable set (4 working-tree file(s) not in it, 2 listed path(s) not regular files)",
+    );
     assert.match(
       formatScanSubject({ source: "walk", reason: "not a git repository" }),
       /^the working tree \(not checked against git: not a git repository\)$/,

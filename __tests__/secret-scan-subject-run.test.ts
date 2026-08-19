@@ -1,5 +1,10 @@
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
+import * as fs from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import * as path from "node:path";
+
 import { LINT_GUARDS } from "@/lib/lint-guards";
 
 import {
@@ -114,6 +119,47 @@ describe("check-secrets, and the set it says it is about", () => {
     // And the count clause stays silent at zero: git left nothing out, so there
     // is nothing for the pass line to say about it.
     assert.doesNotMatch(asked.output, /working-tree file\(s\) not in it/);
+  });
+
+  it("does not read through a tracked symlink, and says how many it left", () => {
+    assert.ok(GUARD);
+    // The one entry the two candidate sources disagreed about. The walk never
+    // returns a symlink (`entry.isFile()` is false for one); `git ls-files`
+    // lists it, because git tracks it — as its TARGET PATH, a few dozen bytes.
+    // `readFileSync` follows it, so before this the scan read whatever the link
+    // pointed at and reported it at the LINK's path, as a credential this
+    // repository committed. The target here is outside the scan root entirely,
+    // which no walk of that root could ever reach.
+    const outside = mkdtempSync(path.join(tmpdir(), "secret-scan-outside-"));
+    fs.writeFileSync(path.join(outside, "real.md"), SCRATCH, "utf8");
+    const fixture = rootWith("symlinked", { "notes.md": "nothing here\n" });
+    try {
+      fs.symlinkSync(path.join(outside, "real.md"), path.join(fixture.root, "linked.md"));
+    } catch {
+      // Creating one needs a privilege this environment may not have. Bail
+      // rather than assert something this case is not about.
+      rmSync(outside, { recursive: true, force: true });
+      return;
+    }
+    try {
+      initGitRoot(fixture.root, "nothing-here\n", { forceAdd: ["linked.md"] });
+      const run = runGuardIn(GUARD, fixture.root);
+      assert.equal(
+        run.status,
+        0,
+        `the scan followed a symlink out of the root it was given:\n${run.output}`,
+      );
+      // Exit 0 alone would also be the answer if the guard had scanned nothing
+      // at all, so the finding's absence is asserted next to the count that
+      // says the link was seen and deliberately not read.
+      assert.doesNotMatch(run.output, /aws-access-key-id/);
+      assert.doesNotMatch(run.output, /linked\.md/);
+      assert.match(run.output, /1 listed path\(s\) not regular files/);
+      // And it stays a scan: the number the floor is about did not collapse.
+      assert.match(run.output, /from git's committable set/);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
   });
 
   it("falls back to the walk outside a work tree, and says that too", () => {
