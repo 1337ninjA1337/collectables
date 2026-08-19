@@ -1,8 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { readFileSync } from "node:fs";
 
 import {
+  ARCHIVE_ENTRY_SEPARATOR,
+  ARCHIVE_SCAN_EXTENSIONS,
   BUNDLE_SKIP_DIRS,
   DEFAULT_SECRET_RULES,
   IGNORE_MARKER,
@@ -15,10 +18,14 @@ import {
   formatSecretReport,
   isPrivilegedSupabaseJwt,
   redact,
+  archiveEntryPath,
+  scanArchiveEntries,
   scanForSecrets,
 } from "../lib/secret-scan";
+import { decodeZipEntryText, readZipEntries } from "../lib/zip-archive";
 import { LINT_GUARDS } from "../lib/lint-guards";
-import { readRepoFile as read, REPO_ROOT } from "./helpers/repo-file";
+import { readRepoFile as read, repoPath, REPO_ROOT } from "./helpers/repo-file";
+import { zipFixture } from "./helpers/zip-fixture";
 import { listFilesUnder } from "../scripts/guard-io";
 
 const b64url = (obj: unknown) =>
@@ -246,7 +253,7 @@ describe("what the source scan does not read", () => {
       ),
     );
     assert.ok(present.size > 5, `only ${present.size} extensions walked — the walk is broken, not the tree`);
-    const scanned = new Set(SOURCE_SCAN_EXTENSIONS);
+    const scanned = new Set([...SOURCE_SCAN_EXTENSIONS, ...ARCHIVE_SCAN_EXTENSIONS]);
     const unaccounted = [...present].filter(
       (ext) => !scanned.has(ext) && !(ext in NOT_SCANNED_EXTENSION_REASONS),
     );
@@ -263,6 +270,16 @@ describe("what the source scan does not read", () => {
       assert.ok(reason.length >= 30, `${ext || '""'} is excluded for a reason shorter than a reason`);
       assert.ok(!scanned.has(ext), `${ext || '""'} is both scanned and excused`);
     }
+    // The two scanned halves are disjoint too: an extension in both would be
+    // read once as one string and once as a container, and the second read is
+    // the one that would throw.
+    for (const ext of ARCHIVE_SCAN_EXTENSIONS) {
+      assert.ok(
+        !SOURCE_SCAN_EXTENSIONS.includes(ext),
+        `${ext} is both a text format and an archive format`,
+      );
+      assert.ok(present.has(ext), `${ext} is opened as an archive and no file in the tree has it`);
+    }
   });
 
   it("reads the two files that tell their reader to paste credentials in", () => {
@@ -277,6 +294,80 @@ describe("what the source scan does not read", () => {
       );
       assert.deepEqual(scanForSecrets(rel, read(rel)), [], `${rel} carries a matching secret`);
     }
+  });
+
+  it("opens the committed .pbit and scans what is inside it", () => {
+    // The template's parts are UTF-16LE JSON holding the whole M expression,
+    // parameters included. Today they hold the placeholders `queries.m` ships;
+    // the case is that they are READ, so the day one of them holds a real
+    // session pooler host and password the guard is what says so.
+    const entries = readZipEntries(readFileSync(repoPath("docs", "powerbi", "Collectables-Starter.pbit")));
+    const decoded: Record<string, string> = {};
+    for (const [name, data] of Object.entries(entries)) decoded[name] = decodeZipEntryText(data);
+    assert.match(decoded["DataModelSchema"], /PostgreSQL\.Database/, "the M expression is not in there");
+    assert.deepEqual(scanArchiveEntries("docs/powerbi/Collectables-Starter.pbit", decoded), []);
+  });
+
+  it("finds a service_role JWT pasted into an archive part, and names the entry", () => {
+    const decoded = {
+      "Report/Layout": "{}",
+      DataModelSchema: `{"expression": "Password=${SERVICE_ROLE_JWT}"}`,
+    };
+    const matches = scanArchiveEntries("docs/powerbi/x.pbit", decoded);
+    assert.equal(matches.length, 1);
+    assert.equal(matches[0].file, `docs/powerbi/x.pbit${ARCHIVE_ENTRY_SEPARATOR}DataModelSchema`);
+    assert.equal(matches[0].ruleId, "supabase-service-role-jwt");
+    assert.equal(archiveEntryPath("docs/powerbi/x.pbit", "DataModelSchema"), matches[0].file);
+  });
+
+  it("is the decoding that makes those bytes matchable at all", () => {
+    // The reason `.pbit` was excused, restated as a case: a UTF-16LE part read
+    // as UTF-8 puts a NUL between every character, and no rule matches across
+    // one. Scanning the raw bytes finds nothing; decoding first finds the key.
+    const part = Buffer.concat([
+      Buffer.from([0xff, 0xfe]),
+      Buffer.from(`"AKIA${"A".repeat(16)}"`, "utf16le"),
+    ]);
+    assert.deepEqual(scanForSecrets("x.pbit!Part", part.toString("utf8")), []);
+    assert.equal(scanArchiveEntries("x.pbit", { Part: decodeZipEntryText(part) }).length, 1);
+  });
+
+  it("scans a DEFLATED archive too, since that is what an exported one is", () => {
+    // Every committed .pbit so far was written by `zipStore` (STORED). A copy
+    // re-exported from Power BI Desktop — the only kind that can carry a real
+    // credential — is deflated, and the reader this scan used to have refused
+    // exactly that.
+    const zip = zipFixture(
+      [
+        {
+          name: "DataModelSchema",
+          data: Buffer.concat([
+            Buffer.from([0xff, 0xfe]),
+            Buffer.from(`{"k":"AKIA${"B".repeat(16)}"}`, "utf16le"),
+          ]),
+        },
+      ],
+      { deflate: true, streamed: true },
+    );
+    const decoded: Record<string, string> = {};
+    for (const [name, data] of Object.entries(readZipEntries(zip))) {
+      decoded[name] = decodeZipEntryText(data);
+    }
+    assert.equal(scanArchiveEntries("x.pbit", decoded)[0]?.ruleId, "aws-access-key-id");
+  });
+
+  it("opens the archives in the wrapper and fails a run that could not", () => {
+    const source = read("scripts/check-secrets.ts");
+    assert.match(source, /extensions: ARCHIVE_SCAN_EXTENSIONS/);
+    assert.match(source, /readZipEntries\(fs\.readFileSync\(path\.join\(repoRoot, rel\)\)\)/);
+    assert.match(source, /scanArchiveEntries\(rel, decoded\)/);
+    // An unopenable archive exits 1 rather than being skipped like a text file
+    // that vanished mid-walk: there are one or two of them, each named by an
+    // extension somebody chose to scan.
+    assert.match(source, /unopened\.length > 0/);
+    // Archives count toward the floor — a walk that lost them is a walk that
+    // scanned less than it says.
+    assert.match(source, /assertScannedFloor\(CHECK_NAME, files\.length \+ archives\.length\)/);
   });
 
   it("states both scans' directory policy in one place, and passes it", () => {

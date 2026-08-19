@@ -254,25 +254,16 @@ export function buildContentTypesXml(): string {
 
 // --- minimal deterministic ZIP (STORE only) so the committed binary is stable
 
-const CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) {
-      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    }
-    table[n] = c >>> 0;
-  }
-  return table;
-})();
+/**
+ * Writing an archive is this module's own business; reading one is not, since
+ * the secret scan reads `.pbit` files this repository did not write. Both
+ * halves of that live in `lib/zip-archive.ts` now — re-exported here because a
+ * writer whose round-trip test has to import its reader from somewhere else
+ * reads as two unrelated things.
+ */
+import { crc32 } from "./zip-archive";
 
-export function crc32(buf: Buffer): number {
-  let crc = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    crc = CRC_TABLE[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
+export { crc32, readZipEntries, ZipFormatError } from "./zip-archive";
 
 interface ZipEntry {
   name: string;
@@ -342,26 +333,6 @@ export function zipStore(entries: ZipEntry[]): Buffer {
   eocd.writeUInt16LE(0, 20);
 
   return Buffer.concat([localData, centralDir, eocd]);
-}
-
-/** STORE-only reader — enough to validate our own deterministic output. */
-export function readZipEntries(buf: Buffer): Record<string, Buffer> {
-  const out: Record<string, Buffer> = {};
-  let pos = 0;
-  while (pos + 4 <= buf.length && buf.readUInt32LE(pos) === 0x04034b50) {
-    const method = buf.readUInt16LE(pos + 8);
-    const size = buf.readUInt32LE(pos + 22);
-    const nameLen = buf.readUInt16LE(pos + 26);
-    const extraLen = buf.readUInt16LE(pos + 28);
-    const name = buf.toString("utf8", pos + 30, pos + 30 + nameLen);
-    const dataStart = pos + 30 + nameLen + extraLen;
-    if (method !== 0) {
-      throw new Error(`unexpected compression method ${method} for ${name}`);
-    }
-    out[name] = buf.subarray(dataStart, dataStart + size);
-    pos = dataStart + size;
-  }
-  return out;
 }
 
 function utf16le(text: string): Buffer {

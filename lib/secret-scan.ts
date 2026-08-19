@@ -151,19 +151,45 @@ export const SOURCE_SCAN_EXTENSIONS: readonly string[] = [
 export const BUNDLE_SCAN_EXTENSIONS: readonly string[] = [".js", ".html", ".json", ".map", ".css"];
 
 /**
+ * The containers the source scan opens and scans the contents of.
+ *
+ * `.pbit` was excused as "a zip, so its text is compressed and unreadable to a
+ * line scanner", and both halves of that were wrong in a way that mattered.
+ * The committed template's parts are STORED, not compressed — what actually
+ * defeats a line scanner is that they are UTF-16LE, so every character is
+ * separated from the next by a NUL byte and no rule can match across it. And
+ * the file this scan should fear is not the committed one anyway: it is the
+ * copy somebody re-exports from Power BI Desktop after filling the four
+ * parameters in `docs/powerbi/queries.m` with their real session pooler host
+ * and service_role database password, exactly as that file's header tells them
+ * to. That copy is DEFLATED, its parts hold the whole M expression as text,
+ * and it drops into the same path with the same name.
+ *
+ * So the container is opened, each entry decoded by its byte-order mark, and
+ * the same rules run over it — see {@link scanArchiveEntries}. Findings are
+ * reported as `docs/powerbi/x.pbit!DataModelSchema:12:34`, the `!` being the
+ * usual way to name a path inside an archive.
+ */
+export const ARCHIVE_SCAN_EXTENSIONS: readonly string[] = [".pbit"];
+
+/** Separates an archive's path from the entry inside it, in a report. */
+export const ARCHIVE_ENTRY_SEPARATOR = "!";
+
+/**
  * The extensions in this repository the source scan deliberately does not
  * read, one reason each.
  *
- * The other half of the partition, and the half that makes it a statement: an
- * extension is either scanned or it is here saying why not, so a new format
- * cannot arrive unscanned by nobody noticing. All three are binary — this
- * scan reads text, and a credential inside a compressed archive is not a
- * string this matcher could find anyway.
+ * The third part of the partition, and the part that makes it a statement: an
+ * extension is either read as text, or opened as an archive, or here saying why
+ * not — so a new format cannot arrive unscanned by nobody noticing. Both
+ * remaining entries are binary in the sense that matters, which is that there
+ * is no text inside them to read; `.pbit` used to be excused on the same
+ * grounds and was the one entry where that was untrue, since a zip's entries
+ * are text this scan can reach (see {@link ARCHIVE_SCAN_EXTENSIONS}).
  */
 export const NOT_SCANNED_EXTENSION_REASONS: Readonly<Record<string, string>> = {
   "": "no extension at all — `path.extname` answers this for a dotfile like `.hw-fix`, and an entry of \"\" in the scan list would also pull in every extensionless binary",
   ".ttf": "font binaries under `assets/`, shipped as-is and never edited by hand",
-  ".pbit": "the Power BI template beside the M and DAX sources: a zip archive, so its text is compressed and unreadable to a line scanner",
 };
 
 export type SecretRule = {
@@ -316,6 +342,42 @@ export function scanForSecrets(
     }
   }
   return matches;
+}
+
+/**
+ * The name a finding inside an archive is reported under —
+ * `docs/powerbi/Collectables-Starter.pbit!DataModelSchema`.
+ *
+ * One function rather than a template literal at each call site, because the
+ * report and any future skip list have to spell it the same way, and the
+ * separator being a single character is exactly the kind of thing that gets
+ * written as `/` by the next person to touch it.
+ */
+export function archiveEntryPath(archive: string, entry: string): string {
+  return `${archive}${ARCHIVE_ENTRY_SEPARATOR}${entry}`;
+}
+
+/**
+ * Scan the decoded entries of one archive, reporting each finding under
+ * {@link archiveEntryPath}.
+ *
+ * Takes already-decoded text rather than the archive's bytes so this module
+ * stays free of `node:zlib` and remains testable as a pure matcher; the
+ * wrapper does the opening, which is the same division `scanForSecrets` and
+ * `check-secrets` already have for the filesystem.
+ *
+ * Entries are visited in name order so a report over an archive reads the same
+ * on every machine — `readZipEntries` returns them in central-directory order,
+ * which is the writer's choice and not stable across tools.
+ */
+export function scanArchiveEntries(
+  archive: string,
+  entries: Readonly<Record<string, string>>,
+  rules: readonly SecretRule[] = DEFAULT_SECRET_RULES,
+): SecretMatch[] {
+  return Object.keys(entries)
+    .sort()
+    .flatMap((entry) => scanForSecrets(archiveEntryPath(archive, entry), entries[entry], rules));
 }
 
 /**

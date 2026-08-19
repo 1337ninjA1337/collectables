@@ -13,7 +13,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
+  ARCHIVE_SCAN_EXTENSIONS,
   formatSecretReport,
+  scanArchiveEntries,
   scanForSecrets,
   SECRET_SKIP_DIRS,
   SECRET_SKIP_FILES,
@@ -22,6 +24,7 @@ import {
 } from "../lib/secret-scan";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import { decodeZipEntryText, readZipEntries } from "../lib/zip-archive";
 import { guardScanRoot, listFilesUnder } from "./guard-io";
 
 const CHECK_NAME = "check-secrets";
@@ -47,9 +50,17 @@ function main(): void {
     skipDirs: SECRET_SKIP_DIRS,
   }).filter((rel) => !SKIP_FILES.has(path.normalize(rel)));
 
+  // The containers, walked separately because what happens to them is
+  // different: they are opened and their entries decoded, rather than read as
+  // one string. Same skip list, since it names files and an archive is one.
+  const archives = listFilesUnder(repoRoot, {
+    extensions: ARCHIVE_SCAN_EXTENSIONS,
+    skipDirs: SECRET_SKIP_DIRS,
+  }).filter((rel) => !SKIP_FILES.has(path.normalize(rel)));
+
   // "scanned 0 file(s), no committed secrets" is the report an unreadable
   // repo root produces, and it exits 0. Assert the premise first.
-  assertScannedFloor(CHECK_NAME, files.length);
+  assertScannedFloor(CHECK_NAME, files.length + archives.length);
 
   const matches: SecretMatch[] = [];
   for (const rel of files) {
@@ -62,9 +73,35 @@ function main(): void {
     matches.push(...scanForSecrets(rel, source));
   }
 
+  // An archive that cannot be opened is reported and fails the run rather than
+  // being skipped like an unreadable text file: there are one or two of them,
+  // each named by an extension somebody chose to scan, so "could not read it"
+  // is news — where one text file out of 770 going missing mid-walk is not.
+  const unopened: string[] = [];
+  let entryCount = 0;
+  for (const rel of archives) {
+    try {
+      const entries = readZipEntries(fs.readFileSync(path.join(repoRoot, rel)));
+      const decoded: Record<string, string> = {};
+      for (const [name, data] of Object.entries(entries)) decoded[name] = decodeZipEntryText(data);
+      entryCount += Object.keys(decoded).length;
+      matches.push(...scanArchiveEntries(rel, decoded));
+    } catch (error) {
+      unopened.push(`  ${rel}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  if (unopened.length > 0) {
+    console.error(
+      `${CHECK_NAME}: ${unopened.length} archive(s) could not be opened, so nothing inside them was scanned:`,
+    );
+    console.error(unopened.join("\n"));
+    process.exit(1);
+  }
+
   if (matches.length === 0) {
     console.log(
-      `${CHECK_NAME}: scanned ${files.length} file(s), no committed secrets.`,
+      `${CHECK_NAME}: scanned ${files.length} file(s) plus ${entryCount} entr(ies) in ${archives.length} archive(s), no committed secrets.`,
     );
     return;
   }
