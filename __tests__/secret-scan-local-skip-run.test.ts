@@ -121,6 +121,24 @@ describe("check-secrets, run against a tree holding a local-only copy", () => {
     assert.match(run.output, /git rm --cached/);
   });
 
+  it("refuses one that is only STAGED, which is the state a mistake is caught in", () => {
+    assert.ok(GUARD);
+    // The case above commits the force-added copy; this one stops at the index,
+    // which is where a developer actually is a minute after `git add -f`. Every
+    // question this guard asks git answers the two the same way TODAY — which
+    // is a reason to pin it, not a reason to assume it: the refusal's whole
+    // premise is that being in the index is enough to be a committed
+    // credential, and until now no fixture could produce that state.
+    const fixture = rootWith("staged", { [IGNORED]: CREDENTIAL_FILE });
+    initGitRoot(fixture.root, `*${LOCAL_ONLY_MARKER}*\n`, { stage: [IGNORED] });
+
+    const run = runGuardIn(GUARD, fixture.root);
+    assert.equal(run.status, 1, `a staged, skipped credential file passed:\n${run.output}`);
+    assert.match(run.output, /tracked by git AND skipped/);
+    assert.match(run.output, /queries\.local\.m/);
+    assert.doesNotMatch(run.output, /no committed secrets/);
+  });
+
   it("reports the same credential in a misnamed copy, and prints the rule under it", () => {
     assert.ok(GUARD);
     const run = runGuardIn(GUARD, rootWith("misnamed", { [MISNAMED]: CREDENTIAL_FILE }).root);

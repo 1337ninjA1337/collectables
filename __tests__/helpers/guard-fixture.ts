@@ -934,6 +934,13 @@ export type PartialRoot = {
  * fixture needs — `check-secrets` opens `.pbit` files now, and the offender it
  * has to be pointed at is a zip. Written without an encoding in that case,
  * since naming one for a Buffer is how a fixture quietly becomes UTF-8.
+ *
+ * What comes back is NOT a git work tree, and for most of these suites that is
+ * the point: `check-secrets` walks when git cannot answer, and this is the
+ * shape that exercises the walk. A case that wants the other half hands the
+ * root to {@link initGitRoot}, which turns it into a repository in place — so
+ * "is this fixture a repository?" is a property a case chooses, and the two
+ * helpers are read together rather than one at a time.
  */
 export function makePartialRoot(
   entries: readonly string[],
@@ -1005,6 +1012,22 @@ export type GitRootOptions = {
    * exactly the mystery {@link initGitRoot} refuses to hand a reader.
    */
   readonly forceAdd?: readonly string[];
+  /**
+   * Paths force-added AFTER the commit, so they are in the index and not in
+   * HEAD.
+   *
+   * The third state a file can be in, and the one no fixture had. `forceAdd`
+   * and a plain untracked file are the two ends; between them sits the state a
+   * developer is ACTUALLY in a minute after force-adding by mistake — staged,
+   * not yet committed — and every question these guards ask git (`ls-files`,
+   * `ls-files --cached`) answers it the same as committed. "The same today" is
+   * not the same as "the same", and the difference is invisible to a fixture
+   * that can only build one of them.
+   *
+   * A path may not be in both lists: committing it and then re-adding it is a
+   * no-op that reads as a request for two different states.
+   */
+  readonly stage?: readonly string[];
 };
 
 /**
@@ -1064,7 +1087,8 @@ export function initGitRoot(root: string, ignore: string, options: GitRootOption
     }
   };
   const forceAdd = options.forceAdd ?? [];
-  for (const relative of forceAdd) {
+  const stage = options.stage ?? [];
+  for (const relative of [...forceAdd, ...stage]) {
     if (path.isAbsolute(relative)) {
       throw new GitFixtureError(
         `"${relative}" must be a path inside the scratch root, not an absolute one.`,
@@ -1075,6 +1099,12 @@ export function initGitRoot(root: string, ignore: string, options: GitRootOption
         `"${relative}" does not exist under ${root}, so \`git add -f\` would fail with git's wording instead of this one. Write the file before initialising the repository.`,
       );
     }
+  }
+  const both = forceAdd.filter((rel) => stage.includes(rel));
+  if (both.length > 0) {
+    throw new GitFixtureError(
+      `${both.join(", ")} named in both \`forceAdd\` and \`stage\` — committed and then staged again is the committed state, so one of the two is not the shape the case wanted.`,
+    );
   }
   git("-c", "init.defaultBranch=main", "init", "-q");
   git("config", "user.email", "fixture@example.invalid");
@@ -1091,6 +1121,9 @@ export function initGitRoot(root: string, ignore: string, options: GitRootOption
   // these guards have never seen, and a fixture should not be the place that
   // discovers what git does there.
   git("commit", "-qm", "fixture");
+  // AFTER the commit, which is the whole difference: these end up in the index
+  // and not in HEAD.
+  if (stage.length > 0) git("add", "-f", "--", ...stage);
 }
 
 /** How a fixture rewrites one file of the copied checkout. */
