@@ -9,7 +9,7 @@ import { SECRET_SKIP_DIRS, SOURCE_SCAN_EXTENSIONS } from "@/lib/secret-scan";
 
 import { listCommittable, runGit, trackedAmong } from "../scripts/git-io";
 import { listFilesUnder, selectPaths } from "../scripts/guard-io";
-import { initGitRoot } from "./helpers/guard-fixture";
+import { GitFixtureError, initGitRoot } from "./helpers/guard-fixture";
 import { REPO_ROOT } from "./helpers/repo-file";
 
 /**
@@ -35,11 +35,12 @@ after(() => {
 /** A one-commit repository with `tracked.local.m` force-added past `.gitignore`. */
 function repoWithForcedLocal(): string {
   const dir = tempDir("git-io-repo-");
-  initGitRoot(dir, "*.local.*\n");
+  // Written BEFORE the repository exists, because `forceAdd` names files git
+  // has to be able to see — the helper says so rather than letting `git add -f`
+  // fail in its own words inside a fixture.
   fs.writeFileSync(path.join(dir, "tracked.local.m"), "Host = \"db.example.invalid\"\n");
   fs.writeFileSync(path.join(dir, "untracked.local.m"), "Host = \"db.example.invalid\"\n");
-  const forced = spawnSync("git", ["add", "-f", "tracked.local.m"], { cwd: dir, encoding: "utf8" });
-  assert.equal(forced.status, 0, `git add -f failed: ${forced.stderr}`);
+  initGitRoot(dir, "*.local.*\n", { forceAdd: ["tracked.local.m"] });
   return dir;
 }
 
@@ -138,5 +139,54 @@ describe("the set a scan of committed secrets is actually about", () => {
     // skipped by SEGMENT wherever the directory appears, and `dist.ts` is a
     // FILE called dist — the last segment is never consulted.
     assert.deepEqual(picked, ["dist.ts", "lib/a.TS", "lib/a.ts"]);
+  });
+});
+
+/**
+ * The fixture the two cases above rest on.
+ *
+ * Everything in this file is an assertion about git's answers, so the shape of
+ * the repository being asked is the premise rather than a detail: a helper that
+ * quietly force-added nothing would leave "reports which of the named paths are
+ * tracked" passing over an empty index, with `[]` on both sides.
+ */
+describe("the scratch repository these cases ask about", () => {
+  it("commits `.gitignore` and every force-added path, past the ignore rule", () => {
+    const dir = repoWithForcedLocal();
+    // Read from HEAD rather than the index: `git add -f` alone leaves a file
+    // staged, which every query here answers the same way — so a helper that
+    // stopped committing would be invisible to `ls-files` and visible to
+    // nothing else in the suite.
+    const head = spawnSync("git", ["ls-tree", "-r", "--name-only", "HEAD"], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(head.status, 0, `git ls-tree failed: ${head.stderr}`);
+    assert.deepEqual(head.stdout.split("\n").filter(Boolean).sort(), [
+      ".gitignore",
+      "tracked.local.m",
+    ]);
+  });
+
+  it("refuses a force-added path that does not exist, and says which", () => {
+    // `git add -f missing.local.m` fails in git's words, inside a fixture,
+    // several frames from the case that asked for it. The helper answers first.
+    const dir = tempDir("git-io-missing-");
+    assert.throws(
+      () => initGitRoot(dir, "*.local.*\n", { forceAdd: ["missing.local.m"] }),
+      (error: unknown) =>
+        error instanceof GitFixtureError && /missing\.local\.m.*does not exist/s.test(error.message),
+    );
+  });
+
+  it("reports a git failure as a fixture error rather than as an assertion", () => {
+    // The distinction the throw exists for: this is the fixture failing to be
+    // built, not the guard under test answering wrongly, and `assert.equal` on
+    // an exit status reported both in the same words. A `cwd` that is not there
+    // leaves `status` null, which the old check rendered as `null !== 0`.
+    assert.throws(
+      () => initGitRoot(path.join(tempDir("git-io-gone-"), "not-a-directory"), ""),
+      (error: unknown) => error instanceof GitFixtureError && /could not be run/.test(error.message),
+    );
   });
 });

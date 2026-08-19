@@ -83,6 +83,39 @@ describe("check-secrets, and the set it says it is about", () => {
     assert.match(run.output, /notes\.md/);
   });
 
+  it("reads the same set both ways when the two sets are the same", () => {
+    assert.ok(GUARD);
+    // The cases around this one prove the DIFFERENCES — an ignored file dropped,
+    // an untracked one kept — and a filter applied on one path and not the other
+    // would leave every one of them green. This is the equality: identical
+    // trees, one a plain directory and one a work tree whose ignore file covers
+    // nothing, must produce the same verdict over the same number of files.
+    const clean = { "notes.md": "nothing here\n" };
+    const walked = runGuardIn(GUARD, rootWith("agree-walk", clean).root);
+    const inGit = rootWith("agree-git", clean);
+    initGitRoot(inGit.root, "nothing-here\n");
+    const asked = runGuardIn(GUARD, inGit.root);
+
+    assert.equal(walked.status, 0, walked.output);
+    assert.equal(asked.status, 0, asked.output);
+    // Counted, not just both-green: "scanned 0 file(s)" would satisfy an
+    // exit-status comparison, and the floor is the only thing standing between
+    // this case and two runs that agreed about nothing.
+    const counted = /scanned (\d+) file\(s\) plus (\d+) entr\(ies\) in (\d+) archive\(s\) from (.+), no committed secrets/;
+    const fromWalk = counted.exec(walked.output);
+    const fromGit = counted.exec(asked.output);
+    assert.ok(fromWalk, `the walk run printed no pass line:\n${walked.output}`);
+    assert.ok(fromGit, `the git run printed no pass line:\n${asked.output}`);
+    assert.deepEqual(fromGit.slice(1, 4), fromWalk.slice(1, 4));
+    assert.ok(Number(fromWalk[1]) > 0, "both runs scanned nothing, so they agreed about nothing");
+    // Same answer, different route — which is what makes the equality worth
+    // asserting rather than tautological.
+    assert.notEqual(fromGit[4], fromWalk[4]);
+    // And the count clause stays silent at zero: git left nothing out, so there
+    // is nothing for the pass line to say about it.
+    assert.doesNotMatch(asked.output, /working-tree file\(s\) not in it/);
+  });
+
   it("falls back to the walk outside a work tree, and says that too", () => {
     assert.ok(GUARD);
     // Every guard fixture is a temp directory, and an unpacked tarball of this
