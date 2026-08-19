@@ -1,13 +1,17 @@
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 import { LINT_GUARDS } from "@/lib/lint-guards";
 import { LOCAL_ONLY_MARKER } from "@/lib/local-only";
 
-import { checkNameOf, makePartialRoot, runGuardIn, type PartialRoot } from "./helpers/guard-fixture";
+import {
+  checkNameOf,
+  initGitRoot,
+  makePartialRoot,
+  runGuardIn,
+  type PartialRoot,
+} from "./helpers/guard-fixture";
 import { SUITES_REL } from "./helpers/suite-files";
 
 /**
@@ -74,6 +78,22 @@ describe("check-secrets, run against a tree holding a local-only copy", () => {
     assert.match(run.output, /not checked against git/);
   });
 
+  it("has nothing left to skip under the git listing, because git dropped it first", () => {
+    assert.ok(GUARD);
+    // The claim `lib/local-only.ts` makes in prose, pinned: inside a work tree
+    // the candidates come from `git ls-files --exclude-standard`, which already
+    // drops everything `.gitignore` covers — so the rule removes nothing and
+    // its clause never appears. That is why the clause is not dead code and the
+    // case above is not redundant: the two runs exercise different halves of
+    // the guard, and only the walk half is left carrying the rule.
+    const fixture = rootWith("ignored-in-git", { [IGNORED]: CREDENTIAL_FILE });
+    initGitRoot(fixture.root, `*${LOCAL_ONLY_MARKER}*\n`);
+    const run = runGuardIn(GUARD, fixture.root);
+    assert.equal(run.status, 0, `the ignored copy was scanned:\n${run.output}`);
+    assert.match(run.output, /from git's committable set/);
+    assert.doesNotMatch(run.output, /skipped \d+ local-only file/);
+  });
+
   it("refuses a `.local.` file git is tracking, which only the suite used to catch", () => {
     assert.ok(GUARD);
     // `git add -f` beats `.gitignore`, so this is a COMMITTED credential the
@@ -81,15 +101,12 @@ describe("check-secrets, run against a tree holding a local-only copy", () => {
     // `npm run lint:secrets` on its own used to walk straight past it because
     // the check lived in a test file.
     const fixture = rootWith("forced", { [IGNORED]: CREDENTIAL_FILE });
-    const git = (...args: string[]) => {
-      const run = spawnSync("git", args, { cwd: fixture.root, encoding: "utf8" });
-      assert.equal(run.status, 0, `git ${args.join(" ")} failed: ${run.stderr}`);
-    };
-    git("init", "-q");
-    git("config", "user.email", "fixture@example.invalid");
-    git("config", "user.name", "fixture");
-    fs.writeFileSync(path.join(fixture.root, ".gitignore"), "*.local.*\n");
-    git("add", "-f", IGNORED);
+    initGitRoot(fixture.root, `*${LOCAL_ONLY_MARKER}*\n`);
+    const forced = spawnSync("git", ["add", "-f", IGNORED], {
+      cwd: fixture.root,
+      encoding: "utf8",
+    });
+    assert.equal(forced.status, 0, `git add -f failed: ${forced.stderr}`);
 
     const run = runGuardIn(GUARD, fixture.root);
     assert.equal(run.status, 1, `a tracked, skipped credential file passed:\n${run.output}`);

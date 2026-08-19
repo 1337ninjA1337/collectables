@@ -1,12 +1,14 @@
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import * as fs from "node:fs";
-import * as path from "node:path";
-
 import { LINT_GUARDS } from "@/lib/lint-guards";
 
-import { checkNameOf, makePartialRoot, runGuardIn, type PartialRoot } from "./helpers/guard-fixture";
+import {
+  checkNameOf,
+  initGitRoot,
+  makePartialRoot,
+  runGuardIn,
+  type PartialRoot,
+} from "./helpers/guard-fixture";
 import { SUITES_REL } from "./helpers/suite-files";
 
 /**
@@ -45,20 +47,6 @@ after(() => {
   for (const fixture of fixtures.values()) fixture.cleanup();
 });
 
-/** Turns a fixture root into a work tree, with `.gitignore` as its only commit. */
-function initGit(root: string, ignore: string): void {
-  const git = (...args: string[]) => {
-    const run = spawnSync("git", args, { cwd: root, encoding: "utf8" });
-    assert.equal(run.status, 0, `git ${args.join(" ")} failed: ${run.stderr}`);
-  };
-  git("init", "-q");
-  git("config", "user.email", "fixture@example.invalid");
-  git("config", "user.name", "fixture");
-  fs.writeFileSync(path.join(root, ".gitignore"), ignore);
-  git("add", ".gitignore");
-  git("commit", "-qm", "fixture");
-}
-
 describe("check-secrets, and the set it says it is about", () => {
   it("is a guard this repository registers", () => {
     assert.ok(GUARD, "check-secrets is not in LINT_GUARDS");
@@ -67,7 +55,7 @@ describe("check-secrets, and the set it says it is about", () => {
   it("scans git's committable set inside a work tree, and names it", () => {
     assert.ok(GUARD);
     const fixture = rootWith("ignored-scratch", { "notes.md": SCRATCH });
-    initGit(fixture.root, "notes.md\n");
+    initGitRoot(fixture.root, "notes.md\n");
     const run = runGuardIn(GUARD, fixture.root);
     assert.equal(
       run.status,
@@ -88,7 +76,7 @@ describe("check-secrets, and the set it says it is about", () => {
     // simplification and would mean a credential pasted into a new file passes
     // every local run until the moment it is committed.
     const fixture = rootWith("untracked-scratch", { "notes.md": SCRATCH });
-    initGit(fixture.root, "nothing-here\n");
+    initGitRoot(fixture.root, "nothing-here\n");
     const run = runGuardIn(GUARD, fixture.root);
     assert.equal(run.status, 1, `an untracked, unignored credential was not scanned:\n${run.output}`);
     assert.match(run.output, /aws-access-key-id/);

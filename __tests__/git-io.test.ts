@@ -9,6 +9,7 @@ import { SECRET_SKIP_DIRS, SOURCE_SCAN_EXTENSIONS } from "@/lib/secret-scan";
 
 import { listCommittable, runGit, trackedAmong } from "../scripts/git-io";
 import { listFilesUnder, selectPaths } from "../scripts/guard-io";
+import { initGitRoot } from "./helpers/guard-fixture";
 import { REPO_ROOT } from "./helpers/repo-file";
 
 /**
@@ -34,19 +35,11 @@ after(() => {
 /** A one-commit repository with `tracked.local.m` force-added past `.gitignore`. */
 function repoWithForcedLocal(): string {
   const dir = tempDir("git-io-repo-");
-  const git = (...args: string[]) => {
-    const run = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
-    assert.equal(run.status, 0, `git ${args.join(" ")} failed: ${run.stderr}`);
-  };
-  git("init", "-q");
-  git("config", "user.email", "fixture@example.invalid");
-  git("config", "user.name", "fixture");
-  fs.writeFileSync(path.join(dir, ".gitignore"), "*.local.*\n");
+  initGitRoot(dir, "*.local.*\n");
   fs.writeFileSync(path.join(dir, "tracked.local.m"), "Host = \"db.example.invalid\"\n");
   fs.writeFileSync(path.join(dir, "untracked.local.m"), "Host = \"db.example.invalid\"\n");
-  git("add", ".gitignore");
-  git("add", "-f", "tracked.local.m");
-  git("commit", "-qm", "fixture");
+  const forced = spawnSync("git", ["add", "-f", "tracked.local.m"], { cwd: dir, encoding: "utf8" });
+  assert.equal(forced.status, 0, `git add -f failed: ${forced.stderr}`);
   return dir;
 }
 

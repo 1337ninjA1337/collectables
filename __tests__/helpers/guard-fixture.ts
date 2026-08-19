@@ -987,6 +987,43 @@ export function makePartialRoot(
   };
 }
 
+/**
+ * Turn a scratch root into a git work tree, with `.gitignore` as its only
+ * commit.
+ *
+ * `check-secrets` takes its candidates from `git ls-files` when git can answer
+ * and from a walk when it cannot, so "is this fixture a repository?" became a
+ * property a case chooses rather than an accident of `os.tmpdir()`. Three
+ * suites had written these six lines out within a day of each other, which is
+ * the count at which a shape stops being a coincidence — and the copies were
+ * already free to differ on the one thing that matters (whether the ignore file
+ * is COMMITTED, which decides whether `--exclude-standard` honours it in a
+ * repository with no HEAD).
+ *
+ * Identity is set explicitly rather than inherited: `git commit` fails outright
+ * on a machine with no `user.email` configured, which is most CI images, and
+ * that failure would arrive as a mystery inside an unrelated assertion.
+ *
+ * `-c init.defaultBranch` keeps the hint off stderr — a guard suite that greps
+ * a run's output should not have to filter git's advice out of it.
+ */
+export function initGitRoot(root: string, ignore: string): void {
+  const git = (...args: string[]): void => {
+    const run = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+    assert.equal(run.status, 0, `git ${args.join(" ")} failed in the fixture: ${run.stderr}`);
+  };
+  git("-c", "init.defaultBranch=main", "init", "-q");
+  git("config", "user.email", "fixture@example.invalid");
+  git("config", "user.name", "guard fixture");
+  fs.writeFileSync(path.join(root, ".gitignore"), ignore, "utf8");
+  git("add", ".gitignore");
+  // Committed, not merely written: `--exclude-standard` reads `.gitignore` from
+  // the working tree, but a repository with no commit at all is a shape half
+  // these guards have never seen, and a fixture should not be the place that
+  // discovers what git does there.
+  git("commit", "-qm", "fixture");
+}
+
 /** How a fixture rewrites one file of the copied checkout. */
 export type RepoPatches = Readonly<Record<string, (source: string) => string>>;
 
