@@ -34,18 +34,28 @@ your Power BI version.
 4. The model loads with `DAU` / `ListingFunnelRate` / `PremiumConversionRate7d`
    already defined; drop them onto visuals with `occurred_at` on the X-axis.
 
+> **Never save back over `Collectables-Starter.pbit`.** A template exported
+> from Desktop carries the parameter values you just typed — host, database and
+> the `service_role` password — inside its `DataModelSchema` part. Export to a
+> `*.local.pbit` name instead: `*.local.*` is gitignored, so the file cannot be
+> committed. `npm run lint:secrets` opens every committed `.pbit` and reads the
+> parts inside it, so a filled-in one that lands here is caught rather than
+> shipped — but not being able to make the mistake is better than catching it.
+
 ## Fallback (manual paste)
 
 If the `.pbit` won't open in your Power BI version, build the same model by
 hand from the text assets:
 
 1. Open **Power BI Desktop** → blank report.
-2. **Home → Transform data → New Query → Blank Query**, open the **Advanced
-   Editor**, and replace its contents with [`queries.m`](./queries.m).
-3. Edit the four parameter literals at the top (`SupabaseHost`,
-   `SupabasePort`, `SupabaseDb`, `SupabaseSchema`) with your **session
-   pooler** values, then **Close & Apply**. Authenticate as the
-   `service_role` — `analytics_events` RLS denies `anon`/`authenticated`.
+2. Copy [`queries.m`](./queries.m) to `queries.local.m` and edit the four
+   parameter literals at the top (`SupabaseHost`, `SupabasePort`,
+   `SupabaseDb`, `SupabaseSchema`) **in the copy** — `*.local.*` is
+   gitignored, the tracked file is not.
+3. **Home → Transform data → New Query → Blank Query**, open the **Advanced
+   Editor**, replace its contents with `queries.local.m`, then **Close &
+   Apply**. Authenticate as the `service_role` — `analytics_events` RLS denies
+   `anon`/`authenticated`.
 4. **Modeling → New measure**, paste each block from
    [`measures.dax`](./measures.dax) (the `Name :=` line plus its expression).
 5. Build visuals: `occurred_at` on the X-axis, `DAU` / `ListingFunnelRate` /

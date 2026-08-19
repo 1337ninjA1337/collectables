@@ -34,6 +34,17 @@ expo-web.out.log
 .env
 .env*.local
 
+# Local, credential-bearing copies of committed templates. The convention is a
+# `.local.` segment in the name — `docs/powerbi/queries.local.m`, or a
+# `*.local.pbit` exported from Power BI Desktop with the four session-pooler
+# parameters filled in. Every document that tells a reader to paste a real
+# connection value points at one of these rather than at the tracked template,
+# so the mistake cannot be made instead of being caught afterwards.
+# `check-secrets` skips them BECAUSE they are ignored here — see
+# `SECRET_SKIP_LOCAL_MARKER` in lib/secret-scan.ts, and the case that asserts
+# git really does ignore the pattern and that nothing tracked matches it.
+*.local.*
+
 # Typescript
 *.tsbuildinfo
 

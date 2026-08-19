@@ -20,6 +20,7 @@ import {
   SECRET_SKIP_DIRS,
   SECRET_SKIP_FILES,
   SOURCE_SCAN_EXTENSIONS,
+  isLocalOnlyPath,
   type SecretMatch,
 } from "../lib/secret-scan";
 import { GuardRootError } from "../lib/guard-root";
@@ -40,6 +41,14 @@ const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
  */
 const SKIP_FILES = new Set(SECRET_SKIP_FILES.map((p) => path.normalize(p)));
 
+/**
+ * The two rules that take a file out of the scan: the named exemptions above,
+ * and the `.local.` convention for a file git will never take. One predicate so
+ * the walks below cannot drift on which of the two they apply.
+ */
+const scanned = (rel: string): boolean =>
+  !SKIP_FILES.has(path.normalize(rel)) && !isLocalOnlyPath(rel);
+
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
   // The skip list is applied after the walk rather than inside it: it names
@@ -48,7 +57,7 @@ function main(): void {
   const files = listFilesUnder(repoRoot, {
     extensions: SOURCE_SCAN_EXTENSIONS,
     skipDirs: SECRET_SKIP_DIRS,
-  }).filter((rel) => !SKIP_FILES.has(path.normalize(rel)));
+  }).filter(scanned);
 
   // The containers, walked separately because what happens to them is
   // different: they are opened and their entries decoded, rather than read as
@@ -56,7 +65,7 @@ function main(): void {
   const archives = listFilesUnder(repoRoot, {
     extensions: ARCHIVE_SCAN_EXTENSIONS,
     skipDirs: SECRET_SKIP_DIRS,
-  }).filter((rel) => !SKIP_FILES.has(path.normalize(rel)));
+  }).filter(scanned);
 
   // "scanned 0 file(s), no committed secrets" is the report an unreadable
   // repo root produces, and it exits 0. Assert the premise first.

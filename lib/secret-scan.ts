@@ -96,6 +96,41 @@ export const SECRET_SKIP_FILE_REASONS: Readonly<Record<string, string>> = {
 export const SECRET_SKIP_FILES: readonly string[] = Object.keys(SECRET_SKIP_FILE_REASONS);
 
 /**
+ * The naming convention for a file git will never take, and this scan
+ * therefore does not read.
+ *
+ * This guard's report says "no committed secrets", and it was scanning the
+ * working tree — which is the same set only on a clean checkout. The gap has a
+ * cost the moment anything asks a reader to put a real credential on disk, and
+ * `docs/powerbi/queries.m` does exactly that in its own header: it names four
+ * literals and tells the reader to replace them with their Supabase session
+ * pooler host and service_role database password. Pointing that instruction at
+ * a `.local.` copy is what makes the mistake impossible rather than merely
+ * detected — but only if the copy does not then fail the reader's own
+ * `npm run verify` forever, which is how a guard stops being run.
+ *
+ * So the marker is a `.local.` SEGMENT in the file's name, `*.local.*` is in
+ * `.gitignore`, and the exemption is checked in the two directions that make it
+ * safe rather than convenient: git is asked whether it really ignores the
+ * pattern, and whether anything tracked matches it anyway (a `git add -f` would
+ * put a committed file outside the scan, which is the only way this rule could
+ * hide a real leak).
+ */
+export const SECRET_SKIP_LOCAL_MARKER = ".local.";
+
+/**
+ * True for a path git ignores by the `.local.` convention.
+ *
+ * Tested on the BASENAME, because the marker is about what a file is called;
+ * `local.ts`, `docs/local/x.ts` and `my.localization.ts` are ordinary tracked
+ * files and none of them carries a `.local.` segment.
+ */
+export function isLocalOnlyPath(relative: string): boolean {
+  const name = relative.split(/[\\/]/).pop() ?? relative;
+  return name.includes(SECRET_SKIP_LOCAL_MARKER);
+}
+
+/**
  * The text formats the source scan reads.
  *
  * It was fourteen extensions in the wrapper and nothing checked it against the

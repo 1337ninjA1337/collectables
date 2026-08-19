@@ -4,11 +4,16 @@
 //   Home → Transform data → (Queries pane) right-click → New Query →
 //   Blank Query → Advanced Editor → replace ALL text with this file.
 //
-// PARAMETERS — replace the four literals below with your Supabase *session
-// pooler* values: Supabase Project → Settings → Database → Connection string
-// → tab "Session pooler". Power BI must authenticate as the service_role
-// (Database password) because analytics_events RLS denies anon/authenticated
-// (see supabase/migrations/20260508_analytics_events.sql + MANUAL-TASKS.md).
+// PARAMETERS — copy this file to queries.local.m FIRST and fill the four
+// literals in there, never here: `*.local.*` is gitignored, and this file is
+// tracked. Your Supabase *session pooler* values: Supabase Project → Settings
+// → Database → Connection string → tab "Session pooler". Power BI must
+// authenticate as the service_role (Database password) because
+// analytics_events RLS denies anon/authenticated (see
+// supabase/migrations/20260508_analytics_events.sql + MANUAL-TASKS.md).
+//
+// The copy is also why `npm run lint:secrets` will not complain about it: the
+// scan reads what can be COMMITTED, and skips the `.local.` names git ignores.
 //
 // Best practice: after a first successful load, promote each of the four to a
 // real parameter via Home → Manage Parameters so the generated .pbit
