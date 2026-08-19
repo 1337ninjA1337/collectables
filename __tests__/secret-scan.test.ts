@@ -356,18 +356,18 @@ describe("what the source scan does not read", () => {
     assert.equal(scanArchiveEntries("x.pbit", decoded)[0]?.ruleId, "aws-access-key-id");
   });
 
-  it("opens the archives in the wrapper and fails a run that could not", () => {
-    const source = read("scripts/check-secrets.ts");
-    assert.match(source, /extensions: ARCHIVE_SCAN_EXTENSIONS/);
-    assert.match(source, /readZipEntries\(fs\.readFileSync\(path\.join\(repoRoot, rel\)\)\)/);
-    assert.match(source, /scanArchiveEntries\(rel, decoded\)/);
-    // An unopenable archive exits 1 rather than being skipped like a text file
-    // that vanished mid-walk: there are one or two of them, each named by an
-    // extension somebody chose to scan.
-    assert.match(source, /unopened\.length > 0/);
-    // Archives count toward the floor — a walk that lost them is a walk that
-    // scanned less than it says.
-    assert.match(source, /assertScannedFloor\(CHECK_NAME, files\.length \+ archives\.length\)/);
+  it("counts archives toward the floor, which no run can demonstrate", () => {
+    // The rest of the wrapper's archive handling — that it walks them, opens
+    // them, decodes them, names the entry and exits 1 on one it could not open
+    // — is asserted by spawning the guard over a planted `.pbit` in
+    // `secret-scan-archive-run.test.ts`, which is what those four regexes over
+    // this file used to stand in for. This line is the exception: the floor is
+    // 500 and no fixture can hold 500 archives, so an archive dropped from the
+    // count is invisible to a run and visible only here.
+    assert.match(
+      read("scripts/check-secrets.ts"),
+      /assertScannedFloor\(CHECK_NAME, files\.length \+ archives\.length\)/,
+    );
   });
 
   it("states both scans' directory policy in one place, and passes it", () => {

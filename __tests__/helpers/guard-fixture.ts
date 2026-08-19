@@ -929,10 +929,15 @@ export type PartialRoot = {
  * about a declared input that reads and parses FINE and carries nothing
  * (`{}`, `""`), and no path in this repository is that file. A literal is the
  * only way to hand a guard one.
+ *
+ * A `Buffer` value plants BYTES rather than text, which is what an archive
+ * fixture needs — `check-secrets` opens `.pbit` files now, and the offender it
+ * has to be pointed at is a zip. Written without an encoding in that case,
+ * since naming one for a Buffer is how a fixture quietly becomes UTF-8.
  */
 export function makePartialRoot(
   entries: readonly string[],
-  files: Readonly<Record<string, string>> = {},
+  files: Readonly<Record<string, string | Buffer>> = {},
 ): PartialRoot {
   if (entries.length === 0 && Object.keys(files).length === 0) {
     throw new Error(
@@ -969,7 +974,8 @@ export function makePartialRoot(
       }
       const destination = path.join(root, relative);
       fs.mkdirSync(path.dirname(destination), { recursive: true });
-      fs.writeFileSync(destination, content, "utf8");
+      if (Buffer.isBuffer(content)) fs.writeFileSync(destination, content);
+      else fs.writeFileSync(destination, content, "utf8");
     }
   } catch (error) {
     fs.rmSync(root, { recursive: true, force: true });
