@@ -53,6 +53,28 @@ function repoWithStagedLocal(): string {
   return dir;
 }
 
+/**
+ * The two names git does not print plainly, force-added past `.gitignore`.
+ *
+ * `café.local.m` is the one git ESCAPES (`core.quotePath` is on by default, so
+ * `ls-files` without `-z` prints `"caf\303\251.local.m"`), and ` lead.local.m`
+ * is the one it does not — a legal filename that arrives verbatim and that a
+ * `.trim()` on the way past silently renames. Both are what a reader in
+ * `docs/` actually creates the day they follow an instruction in their own
+ * language, and both end up in a refusal that tells them to `git rm --cached`
+ * the name it prints.
+ */
+const ESCAPED_NAME = "café.local.m";
+const SPACED_NAME = " lead.local.m";
+function repoWithAwkwardNames(): string {
+  const dir = tempDir("git-io-awkward-");
+  for (const name of [ESCAPED_NAME, SPACED_NAME]) {
+    fs.writeFileSync(path.join(dir, name), "Host = \"db.example.invalid\"\n");
+  }
+  initGitRoot(dir, "*.local.*\n", { forceAdd: [ESCAPED_NAME, SPACED_NAME] });
+  return dir;
+}
+
 /** A repository mid-merge, with `conflicted.local.m` at all three stages. */
 function repoMidMerge(): string {
   const dir = tempDir("git-io-conflict-");
@@ -125,6 +147,63 @@ describe("asking git, from a guard", () => {
     const answer = trackedAmong(dir, ["conflicted.local.m"]);
     assert.ok(answer.ok);
     assert.deepEqual(answer.ok && answer.tracked, ["conflicted.local.m"]);
+  });
+
+  it("names a file git would have escaped in the spelling that is on disk", () => {
+    // The premise, asserted rather than assumed: without `-z` git renders this
+    // name as `"caf\303\251.local.m"` — quotes and octal escapes included. A
+    // checkout with `core.quotePath=false` would print it plainly and leave the
+    // assertion below passing over a bug it never met.
+    const dir = repoWithAwkwardNames();
+    const quoted = spawnSync("git", ["ls-files", "--", ESCAPED_NAME], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    assert.equal(quoted.status, 0, `git ls-files failed: ${quoted.stderr}`);
+    assert.match(
+      quoted.stdout,
+      /^"caf\\303\\251\.local\.m"$/m,
+      "git did not escape this name, so nothing below is about escaping",
+    );
+
+    const answer = trackedAmong(dir, [ESCAPED_NAME]);
+    assert.ok(answer.ok);
+    // The escaped spelling is not a path. `check-secrets` prints this name in a
+    // refusal that says `git rm --cached` it, so a name the reader cannot use
+    // is an instruction that fails at the one moment the file really is a
+    // committed credential.
+    assert.deepEqual(answer.ok && answer.tracked, [ESCAPED_NAME]);
+  });
+
+  it("keeps a name git prints plainly and this code used to trim", () => {
+    // The other half, and the one no escaping would have caught: a leading
+    // space is legal, git quotes nothing, and the old line-reader's `.trim()`
+    // turned ` lead.local.m` into `lead.local.m` — a file that does not exist,
+    // reported as tracked, in the same breath as one that does.
+    const dir = repoWithAwkwardNames();
+    const plain = spawnSync("git", ["ls-files", "--", SPACED_NAME], { cwd: dir, encoding: "utf8" });
+    assert.equal(plain.status, 0, `git ls-files failed: ${plain.stderr}`);
+    assert.match(plain.stdout, /^ lead\.local\.m$/m, "git escaped this name, so the trim is moot");
+
+    const answer = trackedAmong(dir, [SPACED_NAME]);
+    assert.ok(answer.ok);
+    assert.deepEqual(answer.ok && answer.tracked, [SPACED_NAME]);
+  });
+
+  it("answers with names that can be handed straight back as pathspecs", () => {
+    // What "exact" MEANS here, asserted structurally rather than by spelling
+    // out two names a third time: whatever git returns must address the same
+    // files when it goes back in. Any transport that mangles a name — escaping
+    // it, trimming it, decoding it wrongly — breaks the round trip, including
+    // for a name nobody thought to write a case about.
+    const dir = repoWithAwkwardNames();
+    const first = trackedAmong(dir, [ESCAPED_NAME, SPACED_NAME]);
+    assert.ok(first.ok);
+    const names = first.ok ? [...first.tracked] : [];
+    assert.equal(names.length, 2, "the fixture did not force-add both names");
+    const again = trackedAmong(dir, names);
+    assert.ok(again.ok);
+    assert.deepEqual([...(again.ok ? again.tracked : [])].sort(), names.sort());
   });
 
   it("never asks bare `ls-files`, which would answer with the whole index", () => {

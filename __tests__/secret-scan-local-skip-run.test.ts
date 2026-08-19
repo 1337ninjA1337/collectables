@@ -160,6 +160,43 @@ describe("check-secrets, run against a tree holding a local-only copy", () => {
     assert.equal(run.output.match(/queries\.local\.m/g)?.length, 1);
   });
 
+  it("names two tracked copies, in the spelling `git rm --cached` accepts", () => {
+    assert.ok(GUARD);
+    // Two things this refusal had never been RUN through, and one fixture
+    // covers both. The count and the list: every run that reached
+    // `formatTrackedLocalOnly` here held exactly one file, so the plural path
+    // — the count above 1, the sort deciding the order — was exercised by unit
+    // cases over the formatter and by no spawn at all.
+    //
+    // And the names themselves. `git ls-files` escapes `café.local.m` into
+    // `"caf\303\251.local.m"` unless it is asked for `-z`, which is the
+    // spelling this report used to print: a reader told to `git rm --cached`
+    // it would get `did not match any files`, over a file that really is a
+    // committed credential. The output is what proves it, because the report
+    // is the whole product of this refusal.
+    const accented = `docs/powerbi/café${LOCAL_ONLY_MARKER}m`;
+    const fixture = rootWith("forced-pair", {
+      [IGNORED]: CREDENTIAL_FILE,
+      [accented]: CREDENTIAL_FILE,
+    });
+    initGitRoot(fixture.root, `*${LOCAL_ONLY_MARKER}*\n`, { forceAdd: [IGNORED, accented] });
+
+    const run = runGuardIn(GUARD, fixture.root);
+    assert.equal(run.status, 1, `two tracked, skipped credential files passed:\n${run.output}`);
+    assert.match(run.output, /2 file\(s\) are tracked by git AND skipped/);
+    const literal = (rel: string): RegExp => new RegExp(`^ {2}${rel.replace(/\./g, "\\.")}$`, "m");
+    assert.match(run.output, literal(accented));
+    assert.match(run.output, literal(IGNORED));
+    // The escaped spelling, absent — asserting the real name is present is not
+    // enough on its own, since a report printing BOTH would satisfy it.
+    assert.doesNotMatch(run.output, /\\303/);
+    // Sorted, so the same two files read the same way on two machines.
+    assert.ok(
+      run.output.indexOf(`  ${accented}`) < run.output.indexOf(`  ${IGNORED}`),
+      `the refusal did not sort its names:\n${run.output}`,
+    );
+  });
+
   it("reports the same credential in a misnamed copy, and prints the rule under it", () => {
     assert.ok(GUARD);
     const run = runGuardIn(GUARD, rootWith("misnamed", { [MISNAMED]: CREDENTIAL_FILE }).root);

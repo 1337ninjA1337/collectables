@@ -51,6 +51,39 @@ export function runGit(cwd: string, args: readonly string[]): GitAnswer {
 }
 
 /**
+ * The names in a `-z` listing, deduplicated, in git's order.
+ *
+ * Every answer this module builds out of `ls-files` is a SET of paths, and it
+ * was two independent `new Set(...)` calls with a paragraph each until the
+ * second one turned out to be reading a different format. Both callers ask for
+ * `-z` now, so there is one shape to read and one place that knows why:
+ *
+ * `-z` because `ls-files` QUOTES a name it considers unusual otherwise —
+ * `café.local.m` arrives as `"caf\303\251.local.m"`, quotes and octal escapes
+ * included (`core.quotePath`, on by default). That spelling is not a path: a
+ * scan that opens it reads nothing, and a refusal that prints it names a file
+ * `git rm --cached` will not take.
+ *
+ * Deduplicated because during an unresolved merge `--cached` lists a path once
+ * per stage. Three entries for one file is three reads of it, three findings
+ * for one credential, three toward the scanned floor, and a refusal opening
+ * with `3 file(s)` over one name.
+ *
+ * No trimming: a NUL-separated name is already exact, and ` lead.local.m` is a
+ * legal filename that git does NOT quote — trimming it produces a name nothing
+ * on disk answers to. The trailing empty field after the last NUL is what the
+ * emptiness filter is for.
+ */
+function namesFrom(stdout: string): string[] {
+  return [...new Set(stdout.split("\0").filter(Boolean))];
+}
+
+/** The candidate set, or why git could not name it. */
+export type CommittableAnswer =
+  | { readonly ok: true; readonly files: readonly string[] }
+  | { readonly ok: false; readonly reason: string };
+
+/**
  * Every file in `cwd` that git would take: tracked, plus untracked ones no
  * ignore rule covers.
  *
@@ -62,22 +95,15 @@ export function runGit(cwd: string, args: readonly string[]): GitAnswer {
  * and not yet added is one `git add -A` from being committed, so it stays in
  * scope. `--exclude-standard` is what drops the rest.
  *
- * `-z` because git QUOTES unusual names otherwise (`"a\nb.ts"`), and a scan
- * that opens the quoted spelling reads nothing and reports nothing.
- *
- * Deduplicated: during a merge conflict `--cached` lists a path once per stage,
- * which would otherwise scan the same file three times and count it three times
- * toward the floor.
+ * `-z`, and deduplicated, for the reasons {@link namesFrom} carries. Sorted
+ * here and not there, because this is the only one of the two answers a report
+ * counts through: git's own order is stable but arbitrary, and a candidate list
+ * that reads differently on two machines is one nobody can diff.
  */
-export type CommittableAnswer =
-  | { readonly ok: true; readonly files: readonly string[] }
-  | { readonly ok: false; readonly reason: string };
-
 export function listCommittable(cwd: string): CommittableAnswer {
   const answer = runGit(cwd, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"]);
   if (!answer.ok) return { ok: false, reason: answer.reason };
-  const unique = new Set(answer.stdout.split("\0").filter(Boolean));
-  return { ok: true, files: [...unique].sort() };
+  return { ok: true, files: namesFrom(answer.stdout).sort() };
 }
 
 export type TrackedAnswer =
@@ -97,22 +123,18 @@ export type TrackedAnswer =
  * would return the ENTIRE index, which is the difference between "none of
  * these are tracked" and "everything is".
  *
- * Deduplicated for the same reason {@link listCommittable} is: during an
- * unresolved merge the index holds one path at three stages and `ls-files`
- * prints it once per stage. The caller here is a REFUSAL that counts and names
- * what it found, so the undeduplicated answer reads `3 file(s) are tracked by
- * git AND skipped` over one file listed three times — a report that overstates
- * the problem and sends its reader looking for two files that do not exist.
+ * `-z`, and deduplicated, through the same {@link namesFrom} as the listing
+ * above. This call read line-by-line for its first few runs and the difference
+ * was invisible for as long as every tracked file was called something plain.
+ * It is not a formatting preference: the answer goes to a REFUSAL that names
+ * files and tells its reader to `git rm --cached` them, so a name git escaped
+ * (`"caf\303\251.local.m"`) or one this code trimmed (` lead.local.m`) is an
+ * instruction that fails when followed — over a file that really is a
+ * committed credential, which is the moment the report has to be exact.
  */
 export function trackedAmong(cwd: string, paths: readonly string[]): TrackedAnswer {
   if (paths.length === 0) return { ok: true, tracked: [] };
-  const answer = runGit(cwd, ["ls-files", "--", ...paths]);
+  const answer = runGit(cwd, ["ls-files", "-z", "--", ...paths]);
   if (!answer.ok) return { ok: false, reason: answer.reason };
-  const unique = new Set(
-    answer.stdout
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean),
-  );
-  return { ok: true, tracked: [...unique] };
+  return { ok: true, tracked: namesFrom(answer.stdout) };
 }

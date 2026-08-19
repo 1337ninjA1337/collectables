@@ -102,6 +102,12 @@ export function partitionLocalOnly(paths: readonly string[]): {
  * The same reading is why `tracked` arrives deduplicated: during an unresolved
  * merge one path sits in the index at three stages, and a refusal that COUNTS
  * what it found would otherwise report three files where there is one.
+ *
+ * These names are printed for a reader to paste back into `git rm --cached`, so
+ * they have to be the spelling that is on disk — which is a fact about how they
+ * were READ rather than about this module. `scripts/git-io.ts` asks for a
+ * NUL-separated listing precisely so that `café.local.m` does not arrive here
+ * as `"caf\303\251.local.m"`, git's escaped rendering of it.
  */
 export type LocalOnlyTrackedProbe =
   | { readonly asked: true; readonly tracked: readonly string[] }
