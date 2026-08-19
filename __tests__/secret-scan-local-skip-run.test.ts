@@ -1,6 +1,5 @@
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 
 import { LINT_GUARDS } from "@/lib/lint-guards";
 import { LOCAL_ONLY_MARKER } from "@/lib/local-only";
@@ -101,18 +100,25 @@ describe("check-secrets, run against a tree holding a local-only copy", () => {
     // `npm run lint:secrets` on its own used to walk straight past it because
     // the check lived in a test file.
     const fixture = rootWith("forced", { [IGNORED]: CREDENTIAL_FILE });
-    initGitRoot(fixture.root, `*${LOCAL_ONLY_MARKER}*\n`);
-    const forced = spawnSync("git", ["add", "-f", IGNORED], {
-      cwd: fixture.root,
-      encoding: "utf8",
-    });
-    assert.equal(forced.status, 0, `git add -f failed: ${forced.stderr}`);
+    initGitRoot(fixture.root, `*${LOCAL_ONLY_MARKER}*\n`, { forceAdd: [IGNORED] });
 
     const run = runGuardIn(GUARD, fixture.root);
     assert.equal(run.status, 1, `a tracked, skipped credential file passed:\n${run.output}`);
     assert.match(run.output, /tracked by git AND skipped/);
     assert.match(run.output, /queries\.local\.m/);
     assert.doesNotMatch(run.output, /no committed secrets/);
+    // Exit 1 alone proves nothing about the PROBE. A force-added `.local.` file
+    // is in git's listing, so a refactor that dropped `partitionLocalOnly`
+    // entirely would scan it, report the credential as an ordinary finding, and
+    // fail the run in exactly the same colour — with the rule gone. The two
+    // failures are told apart by which report was printed: this one names the
+    // rule and the fix, and never reaches the matcher.
+    assert.doesNotMatch(
+      run.output,
+      /aws-access-key-id/,
+      "the credential was reported as an ordinary finding, so the tracked probe is not what failed the run",
+    );
+    assert.match(run.output, /git rm --cached/);
   });
 
   it("reports the same credential in a misnamed copy, and prints the rule under it", () => {

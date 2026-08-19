@@ -51,19 +51,6 @@ export function runGit(cwd: string, args: readonly string[]): GitAnswer {
 }
 
 /**
- * Which of `paths` git is tracking, relative to `cwd`.
- *
- * `git ls-files --` with explicit pathspecs rather than a full listing: the
- * caller has a handful of names and the whole index is thousands, and the
- * question is membership. `--` because a path that starts with a dash is a
- * flag otherwise, and `.env.local.example` is exactly the sort of name this
- * gets called with.
- *
- * An empty `paths` is answered without spawning anything — bare `ls-files`
- * would return the ENTIRE index, which is the difference between "none of
- * these are tracked" and "everything is".
- */
-/**
  * Every file in `cwd` that git would take: tracked, plus untracked ones no
  * ignore rule covers.
  *
@@ -97,6 +84,19 @@ export type TrackedAnswer =
   | { readonly ok: true; readonly tracked: readonly string[] }
   | { readonly ok: false; readonly reason: string };
 
+/**
+ * Which of `paths` git is tracking, relative to `cwd`.
+ *
+ * `git ls-files --` with explicit pathspecs rather than a full listing: the
+ * caller has a handful of names and the whole index is thousands, and the
+ * question is membership. `--` because a path that starts with a dash is a
+ * flag otherwise, and `.env.local.example` is exactly the sort of name this
+ * gets called with.
+ *
+ * An empty `paths` is answered without spawning anything — bare `ls-files`
+ * would return the ENTIRE index, which is the difference between "none of
+ * these are tracked" and "everything is".
+ */
 export function trackedAmong(cwd: string, paths: readonly string[]): TrackedAnswer {
   if (paths.length === 0) return { ok: true, tracked: [] };
   const answer = runGit(cwd, ["ls-files", "--", ...paths]);

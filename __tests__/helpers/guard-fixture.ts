@@ -987,9 +987,45 @@ export function makePartialRoot(
   };
 }
 
+/** The second half of a git fixture: what is in it that `.gitignore` forbids. */
+export type GitRootOptions = {
+  /**
+   * Paths to commit past the ignore rules, `git add -f` style.
+   *
+   * The one shape this helper existed for and did not cover. `git add -f`
+   * beats `.gitignore`, which is the only way a file the `.local.` convention
+   * skips can also be a COMMITTED credential — so it is the fixture every
+   * suite asserting that refusal needs, and two of the three call sites went
+   * back to spawning git by hand to build it. A helper that covers the easy
+   * half and leaves the interesting half copied is the duplication it was
+   * meant to remove, one step along.
+   *
+   * Paths are relative to `root` and must already exist: `git add -f` on a
+   * missing path fails with git's own wording, inside a fixture, which is
+   * exactly the mystery {@link initGitRoot} refuses to hand a reader.
+   */
+  readonly forceAdd?: readonly string[];
+};
+
 /**
- * Turn a scratch root into a git work tree, with `.gitignore` as its only
- * commit.
+ * The failure of a fixture, distinguishable from the failure of a guard.
+ *
+ * `initGitRoot` used to call `assert.equal` on git's exit status, so "the
+ * scratch repository could not be built" arrived in the output as an assertion
+ * inside whichever case happened to build it — indistinguishable, at a glance,
+ * from the guard under test doing the wrong thing. A described throw says
+ * which of the two happened before the reader starts reading git's stderr.
+ */
+export class GitFixtureError extends Error {
+  constructor(message: string) {
+    super(`initGitRoot: ${message}`);
+    this.name = "GitFixtureError";
+  }
+}
+
+/**
+ * Turn a scratch root into a git work tree whose only commit is `.gitignore`
+ * plus whatever `forceAdd` names.
  *
  * `check-secrets` takes its candidates from `git ls-files` when git can answer
  * and from a walk when it cannot, so "is this fixture a repository?" became a
@@ -1006,17 +1042,50 @@ export function makePartialRoot(
  *
  * `-c init.defaultBranch` keeps the hint off stderr — a guard suite that greps
  * a run's output should not have to filter git's advice out of it.
+ *
+ * Everything that can go wrong here throws a {@link GitFixtureError}, because
+ * a fixture that could not be built and a guard that answered wrongly are two
+ * different pieces of news and a bare `assert.equal` reports them as one.
  */
-export function initGitRoot(root: string, ignore: string): void {
+export function initGitRoot(root: string, ignore: string, options: GitRootOptions = {}): void {
   const git = (...args: string[]): void => {
     const run = spawnSync("git", args, { cwd: root, encoding: "utf8" });
-    assert.equal(run.status, 0, `git ${args.join(" ")} failed in the fixture: ${run.stderr}`);
+    // `run.error` and a non-zero status are two different failures and the old
+    // check saw one of them: a missing binary or an unusable `cwd` leaves
+    // `status` null, which reads as `null !== 0` and says nothing about why.
+    if (run.error) {
+      throw new GitFixtureError(`\`git ${args.join(" ")}\` could not be run in ${root}: ${run.error.message}`);
+    }
+    if (run.status !== 0) {
+      const stderr = (run.stderr ?? "").trim();
+      throw new GitFixtureError(
+        `\`git ${args.join(" ")}\` exited ${String(run.status)} in ${root}: ${stderr || "(no stderr)"}`,
+      );
+    }
   };
+  const forceAdd = options.forceAdd ?? [];
+  for (const relative of forceAdd) {
+    if (path.isAbsolute(relative)) {
+      throw new GitFixtureError(
+        `"${relative}" must be a path inside the scratch root, not an absolute one.`,
+      );
+    }
+    if (!fs.existsSync(path.join(root, relative))) {
+      throw new GitFixtureError(
+        `"${relative}" does not exist under ${root}, so \`git add -f\` would fail with git's wording instead of this one. Write the file before initialising the repository.`,
+      );
+    }
+  }
   git("-c", "init.defaultBranch=main", "init", "-q");
   git("config", "user.email", "fixture@example.invalid");
   git("config", "user.name", "guard fixture");
   fs.writeFileSync(path.join(root, ".gitignore"), ignore, "utf8");
   git("add", ".gitignore");
+  // `-f`, and in the same commit as `.gitignore`: the point of these paths is
+  // that an ignore rule covers them, so a plain `add` would silently take none
+  // of them and leave a fixture that proves the opposite of what it was built
+  // for.
+  if (forceAdd.length > 0) git("add", "-f", "--", ...forceAdd);
   // Committed, not merely written: `--exclude-standard` reads `.gitignore` from
   // the working tree, but a repository with no commit at all is a shape half
   // these guards have never seen, and a fixture should not be the place that
