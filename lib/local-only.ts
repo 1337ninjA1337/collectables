@@ -91,6 +91,17 @@ export function partitionLocalOnly(paths: readonly string[]): {
  * against scratch roots that are not work trees at all, and a scan that refused
  * to run outside git would be a scan its own fixtures could not exercise. What
  * it may not do is stay quiet about it, which is why the reason is carried.
+ *
+ * "Tracked" here means IN THE INDEX, not in HEAD, and the difference matters in
+ * both directions this rule can fail. A file force-added a minute ago and not
+ * yet committed is one `git commit` from being a committed credential, so the
+ * refusal has to cover it — and it does, because `git ls-files` reads the
+ * index. That is a property of git this repository depends on rather than one
+ * it chose, so it is asserted in `__tests__/git-io.test.ts` against a fixture
+ * built in that state instead of being left to the reading of a command name.
+ * The same reading is why `tracked` arrives deduplicated: during an unresolved
+ * merge one path sits in the index at three stages, and a refusal that COUNTS
+ * what it found would otherwise report three files where there is one.
  */
 export type LocalOnlyTrackedProbe =
   | { readonly asked: true; readonly tracked: readonly string[] }

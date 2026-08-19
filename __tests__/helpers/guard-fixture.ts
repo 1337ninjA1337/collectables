@@ -1126,6 +1126,75 @@ export function initGitRoot(root: string, ignore: string, options: GitRootOption
   if (stage.length > 0) git("add", "-f", "--", ...stage);
 }
 
+/** The three blobs an unresolved merge leaves in the index for one path. */
+export type ConflictStages = {
+  /** Stage 1 — the common ancestor. */
+  readonly base: string;
+  /** Stage 2 — the version on the branch being merged INTO. */
+  readonly ours: string;
+  /** Stage 3 — the version being merged in. */
+  readonly theirs: string;
+};
+
+/**
+ * Leave `relative` in the index at all three merge stages, as an unresolved
+ * conflict does.
+ *
+ * A separate function rather than a fourth array on {@link GitRootOptions}: the
+ * other two options say WHICH paths get a state, and this one needs three blobs
+ * per path, so folding it in would mean an option whose element type is unlike
+ * its neighbours'. Call it after {@link initGitRoot}.
+ *
+ * This is the shape `listCommittable`'s deduplication exists for, and until
+ * now nothing could build it — so the claim "`--cached` lists a path once per
+ * stage" was a sentence in a doc comment with no run behind it, guarding a
+ * count that feeds the scanned floor. `git ls-files` prints such a path THREE
+ * times, which is three reads of one file, three findings for one credential,
+ * and three toward a minimum that exists to prove the walk covered the tree.
+ *
+ * Built through `update-index --index-info` rather than by provoking a real
+ * merge: a merge needs two branches, a shared ancestor and a genuine textual
+ * conflict, and every one of those is a way for the fixture to end up NOT
+ * conflicted while still looking like it worked. Writing the three stages
+ * directly is the state itself rather than a recipe that usually produces it.
+ * The working tree is left alone — during a real conflict it holds the merged
+ * file with markers in it, and what is on disk is the caller's business.
+ */
+export function stageConflicted(root: string, relative: string, stages: ConflictStages): void {
+  const git = (args: readonly string[], input?: string): string => {
+    const run = spawnSync("git", [...args], { cwd: root, encoding: "utf8", input });
+    if (run.error) {
+      throw new GitFixtureError(
+        `\`git ${args.join(" ")}\` could not be run in ${root}: ${run.error.message}`,
+      );
+    }
+    if (run.status !== 0) {
+      throw new GitFixtureError(
+        `\`git ${args.join(" ")}\` exited ${String(run.status)} in ${root}: ${(run.stderr ?? "").trim() || "(no stderr)"}`,
+      );
+    }
+    return run.stdout ?? "";
+  };
+  if (path.isAbsolute(relative)) {
+    throw new GitFixtureError(
+      `"${relative}" must be a path inside the scratch root, not an absolute one.`,
+    );
+  }
+  const blob = (content: string): string => git(["hash-object", "-w", "--stdin"], content).trim();
+  const entries = [stages.base, stages.ours, stages.theirs]
+    // The index wants POSIX separators whatever the platform spells paths in,
+    // and `--index-info` is a text protocol: a backslash here is part of the
+    // NAME, so the entry would land at a path nothing else in the fixture
+    // refers to.
+    .map((content, i) => `100644 ${blob(content)} ${i + 1}\t${relative.split(path.sep).join("/")}`)
+    .join("\n");
+  // Removed from the index first: `--index-info` cannot add a staged entry
+  // beside an existing stage-0 one, and the failure is a refusal rather than a
+  // silent no-op only because this line is here.
+  git(["rm", "--cached", "-q", "--ignore-unmatch", "--", relative]);
+  git(["update-index", "--index-info"], `${entries}\n`);
+}
+
 /** How a fixture rewrites one file of the copied checkout. */
 export type RepoPatches = Readonly<Record<string, (source: string) => string>>;
 

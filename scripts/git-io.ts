@@ -96,16 +96,23 @@ export type TrackedAnswer =
  * An empty `paths` is answered without spawning anything — bare `ls-files`
  * would return the ENTIRE index, which is the difference between "none of
  * these are tracked" and "everything is".
+ *
+ * Deduplicated for the same reason {@link listCommittable} is: during an
+ * unresolved merge the index holds one path at three stages and `ls-files`
+ * prints it once per stage. The caller here is a REFUSAL that counts and names
+ * what it found, so the undeduplicated answer reads `3 file(s) are tracked by
+ * git AND skipped` over one file listed three times — a report that overstates
+ * the problem and sends its reader looking for two files that do not exist.
  */
 export function trackedAmong(cwd: string, paths: readonly string[]): TrackedAnswer {
   if (paths.length === 0) return { ok: true, tracked: [] };
   const answer = runGit(cwd, ["ls-files", "--", ...paths]);
   if (!answer.ok) return { ok: false, reason: answer.reason };
-  return {
-    ok: true,
-    tracked: answer.stdout
+  const unique = new Set(
+    answer.stdout
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean),
-  };
+  );
+  return { ok: true, tracked: [...unique] };
 }
