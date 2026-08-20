@@ -112,3 +112,29 @@ describe("visibilityPrivateLockedA11y — every language declares the composed s
     );
   });
 });
+
+/**
+ * The chip's VISIBLE text and its spoken label have to agree in language.
+ * The label went to a per-locale key first (`visibilityPrivateLockedA11y`),
+ * and the four keys that draw the visible chip text and its hint below now
+ * follow the same rule — so a Polish user sees "Prywatna" on the chip and
+ * hears the Polish composed sentence from the label instead of "Private" on
+ * the chip and a Polish sentence in the ear.
+ */
+describe("visibility chip text and hints — every locale declares its own text", () => {
+  const src = readI18nSource();
+  for (const key of [
+    "visibilityPrivate",
+    "visibilityPublic",
+    "visibilityPublicHint",
+    "visibilityPrivateHint",
+  ]) {
+    it(`${key} is declared in every locale rather than inherited from en`, () => {
+      assertMatchesInEveryLocaleBody(
+        src,
+        new RegExp(`${key}\\s*:`),
+        `${key} is declared per locale`,
+      );
+    });
+  }
+});
