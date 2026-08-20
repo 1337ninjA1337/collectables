@@ -315,7 +315,14 @@ export default function ProfileScreen() {
             onPress={() => router.push("/settings")}
             accessibilityLabel={t("settings")}
           >
-            <Ionicons name="settings-outline" size={22} color={TEXT_ON_DARK_4} />
+            <Ionicons
+              name="settings-outline"
+              size={22}
+              color={TEXT_ON_DARK_4}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              aria-hidden
+            />
           </Pressable>
         ) : null}
         <Image source={{ uri: activeProfile.avatar }} style={styles.avatar} />

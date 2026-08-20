@@ -276,7 +276,14 @@ export default function ChatDetailScreen() {
           </Pressable>
           {messages.length > 0 ? (
             <Pressable style={styles.headerAction} onPress={handleClear} accessibilityLabel={t("chatClear")}>
-              <Ionicons name="trash-outline" size={18} color={MUTED} />
+              <Ionicons
+                name="trash-outline"
+                size={18}
+                color={MUTED}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                aria-hidden
+              />
             </Pressable>
           ) : null}
         </View>
@@ -343,7 +350,14 @@ export default function ChatDetailScreen() {
             disabled={!text.trim()}
             accessibilityLabel={t("chatSend")}
           >
-            <Ionicons name="send" size={18} color={text.trim() ? TEXT_ON_DARK_5 : AMBER_MUTED} />
+            <Ionicons
+              name="send"
+              size={18}
+              color={text.trim() ? TEXT_ON_DARK_5 : AMBER_MUTED}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              aria-hidden
+            />
           </Pressable>
         </View>
       </KeyboardAvoidingView>

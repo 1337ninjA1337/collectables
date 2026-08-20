@@ -190,7 +190,14 @@ export default function WishlistScreen() {
           <Text style={{ ...styles.subtitle, color: theme.meta }}>{t("wishlistHint")}</Text>
         </View>
         <Pressable style={styles.addButton} onPress={openAddSheet}>
-          <Ionicons name="add" size={20} color={TEXT_DARK_2} />
+          <Ionicons
+            name="add"
+            size={20}
+            color={TEXT_DARK_2}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            aria-hidden
+          />
           <Text style={styles.addButtonText}>{t("wishlistAdd")}</Text>
         </Pressable>
       </View>
@@ -245,8 +252,19 @@ export default function WishlistScreen() {
                 style={styles.promoteButton}
                 onPress={() => setPromoteFor(item)}
                 disabled={ownedCollections.length === 0}
+                // Greyed out when there is no collection to promote into, which
+                // is conveyed by colour and by nothing else.
+                accessibilityRole="button"
+                accessibilityState={{ disabled: ownedCollections.length === 0 }}
               >
-                <Ionicons name="arrow-forward" size={16} color={TEXT_ON_DARK_5} />
+                <Ionicons
+                  name="arrow-forward"
+                  size={16}
+                  color={TEXT_ON_DARK_5}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                  aria-hidden
+                />
                 <Text style={styles.promoteButtonText}>{t("wishlistPromote")}</Text>
               </Pressable>
               <DangerIconButton
@@ -398,7 +416,14 @@ export default function WishlistScreen() {
 
                 <Text style={styles.label}>{t("photosLabel")}</Text>
                 <Pressable style={styles.pickButton} onPress={pickImages}>
-                  <Ionicons name="images-outline" size={18} color={TEXT_DARK} />
+                  <Ionicons
+                    name="images-outline"
+                    size={18}
+                    color={TEXT_DARK}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    aria-hidden
+                  />
                   <Text style={styles.pickButtonText}>{t("pickFromGallery")}</Text>
                 </Pressable>
                 {photos.length > 0 ? (
@@ -436,7 +461,14 @@ export default function WishlistScreen() {
               {ownedCollections.map((c) => (
                 <Pressable key={c.id} style={styles.collectionRow} onPress={() => void handlePromote(c.id)}>
                   <Text style={styles.collectionRowText}>{c.name}</Text>
-                  <Ionicons name="chevron-forward" size={18} color={MUTED} />
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color={MUTED}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    aria-hidden
+                  />
                 </Pressable>
               ))}
             </ScrollView>

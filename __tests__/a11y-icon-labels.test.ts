@@ -307,3 +307,62 @@ describe("the header and the friends row, which had the nav bar's bug again", ()
     }
   });
 });
+
+describe("the last four screens, which close the sweep", () => {
+  /**
+   * `app/create.tsx` (5), `app/wishlist.tsx` (4), `app/chat/[id].tsx` (2) and
+   * `app/profile/[id].tsx` (1) — the twelve icons left after the two chat entry
+   * points came out of the screen-level group. All twelve are decorative on the
+   * usual evidence, which is why this is a table again rather than twelve
+   * arguments; the two things that were NOT decorative are below.
+   *
+   * With these, every `<Ionicons>` in `app/` and `components/` has been decided
+   * about: hidden where a name already sits beside it, or given the state or
+   * label it was the only carrier of.
+   */
+  const SCREENS: readonly (readonly [string, number, string])[] = [
+    ["app/create.tsx", 5, "each sits beside naming <Text> or in a labelled Pressable"],
+    ["app/wishlist.tsx", 4, "add / promote / pick each carry their own <Text>"],
+    ["app/chat/[id].tsx", 2, 'clear and send carry t("chatClear") and t("chatSend")'],
+    ["app/profile/[id].tsx", 1, 'the settings button carries t("settings")'],
+  ];
+
+  for (const [file, count, why] of SCREENS) {
+    it(`${file} hides ${count} decorative icon(s) on all three platforms — ${why}`, () => {
+      const src = read(file).replace(/\/\*[\s\S]*?\*\//g, "");
+      const tags = src.match(/<Ionicons[\s\S]*?\/>/g) ?? [];
+      assert.equal(tags.length, count, `${file} renders ${tags.length} <Ionicons>, expected ${count}`);
+      for (const [i, tag] of tags.entries()) {
+        assert.match(tag, /accessibilityElementsHidden/, `${file} #${i}: no iOS hide`);
+        assert.match(tag, /importantForAccessibility="no"/, `${file} #${i}: no Android hide`);
+        assert.match(tag, /(?<![\w-])aria-hidden/, `${file} #${i}: no web hide`);
+      }
+    });
+  }
+
+  it("the collection sheet says which collection is selected", () => {
+    // Same seam as components/currency-sheet.tsx: the row is named by its own
+    // <Text> children and the checkmark was the only thing saying which one is
+    // chosen. Hiding it without this would have deleted the only copy.
+    const src = read("app/create.tsx");
+    assert.match(src, /accessibilityState=\{\{ selected: isSelected \}\}/);
+    assert.match(src, /isSelected \? \(\s*<Ionicons/);
+  });
+
+  it("the wishlist promote button says when it is disabled", () => {
+    // Greyed out when there is no collection to promote into, conveyed by
+    // colour and by nothing else.
+    const src = read("app/wishlist.tsx");
+    assert.match(src, /accessibilityState=\{\{ disabled: ownedCollections\.length === 0 \}\}/);
+    assert.match(src, /disabled=\{ownedCollections\.length === 0\}/);
+  });
+
+  it("the collection selector announces as something you can press", () => {
+    // Named by its <Text> and claiming no role, it announced as plain text.
+    const src = read("app/create.tsx");
+    assert.match(
+      src,
+      /onPress=\{\(\) => \{ setSheetQuery\(""\); setSheetOpen\(true\); \}\}\s*\n\s*accessibilityRole="button"/,
+    );
+  });
+});

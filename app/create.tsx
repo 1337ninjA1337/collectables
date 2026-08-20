@@ -261,16 +261,31 @@ export default function CreateItemScreen() {
         <Pressable
           style={{...styles.selectorButton, ...(collectionMissing ? styles.selectorButtonInvalid : {})}}
           onPress={() => { setSheetQuery(""); setSheetOpen(true); }}
+          accessibilityRole="button"
         >
           <View style={styles.selectorContent}>
-            <Ionicons name="folder-outline" size={20} color={collectionId ? TEXT_DARK_4 : PLACEHOLDER} />
+            <Ionicons
+              name="folder-outline"
+              size={20}
+              color={collectionId ? TEXT_DARK_4 : PLACEHOLDER}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              aria-hidden
+            />
             <Text style={collectionId ? styles.selectorText : styles.selectorPlaceholder} numberOfLines={1}>
               {collectionId
                 ? ownedCollections.find((c) => c.id === collectionId)?.name ?? t("collectionFieldLabel")
                 : t("collectionFieldLabel")}
             </Text>
           </View>
-          <Ionicons name="chevron-down" size={18} color={PLACEHOLDER} />
+          <Ionicons
+            name="chevron-down"
+            size={18}
+            color={PLACEHOLDER}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            aria-hidden
+          />
         </Pressable>
       </View>
 
@@ -329,7 +344,14 @@ export default function CreateItemScreen() {
             accessibilityLabel={t("currencyLabel")}
           >
             <Text style={styles.currencySelectorText}>{currency}</Text>
-            <Ionicons name="chevron-down" size={16} color={PLACEHOLDER} />
+            <Ionicons
+              name="chevron-down"
+              size={16}
+              color={PLACEHOLDER}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              aria-hidden
+            />
           </Pressable>
         </View>
         <ErrorPill label={costError ? t(CURRENCY_ERROR_I18N_KEY[costError]) : ""} />
@@ -522,13 +544,25 @@ function CollectionSheet({
                     key={c.id}
                     style={[styles.sheetRow, isSelected && styles.sheetRowSelected]}
                     onPress={() => onSelect(c.id)}
+                    // The row is named by its own name + description <Text>
+                    // children; WHICH one is chosen was drawn as a checkmark
+                    // and said nowhere. Same seam as components/currency-sheet.
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
                   >
                     <View style={styles.sheetRowContent}>
                       {c.coverPhoto ? (
                         <Image source={{ uri: c.coverPhoto }} style={styles.sheetRowThumb} />
                       ) : (
                         <View style={[styles.sheetRowThumb, styles.sheetRowThumbEmpty]}>
-                          <Ionicons name="folder-outline" size={18} color={PLACEHOLDER} />
+                          <Ionicons
+                            name="folder-outline"
+                            size={18}
+                            color={PLACEHOLDER}
+                            accessibilityElementsHidden
+                            importantForAccessibility="no"
+                            aria-hidden
+                          />
                         </View>
                       )}
                       <View style={styles.sheetRowText}>
@@ -541,7 +575,14 @@ function CollectionSheet({
                       </View>
                     </View>
                     {isSelected ? (
-                      <Ionicons name="checkmark-circle" size={22} color={AMBER_ACCENT} />
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={22}
+                        color={AMBER_ACCENT}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        aria-hidden
+                      />
                     ) : null}
                   </Pressable>
                 );
