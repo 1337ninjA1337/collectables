@@ -38,11 +38,11 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "No inline geometry literals (borderRadius 999/22/24, gap 10/12/8) — use RADIUS_*/SPACING_* tokens",
   },
   {
-    npmScript: "lint:a11y-icon-labels",
-    scriptPath: "scripts/check-a11y-icon-labels.ts",
+    npmScript: "lint:a11y-jsx",
+    scriptPath: "scripts/check-a11y-jsx.ts",
     args: [],
     description:
-      "No icon-only Pressable without an accessibilityLabel, and no label written as a bare string literal",
+      "Accessibility problems a text scan can see: unnamed icon buttons, labels written as bare strings, nodes hidden on some platforms only, and icons that are neither hidden nor named",
   },
   {
     npmScript: "lint:env-inlining",

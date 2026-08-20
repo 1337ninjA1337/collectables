@@ -54,7 +54,7 @@ const PLANTED: Readonly<
     file: "app/planted-offender.tsx",
     source: "export const Screen = () => <TextInput value={email} />;\n",
   },
-  "check-a11y-icon-labels": {
+  "check-a11y-jsx": {
     entries: ["app", "components"],
     file: "app/planted-offender.tsx",
     // An arrow in the attribute on purpose: it is the shape that made the

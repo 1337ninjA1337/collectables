@@ -78,7 +78,7 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   "check-problem-phrasing-imports": () => ["app"],
   // Same walk, .tsx only.
   "check-clarity-input-mask": () => ["app"],
-  "check-a11y-icon-labels": () => ["app"],
+  "check-a11y-jsx": () => ["app"],
   // Walks the whole tree; app/ is a few dozen of the several hundred files.
   "check-secrets": () => ["app"],
   // Walks lib/*-config.ts — five files, floor of three, so the fixture is two.

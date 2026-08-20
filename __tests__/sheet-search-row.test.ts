@@ -101,7 +101,7 @@ describe("components/sheet-search-row.tsx — accessibility", () => {
     // iOS honours accessibilityElementsHidden, Android importantForAccessibility
     // and the web aria-hidden — shipping a subset leaves the rest announcing an
     // unnamed glyph. The PAIRING half of this is now
-    // `npm run lint:a11y-icon-labels`, which checks every element in app/ and
+    // `npm run lint:a11y-jsx`, which checks every element in app/ and
     // components/ rather than this one file; what stays here is the COUNT,
     // which is a fact about this component (a magnifier and a clear icon, both
     // decorative) that no repo-wide rule can state. Strip block comments first

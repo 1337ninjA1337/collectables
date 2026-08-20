@@ -1,8 +1,16 @@
 import { stripComments } from "@/lib/strip-comments";
 
 /**
- * Icon-button accessibility scanner behind `scripts/check-a11y-icon-labels.ts`
- * (`npm run lint:a11y-icon-labels`).
+ * Accessibility problems a text scan can see, behind `scripts/check-a11y-jsx.ts`
+ * (`npm run lint:a11y-jsx`).
+ *
+ * Named for what it reads rather than for its first rule. It shipped as
+ * `check-a11y-icon-labels` with one rule about icon buttons and grew three
+ * more the same day — untranslated labels, one-sided hiding, and icons nobody
+ * decided about — of which two are not about labels and one is not about icons
+ * either. The rename cost an entry in six places, every one of them checked by
+ * a suite, and it happened when the name stopped describing the file rather
+ * than when a fifth rule made it embarrassing.
  *
  * A `<Pressable>` whose only child is an icon has no text for an assistive
  * technology to read, so without an `accessibilityLabel` it is announced as
@@ -456,7 +464,7 @@ export function formatIconLabelReport(findings: readonly IconLabelFinding[]): st
   if (findings.length === 0) return "";
   const lines = [
     `Found ${String(findings.length)} accessibility problem(s) in app/** or components/**.`,
-    "Every tappable element needs a name a screen reader can speak, it has to be a t() call, a node hidden from one platform has to be hidden from all three, and every icon has to be hidden or named — see lib/check-a11y-icon-labels.ts.",
+    "Every tappable element needs a name a screen reader can speak, it has to be a t() call, a node hidden from one platform has to be hidden from all three, and every icon has to be hidden or named — see lib/check-a11y-jsx.ts.",
   ];
   for (const finding of findings) {
     lines.push("");

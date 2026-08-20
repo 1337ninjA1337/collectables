@@ -67,7 +67,7 @@ export const FLOOR_WALKS: Readonly<Record<string, FloorWalk>> = {
   "check-inline-radius": { roots: ["app", "components"] },
   "check-analytics-imports": { roots: ["app", "components"] },
   "check-clarity-input-mask": { roots: ["app", "components"], extensions: MARKUP_EXTENSIONS },
-  "check-a11y-icon-labels": { roots: ["app", "components"], extensions: MARKUP_EXTENSIONS },
+  "check-a11y-jsx": { roots: ["app", "components"], extensions: MARKUP_EXTENSIONS },
   "check-problem-phrasing-imports": {
     roots: ["app", "components", "lib", "scripts", "__tests__"],
   },

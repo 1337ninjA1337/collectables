@@ -22,7 +22,7 @@ describe("LINT_GUARDS — registry shape", () => {
     const ids = LINT_GUARDS.map((g) => g.npmScript);
     assert.equal(new Set(ids).size, ids.length, "duplicate guard ids");
     for (const guard of LINT_GUARDS) {
-      // Digits allowed since `lint:a11y-icon-labels`: "a11y" is the name the
+      // Digits allowed since `lint:a11y-jsx`: "a11y" is the name the
       // rule is known by everywhere else, and spelling it out to satisfy a
       // shape check would make the script harder to find than the check is
       // worth.

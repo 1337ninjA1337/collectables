@@ -663,7 +663,7 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     count: { label: "source file", minimum: 450 },
     note: "app/ + components/ + lib/ + scripts/ + __tests__/ held 645 .ts/.tsx files on 2026-08-16 (app 19, components 45, lib 152, scripts 27, tests 402); 450 rides above the 396 that __tests__/ alone contributes, so no single root clears this floor on its own — the property check-inline-hex's note names, and the one that matters most here because __tests__/ is where a hand-joined sentence is likeliest to appear.",
   },
-  "check-a11y-icon-labels": {
+  "check-a11y-jsx": {
     count: { label: "screen file", minimum: 46 },
     note: "app/ + components/ held 63 .tsx files on 2026-08-20 — the same walk check-clarity-input-mask takes, so it carries the same 46 and moves when that one moves. Aligned deliberately: two floors over one walk that disagreed would be two numbers to re-measure for one event, and the walk's largest root (components/ at 44) is what both sit above.",
   },

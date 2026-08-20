@@ -8,10 +8,10 @@ import {
   HIDE_PLATFORMS,
   type HidePlatform,
   type IconLabelCode,
-} from "@/lib/check-a11y-icon-labels";
+} from "@/lib/check-a11y-jsx";
 
 /**
- * The scanner behind `npm run lint:a11y-icon-labels`.
+ * The scanner behind `npm run lint:a11y-jsx`.
  *
  * Most of these cases are the false positives the FIRST version produced. A
  * plain `/<Pressable([\s\S]*?)>/` reported ten unlabeled icon buttons on this
