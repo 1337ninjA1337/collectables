@@ -17,6 +17,7 @@
     "build:powerbi": "tsx scripts/build-powerbi-template.ts",
     "lint:hex": "tsx scripts/check-inline-hex.ts",
     "lint:radius": "tsx scripts/check-inline-radius.ts",
+    "lint:a11y-icon-labels": "tsx scripts/check-a11y-icon-labels.ts",
     "lint:env-inlining": "tsx scripts/check-env-inlining.ts",
     "lint:analytics-imports": "tsx scripts/check-analytics-imports.ts",
     "verify:bundle-inlining": "tsx scripts/verify-bundle-inlining.ts",

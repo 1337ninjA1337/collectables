@@ -54,6 +54,16 @@ const PLANTED: Readonly<
     file: "app/planted-offender.tsx",
     source: "export const Screen = () => <TextInput value={email} />;\n",
   },
+  "check-a11y-icon-labels": {
+    entries: ["app", "components"],
+    file: "app/planted-offender.tsx",
+    // An arrow in the attribute on purpose: it is the shape that made the
+    // first version of this scanner read a fragment of the open tag, so a
+    // plant without one would be found by a scanner this guard has already
+    // outgrown.
+    source:
+      'export const Screen = () => (\n  <Pressable onPress={() => close()}>\n    <Ionicons name="close" />\n  </Pressable>\n);\n',
+  },
 };
 
 /**

@@ -24,16 +24,19 @@ import { readSuite, suiteFiles, suiteText } from "./helpers/suite-files";
  */
 
 /**
- * The two files that hold JavaScript inside a template literal, where a `//`
+ * The three files that hold JavaScript inside a template literal, where a `//`
  * line is string content and the stripper is right to leave it standing.
  *
- * `lib/spa-fallback.ts` emits the service worker as a string, and
- * `i18n-source.test.ts`'s fixtures are source the parser is asked to read.
- * `lib/privacy-page.ts` was a third until the regex fix landed — its survivor
- * was a real comment below a pattern, not quoted source, which is why the
- * "still holds one" check below is worth having.
+ * `lib/spa-fallback.ts` emits the service worker as a string;
+ * `i18n-source.test.ts`'s fixtures are source the parser is asked to read; and
+ * `check-a11y-icon-labels.test.ts` has a fixture that comments OUT an icon
+ * button, which is the case proving that guard reads a commented-out
+ * `<Pressable>` as prose. `lib/privacy-page.ts` was a fourth until the regex
+ * fix landed — its survivor was a real comment below a pattern, not quoted
+ * source, which is why the "still holds one" check below is worth having.
  */
 const QUOTED_SOURCE: readonly string[] = [
+  "check-a11y-icon-labels.test.ts",
   "i18n-source.test.ts",
   "lib/spa-fallback.ts",
 ];
