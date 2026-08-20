@@ -227,7 +227,12 @@ describe("translation floors", () => {
     // complete, and four sit below half. The `assert.ok(true)` keeps the line
     // in the runner's output next to the rows above it.
     const report = COVERAGE.map(formatCoverageRow).join("\n");
-    // 547 as of 2026-08-20: `visibilityPrivateLockedA11y`, the composed spoken
+    // 546 as of 2026-08-20: `visibilityShared` was removed — a dead key
+    // (declared in `en` and `ru`, rendered by no screen; the badge reads
+    // `visibilityViewer`) whose two declarations contradicted each other,
+    // "Shared" in en and "Публичная" (Public) in ru, with the other four
+    // locales inheriting the English one. 547 before that:
+    // `visibilityPrivateLockedA11y`, the composed spoken
     // sentence on the locked private-visibility chip — one key per locale
     // rather than a runtime template joining `visibilityPrivate` and
     // `visibilityPrivatePremiumOnly` so each language answers for its own
@@ -240,7 +245,7 @@ describe("translation floors", () => {
     // — a key the card already rendered — in be/pl/de/es, which had been
     // inheriting the English "5 photos" since it was written. The 545 before
     // it arrived the same way, with the two nav-badge labels.
-    assert.match(report, /en: 547\/547 keys \(100\.0%\)/);
+    assert.match(report, /en: 546\/546 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

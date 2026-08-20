@@ -1,7 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { assertMatchesInEveryLocaleBody } from "./helpers/i18n-locales";
+import { localeKeys } from "@/lib/i18n-source";
+
+import { assertMatchesInEveryLocaleBody, locales } from "./helpers/i18n-locales";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { readRepoFile as read } from "./helpers/repo-file";
 
@@ -134,6 +136,33 @@ describe("visibility chip text and hints — every locale declares its own text"
         src,
         new RegExp(`${key}\\s*:`),
         `${key} is declared per locale`,
+      );
+    });
+  }
+});
+
+/**
+ * `visibilityShared` was removed, and stays removed.
+ *
+ * It was a dead key — no screen rendered it (the badge reads `visibilityViewer`
+ * for a shared-with-me collection and `visibilityPublic` for a public one) —
+ * whose two declarations contradicted each other: "Shared" in `en` and
+ * "Публичная" (Public) in `ru`, with the four other locales inheriting the
+ * English one. Because nothing rendered it, no runtime assertion could catch
+ * the contradiction; a source check is the only place it shows. This pins the
+ * absence so a future edit re-adding a `visibilityShared` (contradictory or
+ * not) has to explain itself rather than reviving a duplicate of
+ * `visibilityViewer` by reflex.
+ */
+describe("visibilityShared — the dead, contradictory key stays deleted", () => {
+  const src = readI18nSource();
+  for (const language of locales(src)) {
+    it(`${language} declares no visibilityShared`, () => {
+      assert.ok(
+        !localeKeys(src, language).has("visibilityShared"),
+        `${language} re-declares visibilityShared — it was removed as a dead, ` +
+          `self-contradictory duplicate of visibilityViewer; use visibilityViewer ` +
+          `(shared-with-me) or visibilityPublic (public) instead`,
       );
     });
   }
