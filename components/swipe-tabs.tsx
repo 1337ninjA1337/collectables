@@ -261,6 +261,8 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
                   ...(isActive ? styles.subTabActive : {}),
                 }}
                 onPress={() => jumpToKey(t.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
               >
                 <Text
                   style={{
@@ -285,6 +287,8 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
                 ...(isActive ? { backgroundColor: theme.text, borderColor: theme.text } : {}),
               }}
               onPress={() => jumpToKey(t.key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
             >
               <Text
                 style={{

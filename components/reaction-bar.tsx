@@ -31,6 +31,8 @@ export function ReactionBar({ targetType, targetId }: Props) {
               ...(item.count > 0 ? styles.chipWithCount : {}),
             }}
             onPress={() => void toggle(item.key)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: item.mine }}
           >
             <Text style={styles.emoji}>{item.icon}</Text>
             {item.count > 0 ? (

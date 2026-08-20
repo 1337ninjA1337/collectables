@@ -54,6 +54,7 @@ export function PhotoPreview({ photos, onChange, maxPhotos = 5 }: Props) {
             style={styles.deleteButton}
             onPress={() => removePhoto(index)}
             hitSlop={6}
+            accessibilityRole="button"
             accessibilityLabel={t("delete")}
           >
             <Ionicons

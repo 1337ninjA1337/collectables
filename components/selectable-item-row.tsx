@@ -29,7 +29,15 @@ export const SELECTABLE_ROW_HEIGHT = 134;
 // perf win.
 export const SelectableItemRow = memo(function SelectableItemRow({ item, selected, onToggle }: Props) {
   return (
-    <Pressable onPress={() => onToggle(item.id)} style={[styles.wrap, selected && styles.wrapSelected]}>
+    <Pressable
+      onPress={() => onToggle(item.id)}
+      style={[styles.wrap, selected && styles.wrapSelected]}
+      // A row in a multi-select list is a checkbox, not a button: "button"
+      // would announce the tap and say nothing about whether the item is in
+      // the selection, which is the whole state this row exists to show.
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
+    >
       <View pointerEvents="none">
         <ItemCard item={item} />
       </View>

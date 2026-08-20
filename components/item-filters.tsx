@@ -218,6 +218,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
         <Pressable
           style={[styles.filterButton, activeCount > 0 && styles.filterButtonActive]}
           onPress={openModal}
+          accessibilityRole="button"
         >
           <Ionicons
             name="options-outline"
@@ -237,6 +238,8 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             key={chip.key}
             style={[styles.chip, chip.active && styles.chipActive]}
             onPress={chip.onToggle}
+            accessibilityRole="button"
+            accessibilityState={{ selected: chip.active }}
           >
             <Text style={[styles.chipText, chip.active && styles.chipTextActive]}>
               {chip.label}
@@ -309,8 +312,16 @@ export function ItemFilterBar({ filters, onChange }: Props) {
       </ScrollView>
 
       <Modal visible={modalOpen} transparent animationType="fade" onRequestClose={() => setModalOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setModalOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => setModalOpen(false)}
+          accessibilityRole="none"
+        >
+          <Pressable
+            style={styles.sheet}
+            onPress={(e) => e.stopPropagation()}
+            accessibilityRole="none"
+          >
             {/* The sheet grew past a small phone's viewport once the sort
                 picker went from 3 chips to 7 (three axes x two directions, plus
                 default). Without this scroll the wrapped chip rows push the
@@ -474,7 +485,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
                 >
                   <Text style={styles.applyButtonText}>{t("filterApply")}</Text>
                 </Pressable>
-                <Pressable style={styles.resetButton} onPress={reset}>
+                <Pressable style={styles.resetButton} onPress={reset} accessibilityRole="button">
                   <Text style={styles.resetButtonText}>{t("filterReset")}</Text>
                 </Pressable>
               </View>

@@ -111,6 +111,8 @@ export function CurrencyInput({
               key={c}
               style={[styles.chip, active && styles.chipActive]}
               onPress={() => selectCurrency(c)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
             >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{c}</Text>
             </Pressable>
@@ -122,6 +124,7 @@ export function CurrencyInput({
             setQuery("");
             setSheetOpen(true);
           }}
+          accessibilityRole="button"
           accessibilityLabel={t("currencyMore")}
         >
           <Ionicons

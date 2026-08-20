@@ -58,6 +58,7 @@ function NavRow({ leftItems, rightItems, onPlusPress, plusLabel }: NavRowProps) 
         <Pressable
           style={{ ...styles.plusButton, backgroundColor: plusBg, borderColor: theme.navBg }}
           onPress={onPlusPress}
+          accessibilityRole="button"
           accessibilityLabel={plusLabel}
         >
           <Ionicons
@@ -297,15 +298,31 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
       </View>
 
       <Modal visible={createOpen} transparent animationType="fade" onRequestClose={closeCreate}>
-        <Pressable style={styles.modalBackdrop} onPress={closeCreate}>
-          <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
-            <Pressable style={styles.modalPrimaryButton} onPress={goCreateCollection}>
+        <Pressable style={styles.modalBackdrop} onPress={closeCreate} accessibilityRole="none">
+          <Pressable
+            style={styles.modalSheet}
+            onPress={(e) => e.stopPropagation()}
+            accessibilityRole="none"
+          >
+            <Pressable
+              style={styles.modalPrimaryButton}
+              onPress={goCreateCollection}
+              accessibilityRole="button"
+            >
               <Text style={styles.modalPrimaryText}>{t("createCollection")}</Text>
             </Pressable>
-            <Pressable style={styles.modalSecondaryButton} onPress={goCreateItem}>
+            <Pressable
+              style={styles.modalSecondaryButton}
+              onPress={goCreateItem}
+              accessibilityRole="button"
+            >
               <Text style={styles.modalSecondaryText}>{t("addItem")}</Text>
             </Pressable>
-            <Pressable style={styles.modalCancelButton} onPress={closeCreate}>
+            <Pressable
+              style={styles.modalCancelButton}
+              onPress={closeCreate}
+              accessibilityRole="button"
+            >
               <Text style={styles.modalCancelText}>{t("cancel")}</Text>
             </Pressable>
           </Pressable>
