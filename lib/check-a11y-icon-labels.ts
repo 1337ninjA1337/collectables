@@ -32,6 +32,24 @@ import { stripComments } from "@/lib/strip-comments";
  * prop, so the browser — this app's primary surface — announced every one of
  * them. This checks every element in both roots.
  *
+ * The fourth is the one this file could not carry until the tree earned it.
+ * A sweep on 2026-08-20 found 36 of this tree's 44 `<Ionicons>` carrying
+ * neither a hide nor a label — nobody had decided whether they were decoration
+ * or content, and every screen reader announced whatever the glyph font
+ * resolved to. That is not a rule you can add while it has 36 findings: it
+ * gets floored at 36 and stops meaning anything. It is a rule you can add the
+ * day the count reaches zero, which the sweep did, so `undecided_icon` now
+ * says every icon is hidden or named and the tree is the proof it passes.
+ *
+ * Hiding is INHERITED, which is why the walk keeps a stack rather than
+ * scanning tags flat: `item-card.tsx`'s photo-count badge is a glyph AND a
+ * bare number, and it is hidden as a subtree so the two go together. A rule
+ * that only read each tag's own props would report both of those icons and
+ * demand redundant props on them. Android is the platform that makes this
+ * more than a detail — `importantForAccessibility="no"` hides the node and
+ * leaves its children announced, and only `"no-hide-descendants"` takes the
+ * subtree.
+ *
  * Why a hand-written tag scanner and not a regex: the obvious
  * `/<Pressable([\s\S]*?)>/` ends the open tag at the first `>` in the file,
  * which on this codebase is usually the one inside `onPress={() => x}`. It
@@ -79,8 +97,30 @@ export type IconLabelCode =
    * tested and silently does nothing on the rest. Checked on every element,
    * not just Pressables — the seven sites in this tree are icons, views and
    * text.
+   *
+   * Not reported inside a subtree an ancestor already hides: hiding a parent
+   * hides what is under it, so a child in there needs nothing and a rule that
+   * demanded props of it would be asking for the redundant.
    */
-  | "half_hidden";
+  | "half_hidden"
+  /**
+   * An `<Ionicons>` that is neither hidden nor named — nobody has decided
+   * whether it is decoration or content, so it is announced as whatever the
+   * glyph font resolves to. This rule could not be written until a sweep on
+   * 2026-08-20 decided all 44 of them: a guard whose first run reports 36
+   * findings is a guard somebody floors at 36.
+   *
+   * "Hidden" counts an ancestor, because that is how the two icons in
+   * `item-card.tsx`'s photo-count badge are hidden — the badge is a glyph AND
+   * a bare number, and hiding it as a subtree is what keeps the two together.
+   *
+   * "Named" is an `accessibilityLabel` on the icon itself. It deliberately
+   * does NOT count a label on an ancestor `<Pressable>`: on iOS that label
+   * REPLACES the subtree, so the icon is silent there and announced on the
+   * web, which is the split this guard exists to catch. Hiding it says the
+   * same thing on all three platforms.
+   */
+  | "undecided_icon";
 
 /** A platform whose accessibility tree has its own way of being told to skip a node. */
 export type HidePlatform = "ios" | "android" | "web";
@@ -122,6 +162,8 @@ const FINDING_DETAIL: Record<IconLabelCode, string> = {
     "an accessibilityLabel written as a bare string literal — it is spoken in that one language to speakers of all six",
   half_hidden:
     "hidden from assistive technology on some platforms only — accessibilityElementsHidden (iOS), importantForAccessibility=\"no\" (Android) and aria-hidden (web) have to travel together, or the node stays announced on whichever platform the author did not test",
+  undecided_icon:
+    "an <Ionicons> that is neither hidden nor named — every icon in this tree is one or the other, so decide: hide it on all three platforms if it is decoration, or give it an accessibilityLabel if it is content",
 };
 
 /**
@@ -222,6 +264,12 @@ type OpenTag = {
   /** Offset of the `>` that closed the open tag. */
   readonly tagEnd: number;
   readonly selfClosing: boolean;
+  /**
+   * True when some ANCESTOR of this tag hides its whole subtree on all three
+   * platforms. Such a node is already unreachable, so it needs no props of its
+   * own and asking for them would be asking for the redundant.
+   */
+  readonly coveredByAncestor: boolean;
 };
 
 /**
@@ -232,17 +280,37 @@ type OpenTag = {
  * over one file would be two chances to disagree about where a tag ends —
  * which is the thing that was hard to get right here.
  *
- * `<` followed by a letter is the whole tag test. A closing tag starts `</`
- * and a fragment `<>`, so neither matches, and a bare `<` in an expression
- * (`a < b`) is followed by a space in every formatting this repository uses.
- * A `<` that turns out not to open a tag costs a fruitless brace walk and no
- * finding, because the rules below both require a named attribute.
+ * `<` followed by a letter is the whole tag test. A bare `<` in an expression
+ * (`a < b`) is followed by a space in every formatting this repository uses,
+ * and a fragment `<>` has no name. A `<` that turns out not to open a tag
+ * costs a fruitless brace walk and no finding, because every rule below
+ * requires a named attribute.
+ *
+ * Closing tags are read too, for one reason: hiding is INHERITED. A node
+ * inside a subtree its parent hides is already unreachable, so the rules have
+ * to know where that parent's subtree ends, and that means a stack rather
+ * than a flat scan. `</>` closes a fragment and matches no name, so it is
+ * skipped along with the `<>` that opened it — a fragment cannot carry props
+ * and so can never be the ancestor that hides anything.
+ *
+ * An unmatched close tag pops down to its name if the name is open, and is
+ * ignored otherwise. Both are the forgiving choice: this scanner reads files
+ * mid-edit, and a stack that threw would turn a lint run into a crash.
  */
 function* openTags(code: string): Generator<OpenTag> {
+  /** Open ancestors, innermost last; `covered` is inherited then widened. */
+  const stack: { name: string; covered: boolean }[] = [];
   let cursor = 0;
   while (cursor < code.length) {
     const start = code.indexOf("<", cursor);
     if (start === -1) return;
+    const closeMatch = /^<\/([A-Za-z][A-Za-z0-9_.]*)\s*>/.exec(code.slice(start));
+    if (closeMatch) {
+      const depth = stack.map((f) => f.name).lastIndexOf(closeMatch[1]);
+      if (depth !== -1) stack.length = depth;
+      cursor = start + closeMatch[0].length;
+      continue;
+    }
     const nameMatch = /^<([A-Za-z][A-Za-z0-9_.]*)/.exec(code.slice(start));
     if (!nameMatch) {
       cursor = start + 1;
@@ -252,14 +320,24 @@ function* openTags(code: string): Generator<OpenTag> {
     const tagEnd = openTagEnd(code, attrsAt);
     if (tagEnd === -1) return;
     cursor = tagEnd + 1;
+    const attrs = code.slice(attrsAt, tagEnd);
+    const selfClosing = code[tagEnd - 1] === "/";
+    const coveredByAncestor = stack.length > 0 && stack[stack.length - 1].covered;
     yield {
       name: nameMatch[1],
-      attrs: code.slice(attrsAt, tagEnd),
+      attrs,
       start,
       attrsAt,
       tagEnd,
-      selfClosing: code[tagEnd - 1] === "/",
+      selfClosing,
+      coveredByAncestor,
     };
+    if (!selfClosing) {
+      stack.push({
+        name: nameMatch[1],
+        covered: coveredByAncestor || hidesSubtree(attrs),
+      });
+    }
   }
 }
 
@@ -285,6 +363,29 @@ const HIDDEN_BY: Record<HidePlatform, RegExp> = {
 };
 
 /**
+ * The same instruction, in the form that reaches DESCENDANTS.
+ *
+ * Two of the three already do: `accessibilityElementsHidden` removes an iOS
+ * subtree and `aria-hidden` removes a DOM one. Android is the exception and
+ * the reason this table is not just the one above — `importantForAccessibility
+ * ="no"` hides the node and leaves its children announced, and only
+ * `"no-hide-descendants"` takes the subtree with it.
+ *
+ * Used for one question: is this tag already unreachable because of something
+ * above it? A node inside such a subtree needs no props of its own.
+ */
+const HIDES_SUBTREE_BY: Record<HidePlatform, RegExp> = {
+  ios: HIDDEN_BY.ios,
+  android: /importantForAccessibility\s*=\s*"no-hide-descendants"/,
+  web: HIDDEN_BY.web,
+};
+
+/** True when these attributes hide the tag AND everything under it, everywhere. */
+function hidesSubtree(attrs: string): boolean {
+  return HIDE_PLATFORMS.every((platform) => HIDES_SUBTREE_BY[platform].test(attrs));
+}
+
+/**
  * Scan one source string for the accessibility problems this guard names.
  *
  * Findings come back in source order, which is the order somebody fixing them
@@ -303,8 +404,10 @@ export function findUnlabeledIconButtons(file: string, source: string): IconLabe
     const { attrs, attrsAt, start } = tag;
     const missing = HIDE_PLATFORMS.filter((platform) => !HIDDEN_BY[platform].test(attrs));
     // A node hidden everywhere is done; one hidden nowhere never asked to be.
-    // Everything between is a hide that stops at a platform boundary.
-    if (missing.length > 0 && missing.length < HIDE_PLATFORMS.length) {
+    // Everything between is a hide that stops at a platform boundary — unless
+    // an ancestor already took the whole subtree, in which case this node is
+    // unreachable however many props it happens to carry.
+    if (!tag.coveredByAncestor && missing.length > 0 && missing.length < HIDE_PLATFORMS.length) {
       findings.push({
         file,
         line: at(start),
@@ -312,6 +415,17 @@ export function findUnlabeledIconButtons(file: string, source: string): IconLabe
         snippet: snippetAt(start),
         missing,
       });
+    }
+    // Every icon in this tree is hidden or named. One that is neither has not
+    // been decided about, and it is announced as whatever the glyph resolves
+    // to until somebody does.
+    if (
+      `<${tag.name}` === ICON_ELEMENT &&
+      !tag.coveredByAncestor &&
+      missing.length > 0 &&
+      !attrs.includes("accessibilityLabel")
+    ) {
+      findings.push({ file, line: at(start), code: "undecided_icon", snippet: snippetAt(start) });
     }
     if (tag.name !== TAG) continue;
     let body = "";
@@ -342,7 +456,7 @@ export function formatIconLabelReport(findings: readonly IconLabelFinding[]): st
   if (findings.length === 0) return "";
   const lines = [
     `Found ${String(findings.length)} accessibility problem(s) in app/** or components/**.`,
-    "Every tappable element needs a name a screen reader can speak, it has to be a t() call, and a node hidden from one platform has to be hidden from all three — see lib/check-a11y-icon-labels.ts.",
+    "Every tappable element needs a name a screen reader can speak, it has to be a t() call, a node hidden from one platform has to be hidden from all three, and every icon has to be hidden or named — see lib/check-a11y-icon-labels.ts.",
   ];
   for (const finding of findings) {
     lines.push("");

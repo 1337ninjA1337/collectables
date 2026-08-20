@@ -22,6 +22,15 @@ import {
  * somebody turns off.
  */
 
+/**
+ * The three props that hide an icon everywhere, as this tree now writes them.
+ *
+ * Spelled once because every fixture below whose SUBJECT is a label needs its
+ * icon to be decided about — an undecided one is its own finding, and a case
+ * asserting two rules at once stops saying which one it is for.
+ */
+const HIDDEN = 'accessibilityElementsHidden importantForAccessibility="no" aria-hidden';
+
 const findings = (source: string) => findUnlabeledIconButtons("app/x.tsx", source);
 const codes = (source: string) => findings(source).map((f) => f.code);
 
@@ -29,7 +38,7 @@ describe("findUnlabeledIconButtons", () => {
   it("flags an icon-only Pressable with no label", () => {
     const found = findings(`
       <Pressable style={styles.chip} onPress={close}>
-        <Ionicons name="close" size={14} />
+        <Ionicons name="close" size={14} ${HIDDEN} />
       </Pressable>
     `);
     assert.deepEqual(
@@ -46,7 +55,7 @@ describe("findUnlabeledIconButtons", () => {
     assert.deepEqual(
       codes(`
         <Pressable onPress={() => setOpen(true)} accessibilityLabel={t("search")}>
-          <Ionicons name="search" size={18} />
+          <Ionicons name="search" size={18} ${HIDDEN} />
         </Pressable>
       `),
       [],
@@ -61,7 +70,7 @@ describe("findUnlabeledIconButtons", () => {
           onPress={() => move(i, i + 1)}
           accessibilityLabel={t("next")}
         >
-          <Ionicons name="chevron-forward" />
+          <Ionicons name="chevron-forward" ${HIDDEN} />
         </Pressable>
       `),
       [],
@@ -72,7 +81,7 @@ describe("findUnlabeledIconButtons", () => {
     assert.deepEqual(
       codes(`
         <Pressable title=">" accessibilityLabel={t("x")}>
-          <Ionicons name="close" />
+          <Ionicons name="close" ${HIDDEN} />
         </Pressable>
       `),
       [],
@@ -85,7 +94,7 @@ describe("findUnlabeledIconButtons", () => {
     assert.deepEqual(
       codes(`
         <Pressable onPress={save}>
-          <Ionicons name="save" />
+          <Ionicons name="save" ${HIDDEN} />
           <Text>{t("save")}</Text>
         </Pressable>
       `),
@@ -102,7 +111,7 @@ describe("findUnlabeledIconButtons", () => {
         <Pressable onPress={openCard}>
           <Text>{title}</Text>
           <Pressable onPress={remove}>
-            <Ionicons name="trash" />
+            <Ionicons name="trash" ${HIDDEN} />
           </Pressable>
         </Pressable>
       `),
@@ -118,7 +127,7 @@ describe("findUnlabeledIconButtons", () => {
     assert.deepEqual(
       codes(`
         <PressableRow onPress={go}>
-          <Ionicons name="chevron-forward" />
+          <Ionicons name="chevron-forward" ${HIDDEN} />
         </PressableRow>
       `),
       [],
@@ -144,7 +153,7 @@ describe("findUnlabeledIconButtons", () => {
     assert.equal(
       findings(`
         <Pressable onPress={open} accessibilityLabel="Close">
-          <Ionicons name="close" />
+          <Ionicons name="close" ${HIDDEN} />
         </Pressable>
       `).length,
       1,
@@ -157,10 +166,10 @@ describe("findUnlabeledIconButtons", () => {
     // an exemption for every file that explains it.
     assert.deepEqual(
       codes(`
-        // <Pressable onPress={x}><Ionicons name="close" /></Pressable>
-        /* <Pressable><Ionicons name="close" /></Pressable> */
+        // <Pressable onPress={x}><Ionicons name="close" ${HIDDEN} /></Pressable>
+        /* <Pressable><Ionicons name="close" ${HIDDEN} /></Pressable> */
         <Pressable onPress={x} accessibilityLabel={t("close")}>
-          <Ionicons name="close" />
+          <Ionicons name="close" ${HIDDEN} />
         </Pressable>
       `),
       [],
@@ -169,9 +178,9 @@ describe("findUnlabeledIconButtons", () => {
 
   it("reports every finding in a file, in source order", () => {
     const found = findings(`
-      <Pressable onPress={a}><Ionicons name="a" /></Pressable>
+      <Pressable onPress={a}><Ionicons name="a" ${HIDDEN} /></Pressable>
       <Pressable onPress={b} accessibilityLabel="B"><Text>b</Text></Pressable>
-      <Pressable onPress={c}><Ionicons name="c" /></Pressable>
+      <Pressable onPress={c}><Ionicons name="c" ${HIDDEN} /></Pressable>
     `);
     assert.deepEqual(
       found.map((f) => f.code),
@@ -187,7 +196,7 @@ describe("findUnlabeledIconButtons", () => {
     // A file mid-edit, or one this scanner simply does not understand. The
     // honest answer is "nothing to report here", not a crash in a lint run.
     assert.doesNotThrow(() => findings(`<Pressable onPress={x}`));
-    assert.doesNotThrow(() => findings(`<Pressable onPress={x}><Ionicons />`));
+    assert.doesNotThrow(() => findings(`<Pressable onPress={x}><Ionicons ${HIDDEN} />`));
   });
 });
 
@@ -197,10 +206,10 @@ describe("the three platform props", () => {
 
   it("flags an element hidden on iOS only", () => {
     assert.deepEqual(
-      codes(`<View accessibilityElementsHidden><Ionicons name="a" /></View>`),
+      codes(`<View accessibilityElementsHidden><Text>a</Text></View>`),
       ["half_hidden"],
     );
-    assert.deepEqual(missingOf(`<View accessibilityElementsHidden><Ionicons name="a" /></View>`), [
+    assert.deepEqual(missingOf(`<View accessibilityElementsHidden><Text>a</Text></View>`), [
       ["android", "web"],
     ]);
   });
@@ -215,15 +224,15 @@ describe("the three platform props", () => {
     // would make next: `aria-hidden` alone reads as done to anyone testing in
     // a browser, and `<Ionicons>` renders a `<Text>`, which does not derive
     // the native props from it the way `<View>` does.
-    assert.deepEqual(codes(`<Ionicons name="a" aria-hidden />`), ["half_hidden"]);
-    assert.deepEqual(missingOf(`<Ionicons name="a" aria-hidden />`), [["ios", "android"]]);
+    assert.deepEqual(codes(`<Text aria-hidden>a</Text>`), ["half_hidden"]);
+    assert.deepEqual(missingOf(`<Text aria-hidden>a</Text>`), [["ios", "android"]]);
   });
 
   it("flags the native pair that forgot the web, which is what every site here was", () => {
     // Before 2026-08-20 all seven decorative icons in this tree looked exactly
     // like this, and the rule that only paired iOS with Android said nothing.
     assert.deepEqual(
-      missingOf(`<Ionicons accessibilityElementsHidden importantForAccessibility="no" />`),
+      missingOf(`<Text accessibilityElementsHidden importantForAccessibility="no">a</Text>`),
       [["web"]],
     );
   });
@@ -236,7 +245,7 @@ describe("the three platform props", () => {
           importantForAccessibility="no"
           aria-hidden
         >
-          <Ionicons name="a" />
+          <Text>a</Text>
         </View>
       `),
       [],
@@ -266,7 +275,7 @@ describe("the three platform props", () => {
     // `-` is a word boundary, so a `\\b` in front of the pattern would pass
     // this. The rule needs the attribute to BE aria-hidden, not end in it.
     assert.deepEqual(
-      missingOf(`<View accessibilityElementsHidden importantForAccessibility="no" data-aria-hidden />`),
+      missingOf(`<Text accessibilityElementsHidden importantForAccessibility="no" data-aria-hidden>a</Text>`),
       [["web"]],
     );
   });
@@ -278,7 +287,7 @@ describe("the three platform props", () => {
     assert.deepEqual(codes(`<View><Text>a</Text></View>`), []);
     for (const found of findings(`
       <View accessibilityElementsHidden>
-        <Ionicons name="a" aria-hidden />
+        <Text aria-hidden>a</Text>
       </View>
     `)) {
       const missing = found.missing ?? [];
@@ -287,11 +296,11 @@ describe("the three platform props", () => {
   });
 
   it("checks every element, not only Pressables", () => {
-    // The seven sites in this tree are icons, views and text. Scoping the rule
-    // to buttons would have covered none of them.
+    // The sites in this tree are icons, views and text. Scoping the rule to
+    // buttons would have covered none of them.
     const found = findings(`
       <View accessibilityElementsHidden>
-        <Ionicons name="a" importantForAccessibility="no" />
+        <Text importantForAccessibility="no">a</Text>
       </View>
     `);
     assert.deepEqual(
@@ -312,7 +321,7 @@ describe("the report", () => {
 
   it("names the file, the line and what is wrong with it", () => {
     const report = formatIconLabelReport(findings(`
-      <Pressable onPress={a}><Ionicons name="a" /></Pressable>
+      <Pressable onPress={a}><Ionicons name="a" ${HIDDEN} /></Pressable>
     `));
     assert.match(report, /Found 1 accessibility problem\(s\)/);
     assert.match(report, /app\/x\.tsx:2/);
@@ -320,7 +329,7 @@ describe("the report", () => {
   });
 
   it("gives every code a sentence", () => {
-    const all: IconLabelCode[] = ["unlabeled", "untranslated", "half_hidden"];
+    const all: IconLabelCode[] = ["unlabeled", "untranslated", "half_hidden", "undecided_icon"];
     for (const code of all) {
       const said = describeIconLabelFinding(code);
       assert.ok(said.length > 40, `${code} is described in fewer words than a reason`);
@@ -355,5 +364,83 @@ describe("the report", () => {
     for (const platform of HIDE_PLATFORMS) {
       assert.match(said, new RegExp(`\\(${platform}\\)`), `${platform} has no prop in the sentence`);
     }
+  });
+});
+
+describe("the icon nobody decided about", () => {
+  it("flags a bare icon", () => {
+    // Announced as whatever the glyph font resolves to, on every platform.
+    assert.deepEqual(codes(`<View><Ionicons name="a" /></View>`), ["undecided_icon"]);
+  });
+
+  it("says nothing about an icon that is hidden, or one that is named", () => {
+    assert.deepEqual(codes(`<View><Ionicons name="a" ${HIDDEN} /></View>`), []);
+    assert.deepEqual(codes(`<View><Ionicons name="a" accessibilityLabel={t("x")} /></View>`), []);
+  });
+
+  it("counts an ancestor that hides the whole subtree", () => {
+    // `item-card.tsx`'s photo-count badge is a glyph AND a bare number, hidden
+    // together so the "5" does not survive on its own. Demanding props on the
+    // icon inside it would be demanding the redundant.
+    assert.deepEqual(
+      codes(`
+        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+          <Ionicons name="a" />
+          <Text>5</Text>
+        </View>
+      `),
+      [],
+    );
+  });
+
+  it('does not count importantForAccessibility="no" on an ancestor', () => {
+    // The distinction that makes this a stack rather than a flag: on Android
+    // "no" hides the node and leaves its children announced. Only
+    // "no-hide-descendants" takes the subtree.
+    assert.deepEqual(
+      codes(`
+        <View accessibilityElementsHidden importantForAccessibility="no" aria-hidden>
+          <Ionicons name="a" />
+        </View>
+      `),
+      ["undecided_icon"],
+    );
+  });
+
+  it("stops covering at the ancestor's closing tag", () => {
+    // The failure a stack that never popped would produce: everything after
+    // the first hidden container looks hidden forever.
+    const found = findings(`
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+        <Ionicons name="inside" />
+      </View>
+      <Ionicons name="after" />
+    `);
+    assert.deepEqual(found.map((f) => f.code), ["undecided_icon"]);
+    assert.match(found[0].snippet, /name="after"/);
+  });
+
+  it("does not accept a label on an ancestor Pressable as the icon's decision", () => {
+    // On iOS that label REPLACES the subtree, so the icon is silent there and
+    // announced on the web — the exact split this guard exists to catch.
+    // Hiding it says the same thing on all three platforms.
+    assert.deepEqual(
+      codes(`
+        <Pressable accessibilityLabel={t("x")}>
+          <Ionicons name="a" />
+          <Text>hi</Text>
+        </Pressable>
+      `),
+      ["undecided_icon"],
+    );
+  });
+
+  it("reports a bare icon in an icon-only button as both problems", () => {
+    // They are two different fixes: the BUTTON needs a name, and the ICON
+    // needs hiding. Reporting one would leave the other in place.
+    assert.deepEqual(
+      codes(`<Pressable onPress={x}><Ionicons name="a" /></Pressable>`),
+      ["unlabeled", "undecided_icon"],
+    );
   });
 });
