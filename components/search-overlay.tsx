@@ -192,8 +192,16 @@ export function SearchOverlay({ visible, onClose }: Props) {
       transparent
       onRequestClose={onClose}
     >
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        accessibilityRole="none"
+      >
+        <Pressable
+          style={styles.sheet}
+          onPress={(e) => e.stopPropagation()}
+          accessibilityRole="none"
+        >
           {/* Search input.
 
               Not `<SheetSearchRow>`: this row carries a trailing "close the
@@ -270,6 +278,8 @@ export function SearchOverlay({ visible, onClose }: Props) {
                 key={f.key}
                 style={[styles.filterChip, filter === f.key && styles.filterChipActive]}
                 onPress={() => setFilter(f.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: filter === f.key }}
               >
                 <Text
                   style={[
@@ -293,6 +303,8 @@ export function SearchOverlay({ visible, onClose }: Props) {
               <Pressable
                 style={[styles.ownerChip, !ownerFilter && styles.ownerChipActive]}
                 onPress={() => setOwnerFilter(null)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: !ownerFilter }}
               >
                 <Text
                   style={[
@@ -311,6 +323,8 @@ export function SearchOverlay({ visible, onClose }: Props) {
                     ownerFilter === o.id && styles.ownerChipActive,
                   ]}
                   onPress={() => setOwnerFilter(ownerFilter === o.id ? null : o.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: ownerFilter === o.id }}
                 >
                   <Text
                     style={[
@@ -348,6 +362,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
                       key={item.id}
                       style={styles.row}
                       onPress={() => goToItem(item.id)}
+                      accessibilityRole="button"
                     >
                       <View style={styles.rowContent}>
                         {item.photos.length > 0 ? (
@@ -385,6 +400,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
                       key={c.id}
                       style={styles.row}
                       onPress={() => goToCollection(c.id)}
+                      accessibilityRole="button"
                     >
                       <View style={styles.rowContent}>
                         {c.coverPhoto ? (
@@ -421,6 +437,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
                       key={p.id}
                       style={styles.row}
                       onPress={() => goToProfile(p.id)}
+                      accessibilityRole="button"
                     >
                       <View style={styles.rowContent}>
                         {p.avatar ? (

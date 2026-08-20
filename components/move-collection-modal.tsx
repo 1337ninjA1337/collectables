@@ -41,17 +41,34 @@ export const MoveCollectionModal = memo(function MoveCollectionModal({
   const { t } = useI18n();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        style={styles.modalBackdrop}
+        onPress={onClose}
+        accessibilityRole="none"
+      >
+        <Pressable
+          style={styles.modalCard}
+          onPress={(e) => e.stopPropagation()}
+          accessibilityRole="none"
+        >
           <Text style={styles.modalTitle}>{t("moveToCollection")}</Text>
           <View style={styles.modalList}>
             {collections.map((c) => (
-              <Pressable key={c.id} style={styles.modalRow} onPress={() => void onMove(c.id)}>
+              <Pressable
+                key={c.id}
+                style={styles.modalRow}
+                onPress={() => void onMove(c.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.modalRowText}>{c.name}</Text>
               </Pressable>
             ))}
           </View>
-          <Pressable style={styles.modalCancel} onPress={onClose}>
+          <Pressable
+            style={styles.modalCancel}
+            onPress={onClose}
+            accessibilityRole="button"
+          >
             <Text style={styles.modalCancelText}>{t("cancel")}</Text>
           </Pressable>
         </Pressable>

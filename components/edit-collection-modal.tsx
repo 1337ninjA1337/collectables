@@ -84,8 +84,16 @@ export const EditCollectionModal = memo(function EditCollectionModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable style={styles.editModalCard} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        style={styles.modalBackdrop}
+        onPress={onClose}
+        accessibilityRole="none"
+      >
+        <Pressable
+          style={styles.editModalCard}
+          onPress={(e) => e.stopPropagation()}
+          accessibilityRole="none"
+        >
           <Text style={styles.modalTitle}>{t("editCollection")}</Text>
 
           <View style={styles.editFieldGroup}>
@@ -116,7 +124,11 @@ export const EditCollectionModal = memo(function EditCollectionModal({
 
           <View style={styles.editFieldGroup}>
             <Text style={styles.editFieldLabel}>{t("collectionCoverLabel")}</Text>
-            <Pressable style={styles.editCoverButton} onPress={() => void onPickCover()}>
+            <Pressable
+              style={styles.editCoverButton}
+              onPress={() => void onPickCover()}
+              accessibilityRole="button"
+            >
               <Text style={styles.editCoverButtonText}>{t("editCover")}</Text>
             </Pressable>
             {coverUri ? (
@@ -155,6 +167,8 @@ export const EditCollectionModal = memo(function EditCollectionModal({
                       }
                       onChangeVisibility(v);
                     }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected, disabled: locked }}
                   >
                     <Text style={{...styles.editVisibilityChipText, ...(selected ? styles.editVisibilityChipTextSelected : {})}}>
                       {t(v === "public" ? "visibilityPublic" : "visibilityPrivate")}
@@ -195,10 +209,15 @@ export const EditCollectionModal = memo(function EditCollectionModal({
             onPress={() => void onSave()}
             disabled={saving}
             accessibilityState={{ disabled: saving }}
+            accessibilityRole="button"
           >
             <Text style={styles.editSaveButtonText}>{saving ? t("saving") : t("saveChanges")}</Text>
           </Pressable>
-          <Pressable style={styles.modalCancel} onPress={onClose}>
+          <Pressable
+            style={styles.modalCancel}
+            onPress={onClose}
+            accessibilityRole="button"
+          >
             <Text style={styles.modalCancelText}>{t("cancelEdit")}</Text>
           </Pressable>
         </Pressable>

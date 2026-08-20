@@ -64,8 +64,16 @@ export function PremiumUpsellSheet({ visible, onClose, onActivated, title, body,
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        accessibilityRole="none"
+      >
+        <Pressable
+          style={styles.card}
+          onPress={(e) => e.stopPropagation()}
+          accessibilityRole="none"
+        >
           <Text style={styles.lock}>🔒</Text>
           <Text style={styles.title}>{title ?? t("premiumTitle")}</Text>
           <Text style={styles.body}>{body ?? t("premiumSubtitle")}</Text>
@@ -79,11 +87,27 @@ export function PremiumUpsellSheet({ visible, onClose, onActivated, title, body,
             ))}
           </View>
 
-          <Pressable style={styles.activate} onPress={handleActivate}>
+          <Pressable
+
+            style={styles.activate}
+
+            onPress={handleActivate}
+
+            accessibilityRole="button"
+
+          >
             <Text style={styles.activateLabel}>{t("premiumActivate")}</Text>
           </Pressable>
 
-          <Pressable style={styles.later} onPress={onClose}>
+          <Pressable
+
+            style={styles.later}
+
+            onPress={onClose}
+
+            accessibilityRole="button"
+
+          >
             <Text style={styles.laterLabel}>{t("premiumUpsellLater")}</Text>
           </Pressable>
         </Pressable>

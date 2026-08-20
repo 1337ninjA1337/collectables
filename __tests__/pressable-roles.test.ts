@@ -14,9 +14,10 @@ import { readRepoFile as read } from "./helpers/repo-file";
  * 2026-08-20 found 152 of this tree's 194 interactive Pressables in that
  * state.
  *
- * This suite owns the SHARED COMPONENTS slice: a role added here is a role
- * added to every screen that renders them. The screens are decomposed into
- * four more sub-tasks in `.tasks/.tasks.md`; when the count reaches zero the
+ * This suite owns the SHARED COMPONENTS and the MODALS AND SHEETS slices: a
+ * role added here is a role added to every screen that renders them. The
+ * screens are decomposed into three more sub-tasks in `.tasks/.tasks.md`;
+ * when the count reaches zero the
  * rule goes into `check-a11y-jsx` the way `undecided_icon` and
  * `silent_disabled` did, and this suite can be deleted in favour of it.
  *
@@ -75,6 +76,13 @@ function interactivePressables(source: string): string[] {
  * of these inherits nothing from the ones already decided, and reddens here.
  */
 const SHARED: readonly (readonly [string, number])[] = [
+  ["components/search-overlay.tsx", 10],
+  ["components/edit-collection-modal.tsx", 7],
+  ["components/sold-listing-prompt.tsx", 5],
+  ["components/share-sheet.tsx", 5],
+  ["components/move-collection-modal.tsx", 4],
+  ["components/premium-upsell-sheet.tsx", 4],
+  ["components/currency-sheet.tsx", 4],
   ["components/bottom-nav.tsx", 6],
   ["components/login-screen.tsx", 5],
   ["components/item-filters.tsx", 10],
@@ -125,7 +133,21 @@ describe("the roles that are not `button`", () => {
     // stop in front of the sheet, and on the wrapper it announces the sheet
     // itself as pressable. `none` is the decision written down, rather than
     // the absence of one — which is what an unset role looks like.
-    for (const file of ["components/item-filters.tsx", "components/bottom-nav.tsx"]) {
+    // Every sheet in this tree is the same two-Pressable sandwich, so every
+    // one of them opts out exactly twice. A sheet with one is a sheet whose
+    // backdrop or wrapper has quietly become a control.
+    const SHEETS = [
+      "components/item-filters.tsx",
+      "components/bottom-nav.tsx",
+      "components/search-overlay.tsx",
+      "components/edit-collection-modal.tsx",
+      "components/sold-listing-prompt.tsx",
+      "components/move-collection-modal.tsx",
+      "components/premium-upsell-sheet.tsx",
+      "components/currency-sheet.tsx",
+      "components/share-sheet.tsx",
+    ];
+    for (const file of SHEETS) {
       const src = read(file);
       assert.equal(
         (src.match(/accessibilityRole="none"/g) ?? []).length,
@@ -141,5 +163,26 @@ describe("the roles that are not `button`", () => {
     assert.match(read("components/currency-input.tsx"), /accessibilityState=\{\{ selected: active \}\}/);
     assert.match(read("components/item-filters.tsx"), /accessibilityState=\{\{ selected: chip\.active \}\}/);
     assert.match(read("components/reaction-bar.tsx"), /accessibilityState=\{\{ selected: item\.mine \}\}/);
+  });
+});
+
+describe("the sheet chips that can be chosen", () => {
+  it("the search overlay's three filter rows say which option is on", () => {
+    // A type filter, an all-owners chip and a per-owner chip, each drawn with
+    // an "active" style and each previously silent about it.
+    const src = read("components/search-overlay.tsx");
+    assert.match(src, /accessibilityState=\{\{ selected: filter === f\.key \}\}/);
+    assert.match(src, /accessibilityState=\{\{ selected: !ownerFilter \}\}/);
+    assert.match(src, /accessibilityState=\{\{ selected: ownerFilter === o\.id \}\}/);
+  });
+
+  it("the visibility chip says both that it is chosen and that it is locked", () => {
+    // Two states drawn on one chip: `editVisibilityChipSelected` and
+    // `editVisibilityChipLocked`. The lock is a premium gate, so a screen
+    // reader user pressing it gets a toast and no warning beforehand.
+    assert.match(
+      read("components/edit-collection-modal.tsx"),
+      /accessibilityState=\{\{ selected, disabled: locked \}\}/,
+    );
   });
 });

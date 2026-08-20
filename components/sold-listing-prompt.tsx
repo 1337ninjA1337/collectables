@@ -92,8 +92,16 @@ export function SoldListingPrompt() {
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={handleKeep}>
-      <Pressable style={styles.backdrop} onPress={handleKeep}>
-        <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        style={styles.backdrop}
+        onPress={handleKeep}
+        accessibilityRole="none"
+      >
+        <Pressable
+          style={styles.card}
+          onPress={(e) => e.stopPropagation()}
+          accessibilityRole="none"
+        >
           <Text style={styles.title}>{t("marketplaceSoldPromptTitle")}</Text>
           <Text style={styles.body}>
             {t("marketplaceSoldPromptBody", {
@@ -102,7 +110,15 @@ export function SoldListingPrompt() {
             })}
           </Text>
 
-          <Pressable style={styles.actionPrimary} onPress={handleArchive}>
+          <Pressable
+
+            style={styles.actionPrimary}
+
+            onPress={handleArchive}
+
+            accessibilityRole="button"
+
+          >
             <Text style={styles.actionPrimaryLabel}>
               {t("marketplaceSoldPromptArchive")}
             </Text>
@@ -111,7 +127,15 @@ export function SoldListingPrompt() {
             </Text>
           </Pressable>
 
-          <Pressable style={styles.actionDanger} onPress={handleDelete}>
+          <Pressable
+
+            style={styles.actionDanger}
+
+            onPress={handleDelete}
+
+            accessibilityRole="button"
+
+          >
             <Text style={styles.actionPrimaryLabel}>
               {t("marketplaceSoldPromptDelete")}
             </Text>
@@ -120,7 +144,15 @@ export function SoldListingPrompt() {
             </Text>
           </Pressable>
 
-          <Pressable style={styles.actionGhost} onPress={handleKeep}>
+          <Pressable
+
+            style={styles.actionGhost}
+
+            onPress={handleKeep}
+
+            accessibilityRole="button"
+
+          >
             <Text style={styles.actionGhostLabel}>
               {t("marketplaceSoldPromptKeep")}
             </Text>

@@ -60,8 +60,16 @@ export const CurrencySheet = memo(function CurrencySheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
-        <Pressable style={styles.sheetContainer} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        style={styles.sheetBackdrop}
+        onPress={onClose}
+        accessibilityRole="none"
+      >
+        <Pressable
+          style={styles.sheetContainer}
+          onPress={(e) => e.stopPropagation()}
+          accessibilityRole="none"
+        >
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>{t("currencySelectTitle")}</Text>
 
@@ -122,7 +130,15 @@ export const CurrencySheet = memo(function CurrencySheet({
             )}
           </ScrollView>
 
-          <Pressable style={styles.sheetCloseButton} onPress={onClose}>
+          <Pressable
+
+            style={styles.sheetCloseButton}
+
+            onPress={onClose}
+
+            accessibilityRole="button"
+
+          >
             <Text style={styles.sheetCloseText}>{t("cancel")}</Text>
           </Pressable>
         </Pressable>

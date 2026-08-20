@@ -68,8 +68,16 @@ export const ShareSheet = memo(function ShareSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.shareBackdrop} onPress={onClose}>
-        <Pressable style={styles.shareSheet} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        style={styles.shareBackdrop}
+        onPress={onClose}
+        accessibilityRole="none"
+      >
+        <Pressable
+          style={styles.shareSheet}
+          onPress={(e) => e.stopPropagation()}
+          accessibilityRole="none"
+        >
           <ScrollView bounces={false} contentContainerStyle={styles.shareSheetContent}>
             <View style={styles.shareHandle} />
             <Text style={styles.shareTitle}>{t("shareTitle")}</Text>
