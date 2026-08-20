@@ -132,6 +132,7 @@ export function PhotoLightbox({ photos, visible, onClose, initialIndex = 0 }: Ph
               style={[styles.navButton, styles.navLeft]}
               onPress={() => goTo(index - 1)}
               disabled={index === 0}
+              accessibilityState={{ disabled: index === 0 }}
               accessibilityRole="button"
               accessibilityLabel={t("galleryPrevious")}
               hitSlop={8}
@@ -149,6 +150,7 @@ export function PhotoLightbox({ photos, visible, onClose, initialIndex = 0 }: Ph
               style={[styles.navButton, styles.navRight]}
               onPress={() => goTo(index + 1)}
               disabled={index === photos.length - 1}
+              accessibilityState={{ disabled: index === photos.length - 1 }}
               accessibilityRole="button"
               accessibilityLabel={t("galleryNext")}
               hitSlop={8}

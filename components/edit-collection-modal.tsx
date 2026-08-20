@@ -194,6 +194,7 @@ export const EditCollectionModal = memo(function EditCollectionModal({
             style={{...styles.editSaveButton, ...(saving ? styles.editSaveButtonDisabled : {})}}
             onPress={() => void onSave()}
             disabled={saving}
+            accessibilityState={{ disabled: saving }}
           >
             <Text style={styles.editSaveButtonText}>{saving ? t("saving") : t("saveChanges")}</Text>
           </Pressable>

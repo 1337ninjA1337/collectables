@@ -438,6 +438,7 @@ export default function WishlistScreen() {
                   style={{ ...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {}) }}
                   onPress={handleSave}
                   disabled={saving}
+                  accessibilityState={{ disabled: saving }}
                 >
                   <Text style={styles.saveButtonText}>{t("saveItem")}</Text>
                 </Pressable>

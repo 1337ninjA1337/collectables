@@ -124,6 +124,7 @@ export const ItemCard = memo(function ItemCard({ item, compact, style }: ItemCar
               style={styles.compactArtFrame}
               onPress={hasPhoto ? openGallery : undefined}
               disabled={!hasPhoto}
+              accessibilityState={{ disabled: !hasPhoto }}
               accessibilityRole="imagebutton"
               accessibilityLabel={
                 photoCount > 1 ? t("galleryOpenPhotos", { count: photoCount }) : t("galleryOpen")
@@ -179,6 +180,7 @@ export const ItemCard = memo(function ItemCard({ item, compact, style }: ItemCar
               style={styles.artWindow}
               onPress={hasPhoto ? openGallery : undefined}
               disabled={!hasPhoto}
+              accessibilityState={{ disabled: !hasPhoto }}
               accessibilityRole="imagebutton"
               accessibilityLabel={
                 photoCount > 1 ? t("galleryOpenPhotos", { count: photoCount }) : t("galleryOpen")

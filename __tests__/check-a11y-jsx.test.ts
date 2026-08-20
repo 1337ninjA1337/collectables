@@ -329,7 +329,13 @@ describe("the report", () => {
   });
 
   it("gives every code a sentence", () => {
-    const all: IconLabelCode[] = ["unlabeled", "untranslated", "half_hidden", "undecided_icon"];
+    const all: IconLabelCode[] = [
+      "unlabeled",
+      "untranslated",
+      "half_hidden",
+      "undecided_icon",
+      "silent_disabled",
+    ];
     for (const code of all) {
       const said = describeIconLabelFinding(code);
       assert.ok(said.length > 40, `${code} is described in fewer words than a reason`);
@@ -441,6 +447,69 @@ describe("the icon nobody decided about", () => {
     assert.deepEqual(
       codes(`<Pressable onPress={x}><Ionicons name="a" /></Pressable>`),
       ["unlabeled", "undecided_icon"],
+    );
+  });
+});
+
+describe("the button that is greyed out and says nothing", () => {
+  it("flags a disabled Pressable with no accessibilityState", () => {
+    // Greyed-out is a colour, and a colour reaches nobody: the button is
+    // offered as though pressing it would do something.
+    assert.deepEqual(
+      codes(`<Pressable onPress={go} disabled={n === 0}><Text>go</Text></Pressable>`),
+      ["silent_disabled"],
+    );
+  });
+
+  it("says nothing when the state names disabled", () => {
+    assert.deepEqual(
+      codes(`
+        <Pressable onPress={go} disabled={n === 0} accessibilityState={{ disabled: n === 0 }}>
+          <Text>go</Text>
+        </Pressable>
+      `),
+      [],
+    );
+  });
+
+  it("does not accept an accessibilityState that names something else", () => {
+    // A tab carrying {{ selected }} beside a disabled prop is exactly as
+    // silent as one carrying nothing — which is why this checks the KEY and
+    // not the presence of the prop.
+    assert.deepEqual(
+      codes(`
+        <Pressable onPress={go} disabled={off} accessibilityState={{ selected: on }}>
+          <Text>go</Text>
+        </Pressable>
+      `),
+      ["silent_disabled"],
+    );
+  });
+
+  it("says nothing about a Pressable that never takes disabled", () => {
+    assert.deepEqual(codes(`<Pressable onPress={go}><Text>go</Text></Pressable>`), []);
+  });
+
+  it("does not confuse a longer prop name for disabled", () => {
+    assert.deepEqual(codes(`<Pressable onPress={go} isDisabled={x}><Text>go</Text></Pressable>`), []);
+  });
+
+  it("leaves a custom component alone, which may forward disabled correctly", () => {
+    // `<DangerSection disabled>` passes it to a Pressable that DOES announce
+    // it. A rule that could not see inside the component would be wrong about
+    // both of this tree's call sites.
+    assert.deepEqual(codes(`<DangerSection onAction={go} disabled={n === 0} />`), []);
+  });
+
+  it("reports a disabled icon-only button as every problem it has", () => {
+    // Three separate fixes: the button needs a name, the icon needs deciding,
+    // and the disabled state needs saying. Reporting one hides the others.
+    // Sorted, because these three sit on one line and findings are ordered by
+    // line — within a line the order is which rule ran first, which is an
+    // implementation detail no reader of the report depends on.
+    assert.deepEqual(
+      codes(`<Pressable onPress={x} disabled={y}><Ionicons name="a" /></Pressable>`).sort(),
+      ["silent_disabled", "undecided_icon", "unlabeled"],
     );
   });
 });

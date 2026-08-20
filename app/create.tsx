@@ -416,13 +416,15 @@ export default function CreateItemScreen() {
           style={{...styles.aiButton, ...((analyzing || photos.length === 0) ? styles.aiButtonDisabled : {})}}
           onPress={() => void handleAnalyze()}
           disabled={analyzing || photos.length === 0}
+          accessibilityState={{ disabled: analyzing || photos.length === 0 }}
         >
           <Text style={styles.aiButtonText}>{analyzing ? t("aiAnalyzing") : t("aiAnalyze")}</Text>
         </Pressable>
         <PhotoPreview photos={photos} onChange={setPhotos} maxPhotos={5} />
       </View>
 
-      <Pressable style={{...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {})}} onPress={handleSave} disabled={saving}>
+      <Pressable style={{...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {})}} onPress={handleSave} disabled={saving}
+      accessibilityState={{ disabled: saving }}>
         <Text style={styles.saveButtonText}>{saving ? t("saving") : t("saveItem")}</Text>
       </Pressable>
 

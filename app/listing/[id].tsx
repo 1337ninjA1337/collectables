@@ -430,6 +430,7 @@ export default function ListingDetailScreen() {
               }}
               onPress={handleClaimPress}
               disabled={claiming}
+              accessibilityState={{ disabled: claiming }}
             >
               <Text style={styles.claimButtonText}>
                 {listing.mode === "sell"

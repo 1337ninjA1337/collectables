@@ -495,6 +495,7 @@ export default function ItemDetailsScreen() {
           style={{...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {})}}
           onPress={() => void handleSaveEdit()}
           disabled={saving}
+          accessibilityState={{ disabled: saving }}
         >
           <Text style={styles.saveButtonText}>{saving ? t("saving") : t("saveChanges")}</Text>
         </Pressable>
@@ -589,6 +590,7 @@ export default function ItemDetailsScreen() {
               style={{ ...styles.listingButton, ...(overFreeCap ? styles.listingButtonDisabled : {}) }}
               onPress={openListingSheet}
               disabled={overFreeCap}
+              accessibilityState={{ disabled: overFreeCap }}
             >
               <Text style={styles.listingButtonText}>{t("marketplaceListOnMarketplace")}</Text>
             </Pressable>
@@ -708,6 +710,7 @@ export default function ItemDetailsScreen() {
                 style={{ ...styles.shareCopyButton, ...(overFreeCap ? styles.saveButtonDisabled : {}) }}
                 onPress={handleSubmitListing}
                 disabled={overFreeCap}
+                accessibilityState={{ disabled: overFreeCap }}
               >
                 <Text style={styles.shareCopyButtonText}>{t("marketplaceSubmitListing")}</Text>
               </Pressable>

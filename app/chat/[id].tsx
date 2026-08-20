@@ -348,6 +348,7 @@ export default function ChatDetailScreen() {
             style={[styles.sendButton, !text.trim() && styles.sendButtonDisabled]}
             onPress={handleSend}
             disabled={!text.trim()}
+            accessibilityState={{ disabled: !text.trim() }}
             accessibilityLabel={t("chatSend")}
           >
             <Ionicons

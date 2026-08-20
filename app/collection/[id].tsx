@@ -843,6 +843,7 @@ export default function CollectionDetailsScreen() {
                 style={{...styles.exportButton, ...(exporting ? styles.exportButtonDisabled : {})}}
                 onPress={() => void handleExportPdf()}
                 disabled={exporting}
+                accessibilityState={{ disabled: exporting }}
               >
                 <Text style={styles.exportButtonText}>{exporting ? t("exportPdfGenerating") : t("exportPdf")}</Text>
               </Pressable>
@@ -872,6 +873,7 @@ export default function CollectionDetailsScreen() {
                 style={{...styles.exportButton, ...(exporting ? styles.exportButtonDisabled : {})}}
                 onPress={() => void handleExportPdf()}
                 disabled={exporting}
+                accessibilityState={{ disabled: exporting }}
               >
                 <Text style={styles.exportButtonText}>{exporting ? t("exportPdfGenerating") : t("exportPdf")}</Text>
               </Pressable>
@@ -949,6 +951,7 @@ export default function CollectionDetailsScreen() {
       <Pressable
         onLongPress={isOwner ? drag : undefined}
         disabled={isActive}
+        accessibilityState={{ disabled: isActive }}
         delayLongPress={150}
       >
         <ItemCard item={item} />

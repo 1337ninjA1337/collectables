@@ -253,6 +253,7 @@ export default function PeopleScreen() {
             style={{...styles.pageButton, ...(page <= 1 ? styles.pageButtonDisabled : {})}}
             onPress={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
+            accessibilityState={{ disabled: page <= 1 }}
           >
             <Text style={{...styles.pageButtonText, ...(page <= 1 ? styles.pageButtonTextDisabled : {})}}>
               {t("prevPage")}
@@ -263,6 +264,7 @@ export default function PeopleScreen() {
             style={{...styles.pageButton, ...(page >= totalPages ? styles.pageButtonDisabled : {})}}
             onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
+            accessibilityState={{ disabled: page >= totalPages }}
           >
             <Text style={{...styles.pageButtonText, ...(page >= totalPages ? styles.pageButtonTextDisabled : {})}}>
               {t("nextPage")}

@@ -265,7 +265,8 @@ export default function CreateCollectionScreen() {
         </Text>
       </View>
 
-      <Pressable style={{...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {})}} onPress={handleSave} disabled={saving}>
+      <Pressable style={{...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {})}} onPress={handleSave} disabled={saving}
+      accessibilityState={{ disabled: saving }}>
         <Text style={styles.saveButtonText}>{saving ? t("creating") : t("saveCollection")}</Text>
       </Pressable>
 

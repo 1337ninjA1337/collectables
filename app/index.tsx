@@ -115,7 +115,8 @@ export default function HomeScreen() {
 
   const renderOwnedCollection = ({ item: collection, drag, isActive }: RenderItemParams<Collection>) => (
     <ScaleDecorator>
-      <Pressable onLongPress={drag} disabled={isActive} delayLongPress={150}>
+      <Pressable onLongPress={drag} disabled={isActive}
+      accessibilityState={{ disabled: isActive }} delayLongPress={150}>
         <CollectionCard
           collection={collection}
           count={getItemsForCollection(collection.id).length}
@@ -159,6 +160,7 @@ export default function HomeScreen() {
                 style={{...styles.signOutButton, ...(pending ? styles.signOutButtonDisabled : {})}}
                 onPress={() => void signOut()}
                 disabled={pending}
+                accessibilityState={{ disabled: pending }}
               >
                 <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
               </Pressable>

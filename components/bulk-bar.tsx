@@ -41,6 +41,7 @@ export const BulkBar = memo(function BulkBar({ count, onMove, onDelete, onCancel
           <Pressable
             style={{ ...styles.bulkBarButton, ...(empty ? styles.bulkBarButtonDisabled : {}) }}
             disabled={empty}
+            accessibilityState={{ disabled: empty }}
             onPress={onMove}
           >
             <Text style={styles.bulkBarButtonText}>{t("moveToCollection")}</Text>
@@ -48,6 +49,7 @@ export const BulkBar = memo(function BulkBar({ count, onMove, onDelete, onCancel
           <Pressable
             style={{ ...styles.bulkBarButton, ...styles.bulkBarButtonDanger, ...(empty ? styles.bulkBarButtonDisabled : {}) }}
             disabled={empty}
+            accessibilityState={{ disabled: empty }}
             onPress={onDelete}
           >
             <Text style={{ ...styles.bulkBarButtonText, ...styles.bulkBarButtonDangerText }}>{t("delete")}</Text>

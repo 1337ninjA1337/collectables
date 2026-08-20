@@ -224,7 +224,8 @@ export default function SettingsScreen() {
           <Text style={styles.currencyChevron}>›</Text>
         </Pressable>
         {currencyRatesUpdatedAt != null ? (
-          <Pressable onPress={handleRefreshRates} disabled={refreshingRates}>
+          <Pressable onPress={handleRefreshRates} disabled={refreshingRates}
+          accessibilityState={{ disabled: refreshingRates }}>
             <Text style={styles.ratesHint}>
               {t("currencyRatesUpdated", {
                 when: formatRelativeDate(new Date(currencyRatesUpdatedAt).toISOString()),

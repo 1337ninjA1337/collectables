@@ -128,7 +128,25 @@ export type IconLabelCode =
    * web, which is the split this guard exists to catch. Hiding it says the
    * same thing on all three platforms.
    */
-  | "undecided_icon";
+  | "undecided_icon"
+  /**
+   * A `<Pressable>` that takes `disabled` and does not say so. Greyed-out is
+   * a colour, and a colour reaches nobody: without
+   * `accessibilityState={{ disabled }}` a screen reader offers the button as
+   * though pressing it would do something. A sweep on 2026-08-20 found 29 of
+   * this tree's 33, including both of the photo lightbox's chevrons at the
+   * first and last photo.
+   *
+   * `<Pressable>` only, for the same reason the icon rule looks for
+   * `<Ionicons>`: a custom component may forward `disabled` to a Pressable
+   * that announces it correctly, which is what `<DangerSection>` does, and a
+   * rule that could not see that would be wrong about it.
+   *
+   * `accessibilityState` has to NAME disabled, not merely exist — a tab
+   * carrying `{{ selected }}` beside a `disabled` prop is exactly as silent
+   * as one carrying nothing.
+   */
+  | "silent_disabled";
 
 /** A platform whose accessibility tree has its own way of being told to skip a node. */
 export type HidePlatform = "ios" | "android" | "web";
@@ -170,6 +188,8 @@ const FINDING_DETAIL: Record<IconLabelCode, string> = {
     "an accessibilityLabel written as a bare string literal — it is spoken in that one language to speakers of all six",
   half_hidden:
     "hidden from assistive technology on some platforms only — accessibilityElementsHidden (iOS), importantForAccessibility=\"no\" (Android) and aria-hidden (web) have to travel together, or the node stays announced on whichever platform the author did not test",
+  silent_disabled:
+    "a <Pressable> that takes `disabled` without accessibilityState={{ disabled }} — greyed-out is a colour, so a screen reader offers the button as though pressing it would do something",
   undecided_icon:
     "an <Ionicons> that is neither hidden nor named — every icon in this tree is one or the other, so decide: hide it on all three platforms if it is decoration, or give it an accessibilityLabel if it is content",
 };
@@ -388,6 +408,12 @@ const HIDES_SUBTREE_BY: Record<HidePlatform, RegExp> = {
   web: HIDDEN_BY.web,
 };
 
+/** A `disabled` prop with a value — `disabledFoo` is a different attribute. */
+const TAKES_DISABLED = /\sdisabled\s*=/;
+
+/** An `accessibilityState` that names `disabled`, not merely one that exists. */
+const ANNOUNCES_DISABLED = /accessibilityState\s*=\s*\{\{[^}]*\bdisabled\b/;
+
 /** True when these attributes hide the tag AND everything under it, everywhere. */
 function hidesSubtree(attrs: string): boolean {
   return HIDE_PLATFORMS.every((platform) => HIDES_SUBTREE_BY[platform].test(attrs));
@@ -435,6 +461,10 @@ export function findUnlabeledIconButtons(file: string, source: string): IconLabe
     ) {
       findings.push({ file, line: at(start), code: "undecided_icon", snippet: snippetAt(start) });
     }
+    // Greyed-out is a colour and a colour reaches nobody.
+    if (tag.name === TAG && TAKES_DISABLED.test(attrs) && !ANNOUNCES_DISABLED.test(attrs)) {
+      findings.push({ file, line: at(start), code: "silent_disabled", snippet: snippetAt(start) });
+    }
     if (tag.name !== TAG) continue;
     let body = "";
     if (!tag.selfClosing) {
@@ -464,7 +494,7 @@ export function formatIconLabelReport(findings: readonly IconLabelFinding[]): st
   if (findings.length === 0) return "";
   const lines = [
     `Found ${String(findings.length)} accessibility problem(s) in app/** or components/**.`,
-    "Every tappable element needs a name a screen reader can speak, it has to be a t() call, a node hidden from one platform has to be hidden from all three, and every icon has to be hidden or named — see lib/check-a11y-jsx.ts.",
+    "Every tappable element needs a name a screen reader can speak, it has to be a t() call, a node hidden from one platform has to be hidden from all three, every icon has to be hidden or named, and a disabled button has to say so — see lib/check-a11y-jsx.ts.",
   ];
   for (const finding of findings) {
     lines.push("");
