@@ -32,6 +32,7 @@ import { LINT_GUARDS } from "../lib/lint-guards";
 import {
   describeScannedFloorProblem,
   scannedFloorProblemDetail,
+  SCANNED_FLOORS,
   SCANNED_FLOORS_ENTRY_SUBJECT,
   type ScannedFloorProblemCode,
 } from "../lib/scanned-floor";
@@ -87,7 +88,17 @@ const CASES: Record<ProblemCodeKey, ProblemCase> = {
   // covered — the reason this is a floor rather than a `count > 0`.
   invalid_minimum: {
     checkName: "check-inline-hex",
-    rewrite: (entry) => entry.replace(/minimum: 160/, "minimum: 0"),
+    // The number is READ from the table rather than written here. It was
+    // spelled out, and a floor is re-measured whenever a scan root draws level
+    // with it — so the rewrite silently matched nothing on the run that raised
+    // it, the patched copy kept a perfectly valid entry, and the case failed
+    // claiming the guard would not refuse. A fixture that hardcodes the value
+    // it is mutating breaks on exactly the maintenance it exists to survive.
+    rewrite: (entry) =>
+      entry.replace(
+        new RegExp(`minimum: ${String(SCANNED_FLOORS["check-inline-hex"].count?.minimum ?? -1)}\\b`),
+        "minimum: 0",
+      ),
   },
   // The label is the noun the failure line uses ("scanned 3 source file(s)");
   // without it the refusal names no unit for what it counted.

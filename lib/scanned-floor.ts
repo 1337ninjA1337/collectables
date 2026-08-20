@@ -644,8 +644,8 @@ export function evaluateParsedInputs(
  */
 export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
   "check-inline-hex": {
-    count: { label: "source file", minimum: 160 },
-    note: "app/ + components/ + lib/ held 216 .ts/.tsx files on 2026-08-16 (app 19, components 45, lib 152); 160 leaves a quarter of them deletable. Raised from 150, which was exactly lib/'s own count — a walk that lost BOTH app/ and components/ passed at the boundary, and the note here claimed it would not. The property __tests__/lint-guard-partial-root.test.ts now enforces is the one a floor can hold: no single scan root clears it on its own. Losing app/ or components/ alone still passes, and that is the price of the slack.",
+    count: { label: "source file", minimum: 168 },
+    note: "app/ + components/ + lib/ held 224 .ts/.tsx files on 2026-08-20 (app 19, components 45, lib 160); 168 leaves a quarter of them deletable. Raised from 160, which lib/'s own count had drawn level with when lib/translation-status.ts landed — the third time this floor has been re-measured for exactly that event, and the second time the root doing it was lib/. The property __tests__/lint-guard-partial-root.test.ts enforces is the one a floor can hold: no single scan root clears it on its own, so a floor sitting at lib/'s count means a walk that lost BOTH app/ and components/ passes at the boundary. Losing app/ or components/ alone still passes, and that is the price of the slack.",
   },
   "check-secrets": {
     count: { label: "file", minimum: 500 },
