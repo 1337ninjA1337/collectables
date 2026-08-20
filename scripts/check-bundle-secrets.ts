@@ -8,6 +8,31 @@
  * Runs as its own CI step right after `npm run build` (the bundle must exist
  * first). The matcher is shared with the source-tree scan via
  * `lib/secret-scan.ts`.
+ *
+ * This scan WALKS, and the one beside it asks git — which now reads as an
+ * oversight and is a decision. `check-secrets` takes its candidates from `git
+ * ls-files` because its report is about the COMMITTED set, and a walk of the
+ * working tree is not that set. `dist/` is the opposite case in every respect:
+ * `.gitignore` covers it whole, so git's listing names nothing under it and
+ * asking would return an empty candidate set over a directory that exists and
+ * is full — and the set this guard reports on is not what git would take but
+ * what the browser was SENT, which is exactly what is on disk. Walking is not
+ * the fallback here; it is the only enumeration that answers the question.
+ * `__tests__/bundle-walk-premise.test.ts` pins both halves against git rather
+ * than leaving them as prose.
+ *
+ * Three properties ride on that walk, and each is free only because it walks:
+ *   - the regular-file question. `listFilesUnder` asks `entry.isFile()` of
+ *     every entry, so a symlink an exporter dropped into `dist/` is never read
+ *     through — the hole `partitionRegularFiles` exists to close on the git
+ *     path. Taking candidates from anywhere else loses this silently.
+ *   - the unread clause. `check-secrets` reports which listed candidates it
+ *     could not read, because a listing can name a path the disk does not hold;
+ *     a walk cannot, since it only ever names what it just met.
+ *   - the `.local.` convention. `isLocalOnlyPath` keeps a file holding a real
+ *     credential out of the source scan. Nothing generates a `*.local.*` name
+ *     into `dist/`, and if a build did emit one it would have been SHIPPED, so
+ *     honouring the convention here would skip the one copy that matters.
  */
 
 import * as fs from "node:fs";
