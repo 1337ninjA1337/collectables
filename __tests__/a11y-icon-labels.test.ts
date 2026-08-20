@@ -202,3 +202,46 @@ describe("the two glyphs that carried state, not decoration", () => {
     assert.match(src, /isSelected \? \(\s*<Ionicons/);
   });
 });
+
+describe("the photo-count chip, which was half a sentence twice over", () => {
+  /**
+   * An `images-outline` glyph followed by a bare number, inside a
+   * `<Pressable>` whose label was `t("galleryOpen")`. Three things were wrong
+   * at once: the glyph was announced, the number was announced as "5" with
+   * nothing saying what it counted, and the count — the useful part — never
+   * reached the button's own name.
+   *
+   * Hiding the icon alone would have left the "5". The fix moves the count
+   * INTO the gallery button's label and hides the badge as a SUBTREE, so the
+   * icon and the number go together and the sentence is said once.
+   */
+  const src = read("components/item-card.tsx");
+
+  it("names the gallery button with its photo count when there is more than one", () => {
+    assert.match(
+      src,
+      /photoCount > 1 \? t\("galleryOpenPhotos", \{ count: photoCount \}\) : t\("galleryOpen"\)/,
+    );
+    // Both layouts, compact and full, carry the same chip and the same button.
+    assert.equal((src.match(/galleryOpenPhotos/g) ?? []).length, 2);
+  });
+
+  it("hides the badge as a subtree rather than the glyph inside it", () => {
+    // `no-hide-descendants` is Android's word for a container hide, and
+    // `accessibilityElementsHidden` / `aria-hidden` already mean the subtree on
+    // iOS and the web. Hiding the <Ionicons> on its own would leave the number.
+    const badges = src.match(/<View\s*\n\s*style=\{styles\.photoCountBadge\}[\s\S]*?>/g) ?? [];
+    assert.equal(badges.length, 2, `expected 2 photo-count badges, got ${badges.length}`);
+    for (const [i, badge] of badges.entries()) {
+      assert.match(badge, /accessibilityElementsHidden/, `badge #${i}: no iOS hide`);
+      assert.match(badge, /importantForAccessibility="no-hide-descendants"/, `badge #${i}: no Android hide`);
+      assert.match(badge, /(?<![\w-])aria-hidden/, `badge #${i}: no web hide`);
+    }
+  });
+
+  it("leaves the bare number where it is, now that nothing announces it", () => {
+    // The "5" is still drawn — this was never a visual change. What changed is
+    // that it is no longer read out on its own.
+    assert.match(src, /<Text style=\{styles\.photoCountText\}>\{photoCount\}<\/Text>/);
+  });
+});

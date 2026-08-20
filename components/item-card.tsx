@@ -125,7 +125,9 @@ export const ItemCard = memo(function ItemCard({ item, compact, style }: ItemCar
               onPress={hasPhoto ? openGallery : undefined}
               disabled={!hasPhoto}
               accessibilityRole="imagebutton"
-              accessibilityLabel={t("galleryOpen")}
+              accessibilityLabel={
+                photoCount > 1 ? t("galleryOpenPhotos", { count: photoCount }) : t("galleryOpen")
+              }
             >
               {hasPhoto ? (
                 <LazyPhoto
@@ -137,7 +139,12 @@ export const ItemCard = memo(function ItemCard({ item, compact, style }: ItemCar
                 <View style={[styles.compactImage, { backgroundColor: placeholderColor(item.id) }]} />
               )}
               {photoCount > 1 ? (
-                <View style={styles.photoCountBadge}>
+                <View
+                  style={styles.photoCountBadge}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  aria-hidden
+                >
                   <Ionicons name="images-outline" size={10} color={TEXT_ON_DARK} />
                   <Text style={styles.photoCountText}>{photoCount}</Text>
                 </View>
@@ -173,7 +180,9 @@ export const ItemCard = memo(function ItemCard({ item, compact, style }: ItemCar
               onPress={hasPhoto ? openGallery : undefined}
               disabled={!hasPhoto}
               accessibilityRole="imagebutton"
-              accessibilityLabel={t("galleryOpen")}
+              accessibilityLabel={
+                photoCount > 1 ? t("galleryOpenPhotos", { count: photoCount }) : t("galleryOpen")
+              }
             >
               {hasPhoto ? (
                 <LazyPhoto
@@ -185,7 +194,12 @@ export const ItemCard = memo(function ItemCard({ item, compact, style }: ItemCar
                 <View style={{ ...styles.art, backgroundColor: placeholderColor(item.id) }} />
               )}
               {photoCount > 1 ? (
-                <View style={styles.photoCountBadge}>
+                <View
+                  style={styles.photoCountBadge}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  aria-hidden
+                >
                   <Ionicons name="images-outline" size={11} color={TEXT_ON_DARK} />
                   <Text style={styles.photoCountText}>{photoCount}</Text>
                 </View>

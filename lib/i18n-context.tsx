@@ -568,6 +568,8 @@ const en = {
   diagnosticsDsnInlined: "Sentry DSN inlined in this build",
   diagnosticsEventsTitle: "Events captured by this app",
   galleryOpen: "Open photo gallery",
+  galleryOpenPhotos: (params?: TranslationParams) =>
+    `Open photo gallery, ${params?.count ?? 0} photos`,
   galleryClose: "Close gallery",
   searchOverlayA11y: "Search items, collections and people",
   searchClose: "Close search",
@@ -1154,6 +1156,8 @@ const ru: TranslationMap = {
     "Произошла непредвиденная ошибка, мы её записали. Попробуйте ещё раз или перезапустите приложение.",
   crashFallbackRetry: "Попробовать ещё раз",
   galleryOpen: "Открыть галерею",
+  galleryOpenPhotos: (params?: TranslationParams) =>
+    `Открыть галерею, фото: ${params?.count ?? 0}`,
   galleryClose: "Закрыть галерею",
   searchOverlayA11y: "Поиск предметов, коллекций и людей",
   searchClose: "Закрыть поиск",
@@ -1246,6 +1250,8 @@ const be: TranslationMap = {
   yourCollection: "Ваша калекцыя",
   sharedToYou: "Адкрылі вам",
   itemsCount: (params?: TranslationParams) => `${params?.count ?? 0} прадметаў`,
+  photosCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} фота`,
   sharedWithPeople: (params?: TranslationParams) => `Адкрыта для ${params?.count ?? 0} людзей`,
   openedForYou: "Адкрылі для вас",
   addFriend: "Дадаць у сябры",
@@ -1400,6 +1406,8 @@ const be: TranslationMap = {
     "Адбылася нечаканая памылка, мы яе запісалі. Паспрабуйце яшчэ раз ці перазапусціце прыкладанне.",
   crashFallbackRetry: "Паспрабаваць яшчэ раз",
   galleryOpen: "Адкрыць галерэю",
+  galleryOpenPhotos: (params?: TranslationParams) =>
+    `Адкрыць галерэю, фота: ${params?.count ?? 0}`,
   galleryClose: "Закрыць галерэю",
   searchOverlayA11y: "Пошук прадметаў, калекцый і людзей",
   searchClose: "Закрыць пошук",
@@ -1495,6 +1503,8 @@ const pl: TranslationMap = {
   yourCollection: "Twoja kolekcja",
   sharedToYou: "Udostępniono ci",
   itemsCount: (params?: TranslationParams) => `${params?.count ?? 0} przedmiotów`,
+  photosCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} zdjęć`,
   sharedWithPeople: (params?: TranslationParams) => `Udostępniono ${params?.count ?? 0} osobom`,
   openedForYou: "Udostępnione dla ciebie",
   invitationSent: "Zaproszenie wysłane",
@@ -1637,6 +1647,8 @@ const pl: TranslationMap = {
     "Wystąpił nieoczekiwany błąd i został zapisany. Spróbuj ponownie lub uruchom aplikację jeszcze raz.",
   crashFallbackRetry: "Spróbuj ponownie",
   galleryOpen: "Otwórz galerię zdjęć",
+  galleryOpenPhotos: (params?: TranslationParams) =>
+    `Otwórz galerię zdjęć, zdjęcia: ${params?.count ?? 0}`,
   galleryClose: "Zamknij galerię",
   searchOverlayA11y: "Szukaj przedmiotów, kolekcji i osób",
   searchClose: "Zamknij wyszukiwanie",
@@ -1728,6 +1740,8 @@ const de: TranslationMap = {
   yourCollection: "Ihre Sammlung",
   sharedToYou: "Für Sie freigegeben",
   itemsCount: (params?: TranslationParams) => `${params?.count ?? 0} Objekte`,
+  photosCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} Fotos`,
   sharedWithPeople: (params?: TranslationParams) => `Mit ${params?.count ?? 0} Personen geteilt`,
   openedForYou: "Für Sie geöffnet",
   invitationSent: "Einladung gesendet",
@@ -1870,6 +1884,8 @@ const de: TranslationMap = {
     "Ein unerwarteter Fehler ist aufgetreten und wurde protokolliert. Bitte erneut versuchen oder die App neu starten.",
   crashFallbackRetry: "Erneut versuchen",
   galleryOpen: "Fotogalerie öffnen",
+  galleryOpenPhotos: (params?: TranslationParams) =>
+    `Fotogalerie öffnen, Fotos: ${params?.count ?? 0}`,
   galleryClose: "Galerie schließen",
   searchOverlayA11y: "Objekte, Sammlungen und Personen suchen",
   searchClose: "Suche schließen",
@@ -1962,6 +1978,8 @@ const es: TranslationMap = {
   yourCollection: "Tu colección",
   sharedToYou: "Compartido contigo",
   itemsCount: (params?: TranslationParams) => `${params?.count ?? 0} objetos`,
+  photosCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} fotos`,
   sharedWithPeople: (params?: TranslationParams) => `Compartido con ${params?.count ?? 0} personas`,
   invitationSent: "Invitación enviada",
   cancelInvitation: "Cancelar invitación",
@@ -2103,6 +2121,8 @@ const es: TranslationMap = {
     "Se produjo un error inesperado y lo hemos registrado. Vuelve a intentarlo o reinicia la aplicación.",
   crashFallbackRetry: "Intentar de nuevo",
   galleryOpen: "Abrir galería de fotos",
+  galleryOpenPhotos: (params?: TranslationParams) =>
+    `Abrir galería de fotos, fotos: ${params?.count ?? 0}`,
   galleryClose: "Cerrar galería",
   searchOverlayA11y: "Buscar objetos, colecciones y personas",
   searchClose: "Cerrar búsqueda",

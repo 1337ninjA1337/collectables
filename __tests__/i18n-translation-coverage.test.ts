@@ -226,12 +226,13 @@ describe("translation floors", () => {
     // complete, and four sit below half. The `assert.ok(true)` keeps the line
     // in the runner's output next to the rows above it.
     const report = COVERAGE.map(formatCoverageRow).join("\n");
-    // 545 as of 2026-08-20: the two nav-badge accessibility labels — the chats
-    // tab's unread count and the friends tab's pending-request notice — added
-    // to all six locales in the same change, which is why every row rose by two
-    // rather than the partial ones falling. The 543 before them arrived the
-    // same way, with the more-currencies chip and the two photo-reorder arrows.
-    assert.match(report, /en: 545\/545 keys \(100\.0%\)/);
+    // 546 as of 2026-08-20: `galleryOpenPhotos`, the item card's gallery button
+    // named with its photo count, written in all six. The four partial rows rose
+    // by two rather than one, because the same change also translated
+    // `photosCount` — a key the card already rendered — in be/pl/de/es, which
+    // had been inheriting the English "5 photos" since it was written. The 545
+    // before it arrived the same way, with the two nav-badge labels.
+    assert.match(report, /en: 546\/546 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
