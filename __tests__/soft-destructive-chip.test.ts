@@ -92,7 +92,7 @@ describe("adoption", () => {
     assert.match(src, /color: SOFT_DESTRUCTIVE_FOREGROUND,/);
   });
 
-  it("leaves one screen importing the trio directly, and it is a known exception", () => {
+  it("leaves no screen importing the trio directly", () => {
     // The point of the extraction: a component importing the pair straight
     // from the palette is one that should be reaching for a widget instead.
     const importers: string[] = [];
@@ -103,11 +103,15 @@ describe("adoption", () => {
         importers.push(file);
       }
     }
-    // `app/collection/[id].tsx` is the one holdout: its delete button is the
-    // block form at RADIUS_CARD rather than the pill both widgets use, so
-    // adopting <DangerSection> there would round its corners. That is a design
-    // decision, not a refactor, so it stays — filed as a suggestion instead.
-    // Both widgets now go through `lib/danger-surface.ts`, so neither appears.
-    assert.deepEqual(importers.sort(), ["app/collection/[id].tsx"]);
+    // `app/collection/[id].tsx` was the lone holdout for a year: its delete
+    // button is the block form at RADIUS_CARD rather than the pill both widgets
+    // use, so adopting <DangerSection> would have rounded its corners — a
+    // design decision, not a refactor. `<DangerSection shape="block">` is the
+    // seam that settled it without repainting anything: same three colours from
+    // `lib/danger-surface.ts`, same two numbers the screen already had. Both
+    // widgets go through the shared surface, so neither appears here either,
+    // and an empty list is now the whole rule rather than a rule with one
+    // exception attached.
+    assert.deepEqual(importers.sort(), []);
   });
 });

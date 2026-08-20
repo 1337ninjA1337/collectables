@@ -14,6 +14,7 @@ import { ReactionBar } from "@/components/reaction-bar";
 import { CostBadge } from "@/components/cost-badge";
 import { CollectionShareSheet } from "@/components/collection-share-sheet";
 import { CurrencySheet } from "@/components/currency-sheet";
+import { DangerSection } from "@/components/danger-section";
 import { EditCollectionModal } from "@/components/edit-collection-modal";
 import { MoveCollectionModal } from "@/components/move-collection-modal";
 import { Screen, useResponsive } from "@/components/screen";
@@ -49,10 +50,7 @@ import {
   CARD_BG,
   CARD_BG_3,
   CARD_BG_9,
-  CARD_BG_10,
   CARD_BG_13,
-  DANGER_DEEP_4,
-  DANGER_SOFT_2,
   HERO_DARK,
   HERO_DARK_2,
   MUTED_3,
@@ -852,9 +850,11 @@ export default function CollectionDetailsScreen() {
             <Pressable style={styles.shareButton} onPress={() => setShareOpen(true)}>
               <Text style={styles.shareButtonText}>{t("share")}</Text>
             </Pressable>
-            <Pressable style={styles.deleteButton} onPress={handleDeleteCollection}>
-              <Text style={styles.deleteButtonText}>{t("deleteCollection")}</Text>
-            </Pressable>
+            <DangerSection
+              shape="block"
+              actionLabel={t("deleteCollection")}
+              onAction={handleDeleteCollection}
+            />
           </View>
         ) : (
           <View style={styles.ownerActions}>
@@ -1312,21 +1312,6 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: TEXT_ON_DARK_4,
     fontSize: 16,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  deleteButton: {
-    borderRadius: RADIUS_CARD,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    borderWidth: 1,
-    borderColor: DANGER_SOFT_2,
-    backgroundColor: CARD_BG_10,
-    alignItems: "center",
-  },
-  deleteButtonText: {
-    color: DANGER_DEEP_4,
-    fontSize: 15,
     fontWeight: "800",
     fontFamily: FONT_BODY_EXTRABOLD,
   },

@@ -7,6 +7,7 @@ import {
   DANGER_DEEP_5,
   DANGER_MEDIUM,
   DANGER_SOFT_3,
+  RADIUS_CARD,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
   SPACING_CARD,
@@ -30,11 +31,35 @@ import {
  */
 export type DangerTone = "soft" | "hard";
 
+/**
+ * The button's GEOMETRY, which is a separate question from its tone.
+ *
+ * `"pill"` is the fully rounded capsule settings uses — the shape both this
+ * widget and `<SoftDestructiveChip>` shipped with. `"block"` is the squarer
+ * card-radius button a page-level action row wants, where the delete button
+ * sits under an export button and a share button that are all the same width
+ * and all `RADIUS_CARD`; a capsule in that stack reads as a different KIND of
+ * control rather than the last item in a list.
+ *
+ * A seam rather than a second widget, and rather than leaving the one screen
+ * that wants it outside the family: `app/collection/[id].tsx` had the soft
+ * tone's exact three colours written out by hand for a year, flagged by
+ * `soft-destructive-chip.test.ts` as the lone holdout, and the only thing
+ * keeping it out was two numbers. Colours are what drift invisibly; a radius
+ * is a design decision the caller can be trusted with.
+ */
+export type DangerShape = "pill" | "block";
+
 type Props = {
   /** Button label. Already localized by the caller. */
   actionLabel: string;
   onAction: () => void;
   tone?: DangerTone;
+  /**
+   * Geometry only — the tone still decides every colour. Defaults to the
+   * capsule, so a call site that forgets the prop gets what settings has.
+   */
+  shape?: DangerShape;
   /**
    * Heading for the surrounding danger-zone card. Supplying `title` (or `hint`)
    * is what makes the component render that card at all — a bare `actionLabel`
@@ -67,6 +92,7 @@ export const DangerSection = memo(function DangerSection({
   actionLabel,
   onAction,
   tone = "soft",
+  shape = "pill",
   title,
   hint,
   disabled = false,
@@ -76,6 +102,7 @@ export const DangerSection = memo(function DangerSection({
     <Pressable
       style={{
         ...(hard ? styles.hardButton : styles.softButton),
+        ...(shape === "block" ? styles.block : styles.pill),
         ...(disabled ? styles.disabled : {}),
       }}
       onPress={onAction}
@@ -101,14 +128,28 @@ export const DangerSection = memo(function DangerSection({
 });
 
 const styles = StyleSheet.create({
+  // The two tone entries carry colour and alignment; the two shape entries
+  // below carry radius and padding, and every button spreads one of each. Split
+  // this way because the pair that must not drift is the colours, and a shape
+  // that had to restate them would be a third place for the trio to live.
   softButton: {
-    borderRadius: RADIUS_PILL,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
     alignItems: "center",
     // Same treatment as <SoftDestructiveChip>, one size up — see there for why
     // the colours are shared but the geometry is not.
     ...SOFT_DESTRUCTIVE_SURFACE,
+  },
+  pill: {
+    borderRadius: RADIUS_PILL,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  // A touch larger, matching the export and share buttons this stacks under in
+  // `app/collection/[id].tsx` — the numbers come from that screen's own
+  // `deleteButton`, which this replaced.
+  block: {
+    borderRadius: RADIUS_CARD,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
   },
   softButtonText: {
     color: SOFT_DESTRUCTIVE_FOREGROUND,
@@ -118,10 +159,7 @@ const styles = StyleSheet.create({
   },
   hardButton: {
     alignSelf: "flex-start",
-    borderRadius: RADIUS_PILL,
     backgroundColor: DANGER_DEEP_2,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
   },
   hardButtonText: {
     color: TEXT_ON_DARK_4,
