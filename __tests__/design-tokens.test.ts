@@ -1292,10 +1292,11 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bCARD_BG\b/);
     assert.match(src, /\bCARD_BG_3\b/);
     assert.match(src, /\bCARD_BG_9\b/);
-    assert.match(src, /\bCARD_BG_10\b/);
     assert.match(src, /\bCARD_BG_13\b/);
-    assert.match(src, /\bDANGER_DEEP_4\b/);
-    assert.match(src, /\bDANGER_SOFT_2\b/);
+    // CARD_BG_10 / DANGER_SOFT_2 / DANGER_DEEP_4 left with the delete button
+    // when it adopted <DangerSection shape="block">: the trio now lives once,
+    // in `lib/danger-surface.ts`, and this screen was the last hand-written
+    // copy of it.
     assert.match(src, /\bHERO_DARK\b/);
     assert.match(src, /\bHERO_DARK_2\b/);
     assert.match(src, /\bMUTED_3\b/);

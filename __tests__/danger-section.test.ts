@@ -60,6 +60,27 @@ describe("<DangerSection> owns both destructive tones", () => {
     );
   });
 
+  it("separates the shape seam from the tone, so colour and geometry cannot drift together", () => {
+    // The split that let the last holdout in: tone entries carry colour and
+    // alignment, shape entries carry radius and padding, and every button
+    // spreads one of each. A shape that restated the colours would be a third
+    // home for the trio `lib/danger-surface.ts` exists to keep in one place.
+    assert.match(src, /export type DangerShape = "pill" \| "block";/);
+    assert.match(src, /shape = "pill"/, "a call site that forgets the prop should get the capsule");
+    assert.match(src, /\.\.\.\(shape === "block" \? styles\.block : styles\.pill\),/);
+    assert.match(src, /pill: \{\s*borderRadius: RADIUS_PILL,/);
+    assert.match(src, /block: \{\s*borderRadius: RADIUS_CARD,/);
+    for (const entry of ["pill", "block"]) {
+      const body = new RegExp(`${entry}: \\{([\\s\\S]*?)\\},`).exec(src)?.[1] ?? "";
+      assert.ok(body.length > 0, `no ${entry} style entry to check`);
+      assert.doesNotMatch(
+        body,
+        /color|SURFACE|border(?!Radius)/,
+        `styles.${entry} carries a colour — geometry only, or the two tones grow a shape-shaped copy each`,
+      );
+    }
+  });
+
   it("keeps the hard button filled with DANGER_DEEP_2 and cream-on-red text", () => {
     assert.match(src, /hardButton: \{[\s\S]*?backgroundColor: DANGER_DEEP_2,/);
     assert.match(src, /hardButtonText: \{\s*color: TEXT_ON_DARK_4,/);
@@ -106,9 +127,42 @@ describe("<DangerSection> owns both destructive tones", () => {
       "DANGER_DEEP_5",
       "DANGER_MEDIUM",
       "DANGER_SOFT_3",
+      // Both radii, since the shape seam landed: a `block` entry that lost its
+      // import would fall back to square corners, which no design asked for.
+      "RADIUS_CARD",
+      "RADIUS_PILL",
       "TEXT_ON_DARK_4",
     ]) {
       assert.match(src, new RegExp(`^\\s+${name},$`, "m"), `${name} is not imported`);
+    }
+  });
+});
+
+describe("app/collection/[id].tsx consumes the block shape", () => {
+  const src = read("app/collection/[id].tsx");
+
+  it("renders the widget instead of its own copy of the soft recipe", () => {
+    assert.match(src, /import \{ DangerSection \} from "@\/components\/danger-section";/);
+    assert.match(
+      src,
+      /<DangerSection\s+shape="block"\s+actionLabel=\{t\("deleteCollection"\)\}\s+onAction=\{handleDeleteCollection\}\s*\/>/,
+    );
+    // No `tone` prop: the default is the reversible one, and deleting a
+    // collection here goes through a confirm dialog rather than a danger zone.
+    assert.doesNotMatch(src, /<DangerSection[\s\S]{0,120}tone=/);
+  });
+
+  it("dropped the styles and the three tokens the widget absorbed", () => {
+    for (const name of ["deleteButton", "deleteButtonText"]) {
+      assert.ok(
+        !src.includes(`${name}:`),
+        `app/collection/[id].tsx still declares styles.${name} — dead after adopting the widget`,
+      );
+    }
+    // The point of the whole family: these three travel together, and a screen
+    // holding them by hand is one design tweak away from being a shade off.
+    for (const token of ["CARD_BG_10", "DANGER_SOFT_2", "DANGER_DEEP_4"]) {
+      assert.ok(!src.includes(token), `app/collection/[id].tsx still reaches for ${token}`);
     }
   });
 });
