@@ -5,6 +5,8 @@ import {
   describeIconLabelFinding,
   findUnlabeledIconButtons,
   formatIconLabelReport,
+  HIDE_PLATFORMS,
+  type HidePlatform,
   type IconLabelCode,
 } from "@/lib/check-a11y-icon-labels";
 
@@ -189,24 +191,50 @@ describe("findUnlabeledIconButtons", () => {
   });
 });
 
-describe("the paired platform props", () => {
+describe("the three platform props", () => {
+  const missingOf = (source: string): (readonly HidePlatform[] | undefined)[] =>
+    findings(source).map((f) => f.missing);
+
   it("flags an element hidden on iOS only", () => {
     assert.deepEqual(
       codes(`<View accessibilityElementsHidden><Ionicons name="a" /></View>`),
       ["half_hidden"],
     );
+    assert.deepEqual(missingOf(`<View accessibilityElementsHidden><Ionicons name="a" /></View>`), [
+      ["android", "web"],
+    ]);
   });
 
   it("flags an element hidden on Android only", () => {
     assert.deepEqual(codes(`<Text importantForAccessibility="no">1</Text>`), ["half_hidden"]);
+    assert.deepEqual(missingOf(`<Text importantForAccessibility="no">1</Text>`), [["ios", "web"]]);
   });
 
-  it("says nothing when both halves travel together", () => {
+  it("flags an element hidden on web only", () => {
+    // The mirror image of the native-pair mistake, and the one this repository
+    // would make next: `aria-hidden` alone reads as done to anyone testing in
+    // a browser, and `<Ionicons>` renders a `<Text>`, which does not derive
+    // the native props from it the way `<View>` does.
+    assert.deepEqual(codes(`<Ionicons name="a" aria-hidden />`), ["half_hidden"]);
+    assert.deepEqual(missingOf(`<Ionicons name="a" aria-hidden />`), [["ios", "android"]]);
+  });
+
+  it("flags the native pair that forgot the web, which is what every site here was", () => {
+    // Before 2026-08-20 all seven decorative icons in this tree looked exactly
+    // like this, and the rule that only paired iOS with Android said nothing.
+    assert.deepEqual(
+      missingOf(`<Ionicons accessibilityElementsHidden importantForAccessibility="no" />`),
+      [["web"]],
+    );
+  });
+
+  it("says nothing when all three travel together", () => {
     assert.deepEqual(
       codes(`
         <View
           accessibilityElementsHidden
           importantForAccessibility="no"
+          aria-hidden
         >
           <Ionicons name="a" />
         </View>
@@ -214,23 +242,52 @@ describe("the paired platform props", () => {
       [],
     );
     assert.deepEqual(
-      codes(`<Ionicons accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />`),
+      codes(
+        `<Ionicons accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden />`,
+      ),
       [],
     );
   });
 
-  it("does not read importantForAccessibility=\"yes\" as half a pair", () => {
+  it("does not read importantForAccessibility=\"yes\" as part of a hide", () => {
     // The opposite instruction: this node should be announced, and it wants no
-    // iOS partner. A rule that paired on the prop NAME would demand one.
+    // partners. A rule that matched on the prop NAME would demand two.
     assert.deepEqual(codes(`<View importantForAccessibility="yes"><Text>a</Text></View>`), []);
   });
 
-  it("does not read an explicitly disabled iOS hide as half a pair", () => {
+  it("does not read an explicitly disabled hide as part of one", () => {
     assert.deepEqual(codes(`<View accessibilityElementsHidden={false}><Text>a</Text></View>`), []);
+    assert.deepEqual(codes(`<View aria-hidden={false}><Text>a</Text></View>`), []);
+    // Spaces inside the braces are the same instruction.
+    assert.deepEqual(codes(`<View aria-hidden={ false }><Text>a</Text></View>`), []);
+  });
+
+  it("does not let a longer attribute ending in aria-hidden stand in for it", () => {
+    // `-` is a word boundary, so a `\\b` in front of the pattern would pass
+    // this. The rule needs the attribute to BE aria-hidden, not end in it.
+    assert.deepEqual(
+      missingOf(`<View accessibilityElementsHidden importantForAccessibility="no" data-aria-hidden />`),
+      [["web"]],
+    );
+  });
+
+  it("never reports a node as missing every platform or none", () => {
+    // Both ends are non-findings by construction: hidden everywhere is done,
+    // hidden nowhere never asked to be. This pins the two boundaries so a
+    // future fourth platform cannot turn every plain <View> into a finding.
+    assert.deepEqual(codes(`<View><Text>a</Text></View>`), []);
+    for (const found of findings(`
+      <View accessibilityElementsHidden>
+        <Ionicons name="a" aria-hidden />
+      </View>
+    `)) {
+      const missing = found.missing ?? [];
+      assert.ok(missing.length > 0 && missing.length < HIDE_PLATFORMS.length);
+    }
   });
 
   it("checks every element, not only Pressables", () => {
-    // The eight sites in this tree are icons, views and text. Scoping the rule
+    // The seven sites in this tree are icons, views and text. Scoping the rule
     // to buttons would have covered none of them.
     const found = findings(`
       <View accessibilityElementsHidden>
@@ -267,6 +324,36 @@ describe("the report", () => {
     for (const code of all) {
       const said = describeIconLabelFinding(code);
       assert.ok(said.length > 40, `${code} is described in fewer words than a reason`);
+    }
+  });
+
+  it("names the platforms a half-hidden node is still announced on", () => {
+    // The generic sentence says the three props travel together; this is the
+    // half that says which one THIS line is short of, so a reader does not
+    // have to diff the rule against the snippet to find out.
+    const report = formatIconLabelReport(
+      findings(`
+        <Ionicons accessibilityElementsHidden importantForAccessibility="no" />
+      `),
+    );
+    assert.match(report, /still announced on web/);
+    assert.match(report, /add aria-hidden \(web\)/);
+    assert.doesNotMatch(report, /still announced on ios/);
+  });
+
+  it("leaves the label codes' sentences platform-free", () => {
+    // `missing` is a half_hidden field; passing platforms alongside another
+    // code must not graft a hiding clause onto a labelling problem.
+    const said = describeIconLabelFinding("unlabeled", ["web"]);
+    assert.equal(said, describeIconLabelFinding("unlabeled"));
+  });
+
+  it("names every platform in the hide set somewhere in its sentence", () => {
+    // Exhaustive over HIDE_PLATFORMS: a fourth platform added to the set with
+    // no prop named for it would produce findings nobody can act on.
+    const said = describeIconLabelFinding("half_hidden", HIDE_PLATFORMS);
+    for (const platform of HIDE_PLATFORMS) {
+      assert.match(said, new RegExp(`\\(${platform}\\)`), `${platform} has no prop in the sentence`);
     }
   });
 });

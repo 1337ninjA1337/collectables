@@ -51,11 +51,14 @@ type Props = {
  * Accessibility is baked in rather than left to the consumer, because that is
  * exactly what drifted: only the filter sheet had ever been made
  * screen-reader-complete. Both `Ionicons` are hidden from the accessibility
- * tree with the PAIRED iOS/Android props (`accessibilityElementsHidden` +
- * `importantForAccessibility="no"` — shipping only one leaves the other
- * platform announcing an unnamed decorative glyph), and the clear chip is a
- * named `button` instead of the anonymous tappable it used to be in the
- * collection and currency sheets.
+ * tree on all THREE platforms this app ships to (`accessibilityElementsHidden`
+ * for iOS + `importantForAccessibility="no"` for Android + `aria-hidden` for
+ * the web — shipping a subset leaves the rest announcing an unnamed decorative
+ * glyph, and the web is this app's primary surface). `<Ionicons>` renders a
+ * `<Text>`, which unlike `<View>` does NOT derive the native pair from
+ * `aria-hidden`, so all three are written out. The clear chip is a named
+ * `button` instead of the anonymous tappable it used to be in the collection
+ * and currency sheets.
  *
  * The clear chip's label is read from i18n here, not passed in: "Clear search"
  * is identical in every sheet, and a per-consumer prop would just be four
@@ -78,6 +81,7 @@ export const SheetSearchRow = memo(function SheetSearchRow({
         color={MUTED_13}
         accessibilityElementsHidden
         importantForAccessibility="no"
+        aria-hidden
       />
       <MaskedTextInput
         style={styles.input}
@@ -103,6 +107,7 @@ export const SheetSearchRow = memo(function SheetSearchRow({
             color={MUTED_15}
             accessibilityElementsHidden
             importantForAccessibility="no"
+            aria-hidden
           />
         </Pressable>
       ) : null}

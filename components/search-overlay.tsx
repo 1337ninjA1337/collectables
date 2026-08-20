@@ -199,8 +199,9 @@ export function SearchOverlay({ visible, onClose }: Props) {
               Not `<SheetSearchRow>`: this row carries a trailing "close the
               overlay" button the shared component has no slot for, and its
               chrome is a size up (icon 20 vs 18, autoFocus). It does mirror
-              the same accessibility contract by hand — every icon hidden with
-              BOTH platform props, every icon-only Pressable named. */}
+              the same accessibility contract by hand — every icon hidden on
+              all three platforms (iOS + Android + web), every icon-only
+              Pressable named. */}
           <View style={styles.inputRow}>
             <Ionicons
               name="search"
@@ -208,6 +209,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
               color={MUTED_13}
               accessibilityElementsHidden
               importantForAccessibility="no"
+              aria-hidden
             />
             <MaskedTextInput
               value={query}
@@ -235,6 +237,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
                   color={MUTED_15}
                   accessibilityElementsHidden
                   importantForAccessibility="no"
+                  aria-hidden
                 />
               </Pressable>
             ) : null}
@@ -251,6 +254,7 @@ export function SearchOverlay({ visible, onClose }: Props) {
                 color={MUTED_13}
                 accessibilityElementsHidden
                 importantForAccessibility="no"
+                aria-hidden
               />
             </Pressable>
           </View>

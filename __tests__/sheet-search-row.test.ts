@@ -97,20 +97,23 @@ describe("components/sheet-search-row.tsx — accessibility", () => {
     );
   });
 
-  it("hides both decorative Ionicons with BOTH platform props", () => {
-    // Android honours importantForAccessibility, iOS accessibilityElementsHidden —
-    // shipping only one leaves the other platform announcing an unnamed glyph.
-    // The PAIRING half of this is now `npm run lint:a11y-icon-labels`, which
-    // checks every element in app/ and components/ rather than this one file;
-    // what stays here is the COUNT, which is a fact about this component (a
-    // magnifier and a clear icon, both decorative) that no repo-wide rule can
-    // state. Strip block comments first — the component's own doc comment
-    // names both props while explaining why they ship as a pair.
+  it("hides both decorative Ionicons on all THREE platforms", () => {
+    // iOS honours accessibilityElementsHidden, Android importantForAccessibility
+    // and the web aria-hidden — shipping a subset leaves the rest announcing an
+    // unnamed glyph. The PAIRING half of this is now
+    // `npm run lint:a11y-icon-labels`, which checks every element in app/ and
+    // components/ rather than this one file; what stays here is the COUNT,
+    // which is a fact about this component (a magnifier and a clear icon, both
+    // decorative) that no repo-wide rule can state. Strip block comments first
+    // — the component's own doc comment names all three props while explaining
+    // why they ship together.
     const jsx = src.replace(/\/\*[\s\S]*?\*\//g, "");
     const ios = jsx.match(/accessibilityElementsHidden/g) ?? [];
     const android = jsx.match(/importantForAccessibility="no"/g) ?? [];
+    const web = jsx.match(/(?<![\w-])aria-hidden/g) ?? [];
     assert.equal(ios.length, 2, `expected the magnifier + clear icons hidden, got ${ios.length}`);
-    assert.equal(android.length, ios.length, "each hidden icon needs BOTH platform props");
+    assert.equal(android.length, ios.length, "each hidden icon needs the Android prop too");
+    assert.equal(web.length, ios.length, "each hidden icon needs aria-hidden for the web");
   });
 });
 
@@ -195,13 +198,17 @@ describe("search affordances outside <SheetSearchRow> — accessibility parity",
     assert.match(src, /accessibilityLabel=\{\s*t\(\s*"searchClose"\s*\)\s*\}/);
   });
 
-  it("components/search-overlay.tsx hides all three decorative icons with BOTH platform props", () => {
+  it("components/search-overlay.tsx hides all three decorative icons on all three platforms", () => {
+    // The overlay strips `{/* ... */}` JSX comments as well: the one above its
+    // input row states this contract in prose and names the props.
     const jsx = read("components/search-overlay.tsx").replace(/\/\*[\s\S]*?\*\//g, "");
     const ios = jsx.match(/accessibilityElementsHidden/g) ?? [];
     const android = jsx.match(/importantForAccessibility="no"/g) ?? [];
+    const web = jsx.match(/(?<![\w-])aria-hidden/g) ?? [];
     // magnifier + close-circle + close
     assert.equal(ios.length, 3, `expected 3 hidden icons, got ${ios.length}`);
-    assert.equal(android.length, ios.length, "each hidden icon needs BOTH platform props");
+    assert.equal(android.length, ios.length, "each hidden icon needs the Android prop too");
+    assert.equal(web.length, ios.length, "each hidden icon needs aria-hidden for the web");
   });
 
   it("app/people.tsx labels its profile-search field", () => {

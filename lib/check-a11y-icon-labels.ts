@@ -20,12 +20,17 @@ import { stripComments } from "@/lib/strip-comments";
  *
  * The third is about the opposite instruction — HIDING a decorative node —
  * and it is the one mistake here that a person cannot see on their own
- * machine. `accessibilityElementsHidden` is iOS and
- * `importantForAccessibility="no"` is Android, so shipping one is a fix that
- * works on the platform its author tested and does nothing on the other. All
- * eight sites in this tree carry both; one file asserted that about itself by
- * counting its own occurrences, which is a rule the ninth site would not
- * inherit. This checks every element in both roots.
+ * machine. It takes THREE props, not two, because this app ships to three
+ * platforms: `accessibilityElementsHidden` is iOS, `importantForAccessibility`
+ * is Android, and `aria-hidden` is the web. React Native's `<View>` maps
+ * `aria-hidden` onto the two native props for you, but `<Text>` does not — and
+ * every decorative node in this tree is an `<Ionicons>`, which renders a
+ * `<Text>` — so the web prop is an addition to the native pair here and not a
+ * replacement for it. Shipping a subset is a fix that works on the platform
+ * its author tested and silently does nothing on the others; before
+ * 2026-08-20 all seven sites carried the native pair and none carried the web
+ * prop, so the browser — this app's primary surface — announced every one of
+ * them. This checks every element in both roots.
  *
  * Why a hand-written tag scanner and not a regex: the obvious
  * `/<Pressable([\s\S]*?)>/` ends the open tag at the first `>` in the file,
@@ -67,14 +72,32 @@ export type IconLabelCode =
    */
   | "untranslated"
   /**
-   * An element hidden from assistive technology on ONE platform. Hiding a
-   * decorative node needs `accessibilityElementsHidden` (iOS) and
-   * `importantForAccessibility="no"` (Android) together; either alone is a
-   * fix that works on the platform its author tested and silently does
-   * nothing on the other. Checked on every element, not just Pressables —
-   * the eight sites in this tree are icons, views and text.
+   * An element hidden from assistive technology on SOME platforms. Hiding a
+   * decorative node needs `accessibilityElementsHidden` (iOS),
+   * `importantForAccessibility="no"` (Android) and `aria-hidden` (web)
+   * together; any subset is a fix that works on the platform its author
+   * tested and silently does nothing on the rest. Checked on every element,
+   * not just Pressables — the seven sites in this tree are icons, views and
+   * text.
    */
   | "half_hidden";
+
+/** A platform whose accessibility tree has its own way of being told to skip a node. */
+export type HidePlatform = "ios" | "android" | "web";
+
+/**
+ * The three platforms, in the order a finding lists them. Exported so a
+ * caller — and the suite — can be exhaustive over the set rather than
+ * repeating the three names.
+ */
+export const HIDE_PLATFORMS: readonly HidePlatform[] = ["ios", "android", "web"];
+
+/** The prop each platform reads, for the sentence that tells somebody what to add. */
+const HIDE_PROP: Record<HidePlatform, string> = {
+  ios: "accessibilityElementsHidden",
+  android: 'importantForAccessibility="no"',
+  web: "aria-hidden",
+};
 
 export type IconLabelFinding = {
   readonly file: string;
@@ -82,6 +105,13 @@ export type IconLabelFinding = {
   readonly code: IconLabelCode;
   /** The offending source line, trimmed, for the report. */
   readonly snippet: string;
+  /**
+   * For `half_hidden` only: the platforms this node is still ANNOUNCED on,
+   * in {@link HIDE_PLATFORMS} order. Never empty when present — a node hidden
+   * everywhere is not a finding, and one hidden nowhere was never asking to
+   * be hidden. Absent on the two label codes, which are platform-neutral.
+   */
+  readonly missing?: readonly HidePlatform[];
 };
 
 /** Exhaustive over {@link IconLabelCode} — a new code needs a sentence. */
@@ -91,12 +121,24 @@ const FINDING_DETAIL: Record<IconLabelCode, string> = {
   untranslated:
     "an accessibilityLabel written as a bare string literal — it is spoken in that one language to speakers of all six",
   half_hidden:
-    "hidden from assistive technology on one platform only — accessibilityElementsHidden (iOS) and importantForAccessibility=\"no\" (Android) have to travel together, or the node stays announced on whichever platform the author did not test",
+    "hidden from assistive technology on some platforms only — accessibilityElementsHidden (iOS), importantForAccessibility=\"no\" (Android) and aria-hidden (web) have to travel together, or the node stays announced on whichever platform the author did not test",
 };
 
-/** The sentence this scan gives one finding code. */
-export function describeIconLabelFinding(code: IconLabelCode): string {
-  return FINDING_DETAIL[code];
+/**
+ * The sentence this scan gives one finding code.
+ *
+ * `missing` is the `half_hidden` extra: the generic sentence says the three
+ * props travel together, and this says which of them this node is short of,
+ * which is the difference between reading the rule and applying it.
+ */
+export function describeIconLabelFinding(
+  code: IconLabelCode,
+  missing?: readonly HidePlatform[],
+): string {
+  const said = FINDING_DETAIL[code];
+  if (code !== "half_hidden" || missing === undefined || missing.length === 0) return said;
+  const props = missing.map((p) => `${HIDE_PROP[p]} (${p})`).join(" + ");
+  return `${said}; still announced on ${missing.join(", ")} — add ${props}`;
 }
 
 /**
@@ -221,15 +263,26 @@ function* openTags(code: string): Generator<OpenTag> {
   }
 }
 
-/** The iOS half of hiding a node from assistive technology. */
-const HIDDEN_IOS = /accessibilityElementsHidden(?!\s*=\s*\{false\})/;
-
 /**
- * The Android half — and only the values that HIDE.
- * `importantForAccessibility="yes"` is the opposite instruction and wants no
- * iOS partner, so it must not be read as half of a pair.
+ * What each platform's "skip this node" instruction looks like in source.
+ *
+ * The pairing is on the INSTRUCTION rather than the prop name, which is why
+ * these are not three name matches. `importantForAccessibility="yes"` is the
+ * OPPOSITE instruction and wants no partners; `accessibilityElementsHidden=
+ * {false}` and `aria-hidden={false}` are not hides either. A rule that
+ * matched names would report all three as incomplete.
  */
-const HIDDEN_ANDROID = /importantForAccessibility\s*=\s*"(no|no-hide-descendants)"/;
+const HIDDEN_BY: Record<HidePlatform, RegExp> = {
+  ios: /accessibilityElementsHidden(?!\s*=\s*\{\s*false\s*\})/,
+  android: /importantForAccessibility\s*=\s*"(no|no-hide-descendants)"/,
+  /**
+   * Web reads `aria-hidden`, which react-native-web forwards to the DOM
+   * attribute of the same name. The lookbehind rejects a longer attribute
+   * ENDING in it — `data-aria-hidden` would otherwise satisfy the rule by
+   * containing it, and `\b` does not help because `-` is already a boundary.
+   */
+  web: /(?<![\w-])aria-hidden(?!\s*=\s*\{\s*false\s*\})/,
+};
 
 /**
  * Scan one source string for the accessibility problems this guard names.
@@ -248,10 +301,17 @@ export function findUnlabeledIconButtons(file: string, source: string): IconLabe
   };
   for (const tag of openTags(code)) {
     const { attrs, attrsAt, start } = tag;
-    const ios = HIDDEN_IOS.test(attrs);
-    const android = HIDDEN_ANDROID.test(attrs);
-    if (ios !== android) {
-      findings.push({ file, line: at(start), code: "half_hidden", snippet: snippetAt(start) });
+    const missing = HIDE_PLATFORMS.filter((platform) => !HIDDEN_BY[platform].test(attrs));
+    // A node hidden everywhere is done; one hidden nowhere never asked to be.
+    // Everything between is a hide that stops at a platform boundary.
+    if (missing.length > 0 && missing.length < HIDE_PLATFORMS.length) {
+      findings.push({
+        file,
+        line: at(start),
+        code: "half_hidden",
+        snippet: snippetAt(start),
+        missing,
+      });
     }
     if (tag.name !== TAG) continue;
     let body = "";
@@ -282,11 +342,13 @@ export function formatIconLabelReport(findings: readonly IconLabelFinding[]): st
   if (findings.length === 0) return "";
   const lines = [
     `Found ${String(findings.length)} accessibility problem(s) in app/** or components/**.`,
-    "Every tappable element needs a name a screen reader can speak, it has to be a t() call, and a node hidden from one platform has to be hidden from both — see lib/check-a11y-icon-labels.ts.",
+    "Every tappable element needs a name a screen reader can speak, it has to be a t() call, and a node hidden from one platform has to be hidden from all three — see lib/check-a11y-icon-labels.ts.",
   ];
   for (const finding of findings) {
     lines.push("");
-    lines.push(`  ${finding.file}:${String(finding.line)}  → ${describeIconLabelFinding(finding.code)}`);
+    lines.push(
+      `  ${finding.file}:${String(finding.line)}  → ${describeIconLabelFinding(finding.code, finding.missing)}`,
+    );
     lines.push(`    ${finding.snippet}`);
   }
   return lines.join("\n");

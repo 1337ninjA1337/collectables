@@ -48,7 +48,7 @@ function main(): void {
 
   if (findings.length === 0) {
     console.log(
-      `${CHECK_NAME}: scanned ${String(files.length)} screen file(s), every icon-only Pressable is named, every name is localized, and every hidden node is hidden on both platforms.`,
+      `${CHECK_NAME}: scanned ${String(files.length)} screen file(s), every icon-only Pressable is named, every name is localized, and every hidden node is hidden on iOS, Android and the web.`,
     );
     return;
   }

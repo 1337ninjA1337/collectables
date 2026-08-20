@@ -254,6 +254,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               color={TEXT_ON_DARK_5}
               accessibilityElementsHidden
               importantForAccessibility="no"
+              aria-hidden
             />
             {/* One line, ellipsised: a long needle would otherwise push the
                 sort and reset chips off the end of the horizontal scroll,
@@ -267,6 +268,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               color={TEXT_ON_DARK_5}
               accessibilityElementsHidden
               importantForAccessibility="no"
+              aria-hidden
             />
           </Pressable>
         ) : null}
