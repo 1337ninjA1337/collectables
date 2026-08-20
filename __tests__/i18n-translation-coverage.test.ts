@@ -227,7 +227,13 @@ describe("translation floors", () => {
     // complete, and four sit below half. The `assert.ok(true)` keeps the line
     // in the runner's output next to the rows above it.
     const report = COVERAGE.map(formatCoverageRow).join("\n");
-    // 546 as of 2026-08-20: `visibilityShared` was removed — a dead key
+    // 537 as of 2026-08-20: the nine `runtimeConfig*` keys were removed — the
+    // strings for a runtime Supabase-config form (title, URL/key labels and
+    // placeholders, save, the "configured in this browser" badge, the clear
+    // button) that `CLAUDE.md` explicitly forbids building and that no screen
+    // rendered. Declared only in `en` and `ru`, so the base map dropped nine
+    // and `ru` dropped nine with it. 546 before that: `visibilityShared` was
+    // removed — a dead key
     // (declared in `en` and `ru`, rendered by no screen; the badge reads
     // `visibilityViewer`) whose two declarations contradicted each other,
     // "Shared" in en and "Публичная" (Public) in ru, with the other four
@@ -245,7 +251,7 @@ describe("translation floors", () => {
     // — a key the card already rendered — in be/pl/de/es, which had been
     // inheriting the English "5 photos" since it was written. The 545 before
     // it arrived the same way, with the two nav-badge labels.
-    assert.match(report, /en: 546\/546 keys \(100\.0%\)/);
+    assert.match(report, /en: 537\/537 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

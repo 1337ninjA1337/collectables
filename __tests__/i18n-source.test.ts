@@ -90,7 +90,8 @@ describe("translation literal parser", () => {
   });
 
   it("does not read a URL inside a string as a comment", () => {
-    // Real row: `runtimeConfigUrlPlaceholder: "https://your-project.supabase.co"`.
+    // A URL-valued row, e.g. `emailPlaceholder: "you@example.com"` — the `//`
+    // inside the string must not be read as the start of a comment.
     const parsed = parseObjectLiteral(`
   url: "https://your-project.supabase.co",
   after: "still here",

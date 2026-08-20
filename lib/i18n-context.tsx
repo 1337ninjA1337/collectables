@@ -548,16 +548,6 @@ const en = {
     `Syncing ${params?.count ?? 0} change${params?.count === 1 ? "" : "s"}…`,
   syncingPillA11y: (params?: TranslationParams) =>
     `${params?.count ?? 0} change${params?.count === 1 ? "" : "s"} syncing to the cloud`,
-  runtimeConfigTitle: "Connect your Supabase project",
-  runtimeConfigSubtitle:
-    "Paste your project URL and publishable key. They will be saved in this browser only.",
-  runtimeConfigUrlLabel: "Project URL",
-  runtimeConfigUrlPlaceholder: "https://your-project.supabase.co",
-  runtimeConfigKeyLabel: "Publishable key (anon key)",
-  runtimeConfigKeyPlaceholder: "eyJ…",
-  runtimeConfigSave: "Save and reload",
-  runtimeConfiguredBadge: "Configured by you in this browser",
-  runtimeConfigClear: "Clear runtime credentials",
   crashFallbackTitle: "Something went wrong",
   crashFallbackBody:
     "An unexpected error occurred and we've logged it for review. Try again or restart the app.",
@@ -1149,16 +1139,6 @@ const ru: TranslationMap = {
     `Синхронизация: ${params?.count ?? 0}…`,
   syncingPillA11y: (params?: TranslationParams) =>
     `${params?.count ?? 0} изменений синхронизируется с облаком`,
-  runtimeConfigTitle: "Подключить проект Supabase",
-  runtimeConfigSubtitle:
-    "Вставьте URL проекта и ключ. Они сохранятся только в этом браузере.",
-  runtimeConfigUrlLabel: "URL проекта",
-  runtimeConfigUrlPlaceholder: "https://your-project.supabase.co",
-  runtimeConfigKeyLabel: "Публичный ключ (anon key)",
-  runtimeConfigKeyPlaceholder: "eyJ…",
-  runtimeConfigSave: "Сохранить и перезагрузить",
-  runtimeConfiguredBadge: "Настроено вами в этом браузере",
-  runtimeConfigClear: "Сбросить runtime-учётные данные",
   crashFallbackTitle: "Что-то пошло не так",
   crashFallbackBody:
     "Произошла непредвиденная ошибка, мы её записали. Попробуйте ещё раз или перезапустите приложение.",
