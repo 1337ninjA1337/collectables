@@ -22,7 +22,11 @@ describe("LINT_GUARDS — registry shape", () => {
     const ids = LINT_GUARDS.map((g) => g.npmScript);
     assert.equal(new Set(ids).size, ids.length, "duplicate guard ids");
     for (const guard of LINT_GUARDS) {
-      assert.match(guard.npmScript, /^lint:[a-z-]+$/);
+      // Digits allowed since `lint:a11y-icon-labels`: "a11y" is the name the
+      // rule is known by everywhere else, and spelling it out to satisfy a
+      // shape check would make the script harder to find than the check is
+      // worth.
+      assert.match(guard.npmScript, /^lint:[a-z0-9-]+$/);
       assert.ok(guard.description.length > 0, `${guard.npmScript} needs a description`);
     }
   });
