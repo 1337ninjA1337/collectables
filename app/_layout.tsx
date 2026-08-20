@@ -222,7 +222,11 @@ function AppShell() {
               showMobileNav ? null : (
                 <View style={styles.headerRightRow}>
                   {pathname !== "/settings" && pathname !== "/" ? (
-                    <Pressable style={styles.headerButton} onPress={() => router.push("/settings")}>
+                    <Pressable
+                      style={styles.headerButton}
+                      onPress={() => router.push("/settings")}
+                      accessibilityRole="button"
+                    >
                       <Text style={styles.headerButtonText}>{t("settings")}</Text>
                     </Pressable>
                   ) : null}
@@ -231,6 +235,7 @@ function AppShell() {
                       style={styles.headerIconButton}
                       onPress={() => router.push("/chats")}
                       accessibilityLabel={chatsA11yLabel}
+                      accessibilityRole="button"
                     >
                       <Ionicons
                         name="chatbubbles-outline"
@@ -257,6 +262,7 @@ function AppShell() {
                     style={styles.headerIconButton}
                     onPress={() => setSearchOpen(true)}
                     accessibilityLabel={t("searchPlaceholder")}
+                    accessibilityRole="button"
                   >
                     <Ionicons
                       name="search"
@@ -272,6 +278,7 @@ function AppShell() {
                       style={styles.headerIconButton}
                       onPress={() => router.push("/chats")}
                       accessibilityLabel={chatsA11yLabel}
+                      accessibilityRole="button"
                     >
                       <Ionicons
                         name="chatbubbles-outline"
@@ -295,7 +302,11 @@ function AppShell() {
                     </Pressable>
                   ) : null}
                   {pathname !== "/" ? (
-                    <Pressable style={styles.homeButton} onPress={() => router.replace("/")}>
+                    <Pressable
+                      style={styles.homeButton}
+                      onPress={() => router.replace("/")}
+                      accessibilityRole="button"
+                    >
                       <Text style={styles.homeButtonText}>{t("goHome")}</Text>
                     </Pressable>
                   ) : null}

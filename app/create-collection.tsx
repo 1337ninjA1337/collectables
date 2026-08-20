@@ -171,6 +171,7 @@ export default function CreateCollectionScreen() {
               key={tpl.id}
               style={{...styles.templateCard, ...(selectedTemplateId === tpl.id ? styles.templateCardActive : {})}}
               onPress={() => applyTemplate(tpl.id)}
+              accessibilityRole="button"
             >
               <Text style={styles.templateIcon}>{tpl.icon}</Text>
               <Text
@@ -212,7 +213,11 @@ export default function CreateCollectionScreen() {
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>{t("collectionCoverLabel")}</Text>
-        <Pressable style={styles.photoButton} onPress={pickCover}>
+        <Pressable
+          style={styles.photoButton}
+          onPress={pickCover}
+          accessibilityRole="button"
+        >
           <Text style={styles.photoButtonText}>{Platform.OS === "web" ? t("chooseCover") : t("openGallery")}</Text>
         </Pressable>
         {coverPhoto ? (
@@ -247,6 +252,7 @@ export default function CreateCollectionScreen() {
                   }
                   setVisibility(v);
                 }}
+                accessibilityRole="button"
               >
                 <Text style={{...styles.visibilityChipText, ...(selected ? styles.visibilityChipTextSelected : {})}}>
                   {t(v === "public" ? "visibilityPublic" : "visibilityPrivate")}
@@ -266,7 +272,9 @@ export default function CreateCollectionScreen() {
       </View>
 
       <Pressable style={{...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {})}} onPress={handleSave} disabled={saving}
-      accessibilityState={{ disabled: saving }}>
+      accessibilityState={{ disabled: saving }}
+        accessibilityRole="button"
+      >
         <Text style={styles.saveButtonText}>{saving ? t("creating") : t("saveCollection")}</Text>
       </Pressable>
 

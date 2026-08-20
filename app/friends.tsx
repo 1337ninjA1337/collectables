@@ -108,10 +108,18 @@ export default function FriendsScreen() {
         <View style={styles.actions}>
           {kind === "request" ? (
             <>
-              <Pressable style={styles.primaryAction} onPress={() => void addFriend(profile.id)}>
+              <Pressable
+                style={styles.primaryAction}
+                onPress={() => void addFriend(profile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.primaryActionText}>{t("acceptRequest")}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryAction} onPress={() => void removeFriend(profile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void removeFriend(profile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("rejectRequest")}</Text>
               </Pressable>
             </>
@@ -120,15 +128,24 @@ export default function FriendsScreen() {
               <Pressable
                 style={styles.primaryAction}
                 onPress={() => router.push(`/chat/${profile.id}` as never)}
+                accessibilityRole="button"
               >
                 <Text style={styles.primaryActionText}>{t("chatSend")}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryAction} onPress={() => void removeFriend(profile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void removeFriend(profile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("removeFriend")}</Text>
               </Pressable>
             </>
           ) : (
-            <Pressable style={styles.secondaryAction} onPress={() => void unfollowProfile(profile.id)}>
+            <Pressable
+              style={styles.secondaryAction}
+              onPress={() => void unfollowProfile(profile.id)}
+              accessibilityRole="button"
+            >
               <Text style={styles.secondaryActionText}>{t("unfollow")}</Text>
             </Pressable>
           )}
@@ -146,7 +163,15 @@ export default function FriendsScreen() {
         subtitle={t("friendsSubtitle")}
       />
 
-      <Pressable style={styles.chatsLink} onPress={() => router.push("/chats")}>
+      <Pressable
+
+        style={styles.chatsLink}
+
+        onPress={() => router.push("/chats")}
+
+        accessibilityRole="button"
+
+      >
         <View style={styles.chatsLinkIcon}>
           <Ionicons
             name="chatbubbles-outline"

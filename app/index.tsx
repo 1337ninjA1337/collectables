@@ -161,6 +161,7 @@ export default function HomeScreen() {
                 onPress={() => void signOut()}
                 disabled={pending}
                 accessibilityState={{ disabled: pending }}
+                accessibilityRole="button"
               >
                 <Text style={styles.signOutButtonText}>{t("signOut")}</Text>
               </Pressable>

@@ -48,7 +48,7 @@ function main(): void {
 
   if (findings.length === 0) {
     console.log(
-      `${CHECK_NAME}: scanned ${String(files.length)} screen file(s), every icon-only Pressable is named, every name is localized, every hidden node is hidden on iOS, Android and the web, every icon is hidden or named, and every disabled button says so.`,
+      `${CHECK_NAME}: scanned ${String(files.length)} screen file(s), every icon-only Pressable is named, every name is localized, every hidden node is hidden on iOS, Android and the web, every icon is hidden or named, every disabled button says so, and every interactive Pressable declares its role.`,
     );
     return;
   }

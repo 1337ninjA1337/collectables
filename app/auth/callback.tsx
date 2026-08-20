@@ -100,7 +100,11 @@ export default function AuthCallbackScreen() {
         <Text style={styles.title}>{error ? t("authCallbackBadLink") : t("authCallbackWorking")}</Text>
         <Text style={styles.subtitle}>{error ?? t("authCallbackBackSoon")}</Text>
         {error ? (
-          <Pressable style={styles.retryButton} onPress={() => router.replace("/")}>
+          <Pressable
+            style={styles.retryButton}
+            onPress={() => router.replace("/")}
+            accessibilityRole="button"
+          >
             <Text style={styles.retryButtonText}>{t("tryAgain")}</Text>
           </Pressable>
         ) : null}

@@ -37,7 +37,7 @@ const codes = (source: string) => findings(source).map((f) => f.code);
 describe("findUnlabeledIconButtons", () => {
   it("flags an icon-only Pressable with no label", () => {
     const found = findings(`
-      <Pressable style={styles.chip} onPress={close}>
+      <Pressable style={styles.chip} onPress={close} accessibilityRole="button">
         <Ionicons name="close" size={14} ${HIDDEN} />
       </Pressable>
     `);
@@ -54,7 +54,7 @@ describe("findUnlabeledIconButtons", () => {
     // it never looked at.
     assert.deepEqual(
       codes(`
-        <Pressable onPress={() => setOpen(true)} accessibilityLabel={t("search")}>
+        <Pressable onPress={() => setOpen(true)} accessibilityLabel={t("search")} accessibilityRole="button">
           <Ionicons name="search" size={18} ${HIDDEN} />
         </Pressable>
       `),
@@ -69,6 +69,7 @@ describe("findUnlabeledIconButtons", () => {
           style={{ ...styles.a, ...(n > 3 ? styles.b : {}) }}
           onPress={() => move(i, i + 1)}
           accessibilityLabel={t("next")}
+          accessibilityRole="button"
         >
           <Ionicons name="chevron-forward" ${HIDDEN} />
         </Pressable>
@@ -93,7 +94,7 @@ describe("findUnlabeledIconButtons", () => {
     // makes screen-reader output worse, not better.
     assert.deepEqual(
       codes(`
-        <Pressable onPress={save}>
+        <Pressable onPress={save} accessibilityRole="button">
           <Ionicons name="save" ${HIDDEN} />
           <Text>{t("save")}</Text>
         </Pressable>
@@ -108,9 +109,9 @@ describe("findUnlabeledIconButtons", () => {
     // and reports the card as an icon button.
     assert.deepEqual(
       codes(`
-        <Pressable onPress={openCard}>
+        <Pressable onPress={openCard} accessibilityRole="button">
           <Text>{title}</Text>
-          <Pressable onPress={remove}>
+          <Pressable onPress={remove} accessibilityRole="button">
             <Ionicons name="trash" ${HIDDEN} />
           </Pressable>
         </Pressable>
@@ -120,7 +121,7 @@ describe("findUnlabeledIconButtons", () => {
   });
 
   it("ignores a self-closing Pressable, which has no children to be icon-only", () => {
-    assert.deepEqual(codes(`<Pressable style={styles.backdrop} onPress={close} />`), []);
+    assert.deepEqual(codes(`<Pressable style={styles.backdrop} onPress={close} accessibilityRole="none" />`), []);
   });
 
   it("ignores a component whose name merely starts with Pressable", () => {
@@ -139,7 +140,7 @@ describe("findUnlabeledIconButtons", () => {
     // languages. A rule that only asks whether one is present passes that.
     assert.deepEqual(
       codes(`
-        <Pressable onPress={open} accessibilityLabel="More currencies">
+        <Pressable onPress={open} accessibilityLabel="More currencies" accessibilityRole="button">
           <Text>+</Text>
         </Pressable>
       `),
@@ -152,7 +153,7 @@ describe("findUnlabeledIconButtons", () => {
     // label already answers the "can a screen reader name this" question.
     assert.equal(
       findings(`
-        <Pressable onPress={open} accessibilityLabel="Close">
+        <Pressable onPress={open} accessibilityLabel="Close" accessibilityRole="button">
           <Ionicons name="close" ${HIDDEN} />
         </Pressable>
       `).length,
@@ -168,7 +169,7 @@ describe("findUnlabeledIconButtons", () => {
       codes(`
         // <Pressable onPress={x}><Ionicons name="close" ${HIDDEN} /></Pressable>
         /* <Pressable><Ionicons name="close" ${HIDDEN} /></Pressable> */
-        <Pressable onPress={x} accessibilityLabel={t("close")}>
+        <Pressable onPress={x} accessibilityLabel={t("close")} accessibilityRole="button">
           <Ionicons name="close" ${HIDDEN} />
         </Pressable>
       `),
@@ -178,9 +179,9 @@ describe("findUnlabeledIconButtons", () => {
 
   it("reports every finding in a file, in source order", () => {
     const found = findings(`
-      <Pressable onPress={a}><Ionicons name="a" ${HIDDEN} /></Pressable>
-      <Pressable onPress={b} accessibilityLabel="B"><Text>b</Text></Pressable>
-      <Pressable onPress={c}><Ionicons name="c" ${HIDDEN} /></Pressable>
+      <Pressable onPress={a} accessibilityRole="button"><Ionicons name="a" ${HIDDEN} /></Pressable>
+      <Pressable onPress={b} accessibilityLabel="B" accessibilityRole="button"><Text>b</Text></Pressable>
+      <Pressable onPress={c} accessibilityRole="button"><Ionicons name="c" ${HIDDEN} /></Pressable>
     `);
     assert.deepEqual(
       found.map((f) => f.code),
@@ -321,7 +322,7 @@ describe("the report", () => {
 
   it("names the file, the line and what is wrong with it", () => {
     const report = formatIconLabelReport(findings(`
-      <Pressable onPress={a}><Ionicons name="a" ${HIDDEN} /></Pressable>
+      <Pressable onPress={a} accessibilityRole="button"><Ionicons name="a" ${HIDDEN} /></Pressable>
     `));
     assert.match(report, /Found 1 accessibility problem\(s\)/);
     assert.match(report, /app\/x\.tsx:2/);
@@ -335,6 +336,7 @@ describe("the report", () => {
       "half_hidden",
       "undecided_icon",
       "silent_disabled",
+      "no_role",
     ];
     for (const code of all) {
       const said = describeIconLabelFinding(code);
@@ -445,7 +447,7 @@ describe("the icon nobody decided about", () => {
     // They are two different fixes: the BUTTON needs a name, and the ICON
     // needs hiding. Reporting one would leave the other in place.
     assert.deepEqual(
-      codes(`<Pressable onPress={x}><Ionicons name="a" /></Pressable>`),
+      codes(`<Pressable onPress={x} accessibilityRole="button"><Ionicons name="a" /></Pressable>`),
       ["unlabeled", "undecided_icon"],
     );
   });
@@ -456,7 +458,7 @@ describe("the button that is greyed out and says nothing", () => {
     // Greyed-out is a colour, and a colour reaches nobody: the button is
     // offered as though pressing it would do something.
     assert.deepEqual(
-      codes(`<Pressable onPress={go} disabled={n === 0}><Text>go</Text></Pressable>`),
+      codes(`<Pressable onPress={go} disabled={n === 0} accessibilityRole="button"><Text>go</Text></Pressable>`),
       ["silent_disabled"],
     );
   });
@@ -464,7 +466,7 @@ describe("the button that is greyed out and says nothing", () => {
   it("says nothing when the state names disabled", () => {
     assert.deepEqual(
       codes(`
-        <Pressable onPress={go} disabled={n === 0} accessibilityState={{ disabled: n === 0 }}>
+        <Pressable onPress={go} disabled={n === 0} accessibilityState={{ disabled: n === 0 }} accessibilityRole="button">
           <Text>go</Text>
         </Pressable>
       `),
@@ -478,7 +480,7 @@ describe("the button that is greyed out and says nothing", () => {
     // not the presence of the prop.
     assert.deepEqual(
       codes(`
-        <Pressable onPress={go} disabled={off} accessibilityState={{ selected: on }}>
+        <Pressable onPress={go} disabled={off} accessibilityState={{ selected: on }} accessibilityRole="button">
           <Text>go</Text>
         </Pressable>
       `),
@@ -487,11 +489,11 @@ describe("the button that is greyed out and says nothing", () => {
   });
 
   it("says nothing about a Pressable that never takes disabled", () => {
-    assert.deepEqual(codes(`<Pressable onPress={go}><Text>go</Text></Pressable>`), []);
+    assert.deepEqual(codes(`<Pressable onPress={go} accessibilityRole="button"><Text>go</Text></Pressable>`), []);
   });
 
   it("does not confuse a longer prop name for disabled", () => {
-    assert.deepEqual(codes(`<Pressable onPress={go} isDisabled={x}><Text>go</Text></Pressable>`), []);
+    assert.deepEqual(codes(`<Pressable onPress={go} isDisabled={x} accessibilityRole="button"><Text>go</Text></Pressable>`), []);
   });
 
   it("leaves a custom component alone, which may forward disabled correctly", () => {
@@ -508,8 +510,42 @@ describe("the button that is greyed out and says nothing", () => {
     // line — within a line the order is which rule ran first, which is an
     // implementation detail no reader of the report depends on.
     assert.deepEqual(
-      codes(`<Pressable onPress={x} disabled={y}><Ionicons name="a" /></Pressable>`).sort(),
+      codes(`<Pressable onPress={x} disabled={y} accessibilityRole="button"><Ionicons name="a" /></Pressable>`).sort(),
       ["silent_disabled", "undecided_icon", "unlabeled"],
+    );
+  });
+});
+
+describe("the tappable that never says it is a button", () => {
+  it("flags an interactive Pressable with no role", () => {
+    // Neither React Native nor react-native-web defaults a role, so it
+    // announces as generic text rather than as something that can be pressed.
+    assert.deepEqual(codes(`<Pressable onPress={go}><Text>go</Text></Pressable>`), ["no_role"]);
+  });
+
+  it('counts accessibilityRole="none" as a role — it is a deliberate opt-out', () => {
+    // A modal backdrop dismisses on press and is not a control; `none` is that
+    // decision written down, not the absence of one.
+    assert.deepEqual(
+      codes(`<Pressable onPress={close} accessibilityRole="none"><View /></Pressable>`),
+      [],
+    );
+    assert.deepEqual(
+      codes(`<Pressable onPress={go} accessibilityRole="button"><Text>go</Text></Pressable>`),
+      [],
+    );
+  });
+
+  it("says nothing about a Pressable with no onPress — it is a layout wrapper", () => {
+    assert.deepEqual(codes(`<Pressable style={styles.card}><Text>hi</Text></Pressable>`), []);
+  });
+
+  it("reports a naked interactive icon button as all three of its problems", () => {
+    // No name, an undecided icon, and no role — three separate fixes, and the
+    // one-line order is which rule ran first, which no report reader depends on.
+    assert.deepEqual(
+      codes(`<Pressable onPress={x}><Ionicons name="a" /></Pressable>`).sort(),
+      ["no_role", "undecided_icon", "unlabeled"],
     );
   });
 });

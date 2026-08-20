@@ -68,6 +68,7 @@ export default function ChatsScreen() {
                 key={preview.chatId}
                 style={[styles.row, { backgroundColor: theme.card, borderColor: theme.border }]}
                 onPress={() => router.push(`/chat/${preview.otherUserId}` as never)}
+                accessibilityRole="button"
               >
                 {profile?.avatar ? (
                   <Image source={{ uri: profile.avatar }} style={styles.avatar} />

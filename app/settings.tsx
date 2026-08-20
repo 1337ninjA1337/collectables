@@ -219,13 +219,16 @@ export default function SettingsScreen() {
             setCurrencySheetOpen(true);
           }}
           accessibilityLabel={t("displayCurrencyTitle")}
+          accessibilityRole="button"
         >
           <Text style={styles.currencyValue}>{displayCurrency}</Text>
           <Text style={styles.currencyChevron}>›</Text>
         </Pressable>
         {currencyRatesUpdatedAt != null ? (
           <Pressable onPress={handleRefreshRates} disabled={refreshingRates}
-          accessibilityState={{ disabled: refreshingRates }}>
+          accessibilityState={{ disabled: refreshingRates }}
+            accessibilityRole="button"
+          >
             <Text style={styles.ratesHint}>
               {t("currencyRatesUpdated", {
                 when: formatRelativeDate(new Date(currencyRatesUpdatedAt).toISOString()),
@@ -284,11 +287,19 @@ export default function SettingsScreen() {
             ))}
           </View>
           {isPremium ? (
-            <Pressable style={styles.premiumCancelButton} onPress={handleCancelPremium}>
+            <Pressable
+              style={styles.premiumCancelButton}
+              onPress={handleCancelPremium}
+              accessibilityRole="button"
+            >
               <Text style={styles.premiumCancelText}>{t("premiumCancel")}</Text>
             </Pressable>
           ) : (
-            <Pressable style={styles.premiumActivateButton} onPress={handleActivatePremium}>
+            <Pressable
+              style={styles.premiumActivateButton}
+              onPress={handleActivatePremium}
+              accessibilityRole="button"
+            >
               <Text style={styles.premiumActivateText}>{t("premiumActivate")}</Text>
             </Pressable>
           )}

@@ -813,7 +813,11 @@ export default function CollectionDetailsScreen() {
 
         {owner ? (
           <View style={styles.ownerActions}>
-            <Pressable style={styles.editCollectionButton} onPress={openEditModal}>
+            <Pressable
+              style={styles.editCollectionButton}
+              onPress={openEditModal}
+              accessibilityRole="button"
+            >
               <Text style={styles.editCollectionButtonText}>{t("editCollection")}</Text>
             </Pressable>
             <Link href={{ pathname: "/create", params: { collectionId: collection.id } }} asChild>
@@ -822,7 +826,11 @@ export default function CollectionDetailsScreen() {
               </Pressable>
             </Link>
             {allItems.length > 0 && !selectionMode ? (
-              <Pressable style={styles.selectButton} onPress={enterSelectionMode}>
+              <Pressable
+                style={styles.selectButton}
+                onPress={enterSelectionMode}
+                accessibilityRole="button"
+              >
                 <Text style={styles.selectButtonText}>{t("selectItems")}</Text>
               </Pressable>
             ) : null}
@@ -844,11 +852,16 @@ export default function CollectionDetailsScreen() {
                 onPress={() => void handleExportPdf()}
                 disabled={exporting}
                 accessibilityState={{ disabled: exporting }}
+                accessibilityRole="button"
               >
                 <Text style={styles.exportButtonText}>{exporting ? t("exportPdfGenerating") : t("exportPdf")}</Text>
               </Pressable>
             ) : null}
-            <Pressable style={styles.shareButton} onPress={() => setShareOpen(true)}>
+            <Pressable
+              style={styles.shareButton}
+              onPress={() => setShareOpen(true)}
+              accessibilityRole="button"
+            >
               <Text style={styles.shareButtonText}>{t("share")}</Text>
             </Pressable>
             <DangerSection
@@ -860,11 +873,19 @@ export default function CollectionDetailsScreen() {
         ) : (
           <View style={styles.ownerActions}>
             {isCollectionFollowed(collection.id) ? (
-              <Pressable style={styles.unfollowButton} onPress={() => void unfollowCollection(collection.id)}>
+              <Pressable
+                style={styles.unfollowButton}
+                onPress={() => void unfollowCollection(collection.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.unfollowButtonText}>{t("unfollowCollection")}</Text>
               </Pressable>
             ) : (
-              <Pressable style={styles.addButton} onPress={() => void followCollection(collection.id)}>
+              <Pressable
+                style={styles.addButton}
+                onPress={() => void followCollection(collection.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.addButtonText}>{t("followCollection")}</Text>
               </Pressable>
             )}
@@ -874,11 +895,16 @@ export default function CollectionDetailsScreen() {
                 onPress={() => void handleExportPdf()}
                 disabled={exporting}
                 accessibilityState={{ disabled: exporting }}
+                accessibilityRole="button"
               >
                 <Text style={styles.exportButtonText}>{exporting ? t("exportPdfGenerating") : t("exportPdf")}</Text>
               </Pressable>
             ) : null}
-            <Pressable style={styles.shareButton} onPress={() => setShareOpen(true)}>
+            <Pressable
+              style={styles.shareButton}
+              onPress={() => setShareOpen(true)}
+              accessibilityRole="button"
+            >
               <Text style={styles.shareButtonText}>{t("share")}</Text>
             </Pressable>
           </View>

@@ -165,7 +165,11 @@ export default function PeopleScreen() {
 
         <View style={styles.actions}>
           {relationship === "friend" ? (
-            <Pressable style={styles.secondaryAction} onPress={() => void removeFriend(profile.id)}>
+            <Pressable
+              style={styles.secondaryAction}
+              onPress={() => void removeFriend(profile.id)}
+              accessibilityRole="button"
+            >
               <Text style={styles.secondaryActionText}>{t("removeFriend")}</Text>
             </Pressable>
           ) : relationship === "request_sent" ? (
@@ -173,34 +177,62 @@ export default function PeopleScreen() {
               <View style={styles.statusBadge}>
                 <Text style={styles.statusBadgeText}>{t("requestSent")}</Text>
               </View>
-              <Pressable style={styles.secondaryAction} onPress={() => void removeFriend(profile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void removeFriend(profile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("cancelInvitation")}</Text>
               </Pressable>
             </>
           ) : relationship === "request_received" ? (
             <>
-              <Pressable style={styles.primaryAction} onPress={() => void addFriend(profile.id)}>
+              <Pressable
+                style={styles.primaryAction}
+                onPress={() => void addFriend(profile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.primaryActionText}>{t("acceptRequest")}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryAction} onPress={() => void removeFriend(profile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void removeFriend(profile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("rejectRequest")}</Text>
               </Pressable>
             </>
           ) : relationship === "following" ? (
             <>
-              <Pressable style={styles.primaryAction} onPress={() => void addFriend(profile.id)}>
+              <Pressable
+                style={styles.primaryAction}
+                onPress={() => void addFriend(profile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.primaryActionText}>{t("addFriend")}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryAction} onPress={() => void unfollowProfile(profile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void unfollowProfile(profile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("unfollow")}</Text>
               </Pressable>
             </>
           ) : (
             <>
-              <Pressable style={styles.primaryAction} onPress={() => void addFriend(profile.id)}>
+              <Pressable
+                style={styles.primaryAction}
+                onPress={() => void addFriend(profile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.primaryActionText}>{t("addFriend")}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryAction} onPress={() => void followProfile(profile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void followProfile(profile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("follow")}</Text>
               </Pressable>
             </>
@@ -254,6 +286,7 @@ export default function PeopleScreen() {
             onPress={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
             accessibilityState={{ disabled: page <= 1 }}
+            accessibilityRole="button"
           >
             <Text style={{...styles.pageButtonText, ...(page <= 1 ? styles.pageButtonTextDisabled : {})}}>
               {t("prevPage")}
@@ -265,6 +298,7 @@ export default function PeopleScreen() {
             onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
             accessibilityState={{ disabled: page >= totalPages }}
+            accessibilityRole="button"
           >
             <Text style={{...styles.pageButtonText, ...(page >= totalPages ? styles.pageButtonTextDisabled : {})}}>
               {t("nextPage")}

@@ -367,6 +367,8 @@ export default function CreateItemScreen() {
                 key={c}
                 style={{...styles.conditionChip, ...(selected ? styles.conditionChipSelected : {})}}
                 onPress={() => setCondition(selected ? "" : c)}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
               >
                 <Text style={{...styles.conditionChipText, ...(selected ? styles.conditionChipTextSelected : {})}}>
                   {t(`condition${c[0].toUpperCase()}${c.slice(1)}` as "conditionNew" | "conditionExcellent" | "conditionGood" | "conditionFair")}
@@ -382,7 +384,12 @@ export default function CreateItemScreen() {
         {tags.length > 0 ? (
           <View style={styles.tagsRow}>
             {tags.map((tag, i) => (
-              <Pressable key={i} style={{...styles.tagChip, backgroundColor: tag.color}} onPress={() => setTags(tags.filter((_, j) => j !== i))}>
+              <Pressable
+                key={i}
+                style={{...styles.tagChip, backgroundColor: tag.color}}
+                onPress={() => setTags(tags.filter((_, j) => j !== i))}
+                accessibilityRole="button"
+              >
                 <Text style={styles.tagChipText}>{tag.label}</Text>
                 <Text style={styles.tagChipRemove}>x</Text>
               </Pressable>
@@ -401,6 +408,7 @@ export default function CreateItemScreen() {
           <Pressable
             style={{...styles.tagAddButton, ...(tagInput.trim() ? {} : styles.tagAddButtonDisabled)}}
             onPress={addTag}
+            accessibilityRole="button"
           >
             <Text style={styles.tagAddButtonText}>{t("tagsAdd")}</Text>
           </Pressable>
@@ -409,7 +417,11 @@ export default function CreateItemScreen() {
 
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>{t("photosLabel")}</Text>
-        <Pressable style={styles.photoButton} onPress={pickImages}>
+        <Pressable
+          style={styles.photoButton}
+          onPress={pickImages}
+          accessibilityRole="button"
+        >
           <Text style={styles.photoButtonText}>{Platform.OS === "web" ? t("choosePhotos") : t("openGallery")}</Text>
         </Pressable>
         <Pressable
@@ -417,6 +429,7 @@ export default function CreateItemScreen() {
           onPress={() => void handleAnalyze()}
           disabled={analyzing || photos.length === 0}
           accessibilityState={{ disabled: analyzing || photos.length === 0 }}
+          accessibilityRole="button"
         >
           <Text style={styles.aiButtonText}>{analyzing ? t("aiAnalyzing") : t("aiAnalyze")}</Text>
         </Pressable>
@@ -424,7 +437,9 @@ export default function CreateItemScreen() {
       </View>
 
       <Pressable style={{...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {})}} onPress={handleSave} disabled={saving}
-      accessibilityState={{ disabled: saving }}>
+      accessibilityState={{ disabled: saving }}
+        accessibilityRole="button"
+      >
         <Text style={styles.saveButtonText}>{saving ? t("saving") : t("saveItem")}</Text>
       </Pressable>
 
@@ -523,8 +538,16 @@ function CollectionSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
-        <Pressable style={styles.sheetContainer} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        style={styles.sheetBackdrop}
+        onPress={onClose}
+        accessibilityRole="none"
+      >
+        <Pressable
+          style={styles.sheetContainer}
+          onPress={(e) => e.stopPropagation()}
+          accessibilityRole="none"
+        >
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>{t("collectionFieldLabel")}</Text>
 
@@ -592,7 +615,15 @@ function CollectionSheet({
             )}
           </ScrollView>
 
-          <Pressable style={styles.sheetCloseButton} onPress={onClose}>
+          <Pressable
+
+            style={styles.sheetCloseButton}
+
+            onPress={onClose}
+
+            accessibilityRole="button"
+
+          >
             <Text style={styles.sheetCloseText}>{t("cancel")}</Text>
           </Pressable>
         </Pressable>

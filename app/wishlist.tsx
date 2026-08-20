@@ -189,7 +189,11 @@ export default function WishlistScreen() {
           <Text style={{ ...styles.title, color: theme.text }}>{t("wishlist")}</Text>
           <Text style={{ ...styles.subtitle, color: theme.meta }}>{t("wishlistHint")}</Text>
         </View>
-        <Pressable style={styles.addButton} onPress={openAddSheet}>
+        <Pressable
+          style={styles.addButton}
+          onPress={openAddSheet}
+          accessibilityRole="button"
+        >
           <Ionicons
             name="add"
             size={20}
@@ -356,7 +360,11 @@ export default function WishlistScreen() {
       />
 
       <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setAddOpen(false)}>
+        <Pressable
+          style={styles.sheetBackdrop}
+          onPress={() => setAddOpen(false)}
+          accessibilityRole="none"
+        >
           <Animated.View
             style={[
               styles.sheet,
@@ -368,7 +376,11 @@ export default function WishlistScreen() {
             ]}
             {...sheetPanResponder.panHandlers}
           >
-            <Pressable style={styles.sheetInner} onPress={(e) => e.stopPropagation()}>
+            <Pressable
+              style={styles.sheetInner}
+              onPress={(e) => e.stopPropagation()}
+              accessibilityRole="none"
+            >
               <View style={styles.sheetHandle} />
               <Text style={styles.sheetTitle}>{t("wishlistAdd")}</Text>
               <ScrollView
@@ -415,7 +427,11 @@ export default function WishlistScreen() {
                 />
 
                 <Text style={styles.label}>{t("photosLabel")}</Text>
-                <Pressable style={styles.pickButton} onPress={pickImages}>
+                <Pressable
+                  style={styles.pickButton}
+                  onPress={pickImages}
+                  accessibilityRole="button"
+                >
                   <Ionicons
                     name="images-outline"
                     size={18}
@@ -431,7 +447,11 @@ export default function WishlistScreen() {
                 ) : null}
               </ScrollView>
               <View style={styles.sheetActions}>
-                <Pressable style={styles.cancelButton} onPress={() => setAddOpen(false)}>
+                <Pressable
+                  style={styles.cancelButton}
+                  onPress={() => setAddOpen(false)}
+                  accessibilityRole="button"
+                >
                   <Text style={styles.cancelButtonText}>{t("cancel")}</Text>
                 </Pressable>
                 <Pressable
@@ -439,6 +459,7 @@ export default function WishlistScreen() {
                   onPress={handleSave}
                   disabled={saving}
                   accessibilityState={{ disabled: saving }}
+                  accessibilityRole="button"
                 >
                   <Text style={styles.saveButtonText}>{t("saveItem")}</Text>
                 </Pressable>
@@ -460,7 +481,12 @@ export default function WishlistScreen() {
             <Text style={styles.subtitle}>{t("wishlistPromoteHint")}</Text>
             <ScrollView style={{ maxHeight: 320 }}>
               {ownedCollections.map((c) => (
-                <Pressable key={c.id} style={styles.collectionRow} onPress={() => void handlePromote(c.id)}>
+                <Pressable
+                  key={c.id}
+                  style={styles.collectionRow}
+                  onPress={() => void handlePromote(c.id)}
+                  accessibilityRole="button"
+                >
                   <Text style={styles.collectionRowText}>{c.name}</Text>
                   <Ionicons
                     name="chevron-forward"
@@ -473,7 +499,11 @@ export default function WishlistScreen() {
                 </Pressable>
               ))}
             </ScrollView>
-            <Pressable style={styles.cancelButton} onPress={() => setPromoteFor(null)}>
+            <Pressable
+              style={styles.cancelButton}
+              onPress={() => setPromoteFor(null)}
+              accessibilityRole="button"
+            >
               <Text style={styles.cancelButtonText}>{t("cancel")}</Text>
             </Pressable>
           </View>

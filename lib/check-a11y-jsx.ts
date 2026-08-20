@@ -146,7 +146,21 @@ export type IconLabelCode =
    * carrying `{{ selected }}` beside a `disabled` prop is exactly as silent
    * as one carrying nothing.
    */
-  | "silent_disabled";
+  | "silent_disabled"
+  /**
+   * An interactive `<Pressable>` — one with an `onPress` — that declares no
+   * `accessibilityRole`. Neither React Native's `<Pressable>` nor
+   * react-native-web's sets a default, so it announces as a generic element:
+   * a screen reader user is told there is text there, not that it can be
+   * pressed. A sweep on 2026-08-20 found 152 of this tree's 194 in that state
+   * and closed the gap over five slices before this rule could go in.
+   *
+   * `onPress` is the interactive test, because a `<Pressable>` without one is
+   * a layout wrapper. `accessibilityRole="none"` is a role, and a deliberate
+   * one — a modal backdrop opts out with it — so "declares no role" is the
+   * bar, not "declares a role that does something".
+   */
+  | "no_role";
 
 /** A platform whose accessibility tree has its own way of being told to skip a node. */
 export type HidePlatform = "ios" | "android" | "web";
@@ -188,6 +202,8 @@ const FINDING_DETAIL: Record<IconLabelCode, string> = {
     "an accessibilityLabel written as a bare string literal — it is spoken in that one language to speakers of all six",
   half_hidden:
     "hidden from assistive technology on some platforms only — accessibilityElementsHidden (iOS), importantForAccessibility=\"no\" (Android) and aria-hidden (web) have to travel together, or the node stays announced on whichever platform the author did not test",
+  no_role:
+    "an interactive <Pressable> with no accessibilityRole — a screen reader announces it as generic text rather than as something that can be pressed; add accessibilityRole=\"button\" (or the right role, or \"none\" for a backdrop that only dismisses)",
   silent_disabled:
     "a <Pressable> that takes `disabled` without accessibilityState={{ disabled }} — greyed-out is a colour, so a screen reader offers the button as though pressing it would do something",
   undecided_icon:
@@ -408,6 +424,12 @@ const HIDES_SUBTREE_BY: Record<HidePlatform, RegExp> = {
   web: HIDDEN_BY.web,
 };
 
+/** An `onPress` prop — what separates an interactive Pressable from a layout wrapper. */
+const IS_INTERACTIVE = /\sonPress\s*=/;
+
+/** Any `accessibilityRole`, including `"none"`, which is a deliberate opt-out. */
+const HAS_ROLE = /accessibilityRole\s*=/;
+
 /** A `disabled` prop with a value — `disabledFoo` is a different attribute. */
 const TAKES_DISABLED = /\sdisabled\s*=/;
 
@@ -465,6 +487,10 @@ export function findUnlabeledIconButtons(file: string, source: string): IconLabe
     if (tag.name === TAG && TAKES_DISABLED.test(attrs) && !ANNOUNCES_DISABLED.test(attrs)) {
       findings.push({ file, line: at(start), code: "silent_disabled", snippet: snippetAt(start) });
     }
+    // A tappable that never says it is a button.
+    if (tag.name === TAG && IS_INTERACTIVE.test(attrs) && !HAS_ROLE.test(attrs)) {
+      findings.push({ file, line: at(start), code: "no_role", snippet: snippetAt(start) });
+    }
     if (tag.name !== TAG) continue;
     let body = "";
     if (!tag.selfClosing) {
@@ -494,7 +520,7 @@ export function formatIconLabelReport(findings: readonly IconLabelFinding[]): st
   if (findings.length === 0) return "";
   const lines = [
     `Found ${String(findings.length)} accessibility problem(s) in app/** or components/**.`,
-    "Every tappable element needs a name a screen reader can speak, it has to be a t() call, a node hidden from one platform has to be hidden from all three, every icon has to be hidden or named, and a disabled button has to say so — see lib/check-a11y-jsx.ts.",
+    "Every tappable element needs a name a screen reader can speak, it has to be a t() call, a node hidden from one platform has to be hidden from all three, every icon has to be hidden or named, a disabled button has to say so, and an interactive one has to declare its role — see lib/check-a11y-jsx.ts.",
   ];
   for (const finding of findings) {
     lines.push("");

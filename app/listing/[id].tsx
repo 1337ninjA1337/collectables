@@ -431,6 +431,7 @@ export default function ListingDetailScreen() {
               onPress={handleClaimPress}
               disabled={claiming}
               accessibilityState={{ disabled: claiming }}
+              accessibilityRole="button"
             >
               <Text style={styles.claimButtonText}>
                 {listing.mode === "sell"
@@ -439,7 +440,11 @@ export default function ListingDetailScreen() {
               </Text>
             </Pressable>
           ) : null}
-          <Pressable style={styles.messageButton} onPress={handleMessageOwner}>
+          <Pressable
+            style={styles.messageButton}
+            onPress={handleMessageOwner}
+            accessibilityRole="button"
+          >
             <Text style={styles.messageButtonText}>{t("marketplaceMessageOwner")}</Text>
           </Pressable>
         </View>

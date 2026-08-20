@@ -255,6 +255,7 @@ export default function ChatDetailScreen() {
           <Pressable
             onPress={() => router.push(`/profile/${otherUserId}` as never)}
             style={styles.headerLeft}
+            accessibilityRole="button"
           >
             {otherProfile?.avatar ? (
               <Image source={{ uri: otherProfile.avatar }} style={styles.headerAvatar} />
@@ -275,7 +276,12 @@ export default function ChatDetailScreen() {
             </View>
           </Pressable>
           {messages.length > 0 ? (
-            <Pressable style={styles.headerAction} onPress={handleClear} accessibilityLabel={t("chatClear")}>
+            <Pressable
+              style={styles.headerAction}
+              onPress={handleClear}
+              accessibilityLabel={t("chatClear")}
+              accessibilityRole="button"
+            >
               <Ionicons
                 name="trash-outline"
                 size={18}
@@ -350,6 +356,7 @@ export default function ChatDetailScreen() {
             disabled={!text.trim()}
             accessibilityState={{ disabled: !text.trim() }}
             accessibilityLabel={t("chatSend")}
+            accessibilityRole="button"
           >
             <Ionicons
               name="send"
