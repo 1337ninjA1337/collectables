@@ -21,8 +21,17 @@
  *
  * Read-only, and not in `lint:all`: this is a tool a person runs when a floor
  * goes red, not a guard. Nothing here can fail a build — the exit status is 1
- * only when a floor is genuinely no longer holding its property, so it is
- * usable in a pinch as a check without ever being one by default.
+ * only when a floor is genuinely no longer holding its property, or when a
+ * walk turns out not to be measuring what it declares, so it is usable in a
+ * pinch as a check without ever being one by default.
+ *
+ * The second of those is why every root is walked twice: once through the
+ * guard's own filter for the count, and once unfiltered for what is actually
+ * there. A tool that only ever saw the filtered walk would happily suggest a
+ * SMALLER floor for a guard that had quietly stopped reading half its root —
+ * counting the erosion and writing it into the table as the new normal.
+ * `checkWalkPremise` states that gap; those lines print under the row they
+ * undermine and are named again at the end.
  *
  * The suggested minimum reproduces the arithmetic the existing notes use: sit
  * above the largest single root, and leave roughly a quarter of the total
@@ -34,23 +43,38 @@
 import * as path from "node:path";
 
 import {
+  checkWalkPremise,
+  describeWalkPremiseProblem,
   FLOOR_WALKS,
   formatFloorMeasurement,
   measureFloorWalk,
   type FloorMeasurement,
+  type WalkPremiseProblem,
 } from "../lib/floor-walks";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
 import { SOURCE_EXTENSIONS } from "../lib/source-dirs";
-import { listSourceFiles } from "./guard-io";
+import { listSourceFiles, tallyExtensions } from "./guard-io";
 
 const REPO_ROOT = path.join(__dirname, "..");
+
+/** A measurement and whether the tree it was taken over is the tree it claims. */
+type MeasuredFloor = {
+  readonly row: FloorMeasurement;
+  readonly premise: readonly WalkPremiseProblem[];
+};
 
 /**
  * One floor's counts, walked. The arithmetic over them is
  * {@link measureFloorWalk} in `lib/floor-walks.ts`, which is where a test can
  * reach it — this half is the disk.
+ *
+ * Two walks per root, not one: the filtered walk is the number, the unfiltered
+ * tally beside it is what makes the number checkable. A suggestion computed
+ * from a walk that had quietly stopped matching part of its own root would be
+ * this tool's worst possible output — a smaller floor, justified by counting,
+ * with the erosion it was written to catch baked into the new number.
  */
-function measure(checkName: string): FloorMeasurement | null {
+function measure(checkName: string): MeasuredFloor | null {
   const walk = FLOOR_WALKS[checkName];
   const floor = SCANNED_FLOORS[checkName]?.count;
   // A walk without a count floor is not a thing this tool has an opinion
@@ -62,13 +86,25 @@ function measure(checkName: string): FloorMeasurement | null {
     root,
     count: listSourceFiles(REPO_ROOT, [root], extensions).length,
   }));
-  return measureFloorWalk(checkName, floor.minimum, floor.label, perRoot);
+  return {
+    row: measureFloorWalk(checkName, floor.minimum, floor.label, perRoot),
+    premise: checkWalkPremise(
+      checkName,
+      walk,
+      perRoot.map(({ root, count }) => ({
+        root,
+        counted: count,
+        present: tallyExtensions(REPO_ROOT, root),
+      })),
+    ),
+  };
 }
 
 function main(): void {
-  const rows = Object.keys(FLOOR_WALKS)
+  const measured = Object.keys(FLOOR_WALKS)
     .map(measure)
-    .filter((row): row is FloorMeasurement => row !== null);
+    .filter((entry): entry is MeasuredFloor => entry !== null);
+  const rows = measured.map((entry) => entry.row);
   if (rows.length === 0) {
     // FLOOR_WALKS is hand-kept; empty means somebody emptied it, and printing
     // "0 floors, all fine" over that is the vacuous pass these floors exist to
@@ -79,17 +115,36 @@ function main(): void {
   console.log(
     `remeasure-floors: ${String(rows.length)} multi-root floor(s), measured from ${REPO_ROOT}\n`,
   );
-  for (const row of rows) console.log(formatFloorMeasurement(row));
+  for (const { row, premise } of measured) {
+    console.log(formatFloorMeasurement(row));
+    // Under the row it undermines rather than in a block of its own: a premise
+    // problem is the reason to distrust THAT line's numbers, and a reader who
+    // met it after the whole table would have already read the suggestion.
+    for (const problem of premise) console.log(`       ! ${describeWalkPremiseProblem(problem)}`);
+  }
   const moved = rows.filter((row) => !row.holds);
+  const unsound = measured.filter((entry) => entry.premise.length > 0);
   console.log("");
-  if (moved.length === 0) {
+  if (moved.length === 0 && unsound.length === 0) {
     console.log("remeasure-floors: every floor still sits above its largest single scan root.");
     return;
   }
-  console.log(
-    `remeasure-floors: ${String(moved.length)} floor(s) no longer sit above their largest root: ` +
-      `${moved.map((row) => row.checkName).join(", ")}. Edit lib/scanned-floor.ts.`,
-  );
+  if (moved.length > 0) {
+    console.log(
+      `remeasure-floors: ${String(moved.length)} floor(s) no longer sit above their largest root: ` +
+        `${moved.map((row) => row.checkName).join(", ")}. Edit lib/scanned-floor.ts.`,
+    );
+  }
+  if (unsound.length > 0) {
+    // Louder than a moved floor and printed last, because it is the one
+    // finding that makes the numbers above unusable: fix what the walk reads
+    // before re-measuring anything from it.
+    console.log(
+      `remeasure-floors: ${String(unsound.length)} walk(s) are not measuring what they declare: ` +
+        `${unsound.map((entry) => entry.row.checkName).join(", ")}. ` +
+        `Every count above them is a count of some other set of files — settle that first.`,
+    );
+  }
   process.exit(1);
 }
 
