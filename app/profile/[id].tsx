@@ -314,6 +314,7 @@ export default function ProfileScreen() {
             style={styles.settingsIcon}
             onPress={() => router.push("/settings")}
             accessibilityLabel={t("settings")}
+            accessibilityRole="button"
           >
             <Ionicons
               name="settings-outline"
@@ -327,7 +328,11 @@ export default function ProfileScreen() {
         ) : null}
         <Image source={{ uri: activeProfile.avatar }} style={styles.avatar} />
         {relationship === "self" ? (
-          <Pressable style={styles.editAvatarButton} onPress={handleChangeAvatar}>
+          <Pressable
+            style={styles.editAvatarButton}
+            onPress={handleChangeAvatar}
+            accessibilityRole="button"
+          >
             <Text style={styles.editAvatarButtonText}>{t("changeProfilePhoto")}</Text>
           </Pressable>
         ) : null}
@@ -344,7 +349,11 @@ export default function ProfileScreen() {
                 autoCapitalize="none"
                 style={styles.handleInput}
               />
-              <Pressable style={styles.handleAction} onPress={() => void handleSaveProfileId()}>
+              <Pressable
+                style={styles.handleAction}
+                onPress={() => void handleSaveProfileId()}
+                accessibilityRole="button"
+              >
                 <Text style={styles.handleActionText}>OK</Text>
               </Pressable>
             </>
@@ -352,7 +361,11 @@ export default function ProfileScreen() {
             <>
               <Text style={styles.username}>@{activeProfile.username}</Text>
               {relationship === "self" ? (
-                <Pressable style={styles.handleAction} onPress={() => setEditingHandle(true)}>
+                <Pressable
+                  style={styles.handleAction}
+                  onPress={() => setEditingHandle(true)}
+                  accessibilityRole="button"
+                >
                   <Text style={styles.handleActionText}>Edit</Text>
                 </Pressable>
               ) : null}
@@ -376,7 +389,11 @@ export default function ProfileScreen() {
               textAlignVertical="top"
               style={{ ...styles.bioInput, backgroundColor: theme.page, borderColor: theme.border, color: theme.text }}
             />
-            <Pressable style={styles.saveBioButton} onPress={() => void handleSaveBio()}>
+            <Pressable
+              style={styles.saveBioButton}
+              onPress={() => void handleSaveBio()}
+              accessibilityRole="button"
+            >
               <Text style={styles.saveBioButtonText}>{t("saveProfileDescription")}</Text>
             </Pressable>
           </View>
@@ -385,7 +402,11 @@ export default function ProfileScreen() {
       ) : (
         <View style={styles.actions}>
           {isAdmin ? (
-            <Pressable style={styles.adminAction} onPress={handleAdminDelete}>
+            <Pressable
+              style={styles.adminAction}
+              onPress={handleAdminDelete}
+              accessibilityRole="button"
+            >
               <Text style={styles.adminActionText}>{t("adminDeleteProfile")}</Text>
             </Pressable>
           ) : null}
@@ -394,13 +415,22 @@ export default function ProfileScreen() {
               <Pressable
                 style={styles.primaryAction}
                 onPress={() => router.push(`/chat/${activeProfile.id}` as never)}
+                accessibilityRole="button"
               >
                 <Text style={styles.primaryActionText}>{t("chatSend")}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryAction} onPress={() => void removeFriend(activeProfile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void removeFriend(activeProfile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("removeFriend")}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryAction} onPress={() => void unfollowProfile(activeProfile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void unfollowProfile(activeProfile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("unfollow")}</Text>
               </Pressable>
             </>
@@ -409,34 +439,62 @@ export default function ProfileScreen() {
               <View style={styles.statusBadge}>
                 <Text style={styles.statusBadgeText}>{t("requestSent")}</Text>
               </View>
-              <Pressable style={styles.secondaryAction} onPress={() => void removeFriend(activeProfile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void removeFriend(activeProfile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("cancelInvitation")}</Text>
               </Pressable>
             </>
           ) : relationship === "request_received" ? (
             <>
-              <Pressable style={styles.primaryAction} onPress={() => void addFriend(activeProfile.id)}>
+              <Pressable
+                style={styles.primaryAction}
+                onPress={() => void addFriend(activeProfile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.primaryActionText}>{t("acceptRequest")}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryAction} onPress={() => void removeFriend(activeProfile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void removeFriend(activeProfile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("rejectRequest")}</Text>
               </Pressable>
             </>
           ) : relationship === "following" ? (
             <>
-              <Pressable style={styles.primaryAction} onPress={() => void addFriend(activeProfile.id)}>
+              <Pressable
+                style={styles.primaryAction}
+                onPress={() => void addFriend(activeProfile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.primaryActionText}>{t("addFriend")}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryAction} onPress={() => void unfollowProfile(activeProfile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void unfollowProfile(activeProfile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("unfollow")}</Text>
               </Pressable>
             </>
           ) : (
             <>
-              <Pressable style={styles.primaryAction} onPress={() => void addFriend(activeProfile.id)}>
+              <Pressable
+                style={styles.primaryAction}
+                onPress={() => void addFriend(activeProfile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.primaryActionText}>{t("addFriend")}</Text>
               </Pressable>
-              <Pressable style={styles.secondaryAction} onPress={() => void followProfile(activeProfile.id)}>
+              <Pressable
+                style={styles.secondaryAction}
+                onPress={() => void followProfile(activeProfile.id)}
+                accessibilityRole="button"
+              >
                 <Text style={styles.secondaryActionText}>{t("follow")}</Text>
               </Pressable>
             </>

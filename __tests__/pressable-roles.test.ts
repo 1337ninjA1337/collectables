@@ -14,10 +14,10 @@ import { readRepoFile as read } from "./helpers/repo-file";
  * 2026-08-20 found 152 of this tree's 194 interactive Pressables in that
  * state.
  *
- * This suite owns the SHARED COMPONENTS and the MODALS AND SHEETS slices: a
- * role added here is a role added to every screen that renders them. The
- * screens are decomposed into three more sub-tasks in `.tasks/.tasks.md`;
- * when the count reaches zero the
+ * This suite covers every file the sweep has reached: the shared components,
+ * the modals and sheets, and the two big detail screens. The screens still
+ * open are decomposed into two more sub-tasks in `.tasks/.tasks.md`; when the
+ * count reaches zero the
  * rule goes into `check-a11y-jsx` the way `undecided_icon` and
  * `silent_disabled` did, and this suite can be deleted in favour of it.
  *
@@ -76,6 +76,8 @@ function interactivePressables(source: string): string[] {
  * of these inherits nothing from the ones already decided, and reddens here.
  */
 const SHARED: readonly (readonly [string, number])[] = [
+  ["app/item/[id].tsx", 17],
+  ["app/profile/[id].tsx", 16],
   ["components/search-overlay.tsx", 10],
   ["components/edit-collection-modal.tsx", 7],
   ["components/sold-listing-prompt.tsx", 5],
@@ -146,6 +148,7 @@ describe("the roles that are not `button`", () => {
       "components/premium-upsell-sheet.tsx",
       "components/currency-sheet.tsx",
       "components/share-sheet.tsx",
+      "app/item/[id].tsx",
     ];
     for (const file of SHEETS) {
       const src = read(file);
@@ -184,5 +187,15 @@ describe("the sheet chips that can be chosen", () => {
       read("components/edit-collection-modal.tsx"),
       /accessibilityState=\{\{ selected, disabled: locked \}\}/,
     );
+  });
+});
+
+describe("the item screen's two chip rows", () => {
+  it("say which condition and which listing mode is chosen", () => {
+    // Both render `conditionChipSelected` and neither said so. They share a
+    // style and a local `selected`, which is why one assertion covers both —
+    // and why a case that matched the style would have passed on either.
+    const src = read("app/item/[id].tsx");
+    assert.equal((src.match(/accessibilityState=\{\{ selected \}\}/g) ?? []).length, 2);
   });
 });

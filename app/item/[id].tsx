@@ -443,6 +443,8 @@ export default function ItemDetailsScreen() {
                   key={c}
                   style={{...styles.conditionChip, ...(selected ? styles.conditionChipSelected : {})}}
                   onPress={() => setEditCondition(selected ? "" : c)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
                 >
                   <Text style={{...styles.conditionChipText, ...(selected ? styles.conditionChipTextSelected : {})}}>
                     {t(`condition${c[0].toUpperCase()}${c.slice(1)}` as "conditionNew" | "conditionExcellent" | "conditionGood" | "conditionFair")}
@@ -458,7 +460,12 @@ export default function ItemDetailsScreen() {
           {editTags.length > 0 ? (
             <View style={styles.tagsRow}>
               {editTags.map((tag, i) => (
-                <Pressable key={i} style={{...styles.editTagChip, backgroundColor: tag.color}} onPress={() => setEditTags(editTags.filter((_, j) => j !== i))}>
+                <Pressable
+                  key={i}
+                  style={{...styles.editTagChip, backgroundColor: tag.color}}
+                  onPress={() => setEditTags(editTags.filter((_, j) => j !== i))}
+                  accessibilityRole="button"
+                >
                   <Text style={styles.editTagChipText}>{tag.label}</Text>
                   <Text style={styles.editTagChipRemove}>x</Text>
                 </Pressable>
@@ -477,6 +484,7 @@ export default function ItemDetailsScreen() {
             <Pressable
               style={{...styles.tagAddButton, ...(editTagInput.trim() ? {} : { opacity: 0.4 })}}
               onPress={addTag}
+              accessibilityRole="button"
             >
               <Text style={styles.tagAddButtonText}>{t("tagsAdd")}</Text>
             </Pressable>
@@ -485,7 +493,11 @@ export default function ItemDetailsScreen() {
 
         <View style={styles.editFieldGroup}>
           <Text style={styles.editLabel}>{t("photosLabel")}</Text>
-          <Pressable style={styles.photoButton} onPress={() => void pickEditPhotos()}>
+          <Pressable
+            style={styles.photoButton}
+            onPress={() => void pickEditPhotos()}
+            accessibilityRole="button"
+          >
             <Text style={styles.photoButtonText}>{t("editPhotos")}</Text>
           </Pressable>
           <PhotoPreview photos={editPhotos} onChange={(p) => { setEditPhotos(p); setNewLocalPhotos(p); }} maxPhotos={5} />
@@ -496,10 +508,15 @@ export default function ItemDetailsScreen() {
           onPress={() => void handleSaveEdit()}
           disabled={saving}
           accessibilityState={{ disabled: saving }}
+          accessibilityRole="button"
         >
           <Text style={styles.saveButtonText}>{saving ? t("saving") : t("saveChanges")}</Text>
         </Pressable>
-        <Pressable style={styles.cancelButton} onPress={cancelEdit}>
+        <Pressable
+          style={styles.cancelButton}
+          onPress={cancelEdit}
+          accessibilityRole="button"
+        >
           <Text style={styles.cancelButtonText}>{t("cancelEdit")}</Text>
         </Pressable>
       </Screen>
@@ -556,15 +573,27 @@ export default function ItemDetailsScreen() {
 
       <View style={styles.actionsRow}>
         {isOwner ? (
-          <Pressable style={styles.editButton} onPress={enterEditMode}>
+          <Pressable
+            style={styles.editButton}
+            onPress={enterEditMode}
+            accessibilityRole="button"
+          >
             <Text style={styles.editButtonText}>{t("editItem")}</Text>
           </Pressable>
         ) : null}
-        <Pressable style={{ ...styles.ghostButton, borderColor: theme.border }} onPress={() => setShareOpen(true)}>
+        <Pressable
+          style={{ ...styles.ghostButton, borderColor: theme.border }}
+          onPress={() => setShareOpen(true)}
+          accessibilityRole="button"
+        >
           <Text style={{ ...styles.ghostButtonText, color: theme.text }}>{t("share")}</Text>
         </Pressable>
         {isOwner ? (
-          <Pressable style={styles.ghostDangerButton} onPress={handleDelete}>
+          <Pressable
+            style={styles.ghostDangerButton}
+            onPress={handleDelete}
+            accessibilityRole="button"
+          >
             <Text style={styles.ghostDangerText}>{t("deleteItem")}</Text>
           </Pressable>
         ) : null}
@@ -580,7 +609,11 @@ export default function ItemDetailsScreen() {
                   : t("marketplaceListedForTrade")}
               </Text>
             </View>
-            <Pressable style={styles.listingRemoveButton} onPress={handleRemoveListing}>
+            <Pressable
+              style={styles.listingRemoveButton}
+              onPress={handleRemoveListing}
+              accessibilityRole="button"
+            >
               <Text style={styles.listingRemoveText}>{t("marketplaceRemoveListing")}</Text>
             </Pressable>
           </View>
@@ -591,6 +624,7 @@ export default function ItemDetailsScreen() {
               onPress={openListingSheet}
               disabled={overFreeCap}
               accessibilityState={{ disabled: overFreeCap }}
+              accessibilityRole="button"
             >
               <Text style={styles.listingButtonText}>{t("marketplaceListOnMarketplace")}</Text>
             </Pressable>
@@ -645,8 +679,16 @@ export default function ItemDetailsScreen() {
         animationType="slide"
         onRequestClose={closeListingSheet}
       >
-        <Pressable style={styles.shareBackdrop} onPress={closeListingSheet}>
-          <Pressable style={styles.shareSheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={styles.shareBackdrop}
+          onPress={closeListingSheet}
+          accessibilityRole="none"
+        >
+          <Pressable
+            style={styles.shareSheet}
+            onPress={(e) => e.stopPropagation()}
+            accessibilityRole="none"
+          >
             <View style={styles.shareHandle} />
             <Text style={styles.shareTitle}>{t("marketplaceListingTitle")}</Text>
             <Text style={styles.shareHint}>{t("marketplaceListingHint")}</Text>
@@ -661,6 +703,8 @@ export default function ItemDetailsScreen() {
                       key={m}
                       style={{ ...styles.conditionChip, ...(selected ? styles.conditionChipSelected : {}) }}
                       onPress={() => setListingMode(m)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
                     >
                       <Text style={{ ...styles.conditionChipText, ...(selected ? styles.conditionChipTextSelected : {}) }}>
                         {m === "trade" ? t("marketplaceModeTrade") : t("marketplaceModeSell")}
@@ -711,11 +755,16 @@ export default function ItemDetailsScreen() {
                 onPress={handleSubmitListing}
                 disabled={overFreeCap}
                 accessibilityState={{ disabled: overFreeCap }}
+                accessibilityRole="button"
               >
                 <Text style={styles.shareCopyButtonText}>{t("marketplaceSubmitListing")}</Text>
               </Pressable>
             </View>
-            <Pressable style={styles.shareCancelButton} onPress={closeListingSheet}>
+            <Pressable
+              style={styles.shareCancelButton}
+              onPress={closeListingSheet}
+              accessibilityRole="button"
+            >
               <Text style={styles.shareCancelText}>{t("cancel")}</Text>
             </Pressable>
           </Pressable>
