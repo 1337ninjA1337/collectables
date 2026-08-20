@@ -161,6 +161,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const items: NavItem[] = [
     {
       key: "home",
+      label: t("goHome"),
       icon: "home-outline",
       iconActive: "home",
       active: onHome,
@@ -168,6 +169,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     },
     {
       key: "search",
+      label: t("searchTitle"),
       icon: "search-outline",
       iconActive: "search",
       active: false,
@@ -175,6 +177,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     },
     {
       key: "marketplace",
+      label: t("marketplaceTitle"),
       icon: "storefront-outline",
       iconActive: "storefront",
       active: marketplaceActive,
@@ -182,6 +185,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     },
     {
       key: "chats",
+      label: t("chatsTitle"),
       icon: "chatbubbles-outline",
       iconActive: "chatbubbles",
       active: chatsActive,
@@ -190,6 +194,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     },
     {
       key: "friends",
+      label: t("friends"),
       icon: "people-outline",
       iconActive: "people",
       active: friendsActive,
@@ -198,6 +203,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     },
     {
       key: "profile",
+      label: t("profile"),
       icon: "person-outline",
       iconActive: "person",
       active: onProfile,

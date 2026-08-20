@@ -56,7 +56,11 @@ describe("CurrencyInput exposes the full picker (so any currency, e.g. HUF, is s
   });
 
   it("renders a 'more currencies' affordance that opens the sheet", () => {
-    assert.match(src, /accessibilityLabel="More currencies"/);
+    // The label was a hardcoded English string for as long as it existed, so
+    // a Polish speaker's screen reader announced "More currencies" — pinning
+    // the `t()` call rather than the attribute is what makes that a regression
+    // rather than a preference.
+    assert.match(src, /accessibilityLabel=\{t\("currencyMore"\)\}/);
     assert.match(src, /setSheetOpen\(true\)/);
   });
 

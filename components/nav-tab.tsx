@@ -12,6 +12,13 @@ import { FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
 export type NavItem = {
   key: string;
+  /**
+   * What a screen reader announces. Required, not optional: a tab is an icon
+   * and nothing else, so an unlabeled one is announced as "button" and the
+   * whole bar reads as six identical buttons. Already localized by the caller —
+   * `<BottomNav>` is where `t()` lives.
+   */
+  label: string;
   icon: keyof typeof Ionicons.glyphMap;
   iconActive: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
@@ -33,7 +40,16 @@ function renderBadge(badge: FriendsTabBadge | undefined) {
 export function NavTab({ item }: { item: NavItem }) {
   const theme = useAppTheme();
   return (
-    <Pressable style={styles.item} onPress={item.onPress}>
+    <Pressable
+      style={styles.item}
+      onPress={item.onPress}
+      accessibilityRole="button"
+      accessibilityLabel={item.label}
+      // Which tab you are on is the one thing the bar's own highlight says and
+      // an icon cannot: without this the active tab announces exactly like the
+      // five you could navigate to.
+      accessibilityState={{ selected: item.active }}
+    >
       <View style={styles.iconWrap}>
         <Ionicons
           name={item.active ? item.iconActive : item.icon}

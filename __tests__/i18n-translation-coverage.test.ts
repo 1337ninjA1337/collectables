@@ -226,11 +226,12 @@ describe("translation floors", () => {
     // complete, and four sit below half. The `assert.ok(true)` keeps the line
     // in the runner's output next to the rows above it.
     const report = COVERAGE.map(formatCoverageRow).join("\n");
-    // 540 as of 2026-08-20: the two `languagePartial*` keys the settings picker
-    // needs to say a language is partly translated, added to all six locales in
-    // the same change — which is why every row rose by two rather than the
-    // partial ones falling.
-    assert.match(report, /en: 540\/540 keys \(100\.0%\)/);
+    // 543 as of 2026-08-20: three accessibility labels — the more-currencies
+    // chip and the two photo-reorder arrows — added to all six locales in the
+    // same change, which is why every row rose by three rather than the partial
+    // ones falling. The 540 before them arrived the same way, with the two
+    // `languagePartial*` keys the settings picker needs.
+    assert.match(report, /en: 543\/543 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

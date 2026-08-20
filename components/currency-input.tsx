@@ -18,6 +18,7 @@ import {
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
 import { sanitizeCurrencyInput } from "@/lib/format-currency-input";
+import { useI18n } from "@/lib/i18n-context";
 import {
   CURRENCY_CHIPS,
   getCurrencySymbol,
@@ -58,6 +59,7 @@ export function CurrencyInput({
   const [query, setQuery] = useState("");
   const [pinned, setPinned] = useState<string[]>([]);
   const theme = useAppTheme();
+  const { t } = useI18n();
 
   // Recently-used currencies lead the strip. Loaded once per mount (picks
   // write through to storage but don't reshuffle the strip mid-interaction —
@@ -120,7 +122,7 @@ export function CurrencyInput({
             setQuery("");
             setSheetOpen(true);
           }}
-          accessibilityLabel="More currencies"
+          accessibilityLabel={t("currencyMore")}
         >
           <Ionicons name="ellipsis-horizontal" size={14} color={MUTED_27} />
         </Pressable>

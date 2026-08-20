@@ -66,6 +66,8 @@ export function PhotoPreview({ photos, onChange, maxPhotos = 5 }: Props) {
                 style={styles.moveButton}
                 onPress={() => movePhoto(index, index - 1)}
                 hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel={t("photoMoveBack")}
               >
                 <Ionicons name="chevron-back" size={14} color={TEXT_ON_DARK} />
               </Pressable>
@@ -77,6 +79,8 @@ export function PhotoPreview({ photos, onChange, maxPhotos = 5 }: Props) {
                 style={styles.moveButton}
                 onPress={() => movePhoto(index, index + 1)}
                 hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel={t("photoMoveForward")}
               >
                 <Ionicons name="chevron-forward" size={14} color={TEXT_ON_DARK} />
               </Pressable>
