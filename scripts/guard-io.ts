@@ -187,15 +187,54 @@ export function selectPaths(
  * irregular too: not a file this scan can read, and not one it should be
  * silent about.
  *
- * Those last two are one number and two events, which is why each one carries
- * its reason. A symlink is a repository that uses links, and normal. A path
- * git lists that is NOT on disk is a checkout that disagrees with its own
+ * Those last two are one lstat-question and two events, which is why each one
+ * carries its reason. A symlink is a repository that uses links, and normal. A
+ * path git lists that is NOT on disk is a checkout that disagrees with its own
  * index — a committed file this scan did not read, reported by a run that
- * otherwise says it read the committed set. The second deserves more alarm
- * than the first, and a single count gives them the same.
+ * otherwise says it read the committed set. The second deserves more alarm than
+ * the first: it FAILS the run (see {@link isUnreadCommitted}), where the first
+ * is a pass-line curiosity.
+ *
+ * The `kind` is a stable CODE, not the sentence a report prints. That sentence
+ * lives in {@link describeIrregular}, and the fail/pass verdict in
+ * {@link isUnreadCommitted}, for the same reason `SecretMatch` carries `ruleId`
+ * beside `description`: rewording the report is a table edit, and deciding
+ * which event fails the run is a boolean nobody has to parse out of prose. A
+ * code compared as data is a switch; a sentence compared as data is a bug
+ * waiting for the day somebody improves the wording.
  */
-export type IrregularKind = "not a regular file" | "missing from the working tree";
+export type IrregularKind = "not-regular-file" | "missing-from-worktree";
 export type IrregularPath = { readonly rel: string; readonly kind: IrregularKind };
+
+/**
+ * Each kind as the sentence a report prints and whether it is a finding or a
+ * curiosity. `unreadCommitted` is the whole reason the two are told apart: a
+ * committed file the scan could not read makes "no committed secrets" a claim
+ * the run cannot stand behind, so the guard refuses; a symlink is a file the
+ * repository never committed at that path, so following it would be the bug and
+ * not reading it is correct.
+ */
+const IRREGULAR_KINDS: Readonly<
+  Record<IrregularKind, { readonly description: string; readonly unreadCommitted: boolean }>
+> = {
+  "not-regular-file": { description: "not a regular file", unreadCommitted: false },
+  "missing-from-worktree": { description: "missing from the working tree", unreadCommitted: true },
+};
+
+/** The sentence a report prints for a kind — the "how it is said" half. */
+export function describeIrregular(kind: IrregularKind): string {
+  return IRREGULAR_KINDS[kind].description;
+}
+
+/**
+ * True when a kind is a COMMITTED file the scan could not read — a checkout
+ * disagreeing with its own index. A run that ends "no committed secrets" may
+ * not pass over one, so the wrapper fails on it; a symlink stays a pass-line
+ * curiosity.
+ */
+export function isUnreadCommitted(kind: IrregularKind): boolean {
+  return IRREGULAR_KINDS[kind].unreadCommitted;
+}
 
 export function partitionRegularFiles(
   root: string,
@@ -206,13 +245,13 @@ export function partitionRegularFiles(
   for (const rel of paths) {
     let kind: IrregularKind | null = null;
     try {
-      if (!fs.lstatSync(path.join(root, rel)).isFile()) kind = "not a regular file";
+      if (!fs.lstatSync(path.join(root, rel)).isFile()) kind = "not-regular-file";
     } catch {
       // Every errno lands here — `ENOENT` for the state this is about, and
       // `EACCES` or `ELOOP` for a root the guard cannot traverse. All of them
       // mean the same thing to a scan: git named this path and the working
       // tree did not produce it.
-      kind = "missing from the working tree";
+      kind = "missing-from-worktree";
     }
     if (kind === null) files.push(rel);
     else irregular.push({ rel, kind });

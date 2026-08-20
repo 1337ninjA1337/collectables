@@ -167,13 +167,14 @@ describe("check-secrets, and the set it says it is about", () => {
     }
   });
 
-  it("says when git listed a committed file the working tree does not hold", () => {
+  it("FAILS when git listed a committed file the working tree does not hold", () => {
     assert.ok(GUARD);
-    // The other reason a listed candidate goes unread, and the one that
-    // deserves alarm rather than a shrug: git names the path, the working tree
-    // does not produce it, so a COMMITTED file went unscanned inside a run
-    // whose last words are "no committed secrets". Summing this with the
-    // symlink count would give the two the same weight.
+    // The other reason a listed candidate goes unread, and the one that fails
+    // the run rather than joining the pass line: git names the path, the
+    // working tree does not produce it, so a COMMITTED file went unscanned
+    // inside a run whose last words would otherwise be "no committed secrets". A
+    // guard cannot vouch for a file it never opened, so it refuses — the same
+    // outcome an archive it could not open already gets.
     const fixture = rootWith("index-only", { "notes.md": "nothing here\n" });
     initGitRoot(fixture.root, "nothing-here\n", { forceAdd: ["notes.md"] });
     // Committed, then removed from the working tree alone — `git rm --cached`
@@ -181,13 +182,23 @@ describe("check-secrets, and the set it says it is about", () => {
     rmSync(path.join(fixture.root, "notes.md"), { force: true });
 
     const run = runGuardIn(GUARD, fixture.root);
-    assert.equal(run.status, 0, `the scan failed over a path it simply could not read:\n${run.output}`);
+    assert.equal(
+      run.status,
+      1,
+      `a committed file the working tree does not hold was waved through:\n${run.output}`,
+    );
+    // Named, so a reader can go and look, and prescribing the fix that applies:
+    // the file is meant to be there, so it is `git checkout`, not `git rm`.
     assert.match(
       run.output,
-      /1 listed path\(s\) not read: notes\.md \(missing from the working tree\)/,
+      /committed file\(s\) are in git's listing but missing from the working tree/,
     );
-    // The reason is what makes this case distinct from the symlink one; before
-    // the two were told apart, both arrived as the same number.
+    assert.match(run.output, /notes\.md/);
+    assert.match(run.output, /git checkout -- <path>/);
+    // Not the vacuous pass the summing-count version produced: the "scanned N
+    // file(s) … no committed secrets" pass line is gone. (The refusal itself
+    // quotes that phrase, which is why the pass line is matched by its shape.)
+    assert.doesNotMatch(run.output, /scanned \d+ file\(s\)/);
     assert.doesNotMatch(run.output, /not a regular file/);
   });
 

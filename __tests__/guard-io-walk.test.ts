@@ -18,6 +18,8 @@ import { SECRET_SKIP_DIRS } from "@/lib/secret-scan";
 import { readRepoFile, REPO_ROOT } from "./helpers/repo-file";
 import { sourceFiles, tsxFiles } from "./helpers/source-files";
 import {
+  describeIrregular,
+  isUnreadCommitted,
   listFilesUnder,
   listSourceFiles,
   partitionRegularFiles,
@@ -227,8 +229,8 @@ describe("partitionRegularFiles", () => {
       // question — that it is not a file is. Both carry the same reason, and
       // it is not the reason a missing path carries.
       assert.deepEqual(answer.irregular, [
-        { rel: "inside.ts", kind: "not a regular file" },
-        { rel: "outside.ts", kind: "not a regular file" },
+        { rel: "inside.ts", kind: "not-regular-file" },
+        { rel: "outside.ts", kind: "not-regular-file" },
       ]);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -246,8 +248,8 @@ describe("partitionRegularFiles", () => {
       const answer = partitionRegularFiles(root, ["app/helpers.ts", "app/weird.ts", "gone.ts"]);
       assert.deepEqual(answer.files, ["app/helpers.ts"]);
       assert.deepEqual(answer.irregular, [
-        { rel: "app/weird.ts", kind: "not a regular file" },
-        { rel: "gone.ts", kind: "missing from the working tree" },
+        { rel: "app/weird.ts", kind: "not-regular-file" },
+        { rel: "gone.ts", kind: "missing-from-worktree" },
       ]);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -278,6 +280,26 @@ describe("partitionRegularFiles", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("the irregular-kind table", () => {
+  // The two are now a CODE plus a table, so a report reword is a table edit and
+  // the fail/pass decision is a boolean nobody parses out of prose. The values
+  // partitionRegularFiles emits are exactly the two keys, checked by the cases
+  // above; here we pin what each key says and how it is judged.
+  it("renders the sentence a report prints for each kind", () => {
+    assert.equal(describeIrregular("not-regular-file"), "not a regular file");
+    assert.equal(describeIrregular("missing-from-worktree"), "missing from the working tree");
+  });
+
+  it("fails only on a committed file the working tree does not hold", () => {
+    // A symlink is a file the repository never committed at that path, so
+    // following it would be the bug — not reading it is correct, and it passes.
+    assert.equal(isUnreadCommitted("not-regular-file"), false);
+    // A path git lists that lstat cannot find is a committed file this scan did
+    // not read, so a run that ends "no committed secrets" may not pass over it.
+    assert.equal(isUnreadCommitted("missing-from-worktree"), true);
   });
 });
 

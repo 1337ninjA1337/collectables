@@ -22,6 +22,7 @@ import {
   SOURCE_SCAN_EXTENSIONS,
   formatScanSubject,
   formatUnreadCandidates,
+  formatUnreadCommitted,
   type ScanSubject,
   type SecretMatch,
 } from "../lib/secret-scan";
@@ -37,7 +38,9 @@ import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 import { decodeZipEntryText, readZipEntries } from "../lib/zip-archive";
 import {
+  describeIrregular,
   guardScanRoot,
+  isUnreadCommitted,
   listFilesUnder,
   partitionRegularFiles,
   selectPaths,
@@ -204,6 +207,22 @@ function main(): void {
     }
   }
 
+  // The two reasons a listed candidate went unread part ways here. A symlink
+  // (`isUnreadCommitted` false) is a repository that uses links, so it stays a
+  // pass-line curiosity below. A committed file the working tree does not hold
+  // is a checkout disagreeing with its own index: this scan could not open it,
+  // and a run that ends "no committed secrets" cannot vouch for a file it never
+  // read — so it fails here, the same as an archive it could not open.
+  const unreadCommitted = candidates.unread
+    .filter((u) => isUnreadCommitted(u.kind))
+    .map((u) => u.rel);
+  const missing = formatUnreadCommitted(unreadCommitted);
+  if (missing) {
+    console.error(`${CHECK_NAME}: ${missing}`);
+    process.exit(1);
+  }
+  const unreadBenign = candidates.unread.filter((u) => !isUnreadCommitted(u.kind));
+
   const matches: SecretMatch[] = [];
   for (const rel of files) {
     let source: string;
@@ -246,7 +265,9 @@ function main(): void {
     // usual line; each appears only when there was something to say.
     const clauses = [
       formatLocalOnlySkips(skippedLocal, probe),
-      formatUnreadCandidates(candidates.unread),
+      formatUnreadCandidates(
+        unreadBenign.map((u) => ({ rel: u.rel, kind: describeIrregular(u.kind) })),
+      ),
     ].filter(Boolean);
     console.log(
       `${CHECK_NAME}: scanned ${files.length} file(s) plus ${entryCount} entr(ies) in ${archives.length} archive(s) from ${formatScanSubject(candidates.subject)}, no committed secrets` +

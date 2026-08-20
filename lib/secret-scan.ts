@@ -478,6 +478,36 @@ export function formatUnreadCandidates(unread: readonly UnreadCandidate[]): stri
 }
 
 /**
+ * The refusal for candidates git committed that the working tree does not hold.
+ *
+ * {@link formatUnreadCandidates} names both reasons a listed path goes unread;
+ * this one is why they are not the same event. A symlink is a repository that
+ * uses links, and the pass line mentioning it is enough — reading it would be
+ * the mistake. A path in `git ls-files` that `lstat` cannot find is a checkout
+ * disagreeing with its own index: a COMMITTED file this scan did not open,
+ * inside a run whose last words are "no committed secrets". A guard cannot
+ * vouch for a file it never read, so this FAILS the run — the same outcome an
+ * archive it could not open already gets, and for the same reason.
+ *
+ * The fix it names is not `git rm --cached`: the file is meant to be there, so
+ * the working tree is what is wrong, and `git checkout -- <path>` (or a fresh
+ * checkout) restores it. Empty at zero so the caller branches on the string,
+ * and sorted by code unit like every other listing this scan prints.
+ */
+export function formatUnreadCommitted(rels: readonly string[]): string {
+  if (rels.length === 0) return "";
+  const sorted = [...rels].sort();
+  return [
+    `${sorted.length} committed file(s) are in git's listing but missing from the working ` +
+      `tree, so this scan could not read them and cannot report on them:`,
+    ...sorted.map((rel) => `  ${rel}`),
+    `Restore the working tree (\`git checkout -- <path>\`, or a fresh checkout) and re-run. ` +
+      `This is an incomplete checkout, not a leak — but a run that skips a committed file cannot ` +
+      `say "no committed secrets".`,
+  ].join("\n");
+}
+
+/**
  * Format a list of matches as a human-readable error message. Returns an
  * empty string when there are no matches so callers can short-circuit.
  */
