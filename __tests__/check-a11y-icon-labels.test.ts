@@ -189,6 +189,65 @@ describe("findUnlabeledIconButtons", () => {
   });
 });
 
+describe("the paired platform props", () => {
+  it("flags an element hidden on iOS only", () => {
+    assert.deepEqual(
+      codes(`<View accessibilityElementsHidden><Ionicons name="a" /></View>`),
+      ["half_hidden"],
+    );
+  });
+
+  it("flags an element hidden on Android only", () => {
+    assert.deepEqual(codes(`<Text importantForAccessibility="no">1</Text>`), ["half_hidden"]);
+  });
+
+  it("says nothing when both halves travel together", () => {
+    assert.deepEqual(
+      codes(`
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        >
+          <Ionicons name="a" />
+        </View>
+      `),
+      [],
+    );
+    assert.deepEqual(
+      codes(`<Ionicons accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />`),
+      [],
+    );
+  });
+
+  it("does not read importantForAccessibility=\"yes\" as half a pair", () => {
+    // The opposite instruction: this node should be announced, and it wants no
+    // iOS partner. A rule that paired on the prop NAME would demand one.
+    assert.deepEqual(codes(`<View importantForAccessibility="yes"><Text>a</Text></View>`), []);
+  });
+
+  it("does not read an explicitly disabled iOS hide as half a pair", () => {
+    assert.deepEqual(codes(`<View accessibilityElementsHidden={false}><Text>a</Text></View>`), []);
+  });
+
+  it("checks every element, not only Pressables", () => {
+    // The eight sites in this tree are icons, views and text. Scoping the rule
+    // to buttons would have covered none of them.
+    const found = findings(`
+      <View accessibilityElementsHidden>
+        <Ionicons name="a" importantForAccessibility="no" />
+      </View>
+    `);
+    assert.deepEqual(
+      found.map((f) => f.line),
+      [2, 3],
+    );
+    assert.deepEqual(
+      found.map((f) => f.code),
+      ["half_hidden", "half_hidden"],
+    );
+  });
+});
+
 describe("the report", () => {
   it("is empty when there is nothing to report", () => {
     assert.equal(formatIconLabelReport([]), "");
@@ -204,7 +263,7 @@ describe("the report", () => {
   });
 
   it("gives every code a sentence", () => {
-    const all: IconLabelCode[] = ["unlabeled", "untranslated"];
+    const all: IconLabelCode[] = ["unlabeled", "untranslated", "half_hidden"];
     for (const code of all) {
       const said = describeIconLabelFinding(code);
       assert.ok(said.length > 40, `${code} is described in fewer words than a reason`);

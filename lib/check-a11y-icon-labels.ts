@@ -18,6 +18,15 @@ import { stripComments } from "@/lib/strip-comments";
  * languages. A rule that only asks whether a label is present passes that
  * happily, which is why a bare string literal is its own finding.
  *
+ * The third is about the opposite instruction — HIDING a decorative node —
+ * and it is the one mistake here that a person cannot see on their own
+ * machine. `accessibilityElementsHidden` is iOS and
+ * `importantForAccessibility="no"` is Android, so shipping one is a fix that
+ * works on the platform its author tested and does nothing on the other. All
+ * eight sites in this tree carry both; one file asserted that about itself by
+ * counting its own occurrences, which is a rule the ninth site would not
+ * inherit. This checks every element in both roots.
+ *
  * Why a hand-written tag scanner and not a regex: the obvious
  * `/<Pressable([\s\S]*?)>/` ends the open tag at the first `>` in the file,
  * which on this codebase is usually the one inside `onPress={() => x}`. It
@@ -56,7 +65,16 @@ export type IconLabelCode =
    * the string a screen reader speaks, and a button with visible text can
    * still carry an English-only spoken one.
    */
-  | "untranslated";
+  | "untranslated"
+  /**
+   * An element hidden from assistive technology on ONE platform. Hiding a
+   * decorative node needs `accessibilityElementsHidden` (iOS) and
+   * `importantForAccessibility="no"` (Android) together; either alone is a
+   * fix that works on the platform its author tested and silently does
+   * nothing on the other. Checked on every element, not just Pressables —
+   * the eight sites in this tree are icons, views and text.
+   */
+  | "half_hidden";
 
 export type IconLabelFinding = {
   readonly file: string;
@@ -72,6 +90,8 @@ const FINDING_DETAIL: Record<IconLabelCode, string> = {
     "an icon-only Pressable with no accessibilityLabel — a screen reader announces it as \"button\" and nothing else",
   untranslated:
     "an accessibilityLabel written as a bare string literal — it is spoken in that one language to speakers of all six",
+  half_hidden:
+    "hidden from assistive technology on one platform only — accessibilityElementsHidden (iOS) and importantForAccessibility=\"no\" (Android) have to travel together, or the node stays announced on whichever platform the author did not test",
 };
 
 /** The sentence this scan gives one finding code. */
@@ -149,8 +169,70 @@ function closeTagIndex(source: string, from: number, tag: string): number {
 
 const TAG = "Pressable";
 
+/** One JSX opening tag, as the scan sees it. */
+type OpenTag = {
+  readonly name: string;
+  /** Everything between the tag name and its closing `>`. */
+  readonly attrs: string;
+  /** Offset of the `<`, and of the attribute text, in the stripped source. */
+  readonly start: number;
+  readonly attrsAt: number;
+  /** Offset of the `>` that closed the open tag. */
+  readonly tagEnd: number;
+  readonly selfClosing: boolean;
+};
+
 /**
- * Scan one source string for icon buttons a screen reader could not name.
+ * Every JSX opening tag in a stripped source, in order.
+ *
+ * One walk for both rules: the label rules care only about `<Pressable>` and
+ * the paired-hiding rule applies to every element, and running two scanners
+ * over one file would be two chances to disagree about where a tag ends —
+ * which is the thing that was hard to get right here.
+ *
+ * `<` followed by a letter is the whole tag test. A closing tag starts `</`
+ * and a fragment `<>`, so neither matches, and a bare `<` in an expression
+ * (`a < b`) is followed by a space in every formatting this repository uses.
+ * A `<` that turns out not to open a tag costs a fruitless brace walk and no
+ * finding, because the rules below both require a named attribute.
+ */
+function* openTags(code: string): Generator<OpenTag> {
+  let cursor = 0;
+  while (cursor < code.length) {
+    const start = code.indexOf("<", cursor);
+    if (start === -1) return;
+    const nameMatch = /^<([A-Za-z][A-Za-z0-9_.]*)/.exec(code.slice(start));
+    if (!nameMatch) {
+      cursor = start + 1;
+      continue;
+    }
+    const attrsAt = start + nameMatch[0].length;
+    const tagEnd = openTagEnd(code, attrsAt);
+    if (tagEnd === -1) return;
+    cursor = tagEnd + 1;
+    yield {
+      name: nameMatch[1],
+      attrs: code.slice(attrsAt, tagEnd),
+      start,
+      attrsAt,
+      tagEnd,
+      selfClosing: code[tagEnd - 1] === "/",
+    };
+  }
+}
+
+/** The iOS half of hiding a node from assistive technology. */
+const HIDDEN_IOS = /accessibilityElementsHidden(?!\s*=\s*\{false\})/;
+
+/**
+ * The Android half — and only the values that HIDE.
+ * `importantForAccessibility="yes"` is the opposite instruction and wants no
+ * iOS partner, so it must not be read as half of a pair.
+ */
+const HIDDEN_ANDROID = /importantForAccessibility\s*=\s*"(no|no-hide-descendants)"/;
+
+/**
+ * Scan one source string for the accessibility problems this guard names.
  *
  * Findings come back in source order, which is the order somebody fixing them
  * reads the file in.
@@ -158,37 +240,28 @@ const TAG = "Pressable";
 export function findUnlabeledIconButtons(file: string, source: string): IconLabelFinding[] {
   const findings: IconLabelFinding[] = [];
   const code = stripComments(source);
-  const open = `<${TAG}`;
-  let cursor = 0;
-  while (true) {
-    const start = code.indexOf(open, cursor);
-    if (start === -1) break;
-    const afterName = start + open.length;
-    // `<PressableRow` is a different component; only a boundary character ends
-    // the tag name.
-    if (/[A-Za-z0-9_]/.test(code[afterName] ?? "")) {
-      cursor = afterName;
-      continue;
+  const at = (index: number): number => code.slice(0, index).split("\n").length;
+  const snippetAt = (index: number): string => {
+    const lineStart = source.lastIndexOf("\n", index) + 1;
+    const lineEnd = source.indexOf("\n", index);
+    return source.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim();
+  };
+  for (const tag of openTags(code)) {
+    const { attrs, attrsAt, start } = tag;
+    const ios = HIDDEN_IOS.test(attrs);
+    const android = HIDDEN_ANDROID.test(attrs);
+    if (ios !== android) {
+      findings.push({ file, line: at(start), code: "half_hidden", snippet: snippetAt(start) });
     }
-    const tagEnd = openTagEnd(code, afterName);
-    if (tagEnd === -1) break;
-    cursor = tagEnd + 1;
-    const attrs = code.slice(afterName, tagEnd);
-    const selfClosing = code[tagEnd - 1] === "/";
+    if (tag.name !== TAG) continue;
     let body = "";
-    if (!selfClosing) {
-      const end = closeTagIndex(code, tagEnd + 1, TAG);
-      body = end === -1 ? "" : code.slice(tagEnd + 1, end);
+    if (!tag.selfClosing) {
+      const end = closeTagIndex(code, tag.tagEnd + 1, TAG);
+      body = end === -1 ? "" : code.slice(tag.tagEnd + 1, end);
     }
-    const at = (index: number): number => code.slice(0, index).split("\n").length;
-    const snippetAt = (index: number): string => {
-      const lineStart = source.lastIndexOf("\n", index) + 1;
-      const lineEnd = source.indexOf("\n", index);
-      return source.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim();
-    };
     const literal = /accessibilityLabel\s*=\s*"/.exec(attrs);
     if (literal) {
-      const index = afterName + literal.index;
+      const index = attrsAt + literal.index;
       findings.push({ file, line: at(index), code: "untranslated", snippet: snippetAt(index) });
     } else if (
       !attrs.includes("accessibilityLabel") &&
@@ -208,8 +281,8 @@ export function findUnlabeledIconButtons(file: string, source: string): IconLabe
 export function formatIconLabelReport(findings: readonly IconLabelFinding[]): string {
   if (findings.length === 0) return "";
   const lines = [
-    `Found ${String(findings.length)} accessibility problem(s) on Pressables in app/** or components/**.`,
-    "Every tappable element needs a name a screen reader can speak, and it has to be a t() call — see lib/check-a11y-icon-labels.ts.",
+    `Found ${String(findings.length)} accessibility problem(s) in app/** or components/**.`,
+    "Every tappable element needs a name a screen reader can speak, it has to be a t() call, and a node hidden from one platform has to be hidden from both — see lib/check-a11y-icon-labels.ts.",
   ];
   for (const finding of findings) {
     lines.push("");

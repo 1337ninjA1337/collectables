@@ -2,7 +2,8 @@
 /**
  * Fails when a `<Pressable>` in `app/**` or `components/**` is an icon and
  * nothing else with no `accessibilityLabel`, or carries one written as a bare
- * string literal instead of a `t()` call. Run via
+ * string literal instead of a `t()` call, or when any element is hidden from
+ * assistive technology on one platform but not the other. Run via
  * `npm run lint:a11y-icon-labels` locally and via `npm run lint:ci` in CI.
  *
  * Walks the two roots that render UI, `.tsx` only: a rule about what a screen
@@ -47,7 +48,7 @@ function main(): void {
 
   if (findings.length === 0) {
     console.log(
-      `${CHECK_NAME}: scanned ${String(files.length)} screen file(s), every icon-only Pressable is named and every name is localized.`,
+      `${CHECK_NAME}: scanned ${String(files.length)} screen file(s), every icon-only Pressable is named, every name is localized, and every hidden node is hidden on both platforms.`,
     );
     return;
   }

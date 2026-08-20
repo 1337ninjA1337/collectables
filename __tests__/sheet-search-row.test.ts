@@ -100,8 +100,12 @@ describe("components/sheet-search-row.tsx — accessibility", () => {
   it("hides both decorative Ionicons with BOTH platform props", () => {
     // Android honours importantForAccessibility, iOS accessibilityElementsHidden —
     // shipping only one leaves the other platform announcing an unnamed glyph.
-    // Strip block comments first — the component's own doc comment names
-    // both props while explaining why they ship as a pair.
+    // The PAIRING half of this is now `npm run lint:a11y-icon-labels`, which
+    // checks every element in app/ and components/ rather than this one file;
+    // what stays here is the COUNT, which is a fact about this component (a
+    // magnifier and a clear icon, both decorative) that no repo-wide rule can
+    // state. Strip block comments first — the component's own doc comment
+    // names both props while explaining why they ship as a pair.
     const jsx = src.replace(/\/\*[\s\S]*?\*\//g, "");
     const ios = jsx.match(/accessibilityElementsHidden/g) ?? [];
     const android = jsx.match(/importantForAccessibility="no"/g) ?? [];
