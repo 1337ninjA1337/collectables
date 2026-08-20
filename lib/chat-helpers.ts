@@ -108,6 +108,42 @@ export function chooseFriendsTabBadge(
 }
 
 /**
+ * What a nav tab's accessibility label has to say beyond the tab's own name.
+ *
+ * A badge is drawn INSIDE the `<Pressable>` that carries the label, so a
+ * screen reader announces "Chats, button" whether there are zero unread
+ * messages or forty: the count is on screen and nowhere in the spoken name.
+ * This is the mapping from the badge a tab draws to the thing its label has
+ * to add, so the two come from ONE decision rather than from the same
+ * counter read twice — the second reader is what drifts.
+ *
+ * Exhaustive over {@link FriendsTabBadge} on purpose: a fourth badge kind
+ * has to answer "and what does this one say out loud?" before it compiles.
+ */
+export type NavTabLabelSpec =
+  /** No badge — the tab's plain name is the whole label. */
+  | { readonly kind: "plain" }
+  /** A count badge: the label says how many. */
+  | { readonly kind: "unread"; readonly count: number }
+  /** A dot badge: the label says there is something waiting, without a number. */
+  | { readonly kind: "pending" };
+
+/** The label a tab needs, given the badge it draws. */
+export function navTabLabelSpec(badge: FriendsTabBadge | undefined): NavTabLabelSpec {
+  if (badge === undefined) return { kind: "plain" };
+  switch (badge.kind) {
+    case "none":
+      return { kind: "plain" };
+    case "dot":
+      return { kind: "pending" };
+    case "count":
+      // A count of zero draws no pill (formatBadgeCount returns ""), so it
+      // must not produce a label claiming unread messages either.
+      return badge.value > 0 ? { kind: "unread", count: badge.value } : { kind: "plain" };
+  }
+}
+
+/**
  * Compact label for a count badge. Caps anything above 99 at "99+" so the
  * pill stays narrow on small screens.
  */

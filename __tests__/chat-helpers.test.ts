@@ -9,7 +9,9 @@ import {
   chooseFriendsTabBadge,
   formatBadgeCount,
   getOtherParticipantId,
+  navTabLabelSpec,
   totalUnread,
+  type FriendsTabBadge,
 } from "@/lib/chat-helpers";
 import { ChatMessage } from "@/lib/types";
 
@@ -253,5 +255,60 @@ describe("formatBadgeCount", () => {
   it("caps anything above 99 at 99+", () => {
     assert.equal(formatBadgeCount(100), "99+");
     assert.equal(formatBadgeCount(2500), "99+");
+  });
+});
+
+describe("navTabLabelSpec", () => {
+  it("leaves an unbadged tab with its plain name", () => {
+    // Four of the six tabs pass no badge at all, and the two that do pass
+    // `{ kind: "none" }` when there is nothing waiting. Both are the same
+    // answer: say the tab's name and stop.
+    assert.deepEqual(navTabLabelSpec(undefined), { kind: "plain" });
+    assert.deepEqual(navTabLabelSpec({ kind: "none" }), { kind: "plain" });
+  });
+
+  it("carries the count through, uncapped", () => {
+    // The pill caps at "99+" because it is 18px wide. This is what a screen
+    // reader says, and a spoken label has no width — so the number survives.
+    assert.deepEqual(navTabLabelSpec({ kind: "count", value: 3 }), {
+      kind: "unread",
+      count: 3,
+    });
+    assert.deepEqual(navTabLabelSpec({ kind: "count", value: 240 }), {
+      kind: "unread",
+      count: 240,
+    });
+  });
+
+  it("says a dot has something waiting, without inventing a number", () => {
+    // The friends badge is a dot: it shows THAT there are requests and not how
+    // many. A label that announced the count would tell a non-visual user
+    // something the screen does not say.
+    assert.deepEqual(navTabLabelSpec({ kind: "dot" }), { kind: "pending" });
+  });
+
+  it("does not claim unread messages for a count of zero", () => {
+    // `formatBadgeCount(0)` is "", so a zero-valued count badge draws nothing.
+    // Announcing "unread: 0" for a tab with no pill is the mismatch this
+    // guards: the two must agree about whether there is anything to say.
+    assert.deepEqual(navTabLabelSpec({ kind: "count", value: 0 }), { kind: "plain" });
+    assert.deepEqual(navTabLabelSpec({ kind: "count", value: -2 }), { kind: "plain" });
+  });
+
+  it("answers every badge kind, so a fourth cannot ship unspoken", () => {
+    // Exhaustive over FriendsTabBadge: the point of routing the label through
+    // the badge is that a new badge kind has to say what it announces.
+    const every: FriendsTabBadge[] = [
+      { kind: "none" },
+      { kind: "dot" },
+      { kind: "count", value: 1 },
+    ];
+    for (const badge of every) {
+      const spec = navTabLabelSpec(badge);
+      assert.ok(
+        ["plain", "unread", "pending"].includes(spec.kind),
+        `${badge.kind} has no spoken form`,
+      );
+    }
   });
 });

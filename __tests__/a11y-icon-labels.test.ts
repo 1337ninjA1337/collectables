@@ -44,6 +44,9 @@ describe("<BottomNav> localizes every tab label", () => {
   const src = read("components/bottom-nav.tsx");
 
   it("gives all six tabs a translated label", () => {
+    // The two badged tabs wrap their name in `tabLabel(...)`, which swaps in a
+    // badge-aware string; the plain name is still the `t()` call it starts
+    // from, so it is still what this pins.
     for (const [key, call] of [
       ["home", 't("goHome")'],
       ["search", 't("searchTitle")'],
@@ -52,9 +55,41 @@ describe("<BottomNav> localizes every tab label", () => {
       ["friends", 't("friends")'],
       ["profile", 't("profile")'],
     ]) {
-      const entry = new RegExp(`key: "${key}",\\s*\\n\\s*label: ${call.replace(/[()"]/g, "\\$&")},`);
+      const entry = new RegExp(
+        `key: "${key}",\\s*\\n\\s*label: (tabLabel\\()?${call.replace(/[()"]/g, "\\$&")}`,
+      );
       assert.match(src, entry, `the ${key} tab has no localized label`);
     }
+  });
+
+  it("speaks the badge the two badged tabs draw", () => {
+    // A badge lives INSIDE the Pressable that carries the label, so a screen
+    // reader announces "Chats, button" whether there are zero unread messages
+    // or forty. Both badged tabs route their name through `tabLabel`, which
+    // maps the badge — not the counter behind it — onto a localized string.
+    for (const [key, badge] of [
+      ["chats", "chatsBadge"],
+      ["friends", "friendsBadge"],
+    ]) {
+      const entry = new RegExp(
+        `key: "${key}",\\s*\\n\\s*label: tabLabel\\(t\\("\\w+"\\), ${badge}\\),`,
+      );
+      assert.match(src, entry, `the ${key} tab's label ignores its badge`);
+    }
+    // Derived from the badge rather than from `unreadTotal` a second time:
+    // two readers of one counter is where the pill and the spoken name drift.
+    assert.match(src, /navTabLabelSpec\(badge\)/);
+    assert.match(src, /t\("navChatsUnreadA11y", \{ count: spec\.count \}\)/);
+    assert.match(src, /t\("navFriendsRequestsA11y"\)/);
+  });
+
+  it("does not announce the pill's 99+ cap", () => {
+    // `formatBadgeCount` caps at "99+" because the pill is 18px wide. A spoken
+    // label has no width, so the label says the true count. Line comments are
+    // stripped first — the code says WHY it does not call this, by name.
+    const code = src.replace(/\/\/.*$/gm, "");
+    assert.doesNotMatch(code, /formatBadgeCount/);
+    assert.match(code, /count: spec\.count/);
   });
 
   it("hands the labels down already translated", () => {

@@ -9,7 +9,7 @@ import { useResponsive } from "@/components/screen";
 import { useAppTheme } from "@/components/use-app-theme";
 import { trackEvent } from "@/lib/analytics";
 import { useChat } from "@/lib/chat-context";
-import { FriendsTabBadge } from "@/lib/chat-helpers";
+import { FriendsTabBadge, navTabLabelSpec } from "@/lib/chat-helpers";
 import {
   AMBER_ACCENT,
   AMBER_SOFT,
@@ -158,6 +158,34 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
   const chatsBadge: FriendsTabBadge = unreadTotal > 0 ? { kind: "count", value: unreadTotal } : { kind: "none" };
   const friendsBadge: FriendsTabBadge = incomingRequestUserIds.length > 0 ? { kind: "dot" } : { kind: "none" };
 
+  /**
+   * A tab's spoken name, derived from the BADGE it draws rather than from the
+   * counter behind it. Reading `unreadTotal` a second time here would work
+   * today and would be a second place for the two to disagree tomorrow; the
+   * badge is what a sighted user sees, so it is what the label has to match.
+   *
+   * `t` stays at this call site because this is where it lives — `<NavTab>`
+   * takes an already-localized string.
+   *
+   * One function for both badged tabs rather than two, because the badge
+   * kinds are already specific: `FriendsTabBadge` defines "count" as unread
+   * messages and "dot" as a pending friend request, so the string each kind
+   * maps to is a property of the kind and not of the tab drawing it.
+   */
+  function tabLabel(plain: string, badge: FriendsTabBadge): string {
+    const spec = navTabLabelSpec(badge);
+    switch (spec.kind) {
+      case "plain":
+        return plain;
+      case "unread":
+        // The true count, not formatBadgeCount's "99+": that cap exists
+        // because the pill is 18px wide, and a spoken label has no width.
+        return t("navChatsUnreadA11y", { count: spec.count });
+      case "pending":
+        return t("navFriendsRequestsA11y");
+    }
+  }
+
   const items: NavItem[] = [
     {
       key: "home",
@@ -185,7 +213,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     },
     {
       key: "chats",
-      label: t("chatsTitle"),
+      label: tabLabel(t("chatsTitle"), chatsBadge),
       icon: "chatbubbles-outline",
       iconActive: "chatbubbles",
       active: chatsActive,
@@ -194,7 +222,7 @@ export function BottomNav({ onSearchPress }: BottomNavProps) {
     },
     {
       key: "friends",
-      label: t("friends"),
+      label: tabLabel(t("friends"), friendsBadge),
       icon: "people-outline",
       iconActive: "people",
       active: friendsActive,

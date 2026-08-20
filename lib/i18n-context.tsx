@@ -410,6 +410,9 @@ const en = {
   deleteAccountDeleting: "Deleting...",
   deleteAccountFailed: "Could not delete account. Please try again later.",
   chatsTitle: "Chats",
+  navChatsUnreadA11y: (params?: TranslationParams) =>
+    `Chats, unread: ${params?.count ?? 0}`,
+  navFriendsRequestsA11y: "Friends, pending requests",
   chatsSubtitle: "Talk to your friends directly inside the app.",
   chatsEmptyTitle: "No chats yet",
   chatsEmptyHint: "Open a friend's profile and tap Message to start a conversation.",
@@ -1005,6 +1008,9 @@ const ru: TranslationMap = {
   deleteAccountDeleting: "Удаление...",
   deleteAccountFailed: "Не удалось удалить аккаунт. Попробуйте позже.",
   chatsTitle: "Чаты",
+  navChatsUnreadA11y: (params?: TranslationParams) =>
+    `Чаты, непрочитанных: ${params?.count ?? 0}`,
+  navFriendsRequestsA11y: "Друзья, есть новые заявки",
   chatsSubtitle: "Общайтесь с друзьями прямо в приложении.",
   chatsEmptyTitle: "Чатов пока нет",
   chatsEmptyHint: "Откройте профиль друга и нажмите «Написать», чтобы начать переписку.",
@@ -1280,6 +1286,9 @@ const be: TranslationMap = {
   deleteAccountDeleting: "Выдаленне...",
   deleteAccountFailed: "Не ўдалося выдаліць акаўнт. Паспрабуйце пазней.",
   chatsTitle: "Чаты",
+  navChatsUnreadA11y: (params?: TranslationParams) =>
+    `Чаты, непрачытаных: ${params?.count ?? 0}`,
+  navFriendsRequestsA11y: "Сябры, ёсць новыя заяўкі",
   chatsSubtitle: "Размаўляйце са сваімі сябрамі прама ў дадатку.",
   chatsEmptyTitle: "Чатаў пакуль няма",
   chatsEmptyHint: "Адкрыйце профіль сябра і націсніце «Напісаць», каб пачаць размову.",
@@ -1514,6 +1523,9 @@ const pl: TranslationMap = {
   deleteAccountDeleting: "Usuwanie...",
   deleteAccountFailed: "Nie udało się usunąć konta. Spróbuj ponownie później.",
   chatsTitle: "Czaty",
+  navChatsUnreadA11y: (params?: TranslationParams) =>
+    `Czaty, nieprzeczytane: ${params?.count ?? 0}`,
+  navFriendsRequestsA11y: "Znajomi, nowe zaproszenia",
   chatsSubtitle: "Rozmawiaj ze znajomymi bezpośrednio w aplikacji.",
   chatsEmptyTitle: "Brak czatów",
   chatsEmptyHint: "Otwórz profil znajomego i kliknij «Wiadomość», aby rozpocząć rozmowę.",
@@ -1744,6 +1756,9 @@ const de: TranslationMap = {
   deleteAccountDeleting: "Wird gelöscht...",
   deleteAccountFailed: "Konto konnte nicht gelöscht werden. Bitte versuchen Sie es später erneut.",
   chatsTitle: "Chats",
+  navChatsUnreadA11y: (params?: TranslationParams) =>
+    `Chats, ungelesen: ${params?.count ?? 0}`,
+  navFriendsRequestsA11y: "Freunde, offene Anfragen",
   chatsSubtitle: "Sprich mit deinen Freunden direkt in der App.",
   chatsEmptyTitle: "Noch keine Chats",
   chatsEmptyHint: "Öffne das Profil eines Freundes und tippe auf «Nachricht», um ein Gespräch zu beginnen.",
@@ -1974,6 +1989,9 @@ const es: TranslationMap = {
   deleteAccountDeleting: "Eliminando...",
   deleteAccountFailed: "No se pudo eliminar la cuenta. Inténtalo de nuevo más tarde.",
   chatsTitle: "Chats",
+  navChatsUnreadA11y: (params?: TranslationParams) =>
+    `Chats, sin leer: ${params?.count ?? 0}`,
+  navFriendsRequestsA11y: "Amigos, solicitudes pendientes",
   chatsSubtitle: "Habla con tus amigos directamente dentro de la app.",
   chatsEmptyTitle: "Aún no hay chats",
   chatsEmptyHint: "Abre el perfil de un amigo y pulsa «Mensaje» para iniciar una conversación.",
