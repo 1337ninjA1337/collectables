@@ -116,7 +116,14 @@ export function PhotoLightbox({ photos, visible, onClose, initialIndex = 0 }: Ph
           accessibilityLabel={t("galleryClose")}
           hitSlop={8}
         >
-          <Ionicons name="close" size={22} color={TEXT_ON_DARK} />
+          <Ionicons
+            name="close"
+            size={22}
+            color={TEXT_ON_DARK}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            aria-hidden
+          />
         </Pressable>
 
         {multi ? (
@@ -133,6 +140,9 @@ export function PhotoLightbox({ photos, visible, onClose, initialIndex = 0 }: Ph
                 name="chevron-back"
                 size={24}
                 color={index === 0 ? TEXT_ON_DARK_SOFT : TEXT_ON_DARK}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                aria-hidden
               />
             </Pressable>
             <Pressable
@@ -147,6 +157,9 @@ export function PhotoLightbox({ photos, visible, onClose, initialIndex = 0 }: Ph
                 name="chevron-forward"
                 size={24}
                 color={index === photos.length - 1 ? TEXT_ON_DARK_SOFT : TEXT_ON_DARK}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                aria-hidden
               />
             </Pressable>
             <View style={styles.footer} pointerEvents="none">

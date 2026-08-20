@@ -103,36 +103,44 @@ describe("<BottomNav> localizes every tab label", () => {
 
 describe("the leaf components whose icon sits next to its own name", () => {
   /**
-   * Six decorative `<Ionicons>` that carried no hide at all, so every screen
-   * reader announced the glyph beside a name that was already there. Each of
-   * these is decorative for a reason a reader can check in the file: either
-   * the `<Pressable>` wrapping it carries an `accessibilityLabel`, or a
-   * sibling `<Text>` says the same thing in words.
+   * Twelve decorative `<Ionicons>` that carried no hide at all, so every
+   * screen reader announced the glyph beside a name that was already there.
+   * Each is decorative for a reason a reader can check in the file: either the
+   * `<Pressable>` wrapping it carries an `accessibilityLabel`, or a sibling
+   * `<Text>` says the same thing in words.
    *
-   * Not the whole sweep — 30 icons in 11 files still carry neither a hide nor
-   * a label, and "decorative" is a judgement per site rather than a rule. These
-   * six are the ones where the judgement is already written down next to them.
+   * Not the whole sweep — 24 icons in 9 files still carry neither a hide nor a
+   * label, and "decorative" is a judgement per site rather than a rule. These
+   * twelve are the ones where the judgement is already written down next to
+   * them; the rest are decomposed in `.tasks/.tasks.md`.
    */
-  const DECORATIVE: readonly (readonly [string, string])[] = [
-    ["components/nav-tab.tsx", "the tab's own accessibilityLabel names it"],
-    ["components/danger-icon-button.tsx", "accessibilityLabel is a required prop"],
-    ["components/soft-destructive-chip.tsx", "the chip's <Text> is the name"],
-    ["components/bottom-nav.tsx", "the plus button carries plusLabel"],
-    ["components/currency-input.tsx", 'the chip carries t("currencyMore")'],
-    ["components/visibility-badge.tsx", "the badge's <Text>{label}</Text> is the name"],
+  const DECORATIVE: readonly (readonly [string, number, string])[] = [
+    ["components/nav-tab.tsx", 1, "the tab's own accessibilityLabel names it"],
+    ["components/danger-icon-button.tsx", 1, "accessibilityLabel is a required prop"],
+    ["components/soft-destructive-chip.tsx", 1, "the chip's <Text> is the name"],
+    ["components/bottom-nav.tsx", 1, "the plus button carries plusLabel"],
+    ["components/currency-input.tsx", 1, 'the chip carries t("currencyMore")'],
+    ["components/visibility-badge.tsx", 1, "the badge's <Text>{label}</Text> is the name"],
+    ["components/photo-lightbox.tsx", 3, "close / previous / next are each a named Pressable"],
+    ["components/photo-preview.tsx", 3, "delete and the two reorder arrows are each named"],
   ];
 
-  for (const [file, why] of DECORATIVE) {
-    it(`${file} hides its decorative icon on all three platforms — ${why}`, () => {
-      const src = read(file);
-      // All three, because the two native props leave the web announcing it and
-      // aria-hidden alone leaves iOS and Android announcing it: <Ionicons>
-      // renders a <Text>, which does not derive the native pair from aria-hidden.
-      const iconTag = /<Ionicons[\s\S]*?\/>/.exec(src.replace(/\/\*[\s\S]*?\*\//g, ""));
-      assert.ok(iconTag, `${file} renders no <Ionicons>`);
-      assert.match(iconTag[0], /accessibilityElementsHidden/, `${file}: no iOS hide`);
-      assert.match(iconTag[0], /importantForAccessibility="no"/, `${file}: no Android hide`);
-      assert.match(iconTag[0], /(?<![\w-])aria-hidden/, `${file}: no web hide`);
+  for (const [file, count, why] of DECORATIVE) {
+    it(`${file} hides ${count} decorative icon(s) on all three platforms — ${why}`, () => {
+      const src = read(file).replace(/\/\*[\s\S]*?\*\//g, "");
+      const tags = src.match(/<Ionicons[\s\S]*?\/>/g) ?? [];
+      // The count is a fact about the file that no repo-wide rule can state:
+      // a seventh icon added here inherits nothing from these six.
+      assert.equal(tags.length, count, `${file} renders ${tags.length} <Ionicons>, expected ${count}`);
+      for (const [i, tag] of tags.entries()) {
+        // All three, because the two native props leave the web announcing it
+        // and aria-hidden alone leaves iOS and Android announcing it:
+        // <Ionicons> renders a <Text>, which unlike <View> does not derive the
+        // native pair from aria-hidden.
+        assert.match(tag, /accessibilityElementsHidden/, `${file} #${i}: no iOS hide`);
+        assert.match(tag, /importantForAccessibility="no"/, `${file} #${i}: no Android hide`);
+        assert.match(tag, /(?<![\w-])aria-hidden/, `${file} #${i}: no web hide`);
+      }
     });
   }
 });

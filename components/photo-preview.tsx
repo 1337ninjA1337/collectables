@@ -56,7 +56,14 @@ export function PhotoPreview({ photos, onChange, maxPhotos = 5 }: Props) {
             hitSlop={6}
             accessibilityLabel={t("delete")}
           >
-            <Ionicons name="close" size={14} color={PURE_WHITE} />
+            <Ionicons
+              name="close"
+              size={14}
+              color={PURE_WHITE}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              aria-hidden
+            />
           </Pressable>
 
           {/* Move arrows */}
@@ -69,7 +76,14 @@ export function PhotoPreview({ photos, onChange, maxPhotos = 5 }: Props) {
                 accessibilityRole="button"
                 accessibilityLabel={t("photoMoveBack")}
               >
-                <Ionicons name="chevron-back" size={14} color={TEXT_ON_DARK} />
+                <Ionicons
+                  name="chevron-back"
+                  size={14}
+                  color={TEXT_ON_DARK}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                  aria-hidden
+                />
               </Pressable>
             ) : (
               <View style={styles.moveButtonPlaceholder} />
@@ -82,7 +96,14 @@ export function PhotoPreview({ photos, onChange, maxPhotos = 5 }: Props) {
                 accessibilityRole="button"
                 accessibilityLabel={t("photoMoveForward")}
               >
-                <Ionicons name="chevron-forward" size={14} color={TEXT_ON_DARK} />
+                <Ionicons
+                  name="chevron-forward"
+                  size={14}
+                  color={TEXT_ON_DARK}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                  aria-hidden
+                />
               </Pressable>
             ) : (
               <View style={styles.moveButtonPlaceholder} />
