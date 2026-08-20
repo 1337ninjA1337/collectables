@@ -331,6 +331,14 @@ const en = {
   visibilityPublicHint: "Anyone can find and view this collection.",
   visibilityPrivateHint: "Only you and people you share with can see this collection.",
   visibilityPrivatePremiumOnly: "Private collections are a premium feature.",
+  /**
+   * The spoken label on the locked "Private" chip — a screen reader hears
+   * this in place of the chip's visible text. One composed sentence per
+   * locale rather than a template literal joining two keys, so each language
+   * answers for its own punctuation and word order rather than inheriting an
+   * English em-dash.
+   */
+  visibilityPrivateLockedA11y: "Private — private collections are a premium feature.",
   filterTitle: "Filters",
   filterPriceFrom: "Price from",
   filterPriceTo: "Price to",
@@ -931,6 +939,8 @@ const ru: TranslationMap = {
   visibilityLabel: "Видимость",
   visibilityPublicHint: "Любой сможет найти и посмотреть эту коллекцию.",
   visibilityPrivateHint: "Только вы и те, с кем подели��ись, смогут видеть эту коллекцию.",
+  visibilityPrivatePremiumOnly: "Приватные коллекции — премиум-функция.",
+  visibilityPrivateLockedA11y: "Приватная: приватные коллекции — премиум-функция.",
   filterTitle: "Фильтры",
   filterPriceFrom: "Цена от",
   filterPriceTo: "Цена до",
@@ -1383,6 +1393,8 @@ const be: TranslationMap = {
   marketplacePriceHistoryLabel: "Нядаўнія цэны на падобныя прадметы",
   marketplacePriceHistoryHint: "Да 10 апошніх цэн па аб'явах з падобнымі назвамі.",
   premiumTitle: "Прэміум",
+  visibilityPrivatePremiumOnly: "Прыватныя калекцыі — гэта прэміум-функцыя.",
+  visibilityPrivateLockedA11y: "Прыватная: прыватныя калекцыі — гэта прэміум-функцыя.",
   premiumSubtitle: "Адкрыйце інструменты калекцыянера і прыбярыце ліміт барахолкі.",
   premiumBenefit1: "Неабмежаваныя актыўныя аб'явы на барахолцы",
   premiumBenefit2: "Прыярытэт у пошуку калекцыянераў",
@@ -1624,6 +1636,8 @@ const pl: TranslationMap = {
   marketplacePriceHistoryLabel: "Ostatnie ceny podobnych przedmiotów",
   marketplacePriceHistoryHint: "Do 10 najnowszych cen z ogłoszeń o podobnych nazwach.",
   premiumTitle: "Premium",
+  visibilityPrivatePremiumOnly: "Prywatne kolekcje to funkcja premium.",
+  visibilityPrivateLockedA11y: "Prywatna: prywatne kolekcje to funkcja premium.",
   premiumSubtitle: "Odblokuj narzędzia kolekcjonera i znieś limit ogłoszeń.",
   premiumBenefit1: "Nieograniczona liczba aktywnych ogłoszeń",
   premiumBenefit2: "Priorytet w wyszukiwarce kolekcjonerów",
@@ -1861,6 +1875,8 @@ const de: TranslationMap = {
   marketplacePriceHistoryLabel: "Aktuelle Preise für ähnliche Objekte",
   marketplacePriceHistoryHint: "Bis zu 10 aktuelle Preise aus Anzeigen mit ähnlichen Namen.",
   premiumTitle: "Premium",
+  visibilityPrivatePremiumOnly: "Private Sammlungen sind eine Premium-Funktion.",
+  visibilityPrivateLockedA11y: "Privat: private Sammlungen sind eine Premium-Funktion.",
   premiumSubtitle: "Schalte Sammler-Tools frei und hebe das Marktplatzlimit auf.",
   premiumBenefit1: "Unbegrenzte aktive Marktplatzanzeigen",
   premiumBenefit2: "Bevorzugte Platzierung in der Sammlersuche",
@@ -2098,6 +2114,8 @@ const es: TranslationMap = {
   marketplacePriceHistoryLabel: "Precios recientes de objetos similares",
   marketplacePriceHistoryHint: "Hasta 10 precios recientes de anuncios con nombres similares.",
   premiumTitle: "Premium",
+  visibilityPrivatePremiumOnly: "Las colecciones privadas son una función premium.",
+  visibilityPrivateLockedA11y: "Privada: las colecciones privadas son una función premium.",
   premiumSubtitle: "Desbloquea herramientas de coleccionista y elimina el límite del mercado.",
   premiumBenefit1: "Anuncios activos ilimitados en el mercado",
   premiumBenefit2: "Posición prioritaria en la búsqueda de coleccionistas",

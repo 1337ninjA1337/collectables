@@ -169,11 +169,7 @@ export const EditCollectionModal = memo(function EditCollectionModal({
                     }}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
-                    accessibilityLabel={
-                      locked
-                        ? `${t("visibilityPrivate")} — ${t("visibilityPrivatePremiumOnly")}`
-                        : undefined
-                    }
+                    accessibilityLabel={locked ? t("visibilityPrivateLockedA11y") : undefined}
                   >
                     <Text style={{...styles.editVisibilityChipText, ...(selected ? styles.editVisibilityChipTextSelected : {})}}>
                       {t(v === "public" ? "visibilityPublic" : "visibilityPrivate")}

@@ -101,16 +101,17 @@ describe("translation coverage", () => {
     assert.equal(coveragePercent(base), 100);
   });
 
-  it("names the three keys Russian still inherits", () => {
-    // Small enough to pin by name rather than by count: two of the three are
-    // legitimate (a brand and an email address render the same in Russian), and
-    // the third is a real gap. A fourth arriving unnoticed is the thing this
-    // catches — for the other four locales the list is in the hundreds, so
-    // their floors do the watching instead.
+  it("names the two keys Russian still inherits", () => {
+    // Small enough to pin by name rather than by count: both are legitimate
+    // (a brand and an email address render the same in Russian). A third
+    // arriving unnoticed is the thing this catches — for the other four
+    // locales the list is in the hundreds, so their floors do the watching
+    // instead. `visibilityPrivatePremiumOnly` fell off this list when it
+    // gained a Russian declaration alongside the new
+    // `visibilityPrivateLockedA11y`.
     assert.deepEqual(rowFor("ru").inherited, [
       "emailPlaceholder",
       "appName",
-      "visibilityPrivatePremiumOnly",
     ]);
   });
 
@@ -226,13 +227,20 @@ describe("translation floors", () => {
     // complete, and four sit below half. The `assert.ok(true)` keeps the line
     // in the runner's output next to the rows above it.
     const report = COVERAGE.map(formatCoverageRow).join("\n");
-    // 546 as of 2026-08-20: `galleryOpenPhotos`, the item card's gallery button
-    // named with its photo count, written in all six. The four partial rows rose
-    // by two rather than one, because the same change also translated
-    // `photosCount` — a key the card already rendered — in be/pl/de/es, which
-    // had been inheriting the English "5 photos" since it was written. The 545
-    // before it arrived the same way, with the two nav-badge labels.
-    assert.match(report, /en: 546\/546 keys \(100\.0%\)/);
+    // 547 as of 2026-08-20: `visibilityPrivateLockedA11y`, the composed spoken
+    // sentence on the locked private-visibility chip — one key per locale
+    // rather than a runtime template joining `visibilityPrivate` and
+    // `visibilityPrivatePremiumOnly` so each language answers for its own
+    // apposition punctuation, and the same change added
+    // `visibilityPrivatePremiumOnly` in the five non-English locales that
+    // had been inheriting the English string all along. 546 before that:
+    // `galleryOpenPhotos`, the item card's gallery button named with its
+    // photo count, written in all six. The four partial rows rose by two
+    // rather than one, because the same change also translated `photosCount`
+    // — a key the card already rendered — in be/pl/de/es, which had been
+    // inheriting the English "5 photos" since it was written. The 545 before
+    // it arrived the same way, with the two nav-badge labels.
+    assert.match(report, /en: 547\/547 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

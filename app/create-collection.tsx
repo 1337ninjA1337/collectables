@@ -254,11 +254,7 @@ export default function CreateCollectionScreen() {
                 }}
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
-                accessibilityLabel={
-                  locked
-                    ? `${t("visibilityPrivate")} — ${t("visibilityPrivatePremiumOnly")}`
-                    : undefined
-                }
+                accessibilityLabel={locked ? t("visibilityPrivateLockedA11y") : undefined}
               >
                 <Text style={{...styles.visibilityChipText, ...(selected ? styles.visibilityChipTextSelected : {})}}>
                   {t(v === "public" ? "visibilityPublic" : "visibilityPrivate")}

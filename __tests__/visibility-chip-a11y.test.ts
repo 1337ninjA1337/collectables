@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { assertMatchesInEveryLocaleBody } from "./helpers/i18n-locales";
+import { readI18nSource } from "./helpers/i18n-source-file";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
@@ -58,13 +60,13 @@ describe("visibility chip — locked private variant announces itself honestly",
     assert.ok(chip);
     // The label is expression-shaped (a ternary over `locked`), so the guard's
     // untranslated-label rule (which matches bare double-quoted strings)
-    // ignores it. Both t() calls must be there — one for the value name,
-    // one for the premium notice — so a fix that dropped either half would
-    // reduce a screen-reader user to "Private" again.
-    assert.match(chip[0], /accessibilityLabel=\{\s*\n?\s*locked\s*\n?\s*\?/);
-    assert.match(chip[0], /t\("visibilityPrivate"\)/);
-    assert.match(chip[0], /t\("visibilityPrivatePremiumOnly"\)/);
-    assert.match(chip[0], /:\s*undefined\b/);
+    // ignores it. The whole sentence is ONE composed key per locale
+    // (`visibilityPrivateLockedA11y`) rather than a template joining two,
+    // so a language whose punctuation is not English answers for its own
+    // word order — Russian and Belarusian read the value+notice pair with
+    // a colon rather than an em-dash — and the guard has no runtime string
+    // concatenation to see through.
+    assert.match(chip[0], /accessibilityLabel=\{\s*locked\s*\?\s*t\("visibilityPrivateLockedA11y"\)\s*:\s*undefined\s*\}/);
   });
 
   it("edit-collection-modal: the chip declares no disabled state either", () => {
@@ -86,9 +88,27 @@ describe("visibility chip — locked private variant announces itself honestly",
   it("edit-collection-modal: the locked variant carries an accessibilityLabel naming Private and the premium constraint", () => {
     const chip = /<Pressable[\s\S]*?key=\{v\}[\s\S]*?<\/Pressable>/.exec(modalSrc);
     assert.ok(chip);
-    assert.match(chip[0], /accessibilityLabel=\{\s*\n?\s*locked\s*\n?\s*\?/);
-    assert.match(chip[0], /t\("visibilityPrivate"\)/);
-    assert.match(chip[0], /t\("visibilityPrivatePremiumOnly"\)/);
-    assert.match(chip[0], /:\s*undefined\b/);
+    assert.match(chip[0], /accessibilityLabel=\{\s*locked\s*\?\s*t\("visibilityPrivateLockedA11y"\)\s*:\s*undefined\s*\}/);
+  });
+});
+
+/**
+ * The composed a11y sentence is a full-locale string, not a template joining
+ * two keys — this pins that decision so a "tidying" pass cannot collapse it
+ * back into `${t("visibilityPrivate")} — ${t("visibilityPrivatePremiumOnly")}`
+ * for a screen reader user in a locale that punctuates the apposition
+ * differently.
+ */
+describe("visibilityPrivateLockedA11y — every language declares the composed sentence directly", () => {
+  it("is declared in every locale body rather than inherited via ...en", () => {
+    // Asked of each locale map on its own — a whole-file count over the key's
+    // name is exactly the shape `i18n-locales-helper.test.ts` retires, because
+    // a base map declaring the key twice would satisfy a `.length === 6`
+    // check while a non-base map inherited the English string.
+    assertMatchesInEveryLocaleBody(
+      readI18nSource(),
+      /visibilityPrivateLockedA11y\s*:/,
+      "visibilityPrivateLockedA11y is declared per locale",
+    );
   });
 });
