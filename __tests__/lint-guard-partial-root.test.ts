@@ -24,6 +24,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { LINT_GUARDS } from "../lib/lint-guards";
+import { FLOOR_WALKS } from "../lib/floor-walks";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
 import {
   assertNoStackTrace,
@@ -251,13 +252,26 @@ describe("every count-shaped guard refuses a partial scan root", () => {
  * them share), and when a root grows past its floor this test goes red in CI
  * and says to re-measure — instead of the floor quietly meaning less each
  * time someone adds a file.
+ *
+ * The roots themselves come from `FLOOR_WALKS` in `lib/floor-walks.ts`, not
+ * from a list here: `npm run remeasure-floors` asks the same question when this
+ * test goes red — which roots does this guard walk, and which is the largest —
+ * and two copies of that answer is the drift `NEVER_WALKED` is the standing
+ * example of. What stays here is the assertion that each entry still matches
+ * the guard's own `SCANNED_DIRS` literal, because that is a fact about the
+ * guard's SOURCE and belongs to a test.
+ *
+ * `check-problem-phrasing-imports` walks five roots and is in that table too;
+ * it is excluded here because its fixtures would each copy a 400-file
+ * `__tests__/` tree, and the property is asserted for it by the script rather
+ * than by five spawns. That is a cost decision, and it is the reason this list
+ * is a subset rather than the table itself.
  */
-const SINGLE_ROOT_LOCKS: Readonly<Record<string, readonly string[]>> = {
-  "check-inline-hex": ["app", "components", "lib"],
-  "check-inline-radius": ["app", "components"],
-  "check-analytics-imports": ["app", "components"],
-  "check-clarity-input-mask": ["app", "components"],
-};
+const SINGLE_ROOT_LOCKS: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
+  Object.entries(FLOOR_WALKS)
+    .filter(([checkName]) => checkName !== "check-problem-phrasing-imports")
+    .map(([checkName, walk]) => [checkName, walk.roots]),
+);
 
 /** The count out of a guard's report, whether it passed or hit its floor. */
 function parseScanned(output: string): number {

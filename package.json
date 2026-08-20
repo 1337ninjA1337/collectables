@@ -39,6 +39,7 @@
     "powerbi:conn": "tsx scripts/print-powerbi-conn.ts",
     "lint:powerbi-doc": "tsx scripts/generate-powerbi-schema-doc.ts --check",
     "sentry:check": "tsx scripts/sentry-doctor.ts",
+    "remeasure-floors": "tsx scripts/remeasure-floors.ts",
     "lint:all": "tsx scripts/lint-all.ts",
     "lint:ci": "npm run typecheck && npm run lint:all && npm test",
     "verify": "npm run lint:ci && npm run build",
