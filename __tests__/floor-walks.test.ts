@@ -8,7 +8,9 @@ import {
   measureFloorWalk,
 } from "@/lib/floor-walks";
 import { SCANNED_FLOORS } from "@/lib/scanned-floor";
-import { readRepoFile } from "./helpers/repo-file";
+import { SOURCE_EXTENSIONS } from "@/lib/source-dirs";
+import { readRepoFile, REPO_ROOT } from "./helpers/repo-file";
+import { listSourceFiles } from "../scripts/guard-io";
 
 /**
  * The arithmetic of a floor re-measure, over counts nobody had to walk for.
@@ -173,6 +175,49 @@ describe("FLOOR_WALKS", () => {
         source,
         new RegExp(`\\[${walk.roots.map((r) => `"${r}"`).join(", ")}\\]`),
         `${checkName}'s scan roots moved; update FLOOR_WALKS in lib/floor-walks.ts to match`,
+      );
+    }
+  });
+
+  it("still sits above its largest single root, for EVERY walk in the table", () => {
+    // The property itself, measured against the real tree and by counting
+    // rather than by spawning — which is what makes it affordable for all five
+    // walks instead of the four the fixture suite can pay for.
+    //
+    // That gap was real and it was over the entry that needs it most.
+    // `lint-guard-partial-root.test.ts` proves this by building a temp tree per
+    // root and running the guard binary in it, which is the stronger evidence
+    // and costs seconds; it skips `check-problem-phrasing-imports` because each
+    // of its five fixtures would copy a 400-file `__tests__/` tree. So the
+    // LARGEST floor in the table — 450, with its biggest root at 430, 96% of
+    // the way there and the one likeliest to move next — had its property
+    // enforced by nothing in CI at all. `npm run remeasure-floors` computes the
+    // same verdict, and a tool nobody is required to run is not enforcement.
+    //
+    // The division of labour, since two things now check one property: this is
+    // the CHEAP enforcement and covers every walk; the fixture suite is the
+    // PROOF that the guard binary really refuses, and covers the four whose
+    // trees are small enough to copy.
+    for (const [checkName, walk] of Object.entries(FLOOR_WALKS)) {
+      const floor = SCANNED_FLOORS[checkName]?.count;
+      assert.ok(floor, `${checkName} declares no count floor`);
+      const perRoot = walk.roots.map((root) => ({
+        root,
+        count: listSourceFiles(REPO_ROOT, [root], walk.extensions ?? SOURCE_EXTENSIONS).length,
+      }));
+      // Premise before the claim: a root that walked to nothing would make the
+      // comparison below true for a reason that has nothing to do with floors.
+      for (const { root, count } of perRoot) {
+        assert.ok(count > 0, `${checkName}'s ${root}/ walked to zero files — this proves nothing`);
+      }
+      const row = measureFloorWalk(checkName, floor.minimum, floor.label, perRoot);
+      assert.ok(
+        row.holds,
+        `${row.largestRoot.root}/ alone holds ${String(row.largestRoot.count)} of the ` +
+          `${floor.label}s ${checkName} counts, which clears its floor of ${String(floor.minimum)} — ` +
+          `so every other scan root could vanish and the guard still reports green. ` +
+          `Run \`npm run remeasure-floors\`: it suggests ${String(row.suggested)}. ` +
+          `Re-measure in lib/scanned-floor.ts and say why in the note.`,
       );
     }
   });
