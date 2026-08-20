@@ -60,7 +60,14 @@ function NavRow({ leftItems, rightItems, onPlusPress, plusLabel }: NavRowProps) 
           onPress={onPlusPress}
           accessibilityLabel={plusLabel}
         >
-          <Ionicons name="add" size={30} color={plusIconColor} />
+          <Ionicons
+            name="add"
+            size={30}
+            color={plusIconColor}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            aria-hidden
+          />
         </Pressable>
       </View>
       {paddedRight.map((item, i) =>

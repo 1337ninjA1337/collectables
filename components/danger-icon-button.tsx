@@ -56,7 +56,14 @@ export const DangerIconButton = memo(function DangerIconButton({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
     >
-      <Ionicons name={icon} size={16} color={DESTRUCTIVE_ICON_FOREGROUND} />
+      <Ionicons
+        name={icon}
+        size={16}
+        color={DESTRUCTIVE_ICON_FOREGROUND}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+        aria-hidden
+      />
     </Pressable>
   );
 });

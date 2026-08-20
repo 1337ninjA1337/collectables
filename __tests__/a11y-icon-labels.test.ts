@@ -101,6 +101,42 @@ describe("<BottomNav> localizes every tab label", () => {
   });
 });
 
+describe("the leaf components whose icon sits next to its own name", () => {
+  /**
+   * Six decorative `<Ionicons>` that carried no hide at all, so every screen
+   * reader announced the glyph beside a name that was already there. Each of
+   * these is decorative for a reason a reader can check in the file: either
+   * the `<Pressable>` wrapping it carries an `accessibilityLabel`, or a
+   * sibling `<Text>` says the same thing in words.
+   *
+   * Not the whole sweep — 30 icons in 11 files still carry neither a hide nor
+   * a label, and "decorative" is a judgement per site rather than a rule. These
+   * six are the ones where the judgement is already written down next to them.
+   */
+  const DECORATIVE: readonly (readonly [string, string])[] = [
+    ["components/nav-tab.tsx", "the tab's own accessibilityLabel names it"],
+    ["components/danger-icon-button.tsx", "accessibilityLabel is a required prop"],
+    ["components/soft-destructive-chip.tsx", "the chip's <Text> is the name"],
+    ["components/bottom-nav.tsx", "the plus button carries plusLabel"],
+    ["components/currency-input.tsx", 'the chip carries t("currencyMore")'],
+    ["components/visibility-badge.tsx", "the badge's <Text>{label}</Text> is the name"],
+  ];
+
+  for (const [file, why] of DECORATIVE) {
+    it(`${file} hides its decorative icon on all three platforms — ${why}`, () => {
+      const src = read(file);
+      // All three, because the two native props leave the web announcing it and
+      // aria-hidden alone leaves iOS and Android announcing it: <Ionicons>
+      // renders a <Text>, which does not derive the native pair from aria-hidden.
+      const iconTag = /<Ionicons[\s\S]*?\/>/.exec(src.replace(/\/\*[\s\S]*?\*\//g, ""));
+      assert.ok(iconTag, `${file} renders no <Ionicons>`);
+      assert.match(iconTag[0], /accessibilityElementsHidden/, `${file}: no iOS hide`);
+      assert.match(iconTag[0], /importantForAccessibility="no"/, `${file}: no Android hide`);
+      assert.match(iconTag[0], /(?<![\w-])aria-hidden/, `${file}: no web hide`);
+    });
+  }
+});
+
 describe("the two icon buttons the sweep found outside the nav bar", () => {
   it("<PhotoPreview> names both reorder arrows", () => {
     const src = read("components/photo-preview.tsx");

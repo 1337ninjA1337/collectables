@@ -59,7 +59,14 @@ describe("<SoftDestructiveChip> component", () => {
   });
 
   it("tints the icon with the foreground token, not a second literal", () => {
-    assert.match(src, /<Ionicons name=\{icon\} size=\{14\} color=\{SOFT_DESTRUCTIVE_FOREGROUND\} \/>/);
+    // Asserted per-prop inside the tag rather than as one line: the previous
+    // form pinned the prop ORDER too, so adding the three accessibility-hiding
+    // props reddened a case about colour. What this owns is the tint.
+    const tag = /<Ionicons[\s\S]*?\/>/.exec(src);
+    assert.ok(tag, "the chip renders no <Ionicons>");
+    assert.match(tag[0], /name=\{icon\}/);
+    assert.match(tag[0], /size=\{14\}/);
+    assert.match(tag[0], /color=\{SOFT_DESTRUCTIVE_FOREGROUND\}/);
   });
 
   it("defaults the icon to close-circle, which is what every caller wanted", () => {

@@ -124,7 +124,14 @@ export function CurrencyInput({
           }}
           accessibilityLabel={t("currencyMore")}
         >
-          <Ionicons name="ellipsis-horizontal" size={14} color={MUTED_27} />
+          <Ionicons
+            name="ellipsis-horizontal"
+            size={14}
+            color={MUTED_27}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            aria-hidden
+          />
         </Pressable>
       </ScrollView>
 

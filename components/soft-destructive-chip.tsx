@@ -47,7 +47,14 @@ export const SoftDestructiveChip = memo(function SoftDestructiveChip({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
     >
-      <Ionicons name={icon} size={14} color={SOFT_DESTRUCTIVE_FOREGROUND} />
+      <Ionicons
+        name={icon}
+        size={14}
+        color={SOFT_DESTRUCTIVE_FOREGROUND}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+        aria-hidden
+      />
       <Text style={styles.label}>{label}</Text>
     </Pressable>
   );

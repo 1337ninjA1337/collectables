@@ -60,6 +60,9 @@ export function VisibilityBadge({
                 ? ACCENT_DEEP_2
                 : theme.text
         }
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+        aria-hidden
       />
       <Text
         style={[

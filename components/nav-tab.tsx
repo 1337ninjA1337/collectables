@@ -55,6 +55,9 @@ export function NavTab({ item }: { item: NavItem }) {
           name={item.active ? item.iconActive : item.icon}
           size={22}
           color={item.active ? theme.navIconActive : theme.navIconInactive}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+          aria-hidden
         />
         {renderBadge(item.badge)}
         {item.premiumBadge ? <View style={styles.premiumDot} /> : null}
