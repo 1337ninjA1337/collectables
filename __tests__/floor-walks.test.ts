@@ -2,15 +2,22 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  checkWalkPremise,
+  describeWalkPremiseProblem,
   FLOOR_SLACK,
   FLOOR_WALKS,
   formatFloorMeasurement,
   measureFloorWalk,
+  UNCOUNTED_MODULE_REASONS,
+  unusedUncountedExcuses,
+  type RootEvidence,
+  type WalkPremiseCode,
 } from "@/lib/floor-walks";
 import { SCANNED_FLOORS } from "@/lib/scanned-floor";
-import { SOURCE_EXTENSIONS } from "@/lib/source-dirs";
+import { MARKUP_EXTENSIONS, MODULE_EXTENSIONS, SOURCE_EXTENSIONS } from "@/lib/source-dirs";
 import { readRepoFile, REPO_ROOT } from "./helpers/repo-file";
-import { listSourceFiles } from "../scripts/guard-io";
+import { SUITES_REL } from "./helpers/suite-files";
+import { listSourceFiles, tallyExtensions } from "../scripts/guard-io";
 
 /**
  * The arithmetic of a floor re-measure, over counts nobody had to walk for.
@@ -30,6 +37,25 @@ import { listSourceFiles } from "../scripts/guard-io";
  */
 
 const root = (name: string, count: number) => ({ root: name, count });
+
+/**
+ * One scan root walked with NO extension filter, tallied by extension.
+ *
+ * Memoised because `app/` alone appears in four of the five walks and
+ * `__tests__/` is 400-odd files: the premise wants a second walk of each root,
+ * not a second walk per row that mentions it.
+ *
+ * The filter is the only difference from the guards' own walk — same skip list
+ * — which is what makes the counts comparable at all.
+ */
+const rootTallies = new Map<string, Record<string, number>>();
+function tallyRoot(name: string): Record<string, number> {
+  const cached = rootTallies.get(name);
+  if (cached) return cached;
+  const tally = tallyExtensions(REPO_ROOT, name);
+  rootTallies.set(name, tally);
+  return tally;
+}
 
 describe("measureFloorWalk", () => {
   it("sums the roots, finds the largest, and holds when the floor clears it", () => {
@@ -153,6 +179,192 @@ describe("formatFloorMeasurement", () => {
   });
 });
 
+/**
+ * A root that holds exactly what it says, so each case below breaks one thing.
+ *
+ * `counted` defaults to the tally over `.ts` and `.tsx`, because the honest
+ * evidence is the two walks AGREEING — a case that wants them to disagree says
+ * so by passing the number it wants.
+ */
+const evidence = (
+  name: string,
+  present: Record<string, number>,
+  counted?: number,
+): RootEvidence => ({
+  root: name,
+  counted: counted ?? SOURCE_EXTENSIONS.reduce((sum, ext) => sum + (present[ext] ?? 0), 0),
+  present,
+});
+
+const codesOf = (problems: readonly { code: WalkPremiseCode }[]) => problems.map((p) => p.code);
+
+describe("checkWalkPremise", () => {
+  const sourceWalk = { roots: ["app", "lib"] };
+
+  it("finds nothing wrong with a walk whose roots hold what it counts", () => {
+    assert.deepEqual(
+      checkWalkPremise("check-x", sourceWalk, [
+        evidence("app", { ".tsx": 19 }),
+        evidence("lib", { ".ts": 149, ".tsx": 12 }),
+      ]),
+      [],
+    );
+  });
+
+  it("names the root that walked to nothing", () => {
+    const problems = checkWalkPremise("check-x", sourceWalk, [
+      evidence("app", { ".md": 3 }),
+      evidence("lib", { ".ts": 149, ".tsx": 12 }),
+    ]);
+    assert.deepEqual(codesOf(problems), ["empty_root"]);
+    assert.equal(problems[0].root, "app");
+    assert.match(describeWalkPremiseProblem(problems[0]), /^check-x: app\/ walked to zero files/);
+  });
+
+  it("catches the guard's walk and an unfiltered walk disagreeing over one root", () => {
+    // The shape a skip list drifting produces: both walks are healthy, both
+    // return a number a floor clears, and they are numbers about different
+    // sets of files.
+    const problems = checkWalkPremise("check-x", sourceWalk, [
+      evidence("app", { ".tsx": 19 }),
+      evidence("lib", { ".ts": 149, ".tsx": 12 }, 120),
+    ]);
+    assert.deepEqual(codesOf(problems), ["count_mismatch"]);
+    const said = describeWalkPremiseProblem(problems[0]);
+    assert.match(said, /counted as 120 file\(s\)/);
+    assert.match(said, /holds 161 with those extensions/);
+  });
+
+  it("catches a declared extension that matches nothing anywhere in the walk", () => {
+    // `.tsx` renamed away, or a walk that outlived the files it was written
+    // for: every root still counts, so the old premise passed.
+    const problems = checkWalkPremise("check-x", sourceWalk, [
+      evidence("app", { ".ts": 4 }),
+      evidence("lib", { ".ts": 149 }),
+    ]);
+    assert.deepEqual(codesOf(problems), ["unused_extension"]);
+    assert.equal(problems[0].extension, ".tsx");
+    assert.equal(problems[0].root, undefined, "the finding is about the walk, not about one root");
+    assert.match(describeWalkPremiseProblem(problems[0]), /declares \.tsx and no file under any of its roots/);
+  });
+
+  it("catches module code under an extension nothing counts and nothing excuses", () => {
+    const problems = checkWalkPremise("check-x", sourceWalk, [
+      evidence("app", { ".tsx": 19 }),
+      evidence("lib", { ".ts": 149, ".mts": 2 }),
+    ]);
+    assert.deepEqual(codesOf(problems), ["uncounted_extension"]);
+    assert.equal(problems[0].extension, ".mts");
+    assert.match(describeWalkPremiseProblem(problems[0]), /lib\/ holds 2 \.mts file\(s\)/);
+  });
+
+  it("leaves excused extensions and non-code files alone", () => {
+    // The two halves of "not a hole": named in UNCOUNTED_MODULE_REASONS, or
+    // not module code at all. Neither is this rule's business, and a premise
+    // that reported them would be a premise nobody could keep green.
+    assert.deepEqual(
+      checkWalkPremise("check-x", { roots: ["scripts", SUITES_REL], extensions: [".ts"] }, [
+        evidence("scripts", { ".ts": 29, ".js": 1 }, 29),
+        evidence(SUITES_REL, { ".ts": 431, ".mjs": 3, ".snap": 2 }, 431),
+      ]),
+      [],
+    );
+  });
+
+  it("reads a markup walk's uncounted .ts as a narrowing rather than a hole", () => {
+    // `check-clarity-input-mask` takes `.tsx` only, and the `.ts` files beside
+    // it are uncounted BY DESIGN — the set that counts them is what makes that
+    // a decision. A premise blind to the difference would fire on the one walk
+    // in the table that narrows on purpose.
+    const markup = { roots: ["app", "components"], extensions: [".tsx"] };
+    assert.deepEqual(
+      checkWalkPremise("check-clarity-input-mask", markup, [
+        evidence("app", { ".tsx": 19 }, 19),
+        evidence("components", { ".tsx": 44, ".ts": 1 }, 44),
+      ]),
+      [],
+    );
+  });
+
+  it("reports every problem it finds rather than the first", () => {
+    const problems = checkWalkPremise("check-x", sourceWalk, [
+      evidence("app", { ".cjs": 1 }),
+      evidence("lib", { ".ts": 149 }),
+    ]);
+    assert.deepEqual(codesOf(problems), ["empty_root", "uncounted_extension", "unused_extension"]);
+  });
+
+  it("refuses evidence about no roots at all", () => {
+    assert.throws(
+      () => checkWalkPremise("check-x", sourceWalk, []),
+      /nothing to be a premise about/,
+    );
+  });
+
+  it("gives every code a sentence naming the guard", () => {
+    // Exhaustive by construction: a new code that reaches the detail table
+    // without a sentence is a TypeScript error, and one that reaches this list
+    // without an entry fails here.
+    const codes: WalkPremiseCode[] = [
+      "empty_root",
+      "count_mismatch",
+      "unused_extension",
+      "uncounted_extension",
+    ];
+    for (const code of codes) {
+      const said = describeWalkPremiseProblem({ checkName: "check-x", code });
+      assert.match(said, /^check-x: /);
+      assert.ok(said.length > 60, `${code} is described in fewer words than a reason`);
+    }
+  });
+});
+
+describe("UNCOUNTED_MODULE_REASONS", () => {
+  it("keeps the three extension sets nested, which is what the partition rests on", () => {
+    // `checkWalkPremise` reads "covered by a declared set" as "in
+    // SOURCE_EXTENSIONS", because SOURCE is the widest of the sets a walk can
+    // narrow to. A third set with an extension outside it would make that
+    // shorthand wrong in the quiet direction — a real hole classified as a
+    // deliberate narrowing — so the nesting is asserted rather than assumed.
+    for (const extension of MARKUP_EXTENSIONS) {
+      assert.ok(SOURCE_EXTENSIONS.includes(extension), `${extension} is markup and not source`);
+    }
+    for (const extension of SOURCE_EXTENSIONS) {
+      assert.ok(MODULE_EXTENSIONS.includes(extension), `${extension} is scanned and not module code`);
+    }
+  });
+
+
+  it("excuses only module extensions, each with a reason", () => {
+    for (const [extension, reason] of Object.entries(UNCOUNTED_MODULE_REASONS)) {
+      assert.ok(
+        MODULE_EXTENSIONS.includes(extension),
+        `${extension} is excused from every floor walk and is not module code — nothing was counting it to begin with`,
+      );
+      assert.ok(
+        !SOURCE_EXTENSIONS.includes(extension),
+        `${extension} is both scanned by the guards and excused from their walks`,
+      );
+      assert.ok(reason.length >= 30, `${extension} is excused for a reason shorter than a reason`);
+    }
+  });
+
+  it("names nothing the walked roots no longer hold", () => {
+    // An excuse for a file that left is an excuse waiting for a different file
+    // to arrive under the same extension.
+    const held = new Set(
+      Object.keys(FLOOR_WALKS).flatMap((checkName) =>
+        FLOOR_WALKS[checkName].roots.flatMap((root) => Object.keys(tallyRoot(root))),
+      ),
+    );
+    assert.deepEqual(
+      unusedUncountedExcuses(held),
+      [],
+      "these extensions are excused from the floor walks and no file under any scan root has one",
+    );
+  });
+});
+
 describe("FLOOR_WALKS", () => {
   it("names only guards that declare a count floor", () => {
     // A walk with no floor under it is a row this tool would skip silently.
@@ -205,11 +417,23 @@ describe("FLOOR_WALKS", () => {
         root,
         count: listSourceFiles(REPO_ROOT, [root], walk.extensions ?? SOURCE_EXTENSIONS).length,
       }));
-      // Premise before the claim: a root that walked to nothing would make the
-      // comparison below true for a reason that has nothing to do with floors.
-      for (const { root, count } of perRoot) {
-        assert.ok(count > 0, `${checkName}'s ${root}/ walked to zero files — this proves nothing`);
-      }
+      // Premise before the claim, and it has to be the WHOLE premise: a root
+      // that walked to nothing makes the comparison below true for a reason
+      // that has nothing to do with floors, and so does a root whose filter
+      // silently stopped matching — that one still returns a healthy count
+      // from the files it does match, while measuring a fraction of the
+      // directory. `checkWalkPremise` states both, plus the two walks
+      // agreeing over each root.
+      const problems = checkWalkPremise(
+        checkName,
+        walk,
+        perRoot.map(({ root, count }) => ({ root, counted: count, present: tallyRoot(root) })),
+      );
+      assert.deepEqual(
+        problems.map(describeWalkPremiseProblem),
+        [],
+        `${checkName} is measuring something other than the walk it declares, so the floor below proves nothing`,
+      );
       const row = measureFloorWalk(checkName, floor.minimum, floor.label, perRoot);
       assert.ok(
         row.holds,

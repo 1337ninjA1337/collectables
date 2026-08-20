@@ -64,6 +64,37 @@ export const SOURCE_EXTENSIONS: readonly string[] = [".ts", ".tsx"];
 export const MARKUP_EXTENSIONS: readonly string[] = [".tsx"];
 
 /**
+ * Every extension a file of module code can carry, whether or not a scan reads
+ * it.
+ *
+ * The two sets above say what a scan LOOKS at; this says what there is to look
+ * at, and the gap between them is the thing no set can state on its own. A
+ * count floor measured over `.ts` and `.tsx` is a floor over the files that
+ * carry those extensions today: the day a directory gains `.mts`, the walk
+ * still returns a healthy number from the files it does match, the floor still
+ * clears, and the guard silently stopped reading part of its own subject.
+ * `checkWalkPremise` in `lib/floor-walks.ts` takes this as the universe to
+ * subtract a walk's own list from, so an extension arriving in a scan root is
+ * a decision — counted, or excused by name — rather than an absence.
+ *
+ * Wider than anything this repository holds on purpose. `.jsx`, `.cjs`,
+ * `.mts` and `.cts` appear in no file here, and listing them is what makes the
+ * first one to arrive land in a check instead of in nothing. Lower case, like
+ * every set handed to {@link import("../scripts/guard-io").listFilesUnder} —
+ * it folds case before testing membership.
+ */
+export const MODULE_EXTENSIONS: readonly string[] = [
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+  ".mts",
+  ".cts",
+];
+
+/**
  * Directory names no scan of source ever descends into, one reason each.
  *
  * The list shipped as three names under one sentence, which left the question

@@ -298,6 +298,31 @@ export function listSourceFiles(
 }
 
 /**
+ * Every file under one scan root by lower-cased extension, unfiltered.
+ *
+ * The other half of {@link listSourceFiles}: that answers "how many files does
+ * this rule read here", this answers "what is here", and the gap between the
+ * two is what a count floor cannot see. A root whose extension filter has
+ * silently stopped matching part of its tree still returns a healthy number
+ * from the rest, so a premise built only on the filtered walk passes while the
+ * guard reads a fraction of its own subject.
+ *
+ * Same skip list as the filtered walk and no extension filter, which is the
+ * only difference between them — anything else and the two counts would not be
+ * comparable, and comparing them is the whole point.
+ * `lib/floor-walks.ts`'s `checkWalkPremise` does the deciding; this is the
+ * disk.
+ */
+export function tallyExtensions(repoRoot: string, dir: string): Record<string, number> {
+  const tally: Record<string, number> = {};
+  for (const rel of listFilesUnder(path.join(repoRoot, dir), { skipDirs: NEVER_WALKED })) {
+    const extension = path.extname(rel).toLowerCase();
+    tally[extension] = (tally[extension] ?? 0) + 1;
+  }
+  return tally;
+}
+
+/**
  * A declared fixed input as text, or the marker that says why not — handed
  * straight to `assertParsedInputs`, which turns it into one line naming the
  * file and the errno.
