@@ -19,6 +19,7 @@ import {
   formatScanSubject,
   formatSecretReport,
   formatUnreadCandidates,
+  formatUnreadCommitted,
   isPrivilegedSupabaseJwt,
   redact,
   archiveEntryPath,
@@ -411,6 +412,27 @@ describe("what the source scan does not read", () => {
     assert.match(line, /^7 listed path\(s\) not read: docs\/l0\.md /);
     assert.match(line, /, \+2 more$/);
     assert.doesNotMatch(line, /docs\/l5\.md/);
+  });
+
+  it("refuses a committed file the working tree does not hold, and names the fix", () => {
+    // Empty at zero, so the caller branches on the string and a clean run's
+    // output is unchanged.
+    assert.equal(formatUnreadCommitted([]), "");
+    const one = formatUnreadCommitted(["notes.md"]);
+    // Counts, names, and says what a run that skipped a committed file cannot
+    // claim — which is the sentence this refusal exists to withhold.
+    assert.match(one, /^1 committed file\(s\) are in git's listing but missing from the working tree/);
+    assert.match(one, /^ {2}notes\.md$/m);
+    assert.match(one, /no committed secrets/);
+    // The fix is a checkout, not a `git rm --cached`: the file is meant to be
+    // there, so the working tree is what is wrong — the opposite of the tracked
+    // `.local.` refusal next door, which removes a file git should not hold.
+    assert.match(one, /git checkout -- <path>/);
+    assert.doesNotMatch(one, /git rm --cached/);
+    // Sorted by code unit, like every other listing this scan prints.
+    const many = formatUnreadCommitted(["b.md", "a.md", "c.md"]);
+    const order = ["a.md", "b.md", "c.md"].map((n) => many.indexOf(n));
+    assert.deepEqual(order, [...order].sort((x, y) => x - y), "the names are not sorted");
   });
 
   it("counts archives toward the floor, which no run can demonstrate", () => {
