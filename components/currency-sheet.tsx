@@ -90,6 +90,11 @@ export const CurrencySheet = memo(function CurrencySheet({
                     key={c.code}
                     style={[styles.sheetRow, isSelected && styles.sheetRowSelected]}
                     onPress={() => onSelect(c.code)}
+                    // The row announces its code and name from its own <Text>
+                    // children; which one is CHOSEN is drawn as a checkmark and
+                    // said nowhere. This is that, in words the platform speaks.
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
                   >
                     <View style={styles.currencyRowText}>
                       <Text
@@ -102,7 +107,14 @@ export const CurrencySheet = memo(function CurrencySheet({
                       </Text>
                     </View>
                     {isSelected ? (
-                      <Ionicons name="checkmark-circle" size={22} color={AMBER_ACCENT} />
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={22}
+                        color={AMBER_ACCENT}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        aria-hidden
+                      />
                     ) : null}
                   </Pressable>
                 );

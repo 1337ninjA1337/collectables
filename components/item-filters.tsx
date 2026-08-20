@@ -223,6 +223,9 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             name="options-outline"
             size={16}
             color={activeCount > 0 ? TEXT_ON_DARK_5 : MUTED_3}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            aria-hidden
           />
           <Text style={[styles.filterButtonText, activeCount > 0 && styles.filterButtonTextActive]}>
             {activeCount > 0 ? t("filterActive", { count: activeCount }) : t("filterTitle")}
@@ -280,9 +283,23 @@ export function ItemFilterBar({ filters, onChange }: Props) {
             accessibilityRole="button"
             accessibilityLabel={t("sortChipClear", { sort: t(sortChip.labelKey) })}
           >
-            <Ionicons name={sortChip.icon} size={14} color={TEXT_ON_DARK_5} />
+            <Ionicons
+              name={sortChip.icon}
+              size={14}
+              color={TEXT_ON_DARK_5}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              aria-hidden
+            />
             <Text style={styles.sortQuickChipText}>{t(sortChip.labelKey)}</Text>
-            <Ionicons name="close-circle" size={14} color={TEXT_ON_DARK_5} />
+            <Ionicons
+              name="close-circle"
+              size={14}
+              color={TEXT_ON_DARK_5}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              aria-hidden
+            />
           </Pressable>
         ) : null}
 
@@ -399,11 +416,20 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               <Pressable
                 style={[styles.toggleRow, draft.hasPhotos && styles.toggleRowActive]}
                 onPress={() => setDraft({ ...draft, hasPhotos: !draft.hasPhotos })}
+                // The glyph swap (checkbox vs square-outline) is the ONLY thing
+                // that says whether this filter is on, and a glyph reaches no
+                // screen reader. The state moves onto the Pressable first;
+                // hiding the icon after that loses nothing.
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: draft.hasPhotos }}
               >
                 <Ionicons
                   name={draft.hasPhotos ? "checkbox" : "square-outline"}
                   size={22}
                   color={draft.hasPhotos ? AMBER_ACCENT : PLACEHOLDER}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                  aria-hidden
                 />
                 <Text style={styles.toggleLabel}>{t("filterHasPhotos")}</Text>
               </Pressable>

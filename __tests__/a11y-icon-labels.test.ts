@@ -103,16 +103,18 @@ describe("<BottomNav> localizes every tab label", () => {
 
 describe("the leaf components whose icon sits next to its own name", () => {
   /**
-   * Twelve decorative `<Ionicons>` that carried no hide at all, so every
-   * screen reader announced the glyph beside a name that was already there.
-   * Each is decorative for a reason a reader can check in the file: either the
-   * `<Pressable>` wrapping it carries an `accessibilityLabel`, or a sibling
-   * `<Text>` says the same thing in words.
+   * Every `<Ionicons>` in these ten files, hidden on all three platforms.
+   * They carried no hide at all, so every screen reader announced the glyph
+   * beside a name that was already there. Each is safe to hide for a reason a
+   * reader can check in the file: the `<Pressable>` wrapping it carries an
+   * `accessibilityLabel`, or a sibling `<Text>` says the same thing in words,
+   * or — for the two below — the meaning moved onto the `<Pressable>` as an
+   * `accessibilityState` first.
    *
-   * Not the whole sweep — 24 icons in 9 files still carry neither a hide nor a
+   * Not the whole sweep — 19 icons in 7 files still carry neither a hide nor a
    * label, and "decorative" is a judgement per site rather than a rule. These
-   * twelve are the ones where the judgement is already written down next to
-   * them; the rest are decomposed in `.tasks/.tasks.md`.
+   * are the ones where the judgement is written down next to them; the rest are
+   * decomposed in `.tasks/.tasks.md`.
    */
   const DECORATIVE: readonly (readonly [string, number, string])[] = [
     ["components/nav-tab.tsx", 1, "the tab's own accessibilityLabel names it"],
@@ -123,6 +125,8 @@ describe("the leaf components whose icon sits next to its own name", () => {
     ["components/visibility-badge.tsx", 1, "the badge's <Text>{label}</Text> is the name"],
     ["components/photo-lightbox.tsx", 3, "close / previous / next are each a named Pressable"],
     ["components/photo-preview.tsx", 3, "delete and the two reorder arrows are each named"],
+    ["components/currency-sheet.tsx", 1, "the row's code + name <Text> name it"],
+    ["components/item-filters.tsx", 6, "each chip carries a name or its own <Text>"],
   ];
 
   for (const [file, count, why] of DECORATIVE) {
@@ -130,7 +134,7 @@ describe("the leaf components whose icon sits next to its own name", () => {
       const src = read(file).replace(/\/\*[\s\S]*?\*\//g, "");
       const tags = src.match(/<Ionicons[\s\S]*?\/>/g) ?? [];
       // The count is a fact about the file that no repo-wide rule can state:
-      // a seventh icon added here inherits nothing from these six.
+      // a new icon added here inherits nothing from the ones already decided.
       assert.equal(tags.length, count, `${file} renders ${tags.length} <Ionicons>, expected ${count}`);
       for (const [i, tag] of tags.entries()) {
         // All three, because the two native props leave the web announcing it
@@ -168,5 +172,33 @@ describe("the two icon buttons the sweep found outside the nav bar", () => {
     assert.match(src, /accessibilityLabel=\{t\("currencyMore"\)\}/);
     assert.doesNotMatch(src, /accessibilityLabel="/, "no hardcoded English labels");
     assert.match(src, /import \{ useI18n \} from "@\/lib\/i18n-context";/);
+  });
+});
+
+describe("the two glyphs that carried state, not decoration", () => {
+  /**
+   * Hiding an icon is only safe when what it says is said somewhere a screen
+   * reader reaches. These two said something no `<Text>` beside them did — a
+   * checkbox's checked-ness and a row's selected-ness — so the meaning moved
+   * onto the `<Pressable>` as a role and an `accessibilityState` BEFORE the
+   * glyph was hidden. Hiding them without that would have removed the only
+   * copy.
+   */
+
+  it("item-filters' has-photos toggle is a checkbox with a checked state", () => {
+    const src = read("components/item-filters.tsx");
+    assert.match(src, /accessibilityRole="checkbox"/);
+    assert.match(src, /accessibilityState=\{\{ checked: draft\.hasPhotos \}\}/);
+    // The glyph swap is what the state replaces, so it must still be the thing
+    // being hidden rather than a second, unrelated icon.
+    assert.match(src, /name=\{draft\.hasPhotos \? "checkbox" : "square-outline"\}/);
+  });
+
+  it("the currency row says which code is selected", () => {
+    const src = read("components/currency-sheet.tsx");
+    assert.match(src, /accessibilityState=\{\{ selected: isSelected \}\}/);
+    // Rendered only when selected, which is exactly why the state has to say
+    // so: an unselected row has no checkmark to hide and nothing to announce.
+    assert.match(src, /isSelected \? \(\s*<Ionicons/);
   });
 });
