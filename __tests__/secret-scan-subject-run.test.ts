@@ -202,6 +202,92 @@ describe("check-secrets, and the set it says it is about", () => {
     assert.doesNotMatch(run.output, /not a regular file/);
   });
 
+  it("puts both pass-line clauses on one line when a checkout is odd in two ways", () => {
+    assert.ok(GUARD);
+    // The two clauses are appended by one `map`, and each has runs proving it
+    // appears alone. A checkout that is strange in both ways at once puts them
+    // on ONE line, in an order nobody chose and with two commas that had never
+    // been seen together — the sentence a reader actually meets, pinned by
+    // nothing until now.
+    //
+    // The `.local.` clause needs a skipped file that is nonetheless in git's
+    // listing, so the ignore file deliberately does NOT cover `*.local.*`:
+    // under the repository's own `.gitignore` such a file is dropped before the
+    // scan sees it, which is the "belt and braces" the module documents.
+    const outside = mkdtempSync(path.join(tmpdir(), "secret-scan-both-"));
+    fs.writeFileSync(path.join(outside, "real.md"), "nothing here\n", "utf8");
+    const fixture = rootWith("both-clauses", {
+      "notes.md": "nothing here\n",
+      "queries.local.md": "nothing here either\n",
+    });
+    try {
+      fs.symlinkSync(path.join(outside, "real.md"), path.join(fixture.root, "linked.md"));
+    } catch {
+      // Same privilege caveat as the symlink case above.
+      rmSync(outside, { recursive: true, force: true });
+      return;
+    }
+    try {
+      initGitRoot(fixture.root, "nothing-here\n", { forceAdd: ["linked.md"] });
+      const run = runGuardIn(GUARD, fixture.root);
+      assert.equal(run.status, 0, `a clean tree with two oddities in it failed:\n${run.output}`);
+      // One line, both clauses, each with its own comma — and the skip clause
+      // still carries git's verdict, which is the half that makes it a
+      // verified exemption rather than an assumed one.
+      assert.match(
+        run.output,
+        /skipped 1 local-only file\(s\): queries\.local\.md \(none tracked by git\), 1 listed path\(s\) not read: linked\.md \(not a regular file\)\./,
+      );
+      // And the order is the one the wrapper chose, not the one a `filter`
+      // happened to produce: the subject, then what a rule removed, then what
+      // the listing held and the scan could not read.
+      assert.ok(
+        run.output.indexOf("from git's committable set") <
+          run.output.indexOf("skipped 1 local-only file(s)"),
+        `the clauses precede the subject they qualify:\n${run.output}`,
+      );
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses over the missing committed file even when a benign symlink is also unread", () => {
+    assert.ok(GUARD);
+    // Precedence, which the two single-reason cases cannot show. A checkout
+    // holding BOTH an unread symlink (a pass-line curiosity) and a committed
+    // file the working tree does not hold (a refusal) must fail — and must not
+    // bury the refusal under a clause about a docs link, which is the outcome
+    // the old summing count produced for every strange checkout alike.
+    const outside = mkdtempSync(path.join(tmpdir(), "secret-scan-both-unread-"));
+    fs.writeFileSync(path.join(outside, "real.md"), "nothing here\n", "utf8");
+    const fixture = rootWith("refusal-wins", { "notes.md": "nothing here\n" });
+    try {
+      fs.symlinkSync(path.join(outside, "real.md"), path.join(fixture.root, "linked.md"));
+    } catch {
+      rmSync(outside, { recursive: true, force: true });
+      return;
+    }
+    try {
+      initGitRoot(fixture.root, "nothing-here\n", { forceAdd: ["linked.md", "notes.md"] });
+      rmSync(path.join(fixture.root, "notes.md"), { force: true });
+      const run = runGuardIn(GUARD, fixture.root);
+      assert.equal(
+        run.status,
+        1,
+        `a committed file the working tree lacks was waved through beside a symlink:\n${run.output}`,
+      );
+      assert.match(run.output, /missing from the working tree/);
+      assert.match(run.output, /notes\.md/);
+      // The symlink is the benign half and stays out of the refusal: a reader
+      // told to restore two files, one of which is a link that is exactly where
+      // it should be, is a reader given the wrong instruction.
+      assert.doesNotMatch(run.output, /linked\.md/);
+      assert.doesNotMatch(run.output, /scanned \d+ file\(s\)/);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
   it("falls back to the walk outside a work tree, and says that too", () => {
     assert.ok(GUARD);
     // Every guard fixture is a temp directory, and an unpacked tarball of this
