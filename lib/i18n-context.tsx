@@ -240,6 +240,9 @@ const en = {
   settingsTitle: "App settings",
   language: "Language",
   languageSubtitle: "Choose the interface language for the app.",
+  languagePartial: "partial",
+  languagePartialHint: (params?: TranslationParams) =>
+    `${params?.label ?? ""} is partly translated — untranslated screens stay in English.`,
   goHome: "Home",
   adminDeleteProfile: "Delete profile",
   adminDeleteProfileTitle: "Delete this profile?",
@@ -873,6 +876,9 @@ const ru: TranslationMap = {
   settingsTitle: "Настройки приложения",
   language: "Язык",
   languageSubtitle: "Выберите язык интерфейса приложения.",
+  languagePartial: "частично",
+  languagePartialHint: (params?: TranslationParams) =>
+    `${params?.label ?? ""} переведён частично — непереведённые экраны останутся на английском.`,
   goHome: "Главная",
   adminDeleteProfile: "Удалить профиль",
   adminDeleteProfileTitle: "Удалить этот профиль?",
@@ -1251,6 +1257,9 @@ const be: TranslationMap = {
   settingsTitle: "Налады праграмы",
   language: "Мова",
   languageSubtitle: "Абярыце мову інтэрфейсу праграмы.",
+  languagePartial: "часткова",
+  languagePartialHint: (params?: TranslationParams) =>
+    `${params?.label ?? ""} перакладзены часткова — неперакладзеныя экраны застануцца на англійскай.`,
   goHome: "Галоўная",
   you: "Вы",
   deleteAccount: "Выдаліць акаўнт",
@@ -1479,6 +1488,9 @@ const pl: TranslationMap = {
   settingsTitle: "Ustawienia aplikacji",
   language: "Język",
   languageSubtitle: "Wybierz język interfejsu aplikacji.",
+  languagePartial: "częściowo",
+  languagePartialHint: (params?: TranslationParams) =>
+    `${params?.label ?? ""} jest przetłumaczony częściowo — nieprzetłumaczone ekrany pozostaną po angielsku.`,
   goHome: "Główna",
   you: "Ty",
   deleteAccount: "Usuń konto",
@@ -1703,6 +1715,9 @@ const de: TranslationMap = {
   settingsTitle: "App-Einstellungen",
   language: "Sprache",
   languageSubtitle: "Wählen Sie die Sprache der App-Oberfläche.",
+  languagePartial: "teilweise",
+  languagePartialHint: (params?: TranslationParams) =>
+    `${params?.label ?? ""} ist nur teilweise übersetzt — nicht übersetzte Bildschirme bleiben auf Englisch.`,
   goHome: "Startseite",
   you: "Sie",
   deleteAccount: "Konto löschen",
@@ -1927,6 +1942,9 @@ const es: TranslationMap = {
   settingsTitle: "Ajustes de la app",
   language: "Idioma",
   languageSubtitle: "Elige el idioma de la interfaz de la app.",
+  languagePartial: "parcial",
+  languagePartialHint: (params?: TranslationParams) =>
+    `${params?.label ?? ""} está traducido parcialmente: las pantallas sin traducir seguirán en inglés.`,
   goHome: "Inicio",
   you: "Tú",
   deleteAccount: "Eliminar cuenta",

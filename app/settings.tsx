@@ -43,6 +43,7 @@ import { useDiagnostics } from "@/lib/diagnostics-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
 import { getSentryStatus } from "@/lib/sentry";
 import { useSocial } from "@/lib/social-context";
+import { isPartiallyTranslated } from "@/lib/translation-status";
 import { useNow } from "@/lib/use-now";
 import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
@@ -171,17 +172,40 @@ export default function SettingsScreen() {
         <Text style={[styles.sectionTitle, { color: theme.text }]}>{t("language")}</Text>
         <Text style={[styles.sectionText, { color: theme.meta }]}>{t("languageSubtitle")}</Text>
         <View style={styles.languageRow}>
-          {languageOptions.map((option) => (
-            <Pressable
-              key={option.code}
-              style={{...styles.languageChip, ...(language === option.code ? styles.languageChipActive : {})}}
-              onPress={() => void setLanguage(option.code as AppLanguage)}
-            >
-              <Text style={{...styles.languageChipText, ...(language === option.code ? styles.languageChipTextActive : {})}}>
-                {option.label}
-              </Text>
-            </Pressable>
-          ))}
+          {languageOptions.map((option) => {
+            // Four of the six locales sit below half — every locale map opens
+            // with `...en`, so an untranslated key renders as English under
+            // another flag. Listing them at the same weight as `ru` promises a
+            // parity the app cannot keep, so the chip says so. The label is on
+            // the Pressable rather than the badge: a badge a screen reader
+            // announces after the language name is one a reader meets after
+            // they have already chosen.
+            const partial = isPartiallyTranslated(option.code);
+            const active = language === option.code;
+            return (
+              <Pressable
+                key={option.code}
+                style={{...styles.languageChip, ...(active ? styles.languageChipActive : {})}}
+                onPress={() => void setLanguage(option.code as AppLanguage)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={
+                  partial ? t("languagePartialHint", { label: option.label }) : option.label
+                }
+              >
+                <Text style={{...styles.languageChipText, ...(active ? styles.languageChipTextActive : {})}}>
+                  {option.label}
+                </Text>
+                {partial ? (
+                  <Text
+                    style={{...styles.languageChipBadge, ...(active ? styles.languageChipBadgeActive : {})}}
+                  >
+                    {t("languagePartial")}
+                  </Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
         </View>
       </View>
 
@@ -396,6 +420,19 @@ const styles = StyleSheet.create({
   },
   languageChipTextActive: {
     color: TEXT_ON_DARK_4,
+  },
+  // Under the label rather than beside it: the chips wrap in a row, and a badge
+  // on the same line widens `Беларуская` enough to push the row to three lines
+  // on a narrow phone. Smaller and in the muted colour, so the language name
+  // stays the thing being chosen and this stays the qualification on it.
+  languageChipBadge: {
+    marginTop: 2,
+    fontSize: 11,
+    color: MUTED_2,
+    fontFamily: FONT_BODY,
+  },
+  languageChipBadgeActive: {
+    color: TEXT_ON_DARK_SOFT,
   },
   currencyRow: {
     flexDirection: "row",
