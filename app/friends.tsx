@@ -148,18 +148,42 @@ export default function FriendsScreen() {
 
       <Pressable style={styles.chatsLink} onPress={() => router.push("/chats")}>
         <View style={styles.chatsLinkIcon}>
-          <Ionicons name="chatbubbles-outline" size={22} color={HERO_DARK_3} />
+          <Ionicons
+            name="chatbubbles-outline"
+            size={22}
+            color={HERO_DARK_3}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            aria-hidden
+          />
         </View>
         <View style={styles.chatsLinkBody}>
           <Text style={styles.chatsLinkTitle}>{t("chatsTitle")}</Text>
           <Text style={styles.chatsLinkSubtitle}>{t("chatsSubtitle")}</Text>
         </View>
         {unreadTotal > 0 ? (
-          <View style={styles.chatsBadge}>
-            <Text style={styles.chatsBadgeText}>{unreadTotal}</Text>
+          <View
+            style={styles.chatsBadge}
+            accessibilityLabel={t("navChatsUnreadA11y", { count: unreadTotal })}
+          >
+            <Text
+              style={styles.chatsBadgeText}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              aria-hidden
+            >
+              {unreadTotal}
+            </Text>
           </View>
         ) : (
-          <Ionicons name="chevron-forward" size={20} color={MUTED} />
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={MUTED}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            aria-hidden
+          />
         )}
       </Pressable>
 

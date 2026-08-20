@@ -245,3 +245,65 @@ describe("the photo-count chip, which was half a sentence twice over", () => {
     assert.match(src, /<Text style=\{styles\.photoCountText\}>\{photoCount\}<\/Text>/);
   });
 });
+
+describe("the header and the friends row, which had the nav bar's bug again", () => {
+  /**
+   * `app/_layout.tsx`'s header chat button and `app/friends.tsx`'s chats row
+   * each draw an unread count inside the element that names them — the same
+   * hole the bottom nav's chats tab had, in two more places. The header ships
+   * on every screen, so it is the widest of the three.
+   *
+   * The two need OPPOSITE fixes, for a reason worth stating: the header's
+   * `<Pressable>` carries an `accessibilityLabel`, which on iOS replaces its
+   * children entirely, so the count has to go INTO the label and the pill is
+   * hidden. The friends row carries no label — it is named by composing its
+   * two `<Text>` children — so its pill stays in the tree and is given a
+   * sentence instead of a bare number.
+   */
+
+  it("the header chat button says its unread count, once, for both copies", () => {
+    const src = read("app/_layout.tsx");
+    assert.match(
+      src,
+      /unreadTotal > 0 \? t\("navChatsUnreadA11y", \{ count: unreadTotal \}\) : t\("chatsTitle"\)/,
+    );
+    // The button is written out twice under two mutually exclusive path
+    // conditions; one shared const is what keeps the two from drifting.
+    assert.equal((src.match(/accessibilityLabel=\{chatsA11yLabel\}/g) ?? []).length, 2);
+    assert.doesNotMatch(src, /accessibilityLabel=\{t\("chatsTitle"\)\}/);
+  });
+
+  it("the header hides the pill whose number the label now carries", () => {
+    const src = read("app/_layout.tsx");
+    const badges = src.match(/<View\s*\n\s*style=\{styles\.headerBadge\}[\s\S]*?>/g) ?? [];
+    assert.equal(badges.length, 2, `expected 2 header badges, got ${badges.length}`);
+    for (const [i, badge] of badges.entries()) {
+      assert.match(badge, /importantForAccessibility="no-hide-descendants"/, `badge #${i}`);
+      assert.match(badge, /(?<![\w-])aria-hidden/, `badge #${i}`);
+    }
+  });
+
+  it("the friends row names its pill rather than hiding it", () => {
+    const src = read("app/friends.tsx");
+    // Opposite of the header on purpose: no label on the row, so the pill is
+    // part of the composed name and has to be worth composing.
+    assert.match(src, /accessibilityLabel=\{t\("navChatsUnreadA11y", \{ count: unreadTotal \}\)\}/);
+    assert.doesNotMatch(src, /<Text style=\{styles\.chatsBadgeText\}>\{unreadTotal\}<\/Text>/);
+  });
+
+  it("both screens hide every icon on all three platforms", () => {
+    for (const [file, count] of [
+      ["app/_layout.tsx", 3],
+      ["app/friends.tsx", 2],
+    ] as const) {
+      const src = read(file).replace(/\/\*[\s\S]*?\*\//g, "");
+      const tags = src.match(/<Ionicons[\s\S]*?\/>/g) ?? [];
+      assert.equal(tags.length, count, `${file} renders ${tags.length} <Ionicons>, expected ${count}`);
+      for (const [i, tag] of tags.entries()) {
+        assert.match(tag, /accessibilityElementsHidden/, `${file} #${i}: no iOS hide`);
+        assert.match(tag, /importantForAccessibility="no"/, `${file} #${i}: no Android hide`);
+        assert.match(tag, /(?<![\w-])aria-hidden/, `${file} #${i}: no web hide`);
+      }
+    }
+  });
+});

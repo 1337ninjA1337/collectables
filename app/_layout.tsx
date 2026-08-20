@@ -150,6 +150,20 @@ function AppShell() {
   const { isMobile } = useResponsive();
   const [searchOpen, setSearchOpen] = useState(false);
 
+  /**
+   * The header's chat button draws an unread pill INSIDE the `<Pressable>`
+   * that names it, so the pill reached no screen reader — the same hole the
+   * bottom nav's chats tab had, in the header that ships on every screen. The
+   * `<Pressable>` carries a label, which on iOS replaces its children entirely,
+   * so the count has to go into the label rather than beside it.
+   *
+   * Declared once because the button below is written out twice, under two
+   * mutually exclusive path conditions; the label was the only part of the two
+   * blocks that had any reason to differ, and it does not.
+   */
+  const chatsA11yLabel =
+    unreadTotal > 0 ? t("navChatsUnreadA11y", { count: unreadTotal }) : t("chatsTitle");
+
   if (!ready || !i18nReady) {
     return (
       <Screen scroll={false}>
@@ -216,12 +230,24 @@ function AppShell() {
                     <Pressable
                       style={styles.headerIconButton}
                       onPress={() => router.push("/chats")}
-                      accessibilityLabel={t("chatsTitle")}
+                      accessibilityLabel={chatsA11yLabel}
                     >
-                      <Ionicons name="chatbubbles-outline" size={18} color={HERO_DARK_2} />
+                      <Ionicons
+                        name="chatbubbles-outline"
+                        size={18}
+                        color={HERO_DARK_2}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        aria-hidden
+                      />
                       <View style={[styles.realtimeDot, realtimeOnline ? styles.realtimeDotOnline : styles.realtimeDotOffline]} />
                       {unreadTotal > 0 ? (
-                        <View style={styles.headerBadge}>
+                        <View
+                          style={styles.headerBadge}
+                          accessibilityElementsHidden
+                          importantForAccessibility="no-hide-descendants"
+                          aria-hidden
+                        >
                           <Text style={styles.headerBadgeText}>{formatBadgeCount(unreadTotal)}</Text>
                         </View>
                       ) : null}
@@ -232,18 +258,37 @@ function AppShell() {
                     onPress={() => setSearchOpen(true)}
                     accessibilityLabel={t("searchPlaceholder")}
                   >
-                    <Ionicons name="search" size={18} color={HERO_DARK_2} />
+                    <Ionicons
+                      name="search"
+                      size={18}
+                      color={HERO_DARK_2}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                      aria-hidden
+                    />
                   </Pressable>
                   {pathname !== "/chats" ? (
                     <Pressable
                       style={styles.headerIconButton}
                       onPress={() => router.push("/chats")}
-                      accessibilityLabel={t("chatsTitle")}
+                      accessibilityLabel={chatsA11yLabel}
                     >
-                      <Ionicons name="chatbubbles-outline" size={18} color={HERO_DARK_2} />
+                      <Ionicons
+                        name="chatbubbles-outline"
+                        size={18}
+                        color={HERO_DARK_2}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        aria-hidden
+                      />
                       <View style={[styles.realtimeDot, realtimeOnline ? styles.realtimeDotOnline : styles.realtimeDotOffline]} />
                       {unreadTotal > 0 ? (
-                        <View style={styles.headerBadge}>
+                        <View
+                          style={styles.headerBadge}
+                          accessibilityElementsHidden
+                          importantForAccessibility="no-hide-descendants"
+                          aria-hidden
+                        >
                           <Text style={styles.headerBadgeText}>{formatBadgeCount(unreadTotal)}</Text>
                         </View>
                       ) : null}
