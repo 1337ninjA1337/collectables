@@ -40,8 +40,6 @@ describe("HM-C3 — EditCollectionModal extraction", () => {
       "visibilityLabel",
       "visibilityPrivatePremiumOnly",
       "premiumTitle",
-      "visibilityPublicHint",
-      "visibilityPrivateHint",
       "currencyLabel",
       "collectionCurrencyAuto",
       "collectionCurrencyHint",
@@ -52,6 +50,15 @@ describe("HM-C3 — EditCollectionModal extraction", () => {
       assert.match(src, new RegExp(`t\\("${key}"`), `missing t("${key}")`);
     }
     assert.match(src, /useI18n\(\)/);
+    // The two per-selection hints are named by `visibilityHintKey` rather than
+    // here: the modal and the create screen were choosing between the same two
+    // keys with slightly different conditions, and one of those conditions was
+    // dead. The keys are still asserted, one level down.
+    assert.match(src, /t\(visibilityHintKey\(visibility\)\)/);
+    const helper = readRepoFile("lib/premium-helpers.ts");
+    for (const key of ["visibilityPublicHint", "visibilityPrivateHint"]) {
+      assert.match(helper, new RegExp(`"${key}"`), `missing ${key} in premium-helpers`);
+    }
   });
 
   it("uses MaskedTextInput for the text fields (clarity-mask convention)", () => {

@@ -19,18 +19,47 @@ describe("collection edit modal: editing visibility public→private requires pr
   });
 
   it("locks the edit Private chip for non-premium users only when the collection isn't already private", () => {
-    // The lock targets the public→private transition: not premium AND the
-    // persisted visibility (the savedVisibility prop) is not already private.
+    // The rule itself is `isPrivateVisibilityLocked`, called rather than
+    // matched (see premium-visibility-lock.test.ts). What is a fact about THIS
+    // file is which value it passes for an unknown saved visibility: `??
+    // "private"` is what keeps a lapsed owner out of a locked sheet while the
+    // collection loads, and passing `"public"` here — the create screen's
+    // answer — would lock them out of their own private collection.
     assert.match(
       modal,
-      /v\s*===\s*"private"\s*&&\s*!isPremium\s*&&\s*\(savedVisibility\s*\?\?\s*"private"\)\s*!==\s*"private"/,
+      /isPrivateVisibilityLocked\(isPremium,\s*savedVisibility\s*\?\?\s*"private"\)/,
     );
+    assert.match(modal, /const locked = v === "private" && privateLocked;/);
   });
 
   it("toasts the premium-only hint when a locked edit chip is tapped", () => {
+    // The chip and the sentence under the row now call one function, so the
+    // assertion is that the padlock's behaviour is defined once and that the
+    // chip reaches it.
     assert.match(
       modal,
-      /if\s*\(locked\)\s*\{(?:(?!\}\s*onChangeVisibility)[\s\S])*?toast\.error\(t\("visibilityPrivatePremiumOnly"\)/,
+      /function showPrivateUpsell\(\)[\s\S]{0,400}?toast\.error\(t\("visibilityPrivatePremiumOnly"\)/,
+    );
+    assert.match(
+      modal,
+      /if\s*\(locked\)\s*\{\s*showPrivateUpsell\(\);\s*return;\s*\}/,
+    );
+  });
+
+  it("offers the same upsell from the sentence under the row", () => {
+    // The branch that rendered this sentence was DEAD: it required
+    // `visibility === "private"` while not premium, and a free user can never
+    // get there — the locked chip returns before setting it. So the only place
+    // the explanation appeared was a toast that has gone by the time somebody
+    // looks back at the row.
+    assert.match(
+      modal,
+      /\{privateLocked \? \(\s*<Pressable\s*onPress=\{showPrivateUpsell\}/,
+    );
+    assert.doesNotMatch(
+      modal,
+      /!isPremium\s*&&\s*visibility === "private"/,
+      "the dead premium-hint branch is back",
     );
   });
 
@@ -46,7 +75,7 @@ describe("collection edit modal: editing visibility public→private requires pr
     // The guard predicate excludes already-private collections, so a lapsed
     // owner editing an unrelated field keeps the collection private — both
     // at chip level (component) and at save level (page clamp).
-    assert.match(modal, /\(savedVisibility\s*\?\?\s*"private"\)\s*!==\s*"private"/);
+    assert.match(modal, /isPrivateVisibilityLocked\(isPremium,\s*savedVisibility\s*\?\?\s*"private"\)/);
     assert.match(page, /\(collection\.visibility\s*\?\?\s*"private"\)\s*!==\s*"private"/);
   });
 });
