@@ -11,6 +11,7 @@ type TranslationParams = Record<string, string | number>;
 type TranslationValue = string | ((params?: TranslationParams) => string);
 
 const en = {
+  defaultDisplayName: "Collector",
   checkingSession: "Checking your session...",
   authAccount: "Collectables Account",
   authTitle: "Sign in to keep your collections in a personal profile.",
@@ -550,6 +551,7 @@ type TranslationMap = Record<TranslationKey, TranslationValue>;
 
 const ru: TranslationMap = {
   ...en,
+  defaultDisplayName: "Коллекционер",
   diagnosticsTitle: "Диагностика и отчёты о сбоях",
   diagnosticsHint:
     "Если включено, анонимные отчёты о сбоях помогают нам быстрее исправлять ошибки. Выключите, чтобы не отправлять диагностику.",
@@ -1089,6 +1091,7 @@ const ru: TranslationMap = {
 
 const be: TranslationMap = {
   ...en,
+  defaultDisplayName: "Калекцыянер",
   diagnosticsTitle: "Дыягностыка і справаздачы пра збоі",
   diagnosticsHint:
     "Калі ўключана, ананімныя справаздачы пра збоі дапамагаюць нам хутчэй выпраўляць памылкі. Выключыце, каб не адпраўляць дыягностыку.",
@@ -1340,6 +1343,7 @@ const be: TranslationMap = {
 
 const pl: TranslationMap = {
   ...en,
+  defaultDisplayName: "Kolekcjoner",
   deleteItem: "Usuń przedmiot",
   deleteItemTitle: "Usunąć przedmiot?",
   deleteItemText: "Zniknie z tej kolekcji na zawsze.",
@@ -1582,6 +1586,7 @@ const pl: TranslationMap = {
 
 const de: TranslationMap = {
   ...en,
+  defaultDisplayName: "Sammler",
   deleteItem: "Objekt löschen",
   deleteItemTitle: "Objekt löschen?",
   deleteItemText: "Es verschwindet dauerhaft aus dieser Sammlung.",
@@ -1820,6 +1825,7 @@ const de: TranslationMap = {
 
 const es: TranslationMap = {
   ...en,
+  defaultDisplayName: "Coleccionista",
   deleteItem: "Eliminar objeto",
   deleteItemTitle: "¿Eliminar objeto?",
   deleteItemText: "Desaparecerá de esta colección de forma permanente.",
