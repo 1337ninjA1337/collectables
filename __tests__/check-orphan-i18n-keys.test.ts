@@ -46,24 +46,45 @@ const TRANSLATIONS = [
 const sources = (...entries: readonly string[]): ScannedSource[] =>
   entries.map((source, index) => ({ file: `app/file-${index}.tsx`, source }));
 
-describe("collecting the string literals a key could hide in", () => {
-  it("finds identifier-shaped literals in either quote", () => {
-    const found = collectStringLiterals(`const a = "greeting"; const b = 'farewell';`);
-    assert.ok(found.has("greeting"));
-    assert.ok(found.has("farewell"));
+describe("collecting the literals that sit where a key is written", () => {
+  it("finds a literal in each of the five key positions, in either quote", () => {
+    // The alternation IS the rule, so every branch of it gets a reading.
+    assert.ok(collectStringLiterals(`t("greeting");`).has("greeting"));
+    assert.ok(collectStringLiterals(`pick(t, 'greeting');`).has("greeting"));
+    assert.ok(collectStringLiterals(`const m = { labelKey: "greeting" };`).has("greeting"));
+    assert.ok(collectStringLiterals('t(`x` as "greeting");').has("greeting"));
+    assert.ok(collectStringLiterals(`type K =\n  | "greeting";`).has("greeting"));
+    assert.ok(collectStringLiterals(`const all = ["other", "greeting"];`).has("greeting"));
+  });
+
+  it("does NOT count a literal used as a plain value", () => {
+    // The distinction that found the 37th orphan. `you` is declared in all six
+    // locales, rendered by nothing, and its only mention in the tree is a
+    // default display name — a fallback VALUE, not a key.
+    const found = collectStringLiterals(
+      `const baseName = user.email?.split("@")[0] ?? "you";`,
+    );
+    assert.ok(!found.has("you"));
+  });
+
+  it("does not count an assignment or a comparison either", () => {
+    assert.ok(!collectStringLiterals(`const a = "greeting";`).has("greeting"));
+    assert.ok(!collectStringLiterals(`if (x === "greeting") {}`).has("greeting"));
+    assert.ok(!collectStringLiterals(`return "greeting";`).has("greeting"));
   });
 
   it("ignores anything that is not identifier-shaped", () => {
     // Restricted on purpose: matching arbitrary string bodies would pull in
     // every sentence in the tree for hits that can never be keys.
-    const found = collectStringLiterals(`const a = "hello there"; const b = "with-dash";`);
+    const found = collectStringLiterals(`t("hello there"); t("with-dash");`);
     assert.equal(found.size, 0);
   });
 
   it("strips comments first, so prose naming a key does not keep it alive", () => {
     // Without this the guard's own doc comment would resurrect nine of the
-    // keys it exists to have removed.
-    const found = collectStringLiterals(`// we removed "orphan" last week\nconst a = 1;`);
+    // keys it exists to have removed — and the comment defining the rule names
+    // four more.
+    const found = collectStringLiterals(`// we removed t("orphan") last week\nconst a = 1;`);
     assert.ok(!found.has("orphan"));
   });
 
@@ -116,6 +137,35 @@ describe("finding base keys nothing reads", () => {
     const findings = findOrphanI18nKeys(
       TRANSLATIONS,
       sources(`pick(t, "orphan"); t("greeting"); t("sortNameAsc"); t("conditionNew");`),
+    );
+    assert.deepEqual(findings, []);
+  });
+
+  it("still reports a key whose only mention is a plain value", () => {
+    // The whole point of the position rule, end to end rather than at the
+    // lexer: a source that MENTIONS `orphan` but never in a key position
+    // leaves it reported, which is what the first version of this guard got
+    // wrong about `you`.
+    const findings = findOrphanI18nKeys(
+      TRANSLATIONS,
+      sources(
+        `const fallback = x ?? "orphan";`,
+        `t("greeting"); t("sortNameAsc"); t("conditionNew");`,
+      ),
+    );
+    assert.deepEqual(findings.map((f) => f.key), ["orphan"]);
+  });
+
+  it("counts a union member on its own line, which is how a wrapped assertion reads", () => {
+    // Three of the four `condition*` keys are spelled this way in
+    // `components/item-card.tsx`, so a rule that wanted `as "k"` on one line
+    // would report them.
+    const findings = findOrphanI18nKeys(
+      TRANSLATIONS,
+      sources(
+        `type Condition =\n  | "conditionNew";`,
+        `t("greeting"); t("sortNameAsc"); t("orphan");`,
+      ),
     );
     assert.deepEqual(findings, []);
   });

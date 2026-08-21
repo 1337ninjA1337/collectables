@@ -39,14 +39,32 @@ import { stripComments } from "@/lib/strip-comments";
  * is to widen the rule or to write the key down in an `as` clause, not to
  * exempt it: an exemption is a key nobody has to justify again.
  *
- * The rule is deliberately LOOSE in one direction and the looseness is the
- * price of having no exemptions. A key whose name collides with an unrelated
- * string literal — `"you"`, `"profile"` — is counted as read even if nothing
- * calls `t()` on it. It is still far tighter than the bare-word matching the
- * throwaway scans used, which counted `profileId` as read because
- * `lib/social-context.tsx` declares six `(profileId: string)` PARAMETERS; that
- * key was dead and three hand-run scans missed it. Prefer a rule that reports
- * one real orphan late over one that reports a live key.
+ * WHERE the literal sits matters too, and that is the second thing this rule
+ * learned. Shipped first as "appears as a string literal ANYWHERE", which had
+ * a blind spot: a key whose name collides with an unrelated literal counts as
+ * read. Measuring the blind spot against the tree — the follow-up the first
+ * version filed against itself — found it had exactly one occupant, and it was
+ * a real orphan. `you` ("You", and translated into all six locales) is
+ * rendered by nothing; its only mention in the tree is
+ * `user.email?.split("@")[0] ?? "you"` in `lib/social-context.tsx`, a default
+ * display name that has nothing to do with the key.
+ *
+ * So a mention only counts when the literal sits in a POSITION a translation
+ * key is written in: after `(` or `,` (an argument — `t("k")`,
+ * `pick(t, "k")`), after `:` (a record value — `from_negative: "k"`,
+ * `labelKey: "k"`), after `as` or `|` (a union member, including the
+ * continuation lines of a multi-line one). A fallback value — `?? "you"` — is
+ * preceded by `?` and qualifies under none of them. Measured over the whole
+ * tree, this reports one orphan and no false positives; the looser rule
+ * reported none and missed it.
+ *
+ * The rule is still LOOSE in one direction, and that is the price of having no
+ * exemptions: a key colliding with an unrelated literal that HAPPENS to sit in
+ * one of those positions would still count as read. It is much tighter than
+ * the bare-word matching the throwaway scans used, which counted `profileId`
+ * as read because `lib/social-context.tsx` declares six `(profileId: string)`
+ * PARAMETERS. Prefer a rule that reports one real orphan late over one that
+ * reports a live key.
  *
  * Comments are stripped before matching, so a doc block naming a key does not
  * keep it alive — this module's own would otherwise resurrect nine of them.
@@ -67,17 +85,38 @@ export type OrphanKeyFinding = {
 };
 
 /**
- * Every bare string literal in one source, comments stripped.
+ * A string literal sitting where a translation key is written.
  *
- * Restricted to identifier-shaped contents because that is what a translation
+ * The alternation is the rule, so it is worth reading slowly. What may precede
+ * the literal:
+ *  - `(` — the first argument of a call: `t("k")`;
+ *  - `,` — a later argument, or an array element: `pick(t, "k")`, `["a", "k"]`;
+ *  - `:` — a record value: `from_negative: "k"`, `labelKey: "k"`;
+ *  - `as` — a type assertion: ``t(`condition${c}` as "conditionNew" | …)``;
+ *  - `|` — a union member, which is how the continuation lines of a
+ *    multi-line assertion are spelled.
+ *
+ * What is deliberately NOT here is every other expression position — `??`,
+ * `=`, `===`, `+`, `return`. A literal in one of those is a VALUE, and the one
+ * that made the distinction worth drawing is `?? "you"`.
+ *
+ * Contents restricted to identifier shapes because that is what a translation
  * key is: matching arbitrary string bodies would pull in every sentence in the
- * tree and cost time for hits that can never be keys.
+ * tree for hits that can never be keys.
+ */
+const KEY_POSITION_LITERAL = /(?:[(,:|[]|\bas)\s*["']([A-Za-z_][A-Za-z0-9_]*)["']/g;
+
+/**
+ * Every identifier-shaped string literal in one source that sits in a key
+ * position, comments stripped.
+ *
+ * Comments are stripped first so a doc block naming a key does not keep it
+ * alive — this module's own would otherwise resurrect nine of them, and the
+ * one directly above names four.
  */
 export function collectStringLiterals(source: string): ReadonlySet<string> {
   const literals = new Set<string>();
-  for (const match of stripComments(source).matchAll(
-    /["']([A-Za-z_][A-Za-z0-9_]*)["']/g,
-  )) {
+  for (const match of stripComments(source).matchAll(KEY_POSITION_LITERAL)) {
     literals.add(match[1]);
   }
   return literals;
