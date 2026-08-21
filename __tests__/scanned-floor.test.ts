@@ -789,8 +789,13 @@ describe("a failure carries a problem, not a sentence about one", () => {
       if (verdict.ok) throw new Error("expected a missing root to fail");
       return verdict.failure;
     },
+    // Must name a count-shaped entry that declares NO roots, which is why it
+    // is not one of the six multi-root walks — every one of those declares
+    // them now, and pointing here would produce `no_root_files` instead.
+    // `check-env-inlining` walks a single root, where naming roots would be
+    // the floor and the root saying the same thing twice.
     no_roots_floor: () =>
-      failureFromThrow(() => assertScannedRoots("check-inline-hex", ["lib/a.ts"])),
+      failureFromThrow(() => assertScannedRoots("check-env-inlining", ["lib/a-config.ts"])),
   };
   const failureCodes = Object.keys(EVERY_FAILURE) as ScannedFloorFailureCode[];
 

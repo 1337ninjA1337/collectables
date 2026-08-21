@@ -20,7 +20,11 @@ import {
   type HexMatch,
 } from "../lib/check-inline-hex";
 import { GuardRootError } from "../lib/guard-root";
-import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import {
+  ScannedFloorError,
+  assertScannedFloor,
+  assertScannedRoots,
+} from "../lib/scanned-floor";
 import { guardScanRoot, listSourceFiles } from "./guard-io";
 
 const CHECK_NAME = "check-inline-hex";
@@ -33,6 +37,10 @@ function main(): void {
 
   // Before reading a single byte: a walk that found nothing (or almost
   // nothing) reports "no inline hex literals" just as cheerfully as a full one.
+  // Roots before the count: when a scan root vanishes both fire, and only
+  // this one names the directory that went quiet — `below_floor` would send
+  // the reader off to re-measure a floor that is not the problem.
+  assertScannedRoots(CHECK_NAME, files);
   assertScannedFloor(CHECK_NAME, files.length);
 
   const allMatches: HexMatch[] = [];

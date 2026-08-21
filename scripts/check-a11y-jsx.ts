@@ -24,7 +24,11 @@ import {
   type IconLabelFinding,
 } from "../lib/check-a11y-jsx";
 import { GuardRootError } from "../lib/guard-root";
-import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import {
+  ScannedFloorError,
+  assertScannedFloor,
+  assertScannedRoots,
+} from "../lib/scanned-floor";
 import { MARKUP_EXTENSIONS } from "../lib/source-dirs";
 import { guardScanRoot, listSourceFiles } from "./guard-io";
 
@@ -38,6 +42,10 @@ function main(): void {
 
   // A walk that lost a scan root reports "every icon button is named" in
   // exactly the same words as a walk that read everything.
+  // Roots before the count: when a scan root vanishes both fire, and only
+  // this one names the directory that went quiet — `below_floor` would send
+  // the reader off to re-measure a floor that is not the problem.
+  assertScannedRoots(CHECK_NAME, files);
   assertScannedFloor(CHECK_NAME, files.length);
 
   const findings: IconLabelFinding[] = [];
