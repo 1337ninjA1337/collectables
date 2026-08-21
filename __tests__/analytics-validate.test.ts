@@ -65,7 +65,7 @@ describe("assertValidProps", () => {
   beforeEach(() => __resetAnalyticsValidateForTests());
 
   it("returns a fully-declared payload unchanged without warning", () => {
-    const payload = { mode: "sale", hasPrice: true };
+    const payload = { mode: "sell", hasPrice: true };
     const { result, warns } = withCapturedWarns(() =>
       assertValidProps("listing_created", payload),
     );
@@ -78,7 +78,7 @@ describe("assertValidProps", () => {
       () =>
         assertValidProps(
           "listing_created",
-          { mode: "sale", pirce: 10 },
+          { mode: "sell", pirce: 10 },
           { failFast: true },
         ),
       /listing_created.*pirce/s,
@@ -99,16 +99,16 @@ describe("assertValidProps", () => {
 
   it("warns once and strips unknown keys outside dev", () => {
     const { result: first, warns } = withCapturedWarns(() =>
-      assertValidProps("listing_created", { mode: "sale", pirce: 10 }),
+      assertValidProps("listing_created", { mode: "sell", pirce: 10 }),
     );
-    assert.deepEqual(first, { mode: "sale" });
+    assert.deepEqual(first, { mode: "sell" });
     assert.equal(warns.length, 1);
     assert.match(warns[0], /pirce/);
     assert.match(warns[0], /allowed: mode, hasPrice/);
 
     // Same event+keys again — deduped, no second warning.
     const { warns: repeatWarns } = withCapturedWarns(() =>
-      assertValidProps("listing_created", { mode: "sale", pirce: 11 }),
+      assertValidProps("listing_created", { mode: "sell", pirce: 11 }),
     );
     assert.deepEqual(repeatWarns, []);
   });
@@ -146,18 +146,18 @@ describe("trackEvent wiring", () => {
 
   it("captures declared props untouched", async () => {
     const captures = await initWithFakeSdk();
-    trackEvent("listing_created", { mode: "sale", hasPrice: true });
+    trackEvent("listing_created", { mode: "sell", hasPrice: true });
     assert.equal(captures.length, 1);
-    assert.deepEqual(captures[0].props, { mode: "sale", hasPrice: true });
+    assert.deepEqual(captures[0].props, { mode: "sell", hasPrice: true });
   });
 
   it("strips undeclared props before capture in production", async () => {
     const captures = await initWithFakeSdk();
     const { warns } = withCapturedWarns(() =>
-      trackEvent("listing_created", { mode: "sale", pirce: 10 }),
+      trackEvent("listing_created", { mode: "sell", pirce: 10 }),
     );
     assert.equal(captures.length, 1);
-    assert.deepEqual(captures[0].props, { mode: "sale" });
+    assert.deepEqual(captures[0].props, { mode: "sell" });
     assert.equal(warns.length, 1);
   });
 
