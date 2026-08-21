@@ -1386,6 +1386,27 @@ const be: TranslationMap = {
   wishlistPromoted: "Перанесена ў калекцыю",
   wishlistSource: "Дзе шукаць",
   wishlistSourcePlaceholder: "напр. інтэрнэт-крама, барахолка",
+  // Item filters. The quoted field names use each locale's own quotation
+  // marks — «…» for be, „…” for pl, „…“ for de, «…» for es.
+  filterTitle: "Фільтры",
+  filterPriceFrom: "Цана ад",
+  filterPriceTo: "Цана да",
+  filterPriceFromInvalid: "«Цана ад» павінна быць лікам.",
+  filterPriceToInvalid: "«Цана да» павінна быць лікам.",
+  filterPriceNegative: "Цана не можа быць адмоўнай.",
+  filterPriceRangeInverted: "«Цана ад» не можа быць большай за «цану да».",
+  filterDateFrom: "Набыта з",
+  filterDateTo: "Набыта да",
+  filterDateFromInvalid: "«Набыта з» павінна быць датай выгляду 2024-01-31.",
+  filterDateToInvalid: "«Набыта да» павінна быць датай выгляду 2024-01-31.",
+  filterDateNotReal: "Такой даты не існуе ў календары.",
+  filterDateRangeInverted: "«Набыта з» не можа быць пазней за «набыта да».",
+  filterSource: "Крыніца",
+  filterSourcePlaceholder: "напр. барахолка, eBay",
+  filterHasPhotos: "Толькі з фота",
+  filterApply: "Ужыць",
+  filterReset: "Скінуць",
+  filterActive: (params?: TranslationParams) => `Фільтры (${params?.count ?? 0})`,
 };
 
 const pl: TranslationMap = {
@@ -1677,6 +1698,27 @@ const pl: TranslationMap = {
   wishlistPromoted: "Przeniesiono do kolekcji",
   wishlistSource: "Gdzie szukać",
   wishlistSourcePlaceholder: "np. sklep internetowy, pchli targ",
+  // Item filters. The quoted field names use each locale's own quotation
+  // marks — «…» for be, „…” for pl, „…“ for de, «…» for es.
+  filterTitle: "Filtry",
+  filterPriceFrom: "Cena od",
+  filterPriceTo: "Cena do",
+  filterPriceFromInvalid: "„Cena od” musi być liczbą.",
+  filterPriceToInvalid: "„Cena do” musi być liczbą.",
+  filterPriceNegative: "Cena nie może być ujemna.",
+  filterPriceRangeInverted: "„Cena od” nie może być większa niż „cena do”.",
+  filterDateFrom: "Nabyto od",
+  filterDateTo: "Nabyto do",
+  filterDateFromInvalid: "„Nabyto od” musi być datą w formacie 2024-01-31.",
+  filterDateToInvalid: "„Nabyto do” musi być datą w formacie 2024-01-31.",
+  filterDateNotReal: "Taka data nie istnieje w kalendarzu.",
+  filterDateRangeInverted: "„Nabyto od” nie może być późniejsze niż „nabyto do”.",
+  filterSource: "Źródło",
+  filterSourcePlaceholder: "np. pchli targ, eBay",
+  filterHasPhotos: "Tylko ze zdjęciami",
+  filterApply: "Zastosuj",
+  filterReset: "Wyczyść",
+  filterActive: (params?: TranslationParams) => `Filtry (${params?.count ?? 0})`,
 };
 
 const de: TranslationMap = {
@@ -1966,6 +2008,27 @@ const de: TranslationMap = {
   wishlistPromoted: "In die Sammlung verschoben",
   wishlistSource: "Wo zu finden",
   wishlistSourcePlaceholder: "z. B. Onlineshop, Flohmarkt",
+  // Item filters. The quoted field names use each locale's own quotation
+  // marks — «…» for be, „…” for pl, „…“ for de, «…» for es.
+  filterTitle: "Filter",
+  filterPriceFrom: "Preis ab",
+  filterPriceTo: "Preis bis",
+  filterPriceFromInvalid: "„Preis ab“ muss eine Zahl sein.",
+  filterPriceToInvalid: "„Preis bis“ muss eine Zahl sein.",
+  filterPriceNegative: "Ein Preis kann nicht negativ sein.",
+  filterPriceRangeInverted: "„Preis ab“ darf nicht größer sein als „Preis bis“.",
+  filterDateFrom: "Erworben ab",
+  filterDateTo: "Erworben bis",
+  filterDateFromInvalid: "„Erworben ab“ muss ein Datum wie 2024-01-31 sein.",
+  filterDateToInvalid: "„Erworben bis“ muss ein Datum wie 2024-01-31 sein.",
+  filterDateNotReal: "Dieses Datum gibt es im Kalender nicht.",
+  filterDateRangeInverted: "„Erworben ab“ darf nicht nach „Erworben bis“ liegen.",
+  filterSource: "Quelle",
+  filterSourcePlaceholder: "z. B. Flohmarkt, eBay",
+  filterHasPhotos: "Nur mit Fotos",
+  filterApply: "Anwenden",
+  filterReset: "Zurücksetzen",
+  filterActive: (params?: TranslationParams) => `Filter (${params?.count ?? 0})`,
 };
 
 const es: TranslationMap = {
@@ -2254,6 +2317,30 @@ const es: TranslationMap = {
   wishlistPromoted: "Movido a la colección",
   wishlistSource: "Dónde encontrarlo",
   wishlistSourcePlaceholder: "p. ej. tienda online, mercadillo",
+  // Item filters. The quoted field names use each locale's own quotation
+  // marks — «…» for be, „…” for pl, „…“ for de, «…» for es.
+  filterTitle: "Filtros",
+  filterPriceFrom: "Precio desde",
+  filterPriceTo: "Precio hasta",
+  filterPriceFromInvalid: "«Precio desde» debe ser un número.",
+  filterPriceToInvalid: "«Precio hasta» debe ser un número.",
+  filterPriceNegative: "Un precio no puede ser negativo.",
+  filterPriceRangeInverted:
+    "«Precio desde» no puede ser mayor que «precio hasta».",
+  filterDateFrom: "Adquirido desde",
+  filterDateTo: "Adquirido hasta",
+  filterDateFromInvalid:
+    "«Adquirido desde» debe ser una fecha como 2024-01-31.",
+  filterDateToInvalid: "«Adquirido hasta» debe ser una fecha como 2024-01-31.",
+  filterDateNotReal: "Esa fecha no existe en el calendario.",
+  filterDateRangeInverted:
+    "«Adquirido desde» no puede ser posterior a «adquirido hasta».",
+  filterSource: "Origen",
+  filterSourcePlaceholder: "p. ej. mercadillo, eBay",
+  filterHasPhotos: "Solo con fotos",
+  filterApply: "Aplicar",
+  filterReset: "Restablecer",
+  filterActive: (params?: TranslationParams) => `Filtros (${params?.count ?? 0})`,
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };
