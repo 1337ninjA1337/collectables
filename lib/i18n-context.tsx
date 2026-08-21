@@ -1386,8 +1386,8 @@ const be: TranslationMap = {
   wishlistPromoted: "Перанесена ў калекцыю",
   wishlistSource: "Дзе шукаць",
   wishlistSourcePlaceholder: "напр. інтэрнэт-крама, барахолка",
-  // Item filters. The quoted field names use each locale's own quotation
-  // marks — «…» for be, „…” for pl, „…“ for de, «…» for es.
+  // Item filters. The quoted field names use this locale's own quotation
+  // marks; the pairs are declared in __tests__/i18n-quotation-marks.test.ts.
   filterTitle: "Фільтры",
   filterPriceFrom: "Цана ад",
   filterPriceTo: "Цана да",
@@ -1407,6 +1407,22 @@ const be: TranslationMap = {
   filterApply: "Ужыць",
   filterReset: "Скінуць",
   filterActive: (params?: TranslationParams) => `Фільтры (${params?.count ?? 0})`,
+  // Search overlay. `searchClose`, the two in-collection strings and the
+  // overlay label were already declared here — only the other 14 are new.
+  searchTitle: "Пошук",
+  searchSubtitle: "Знайдзіце людзей і калекцыі.",
+  searchByProfileId: "Пошук па ID профілю",
+  searchByProfileIdPlaceholder: "Увядзіце ID профілю",
+  searchFilterAll: "Усе",
+  searchFilterAllOwners: "Усе ўладальнікі",
+  searchFilterCollections: "Калекцыі",
+  searchFilterItems: "Прадметы",
+  searchFilterPeople: "Людзі",
+  searchNoResults: "Нічога не знойдзена",
+  searchPlaceholder: "Прадметы, калекцыі, людзі...",
+  searchResultsCollections: "Калекцыі",
+  searchResultsItems: "Прадметы",
+  searchResultsPeople: "Людзі",
 };
 
 const pl: TranslationMap = {
@@ -1520,7 +1536,7 @@ const pl: TranslationMap = {
   navFriendsRequestsA11y: "Znajomi, nowe zaproszenia",
   chatsSubtitle: "Rozmawiaj ze znajomymi bezpośrednio w aplikacji.",
   chatsEmptyTitle: "Brak czatów",
-  chatsEmptyHint: "Otwórz profil znajomego i kliknij «Wiadomość», aby rozpocząć rozmowę.",
+  chatsEmptyHint: "Otwórz profil znajomego i kliknij „Wiadomość”, aby rozpocząć rozmowę.",
   chatsEmptyNoFriendsHint: "Możesz rozmawiać tylko ze znajomymi. Najpierw dodaj kogoś jako znajomego.",
   chatTitle: "Czat",
   chatEmptyTitle: "Przywitaj się",
@@ -1574,9 +1590,9 @@ const pl: TranslationMap = {
   marketplaceClaim: "Odbierz",
   marketplaceClaimSuccess: "Ogłoszenie przypisane",
   marketplaceClaimAutoMessageBuy: (params?: TranslationParams) =>
-    `Kupiłem/am twoje ogłoszenie „${params?.title ?? ""}" za ${params?.price ?? ""} ${params?.currency ?? ""}.`,
+    `Kupiłem/am twoje ogłoszenie „${params?.title ?? ""}” za ${params?.price ?? ""} ${params?.currency ?? ""}.`,
   marketplaceClaimAutoMessageTrade: (params?: TranslationParams) =>
-    `Odebrałem/am twoją ofertę wymiany „${params?.title ?? ""}".`,
+    `Odebrałem/am twoją ofertę wymiany „${params?.title ?? ""}”.`,
   marketplaceSoldBanner: "Sprzedane",
   marketplaceSoldTo: (params?: TranslationParams) => `Sprzedane użytkownikowi ${params?.name ?? ""}`,
   marketplaceBoughtFrom: (params?: TranslationParams) => `Od ${params?.name ?? ""}`,
@@ -1698,8 +1714,8 @@ const pl: TranslationMap = {
   wishlistPromoted: "Przeniesiono do kolekcji",
   wishlistSource: "Gdzie szukać",
   wishlistSourcePlaceholder: "np. sklep internetowy, pchli targ",
-  // Item filters. The quoted field names use each locale's own quotation
-  // marks — «…» for be, „…” for pl, „…“ for de, «…» for es.
+  // Item filters. The quoted field names use this locale's own quotation
+  // marks; the pairs are declared in __tests__/i18n-quotation-marks.test.ts.
   filterTitle: "Filtry",
   filterPriceFrom: "Cena od",
   filterPriceTo: "Cena do",
@@ -1719,6 +1735,22 @@ const pl: TranslationMap = {
   filterApply: "Zastosuj",
   filterReset: "Wyczyść",
   filterActive: (params?: TranslationParams) => `Filtry (${params?.count ?? 0})`,
+  // Search overlay. `searchClose`, the two in-collection strings and the
+  // overlay label were already declared here — only the other 14 are new.
+  searchTitle: "Szukaj",
+  searchSubtitle: "Znajdź osoby i kolekcje.",
+  searchByProfileId: "Szukaj po ID profilu",
+  searchByProfileIdPlaceholder: "Wpisz ID profilu",
+  searchFilterAll: "Wszystko",
+  searchFilterAllOwners: "Wszyscy właściciele",
+  searchFilterCollections: "Kolekcje",
+  searchFilterItems: "Przedmioty",
+  searchFilterPeople: "Osoby",
+  searchNoResults: "Nic nie znaleziono",
+  searchPlaceholder: "Przedmioty, kolekcje, osoby...",
+  searchResultsCollections: "Kolekcje",
+  searchResultsItems: "Przedmioty",
+  searchResultsPeople: "Osoby",
 };
 
 const de: TranslationMap = {
@@ -1828,7 +1860,7 @@ const de: TranslationMap = {
   navFriendsRequestsA11y: "Freunde, offene Anfragen",
   chatsSubtitle: "Sprich mit deinen Freunden direkt in der App.",
   chatsEmptyTitle: "Noch keine Chats",
-  chatsEmptyHint: "Öffne das Profil eines Freundes und tippe auf «Nachricht», um ein Gespräch zu beginnen.",
+  chatsEmptyHint: "Öffne das Profil eines Freundes und tippe auf „Nachricht“, um ein Gespräch zu beginnen.",
   chatsEmptyNoFriendsHint: "Du kannst nur mit Freunden chatten. Füge zuerst jemanden als Freund hinzu.",
   chatTitle: "Chat",
   chatEmptyTitle: "Sag Hallo",
@@ -1882,9 +1914,9 @@ const de: TranslationMap = {
   marketplaceClaim: "Übernehmen",
   marketplaceClaimSuccess: "Anzeige übernommen",
   marketplaceClaimAutoMessageBuy: (params?: TranslationParams) =>
-    `Habe deine Anzeige „${params?.title ?? ""}" für ${params?.price ?? ""} ${params?.currency ?? ""} gekauft.`,
+    `Habe deine Anzeige „${params?.title ?? ""}“ für ${params?.price ?? ""} ${params?.currency ?? ""} gekauft.`,
   marketplaceClaimAutoMessageTrade: (params?: TranslationParams) =>
-    `Habe dein Tauschangebot „${params?.title ?? ""}" angenommen.`,
+    `Habe dein Tauschangebot „${params?.title ?? ""}“ angenommen.`,
   marketplaceSoldBanner: "Verkauft",
   marketplaceSoldTo: (params?: TranslationParams) => `Verkauft an ${params?.name ?? ""}`,
   marketplaceBoughtFrom: (params?: TranslationParams) => `Von ${params?.name ?? ""}`,
@@ -2008,8 +2040,8 @@ const de: TranslationMap = {
   wishlistPromoted: "In die Sammlung verschoben",
   wishlistSource: "Wo zu finden",
   wishlistSourcePlaceholder: "z. B. Onlineshop, Flohmarkt",
-  // Item filters. The quoted field names use each locale's own quotation
-  // marks — «…» for be, „…” for pl, „…“ for de, «…» for es.
+  // Item filters. The quoted field names use this locale's own quotation
+  // marks; the pairs are declared in __tests__/i18n-quotation-marks.test.ts.
   filterTitle: "Filter",
   filterPriceFrom: "Preis ab",
   filterPriceTo: "Preis bis",
@@ -2029,6 +2061,22 @@ const de: TranslationMap = {
   filterApply: "Anwenden",
   filterReset: "Zurücksetzen",
   filterActive: (params?: TranslationParams) => `Filter (${params?.count ?? 0})`,
+  // Search overlay. `searchClose`, the two in-collection strings and the
+  // overlay label were already declared here — only the other 14 are new.
+  searchTitle: "Suche",
+  searchSubtitle: "Finde Leute und Sammlungen.",
+  searchByProfileId: "Nach Profil-ID suchen",
+  searchByProfileIdPlaceholder: "Profil-ID eingeben",
+  searchFilterAll: "Alle",
+  searchFilterAllOwners: "Alle Besitzer",
+  searchFilterCollections: "Sammlungen",
+  searchFilterItems: "Objekte",
+  searchFilterPeople: "Leute",
+  searchNoResults: "Nichts gefunden",
+  searchPlaceholder: "Objekte, Sammlungen, Leute...",
+  searchResultsCollections: "Sammlungen",
+  searchResultsItems: "Objekte",
+  searchResultsPeople: "Leute",
 };
 
 const es: TranslationMap = {
@@ -2317,8 +2365,8 @@ const es: TranslationMap = {
   wishlistPromoted: "Movido a la colección",
   wishlistSource: "Dónde encontrarlo",
   wishlistSourcePlaceholder: "p. ej. tienda online, mercadillo",
-  // Item filters. The quoted field names use each locale's own quotation
-  // marks — «…» for be, „…” for pl, „…“ for de, «…» for es.
+  // Item filters. The quoted field names use this locale's own quotation
+  // marks; the pairs are declared in __tests__/i18n-quotation-marks.test.ts.
   filterTitle: "Filtros",
   filterPriceFrom: "Precio desde",
   filterPriceTo: "Precio hasta",
@@ -2341,6 +2389,22 @@ const es: TranslationMap = {
   filterApply: "Aplicar",
   filterReset: "Restablecer",
   filterActive: (params?: TranslationParams) => `Filtros (${params?.count ?? 0})`,
+  // Search overlay. `searchClose`, the two in-collection strings and the
+  // overlay label were already declared here — only the other 14 are new.
+  searchTitle: "Buscar",
+  searchSubtitle: "Encuentra personas y colecciones.",
+  searchByProfileId: "Buscar por ID de perfil",
+  searchByProfileIdPlaceholder: "Escribe el ID de perfil",
+  searchFilterAll: "Todo",
+  searchFilterAllOwners: "Todos los propietarios",
+  searchFilterCollections: "Colecciones",
+  searchFilterItems: "Objetos",
+  searchFilterPeople: "Personas",
+  searchNoResults: "No se encontró nada",
+  searchPlaceholder: "Objetos, colecciones, personas...",
+  searchResultsCollections: "Colecciones",
+  searchResultsItems: "Objetos",
+  searchResultsPeople: "Personas",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };

@@ -61,6 +61,13 @@ const FAMILIES: readonly Family[] = [
     because:
       "the filter sheet opens from every list screen, and eight of its twenty strings are validation errors — the messages a user reads while already stuck, which is the worst moment to switch languages on them",
   },
+  {
+    name: "search",
+    pattern: /^search[A-Z]/,
+    size: 18,
+    because:
+      "the search overlay was already half-translated — four keys in every locale and fourteen in none, so the same overlay showed a translated placeholder above English result headings",
+  },
 ];
 
 describe("complete i18n families", () => {

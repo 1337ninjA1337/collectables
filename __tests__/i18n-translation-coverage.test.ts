@@ -312,10 +312,11 @@ describe("translation floors", () => {
       "every row must be measured against the same denominator",
     );
     // Zero since 2026-08-21: every locale is at or above half for the first
-    // time (be 57.9%, pl 56.1%, es 55.5%, de 55.3%), after the empty-state
-    // (24), wishlist (14) and item-filter (19) families were translated into
-    // all four partial locales. It was 4 that morning, 3 between the first two
-    // families, and 0 from the second onward. Notable because it is
+    // time (be 60.7%, pl 58.9%, es 58.3%, de 58.1%), after the empty-state
+    // (24), wishlist (14), item-filter (19) and search (14) families were
+    // translated into all four partial locales. It was 4 that morning, 3
+    // between the first two families, and 0 from the second onward. Notable
+    // because it is
     // the first time these rows moved for the right reason: every previous
     // move came from DELETING dead English keys, which raises the percentage
     // without a user seeing one more word in their own language.
