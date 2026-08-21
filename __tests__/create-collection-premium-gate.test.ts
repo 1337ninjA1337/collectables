@@ -24,7 +24,14 @@ describe("create-collection screen: private collections require premium", () => 
   });
 
   it("locks the Private chip for a non-premium user", () => {
-    assert.match(src, /locked\s*=\s*v\s*===\s*"private"\s*&&\s*!isPremium/);
+    // The rule is `isPrivateVisibilityLocked`, called rather than matched (see
+    // premium-visibility-lock.test.ts). What is a fact about THIS screen is
+    // the value it passes for the saved visibility: a collection being created
+    // has none, and `"public"` is what says it has no private history to
+    // protect — the edit sheet's `?? "private"` here would unlock the chip for
+    // every free user.
+    assert.match(src, /isPrivateVisibilityLocked\(isPremium, "public"\)/);
+    assert.match(src, /const locked = v === "private" && privateLocked;/);
     assert.match(src, /visibilityPrivatePremiumOnly/);
   });
 
@@ -32,7 +39,20 @@ describe("create-collection screen: private collections require premium", () => 
     assert.match(src, /from\s+"@\/components\/premium-upsell-sheet"/);
     assert.match(
       src,
-      /if\s*\(locked\)\s*\{(?:(?!\}\s*setVisibility)[\s\S])*?setUpsellVisible\(true\)/,
+      /function showPrivateUpsell\(\)[\s\S]{0,400}?setUpsellVisible\(true\)/,
+    );
+    assert.match(
+      src,
+      /if\s*\(locked\)\s*\{\s*showPrivateUpsell\(\);\s*return;\s*\}/,
+    );
+    // The sentence under the row is the same button. Its branch used to be
+    // dead — it required `visibility === "private"` while not premium, which a
+    // free user can never reach because the locked chip returns first.
+    assert.match(src, /\{privateLocked \? \(\s*<Pressable\s*onPress=\{showPrivateUpsell\}/);
+    assert.doesNotMatch(
+      src,
+      /!isPremium && visibility === "private"/,
+      "the dead premium-hint branch is back",
     );
     assert.match(src, /<PremiumUpsellSheet/);
     // On activation from the sheet, the visibility flips to private for the user.

@@ -28,6 +28,7 @@ import {
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
+import { isPrivateVisibilityLocked, visibilityHintKey } from "@/lib/premium-helpers";
 import { useToast } from "@/lib/toast-context";
 import type { CollectionVisibility } from "@/lib/types";
 
@@ -81,6 +82,20 @@ export const EditCollectionModal = memo(function EditCollectionModal({
 }: Props) {
   const { t } = useI18n();
   const toast = useToast();
+
+  // The saved value can be momentarily unknown while the collection loads, and
+  // treating unknown as private errs toward NOT locking an owner out of their
+  // own sheet — the lapsed-subscriber case this rule exists for.
+  const privateLocked = isPrivateVisibilityLocked(isPremium, savedVisibility ?? "private");
+
+  /** What the padlock does, from the chip and from the sentence below it. */
+  function showPrivateUpsell() {
+    trackEvent("premium_upsell_shown", {
+      feature: "private_collection",
+      source: "collection_edit",
+    });
+    toast.error(t("visibilityPrivatePremiumOnly"), t("premiumTitle"));
+  }
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -144,10 +159,7 @@ export const EditCollectionModal = memo(function EditCollectionModal({
                 // Block the public→private transition for non-premium users,
                 // but never lock an already-private collection (so a lapsed
                 // owner keeps it private without being forced to downgrade).
-                const locked =
-                  v === "private" &&
-                  !isPremium &&
-                  (savedVisibility ?? "private") !== "private";
+                const locked = v === "private" && privateLocked;
                 return (
                   <Pressable
                     key={v}
@@ -158,11 +170,7 @@ export const EditCollectionModal = memo(function EditCollectionModal({
                     }}
                     onPress={() => {
                       if (locked) {
-                        trackEvent("premium_upsell_shown", {
-                          feature: "private_collection",
-                          source: "collection_edit",
-                        });
-                        toast.error(t("visibilityPrivatePremiumOnly"), t("premiumTitle"));
+                        showPrivateUpsell();
                         return;
                       }
                       onChangeVisibility(v);
@@ -180,14 +188,22 @@ export const EditCollectionModal = memo(function EditCollectionModal({
               })}
             </View>
             <Text style={styles.editVisibilityHint}>
-              {!isPremium &&
-              visibility === "private" &&
-              (savedVisibility ?? "private") !== "private"
-                ? t("visibilityPrivatePremiumOnly")
-                : visibility === "public"
-                  ? t("visibilityPublicHint")
-                  : t("visibilityPrivateHint")}
+              {t(visibilityHintKey(visibility))}
             </Text>
+            {/* The same button as the padlocked chip, in words. Without it the
+                only place the sentence appears is a toast that has gone by the
+                time somebody looks back at the row. */}
+            {privateLocked ? (
+              <Pressable
+                onPress={showPrivateUpsell}
+                accessibilityRole="button"
+                accessibilityLabel={t("visibilityPrivateLockedA11y")}
+              >
+                <Text style={styles.editVisibilityLockedHint}>
+                  {t("visibilityPrivatePremiumOnly")}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
 
           <View style={styles.editFieldGroup}>
@@ -343,6 +359,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     fontFamily: FONT_BODY,
+  },
+  // Amber rather than muted: this line is the padlock's explanation and a
+  // button, so it has to read as something to press next to the sentence above
+  // it, which is not.
+  editVisibilityLockedHint: {
+    color: AMBER_ACCENT,
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: FONT_BODY_BOLD,
+    marginTop: 4,
   },
   editCurrencyButton: {
     borderRadius: 16,

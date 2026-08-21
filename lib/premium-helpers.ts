@@ -16,6 +16,50 @@ export function defaultCollectionVisibilityForUser(isPremium: boolean): Collecti
   return isPremium ? "private" : "public";
 }
 
+/**
+ * Is the "private" option locked for this user, on this collection?
+ *
+ * The rule both visibility rows were writing out for themselves: a free user
+ * cannot make a collection private, but an ALREADY-private collection is never
+ * locked, so a lapsed subscriber is not forced to publish what they had.
+ *
+ * `savedVisibility` is what the collection is stored as, and each caller
+ * decides what "not stored yet" means for it, because the two screens
+ * genuinely disagree and both are right. The create screen has no saved value
+ * and passes `"public"`: a collection being created has no private history to
+ * protect. The edit sheet passes `savedVisibility ?? "private"`: there the
+ * value can be momentarily unknown while the collection loads, and treating
+ * unknown as private errs toward NOT locking an owner out of their own sheet.
+ */
+export function isPrivateVisibilityLocked(
+  isPremium: boolean,
+  savedVisibility: CollectionVisibility,
+): boolean {
+  return !isPremium && savedVisibility !== "private";
+}
+
+/**
+ * Which sentence belongs under a visibility row, given what is selected.
+ *
+ * Split from the lock because the two answers are independent, and conflating
+ * them is what made the premium explanation unreachable: both screens rendered
+ * ONE sentence chosen by `!isPremium && visibility === "private"`, and a free
+ * user can never get `visibility` to `"private"` — the locked chip returns
+ * before setting it. So the branch that explains the padlock was dead in both
+ * files, and the only place the sentence appeared was a toast that has already
+ * gone by the time somebody looks at the row.
+ *
+ * The current selection always gets its own sentence now; the lock adds a
+ * second line beside it rather than replacing it. Losing "public collections
+ * are visible to everyone" in order to say "private is premium" would trade
+ * one explanation for another.
+ */
+export function visibilityHintKey(
+  visibility: CollectionVisibility,
+): "visibilityPublicHint" | "visibilityPrivateHint" {
+  return visibility === "public" ? "visibilityPublicHint" : "visibilityPrivateHint";
+}
+
 export const DEFAULT_PREMIUM_STATE: PremiumState = {
   isPremium: false,
   activatedAt: null,

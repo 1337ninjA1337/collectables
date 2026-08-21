@@ -37,7 +37,11 @@ import {
   TEXT_ON_DARK_2,
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
-import { defaultCollectionVisibilityForUser } from "@/lib/premium-helpers";
+import {
+  defaultCollectionVisibilityForUser,
+  isPrivateVisibilityLocked,
+  visibilityHintKey,
+} from "@/lib/premium-helpers";
 import { usePremium } from "@/lib/premium-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectionVisibility } from "@/lib/types";
@@ -60,6 +64,20 @@ export default function CreateCollectionScreen() {
     defaultCollectionVisibilityForUser(isPremium),
   );
   const [upsellVisible, setUpsellVisible] = useState(false);
+
+  // A collection being created has no saved value and no private history to
+  // protect, so "not stored yet" is `"public"` here — see
+  // `isPrivateVisibilityLocked` for why the edit sheet answers differently.
+  const privateLocked = isPrivateVisibilityLocked(isPremium, "public");
+
+  /** What the padlock does, from the chip and from the sentence below it. */
+  function showPrivateUpsell() {
+    trackEvent("premium_upsell_shown", {
+      feature: "private_collection",
+      source: "create_collection",
+    });
+    setUpsellVisible(true);
+  }
 
   function applyTemplate(templateId: string) {
     const tpl = collectionTemplates.find((t) => t.id === templateId);
@@ -232,7 +250,7 @@ export default function CreateCollectionScreen() {
         <View style={styles.visibilityRow}>
           {(["private", "public"] as const).map((v) => {
             const selected = visibility === v;
-            const locked = v === "private" && !isPremium;
+            const locked = v === "private" && privateLocked;
             return (
               <Pressable
                 key={v}
@@ -243,11 +261,7 @@ export default function CreateCollectionScreen() {
                 }}
                 onPress={() => {
                   if (locked) {
-                    trackEvent("premium_upsell_shown", {
-                      feature: "private_collection",
-                      source: "create_collection",
-                    });
-                    setUpsellVisible(true);
+                    showPrivateUpsell();
                     return;
                   }
                   setVisibility(v);
@@ -264,13 +278,22 @@ export default function CreateCollectionScreen() {
             );
           })}
         </View>
-        <Text style={styles.visibilityHint}>
-          {!isPremium && visibility === "private"
-            ? t("visibilityPrivatePremiumOnly")
-            : visibility === "public"
-              ? t("visibilityPublicHint")
-              : t("visibilityPrivateHint")}
-        </Text>
+        <Text style={styles.visibilityHint}>{t(visibilityHintKey(visibility))}</Text>
+        {/* The padlock on the chip is the only thing that explains itself
+            today, and only to somebody who taps it. This says why in words, on
+            the row, and is the same button: a sighted user who reads the
+            sentence and taps it gets the upsell rather than nothing. */}
+        {privateLocked ? (
+          <Pressable
+            onPress={showPrivateUpsell}
+            accessibilityRole="button"
+            accessibilityLabel={t("visibilityPrivateLockedA11y")}
+          >
+            <Text style={styles.visibilityLockedHint}>
+              {t("visibilityPrivatePremiumOnly")}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <Pressable style={{...styles.saveButton, ...(saving ? styles.saveButtonDisabled : {})}} onPress={handleSave} disabled={saving}
@@ -438,6 +461,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     fontFamily: FONT_BODY,
+  },
+  // Amber rather than muted: this line is the padlock's explanation and a
+  // button, so it has to read as something to press next to the sentence above
+  // it, which is not.
+  visibilityLockedHint: {
+    color: AMBER_ACCENT,
+    fontSize: 13,
+    lineHeight: 20,
+    fontFamily: FONT_BODY_BOLD,
+    marginTop: 4,
   },
   saveButton: {
     borderRadius: RADIUS_CARD_LG,
