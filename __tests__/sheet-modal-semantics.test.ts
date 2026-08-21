@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { attributeValue, openTagAt } from "@/lib/jsx-open-tag";
+
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 
 /**
@@ -54,50 +56,6 @@ function modalSpans(code: string): { start: number; end: number }[] {
     if (end !== -1) spans.push({ start, end });
   }
   return spans;
-}
-
-/**
- * The open tag of the element that carries the attribute at `at`.
- *
- * Reads to the tag's own `>` while skipping any inside a braced attribute
- * value, because `style={[styles.sheet, { maxHeight: h }]}` and
- * `onPress={() => setOpen(false)}` both contain characters a naive
- * `indexOf(">")` would stop on — and `=>` is in nearly every handler here.
- */
-function owningTag(code: string, at: number): string {
-  const start = code.lastIndexOf("<", at);
-  let depth = 0;
-  for (let i = start; i < code.length; i++) {
-    const ch = code[i];
-    if (ch === "{") depth += 1;
-    else if (ch === "}") depth -= 1;
-    else if (ch === ">" && depth === 0) return code.slice(start, i + 1);
-  }
-  return code.slice(start);
-}
-
-/**
- * The expression inside `name={…}`, whitespace flattened, or null if absent.
- *
- * Brace-aware for the same reason: an inline arrow is the common value here,
- * and reading to the first `}` truncates `onPress={() => setOpen(false)}` at
- * `setOpen(false` — which would then compare unequal to itself written on one
- * line elsewhere. Flattening the whitespace is what lets a prop wrapped across
- * three lines by the formatter match the same handler written inline.
- */
-function bracedAttr(tag: string, name: string): string | null {
-  const at = tag.indexOf(`${name}={`);
-  if (at === -1) return null;
-  const open = at + name.length + 1;
-  let depth = 0;
-  for (let i = open; i < tag.length; i++) {
-    if (tag[i] === "{") depth += 1;
-    else if (tag[i] === "}") {
-      depth -= 1;
-      if (depth === 0) return tag.slice(open + 1, i).replace(/\s+/g, " ").trim();
-    }
-  }
-  return null;
 }
 
 /** Files carrying the sandwich, with the offsets of each opt-out. */
@@ -162,11 +120,11 @@ describe("every sheet sandwich is inside a Modal", () => {
       for (const span of modalSpans(code)) {
         const backdropAt = optOuts.find((at) => at > span.start && at < span.end);
         if (backdropAt === undefined) continue;
-        const requested = bracedAttr(
-          code.slice(span.start, span.end),
-          "onRequestClose",
-        );
-        const tapped = bracedAttr(owningTag(code, backdropAt), "onPress");
+        // The Modal's OWN open tag, not the whole span: reading the span
+        // would find an `onRequestClose` on a nested element when the Modal
+        // itself has none, which is the one case this rule cares about most.
+        const requested = attributeValue(openTagAt(code, span.start + 1), "onRequestClose");
+        const tapped = attributeValue(openTagAt(code, backdropAt), "onPress");
         // A backdrop with no `onPress` is a sheet that deliberately does not
         // dismiss on a tap (the wishlist promote sheet is one). Escape-only is
         // an asymmetry, not a contradiction, so it is not reported here.
@@ -191,8 +149,8 @@ describe("every sheet sandwich is inside a Modal", () => {
         const backdropAt = optOuts.find((at) => at > span.start && at < span.end);
         return (
           backdropAt !== undefined &&
-          bracedAttr(code.slice(span.start, span.end), "onRequestClose") !== null &&
-          bracedAttr(owningTag(code, backdropAt), "onPress") !== null
+          attributeValue(openTagAt(code, span.start + 1), "onRequestClose") !== null &&
+          attributeValue(openTagAt(code, backdropAt), "onPress") !== null
         );
       }),
     );
