@@ -311,15 +311,24 @@ describe("translation floors", () => {
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
     );
-    // Three, not four, since 2026-08-21: `be` crossed half (51.3%) when the
-    // 24 empty-state keys were translated into all four partial locales. It is
-    // the first time a partial row moved because something was TRANSLATED
-    // rather than because the denominator shrank under it — every previous
-    // move of this number came from deleting dead English keys, which raises
-    // the percentage without a user seeing one more word in their language.
+    // Zero since 2026-08-21: every locale is at or above half for the first
+    // time (be 54.1%, es 51.7%, de 51.5%, pl 52.3%), after the 24 empty-state
+    // and 14 wishlist keys were translated into all four partial locales. It
+    // was 4 that morning and 3 between the two families. Notable because it is
+    // the first time these rows moved for the right reason: every previous
+    // move came from DELETING dead English keys, which raises the percentage
+    // without a user seeing one more word in their own language.
+    //
+    // Published, not ratcheted, and the distinction matters — this is a count
+    // that is expected to move in BOTH directions. Forty-one new English keys
+    // with no new `be` translations would put `be` back under half without
+    // anybody losing a translation, which is ordinary feature churn and the
+    // exact failure mode `TRANSLATION_FLOORS` documents for a ceiling. If this
+    // goes red that way, the honest fix is to update the number (or translate
+    // the backlog), not to delete the case.
     assert.ok(
-      COVERAGE.filter((row) => coveragePercent(row) < 50).length === 3,
-      `three of the six locales sit below half; the report reads:\n${report}`,
+      COVERAGE.filter((row) => coveragePercent(row) < 50).length === 0,
+      `no locale sits below half; the report reads:\n${report}`,
     );
   });
 });

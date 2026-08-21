@@ -161,19 +161,19 @@ export const TRANSLATION_FLOORS: Readonly<
     note: "499 of 501 on 2026-08-21 (99.6%) — the only fully-maintained locale, and the row that forced this re-measurement: it declared every one of the 35 removed keys, so the last family took it to exactly its old floor of 500 and the slack assertion (strict `<`) went red at equality. ~7% slack; the two inherited keys are pinned by name in the suite rather than left to this number.",
   },
   be: {
-    minimum: 236,
-    note: "257 of 501 on 2026-08-21 (51.3%) — the first partial locale to pass half, and it did so by translation rather than by the denominator shrinking: the 24 empty-state keys landed in all four partial locales on the same day. 233 of 502 earlier the same day, 222 of 538 before the dead-key removals. ~8% slack, which is roughly one feature's worth of keys.",
+    minimum: 249,
+    note: "271 of 501 on 2026-08-21 (54.1%) — the first partial locale to pass half, and it did so by translation rather than by the denominator shrinking: the 24 empty-state and 14 wishlist keys landed in all four partial locales the same day. 257 after the empty states, 233 before them, 222 of 538 before the dead-key removals. ~8% slack, which is roughly one feature's worth of keys.",
   },
   pl: {
-    minimum: 228,
-    note: "248 of 501 on 2026-08-21 (49.5%), 224 of 502 earlier the same day (the 24 empty-state keys), 213 of 538 before the removals. ~8% slack, same reasoning as be.",
+    minimum: 241,
+    note: "262 of 501 on 2026-08-21 (52.3%) — 248 after the empty states, 224 before them, 213 of 538 before the removals. ~8% slack, same reasoning as be.",
   },
   de: {
-    minimum: 224,
-    note: "244 of 501 on 2026-08-21 (48.7%), 220 of 502 earlier the same day (the 24 empty-state keys), 209 of 538 before the removals. ~8% slack, same reasoning as be.",
+    minimum: 237,
+    note: "258 of 501 on 2026-08-21 (51.5%) — 244 after the empty states, 220 before them, 209 of 538 before the removals. ~8% slack, same reasoning as be.",
   },
   es: {
-    minimum: 225,
-    note: "245 of 501 on 2026-08-21 (48.9%), 221 of 502 earlier the same day (the 24 empty-state keys), 209 of 538 before the removals. One ahead of de because it never declared the 'opened for you' header, so the collections-list removal took two declarations from it rather than three. ~8% slack, same reasoning as be.",
+    minimum: 238,
+    note: "259 of 501 on 2026-08-21 (51.7%) — 245 after the empty states, 221 before them, 209 of 538 before the removals. One ahead of de because it never declared the 'opened for you' header, so the collections-list removal took two declarations from it rather than three. ~8% slack, same reasoning as be.",
   },
 };
