@@ -145,3 +145,72 @@ export function diffAcceptedFriendships(
   }
   return accepted;
 }
+
+/**
+ * The seed for `username` and `publicId` when nothing better is available.
+ *
+ * ASCII on purpose, and deliberately NOT the translated display name: both
+ * fields are slugs, and the slugifier strips everything outside `[a-z0-9]`.
+ * Seeding them from a translated word would leave a Russian or Belarusian user
+ * with an empty slug rescued by a timestamp — a worse profile ID than the one
+ * they get now. Matches the `"collector"` that `normalizeProfile` and
+ * `ensureUniqueUsername` already fall back to, so the three agree on one word.
+ */
+export const FALLBACK_SLUG_SEED = "collector";
+
+/** The placeholder address for a session that carries no email at all. */
+export const FALLBACK_PROFILE_EMAIL = "collector@collectables.app";
+
+/** What a session can tell us about who somebody is. */
+export type FallbackIdentityInput = {
+  readonly email?: string | null;
+  readonly fullName?: string;
+  readonly userName?: string;
+};
+
+/** The identity fields of the profile shown before a cloud row exists. */
+export type FallbackIdentity = {
+  readonly displayName: string;
+  readonly username: string;
+  readonly email: string;
+  /** Seed for the public-ID slug — ASCII, never the translated name. */
+  readonly slugSeed: string;
+};
+
+/**
+ * Resolve the four identity fields of the fallback profile, given whatever the
+ * session carries and the localised default display name.
+ *
+ * Extracted from `buildFallbackProfile` in `lib/social-context.tsx` so the
+ * fallback CHAIN can be tested by calling it. That file pulls React Native
+ * peers, which `tsx --test` cannot transform, so everything about this logic
+ * used to be asserted by matching the source text — which passes on a refactor
+ * that keeps the text and breaks the behaviour.
+ *
+ * The one thing to understand before changing it: the display name and the two
+ * slug seeds fall back to DIFFERENT things on purpose. `displayName` is prose
+ * a person reads, so its last resort is translated. `username` and `slugSeed`
+ * become slugs, so theirs is {@link FALLBACK_SLUG_SEED} — passing the
+ * translated name here is the mistake this split exists to prevent.
+ *
+ * Deliberately does not slugify `slugSeed` itself: the slugifier's own
+ * last-resort branch stamps a timestamp for uniqueness, which would make this
+ * function non-deterministic and untestable for exactly the inputs (a
+ * non-ASCII email local part) that reach it.
+ */
+export function resolveFallbackIdentity(
+  input: FallbackIdentityInput,
+  defaultDisplayName: string,
+): FallbackIdentity {
+  // An empty local part (`"@example.com"`) is not a name, so it is treated the
+  // same as no address at all rather than becoming an empty display name.
+  const emailName = input.email?.split("@")[0]?.trim() || undefined;
+  const slugSeed = emailName ?? FALLBACK_SLUG_SEED;
+  return {
+    displayName: input.fullName ?? emailName ?? defaultDisplayName,
+    username:
+      input.userName ?? slugSeed.toLowerCase().replace(/[^a-z0-9_]+/g, ""),
+    email: input.email ?? FALLBACK_PROFILE_EMAIL,
+    slugSeed,
+  };
+}
