@@ -31,6 +31,61 @@ on the free plan and use only the production database tied to `main`:
    Until you add the secret (or instead of it), keep applying each migration's
    SQL manually via the Supabase SQL editor as documented in the sections below.
 
+## Remediation: public profile IDs derived from email addresses (2026-08-21)
+
+**This one is a data fix, not a migration — no schema changes, and it is only
+needed if the query below returns rows.**
+
+`normalizeProfile` used to derive a profile's `public_id` from its `email` when
+the row carried no `public_id`, no `username` and no `display_name`. `public_id`
+is the identifier the app invites people to share so others can find them, and
+`upsertMyProfile` writes it back, so an affected profile has its email address
+slugified into a permanently shared, searchable ID
+(`ada.lovelace@example.com` → `ada-lovelace-example-com`).
+
+The code no longer produces these (the fallback chain ends at the display name
+and otherwise uses an anonymous seed), but rows written **before** that change
+still carry whatever was derived earlier.
+
+### 1. Find affected rows
+
+Compares each row's `public_id` against its own email slugified the same way
+the app did. Read-only.
+
+```sql
+select id, email, public_id
+from public.profiles
+where public_id is not null
+  and public_id <> ''
+  and public_id = trim(both '-' from regexp_replace(lower(email), '[^a-z0-9]+', '-', 'g'));
+```
+
+If this returns no rows, nothing further is needed.
+
+### 2. Decide, then clear
+
+Do **not** blank these silently if the project has users who may have shared
+their profile link — a cleared `public_id` breaks any URL already handed out.
+Two options, in order of preference:
+
+- **Preferred:** contact the affected users and let them choose a new ID in the
+  app (Profile → profile ID). The app will slugify and de-duplicate it.
+- **If the profile is unused / test data,** clear it and let the app re-derive
+  a non-identifying ID the next time that profile is normalised:
+
+  ```sql
+  -- Review the SELECT above first. Replace the id list with the rows you
+  -- actually want reset; do not run this unqualified.
+  update public.profiles
+  set public_id = null
+  where id in ('<paste ids from the query above>');
+  ```
+
+### 3. Nothing to do for local-only profiles
+
+Profiles held only in AsyncStorage are re-normalised on the next load and pick
+up the new chain automatically.
+
 ## 20260423_base_schema.sql
 
 Authoritative, idempotent definition of the four core tables (`profiles`,
