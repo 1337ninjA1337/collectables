@@ -8,22 +8,21 @@ import { HeroBanner } from "@/components/hero-banner";
 import { EmptyState } from "@/components/empty-state";
 import { SkeletonProfileList } from "@/components/skeleton";
 
+import { RelationshipActionRow } from "@/components/relationship-action-row";
 import { Screen } from "@/components/screen";
 import { SwipeTabs } from "@/components/swipe-tabs";
 import { useChat } from "@/lib/chat-context";
 import { useI18n } from "@/lib/i18n-context";
+import { ACTION_METHOD, type RelationshipActionId } from "@/lib/relationship-actions";
 import { useSocial } from "@/lib/social-context";
-import { UserProfile } from "@/lib/types";
+import { ProfileRelationship, UserProfile } from "@/lib/types";
 import { FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import {
   AMBER_MUTED,
-  AMBER_SOFT,
   BORDER,
   CARD_BG,
   CARD_BG_3,
   DANGER,
-  HERO_DARK,
-  HERO_DARK_2,
   HERO_DARK_3,
   MUTED,
   MUTED_2,
@@ -31,10 +30,7 @@ import {
   PURE_WHITE,
   RADIUS_CARD,
   RADIUS_CARD_LG,
-  RADIUS_PILL,
-  SPACING_LIST,
   TEXT_DARK,
-  TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
 
 type Tab = "friends" | "following";
@@ -88,6 +84,53 @@ export default function FriendsScreen() {
     .map((id) => getProfileById(id))
     .filter((p): p is UserProfile => p !== undefined);
 
+  /**
+   * One intent → one context method, via `ACTION_METHOD`. Same switch the
+   * other two surfaces run, and `chat` navigates here exactly as it does on
+   * the profile screen — this screen is the one that had a chat button before
+   * the table existed.
+   */
+  function runRelationshipAction(id: RelationshipActionId, profileId: string) {
+    switch (ACTION_METHOD[id]) {
+      case "chat":
+        router.push(`/chat/${profileId}` as never);
+        return;
+      case "addFriend":
+        void addFriend(profileId);
+        return;
+      case "removeFriend":
+        void removeFriend(profileId);
+        return;
+      case "unfollowProfile":
+        void unfollowProfile(profileId);
+        return;
+      case "followProfile":
+        // No follow action reaches the friends screen — every list here is of
+        // people the user already has an edge to. Throwing rather than
+        // falling through is how a table edit that gave a tab a follow button
+        // surfaces, instead of a button that does nothing.
+        throw new Error("friends screen has no follow action");
+    }
+  }
+
+  /**
+   * The tab a profile is listed under, as a relationship.
+   *
+   * Read from the LIST rather than from `getRelationship`, and the difference
+   * is load-bearing: `getRelationship` answers `friend` before it answers
+   * `following`, so a friend the user also follows would render the friends
+   * buttons on the following tab. The following tab is a tidying screen and
+   * lists everyone in `following` — the tab is the question being asked, so
+   * the tab is what decides.
+   */
+  const RELATIONSHIP_BY_TAB: Readonly<
+    Record<"friend" | "following" | "request", ProfileRelationship>
+  > = {
+    friend: "friend",
+    following: "following",
+    request: "request_received",
+  };
+
   function renderProfileCard(profile: UserProfile, kind: "friend" | "following" | "request") {
     return (
       <View key={profile.id} style={styles.card}>
@@ -105,51 +148,11 @@ export default function FriendsScreen() {
             </View>
           </Pressable>
         </Link>
-        <View style={styles.actions}>
-          {kind === "request" ? (
-            <>
-              <Pressable
-                style={styles.primaryAction}
-                onPress={() => void addFriend(profile.id)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.primaryActionText}>{t("acceptRequest")}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryAction}
-                onPress={() => void removeFriend(profile.id)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.secondaryActionText}>{t("rejectRequest")}</Text>
-              </Pressable>
-            </>
-          ) : kind === "friend" ? (
-            <>
-              <Pressable
-                style={styles.primaryAction}
-                onPress={() => router.push(`/chat/${profile.id}` as never)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.primaryActionText}>{t("chatSend")}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryAction}
-                onPress={() => void removeFriend(profile.id)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.secondaryActionText}>{t("removeFriend")}</Text>
-              </Pressable>
-            </>
-          ) : (
-            <Pressable
-              style={styles.secondaryAction}
-              onPress={() => void unfollowProfile(profile.id)}
-              accessibilityRole="button"
-            >
-              <Text style={styles.secondaryActionText}>{t("unfollow")}</Text>
-            </Pressable>
-          )}
-        </View>
+        <RelationshipActionRow
+          relationship={RELATIONSHIP_BY_TAB[kind]}
+          surface="tab"
+          onAction={(id) => runRelationshipAction(id, profile.id)}
+        />
       </View>
     );
   }
@@ -380,34 +383,5 @@ const styles = StyleSheet.create({
     color: MUTED_2,
     lineHeight: 21,
     fontFamily: FONT_BODY,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING_LIST,
-  },
-  primaryAction: {
-    borderRadius: RADIUS_PILL,
-    backgroundColor: HERO_DARK,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  primaryActionText: {
-    color: TEXT_ON_DARK_4,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  secondaryAction: {
-    borderRadius: RADIUS_PILL,
-    backgroundColor: CARD_BG_3,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  secondaryActionText: {
-    color: HERO_DARK_2,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
   },
 });

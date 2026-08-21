@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { relationshipActions, type ProfileSurface } from "@/lib/relationship-actions";
+import {
+  relationshipActions,
+  SURFACE_RELATIONSHIPS,
+  type ProfileSurface,
+} from "@/lib/relationship-actions";
 import { stripComments } from "@/lib/strip-comments";
 import type { ProfileRelationship } from "@/lib/types";
 
@@ -11,8 +15,8 @@ import { readRepoFile } from "./helpers/repo-file";
  * `<RelationshipActionRow>` — the presentation half of the relationship table.
  *
  * `lib/relationship-actions.ts` made the DECISION single and left the RENDER
- * in two files: `app/people.tsx` and `app/profile/[id].tsx` each declared
- * `primaryAction`, `secondaryAction`, `statusBadge` and three text styles with
+ * in three files: `app/people.tsx`, `app/profile/[id].tsx` and `app/friends.tsx`
+ * each declared `primaryAction`, `secondaryAction` and their label styles with
  * the same values, then wrote the same map-and-render block underneath. One
  * layer down from the duplication the table removed.
  *
@@ -20,11 +24,11 @@ import { readRepoFile } from "./helpers/repo-file";
  * suite here: `tsx --test` has no DOM and importing the component would pull
  * react-native. What that CANNOT see is the pixel, which is exactly how the
  * font drift below survived — so the cases that matter most are the ones
- * pinning that the two screens no longer own any of this.
+ * pinning that the three screens no longer own any of this.
  */
 
 const COMPONENT = "components/relationship-action-row.tsx";
-const SCREENS = ["app/people.tsx", "app/profile/[id].tsx"] as const;
+const SCREENS = ["app/people.tsx", "app/profile/[id].tsx", "app/friends.tsx"] as const;
 
 function read(rel: string): string {
   return readRepoFile(rel);
@@ -130,8 +134,8 @@ describe("components/relationship-action-row.tsx — the styles that moved", () 
   });
 });
 
-describe("both profile surfaces render through the row", () => {
-  it("neither screen declares the styles any more", () => {
+describe("all three profile surfaces render through the row", () => {
+  it("no screen declares the styles any more", () => {
     for (const rel of SCREENS) {
       const src = read(rel);
       for (const name of ["primaryAction", "secondaryAction", "statusBadge"]) {
@@ -144,7 +148,7 @@ describe("both profile surfaces render through the row", () => {
     }
   });
 
-  it("neither screen maps the action list itself", () => {
+  it("no screen maps the action list itself", () => {
     for (const rel of SCREENS) {
       const src = read(rel);
       assert.doesNotMatch(src, /action\.labelKey/, `${rel} still renders actions by hand`);
@@ -155,6 +159,7 @@ describe("both profile surfaces render through the row", () => {
   it("each screen names its own surface", () => {
     assert.match(read("app/people.tsx"), /surface="row"/);
     assert.match(read("app/profile/[id].tsx"), /surface="detail"/);
+    assert.match(read("app/friends.tsx"), /surface="tab"/);
   });
 
   it("the admin button goes through children rather than into the table", () => {
@@ -179,16 +184,17 @@ describe("the row shows what the table says, for every relationship", () => {
     "request_received",
     "none",
   ];
-  const SURFACES: readonly ProfileSurface[] = ["detail", "row"];
+  const SURFACES: readonly ProfileSurface[] = ["detail", "row", "tab"];
 
-  it("has something to render on every surface except a viewer's own profile", () => {
-    // `self` is empty on purpose — the own-profile branch renders editing
-    // controls instead — and the component is only reached on the other
-    // branch. Pinning the emptiness here says the empty list is a decision
-    // rather than a relationship the table forgot.
+  it("never renders an empty row for a relationship its surface actually shows", () => {
+    // An empty `<View style={styles.actions}>` is invisible in a screenshot
+    // and takes up a gap, so nothing here would catch one. The set of
+    // relationships a surface actually shows is `SURFACE_RELATIONSHIPS` — not
+    // "everything except self", which stopped being true when the friends tab
+    // arrived and brought two relationships it has no list for.
     for (const surface of SURFACES) {
       assert.deepEqual(relationshipActions("self", surface), []);
-      for (const relationship of RELATIONSHIPS.filter((r) => r !== "self")) {
+      for (const relationship of SURFACE_RELATIONSHIPS[surface]) {
         assert.ok(
           relationshipActions(relationship, surface).length > 0,
           `${relationship} on ${surface} would render an empty row`,

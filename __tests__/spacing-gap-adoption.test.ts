@@ -39,7 +39,8 @@ const MIGRATED_FILES: ReadonlyArray<{
   // batch 4/6 — app/ now greps clean for gap: 10 / 12 / 8
   { rel: "app/create-collection.tsx", list: true, card: false, inline: true },
   { rel: "app/people.tsx", list: true, card: false, inline: false },
-  { rel: "app/friends.tsx", list: true, card: false, inline: false },
+  // list: false since 2026-08-21 — the action-row gap left with <RelationshipActionRow>
+  { rel: "app/friends.tsx", list: false, card: false, inline: false },
   { rel: "app/stats.tsx", list: true, card: false, inline: true },
   // list: false since 2026-08-08 — the hero gap left with <HeroBanner>
   { rel: "app/collections-feed.tsx", list: false, card: false, inline: false },
