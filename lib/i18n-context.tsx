@@ -1339,6 +1339,37 @@ const be: TranslationMap = {
   profileCacheTtlLowTitle: "Занадта малы TTL кэша профіляў",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS усталяваны ніжэй за 30 секунд. Занадта агрэсіўныя значэнні нагружаюць ліміты Supabase.",
+  // Empty states — the first screen a new account sees on every tab.
+  emptyOwnedTitle: "Пачніце сваю першую калекцыю",
+  emptyOwnedHint:
+    "Згрупуйце прадметы па тэме — карткі, манеты, вініл, цацкі — і дзяліцеся з сябрамі.",
+  emptyOwnedCta: "Стварыць калекцыю",
+  emptyFriendCollectionsTitle: "Пакуль няма калекцый сяброў",
+  emptyFriendCollectionsHint: "Дадавайце сяброў — іх калекцыі з'явяцца тут.",
+  emptyFriendCollectionsCta: "Знайсці сяброў",
+  emptySubscribedTitle: "Няма падпісак",
+  emptySubscribedHint: "Падпішыцеся на цікавыя калекцыі — яны з'явяцца тут.",
+  emptySubscribedCta: "Глядзець людзей",
+  emptyItemsTitle: "У калекцыі пакуль пуста",
+  emptyItemsHint:
+    "Дадайце першы прадмет — сфатаграфуйце, дайце назву і раскажыце гісторыю.",
+  emptyItemsCta: "Дадаць першы прадмет",
+  emptyFriendsTabTitle: "Сяброў пакуль няма",
+  emptyFriendsTabHint:
+    "Адпраўце заяўку з укладкі людзей — калі яе прымуць, вы ўбачыце адно аднаго тут.",
+  emptyFollowingTabTitle: "Вы ні на кога не падпісаны",
+  emptyFollowingTabHint: "Выберыце профіль з укладкі людзей, каб пачаць сачыць.",
+  emptyPeopleTitle: "Нікога не знайшлі",
+  emptyPeopleHint: "Праверце публічны ID або паспрабуйце іншы запыт.",
+  emptySearchTitle: "Нічога не знойдзена",
+  emptySearchHint:
+    "Паспрабуйце іншае слова — пошук глядзіць назвы калекцый і прадметаў.",
+  emptyProfileCollectionsTitle: "Калекцыі схаваны",
+  emptyProfileCollectionsHint:
+    "Падпішыцеся на профіль або дадайце ў сябры, каб бачыць калекцыі.",
+  emptyProfileWishlistTitle: "Спіс жаданняў пусты",
+  emptyProfileWishlistHint:
+    "Гэты карыстальнік пакуль не дадаў прадметы ў спіс жаданняў.",
 };
 
 const pl: TranslationMap = {
@@ -1582,6 +1613,38 @@ const pl: TranslationMap = {
   profileCacheTtlLowTitle: "Za niski TTL pamięci podręcznej profili",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS jest ustawiony poniżej 30 sekund. Zbyt agresywne wartości obciążają limity Supabase.",
+  // Empty states — the first screen a new account sees on every tab.
+  emptyOwnedTitle: "Zacznij swoją pierwszą kolekcję",
+  emptyOwnedHint:
+    "Pogrupuj przedmioty tematycznie — karty, monety, winyle, zabawki — i dziel się nimi ze znajomymi.",
+  emptyOwnedCta: "Utwórz kolekcję",
+  emptyFriendCollectionsTitle: "Brak kolekcji znajomych",
+  emptyFriendCollectionsHint: "Dodaj znajomych, a ich kolekcje pojawią się tutaj.",
+  emptyFriendCollectionsCta: "Znajdź znajomych",
+  emptySubscribedTitle: "Brak subskrypcji",
+  emptySubscribedHint: "Obserwuj ciekawe kolekcje, a pojawią się tutaj.",
+  emptySubscribedCta: "Przeglądaj osoby",
+  emptyItemsTitle: "Ta kolekcja jest pusta",
+  emptyItemsHint:
+    "Dodaj pierwszy przedmiot — zrób zdjęcie, nadaj nazwę i opowiedz jego historię.",
+  emptyItemsCta: "Dodaj pierwszy przedmiot",
+  emptyFriendsTabTitle: "Nie masz jeszcze znajomych",
+  emptyFriendsTabHint:
+    "Wyślij zaproszenie z zakładki z osobami — gdy je przyjmą, zobaczycie się tutaj.",
+  emptyFollowingTabTitle: "Nikogo nie obserwujesz",
+  emptyFollowingTabHint:
+    "Wybierz profil w zakładce z osobami, aby zacząć obserwować.",
+  emptyPeopleTitle: "Nie znaleziono osób",
+  emptyPeopleHint: "Sprawdź publiczny identyfikator lub spróbuj innego zapytania.",
+  emptySearchTitle: "Brak wyników",
+  emptySearchHint:
+    "Spróbuj innego słowa — wyszukiwarka przegląda nazwy kolekcji i przedmiotów.",
+  emptyProfileCollectionsTitle: "Kolekcje są prywatne",
+  emptyProfileCollectionsHint:
+    "Obserwuj ten profil lub dodaj tę osobę do znajomych, aby zobaczyć jej kolekcje.",
+  emptyProfileWishlistTitle: "Lista życzeń jest pusta",
+  emptyProfileWishlistHint:
+    "Ta osoba nie dodała jeszcze nic do swojej listy życzeń.",
 };
 
 const de: TranslationMap = {
@@ -1821,6 +1884,40 @@ const de: TranslationMap = {
   profileCacheTtlLowTitle: "Profil-Cache-TTL zu niedrig",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS ist auf unter 30 Sekunden gesetzt. Zu aggressive Werte belasten die Supabase-Limits.",
+  // Empty states — the first screen a new account sees on every tab.
+  emptyOwnedTitle: "Starte deine erste Sammlung",
+  emptyOwnedHint:
+    "Gruppiere Objekte nach Thema — Karten, Münzen, Vinyl, Spielzeug — und teile sie mit Freunden.",
+  emptyOwnedCta: "Sammlung erstellen",
+  emptyFriendCollectionsTitle: "Noch keine Sammlungen von Freunden",
+  emptyFriendCollectionsHint:
+    "Füge Freunde hinzu — ihre Sammlungen erscheinen dann hier.",
+  emptyFriendCollectionsCta: "Freunde finden",
+  emptySubscribedTitle: "Keine Abos",
+  emptySubscribedHint:
+    "Folge interessanten Sammlungen — sie erscheinen dann hier.",
+  emptySubscribedCta: "Leute ansehen",
+  emptyItemsTitle: "Diese Sammlung ist leer",
+  emptyItemsHint:
+    "Füge dein erstes Objekt hinzu — Foto machen, Namen geben und die Geschichte erzählen.",
+  emptyItemsCta: "Erstes Objekt hinzufügen",
+  emptyFriendsTabTitle: "Noch keine Freunde",
+  emptyFriendsTabHint:
+    "Schick eine Anfrage aus dem Leute-Tab — sobald sie angenommen wird, seht ihr euch hier.",
+  emptyFollowingTabTitle: "Du folgst niemandem",
+  emptyFollowingTabHint:
+    "Wähle im Leute-Tab ein Profil aus, um ihm zu folgen.",
+  emptyPeopleTitle: "Niemanden gefunden",
+  emptyPeopleHint: "Prüfe die öffentliche ID oder versuche eine andere Suche.",
+  emptySearchTitle: "Nichts gefunden",
+  emptySearchHint:
+    "Versuch ein anderes Wort — die Suche schaut in Sammlungs- und Objektnamen.",
+  emptyProfileCollectionsTitle: "Sammlungen sind privat",
+  emptyProfileCollectionsHint:
+    "Folge diesem Profil oder füge die Person als Freund hinzu, um ihre Sammlungen zu sehen.",
+  emptyProfileWishlistTitle: "Wunschliste ist leer",
+  emptyProfileWishlistHint:
+    "Diese Person hat noch nichts auf ihre Wunschliste gesetzt.",
 };
 
 const es: TranslationMap = {
@@ -2061,6 +2158,38 @@ const es: TranslationMap = {
   profileCacheTtlLowTitle: "TTL de caché de perfiles demasiado bajo",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS está por debajo de 30 segundos. Valores demasiado agresivos saturan los límites de Supabase.",
+  // Empty states — the first screen a new account sees on every tab.
+  emptyOwnedTitle: "Empieza tu primera colección",
+  emptyOwnedHint:
+    "Agrupa objetos por tema — cartas, monedas, vinilos, juguetes — y compártelos con tus amigos.",
+  emptyOwnedCta: "Crear colección",
+  emptyFriendCollectionsTitle: "Aún no hay colecciones de amigos",
+  emptyFriendCollectionsHint: "Añade amigos y sus colecciones aparecerán aquí.",
+  emptyFriendCollectionsCta: "Buscar amigos",
+  emptySubscribedTitle: "Sin suscripciones",
+  emptySubscribedHint: "Sigue colecciones interesantes y aparecerán aquí.",
+  emptySubscribedCta: "Ver personas",
+  emptyItemsTitle: "Esta colección está vacía",
+  emptyItemsHint:
+    "Añade tu primer objeto — hazle una foto, ponle nombre y cuenta su historia.",
+  emptyItemsCta: "Añadir primer objeto",
+  emptyFriendsTabTitle: "Aún no tienes amigos",
+  emptyFriendsTabHint:
+    "Envía una solicitud desde la pestaña de personas — cuando la acepten, aparecerá aquí.",
+  emptyFollowingTabTitle: "No sigues a nadie",
+  emptyFollowingTabHint:
+    "Elige un perfil en la pestaña de personas para empezar a seguirlo.",
+  emptyPeopleTitle: "No se encontró a nadie",
+  emptyPeopleHint: "Comprueba el ID público o prueba otra búsqueda.",
+  emptySearchTitle: "Sin resultados",
+  emptySearchHint:
+    "Prueba otra palabra — la búsqueda mira los nombres de colecciones y objetos.",
+  emptyProfileCollectionsTitle: "Las colecciones son privadas",
+  emptyProfileCollectionsHint:
+    "Sigue este perfil o añade a la persona como amiga para ver sus colecciones.",
+  emptyProfileWishlistTitle: "La lista de deseos está vacía",
+  emptyProfileWishlistHint:
+    "Esta persona todavía no ha añadido nada a su lista de deseos.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };

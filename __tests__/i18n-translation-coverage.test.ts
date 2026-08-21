@@ -311,9 +311,15 @@ describe("translation floors", () => {
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
     );
+    // Three, not four, since 2026-08-21: `be` crossed half (51.3%) when the
+    // 24 empty-state keys were translated into all four partial locales. It is
+    // the first time a partial row moved because something was TRANSLATED
+    // rather than because the denominator shrank under it — every previous
+    // move of this number came from deleting dead English keys, which raises
+    // the percentage without a user seeing one more word in their language.
     assert.ok(
-      COVERAGE.filter((row) => coveragePercent(row) < 50).length === 4,
-      `four of the six locales sit below half; the report reads:\n${report}`,
+      COVERAGE.filter((row) => coveragePercent(row) < 50).length === 3,
+      `three of the six locales sit below half; the report reads:\n${report}`,
     );
   });
 });
