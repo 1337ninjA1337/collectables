@@ -18,13 +18,32 @@
  * This module is that instinct lifted out so all twelve can hold it.
  *
  * A floor is stricter than `count > 0` on purpose. Zero files is the loud
- * version of the failure; ONE file is the quiet version, and a walk that lost
- * `app/` but kept `lib/` still reports a comfortable-looking number. So each
- * guard commits a MEASURED minimum — a fact about the current tree with slack
- * under it, in the same spirit as `PRIVACY_BODY_BASELINES` — rather than a
- * magic constant. When a floor legitimately stops matching the tree, the fix
- * is to re-measure and say so in the commit, which is the point: the number
- * only moves deliberately.
+ * version of the failure; ONE file is the quiet version. So each guard commits
+ * a MEASURED minimum — a fact about the current tree with slack under it, in
+ * the same spirit as `PRIVACY_BODY_BASELINES` — rather than a magic constant.
+ * When a floor legitimately stops matching the tree, the fix is to re-measure
+ * and say so in the commit, which is the point: the number only moves
+ * deliberately.
+ *
+ * There are TWO quiet failures, and only one of them is a count.
+ *
+ * A walk that lost `app/` but kept `lib/` reports a comfortable-looking
+ * number, and that used to be the count floor's job too — carried by
+ * arithmetic, since a minimum sitting above the largest single root cannot be
+ * cleared by any one root alone. It worked, and it needed re-measuring every
+ * time the tree grew past it: five times, twice in one afternoon from one new
+ * component, each arriving in a suite unrelated to whatever added the file.
+ * That property now belongs to {@link ScannedCountFloor.roots} and
+ * {@link evaluateScannedRoots}, which say it directly — every declared root
+ * contributed — with no number to go stale.
+ *
+ * What the count still owns is the walk that came back implausibly SMALL with
+ * every root present: a narrowed glob, an extension filter that stopped
+ * matching, a widened skip list. No per-root check can see that, and no
+ * per-root check should — it is a question about the size of the result, which
+ * is what a floor is. The two assertions sit side by side in each multi-root
+ * wrapper, roots first, because when both fire only one of them names the
+ * directory that went quiet.
  *
  * Node-pure on purpose: imported by the tsx CLI wrappers and by node tests.
  */
@@ -760,7 +779,7 @@ export function evaluateParsedInputs(
 export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
   "check-inline-hex": {
     count: { label: "source file", minimum: 174, roots: ["app", "components", "lib"] },
-    note: "app/ + components/ + lib/ held 232 .ts/.tsx files on 2026-08-21 (app 19, components 45, lib 168) — `npm run remeasure-floors` prints this breakdown, and 174 leaves 25% of them deletable. Raised from 168, which lib/'s own count had drawn level with when lib/relationship-actions.ts landed — the FOURTH time this floor has been re-measured for exactly that event, and the third time the root doing it was lib/. That pattern is now the finding rather than the incident: this floor is re-measured every time lib/ grows past it, which is every few weeks, and the note it needs each time is the same one. A floor expressed as a fraction of the walk (\"no root may hold more than 70% of it\") would state the property directly instead of restating a number; see .tasks/.suggestions.md. The property __tests__/lint-guard-partial-root.test.ts enforces is the one a floor can hold: no single scan root clears it on its own, so a floor sitting at lib/'s count means a walk that lost BOTH app/ and components/ passes at the boundary. Losing app/ or components/ alone still passes, and that is the price of the slack.",
+    note: "app/ + components/ + lib/ held 233 .ts/.tsx files on 2026-08-21 (app 19, components 46, lib 168); 174 leaves 25% of them deletable. What this number is FOR changed on 2026-08-21 and the number did not: the no-single-root property moved to `roots` below, which the guard asserts directly, so this floor no longer has to ride above lib/'s 168 and no longer needs re-measuring when a root grows past it. It still catches the other failure — a walk that came back implausibly small with every root present (a narrowed glob, a broken extension filter, a widened skip list) — which a per-root check cannot see. Re-measure it only when the walk's TOTAL has drifted far from it; `npm run remeasure-floors` prints the breakdown and suggests 174.",
   },
   "check-secrets": {
     count: { label: "file", minimum: 500 },
@@ -768,11 +787,11 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
   },
   "check-inline-radius": {
     count: { label: "source file", minimum: 48, roots: ["app", "components"] },
-    note: "app/ + components/ held 65 .ts/.tsx files on 2026-08-21; 48 rides above the 46 that components/ alone contributes, so losing app/ — the root that holds most of the geometry literals — fails rather than passes. Raised from 46 when <RelationshipActionRow> made components/ a 46th file and drew level with the floor: the floor was measured to sit ABOVE that root's own count, so a component landing is exactly the ordinary event it has to be re-measured for. 17 files of slack, the same ~26% it shipped with. Fifth re-measurement across the six multi-root floors and the second caused by a single new component — see .tasks/.suggestions.md on stating the property as a FRACTION of the walk (minimum ≈ 0.75 × walkSize), which is what these numbers keep approximating by hand.",
+    note: "app/ + components/ held 65 .ts/.tsx files on 2026-08-21; 48 leaves 26% deletable. First entry to declare `roots`, on 2026-08-21, after its floor had been re-measured twice in one afternoon because <RelationshipActionRow> made components/ a 46th file and drew level with it. That comparison is gone: the guard asserts every declared root contributed, so a lost app/ refuses by name whatever this number is. The number's remaining job is the walk that shrank without losing a root.",
   },
   "check-analytics-imports": {
     count: { label: "source file", minimum: 48, roots: ["app", "components"] },
-    note: "same app/ + components/ walk as check-inline-radius, 65 files on 2026-08-21; same 48 for the same reason, raised alongside it.",
+    note: "same app/ + components/ walk as check-inline-radius, 65 files on 2026-08-21; same 48 for the same reason, and it declares the same roots. Aligned deliberately, as before — but the alignment now costs nothing to keep, since neither number moves when a root grows.",
   },
   "check-profile-id-pii": {
     count: { label: "source file", minimum: 200 },
@@ -784,15 +803,15 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
   },
   "check-problem-phrasing-imports": {
     count: { label: "source file", minimum: 535, roots: ["app", "components", "lib", "scripts", "__tests__"] },
-    note: "app/ + components/ + lib/ + scripts/ + __tests__/ held 713 .ts/.tsx files on 2026-08-21 (app 19, components 45, lib 168, scripts 32, tests 449); 535 rides above the 449 that __tests__/ alone contributes, so no single root clears this floor on its own — the property check-inline-hex's note names, and the one that matters most here because __tests__/ is where a hand-joined sentence is likeliest to appear. Raised from 450, which __tests__/ drew level with when relationship-actions.test.ts landed. Note that BOTH multi-root floors were re-measured by that one task — one lib/ file and one test file, neither of them large — which is the clearest evidence yet that these floors track repository growth rather than guard coverage; see .tasks/.suggestions.md on expressing the property as a fraction of the walk.",
+    note: "app/ + components/ + lib/ + scripts/ + __tests__/ held 716 .ts/.tsx files on 2026-08-21 (app 19, components 46, lib 168, scripts 32, tests 451); 535 leaves 25% deletable. It used to have to ride above the 451 that __tests__/ alone contributes, which made it the entry likeliest to need re-measuring next — 96% of the way there at one point. `roots` holds that property now, asserted by the guard rather than by this number, and what is left is a plausibility check on the total.",
   },
   "check-a11y-jsx": {
     count: { label: "screen file", minimum: 48, roots: ["app", "components"] },
-    note: "app/ + components/ held 64 .tsx files on 2026-08-21 — the same walk check-clarity-input-mask takes, so it carries the same 48 and moves when that one moves. Aligned deliberately: two floors over one walk that disagreed would be two numbers to re-measure for one event, and the walk's largest root (components/ at 45) is what both sit above.",
+    note: "app/ + components/ held 64 .tsx files on 2026-08-21 — the same walk check-clarity-input-mask takes, so it carries the same 48. Aligned deliberately: two floors over one walk that disagreed would be two numbers to think about for one event. Since 2026-08-21 both declare their roots, so neither moves when a root grows and the alignment is stable by default rather than by maintenance.",
   },
   "check-clarity-input-mask": {
     count: { label: "screen file", minimum: 48, roots: ["app", "components"] },
-    note: "app/ + components/ held 64 .tsx files on 2026-08-21 (one fewer than the radius walk, which also takes .ts); 48 keeps the two floors aligned since the walks differ by a single extension, and still rides above the 45 .tsx files components/ alone contributes. Raised from 46 with check-inline-radius rather than because this walk drew level — alignment is the point, and two floors that used to be one number are two numbers the moment one of them moves alone.",
+    note: "app/ + components/ held 64 .tsx files on 2026-08-21 (one fewer than the radius walk, which also takes .ts); 48 keeps the two floors aligned since the walks differ by a single extension. It no longer needs to ride above components/'s 45 — `roots` holds that property — so the alignment is a readability choice rather than a second number to re-measure.",
   },
   "check-env-inlining": {
     count: { label: "config file", minimum: 3 },

@@ -265,6 +265,26 @@ export const FLOOR_SLACK = 0.25;
 /** One root's contribution to a walk. */
 export type RootCount = { readonly root: string; readonly count: number };
 
+/**
+ * How a walk holds "no single scan root clears this alone".
+ *
+ * `declared_roots` — the entry names its `roots` and the guard asserts at its
+ * own runtime that every one contributed. No number is involved, so the
+ * property survives the tree growing.
+ *
+ * `arithmetic` — the property is carried by the committed minimum sitting
+ * above the largest single root. It is a real enforcement and it was the only
+ * one available before `count.roots` existed, but it is a comparison against a
+ * number, so it stops being true when the tree grows past it: five
+ * re-measurements, twice in one afternoon from a single new component, each
+ * surfacing in a suite unrelated to the change that caused it.
+ *
+ * Every multi-root guard in this repository is on `declared_roots` today. The
+ * other value is not dead: the NEXT one arrives without roots declared, and
+ * this is what tells it so.
+ */
+export type FloorProperty = "declared_roots" | "arithmetic";
+
 export type FloorMeasurement = {
   readonly checkName: string;
   readonly minimum: number;
@@ -272,8 +292,29 @@ export type FloorMeasurement = {
   readonly total: number;
   readonly perRoot: readonly RootCount[];
   readonly largestRoot: RootCount;
-  /** True while no single root clears the declared minimum on its own. */
+  /** Which mechanism holds the no-single-root property for this walk. */
+  readonly property: FloorProperty;
+  /**
+   * True while no single root clears the declared minimum on its own.
+   *
+   * A FACT about the numbers, computed the same way whatever holds the
+   * property — so a `declared_roots` row can report `false` here and be in
+   * perfect health, because what that row's number is for is no longer this.
+   * Whether a `false` needs acting on is {@link FloorMeasurement.actionable},
+   * deliberately a second field: one place decides policy, and the fact stays
+   * readable next to it.
+   */
   readonly holds: boolean;
+  /**
+   * Whether a person has to do something about this row.
+   *
+   * The only thing `remeasure-floors` exits 1 for, and the reason `holds`
+   * alone is not enough: a walk whose roots are declared has its property
+   * enforced by the guard binary, so its minimum drifting under the largest
+   * root costs nothing and demanding a re-measure for it would be the chore
+   * this whole change exists to remove.
+   */
+  readonly actionable: boolean;
   /** Percent of the walk a deletion could remove before the floor trips. */
   readonly slackPercent: number;
   /** What the floor would be if re-measured today. */
@@ -301,6 +342,7 @@ export function measureFloorWalk(
   minimum: number,
   label: string,
   perRoot: readonly RootCount[],
+  property: FloorProperty = "arithmetic",
 ): FloorMeasurement {
   if (perRoot.length === 0) {
     throw new Error(
@@ -311,6 +353,8 @@ export function measureFloorWalk(
   // Ties go to the first root in declared order, which is the order the guard
   // walks and the order every note reads in.
   const largestRoot = perRoot.reduce((max, entry) => (entry.count > max.count ? entry : max));
+  const holds = minimum > largestRoot.count;
+  const slack = Math.floor(total * (1 - FLOOR_SLACK));
   return {
     checkName,
     minimum,
@@ -318,14 +362,30 @@ export function measureFloorWalk(
     total,
     perRoot,
     largestRoot,
-    holds: minimum > largestRoot.count,
+    property,
+    holds,
+    // A `declared_roots` row is never actionable on this axis: its property is
+    // asserted by the guard binary, so the minimum drifting under the largest
+    // root is a number moving, not a hole opening.
+    actionable: property === "arithmetic" && !holds,
     slackPercent: total === 0 ? 0 : Math.round(((total - minimum) / total) * 100),
-    // Above the largest root, and leaving a quarter of the walk deletable —
-    // whichever of the two is STRICTER, because the property is not negotiable
-    // and the slack is. On a lopsided tree the first wins and the suggestion is
-    // tighter than the notes' usual slack; that is the honest answer, since a
-    // floor under its largest root is not a floor.
-    suggested: Math.max(largestRoot.count + 1, Math.floor(total * (1 - FLOOR_SLACK))),
+    // What the floor would be, measured today, under the rule that applies to
+    // it.
+    //
+    // `arithmetic`: above the largest root AND leaving a quarter of the walk
+    // deletable, whichever is STRICTER — the property is not negotiable and
+    // the slack is. On a lopsided tree the first wins and the suggestion comes
+    // out tighter than the notes' usual slack, which is the honest answer,
+    // since a floor under its largest root is not a floor.
+    //
+    // `declared_roots`: the slack reading alone. Freeing the number from the
+    // largest root is the point rather than a side effect — that term is what
+    // pushed floors UP as the tree grew, and a floor pushed up is one that
+    // trips on ordinary shrinkage. What the number is still for is the OTHER
+    // failure: a walk that came back implausibly small with every root present
+    // (a narrowed glob, a broken extension filter, a widened skip list), which
+    // `no_root_files` cannot see and only a count can.
+    suggested: property === "declared_roots" ? slack : Math.max(largestRoot.count + 1, slack),
   };
 }
 
@@ -341,15 +401,26 @@ export function measureFloorWalk(
 export function formatFloorMeasurement(row: FloorMeasurement): string {
   const breakdown = row.perRoot.map(({ root, count }) => `${root} ${String(count)}`).join(", ");
   const lines = [
-    `${row.holds ? "ok  " : "MOVE"} ${row.checkName}`,
+    `${row.actionable ? "MOVE" : "ok  "} ${row.checkName}`,
     `       declared ${String(row.minimum)} ${row.label}(s); walk holds ${String(row.total)} (${breakdown})`,
     `       largest single root: ${row.largestRoot.root} at ${String(row.largestRoot.count)}` +
       `, ${String(row.slackPercent)}% of the walk currently deletable`,
   ];
-  if (!row.holds) {
+  if (row.actionable) {
     lines.push(
       `       ${row.largestRoot.root}/ alone clears the floor, so every other root could vanish and the guard still passes.`,
-      `       re-measure to ${String(row.suggested)} and say why in the note — the note is the half this tool cannot write.`,
+      `       Declare this guard's roots in lib/scanned-floor.ts and assert them in its wrapper — the property`,
+      `       stops depending on the number and this row stops needing a re-measure. Or re-measure to ${String(row.suggested)}`,
+      `       and say why in the note — the note is the half this tool cannot write.`,
+    );
+  } else if (row.property === "declared_roots" && !row.holds) {
+    // Worth saying out loud rather than leaving as a silent `ok`: the number
+    // IS under the largest root, which used to be the whole finding. It is
+    // fine now, and a reader who remembers the old rule should be told why
+    // rather than left to wonder whether the tool stopped checking.
+    lines.push(
+      `       ${row.largestRoot.root}/ alone clears the floor, which no longer matters: this guard asserts`,
+      `       every declared root contributed, so a lost root refuses by name whatever this number is.`,
     );
   } else if (row.slackPercent < FLOOR_SLACK * 100) {
     lines.push(

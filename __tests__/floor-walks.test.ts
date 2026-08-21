@@ -116,6 +116,57 @@ describe("measureFloorWalk", () => {
     assert.ok(row.suggested > row.largestRoot.count);
   });
 
+  it("reports a declared-roots floor under its largest root as a fact, not as work", () => {
+    // The distinction 3/3 is about. `holds` is arithmetic and stays a fact
+    // computed the same way for every row; `actionable` is the policy, and it
+    // is the only thing the tool exits 1 for. A guard that asserts its roots
+    // has the property enforced by its own binary, so the same numbers that
+    // used to be a finding are now just numbers.
+    const declared = measureFloorWalk(
+      "check-x",
+      160,
+      "source file",
+      [root("app", 19), root("components", 45), root("lib", 160)],
+      "declared_roots",
+    );
+    assert.equal(declared.holds, false, "the arithmetic fact is unchanged");
+    assert.equal(declared.actionable, false, "and it is no longer work");
+
+    // Same numbers, no roots declared: still a finding.
+    const arithmetic = measureFloorWalk(
+      "check-x",
+      160,
+      "source file",
+      [root("app", 19), root("components", 45), root("lib", 160)],
+      "arithmetic",
+    );
+    assert.equal(arithmetic.holds, false);
+    assert.equal(arithmetic.actionable, true);
+  });
+
+  it("defaults to arithmetic, so a caller that says nothing gets the stricter rule", () => {
+    // The safer default by a mile: a new multi-root guard arrives without
+    // roots declared, and defaulting to `declared_roots` would quietly exempt
+    // it from the only property it has.
+    const row = measureFloorWalk("check-x", 160, "file", [root("app", 19), root("lib", 160)]);
+    assert.equal(row.property, "arithmetic");
+    assert.equal(row.actionable, true);
+  });
+
+  it("suggests the slack reading alone once the roots are declared", () => {
+    // Freeing the number from `largestRoot + 1` is the point, not a side
+    // effect: that term pushed floors UP as the tree grew, and a floor pushed
+    // up is one that trips on ordinary shrinkage. What the number is still for
+    // is the walk that came back implausibly small with every root present.
+    const perRoot = [root("app", 2), root("tests", 98)];
+    const declared = measureFloorWalk("check-x", 10, "file", perRoot, "declared_roots");
+    // 100 * 0.75 = 75, and the lopsided root is not consulted.
+    assert.equal(declared.suggested, 75);
+    const arithmetic = measureFloorWalk("check-x", 10, "file", perRoot, "arithmetic");
+    // The same tree under the old rule: 98 clears 75, so the property wins.
+    assert.equal(arithmetic.suggested, 99);
+  });
+
   it("refuses a measurement over no roots instead of inventing a zero", () => {
     // A floor over no roots has no largest one, and answering with 0 would be
     // this module producing exactly the vacuous number the floors exist to
@@ -157,6 +208,41 @@ describe("formatFloorMeasurement", () => {
     // The sentence that keeps this a tool rather than a rewriter: the number is
     // mechanical and the reason it moved is not.
     assert.match(line, /the note is the half this tool cannot write/);
+  });
+
+  it("says why a declared-roots floor under its largest root is fine, instead of a silent ok", () => {
+    // A reader who remembers the old rule sees a number under its largest root
+    // and a row marked ok. Left silent, the honest reading is "the tool
+    // stopped checking" — so the row says which mechanism holds the property
+    // now. It is still `ok  ` and still exits 0.
+    const line = formatFloorMeasurement(
+      measureFloorWalk(
+        "check-x",
+        160,
+        "source file",
+        [root("app", 19), root("lib", 160)],
+        "declared_roots",
+      ),
+    );
+    assert.match(line, /^ok {3}check-x$/m);
+    assert.match(line, /which no longer matters/);
+    assert.match(line, /a lost root refuses by name whatever this number is/);
+    assert.doesNotMatch(line, /re-measure to/);
+  });
+
+  it("offers declaring roots before re-measuring, when a row IS actionable", () => {
+    // The order matters: re-measuring is what this tool used to ask for every
+    // time, and it is the fix that has to be done again next quarter. Naming
+    // the durable one first is the difference between a tool that ends a chore
+    // and one that schedules it.
+    const line = formatFloorMeasurement(
+      measureFloorWalk("check-x", 160, "source file", [root("app", 19), root("lib", 160)], "arithmetic"),
+    );
+    assert.match(line, /^MOVE check-x$/m);
+    const declareAt = line.indexOf("Declare this guard's roots");
+    const remeasureAt = line.indexOf("re-measure to");
+    assert.ok(declareAt >= 0 && remeasureAt >= 0, "both remedies must be offered");
+    assert.ok(declareAt < remeasureAt, "the durable fix should be read first");
   });
 
   it("says when a holding floor has less room than these floors are measured with", () => {
@@ -471,8 +557,10 @@ describe("FLOOR_WALKS", () => {
         `${row.largestRoot.root}/ alone holds ${String(row.largestRoot.count)} of the ` +
           `${floor.label}s ${checkName} counts, which clears its floor of ${String(floor.minimum)} — ` +
           `so every other scan root could vanish and the guard still reports green. ` +
-          `Run \`npm run remeasure-floors\`: it suggests ${String(row.suggested)}. ` +
-          `Re-measure in lib/scanned-floor.ts and say why in the note.`,
+          `Declare this guard's roots in lib/scanned-floor.ts and assert them in its wrapper ` +
+          `(see check-inline-radius) — the property stops depending on the number and this case ` +
+          `stops applying to it. Or run \`npm run remeasure-floors\`: it suggests ` +
+          `${String(row.suggested)}; re-measure in lib/scanned-floor.ts and say why in the note.`,
       );
     }
   });

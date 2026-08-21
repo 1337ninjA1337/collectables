@@ -87,7 +87,17 @@ function measure(checkName: string): MeasuredFloor | null {
     count: listSourceFiles(REPO_ROOT, [root], extensions).length,
   }));
   return {
-    row: measureFloorWalk(checkName, floor.minimum, floor.label, perRoot),
+    row: measureFloorWalk(
+      checkName,
+      floor.minimum,
+      floor.label,
+      perRoot,
+      // Which rule this row is judged under. A guard that declares its roots
+      // asserts the property itself, so its number is only ever about the
+      // other failure — a walk that came back implausibly small with every
+      // root present — and this tool stops asking it to move.
+      floor.roots ? "declared_roots" : "arithmetic",
+    ),
     premise: checkWalkPremise(
       checkName,
       walk,
@@ -122,17 +132,19 @@ function main(): void {
     // met it after the whole table would have already read the suggestion.
     for (const problem of premise) console.log(`       ! ${describeWalkPremiseProblem(problem)}`);
   }
-  const moved = rows.filter((row) => !row.holds);
+  const moved = rows.filter((row) => row.actionable);
   const unsound = measured.filter((entry) => entry.premise.length > 0);
   console.log("");
   if (moved.length === 0 && unsound.length === 0) {
-    console.log("remeasure-floors: every floor still sits above its largest single scan root.");
+    console.log(
+      "remeasure-floors: nothing to move — every floor either declares its scan roots (so the property is asserted by the guard, not by the number) or still sits above its largest single root.",
+    );
     return;
   }
   if (moved.length > 0) {
     console.log(
-      `remeasure-floors: ${String(moved.length)} floor(s) no longer sit above their largest root: ` +
-        `${moved.map((row) => row.checkName).join(", ")}. Edit lib/scanned-floor.ts.`,
+      `remeasure-floors: ${String(moved.length)} floor(s) hold the no-single-root property by arithmetic and no longer sit above their largest root: ` +
+        `${moved.map((row) => row.checkName).join(", ")}. Declare their roots in lib/scanned-floor.ts, or re-measure.`,
     );
   }
   if (unsound.length > 0) {
