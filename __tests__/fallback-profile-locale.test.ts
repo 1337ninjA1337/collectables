@@ -139,13 +139,20 @@ describe("the slug fields stay ASCII, which is why they are not translated", () 
     assert.doesNotMatch(FALLBACK_PROFILE_EMAIL, /\byou\b/);
   });
 
-  it("agrees with the two other places that fall back to the same word", () => {
-    // `normalizeProfile` and `ensureUniqueUsername` already default to
-    // "collector"; a seed that disagreed would give one user two different
-    // fallback identities depending on which path built the profile.
+  it("agrees with the other places that fall back to the same word", () => {
+    // `normalizeProfile` and both slugifiers invent a name for a profile that
+    // has none; a seed that disagreed would give one user two different
+    // fallback identities depending on which path built the profile. They
+    // agreed by three hand-written literals until the slug helpers moved to
+    // `lib/social-helpers.ts`; the agreement is structural now, so this checks
+    // the constant is IMPORTED rather than re-typed.
     assert.equal(FALLBACK_SLUG_SEED, "collector");
-    assert.match(SOCIAL_CONTEXT, /\|\| "collector";/);
-    assert.match(SOCIAL_CONTEXT, /\|\| `collector_\$\{Date\.now\(\)\}`/);
+    assert.match(SOCIAL_CONTEXT, /\|\| FALLBACK_SLUG_SEED;/);
+    assert.doesNotMatch(
+      SOCIAL_CONTEXT,
+      /\|\| "collector"/,
+      "a hand-written copy of the fallback word is back alongside the constant",
+    );
   });
 
   it("is what the screen-facing builder actually calls", () => {
