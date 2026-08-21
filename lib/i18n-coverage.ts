@@ -161,19 +161,19 @@ export const TRANSLATION_FLOORS: Readonly<
     note: "499 of 501 on 2026-08-21 (99.6%) — the only fully-maintained locale, and the row that forced this re-measurement: it declared every one of the 35 removed keys, so the last family took it to exactly its old floor of 500 and the slack assertion (strict `<`) went red at equality. ~7% slack; the two inherited keys are pinned by name in the suite rather than left to this number.",
   },
   be: {
-    minimum: 266,
-    note: "290 of 501 on 2026-08-21 (57.9%) — the first partial locale to pass half, and it did so by translation rather than by the denominator shrinking: the empty-state (24), wishlist (14) and item-filter (19) families all landed in all four partial locales the same day. 271 after the wishlist, 257 after the empty states, 233 before them, 222 of 538 before the dead-key removals. ~8% slack, which is roughly one feature's worth of keys.",
+    minimum: 279,
+    note: "304 of 501 on 2026-08-21 (60.7%) — the first partial locale to pass half, and it did so by translation rather than by the denominator shrinking: the empty-state (24), wishlist (14), item-filter (19) and search (14) families all landed in all four partial locales the same day. 290 after the filters, 271 after the wishlist, 257 after the empty states, 233 before them, 222 of 538 before the dead-key removals. ~8% slack, which is roughly one feature's worth of keys.",
   },
   pl: {
-    minimum: 258,
-    note: "281 of 501 on 2026-08-21 (56.1%) — 262 after the wishlist, 248 after the empty states, 224 before them, 213 of 538 before the removals. ~8% slack, same reasoning as be.",
+    minimum: 271,
+    note: "295 of 501 on 2026-08-21 (58.9%) — 281 after the filters, 262 after the wishlist, 248 after the empty states, 224 before them, 213 of 538 before the removals. ~8% slack, same reasoning as be.",
   },
   de: {
-    minimum: 254,
-    note: "277 of 501 on 2026-08-21 (55.3%) — 258 after the wishlist, 244 after the empty states, 220 before them, 209 of 538 before the removals. ~8% slack, same reasoning as be.",
+    minimum: 267,
+    note: "291 of 501 on 2026-08-21 (58.1%) — 277 after the filters, 258 after the wishlist, 244 after the empty states, 220 before them, 209 of 538 before the removals. ~8% slack, same reasoning as be.",
   },
   es: {
-    minimum: 255,
-    note: "278 of 501 on 2026-08-21 (55.5%) — 259 after the wishlist, 245 after the empty states, 221 before them, 209 of 538 before the removals. One ahead of de because it never declared the 'opened for you' header, so the collections-list removal took two declarations from it rather than three. ~8% slack, same reasoning as be.",
+    minimum: 268,
+    note: "292 of 501 on 2026-08-21 (58.3%) — 278 after the filters, 259 after the wishlist, 245 after the empty states, 221 before them, 209 of 538 before the removals. One ahead of de because it never declared the 'opened for you' header, so the collections-list removal took two declarations from it rather than three. ~8% slack, same reasoning as be.",
   },
 };
