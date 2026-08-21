@@ -46,14 +46,14 @@ import {
   checkWalkPremise,
   describeWalkPremiseProblem,
   FLOOR_DRIFT,
-  FLOOR_WALKS,
+  floorWalks,
   formatFloorMeasurement,
   measureFloorWalk,
   type FloorMeasurement,
+  type FloorWalk,
   type WalkPremiseProblem,
 } from "../lib/floor-walks";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
-import { SOURCE_EXTENSIONS } from "../lib/source-dirs";
 import { listSourceFiles, tallyExtensions } from "./guard-io";
 
 const REPO_ROOT = path.join(__dirname, "..");
@@ -75,14 +75,15 @@ type MeasuredFloor = {
  * this tool's worst possible output — a smaller floor, justified by counting,
  * with the erosion it was written to catch baked into the new number.
  */
-function measure(checkName: string): MeasuredFloor | null {
-  const walk = FLOOR_WALKS[checkName];
+function measure(walk: FloorWalk): MeasuredFloor | null {
+  const checkName = walk.checkName;
   const floor = SCANNED_FLOORS[checkName]?.count;
-  // A walk without a count floor is not a thing this tool has an opinion
-  // about, and saying so with `null` keeps the caller's loop free of a branch
-  // per table.
-  if (!walk || !floor) return null;
-  const extensions = walk.extensions ?? SOURCE_EXTENSIONS;
+  // Cannot be null now that the walk list is derived FROM the floor table —
+  // kept as a guard rather than an assertion because the two are read
+  // separately here, and a `null` row is quieter than a throw for a tool
+  // nobody is required to run.
+  if (!floor) return null;
+  const extensions = walk.extensions;
   const perRoot = walk.roots.map((root) => ({
     root,
     count: listSourceFiles(REPO_ROOT, [root], extensions).length,
@@ -101,7 +102,7 @@ function measure(checkName: string): MeasuredFloor | null {
     ),
     premise: checkWalkPremise(
       checkName,
-      walk,
+      extensions,
       perRoot.map(({ root, count }) => ({
         root,
         counted: count,
@@ -112,15 +113,17 @@ function measure(checkName: string): MeasuredFloor | null {
 }
 
 function main(): void {
-  const measured = Object.keys(FLOOR_WALKS)
+  const measured = floorWalks()
     .map(measure)
     .filter((entry): entry is MeasuredFloor => entry !== null);
   const rows = measured.map((entry) => entry.row);
   if (rows.length === 0) {
-    // FLOOR_WALKS is hand-kept; empty means somebody emptied it, and printing
-    // "0 floors, all fine" over that is the vacuous pass these floors exist to
-    // refuse one level down.
-    console.error("remeasure-floors: no multi-root floors to measure — FLOOR_WALKS is empty.");
+    // Empty means no SCANNED_FLOORS entry declares `roots` any more, and
+    // printing "0 floors, all fine" over that is the vacuous pass these floors
+    // exist to refuse one level down.
+    console.error(
+      "remeasure-floors: no multi-root floors to measure — no SCANNED_FLOORS entry declares count.roots.",
+    );
     process.exit(1);
   }
   console.log(

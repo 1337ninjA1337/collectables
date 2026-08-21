@@ -48,6 +48,8 @@
  * Node-pure on purpose: imported by the tsx CLI wrappers and by node tests.
  */
 
+import { MARKUP_EXTENSIONS } from "./source-dirs";
+
 /** Why a floor check failed. */
 export type ScannedFloorFailureCode =
   /** The walk found nothing at all — the loud version. */
@@ -351,6 +353,23 @@ export type ScannedCountFloor = {
    * `__tests__/floor-walks.test.ts` pins for every row that declares them.
    */
   readonly roots?: readonly string[];
+  /**
+   * File extensions the walk counts, when it counts fewer than all of them.
+   *
+   * Only meaningful alongside {@link ScannedCountFloor.roots}, and only for
+   * the walks that narrow: `check-a11y-jsx` and `check-clarity-input-mask`
+   * read `.tsx` alone, because a rule about rendered elements has nothing to
+   * say about a `.ts` module beside them. Omitted means every source
+   * extension, which is what the other four take.
+   *
+   * It lives here rather than in a table of its own because a walk is
+   * completely described by its roots and its extensions, and those were two
+   * lists in two files kept in step by a test — `FLOOR_WALKS` named the roots
+   * for the re-measure tool while this entry named them for the guard. One of
+   * them had to be the source, and it had to be the one the guard actually
+   * asserts against.
+   */
+  readonly extensions?: readonly string[];
 };
 
 /**
@@ -806,11 +825,21 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     note: "app/ + components/ + lib/ + scripts/ + __tests__/ held 716 .ts/.tsx files on 2026-08-21 (app 19, components 46, lib 168, scripts 32, tests 451); 535 leaves 25% deletable. It used to have to ride above the 451 that __tests__/ alone contributes, which made it the entry likeliest to need re-measuring next — 96% of the way there at one point. `roots` holds that property now, asserted by the guard rather than by this number, and what is left is a plausibility check on the total.",
   },
   "check-a11y-jsx": {
-    count: { label: "screen file", minimum: 48, roots: ["app", "components"] },
+    count: {
+      label: "screen file",
+      minimum: 48,
+      roots: ["app", "components"],
+      extensions: MARKUP_EXTENSIONS,
+    },
     note: "app/ + components/ held 64 .tsx files on 2026-08-21 — the same walk check-clarity-input-mask takes, so it carries the same 48. Aligned deliberately: two floors over one walk that disagreed would be two numbers to think about for one event. Since 2026-08-21 both declare their roots, so neither moves when a root grows and the alignment is stable by default rather than by maintenance.",
   },
   "check-clarity-input-mask": {
-    count: { label: "screen file", minimum: 48, roots: ["app", "components"] },
+    count: {
+      label: "screen file",
+      minimum: 48,
+      roots: ["app", "components"],
+      extensions: MARKUP_EXTENSIONS,
+    },
     note: "app/ + components/ held 64 .tsx files on 2026-08-21 (one fewer than the radius walk, which also takes .ts); 48 keeps the two floors aligned since the walks differ by a single extension. It no longer needs to ride above components/'s 45 — `roots` holds that property — so the alignment is a readability choice rather than a second number to re-measure.",
   },
   "check-env-inlining": {
