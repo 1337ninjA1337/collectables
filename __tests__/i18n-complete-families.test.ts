@@ -68,6 +68,13 @@ const FAMILIES: readonly Family[] = [
     because:
       "the search overlay was already half-translated — four keys in every locale and fourteen in none, so the same overlay showed a translated placeholder above English result headings",
   },
+  {
+    name: "marketplace",
+    pattern: /^marketplace[A-Z]/,
+    size: 73,
+    because:
+      "the largest family in the map, and the only one that was 61/73 done in four locales — the twelve missing keys were the whole `marketplaceSoldPrompt*` sub-family, which is the dialog a seller meets the moment somebody claims their listing and has to choose between archiving, deleting and keeping the original",
+  },
 ];
 
 describe("complete i18n families", () => {
