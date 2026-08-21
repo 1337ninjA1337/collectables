@@ -54,6 +54,13 @@ const FAMILIES: readonly Family[] = [
     because:
       "the wishlist empty states were translated on 2026-08-21 while `wishlist` itself was not, so the screen read a translated body under an English heading — the seam this family closes",
   },
+  {
+    name: "item filters",
+    pattern: /^filter[A-Z]/,
+    size: 20,
+    because:
+      "the filter sheet opens from every list screen, and eight of its twenty strings are validation errors — the messages a user reads while already stuck, which is the worst moment to switch languages on them",
+  },
 ];
 
 describe("complete i18n families", () => {
@@ -89,14 +96,19 @@ describe("complete i18n families", () => {
         }
       });
 
+      // The keys worth comparing by value: long enough that a copy-paste
+      // actually reaches for them. Short labels can legitimately coincide
+      // between related languages, and `Premium` is the same word in five of
+      // the six. `filterActive` qualifies through its TEMPLATE rather than a
+      // string literal — see `valueOf`.
+      const long = keys.filter(
+        (key) => (valueOf(TRANSLATION_BASE_LANGUAGE, key) ?? "").length >= 25,
+      );
+
       it("says something different from English in each language", () => {
         // Declaring the key and pasting the English value satisfies the rule
         // above without meeting it, and the coverage counter cannot see the
-        // difference — a declared key counts whatever its value is. Checked on
-        // the long strings, which are what a copy-paste actually reaches for;
-        // short labels can legitimately coincide between related languages,
-        // and `Premium` is the same word in five of the six.
-        const long = keys.filter((key) => (valueOf(TRANSLATION_BASE_LANGUAGE, key) ?? "").length >= 25);
+        // difference — a declared key counts whatever its value is.
         assert.ok(
           long.length >= 4,
           `'${family.name}' has only ${long.length} long strings — too few for this case to mean anything`,
@@ -115,11 +127,27 @@ describe("complete i18n families", () => {
         }
       });
 
+      it("compares the function-valued keys too, not just the literals", () => {
+        // `filterActive` is the first function value to land in a listed
+        // family, and it is exactly the shape that slips through: a locale can
+        // declare `(params) => ⁠`Filters (${…})`⁠` with the English word in it
+        // and satisfy every count in this file. So the comparison above must
+        // reach it, which means this case has to assert that it DOES — a
+        // reader that quietly returned null for functions would make the
+        // verbatim check skip them and stay green.
+        const functionKeys = keys.filter((key) => isFunctionValued(TRANSLATION_BASE_LANGUAGE, key));
+        for (const key of functionKeys) {
+          assert.ok(
+            long.includes(key),
+            `'${key}' is function-valued and is not being compared — the template reader stopped working`,
+          );
+        }
+      });
+
       it("reads a real value for every long string in every language", () => {
-        // The case above compares two reads and passes when BOTH come back
+        // The verbatim case compares two reads and passes when BOTH come back
         // null, which is what a reader that stopped working returns. This is
         // the half that would notice.
-        const long = keys.filter((key) => (valueOf(TRANSLATION_BASE_LANGUAGE, key) ?? "").length >= 25);
         for (const language of TRANSLATION_LANGUAGES) {
           for (const key of long) {
             const value = valueOf(language, key);
@@ -152,17 +180,40 @@ describe("complete i18n families", () => {
 });
 
 /**
- * Reads one key's literal string out of one locale block, tolerating the
- * line-wrapped form (`key:\n    "…"`) the long strings are written in — there
- * is no prettier here, so both spellings genuinely exist side by side. Returns
- * `null` for a key declared as a function (`filterActive` is one, in a family
- * not yet listed here) or absent; the vacuity cases above are what stop a
- * `null` being read as agreement.
+ * Reads one key's translatable TEXT out of one locale block, in either of the
+ * two shapes this file uses.
+ *
+ * A string literal, tolerating the line-wrapped form (`key:\n    "…"`) the
+ * long strings are written in — there is no prettier here, so both spellings
+ * genuinely exist side by side.
+ *
+ * Or, for a function-valued key, the body of its template literal —
+ * `` `Filters (${params?.count ?? 0})` `` yields ``Filters (${params?.count ??
+ * 0})``. The interpolation is deliberately left in rather than stripped: it is
+ * identical across locales, so it neither hides a difference nor invents one,
+ * and stripping it would need a second brace-aware walk to do correctly.
+ * Reading these matters because a function value is the shape most likely to
+ * be copied wholesale — the English word sits inside what looks like code.
+ *
+ * Returns `null` when the key is absent or declared in some third shape; the
+ * vacuity cases above are what stop a `null` being read as agreement.
  */
 function valueOf(language: string, key: string): string | null {
   const block = findLocaleBlock(source, language);
   if (!block) return null;
-  const re = new RegExp(`(?:^|\\n)\\s{2}${key}:\\s*(?:\\n\\s+)?"((?:[^"\\\\]|\\\\.)*)"`);
-  const match = re.exec(block.body);
-  return match ? match[1] : null;
+  const literal = new RegExp(
+    `(?:^|\\n)\\s{2}${key}:\\s*(?:\\n\\s+)?"((?:[^"\\\\]|\\\\.)*)"`,
+  ).exec(block.body);
+  if (literal) return literal[1];
+  const template = new RegExp(
+    `(?:^|\\n)\\s{2}${key}:\\s*\\([^)]*\\)\\s*=>\\s*(?:\\n\\s+)?\`([^\`]*)\``,
+  ).exec(block.body);
+  return template ? template[1] : null;
+}
+
+/** True when the base language declares this key as an arrow function. */
+function isFunctionValued(language: string, key: string): boolean {
+  const block = findLocaleBlock(source, language);
+  if (!block) return false;
+  return new RegExp(`(?:^|\\n)\\s{2}${key}:\\s*\\(`).test(block.body);
 }
