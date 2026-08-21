@@ -9,9 +9,11 @@ import {
   assertParsedInputs,
   assertScanned,
   assertScannedFloor,
+  assertScannedRoots,
   countFloorFor,
   evaluateParsedInputs,
   evaluateScannedFloor,
+  evaluateScannedRoots,
   describeScannedFloorProblem,
   describeScannedFloorProblemRef,
   scannedFloorProblemSubject,
@@ -92,6 +94,9 @@ const EVERY_PROBLEM_CODE: Record<ScannedFloorProblemCode, true> = {
   empty_inputs: true,
   blank_input: true,
   duplicate_input: true,
+  empty_roots: true,
+  blank_root: true,
+  duplicate_root: true,
   delegation_with_shape: true,
   empty_delegation: true,
   empty_note: true,
@@ -240,6 +245,86 @@ describe("isNonEmptyInput", () => {
   });
 });
 
+describe("evaluateScannedRoots", () => {
+  const ROOTS = ["app", "components"] as const;
+  const both = ["app/index.tsx", "components/screen.tsx"];
+
+  it("passes when every declared root contributed", () => {
+    assert.deepEqual(evaluateScannedRoots(both, ROOTS), { ok: true });
+  });
+
+  it("is satisfied by one file per root, because presence is the whole claim", () => {
+    // Deliberately not a per-root minimum: the failure this defends against is
+    // a root that stopped being walked at all. A root legitimately holding one
+    // file is a root the guard is reading, and demanding more would be a
+    // second measured number needing its own note and its own re-measure.
+    assert.deepEqual(evaluateScannedRoots(both, ROOTS).ok, true);
+  });
+
+  it("names the root that turned up nothing", () => {
+    const verdict = evaluateScannedRoots(["app/index.tsx"], ROOTS);
+    assert.equal(verdict.ok, false);
+    if (verdict.ok) return;
+    assert.equal(verdict.failure.code, "no_root_files");
+    assert.equal(verdict.failure.root, "components");
+  });
+
+  it("reports the first empty root in declared order, not all of them", () => {
+    // Same rule `scannedFloorFor` follows for entry problems: a guard that lost
+    // two roots has one thing wrong with it, and a list of consequences reads
+    // as a list of bugs.
+    const verdict = evaluateScannedRoots(["lib/x.ts"], ROOTS);
+    assert.equal(verdict.ok, false);
+    if (verdict.ok) return;
+    assert.equal(verdict.failure.root, "app");
+  });
+
+  it("does not let a similarly-named sibling stand in for a root", () => {
+    // `startsWith("app")` would take `apple/` as evidence that `app/` was
+    // walked — a silent miss of exactly the kind this check exists to catch.
+    const verdict = evaluateScannedRoots(
+      ["apple/index.tsx", "components/screen.tsx"],
+      ROOTS,
+    );
+    assert.equal(verdict.ok, false);
+    if (verdict.ok) return;
+    assert.equal(verdict.failure.root, "app");
+  });
+
+  it("counts a file that IS the root, for a walk of a single file path", () => {
+    assert.deepEqual(evaluateScannedRoots(["MANUAL-TASKS.md"], ["MANUAL-TASKS.md"]).ok, true);
+  });
+
+  it("carries the count of the whole walk, which is what makes the message land", () => {
+    // The point of the sentence is that the total looks healthy — quoting the
+    // walk's own count is what shows the reader why nothing else noticed.
+    const verdict = evaluateScannedRoots(
+      ["app/a.tsx", "app/b.tsx", "app/c.tsx"],
+      ROOTS,
+      "source file",
+    );
+    assert.equal(verdict.ok, false);
+    if (verdict.ok) return;
+    assert.equal(verdict.failure.count, 3);
+    assert.equal(verdict.failure.label, "source file");
+    const message = formatScannedFloorFailure("check-x", verdict.failure);
+    assert.match(message, /components\/ contributed 0 of the 3 source file\(s\)/);
+    // No re-measure advice: there is no number here to move, and telling a
+    // reader to lower a floor because a directory vanished is the wrong fix
+    // made easy — which is why this code exists beside `below_floor`.
+    assert.doesNotMatch(message, /re-measure/i);
+  });
+
+  it("refuses to be asked over no roots at all", () => {
+    // The vacuous pass one level up from the empty walk: a per-root check with
+    // no roots passes over any tree, including the tree that lost every one.
+    assert.throws(
+      () => evaluateScannedRoots(both, []),
+      /passes over any walk/,
+    );
+  });
+});
+
 describe("evaluateParsedInputs", () => {
   it("passes when every declared input is present and non-empty", () => {
     assert.deepEqual(
@@ -377,6 +462,12 @@ describe("validateScannedFloorEntry", () => {
     empty_inputs: { inputs: [], note: "nothing named" },
     blank_input: { inputs: ["app.json", "  "], note: "one is blank" },
     duplicate_input: { inputs: ["app.json", "app.json"], note: "twice" },
+    empty_roots: { count: { label: "file", minimum: 10, roots: [] }, note: "2026-08-13" },
+    blank_root: { count: { label: "file", minimum: 10, roots: ["app", " "] }, note: "2026-08-13" },
+    duplicate_root: {
+      count: { label: "file", minimum: 10, roots: ["app", "app"] },
+      note: "2026-08-13",
+    },
     delegation_with_shape: {
       count: { label: "file", minimum: 10 },
       delegatedTo: "elsewhere",
@@ -690,6 +781,16 @@ describe("a failure carries a problem, not a sentence about one", () => {
       failureFromThrow(() => countFloorFor("check-appstore-config")),
     no_inputs_floor: () =>
       failureFromThrow(() => assertParsedInputs("check-secrets", {})),
+    // The per-root pair. `no_root_files` has a pure evaluator like the first
+    // six; `no_roots_floor` is a lookup code like the three above it, raised by
+    // a wrapper handing files to an entry that names no roots.
+    no_root_files: () => {
+      const verdict = evaluateScannedRoots(["components/a.tsx"], ["app", "components"], "file");
+      if (verdict.ok) throw new Error("expected a missing root to fail");
+      return verdict.failure;
+    },
+    no_roots_floor: () =>
+      failureFromThrow(() => assertScannedRoots("check-inline-hex", ["lib/a.ts"])),
   };
   const failureCodes = Object.keys(EVERY_FAILURE) as ScannedFloorFailureCode[];
 
@@ -729,6 +830,7 @@ describe("a failure carries a problem, not a sentence about one", () => {
       minimum: true,
       label: true,
       input: true,
+      root: true,
       reason: true,
       problem: true,
     };
@@ -740,6 +842,7 @@ describe("a failure carries a problem, not a sentence about one", () => {
       "minimum",
       "problem",
       "reason",
+      "root",
     ]);
     for (const code of failureCodes) {
       for (const field of Object.keys(EVERY_FAILURE[code]())) {

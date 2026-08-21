@@ -131,6 +131,32 @@ const CASES: Record<ProblemCodeKey, ProblemCase> = {
     checkName: "check-sentry-version",
     rewrite: (entry) => entry.replace(/inputs: \["([^"]+)"/, 'inputs: ["$1", "$1"'),
   },
+  // The three roots codes, all against the one guard that declares roots. Each
+  // rewrite trips exactly one: `[]` satisfies neither the blank nor the
+  // duplicate check, `["app", ""]` has two distinct entries, and `["app",
+  // "app"]` has no blank one.
+  //
+  // An empty list is the worst of the three: the per-root assertion then walks
+  // no roots and passes over anything, which is the vacuous pass one level up
+  // from the empty walk the count floor exists to refuse.
+  empty_roots: {
+    checkName: "check-inline-radius",
+    rewrite: (entry) => entry.replace(/roots: \[[^\]]*\]/, "roots: []"),
+  },
+  // A blank root is satisfied by every file in the walk, because every path
+  // starts with the empty string — so it reads as a root being checked and
+  // reports nothing about any directory.
+  blank_root: {
+    checkName: "check-inline-radius",
+    rewrite: (entry) => entry.replace(/roots: \[[^\]]*\]/, 'roots: ["app", ""]'),
+  },
+  // The second copy can only pass when the first already did, so it is a check
+  // that cannot fail on its own — and it hides a root the walk really does
+  // cover from ever being named.
+  duplicate_root: {
+    checkName: "check-inline-radius",
+    rewrite: (entry) => entry.replace(/roots: \[[^\]]*\]/, 'roots: ["app", "app"]'),
+  },
   // Two places claiming one premise, which is the shape that produces a guard
   // everybody believes is covered and nobody owns.
   delegation_with_shape: {

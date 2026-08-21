@@ -69,8 +69,17 @@ function firstEntriesOf(
 const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // Walks app + components + lib; app alone is the smallest of the three.
   "check-inline-hex": () => ["app"],
-  // Both walk app + components.
-  "check-inline-radius": () => ["app"],
+  // Both walk app + components. `check-inline-radius` keeps a slice of BOTH
+  // roots rather than all of `app`, because it is the first guard to assert
+  // per-root presence and that assertion now runs first: a fixture holding only
+  // `app` refuses on `no_root_files` naming `components/`, which is the right
+  // refusal and the wrong one for this suite. Six files across two present
+  // roots is a walk that is genuinely too small, which is what `below_floor`
+  // is about. The dropped-root case has its own block at the end of this file.
+  "check-inline-radius": () => [
+    ...firstEntriesOf("app", 3, (name) => name.endsWith(".tsx")),
+    ...firstEntriesOf("components", 3, (name) => name.endsWith(".tsx")),
+  ],
   "check-analytics-imports": () => ["app"],
   // Walks app + components + lib + scripts + __tests__. Its floor rides above
   // what __tests__/ alone contributes, so app/ — the smallest of the five — is
@@ -319,10 +328,37 @@ describe("no single scan root clears a multi-root guard's floor", () => {
           const run = runGuardIn(guard, fixtureFor([root]).root);
           const floor = SCANNED_FLOORS[checkName].count;
           assert.ok(floor, `${checkName} declares no count floor`);
+
+          // Two ways to hold this property, and which one a guard uses is
+          // whether its entry names `roots`.
+          //
+          // Declaring them states it directly: every declared root must have
+          // contributed, so a tree holding one root refuses by NAME whatever
+          // the committed minimum happens to be. Nothing to re-measure.
+          //
+          // Without them the property is arithmetic — the floor has to sit
+          // above the largest single root — and that number goes stale every
+          // time the tree grows, which is what this failure message is for.
+          // The remaining guards move onto `roots` in 2/3; until then both
+          // spellings are live and this case reads whichever applies.
+          if (floor.roots) {
+            assert.equal(
+              run.status,
+              1,
+              `${checkName} declares roots and passed over a tree holding only ${root}/:\n${run.output}`,
+            );
+            assert.match(
+              run.output,
+              new RegExp(`scan root (?!${root}/)\\S+/ contributed 0 of the`),
+              `${checkName} refused a tree holding only ${root}/ without naming the root that went missing — the whole point of declaring roots:\n${run.output}`,
+            );
+            return;
+          }
+
           assert.equal(
             run.status,
             1,
-            `${root}/ alone holds ${parseScanned(run.output)} of the ${floor.label}s ${checkName} counts, which clears its floor of ${floor.minimum} — so every other scan root can vanish and the guard still reports green. Re-measure the floor in lib/scanned-floor.ts and say why in the commit.\n${run.output}`,
+            `${root}/ alone holds ${parseScanned(run.output)} of the ${floor.label}s ${checkName} counts, which clears its floor of ${floor.minimum} — so every other scan root can vanish and the guard still reports green. Declare this guard's roots in lib/scanned-floor.ts (see check-inline-radius) so the property stops depending on the number, or re-measure the floor and say why in the commit.\n${run.output}`,
           );
           const { count } = parseBelowFloor(checkName, run.output);
           assert.ok(count > 0, `${root}/ contributed nothing to the walk`);
