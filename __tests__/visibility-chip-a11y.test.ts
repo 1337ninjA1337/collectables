@@ -1,9 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { localeKeys } from "@/lib/i18n-source";
-
-import { assertMatchesInEveryLocaleBody, locales } from "./helpers/i18n-locales";
+import {
+  assertMatchesInEveryLocaleBody,
+  assertNoLocaleDeclares,
+} from "./helpers/i18n-locales";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { readRepoFile as read } from "./helpers/repo-file";
 
@@ -155,15 +156,13 @@ describe("visibility chip text and hints — every locale declares its own text"
  * `visibilityViewer` by reflex.
  */
 describe("visibilityShared — the dead, contradictory key stays deleted", () => {
-  const src = readI18nSource();
-  for (const language of locales(src)) {
-    it(`${language} declares no visibilityShared`, () => {
-      assert.ok(
-        !localeKeys(src, language).has("visibilityShared"),
-        `${language} re-declares visibilityShared — it was removed as a dead, ` +
-          `self-contradictory duplicate of visibilityViewer; use visibilityViewer ` +
-          `(shared-with-me) or visibilityPublic (public) instead`,
-      );
-    });
-  }
+  it("no locale declares visibilityShared", () => {
+    assertNoLocaleDeclares(
+      readI18nSource(),
+      (key) => key === "visibilityShared",
+      "visibilityShared was removed as a dead, self-contradictory duplicate " +
+        "of visibilityViewer; use visibilityViewer (shared-with-me) or " +
+        "visibilityPublic (public) instead",
+    );
+  });
 });

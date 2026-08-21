@@ -5,6 +5,7 @@ import { readI18nSource } from "./helpers/i18n-source-file";
 import {
   assertDeclaredInEveryLocale,
   assertMatchesInEveryLocaleBody,
+  assertNoLocaleDeclares,
   assertMatchesInEveryNonBaseLocaleBody,
   assertValueInEveryLocale,
   localeBodies,
@@ -138,6 +139,68 @@ describe("asking each locale instead of counting the file", () => {
     );
     assert.deepEqual([...localeBodies(mentioned).keys()], ["en", "ru"]);
     assert.throws(() => assertDeclaredInEveryLocale(mentioned, "note"), /ru/);
+  });
+});
+
+describe("the mirror: a key that was removed on purpose", () => {
+  it("passes for a name no locale declares", () => {
+    assertNoLocaleDeclares(TWO_LOCALES, (key) => key === "salutation", "gone");
+    assertNoLocaleDeclares(TWO_LOCALES, (key) => key.startsWith("runtime"), "gone");
+  });
+
+  it("names the locale AND the key, because a half-done removal is the likely one", () => {
+    // The realistic regression is not a wholesale revert: it is a key deleted
+    // from `en` and left in `ru`. Both locales inherit-or-serve a string
+    // either way, so nothing at runtime shows it, and "some locale still has
+    // it" would send a reader back to the file to find out which.
+    const halfRemoved = TWO_LOCALES.replace('  greeting: "Hello",\n', "");
+    assert.throws(
+      () => assertNoLocaleDeclares(halfRemoved, (key) => key === "greeting", "greeting is gone"),
+      (error: Error) => {
+        assert.match(error.message, /greeting is gone/);
+        assert.match(error.message, /ru: greeting/);
+        assert.doesNotMatch(error.message, /en: greeting/);
+        return true;
+      },
+    );
+  });
+
+  it("reports every offender rather than the first, so one run says how far the revert went", () => {
+    assert.throws(
+      () => assertNoLocaleDeclares(TWO_LOCALES, (key) => key === "farewell", "farewell is gone"),
+      (error: Error) => {
+        assert.match(error.message, /en: farewell/);
+        assert.match(error.message, /ru: farewell/);
+        return true;
+      },
+    );
+  });
+
+  it("asks each locale's DECLARED keys, so an inherited key is not an offence", () => {
+    // The other side of the distinction `assertDeclaredInEveryLocale` makes.
+    // `ru` spreads `...en`, so a key only `en` declares RESOLVES for Russian —
+    // but `ru` has not re-declared it, and re-declaring is the thing being
+    // guarded against. Reporting `ru` here would make the failure unfixable:
+    // there is nothing in the `ru` map to delete.
+    const baseOnly = TWO_LOCALES.replace('  greeting: "Привет",\n', "");
+    assert.throws(
+      () => assertNoLocaleDeclares(baseOnly, (key) => key === "greeting", "greeting is gone"),
+      (error: Error) => {
+        assert.match(error.message, /en: greeting/);
+        assert.doesNotMatch(error.message, /ru: greeting/);
+        return true;
+      },
+    );
+  });
+
+  it("is the mirror of the declaration check on the same fixture", () => {
+    // Stated as a pair, because the two are easy to reach for by the wrong
+    // name: one demands the key everywhere, the other forbids it everywhere,
+    // and no source can satisfy both for a key any locale declares.
+    assertDeclaredInEveryLocale(TWO_LOCALES, "greeting");
+    assert.throws(() =>
+      assertNoLocaleDeclares(TWO_LOCALES, (key) => key === "greeting", "greeting is gone"),
+    );
   });
 });
 

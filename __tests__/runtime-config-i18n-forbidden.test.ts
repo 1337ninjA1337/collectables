@@ -1,9 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { localeKeys } from "@/lib/i18n-source";
-
-import { locales } from "./helpers/i18n-locales";
+import { assertNoLocaleDeclares } from "./helpers/i18n-locales";
 import { readI18nSource } from "./helpers/i18n-source-file";
 
 /**
@@ -25,18 +23,23 @@ import { readI18nSource } from "./helpers/i18n-source-file";
 describe("runtime Supabase-config form — its i18n keys stay deleted", () => {
   const src = readI18nSource();
 
-  for (const language of locales(src)) {
-    it(`${language} declares no runtimeConfig* key`, () => {
-      const offenders = [...localeKeys(src, language)].filter((key) =>
-        key.startsWith("runtimeConfig"),
-      );
-      assert.deepEqual(
-        offenders,
-        [],
-        `${language} declares ${offenders.join(", ")} — the runtime Supabase ` +
-          `config form is forbidden by CLAUDE.md; its strings were removed as ` +
-          `dead copy and must not return`,
-      );
-    });
-  }
+  it("no locale declares a runtimeConfig* key", () => {
+    assertNoLocaleDeclares(
+      src,
+      (key) => key.startsWith("runtimeConfig"),
+      "the runtime Supabase config form is forbidden by CLAUDE.md; its " +
+        "strings were removed as dead copy and must not return",
+    );
+  });
+
+  it("the prefix is what is forbidden, not one spelling of it", () => {
+    // The predicate is the whole rule, so it gets its own reading: a name that
+    // merely CONTAINS the prefix later on is not the form's copy, and a case
+    // pinned to the nine removed names would pass on a tenth.
+    const forbids = (key: string) => key.startsWith("runtimeConfig");
+    assert.ok(forbids("runtimeConfigTitle"));
+    assert.ok(forbids("runtimeConfigClear"));
+    assert.ok(forbids("runtimeConfigSomethingNobodyHasNamedYet"));
+    assert.ok(!forbids("clearRuntimeConfig"));
+  });
 });
