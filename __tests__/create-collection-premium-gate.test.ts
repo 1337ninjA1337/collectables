@@ -39,16 +39,19 @@ describe("create-collection screen: private collections require premium", () => 
     assert.match(src, /from\s+"@\/components\/premium-upsell-sheet"/);
     assert.match(
       src,
-      /function showPrivateUpsell\(\)[\s\S]{0,400}?setUpsellVisible\(true\)/,
+      /function showPrivateUpsell\(control: PremiumUpsellControl\)[\s\S]{0,400}?setUpsellVisible\(true\)/,
     );
     assert.match(
       src,
-      /if\s*\(locked\)\s*\{\s*showPrivateUpsell\(\);\s*return;\s*\}/,
+      /if\s*\(locked\)\s*\{\s*showPrivateUpsell\("chip"\);\s*return;\s*\}/,
     );
     // The sentence under the row is the same button. Its branch used to be
     // dead — it required `visibility === "private"` while not premium, which a
     // free user can never reach because the locked chip returns first.
-    assert.match(src, /\{privateLocked \? \(\s*<Pressable\s*onPress=\{showPrivateUpsell\}/);
+    assert.match(
+      src,
+      /\{privateLocked \? \(\s*<Pressable\s*onPress=\{\(\) => showPrivateUpsell\("hint"\)\}/,
+    );
     assert.doesNotMatch(
       src,
       /!isPremium && visibility === "private"/,

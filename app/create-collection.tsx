@@ -40,6 +40,7 @@ import { useI18n } from "@/lib/i18n-context";
 import {
   defaultCollectionVisibilityForUser,
   isPrivateVisibilityLocked,
+  PremiumUpsellControl,
   visibilityHintKey,
 } from "@/lib/premium-helpers";
 import { usePremium } from "@/lib/premium-context";
@@ -70,11 +71,16 @@ export default function CreateCollectionScreen() {
   // `isPrivateVisibilityLocked` for why the edit sheet answers differently.
   const privateLocked = isPrivateVisibilityLocked(isPremium, "public");
 
-  /** What the padlock does, from the chip and from the sentence below it. */
-  function showPrivateUpsell() {
+  /**
+   * What the padlock does, from the chip and from the sentence below it. Same
+   * gate, same feature, same source — `control` is the only thing that tells
+   * the funnel which of the two a person actually pressed.
+   */
+  function showPrivateUpsell(control: PremiumUpsellControl) {
     trackEvent("premium_upsell_shown", {
       feature: "private_collection",
       source: "create_collection",
+      control,
     });
     setUpsellVisible(true);
   }
@@ -261,7 +267,7 @@ export default function CreateCollectionScreen() {
                 }}
                 onPress={() => {
                   if (locked) {
-                    showPrivateUpsell();
+                    showPrivateUpsell("chip");
                     return;
                   }
                   setVisibility(v);
@@ -285,7 +291,9 @@ export default function CreateCollectionScreen() {
             sentence and taps it gets the upsell rather than nothing. */}
         {privateLocked ? (
           <Pressable
-            onPress={showPrivateUpsell}
+            onPress={() => showPrivateUpsell("hint")}
+            hitSlop={8}
+            style={({ pressed }) => (pressed ? styles.visibilityLockedHintPressed : null)}
             accessibilityRole="button"
             accessibilityLabel={t("visibilityPrivateLockedA11y")}
           >
@@ -471,6 +479,13 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: FONT_BODY_BOLD,
     marginTop: 4,
+  },
+  // A line of text acting as a button is the shape most likely to feel broken:
+  // without this it is the only control on the row that looks identical while
+  // held down. Opacity rather than a colour swap so the amber that marks it as
+  // pressable in the first place survives the press.
+  visibilityLockedHintPressed: {
+    opacity: 0.6,
   },
   saveButton: {
     borderRadius: RADIUS_CARD_LG,

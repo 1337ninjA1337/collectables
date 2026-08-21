@@ -39,6 +39,44 @@ export function isPrivateVisibilityLocked(
 }
 
 /**
+ * What a save is allowed to write, given what the user selected.
+ *
+ * Defence in depth for the collection edit sheet: the chip already refuses to
+ * select "private" when the lock is on, so this can only differ from `selected`
+ * if that refusal was bypassed. It is deliberately kept — and deliberately
+ * expressed through `isPrivateVisibilityLocked` rather than as a fourth inline
+ * spelling of the same three clauses, which is what it was.
+ *
+ * `savedVisibility` is the stored value, and the argument order matches the
+ * lock's: swapping `selected` and `savedVisibility` type-checks (both are
+ * `CollectionVisibility`) and silently clamps the wrong direction, so both
+ * are asserted.
+ */
+export function clampVisibilityForSave(
+  isPremium: boolean,
+  selected: CollectionVisibility,
+  savedVisibility: CollectionVisibility,
+): CollectionVisibility {
+  if (selected === "private" && isPrivateVisibilityLocked(isPremium, savedVisibility)) {
+    return "public";
+  }
+  return selected;
+}
+
+/**
+ * Which of the two controls fired the upsell.
+ *
+ * The padlocked chip and the sentence beside it are the same button doing the
+ * same job, so they send the same `feature` and `source` — and until this
+ * existed, `premium_upsell_shown` could not tell them apart at all. That
+ * matters because the standing "hide the locked chip once the dashboard shows
+ * nobody taps it" decision is read off this event: with the two controls
+ * merged, taps on the SENTENCE would keep the chip alive forever, and hiding
+ * the chip would look like it cost traffic it never had.
+ */
+export type PremiumUpsellControl = "chip" | "hint";
+
+/**
  * Which sentence belongs under a visibility row, given what is selected.
  *
  * Split from the lock because the two answers are independent, and conflating

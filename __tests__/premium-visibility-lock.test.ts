@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  clampVisibilityForSave,
   isPrivateVisibilityLocked,
   visibilityHintKey,
 } from "@/lib/premium-helpers";
@@ -107,15 +108,19 @@ describe("both screens call the rule instead of restating it", () => {
       ["app/create-collection.tsx", create],
       ["components/edit-collection-modal.tsx", modal],
     ] as const) {
-      assert.match(src, /function showPrivateUpsell\(\)/, `${name} has no shared handler`);
       assert.match(
         src,
-        /if\s*\(locked\)\s*\{\s*showPrivateUpsell\(\);\s*return;\s*\}/,
+        /function showPrivateUpsell\(control: PremiumUpsellControl\)/,
+        `${name} has no shared handler`,
+      );
+      assert.match(
+        src,
+        /if\s*\(locked\)\s*\{\s*showPrivateUpsell\("chip"\);\s*return;\s*\}/,
         `${name}'s chip no longer calls the shared handler`,
       );
       assert.match(
         src,
-        /\{privateLocked \? \(\s*<Pressable\s*onPress=\{showPrivateUpsell\}/,
+        /\{privateLocked \? \(\s*<Pressable\s*onPress=\{\(\) => showPrivateUpsell\("hint"\)\}/,
         `${name}'s locked hint is not a button`,
       );
     }
@@ -128,5 +133,119 @@ describe("both screens call the rule instead of restating it", () => {
     // "hide the locked chip" decision is waiting on.
     assert.match(create, /source: "create_collection"/);
     assert.match(modal, /source: "collection_edit"/);
+  });
+
+  it("tags the event with which of the two controls fired it", () => {
+    // The other half of the same problem, one level down. The chip and the
+    // sentence send the same feature AND the same source, so before `control`
+    // the two were indistinguishable in the dashboard — and the standing
+    // decision is specifically about the CHIP. Taps on the sentence would have
+    // kept it alive forever.
+    for (const [name, src] of [
+      ["app/create-collection.tsx", create],
+      ["components/edit-collection-modal.tsx", modal],
+    ] as const) {
+      assert.match(
+        src,
+        /trackEvent\("premium_upsell_shown",\s*\{[^}]*\bcontrol,/,
+        `${name} no longer forwards which control fired the upsell`,
+      );
+      // Forwarding the argument is worth nothing if both call sites pass the
+      // same literal, and "chip" is the one a copy-paste lands on — the funnel
+      // would then look exactly as it did before, with a name on it.
+      assert.match(src, /showPrivateUpsell\("chip"\)/, `${name}'s chip is untagged`);
+      assert.match(src, /showPrivateUpsell\("hint"\)/, `${name}'s sentence is untagged`);
+    }
+  });
+
+  it("acknowledges the press on the sentence, which is not obviously a button", () => {
+    // A line of text acting as a button, with no ripple and a 20px-tall touch
+    // target, is the shape most likely to feel broken on a phone. Both halves
+    // are asserted because either alone leaves it feeling dead: the hit-slop
+    // makes it hittable, the pressed style makes the hit visible.
+    for (const [name, src, style] of [
+      ["app/create-collection.tsx", create, "visibilityLockedHintPressed"],
+      ["components/edit-collection-modal.tsx", modal, "editVisibilityLockedHintPressed"],
+    ] as const) {
+      assert.match(src, /hitSlop=\{8\}/, `${name}'s locked hint has no hit-slop`);
+      assert.match(
+        src,
+        new RegExp(`style=\\{\\(\\{ pressed \\}\\) => \\(pressed \\? styles\\.${style} : null\\)\\}`),
+        `${name}'s locked hint gives no feedback on press`,
+      );
+      assert.match(
+        src,
+        new RegExp(`${style}: \\{\\s*opacity: 0\\.6,`),
+        `${name} declares no pressed style for the locked hint`,
+      );
+    }
+  });
+});
+
+describe("what a save is allowed to write", () => {
+  it("leaves every selection alone for a premium user", () => {
+    assert.equal(clampVisibilityForSave(true, "private", "public"), "private");
+    assert.equal(clampVisibilityForSave(true, "public", "private"), "public");
+  });
+
+  it("clamps a free user's public → private to public", () => {
+    assert.equal(clampVisibilityForSave(false, "private", "public"), "public");
+  });
+
+  it("leaves an already-private collection private for a lapsed subscriber", () => {
+    // The same case the lock exists for, restated at save time: this is where
+    // an over-eager clamp would silently PUBLISH a collection somebody made
+    // private while they were paying.
+    assert.equal(clampVisibilityForSave(false, "private", "private"), "private");
+  });
+
+  it("never clamps a selection of public, whatever it was saved as", () => {
+    // Going private → public is a downgrade the free tier allows; a clamp that
+    // fired on it would trap the collection in whichever state it was in.
+    assert.equal(clampVisibilityForSave(false, "public", "private"), "public");
+    assert.equal(clampVisibilityForSave(false, "public", "public"), "public");
+  });
+
+  it("agrees with the lock the chip renders, on every combination", () => {
+    // Stated as an exhaustive case rather than by inspection, because the two
+    // disagreeing is precisely the bug the three inline clauses could grow: a
+    // chip that refuses a change the save would have allowed reads as broken,
+    // and a chip that allows one the save silently reverts is worse.
+    for (const isPremium of [true, false]) {
+      for (const saved of ["public", "private"] as const) {
+        const locked = isPrivateVisibilityLocked(isPremium, saved);
+        assert.equal(
+          clampVisibilityForSave(isPremium, "private", saved),
+          locked ? "public" : "private",
+          `clamp disagrees with the chip at isPremium=${isPremium}, saved=${saved}`,
+        );
+      }
+    }
+  });
+
+  it("is not symmetric in its two visibility arguments", () => {
+    // Both are `CollectionVisibility`, so swapping the call's last two
+    // arguments type-checks and clamps the wrong direction in silence. This is
+    // the pair that tells them apart.
+    assert.equal(clampVisibilityForSave(false, "private", "public"), "public");
+    assert.equal(clampVisibilityForSave(false, "public", "private"), "public");
+  });
+
+  it("is what the collection screen actually saves through", () => {
+    // The clamp is defence in depth and unreachable through the UI today
+    // (`openEditModal` seeds the selection from the collection, and the locked
+    // chip returns before changing it), which is exactly why it needs pinning:
+    // nothing exercises it at runtime, so a regression to a fourth hand-written
+    // spelling would look like working code forever.
+    const page = readRepoFile("app/collection/[id].tsx");
+    assert.match(
+      page,
+      /clampVisibilityForSave\(\s*isPremium,\s*editVisibility,\s*collection\.visibility \?\? "private",\s*\)/,
+    );
+    assert.doesNotMatch(
+      page,
+      /!isPremium &&\s*editVisibility === "private"/,
+      "the save clamp still spells the lock out for itself",
+    );
   });
 });
