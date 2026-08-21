@@ -48,6 +48,11 @@ import {
 } from "@/lib/design-tokens";
 import { FONT_DISPLAY_EDITORIAL } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
+import {
+  ACTION_METHOD,
+  relationshipActions,
+  type RelationshipActionId,
+} from "@/lib/relationship-actions";
 import { DEFAULT_EN_PROFILE_BIO, useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
 import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
@@ -278,6 +283,33 @@ export default function ProfileScreen() {
     router.replace("/people");
   }
 
+  /**
+   * One intent → one context method, via `ACTION_METHOD`. The switch is
+   * exhaustive over the method names rather than over the eight intents, so a
+   * ninth intent reusing an existing method needs no change here. `chat` is
+   * the one that is navigation rather than a graph edit, which is why it is a
+   * method name of its own.
+   */
+  function runRelationshipAction(id: RelationshipActionId, profileId: string) {
+    switch (ACTION_METHOD[id]) {
+      case "chat":
+        router.push(`/chat/${profileId}` as never);
+        return;
+      case "addFriend":
+        void addFriend(profileId);
+        return;
+      case "removeFriend":
+        void removeFriend(profileId);
+        return;
+      case "followProfile":
+        void followProfile(profileId);
+        return;
+      case "unfollowProfile":
+        void unfollowProfile(profileId);
+        return;
+    }
+  }
+
   function handleAdminDelete() {
     if (!activeProfile || !isAdmin || relationship === "self") {
       return;
@@ -409,94 +441,31 @@ export default function ProfileScreen() {
               <Text style={styles.adminActionText}>{t("adminDeleteProfile")}</Text>
             </Pressable>
           ) : null}
-          {relationship === "friend" ? (
-            <>
-              <Pressable
-                style={styles.primaryAction}
-                onPress={() => router.push(`/chat/${activeProfile.id}` as never)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.primaryActionText}>{t("chatSend")}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryAction}
-                onPress={() => void removeFriend(activeProfile.id)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.secondaryActionText}>{t("removeFriend")}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryAction}
-                onPress={() => void unfollowProfile(activeProfile.id)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.secondaryActionText}>{t("unfollow")}</Text>
-              </Pressable>
-            </>
-          ) : relationship === "request_sent" ? (
-            <>
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusBadgeText}>{t("requestSent")}</Text>
+          {relationshipActions(relationship, "detail").map((action, index) =>
+            action.kind === "badge" ? (
+              <View key={`${action.id}-${index}`} style={styles.statusBadge}>
+                <Text style={styles.statusBadgeText}>{t(action.labelKey)}</Text>
               </View>
+            ) : (
               <Pressable
-                style={styles.secondaryAction}
-                onPress={() => void removeFriend(activeProfile.id)}
+                key={`${action.id}-${index}`}
+                style={
+                  action.kind === "primary" ? styles.primaryAction : styles.secondaryAction
+                }
+                onPress={() => runRelationshipAction(action.id, activeProfile.id)}
                 accessibilityRole="button"
               >
-                <Text style={styles.secondaryActionText}>{t("cancelInvitation")}</Text>
+                <Text
+                  style={
+                    action.kind === "primary"
+                      ? styles.primaryActionText
+                      : styles.secondaryActionText
+                  }
+                >
+                  {t(action.labelKey)}
+                </Text>
               </Pressable>
-            </>
-          ) : relationship === "request_received" ? (
-            <>
-              <Pressable
-                style={styles.primaryAction}
-                onPress={() => void addFriend(activeProfile.id)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.primaryActionText}>{t("acceptRequest")}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryAction}
-                onPress={() => void removeFriend(activeProfile.id)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.secondaryActionText}>{t("rejectRequest")}</Text>
-              </Pressable>
-            </>
-          ) : relationship === "following" ? (
-            <>
-              <Pressable
-                style={styles.primaryAction}
-                onPress={() => void addFriend(activeProfile.id)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.primaryActionText}>{t("addFriend")}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryAction}
-                onPress={() => void unfollowProfile(activeProfile.id)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.secondaryActionText}>{t("unfollow")}</Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <Pressable
-                style={styles.primaryAction}
-                onPress={() => void addFriend(activeProfile.id)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.primaryActionText}>{t("addFriend")}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryAction}
-                onPress={() => void followProfile(activeProfile.id)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.secondaryActionText}>{t("follow")}</Text>
-              </Pressable>
-            </>
+            ),
           )}
         </View>
       )}

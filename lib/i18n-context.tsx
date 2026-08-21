@@ -546,7 +546,13 @@ const en = {
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS is set below 30 seconds. Aggressive overrides can hammer Supabase rate limits.",
 } as const;
 
-type TranslationKey = keyof typeof en;
+/**
+ * Exported so a pure module can name a key it does not render — see
+ * `lib/relationship-actions.ts`, whose table stores label KEYS and leaves
+ * `t()` to the screen. A `string` there would compile in that module and fail
+ * at every call site.
+ */
+export type TranslationKey = keyof typeof en;
 type TranslationMap = Record<TranslationKey, TranslationValue>;
 
 const ru: TranslationMap = {
