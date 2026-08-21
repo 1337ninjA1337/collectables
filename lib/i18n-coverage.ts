@@ -52,14 +52,44 @@ export const TRANSLATION_LANGUAGES = ["ru", "en", "be", "pl", "de", "es"] as con
 
 export type TranslationLanguage = (typeof TRANSLATION_LANGUAGES)[number];
 
+/**
+ * Base keys no language is expected to translate, with the reason each is on
+ * the list.
+ *
+ * A brand name and an email address render identically in every language this
+ * app ships, so declaring them per locale would be six copies of one string
+ * and re-translating them would be a defect. They were nevertheless counted as
+ * gaps — `ru` reads 99.6% and has been "two keys from done" for as long as
+ * anybody has looked, and every other row's percentage is a share of a
+ * denominator containing two keys nobody should ever fill.
+ *
+ * A reason each rather than a bare list, for the same reason every other skip
+ * list in this repository carries one: a list without reasons stops being
+ * reviewable at the second entry, and this one exists to be argued with. The
+ * bar is "translating this would be wrong", not "nobody has got to it yet" —
+ * `TRANSLATION_FLOORS` is what watches the second kind.
+ */
+export const UNTRANSLATABLE_KEYS: Readonly<Record<string, string>> = {
+  appName: "a brand name — the app is called the same thing in every language, and a locale that 'translated' it would be renaming the product",
+  emailPlaceholder: "you@example.com, an address rather than prose; the local-part and the domain are both invariant and the shape is what the field is teaching",
+};
+
 /** One language's standing against the base map. */
 export type TranslationCoverage = {
   readonly language: string;
   /** Keys the language writes for itself. */
   readonly declared: number;
-  /** Keys in the base map this language does not declare, in base order. */
+  /**
+   * Keys in the base map this language does not declare, in base order.
+   *
+   * Excludes {@link UNTRANSLATABLE_KEYS}: a language that does not declare
+   * `appName` has not left a gap, it has agreed with the other five.
+   */
   readonly inherited: readonly string[];
-  /** Size of the base map — the denominator. */
+  /**
+   * Size of the base map MINUS the untranslatable keys — the denominator, and
+   * the count of keys a language could actually be asked to write.
+   */
   readonly baseKeys: number;
   /**
    * Keys declared here that the base map does not have. Always empty today;
@@ -100,8 +130,12 @@ export function translationCoverage(
       `no \`const ${TRANSLATION_BASE_LANGUAGE}\` map in the source — every ratio here is measured against it`,
     );
   }
-  const baseKeys = base.keys;
-  const baseSet = new Set(baseKeys);
+  // The denominator is what is translatable, not what is declared: two of the
+  // base map's keys are a brand and an email address, and counting them made
+  // `ru` read 99.6% forever while every other row measured itself against a
+  // total containing two keys nobody should fill.
+  const baseKeys = base.keys.filter((key) => !(key in UNTRANSLATABLE_KEYS));
+  const baseSet = new Set(base.keys);
 
   return languages.map((language) => {
     const block =

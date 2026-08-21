@@ -6,6 +6,7 @@ import {
   TRANSLATION_FLOORS,
   TRANSLATION_LANGUAGES,
   coveragePercent,
+  UNTRANSLATABLE_KEYS,
   formatCoverageRow,
   translationCoverage,
 } from "@/lib/i18n-coverage";
@@ -97,22 +98,42 @@ describe("translation coverage", () => {
   it("the base language inherits nothing and sets the denominator", () => {
     const base = rowFor(TRANSLATION_BASE_LANGUAGE);
     assert.deepEqual(base.inherited, []);
-    assert.equal(base.declared, base.baseKeys);
     assert.equal(coveragePercent(base), 100);
+    // `declared` counts what the map WRITES; `baseKeys` counts what a language
+    // could be asked to write. They differ by exactly the untranslatable keys,
+    // which is the whole of this change stated as an equation.
+    assert.equal(base.declared - Object.keys(UNTRANSLATABLE_KEYS).length, base.baseKeys);
   });
 
-  it("names the two keys Russian still inherits", () => {
-    // Small enough to pin by name rather than by count: both are legitimate
-    // (a brand and an email address render the same in Russian). A third
-    // arriving unnoticed is the thing this catches — for the other four
-    // locales the list is in the hundreds, so their floors do the watching
-    // instead. `visibilityPrivatePremiumOnly` fell off this list when it
-    // gained a Russian declaration alongside the new
-    // `visibilityPrivateLockedA11y`.
-    assert.deepEqual(rowFor("ru").inherited, [
-      "emailPlaceholder",
-      "appName",
-    ]);
+  it("reads Russian as complete, because the two it inherits are untranslatable", () => {
+    // This row said 99.6% and named `emailPlaceholder` and `appName` — a brand
+    // and an address, both of which a Russian locale is RIGHT not to declare.
+    // "Two keys from done" was a permanent state describing work that must
+    // never be done, and it sat in the denominator of every other row too.
+    //
+    // They are now excluded, so `ru` reads what it is: finished. The keys
+    // themselves are still watched — by UNTRANSLATABLE_KEYS needing a written
+    // reason per entry, which is a higher bar than being on an inherited list
+    // nobody re-reads.
+    assert.deepEqual(rowFor("ru").inherited, []);
+    assert.equal(coveragePercent(rowFor("ru")), 100);
+  });
+
+  it("excludes exactly the untranslatable keys from the denominator, and nothing else", () => {
+    // The guard against this list growing into a place to hide untranslated
+    // work: every entry must be a real base key (a stale one silently shrinks
+    // the denominator for a key that no longer exists) and must carry a
+    // reason. The bar is "translating this would be wrong" — anything that is
+    // merely not-done-yet belongs in the floors instead.
+    const base = new Set(findLocaleBlock(SOURCE, TRANSLATION_BASE_LANGUAGE)!.keys);
+    for (const [key, reason] of Object.entries(UNTRANSLATABLE_KEYS)) {
+      assert.ok(base.has(key), `UNTRANSLATABLE_KEYS names '${key}', which is not a base key`);
+      assert.ok(reason.trim().length > 20, `'${key}' is excused with no real reason`);
+    }
+    assert.equal(
+      rowFor(TRANSLATION_BASE_LANGUAGE).baseKeys,
+      base.size - Object.keys(UNTRANSLATABLE_KEYS).length,
+    );
   });
 
   it("every locale declares the delete-item family", () => {
@@ -306,9 +327,19 @@ describe("translation floors", () => {
     // — a key the card already rendered — in be/pl/de/es, which had been
     // inheriting the English "5 photos" since it was written. The 545 before
     // it arrived the same way, with the two nav-badge labels.
-    assert.match(report, /en: 501\/501 keys \(100\.0%\)/);
+    // 499, not 501: the denominator is what a language could be ASKED to
+    // write, and `appName` and `emailPlaceholder` are a brand and an address
+    // that every locale is right to inherit. Counting them held `ru` at 99.6%
+    // — a permanent state describing work that must never be done — and put
+    // two unfillable keys under every other row's percentage too.
+    assert.match(report, /en: 499\/499 keys \(100\.0%\)/);
+    assert.match(report, /ru: 499\/499 keys \(100\.0%\)/);
     assert.ok(
-      COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
+      COVERAGE.every(
+        (row) =>
+          row.baseKeys ===
+          rowFor("en").declared - Object.keys(UNTRANSLATABLE_KEYS).length,
+      ),
       "every row must be measured against the same denominator",
     );
     // Zero since 2026-08-21: every locale is at or above half for the first
