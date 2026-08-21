@@ -1274,6 +1274,23 @@ const be: TranslationMap = {
     `Прыняў(ла) абмен па аб'яве «${params?.title ?? ""}».`,
   marketplaceSoldBanner: "Прададзена",
   marketplaceSoldTo: (params?: TranslationParams) => `Прададзена карыстальніку ${params?.name ?? ""}`,
+  marketplaceSoldPromptTitle: "Вашу аб'яву забралі",
+  marketplaceSoldPromptBody: (params?: TranslationParams) =>
+    `${params?.buyer ?? "Нехта"} толькі што забраў «${params?.title ?? "ваш прадмет"}». Што зрабіць з арыгіналам у вашай калекцыі?`,
+  marketplaceSoldPromptArchive: "Архіваваць прадмет",
+  marketplaceSoldPromptArchiveHint:
+    "Схаваць са спісаў калекцыі, але пакінуць для статыстыкі і гісторыі.",
+  marketplaceSoldPromptDelete: "Выдаліць з калекцыі",
+  marketplaceSoldPromptDeleteHint:
+    "Незваротна выдаліць прадмет з вашай калекцыі.",
+  marketplaceSoldPromptKeep: "Пакінуць як ёсць",
+  marketplaceSoldPromptKeepHint:
+    "Пакінуць прадмет у калекцыі — карысна для гісторыі продажаў.",
+  marketplaceSoldPromptConfirmDeleteTitle: "Выдаліць прадмет?",
+  marketplaceSoldPromptConfirmDeleteBody:
+    "Гэта незваротна выдаліць прадмет з вашай калекцыі. Замест гэтага яго можна архіваваць.",
+  marketplaceSoldPromptItemArchived: "Прадмет архіваваны",
+  marketplaceSoldPromptItemDeleted: "Прадмет выдалены",
   marketplaceBoughtFrom: (params?: TranslationParams) => `Ад ${params?.name ?? ""}`,
   itemValueApprox: (params?: TranslationParams) => `≈ ${params?.amount ?? ""} ${params?.currency ?? ""}`,
   displayCurrencyTitle: "Валюта адлюстравання",
@@ -1601,6 +1618,23 @@ const pl: TranslationMap = {
     `Odebrałem/am twoją ofertę wymiany „${params?.title ?? ""}”.`,
   marketplaceSoldBanner: "Sprzedane",
   marketplaceSoldTo: (params?: TranslationParams) => `Sprzedane użytkownikowi ${params?.name ?? ""}`,
+  marketplaceSoldPromptTitle: "Twoje ogłoszenie zostało odebrane",
+  marketplaceSoldPromptBody: (params?: TranslationParams) =>
+    `${params?.buyer ?? "Ktoś"} właśnie odebrał „${params?.title ?? "twój przedmiot"}”. Co zrobić z oryginałem w twojej kolekcji?`,
+  marketplaceSoldPromptArchive: "Zarchiwizuj przedmiot",
+  marketplaceSoldPromptArchiveHint:
+    "Ukryj na listach kolekcji, ale zachowaj do statystyk i historii.",
+  marketplaceSoldPromptDelete: "Usuń z kolekcji",
+  marketplaceSoldPromptDeleteHint:
+    "Trwale usuń przedmiot z twojej kolekcji.",
+  marketplaceSoldPromptKeep: "Zostaw bez zmian",
+  marketplaceSoldPromptKeepHint:
+    "Zostaw przedmiot w kolekcji — przydatne do historii sprzedaży.",
+  marketplaceSoldPromptConfirmDeleteTitle: "Usunąć przedmiot?",
+  marketplaceSoldPromptConfirmDeleteBody:
+    "To trwale usunie przedmiot z twojej kolekcji. Zamiast tego możesz go zarchiwizować.",
+  marketplaceSoldPromptItemArchived: "Przedmiot zarchiwizowany",
+  marketplaceSoldPromptItemDeleted: "Przedmiot usunięty",
   marketplaceBoughtFrom: (params?: TranslationParams) => `Od ${params?.name ?? ""}`,
   itemValueApprox: (params?: TranslationParams) => `≈ ${params?.amount ?? ""} ${params?.currency ?? ""}`,
   displayCurrencyTitle: "Waluta wyświetlania",
@@ -1925,6 +1959,23 @@ const de: TranslationMap = {
     `Habe dein Tauschangebot „${params?.title ?? ""}“ angenommen.`,
   marketplaceSoldBanner: "Verkauft",
   marketplaceSoldTo: (params?: TranslationParams) => `Verkauft an ${params?.name ?? ""}`,
+  marketplaceSoldPromptTitle: "Deine Anzeige wurde übernommen",
+  marketplaceSoldPromptBody: (params?: TranslationParams) =>
+    `${params?.buyer ?? "Jemand"} hat gerade „${params?.title ?? "dein Objekt"}“ übernommen. Was möchtest du mit dem Original in deiner Sammlung machen?`,
+  marketplaceSoldPromptArchive: "Objekt archivieren",
+  marketplaceSoldPromptArchiveHint:
+    "Aus den Sammlungslisten ausblenden, aber für Statistik und Verlauf behalten.",
+  marketplaceSoldPromptDelete: "Aus Sammlung löschen",
+  marketplaceSoldPromptDeleteHint:
+    "Das Objekt dauerhaft aus deiner Sammlung entfernen.",
+  marketplaceSoldPromptKeep: "Unverändert lassen",
+  marketplaceSoldPromptKeepHint:
+    "Das Objekt in deiner Sammlung lassen — nützlich für den Verkaufsverlauf.",
+  marketplaceSoldPromptConfirmDeleteTitle: "Objekt löschen?",
+  marketplaceSoldPromptConfirmDeleteBody:
+    "Damit wird das Objekt dauerhaft aus deiner Sammlung entfernt. Du kannst es stattdessen archivieren.",
+  marketplaceSoldPromptItemArchived: "Objekt archiviert",
+  marketplaceSoldPromptItemDeleted: "Objekt gelöscht",
   marketplaceBoughtFrom: (params?: TranslationParams) => `Von ${params?.name ?? ""}`,
   itemValueApprox: (params?: TranslationParams) => `≈ ${params?.amount ?? ""} ${params?.currency ?? ""}`,
   displayCurrencyTitle: "Anzeigewährung",
@@ -2252,6 +2303,23 @@ const es: TranslationMap = {
     `He aceptado tu oferta de intercambio "${params?.title ?? ""}".`,
   marketplaceSoldBanner: "Vendido",
   marketplaceSoldTo: (params?: TranslationParams) => `Vendido a ${params?.name ?? ""}`,
+  marketplaceSoldPromptTitle: "Han reclamado tu anuncio",
+  marketplaceSoldPromptBody: (params?: TranslationParams) =>
+    `${params?.buyer ?? "Alguien"} acaba de reclamar «${params?.title ?? "tu objeto"}». ¿Qué quieres hacer con el original de tu colección?`,
+  marketplaceSoldPromptArchive: "Archivar objeto",
+  marketplaceSoldPromptArchiveHint:
+    "Ocultar de las listas de la colección, pero conservar para estadísticas e historial.",
+  marketplaceSoldPromptDelete: "Eliminar de la colección",
+  marketplaceSoldPromptDeleteHint:
+    "Eliminar el objeto de tu colección de forma permanente.",
+  marketplaceSoldPromptKeep: "Dejar como está",
+  marketplaceSoldPromptKeepHint:
+    "Dejar el objeto en tu colección: útil para el historial de ventas.",
+  marketplaceSoldPromptConfirmDeleteTitle: "¿Eliminar objeto?",
+  marketplaceSoldPromptConfirmDeleteBody:
+    "Esto elimina el objeto de tu colección de forma permanente. En su lugar puedes archivarlo.",
+  marketplaceSoldPromptItemArchived: "Objeto archivado",
+  marketplaceSoldPromptItemDeleted: "Objeto eliminado",
   marketplaceBoughtFrom: (params?: TranslationParams) => `De ${params?.name ?? ""}`,
   itemValueApprox: (params?: TranslationParams) => `≈ ${params?.amount ?? ""} ${params?.currency ?? ""}`,
   displayCurrencyTitle: "Moneda de visualización",
