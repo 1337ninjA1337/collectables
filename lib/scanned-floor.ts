@@ -52,7 +52,20 @@ export type ScannedFloorFailureCode =
   /** The entry exists and is not count-shaped, but the wrapper asked for one. */
   | "no_count_floor"
   /** The entry exists and declares no fixed inputs, but the wrapper asked for them. */
-  | "no_inputs_floor";
+  | "no_inputs_floor"
+  /**
+   * A declared scan root contributed no files to the walk.
+   *
+   * The property a multi-root floor has always been trying to state, said
+   * directly instead of by arithmetic. `below_floor` catches a root going
+   * missing only while the committed minimum happens to sit above the largest
+   * REMAINING root — which is why that number has had to be re-measured five
+   * times as the tree grew, in a suite unrelated to whatever added the file.
+   * This code has no number in it and never needs re-measuring.
+   */
+  | "no_root_files"
+  /** The entry exists and names no scan roots, but the wrapper handed some over. */
+  | "no_roots_floor";
 
 export type ScannedFloorFailure = {
   readonly code: ScannedFloorFailureCode;
@@ -64,6 +77,8 @@ export type ScannedFloorFailure = {
   readonly label: string;
   /** Set for the three input codes: which declared input went wrong. */
   readonly input?: string;
+  /** Set for `no_root_files`: which declared scan root turned up nothing. */
+  readonly root?: string;
   /** Set for `unreadable_input`: what the filesystem or parser said. */
   readonly reason?: string;
   /**
@@ -156,6 +171,59 @@ export function evaluateScannedFloor(
   return OK;
 }
 
+/**
+ * Whether every declared scan root actually contributed to the walk.
+ *
+ * The direct form of what a multi-root count floor approximates. A file is
+ * attributed to the root it sits under, matched on a path SEGMENT boundary so
+ * that `app/` does not claim `apple/`, and a root that ends up with nothing is
+ * reported by name.
+ *
+ * Deliberately not a count: "at least one file" is the whole claim, because
+ * the failure this defends against is a root that stopped being walked at all
+ * — a deleted directory, a `SCANNED_DIRS` typo, a glob that silently resolved
+ * to nothing. A root that legitimately holds one file is a root the guard is
+ * reading, and a floor that demanded more of it would be a second measured
+ * number needing its own note.
+ *
+ * Pure and separate from {@link evaluateScannedFloor} on purpose: the two
+ * answer different questions about the same walk — "is this enough files" and
+ * "did every root turn up" — and a walk can fail either without the other
+ * noticing. Reports the FIRST empty root in declared order rather than all of
+ * them, matching how `scannedFloorFor` raises the first problem: a guard that
+ * lost two roots has one thing wrong with it.
+ *
+ * Throws on an empty `roots`, for the reason every other emptiness in this
+ * module is refused rather than defaulted: a per-root check over no roots
+ * passes over anything at all, which is the vacuous pass the file exists to
+ * close.
+ */
+export function evaluateScannedRoots(
+  files: readonly string[],
+  roots: readonly string[],
+  label: string = DEFAULT_SCANNED_LABEL,
+): ScannedFloorVerdict {
+  if (roots.length === 0) {
+    throw new Error(
+      "a per-root check over no scan roots passes over any walk, which is the failure it exists to catch",
+    );
+  }
+  for (const root of roots) {
+    // Segment boundary, not `startsWith(root)`: `app` must not be satisfied by
+    // `apple/foo.ts`, and a walk whose only "app" file was under a
+    // similarly-named sibling is exactly the silent miss this is for.
+    const prefix = `${root}/`;
+    const found = files.filter((file) => file === root || file.startsWith(prefix)).length;
+    if (found === 0) {
+      return {
+        ok: false,
+        failure: { code: "no_root_files", count: files.length, minimum: 1, label, root },
+      };
+    }
+  }
+  return OK;
+}
+
 const REMEASURE_HINT =
   "If the tree legitimately shrank, re-measure the floor in lib/scanned-floor.ts and say why in the commit.";
 
@@ -194,6 +262,14 @@ const FAILURE_MESSAGE: Record<
     `asked for a count floor and its SCANNED_FLOORS entry declares none — ${SHAPE_MISMATCH_REASON}. Either this wrapper wants assertParsedInputs, or the entry in lib/scanned-floor.ts is missing its count.`,
   no_inputs_floor: () =>
     `asked for its declared inputs and its SCANNED_FLOORS entry declares none — ${SHAPE_MISMATCH_REASON}. Either this wrapper wants assertScannedFloor, or the entry in lib/scanned-floor.ts is missing its inputs.`,
+  no_roots_floor: () =>
+    `handed over its walked files for a per-root check and its SCANNED_FLOORS entry names no roots — ${SHAPE_MISMATCH_REASON}. Either this wrapper walks one root and wants assertScannedFloor alone, or the entry in lib/scanned-floor.ts is missing its roots.`,
+  // About the tree, like `no_files` and `below_floor`, and the only one of the
+  // three that names WHICH part of the walk went quiet. Deliberately says
+  // nothing about re-measuring: there is no number here to move, which is the
+  // entire reason this code exists beside `below_floor`.
+  no_root_files: (f) =>
+    `scan root ${f.root ?? "(unnamed)"}/ contributed 0 of the ${f.count} ${f.label}(s) this walk found — every other root is still there, so the count looks healthy and this guard proved its negative over a tree with a hole in it. Check that ${f.root ?? "the root"}/ still exists, is readable, and is spelled the same way in the wrapper's SCANNED_DIRS as in lib/scanned-floor.ts.`,
 };
 
 /** One-line, prefixed with the guard's own name so the log says who failed. */
@@ -238,6 +314,24 @@ export type ScannedCountFloor = {
   readonly label: string;
   /** Committed minimum: a measured count of the tree, with slack under it. */
   readonly minimum: number;
+  /**
+   * The directories the walk covers, when it covers more than one.
+   *
+   * Optional because a single-root walk has nothing to say here: its floor and
+   * its root are the same claim, and `no_files` already covers the root
+   * vanishing. A MULTI-root walk is the case where the count alone cannot
+   * state the property — `app/` disappearing while `lib/` keeps 168 files
+   * leaves a comfortable-looking number — and where the arithmetic standing in
+   * for it (`minimum > largestRoot`, enforced in
+   * `__tests__/lint-guard-partial-root.test.ts`) has needed re-measuring every
+   * time the tree grew.
+   *
+   * Naming the roots lets {@link evaluateScannedRoots} say it with no number
+   * at all: every declared root contributed at least one file. Paths are
+   * repo-relative and must match the `SCANNED_DIRS` the wrapper walks, which
+   * `__tests__/floor-walks.test.ts` pins for every row that declares them.
+   */
+  readonly roots?: readonly string[];
 };
 
 /**
@@ -305,6 +399,12 @@ export type ScannedFloorProblemCode =
   | "delegation_with_shape"
   /** `delegatedTo: ""` — says the premise lives elsewhere without saying where. */
   | "empty_delegation"
+  /** `roots: []` — declared the per-root shape and named no roots to check. */
+  | "empty_roots"
+  /** A blank entry in `roots`, which would match every file in the walk. */
+  | "blank_root"
+  /** The same root twice: the second is a check that can never fail on its own. */
+  | "duplicate_root"
   /** No note, so the number is a magic constant again. */
   | "empty_note"
   /** A `count` note carrying no date — a measurement nobody can re-take. */
@@ -342,6 +442,12 @@ const PROBLEM_DETAIL: Record<ScannedFloorProblemCode, string> = {
     "declares a blank input name, which no wrapper can hand over and no message can name",
   duplicate_input:
     "declares the same input twice — the second copy is never reached, so a wrapper could drop it unnoticed",
+  empty_roots:
+    "declares an empty scan-root list, so the per-root assertion passes over any walk at all — including the walk that lost every root it was written to notice",
+  blank_root:
+    "declares a blank scan root, and every path in a walk starts with the empty string, so that entry is satisfied by any file and reports nothing about any directory",
+  duplicate_root:
+    "declares the same scan root twice — the second copy can only pass when the first already did, so it is a check that cannot fail on its own",
   delegation_with_shape:
     "delegates its premise elsewhere AND declares a count or inputs here, so two places claim to own one check and neither is authoritative",
   empty_delegation:
@@ -494,6 +600,15 @@ export function validateScannedFloorEntry(
       add("invalid_minimum");
     }
     if (floor.count.label.trim().length === 0) add("empty_label");
+    // Same three shape checks `inputs` gets below, for the same reasons: a
+    // declared-and-empty list is the shape claimed and nothing checked, and a
+    // blank entry is worse than a missing one — `""` makes every path in the
+    // walk start with it, so the root check passes on any non-empty walk.
+    if (floor.count.roots) {
+      if (floor.count.roots.length === 0) add("empty_roots");
+      if (floor.count.roots.some((root) => root.trim().length === 0)) add("blank_root");
+      if (new Set(floor.count.roots).size !== floor.count.roots.length) add("duplicate_root");
+    }
   }
   if (floor.inputs) {
     if (floor.inputs.length === 0) add("empty_inputs");
@@ -652,7 +767,7 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     note: "the whole-tree walk (minus node_modules/.git/dist and non-text extensions) held 713 files on 2026-08-12; 500 survives ordinary pruning while a walk that lost __tests__/ or lib/ does not.",
   },
   "check-inline-radius": {
-    count: { label: "source file", minimum: 48 },
+    count: { label: "source file", minimum: 48, roots: ["app", "components"] },
     note: "app/ + components/ held 65 .ts/.tsx files on 2026-08-21; 48 rides above the 46 that components/ alone contributes, so losing app/ — the root that holds most of the geometry literals — fails rather than passes. Raised from 46 when <RelationshipActionRow> made components/ a 46th file and drew level with the floor: the floor was measured to sit ABOVE that root's own count, so a component landing is exactly the ordinary event it has to be re-measured for. 17 files of slack, the same ~26% it shipped with. Fifth re-measurement across the six multi-root floors and the second caused by a single new component — see .tasks/.suggestions.md on stating the property as a FRACTION of the walk (minimum ≈ 0.75 × walkSize), which is what these numbers keep approximating by hand.",
   },
   "check-analytics-imports": {
@@ -778,6 +893,33 @@ export function countFloorFor(checkName: string): ScannedCountFloor {
 export function assertScannedFloor(checkName: string, count: number): void {
   const floor = countFloorFor(checkName);
   assertScanned(checkName, count, floor.minimum, floor.label);
+}
+
+/**
+ * The per-root counterpart to {@link assertScannedFloor}, for the walks that
+ * cover more than one directory.
+ *
+ * The wrapper hands over the file list it just walked instead of its length,
+ * because the length is exactly what cannot answer this question: a walk that
+ * lost `app/` and kept `lib/` has a healthy count and a hole in it. Called
+ * ALONGSIDE the count assertion rather than instead of it — the two catch
+ * different failures, and a walk can fail either while passing the other. A
+ * glob that broke without emptying a root still trips `below_floor`; a root
+ * that vanished entirely trips this, whatever the committed minimum happens to
+ * be this month.
+ *
+ * That last clause is the point. The property "no single scan root clears this
+ * floor alone" has been enforced since the floors were written, as arithmetic
+ * (`minimum > largestRoot`) in a suite that has to be re-measured every time
+ * the tree grows — five times so far, twice in one afternoon from a single new
+ * component, always in a suite unrelated to the change that caused it. Stated
+ * here there is no number to move.
+ */
+export function assertScannedRoots(checkName: string, files: readonly string[]): void {
+  const floor = countFloorFor(checkName);
+  if (!floor.roots) throw new ScannedFloorError(checkName, lookupFailure("no_roots_floor"));
+  const verdict = evaluateScannedRoots(files, floor.roots, floor.label);
+  if (!verdict.ok) throw new ScannedFloorError(checkName, verdict.failure);
 }
 
 /**

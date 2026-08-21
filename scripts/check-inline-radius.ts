@@ -17,7 +17,7 @@ import {
   type RadiusMatch,
 } from "../lib/check-inline-radius";
 import { GuardRootError } from "../lib/guard-root";
-import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import { ScannedFloorError, assertScannedFloor, assertScannedRoots } from "../lib/scanned-floor";
 import { guardScanRoot, listSourceFiles } from "./guard-io";
 
 const CHECK_NAME = "check-inline-radius";
@@ -29,6 +29,19 @@ function main(): void {
 
   // A walk that lost a scan root reports "no inline geometry literals" in
   // exactly the same words as a walk that read everything.
+  //
+  // Two assertions because they catch different failures over the same walk:
+  // the per-root check notices one root going quiet while the other keeps the
+  // total looking healthy, and the count notices a walk that came back
+  // implausibly small with every root still present. Only the second carries a
+  // measured number, which is why only the second ever needs re-measuring.
+  //
+  // Roots FIRST, deliberately. When a root vanishes both fire, and they give
+  // opposite advice: `no_root_files` names the directory that went quiet, while
+  // `below_floor` says "if the tree legitimately shrank, re-measure the floor"
+  // — which is the wrong thing to do and the easy thing to do. The more
+  // specific diagnosis should be the one the reader meets.
+  assertScannedRoots(CHECK_NAME, files);
   assertScannedFloor(CHECK_NAME, files.length);
 
   const allMatches: RadiusMatch[] = [];

@@ -71,6 +71,7 @@ type EvaluatorFailureCode = Extract<
   | "missing_input"
   | "unreadable_input"
   | "empty_input"
+  | "no_root_files"
 >;
 
 const EVALUATOR_PRODUCED: Record<EvaluatorFailureCode, string> = {
@@ -86,6 +87,8 @@ const EVALUATOR_PRODUCED: Record<EvaluatorFailureCode, string> = {
     "returned by evaluateParsedInputs for an input the wrapper could not read, produced against a scratch root by __tests__/lint-guard-empty-input.test.ts",
   empty_input:
     "returned by evaluateParsedInputs for an input that read and parsed to nothing, produced per declared input by __tests__/lint-guard-empty-input.test.ts",
+  no_root_files:
+    "returned by evaluateScannedRoots over a tree holding every scan root but one, built by __tests__/lint-guard-partial-root.test.ts — the sibling of below_floor and the reason it exists: a lost root is a hole with a name, not a small number",
 };
 
 /**
@@ -135,6 +138,16 @@ const CASES: Record<LookupFailureCode, LookupCase> = {
         .replace(/inputs: \["app\.json"\],/, 'count: { label: "config file", minimum: 1 },')
         .replace(/note: "/, 'note: "measured 2026-08-14. '),
     cleanLine: /iOS block OK|app\.json OK/,
+  },
+  // The wrapper hands its walked files over for a per-root check and the entry
+  // names no roots. Dropping the `roots` list leaves an entry that is valid in
+  // every other respect — `scannedFloorFor` passes it and `countFloorFor`
+  // answers — so `assertScannedRoots` is what refuses, which is the direction
+  // this code is about.
+  no_roots_floor: {
+    checkName: "check-inline-radius",
+    rewrite: (entry) => entry.replace(/, roots: \[[^\]]*\]/, ""),
+    cleanLine: /no inline geometry literals/,
   },
 };
 

@@ -391,6 +391,25 @@ describe("FLOOR_WALKS", () => {
     }
   });
 
+  it("declares the same roots in SCANNED_FLOORS as it walks, for every entry that names them", () => {
+    // Two tables now name a walk's roots, for different jobs: `FLOOR_WALKS` is
+    // read by the re-measure tool and by this suite, and `count.roots` is read
+    // by the guard at its own runtime. They must agree, because the second is
+    // the one that refuses and the first is the one people read — a guard
+    // whose runtime list quietly lost a root would enforce less than the table
+    // it is documented by, which is the failure this whole shape is about, one
+    // level up.
+    for (const [checkName, walk] of Object.entries(FLOOR_WALKS)) {
+      const roots = SCANNED_FLOORS[checkName]?.count?.roots;
+      if (!roots) continue;
+      assert.deepEqual(
+        [...roots],
+        [...walk.roots],
+        `${checkName}'s SCANNED_FLOORS roots and its FLOOR_WALKS roots disagree`,
+      );
+    }
+  });
+
   it("still sits above its largest single root, for EVERY walk in the table", () => {
     // The property itself, measured against the real tree and by counting
     // rather than by spawning — which is what makes it affordable for all five
@@ -413,6 +432,15 @@ describe("FLOOR_WALKS", () => {
     for (const [checkName, walk] of Object.entries(FLOOR_WALKS)) {
       const floor = SCANNED_FLOORS[checkName]?.count;
       assert.ok(floor, `${checkName} declares no count floor`);
+      // A guard that declares its roots states the property directly — every
+      // declared root must have contributed — so the arithmetic below is a
+      // second, weaker statement of something already enforced at its own
+      // runtime, and the ONLY reason its number would have to move. Skipped
+      // for those, which is the entire point of declaring them: this case has
+      // gone red five times as the tree grew, twice in one afternoon from a
+      // single new component, always in a suite unrelated to the change that
+      // caused it. The remaining walks move onto `roots` in 2/3.
+      if (floor.roots) continue;
       const perRoot = walk.roots.map((root) => ({
         root,
         count: listSourceFiles(REPO_ROOT, [root], walk.extensions ?? SOURCE_EXTENSIONS).length,
