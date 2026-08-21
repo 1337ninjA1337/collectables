@@ -1370,6 +1370,22 @@ const be: TranslationMap = {
   emptyProfileWishlistTitle: "Спіс жаданняў пусты",
   emptyProfileWishlistHint:
     "Гэты карыстальнік пакуль не дадаў прадметы ў спіс жаданняў.",
+  // Wishlist — the same vocabulary as the wishlist empty states above.
+  wishlist: "Спіс жаданняў",
+  wishlistHint: "Прадметы, якія вы хочаце — асобна ад асноўных калекцый",
+  wishlistAdd: "Дадаць у спіс жаданняў",
+  wishlistAdded: "Дададзена ў спіс жаданняў",
+  wishlistDeleted: "Выдалена са спіса жаданняў",
+  wishlistConfirmDelete: "Выдаліць гэты прадмет са спіса жаданняў?",
+  wishlistEmptyTitle: "Ваш спіс жаданняў пусты",
+  wishlistEmptyHint:
+    "Захоўвайце тое, што шукаеце — перанесяце ў калекцыю, калі атрымаеце.",
+  wishlistPromote: "Атрымаў",
+  wishlistPromoteTitle: "Перанесці ў калекцыю",
+  wishlistPromoteHint: "Выберыце, у якую калекцыю дадаць гэты прадмет.",
+  wishlistPromoted: "Перанесена ў калекцыю",
+  wishlistSource: "Дзе шукаць",
+  wishlistSourcePlaceholder: "напр. інтэрнэт-крама, барахолка",
 };
 
 const pl: TranslationMap = {
@@ -1645,6 +1661,22 @@ const pl: TranslationMap = {
   emptyProfileWishlistTitle: "Lista życzeń jest pusta",
   emptyProfileWishlistHint:
     "Ta osoba nie dodała jeszcze nic do swojej listy życzeń.",
+  // Wishlist — the same vocabulary as the wishlist empty states above.
+  wishlist: "Lista życzeń",
+  wishlistHint: "Przedmioty, których szukasz — osobno od Twoich kolekcji",
+  wishlistAdd: "Dodaj do listy życzeń",
+  wishlistAdded: "Dodano do listy życzeń",
+  wishlistDeleted: "Usunięto z listy życzeń",
+  wishlistConfirmDelete: "Usunąć ten przedmiot z listy życzeń?",
+  wishlistEmptyTitle: "Twoja lista życzeń jest pusta",
+  wishlistEmptyHint:
+    "Zapisuj przedmioty, których szukasz — przeniesiesz je do kolekcji, gdy je zdobędziesz.",
+  wishlistPromote: "Mam to",
+  wishlistPromoteTitle: "Przenieś do kolekcji",
+  wishlistPromoteHint: "Wybierz, do której kolekcji trafi ten przedmiot.",
+  wishlistPromoted: "Przeniesiono do kolekcji",
+  wishlistSource: "Gdzie szukać",
+  wishlistSourcePlaceholder: "np. sklep internetowy, pchli targ",
 };
 
 const de: TranslationMap = {
@@ -1918,6 +1950,22 @@ const de: TranslationMap = {
   emptyProfileWishlistTitle: "Wunschliste ist leer",
   emptyProfileWishlistHint:
     "Diese Person hat noch nichts auf ihre Wunschliste gesetzt.",
+  // Wishlist — the same vocabulary as the wishlist empty states above.
+  wishlist: "Wunschliste",
+  wishlistHint: "Objekte, die du suchst — getrennt von deinen Sammlungen",
+  wishlistAdd: "Zur Wunschliste",
+  wishlistAdded: "Zur Wunschliste hinzugefügt",
+  wishlistDeleted: "Von der Wunschliste entfernt",
+  wishlistConfirmDelete: "Dieses Objekt von der Wunschliste entfernen?",
+  wishlistEmptyTitle: "Deine Wunschliste ist leer",
+  wishlistEmptyHint:
+    "Merk dir, wonach du suchst — verschiebe es in eine Sammlung, sobald du es hast.",
+  wishlistPromote: "Hab ich",
+  wishlistPromoteTitle: "In Sammlung verschieben",
+  wishlistPromoteHint: "Wähle, in welche Sammlung dieses Objekt jetzt gehört.",
+  wishlistPromoted: "In die Sammlung verschoben",
+  wishlistSource: "Wo zu finden",
+  wishlistSourcePlaceholder: "z. B. Onlineshop, Flohmarkt",
 };
 
 const es: TranslationMap = {
@@ -2190,6 +2238,22 @@ const es: TranslationMap = {
   emptyProfileWishlistTitle: "La lista de deseos está vacía",
   emptyProfileWishlistHint:
     "Esta persona todavía no ha añadido nada a su lista de deseos.",
+  // Wishlist — the same vocabulary as the wishlist empty states above.
+  wishlist: "Lista de deseos",
+  wishlistHint: "Objetos que buscas — aparte de tus colecciones",
+  wishlistAdd: "Añadir a la lista de deseos",
+  wishlistAdded: "Añadido a la lista de deseos",
+  wishlistDeleted: "Eliminado de la lista de deseos",
+  wishlistConfirmDelete: "¿Eliminar este objeto de tu lista de deseos?",
+  wishlistEmptyTitle: "Tu lista de deseos está vacía",
+  wishlistEmptyHint:
+    "Guarda lo que estás buscando — muévelo a una colección cuando lo consigas.",
+  wishlistPromote: "Ya lo tengo",
+  wishlistPromoteTitle: "Mover a una colección",
+  wishlistPromoteHint: "Elige en qué colección va este objeto ahora que es tuyo.",
+  wishlistPromoted: "Movido a la colección",
+  wishlistSource: "Dónde encontrarlo",
+  wishlistSourcePlaceholder: "p. ej. tienda online, mercadillo",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };
