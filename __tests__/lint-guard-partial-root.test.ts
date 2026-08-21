@@ -85,6 +85,9 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // on below_floor rather than on the missing translations file — which is
   // the distinction this suite exists to keep.
   "check-orphan-i18n-keys": () => ["app"],
+  // Same five-root walk as check-orphan-i18n-keys and the same floor of 200;
+  // `app` at 19 files is nowhere near it.
+  "check-profile-id-pii": () => ["app"],
   "check-a11y-jsx": () => ["app"],
   // Walks the whole tree; app/ is a few dozen of the several hundred files.
   "check-secrets": () => ["app"],

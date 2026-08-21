@@ -59,6 +59,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "No direct analytics-events imports from UI code — the taxonomy is consumed via lib/analytics.ts",
   },
   {
+    npmScript: "lint:profile-id-pii",
+    scriptPath: "scripts/check-profile-id-pii.ts",
+    args: [],
+    description:
+      "No email address reaching a public profile identifier (publicId / username) — those are shared, searched and written back to the cloud row",
+  },
+  {
     npmScript: "lint:orphan-i18n",
     scriptPath: "scripts/check-orphan-i18n-keys.ts",
     args: [],

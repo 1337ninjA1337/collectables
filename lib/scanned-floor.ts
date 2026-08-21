@@ -659,6 +659,10 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     count: { label: "source file", minimum: 46 },
     note: "same app/ + components/ walk as check-inline-radius, 64 files on 2026-08-16; same 46 for the same reason, raised alongside it.",
   },
+  "check-profile-id-pii": {
+    count: { label: "source file", minimum: 200 },
+    note: "app/ + components/ + data/ + lib/ + scripts/ held 264 .ts/.tsx files on 2026-08-21; the same walk check-orphan-i18n-keys takes minus its one exclusion, so it carries the same 200 for the same reason — it rides above the 165 that lib/ alone contributes, and lib/ is where every profile-shaping function lives. A walk that had quietly lost lib/ would report a clean tree while reading none of the code this rule is about.",
+  },
   "check-orphan-i18n-keys": {
     count: { label: "source file", minimum: 200 },
     note: "app/ + components/ + data/ + lib/ + scripts/ held 262 .ts/.tsx files on 2026-08-21, minus lib/i18n-context.tsx itself (which declares every key, so counting it would make every key read) = 261. 200 rides above the 163 that lib/ alone contributes, so no single root clears this floor on its own — the property matters more here than for most, because a key's only reader is often a TABLE in lib/ rather than a `t()` call in a screen, and a walk that had quietly lost app/ would report those keys live while missing every orphan a screen used to render.",

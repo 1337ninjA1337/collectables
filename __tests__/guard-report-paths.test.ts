@@ -55,6 +55,16 @@ const PLANTED: Readonly<
     file: "app/planted-offender.tsx",
     source: "export const Screen = () => <TextInput value={email} />;\n",
   },
+  "check-profile-id-pii": {
+    entries: ["app", "components", "lib"],
+    file: "lib/planted-offender.ts",
+    // Multi-line on purpose: the value reader is brace- and quote-aware
+    // precisely so a wrapped expression is not truncated at the first comma,
+    // and a single-line plant would be found by a scanner that only reads to
+    // the end of the line.
+    source:
+      "export const p = {\n  publicId: slugify(\n    profile.publicId || profile.email,\n  ),\n};\n",
+  },
   "check-a11y-jsx": {
     entries: ["app", "components"],
     file: "app/planted-offender.tsx",
