@@ -2,6 +2,12 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  FALLBACK_PROFILE_EMAIL,
+  FALLBACK_SLUG_SEED,
+  resolveFallbackIdentity,
+} from "@/lib/social-helpers";
+
+import {
   assertDeclaredInEveryLocale,
   localeStrings,
 } from "./helpers/i18n-locales";
@@ -49,14 +55,41 @@ const sentinelValue = (): string => {
   return match![1];
 };
 
-describe("the fallback profile's display name is translated", () => {
-  it("reads defaultDisplayName rather than an English literal", () => {
-    assert.match(SOCIAL_CONTEXT, /t\("defaultDisplayName"\)/);
-    assert.doesNotMatch(
-      SOCIAL_CONTEXT,
-      /\?\?\s*"you"/,
-      'the fallback display name is an English literal again — a person with no email address and no full_name is shown the word "you" as their name, in every language',
+describe("the fallback identity chain, called rather than read", () => {
+  const DEFAULT_NAME = "Коллекционер";
+
+  it("prefers the session's full name above everything", () => {
+    const identity = resolveFallbackIdentity(
+      { email: "ada@example.com", fullName: "Ada Lovelace", userName: "ada_l" },
+      DEFAULT_NAME,
     );
+    assert.equal(identity.displayName, "Ada Lovelace");
+    assert.equal(identity.username, "ada_l");
+  });
+
+  it("falls back to the email's local part before reaching for the key", () => {
+    // The key is the LAST resort, not the first: somebody with an address
+    // should be called by the name in it, which the translation must not
+    // quietly replace.
+    const identity = resolveFallbackIdentity({ email: "ada@example.com" }, DEFAULT_NAME);
+    assert.equal(identity.displayName, "ada");
+    assert.equal(identity.username, "ada");
+    assert.equal(identity.email, "ada@example.com");
+  });
+
+  it("uses the translated default only when there is no name and no address", () => {
+    // The bug this whole change exists for: this returned the English word
+    // "you" as a person's NAME, in every language.
+    const identity = resolveFallbackIdentity({}, DEFAULT_NAME);
+    assert.equal(identity.displayName, DEFAULT_NAME);
+  });
+
+  it("treats an address with an empty local part as no address", () => {
+    // `"@example.com".split("@")[0]` is `""`, which would otherwise become an
+    // empty display name and an empty username — neither of which is a name.
+    const identity = resolveFallbackIdentity({ email: "@example.com" }, DEFAULT_NAME);
+    assert.equal(identity.displayName, DEFAULT_NAME);
+    assert.equal(identity.slugSeed, FALLBACK_SLUG_SEED);
   });
 
   it("declares defaultDisplayName in every locale", () => {
@@ -71,44 +104,55 @@ describe("the fallback profile's display name is translated", () => {
     assert.equal(new Set(values.values()).size, values.size);
   });
 
-  it("falls back to the email's local part before reaching for the key", () => {
-    // The key is the LAST resort, not the first: somebody with an address
-    // should be called by the name in it, which is what the code did before
-    // and what the translation must not quietly replace.
-    assert.match(
+  it("no longer reaches for the pronoun that used to be here", () => {
+    assert.doesNotMatch(
       SOCIAL_CONTEXT,
-      /const emailName = user\.email\?\.split\("@"\)\[0\];/,
-    );
-    assert.match(
-      SOCIAL_CONTEXT,
-      /full_name[\s\S]{0,80}\?\?\s*\n?\s*emailName\s*\?\?\s*\n?\s*t\("defaultDisplayName"\)/,
-      "the order of the fallback chain changed — full_name, then the email's local part, then the translated default",
+      /\?\?\s*"you"/,
+      'the fallback display name is an English literal again — a person with no email address and no full_name is shown the word "you" as their name, in every language',
     );
   });
 });
 
 describe("the slug fields stay ASCII, which is why they are not translated", () => {
-  it("seeds username and publicId from a constant, not from the translated name", () => {
-    // `slugifyProfileId` strips everything outside [a-z0-9], so seeding a slug
-    // from a translated word leaves a Russian or Belarusian user with an empty
-    // slug rescued into `collector-<timestamp>` — a worse profile ID than the
-    // one they had. This is the assertion that would fail if somebody
-    // "finished the job" by translating the other three fields too.
-    assert.match(SOCIAL_CONTEXT, /const FALLBACK_SLUG_SEED = "collector";/);
-    assert.match(SOCIAL_CONTEXT, /const slugSeed = emailName \?\? FALLBACK_SLUG_SEED;/);
-    assert.match(SOCIAL_CONTEXT, /publicId: slugifyProfileId\(slugSeed\)/);
+  const CYRILLIC_DEFAULT = "Коллекционер";
+
+  it("never seeds a slug from the translated display name", () => {
+    // The regression this split prevents. A slug seeded from "Коллекционер"
+    // survives `[^a-z0-9]` stripping as the empty string, and the slugifier's
+    // last resort stamps a timestamp — so the user ends up with
+    // `collector-1755…` as their public profile ID instead of a name.
+    const identity = resolveFallbackIdentity({}, CYRILLIC_DEFAULT);
+    assert.equal(identity.displayName, CYRILLIC_DEFAULT);
+    assert.equal(identity.slugSeed, FALLBACK_SLUG_SEED);
+    assert.equal(identity.username, FALLBACK_SLUG_SEED);
+    assert.doesNotMatch(identity.slugSeed, /[^a-z0-9]/);
+  });
+
+  it("strips a real email's local part down to a usable username", () => {
+    const identity = resolveFallbackIdentity({ email: "Ada.Lovelace+x@e.com" }, "Collector");
+    assert.equal(identity.username, "adalovelacex");
+    assert.equal(identity.displayName, "Ada.Lovelace+x");
+  });
+
+  it("uses the placeholder address only when the session has none", () => {
+    assert.equal(resolveFallbackIdentity({}, "Collector").email, FALLBACK_PROFILE_EMAIL);
+    assert.doesNotMatch(FALLBACK_PROFILE_EMAIL, /\byou\b/);
   });
 
   it("agrees with the two other places that fall back to the same word", () => {
     // `normalizeProfile` and `ensureUniqueUsername` already default to
     // "collector"; a seed that disagreed would give one user two different
     // fallback identities depending on which path built the profile.
+    assert.equal(FALLBACK_SLUG_SEED, "collector");
     assert.match(SOCIAL_CONTEXT, /\|\| "collector";/);
     assert.match(SOCIAL_CONTEXT, /\|\| `collector_\$\{Date\.now\(\)\}`/);
   });
 
-  it("no longer seeds the placeholder email from a pronoun", () => {
-    assert.match(SOCIAL_CONTEXT, /"collector@collectables\.app"/);
+  it("is what the screen-facing builder actually calls", () => {
+    // The pure function can be perfect and unused. This is the wiring.
+    assert.match(SOCIAL_CONTEXT, /resolveFallbackIdentity\(/);
+    assert.match(SOCIAL_CONTEXT, /publicId: slugifyProfileId\(identity\.slugSeed\)/);
+    assert.match(SOCIAL_CONTEXT, /t\("defaultDisplayName"\)/);
   });
 });
 

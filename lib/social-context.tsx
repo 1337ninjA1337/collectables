@@ -34,7 +34,11 @@ import {
   type PendingSocialQueue,
   type SocialMutation,
 } from "@/lib/pending-social";
-import { classifyRequestRemoval, diffAcceptedFriendships } from "@/lib/social-helpers";
+import {
+  classifyRequestRemoval,
+  diffAcceptedFriendships,
+  resolveFallbackIdentity,
+} from "@/lib/social-helpers";
 import { createRateLimitedDeliver } from "@/lib/write-rate-limit";
 import { Collection, CollectableItem, ProfileRelationship, UserProfile } from "@/lib/types";
 
@@ -124,19 +128,6 @@ function ensureUniqueUsername(username: string, profiles: UserProfile[], selfId?
 }
 
 /**
- * The seed for `username` and `publicId` when the session carries no email.
- *
- * ASCII on purpose, and deliberately NOT the translated display name: both
- * fields are slugs, and `slugifyProfileId` strips everything outside
- * `[a-z0-9]`. Seeding them from a translated word would leave a Russian or
- * Belarusian user with an empty slug rescued into `collector-1755...` by the
- * timestamp fallback — a worse profile ID than the one they get now. Matches
- * the `"collector"` that `normalizeProfile` and `ensureUniqueUsername` already
- * fall back to, so the three agree on one word.
- */
-const FALLBACK_SLUG_SEED = "collector";
-
-/**
  * The English bio a brand-new profile is created with, and the SENTINEL that
  * `app/profile/[id].tsx` translates on render.
  *
@@ -161,34 +152,33 @@ export const DEFAULT_EN_PROFILE_BIO =
 /**
  * The profile shown before a cloud row exists — after sign-up, or offline.
  *
- * Takes `t` for `displayName`, which used to be the English word "you" for a
- * session carrying no email address and no `full_name` metadata — shown as a
- * person's NAME, in English, whatever language the app was in. It reads
- * `defaultDisplayName` now: a key named for the job, translated in all six
- * locales, and unlike the bio it is safe to localise at write time because it
- * is recomputed on every render until the person edits their profile, at which
- * point they have chosen a name of their own.
+ * The identity fields come from {@link resolveFallbackIdentity}, which is pure
+ * and lives in `lib/social-helpers.ts` so the fallback chain can be tested by
+ * being CALLED — this module pulls React Native peers, so anything asserted
+ * about it here can only be asserted about its source text.
  *
- * The split between the prose fields and the slug fields is the point of the
- * rest: only `displayName` is translated. See {@link FALLBACK_SLUG_SEED}.
+ * What stays: reading the session's metadata bag (untyped, hence the casts),
+ * and slugifying the public ID, which is not pure — its last-resort branch
+ * stamps a timestamp so two profiles with unslugifiable names cannot collide.
  */
 function buildFallbackProfile(
   user: NonNullable<ReturnType<typeof useAuth>["user"]>,
   t: ReturnType<typeof useI18n>["t"],
 ): UserProfile {
-  const emailName = user.email?.split("@")[0];
-  const slugSeed = emailName ?? FALLBACK_SLUG_SEED;
+  const identity = resolveFallbackIdentity(
+    {
+      email: user.email,
+      fullName: user.user_metadata?.full_name as string | undefined,
+      userName: user.user_metadata?.user_name as string | undefined,
+    },
+    t("defaultDisplayName"),
+  );
   return {
     id: user.id,
-    email: user.email ?? "collector@collectables.app",
-    displayName:
-      (user.user_metadata?.full_name as string | undefined) ??
-      emailName ??
-      t("defaultDisplayName"),
-    username:
-      (user.user_metadata?.user_name as string | undefined) ??
-      slugSeed.toLowerCase().replace(/[^a-z0-9_]+/g, ""),
-    publicId: slugifyProfileId(slugSeed),
+    email: identity.email,
+    displayName: identity.displayName,
+    username: identity.username,
+    publicId: slugifyProfileId(identity.slugSeed),
     bio: DEFAULT_EN_PROFILE_BIO,
     avatar: (user.user_metadata?.avatar_url as string | undefined) ?? "",
   };
