@@ -214,3 +214,104 @@ export function resolveFallbackIdentity(
     slugSeed,
   };
 }
+
+/**
+ * The last-resort unique suffix for a name that slugifies to nothing.
+ *
+ * Injected rather than read from the clock so the slug functions are pure
+ * given their arguments, and so the branch that produces it can be asserted at
+ * all. The default is the wall clock, which is what shipped: two people whose
+ * names contain no ASCII letters — a Cyrillic display name, a Cyrillic email
+ * local part — would otherwise both slugify to the empty string and collide on
+ * one profile ID.
+ */
+export type UniqueSuffix = () => string;
+
+const wallClockSuffix: UniqueSuffix = () => String(Date.now());
+
+/**
+ * The minimum a profile has to be for the uniqueness walks to read it.
+ *
+ * Structural rather than `UserProfile` so a test fixture is three fields
+ * instead of eight, and so the walks cannot quietly start depending on
+ * something else about a profile.
+ */
+export type ProfileIdentity = {
+  readonly id: string;
+  readonly publicId?: string;
+  readonly username?: string;
+};
+
+/**
+ * A public profile ID: lower-case, `[a-z0-9]` separated by single hyphens.
+ *
+ * The separator differs from {@link slugifyUsername}'s on purpose — a public
+ * ID appears in a URL and a username does not — which is why the two are not
+ * one function with a parameter.
+ */
+export function slugifyProfileId(
+  value: string,
+  suffix: UniqueSuffix = wallClockSuffix,
+): string {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || `${FALLBACK_SLUG_SEED}-${suffix()}`
+  );
+}
+
+/** A username: lower-case, `[a-z0-9_]` separated by single underscores. */
+export function slugifyUsername(
+  value: string,
+  suffix: UniqueSuffix = wallClockSuffix,
+): string {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, "_")
+      .replace(/^_+|_+$/g, "") || `${FALLBACK_SLUG_SEED}_${suffix()}`
+  );
+}
+
+/**
+ * Walk `-2`, `-3`, … until the slug is free among `profiles`.
+ *
+ * `selfId` is excluded so re-saving a profile without changing its ID is not
+ * treated as a collision with itself — the case that would otherwise renumber
+ * somebody's public ID every time they edited their bio.
+ */
+export function ensureUniquePublicId(
+  publicId: string,
+  profiles: readonly ProfileIdentity[],
+  selfId?: string,
+  suffix: UniqueSuffix = wallClockSuffix,
+): string {
+  const base = slugifyProfileId(publicId, suffix);
+  let next = base;
+  let counter = 2;
+  while (profiles.some((p) => p.id !== selfId && p.publicId === next)) {
+    next = `${base}-${counter}`;
+    counter += 1;
+  }
+  return next;
+}
+
+/** {@link ensureUniquePublicId} for usernames, walking `_2`, `_3`, … */
+export function ensureUniqueUsername(
+  username: string,
+  profiles: readonly ProfileIdentity[],
+  selfId?: string,
+  suffix: UniqueSuffix = wallClockSuffix,
+): string {
+  const base = slugifyUsername(username, suffix);
+  let next = base;
+  let counter = 2;
+  while (profiles.some((p) => p.id !== selfId && p.username === next)) {
+    next = `${base}_${counter}`;
+    counter += 1;
+  }
+  return next;
+}

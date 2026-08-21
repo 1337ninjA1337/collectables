@@ -37,7 +37,11 @@ import {
 import {
   classifyRequestRemoval,
   diffAcceptedFriendships,
+  ensureUniquePublicId,
+  ensureUniqueUsername,
+  FALLBACK_SLUG_SEED,
   resolveFallbackIdentity,
+  slugifyProfileId,
 } from "@/lib/social-helpers";
 import { createRateLimitedDeliver } from "@/lib/write-rate-limit";
 import { Collection, CollectableItem, ProfileRelationship, UserProfile } from "@/lib/types";
@@ -84,48 +88,6 @@ type SocialContextValue = {
 };
 
 const SocialContext = createContext<SocialContextValue | null>(null);
-
-function slugifyProfileId(value: string) {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || `collector-${Date.now()}`
-  );
-}
-
-function ensureUniquePublicId(publicId: string, profiles: UserProfile[], selfId?: string) {
-  const base = slugifyProfileId(publicId);
-  let next = base;
-  let counter = 2;
-
-  while (profiles.some((profile) => profile.id !== selfId && profile.publicId === next)) {
-    next = `${base}-${counter}`;
-    counter += 1;
-  }
-
-  return next;
-}
-
-function ensureUniqueUsername(username: string, profiles: UserProfile[], selfId?: string) {
-  const base =
-    username
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_]+/g, "_")
-      .replace(/^_+|_+$/g, "") || `collector_${Date.now()}`;
-
-  let next = base;
-  let counter = 2;
-
-  while (profiles.some((profile) => profile.id !== selfId && profile.username === next)) {
-    next = `${base}_${counter}`;
-    counter += 1;
-  }
-
-  return next;
-}
 
 /**
  * The English bio a brand-new profile is created with, and the SENTINEL that
@@ -190,7 +152,7 @@ function normalizeProfile(profile: UserProfile) {
       ?.trim()
       .toLowerCase()
       .replace(/[^a-z0-9_]+/g, "_")
-      .replace(/^_+|_+$/g, "") || "collector";
+      .replace(/^_+|_+$/g, "") || FALLBACK_SLUG_SEED;
 
   return {
     ...profile,
