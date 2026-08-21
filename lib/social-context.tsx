@@ -39,7 +39,7 @@ import {
   diffAcceptedFriendships,
   ensureUniquePublicId,
   ensureUniqueUsername,
-  FALLBACK_SLUG_SEED,
+  normalizeProfile,
   resolveFallbackIdentity,
   slugifyProfileId,
 } from "@/lib/social-helpers";
@@ -143,21 +143,6 @@ function buildFallbackProfile(
     publicId: slugifyProfileId(identity.slugSeed),
     bio: DEFAULT_EN_PROFILE_BIO,
     avatar: (user.user_metadata?.avatar_url as string | undefined) ?? "",
-  };
-}
-
-function normalizeProfile(profile: UserProfile) {
-  const normalizedUsername =
-    profile.username
-      ?.trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_]+/g, "_")
-      .replace(/^_+|_+$/g, "") || FALLBACK_SLUG_SEED;
-
-  return {
-    ...profile,
-    username: normalizedUsername,
-    publicId: profile.publicId ? slugifyProfileId(profile.publicId) : slugifyProfileId(profile.username || profile.displayName || profile.email),
   };
 }
 

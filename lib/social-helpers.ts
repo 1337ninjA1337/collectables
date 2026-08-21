@@ -3,7 +3,7 @@
  * sites (and any future UI that needs the same buckets).
  */
 
-import type { ProfileRelationship } from "@/lib/types";
+import type { ProfileRelationship, UserProfile } from "@/lib/types";
 
 /**
  * Canonical 3-way relationship bucket for analytics payloads. Coarser than
@@ -314,4 +314,49 @@ export function ensureUniqueUsername(
     counter += 1;
   }
   return next;
+}
+
+/**
+ * Settle a profile's two slug fields, wherever the profile came from.
+ *
+ * Run on every profile the app holds — the signed-in user's, the ones read
+ * back from AsyncStorage, and every row fetched from the cloud — because none
+ * of those sources guarantees a usable `username` or `publicId`.
+ * `coerceProfileRow` turns a NULL column into `""`, so a sparse cloud row
+ * arrives with empty strings rather than with something to slugify.
+ *
+ * The fallback chain for `publicId` deliberately ENDS at the display name.
+ * It used to end at `profile.email`, and that was reachable: a row with a NULL
+ * `public_id`, `username` and `display_name` but a real address produced
+ * `ada-lovelace-example-com` as a public profile ID — an identifier the app
+ * invites people to share so others can find them, and which is written back
+ * to the cloud row on the next save, so the address would stick. A profile
+ * with nothing to name it gets the anonymous seed instead, which is what
+ * `slugifyProfileId` already does with an empty string.
+ *
+ * `username`'s fallback is the bare seed with no suffix, which is NOT a
+ * mistake carried over: several nameless profiles sharing the username
+ * `collector` is the behaviour that shipped, and changing it would rename
+ * profiles already stored under it. `ensureUniqueUsername` is what resolves a
+ * clash when somebody actually picks a name.
+ */
+export function normalizeProfile(
+  profile: UserProfile,
+  suffix: UniqueSuffix = wallClockSuffix,
+): UserProfile {
+  const username =
+    profile.username
+      ?.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, "_")
+      .replace(/^_+|_+$/g, "") || FALLBACK_SLUG_SEED;
+
+  return {
+    ...profile,
+    username,
+    publicId: slugifyProfileId(
+      profile.publicId || profile.username || profile.displayName || "",
+      suffix,
+    ),
+  };
 }
