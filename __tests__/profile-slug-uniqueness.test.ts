@@ -8,6 +8,8 @@ import {
   normalizeProfile,
   slugifyProfileId,
   slugifyUsername,
+  slugSuffixFromSeed,
+  stableSuffix,
   type ProfileIdentity,
 } from "@/lib/social-helpers";
 
@@ -261,5 +263,185 @@ describe("normalizing a profile never derives a public ID from an email", () => 
     assert.equal(normalized.email, "ada.lovelace@example.com");
     assert.equal(normalized.bio, "hi");
     assert.equal(normalized.avatar, "a.png");
+  });
+});
+
+/**
+ * The suffix a name that slugifies to nothing gets, and why it is no longer the
+ * clock.
+ *
+ * `String(Date.now())` was wrong in two directions at once. It is 13 digits in
+ * an identifier the app asks a person to SHARE (`collector-1755823419233`), and
+ * — the actual bug — it is a different value on every call. `normalizeProfile`
+ * runs on every profile in a `useMemo` that recomputes on a language change or
+ * an arriving friend request, and `buildFallbackProfile` runs inside the same
+ * memo, so a user whose display name and email local part are both Cyrillic was
+ * handed a NEW public ID every recompute. Nobody could find them by the ID on
+ * their own screen, and the next save would write whichever one happened to be
+ * current into the cloud row.
+ *
+ * Seeding the suffix on the account ID keeps the one property the clock was
+ * there for — two such accounts must not collide — while making the result the
+ * same on every call and on every device.
+ */
+describe("the seeded suffix for a name that slugifies to nothing", () => {
+  const CYRILLIC = "Коллекционер";
+
+  it("is the same value every time, which the wall clock was not", () => {
+    assert.equal(slugSuffixFromSeed("user-1"), slugSuffixFromSeed("user-1"));
+    assert.equal(stableSuffix("user-1")(), stableSuffix("user-1")());
+  });
+
+  it("differs between accounts, which is the collision the clock prevented", () => {
+    const seeds = [
+      "9f8a1c2e-0000-4000-8000-000000000001",
+      "9f8a1c2e-0000-4000-8000-000000000002",
+      "user-1",
+      "user-2",
+      "",
+    ];
+    const tokens = new Set(seeds.map(slugSuffixFromSeed));
+    assert.equal(tokens.size, seeds.length);
+  });
+
+  it("is six characters of [a-z0-9], the alphabet the slugifier keeps", () => {
+    // Anything outside `[a-z0-9]` would be appended AFTER slugification and so
+    // would survive into the ID unstripped — a `-` or a `_` in the token would
+    // read as a separator and a `+` would need percent-encoding in a URL.
+    for (const seed of ["", "a", "user-1", "9f8a1c2e-0000-4000-8000-000000000001", "Коллекционер"]) {
+      const token = slugSuffixFromSeed(seed);
+      assert.match(token, /^[a-z0-9]{6}$/, `seed ${JSON.stringify(seed)} produced ${token}`);
+    }
+  });
+
+  it("gives the same account the same public ID twice in a row", () => {
+    // The regression, stated as directly as it can be: two calls, no injected
+    // suffix, one profile. With the clock underneath this failed whenever the
+    // two calls landed in different milliseconds.
+    const anonymous = {
+      id: "u1",
+      email: "коллекционер@example.com",
+      displayName: CYRILLIC,
+      username: "",
+      publicId: "",
+      bio: "",
+      avatar: "",
+    };
+    assert.equal(normalizeProfile(anonymous).publicId, normalizeProfile(anonymous).publicId);
+    assert.match(normalizeProfile(anonymous).publicId, new RegExp(`^${FALLBACK_SLUG_SEED}-[a-z0-9]{6}$`));
+  });
+
+  it("still separates two accounts with equally unslugifiable names", () => {
+    const one = normalizeProfile({
+      id: "u1",
+      email: "",
+      displayName: CYRILLIC,
+      username: "",
+      publicId: "",
+      bio: "",
+      avatar: "",
+    });
+    const two = normalizeProfile({
+      id: "u2",
+      email: "",
+      displayName: CYRILLIC,
+      username: "",
+      publicId: "",
+      bio: "",
+      avatar: "",
+    });
+    assert.notEqual(one.publicId, two.publicId);
+  });
+
+  it("no longer stamps a 13-digit timestamp into a shareable ID", () => {
+    const id = slugifyProfileId(CYRILLIC, stableSuffix("u1"));
+    assert.doesNotMatch(id, /\d{13}/);
+    assert.ok(id.length <= FALLBACK_SLUG_SEED.length + 1 + 6, `too long to share: ${id}`);
+  });
+
+  it("does not leak the account ID it was seeded on", () => {
+    // The seed is the auth UUID and the ID goes in a URL, so the one-way step
+    // is load-bearing rather than incidental.
+    const accountId = "9f8a1c2e-0000-4000-8000-000000000001";
+    const id = slugifyProfileId(CYRILLIC, stableSuffix(accountId));
+    for (const chunk of accountId.split("-")) {
+      assert.ok(!id.includes(chunk), `${chunk} of the account ID reached the public ID: ${id}`);
+    }
+  });
+});
+
+describe("a public profile ID is safe to put in a URL", () => {
+  it("survives encodeURIComponent unchanged, whatever the name was", () => {
+    // The constraint the two slug alphabets exist to satisfy, asserted where it
+    // can be checked — rather than as a comparison against `slugifyUsername`,
+    // which is a second function that could drift in the same direction.
+    const names = [
+      "Ada Lovelace",
+      "ada@example.com",
+      "  ../../etc/passwd  ",
+      "Коллекционер",
+      "a?b&c=d#e",
+      "100% Мой + твой",
+      "",
+    ];
+    for (const name of names) {
+      const id = slugifyProfileId(name, stableSuffix("u1"));
+      assert.equal(encodeURIComponent(id), id, `${JSON.stringify(name)} produced ${id}`);
+      assert.match(id, /^[a-z0-9]+(-[a-z0-9]+)*$/, `${JSON.stringify(name)} produced ${id}`);
+    }
+  });
+});
+
+describe("the uniqueness walks read the profile list once", () => {
+  it("still lands on the right suffix across a long run of collisions", () => {
+    // The walk re-scanned the whole list per iteration, so 200 collisions cost
+    // 200 full passes. Reading the list once is the same answer — this is the
+    // case that says so at a size where an off-by-one in the rewrite shows.
+    const others = Array.from({ length: 200 }, (_, i) =>
+      profile(`p${i}`, { publicId: i === 0 ? "ada-lovelace" : `ada-lovelace-${i + 1}` }),
+    );
+    assert.equal(ensureUniquePublicId("Ada Lovelace", others), "ada-lovelace-201");
+    assert.equal(
+      ensureUniqueUsername(
+        "Ada Lovelace",
+        others.map((p, i) => profile(p.id, { username: i === 0 ? "ada_lovelace" : `ada_lovelace_${i + 1}` })),
+      ),
+      "ada_lovelace_201",
+    );
+  });
+
+  it("does not treat a profile with an empty slug as holding one", () => {
+    // `coerceProfileRow` turns a NULL column into `""`, so empty slugs are
+    // normal in this list. A set built without skipping them would hold `""`,
+    // which no candidate can equal — but a later `taken.has(base)` on an empty
+    // base would then walk when it should not.
+    const others = [profile("b", { publicId: "" }), profile("c", { username: "" })];
+    assert.equal(ensureUniquePublicId("Ada Lovelace", others), "ada-lovelace");
+    assert.equal(ensureUniqueUsername("Ada Lovelace", others), "ada_lovelace");
+  });
+
+  it("excludes every profile row carrying the self id, not just the first", () => {
+    // The exclusion moved out of the loop condition and into the set build; a
+    // duplicated self row is the shape that would catch a `find`-style rewrite.
+    const me = [profile("me", { publicId: "ada-lovelace" }), profile("me", { publicId: "ada-lovelace-2" })];
+    assert.equal(ensureUniquePublicId("Ada Lovelace", me, "me"), "ada-lovelace");
+  });
+});
+
+describe("the fallback profile does not read the clock", () => {
+  it("seeds its public-ID suffix on the account id", () => {
+    // `buildFallbackProfile` is behind the React Native import wall, so this is
+    // asserted about its source text. The behaviour it delegates to is covered
+    // by the cases above; what this pins is that the call site still passes a
+    // seed rather than falling back to `wallClockSuffix` by omission.
+    const source = readRepoFile("lib/social-context.tsx");
+    assert.match(source, /slugifyProfileId\(identity\.slugSeed,\s*stableSuffix\(user\.id\)\)/);
+    assert.doesNotMatch(source, /slugifyProfileId\(identity\.slugSeed\)/);
+  });
+
+  it("seeds the edit path too, so a saved ID does not renumber per save", () => {
+    const source = readRepoFile("lib/social-context.tsx");
+    assert.match(source, /ensureUniquePublicId\(input\.publicId, profiles, user\.id, seeded\)/);
+    assert.match(source, /ensureUniqueUsername\(input\.username, profiles, user\.id, seeded\)/);
   });
 });

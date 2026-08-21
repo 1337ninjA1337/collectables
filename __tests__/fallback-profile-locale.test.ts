@@ -157,7 +157,13 @@ describe("the slug fields stay ASCII, which is why they are not translated", () 
   it("is what the screen-facing builder actually calls", () => {
     // The pure function can be perfect and unused. This is the wiring.
     assert.match(SOCIAL_CONTEXT, /resolveFallbackIdentity\(/);
-    assert.match(SOCIAL_CONTEXT, /publicId: slugifyProfileId\(identity\.slugSeed\)/);
+    // The suffix argument is part of the wiring, not decoration: without it the
+    // slugifier falls back to the wall clock and a Cyrillic-named account gets a
+    // different public ID on every recompute of the profile memo.
+    assert.match(
+      SOCIAL_CONTEXT,
+      /publicId: slugifyProfileId\(identity\.slugSeed, stableSuffix\(user\.id\)\)/,
+    );
     assert.match(SOCIAL_CONTEXT, /t\("defaultDisplayName"\)/);
   });
 });

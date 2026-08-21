@@ -42,6 +42,7 @@ import {
   normalizeProfile,
   resolveFallbackIdentity,
   slugifyProfileId,
+  stableSuffix,
 } from "@/lib/social-helpers";
 import { createRateLimitedDeliver } from "@/lib/write-rate-limit";
 import { Collection, CollectableItem, ProfileRelationship, UserProfile } from "@/lib/types";
@@ -120,8 +121,14 @@ export const DEFAULT_EN_PROFILE_BIO =
  * about it here can only be asserted about its source text.
  *
  * What stays: reading the session's metadata bag (untyped, hence the casts),
- * and slugifying the public ID, which is not pure — its last-resort branch
- * stamps a timestamp so two profiles with unslugifiable names cannot collide.
+ * and slugifying the public ID. That last-resort branch used to stamp the wall
+ * clock, which made this function non-deterministic in the worst possible
+ * place: `profiles` is a memo that recomputes on a language change or an
+ * arriving friend request, so a user whose name slugifies to nothing was handed
+ * a NEW public ID each time — the identifier the app tells them to share
+ * changed under them. It is seeded on the account ID now, so the same account
+ * always produces the same `collector-xxxxxx` while two such accounts still
+ * differ, which is the collision the clock was there to prevent.
  */
 function buildFallbackProfile(
   user: NonNullable<ReturnType<typeof useAuth>["user"]>,
@@ -140,7 +147,7 @@ function buildFallbackProfile(
     email: identity.email,
     displayName: identity.displayName,
     username: identity.username,
-    publicId: slugifyProfileId(identity.slugSeed),
+    publicId: slugifyProfileId(identity.slugSeed, stableSuffix(user.id)),
     bio: DEFAULT_EN_PROFILE_BIO,
     avatar: (user.user_metadata?.avatar_url as string | undefined) ?? "",
   };
@@ -611,9 +618,15 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
 
         setMyProfileOverride((current) => {
           const base = normalizeProfile(current ?? buildFallbackProfile(user, t));
-          const nextUsername = input.username ? ensureUniqueUsername(input.username, profiles, user.id) : base.username;
+          // Seeded on the account ID for the same reason `buildFallbackProfile`
+          // is: somebody who types an all-Cyrillic ID slugifies to nothing, and
+          // the wall clock would give them a different 13-digit ID on each save.
+          const seeded = stableSuffix(user.id);
+          const nextUsername = input.username
+            ? ensureUniqueUsername(input.username, profiles, user.id, seeded)
+            : base.username;
           const nextPublicId = input.publicId
-            ? ensureUniquePublicId(input.publicId, profiles, user.id)
+            ? ensureUniquePublicId(input.publicId, profiles, user.id, seeded)
             : base.publicId;
 
           return {
