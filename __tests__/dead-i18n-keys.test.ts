@@ -1,0 +1,172 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+
+import { assertNoLocaleDeclares } from "./helpers/i18n-locales";
+import { readI18nSource } from "./helpers/i18n-source-file";
+import { sourceCode, sourceFiles } from "./helpers/source-files";
+
+/**
+ * The translation keys that were removed as dead, and stay removed.
+ *
+ * An orphan scan over the base map found 35 keys with no reader anywhere in
+ * `app/`, `components/`, `lib/`, `scripts/`, `data/`, `__tests__/` or `docs/`,
+ * in three families. They are dead in the way translations are always dead —
+ * silently: every locale map opens with `...en`, so `t("peopleTitle")` returns
+ * a non-empty string in all six languages whether or not anything renders it,
+ * and no runtime assertion can see the difference. Only the source can.
+ *
+ * A TABLE rather than a suite per family, and the second family is what earned
+ * it. This file shipped a day earlier as `dead-social-i18n-keys.test.ts` with
+ * one family written out flat; the collections-list family arriving the next
+ * morning would have been a second copy of the same three cases, and the
+ * feed/share family a third. What varies between them is a list of names and a
+ * paragraph saying where they came from — so that is what the table holds, and
+ * the walk of the source tree (the expensive half) now happens once for all
+ * families instead of once per family.
+ *
+ * Two things are pinned per family, because re-adding the KEY is only half of
+ * a reintroduction:
+ *  - no locale map declares one of its names, and
+ *  - nothing in the source tree names one either, so a screen reviving the
+ *    string has to bring back its reader too.
+ */
+
+type RemovedFamily = {
+  /** What the family is called in the removal task and in failure messages. */
+  readonly name: string;
+  /** What a contributor who trips this should do instead. */
+  readonly instead: string;
+  /** Every key removed with it. */
+  readonly keys: readonly string[];
+};
+
+const REMOVED_FAMILIES: readonly RemovedFamily[] = [
+  {
+    name: "social/people",
+    instead:
+      "nine outlived the screens that rendered them and six were never " +
+      "rendered at all; a screen that needs one of these words should write " +
+      "its own key",
+    keys: [
+      // Rewritten away in `8b35e1b` (2026-04-12) with app/people.tsx and
+      // app/friends.tsx.
+      "noFriendsYet",
+      "noFriendsYetTab",
+      "noRequestsYet",
+      "noFollowingYet",
+      "peopleTitle",
+      "peopleSubtitle",
+      "noPeopleFound",
+      "loadingPeople",
+      "subscribeToSeeCollections",
+      // Never rendered by anything, in any commit: copy for a friend/following
+      // badge on a profile row, a "By owner" search filter, and a "Save
+      // profile ID" field with its hint. `invitationSent` is the one of the
+      // fifteen that was translated into all six locales, so four languages
+      // carried a translation for a string nobody ever rendered.
+      "friendBadge",
+      "followingBadge",
+      "invitationSent",
+      "searchFilterByOwner",
+      "profileIdHint",
+      "saveProfileId",
+    ],
+  },
+  {
+    name: "collections-list",
+    instead:
+      "six outlived the collections list that rendered them and four were " +
+      "never rendered at all; the list screens write their own strings now",
+    keys: [
+      // Five lost their call sites in `8b35e1b` (2026-04-12) alongside the
+      // social family, and `loadingCollections` a fortnight later in `6bfbfd1`
+      // (2026-05-01, "implement new design") — the same rewrite reaching the
+      // collections list rather than the people screens.
+      "noOwnedCollections",
+      "noFriendCollections",
+      "noSubscribedCollections",
+      "yourCollection",
+      "sharedToYou",
+      "loadingCollections",
+      // Never rendered in any commit: the header and subtitle of an "Opened
+      // for you" section, its empty state, and a bare "items" stat label.
+      // `yourCollection`, `sharedToYou` and `openedForYou` are the reason this
+      // family reaches past `en`/`ru`: they were translated into be/pl/de/es
+      // (es has the first two) for a section that was never built.
+      "openedForYou",
+      "openedForYouSubtitle",
+      "noSharedCollections",
+      "statsItems",
+    ],
+  },
+];
+
+/** Every removed key, across families — the table flattened once. */
+const ALL_REMOVED = REMOVED_FAMILIES.flatMap((family) =>
+  family.keys.map((key) => ({ key, family: family.name })),
+);
+
+describe("the i18n keys removed as dead stay deleted", () => {
+  const src = readI18nSource();
+
+  for (const family of REMOVED_FAMILIES) {
+    it(`no locale declares one of the ${family.keys.length} ${family.name} keys`, () => {
+      assertNoLocaleDeclares(
+        src,
+        (key) => (family.keys as readonly string[]).includes(key),
+        `these ${family.name} strings were removed as dead copy — ${family.instead}`,
+      );
+    });
+  }
+
+  it("nothing in the source tree names a removed key", () => {
+    // The half the absence pins cannot state on their own, and the reason the
+    // walk lives outside the per-family loop: it reads every source file once
+    // for all families rather than once each.
+    //
+    // `sourceCode` rather than the raw text, so a comment recording why a key
+    // was removed is not itself an offence; and the source tree only, not
+    // `__tests__`, because this suite writes every removed name out.
+    const offenders: string[] = [];
+    for (const relative of sourceFiles()) {
+      const code = sourceCode(relative);
+      for (const { key, family } of ALL_REMOVED) {
+        if (new RegExp(`\\b${key}\\b`).test(code)) {
+          offenders.push(`${relative}: ${key} (${family})`);
+        }
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      `these files name a removed i18n key:\n  ${offenders.join("\n  ")}`,
+    );
+  });
+
+  it("names each key once across the whole table", () => {
+    // Deliberately across families rather than within one. A name written
+    // twice inside a family makes its count wrong; a name written in TWO
+    // families makes both counts wrong and hides which removal owns it — and
+    // that is the mistake a table invites, since the families were removed a
+    // day apart from one scan's output.
+    const duplicates = ALL_REMOVED.map(({ key }) => key).filter(
+      (key, index, all) => all.indexOf(key) !== index,
+    );
+    assert.deepEqual(duplicates, []);
+    assert.equal(ALL_REMOVED.length, 25);
+  });
+
+  it("every family says what it is and what to do instead", () => {
+    // The `instead` clause is the whole value of a failure here: the key is
+    // gone on purpose, so "this key does not exist" is not news — where to go
+    // next is. An empty one would leave the message trailing off after a dash.
+    for (const family of REMOVED_FAMILIES) {
+      assert.ok(family.name.trim().length > 0);
+      assert.ok(
+        family.instead.trim().length > 20,
+        `'${family.name}' carries no instruction for whoever trips it`,
+      );
+      assert.ok(family.keys.length > 0);
+    }
+  });
+});
