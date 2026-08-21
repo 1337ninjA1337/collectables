@@ -78,6 +78,13 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   "check-problem-phrasing-imports": () => ["app"],
   // Same walk, .tsx only.
   "check-clarity-input-mask": () => ["app"],
+  // Walks app + components + data + lib + scripts. `app` at 19 files is the
+  // second-smallest of the five and a long way under the floor of 200, which
+  // rides above what lib/ alone contributes. The floor is checked BEFORE the
+  // guard reads lib/i18n-context.tsx, so a fixture holding only `app` refuses
+  // on below_floor rather than on the missing translations file — which is
+  // the distinction this suite exists to keep.
+  "check-orphan-i18n-keys": () => ["app"],
   "check-a11y-jsx": () => ["app"],
   // Walks the whole tree; app/ is a few dozen of the several hundred files.
   "check-secrets": () => ["app"],

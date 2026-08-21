@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { collectStringLiterals } from "@/lib/check-orphan-i18n-keys";
+
 import { assertNoLocaleDeclares } from "./helpers/i18n-locales";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
@@ -10,7 +12,9 @@ import { sourceCode, sourceFiles } from "./helpers/source-files";
  *
  * An orphan scan over the base map found 35 keys with no reader anywhere in
  * `app/`, `components/`, `lib/`, `scripts/`, `data/`, `__tests__/` or `docs/`,
- * in three families. They are dead in the way translations are always dead —
+ * in three families, and `check-orphan-i18n-keys` — the guard that scan became
+ * — found a 36th on its first run. They are dead in the way translations are
+ * always dead —
  * silently: every locale map opens with `...en`, so `t("peopleTitle")` returns
  * a non-empty string in all six languages whether or not anything renders it,
  * and no runtime assertion can see the difference. Only the source can.
@@ -70,6 +74,14 @@ const REMOVED_FAMILIES: readonly RemovedFamily[] = [
       "searchFilterByOwner",
       "profileIdHint",
       "saveProfileId",
+      // The sixteenth, found by `check-orphan-i18n-keys` on its first run
+      // rather than by the hand scans — it is the LABEL of the same
+      // never-built "Save profile ID" field as the two keys above it, and
+      // three scratch scans counted it as read because
+      // `lib/social-context.tsx` declares six `(profileId: string)`
+      // parameters. Bare-word matching could not tell a parameter name from a
+      // key reference; the guard's string-literal rule can.
+      "profileId",
     ],
   },
   {
@@ -152,14 +164,24 @@ describe("the i18n keys removed as dead stay deleted", () => {
     // walk lives outside the per-family loop: it reads every source file once
     // for all families rather than once each.
     //
-    // `sourceCode` rather than the raw text, so a comment recording why a key
-    // was removed is not itself an offence; and the source tree only, not
+    // Matched through `collectStringLiterals` — the SAME rule
+    // `check-orphan-i18n-keys` uses to decide a key is read — rather than the
+    // `\bkey\b` this case shipped with. The two disagreeing is what let
+    // `profileId` hide: bare-word matching counted it as named because
+    // `lib/social-context.tsx` declares six `(profileId: string)` PARAMETERS,
+    // and adding the key to the table above turned this case red for exactly
+    // that reason. One rule with two consumers means "the guard says this key
+    // is dead" and "this suite says it stays dead" can no longer be answered
+    // differently.
+    //
+    // `sourceCode` still strips comments first, so a comment recording why a
+    // key was removed is not an offence; and the source tree only, not
     // `__tests__`, because this suite writes every removed name out.
     const offenders: string[] = [];
     for (const relative of sourceFiles()) {
-      const code = sourceCode(relative);
+      const literals = collectStringLiterals(sourceCode(relative));
       for (const { key, family } of ALL_REMOVED) {
-        if (new RegExp(`\\b${key}\\b`).test(code)) {
+        if (literals.has(key)) {
           offenders.push(`${relative}: ${key} (${family})`);
         }
       }
@@ -181,18 +203,18 @@ describe("the i18n keys removed as dead stay deleted", () => {
       (key, index, all) => all.indexOf(key) !== index,
     );
     assert.deepEqual(duplicates, []);
-    assert.equal(ALL_REMOVED.length, 35);
+    assert.equal(ALL_REMOVED.length, 36);
   });
 
   it("accounts for every key the orphan scan found", () => {
-    // The scan reported 35 across three families and the table holds three
-    // families. Stated as its own case because the count above would still
-    // pass on a table that lost a whole family: 35 is the finding, and this is
-    // where it is written down.
+    // The hand scans reported 35 across three families and
+    // `check-orphan-i18n-keys` found a 36th on its first run. Stated as its
+    // own case because the count above would still pass on a table that lost a
+    // whole family: 36 is the finding, and this is where it is written down.
     assert.equal(REMOVED_FAMILIES.length, 3);
     assert.equal(
       REMOVED_FAMILIES.reduce((sum, family) => sum + family.keys.length, 0),
-      35,
+      36,
     );
   });
 

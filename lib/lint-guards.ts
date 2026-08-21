@@ -59,6 +59,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "No direct analytics-events imports from UI code — the taxonomy is consumed via lib/analytics.ts",
   },
   {
+    npmScript: "lint:orphan-i18n",
+    scriptPath: "scripts/check-orphan-i18n-keys.ts",
+    args: [],
+    description:
+      "No base translation key that nothing in the source tree reads — an orphan still resolves through every locale's ...en spread, so nothing at runtime shows it",
+  },
+  {
     npmScript: "lint:problem-phrasing",
     scriptPath: "scripts/check-problem-phrasing-imports.ts",
     args: [],
