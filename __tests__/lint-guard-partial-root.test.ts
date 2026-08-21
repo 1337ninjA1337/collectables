@@ -24,7 +24,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { LINT_GUARDS } from "../lib/lint-guards";
-import { FLOOR_WALKS } from "../lib/floor-walks";
+import { floorWalks } from "../lib/floor-walks";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
 import { SOURCE_EXTENSIONS } from "../lib/source-dirs";
 import {
@@ -83,11 +83,10 @@ function firstEntriesOf(
  * per whole root and would still copy a 400-file `__tests__/` tree.
  */
 function sliceOfEveryRoot(checkName: string, take = 3): string[] {
-  const walk = FLOOR_WALKS[checkName];
-  assert.ok(walk, `${checkName} is not in FLOOR_WALKS, so its roots are not known here`);
-  const extensions = walk.extensions ?? SOURCE_EXTENSIONS;
+  const walk = floorWalks().find((entry) => entry.checkName === checkName);
+  assert.ok(walk, `${checkName} declares no count.roots, so its roots are not known here`);
   return walk.roots.flatMap((root) =>
-    firstEntriesOf(root, take, (name) => extensions.some((ext) => name.endsWith(ext))),
+    firstEntriesOf(root, take, (name) => walk.extensions.some((ext) => name.endsWith(ext))),
   );
 }
 
@@ -308,9 +307,9 @@ describe("every count-shaped guard refuses a partial scan root", () => {
  * is a subset rather than the table itself.
  */
 const SINGLE_ROOT_LOCKS: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
-  Object.entries(FLOOR_WALKS)
-    .filter(([checkName]) => checkName !== "check-problem-phrasing-imports")
-    .map(([checkName, walk]) => [checkName, walk.roots]),
+  floorWalks()
+    .filter((walk) => walk.checkName !== "check-problem-phrasing-imports")
+    .map((walk) => [walk.checkName, walk.roots]),
 );
 
 /** The count out of a guard's report, whether it passed or hit its floor. */

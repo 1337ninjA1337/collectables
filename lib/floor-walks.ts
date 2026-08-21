@@ -55,23 +55,40 @@
  * same split `lib/scanned-floor.ts` and the guard wrappers already have.
  */
 
-import { MARKUP_EXTENSIONS, MODULE_EXTENSIONS, SOURCE_EXTENSIONS } from "./source-dirs";
+import { SCANNED_FLOORS } from "./scanned-floor";
+import { MODULE_EXTENSIONS, SOURCE_EXTENSIONS } from "./source-dirs";
 
+/** One multi-root walk, read out of the floor that declares it. */
 export type FloorWalk = {
+  readonly checkName: string;
   readonly roots: readonly string[];
-  readonly extensions?: readonly string[];
+  readonly extensions: readonly string[];
 };
 
-export const FLOOR_WALKS: Readonly<Record<string, FloorWalk>> = {
-  "check-inline-hex": { roots: ["app", "components", "lib"] },
-  "check-inline-radius": { roots: ["app", "components"] },
-  "check-analytics-imports": { roots: ["app", "components"] },
-  "check-clarity-input-mask": { roots: ["app", "components"], extensions: MARKUP_EXTENSIONS },
-  "check-a11y-jsx": { roots: ["app", "components"], extensions: MARKUP_EXTENSIONS },
-  "check-problem-phrasing-imports": {
-    roots: ["app", "components", "lib", "scripts", "__tests__"],
-  },
-};
+/**
+ * Every walk whose floor names more than one scan root, derived rather than
+ * listed.
+ *
+ * This used to be a hand-kept `FLOOR_WALKS` table naming the same roots the
+ * floor entries name, with a test asserting the two agreed — a list, a second
+ * list, and a check that they matched, for one fact. The floor entry wins the
+ * tie because it is the one the GUARD asserts against: a table that disagreed
+ * with it would document a property the binary does not enforce, which is the
+ * failure this module is about, one level up.
+ *
+ * A guard joins by declaring `count.roots`. That is also what makes it a
+ * multi-root walk, so the two can no longer drift apart: there is nothing to
+ * add here when a guard adopts roots, and nothing to remove when one stops.
+ */
+export function floorWalks(): readonly FloorWalk[] {
+  return Object.entries(SCANNED_FLOORS)
+    .filter(([, floor]) => floor.count?.roots)
+    .map(([checkName, floor]) => ({
+      checkName,
+      roots: floor.count?.roots ?? [],
+      extensions: floor.count?.extensions ?? SOURCE_EXTENSIONS,
+    }));
+}
 
 /**
  * Module extensions a floor walk deliberately does not count, one reason each.
@@ -199,13 +216,12 @@ export function describeWalkPremiseProblem(problem: WalkPremiseProblem): string 
  */
 export function checkWalkPremise(
   checkName: string,
-  walk: FloorWalk,
+  extensions: readonly string[],
   roots: readonly RootEvidence[],
 ): WalkPremiseProblem[] {
   if (roots.length === 0) {
     throw new Error(`${checkName}: a walk premise checked over no roots has nothing to be a premise about`);
   }
-  const extensions = walk.extensions ?? SOURCE_EXTENSIONS;
   const problems: WalkPremiseProblem[] = [];
   const matchedSomewhere = new Set<string>();
   for (const { root, counted, present } of roots) {

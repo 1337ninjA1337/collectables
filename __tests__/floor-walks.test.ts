@@ -6,7 +6,7 @@ import {
   describeWalkPremiseProblem,
   FLOOR_DRIFT,
   FLOOR_SLACK,
-  FLOOR_WALKS,
+  floorWalks,
   formatFloorMeasurement,
   measureFloorWalk,
   UNCOUNTED_MODULE_REASONS,
@@ -14,6 +14,7 @@ import {
   type RootEvidence,
   type WalkPremiseCode,
 } from "@/lib/floor-walks";
+import { LINT_GUARDS } from "@/lib/lint-guards";
 import { SCANNED_FLOORS } from "@/lib/scanned-floor";
 import { MARKUP_EXTENSIONS, MODULE_EXTENSIONS, SOURCE_EXTENSIONS } from "@/lib/source-dirs";
 import { readRepoFile, REPO_ROOT } from "./helpers/repo-file";
@@ -335,7 +336,11 @@ const evidence = (
 const codesOf = (problems: readonly { code: WalkPremiseCode }[]) => problems.map((p) => p.code);
 
 describe("checkWalkPremise", () => {
-  const sourceWalk = { roots: ["app", "lib"] };
+  // The premise reads a walk's EXTENSION list, not its roots — the roots
+  // arrive as evidence, one entry each. Since the walk table was derived from
+  // SCANNED_FLOORS these cases pass the list directly rather than a walk
+  // object, which is also what they were always really about.
+  const sourceWalk = SOURCE_EXTENSIONS;
 
   it("finds nothing wrong with a walk whose roots hold what it counts", () => {
     assert.deepEqual(
@@ -399,7 +404,7 @@ describe("checkWalkPremise", () => {
     // not module code at all. Neither is this rule's business, and a premise
     // that reported them would be a premise nobody could keep green.
     assert.deepEqual(
-      checkWalkPremise("check-x", { roots: ["scripts", SUITES_REL], extensions: [".ts"] }, [
+      checkWalkPremise("check-x", [".ts"], [
         evidence("scripts", { ".ts": 29, ".js": 1 }, 29),
         evidence(SUITES_REL, { ".ts": 431, ".mjs": 3, ".snap": 2 }, 431),
       ]),
@@ -412,7 +417,7 @@ describe("checkWalkPremise", () => {
     // it are uncounted BY DESIGN — the set that counts them is what makes that
     // a decision. A premise blind to the difference would fire on the one walk
     // in the table that narrows on purpose.
-    const markup = { roots: ["app", "components"], extensions: [".tsx"] };
+    const markup = [".tsx"];
     assert.deepEqual(
       checkWalkPremise("check-clarity-input-mask", markup, [
         evidence("app", { ".tsx": 19 }, 19),
@@ -489,8 +494,8 @@ describe("UNCOUNTED_MODULE_REASONS", () => {
     // An excuse for a file that left is an excuse waiting for a different file
     // to arrive under the same extension.
     const held = new Set(
-      Object.keys(FLOOR_WALKS).flatMap((checkName) =>
-        FLOOR_WALKS[checkName].roots.flatMap((root) => Object.keys(tallyRoot(root))),
+      floorWalks().flatMap((walk) =>
+        walk.roots.flatMap((root) => Object.keys(tallyRoot(root))),
       ),
     );
     assert.deepEqual(
@@ -501,13 +506,13 @@ describe("UNCOUNTED_MODULE_REASONS", () => {
   });
 });
 
-describe("FLOOR_WALKS", () => {
+describe("floorWalks()", () => {
   it("names only guards that declare a count floor", () => {
     // A walk with no floor under it is a row this tool would skip silently.
-    for (const checkName of Object.keys(FLOOR_WALKS)) {
+    for (const { checkName } of floorWalks()) {
       assert.ok(
         SCANNED_FLOORS[checkName]?.count,
-        `${checkName} is in FLOOR_WALKS and declares no count floor in SCANNED_FLOORS`,
+        `${checkName} is in floorWalks() and declares no count floor in SCANNED_FLOORS`,
       );
     }
   });
@@ -517,32 +522,28 @@ describe("FLOOR_WALKS", () => {
     // partial-root suite asserts this too for the four it builds fixtures
     // from; here it covers every row, including the five-root walk that suite
     // deliberately skips.
-    for (const [checkName, walk] of Object.entries(FLOOR_WALKS)) {
+    for (const walk of floorWalks()) {
+      const checkName = walk.checkName;
       const source = readRepoFile("scripts", `${checkName}.ts`);
       assert.match(
         source,
         new RegExp(`\\[${walk.roots.map((r) => `"${r}"`).join(", ")}\\]`),
-        `${checkName}'s scan roots moved; update FLOOR_WALKS in lib/floor-walks.ts to match`,
+        `${checkName}'s scan roots moved; update floorWalks() in lib/floor-walks.ts to match`,
       );
     }
   });
 
-  it("declares the same roots in SCANNED_FLOORS as it walks, for every entry that names them", () => {
-    // Two tables now name a walk's roots, for different jobs: `FLOOR_WALKS` is
-    // read by the re-measure tool and by this suite, and `count.roots` is read
-    // by the guard at its own runtime. They must agree, because the second is
-    // the one that refuses and the first is the one people read — a guard
-    // whose runtime list quietly lost a root would enforce less than the table
-    // it is documented by, which is the failure this whole shape is about, one
-    // level up.
-    for (const [checkName, walk] of Object.entries(FLOOR_WALKS)) {
-      const roots = SCANNED_FLOORS[checkName]?.count?.roots;
-      if (!roots) continue;
-      assert.deepEqual(
-        [...roots],
-        [...walk.roots],
-        `${checkName}'s SCANNED_FLOORS roots and its FLOOR_WALKS roots disagree`,
-      );
+  it("derives its roots from the floor entry, so there is nothing to keep in step", () => {
+    // This used to assert that FLOOR_WALKS and count.roots agreed — two lists
+    // of the same roots in two files, and a test to catch them drifting. The
+    // floor entry won the tie because it is the one the GUARD asserts against:
+    // a second table that disagreed would document a property the binary does
+    // not enforce. What is left is worth pinning because it is the reason the
+    // old case could go: the walk list is a projection, not a copy.
+    for (const walk of floorWalks()) {
+      const floor = SCANNED_FLOORS[walk.checkName]?.count;
+      assert.ok(floor?.roots, `${walk.checkName} is in the walk list without declaring roots`);
+      assert.equal(walk.roots, floor.roots, `${walk.checkName}'s roots are copied, not referenced`);
     }
   });
 
@@ -568,7 +569,8 @@ describe("FLOOR_WALKS", () => {
     // multi-root guard, which will arrive without roots declared and be caught
     // here on its first red run. Retiring it for good, and deciding what the
     // count floors are still for, is 3/3 in .tasks/.tasks.md.
-    for (const [checkName, walk] of Object.entries(FLOOR_WALKS)) {
+    for (const walk of floorWalks()) {
+      const checkName = walk.checkName;
       const floor = SCANNED_FLOORS[checkName]?.count;
       assert.ok(floor, `${checkName} declares no count floor`);
       // A guard that declares its roots states the property directly — every
@@ -582,7 +584,7 @@ describe("FLOOR_WALKS", () => {
       if (floor.roots) continue;
       const perRoot = walk.roots.map((root) => ({
         root,
-        count: listSourceFiles(REPO_ROOT, [root], walk.extensions ?? SOURCE_EXTENSIONS).length,
+        count: listSourceFiles(REPO_ROOT, [root], walk.extensions).length,
       }));
       // Premise before the claim, and it has to be the WHOLE premise: a root
       // that walked to nothing makes the comparison below true for a reason
@@ -593,7 +595,7 @@ describe("FLOOR_WALKS", () => {
       // agreeing over each root.
       const problems = checkWalkPremise(
         checkName,
-        walk,
+        walk.extensions,
         perRoot.map(({ root, count }) => ({ root, counted: count, present: tallyRoot(root) })),
       );
       assert.deepEqual(
@@ -615,28 +617,35 @@ describe("FLOOR_WALKS", () => {
     }
   });
 
-  it("says how many walks still depend on that arithmetic, so nobody mistakes silence for coverage", () => {
-    // The vacuity guard for the case above. It is a loop with a `continue` in
-    // it, and a loop that skips every entry passes exactly like a loop that
-    // checked every entry — so the count is published here instead of being
-    // left to whoever next reads a green run.
+  it("finds no guard that walks several roots without declaring them", () => {
+    // The vacuity guard for the case above, and it had to be rewritten when
+    // the walk list stopped being hand-kept. Asking `floorWalks()` which of
+    // its entries lack roots is now unanswerable-by-construction — that list
+    // IS the entries with roots — so the question moved to where it can still
+    // be wrong: the wrappers.
     //
-    // Zero today, which is the migration being finished rather than the check
-    // being broken. This number going UP is a new multi-root guard that has
-    // not declared its roots; it is not a failure, it is a to-do, which is why
-    // this reports rather than refuses.
-    const onArithmetic = Object.keys(FLOOR_WALKS).filter(
-      (checkName) => !SCANNED_FLOORS[checkName]?.count?.roots,
-    );
+    // A guard whose SCANNED_DIRS names more than one directory holds the
+    // no-single-root property somehow. Declaring `count.roots` is the way that
+    // survives the tree growing; the arithmetic in the case above is the way
+    // that does not. This finds the guard that has neither — the one a
+    // hand-kept table would simply have omitted, silently.
+    const multiRoot: string[] = [];
+    for (const guard of LINT_GUARDS) {
+      const checkName = guard.scriptPath.replace(/^scripts\//, "").replace(/\.ts$/, "");
+      const dirs = readRepoFile(guard.scriptPath).match(/SCANNED_DIRS = \[([^\]]*)\]/);
+      if (!dirs) continue;
+      const count = (dirs[1].match(/"/g) ?? []).length / 2;
+      if (count > 1 && !SCANNED_FLOORS[checkName]?.count?.roots) multiRoot.push(checkName);
+    }
     assert.deepEqual(
-      onArithmetic,
+      multiRoot,
       [],
-      `these walks still hold the no-single-root property by a committed number rather than by declaring count.roots, so their floors will need re-measuring as the tree grows: ${onArithmetic.join(", ")}`,
+      `these guards walk more than one scan root and declare no count.roots, so nothing asserts that every root contributed and their floors will need re-measuring as the tree grows: ${multiRoot.join(", ")}`,
     );
   });
 
   it("is not empty, and its slack is the tighter reading of the notes", () => {
-    assert.ok(Object.keys(FLOOR_WALKS).length >= 4, "too few walks for the cases above to mean much");
+    assert.ok(floorWalks().length >= 4, "too few walks for the cases above to mean much");
     // The notes do their arithmetic between a quarter and a third; suggesting
     // with the quarter means a suggestion never claims more room than the
     // notes it imitates.
