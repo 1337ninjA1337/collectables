@@ -181,9 +181,25 @@ describe("both screens render from the table", () => {
   const profile = readRepoFile("app/profile/[id].tsx");
   const people = readRepoFile("app/people.tsx");
 
-  it("calls the helper with the surface each one is", () => {
-    assert.match(profile, /relationshipActions\(relationship, "detail"\)/);
-    assert.match(people, /relationshipActions\(relationship, "row"\)/);
+  it("declares the surface each one is, and reads the table only through the row", () => {
+    // The screens stopped calling `relationshipActions` directly when
+    // `<RelationshipActionRow>` took the rendering — they now name their
+    // surface and the component asks the table. Asserting they do NOT call it
+    // is the half that matters: a screen that went back to mapping the list
+    // itself would re-open the presentation duplication this extraction closed
+    // while still passing the `surface=` half of this case.
+    assert.match(profile, /surface="detail"/);
+    assert.match(people, /surface="row"/);
+    for (const [name, src] of [
+      ["app/profile/[id].tsx", profile],
+      ["app/people.tsx", people],
+    ] as const) {
+      assert.doesNotMatch(
+        src,
+        /relationshipActions\(/,
+        `${name} reads the table directly instead of rendering <RelationshipActionRow>`,
+      );
+    }
   });
 
   it("leaves no hand-written relationship branch behind", () => {
