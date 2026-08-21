@@ -808,11 +808,8 @@ describe("design-tokens adoption", () => {
   it("app/friends.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("app/friends.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
-    assert.match(src, /HERO_DARK\b/);
-    assert.match(src, /HERO_DARK_2/);
     assert.match(src, /HERO_DARK_3/);
     assert.match(src, /AMBER_MUTED/);
-    assert.match(src, /AMBER_SOFT/);
     assert.match(src, /BORDER\b/);
     assert.match(src, /CARD_BG\b/);
     assert.match(src, /CARD_BG_3/);
@@ -821,9 +818,12 @@ describe("design-tokens adoption", () => {
     assert.match(src, /MUTED_2/);
     assert.match(src, /MUTED_10/);
     assert.match(src, /TEXT_DARK\b/);
-    assert.match(src, /TEXT_ON_DARK_4/);
     // AMBER_LIGHT / TEXT_ON_DARK_3 / TEXT_ON_DARK_SOFT left with the hero banner when it moved into <HeroBanner>
     // (components/hero-banner.tsx) — pinned by hero-banner.test.ts.
+    // AMBER_SOFT / HERO_DARK / HERO_DARK_2 / TEXT_ON_DARK_4 left with the tab's
+    // relationship buttons when they moved into <RelationshipActionRow>
+    // (components/relationship-action-row.tsx) — pinned there by
+    // relationship-action-row.test.ts, on all three surfaces' behalf.
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });

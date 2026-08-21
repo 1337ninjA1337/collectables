@@ -16,6 +16,12 @@ import type { ProfileRelationship } from "@/lib/types";
  * for three buttons — and expressing it as `surfaces` makes it a fact with a
  * name instead of a difference nobody had noticed was deliberate.
  *
+ * `app/friends.tsx` was a THIRD copy, found later, and it is why `surfaces`
+ * earned its third member. It branches on the TAB the user is looking at
+ * rather than on a relationship, and shows fewer buttons because the tab has
+ * already said what the list is. Every one of its omissions turned out to be
+ * defensible; none of them was written down. They are now entries.
+ *
  * Pure and node-testable: no React, no navigation, no `t()`. Labels are KEYS
  * and handlers are INTENTS; resolving either is the screen's job. The
  * `TranslationKey` import is type-only and therefore erased — `i18n-context`
@@ -34,8 +40,17 @@ export type RelationshipActionId =
   | "follow"
   | "unfollow";
 
-/** Where a profile is being shown. */
-export type ProfileSurface = "detail" | "row";
+/**
+ * Where a profile is being shown.
+ *
+ * `detail` is `app/profile/[id].tsx`, `row` is `app/people.tsx`, and `tab` is
+ * `app/friends.tsx` — a list the user reached by choosing a relationship, so
+ * the buttons that would only restate that choice are dropped. The friends tab
+ * offers no unfollow (you are looking at friends) and the following tab offers
+ * no add-friend (you chose the people you follow), which is why `tab` is a
+ * surface rather than a second name for `row`.
+ */
+export type ProfileSurface = "detail" | "row" | "tab";
 
 export type RelationshipAction = {
   readonly id: RelationshipActionId;
@@ -52,8 +67,18 @@ export type RelationshipAction = {
   readonly surfaces: readonly ProfileSurface[];
 };
 
-const BOTH: readonly ProfileSurface[] = ["detail", "row"];
+/**
+ * The surface sets, named by what they mean rather than by their members.
+ *
+ * `BROWSING` is the two surfaces a user reaches without having declared
+ * anything about the relationship — a profile page and a search result — so
+ * they carry the full offer. `tab` joins a set only where the friends screen
+ * genuinely shows that button today.
+ */
+const EVERYWHERE: readonly ProfileSurface[] = ["detail", "row", "tab"];
+const BROWSING: readonly ProfileSurface[] = ["detail", "row"];
 const DETAIL_ONLY: readonly ProfileSurface[] = ["detail"];
+const DETAIL_AND_TAB: readonly ProfileSurface[] = ["detail", "tab"];
 
 /**
  * The full table, before any surface filtering.
@@ -65,28 +90,56 @@ const DETAIL_ONLY: readonly ProfileSurface[] = ["detail"];
 const TABLE: Readonly<Record<ProfileRelationship, readonly RelationshipAction[]>> = {
   self: [],
   friend: [
-    // Detail-only, both of them: a friend's row in the people list offers
-    // unfriend alone, which is the one place the two screens genuinely differ.
-    { id: "chat", kind: "primary", labelKey: "chatSend", surfaces: DETAIL_ONLY },
-    { id: "remove_friend", kind: "secondary", labelKey: "removeFriend", surfaces: BOTH },
+    // Chat is offered wherever the user came to see this person specifically —
+    // a profile page, or the friends tab — but not in a search result, where a
+    // list row is not the place for three buttons.
+    { id: "chat", kind: "primary", labelKey: "chatSend", surfaces: DETAIL_AND_TAB },
+    { id: "remove_friend", kind: "secondary", labelKey: "removeFriend", surfaces: EVERYWHERE },
+    // Detail only. The friends tab does not offer it because a friend listed
+    // under "Friends" is not there to be unfollowed, and the people row does
+    // not because unfriending is the one removal that row is for.
     { id: "unfollow", kind: "secondary", labelKey: "unfollow", surfaces: DETAIL_ONLY },
   ],
   request_sent: [
-    { id: "cancel_request", kind: "badge", labelKey: "requestSent", surfaces: BOTH },
-    { id: "cancel_request", kind: "secondary", labelKey: "cancelInvitation", surfaces: BOTH },
+    // No `tab`: the friends screen has no outgoing-requests list, so this
+    // relationship never reaches it. An entry that named `tab` here would be
+    // a button nobody can see rather than a decision anybody made.
+    { id: "cancel_request", kind: "badge", labelKey: "requestSent", surfaces: BROWSING },
+    { id: "cancel_request", kind: "secondary", labelKey: "cancelInvitation", surfaces: BROWSING },
   ],
   request_received: [
-    { id: "accept_request", kind: "primary", labelKey: "acceptRequest", surfaces: BOTH },
-    { id: "reject_request", kind: "secondary", labelKey: "rejectRequest", surfaces: BOTH },
+    { id: "accept_request", kind: "primary", labelKey: "acceptRequest", surfaces: EVERYWHERE },
+    { id: "reject_request", kind: "secondary", labelKey: "rejectRequest", surfaces: EVERYWHERE },
   ],
   following: [
-    { id: "add_friend", kind: "primary", labelKey: "addFriend", surfaces: BOTH },
-    { id: "unfollow", kind: "secondary", labelKey: "unfollow", surfaces: BOTH },
+    // Not on the tab: the following list is where you go to stop following,
+    // and offering to friend everyone in it turns a tidying screen into a
+    // prompt. Reachable one tap away on the profile itself.
+    { id: "add_friend", kind: "primary", labelKey: "addFriend", surfaces: BROWSING },
+    { id: "unfollow", kind: "secondary", labelKey: "unfollow", surfaces: EVERYWHERE },
   ],
   none: [
-    { id: "add_friend", kind: "primary", labelKey: "addFriend", surfaces: BOTH },
-    { id: "follow", kind: "secondary", labelKey: "follow", surfaces: BOTH },
+    // No `tab`: a stranger appears in no list on the friends screen.
+    { id: "add_friend", kind: "primary", labelKey: "addFriend", surfaces: BROWSING },
+    { id: "follow", kind: "secondary", labelKey: "follow", surfaces: BROWSING },
   ],
+};
+
+/**
+ * The relationships a surface is ever asked about.
+ *
+ * `tab` sees three, because the friends screen's three lists ARE three
+ * relationships — that is what makes its shorter button sets defensible rather
+ * than missing. Stated here so that a fourth list, or a relationship quietly
+ * dropped from one, is a change to this record instead of a surface that
+ * silently renders an empty row.
+ */
+export const SURFACE_RELATIONSHIPS: Readonly<
+  Record<ProfileSurface, readonly ProfileRelationship[]>
+> = {
+  detail: ["friend", "request_sent", "request_received", "following", "none"],
+  row: ["friend", "request_sent", "request_received", "following", "none"],
+  tab: ["friend", "request_received", "following"],
 };
 
 /** The actions one surface shows for one relationship, in render order. */

@@ -28,7 +28,10 @@ const MIGRATED_FILES = [
   "app/people.tsx",
   "app/listing/[id].tsx",
   "app/_layout.tsx",
-  "app/friends.tsx",
+  // app/friends.tsx left the registry 2026-08-21 with the <RelationshipActionRow>
+  // extraction — its only RADIUS_PILL consumers were the three tabs' action
+  // buttons, which now live in components/relationship-action-row.tsx;
+  // lint:radius still guards the page.
   "app/create.tsx",
   "app/create-collection.tsx",
   "app/chat/[id].tsx",
