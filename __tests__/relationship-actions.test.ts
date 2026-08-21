@@ -317,6 +317,52 @@ describe("all three screens render from the table", () => {
     assert.match(friends, /throw new Error\("friends screen has no follow action"\)/);
   });
 
+  it("ties SURFACE_RELATIONSHIPS to the screens, not just to the table", () => {
+    // The gap this record had when it landed: every case about it read the
+    // TABLE, so it was a claim checked against itself. It says `tab` is asked
+    // about exactly three relationships because `app/friends.tsx` has three
+    // lists — and nothing connected the two, so a fourth list, or one quietly
+    // re-pointed at a different id array, would leave the record wrong and
+    // every existing case green.
+    //
+    // The friends screen is the one surface whose relationships are
+    // ENUMERABLE: it maps a tab to a relationship through a literal record, so
+    // the record's values can be read out of the source and compared.
+    const map = friends.match(/const RELATIONSHIP_BY_TAB[\s\S]*?\{([\s\S]*?)\n\};/);
+    assert.ok(map, "RELATIONSHIP_BY_TAB literal not found in app/friends.tsx");
+    const mapped = [...map[1].matchAll(/:\s*"([a-z_]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(
+      [...mapped].sort(),
+      [...SURFACE_RELATIONSHIPS.tab].sort(),
+      "the friends screen's tabs and SURFACE_RELATIONSHIPS.tab disagree about which relationships that surface serves",
+    );
+  });
+
+  it("leaves detail and row un-enumerable, and says why that is not a gap", () => {
+    // The counterpart, and the honest limit of the case above. `detail` and
+    // `row` do not map a fixed set — they call `getRelationship`, which can
+    // answer any of the six, so every relationship except `self` is reachable
+    // there by construction rather than by a list somebody wrote. What CAN be
+    // checked is that they still ask the context, because a screen that
+    // started deriving the relationship some other way would be the one that
+    // could quietly narrow what its surface serves.
+    for (const [name, src] of [
+      ["app/profile/[id].tsx", profile],
+      ["app/people.tsx", people],
+    ] as const) {
+      assert.match(
+        stripComments(src),
+        /getRelationship\(/,
+        `${name} no longer asks the context for the relationship, so SURFACE_RELATIONSHIPS can no longer be inferred for its surface`,
+      );
+    }
+    // Five each: every relationship but `self`, which the own-profile branch
+    // handles before this row is reached.
+    for (const surface of ["detail", "row"] as const) {
+      assert.equal(SURFACE_RELATIONSHIPS[surface].length, RELATIONSHIPS.length - 1);
+    }
+  });
+
   it("reads the friends tab from the LIST, not from getRelationship", () => {
     // Load-bearing, and the reason this screen maps `kind` rather than asking
     // the context: `getRelationship` answers `friend` before `following`, so a

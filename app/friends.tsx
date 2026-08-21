@@ -35,6 +35,34 @@ import {
 
 type Tab = "friends" | "following";
 
+/**
+ * The tab a profile is listed under, as a relationship.
+ *
+ * Read from the LIST rather than from `getRelationship`, and the difference
+ * is load-bearing: `getRelationship` answers `friend` before it answers
+ * `following`, so a friend the user also follows would render the friends
+ * buttons on the following tab. The following tab is a tidying screen and
+ * lists everyone in `following` — the tab is the question being asked, so
+ * the tab is what decides.
+ *
+ * The `kind` union and `ProfileRelationship` are, on the face of it, two names
+ * for the same three values, and `renderProfileCard` could take the
+ * relationship directly and let its three call sites name it — deleting both
+ * the union and this record. Deliberately not done: this record is where the
+ * paragraph above LIVES. Passing the relationship in would move that decision
+ * to three call sites, each of which would then be one edit away from reaching
+ * for `getRelationship` because it is right there. One place to state a
+ * decision beats three places to restate it, and the duplication buys exactly
+ * that.
+ */
+const RELATIONSHIP_BY_TAB: Readonly<
+  Record<"friend" | "following" | "request", ProfileRelationship>
+> = {
+  friend: "friend",
+  following: "following",
+  request: "request_received",
+};
+
 export default function FriendsScreen() {
   const { t } = useI18n();
   const {
@@ -112,24 +140,6 @@ export default function FriendsScreen() {
         throw new Error("friends screen has no follow action");
     }
   }
-
-  /**
-   * The tab a profile is listed under, as a relationship.
-   *
-   * Read from the LIST rather than from `getRelationship`, and the difference
-   * is load-bearing: `getRelationship` answers `friend` before it answers
-   * `following`, so a friend the user also follows would render the friends
-   * buttons on the following tab. The following tab is a tidying screen and
-   * lists everyone in `following` — the tab is the question being asked, so
-   * the tab is what decides.
-   */
-  const RELATIONSHIP_BY_TAB: Readonly<
-    Record<"friend" | "following" | "request", ProfileRelationship>
-  > = {
-    friend: "friend",
-    following: "following",
-    request: "request_received",
-  };
 
   function renderProfileCard(profile: UserProfile, kind: "friend" | "following" | "request") {
     return (
