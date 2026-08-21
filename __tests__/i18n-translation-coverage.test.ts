@@ -227,7 +227,18 @@ describe("translation floors", () => {
     // complete, and four sit below half. The `assert.ok(true)` keeps the line
     // in the runner's output next to the rows above it.
     const report = COVERAGE.map(formatCoverageRow).join("\n");
-    // 537 as of 2026-08-20: the nine `runtimeConfig*` keys were removed — the
+    // 522 as of 2026-08-21: the fifteen dead social/people keys were removed —
+    // nine that outlived their screens when `app/people.tsx` was rewritten and
+    // `app/friends.tsx` was added on 2026-04-12 (`peopleTitle`,
+    // `peopleSubtitle`, `noPeopleFound`, `loadingPeople`, `noFriendsYet`,
+    // `noFriendsYetTab`, `noRequestsYet`, `noFollowingYet`,
+    // `subscribeToSeeCollections`) and six that never had a call site in any
+    // commit (`friendBadge`, `followingBadge`, `invitationSent`,
+    // `searchFilterByOwner`, `profileIdHint`, `saveProfileId`). Declared in
+    // `en` and `ru`, so both dropped fifteen; `invitationSent` was the one
+    // translated into all six, so be/pl/de/es each dropped one as well. The
+    // floors are untouched — `ru` lands at 520 against 500. 537 before that:
+    // the nine `runtimeConfig*` keys were removed — the
     // strings for a runtime Supabase-config form (title, URL/key labels and
     // placeholders, save, the "configured in this browser" badge, the clear
     // button) that `CLAUDE.md` explicitly forbids building and that no screen
@@ -251,7 +262,7 @@ describe("translation floors", () => {
     // — a key the card already rendered — in be/pl/de/es, which had been
     // inheriting the English "5 photos" since it was written. The 545 before
     // it arrived the same way, with the two nav-badge labels.
-    assert.match(report, /en: 537\/537 keys \(100\.0%\)/);
+    assert.match(report, /en: 522\/522 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

@@ -21,12 +21,14 @@
  *    locales are read from the PICKER here (`languageOptionCodes`), so a
  *    seventh is checked rather than counted.
  *
- * Seven exports now, which is enough that picking the wrong one is easy — and
+ * Eight exports now, which is enough that picking the wrong one is easy — and
  * the one that is easiest to reach for is the one that should be reached for
  * last. In order of what to try first:
  *
  *  1. {@link assertDeclaredInEveryLocale} — "every locale writes this key".
  *     The commonest claim, and it needs no pattern at all.
+ *  1b. {@link assertNoLocaleDeclares} — its mirror, "no locale writes this
+ *     key (or this family) any more", for copy that was deleted on purpose.
  *  2. {@link assertValueInEveryLocale} — "and its value looks like this".
  *     Matches the key's OWN span, so nothing a neighbouring key writes can
  *     satisfy it.
@@ -96,6 +98,43 @@ export function assertDeclaredInEveryLocale(
     missing,
     [],
     `'${key}' is not declared in ${missing.join(", ")} — those locales serve the English string`,
+  );
+}
+
+/**
+ * The mirror of {@link assertDeclaredInEveryLocale}: asserts NO locale declares
+ * a key the predicate names.
+ *
+ * For keys that were REMOVED and must stay removed. Three suites had grown the
+ * same loop by hand — `visibilityShared` (a dead key whose `en` and `ru` values
+ * contradicted each other), the nine `runtimeConfig*` keys (the copy for a form
+ * `CLAUDE.md` forbids building), and the fifteen social/people leftovers — and
+ * each phrased its failure differently, which is what a fourth copy would have
+ * drifted further from.
+ *
+ * A predicate rather than a key, because the three claims are three shapes: an
+ * exact name, a prefix, and a set. Passing the test is the same work in all
+ * three, and the part worth writing once is the ANSWER — every offending
+ * `locale: key` pair listed, not "some locale re-declared something". A removal
+ * that reaches `en` and misses `ru` is the realistic regression here (the
+ * inheriting locales serve English either way, so nothing at runtime shows it),
+ * and naming the locale is what tells that apart from a wholesale revert.
+ */
+export function assertNoLocaleDeclares(
+  source: string,
+  predicate: (key: string) => boolean,
+  why: string,
+): void {
+  const offenders: string[] = [];
+  for (const code of locales(source)) {
+    for (const key of localeKeys(source, code)) {
+      if (predicate(key)) offenders.push(`${code}: ${key}`);
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `${why} — re-declared in\n  ${offenders.join("\n  ")}`,
   );
 }
 
