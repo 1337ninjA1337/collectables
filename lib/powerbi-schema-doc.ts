@@ -30,14 +30,34 @@ export function escapeTableCell(value: string): string {
 }
 
 /**
+ * A prop that declares a closed set is rendered with the set inline, because
+ * the buckets are what a report builder actually needs: knowing a column is
+ * called `sellerRelationship` does not say whether to expect two values or
+ * ten. A prop with no set renders as the bare key — its values are ids,
+ * counts, or come from outside the app.
+ */
+function renderPropKey(
+  prop: string,
+  values: Readonly<Record<string, readonly string[]>> | undefined,
+): string {
+  const allowed = values?.[prop];
+  if (!allowed) return `\`${prop}\``;
+  return `\`${prop}\` (${allowed.map((v) => `\`${v}\``).join(" \\| ")})`;
+}
+
+/**
  * The full per-event property-key table, one row per event in the taxonomy,
  * sorted by event name (via `ANALYTICS_EVENT_NAMES`) so output is stable
  * regardless of object insertion order.
  */
 export function renderPowerbiSchemaTable(): string {
   const rows = ANALYTICS_EVENT_NAMES.map((name) => {
-    const def = ANALYTICS_EVENTS[name];
-    const props = def.props.map((p) => `\`${p}\``).join(", ");
+    const def: {
+      readonly props: readonly string[];
+      readonly description: string;
+      readonly values?: Readonly<Record<string, readonly string[]>>;
+    } = ANALYTICS_EVENTS[name];
+    const props = def.props.map((p) => renderPropKey(p, def.values)).join(", ");
     return `| \`${name}\` | ${props} | ${escapeTableCell(def.description)} |`;
   });
   return [

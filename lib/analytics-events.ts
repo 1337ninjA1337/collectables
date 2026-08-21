@@ -1,4 +1,17 @@
 import type { AnalyticsEventName } from "@/lib/analytics";
+import {
+  APP_LANGUAGE_VALUES,
+  FRIEND_ACCEPT_DIRECTION_VALUES,
+  INVALID_PRICE_REASON_VALUES,
+  MARKETPLACE_MODE_VALUES,
+  PREMIUM_INTENT_SOURCE_VALUES,
+  SELLER_RELATIONSHIP_VALUES,
+  SIGNUP_METHOD_VALUES,
+  UPSELL_CONTROL_VALUES,
+  UPSELL_FEATURE_VALUES,
+  UPSELL_SOURCE_VALUES,
+  VISIBILITY_VALUES,
+} from "@/lib/analytics-prop-values";
 
 /**
  * Event taxonomy — single source of truth for the analytics events the app
@@ -22,6 +35,17 @@ import type { AnalyticsEventName } from "@/lib/analytics";
 export type AnalyticsEventDefinition = {
   readonly description: string;
   readonly props: readonly string[];
+  /**
+   * Optional closed sets of allowed VALUES, keyed by prop name. Absent means
+   * the prop is unconstrained (ids, counts, anything sourced from outside the
+   * app); a prop named here may only carry a listed value, enforced by
+   * `assertValidProps` on the same dev-throws / production-warns policy the
+   * key check uses. Every key must also appear in `props` — the two lists
+   * disagreeing is checked in `__tests__/analytics-events.test.ts`, because a
+   * `values` entry for a prop the event does not have is a rule that can
+   * never fire.
+   */
+  readonly values?: Readonly<Record<string, readonly string[]>>;
 };
 
 // `as const satisfies` (instead of a wide `Record<...>` annotation) lifts
@@ -35,11 +59,14 @@ export const ANALYTICS_EVENTS = {
     description:
       "Fired when a freshly-created user finishes the OTP/OAuth flow (detected by `created_at` within the last 5 minutes).",
     props: ["method", "provider", "language"],
+    // `provider` is whatever Supabase reports and is deliberately open.
+    values: { method: SIGNUP_METHOD_VALUES, language: APP_LANGUAGE_VALUES },
   },
   collection_created: {
     description:
       "Fired after a successful save in `app/create-collection.tsx`. Lets us track public-vs-private adoption and whether premium users behave differently; `hasCover` flags whether a cover photo was uploaded at create time.",
     props: ["visibility", "isPremium", "hasCover"],
+    values: { visibility: VISIBILITY_VALUES },
   },
   item_added: {
     description:
@@ -58,28 +85,39 @@ export const ANALYTICS_EVENTS = {
   },
   listing_created: {
     description:
-      "Fired from `app/item/[id].tsx` after a marketplace listing is published. `mode` = sale/trade/swap; `hasPrice` flags whether the listing carries a numeric price.",
+      "Fired from `app/item/[id].tsx` after a marketplace listing is published. `mode` is the `MarketplaceMode` the listing was created in; `hasPrice` flags whether the listing carries a numeric price. (This sentence used to read `mode` = sale/trade/swap — two of those three values have never existed; the rendered value set beside the key is now generated from the type rather than remembered.)",
     props: ["mode", "hasPrice"],
+    values: { mode: MARKETPLACE_MODE_VALUES },
   },
   listing_dropped: {
     description:
       "Fired from `app/item/[id].tsx` when the listing sheet is dismissed with a dirty draft (the user filled in fields but never published). The abandon arm balancing `listing_created`; `hasPrice` flags whether a price had been typed at dismissal.",
     props: ["mode", "hasPrice"],
+    values: { mode: MARKETPLACE_MODE_VALUES },
   },
   listing_price_invalid: {
     description:
       "Fired from `app/item/[id].tsx` when a sell-mode submit is rejected because the typed price fails `parseCurrencyValue`. `reason` classifies the failure (empty / unparseable / non_positive); `language` surfaces locales where comma-vs-dot decimal habits drive high invalid rates.",
     props: ["reason", "language"],
+    values: { reason: INVALID_PRICE_REASON_VALUES, language: APP_LANGUAGE_VALUES },
   },
   listing_claimed: {
     description:
       "Fired from `app/listing/[id].tsx` after the buy/trade flow completes. `sellerWasFriend` measures the social-graph contribution to marketplace velocity; `sellerRelationship` is the finer friend/following/stranger bucket (`relationshipForAnalytics`) so reports can slice friend trades from stranger sales.",
     props: ["mode", "sellerWasFriend", "sellerRelationship"],
+    values: {
+      mode: MARKETPLACE_MODE_VALUES,
+      sellerRelationship: SELLER_RELATIONSHIP_VALUES,
+    },
   },
   listing_view: {
     description:
       "Fired from `app/listing/[id].tsx` after a dwell-time gate (`useDwellTimeEffect`) when a user views someone else's listing — pagination scroll-pasts and navigation flickers never count. The denominator for `listing_claimed`'s view-to-buy conversion; `sellerRelationship` slices conversion by social proximity, `isSold` separates browsing the active feed from viewing sold history.",
     props: ["mode", "sellerRelationship", "isSold"],
+    values: {
+      mode: MARKETPLACE_MODE_VALUES,
+      sellerRelationship: SELLER_RELATIONSHIP_VALUES,
+    },
   },
   chat_opened: {
     description:
@@ -95,6 +133,7 @@ export const ANALYTICS_EVENTS = {
     description:
       "Fired from the friendRequests diff effect in `lib/social-context.tsx` when a half handshake flips to a mutual friendship — the accepted arm of the `friend_requested` funnel. `direction` says which side completed it: `accepted_by_me` (this device tapped accept) or `accepted_by_them` (our outgoing request converted remotely).",
     props: ["targetUserId", "direction"],
+    values: { direction: FRIEND_ACCEPT_DIRECTION_VALUES },
   },
   friend_request_cancelled: {
     description:
@@ -105,16 +144,28 @@ export const ANALYTICS_EVENTS = {
     description:
       "Fired from the premium false→true transition hook in `components/bottom-nav.tsx`. `source` carries which screen triggered the upgrade via the one-shot `consumeLastPremiumIntent()` intent ref (`settings` / `create_collection` / `upsell_sheet` / `server_sync` for entitlements restored by the cloud validation merge / `unknown` for an untagged caller).",
     props: ["source"],
+    values: { source: PREMIUM_INTENT_SOURCE_VALUES },
   },
   premium_upsell_shown: {
     description:
       "Fired when a free user hits a premium gate (e.g. taps the locked Private visibility chip). `feature` names the gated capability, `source` the screen, and `control` which affordance was pressed — `chip` for the padlocked chip, `hint` for the sentence beside it. Zero events for a feature over a long window is the evidence needed to hide its locked affordance entirely, and that decision is per-CONTROL: the two send the same feature and source, so without `control` a tap on the sentence reads as a tap on the chip.",
     props: ["feature", "source", "control"],
+    // `source` here is the SCREEN, a different set from `premium_activated`'s
+    // intent source above — same prop name, so the sets have to be per-event.
+    values: {
+      feature: UPSELL_FEATURE_VALUES,
+      source: UPSELL_SOURCE_VALUES,
+      control: UPSELL_CONTROL_VALUES,
+    },
   },
   language_switched: {
     description:
       "Fired from `lib/i18n-context.tsx:setLanguage()` whenever the user picks a new language. Used to size the i18n test surface per locale.",
     props: ["language", "previousLanguage"],
+    values: {
+      language: APP_LANGUAGE_VALUES,
+      previousLanguage: APP_LANGUAGE_VALUES,
+    },
   },
 } as const satisfies Record<AnalyticsEventName, AnalyticsEventDefinition>;
 
