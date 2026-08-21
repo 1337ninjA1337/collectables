@@ -227,7 +227,18 @@ describe("translation floors", () => {
     // complete, and four sit below half. The `assert.ok(true)` keeps the line
     // in the runner's output next to the rows above it.
     const report = COVERAGE.map(formatCoverageRow).join("\n");
-    // 512 as of 2026-08-21: the ten dead collections-list keys were removed —
+    // 502 as of 2026-08-21: the ten dead feed/share keys were removed, the last
+    // of the three families and the only one that moved a floor. Three lost
+    // their call sites in the same rewrites (`tabDiscover`,
+    // `needMoreDataItemText`, `needTitleText`) and seven were never rendered
+    // in any commit — an empty discover feed (`emptyFeedTitle`,
+    // `emptyFeedHint`, `discoverCta`), a share-with-users sheet
+    // (`shareWithUsers`, `shareWithUsersHint`, `noUsersToShare`) and
+    // `conditionPlaceholder`. All ten were `en`/`ru` only, so the four partial
+    // rows are unchanged in NUMERATOR and rose in percentage purely because
+    // the denominator shrank. `ru` landing at exactly its old floor of 500 is
+    // what forced the `TRANSLATION_FLOORS` re-measurement recorded there.
+    // 512 before that: the ten dead collections-list keys were removed —
     // six that lost their call sites when the collections list was rewritten
     // (`noOwnedCollections`, `noFriendCollections`, `noSubscribedCollections`,
     // `yourCollection`, `sharedToYou` in `8b35e1b`, `loadingCollections` in
@@ -272,7 +283,7 @@ describe("translation floors", () => {
     // — a key the card already rendered — in be/pl/de/es, which had been
     // inheriting the English "5 photos" since it was written. The 545 before
     // it arrived the same way, with the two nav-badge labels.
-    assert.match(report, /en: 512\/512 keys \(100\.0%\)/);
+    assert.match(report, /en: 502\/502 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

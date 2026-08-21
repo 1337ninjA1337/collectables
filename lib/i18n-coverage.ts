@@ -153,27 +153,27 @@ export const TRANSLATION_FLOORS: Readonly<
   Record<TranslationLanguage, TranslationFloor>
 > = {
   en: {
-    minimum: 500,
-    note: "538 keys on 2026-08-17. The base map and the denominator of every other row: a drop here shrinks the whole table's meaning, so the slack is the tightest of the six (~7%).",
+    minimum: 466,
+    note: "502 keys on 2026-08-21, re-measured after the three dead-key families (35 orphaned base keys) were removed — 538 before them. The base map and the denominator of every other row: a drop here shrinks the whole table's meaning, so the slack is the tightest of the six (~7%).",
   },
   ru: {
-    minimum: 500,
-    note: "535 of 538 on 2026-08-17 (99.4%) — the only fully-maintained locale. ~7% slack; the three inherited keys are pinned by name in the suite rather than left to this number.",
+    minimum: 465,
+    note: "500 of 502 on 2026-08-21 (99.6%) — the only fully-maintained locale, and the row that forced this re-measurement: it declared every one of the 35 removed keys, so the last family took it to exactly its old floor of 500 and the slack assertion (strict `<`) went red at equality. ~7% slack; the two inherited keys are pinned by name in the suite rather than left to this number.",
   },
   be: {
-    minimum: 205,
-    note: "222 of 538 on 2026-08-17 (41.3%). ~8% slack, which is roughly one feature's worth of keys.",
+    minimum: 214,
+    note: "233 of 502 on 2026-08-21 (46.4%) — 222 of 538 before the removals; the percentage rose because the denominator shrank by 35 while this locale lost only 4 declarations. ~8% slack, which is roughly one feature's worth of keys.",
   },
   pl: {
-    minimum: 197,
-    note: "213 of 538 on 2026-08-17 (39.6%). ~8% slack, same reasoning as be.",
+    minimum: 206,
+    note: "224 of 502 on 2026-08-21 (44.6%), 213 of 538 before. ~8% slack, same reasoning as be.",
   },
   de: {
-    minimum: 193,
-    note: "209 of 538 on 2026-08-17 (38.8%). ~8% slack, same reasoning as be.",
+    minimum: 202,
+    note: "220 of 502 on 2026-08-21 (43.8%), 209 of 538 before. ~8% slack, same reasoning as be.",
   },
   es: {
-    minimum: 193,
-    note: "209 of 538 on 2026-08-17 (38.8%). ~8% slack, same reasoning as be.",
+    minimum: 203,
+    note: "221 of 502 on 2026-08-21 (44.0%), 209 of 538 before. One ahead of de because it never declared the 'opened for you' header, so the collections-list removal took two declarations from it rather than three. ~8% slack, same reasoning as be.",
   },
 };
