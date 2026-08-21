@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/empty-state";
 import { SkeletonProfile } from "@/components/skeleton";
 
 import { CollectionCard } from "@/components/collection-card";
+import { RelationshipActionRow } from "@/components/relationship-action-row";
 import { Screen } from "@/components/screen";
 import { useAppTheme } from "@/components/use-app-theme";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
@@ -19,16 +20,12 @@ import { purchasesForUser, salesForUser } from "@/lib/marketplace-helpers";
 import {
   AMBER_LIGHT,
   AMBER_MUTED_5,
-  AMBER_SOFT,
   BORDER,
-  BORDER_2,
   CARD_BG,
-  CARD_BG_3,
   DANGER_DEEP_2,
   HERO_DARK,
   HERO_DARK_2,
   MUTED_2,
-  MUTED_8,
   MUTED_18,
   MUTED_19,
   PLACEHOLDER,
@@ -39,7 +36,6 @@ import {
   SHADOW_SOFT,
   SPACING_CARD,
   SPACING_INLINE,
-  SPACING_LIST,
   TEXT_DARK,
   TEXT_DARK_3,
   TEXT_ON_DARK,
@@ -48,11 +44,7 @@ import {
 } from "@/lib/design-tokens";
 import { FONT_DISPLAY_EDITORIAL } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
-import {
-  ACTION_METHOD,
-  relationshipActions,
-  type RelationshipActionId,
-} from "@/lib/relationship-actions";
+import { ACTION_METHOD, type RelationshipActionId } from "@/lib/relationship-actions";
 import { DEFAULT_EN_PROFILE_BIO, useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
 import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
@@ -431,7 +423,11 @@ export default function ProfileScreen() {
 
         </View>
       ) : (
-        <View style={styles.actions}>
+        <RelationshipActionRow
+          relationship={relationship}
+          surface="detail"
+          onAction={(id) => runRelationshipAction(id, activeProfile.id)}
+        >
           {isAdmin ? (
             <Pressable
               style={styles.adminAction}
@@ -441,33 +437,7 @@ export default function ProfileScreen() {
               <Text style={styles.adminActionText}>{t("adminDeleteProfile")}</Text>
             </Pressable>
           ) : null}
-          {relationshipActions(relationship, "detail").map((action, index) =>
-            action.kind === "badge" ? (
-              <View key={`${action.id}-${index}`} style={styles.statusBadge}>
-                <Text style={styles.statusBadgeText}>{t(action.labelKey)}</Text>
-              </View>
-            ) : (
-              <Pressable
-                key={`${action.id}-${index}`}
-                style={
-                  action.kind === "primary" ? styles.primaryAction : styles.secondaryAction
-                }
-                onPress={() => runRelationshipAction(action.id, activeProfile.id)}
-                accessibilityRole="button"
-              >
-                <Text
-                  style={
-                    action.kind === "primary"
-                      ? styles.primaryActionText
-                      : styles.secondaryActionText
-                  }
-                >
-                  {t(action.labelKey)}
-                </Text>
-              </Pressable>
-            ),
-          )}
-        </View>
+        </RelationshipActionRow>
       )}
 
       <View style={styles.section}>
@@ -711,45 +681,6 @@ const styles = StyleSheet.create({
   },
   selfTools: {
     gap: 14,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING_LIST,
-  },
-  primaryAction: {
-    borderRadius: RADIUS_PILL,
-    backgroundColor: HERO_DARK,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  primaryActionText: {
-    color: TEXT_ON_DARK_4,
-    fontWeight: "800",
-  },
-  secondaryAction: {
-    borderRadius: RADIUS_PILL,
-    backgroundColor: CARD_BG_3,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  secondaryActionText: {
-    color: HERO_DARK_2,
-    fontWeight: "800",
-  },
-  statusBadge: {
-    borderRadius: RADIUS_PILL,
-    backgroundColor: BORDER_2,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  statusBadgeText: {
-    color: MUTED_8,
-    fontWeight: "800",
   },
   adminAction: {
     borderRadius: RADIUS_PILL,

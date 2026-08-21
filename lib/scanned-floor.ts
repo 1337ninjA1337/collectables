@@ -652,12 +652,12 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     note: "the whole-tree walk (minus node_modules/.git/dist and non-text extensions) held 713 files on 2026-08-12; 500 survives ordinary pruning while a walk that lost __tests__/ or lib/ does not.",
   },
   "check-inline-radius": {
-    count: { label: "source file", minimum: 46 },
-    note: "app/ + components/ held 64 .ts/.tsx files on 2026-08-16; 46 rides above the 45 that components/ alone contributes, so losing app/ — the root that holds most of the geometry literals — fails rather than passes. Raised from 45 when <DangerIconButton> made components/ a 45th file and drew level with the floor: the floor was measured to sit ABOVE that root's own count, so a component landing is exactly the ordinary event it has to be re-measured for. 18 files of slack, the same ~28% it shipped with.",
+    count: { label: "source file", minimum: 48 },
+    note: "app/ + components/ held 65 .ts/.tsx files on 2026-08-21; 48 rides above the 46 that components/ alone contributes, so losing app/ — the root that holds most of the geometry literals — fails rather than passes. Raised from 46 when <RelationshipActionRow> made components/ a 46th file and drew level with the floor: the floor was measured to sit ABOVE that root's own count, so a component landing is exactly the ordinary event it has to be re-measured for. 17 files of slack, the same ~26% it shipped with. Fifth re-measurement across the six multi-root floors and the second caused by a single new component — see .tasks/.suggestions.md on stating the property as a FRACTION of the walk (minimum ≈ 0.75 × walkSize), which is what these numbers keep approximating by hand.",
   },
   "check-analytics-imports": {
-    count: { label: "source file", minimum: 46 },
-    note: "same app/ + components/ walk as check-inline-radius, 64 files on 2026-08-16; same 46 for the same reason, raised alongside it.",
+    count: { label: "source file", minimum: 48 },
+    note: "same app/ + components/ walk as check-inline-radius, 65 files on 2026-08-21; same 48 for the same reason, raised alongside it.",
   },
   "check-profile-id-pii": {
     count: { label: "source file", minimum: 200 },
@@ -672,12 +672,12 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     note: "app/ + components/ + lib/ + scripts/ + __tests__/ held 713 .ts/.tsx files on 2026-08-21 (app 19, components 45, lib 168, scripts 32, tests 449); 535 rides above the 449 that __tests__/ alone contributes, so no single root clears this floor on its own — the property check-inline-hex's note names, and the one that matters most here because __tests__/ is where a hand-joined sentence is likeliest to appear. Raised from 450, which __tests__/ drew level with when relationship-actions.test.ts landed. Note that BOTH multi-root floors were re-measured by that one task — one lib/ file and one test file, neither of them large — which is the clearest evidence yet that these floors track repository growth rather than guard coverage; see .tasks/.suggestions.md on expressing the property as a fraction of the walk.",
   },
   "check-a11y-jsx": {
-    count: { label: "screen file", minimum: 46 },
-    note: "app/ + components/ held 63 .tsx files on 2026-08-20 — the same walk check-clarity-input-mask takes, so it carries the same 46 and moves when that one moves. Aligned deliberately: two floors over one walk that disagreed would be two numbers to re-measure for one event, and the walk's largest root (components/ at 44) is what both sit above.",
+    count: { label: "screen file", minimum: 48 },
+    note: "app/ + components/ held 64 .tsx files on 2026-08-21 — the same walk check-clarity-input-mask takes, so it carries the same 48 and moves when that one moves. Aligned deliberately: two floors over one walk that disagreed would be two numbers to re-measure for one event, and the walk's largest root (components/ at 45) is what both sit above.",
   },
   "check-clarity-input-mask": {
-    count: { label: "screen file", minimum: 46 },
-    note: "app/ + components/ held 63 .tsx files on 2026-08-16 (one fewer than the radius walk, which also takes .ts); 46 keeps the two floors aligned since the walks differ by a single extension, and still rides above the 44 .tsx files components/ alone contributes. Raised from 45 with check-inline-radius rather than because this walk drew level — alignment is the point, and two floors that used to be one number are two numbers the moment one of them moves alone.",
+    count: { label: "screen file", minimum: 48 },
+    note: "app/ + components/ held 64 .tsx files on 2026-08-21 (one fewer than the radius walk, which also takes .ts); 48 keeps the two floors aligned since the walks differ by a single extension, and still rides above the 45 .tsx files components/ alone contributes. Raised from 46 with check-inline-radius rather than because this walk drew level — alignment is the point, and two floors that used to be one number are two numbers the moment one of them moves alone.",
   },
   "check-env-inlining": {
     count: { label: "config file", minimum: 3 },

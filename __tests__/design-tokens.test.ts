@@ -721,18 +721,13 @@ describe("design-tokens adoption", () => {
     const src = read("app/people.tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /AMBER_MUTED/);
-    assert.match(src, /AMBER_SOFT\b/);
     assert.match(src, /BORDER\b/);
-    assert.match(src, /BORDER_2/);
     assert.match(src, /BORDER_4/);
     assert.match(src, /CARD_BG\b/);
-    assert.match(src, /CARD_BG_3/);
     assert.match(src, /HERO_DARK\b/);
-    assert.match(src, /HERO_DARK_2/);
     assert.match(src, /MUTED\b/);
     assert.match(src, /MUTED_2/);
     assert.match(src, /MUTED_3/);
-    assert.match(src, /MUTED_8/);
     assert.match(src, /MUTED_10/);
     assert.match(src, /MUTED_16/);
     assert.match(src, /PLACEHOLDER/);
@@ -753,6 +748,10 @@ describe("design-tokens adoption", () => {
     assert.match(src, /color:\s*theme\.muted\b/);
     // AMBER_LIGHT / TEXT_ON_DARK_3 / TEXT_ON_DARK_SOFT / RADIUS_HERO_LG left with the hero banner when it moved into <HeroBanner>
     // (components/hero-banner.tsx) — pinned by hero-banner.test.ts.
+    // AMBER_SOFT / BORDER_2 / CARD_BG_3 / HERO_DARK_2 / MUTED_8 left with the
+    // relationship buttons when they moved into <RelationshipActionRow>
+    // (components/relationship-action-row.tsx) — pinned there by
+    // relationship-action-row.test.ts, on both screens' behalf.
     const hexLiterals = src.match(/#[0-9a-fA-F]{6}/g) ?? [];
     assert.deepEqual(hexLiterals, [], `unexpected inline hex literals remain: ${hexLiterals.join(", ")}`);
   });
@@ -1080,16 +1079,12 @@ describe("design-tokens adoption", () => {
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /AMBER_LIGHT/);
     assert.match(src, /AMBER_MUTED_5/);
-    assert.match(src, /AMBER_SOFT/);
     assert.match(src, /BORDER\b/);
-    assert.match(src, /BORDER_2/);
     assert.match(src, /CARD_BG\b/);
-    assert.match(src, /CARD_BG_3/);
     assert.match(src, /DANGER_DEEP_2/);
     assert.match(src, /HERO_DARK\b/);
     assert.match(src, /HERO_DARK_2/);
     assert.match(src, /MUTED_2\b/);
-    assert.match(src, /MUTED_8\b/);
     assert.match(src, /MUTED_18/);
     assert.match(src, /MUTED_19/);
     assert.match(src, /PLACEHOLDER/);
@@ -1099,6 +1094,10 @@ describe("design-tokens adoption", () => {
     assert.match(src, /TEXT_ON_DARK\b/);
     assert.match(src, /TEXT_ON_DARK_4/);
     assert.match(src, /TEXT_ON_DARK_SOFT/);
+    // AMBER_SOFT / BORDER_2 / CARD_BG_3 / MUTED_8 left with the relationship
+    // buttons when they moved into <RelationshipActionRow>
+    // (components/relationship-action-row.tsx) — pinned there by
+    // relationship-action-row.test.ts, on both screens' behalf.
     // PR8c (visual-upgrade `redesign-secondary`): the profile screen adopts the
     // theme hook, airy hero/card radii + soft shadow, and the editorial font.
     assert.match(src, /from\s+"@\/components\/use-app-theme"/);

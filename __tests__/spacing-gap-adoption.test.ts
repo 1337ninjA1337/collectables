@@ -30,7 +30,8 @@ const MIGRATED_FILES: ReadonlyArray<{
   // batch 3/6
   { rel: "app/listing/[id].tsx", list: true, card: false, inline: true },
   { rel: "app/wishlist.tsx", list: true, card: true, inline: true },
-  { rel: "app/profile/[id].tsx", list: true, card: true, inline: true },
+  // list: false since 2026-08-21 — the action-row gap left with <RelationshipActionRow>
+  { rel: "app/profile/[id].tsx", list: false, card: true, inline: true },
   { rel: "app/chat/[id].tsx", list: true, card: true, inline: true },
   { rel: "app/chats.tsx", list: true, card: false, inline: true },
   // list: false since 2026-08-08 — the hero gap left with <HeroBanner>
@@ -64,6 +65,8 @@ const MIGRATED_FILES: ReadonlyArray<{
   { rel: "lib/toast-context.tsx", list: false, card: false, inline: true },
   // the shared banner the eight hero screens now render (2026-08-08)
   { rel: "components/hero-banner.tsx", list: true, card: false, inline: false },
+  // the relationship buttons both profile surfaces now render (2026-08-21)
+  { rel: "components/relationship-action-row.tsx", list: true, card: false, inline: false },
 ];
 
 const TOKEN_BY_GAP = [

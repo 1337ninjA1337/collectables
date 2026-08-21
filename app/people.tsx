@@ -5,23 +5,19 @@ import { HeroBanner } from "@/components/hero-banner";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
 import { EmptyState } from "@/components/empty-state";
+import { RelationshipActionRow } from "@/components/relationship-action-row";
 import { Screen } from "@/components/screen";
 import { SkeletonProfileList } from "@/components/skeleton";
 import { useAppTheme } from "@/components/use-app-theme";
 import {
   AMBER_MUTED,
-  AMBER_SOFT,
   BORDER,
-  BORDER_2,
   BORDER_4,
   CARD_BG,
-  CARD_BG_3,
   HERO_DARK,
-  HERO_DARK_2,
   MUTED,
   MUTED_2,
   MUTED_3,
-  MUTED_8,
   MUTED_10,
   MUTED_16,
   PLACEHOLDER,
@@ -35,11 +31,7 @@ import {
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
-import {
-  ACTION_METHOD,
-  relationshipActions,
-  type RelationshipActionId,
-} from "@/lib/relationship-actions";
+import { ACTION_METHOD, type RelationshipActionId } from "@/lib/relationship-actions";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
@@ -195,34 +187,11 @@ export default function PeopleScreen() {
           </Pressable>
         </Link>
 
-        <View style={styles.actions}>
-          {relationshipActions(relationship, "row").map((action, index) =>
-            action.kind === "badge" ? (
-              <View key={`${action.id}-${index}`} style={styles.statusBadge}>
-                <Text style={styles.statusBadgeText}>{t(action.labelKey)}</Text>
-              </View>
-            ) : (
-              <Pressable
-                key={`${action.id}-${index}`}
-                style={
-                  action.kind === "primary" ? styles.primaryAction : styles.secondaryAction
-                }
-                onPress={() => runRelationshipAction(action.id, profile.id)}
-                accessibilityRole="button"
-              >
-                <Text
-                  style={
-                    action.kind === "primary"
-                      ? styles.primaryActionText
-                      : styles.secondaryActionText
-                  }
-                >
-                  {t(action.labelKey)}
-                </Text>
-              </Pressable>
-            ),
-          )}
-        </View>
+        <RelationshipActionRow
+          relationship={relationship}
+          surface="row"
+          onAction={(id) => runRelationshipAction(id, profile.id)}
+        />
       </View>
     );
   }
@@ -360,48 +329,6 @@ const styles = StyleSheet.create({
     color: MUTED_2,
     lineHeight: 21,
     fontFamily: FONT_BODY,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING_LIST,
-  },
-  primaryAction: {
-    borderRadius: RADIUS_PILL,
-    backgroundColor: HERO_DARK,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  primaryActionText: {
-    color: TEXT_ON_DARK_4,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  secondaryAction: {
-    borderRadius: RADIUS_PILL,
-    backgroundColor: CARD_BG_3,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  secondaryActionText: {
-    color: HERO_DARK_2,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
-  },
-  statusBadge: {
-    borderRadius: RADIUS_PILL,
-    backgroundColor: BORDER_2,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  statusBadgeText: {
-    color: MUTED_8,
-    fontWeight: "800",
-    fontFamily: FONT_BODY_EXTRABOLD,
   },
   pagination: {
     flexDirection: "row",
