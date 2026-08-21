@@ -75,6 +75,13 @@ const FAMILIES: readonly Family[] = [
     because:
       "the largest family in the map, and the only one that was 61/73 done in four locales — the twelve missing keys were the whole `marketplaceSoldPrompt*` sub-family, which is the dialog a seller meets the moment somebody claims their listing and has to choose between archiving, deleting and keeping the original",
   },
+  {
+    name: "collection",
+    pattern: /^collection[A-Z]/,
+    size: 14,
+    because:
+      "the last prefix family of any size, and the labels on the form a user meets before they own anything — naming a collection is the first thing the app asks anybody to do, so an English form here is the first English a new speaker of any of these four sees",
+  },
 ];
 
 describe("complete i18n families", () => {
