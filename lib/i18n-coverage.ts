@@ -154,26 +154,26 @@ export const TRANSLATION_FLOORS: Readonly<
 > = {
   en: {
     minimum: 466,
-    note: "502 keys on 2026-08-21, re-measured after the three dead-key families (35 orphaned base keys) were removed — 538 before them. The base map and the denominator of every other row: a drop here shrinks the whole table's meaning, so the slack is the tightest of the six (~7%).",
+    note: "501 keys on 2026-08-21, re-measured after the three dead-key families (35 orphaned base keys) were removed — 538 before them. The base map and the denominator of every other row: a drop here shrinks the whole table's meaning, so the slack is the tightest of the six (~7%).",
   },
   ru: {
     minimum: 465,
-    note: "500 of 502 on 2026-08-21 (99.6%) — the only fully-maintained locale, and the row that forced this re-measurement: it declared every one of the 35 removed keys, so the last family took it to exactly its old floor of 500 and the slack assertion (strict `<`) went red at equality. ~7% slack; the two inherited keys are pinned by name in the suite rather than left to this number.",
+    note: "499 of 501 on 2026-08-21 (99.6%) — the only fully-maintained locale, and the row that forced this re-measurement: it declared every one of the 35 removed keys, so the last family took it to exactly its old floor of 500 and the slack assertion (strict `<`) went red at equality. ~7% slack; the two inherited keys are pinned by name in the suite rather than left to this number.",
   },
   be: {
-    minimum: 214,
-    note: "233 of 502 on 2026-08-21 (46.4%) — 222 of 538 before the removals; the percentage rose because the denominator shrank by 35 while this locale lost only 4 declarations. ~8% slack, which is roughly one feature's worth of keys.",
+    minimum: 236,
+    note: "257 of 501 on 2026-08-21 (51.3%) — the first partial locale to pass half, and it did so by translation rather than by the denominator shrinking: the 24 empty-state keys landed in all four partial locales on the same day. 233 of 502 earlier the same day, 222 of 538 before the dead-key removals. ~8% slack, which is roughly one feature's worth of keys.",
   },
   pl: {
-    minimum: 206,
-    note: "224 of 502 on 2026-08-21 (44.6%), 213 of 538 before. ~8% slack, same reasoning as be.",
+    minimum: 228,
+    note: "248 of 501 on 2026-08-21 (49.5%), 224 of 502 earlier the same day (the 24 empty-state keys), 213 of 538 before the removals. ~8% slack, same reasoning as be.",
   },
   de: {
-    minimum: 202,
-    note: "220 of 502 on 2026-08-21 (43.8%), 209 of 538 before. ~8% slack, same reasoning as be.",
+    minimum: 224,
+    note: "244 of 501 on 2026-08-21 (48.7%), 220 of 502 earlier the same day (the 24 empty-state keys), 209 of 538 before the removals. ~8% slack, same reasoning as be.",
   },
   es: {
-    minimum: 203,
-    note: "221 of 502 on 2026-08-21 (44.0%), 209 of 538 before. One ahead of de because it never declared the 'opened for you' header, so the collections-list removal took two declarations from it rather than three. ~8% slack, same reasoning as be.",
+    minimum: 225,
+    note: "245 of 501 on 2026-08-21 (48.9%), 221 of 502 earlier the same day (the 24 empty-state keys), 209 of 538 before the removals. One ahead of de because it never declared the 'opened for you' header, so the collections-list removal took two declarations from it rather than three. ~8% slack, same reasoning as be.",
   },
 };
