@@ -147,7 +147,6 @@ describe("the slug fields stay ASCII, which is why they are not translated", () 
     // `lib/social-helpers.ts`; the agreement is structural now, so this checks
     // the constant is IMPORTED rather than re-typed.
     assert.equal(FALLBACK_SLUG_SEED, "collector");
-    assert.match(SOCIAL_CONTEXT, /\|\| FALLBACK_SLUG_SEED;/);
     assert.doesNotMatch(
       SOCIAL_CONTEXT,
       /\|\| "collector"/,

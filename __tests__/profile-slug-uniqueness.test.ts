@@ -5,6 +5,7 @@ import {
   ensureUniquePublicId,
   ensureUniqueUsername,
   FALLBACK_SLUG_SEED,
+  normalizeProfile,
   slugifyProfileId,
   slugifyUsername,
   type ProfileIdentity,
@@ -164,21 +165,101 @@ describe("walking to a free username", () => {
 });
 
 describe("the three fallback paths agree on one word", () => {
-  it("normalizeProfile reads the shared constant rather than its own literal", () => {
+  it("no file writes the fallback word out by hand", () => {
     // `buildFallbackProfile`, `normalizeProfile` and both slugifiers all invent
     // a name for a profile that has none. They agreed by three separate
-    // literals; now the constant is imported, so the agreement is structural.
-    const source = readRepoFile("lib/social-context.tsx");
-    assert.match(source, /\|\| FALLBACK_SLUG_SEED;/);
-    assert.doesNotMatch(
-      source,
-      /\|\| "collector"/,
-      "a fourth hand-written copy of the fallback word is back",
-    );
+    // literals until each moved onto the constant; this is what says none of
+    // them drifted back. Both files are checked because the functions have
+    // been migrating between them all evening.
+    for (const file of ["lib/social-context.tsx", "lib/social-helpers.ts"]) {
+      assert.doesNotMatch(
+        readRepoFile(file),
+        /\|\| "collector"/,
+        `${file} writes the fallback word out by hand instead of reading FALLBACK_SLUG_SEED`,
+      );
+    }
+    // And the constant is genuinely what the survivors read.
+    assert.match(readRepoFile("lib/social-helpers.ts"), /\|\| FALLBACK_SLUG_SEED;/);
   });
 
   it("both slugifiers build their last resort from the same seed", () => {
     assert.ok(slugifyProfileId("", FIXED).startsWith(FALLBACK_SLUG_SEED));
     assert.ok(slugifyUsername("", FIXED).startsWith(FALLBACK_SLUG_SEED));
+  });
+});
+
+/**
+ * `normalizeProfile` runs on every profile the app holds, and it used to reach
+ * for the email address.
+ *
+ * The chain was `publicId || username || displayName || email`. That last term
+ * was reachable, not theoretical: `coerceProfileRow` turns a NULL column into
+ * `""`, so a cloud row with no `public_id`, no `username` and no
+ * `display_name` but a real address produced a public profile ID slugified
+ * straight out of the address — `ada-lovelace-example-com`. `publicId` is the
+ * identifier the app invites people to SHARE so others can find them, and it
+ * is written back to the cloud row on the next save, so the address would
+ * stick to the profile permanently.
+ */
+describe("normalizing a profile never derives a public ID from an email", () => {
+  const sparse = {
+    id: "u1",
+    email: "ada.lovelace@example.com",
+    displayName: "",
+    username: "",
+    publicId: "",
+    bio: "",
+    avatar: "",
+  };
+
+  it("gives a profile with nothing to name it the anonymous seed", () => {
+    const normalized = normalizeProfile(sparse, FIXED);
+    assert.equal(normalized.publicId, `${FALLBACK_SLUG_SEED}-9999`);
+  });
+
+  it("leaks no part of the address into the public ID", () => {
+    // Asserted piece by piece rather than as one string, because a partial
+    // leak — the local part without the domain, say — is the shape a careless
+    // "fix" produces, and equality against the seed alone would not name it.
+    const normalized = normalizeProfile(sparse, FIXED);
+    for (const fragment of ["ada", "lovelace", "example", "com"]) {
+      assert.ok(
+        !normalized.publicId.includes(fragment),
+        `'${fragment}' from the email address reached the public profile ID: ${normalized.publicId}`,
+      );
+    }
+  });
+
+  it("still prefers a real public ID, username or display name, in that order", () => {
+    assert.equal(
+      normalizeProfile({ ...sparse, publicId: "Chosen ID", username: "u", displayName: "D" }, FIXED)
+        .publicId,
+      "chosen-id",
+    );
+    assert.equal(
+      normalizeProfile({ ...sparse, username: "ada_l", displayName: "Ada L" }, FIXED).publicId,
+      "ada-l",
+    );
+    assert.equal(
+      normalizeProfile({ ...sparse, displayName: "Ada Lovelace" }, FIXED).publicId,
+      "ada-lovelace",
+    );
+  });
+
+  it("normalizes the username without a suffix, which is the shipped behaviour", () => {
+    // Deliberately unchanged: several nameless profiles share the username
+    // `collector`, and adding a suffix here would rename profiles already
+    // stored under it. `ensureUniqueUsername` resolves a clash when somebody
+    // actually picks a name.
+    assert.equal(normalizeProfile(sparse, FIXED).username, FALLBACK_SLUG_SEED);
+    assert.equal(normalizeProfile({ ...sparse, username: "  Ada L! " }, FIXED).username, "ada_l");
+  });
+
+  it("leaves every other field alone", () => {
+    const normalized = normalizeProfile({ ...sparse, bio: "hi", avatar: "a.png" }, FIXED);
+    assert.equal(normalized.id, "u1");
+    assert.equal(normalized.email, "ada.lovelace@example.com");
+    assert.equal(normalized.bio, "hi");
+    assert.equal(normalized.avatar, "a.png");
   });
 });
