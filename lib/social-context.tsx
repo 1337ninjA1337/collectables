@@ -123,15 +123,73 @@ function ensureUniqueUsername(username: string, profiles: UserProfile[], selfId?
   return next;
 }
 
-function buildFallbackProfile(user: NonNullable<ReturnType<typeof useAuth>["user"]>): UserProfile {
-  const baseName = user.email?.split("@")[0] ?? "you";
+/**
+ * The seed for `username` and `publicId` when the session carries no email.
+ *
+ * ASCII on purpose, and deliberately NOT the translated display name: both
+ * fields are slugs, and `slugifyProfileId` strips everything outside
+ * `[a-z0-9]`. Seeding them from a translated word would leave a Russian or
+ * Belarusian user with an empty slug rescued into `collector-1755...` by the
+ * timestamp fallback — a worse profile ID than the one they get now. Matches
+ * the `"collector"` that `normalizeProfile` and `ensureUniqueUsername` already
+ * fall back to, so the three agree on one word.
+ */
+const FALLBACK_SLUG_SEED = "collector";
+
+/**
+ * The English bio a brand-new profile is created with, and the SENTINEL that
+ * `app/profile/[id].tsx` translates on render.
+ *
+ * Deliberately not translated at write time, which is the counter-intuitive
+ * half. The bio is persisted — to AsyncStorage, and to the cloud row other
+ * people read — so a value written in the author's language at sign-up would
+ * be frozen in it: switching the app to English afterwards would still show
+ * Russian, and a Polish viewer looking at the profile would see Russian too.
+ * Storing one known sentence and translating it at RENDER keeps the default
+ * bio in whatever language the person reading it has chosen, which is what the
+ * profile screen has always done.
+ *
+ * Exported because it was previously written out twice — a literal here and a
+ * private `const` in the profile screen — with nothing tying the copies
+ * together. Either one being reworded would have left the screen comparing
+ * against a sentence nothing writes any more, and the symptom would be a bio
+ * that quietly stopped translating rather than an error.
+ */
+export const DEFAULT_EN_PROFILE_BIO =
+  "I collect things worth saving beautifully and sharing with friends.";
+
+/**
+ * The profile shown before a cloud row exists — after sign-up, or offline.
+ *
+ * Takes `t` for `displayName`, which used to be the English word "you" for a
+ * session carrying no email address and no `full_name` metadata — shown as a
+ * person's NAME, in English, whatever language the app was in. It reads
+ * `defaultDisplayName` now: a key named for the job, translated in all six
+ * locales, and unlike the bio it is safe to localise at write time because it
+ * is recomputed on every render until the person edits their profile, at which
+ * point they have chosen a name of their own.
+ *
+ * The split between the prose fields and the slug fields is the point of the
+ * rest: only `displayName` is translated. See {@link FALLBACK_SLUG_SEED}.
+ */
+function buildFallbackProfile(
+  user: NonNullable<ReturnType<typeof useAuth>["user"]>,
+  t: ReturnType<typeof useI18n>["t"],
+): UserProfile {
+  const emailName = user.email?.split("@")[0];
+  const slugSeed = emailName ?? FALLBACK_SLUG_SEED;
   return {
     id: user.id,
-    email: user.email ?? "you@collectables.app",
-    displayName: (user.user_metadata?.full_name as string | undefined) ?? baseName,
-    username: (user.user_metadata?.user_name as string | undefined) ?? baseName.toLowerCase().replace(/[^a-z0-9_]+/g, ""),
-    publicId: slugifyProfileId(baseName),
-    bio: "I collect things worth saving beautifully and sharing with friends.",
+    email: user.email ?? "collector@collectables.app",
+    displayName:
+      (user.user_metadata?.full_name as string | undefined) ??
+      emailName ??
+      t("defaultDisplayName"),
+    username:
+      (user.user_metadata?.user_name as string | undefined) ??
+      slugSeed.toLowerCase().replace(/[^a-z0-9_]+/g, ""),
+    publicId: slugifyProfileId(slugSeed),
+    bio: DEFAULT_EN_PROFILE_BIO,
     avatar: (user.user_metadata?.avatar_url as string | undefined) ?? "",
   };
 }
@@ -352,7 +410,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     const result: UserProfile[] = [];
 
     if (user) {
-      const selfProfile = normalizeProfile(myProfileOverride ?? buildFallbackProfile(user));
+      const selfProfile = normalizeProfile(myProfileOverride ?? buildFallbackProfile(user, t));
       result.push(selfProfile);
       seen.add(selfProfile.id);
     }
@@ -373,7 +431,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     }
 
     return result;
-  }, [deletedProfileIds, myProfileOverride, remoteProfiles, user]);
+  }, [deletedProfileIds, myProfileOverride, remoteProfiles, t, user]);
 
   const isAdmin = useMemo(() => {
     if (!user) {
@@ -615,7 +673,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         }
 
         setMyProfileOverride((current) => {
-          const base = normalizeProfile(current ?? buildFallbackProfile(user));
+          const base = normalizeProfile(current ?? buildFallbackProfile(user, t));
           const nextUsername = input.username ? ensureUniqueUsername(input.username, profiles, user.id) : base.username;
           const nextPublicId = input.publicId
             ? ensureUniquePublicId(input.publicId, profiles, user.id)

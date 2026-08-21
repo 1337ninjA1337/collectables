@@ -48,13 +48,12 @@ import {
 } from "@/lib/design-tokens";
 import { FONT_DISPLAY_EDITORIAL } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
-import { useSocial } from "@/lib/social-context";
+import { DEFAULT_EN_PROFILE_BIO, useSocial } from "@/lib/social-context";
 import { useToast } from "@/lib/toast-context";
 import { fetchCollectionsByUserId, fetchPublicCollectionsByUserId, fetchItemsByCollectionId, fetchWishlistItemsByUserId } from "@/lib/supabase-profiles";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { CollectableItem, Collection, MarketplaceListing, UserProfile } from "@/lib/types";
 
-const DEFAULT_EN_PROFILE_BIO = "I collect things worth saving beautifully and sharing with friends.";
 
 export default function ProfileScreen() {
   const params = useLocalSearchParams<{ id: string }>();

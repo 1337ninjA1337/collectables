@@ -227,7 +227,14 @@ describe("translation floors", () => {
     // complete, and four sit below half. The `assert.ok(true)` keeps the line
     // in the runner's output next to the rows above it.
     const report = COVERAGE.map(formatCoverageRow).join("\n");
-    // 500 as of 2026-08-21: `you` was removed — the 37th orphan, and the one
+    // 501 as of 2026-08-21: `defaultDisplayName` was ADDED — the first key
+    // this file has gained in a week of removals, and it arrived because
+    // removing `you` uncovered the live bug underneath it.
+    // `buildFallbackProfile` in `lib/social-context.tsx` fell back to the
+    // English word "you" as a person's NAME when their session carried no
+    // email address and no `full_name`, in whatever language the app was in.
+    // Declared and translated in all six locales, so every row rises by one.
+    // 500 before that: `you` was removed — the 37th orphan, and the one
     // that came from measuring `check-orphan-i18n-keys`' own blind spot rather
     // than from a sweep. Under the rule as first shipped ("appears as a string
     // literal anywhere") it counted as read, because `lib/social-context.tsx`
@@ -299,7 +306,7 @@ describe("translation floors", () => {
     // — a key the card already rendered — in be/pl/de/es, which had been
     // inheriting the English "5 photos" since it was written. The 545 before
     // it arrived the same way, with the two nav-badge labels.
-    assert.match(report, /en: 500\/500 keys \(100\.0%\)/);
+    assert.match(report, /en: 501\/501 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
