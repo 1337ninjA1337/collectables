@@ -942,6 +942,31 @@ export function assertScannedRoots(checkName: string, files: readonly string[]):
 }
 
 /**
+ * Both premises a multi-root walk has, in the order they have to run.
+ *
+ * The one line those six wrappers actually want. Each of them was carrying two
+ * calls plus the same four-line comment explaining why roots come first —
+ * which is a decision written out six times, the shape the extractions either
+ * side of this one have been undoing.
+ *
+ * Order is the whole content: when a scan root vanishes BOTH assertions fail,
+ * and they give opposite advice. `no_root_files` names the directory that went
+ * quiet; `below_floor` says "if the tree legitimately shrank, re-measure the
+ * floor", which is the wrong fix and the easy one. The specific diagnosis has
+ * to be the one the reader meets, and now that is true by construction rather
+ * than by six call sites remembering.
+ *
+ * Only for walks whose entry declares `roots` — {@link assertScannedRoots}
+ * refuses one that does not, by design. A single-root guard wants
+ * {@link assertScannedFloor} alone, where the floor and the root are the same
+ * claim.
+ */
+export function assertScannedWalk(checkName: string, files: readonly string[]): void {
+  assertScannedRoots(checkName, files);
+  assertScannedFloor(checkName, files.length);
+}
+
+/**
  * The `inputs` counterpart to {@link assertScannedFloor}. The wrapper hands
  * over what it parsed, keyed by the same display names the table declares —
  * so a wrapper that stops reading one of them fails on `missing_input`

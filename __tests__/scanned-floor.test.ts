@@ -10,6 +10,7 @@ import {
   assertScanned,
   assertScannedFloor,
   assertScannedRoots,
+  assertScannedWalk,
   countFloorFor,
   evaluateParsedInputs,
   evaluateScannedFloor,
@@ -322,6 +323,84 @@ describe("evaluateScannedRoots", () => {
       () => evaluateScannedRoots(both, []),
       /passes over any walk/,
     );
+  });
+});
+
+describe("assertScannedWalk", () => {
+  const WRAPPERS = [
+    "check-inline-hex",
+    "check-inline-radius",
+    "check-analytics-imports",
+    "check-clarity-input-mask",
+    "check-a11y-jsx",
+    "check-problem-phrasing-imports",
+  ] as const;
+
+  it("runs the per-root premise BEFORE the count, which is its entire content", () => {
+    // A walk missing a root fails both assertions, and they give opposite
+    // advice: one names the directory that went quiet, the other says
+    // "re-measure the floor" — the wrong fix and the easy one. Which the
+    // reader meets used to depend on six call sites remembering the order.
+    //
+    // Two files under `app` only: below every floor here AND missing
+    // `components`, so both premises are violated and the code that comes back
+    // says which one this function put first.
+    const partial = ["app/a.tsx", "app/b.tsx"];
+    try {
+      assertScannedWalk("check-inline-radius", partial);
+      assert.fail("expected a walk missing a scan root to be refused");
+    } catch (error) {
+      assert.ok(error instanceof ScannedFloorError);
+      assert.equal(error.failure.code, "no_root_files");
+      assert.equal(error.failure.root, "components");
+    }
+  });
+
+  it("still reports the count when every root turned up", () => {
+    // The other premise is not skipped — a walk with all its roots and far too
+    // few files is exactly what the number is still for.
+    try {
+      assertScannedWalk("check-inline-radius", ["app/a.tsx", "components/b.tsx"]);
+      assert.fail("expected a two-file walk to be below the floor");
+    } catch (error) {
+      assert.ok(error instanceof ScannedFloorError);
+      assert.equal(error.failure.code, "below_floor");
+    }
+  });
+
+  it("is what every multi-root wrapper calls, and none of them calls the halves", () => {
+    // The duplication this replaced: two calls plus the same four-line comment
+    // about ordering, written out six times. A wrapper that went back to the
+    // halves would be re-deciding the order locally, which is the shape being
+    // removed.
+    for (const checkName of WRAPPERS) {
+      const src = read(path.join("scripts", `${checkName}.ts`));
+      assert.match(src, /assertScannedWalk\(CHECK_NAME, /, `${checkName} does not call assertScannedWalk`);
+      assert.doesNotMatch(
+        src,
+        /assertScannedRoots\(/,
+        `${checkName} calls assertScannedRoots directly, re-deciding the order locally`,
+      );
+      assert.doesNotMatch(
+        src,
+        /assertScannedFloor\(/,
+        `${checkName} calls assertScannedFloor directly, re-deciding the order locally`,
+      );
+    }
+  });
+
+  it("refuses an entry that names no roots, so it cannot be used as a count-only shortcut", () => {
+    // Single-root guards want assertScannedFloor alone, where the floor and
+    // the root are the same claim. Letting this function fall back to the
+    // count for them would make "which premises did this guard assert?"
+    // unanswerable from the call site.
+    try {
+      assertScannedWalk("check-env-inlining", ["lib/a-config.ts"]);
+      assert.fail("expected an entry with no roots to be refused");
+    } catch (error) {
+      assert.ok(error instanceof ScannedFloorError);
+      assert.equal(error.failure.code, "no_roots_floor");
+    }
   });
 });
 
@@ -1161,7 +1240,7 @@ describe("the wrappers actually call it", () => {
       it(`${scriptPath} enforces its premise where the table says it does`, () => {
         // The one guard that keeps its own refusal; the table names where.
         assert.match(floor.delegatedTo!, /\S/);
-        assert.doesNotMatch(read(scriptPath), /assertScannedFloor\(/);
+        assert.doesNotMatch(read(scriptPath), /assertScanned(?:Floor|Walk)\(/);
       });
       continue;
     }
@@ -1169,9 +1248,15 @@ describe("the wrappers actually call it", () => {
     it(`${scriptPath} asserts its floor and prints the failure without a stack`, () => {
       const source = read(scriptPath);
       if (floor?.count) {
+        // Either spelling counts. A multi-root walk asserts both premises
+        // through `assertScannedWalk`, which runs the per-root check and then
+        // the count; a single-root one calls `assertScannedFloor` directly,
+        // where the floor and the root are the same claim. What this case is
+        // about is that the guard asserts its committed number SOMEHOW before
+        // proving its negative — not which of the two front doors it used.
         assert.match(
           source,
-          /assertScannedFloor\(\s*CHECK_NAME/,
+          /assertScanned(?:Floor|Walk)\(\s*CHECK_NAME/,
           `${scriptPath} must assert its count floor`,
         );
       }
@@ -1203,8 +1288,11 @@ describe("the wrappers actually call it", () => {
       if (floor?.delegatedTo) continue;
       const source = read(scriptPath);
       const assertAt = Math.min(
-        ...[source.indexOf("assertScannedFloor("), source.indexOf("assertParsedInputs(")]
-          .filter((i) => i >= 0),
+        ...[
+          source.indexOf("assertScannedFloor("),
+          source.indexOf("assertScannedWalk("),
+          source.indexOf("assertParsedInputs("),
+        ].filter((i) => i >= 0),
       );
       const reportAt = source.indexOf("console.log(");
       assert.ok(assertAt > 0, `${scriptPath} asserts nothing`);

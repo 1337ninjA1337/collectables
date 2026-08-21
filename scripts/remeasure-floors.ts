@@ -45,6 +45,7 @@ import * as path from "node:path";
 import {
   checkWalkPremise,
   describeWalkPremiseProblem,
+  FLOOR_DRIFT,
   FLOOR_WALKS,
   formatFloorMeasurement,
   measureFloorWalk,
@@ -133,8 +134,21 @@ function main(): void {
     for (const problem of premise) console.log(`       ! ${describeWalkPremiseProblem(problem)}`);
   }
   const moved = rows.filter((row) => row.actionable);
+  const drifted = rows.filter(
+    (row) => !row.actionable && row.slackPercent >= FLOOR_DRIFT * 100,
+  );
   const unsound = measured.filter((entry) => entry.premise.length > 0);
   console.log("");
+  // Named before the early return, because a drifted floor is the one finding
+  // here that never fails anything: mentioned only inside the per-row block it
+  // would be the line a reader scrolls past on an otherwise-clean run.
+  if (drifted.length > 0) {
+    console.log(
+      `remeasure-floors: ${String(drifted.length)} floor(s) have drifted loose as the tree grew — ` +
+        `${drifted.map((row) => row.checkName).join(", ")}. Nothing is broken and nothing will go red for it; ` +
+        `re-measure when convenient.`,
+    );
+  }
   if (moved.length === 0 && unsound.length === 0) {
     console.log(
       "remeasure-floors: nothing to move — every floor either declares its scan roots (so the property is asserted by the guard, not by the number) or still sits above its largest single root.",

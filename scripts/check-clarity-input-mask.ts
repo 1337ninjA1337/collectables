@@ -18,11 +18,7 @@ import {
   formatClarityMaskReport,
 } from "../lib/check-clarity-input-mask";
 import { GuardRootError } from "../lib/guard-root";
-import {
-  ScannedFloorError,
-  assertScannedFloor,
-  assertScannedRoots,
-} from "../lib/scanned-floor";
+import { ScannedFloorError, assertScannedWalk } from "../lib/scanned-floor";
 import { MARKUP_EXTENSIONS } from "../lib/source-dirs";
 import { guardScanRoot, listSourceFiles } from "./guard-io";
 
@@ -37,15 +33,12 @@ function main(): void {
     files[relative] = fs.readFileSync(path.join(repoRoot, relative), "utf8");
   }
 
-  // Roots before the count: when a scan root vanishes both fire, and only
-
-  // this one names the directory that went quiet — `below_floor` would send
-
-  // the reader off to re-measure a floor that is not the problem.
-
-  assertScannedRoots(CHECK_NAME, Object.keys(files));
-
-  assertScannedFloor(CHECK_NAME, Object.keys(files).length);
+  // A walk that lost a scan root proves its negative over a tree with a hole
+  // in it, in exactly the same words as a walk that read everything.
+  // assertScannedWalk runs both premises in the order that matters: the
+  // per-root check first, so a vanished root is named rather than reported as
+  // a number that needs re-measuring.
+  assertScannedWalk(CHECK_NAME, Object.keys(files));
 
   const violations = findClarityMaskViolations(files);
 
