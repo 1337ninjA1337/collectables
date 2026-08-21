@@ -18,7 +18,11 @@ import {
   formatClarityMaskReport,
 } from "../lib/check-clarity-input-mask";
 import { GuardRootError } from "../lib/guard-root";
-import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import {
+  ScannedFloorError,
+  assertScannedFloor,
+  assertScannedRoots,
+} from "../lib/scanned-floor";
 import { MARKUP_EXTENSIONS } from "../lib/source-dirs";
 import { guardScanRoot, listSourceFiles } from "./guard-io";
 
@@ -32,6 +36,14 @@ function main(): void {
   for (const relative of listSourceFiles(repoRoot, SCANNED_DIRS, MARKUP_EXTENSIONS)) {
     files[relative] = fs.readFileSync(path.join(repoRoot, relative), "utf8");
   }
+
+  // Roots before the count: when a scan root vanishes both fire, and only
+
+  // this one names the directory that went quiet — `below_floor` would send
+
+  // the reader off to re-measure a floor that is not the problem.
+
+  assertScannedRoots(CHECK_NAME, Object.keys(files));
 
   assertScannedFloor(CHECK_NAME, Object.keys(files).length);
 

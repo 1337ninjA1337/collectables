@@ -410,25 +410,28 @@ describe("FLOOR_WALKS", () => {
     }
   });
 
-  it("still sits above its largest single root, for EVERY walk in the table", () => {
-    // The property itself, measured against the real tree and by counting
-    // rather than by spawning — which is what makes it affordable for all five
-    // walks instead of the four the fixture suite can pay for.
+  it("still sits above its largest single root, for every walk that has not moved onto roots", () => {
+    // What this case was for, and why it now checks nothing.
     //
-    // That gap was real and it was over the entry that needs it most.
-    // `lint-guard-partial-root.test.ts` proves this by building a temp tree per
-    // root and running the guard binary in it, which is the stronger evidence
-    // and costs seconds; it skips `check-problem-phrasing-imports` because each
-    // of its five fixtures would copy a 400-file `__tests__/` tree. So the
-    // LARGEST floor in the table — 450, with its biggest root at 430, 96% of
-    // the way there and the one likeliest to move next — had its property
-    // enforced by nothing in CI at all. `npm run remeasure-floors` computes the
-    // same verdict, and a tool nobody is required to run is not enforcement.
+    // The property — no single scan root clears a multi-root floor alone — was
+    // enforced here by arithmetic, cheaply and over every walk, because the
+    // fixture suite can only afford to spawn guards for the walks whose trees
+    // are small enough to copy. Arithmetic is the wrong shape for it: the
+    // comparison is against a COMMITTED number, so it goes red whenever the
+    // tree grows past one, which happened five times and twice in one
+    // afternoon, always in a suite unrelated to the change that caused it.
     //
-    // The division of labour, since two things now check one property: this is
-    // the CHEAP enforcement and covers every walk; the fixture suite is the
-    // PROOF that the guard binary really refuses, and covers the four whose
-    // trees are small enough to copy.
+    // A guard that declares `count.roots` states the property at its own
+    // runtime instead — every declared root must have contributed — and is
+    // skipped here. All six now do, so this loop covers nothing, and the case
+    // below says so out loud rather than passing over an empty list: a green
+    // assertion nobody notices has stopped running is the exact failure this
+    // whole module exists to refuse, one level up.
+    //
+    // Kept rather than deleted because it is the safety net for the NEXT
+    // multi-root guard, which will arrive without roots declared and be caught
+    // here on its first red run. Retiring it for good, and deciding what the
+    // count floors are still for, is 3/3 in .tasks/.tasks.md.
     for (const [checkName, walk] of Object.entries(FLOOR_WALKS)) {
       const floor = SCANNED_FLOORS[checkName]?.count;
       assert.ok(floor, `${checkName} declares no count floor`);
@@ -472,6 +475,26 @@ describe("FLOOR_WALKS", () => {
           `Re-measure in lib/scanned-floor.ts and say why in the note.`,
       );
     }
+  });
+
+  it("says how many walks still depend on that arithmetic, so nobody mistakes silence for coverage", () => {
+    // The vacuity guard for the case above. It is a loop with a `continue` in
+    // it, and a loop that skips every entry passes exactly like a loop that
+    // checked every entry — so the count is published here instead of being
+    // left to whoever next reads a green run.
+    //
+    // Zero today, which is the migration being finished rather than the check
+    // being broken. This number going UP is a new multi-root guard that has
+    // not declared its roots; it is not a failure, it is a to-do, which is why
+    // this reports rather than refuses.
+    const onArithmetic = Object.keys(FLOOR_WALKS).filter(
+      (checkName) => !SCANNED_FLOORS[checkName]?.count?.roots,
+    );
+    assert.deepEqual(
+      onArithmetic,
+      [],
+      `these walks still hold the no-single-root property by a committed number rather than by declaring count.roots, so their floors will need re-measuring as the tree grows: ${onArithmetic.join(", ")}`,
+    );
   });
 
   it("is not empty, and its slack is the tighter reading of the notes", () => {

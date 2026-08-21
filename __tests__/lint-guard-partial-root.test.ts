@@ -26,6 +26,7 @@ import * as path from "node:path";
 import { LINT_GUARDS } from "../lib/lint-guards";
 import { FLOOR_WALKS } from "../lib/floor-walks";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
+import { SOURCE_EXTENSIONS } from "../lib/source-dirs";
 import {
   assertNoStackTrace,
   checkNameOf,
@@ -60,6 +61,37 @@ function firstEntriesOf(
 }
 
 /**
+ * A few files from EVERY root a multi-root guard walks.
+ *
+ * The fixture `below_floor` needs once a guard declares its `roots`. These
+ * specs used to hand over one whole root (`["app"]`), which was the shortest
+ * way to a walk that came up short — and stopped being that the moment the
+ * per-root assertion landed and started running first: a tree missing
+ * `components/` entirely now refuses by NAME, which is the right refusal and
+ * the wrong one for this suite. Keeping a slice of every root leaves the walk
+ * genuinely too small with nothing missing, which is what `below_floor` is
+ * about. The dropped-root case has its own block at the end of this file.
+ *
+ * Driven off `FLOOR_WALKS` rather than written out six times, extensions
+ * included: a markup-only walk needs `.tsx` files or it counts zero of what it
+ * was handed and reproduces `no_files` instead — the code the empty-root
+ * harness already covers.
+ *
+ * Cheaper than what it replaces, too: `check-problem-phrasing-imports` used to
+ * be pointed at the whole of `app/` and is now fifteen files. That does NOT
+ * make it affordable in the dropped-root block below, which builds one fixture
+ * per whole root and would still copy a 400-file `__tests__/` tree.
+ */
+function sliceOfEveryRoot(checkName: string, take = 3): string[] {
+  const walk = FLOOR_WALKS[checkName];
+  assert.ok(walk, `${checkName} is not in FLOOR_WALKS, so its roots are not known here`);
+  const extensions = walk.extensions ?? SOURCE_EXTENSIONS;
+  return walk.roots.flatMap((root) =>
+    firstEntriesOf(root, take, (name) => extensions.some((ext) => name.endsWith(ext))),
+  );
+}
+
+/**
  * What each count-shaped guard gets pointed at. Every spec is a STRICT subset
  * of what the guard normally walks: enough to clear zero, far short of the
  * floor. The assertions read the count out of the guard's own message rather
@@ -67,26 +99,14 @@ function firstEntriesOf(
  * suite — only a fixture that stopped being partial can.
  */
 const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
-  // Walks app + components + lib; app alone is the smallest of the three.
-  "check-inline-hex": () => ["app"],
-  // Both walk app + components. `check-inline-radius` keeps a slice of BOTH
-  // roots rather than all of `app`, because it is the first guard to assert
-  // per-root presence and that assertion now runs first: a fixture holding only
-  // `app` refuses on `no_root_files` naming `components/`, which is the right
-  // refusal and the wrong one for this suite. Six files across two present
-  // roots is a walk that is genuinely too small, which is what `below_floor`
-  // is about. The dropped-root case has its own block at the end of this file.
-  "check-inline-radius": () => [
-    ...firstEntriesOf("app", 3, (name) => name.endsWith(".tsx")),
-    ...firstEntriesOf("components", 3, (name) => name.endsWith(".tsx")),
-  ],
-  "check-analytics-imports": () => ["app"],
-  // Walks app + components + lib + scripts + __tests__. Its floor rides above
-  // what __tests__/ alone contributes, so app/ — the smallest of the five — is
-  // a long way short of it.
-  "check-problem-phrasing-imports": () => ["app"],
-  // Same walk, .tsx only.
-  "check-clarity-input-mask": () => ["app"],
+  // The six multi-root walks, all built the same way now that all six declare
+  // their roots: a slice of every root, so the walk is small with nothing
+  // missing. See sliceOfEveryRoot above for why one whole root stopped working.
+  "check-inline-hex": () => sliceOfEveryRoot("check-inline-hex"),
+  "check-inline-radius": () => sliceOfEveryRoot("check-inline-radius"),
+  "check-analytics-imports": () => sliceOfEveryRoot("check-analytics-imports"),
+  "check-problem-phrasing-imports": () => sliceOfEveryRoot("check-problem-phrasing-imports"),
+  "check-clarity-input-mask": () => sliceOfEveryRoot("check-clarity-input-mask"),
   // Walks app + components + data + lib + scripts. `app` at 19 files is the
   // second-smallest of the five and a long way under the floor of 200, which
   // rides above what lib/ alone contributes. The floor is checked BEFORE the
@@ -97,7 +117,7 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // Same five-root walk as check-orphan-i18n-keys and the same floor of 200;
   // `app` at 19 files is nowhere near it.
   "check-profile-id-pii": () => ["app"],
-  "check-a11y-jsx": () => ["app"],
+  "check-a11y-jsx": () => sliceOfEveryRoot("check-a11y-jsx"),
   // Walks the whole tree; app/ is a few dozen of the several hundred files.
   "check-secrets": () => ["app"],
   // Walks lib/*-config.ts — five files, floor of three, so the fixture is two.
