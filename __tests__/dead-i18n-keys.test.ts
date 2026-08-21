@@ -99,6 +99,34 @@ const REMOVED_FAMILIES: readonly RemovedFamily[] = [
       "statsItems",
     ],
   },
+  {
+    name: "feed/share",
+    instead:
+      "three outlived their screens and seven were never rendered at all; " +
+      "the discover feed and the share-with-users sheet this copy describes " +
+      "were not built",
+    keys: [
+      // Lost their call sites in the same 2026-04-12 / 2026-05-01 rewrites.
+      "tabDiscover",
+      "needMoreDataItemText",
+      "needTitleText",
+      // Never rendered in any commit: an empty discover feed with its hint and
+      // call to action, a "share with users" sheet with its hint and empty
+      // state, and a picker placeholder.
+      "emptyFeedTitle",
+      "emptyFeedHint",
+      "discoverCta",
+      "shareWithUsers",
+      "shareWithUsersHint",
+      "noUsersToShare",
+      // NOT part of the `condition*` family the three dynamic `t()` call sites
+      // build. Those spell their union out — `as "conditionNew" |
+      // "conditionExcellent" | "conditionGood" | "conditionFair"` — and this
+      // is not in it. The closest any of the 35 came to a false positive, so
+      // it was read at the call site rather than trusted to the scan.
+      "conditionPlaceholder",
+    ],
+  },
 ];
 
 /** Every removed key, across families — the table flattened once. */
@@ -153,7 +181,19 @@ describe("the i18n keys removed as dead stay deleted", () => {
       (key, index, all) => all.indexOf(key) !== index,
     );
     assert.deepEqual(duplicates, []);
-    assert.equal(ALL_REMOVED.length, 25);
+    assert.equal(ALL_REMOVED.length, 35);
+  });
+
+  it("accounts for every key the orphan scan found", () => {
+    // The scan reported 35 across three families and the table holds three
+    // families. Stated as its own case because the count above would still
+    // pass on a table that lost a whole family: 35 is the finding, and this is
+    // where it is written down.
+    assert.equal(REMOVED_FAMILIES.length, 3);
+    assert.equal(
+      REMOVED_FAMILIES.reduce((sum, family) => sum + family.keys.length, 0),
+      35,
+    );
   });
 
   it("every family says what it is and what to do instead", () => {
