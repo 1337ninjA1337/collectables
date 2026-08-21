@@ -108,8 +108,8 @@ export const ANALYTICS_EVENTS = {
   },
   premium_upsell_shown: {
     description:
-      "Fired when a free user hits a premium gate (e.g. taps the locked Private visibility chip). `feature` names the gated capability, `source` the screen. Zero events for a feature over a long window is the evidence needed to hide its locked affordance entirely.",
-    props: ["feature", "source"],
+      "Fired when a free user hits a premium gate (e.g. taps the locked Private visibility chip). `feature` names the gated capability, `source` the screen, and `control` which affordance was pressed — `chip` for the padlocked chip, `hint` for the sentence beside it. Zero events for a feature over a long window is the evidence needed to hide its locked affordance entirely, and that decision is per-CONTROL: the two send the same feature and source, so without `control` a tap on the sentence reads as a tap on the chip.",
+    props: ["feature", "source", "control"],
   },
   language_switched: {
     description:

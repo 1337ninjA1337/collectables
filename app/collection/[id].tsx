@@ -32,6 +32,7 @@ import { useI18n } from "@/lib/i18n-context";
 import { getDefaultLocaleForLanguage } from "@/lib/locale-helpers";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { usePremium } from "@/lib/premium-context";
+import { clampVisibilityForSave } from "@/lib/premium-helpers";
 import { useSocial } from "@/lib/social-context";
 import { fetchCollectionById, fetchItemsByCollectionId } from "@/lib/supabase-profiles";
 import { useToast } from "@/lib/toast-context";
@@ -534,15 +535,19 @@ export default function CollectionDetailsScreen() {
       if (editCoverChanged && editCoverUri) {
         finalCover = await uploadImage(editCoverUri);
       }
-      // Defense-in-depth: even if the locked chip is bypassed, a non-premium
-      // user can never flip a public collection to private (matches the
-      // creation gate). An already-private collection is left untouched.
-      const finalVisibility: CollectionVisibility =
-        !isPremium &&
-        editVisibility === "private" &&
-        (collection.visibility ?? "private") !== "private"
-          ? "public"
-          : editVisibility;
+      // Defence in depth, and unreachable through the UI on purpose:
+      // `openEditModal` seeds `editVisibility` from the collection, and the
+      // sheet's locked chip returns before changing it, so a free user cannot
+      // arrive here having selected "private" on a public collection. Kept
+      // because the day that stops being true this is the only thing between a
+      // bypassed chip and a private collection on a free account — and routed
+      // through `clampVisibilityForSave` because the three clauses spelled out
+      // here were a third copy of the sheet's rule, already free to drift.
+      const finalVisibility: CollectionVisibility = clampVisibilityForSave(
+        isPremium,
+        editVisibility,
+        collection.visibility ?? "private",
+      );
       await updateCollection(collection.id, {
         name: editName.trim(),
         description: editDescription.trim(),

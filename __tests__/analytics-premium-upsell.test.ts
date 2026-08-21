@@ -6,10 +6,13 @@ import { ANALYTICS_EVENTS } from "../lib/analytics-events";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("premium_upsell_shown — event registry", () => {
-  it("is declared in ANALYTICS_EVENTS with feature + source props", () => {
+  it("is declared in ANALYTICS_EVENTS with feature + source + control props", () => {
     const def = ANALYTICS_EVENTS.premium_upsell_shown;
     assert.ok(def, "premium_upsell_shown must exist in ANALYTICS_EVENTS");
-    assert.deepEqual([...def.props].sort(), ["feature", "source"]);
+    // `control` is not decoration: `assertValidProps` strips (production) or
+    // throws on (dev) a key the registry does not list, so a call site sending
+    // it while this array does not name it loses the payload silently.
+    assert.deepEqual([...def.props].sort(), ["control", "feature", "source"]);
   });
 });
 

@@ -28,7 +28,11 @@ import {
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
-import { isPrivateVisibilityLocked, visibilityHintKey } from "@/lib/premium-helpers";
+import {
+  isPrivateVisibilityLocked,
+  PremiumUpsellControl,
+  visibilityHintKey,
+} from "@/lib/premium-helpers";
 import { useToast } from "@/lib/toast-context";
 import type { CollectionVisibility } from "@/lib/types";
 
@@ -88,11 +92,16 @@ export const EditCollectionModal = memo(function EditCollectionModal({
   // own sheet — the lapsed-subscriber case this rule exists for.
   const privateLocked = isPrivateVisibilityLocked(isPremium, savedVisibility ?? "private");
 
-  /** What the padlock does, from the chip and from the sentence below it. */
-  function showPrivateUpsell() {
+  /**
+   * What the padlock does, from the chip and from the sentence below it. Same
+   * gate, same feature, same source — `control` is the only thing that tells
+   * the funnel which of the two a person actually pressed.
+   */
+  function showPrivateUpsell(control: PremiumUpsellControl) {
     trackEvent("premium_upsell_shown", {
       feature: "private_collection",
       source: "collection_edit",
+      control,
     });
     toast.error(t("visibilityPrivatePremiumOnly"), t("premiumTitle"));
   }
@@ -170,7 +179,7 @@ export const EditCollectionModal = memo(function EditCollectionModal({
                     }}
                     onPress={() => {
                       if (locked) {
-                        showPrivateUpsell();
+                        showPrivateUpsell("chip");
                         return;
                       }
                       onChangeVisibility(v);
@@ -195,7 +204,9 @@ export const EditCollectionModal = memo(function EditCollectionModal({
                 time somebody looks back at the row. */}
             {privateLocked ? (
               <Pressable
-                onPress={showPrivateUpsell}
+                onPress={() => showPrivateUpsell("hint")}
+                hitSlop={8}
+                style={({ pressed }) => (pressed ? styles.editVisibilityLockedHintPressed : null)}
                 accessibilityRole="button"
                 accessibilityLabel={t("visibilityPrivateLockedA11y")}
               >
@@ -369,6 +380,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: FONT_BODY_BOLD,
     marginTop: 4,
+  },
+  // See the same style in `app/create-collection.tsx`: a line of text acting as
+  // a button needs to acknowledge the press, and opacity keeps the amber that
+  // marks it as pressable in the first place.
+  editVisibilityLockedHintPressed: {
+    opacity: 0.6,
   },
   editCurrencyButton: {
     borderRadius: 16,

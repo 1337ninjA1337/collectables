@@ -38,11 +38,11 @@ describe("collection edit modal: editing visibility public→private requires pr
     // chip reaches it.
     assert.match(
       modal,
-      /function showPrivateUpsell\(\)[\s\S]{0,400}?toast\.error\(t\("visibilityPrivatePremiumOnly"\)/,
+      /function showPrivateUpsell\(control: PremiumUpsellControl\)[\s\S]{0,400}?toast\.error\(t\("visibilityPrivatePremiumOnly"\)/,
     );
     assert.match(
       modal,
-      /if\s*\(locked\)\s*\{\s*showPrivateUpsell\(\);\s*return;\s*\}/,
+      /if\s*\(locked\)\s*\{\s*showPrivateUpsell\("chip"\);\s*return;\s*\}/,
     );
   });
 
@@ -54,7 +54,7 @@ describe("collection edit modal: editing visibility public→private requires pr
     // looks back at the row.
     assert.match(
       modal,
-      /\{privateLocked \? \(\s*<Pressable\s*onPress=\{showPrivateUpsell\}/,
+      /\{privateLocked \? \(\s*<Pressable\s*onPress=\{\(\) => showPrivateUpsell\("hint"\)\}/,
     );
     assert.doesNotMatch(
       modal,
@@ -64,9 +64,15 @@ describe("collection edit modal: editing visibility public→private requires pr
   });
 
   it("forces 'public' on save when a non-premium user tries to make a public collection private", () => {
+    // The clamp is `clampVisibilityForSave`, called rather than matched — the
+    // behaviour is exercised in premium-visibility-lock.test.ts, where it can
+    // be stated as a case instead of as a shape. What is a fact about THIS
+    // file is the three arguments it passes: the saved value is the
+    // COLLECTION's, not the sheet's `savedVisibility` prop, and putting
+    // `editVisibility` in the third slot type-checks and clamps backwards.
     assert.match(
       page,
-      /finalVisibility[^=]*=\s*\n?\s*!isPremium\s*&&\s*\n?\s*editVisibility\s*===\s*"private"\s*&&\s*\n?\s*\(collection\.visibility\s*\?\?\s*"private"\)\s*!==\s*"private"\s*\n?\s*\?\s*"public"\s*\n?\s*:\s*editVisibility/,
+      /const finalVisibility: CollectionVisibility = clampVisibilityForSave\(\s*isPremium,\s*editVisibility,\s*collection\.visibility \?\? "private",\s*\)/,
     );
     assert.match(page, /visibility:\s*finalVisibility/);
   });
@@ -76,7 +82,7 @@ describe("collection edit modal: editing visibility public→private requires pr
     // owner editing an unrelated field keeps the collection private — both
     // at chip level (component) and at save level (page clamp).
     assert.match(modal, /isPrivateVisibilityLocked\(isPremium,\s*savedVisibility\s*\?\?\s*"private"\)/);
-    assert.match(page, /\(collection\.visibility\s*\?\?\s*"private"\)\s*!==\s*"private"/);
+    assert.match(page, /clampVisibilityForSave\(\s*isPremium,\s*editVisibility,\s*collection\.visibility \?\? "private",/);
   });
 });
 
