@@ -659,6 +659,10 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     count: { label: "source file", minimum: 46 },
     note: "same app/ + components/ walk as check-inline-radius, 64 files on 2026-08-16; same 46 for the same reason, raised alongside it.",
   },
+  "check-orphan-i18n-keys": {
+    count: { label: "source file", minimum: 200 },
+    note: "app/ + components/ + data/ + lib/ + scripts/ held 262 .ts/.tsx files on 2026-08-21, minus lib/i18n-context.tsx itself (which declares every key, so counting it would make every key read) = 261. 200 rides above the 163 that lib/ alone contributes, so no single root clears this floor on its own — the property matters more here than for most, because a key's only reader is often a TABLE in lib/ rather than a `t()` call in a screen, and a walk that had quietly lost app/ would report those keys live while missing every orphan a screen used to render.",
+  },
   "check-problem-phrasing-imports": {
     count: { label: "source file", minimum: 450 },
     note: "app/ + components/ + lib/ + scripts/ + __tests__/ held 645 .ts/.tsx files on 2026-08-16 (app 19, components 45, lib 152, scripts 27, tests 402); 450 rides above the 396 that __tests__/ alone contributes, so no single root clears this floor on its own — the property check-inline-hex's note names, and the one that matters most here because __tests__/ is where a hand-joined sentence is likeliest to appear.",

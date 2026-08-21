@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { formatOrphanKeyReport } from "@/lib/check-orphan-i18n-keys";
 import { LINT_GUARDS } from "@/lib/lint-guards";
 
 import { checkNameOf, makePartialRoot, runGuardIn } from "./helpers/guard-fixture";
@@ -85,6 +86,13 @@ function reportedPath(output: string, plantedBasename: string): string | null {
   return match ? match[1] : null;
 }
 
+/**
+ * Guards that walk through `listSourceFiles` and name no file in their report,
+ * because their finding is an ABSENCE rather than a location. Held honest by
+ * the last case in this suite rather than by this comment.
+ */
+const REPORTS_NO_PATH = ["check-orphan-i18n-keys"];
+
 describe("a guard's report names a file its reader can open", () => {
   for (const [checkName, plant] of Object.entries(PLANTED)) {
     const guard = LINT_GUARDS.find((g) => checkNameOf(g.scriptPath) === checkName);
@@ -148,9 +156,40 @@ describe("a guard's report names a file its reader can open", () => {
     );
     assert.deepEqual(
       callers.sort(),
-      [...Object.keys(PLANTED), ...ASSERTED_AT_SOURCE].sort(),
+      [...Object.keys(PLANTED), ...ASSERTED_AT_SOURCE, ...REPORTS_NO_PATH].sort(),
       "a guard started walking through listSourceFiles without a planted-offender case",
     );
+  });
+
+  it("holds the no-path exemption to the guards whose finding really is an absence", () => {
+    // `check-orphan-i18n-keys` walks through `listSourceFiles` like the others
+    // and reports no `path:line:column`, because it cannot: its finding is
+    // that NO file mentions a key. There is no location to name, so the
+    // property the planted cases check — that a reported path resolves under
+    // the root — has no subject here.
+    //
+    // Which makes the exemption exactly the kind that goes stale silently: the
+    // day this guard learns to name a file, it needs a planted case and
+    // nothing would say so. So the reason is asserted rather than remembered —
+    // the report must contain no path-shaped token at all.
+    for (const checkName of REPORTS_NO_PATH) {
+      const source = readRepoFile("scripts", `${checkName}.ts`);
+      assert.match(
+        source,
+        /formatOrphanKeyReport\(findings, files\.length\)/,
+        `${checkName} no longer prints the report this exemption was written for`,
+      );
+      const report = formatOrphanKeyReport(
+        [{ key: "orphan", declaredIn: ["ru", "en"] }],
+        261,
+      );
+      const pathShaped = report.match(/[\w./[\]-]+\.tsx?\b/);
+      assert.equal(
+        pathShaped,
+        null,
+        `${checkName} now names ${pathShaped?.[0]} in its report — it reports a location after all, so it needs a planted-offender case above rather than this exemption`,
+      );
+    }
   });
 
   it("names the bundle scan's base in the report, since its walk is dist-relative", () => {

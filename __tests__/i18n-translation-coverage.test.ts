@@ -227,7 +227,15 @@ describe("translation floors", () => {
     // complete, and four sit below half. The `assert.ok(true)` keeps the line
     // in the runner's output next to the rows above it.
     const report = COVERAGE.map(formatCoverageRow).join("\n");
-    // 502 as of 2026-08-21: the ten dead feed/share keys were removed, the last
+    // 501 as of 2026-08-21: `profileId` was removed — the sixteenth
+    // social/people orphan, and the first finding of the new
+    // `check-orphan-i18n-keys` guard rather than of a hand scan. It is the
+    // LABEL of the never-built "Save profile ID" field whose hint and button
+    // went with the family a day earlier; three scratch scans counted it as
+    // read because `lib/social-context.tsx` declares six `(profileId: string)`
+    // parameters, which bare-word matching cannot tell from a key reference.
+    // Declared in `en` and `ru` only. 502 before that: the ten dead feed/share
+    // keys were removed, the last
     // of the three families and the only one that moved a floor. Three lost
     // their call sites in the same rewrites (`tabDiscover`,
     // `needMoreDataItemText`, `needTitleText`) and seven were never rendered
@@ -283,7 +291,7 @@ describe("translation floors", () => {
     // — a key the card already rendered — in be/pl/de/es, which had been
     // inheriting the English "5 photos" since it was written. The 545 before
     // it arrived the same way, with the two nav-badge labels.
-    assert.match(report, /en: 502\/502 keys \(100\.0%\)/);
+    assert.match(report, /en: 501\/501 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
