@@ -1,3 +1,4 @@
+import { closeTagIndex, openTagEnd } from "@/lib/jsx-open-tag";
 import { stripComments } from "@/lib/strip-comments";
 
 /**
@@ -63,9 +64,12 @@ import { stripComments } from "@/lib/strip-comments";
  * which on this codebase is usually the one inside `onPress={() => x}`. It
  * reported ten offenders on the tree the careful version reports three for —
  * seven false positives, every one of them a button that DID carry a label,
- * in attribute text the regex never reached. So the open tag is walked with a
- * brace counter and string-literal skipping, and the close tag is matched with
- * a depth counter so a nested `<Pressable>` does not end its parent.
+ * in attribute text the regex never reached. The walk that gets this right
+ * now lives in `lib/jsx-open-tag.ts`, because it stopped being this guard's
+ * private business the moment a suite reimplemented it and left out the
+ * string-literal half. What stays here is the tag STACK below: tracking
+ * ancestors so a node inside a hidden subtree is not asked for props of its
+ * own is a rule about this guard's domain, not a primitive.
  *
  * What it deliberately does NOT do: understand components. A button whose
  * child is `<MyIcon />` or `{renderIcon()}` is invisible here, and a button
@@ -225,74 +229,6 @@ export function describeIconLabelFinding(
   if (code !== "half_hidden" || missing === undefined || missing.length === 0) return said;
   const props = missing.map((p) => `${HIDE_PROP[p]} (${p})`).join(" + ");
   return `${said}; still announced on ${missing.join(", ")} — add ${props}`;
-}
-
-/**
- * Walk from just after an opening tag name to the `>` that closes it.
- *
- * Returns the index of that `>`, or -1 if the tag never closes. Brace depth
- * matters because every interesting attribute in this codebase is an
- * expression containing at least one `>`; string and template literals are
- * skipped whole so a `">"` inside one cannot end the tag either.
- */
-function openTagEnd(source: string, from: number): number {
-  let depth = 0;
-  let i = from;
-  while (i < source.length) {
-    const c = source[i];
-    if (c === '"' || c === "'" || c === "`") {
-      i = skipStringLiteral(source, i);
-      continue;
-    }
-    if (c === "{") depth++;
-    else if (c === "}") depth--;
-    else if (c === ">" && depth === 0) return i;
-    i++;
-  }
-  return -1;
-}
-
-/** Index just past the closing quote of the literal starting at `i`. */
-function skipStringLiteral(source: string, i: number): number {
-  const quote = source[i];
-  let j = i + 1;
-  while (j < source.length) {
-    if (source[j] === "\\") {
-      j += 2;
-      continue;
-    }
-    if (source[j] === quote) return j + 1;
-    j++;
-  }
-  return source.length;
-}
-
-/**
- * Index of the `</Pressable>` matching an open tag that ended at `from`.
- *
- * Depth-counted: a row of buttons inside a pressable card is the ordinary case
- * here, and a scanner that took the first close tag would hand the parent's
- * body to the child and report the card as icon-only.
- */
-function closeTagIndex(source: string, from: number, tag: string): number {
-  const open = `<${tag}`;
-  const close = `</${tag}>`;
-  let depth = 1;
-  let i = from;
-  while (i < source.length) {
-    const nextOpen = source.indexOf(open, i);
-    const nextClose = source.indexOf(close, i);
-    if (nextClose === -1) return -1;
-    if (nextOpen !== -1 && nextOpen < nextClose) {
-      depth++;
-      i = nextOpen + open.length;
-      continue;
-    }
-    depth--;
-    if (depth === 0) return nextClose;
-    i = nextClose + close.length;
-  }
-  return -1;
 }
 
 const TAG = "Pressable";
