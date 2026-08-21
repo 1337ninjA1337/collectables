@@ -262,6 +262,25 @@ export function unusedUncountedExcuses(present: Iterable<string>): string[] {
  */
 export const FLOOR_SLACK = 0.25;
 
+/**
+ * Share of the walk a floor may leave deletable before it is worth mentioning.
+ *
+ * The other end of {@link FLOOR_SLACK}, and the gap the scan-root work opened
+ * on purpose: nothing forces a floor to be re-measured any more, so nothing
+ * notices one going SLACK either. A floor measured at 25% of a 700-file walk
+ * is 41% of a 900-file one without anybody touching it, and at that point a
+ * walk could lose two-fifths of its files — every root still present, so the
+ * per-root check is happy — and pass.
+ *
+ * Reported and never failed, which is the whole point of picking a number
+ * here rather than reusing `FLOOR_SLACK`: a floor is allowed to drift, drift
+ * is not a defect, and a tool that went red for it would have reintroduced
+ * the chore this all exists to remove. 0.4 is where the number stops doing
+ * much rather than where it becomes wrong — comfortably past the measured
+ * quarter, comfortably short of "this floor is decorative".
+ */
+export const FLOOR_DRIFT = 0.4;
+
 /** One root's contribution to a walk. */
 export type RootCount = { readonly root: string; readonly count: number };
 
@@ -406,6 +425,11 @@ export function formatFloorMeasurement(row: FloorMeasurement): string {
     `       largest single root: ${row.largestRoot.root} at ${String(row.largestRoot.count)}` +
       `, ${String(row.slackPercent)}% of the walk currently deletable`,
   ];
+  // Two independent things to say about one row: what the largest root means
+  // for it, and how much room the number has. They used to be one `else if`
+  // chain, which meant a declared-roots row under its largest root could not
+  // also report drift — the note about the retired rule swallowed the note
+  // about the live one.
   if (row.actionable) {
     lines.push(
       `       ${row.largestRoot.root}/ alone clears the floor, so every other root could vanish and the guard still passes.`,
@@ -422,10 +446,21 @@ export function formatFloorMeasurement(row: FloorMeasurement): string {
       `       ${row.largestRoot.root}/ alone clears the floor, which no longer matters: this guard asserts`,
       `       every declared root contributed, so a lost root refuses by name whatever this number is.`,
     );
-  } else if (row.slackPercent < FLOOR_SLACK * 100) {
+  }
+  if (!row.actionable && row.slackPercent < FLOOR_SLACK * 100) {
     lines.push(
       `       holds, but only ${String(row.slackPercent)}% is deletable — under the ~${String(FLOOR_SLACK * 100)}% these floors are measured with,`,
       `       so it will trip on ordinary churn before it catches a lost root.`,
+    );
+  } else if (!row.actionable && row.slackPercent >= FLOOR_DRIFT * 100) {
+    // The direction nothing else watches. Advice, not a finding: the row stays
+    // `ok  ` and the tool still exits 0, because a floor drifting loose as the
+    // tree grows is what these numbers do now that they are no longer pinned
+    // to the largest root.
+    lines.push(
+      `       holds, and ${String(row.slackPercent)}% is deletable — the tree has grown well past the ~${String(FLOOR_SLACK * 100)}% this was`,
+      `       measured at, so the number is doing less than it reads. Re-measure to ${String(row.suggested)} when convenient;`,
+      `       nothing is broken, and nothing will go red for this.`,
     );
   }
   return lines.join("\n");

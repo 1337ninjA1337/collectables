@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   checkWalkPremise,
   describeWalkPremiseProblem,
+  FLOOR_DRIFT,
   FLOOR_SLACK,
   FLOOR_WALKS,
   formatFloorMeasurement,
@@ -245,6 +246,50 @@ describe("formatFloorMeasurement", () => {
     assert.ok(declareAt < remeasureAt, "the durable fix should be read first");
   });
 
+  it("says when a holding floor has drifted loose, as advice rather than a finding", () => {
+    // The gap the scan-root work opened on purpose: nothing forces a floor to
+    // be re-measured any more, so nothing notices one going SLACK either. A
+    // number measured at a quarter of a 700-file walk is 41% of a 900-file one
+    // without anybody touching it, and at that point the walk could lose
+    // two-fifths of its files — every root present, so the per-root check is
+    // happy — and pass.
+    const line = formatFloorMeasurement(
+      measureFloorWalk("check-x", 50, "file", [root("app", 20), root("lib", 80)], "declared_roots"),
+    );
+    // Still ok, still exits 0: drift is what these numbers do now, not a defect.
+    assert.match(line, /^ok {3}check-x$/m);
+    assert.match(line, /50% is deletable/);
+    assert.match(line, /nothing is broken, and nothing will go red for this/);
+    assert.match(line, /Re-measure to 75 when convenient/);
+  });
+
+  it("reports the retired rule AND the drift, which used to be one else-if", () => {
+    // Two independent things about one row: what the largest root means for it
+    // (nothing, now) and how much room the number has. Chained, the note about
+    // the retired rule swallowed the note about the live one — so a
+    // declared-roots row under its largest root could never report drift, and
+    // that is exactly the row most likely to have it.
+    // 50 against app 30 + lib 60: under its largest root (so the retired-rule
+    // note fires) AND 44% deletable (so the drift note does too).
+    const line = formatFloorMeasurement(
+      measureFloorWalk("check-x", 50, "file", [root("app", 30), root("lib", 60)], "declared_roots"),
+    );
+    assert.match(line, /which no longer matters/, "the largest-root note");
+    assert.match(line, /is deletable — the tree has grown/, "and the drift note");
+  });
+
+  it("keeps the two slack directions apart, with a gap between them", () => {
+    // A floor cannot be both too tight and drifted loose, and the constants
+    // have to leave room between the readings or every floor is one or the
+    // other and neither line means anything.
+    assert.ok(FLOOR_DRIFT > FLOOR_SLACK, "drift must sit above the measured slack");
+    const comfortable = formatFloorMeasurement(
+      measureFloorWalk("check-x", 70, "file", [root("app", 20), root("lib", 80)], "declared_roots"),
+    );
+    // 30% deletable: past the 25% target, short of the 40% drift line.
+    assert.doesNotMatch(comfortable, /is deletable —/);
+  });
+
   it("says when a holding floor has less room than these floors are measured with", () => {
     // The other direction, and a note rather than a failure. A floor sitting
     // close under the total trips on an ordinary deletion long before it
@@ -255,12 +300,17 @@ describe("formatFloorMeasurement", () => {
     );
     assert.match(tight, /^ok {3}check-x$/m);
     assert.match(tight, /only 5% is deletable/);
-    // And a floor with MORE room than the target says nothing: telling a
-    // reader to tighten a working floor is how a tool stops being run.
+    // A floor with more room than the target used to say nothing at all, on
+    // the grounds that telling a reader to tighten a working floor is how a
+    // tool stops being run. That still holds up to a point, and the point is
+    // FLOOR_DRIFT: past it the number has grown loose enough to be worth
+    // mentioning, and the line says so as advice that fails nothing.
     const roomy = formatFloorMeasurement(
-      measureFloorWalk("check-x", 50, "file", [root("app", 40), root("lib", 45)]),
+      measureFloorWalk("check-x", 50, "file", [root("app", 40), root("lib", 45)], "declared_roots"),
     );
-    assert.doesNotMatch(roomy, /is deletable —/);
+    assert.match(roomy, /^ok {3}check-x$/m);
+    assert.match(roomy, /41% is deletable — the tree has grown/);
+    assert.match(roomy, /nothing will go red for this/);
     assert.doesNotMatch(roomy, /re-measure to/);
   });
 });
