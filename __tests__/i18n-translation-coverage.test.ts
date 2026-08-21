@@ -227,7 +227,17 @@ describe("translation floors", () => {
     // complete, and four sit below half. The `assert.ok(true)` keeps the line
     // in the runner's output next to the rows above it.
     const report = COVERAGE.map(formatCoverageRow).join("\n");
-    // 522 as of 2026-08-21: the fifteen dead social/people keys were removed —
+    // 512 as of 2026-08-21: the ten dead collections-list keys were removed —
+    // six that lost their call sites when the collections list was rewritten
+    // (`noOwnedCollections`, `noFriendCollections`, `noSubscribedCollections`,
+    // `yourCollection`, `sharedToYou` in `8b35e1b`, `loadingCollections` in
+    // `6bfbfd1`) and four that were never rendered in any commit
+    // (`openedForYou`, `openedForYouSubtitle`, `noSharedCollections`,
+    // `statsItems`). `en` and `ru` declared all ten; `yourCollection` and
+    // `sharedToYou` reached be/pl/de/es and `openedForYou` be/pl/de, so the
+    // partial rows drop three each (two for es). Floors untouched — `ru` lands
+    // at 510 against 500. 522 before that: the fifteen dead social/people keys
+    // were removed —
     // nine that outlived their screens when `app/people.tsx` was rewritten and
     // `app/friends.tsx` was added on 2026-04-12 (`peopleTitle`,
     // `peopleSubtitle`, `noPeopleFound`, `loadingPeople`, `noFriendsYet`,
@@ -262,7 +272,7 @@ describe("translation floors", () => {
     // — a key the card already rendered — in be/pl/de/es, which had been
     // inheriting the English "5 photos" since it was written. The 545 before
     // it arrived the same way, with the two nav-badge labels.
-    assert.match(report, /en: 522\/522 keys \(100\.0%\)/);
+    assert.match(report, /en: 512\/512 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
