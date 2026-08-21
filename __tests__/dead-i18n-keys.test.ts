@@ -12,9 +12,10 @@ import { sourceCode, sourceFiles } from "./helpers/source-files";
  *
  * An orphan scan over the base map found 35 keys with no reader anywhere in
  * `app/`, `components/`, `lib/`, `scripts/`, `data/`, `__tests__/` or `docs/`,
- * in three families, and `check-orphan-i18n-keys` — the guard that scan became
- * — found a 36th on its first run. They are dead in the way translations are
- * always dead —
+ * in three families; `check-orphan-i18n-keys` — the guard that scan became —
+ * found a 36th on its first run and a 37th when its rule was tightened from "a
+ * literal anywhere" to "a literal in a key position". They are dead in the way
+ * translations are always dead —
  * silently: every locale map opens with `...en`, so `t("peopleTitle")` returns
  * a non-empty string in all six languages whether or not anything renders it,
  * and no runtime assertion can see the difference. Only the source can.
@@ -139,6 +140,25 @@ const REMOVED_FAMILIES: readonly RemovedFamily[] = [
       "conditionPlaceholder",
     ],
   },
+  {
+    name: "self-label",
+    instead:
+      "`you` was a bare pronoun rendered by nothing; a screen marking the " +
+      "current user's own row should write a key that says what the row IS " +
+      "rather than reviving a word with no context",
+    keys: [
+      // The 37th, and the one that proved the guard's own blind spot was
+      // worth measuring rather than merely documenting. Under the shipped
+      // "appears as a string literal anywhere" rule it counted as read,
+      // because `lib/social-context.tsx` derives a default display name with
+      // `user.email?.split("@")[0] ?? "you"` — a fallback VALUE that has
+      // nothing to do with the key. Tightening the rule to key POSITIONS
+      // reported it, and it was translated into all six locales for a string
+      // nobody renders. A family of one, because it belongs to none of the
+      // three sweeps above.
+      "you",
+    ],
+  },
 ];
 
 /** Every removed key, across families — the table flattened once. */
@@ -203,18 +223,20 @@ describe("the i18n keys removed as dead stay deleted", () => {
       (key, index, all) => all.indexOf(key) !== index,
     );
     assert.deepEqual(duplicates, []);
-    assert.equal(ALL_REMOVED.length, 36);
+    assert.equal(ALL_REMOVED.length, 37);
   });
 
   it("accounts for every key the orphan scan found", () => {
-    // The hand scans reported 35 across three families and
-    // `check-orphan-i18n-keys` found a 36th on its first run. Stated as its
-    // own case because the count above would still pass on a table that lost a
-    // whole family: 36 is the finding, and this is where it is written down.
-    assert.equal(REMOVED_FAMILIES.length, 3);
+    // The hand scans reported 35 across three families;
+    // `check-orphan-i18n-keys` found a 36th on its first run and a 37th when
+    // its rule was tightened from "a literal anywhere" to "a literal in a key
+    // position". Stated as its own case because the count above would still
+    // pass on a table that lost a whole family: 37 is the finding, and this is
+    // where it is written down.
+    assert.equal(REMOVED_FAMILIES.length, 4);
     assert.equal(
       REMOVED_FAMILIES.reduce((sum, family) => sum + family.keys.length, 0),
-      36,
+      37,
     );
   });
 

@@ -227,7 +227,15 @@ describe("translation floors", () => {
     // complete, and four sit below half. The `assert.ok(true)` keeps the line
     // in the runner's output next to the rows above it.
     const report = COVERAGE.map(formatCoverageRow).join("\n");
-    // 501 as of 2026-08-21: `profileId` was removed — the sixteenth
+    // 500 as of 2026-08-21: `you` was removed — the 37th orphan, and the one
+    // that came from measuring `check-orphan-i18n-keys`' own blind spot rather
+    // than from a sweep. Under the rule as first shipped ("appears as a string
+    // literal anywhere") it counted as read, because `lib/social-context.tsx`
+    // builds a default display name with `?? "you"` — a fallback VALUE, not a
+    // key. Tightening the rule to key POSITIONS reported it. Declared in all
+    // six locales, so every row drops one: this is the only one of the 37
+    // whose translation somebody wrote in five languages for a string nothing
+    // renders. 501 before that: `profileId` was removed — the sixteenth
     // social/people orphan, and the first finding of the new
     // `check-orphan-i18n-keys` guard rather than of a hand scan. It is the
     // LABEL of the never-built "Save profile ID" field whose hint and button
@@ -291,7 +299,7 @@ describe("translation floors", () => {
     // — a key the card already rendered — in be/pl/de/es, which had been
     // inheriting the English "5 photos" since it was written. The 545 before
     // it arrived the same way, with the two nav-badge labels.
-    assert.match(report, /en: 501\/501 keys \(100\.0%\)/);
+    assert.match(report, /en: 500\/500 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

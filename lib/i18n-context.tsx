@@ -221,7 +221,6 @@ const en = {
   adminDeleteProfileTitle: "Delete this profile?",
   adminDeleteProfileText: (params?: TranslationParams) =>
     `${params?.name ?? "This user"} and all collections and images in the app will be deleted permanently.`,
-  you: "You",
   selectItems: "Select",
   selectedCount: (params?: TranslationParams) => `${params?.count ?? 0} selected`,
   moveToCollection: "Move to collection",
@@ -823,7 +822,6 @@ const ru: TranslationMap = {
   adminDeleteProfileTitle: "Удалить этот профиль?",
   adminDeleteProfileText: (params?: TranslationParams) =>
     `${params?.name ?? "Этот пользователь"} и все его коллекции и фото в приложении будут удалены без возможности восстановления.`,
-  you: "Вы",
   exportPdf: "Экспорт в PDF",
   exportPdfGenerating: "Генерация PDF...",
   exportPdfDone: "PDF готов",
@@ -1194,7 +1192,6 @@ const be: TranslationMap = {
   languagePartialHint: (params?: TranslationParams) =>
     `${params?.label ?? ""} перакладзены часткова — неперакладзеныя экраны застануцца на англійскай.`,
   goHome: "Галоўная",
-  you: "Вы",
   deleteAccount: "Выдаліць акаўнт",
   deleteAccountSection: "Небяспечная зона",
   deleteAccountHint: "Незваротна выдаліць акаўнт, усе калекцыі, прадметы і загружаныя фатаграфіі. Гэта дзеянне нельга адмяніць.",
@@ -1437,7 +1434,6 @@ const pl: TranslationMap = {
   languagePartialHint: (params?: TranslationParams) =>
     `${params?.label ?? ""} jest przetłumaczony częściowo — nieprzetłumaczone ekrany pozostaną po angielsku.`,
   goHome: "Główna",
-  you: "Ty",
   deleteAccount: "Usuń konto",
   deleteAccountSection: "Strefa zagrożenia",
   deleteAccountHint: "Trwale usuń konto, wszystkie kolekcje, przedmioty i przesłane zdjęcia. Tej operacji nie można cofnąć.",
@@ -1676,7 +1672,6 @@ const de: TranslationMap = {
   languagePartialHint: (params?: TranslationParams) =>
     `${params?.label ?? ""} ist nur teilweise übersetzt — nicht übersetzte Bildschirme bleiben auf Englisch.`,
   goHome: "Startseite",
-  you: "Sie",
   deleteAccount: "Konto löschen",
   deleteAccountSection: "Gefahrenzone",
   deleteAccountHint: "Konto, alle Sammlungen, Gegenstände und hochgeladene Bilder dauerhaft löschen. Diese Aktion kann nicht rückgängig gemacht werden.",
@@ -1916,7 +1911,6 @@ const es: TranslationMap = {
   languagePartialHint: (params?: TranslationParams) =>
     `${params?.label ?? ""} está traducido parcialmente: las pantallas sin traducir seguirán en inglés.`,
   goHome: "Inicio",
-  you: "Tú",
   deleteAccount: "Eliminar cuenta",
   deleteAccountSection: "Zona de peligro",
   deleteAccountHint: "Eliminar permanentemente la cuenta, todas las colecciones, objetos y fotos subidas. Esta acción no se puede deshacer.",
