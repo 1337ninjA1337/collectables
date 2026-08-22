@@ -150,6 +150,13 @@ const FAMILIES: readonly Family[] = [
       "the first thing the app asks a new account to DO, and the screen the sign-in screen hands them to — measured on 2026-08-22 as reading 46 base keys of which 38 were English in all four partial locales. It is also the first screen family to overlap the prefix families (`collection*` twice, `search*` twice), which is why the ownership rule above had to be written down rather than left to luck",
   },
   {
+    name: "home screen",
+    screen: "app/index.tsx",
+    size: 25,
+    because:
+      "the screen behind the app icon, and the one every session starts and returns to — measured on 2026-08-22 as reading 37 base keys, 12 owned by prefix families and one (`appName`) exempt, leaving 25 of which 19 were not declared in all six locales. The most MIXED screen listed so far: `createCollection` was missing only in `de`, `myCollections` in three, `friends` in all four, so a German reader met a section header in German above two English tiles — which is the seam a screen family closes and a per-key gap count never showed",
+  },
+  {
     name: "collection-detail screen",
     screen: "app/collection/[id].tsx",
     size: 46,

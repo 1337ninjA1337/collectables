@@ -106,27 +106,46 @@ describe("the partial-translation list the picker acts on", () => {
     // What it WAS written for survives intact and is per row: no locale may sit
     // so close to the threshold that ordinary churn reclassifies it. The unit
     // is the same one the old case reasoned in — a feature PR adds English
-    // strings, the denominator grows, and every partial row falls. At ~500
-    // translatable keys a point is ~5 keys, so a ten-string feature drops each
-    // partial row about two points. Four points is two such PRs, and it is the
-    // smallest margin that cannot be crossed by a single one.
+    // strings, the denominator grows, and every row that has not translated
+    // them falls. At ~500 translatable keys a point is ~5 keys, so a ten-string
+    // feature drops each partial row about two points. Four points is two such
+    // PRs, and the smallest margin a single one cannot cross.
     //
-    // This is a tripwire and is MEANT to fire: `be` is 5.1 points clear today,
-    // which is roughly one more screen family. When it goes red, the answer is
-    // to decide what the Belarusian badge should say — not to widen the margin.
+    // ONE-SIDED, and the first version of this case (pushed earlier the same
+    // day) had it symmetric, which was wrong. Churn only ever moves a row DOWN:
+    // adding English keys cannot raise anybody's percentage. So a locale BELOW
+    // the threshold is in no danger from it — `be` at 87.6% can only cross by
+    // somebody translating twelve more keys, which is deliberate, and the
+    // parity case above is what catches it, red, on the run that does it. The
+    // reclassification churn can cause is the other one: a complete locale
+    // falling under the threshold and getting badged by a feature PR nobody
+    // thought was about translations. That is what this measures, and `ru` and
+    // `en` at 100% are ten points clear of it.
+    //
+    // The symmetric version fired within a day of being written, on `be` at
+    // 87.6%, for a crossing that cannot happen by accident. A guard that fires
+    // on the safe direction teaches its reader to widen the margin, which is
+    // the one repair that would have made it useless.
     const MARGIN_POINTS = 4;
     assert.ok(
       COVERAGE.length >= 6,
       `only ${String(COVERAGE.length)} coverage row(s) — this case would pass vacuously`,
     );
-    const crowded = COVERAGE.filter(
-      (row) => Math.abs(coveragePercent(row) - TRANSLATION_COMPLETE_PERCENT) < MARGIN_POINTS,
+    const complete = COVERAGE.filter(
+      (row) => coveragePercent(row) >= TRANSLATION_COMPLETE_PERCENT,
+    );
+    assert.ok(
+      complete.length > 0,
+      "no locale clears the threshold — this case would pass with nothing to check",
+    );
+    const crowded = complete.filter(
+      (row) => coveragePercent(row) - TRANSLATION_COMPLETE_PERCENT < MARGIN_POINTS,
     );
     assert.deepEqual(
       crowded.map((row) => `${row.language} ${coveragePercent(row).toFixed(1)}%`),
       [],
-      `these locales are within ${MARGIN_POINTS} points of the ${TRANSLATION_COMPLETE_PERCENT}% threshold, ` +
-        `so one feature PR's worth of new English keys would reclassify them:\n  ` +
+      `these locales clear the ${TRANSLATION_COMPLETE_PERCENT}% threshold by less than ${MARGIN_POINTS} points, ` +
+        `so one feature PR's worth of new English keys would badge them:\n  ` +
         COVERAGE.map((row) => `${row.language}: ${coveragePercent(row).toFixed(1)}%`).join("\n  "),
     );
   });

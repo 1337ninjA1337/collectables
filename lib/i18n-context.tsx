@@ -1562,6 +1562,21 @@ const be: TranslationMap = {
   exportPdfFailed: "Не ўдалося стварыць PDF",
   exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} прадметаў`,
   sharedCollectionSaved: "Дададзена ў калекцыі сяброў",
+  // Home screen — the keys app/index.tsx still inherited.
+  noEmail: "Без email",
+  openProfile: "Адкрыць профіль",
+  friends: "Сяброў",
+  following: "Падпісак",
+  myCollectionsSubtitle: "Усё, чым вы валодаеце і чым можаце дзяліцца.",
+  friendCollections: "Калекцыі сяброў",
+  friendCollectionsSubtitle: "Калекцыі людзей, якіх вы дадалі ў сябры.",
+  collectionsFeedSubtitle:
+    "Глядзіце калекцыі вашых сяброў і калекцыі, на якія вы падпісаліся.",
+  tabSubscribedCollections: "Падпіскі",
+  statsTitle: "Статыстыка",
+  statsSubtitle: "Агляд вашай калекцыі.",
+  recentlyAdded: "Нядаўна дададзеныя",
+  recentlyAddedHint: "Апошнія прадметы з усіх калекцый",
 };
 
 const pl: TranslationMap = {
@@ -2025,6 +2040,23 @@ const pl: TranslationMap = {
   exportPdfFailed: "Nie udało się utworzyć PDF",
   exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} przedmiotów`,
   sharedCollectionSaved: "Dodano do kolekcji znajomych",
+  // Home screen — the keys app/index.tsx still inherited.
+  noEmail: "Brak e-maila",
+  openProfile: "Otwórz profil",
+  friends: "Znajomych",
+  following: "Obserwowanych",
+  myCollections: "Moje kolekcje",
+  myCollectionsSubtitle: "Wszystko, co masz i czym możesz się dzielić.",
+  newCollectionInline: "+ Nowa kolekcja",
+  friendCollections: "Kolekcje znajomych",
+  friendCollectionsSubtitle: "Kolekcje osób, które dodałeś do znajomych.",
+  collectionsFeedSubtitle:
+    "Zobacz kolekcje znajomych i kolekcje, które obserwujesz.",
+  tabSubscribedCollections: "Obserwowane",
+  statsTitle: "Statystyki",
+  statsSubtitle: "Przegląd twojej kolekcji.",
+  recentlyAdded: "Ostatnio dodane",
+  recentlyAddedHint: "Twoje najnowsze przedmioty ze wszystkich kolekcji",
 };
 
 const de: TranslationMap = {
@@ -2489,6 +2521,27 @@ const de: TranslationMap = {
   exportPdfFailed: "PDF konnte nicht erstellt werden",
   exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} Objekte`,
   sharedCollectionSaved: "Zu deinen Freundes-Sammlungen hinzugefügt",
+  // Home screen — the keys app/index.tsx still inherited.
+  noEmail: "Keine E-Mail",
+  addItem: "Neues Objekt hinzufügen",
+  createCollection: "Sammlung erstellen",
+  myProfile: "Mein Profil",
+  myProfileSubtitle: "Folge anderen Leuten und öffne ihre Sammlungen.",
+  openProfile: "Profil öffnen",
+  friends: "Freunde",
+  following: "Abos",
+  myCollections: "Meine Sammlungen",
+  myCollectionsSubtitle: "Alles, was dir gehört und was du teilen kannst.",
+  newCollectionInline: "+ Neue Sammlung",
+  friendCollections: "Sammlungen von Freunden",
+  friendCollectionsSubtitle: "Sammlungen von Leuten, die du als Freunde hinzugefügt hast.",
+  collectionsFeedSubtitle:
+    "Sieh Sammlungen von deinen Freunden und die, die du abonniert hast.",
+  tabSubscribedCollections: "Abonniert",
+  statsTitle: "Statistik",
+  statsSubtitle: "Überblick über deine Sammlung.",
+  recentlyAdded: "Zuletzt hinzugefügt",
+  recentlyAddedHint: "Deine neuesten Objekte aus allen Sammlungen",
 };
 
 const es: TranslationMap = {
@@ -2953,6 +3006,26 @@ const es: TranslationMap = {
   exportPdfFailed: "No se pudo generar el PDF",
   exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} objetos`,
   sharedCollectionSaved: "Añadida a tus colecciones de amigos",
+  // Home screen — the keys app/index.tsx still inherited.
+  noEmail: "Sin correo",
+  addItem: "Añadir objeto nuevo",
+  myProfile: "Mi perfil",
+  myProfileSubtitle: "Sigue a otras personas y abre sus colecciones.",
+  openProfile: "Abrir perfil",
+  friends: "Amigos",
+  following: "Siguiendo",
+  myCollections: "Mis colecciones",
+  myCollectionsSubtitle: "Todo lo que tienes y puedes compartir.",
+  newCollectionInline: "+ Nueva colección",
+  friendCollections: "Colecciones de amigos",
+  friendCollectionsSubtitle: "Colecciones de las personas que añadiste como amigos.",
+  collectionsFeedSubtitle:
+    "Mira las colecciones de tus amigos y las que sigues.",
+  tabSubscribedCollections: "Suscripciones",
+  statsTitle: "Estadísticas",
+  statsSubtitle: "Resumen de tu colección.",
+  recentlyAdded: "Añadidos recientemente",
+  recentlyAddedHint: "Tus objetos más recientes de todas las colecciones",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };

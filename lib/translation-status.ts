@@ -43,13 +43,18 @@
  *
  * It was chosen in 2026-08 to separate two groups fifty points apart, when the
  * four partial locales sat near 40% and nothing was near the boundary. They are
- * no longer: `be` measured 84.9% on 2026-08-22 and is roughly one screen family
- * from crossing. `__tests__/translation-status.test.ts` now checks the MARGIN
- * around this number rather than the gap between the groups — the gap was a
+ * no longer: `be` measured 87.6% on 2026-08-22 and is one screen family from
+ * crossing. `__tests__/translation-status.test.ts` now checks the MARGIN
+ * above this number rather than the gap between the groups — the gap was a
  * measure of how little had been translated, and could only be restored by
- * stopping — and it goes red before a locale can cross by denominator drift
- * alone. The answer when it does is to decide what the badge should say at
- * 90%, not to move this number to keep the badge.
+ * stopping.
+ *
+ * Above and not around, because denominator drift is one-directional: adding
+ * English keys lowers every row that has not translated them and raises
+ * nobody. A partial locale can only cross this number by somebody doing the
+ * work, and the parity case catches that on the run that does it. What churn
+ * CAN do is push a complete locale under and badge it in a PR nobody thought
+ * was about translations, and that is the only side worth a margin.
  */
 export const TRANSLATION_COMPLETE_PERCENT = 90;
 
@@ -61,13 +66,14 @@ export const TRANSLATION_COMPLETE_PERCENT = 90;
  * apart.
  *
  * Re-measured 2026-08-22 against 498 translatable keys, after eight families
- * and three screens were translated: `be` 84.9%, `pl` 83.5%, `es` 82.9%, `de`
- * 82.7% — versus `en` and `ru` at 100%. Still four names and still the right
+ * and four screens were translated: `be` 87.6%, `pl` 86.5%, `de` 86.5%, `es`
+ * 86.5% — versus `en` and `ru` at 100%. Still four names and still the right
  * four, and the list is deliberately the committed thing rather than these
- * numbers. What HAS changed is that the boundary is now near: the next one or
- * two screens take `be` over 90 and this list loses a name, which is a product
- * decision (the picker stops qualifying Belarusian) rather than a measurement
- * artefact. The margin case next door fires first, on purpose.
+ * numbers. What HAS changed is that the boundary is near: `be` is twelve keys
+ * from 90, so the next screen family takes it over and this list loses a name.
+ * That is a product decision — the picker stops qualifying Belarusian while
+ * ~60 keys behind it are still English — and it arrives as a red parity case
+ * on the run that crosses it, which is the right place to have the argument.
  */
 export const PARTIALLY_TRANSLATED_LANGUAGES: readonly string[] = ["be", "pl", "de", "es"];
 
