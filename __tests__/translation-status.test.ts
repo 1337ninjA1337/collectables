@@ -91,22 +91,43 @@ describe("the partial-translation list the picker acts on", () => {
     }
   });
 
-  it("separates the two groups by a gap no ordinary translation run crosses", () => {
-    // The threshold is a judgement, and this is what makes it a safe one: the
-    // nearest complete locale and the nearest partial one are tens of points
-    // apart, so a feature PR moving every denominator does not reclassify a
-    // language by accident. If this narrows, the threshold needs re-deciding
-    // rather than nudging.
-    const partials = COVERAGE.filter((row) => PARTIALLY_TRANSLATED_LANGUAGES.includes(row.language));
-    const complete = COVERAGE.filter((row) => !PARTIALLY_TRANSLATED_LANGUAGES.includes(row.language));
-    assert.ok(partials.length > 0 && complete.length > 0, "one of the two groups is empty");
-    const highestPartial = Math.max(...partials.map(coveragePercent));
-    const lowestComplete = Math.min(...complete.map(coveragePercent));
+  it("leaves every locale further from the threshold than one PR's drift", () => {
+    // This case used to demand a twenty-point GAP between the highest partial
+    // locale and the lowest complete one, and it was right for as long as the
+    // four partials were parked near 40% — the two groups were fifty points
+    // apart and no run of work came near the boundary.
+    //
+    // The translation work closed that gap on purpose. `be` reached 84.9% on
+    // 2026-08-22, so a between-groups gap now measures the PROGRESS rather than
+    // the safety of the threshold, and it can only be restored by stopping the
+    // work. A guard whose green depends on nobody finishing anything is not
+    // guarding the thing it was written for.
+    //
+    // What it WAS written for survives intact and is per row: no locale may sit
+    // so close to the threshold that ordinary churn reclassifies it. The unit
+    // is the same one the old case reasoned in — a feature PR adds English
+    // strings, the denominator grows, and every partial row falls. At ~500
+    // translatable keys a point is ~5 keys, so a ten-string feature drops each
+    // partial row about two points. Four points is two such PRs, and it is the
+    // smallest margin that cannot be crossed by a single one.
+    //
+    // This is a tripwire and is MEANT to fire: `be` is 5.1 points clear today,
+    // which is roughly one more screen family. When it goes red, the answer is
+    // to decide what the Belarusian badge should say — not to widen the margin.
+    const MARGIN_POINTS = 4;
     assert.ok(
-      lowestComplete - highestPartial >= 20,
-      `the groups are only ${(lowestComplete - highestPartial).toFixed(1)} points apart ` +
-        `(highest partial ${highestPartial.toFixed(1)}%, lowest complete ${lowestComplete.toFixed(1)}%) — ` +
-        `the threshold is no longer separating two clearly different things`,
+      COVERAGE.length >= 6,
+      `only ${String(COVERAGE.length)} coverage row(s) — this case would pass vacuously`,
+    );
+    const crowded = COVERAGE.filter(
+      (row) => Math.abs(coveragePercent(row) - TRANSLATION_COMPLETE_PERCENT) < MARGIN_POINTS,
+    );
+    assert.deepEqual(
+      crowded.map((row) => `${row.language} ${coveragePercent(row).toFixed(1)}%`),
+      [],
+      `these locales are within ${MARGIN_POINTS} points of the ${TRANSLATION_COMPLETE_PERCENT}% threshold, ` +
+        `so one feature PR's worth of new English keys would reclassify them:\n  ` +
+        COVERAGE.map((row) => `${row.language}: ${coveragePercent(row).toFixed(1)}%`).join("\n  "),
     );
   });
 

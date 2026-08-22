@@ -1533,6 +1533,35 @@ const be: TranslationMap = {
   editPhotos: "Змяніць фота",
   share: "Падзяліцца",
   shareItemHint: "Дашліце гэтую спасылку — атрымальнік адкрые прадмет напрамую.",
+  // Collection-detail screen — the keys app/collection/[id].tsx still inherited.
+  followCollection: "Сачыць за калекцыяй",
+  unfollowCollection: "Перастаць сачыць",
+  accessOpenFor: (params?: TranslationParams) => `Доступ адкрыты для ${params?.count ?? 0} людзей`,
+  viewingCollectionOf: (params?: TranslationParams) => `Прагляд калекцыі ${params?.name ?? ""}`,
+  itemsInside: "Прадметаў унутры",
+  photosSaved: "Захавана фота",
+  addItemToCollection: "Дадаць прадмет у гэтую калекцыю",
+  deleteCollectionTitle: "Выдаліць калекцыю?",
+  deleteCollectionText:
+    "Калекцыя і ўсе прадметы ўнутры будуць выдалены без магчымасці аднаўлення.",
+  description: "Апісанне",
+  editCollection: "Рэдагаваць",
+  totalCost: "Агульны кошт",
+  needTitle: "Патрэбна назва",
+  noAccessCover: "Дазвольце доступ да фота, каб выбраць вокладку калекцыі.",
+  selectItems: "Выбраць",
+  noOtherCollections: "У вас няма іншых калекцый для перамяшчэння.",
+  deleteItemsTitle: (params?: TranslationParams) => `Выдаліць ${params?.count ?? 0} прадметаў?`,
+  deleteItemsText:
+    "Выбраныя прадметы будуць выдалены з гэтай калекцыі без магчымасці аднаўлення.",
+  itemsMoved: (params?: TranslationParams) => `Перамешчана: ${params?.count ?? 0}`,
+  itemsDeleted: (params?: TranslationParams) => `Выдалена: ${params?.count ?? 0}`,
+  exportPdf: "Экспарт у PDF",
+  exportPdfGenerating: "Ствараем PDF...",
+  exportPdfDone: "PDF гатовы",
+  exportPdfFailed: "Не ўдалося стварыць PDF",
+  exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} прадметаў`,
+  sharedCollectionSaved: "Дададзена ў калекцыі сяброў",
 };
 
 const pl: TranslationMap = {
@@ -1966,6 +1995,36 @@ const pl: TranslationMap = {
   editPhotos: "Zmień zdjęcia",
   share: "Udostępnij",
   shareItemHint: "Wyślij ten link komukolwiek — otworzy przedmiot bezpośrednio.",
+  // Collection-detail screen — the keys app/collection/[id].tsx still inherited.
+  followCollection: "Obserwuj kolekcję",
+  unfollowCollection: "Przestań obserwować",
+  accessOpenFor: (params?: TranslationParams) => `Dostęp ma ${params?.count ?? 0} osób`,
+  viewingCollectionOf: (params?: TranslationParams) => `Kolekcja użytkownika ${params?.name ?? ""}`,
+  itemsInside: "Przedmiotów w środku",
+  photosSaved: "Zapisane zdjęcia",
+  addItemToCollection: "Dodaj przedmiot do tej kolekcji",
+  deleteCollection: "Usuń kolekcję",
+  deleteCollectionTitle: "Usunąć kolekcję?",
+  deleteCollectionText:
+    "Kolekcja i wszystkie przedmioty w środku zostaną usunięte bezpowrotnie.",
+  description: "Opis",
+  editCollection: "Edytuj",
+  totalCost: "Łączny koszt",
+  needTitle: "Wymagana nazwa",
+  noAccessCover: "Zezwól na dostęp do zdjęć, aby wybrać okładkę kolekcji.",
+  selectItems: "Zaznacz",
+  noOtherCollections: "Nie masz innych kolekcji, do których można przenieść przedmioty.",
+  deleteItemsTitle: (params?: TranslationParams) => `Usunąć ${params?.count ?? 0} przedmiotów?`,
+  deleteItemsText:
+    "Zaznaczone przedmioty zostaną bezpowrotnie usunięte z tej kolekcji.",
+  itemsMoved: (params?: TranslationParams) => `Przeniesiono: ${params?.count ?? 0}`,
+  itemsDeleted: (params?: TranslationParams) => `Usunięto: ${params?.count ?? 0}`,
+  exportPdf: "Eksportuj do PDF",
+  exportPdfGenerating: "Tworzenie PDF...",
+  exportPdfDone: "PDF gotowy",
+  exportPdfFailed: "Nie udało się utworzyć PDF",
+  exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} przedmiotów`,
+  sharedCollectionSaved: "Dodano do kolekcji znajomych",
 };
 
 const de: TranslationMap = {
@@ -2399,6 +2458,37 @@ const de: TranslationMap = {
   editPhotos: "Fotos ändern",
   share: "Teilen",
   shareItemHint: "Schick diesen Link an wen du willst — damit öffnet sich das Objekt direkt.",
+  // Collection-detail screen — the keys app/collection/[id].tsx still inherited.
+  followCollection: "Sammlung folgen",
+  unfollowCollection: "Nicht mehr folgen",
+  accessOpenFor: (params?: TranslationParams) => `Zugriff haben ${params?.count ?? 0} Personen`,
+  viewingCollectionOf: (params?: TranslationParams) =>
+    `Du siehst die Sammlung von ${params?.name ?? ""}`,
+  itemsInside: "Objekte darin",
+  photosSaved: "Gespeicherte Fotos",
+  addItemToCollection: "Objekt zu dieser Sammlung hinzufügen",
+  deleteCollection: "Sammlung löschen",
+  deleteCollectionTitle: "Sammlung löschen?",
+  deleteCollectionText:
+    "Die Sammlung und alle Objekte darin werden endgültig gelöscht.",
+  description: "Beschreibung",
+  editCollection: "Bearbeiten",
+  totalCost: "Gesamtkosten",
+  needTitle: "Name erforderlich",
+  noAccessCover: "Erlaube den Zugriff auf Fotos, damit du ein Sammlungscover wählen kannst.",
+  selectItems: "Auswählen",
+  noOtherCollections: "Du hast keine anderen Sammlungen, in die du Objekte verschieben kannst.",
+  deleteItemsTitle: (params?: TranslationParams) => `${params?.count ?? 0} Objekte löschen?`,
+  deleteItemsText:
+    "Die ausgewählten Objekte werden endgültig aus dieser Sammlung entfernt.",
+  itemsMoved: (params?: TranslationParams) => `Verschoben: ${params?.count ?? 0}`,
+  itemsDeleted: (params?: TranslationParams) => `Gelöscht: ${params?.count ?? 0}`,
+  exportPdf: "Als PDF exportieren",
+  exportPdfGenerating: "PDF wird erstellt...",
+  exportPdfDone: "PDF fertig",
+  exportPdfFailed: "PDF konnte nicht erstellt werden",
+  exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} Objekte`,
+  sharedCollectionSaved: "Zu deinen Freundes-Sammlungen hinzugefügt",
 };
 
 const es: TranslationMap = {
@@ -2832,6 +2922,37 @@ const es: TranslationMap = {
   editPhotos: "Cambiar fotos",
   share: "Compartir",
   shareItemHint: "Envía este enlace a quien quieras — abrirá el objeto directamente.",
+  // Collection-detail screen — the keys app/collection/[id].tsx still inherited.
+  followCollection: "Seguir colección",
+  unfollowCollection: "Dejar de seguir",
+  accessOpenFor: (params?: TranslationParams) => `${params?.count ?? 0} personas tienen acceso`,
+  viewingCollectionOf: (params?: TranslationParams) =>
+    `Viendo la colección de ${params?.name ?? ""}`,
+  itemsInside: "Objetos dentro",
+  photosSaved: "Fotos guardadas",
+  addItemToCollection: "Añadir objeto a esta colección",
+  deleteCollection: "Eliminar colección",
+  deleteCollectionTitle: "¿Eliminar la colección?",
+  deleteCollectionText:
+    "La colección y todos los objetos que contiene se eliminarán de forma permanente.",
+  description: "Descripción",
+  editCollection: "Editar",
+  totalCost: "Coste total",
+  needTitle: "Falta el nombre",
+  noAccessCover: "Permite el acceso a las fotos para elegir la portada de la colección.",
+  selectItems: "Seleccionar",
+  noOtherCollections: "No tienes otras colecciones a las que mover los objetos.",
+  deleteItemsTitle: (params?: TranslationParams) => `¿Eliminar ${params?.count ?? 0} objetos?`,
+  deleteItemsText:
+    "Los objetos seleccionados se eliminarán de esta colección de forma permanente.",
+  itemsMoved: (params?: TranslationParams) => `Movidos: ${params?.count ?? 0}`,
+  itemsDeleted: (params?: TranslationParams) => `Eliminados: ${params?.count ?? 0}`,
+  exportPdf: "Exportar a PDF",
+  exportPdfGenerating: "Generando PDF...",
+  exportPdfDone: "PDF listo",
+  exportPdfFailed: "No se pudo generar el PDF",
+  exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} objetos`,
+  sharedCollectionSaved: "Añadida a tus colecciones de amigos",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };

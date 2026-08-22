@@ -150,6 +150,13 @@ const FAMILIES: readonly Family[] = [
       "the first thing the app asks a new account to DO, and the screen the sign-in screen hands them to — measured on 2026-08-22 as reading 46 base keys of which 38 were English in all four partial locales. It is also the first screen family to overlap the prefix families (`collection*` twice, `search*` twice), which is why the ownership rule above had to be written down rather than left to luck",
   },
   {
+    name: "collection-detail screen",
+    screen: "app/collection/[id].tsx",
+    size: 46,
+    because:
+      "the screen a collector actually lives in — the one the 'this screen is half-translated' complaint was originally about — and the largest single holder left on 2026-08-22 at 27 of its 46 keys English in all four partial locales. It is also the first listed screen whose keys are not all its own: it renders through `<ItemCard>`, `<BulkBar>`, `<EditCollectionModal>`, the share sheet and more, so this entry finishes the FILE while a user reads the union, and the components are listed separately in their own suites",
+  },
+  {
     name: "item-detail screen",
     screen: "app/item/[id].tsx",
     size: 38,
@@ -387,40 +394,48 @@ describe("complete i18n families", () => {
 });
 
 /**
- * Reads one key's translatable TEXT out of one locale block, in either of the
- * two shapes this file uses.
+ * Reads one key's translatable TEXT out of one locale block, in any of the
+ * three shapes this file uses.
  *
- * A string literal, tolerating the line-wrapped form (`key:\n    "…"`) the
- * long strings are written in — there is no prettier here, so both spellings
- * genuinely exist side by side.
+ * Reads the VALUE SPAN the parser already isolates (`LocaleBlock.values`) —
+ * colon to the comma that ends the entry, brace-aware — rather than matching
+ * `key:` against the whole block. That is not a tidying: the regex form knew
+ * two shapes, a string literal and a one-expression arrow, and this file has a
+ * third. `ru` declares `selectedCount` and `deleteItemsTitle` as arrows with a
+ * BLOCK body, because Russian needs three plural forms and a ternary cannot
+ * spell them. The regex returned `null` for those, and `null` is what the
+ * verbatim case reads as "nothing to compare" — so the two keys most likely to
+ * be copied wholesale, the ones where the English sits inside what looks like
+ * code, were the two it silently skipped. The vacuity case below is what turns
+ * that back into a failure, and it goes red the moment a block-bodied key
+ * joins a listed family.
  *
- * Or, for a function-valued key, the body of its template literal —
- * `` `Filters (${params?.count ?? 0})` `` yields ``Filters (${params?.count ??
- * 0})``. The interpolation is deliberately left in rather than stripped: it is
- * identical across locales, so it neither hides a difference nor invents one,
- * and stripping it would need a second brace-aware walk to do correctly.
- * Reading these matters because a function value is the shape most likely to
- * be copied wholesale — the English word sits inside what looks like code.
+ * A string literal yields its inner text, escapes and all, tolerating the
+ * line-wrapped form (`key:\n    "…"`) the long strings are written in — there
+ * is no prettier here, so both spellings genuinely exist side by side.
  *
- * Returns `null` when the key is absent or declared in some third shape; the
- * vacuity cases above are what stop a `null` being read as agreement.
+ * A function value yields every template literal in it, joined by newlines:
+ * one for the expression form, three for `ru`'s plural blocks. The
+ * interpolations are deliberately left in rather than stripped — they are
+ * identical across locales, so they neither hide a difference nor invent one.
+ *
+ * Returns `null` when the key is absent or its value contains no readable
+ * text at all.
  */
 function valueOf(language: string, key: string): string | null {
   const block = findLocaleBlock(source, language);
-  if (!block) return null;
-  const literal = new RegExp(
-    `(?:^|\\n)\\s{2}${key}:\\s*(?:\\n\\s+)?"((?:[^"\\\\]|\\\\.)*)"`,
-  ).exec(block.body);
+  const value = block?.values.get(key);
+  if (value === undefined) return null;
+
+  const literal = /^"((?:[^"\\]|\\.)*)"$/s.exec(value);
   if (literal) return literal[1];
-  const template = new RegExp(
-    `(?:^|\\n)\\s{2}${key}:\\s*\\([^)]*\\)\\s*=>\\s*(?:\\n\\s+)?\`([^\`]*)\``,
-  ).exec(block.body);
-  return template ? template[1] : null;
+
+  const templates = [...value.matchAll(/`([^`]*)`/g)].map((match) => match[1]);
+  return templates.length > 0 ? templates.join("\n") : null;
 }
 
 /** True when the base language declares this key as an arrow function. */
 function isFunctionValued(language: string, key: string): boolean {
-  const block = findLocaleBlock(source, language);
-  if (!block) return false;
-  return new RegExp(`(?:^|\\n)\\s{2}${key}:\\s*\\(`).test(block.body);
+  const value = findLocaleBlock(source, language)?.values.get(key);
+  return value !== undefined && value.startsWith("(");
 }
