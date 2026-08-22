@@ -13,7 +13,7 @@ import {
   isPartiallyTranslated,
 } from "@/lib/translation-status";
 import { readI18nSource } from "./helpers/i18n-source-file";
-import { sourceCode } from "./helpers/source-files";
+import { sourceCode, sourceFiles } from "./helpers/source-files";
 
 /**
  * The measurement, and the list the picker acts on.
@@ -218,5 +218,118 @@ describe("the partial-translation list the picker acts on", () => {
     // is caught by the parity case above, not by a crash in settings.
     assert.equal(isPartiallyTranslated("fr"), false);
     assert.equal(isPartiallyTranslated(""), false);
+  });
+});
+
+/**
+ * The picker's verdict is bundled; the measurement behind it is not.
+ *
+ * `app/settings.tsx` calls `isPartiallyTranslated` once per language chip, so
+ * `lib/translation-status.ts` ships to the browser. `lib/i18n-coverage.ts`
+ * computes the same classification properly — by parsing the source of
+ * `lib/i18n-context.tsx` through `lib/i18n-source.ts` — and ships nowhere,
+ * which is the whole reason the verdict was copied into a second module rather
+ * than imported from the first.
+ *
+ * That arrangement became a real edge on 2026-08-22, when `lib/i18n-coverage.ts`
+ * started importing the picker's list so `localeListingState` could compare the
+ * two. Safe in that direction and only that direction, and until this block the
+ * only thing saying so was a comment at the import. The failure it guards
+ * against is quiet: the reverse import compiles, every suite stays green, and
+ * what changes is the size of a file nobody was looking at. `bundle-size` would
+ * eventually notice, as a number rather than as a name, on whichever unrelated
+ * PR pushed it over.
+ */
+describe("the parser stays out of the bundle", () => {
+  /** Every module specifier a file imports, requires, or dynamically imports. */
+  const specifiersIn = (relative: string): readonly string[] => {
+    const matches = sourceCode(relative).matchAll(
+      /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)"([^"]+)"/g,
+    );
+    return [...matches].map((match) => match[1]);
+  };
+
+  it("lib/translation-status.ts imports nothing at all", () => {
+    // The strongest form of the rule and the cheapest to read: a module with no
+    // imports cannot reach the parser by any path, so this needs no import
+    // graph and cannot be defeated by an intermediate module.
+    //
+    // It is deliberately stricter than the danger. If this module ever does
+    // need an import, the question the failure should provoke is not "which
+    // import is banned" but "what does the settings screen now pay to render a
+    // badge" — and a case that listed banned specifiers would answer neither.
+    assert.deepEqual(
+      [...specifiersIn("lib/translation-status.ts")],
+      [],
+      "lib/translation-status.ts has grown an import, and app/settings.tsx pays for whatever it pulls in.\n" +
+        "  It exists as a separate module from lib/i18n-coverage.ts precisely so the picker can have the verdict without the parser.",
+    );
+  });
+
+  /**
+   * Modules that may import the parser, and why each one is not in the bundle.
+   *
+   * Named rather than counted: the rule is "nothing the app loads reaches this",
+   * and a count would be satisfied by swapping a test-side importer for an
+   * app-side one.
+   */
+  const MAY_IMPORT_THE_PARSER: Readonly<Record<string, string>> = {
+    "lib/i18n-coverage.ts":
+      "the arithmetic over what the parser found — Node-pure, read by the suites and by nothing the app imports",
+    "lib/check-orphan-i18n-keys.ts":
+      "the orphan-key lint guard's module, run by tsx from scripts/check-orphan-i18n-keys.ts",
+  };
+
+  it("is imported only by modules the app never loads", () => {
+    const parser = /(?:^|\/)i18n-(?:source|coverage)$/;
+    const files = sourceFiles();
+    assert.ok(
+      files.length >= 100,
+      `the source walk found only ${String(files.length)} file(s) — this sweep would pass vacuously`,
+    );
+    const importers = files.filter((relative) =>
+      specifiersIn(relative).some((specifier) => parser.test(specifier)),
+    );
+    assert.deepEqual(
+      importers.filter((relative) => !(relative in MAY_IMPORT_THE_PARSER)),
+      [],
+      "these files import the i18n parser and are not on the test-side list:\n  " +
+        importers.join("\n  ") +
+        "\n  If one of them is reachable from app/ or components/, the parser and lib/js-tokens.ts are now in the web bundle.\n" +
+        "  If it is genuinely test-side, add it to MAY_IMPORT_THE_PARSER with the reason it never loads.",
+    );
+  });
+
+  it("names only importers that still exist", () => {
+    // The other direction, and the reason an allow-list rots: an entry naming a
+    // module that no longer imports the parser permits nothing and looks exactly
+    // like one that does.
+    const parser = /(?:^|\/)i18n-(?:source|coverage)$/;
+    const stale = Object.keys(MAY_IMPORT_THE_PARSER).filter(
+      (relative) => !specifiersIn(relative).some((specifier) => parser.test(specifier)),
+    );
+    assert.deepEqual(
+      stale,
+      [],
+      `MAY_IMPORT_THE_PARSER names ${stale.join(", ")}, which no longer imports the parser — remove the entry rather than leaving a permission nobody uses`,
+    );
+  });
+
+  it("reads the specifiers it claims to", () => {
+    // The sweep above is only as good as this regex, and its green run is a
+    // report of "no file matched" either way. Both non-import spellings are the
+    // ones a module actually uses to defer a heavy dependency.
+    assert.deepEqual(
+      [...sourceCode("lib/i18n-coverage.ts").matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)"([^"]+)"/g)]
+        .map((match) => match[1])
+        .filter((specifier) => /i18n-source/.test(specifier)),
+      ["./i18n-source"],
+      "the specifier regex no longer finds the one static import this suite knows about",
+    );
+    const specifiers = (code: string) =>
+      [...code.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)"([^"]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(specifiers(`const m = await import("./i18n-source");`), ["./i18n-source"]);
+    assert.deepEqual(specifiers(`const m = require("./i18n-source");`), ["./i18n-source"]);
+    assert.deepEqual(specifiers(`const label = "./i18n-source";`), []);
   });
 });
