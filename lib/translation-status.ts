@@ -91,6 +91,14 @@ export const TRANSLATION_COMPLETE_PERCENT = 90;
  * The same case is also what makes the empty list honest today: it is derived
  * from the real coverage rows rather than asserted, so `[]` means "nothing
  * measured below 90%", not "nobody has looked lately".
+ *
+ * `COMPLETE_LANGUAGES` in `lib/i18n-coverage.ts` is the other half of that
+ * arrival and the reason it stays possible: the completeness rule is phrased
+ * over a LIST of finished locales rather than over every language in the
+ * picker, so a seventh can be added at 0%, badged here while somebody works on
+ * it, and promoted when it is done. A rule over all languages would have made
+ * adding a language a 498-value pull request, which is how a language does not
+ * get added — and it would have made this module dead for real.
  */
 export const PARTIALLY_TRANSLATED_LANGUAGES: readonly string[] = [];
 

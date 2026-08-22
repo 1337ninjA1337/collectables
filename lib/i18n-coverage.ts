@@ -217,6 +217,49 @@ export function translationCoverage(
   });
 }
 
+/**
+ * Languages that have translated every translatable base key, and may not stop.
+ *
+ * The stricter rule the general case cannot have, and the same trade
+ * `__tests__/i18n-complete-families.test.ts` makes one family at a time.
+ * {@link TRANSLATION_FLOORS} is deliberately a floor rather than a ceiling on
+ * {@link TranslationCoverage.inherited}, and the reason is written out below it:
+ * a new English string ships before its five translations, so a ceiling would
+ * go red on every feature PR. That argument was written when four locales were
+ * two hundred keys behind, and a rule demanding they catch up on somebody
+ * else's PR would have been demanding the impossible.
+ *
+ * On 2026-08-22 all six reached 100%, and the argument no longer describes
+ * anything. The cost of the ceiling is now one PR's worth of translation on the
+ * PR that adds the key — six values, written by whoever wrote the English one,
+ * which is the cheapest moment they will ever be written and the only moment
+ * anybody knows what the string means. What it buys is the thing fifteen runs
+ * of translation work could not buy: the map cannot drift back. Every
+ * percentage in this repository measures a state; this measures the invariant.
+ *
+ * A LIST rather than "all of them", so a seventh language can still arrive.
+ * A locale added to the picker starts at 0% and has to be worked on; demanding
+ * 498 values in the PR that adds the chip is how a language does not get added.
+ * It stays off this list, `PARTIALLY_TRANSLATED_LANGUAGES` badges it in the
+ * picker until it is finished, and joining here is the recorded moment it was.
+ * `__tests__/i18n-locale-completeness.test.ts` keeps the list from rotting in
+ * both directions: a listed language that slips fails, and an unlisted language
+ * measured at 100% fails too — a finished locale that nothing protects is the
+ * state this whole list exists to end.
+ *
+ * If this ever does become the chore its predecessor feared, the repair is to
+ * take a name off — which is a deliberate, reviewable admission that a locale
+ * is no longer maintained — and not to widen the rule.
+ */
+export const COMPLETE_LANGUAGES: readonly TranslationLanguage[] = [
+  "ru",
+  "en",
+  "be",
+  "pl",
+  "de",
+  "es",
+];
+
 /** A committed measurement of one language's declared-key count. */
 export type TranslationFloor = {
   /** Minimum declared keys, measured with slack under it. */
@@ -237,6 +280,14 @@ export type TranslationFloor = {
  * never happen is the other direction: a locale LOSING translations, from a
  * bad merge or a block deleted while resolving a conflict. That is what these
  * catch, and the inherited counts are published by the suite instead of gated.
+ *
+ * That last sentence stopped being the whole story on 2026-08-22, when all six
+ * locales reached 100% and {@link COMPLETE_LANGUAGES} took the ceiling for the
+ * ones that had — see the reasoning there for why the paragraph above no longer
+ * describes anything. These floors are not made redundant by it: the ceiling is
+ * RELATIVE (each locale against the base map), so a merge that deleted two
+ * hundred keys from every map including `en` satisfies it exactly, and these
+ * absolute numbers are what refuses it. The pair is deliberate.
  *
  * Exhaustive over {@link TRANSLATION_LANGUAGES}, so a seventh language cannot
  * be added to the picker without a measurement of its own.
