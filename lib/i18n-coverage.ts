@@ -253,12 +253,12 @@ export const TRANSLATION_FLOORS: Readonly<
     note: "499 of 501 on 2026-08-21 (99.6%) — the only fully-maintained locale, and the row that forced this re-measurement: it declared every one of the 35 removed keys, so the last family took it to exactly its old floor of 500 and the slack assertion (strict `<`) went red at equality. ~7% slack. It reads 100% since 2026-08-22 without declaring one more key: the two it inherits are `appName` and `emailPlaceholder`, now in UNTRANSLATABLE_KEYS and out of the denominator, and they are pinned by name in the suite rather than left to this number.",
   },
   be: {
-    minimum: 279,
-    note: "304 of 501 on 2026-08-21 (60.7%) — the first partial locale to pass half, and it did so by translation rather than by the denominator shrinking: the empty-state (24), wishlist (14), item-filter (19) and search (14) families all landed in all four partial locales the same day. 290 after the filters, 271 after the wishlist, 257 after the empty states, 233 before them, 222 of 538 before the dead-key removals. ~8% slack, which is roughly one feature's worth of keys.",
+    minimum: 463,
+    note: "498 of 501 on 2026-08-22 (100.0%) — the first partial locale to finish, by the per-locale sweep the screen families ran out before reaching: 62 keys in one pass, spread over ~26 files that no unit grouped. 304 on 2026-08-21 (60.7%), 290 after the filters, 271 after the wishlist, 257 after the empty states, 233 before them, 222 of 538 before the dead-key removals. Re-measured to ~7% slack, the tighter figure the complete locales carry: a floor of 279 under a 498-key map caught nothing a bad merge could do.",
   },
   pl: {
-    minimum: 271,
-    note: "295 of 501 on 2026-08-21 (58.9%) — 281 after the filters, 262 after the wishlist, 248 after the empty states, 224 before them, 213 of 538 before the removals. ~8% slack, same reasoning as be.",
+    minimum: 463,
+    note: "498 of 501 on 2026-08-22 (100.0%) — finished in the same sweep as be, 67 keys rather than 62 because it had also never declared `addFriend`, `removeFriend`, `follow`, `unfollow` or `saveCollection`. 295 on 2026-08-21 (58.9%), 281 after the filters, 262 after the wishlist, 248 after the empty states, 224 before them, 213 of 538 before the removals. ~7% slack, same reasoning as be.",
   },
   de: {
     minimum: 267,

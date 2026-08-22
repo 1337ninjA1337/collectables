@@ -67,15 +67,20 @@ export const TRANSLATION_COMPLETE_PERCENT = 90;
  *
  * Re-measured 2026-08-22 against 498 translatable keys, after eight families
  * and four screens were translated: `be` 87.6%, `pl` 86.5%, `de` 86.5%, `es`
- * 86.5% — versus `en` and `ru` at 100%. Still four names and still the right
- * four, and the list is deliberately the committed thing rather than these
- * numbers. What HAS changed is that the boundary is near: `be` is twelve keys
- * from 90, so the next screen family takes it over and this list loses a name.
- * That is a product decision — the picker stops qualifying Belarusian while
- * ~60 keys behind it are still English — and it arrives as a red parity case
- * on the run that crosses it, which is the right place to have the argument.
+ * 86.5% — versus `en` and `ru` at 100%.
+ *
+ * `be` and `pl` left the list later the same day, at 100%, and the way they
+ * left is the part worth keeping. Three consecutive runs filed the crossing as
+ * a product decision — the picker would stop qualifying Belarusian while ~60
+ * keys behind it were still English, so either 90 was the promise or the
+ * threshold wanted a second tier. The decision was never taken, because the
+ * sweep that would have forced it FINISHED the locale instead: at 100% there
+ * is nothing to qualify and nothing to tier. A threshold argument is only
+ * worth having about a locale that stops short of it.
+ *
+ * Two names left, both at 86.5% and both the same 67 keys behind.
  */
-export const PARTIALLY_TRANSLATED_LANGUAGES: readonly string[] = ["be", "pl", "de", "es"];
+export const PARTIALLY_TRANSLATED_LANGUAGES: readonly string[] = ["de", "es"];
 
 /**
  * True when the picker should qualify this language.

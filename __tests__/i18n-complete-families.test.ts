@@ -9,6 +9,7 @@ import {
 import { findLocaleBlock, localeKeys } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { keysReadBy } from "./helpers/i18n-keys-read";
+import { readableText } from "./helpers/i18n-readable-text";
 
 /**
  * Families that must be translated in every locale, all or nothing.
@@ -439,40 +440,6 @@ describe("complete i18n families", () => {
     assert.equal(readableText("someIdentifier"), null);
   });
 });
-
-/**
- * The translatable TEXT inside one declared VALUE, whatever shape it is
- * written in.
- *
- * Takes the value span rather than a language and a key so that it can be
- * exercised on a shape the tree does not currently contain — see the case
- * above. The span itself comes from `LocaleBlock.values`: colon to the comma
- * that ends the entry, brace-aware, which is what makes a block body readable
- * at all. The regex form this replaced matched `key:` against the whole locale
- * block and knew two shapes, a string literal and a one-expression arrow.
- *
- * A string literal yields its inner text, escapes and all, tolerating the
- * line-wrapped form (`key:\n    "…"`) the long strings are written in — there
- * is no prettier here, so both spellings genuinely exist side by side.
- *
- * Anything else yields every template literal in it, joined by newlines: one
- * for the arrow-expression form, three for an arrow whose body branches. The
- * interpolations are deliberately left in rather than stripped — they are
- * identical across locales, so they neither hide a difference nor invent one,
- * and they are where a copy-paste hides: `${slavicPlural(params?.count,
- * "предмет", …)}` puts the translated words inside what looks like code.
- *
- * Returns `null` for a value containing no readable text at all, which is the
- * answer the vacuity cases exist to catch — `null` compared against `null` is
- * what a reader that stopped working returns, and it looks like agreement.
- */
-function readableText(value: string): string | null {
-  const literal = /^"((?:[^"\\]|\\.)*)"$/s.exec(value);
-  if (literal) return literal[1];
-
-  const templates = [...value.matchAll(/`([^`]*)`/g)].map((match) => match[1]);
-  return templates.length > 0 ? templates.join("\n") : null;
-}
 
 /** {@link readableText} of one key's value in one locale, or `null` if absent. */
 function valueOf(language: string, key: string): string | null {
