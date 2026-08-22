@@ -34,6 +34,8 @@ import { readRepoFile, REPO_ROOT, repoPath } from "./helpers/repo-file";
 const CHECK_NAME = "check-privacy-baseline-provenance";
 const SCRIPT = repoPath("scripts", "check-privacy-baseline-provenance.ts");
 const BASELINE_MODULE = "lib/privacy-body-baselines.ts";
+/** The second table the guard covers — see the case that drifts it. */
+const TRANSLATION_MODULE = "lib/privacy-translated-section.ts";
 
 const REAL_BASELINE_SOURCE = readRepoFile(BASELINE_MODULE);
 
@@ -204,6 +206,35 @@ describe("check-privacy-baseline-provenance against a scratch repository", () =>
     assert.ok(
       !run.stdout.includes("drift half skipped"),
       `an unparseable revision must not read as a skip:\n${run.stdout}`,
+    );
+  });
+
+  it("runs the translation-checksum table against its own previous revision", () => {
+    // The second table this guard covers. Its `current` is always this
+    // checkout's imported object — only history moves — so the fixture supplies
+    // a BASE revision whose checksums differ while the note and date match the
+    // shipped ones. That is the paste this table's note column exists to refuse,
+    // and it reaches the script through the same base-ref resolution the
+    // baselines table uses, which is the whole reason the two share a guard.
+    const drifted = readRepoFile(TRANSLATION_MODULE).replace(
+      /sourceChecksum: "[0-9a-f]{16}"/g,
+      'sourceChecksum: "0000000000000000"',
+    );
+    const { root, base } = repoWithBase({
+      [BASELINE_MODULE]: REAL_BASELINE_SOURCE,
+      [TRANSLATION_MODULE]: drifted,
+    });
+    const run = runGuard(root, base);
+    assert.equal(
+      run.status,
+      1,
+      `a checksum that moved with its note standing still has to fail:\n${run.stdout}${run.stderr}`,
+    );
+    assert.match(run.stderr, /PRIVACY_TRANSLATION_SOURCES\["de"\]/);
+    assert.match(run.stderr, /same note and date/);
+    assert.ok(
+      run.stdout.includes("baseline(s) well-formed"),
+      `the other table's pass must still be reported on stdout:\n${run.stdout}`,
     );
   });
 

@@ -122,7 +122,7 @@ export const LINT_GUARDS: readonly LintGuard[] = [
     scriptPath: "scripts/check-privacy-baseline-provenance.ts",
     args: [],
     description:
-      "A PRIVACY_BODY_BASELINES word count may not change without a dated note saying why, and a policy file change to match",
+      "A recorded measurement of the privacy policy — a PRIVACY_BODY_BASELINES word count or a PRIVACY_TRANSLATION_SOURCES checksum — may not change without a dated note saying why, and a policy file change to match",
   },
   {
     npmScript: "lint:powerbi-doc",

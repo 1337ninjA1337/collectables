@@ -227,6 +227,53 @@ export const PRIVACY_TRANSLATION_SOURCES: Readonly<
 };
 
 /**
+ * The {@link PRIVACY_TRANSLATION_SOURCES} literal recovered from a revision of
+ * this module's SOURCE TEXT, or null when the declaration is not there at all.
+ *
+ * A regex over the literal rather than an import, for the same reason
+ * `parsePrivacyBodyBaselines` is one: the input is
+ * `git show <base>:lib/privacy-translated-section.ts` — a string from a commit
+ * that may predate this file, may predate the field set, and must not be
+ * executed.
+ *
+ * Null means "no comparable table at that revision" and the caller SKIPS the
+ * drift half rather than reporting five changes.
+ * `__tests__/privacy-translated-section.test.ts` round-trips the file on disk
+ * through this parser, so a reformat that defeats it fails on the commit that
+ * does it rather than three commits later.
+ */
+export function parsePrivacyTranslationSources(
+  source: string,
+): Record<string, PrivacyTranslationSource> | null {
+  // Anchored on the DECLARATION rather than the name, which also appears in
+  // this file's prose above it.
+  const start = source.indexOf("export const PRIVACY_TRANSLATION_SOURCES");
+  if (start === -1) return null;
+  const open = source.indexOf("{", start);
+  if (open === -1) return null;
+  // Closed by a `};` at column 0 — every nested brace in the literal is
+  // indented, so this needs no brace counting.
+  const close = source.indexOf("\n};", open);
+  if (close === -1) return null;
+  const body = source.slice(open, close);
+
+  const entry =
+    /([a-z]{2,8})\s*:\s*\{\s*sourceChecksum\s*:\s*"([0-9a-f]*)"\s*,\s*translatedChecksum\s*:\s*"([0-9a-f]*)"\s*,\s*checkedOn\s*:\s*"([^"]*)"\s*,\s*note\s*:\s*"((?:[^"\\]|\\.)*)"\s*,?\s*\}/g;
+  const parsed: Record<string, PrivacyTranslationSource> = {};
+  for (const match of body.matchAll(entry)) {
+    parsed[match[1]] = {
+      sourceChecksum: match[2],
+      translatedChecksum: match[3],
+      checkedOn: match[4],
+      // Only `\"` and `\\` can legally appear; unescaping them keeps a note
+      // containing a quote comparable with the imported object.
+      note: match[5].replace(/\\(["\\])/g, "$1"),
+    };
+  }
+  return Object.keys(parsed).length === 0 ? null : parsed;
+}
+
+/**
  * The codes {@link PRIVACY_TRANSLATION_SOURCES} must cover — every page the
  * `/privacy` picker offers except the English original, which is the source
  * rather than a translation of it.

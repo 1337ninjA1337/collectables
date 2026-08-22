@@ -1,12 +1,22 @@
 #!/usr/bin/env tsx
 /**
- * Fails when a `PRIVACY_BODY_BASELINES` entry is malformed, or when a `words`
- * value changed without the provenance that makes the change reviewable. Run
- * via `npm run lint:baseline-provenance`; part of the `lint:all` fan-out.
+ * Fails when a recorded measurement of the privacy policy is malformed, or
+ * changed without the provenance that makes the change reviewable. Run via
+ * `npm run lint:baseline-provenance`; part of the `lint:all` fan-out.
  *
- * The matching logic is pure and lives in `lib/privacy-baseline-provenance.ts`;
- * this file is the git half — it decides WHAT to compare against and reads the
- * previous revision of the table as text.
+ * TWO tables, one guard: `PRIVACY_BODY_BASELINES` (a word count per page) and
+ * `PRIVACY_TRANSLATION_SOURCES` (a checksum of the English disclosure and of
+ * each translation). Same question of both — a measurement moved, did the diff
+ * say why — and the same three answers needed from git, which is the part with
+ * the CI-specific reasoning in it and the reason they share a script rather than
+ * having one each.
+ *
+ * The matching logic is pure and lives in `lib/privacy-baseline-provenance.ts`
+ * and `lib/privacy-translation-provenance.ts`; this file is the git half — it
+ * decides WHAT to compare against and reads the previous revision of each table
+ * as text. Both reports are printed before either exit code is honoured: the
+ * commit that amends the English disclosure moves the word count AND all five
+ * checksums, so stopping at the first would hide half the work behind a fix.
  *
  * Base revision, first match wins:
  *
@@ -54,6 +64,14 @@ import {
 } from "../lib/privacy-baseline-provenance";
 import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
 import {
+  PRIVACY_TRANSLATION_SOURCES,
+  parsePrivacyTranslationSources,
+} from "../lib/privacy-translated-section";
+import {
+  evaluateTranslationProvenance,
+  formatTranslationProvenanceReport,
+} from "../lib/privacy-translation-provenance";
+import {
   GUARD_ROOT_ENV,
   GuardRootError,
   PRIVACY_BASELINE_ROOT_ENV,
@@ -63,6 +81,24 @@ import {
 
 const CHECK_NAME = "check-privacy-baseline-provenance";
 const BASELINE_MODULE = "lib/privacy-body-baselines.ts";
+/**
+ * The second table this guard covers: the per-language checksums of the English
+ * disclosure and of each shipped translation.
+ *
+ * Here rather than in a guard of its own because the question is identical — a
+ * recorded measurement changed, did the diff say why — and because both tables
+ * need the same three things this file already works out: which revision to
+ * compare against, whether that revision is readable, and which files the same
+ * diff touched. A second script would be a second copy of the base-ref
+ * resolution, which is the part with the CI-specific reasoning in it.
+ *
+ * The two passes are otherwise independent: separate parsers, separate
+ * evaluators, separate reports, and a failure in one does not suppress the
+ * other's report. The `absent` skip is per table too — this module is younger
+ * than the baselines one, so there are revisions where one is readable and the
+ * other is not.
+ */
+const TRANSLATION_MODULE = "lib/privacy-translated-section.ts";
 
 /**
  * Repository whose HISTORY is read. Overridable by
@@ -237,6 +273,24 @@ function baselinesAt(ref: string): BaselineRevision {
 }
 
 /**
+ * The checksum table as it stood at `ref`, or null when nothing comparable is
+ * there.
+ *
+ * Null rather than the three-way classification the baselines table gets, and
+ * the difference is deliberate. That one distinguishes "the module was not there
+ * yet" (skip) from "the module was there and yielded no table" (fail), because a
+ * reformat that defeats its parser would silently disable a guard that had been
+ * running for months. This table is days old and its parser is round-tripped by
+ * the suite on every run, so the same distinction would buy a branch that cannot
+ * fire against a cost this file has already paid once. It is worth revisiting
+ * the first time this parser is changed.
+ */
+function translationSourcesAt(ref: string) {
+  const source = git("show", `${ref}:${TRANSLATION_MODULE}`);
+  return source === null ? null : parsePrivacyTranslationSources(source);
+}
+
+/**
  * Files differing between `ref` and the WORKING TREE — not `ref..HEAD`. The
  * guard is meant to fire while the change is still being written, and an
  * uncommitted baseline edit is exactly the moment the note is easiest to add.
@@ -283,28 +337,59 @@ function main(): void {
       comparison.kind === "compare" ? changedFilesSince(comparison.ref) : [],
   });
 
-  if (result.ok) {
-    console.log(formatBaselineProvenanceReport(CHECK_NAME, result));
-    if (comparison.kind === "skip") {
-      console.log(`${CHECK_NAME}: drift half skipped — ${comparison.reason}.`);
-    } else if (previous === null) {
+  // Both reports are printed before either exit code is honoured. A run that
+  // stopped at the first failing table would hide the second one behind a fix,
+  // and these two move together: the commit that amends the English disclosure
+  // touches the word count and all five checksums.
+  const translation = evaluateTranslationProvenance({
+    current: PRIVACY_TRANSLATION_SOURCES,
+    previous:
+      comparison.kind === "compare"
+        ? translationSourcesAt(comparison.ref)
+        : null,
+    baseRef: comparison.kind === "compare" ? comparison.ref : null,
+    changedFiles:
+      comparison.kind === "compare" ? changedFilesSince(comparison.ref) : [],
+  });
+
+  // Each report goes to the stream its OWN verdict earns: one table passing
+  // while the other fails is an ordinary outcome, and a pass line on stderr
+  // reads as part of the failure.
+  (result.ok ? console.log : console.error)(
+    formatBaselineProvenanceReport(CHECK_NAME, result),
+  );
+  (translation.ok ? console.log : console.error)(
+    formatTranslationProvenanceReport(CHECK_NAME, translation),
+  );
+  if (comparison.kind === "skip") {
+    console.log(`${CHECK_NAME}: drift halves skipped — ${comparison.reason}.`);
+  } else {
+    if (previous === null) {
       console.log(
         `${CHECK_NAME}: drift half skipped — ${BASELINE_MODULE} did not exist at ${comparison.ref}, so the guard predates it.`,
       );
     }
-    if (REPO_ROOT_OVERRIDE !== null) {
-      // On the PASS line too, not only twenty lines above it: a green summary
-      // that does not mention where it read from is how a redirected guard
-      // becomes the guard.
+    if (translation.comparedAgainst === null) {
+      // Worded so it cannot be mistaken for the line above it, by a reader or by
+      // a suite: the two tables skip independently, and "drift half skipped"
+      // reported twice with different modules behind it is how somebody
+      // concludes the whole guard sat out.
       console.log(
-        `${CHECK_NAME}: that pass read history from ${REPO_ROOT_OVERRIDE}, not from this checkout.`,
+        `${CHECK_NAME}: translation-checksum drift skipped — no ${TRANSLATION_MODULE} table was readable at ${comparison.ref}, so the guard predates it.`,
       );
     }
-    return;
   }
-
-  console.error(formatBaselineProvenanceReport(CHECK_NAME, result));
-  process.exit(1);
+  if (REPO_ROOT_OVERRIDE !== null) {
+    // On the PASS line too, not only twenty lines above it: a green summary
+    // that does not mention where it read from is how a redirected guard
+    // becomes the guard. "pass" only when it was one — a failing run that
+    // called itself a pass would be a stranger sentence than the one it saved.
+    const verdict = result.ok && translation.ok ? "pass" : "run";
+    console.log(
+      `${CHECK_NAME}: that ${verdict} read history from ${REPO_ROOT_OVERRIDE}, not from this checkout.`,
+    );
+  }
+  if (!result.ok || !translation.ok) process.exit(1);
 }
 
 main();
