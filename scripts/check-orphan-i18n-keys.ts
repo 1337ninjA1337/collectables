@@ -27,9 +27,14 @@ const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
 /**
  * The translations file itself, excluded from the walk that reads it.
  *
- * It declares every key, so counting its own text as a mention would make
- * every key "read" and the guard vacuous — the one exclusion the rule cannot
- * do without.
+ * Defensive rather than load-bearing, which is the opposite of what this
+ * comment said until 2026-08-22. The map writes its keys as identifiers
+ * (`greeting: "Hello"`), so none of them sits in a key POSITION and including
+ * the file would make zero keys read — measured, and pinned by a case in
+ * `__tests__/i18n-key-usage.test.ts`. What the exclusion defends against is
+ * quoting the keys (`"greeting": "Hello"`), which would put all but the first
+ * of them after a comma and make this guard vacuous in a commit that reads as
+ * formatting.
  */
 const TRANSLATIONS_FILE = "lib/i18n-context.tsx";
 

@@ -81,9 +81,19 @@ import { stripComments } from "@/lib/strip-comments";
  *
  * Comments are stripped before matching, so a doc block naming a key does not
  * count as reading it — this module's own would otherwise credit itself with
- * nine. `lib/i18n-context.tsx` is excluded from the walk by the CLI for the
- * same reason at a larger scale: it declares every key, so including it would
- * make every key read and the orphan guard vacuous.
+ * nine.
+ *
+ * `lib/i18n-context.tsx` is excluded from the walk by the CLI, and the reason
+ * it carried until 2026-08-22 was wrong: "it declares every key, so including
+ * it would make every key read". Measured, it makes NONE read — the map writes
+ * its keys as identifiers (`greeting: "Hello"`), and an identifier is not a
+ * string literal, so no key in that file sits in a key position. The exclusion
+ * is DEFENSIVE rather than load-bearing, and what it defends against is one
+ * edit: quoting the keys (`"greeting": "Hello"`) puts every one of them but
+ * the first after a comma, which is a key position, and the orphan guard would
+ * go vacuous in a commit whose diff looks like formatting. A case in
+ * `__tests__/i18n-key-usage.test.ts` pins the measurement at zero so the day
+ * that changes is a red suite rather than a silently useless guard.
  *
  * Pure module: no filesystem access — callers walk the tree and hand sources
  * over, so the index is unit-testable under `node --test`.

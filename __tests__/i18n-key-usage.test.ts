@@ -260,6 +260,40 @@ describe("the index over the real source tree", () => {
     }
   });
 
+  it("measures what the translations-file exclusion is actually worth", () => {
+    // The guard excludes `lib/i18n-context.tsx` from its walk, and the reason
+    // it carried until 2026-08-22 was "it declares every key, so including it
+    // would make every key read". That is false, and this is the measurement:
+    // the map writes its keys as identifiers (`greeting: "Hello"`), and an
+    // identifier is not a string literal, so NONE of them sits in a key
+    // position.
+    //
+    // Pinned at zero rather than deleted, because the exclusion is still
+    // right — it defends against one edit. Quoting the keys
+    // (`"greeting": "Hello"`) puts every one of them after a comma, which IS a
+    // key position, and the orphan guard would go vacuous in a commit whose
+    // diff reads as formatting. That day this case goes red, which is the
+    // whole point of writing the number down.
+    const literals = collectStringLiterals(readI18nSource());
+    const named = [...base].filter((key) => literals.has(key));
+    assert.deepEqual(
+      named,
+      [],
+      `the translations file now names ${named.length} of its own keys in a key position — if the keys were quoted, the orphan guard's exclusion just became load-bearing`,
+    );
+    const quoted = collectStringLiterals(
+      `const en = {\n  "first": "One",\n  "greeting": "Hello",\n};`,
+    );
+    assert.ok(
+      quoted.has("greeting"),
+      "the quoted-key shape must be visible to the rule, or the paragraph above is wrong about what the exclusion defends against",
+    );
+    // Every quoted key except the FIRST, which follows `{` and not a comma —
+    // written out because a reader checking the claim above deserves the exact
+    // shape of it rather than a rounded version.
+    assert.ok(!quoted.has("first"));
+  });
+
   it("reports no unread key, which is what the guard exits 0 for", () => {
     // The same fact `npm run lint:orphan-i18n` establishes, reached from the
     // index rather than from the CLI. Not a duplicate of the guard: it runs
