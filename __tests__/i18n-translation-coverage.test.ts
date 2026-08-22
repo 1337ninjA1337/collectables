@@ -122,6 +122,11 @@ describe("translation coverage", () => {
       "emailPlaceholder",
       "appName",
     ]);
+    // `acquiredDatePlaceholder` is the third exemption and is NOT here: `ru`
+    // declares it (identically to English, since an ISO date is an ISO date),
+    // so the row is not using that exemption and does not claim it.
+    assert.ok(!rowFor("ru").untranslatable.includes("acquiredDatePlaceholder"));
+    assert.ok(rowFor("de").untranslatable.includes("acquiredDatePlaceholder"));
   });
 
   it("every locale declares the delete-item family", () => {
@@ -439,13 +444,14 @@ describe("translation floors", () => {
     // — a key the card already rendered — in be/pl/de/es, which had been
     // inheriting the English "5 photos" since it was written. The 545 before
     // it arrived the same way, with the two nav-badge labels.
-    // 499 rather than 501 since 2026-08-22: `appName` and `emailPlaceholder`
-    // moved into `UNTRANSLATABLE_KEYS` and out of the denominator. A brand and
-    // an email address are not work anybody can do, and counting them as gaps
-    // held `ru` at 99.6% under a threshold somebody would eventually be
-    // tempted to lower. The map still holds 501 keys, which is what
-    // `row.baseKeys` reports and why the two numbers are separate fields.
-    assert.match(report, /en: 499\/499 keys \(100\.0%\)/);
+    // 498 rather than 501 since 2026-08-22: `appName`, `emailPlaceholder` and
+    // `acquiredDatePlaceholder` moved into `UNTRANSLATABLE_KEYS` and out of the
+    // denominator. A brand, an email address and an ISO date are not work
+    // anybody can do, and counting them as gaps held `ru` at 99.6% under a
+    // threshold somebody would eventually be tempted to lower. The map still
+    // holds 501 keys, which is what `row.baseKeys` reports and why the two
+    // numbers are separate fields.
+    assert.match(report, /en: 498\/498 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

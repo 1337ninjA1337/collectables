@@ -48,10 +48,29 @@ import { keysReadBy } from "./helpers/i18n-keys-read";
  * arrives already inside the rule and has to be translated or the screen has
  * to leave the list.
  *
- * {@link UNTRANSLATABLE_KEYS} are subtracted from both kinds. `appName` and
- * `emailPlaceholder` are correct in English everywhere — the sign-in screen
- * renders the second one — and a rule demanding they be declared in six
- * locales would be demanding the English string be pasted five times.
+ * {@link UNTRANSLATABLE_KEYS} are subtracted from both kinds. `appName`,
+ * `emailPlaceholder` and `acquiredDatePlaceholder` are correct in English
+ * everywhere — the sign-in screen renders the second one and the add-item
+ * screen the third — and a rule demanding they be declared in six locales
+ * would be demanding the English string be pasted five times.
+ *
+ * WHO OWNS AN OVERLAPPING KEY, since the two kinds genuinely overlap.
+ *
+ * A screen renders whatever it renders, so `app/create.tsx` reaches for two
+ * `collection*` keys and two `search*` ones — both prefix families, both
+ * already complete. The rule is that a PREFIX family owns its keys and a
+ * screen family claims what is left of its file. Not a tie-break for a tie
+ * nobody can settle: a key under the prefix rule is already all-or-nothing in
+ * six locales, so the screen's claim would add nothing but a second name in
+ * the failure message, and the alternative (screen wins) would quietly remove
+ * a key from the family a reader goes looking for it in.
+ *
+ * Two screens overlapping is different and is fine: `cancel` and `saving` are
+ * on half the screens in the app, and both entries wanting them translated is
+ * the same demand made twice, not a contradiction. So the disjointness case
+ * below is about PREFIX families only, and a separate case asserts the
+ * subtraction actually happened rather than trusting the entries to be
+ * disjoint by luck.
  */
 
 const source = readI18nSource();
@@ -116,6 +135,13 @@ const FAMILIES: readonly Family[] = [
       "the last prefix family of any size, and the labels on the form a user meets before they own anything — naming a collection is the first thing the app asks anybody to do, so an English form here is the first English a new speaker of any of these four sees",
   },
   {
+    name: "add-item screen",
+    screen: "app/create.tsx",
+    size: 41,
+    because:
+      "the first thing the app asks a new account to DO, and the screen the sign-in screen hands them to — measured on 2026-08-22 as reading 46 base keys of which 38 were English in all four partial locales. It is also the first screen family to overlap the prefix families (`collection*` twice, `search*` twice), which is why the ownership rule above had to be written down rather than left to luck",
+  },
+  {
     name: "sign-in screen",
     screen: "components/login-screen.tsx",
     size: 22,
@@ -135,11 +161,20 @@ describe("complete i18n families", () => {
    * keys the way the map does rather than alphabetically.
    */
   const keysOf = (family: Family): readonly string[] => {
-    const declared = family.screen
-      ? keysReadBy(family.screen)
-      : baseKeys.filter((key) => family.pattern!.test(key)).sort();
-    return declared.filter((key) => !(key in UNTRANSLATABLE_KEYS));
+    if (family.pattern) {
+      return baseKeys
+        .filter((key) => family.pattern!.test(key))
+        .filter((key) => !(key in UNTRANSLATABLE_KEYS))
+        .sort();
+    }
+    return keysReadBy(family.screen!)
+      .filter((key) => !(key in UNTRANSLATABLE_KEYS))
+      .filter((key) => !claimedByPrefix(key));
   };
+
+  /** True when some prefix family already owns this key — see the header. */
+  const claimedByPrefix = (key: string): boolean =>
+    FAMILIES.some((family) => family.pattern?.test(key) ?? false);
 
   it("every entry says which keys it means, exactly once", () => {
     // A `Family` with neither a pattern nor a screen matches nothing, and one
@@ -251,11 +286,32 @@ describe("complete i18n families", () => {
     });
   }
 
-  it("names no family twice, and no pattern swallows another", () => {
-    // Two entries matching the same key would report it under both names, and
-    // a pattern like /^wish/ would quietly annex a future `wishGranted`.
+  it("a screen family leaves the prefix families their keys", () => {
+    // The subtraction, asserted rather than assumed. `app/create.tsx` renders
+    // `collectionFieldLabel`, `collectionPickerSearchA11y`, `searchPlaceholder`
+    // and `searchNoResults`, all owned by prefix entries; a `keysOf` that
+    // stopped subtracting would report them under two names, and the case
+    // below would go red for a reason that has nothing to do with the
+    // translations.
+    for (const family of FAMILIES) {
+      if (!family.screen) continue;
+      const stolen = keysOf(family).filter((key) => claimedByPrefix(key));
+      assert.deepEqual(
+        stolen,
+        [],
+        `'${family.name}' claims ${stolen.join(", ")}, which a prefix family already owns`,
+      );
+    }
+  });
+
+  it("names no prefix family twice, and no pattern swallows another", () => {
+    // Two PATTERNS matching the same key would report it under both names, and
+    // a pattern like /^wish/ would quietly annex a future `wishGranted`. Screen
+    // families are deliberately not in this: two screens rendering `cancel` is
+    // the ordinary case, not a collision.
     const seen = new Map<string, string>();
     for (const family of FAMILIES) {
+      if (!family.pattern) continue;
       for (const key of keysOf(family)) {
         const owner = seen.get(key);
         assert.equal(

@@ -81,6 +81,7 @@ export type TranslationLanguage = (typeof TRANSLATION_LANGUAGES)[number];
 export const UNTRANSLATABLE_KEYS: Readonly<Record<string, string>> = {
   appName: "the product's name — a brand renders the same in every locale, and a translated one would be a different app",
   emailPlaceholder: "`you@example.com`, an address rather than a phrase; the RFC 2606 example domain is not localised",
+  acquiredDatePlaceholder: "`2025-11-03`, an ISO 8601 date shown as the format the field expects — the format is what the parser accepts, so a locale writing `03.11.2025` would be documenting an input the field rejects",
 };
 
 /** One language's standing against the base map. */
