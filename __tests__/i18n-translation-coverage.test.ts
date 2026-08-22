@@ -5,6 +5,7 @@ import {
   TRANSLATION_BASE_LANGUAGE,
   TRANSLATION_FLOORS,
   TRANSLATION_LANGUAGES,
+  UNTRANSLATABLE_KEYS,
   coveragePercent,
   formatCoverageRow,
   translationCoverage,
@@ -101,15 +102,23 @@ describe("translation coverage", () => {
     assert.equal(coveragePercent(base), 100);
   });
 
-  it("names the two keys Russian still inherits", () => {
-    // Small enough to pin by name rather than by count: both are legitimate
-    // (a brand and an email address render the same in Russian). A third
-    // arriving unnoticed is the thing this catches — for the other four
-    // locales the list is in the hundreds, so their floors do the watching
-    // instead. `visibilityPrivatePremiumOnly` fell off this list when it
-    // gained a Russian declaration alongside the new
-    // `visibilityPrivateLockedA11y`.
-    assert.deepEqual(rowFor("ru").inherited, [
+  it("leaves Russian nothing to translate", () => {
+    // The two keys this row used to be pinned by name for — a brand and an
+    // email address — are now `UNTRANSLATABLE_KEYS`, so the worklist is empty
+    // rather than permanently two. What the old case watched for is watched
+    // by the pair below it: a THIRD untranslated key arriving in `ru` shows up
+    // here, and a third EXEMPTION shows up in the exemption cases.
+    // `visibilityPrivatePremiumOnly` fell off this list when it gained a
+    // Russian declaration alongside the new `visibilityPrivateLockedA11y`.
+    assert.deepEqual(rowFor("ru").inherited, []);
+    assert.equal(coveragePercent(rowFor("ru")), 100);
+  });
+
+  it("reports the exemptions Russian is using, rather than hiding them", () => {
+    // Moved out of the worklist, not out of the report: `ru` serves the
+    // English text for both, and a row that said nothing about them would be
+    // claiming a completeness it has by exemption.
+    assert.deepEqual(rowFor("ru").untranslatable, [
       "emailPlaceholder",
       "appName",
     ]);
@@ -163,6 +172,11 @@ describe("translation coverage", () => {
     assert.equal(ru.declared, 2);
     assert.deepEqual(ru.inherited, ["second", "fourth"]);
     assert.equal(ru.baseKeys, 4);
+    // No exemption applies to this source, so the two denominators agree —
+    // which is the case that says the exemption changes nothing where there is
+    // nothing to exempt.
+    assert.equal(ru.translatable, 4);
+    assert.deepEqual(ru.untranslatable, []);
     assert.equal(coveragePercent(ru), 50);
     assert.equal(
       formatCoverageRow(ru),
@@ -171,9 +185,128 @@ describe("translation coverage", () => {
   });
 
   it("rounds the published percentage to one decimal", () => {
-    const row = { language: "x", declared: 1, inherited: ["a", "b"], baseKeys: 3, unknown: [] };
+    const row = {
+      language: "x",
+      declared: 1,
+      inherited: ["a", "b"],
+      untranslatable: [],
+      baseKeys: 3,
+      translatable: 3,
+      unknown: [],
+    };
     assert.equal(coveragePercent(row), 33.3);
-    assert.equal(coveragePercent({ ...row, baseKeys: 0, inherited: [] }), 0);
+    assert.equal(coveragePercent({ ...row, translatable: 0, inherited: [] }), 0);
+  });
+
+  it("measures against what can be translated, not against the whole map", () => {
+    // The point of the exemption, on a source small enough to check by hand:
+    // `appName` is in the map and out of the denominator, so a locale that
+    // translates everything else reads 100% rather than 66.7%.
+    const source = [
+      `const en = {`,
+      `  appName: "Collectables",`,
+      `  first: "one",`,
+      `  second: "two",`,
+      `} as const;`,
+      ``,
+      `const ru: TranslationMap = {`,
+      `  ...en,`,
+      `  first: "один",`,
+      `  second: "два",`,
+      `};`,
+      ``,
+    ].join("\n");
+    const [, ru] = translationCoverage(source, ["en", "ru"]);
+    assert.equal(ru.baseKeys, 3);
+    assert.equal(ru.translatable, 2);
+    assert.deepEqual(ru.inherited, []);
+    assert.deepEqual(ru.untranslatable, ["appName"]);
+    assert.equal(coveragePercent(ru), 100);
+    assert.equal(
+      formatCoverageRow(ru),
+      "ru: 2/2 keys (100.0%), 0 inherited from en, 1 not translatable (appName)",
+    );
+  });
+
+  it("credits a locale that declares an exempt key anyway", () => {
+    // Writing `appName: "Collectables"` in a locale is a decision too, just a
+    // redundant one — and a row reporting an exemption it is not using would
+    // be claiming a gap it does not have.
+    const source = [
+      `const en = {`,
+      `  appName: "Collectables",`,
+      `  first: "one",`,
+      `} as const;`,
+      ``,
+      `const ru: TranslationMap = {`,
+      `  ...en,`,
+      `  appName: "Collectables",`,
+      `};`,
+      ``,
+    ].join("\n");
+    const [, ru] = translationCoverage(source, ["en", "ru"]);
+    assert.deepEqual(ru.untranslatable, []);
+    assert.deepEqual(ru.inherited, ["first"]);
+    assert.equal(coveragePercent(ru), 0);
+  });
+});
+
+describe("the untranslatable-key exemptions", () => {
+  it("names only keys the base map declares", () => {
+    // Checked against the real map rather than trusted: an exemption for a key
+    // that no longer exists removes nothing from the denominator and looks
+    // exactly like one that does.
+    const base = findLocaleBlock(SOURCE, TRANSLATION_BASE_LANGUAGE)!.keys;
+    for (const key of Object.keys(UNTRANSLATABLE_KEYS)) {
+      assert.ok(
+        base.includes(key),
+        `'${key}' is exempt from the denominator and is not in the base map`,
+      );
+    }
+  });
+
+  it("changes nothing for a source that declares none of them", () => {
+    // The other half of the case above, and the reason the staleness check
+    // lives here rather than as a throw inside `translationCoverage`: that
+    // function is handed any source, and every hand-checkable fixture in this
+    // suite declares four keys and no brand name. An exemption that does not
+    // apply must be inert, not fatal.
+    const [, ru] = translationCoverage(
+      `const en = {\n  first: "one",\n};\n\nconst ru: TranslationMap = {\n  ...en,\n  first: "один",\n};\n`,
+      ["en", "ru"],
+    );
+    assert.equal(ru.baseKeys, 1);
+    assert.equal(ru.translatable, 1);
+    assert.deepEqual(ru.untranslatable, []);
+    assert.equal(coveragePercent(ru), 100);
+  });
+
+  it("says why each key is on the list", () => {
+    // A reason per key is what stops the list growing: an exemption nobody has
+    // to justify is one nobody will ever remove.
+    for (const [key, reason] of Object.entries(UNTRANSLATABLE_KEYS)) {
+      assert.ok(
+        reason.trim().length > 20,
+        `'${key}' is exempt with no reason worth reading`,
+      );
+    }
+  });
+
+  it("stays small enough to read, and is still doing something", () => {
+    // Two today. The upper bound is a judgement about the mechanism rather
+    // than about these keys: a list long enough to skim is a list that hides
+    // the key somebody parked there. The lower half of the case is the
+    // staleness check the count cannot make — an exemption every locale
+    // declares anyway is exempting nothing, and should be deleted rather than
+    // left as furniture.
+    const keys = Object.keys(UNTRANSLATABLE_KEYS);
+    assert.ok(keys.length <= 5, `${keys.length} exemptions is a list, not a pair`);
+    for (const key of keys) {
+      assert.ok(
+        COVERAGE.some((row) => row.untranslatable.includes(key)),
+        `no locale is inheriting '${key}' — either they all declare it or the base map no longer does, and either way exempting it changes nothing; delete the entry`,
+      );
+    }
   });
 });
 
@@ -306,10 +439,24 @@ describe("translation floors", () => {
     // — a key the card already rendered — in be/pl/de/es, which had been
     // inheriting the English "5 photos" since it was written. The 545 before
     // it arrived the same way, with the two nav-badge labels.
-    assert.match(report, /en: 501\/501 keys \(100\.0%\)/);
+    // 499 rather than 501 since 2026-08-22: `appName` and `emailPlaceholder`
+    // moved into `UNTRANSLATABLE_KEYS` and out of the denominator. A brand and
+    // an email address are not work anybody can do, and counting them as gaps
+    // held `ru` at 99.6% under a threshold somebody would eventually be
+    // tempted to lower. The map still holds 501 keys, which is what
+    // `row.baseKeys` reports and why the two numbers are separate fields.
+    assert.match(report, /en: 499\/499 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
+    );
+    assert.ok(
+      COVERAGE.every(
+        (row) =>
+          row.translatable ===
+          row.baseKeys - Object.keys(UNTRANSLATABLE_KEYS).length,
+      ),
+      "every row's denominator must be the base map minus the same exemptions",
     );
     // Zero since 2026-08-21: every locale is at or above half for the first
     // time (be 60.7%, pl 58.9%, es 58.3%, de 58.1%), after the empty-state
