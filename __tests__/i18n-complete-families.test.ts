@@ -71,6 +71,14 @@ import { keysReadBy } from "./helpers/i18n-keys-read";
  * below is about PREFIX families only, and a separate case asserts the
  * subtraction actually happened rather than trusting the entries to be
  * disjoint by luck.
+ *
+ * That overlap stopped being hypothetical on 2026-08-22: the item-detail
+ * screen shares 22 keys with the add-item screen, because the detail screen's
+ * edit mode IS the add-item form. It is also the reason that screen needed
+ * twelve translations rather than the thirty-three a file-level count
+ * predicted — most of its English had already been written for another entry.
+ * A case below pins the overlap at non-empty, so the exclusion the
+ * disjointness case makes is exercised rather than merely asserted.
  */
 
 const source = readI18nSource();
@@ -140,6 +148,13 @@ const FAMILIES: readonly Family[] = [
     size: 41,
     because:
       "the first thing the app asks a new account to DO, and the screen the sign-in screen hands them to — measured on 2026-08-22 as reading 46 base keys of which 38 were English in all four partial locales. It is also the first screen family to overlap the prefix families (`collection*` twice, `search*` twice), which is why the ownership rule above had to be written down rather than left to luck",
+  },
+  {
+    name: "item-detail screen",
+    screen: "app/item/[id].tsx",
+    size: 38,
+    because:
+      "the screen a collector opens most often once they own anything, and the one where the app finally shows a person their own stuff — measured on 2026-08-22 as reading 59 base keys, 21 of them already owned by prefix families, leaving 38 of which 12 were English in all four partial locales. Five of those twelve (`delete`, `acquiredHow`, `acquiredDate`, `variants`, `share`) are also rendered by `app/collection/[id].tsx`, which is the next screen and the largest remaining holder",
   },
   {
     name: "sign-in screen",
@@ -320,6 +335,52 @@ describe("complete i18n families", () => {
           `'${key}' is claimed by both '${owner}' and '${family.name}'`,
         );
         seen.set(key, family.name);
+      }
+    }
+  });
+
+  it("two screen families really do share keys, which is why the case above skips them", () => {
+    // The exclusion in the case above was written as a claim about a situation
+    // that had not happened yet: when the sign-in screen joined, the three
+    // listed screens shared nothing, so "two screens rendering `cancel` is the
+    // ordinary case" was defending against a hypothetical. The item-detail
+    // screen made it real — it shares 22 keys with `app/create.tsx`, an
+    // add-item form and the detail screen's own edit mode being the same form
+    // twice — and that is also why it needed twelve translations rather than
+    // the thirty-three the previous run's file-level count predicted.
+    //
+    // So this pins the overlap at non-empty rather than asserting a number.
+    // The exact count moves whenever either screen gains a string; what must
+    // stay true is that the screen exclusion is load-bearing, because the day
+    // it is not, the honest edit is to fold screens into the disjointness
+    // check rather than to keep a skip nothing exercises.
+    const screens = FAMILIES.filter((family) => family.screen !== undefined);
+    const overlaps = screens.flatMap((one, index) =>
+      screens.slice(index + 1).map((other) => ({
+        one,
+        other,
+        shared: keysOf(one).filter((key) => keysOf(other).includes(key)),
+      })),
+    );
+    const sharing = overlaps.filter((pair) => pair.shared.length > 0);
+    assert.ok(
+      sharing.length > 0,
+      `no two screen families share a key, so the exclusion in "names no prefix family twice" guards nothing — ${screens.map((family) => family.name).join(", ")}`,
+    );
+
+    // And the overlap is only benign because both entries make the SAME
+    // demand: every shared key has to be declared in all six locales either
+    // way. A shared key missing from a locale would fail under both names,
+    // which reads as two bugs; this is the case that says it is one.
+    for (const { one, other, shared } of sharing) {
+      for (const language of TRANSLATION_LANGUAGES) {
+        const declared = localeKeys(source, language);
+        const missing = shared.filter((key) => !declared.has(key));
+        assert.deepEqual(
+          missing,
+          [],
+          `'${language}' inherits ${missing.join(", ")}, shared by '${one.name}' and '${other.name}'`,
+        );
       }
     }
   });

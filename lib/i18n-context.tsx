@@ -1520,6 +1520,19 @@ const be: TranslationMap = {
   searchResultsCollections: "Калекцыі",
   searchResultsItems: "Прадметы",
   searchResultsPeople: "Людзі",
+  // Item-detail screen — the twelve keys app/item/[id].tsx still inherited.
+  delete: "Выдаліць",
+  itemNotFound: "Прадмет не знойдзены",
+  addedBy: (params?: TranslationParams) => `Дадаў: ${params?.name ?? ""}`,
+  acquiredHow: "Як з'явіўся",
+  acquiredDate: "Дата з'яўлення",
+  variants: "Іншыя варыянты",
+  editItem: "Рэдагаваць",
+  saveChanges: "Захаваць змены",
+  cancelEdit: "Скасаваць",
+  editPhotos: "Змяніць фота",
+  share: "Падзяліцца",
+  shareItemHint: "Дашліце гэтую спасылку — атрымальнік адкрые прадмет напрамую.",
 };
 
 const pl: TranslationMap = {
@@ -1940,6 +1953,19 @@ const pl: TranslationMap = {
   searchResultsCollections: "Kolekcje",
   searchResultsItems: "Przedmioty",
   searchResultsPeople: "Osoby",
+  // Item-detail screen — the twelve keys app/item/[id].tsx still inherited.
+  delete: "Usuń",
+  itemNotFound: "Nie znaleziono przedmiotu",
+  addedBy: (params?: TranslationParams) => `Dodał: ${params?.name ?? ""}`,
+  acquiredHow: "Jak trafił do kolekcji",
+  acquiredDate: "Data nabycia",
+  variants: "Inne warianty",
+  editItem: "Edytuj",
+  saveChanges: "Zapisz zmiany",
+  cancelEdit: "Anuluj",
+  editPhotos: "Zmień zdjęcia",
+  share: "Udostępnij",
+  shareItemHint: "Wyślij ten link komukolwiek — otworzy przedmiot bezpośrednio.",
 };
 
 const de: TranslationMap = {
@@ -2360,6 +2386,19 @@ const de: TranslationMap = {
   searchResultsCollections: "Sammlungen",
   searchResultsItems: "Objekte",
   searchResultsPeople: "Leute",
+  // Item-detail screen — the twelve keys app/item/[id].tsx still inherited.
+  delete: "Löschen",
+  itemNotFound: "Objekt nicht gefunden",
+  addedBy: (params?: TranslationParams) => `Hinzugefügt von: ${params?.name ?? ""}`,
+  acquiredHow: "Wie es dazukam",
+  acquiredDate: "Erwerbsdatum",
+  variants: "Weitere Varianten",
+  editItem: "Bearbeiten",
+  saveChanges: "Änderungen speichern",
+  cancelEdit: "Abbrechen",
+  editPhotos: "Fotos ändern",
+  share: "Teilen",
+  shareItemHint: "Schick diesen Link an wen du willst — damit öffnet sich das Objekt direkt.",
 };
 
 const es: TranslationMap = {
@@ -2780,6 +2819,19 @@ const es: TranslationMap = {
   searchResultsCollections: "Colecciones",
   searchResultsItems: "Objetos",
   searchResultsPeople: "Personas",
+  // Item-detail screen — the twelve keys app/item/[id].tsx still inherited.
+  delete: "Eliminar",
+  itemNotFound: "Objeto no encontrado",
+  addedBy: (params?: TranslationParams) => `Añadido por: ${params?.name ?? ""}`,
+  acquiredHow: "Cómo llegó",
+  acquiredDate: "Fecha de adquisición",
+  variants: "Otras variantes",
+  editItem: "Editar",
+  saveChanges: "Guardar cambios",
+  cancelEdit: "Cancelar",
+  editPhotos: "Cambiar fotos",
+  share: "Compartir",
+  shareItemHint: "Envía este enlace a quien quieras — abrirá el objeto directamente.",
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };
