@@ -4,8 +4,8 @@
  * nothing in the source tree. Run via `npm run lint:orphan-i18n` locally and
  * via `npm run lint:ci` in CI.
  *
- * The rule and the reasoning behind "read" live in
- * `lib/check-orphan-i18n-keys.ts`; this is the walk and the exit code.
+ * The orphan question lives in `lib/check-orphan-i18n-keys.ts` and the rule
+ * behind "read" in `lib/i18n-key-usage.ts`; this is the walk and the exit code.
  */
 
 import * as fs from "node:fs";
@@ -14,9 +14,9 @@ import * as path from "node:path";
 import {
   findOrphanI18nKeys,
   formatOrphanKeyReport,
-  type ScannedSource,
 } from "../lib/check-orphan-i18n-keys";
 import { GuardRootError } from "../lib/guard-root";
+import type { ScannedSource } from "../lib/i18n-key-usage";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 import { SOURCE_DIRS } from "../lib/source-dirs";
 import { guardScanRoot, listSourceFiles } from "./guard-io";

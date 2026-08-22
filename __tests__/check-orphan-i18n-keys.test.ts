@@ -2,11 +2,10 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  collectStringLiterals,
   findOrphanI18nKeys,
   formatOrphanKeyReport,
-  type ScannedSource,
 } from "@/lib/check-orphan-i18n-keys";
+import type { ScannedSource } from "@/lib/i18n-key-usage";
 
 /**
  * The scanner behind `npm run lint:orphan-i18n`.
@@ -19,6 +18,13 @@ import {
  * are built around the four forms rather than around the direct call, and the
  * cases that matter most are the ones proving a key reached by an INDIRECT
  * form is not reported.
+ *
+ * The word READS is now `lib/i18n-key-usage.ts`' to define, and the cases
+ * reading it one literal at a time moved to `i18n-key-usage.test.ts` with it.
+ * What stays here is the same rule exercised END TO END — through the orphan
+ * question, on a translations source — because that is the level the guard
+ * fails at, and a lexer case passing while `findOrphanI18nKeys` reports a live
+ * key is precisely the disagreement worth catching.
  */
 
 /** A translations source in miniature, with the shape the parser needs. */
@@ -45,56 +51,6 @@ const TRANSLATIONS = [
 
 const sources = (...entries: readonly string[]): ScannedSource[] =>
   entries.map((source, index) => ({ file: `app/file-${index}.tsx`, source }));
-
-describe("collecting the literals that sit where a key is written", () => {
-  it("finds a literal in each of the five key positions, in either quote", () => {
-    // The alternation IS the rule, so every branch of it gets a reading.
-    assert.ok(collectStringLiterals(`t("greeting");`).has("greeting"));
-    assert.ok(collectStringLiterals(`pick(t, 'greeting');`).has("greeting"));
-    assert.ok(collectStringLiterals(`const m = { labelKey: "greeting" };`).has("greeting"));
-    assert.ok(collectStringLiterals('t(`x` as "greeting");').has("greeting"));
-    assert.ok(collectStringLiterals(`type K =\n  | "greeting";`).has("greeting"));
-    assert.ok(collectStringLiterals(`const all = ["other", "greeting"];`).has("greeting"));
-  });
-
-  it("does NOT count a literal used as a plain value", () => {
-    // The distinction that found the 37th orphan. `you` is declared in all six
-    // locales, rendered by nothing, and its only mention in the tree is a
-    // default display name — a fallback VALUE, not a key.
-    const found = collectStringLiterals(
-      `const baseName = user.email?.split("@")[0] ?? "you";`,
-    );
-    assert.ok(!found.has("you"));
-  });
-
-  it("does not count an assignment or a comparison either", () => {
-    assert.ok(!collectStringLiterals(`const a = "greeting";`).has("greeting"));
-    assert.ok(!collectStringLiterals(`if (x === "greeting") {}`).has("greeting"));
-    assert.ok(!collectStringLiterals(`return "greeting";`).has("greeting"));
-  });
-
-  it("ignores anything that is not identifier-shaped", () => {
-    // Restricted on purpose: matching arbitrary string bodies would pull in
-    // every sentence in the tree for hits that can never be keys.
-    const found = collectStringLiterals(`t("hello there"); t("with-dash");`);
-    assert.equal(found.size, 0);
-  });
-
-  it("strips comments first, so prose naming a key does not keep it alive", () => {
-    // Without this the guard's own doc comment would resurrect nine of the
-    // keys it exists to have removed — and the comment defining the rule names
-    // four more.
-    const found = collectStringLiterals(`// we removed t("orphan") last week\nconst a = 1;`);
-    assert.ok(!found.has("orphan"));
-  });
-
-  it("does not treat an identifier as a literal", () => {
-    // The distinction that found the 36th orphan: `(profileId: string)` is a
-    // parameter, not a mention of the key `profileId`.
-    const found = collectStringLiterals(`function f(profileId: string) { return profileId; }`);
-    assert.ok(!found.has("profileId"));
-  });
-});
 
 describe("finding base keys nothing reads", () => {
   it("reports a key no source mentions, and says which locales declare it", () => {
