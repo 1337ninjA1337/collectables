@@ -1,9 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { TRANSLATION_BASE_LANGUAGE, TRANSLATION_LANGUAGES } from "@/lib/i18n-coverage";
+import {
+  TRANSLATION_BASE_LANGUAGE,
+  TRANSLATION_LANGUAGES,
+  UNTRANSLATABLE_KEYS,
+} from "@/lib/i18n-coverage";
 import { findLocaleBlock, localeKeys } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { keysReadBy } from "./helpers/i18n-keys-read";
 
 /**
  * Families that must be translated in every locale, all or nothing.
@@ -24,6 +29,29 @@ import { readI18nSource } from "./helpers/i18n-source-file";
  * A family joins this list when it is complete in all six locales, and not
  * before — a half-translated family listed here is a red suite that gets
  * exempted, which is how a rule stops being read.
+ *
+ * TWO KINDS OF FAMILY, and the second one is why this comment grew.
+ *
+ * Six entries here are key PREFIXES, and that unit is spent: 175 keys remain
+ * English in all four partial locales and the largest remaining prefix group
+ * is seven, so a seventh prefix entry would be more ceremony than guard. The
+ * unit that groups the remainder the way a user meets it is the SCREEN — every
+ * key one file renders — which is also the unit that makes "this screen is
+ * half-translated" a checkable claim rather than an impression.
+ *
+ * A screen family names a file and reads its keys through
+ * `lib/i18n-key-usage.ts`, the same index `check-orphan-i18n-keys` decides
+ * orphanhood with. That matters more than it sounds: the alternative is a
+ * hand-written list of the keys somebody believed the screen rendered, which
+ * is a second statement of the file's contents and drifts the moment a string
+ * is added. Here the file IS the list, so a new string on a listed screen
+ * arrives already inside the rule and has to be translated or the screen has
+ * to leave the list.
+ *
+ * {@link UNTRANSLATABLE_KEYS} are subtracted from both kinds. `appName` and
+ * `emailPlaceholder` are correct in English everywhere — the sign-in screen
+ * renders the second one — and a rule demanding they be declared in six
+ * locales would be demanding the English string be pasted five times.
  */
 
 const source = readI18nSource();
@@ -31,8 +59,13 @@ const source = readI18nSource();
 type Family = {
   /** Human name, used in failure messages. */
   readonly name: string;
-  /** Matches every base key in the family. */
-  readonly pattern: RegExp;
+  /**
+   * What the family IS: a pattern over base keys, or the screen whose rendered
+   * keys are the family. Exactly one, so "which keys" always has one answer.
+   */
+  readonly pattern?: RegExp;
+  /** Repo-relative path of the screen, for a screen family. */
+  readonly screen?: string;
   /** Measured size, so a family cannot silently shrink out from under a green run. */
   readonly size: number;
   /** Why this family earns the stricter rule. */
@@ -82,14 +115,50 @@ const FAMILIES: readonly Family[] = [
     because:
       "the last prefix family of any size, and the labels on the form a user meets before they own anything — naming a collection is the first thing the app asks anybody to do, so an English form here is the first English a new speaker of any of these four sees",
   },
+  {
+    name: "sign-in screen",
+    screen: "components/login-screen.tsx",
+    size: 22,
+    because:
+      "the first screen of the app and the last one anybody thought to translate — measured on 2026-08-22 as reading 23 base keys of which 23 were English in all four partial locales, the only screen in the tree at zero. A person who has just chosen Polish in the picker meets an English sign-in form, and the twenty-third key is `emailPlaceholder`, which is an address and stays English on purpose",
+  },
 ];
 
 describe("complete i18n families", () => {
   const baseKeys = [...localeKeys(source, TRANSLATION_BASE_LANGUAGE)];
 
+  /**
+   * The family's keys, whichever kind it is, minus the exemptions.
+   *
+   * Sorted for the prefix kind and left in base-map order for the screen kind
+   * — `keysReadBy` already answers in base-map order, which groups a screen's
+   * keys the way the map does rather than alphabetically.
+   */
+  const keysOf = (family: Family): readonly string[] => {
+    const declared = family.screen
+      ? keysReadBy(family.screen)
+      : baseKeys.filter((key) => family.pattern!.test(key)).sort();
+    return declared.filter((key) => !(key in UNTRANSLATABLE_KEYS));
+  };
+
+  it("every entry says which keys it means, exactly once", () => {
+    // A `Family` with neither a pattern nor a screen matches nothing, and one
+    // with both has two answers to the question this table exists to answer.
+    // The type permits both shapes because a discriminated union would make
+    // six existing entries noisier than the rule is worth; this is the check
+    // that buys that.
+    for (const family of FAMILIES) {
+      assert.equal(
+        Number(family.pattern !== undefined) + Number(family.screen !== undefined),
+        1,
+        `'${family.name}' must name a pattern or a screen, not neither and not both`,
+      );
+    }
+  });
+
   for (const family of FAMILIES) {
     describe(family.name, () => {
-      const keys = baseKeys.filter((key) => family.pattern.test(key)).sort();
+      const keys = keysOf(family);
 
       it("is still the size it was measured at", () => {
         // A vacuity guard, and not a theoretical one: every case below passes
@@ -101,7 +170,7 @@ describe("complete i18n families", () => {
         assert.equal(
           keys.length,
           family.size,
-          `'${family.name}' now has ${keys.length} base keys, measured at ${family.size}. If a key was added, translate it in all six locales and update the size; if the family was renamed, update the pattern.`,
+          `'${family.name}' now has ${keys.length} base keys, measured at ${family.size}. If a key was added, translate it in all six locales and update the size; if the family stopped matching, update its ${family.screen ? "screen path" : "pattern"}.`,
         );
       });
 
@@ -187,7 +256,7 @@ describe("complete i18n families", () => {
     // a pattern like /^wish/ would quietly annex a future `wishGranted`.
     const seen = new Map<string, string>();
     for (const family of FAMILIES) {
-      for (const key of baseKeys.filter((k) => family.pattern.test(k))) {
+      for (const key of keysOf(family)) {
         const owner = seen.get(key);
         assert.equal(
           owner,
