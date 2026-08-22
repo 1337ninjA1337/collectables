@@ -99,6 +99,14 @@ export const TRANSLATION_COMPLETE_PERCENT = 90;
  * it, and promoted when it is done. A rule over all languages would have made
  * adding a language a 498-value pull request, which is how a language does not
  * get added — and it would have made this module dead for real.
+ *
+ * The two lists are checked AGAINST EACH OTHER by `localeListingState` in that
+ * file, and `__tests__/i18n-locale-listing.test.ts` refuses the one combination
+ * that is not a state a locale can be in: a name in both, badged as unfinished
+ * while a ceiling swears it declares everything. Each list is separately derived
+ * from the measurement, so a contradiction fails both of those cases too — but
+ * as "this list drifted", in two suites, neither of which knows the other list
+ * exists. The pairing rule is structural and says the actual thing.
  */
 export const PARTIALLY_TRANSLATED_LANGUAGES: readonly string[] = [];
 

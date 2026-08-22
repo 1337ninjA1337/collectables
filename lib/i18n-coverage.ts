@@ -47,6 +47,13 @@ import {
   TRANSLATION_BASE_LANGUAGE,
   findLocaleBlock,
 } from "./i18n-source";
+// One direction only, and it is this one. `lib/translation-status.ts` is a leaf
+// — two constants and a predicate, no imports at all — because the app bundles
+// it: `app/settings.tsx` asks it for the badge on every picker row. This module
+// parses `lib/i18n-context.tsx` and nothing in the app imports it, so reaching
+// down for the picker's list costs the bundle nothing. The reverse import would
+// pull the parser into the app.
+import { PARTIALLY_TRANSLATED_LANGUAGES } from "./translation-status";
 
 export { TRANSLATION_BASE_LANGUAGE };
 
@@ -250,6 +257,10 @@ export function translationCoverage(
  * If this ever does become the chore its predecessor feared, the repair is to
  * take a name off — which is a deliberate, reviewable admission that a locale
  * is no longer maintained — and not to widen the rule.
+ *
+ * This list and `PARTIALLY_TRANSLATED_LANGUAGES` are two hand-maintained lists
+ * over the same names, and {@link localeListingState} below is what makes them
+ * aware of each other.
  */
 export const COMPLETE_LANGUAGES: readonly TranslationLanguage[] = [
   "ru",
@@ -259,6 +270,83 @@ export const COMPLETE_LANGUAGES: readonly TranslationLanguage[] = [
   "de",
   "es",
 ];
+
+/**
+ * What the two committed lists say about one language, before any measurement
+ * is taken.
+ *
+ * - `complete` — {@link COMPLETE_LANGUAGES} only. Finished, and may not slip.
+ * - `partial` — `PARTIALLY_TRANSLATED_LANGUAGES` only. Unfinished, and the
+ *   picker says so.
+ * - `unlisted` — neither. Not protected and not qualified, which is the state
+ *   a language legitimately occupies between clearing
+ *   `TRANSLATION_COMPLETE_PERCENT` and declaring the last key.
+ * - `contradictory` — both. Badged as unfinished while a rule swears it
+ *   declares everything; see {@link localeListingState}.
+ */
+export type LocaleListingState =
+  | "complete"
+  | "partial"
+  | "unlisted"
+  | "contradictory";
+
+/**
+ * Which of the two lists claim this language.
+ *
+ * `COMPLETE_LANGUAGES` here and `PARTIALLY_TRANSLATED_LANGUAGES` next door are
+ * two hand-maintained lists over the same six names, written by different runs
+ * for different readers — one says "finished, may not slip", the other says
+ * "unfinished, badge it in the picker" — and until this function neither knew
+ * the other existed. Today they partition the picker exactly: six complete,
+ * none partial, none in between.
+ *
+ * Each list is already derived against the measurement by a case of its own, so
+ * the obvious question is what a third rule adds. Two things.
+ *
+ * The first is that `contradictory` is refused STRUCTURALLY. Both derivations
+ * run through `translationCoverage`, so both are claims about what the parser
+ * found; this one is a claim about the lists themselves and holds with the
+ * parser deleted. A name in both lists is not a locale in a strange state — it
+ * is two rules asserting opposite things about the same six letters, and the
+ * cheapest moment to notice is before either measurement is consulted.
+ *
+ * The second is that the three legitimate states are now NAMED, and `unlisted`
+ * is the one worth naming. A locale in neither list reads as an oversight and
+ * usually is one — a finished locale nobody promoted, or a collapsed one nobody
+ * badged, both caught next door. But it is also exactly where a seventh
+ * language sits after the work that takes it over 90% and before the work that
+ * finishes it, and a rule that could not express that state would have to
+ * choose between refusing a legal position and saying nothing about an illegal
+ * one. `__tests__/i18n-locale-listing.test.ts` holds each state to the band of
+ * the measurement it implies.
+ *
+ * Takes a plain string rather than {@link TranslationLanguage}: the point is to
+ * classify what the picker offers, and a seventh code arrives in the picker
+ * before it arrives in this file's union. An unmeasured code answers `unlisted`,
+ * which is the truthful reading — no list claims it — and the suite is what
+ * turns that into a finding.
+ *
+ * `lists` defaults to the two real ones and exists for the same reason
+ * {@link translationCoverage} takes its source as an argument: three of the four
+ * states are unreachable from the shipped lists today — nothing is partial,
+ * nothing is in between, and `contradictory` had better be unreachable forever —
+ * so a function that could only be called on the real pair would have one
+ * branch under test and three under description.
+ */
+export function localeListingState(
+  language: string,
+  lists: {
+    readonly complete: readonly string[];
+    readonly partial: readonly string[];
+  } = { complete: COMPLETE_LANGUAGES, partial: PARTIALLY_TRANSLATED_LANGUAGES },
+): LocaleListingState {
+  const complete = lists.complete.includes(language);
+  const partial = lists.partial.includes(language);
+  if (complete && partial) return "contradictory";
+  if (complete) return "complete";
+  if (partial) return "partial";
+  return "unlisted";
+}
 
 /** A committed measurement of one language's declared-key count. */
 export type TranslationFloor = {
