@@ -69,18 +69,30 @@ export const TRANSLATION_COMPLETE_PERCENT = 90;
  * and four screens were translated: `be` 87.6%, `pl` 86.5%, `de` 86.5%, `es`
  * 86.5% — versus `en` and `ru` at 100%.
  *
- * `be` and `pl` left the list later the same day, at 100%, and the way they
- * left is the part worth keeping. Three consecutive runs filed the crossing as
- * a product decision — the picker would stop qualifying Belarusian while ~60
- * keys behind it were still English, so either 90 was the promise or the
- * threshold wanted a second tier. The decision was never taken, because the
- * sweep that would have forced it FINISHED the locale instead: at 100% there
+ * All four left the list later the same day, and the way they left is the part
+ * worth keeping. Three consecutive runs filed the crossing as a product
+ * decision — the picker would stop qualifying Belarusian while ~60 keys behind
+ * it were still English, so either 90 was the promise or the threshold wanted
+ * a second tier ("mostly translated"). The decision was never taken, because
+ * the sweep that would have forced it FINISHED the locale instead, and then
+ * the other three: all six now declare every translatable key. At 100% there
  * is nothing to qualify and nothing to tier. A threshold argument is only
- * worth having about a locale that stops short of it.
+ * worth having about a locale that stops short of the threshold.
  *
- * Two names left, both at 86.5% and both the same 67 keys behind.
+ * EMPTY, AND THE MODULE STAYS. A verdict nobody is currently accused by is the
+ * shape of thing a later reader deletes as dead, so the reason it is here is
+ * this: the seventh language arrives at 0%, on the day somebody adds a chip to
+ * the picker, and the badge is what the picker owes that reader on that day.
+ * Deleting this would mean re-deriving it under a deadline. The parity case in
+ * `__tests__/translation-status.test.ts` makes that arrival RED — a new locale
+ * measured below the threshold and not listed here fails the suite — so the
+ * list cannot be silently left empty when it stops being true.
+ *
+ * The same case is also what makes the empty list honest today: it is derived
+ * from the real coverage rows rather than asserted, so `[]` means "nothing
+ * measured below 90%", not "nobody has looked lately".
  */
-export const PARTIALLY_TRANSLATED_LANGUAGES: readonly string[] = ["de", "es"];
+export const PARTIALLY_TRANSLATED_LANGUAGES: readonly string[] = [];
 
 /**
  * True when the picker should qualify this language.

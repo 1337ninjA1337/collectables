@@ -13,6 +13,7 @@ import {
   isPartiallyTranslated,
 } from "@/lib/translation-status";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { sourceCode } from "./helpers/source-files";
 
 /**
  * The measurement, and the list the picker acts on.
@@ -147,6 +148,67 @@ describe("the partial-translation list the picker acts on", () => {
       `these locales clear the ${TRANSLATION_COMPLETE_PERCENT}% threshold by less than ${MARGIN_POINTS} points, ` +
         `so one feature PR's worth of new English keys would badge them:\n  ` +
         COVERAGE.map((row) => `${row.language}: ${coveragePercent(row).toFixed(1)}%`).join("\n  "),
+    );
+  });
+
+  it("would still name a locale that fell short, now that none does", () => {
+    // The parity case above compares two empty lists as of 2026-08-22, and an
+    // empty list equals an empty list for two very different reasons: nothing
+    // measured below the threshold, or the measurement stopped working. Until
+    // today one of those was ruled out by there being four names in it.
+    //
+    // So the derivation gets its own case, on a source this file writes. Four
+    // keys, a locale declaring one of them: 25%, which is below any threshold
+    // this module would ever hold. If the rule that produces `measuredPartial`
+    // broke — a comparison inverted, a percentage that came back NaN, a filter
+    // over the wrong field — this goes red while the parity case stays green.
+    //
+    // Deliberately not asserting `PARTIALLY_TRANSLATED_LANGUAGES` against this
+    // fixture: the shipped list is about the real map, and a case that fed it
+    // a fabricated one would be asserting the fixture.
+    const source = [
+      `const en = {`,
+      `  first: "one",`,
+      `  second: "two",`,
+      `  third: "three",`,
+      `  fourth: "four",`,
+      `} as const;`,
+      ``,
+      `const xx: TranslationMap = {`,
+      `  ...en,`,
+      `  first: "uno",`,
+      `};`,
+      ``,
+    ].join("\n");
+    const rows = translationCoverage(source, ["en", "xx"]);
+    assert.deepEqual(
+      rows.filter((row) => coveragePercent(row) < TRANSLATION_COMPLETE_PERCENT).map((row) => row.language),
+      ["xx"],
+      "a locale declaring one key of four does not come out below the threshold — the derivation behind the parity case is broken",
+    );
+    assert.equal(coveragePercent(rows[1]), 25);
+  });
+
+  it("still has a caller, which is the half an empty list stops proving", () => {
+    // What an empty list actually costs: the badge is now unreachable at
+    // runtime, so every case in this file passes with the picker's branch
+    // deleted, and "nothing renders this" is the argument that deletes it. The
+    // seventh language arrives at 0% on the day somebody adds a chip, and the
+    // badge is what the picker owes that reader on that day.
+    //
+    // Structural rather than rendered, for the reason every screen suite here
+    // is: `app/settings.tsx` pulls React Native peers. Two claims — the screen
+    // asks for the verdict, and it renders the string the verdict is for.
+    const settings = sourceCode("app/settings.tsx");
+    assert.match(
+      settings,
+      /isPartiallyTranslated\(/,
+      "app/settings.tsx no longer asks whether a language is partially translated — the picker has stopped qualifying anything, in every future language too",
+    );
+    assert.match(
+      settings,
+      /t\("languagePartial"\)/,
+      "app/settings.tsx no longer renders the partial badge — the verdict is computed and thrown away",
     );
   });
 

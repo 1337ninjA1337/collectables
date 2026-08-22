@@ -261,11 +261,11 @@ export const TRANSLATION_FLOORS: Readonly<
     note: "498 of 501 on 2026-08-22 (100.0%) — finished in the same sweep as be, 67 keys rather than 62 because it had also never declared `addFriend`, `removeFriend`, `follow`, `unfollow` or `saveCollection`. 295 on 2026-08-21 (58.9%), 281 after the filters, 262 after the wishlist, 248 after the empty states, 224 before them, 213 of 538 before the removals. ~7% slack, same reasoning as be.",
   },
   de: {
-    minimum: 267,
-    note: "291 of 501 on 2026-08-21 (58.1%) — 277 after the filters, 258 after the wishlist, 244 after the empty states, 220 before them, 209 of 538 before the removals. ~8% slack, same reasoning as be.",
+    minimum: 463,
+    note: "498 of 501 on 2026-08-22 (100.0%) — the second half of the per-locale sweep, 67 keys. 291 on 2026-08-21 (58.1%), 277 after the filters, 258 after the wishlist, 244 after the empty states, 220 before them, 209 of 538 before the removals. ~7% slack, same reasoning as be.",
   },
   es: {
-    minimum: 268,
-    note: "292 of 501 on 2026-08-21 (58.3%) — 278 after the filters, 259 after the wishlist, 245 after the empty states, 221 before them, 209 of 538 before the removals. One ahead of de because it never declared the 'opened for you' header, so the collections-list removal took two declarations from it rather than three. ~8% slack, same reasoning as be.",
+    minimum: 463,
+    note: "498 of 501 on 2026-08-22 (100.0%) — finished alongside de, and the two now declare the same 498 keys. 292 on 2026-08-21 (58.3%), 278 after the filters, 259 after the wishlist, 245 after the empty states, 221 before them, 209 of 538 before the removals. One ahead of de through that whole stretch because it never declared the 'opened for you' header. ~7% slack, same reasoning as be.",
   },
 };

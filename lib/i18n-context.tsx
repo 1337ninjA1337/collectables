@@ -2712,6 +2712,90 @@ const de: TranslationMap = {
   statsSubtitle: "Überblick über deine Sammlung.",
   recentlyAdded: "Zuletzt hinzugefügt",
   recentlyAddedHint: "Deine neuesten Objekte aus allen Sammlungen",
+  // The remainder — the 67 keys `de` still inherited once the screen families
+  // ran out. Grouped by the surface they belong to rather than by prefix,
+  // because that is the order somebody translating them reads them in.
+  checkingSession: "Wir prüfen deine Sitzung...",
+  authCallbackWorking: "Anmeldung wird abgeschlossen...",
+  authCallbackBackSoon: "Wir bringen dich gleich zurück in die App.",
+  authCallbackBadLink: "Mit dem Link stimmt etwas nicht",
+  tryAgain: "Nochmal versuchen",
+  collectionsFeed: "Sammlungs-Feed",
+  collectionsFeedTitle: "Sammlungen von Freunden und Abos",
+  tabFriendCollections: "Freunde",
+  community: "Gemeinschaft",
+  ownerLabel: (params?: TranslationParams) => `Besitzer: ${params?.name ?? ""}`,
+  addFriend: "Als Freund hinzufügen",
+  removeFriend: "Freund entfernen",
+  follow: "Folgen",
+  unfollow: "Nicht mehr folgen",
+  acceptRequest: "Anfrage annehmen",
+  rejectRequest: "Ablehnen",
+  requestSent: "Anfrage gesendet",
+  profileNotFound: "Profil nicht gefunden",
+  findPeople: "Leute finden",
+  editCover: "Titelbild ändern",
+  // An example handle rather than a phrase — the same string `ru` declares.
+  profileIdPlaceholder: "my-collectables-id",
+  profileWishlist: "Wunschliste",
+  tabFriends: "Freunde",
+  tabFollowing: "Abos",
+  friendsTitle: "Freunde und Abos",
+  friendsSubtitle: "Sieh dir deine Freunde und die Profile an, denen du folgst.",
+  subTabMyFriends: "Meine Freunde",
+  subTabRequests: "Freundschaftsanfragen",
+  statsTotalItems: "Objekte insgesamt",
+  statsTotalValue: "Gesamtwert",
+  statsTotalCollections: "Sammlungen",
+  statsGrowthTitle: "Wachstum nach Monat",
+  statsNoData: "Noch keine Daten. Füge Objekte hinzu, um Statistiken zu sehen.",
+  prevPage: "Zurück",
+  nextPage: "Weiter",
+  pageOf: ((params?: TranslationParams) =>
+    `Seite ${params?.page ?? 1} von ${params?.total ?? 1}`) as TranslationValue,
+  newCollectionTitle: "Neue Sammlung",
+  createCollectionTitle: "Erstelle deine Sammlung",
+  createCollectionSubtitle:
+    "Gib ihr einen Namen, füge eine Beschreibung und ein Titelbild hinzu. Danach kannst du Objekte mit Fotos und Notizen darin ablegen.",
+  saveCollection: "Sammlung erstellen",
+  chooseCover: "Titelbild wählen",
+  creating: "Wird erstellt...",
+  coverFallbackHint: "Wenn du das überspringst, setze ich ein vorläufiges Titelbild ein.",
+  defaultCollectionDescription: "Für diese Sammlung gibt es noch keine Beschreibung.",
+  upTo5Photos:
+    "Du kannst bis zu 5 Fotos wählen. Wenn du diesen Schritt überspringst, nehmen wir ein vorläufiges Platzhalterbild.",
+  adminDeleteProfile: "Profil löschen",
+  adminDeleteProfileTitle: "Dieses Profil löschen?",
+  adminDeleteProfileText: (params?: TranslationParams) =>
+    `${params?.name ?? "Diese Person"} und alle Sammlungen und Bilder in der App werden endgültig gelöscht.`,
+  // The count last, so nothing has to agree with it: `ausgewählt` is a
+  // participle and does not inflect in German, and a value shaped
+  // `1 ausgewählt` would need an entry in the agreement suite's INVARIANT list
+  // to say so. The colon form is also what a selection bar reads like here.
+  selectedCount: (params?: TranslationParams) => `Ausgewählt: ${params?.count ?? 0}`,
+  moveToCollection: "In Sammlung verschieben",
+  shareTitle: "Link teilen",
+  shareCollectionHint:
+    "Schick diesen Link an wen du willst — damit öffnet sich die Sammlung direkt.",
+  copyLink: "Link kopieren",
+  linkCopied: "Kopiert!",
+  shareVia: "Teilen…",
+  visibilityLabel: "Sichtbarkeit",
+  visibilityViewer: "Mit dir geteilt",
+  shareWithFriends: "Mit Freunden teilen",
+  shareWithFriendsHint:
+    "Freunde, mit denen du teilst, sehen diese Sammlung auf ihrem Startbildschirm.",
+  shared: "Geteilt",
+  noFriendsToShare: "Füge zuerst Freunde hinzu, um Sammlungen mit ihnen zu teilen.",
+  peopleWithAccess: "Leute mit Zugriff",
+  peopleWithAccessHint:
+    "Alle in dieser Liste — auch wer den geteilten Link geöffnet hat — können diese Sammlung sehen. Entzieh den Zugriff, um das zu beenden.",
+  removeAccess: "Entfernen",
+  chatOfflinePill: "Offline · verbindet neu",
+  syncingPill: (params?: TranslationParams) =>
+    `Synchronisiere ${params?.count ?? 0} ${plural(params?.count, "Änderung", "Änderungen")}…`,
+  syncingPillA11y: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "Änderung wird", "Änderungen werden")} mit der Cloud synchronisiert`,
 };
 
 const es: TranslationMap = {
@@ -3203,6 +3287,87 @@ const es: TranslationMap = {
   statsSubtitle: "Resumen de tu colección.",
   recentlyAdded: "Añadidos recientemente",
   recentlyAddedHint: "Tus objetos más recientes de todas las colecciones",
+  // The remainder — the 67 keys `es` still inherited once the screen families
+  // ran out. Grouped by the surface they belong to rather than by prefix,
+  // because that is the order somebody translating them reads them in.
+  checkingSession: "Comprobando tu sesión...",
+  authCallbackWorking: "Terminando el inicio de sesión...",
+  authCallbackBackSoon: "Te devolvemos a la aplicación en un momento.",
+  authCallbackBadLink: "Algo va mal con el enlace",
+  tryAgain: "Intentar de nuevo",
+  collectionsFeed: "Novedades de colecciones",
+  collectionsFeedTitle: "Colecciones de amigos y suscripciones",
+  tabFriendCollections: "Amigos",
+  community: "Comunidad",
+  ownerLabel: (params?: TranslationParams) => `Propietario: ${params?.name ?? ""}`,
+  addFriend: "Añadir a amigos",
+  removeFriend: "Quitar de amigos",
+  follow: "Seguir",
+  unfollow: "Dejar de seguir",
+  acceptRequest: "Aceptar solicitud",
+  rejectRequest: "Rechazar",
+  requestSent: "Solicitud enviada",
+  profileNotFound: "Perfil no encontrado",
+  findPeople: "Buscar personas",
+  editCover: "Cambiar portada",
+  // An example handle rather than a phrase — the same string `ru` declares.
+  profileIdPlaceholder: "my-collectables-id",
+  profileWishlist: "Lista de deseos",
+  tabFriends: "Amigos",
+  tabFollowing: "Siguiendo",
+  friendsTitle: "Amigos y suscripciones",
+  friendsSubtitle: "Mira a tus amigos y los perfiles que sigues.",
+  subTabMyFriends: "Mis amigos",
+  subTabRequests: "Solicitudes de amistad",
+  statsTotalItems: "Objetos en total",
+  statsTotalValue: "Valor total",
+  statsTotalCollections: "Colecciones",
+  statsGrowthTitle: "Crecimiento por mes",
+  statsNoData: "Aún no hay datos. Añade objetos para ver las estadísticas.",
+  prevPage: "Anterior",
+  nextPage: "Siguiente",
+  pageOf: ((params?: TranslationParams) =>
+    `Página ${params?.page ?? 1} de ${params?.total ?? 1}`) as TranslationValue,
+  newCollectionTitle: "Nueva colección",
+  createCollectionTitle: "Crea tu colección",
+  createCollectionSubtitle:
+    "Dale un nombre, añade una descripción y una portada. Después podrás guardar dentro objetos con fotos y notas.",
+  saveCollection: "Crear colección",
+  chooseCover: "Elegir portada",
+  creating: "Creando...",
+  coverFallbackHint: "Si te lo saltas, pondré una portada temporal.",
+  defaultCollectionDescription: "Esta colección todavía no tiene descripción.",
+  upTo5Photos:
+    "Puedes elegir hasta 5 fotos. Si te saltas este paso, usaremos una imagen temporal de relleno.",
+  adminDeleteProfile: "Eliminar perfil",
+  adminDeleteProfileTitle: "¿Eliminar este perfil?",
+  adminDeleteProfileText: (params?: TranslationParams) =>
+    `${params?.name ?? "Esta persona"} y todas sus colecciones e imágenes en la aplicación se eliminarán para siempre.`,
+  selectedCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "seleccionado", "seleccionados")}`,
+  moveToCollection: "Mover a una colección",
+  shareTitle: "Enlace",
+  shareCollectionHint:
+    "Envía este enlace a quien quieras — abrirá la colección directamente.",
+  copyLink: "Copiar enlace",
+  linkCopied: "¡Copiado!",
+  shareVia: "Compartir…",
+  visibilityLabel: "Visibilidad",
+  visibilityViewer: "Compartido contigo",
+  shareWithFriends: "Compartir con amigos",
+  shareWithFriendsHint:
+    "Los amigos con los que compartas verán esta colección en su pantalla de inicio.",
+  shared: "Compartida",
+  noFriendsToShare: "Añade amigos primero para compartir colecciones con ellos.",
+  peopleWithAccess: "Personas con acceso",
+  peopleWithAccessHint:
+    "Cualquiera de esta lista — incluidas las personas que abrieron el enlace compartido — puede ver esta colección. Quita el acceso para revocarlo.",
+  removeAccess: "Quitar",
+  chatOfflinePill: "Sin conexión · reconectando",
+  syncingPill: (params?: TranslationParams) =>
+    `Sincronizando ${params?.count ?? 0} ${plural(params?.count, "cambio", "cambios")}…`,
+  syncingPillA11y: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "cambio se sincroniza", "cambios se sincronizan")} con la nube`,
 };
 
 const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };
