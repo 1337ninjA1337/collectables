@@ -398,47 +398,86 @@ describe("complete i18n families", () => {
       }
     }
   });
+
+  it("reads a branching function body, which the tree no longer contains", () => {
+    // `readableText` learned this shape earlier the same day, for `ru`'s
+    // `selectedCount` and `deleteItemsTitle` — arrows with a block body,
+    // because Russian needs three plural forms and a ternary cannot spell
+    // them. The regex reader before it returned `null` for both, and `null` is
+    // what the verbatim case reads as "nothing to compare", so the two keys
+    // most likely to be copied wholesale were the two it silently skipped.
+    //
+    // Then `lib/plural-slavic.ts` moved the rule out of the map, and both
+    // block bodies became one-line arrows. The capability is now correct and
+    // unexercised by real data, which is the state a reader quietly loses: a
+    // future simplification "nothing uses this" would be measurably true and
+    // wrong the next time a locale needs a branch.
+    //
+    // So it is exercised here on a literal, which is also the honest scope of
+    // the claim — the rule is "every template in the value", not "block bodies
+    // specifically", and nothing about it depends on where the value came from.
+    const branching = [
+      "(params?: TranslationParams) => {",
+      "    const n = Number(params?.count ?? 0);",
+      "    if (n === 1) return `Выбран ${n}`;",
+      "    return `Выбрано ${n}`;",
+      "  }",
+    ].join("\n");
+    assert.equal(readableText(branching), "Выбран ${n}\nВыбрано ${n}");
+
+    // And the two shapes the tree does contain, so a change that broke either
+    // one while keeping the branch alive is caught in the same place.
+    assert.equal(readableText('"Total cost"'), "Total cost");
+    assert.equal(
+      readableText("(params?: TranslationParams) => `Filters (${params?.count ?? 0})`"),
+      "Filters (${params?.count ?? 0})",
+    );
+
+    // A value with no text is `null` rather than an empty string: the vacuity
+    // cases above distinguish "read nothing" from "read the empty string", and
+    // an empty string would satisfy the verbatim comparison on both sides.
+    assert.equal(readableText("someIdentifier"), null);
+  });
 });
 
 /**
- * Reads one key's translatable TEXT out of one locale block, in any of the
- * three shapes this file uses.
+ * The translatable TEXT inside one declared VALUE, whatever shape it is
+ * written in.
  *
- * Reads the VALUE SPAN the parser already isolates (`LocaleBlock.values`) —
- * colon to the comma that ends the entry, brace-aware — rather than matching
- * `key:` against the whole block. That is not a tidying: the regex form knew
- * two shapes, a string literal and a one-expression arrow, and this file has a
- * third. `ru` declares `selectedCount` and `deleteItemsTitle` as arrows with a
- * BLOCK body, because Russian needs three plural forms and a ternary cannot
- * spell them. The regex returned `null` for those, and `null` is what the
- * verbatim case reads as "nothing to compare" — so the two keys most likely to
- * be copied wholesale, the ones where the English sits inside what looks like
- * code, were the two it silently skipped. The vacuity case below is what turns
- * that back into a failure, and it goes red the moment a block-bodied key
- * joins a listed family.
+ * Takes the value span rather than a language and a key so that it can be
+ * exercised on a shape the tree does not currently contain — see the case
+ * above. The span itself comes from `LocaleBlock.values`: colon to the comma
+ * that ends the entry, brace-aware, which is what makes a block body readable
+ * at all. The regex form this replaced matched `key:` against the whole locale
+ * block and knew two shapes, a string literal and a one-expression arrow.
  *
  * A string literal yields its inner text, escapes and all, tolerating the
  * line-wrapped form (`key:\n    "…"`) the long strings are written in — there
  * is no prettier here, so both spellings genuinely exist side by side.
  *
- * A function value yields every template literal in it, joined by newlines:
- * one for the expression form, three for `ru`'s plural blocks. The
+ * Anything else yields every template literal in it, joined by newlines: one
+ * for the arrow-expression form, three for an arrow whose body branches. The
  * interpolations are deliberately left in rather than stripped — they are
- * identical across locales, so they neither hide a difference nor invent one.
+ * identical across locales, so they neither hide a difference nor invent one,
+ * and they are where a copy-paste hides: `${slavicPlural(params?.count,
+ * "предмет", …)}` puts the translated words inside what looks like code.
  *
- * Returns `null` when the key is absent or its value contains no readable
- * text at all.
+ * Returns `null` for a value containing no readable text at all, which is the
+ * answer the vacuity cases exist to catch — `null` compared against `null` is
+ * what a reader that stopped working returns, and it looks like agreement.
  */
-function valueOf(language: string, key: string): string | null {
-  const block = findLocaleBlock(source, language);
-  const value = block?.values.get(key);
-  if (value === undefined) return null;
-
+function readableText(value: string): string | null {
   const literal = /^"((?:[^"\\]|\\.)*)"$/s.exec(value);
   if (literal) return literal[1];
 
   const templates = [...value.matchAll(/`([^`]*)`/g)].map((match) => match[1]);
   return templates.length > 0 ? templates.join("\n") : null;
+}
+
+/** {@link readableText} of one key's value in one locale, or `null` if absent. */
+function valueOf(language: string, key: string): string | null {
+  const value = findLocaleBlock(source, language)?.values.get(key);
+  return value === undefined ? null : readableText(value);
 }
 
 /** True when the base language declares this key as an arrow function. */

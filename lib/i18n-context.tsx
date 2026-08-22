@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { trackEvent } from "@/lib/analytics";
 import { getDefaultLocaleForLanguage } from "@/lib/locale-helpers";
+import { slavicPlural } from "@/lib/plural-slavic";
 import { LANGUAGE_KEY } from "@/lib/storage-keys";
 
 export type AppLanguage = "ru" | "en" | "be" | "pl" | "de" | "es";
@@ -620,8 +621,10 @@ const ru: TranslationMap = {
   tabSubscribedCollections: "Подписки",
   followCollection: "Отслеживать коллекцию",
   unfollowCollection: "Перестать отслеживать",
-  itemsCount: (params?: TranslationParams) => `${params?.count ?? 0} предметов`,
-  sharedWithPeople: (params?: TranslationParams) => `Поделились с ${params?.count ?? 0} людьми`,
+  itemsCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "предмет", "предмета", "предметов")}`,
+  sharedWithPeople: (params?: TranslationParams) =>
+    `Поделились с ${params?.count ?? 0} ${slavicPlural(params?.count, "человеком", "людьми", "людьми")}`,
   ownerLabel: (params?: TranslationParams) => `Владелец: ${params?.name ?? ""}`,
   photosCount: (params?: TranslationParams) => `${params?.count ?? 0} фото`,
   community: "Сообщество",
@@ -638,7 +641,8 @@ const ru: TranslationMap = {
   profileCollections: "Коллекции пользователя",
   findPeople: "Найти людей",
   collectionNotFound: "Коллекция не найдена",
-  accessOpenFor: (params?: TranslationParams) => `Доступ открыт для ${params?.count ?? 0} человек`,
+  accessOpenFor: (params?: TranslationParams) =>
+    `Доступ открыт для ${params?.count ?? 0} ${slavicPlural(params?.count, "человека", "человек", "человек")}`,
   viewingCollectionOf: (params?: TranslationParams) => `Просмотр коллекции ${params?.name ?? ""}`,
   itemsInside: "Предметов внутри",
   photosSaved: "Сохранено фото",
@@ -657,23 +661,12 @@ const ru: TranslationMap = {
   deleteItemTitle: "Удалить предмет?",
   deleteItemText: "Он исчезнет из этой коллекции без возможности восстановления.",
   selectItems: "Выбрать",
-  selectedCount: (params?: TranslationParams) => {
-    const n = Number(params?.count ?? 0);
-    const mod10 = n % 10;
-    const mod100 = n % 100;
-    if (mod10 === 1 && mod100 !== 11) return `Выбран ${n}`;
-    return `Выбрано ${n}`;
-  },
+  selectedCount: (params?: TranslationParams) =>
+    `${slavicPlural(params?.count, "Выбран", "Выбрано", "Выбрано")} ${params?.count ?? 0}`,
   moveToCollection: "Переместить в коллекцию",
   noOtherCollections: "У вас нет других коллекций для перемещения.",
-  deleteItemsTitle: (params?: TranslationParams) => {
-    const n = Number(params?.count ?? 0);
-    const mod10 = n % 10;
-    const mod100 = n % 100;
-    if (mod10 === 1 && mod100 !== 11) return `Удалить ${n} предмет?`;
-    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `Удалить ${n} предмета?`;
-    return `Удалить ${n} предметов?`;
-  },
+  deleteItemsTitle: (params?: TranslationParams) =>
+    `Удалить ${params?.count ?? 0} ${slavicPlural(params?.count, "предмет", "предмета", "предметов")}?`,
   deleteItemsText: "Выбранные предметы будут удалены из этой коллекции без возможности восстановления.",
   itemsMoved: (params?: TranslationParams) => `Перемещено: ${params?.count ?? 0}`,
   itemsDeleted: (params?: TranslationParams) => `Удалено: ${params?.count ?? 0}`,
@@ -834,7 +827,8 @@ const ru: TranslationMap = {
   exportPdfGenerating: "Генерация PDF...",
   exportPdfDone: "PDF готов",
   exportPdfFailed: "Не удалось создать PDF",
-  exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} предметов`,
+  exportPdfItemCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "предмет", "предмета", "предметов")}`,
   recentlyAdded: "Недавно добавленные",
   recentlyAddedHint: "Последние предметы из всех коллекций",
   wishlist: "Вишлист",
@@ -1072,7 +1066,7 @@ const ru: TranslationMap = {
   syncingPill: (params?: TranslationParams) =>
     `Синхронизация: ${params?.count ?? 0}…`,
   syncingPillA11y: (params?: TranslationParams) =>
-    `${params?.count ?? 0} изменений синхронизируется с облаком`,
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "изменение синхронизируется", "изменения синхронизируются", "изменений синхронизируется")} с облаком`,
   crashFallbackTitle: "Что-то пошло не так",
   crashFallbackBody:
     "Произошла непредвиденная ошибка, мы её записали. Попробуйте ещё раз или перезапустите приложение.",
@@ -1244,10 +1238,12 @@ const be: TranslationMap = {
   peopleAndFollowing: "Людзі і падпіскі",
   myProfile: "Мой профіль",
   myProfileSubtitle: "Сачыце за іншымі карыстальнікамі і адкрывайце іх калекцыі.",
-  itemsCount: (params?: TranslationParams) => `${params?.count ?? 0} прадметаў`,
+  itemsCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "прадмет", "прадметы", "прадметаў")}`,
   photosCount: (params?: TranslationParams) =>
     `${params?.count ?? 0} фота`,
-  sharedWithPeople: (params?: TranslationParams) => `Адкрыта для ${params?.count ?? 0} людзей`,
+  sharedWithPeople: (params?: TranslationParams) =>
+    `Адкрыта для ${params?.count ?? 0} ${slavicPlural(params?.count, "чалавека", "чалавек", "чалавек")}`,
   addFriend: "Дадаць у сябры",
   follow: "Падпісацца",
   unfollow: "Адпісацца",
@@ -1536,7 +1532,8 @@ const be: TranslationMap = {
   // Collection-detail screen — the keys app/collection/[id].tsx still inherited.
   followCollection: "Сачыць за калекцыяй",
   unfollowCollection: "Перастаць сачыць",
-  accessOpenFor: (params?: TranslationParams) => `Доступ адкрыты для ${params?.count ?? 0} людзей`,
+  accessOpenFor: (params?: TranslationParams) =>
+    `Доступ адкрыты для ${params?.count ?? 0} ${slavicPlural(params?.count, "чалавека", "чалавек", "чалавек")}`,
   viewingCollectionOf: (params?: TranslationParams) => `Прагляд калекцыі ${params?.name ?? ""}`,
   itemsInside: "Прадметаў унутры",
   photosSaved: "Захавана фота",
@@ -1551,7 +1548,8 @@ const be: TranslationMap = {
   noAccessCover: "Дазвольце доступ да фота, каб выбраць вокладку калекцыі.",
   selectItems: "Выбраць",
   noOtherCollections: "У вас няма іншых калекцый для перамяшчэння.",
-  deleteItemsTitle: (params?: TranslationParams) => `Выдаліць ${params?.count ?? 0} прадметаў?`,
+  deleteItemsTitle: (params?: TranslationParams) =>
+    `Выдаліць ${params?.count ?? 0} ${slavicPlural(params?.count, "прадмет", "прадметы", "прадметаў")}?`,
   deleteItemsText:
     "Выбраныя прадметы будуць выдалены з гэтай калекцыі без магчымасці аднаўлення.",
   itemsMoved: (params?: TranslationParams) => `Перамешчана: ${params?.count ?? 0}`,
@@ -1560,7 +1558,8 @@ const be: TranslationMap = {
   exportPdfGenerating: "Ствараем PDF...",
   exportPdfDone: "PDF гатовы",
   exportPdfFailed: "Не ўдалося стварыць PDF",
-  exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} прадметаў`,
+  exportPdfItemCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "прадмет", "прадметы", "прадметаў")}`,
   sharedCollectionSaved: "Дададзена ў калекцыі сяброў",
   // Home screen — the keys app/index.tsx still inherited.
   noEmail: "Без email",
@@ -1732,10 +1731,12 @@ const pl: TranslationMap = {
   peopleAndFollowing: "Ludzie i obserwowane profile",
   myProfile: "Mój profil",
   myProfileSubtitle: "Obserwuj innych użytkowników i otwieraj ich kolekcje.",
-  itemsCount: (params?: TranslationParams) => `${params?.count ?? 0} przedmiotów`,
+  itemsCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "przedmiot", "przedmioty", "przedmiotów")}`,
   photosCount: (params?: TranslationParams) =>
-    `${params?.count ?? 0} zdjęć`,
-  sharedWithPeople: (params?: TranslationParams) => `Udostępniono ${params?.count ?? 0} osobom`,
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "zdjęcie", "zdjęcia", "zdjęć")}`,
+  sharedWithPeople: (params?: TranslationParams) =>
+    `Udostępniono ${params?.count ?? 0} ${slavicPlural(params?.count, "osobie", "osobom", "osobom")}`,
   cancelInvitation: "Anuluj zaproszenie",
   changeProfilePhoto: "Zmień zdjęcie profilu",
   descriptionLabel: "Opis",
@@ -2013,7 +2014,8 @@ const pl: TranslationMap = {
   // Collection-detail screen — the keys app/collection/[id].tsx still inherited.
   followCollection: "Obserwuj kolekcję",
   unfollowCollection: "Przestań obserwować",
-  accessOpenFor: (params?: TranslationParams) => `Dostęp ma ${params?.count ?? 0} osób`,
+  accessOpenFor: (params?: TranslationParams) =>
+    `Dostęp ma ${params?.count ?? 0} ${slavicPlural(params?.count, "osoba", "osoby", "osób")}`,
   viewingCollectionOf: (params?: TranslationParams) => `Kolekcja użytkownika ${params?.name ?? ""}`,
   itemsInside: "Przedmiotów w środku",
   photosSaved: "Zapisane zdjęcia",
@@ -2029,7 +2031,8 @@ const pl: TranslationMap = {
   noAccessCover: "Zezwól na dostęp do zdjęć, aby wybrać okładkę kolekcji.",
   selectItems: "Zaznacz",
   noOtherCollections: "Nie masz innych kolekcji, do których można przenieść przedmioty.",
-  deleteItemsTitle: (params?: TranslationParams) => `Usunąć ${params?.count ?? 0} przedmiotów?`,
+  deleteItemsTitle: (params?: TranslationParams) =>
+    `Usunąć ${params?.count ?? 0} ${slavicPlural(params?.count, "przedmiot", "przedmioty", "przedmiotów")}?`,
   deleteItemsText:
     "Zaznaczone przedmioty zostaną bezpowrotnie usunięte z tej kolekcji.",
   itemsMoved: (params?: TranslationParams) => `Przeniesiono: ${params?.count ?? 0}`,
@@ -2038,7 +2041,8 @@ const pl: TranslationMap = {
   exportPdfGenerating: "Tworzenie PDF...",
   exportPdfDone: "PDF gotowy",
   exportPdfFailed: "Nie udało się utworzyć PDF",
-  exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} przedmiotów`,
+  exportPdfItemCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "przedmiot", "przedmioty", "przedmiotów")}`,
   sharedCollectionSaved: "Dodano do kolekcji znajomych",
   // Home screen — the keys app/index.tsx still inherited.
   noEmail: "Brak e-maila",
