@@ -5,6 +5,7 @@ import {
   assertDeclaredInEveryLocale,
   assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
+import { assertReadsKeys } from "./helpers/i18n-keys-read";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
@@ -82,9 +83,12 @@ describe("<PhotoLightbox> — fullscreen gallery", () => {
   });
 
   it("labels every control through t() — no hard-coded copy", () => {
-    for (const key of ["galleryClose", "galleryPrevious", "galleryNext", "galleryCounter"]) {
-      assert.match(lightboxSrc, new RegExp(`t\\("${key}"`), `${key} must be used`);
-    }
+    assertReadsKeys("components/photo-lightbox.tsx", [
+      "galleryClose",
+      "galleryPrevious",
+      "galleryNext",
+      "galleryCounter",
+    ]);
     assert.doesNotMatch(lightboxSrc, /accessibilityLabel="[^"]/);
   });
 });

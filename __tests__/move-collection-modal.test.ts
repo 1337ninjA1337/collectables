@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { assertReadsKeys } from "./helpers/i18n-keys-read";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -27,9 +28,10 @@ describe("HM-C1 — MoveCollectionModal extraction", () => {
 
   it("all modal strings go through t()", () => {
     const src = readModalSrc();
-    for (const key of ["moveToCollection", "cancel"]) {
-      assert.match(src, new RegExp(`t\\("${key}"`), `missing t("${key}")`);
-    }
+    assertReadsKeys("components/move-collection-modal.tsx", [
+      "moveToCollection",
+      "cancel",
+    ]);
     assert.match(src, /useI18n\(\)/);
   });
 

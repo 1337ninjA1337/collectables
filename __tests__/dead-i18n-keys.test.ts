@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { collectStringLiterals } from "@/lib/check-orphan-i18n-keys";
+import { collectStringLiterals } from "@/lib/i18n-key-usage";
 
 import { assertNoLocaleDeclares } from "./helpers/i18n-locales";
 import { readI18nSource } from "./helpers/i18n-source-file";

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { stripComments } from "@/lib/strip-comments";
 
+import { assertReadsKeys } from "./helpers/i18n-keys-read";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -67,9 +68,16 @@ describe("ShareSheet — shared deep-link sheet", () => {
 
   it("routes every chrome string through t()", () => {
     const src = shareSheetSrc();
-    for (const key of ["shareTitle", "linkCopied", "copyLink", "shareVia", "cancel"]) {
-      assert.match(src, new RegExp(`t\\("${key}"`), `missing t("${key}")`);
-    }
+    // Through the key-usage index rather than `t\("key"`: the direct call is
+    // one of four forms a key is reached by here, and this suite has no
+    // opinion about which one the sheet uses.
+    assertReadsKeys("components/share-sheet.tsx", [
+      "shareTitle",
+      "linkCopied",
+      "copyLink",
+      "shareVia",
+      "cancel",
+    ]);
     assert.match(src, /useI18n\(\)/);
     // The per-screen hint is a prop, not a hard-coded key.
     assert.doesNotMatch(src, /t\("share(Item|Collection|Profile)Hint"\)/);

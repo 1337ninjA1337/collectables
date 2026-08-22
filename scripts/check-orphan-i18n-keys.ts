@@ -4,8 +4,8 @@
  * nothing in the source tree. Run via `npm run lint:orphan-i18n` locally and
  * via `npm run lint:ci` in CI.
  *
- * The rule and the reasoning behind "read" live in
- * `lib/check-orphan-i18n-keys.ts`; this is the walk and the exit code.
+ * The orphan question lives in `lib/check-orphan-i18n-keys.ts` and the rule
+ * behind "read" in `lib/i18n-key-usage.ts`; this is the walk and the exit code.
  */
 
 import * as fs from "node:fs";
@@ -14,9 +14,9 @@ import * as path from "node:path";
 import {
   findOrphanI18nKeys,
   formatOrphanKeyReport,
-  type ScannedSource,
 } from "../lib/check-orphan-i18n-keys";
 import { GuardRootError } from "../lib/guard-root";
+import type { ScannedSource } from "../lib/i18n-key-usage";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
 import { SOURCE_DIRS } from "../lib/source-dirs";
 import { guardScanRoot, listSourceFiles } from "./guard-io";
@@ -27,9 +27,14 @@ const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
 /**
  * The translations file itself, excluded from the walk that reads it.
  *
- * It declares every key, so counting its own text as a mention would make
- * every key "read" and the guard vacuous — the one exclusion the rule cannot
- * do without.
+ * Defensive rather than load-bearing, which is the opposite of what this
+ * comment said until 2026-08-22. The map writes its keys as identifiers
+ * (`greeting: "Hello"`), so none of them sits in a key POSITION and including
+ * the file would make zero keys read — measured, and pinned by a case in
+ * `__tests__/i18n-key-usage.test.ts`. What the exclusion defends against is
+ * quoting the keys (`"greeting": "Hello"`), which would put all but the first
+ * of them after a comma and make this guard vacuous in a commit that reads as
+ * formatting.
  */
 const TRANSLATIONS_FILE = "lib/i18n-context.tsx";
 

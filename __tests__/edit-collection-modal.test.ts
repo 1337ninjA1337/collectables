@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { assertReadsKeys } from "./helpers/i18n-keys-read";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -29,7 +30,7 @@ describe("HM-C3 — EditCollectionModal extraction", () => {
 
   it("all modal strings go through t()", () => {
     const src = readModalSrc();
-    for (const key of [
+    assertReadsKeys("components/edit-collection-modal.tsx", [
       "editCollection",
       "collectionNameLabel",
       "collectionNamePlaceholder",
@@ -46,9 +47,7 @@ describe("HM-C3 — EditCollectionModal extraction", () => {
       "saving",
       "saveChanges",
       "cancelEdit",
-    ]) {
-      assert.match(src, new RegExp(`t\\("${key}"`), `missing t("${key}")`);
-    }
+    ]);
     assert.match(src, /useI18n\(\)/);
     // The two per-selection hints are named by `visibilityHintKey` rather than
     // here: the modal and the create screen were choosing between the same two

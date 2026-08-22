@@ -26,6 +26,16 @@
  * of keys, and the honest thing to publish is the count of decisions not made,
  * which is why {@link TranslationCoverage.inherited} carries the names.
  *
+ * Those two keys are the reason {@link UNTRANSLATABLE_KEYS} exists. They are
+ * not decisions nobody has made — they are decisions that were made and came
+ * back "English is correct here" — so counting them as gaps made `ru` read
+ * 99.6% forever and made every other row a percentage of something nobody can
+ * finish. The list is the ONE place this module admits an exemption, and it is
+ * kept honest by being small, reasoned per key, and checked against the base
+ * map in the suite: an entry naming a key that no longer exists shrinks the
+ * denominator by nothing and looks exactly like one that works, so something
+ * has to go looking for it.
+ *
  * Node-pure on purpose, and measured from the source rather than from an
  * import: `lib/i18n-context.tsx` pulls React Native peers. The reading itself
  * lives in `lib/i18n-source.ts` — one parser for that file, shared with the
@@ -52,15 +62,65 @@ export const TRANSLATION_LANGUAGES = ["ru", "en", "be", "pl", "de", "es"] as con
 
 export type TranslationLanguage = (typeof TRANSLATION_LANGUAGES)[number];
 
+/**
+ * Base keys that are correct in English in every language, and the reason each
+ * one is.
+ *
+ * A reason per key rather than a bare set, because that is what stops the list
+ * growing: an exemption is a key nobody has to justify again, and the smallest
+ * defence against that is making somebody write the justification down where
+ * the next reader will see it. Two entries today, both of them things rather
+ * than words — a product's name and an address — and neither of them a
+ * sentence a translator could improve.
+ *
+ * What this is NOT: a place to park a key that is merely hard, or one that
+ * five locales have not got to yet. Those are the inherited list, which is a
+ * worklist and is supposed to be long. The test for membership is whether a
+ * translator handed this key would correctly hand it back unchanged.
+ */
+export const UNTRANSLATABLE_KEYS: Readonly<Record<string, string>> = {
+  appName: "the product's name — a brand renders the same in every locale, and a translated one would be a different app",
+  emailPlaceholder: "`you@example.com`, an address rather than a phrase; the RFC 2606 example domain is not localised",
+  acquiredDatePlaceholder: "`2025-11-03`, an ISO 8601 date shown as the format the field expects — the format is what the parser accepts, so a locale writing `03.11.2025` would be documenting an input the field rejects",
+};
+
 /** One language's standing against the base map. */
 export type TranslationCoverage = {
   readonly language: string;
   /** Keys the language writes for itself. */
   readonly declared: number;
-  /** Keys in the base map this language does not declare, in base order. */
+  /**
+   * Translatable base keys this language does not declare, in base order —
+   * the worklist, and the numerator's complement.
+   *
+   * {@link UNTRANSLATABLE_KEYS} are excluded: a key that is correct in English
+   * is not work anybody can do, and listing it here made the list a worklist
+   * with two entries nobody could ever tick off. They are reported by
+   * {@link untranslatable} instead, so nothing is hidden — only moved out of
+   * the column that means "somebody still has to look at this".
+   */
   readonly inherited: readonly string[];
-  /** Size of the base map — the denominator. */
+  /**
+   * The {@link UNTRANSLATABLE_KEYS} this language does not declare, in base
+   * order.
+   *
+   * Per language rather than global because a locale MAY declare one — writing
+   * `appName: "Collectables"` is a decision too, just a redundant one — and a
+   * row that reported the exemptions it is not using would be claiming credit
+   * for a gap it does not have.
+   */
+  readonly untranslatable: readonly string[];
+  /** Size of the base map. The denominator is {@link translatable}. */
   readonly baseKeys: number;
+  /**
+   * The denominator: base keys minus the untranslatable ones.
+   *
+   * Separate from {@link baseKeys} rather than replacing it, because the two
+   * answer different questions and a single number would silently mean the
+   * second while being read as the first. `501 keys in the map, 499 of them
+   * translatable` is the honest pair.
+   */
+  readonly translatable: number;
   /**
    * Keys declared here that the base map does not have. Always empty today;
    * a non-empty list is a typo'd key, which `TranslationMap` would reject at
@@ -69,16 +129,33 @@ export type TranslationCoverage = {
   readonly unknown: readonly string[];
 };
 
-/** Translated share of the base map, 0–100, one decimal place. */
+/**
+ * Translated share of what can be translated, 0–100, one decimal place.
+ *
+ * Measured against {@link TranslationCoverage.translatable} rather than the
+ * whole map, which is what lets a finished locale read 100%. Before that,
+ * `ru` sat at 99.6% with the missing 0.4% being a brand name and an email
+ * address — a number that could not be moved, under a threshold somebody would
+ * eventually be tempted to lower.
+ */
 export function coveragePercent(row: TranslationCoverage): number {
-  if (row.baseKeys === 0) return 0;
-  const translated = row.baseKeys - row.inherited.length;
-  return Math.round((translated / row.baseKeys) * 1000) / 10;
+  if (row.translatable === 0) return 0;
+  const translated = row.translatable - row.inherited.length;
+  return Math.round((translated / row.translatable) * 1000) / 10;
 }
 
-/** One line per language, for a report a person reads. */
+/**
+ * One line per language, for a report a person reads.
+ *
+ * Names the exemptions when the row has any, because a reader who knows the
+ * map holds 501 keys and sees a denominator of 499 should not have to go
+ * looking for the difference.
+ */
 export function formatCoverageRow(row: TranslationCoverage): string {
-  return `${row.language}: ${row.baseKeys - row.inherited.length}/${row.baseKeys} keys (${coveragePercent(row).toFixed(1)}%), ${row.inherited.length} inherited from ${TRANSLATION_BASE_LANGUAGE}`;
+  const line = `${row.language}: ${row.translatable - row.inherited.length}/${row.translatable} keys (${coveragePercent(row).toFixed(1)}%), ${row.inherited.length} inherited from ${TRANSLATION_BASE_LANGUAGE}`;
+  return row.untranslatable.length === 0
+    ? line
+    : `${line}, ${row.untranslatable.length} not translatable (${row.untranslatable.join(", ")})`;
 }
 
 /**
@@ -103,6 +180,18 @@ export function translationCoverage(
   const baseKeys = base.keys;
   const baseSet = new Set(baseKeys);
 
+  // Intersected with the base map rather than trusted, so an exemption naming
+  // a key this source does not declare removes nothing from its denominator.
+  //
+  // NOT a throw, and the difference is worth stating: a stale entry is a
+  // finding about THIS REPOSITORY's map, and this function is handed any
+  // source — every hand-checkable fixture in the suite declares four keys and
+  // none of them is a brand name. Refusing here would make the general
+  // function unusable to prove the arithmetic, so the staleness claim is made
+  // where it can be made honestly, in `i18n-translation-coverage.test.ts`
+  // against the real map.
+  const exempt = baseKeys.filter((key) => key in UNTRANSLATABLE_KEYS);
+
   return languages.map((language) => {
     const block =
       language === TRANSLATION_BASE_LANGUAGE
@@ -112,14 +201,17 @@ export function translationCoverage(
       throw new Error(`no \`const ${language}\` translation map in the source`);
     }
     const declared = new Set(block.keys);
+    const missing = (keys: readonly string[]) =>
+      language === TRANSLATION_BASE_LANGUAGE
+        ? []
+        : keys.filter((key) => !declared.has(key));
     return {
       language,
       declared: block.keys.length,
-      inherited:
-        language === TRANSLATION_BASE_LANGUAGE
-          ? []
-          : baseKeys.filter((key) => !declared.has(key)),
+      inherited: missing(baseKeys).filter((key) => !(key in UNTRANSLATABLE_KEYS)),
+      untranslatable: missing(exempt),
       baseKeys: baseKeys.length,
+      translatable: baseKeys.length - exempt.length,
       unknown: block.keys.filter((key) => !baseSet.has(key)),
     };
   });
@@ -158,7 +250,7 @@ export const TRANSLATION_FLOORS: Readonly<
   },
   ru: {
     minimum: 465,
-    note: "499 of 501 on 2026-08-21 (99.6%) — the only fully-maintained locale, and the row that forced this re-measurement: it declared every one of the 35 removed keys, so the last family took it to exactly its old floor of 500 and the slack assertion (strict `<`) went red at equality. ~7% slack; the two inherited keys are pinned by name in the suite rather than left to this number.",
+    note: "499 of 501 on 2026-08-21 (99.6%) — the only fully-maintained locale, and the row that forced this re-measurement: it declared every one of the 35 removed keys, so the last family took it to exactly its old floor of 500 and the slack assertion (strict `<`) went red at equality. ~7% slack. It reads 100% since 2026-08-22 without declaring one more key: the two it inherits are `appName` and `emailPlaceholder`, now in UNTRANSLATABLE_KEYS and out of the denominator, and they are pinned by name in the suite rather than left to this number.",
   },
   be: {
     minimum: 279,
