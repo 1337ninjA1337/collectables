@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { assertReadsKeys } from "./helpers/i18n-keys-read";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -26,9 +27,12 @@ describe("BB-A — BulkBar extraction", () => {
 
   it("all bulk-bar strings go through t()", () => {
     const src = readBulkBarSrc();
-    for (const key of ["selectedCount", "moveToCollection", "delete", "cancel"]) {
-      assert.match(src, new RegExp(`t\\("${key}"`), `missing t("${key}")`);
-    }
+    assertReadsKeys("components/bulk-bar.tsx", [
+      "selectedCount",
+      "moveToCollection",
+      "delete",
+      "cancel",
+    ]);
     assert.match(src, /useI18n\(\)/);
   });
 

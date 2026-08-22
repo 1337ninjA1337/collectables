@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { assertReadsKeys } from "./helpers/i18n-keys-read";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -30,7 +31,7 @@ describe("HM-C2 — CollectionShareSheet extraction", () => {
     const src = readSheetSrc();
     // The chrome keys (shareTitle / copyLink / linkCopied / shareVia / cancel)
     // moved into <ShareSheet> — see __tests__/share-sheet.test.ts.
-    for (const key of [
+    assertReadsKeys("components/collection-share-sheet.tsx", [
       "shareCollectionHint",
       "shareWithFriends",
       "shareWithFriendsHint",
@@ -40,9 +41,7 @@ describe("HM-C2 — CollectionShareSheet extraction", () => {
       "peopleWithAccess",
       "peopleWithAccessHint",
       "removeAccess",
-    ]) {
-      assert.match(src, new RegExp(`t\\("${key}"`), `missing t("${key}")`);
-    }
+    ]);
     assert.match(src, /useI18n\(\)/);
   });
 
