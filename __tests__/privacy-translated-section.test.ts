@@ -7,6 +7,7 @@ import {
   PRIVACY_TRANSLATION_SOURCES,
   extractPrivacyTranslatedSection,
   privacyTranslatedSectionChecksum,
+  privacyTranslationChecksum,
 } from "../lib/privacy-translated-section";
 import { privacyPolicySourcePath } from "../lib/privacy-body-baselines";
 
@@ -144,6 +145,49 @@ describe("PRIVACY_TRANSLATION_SOURCES — one entry per translated page", () => 
     );
   });
 
+  it("records five different pages and one shared English section", () => {
+    // Two claims that read as bookkeeping and are the table's premise.
+    //
+    // The page checksums must all DIFFER: five equal values would mean five
+    // identical files, which is one language pasted over the others and is the
+    // thing the similarity gate refuses in the English direction only.
+    //
+    // The source checksums are all EQUAL today, and that is a state rather than
+    // a design — the first amendment splits them, because whoever refreshes the
+    // German records only German's. Asserted so the equality is a recorded fact
+    // somebody has to change deliberately, not a coincidence that invites
+    // collapsing the column into one constant.
+    const entries = Object.entries(PRIVACY_TRANSLATION_SOURCES);
+    const pages = entries.map(([, entry]) => entry.translatedChecksum);
+    assert.equal(
+      new Set(pages).size,
+      pages.length,
+      `two translated pages have the same checksum, so their files are identical: ${entries.map(([code, entry]) => `${code} ${entry.translatedChecksum}`).join(", ")}`,
+    );
+    assert.equal(
+      new Set(entries.map(([, entry]) => entry.sourceChecksum)).size,
+      1,
+      "the five entries no longer agree on which English section they were written against — that is expected mid-catch-up, and this case is the reminder to finish it",
+    );
+  });
+
+  it("fingerprints a page by its words, not its line breaks", () => {
+    // Same normalisation as the source side and the same argument: a prettier
+    // pass over five legal pages must not demand five explanations.
+    const page = "# Titel\n\n> Aufbewahrung bis zu 90 Tage,\n> niemals verkauft.\n";
+    const rewrapped = "# Titel\n\n> Aufbewahrung bis zu\n> 90 Tage, niemals verkauft.\n";
+    assert.equal(
+      privacyTranslationChecksum(page),
+      privacyTranslationChecksum(rewrapped),
+      "re-wrapping a translated page changed its checksum",
+    );
+    assert.notEqual(
+      privacyTranslationChecksum(page),
+      privacyTranslationChecksum(page.replace("90", "30")),
+      "changing the retention window in a translation did NOT change its checksum",
+    );
+  });
+
   for (const [code, entry] of Object.entries(PRIVACY_TRANSLATION_SOURCES)) {
     describe(`${code}`, () => {
       it("was written against the English section as it stands today", () => {
@@ -158,12 +202,32 @@ describe("PRIVACY_TRANSLATION_SOURCES — one entry per translated page", () => 
         );
       });
 
+      it("is itself the page that was confirmed", () => {
+        // The symmetric half. `sourceChecksum` catches the English moving out
+        // from under five translations; this catches one of the five moving on
+        // its own — a merge that drops the retention sentence from the German,
+        // or a "fix" that turns 90 into 30 in one language. The size gate next
+        // door sees a big enough deletion as a word count and sees nothing at
+        // all in a changed number, which is the edit that matters most on a page
+        // nobody in the room can read.
+        const path = privacyPolicySourcePath(code);
+        const current = privacyTranslationChecksum(readRepoFile(path));
+        assert.equal(
+          entry.translatedChecksum,
+          current,
+          `${path} has changed since it was last confirmed (recorded ${entry.checkedOn}).\n` +
+            `  This is a shipped legal disclosure in a language nobody reviewing the diff necessarily reads, so the edit needs saying out loud.\n` +
+            `  Record ${current} here with a note naming what changed and why — a rewrap alone cannot reach this checksum, so something in the words moved.`,
+        );
+      });
+
       it("carries a note that says what was confirmed", () => {
         // Same argument PRIVACY_BODY_BASELINES makes about its own numbers: the
         // documented repair for a red checksum is "paste the new one in", so the
         // field that stops that from being the whole commit is the one a
         // reviewer reads.
-        assert.match(entry.sourceChecksum, /^[0-9a-f]{16}$/, "checksum is not 16 lowercase hex characters");
+        assert.match(entry.sourceChecksum, /^[0-9a-f]{16}$/, "sourceChecksum is not 16 lowercase hex characters");
+        assert.match(entry.translatedChecksum, /^[0-9a-f]{16}$/, "translatedChecksum is not 16 lowercase hex characters");
         assert.match(entry.checkedOn, /^\d{4}-\d{2}-\d{2}$/, "checkedOn is not a YYYY-MM-DD date");
         assert.ok(
           entry.note.split(/\s+/).length >= 8,

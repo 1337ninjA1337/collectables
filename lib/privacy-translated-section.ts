@@ -87,24 +87,54 @@ export function extractPrivacyTranslatedSection(markdown: string): string {
   for (let index = starts[0].index; index < lines.length; index += 1) {
     const line = lines[index];
     if (!line.startsWith(">")) break;
-    body.push(line.replace(/^>\s?/, ""));
+    body.push(line);
   }
-  return body.join(" ").replace(/\s+/g, " ").trim();
+  return normalisePolicyText(body.join("\n"));
 }
 
 /**
- * A short, stable fingerprint of {@link extractPrivacyTranslatedSection}.
+ * Policy prose reduced to its words: quote markers off, whitespace collapsed.
  *
- * Sixteen hex characters of SHA-256: enough that two different disclosures will
- * not collide, short enough to read in a diff and to type into the table when a
- * translation is refreshed. The point of the field is to be compared by a
+ * The normalisation both checksums share, and the reason either is keepable.
+ * These files are hard-wrapped: a rewrap changes every line and no meaning, and
+ * a guard red for that would be switched off long before the amendment it was
+ * written for arrived. Everything a reader could act on survives — numbers,
+ * field names, the opt-out path — because only whitespace and the `>` prefix
+ * are discarded.
+ */
+export function normalisePolicyText(markdown: string): string {
+  return markdown
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^>\s?/, ""))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * A short, stable fingerprint. Sixteen hex characters of SHA-256: enough that
+ * two different disclosures will not collide, short enough to read in a diff and
+ * to type into the table when a page is refreshed. The field is compared by a
  * machine and READ by a reviewer, and a 64-character line is only the first.
  */
+function checksum(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex").slice(0, 16);
+}
+
+/** The English section the five translations carry, fingerprinted. */
 export function privacyTranslatedSectionChecksum(markdown: string): string {
-  return createHash("sha256")
-    .update(extractPrivacyTranslatedSection(markdown), "utf8")
-    .digest("hex")
-    .slice(0, 16);
+  return checksum(extractPrivacyTranslatedSection(markdown));
+}
+
+/**
+ * One whole `PRIVACY.md.<code>` page, fingerprinted.
+ *
+ * The whole file rather than its blockquote, because the sentence above the
+ * blockquote is a disclosure too — it tells a reader that the full policy exists
+ * and is in English, which is the other half of what art. 12 is asking for.
+ */
+export function privacyTranslationChecksum(markdown: string): string {
+  return checksum(normalisePolicyText(markdown));
 }
 
 /** One translation's record of the English text it was written against. */
@@ -114,13 +144,25 @@ export type PrivacyTranslationSource = {
    * translation was last confirmed to say the same thing.
    */
   readonly sourceChecksum: string;
+  /**
+   * {@link privacyTranslationChecksum} of this page's own file at that moment.
+   *
+   * The symmetric half, and the cheaper one. `sourceChecksum` catches the
+   * English moving out from under five translations; this catches one of the
+   * five moving on its own — a merge that drops the retention sentence from the
+   * German, a "fix" that turns 90 into 30 in one language. The size gate next
+   * door would see a big enough deletion as a word count and sees nothing at all
+   * in a changed number, which is the edit that matters most on a page nobody in
+   * the room can read.
+   */
+  readonly translatedChecksum: string;
   /** `YYYY-MM-DD` that confirmation was made. */
   readonly checkedOn: string;
   /**
-   * What was confirmed, and by what. On a refresh it must say what changed in
-   * the English — "90 → 30 day retention, re-translated" — because the whole
-   * value of the field is that a reviewer can tell a re-translation from a
-   * checksum somebody pasted to get the suite green.
+   * What was confirmed, and by what. On a refresh it must say what changed —
+   * "90 → 30 day retention, re-translated" — because the whole value of the
+   * field is that a reviewer can tell a re-translation from a checksum somebody
+   * pasted to get the suite green.
    */
   readonly note: string;
 };
@@ -134,40 +176,53 @@ export type PrivacyTranslationSource = {
  * without an entry here would ship unguarded, which is the state all five were
  * in until this table existed.
  *
- * The repair when this goes red is to READ the English section, decide whether
- * the change reached the meaning, update the translation if it did, and then
- * record the new checksum with a note saying which. Pasting the new checksum
- * alone is available and is exactly the failure `PRIVACY_BODY_BASELINES`
- * documents next door — which is why `note` is required to move with it, and
- * why it must name the change rather than the date.
+ * The repair when either checksum goes red is to READ the two texts, decide
+ * whether the change reached the meaning, re-translate if it did, and then
+ * record the new value with a note saying which. Pasting the new checksum alone
+ * is available and is exactly the failure `PRIVACY_BODY_BASELINES` documents
+ * next door — which is why `note` is required to move with it, and why it must
+ * name the change rather than the date.
+ *
+ * ALL FIVE `sourceChecksum` VALUES ARE IDENTICAL TODAY, and that is a state
+ * rather than a design. They are equal because no amendment has yet split them:
+ * the first change to the English section makes four of them stale while
+ * whoever refreshes the German records only German's. Collapsing the column
+ * into one shared constant would be correct arithmetic and would delete exactly
+ * the property the table is for — a partial catch-up showing as four remaining
+ * names instead of being cleared by one edit.
  */
 export const PRIVACY_TRANSLATION_SOURCES: Readonly<
   Record<string, PrivacyTranslationSource>
 > = {
   ru: {
     sourceChecksum: "9a80c71b9e718ede",
+    translatedChecksum: "d5f3f68fc7c8012d",
     checkedOn: "2026-08-22",
-    note: "First recorded checksum. The Russian page carries the Sentry blockquote as shipped 2026-08-11; nothing has amended the English section since, so this records the state rather than a re-translation.",
+    note: "First recorded checksums. The Russian page carries the Sentry blockquote as shipped 2026-08-11; nothing has amended the English section or this page since, so this records the state rather than a re-translation.",
   },
   be: {
     sourceChecksum: "9a80c71b9e718ede",
+    translatedChecksum: "d06943bcea0b8824",
     checkedOn: "2026-08-22",
-    note: "First recorded checksum, same English section and same reasoning as ru.",
+    note: "First recorded checksums, same English section and same reasoning as ru.",
   },
   pl: {
     sourceChecksum: "9a80c71b9e718ede",
+    translatedChecksum: "73bf12618bd8be4a",
     checkedOn: "2026-08-22",
-    note: "First recorded checksum, same English section and same reasoning as ru.",
+    note: "First recorded checksums, same English section and same reasoning as ru.",
   },
   de: {
     sourceChecksum: "9a80c71b9e718ede",
+    translatedChecksum: "be4906866243eb68",
     checkedOn: "2026-08-22",
-    note: "First recorded checksum, same English section and same reasoning as ru.",
+    note: "First recorded checksums, same English section and same reasoning as ru.",
   },
   es: {
     sourceChecksum: "9a80c71b9e718ede",
+    translatedChecksum: "366e646ebda615aa",
     checkedOn: "2026-08-22",
-    note: "First recorded checksum, same English section and same reasoning as ru.",
+    note: "First recorded checksums, same English section and same reasoning as ru.",
   },
 };
 
