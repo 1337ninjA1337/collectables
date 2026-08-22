@@ -407,7 +407,7 @@ describe("complete i18n families", () => {
     // what the verbatim case reads as "nothing to compare", so the two keys
     // most likely to be copied wholesale were the two it silently skipped.
     //
-    // Then `lib/plural-slavic.ts` moved the rule out of the map, and both
+    // Then `lib/plural.ts` moved the rule out of the map, and both
     // block bodies became one-line arrows. The capability is now correct and
     // unexercised by real data, which is the state a reader quietly loses: a
     // future simplification "nothing uses this" would be measurably true and

@@ -1,18 +1,58 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { slavicPlural } from "@/lib/plural-slavic";
+import { plural, slavicPlural } from "@/lib/plural";
 
 /**
- * The branch, exercised at the numbers that distinguish it.
+ * Both branches, exercised at the numbers that distinguish them.
  *
- * A plural rule tested at 1, 2 and 5 passes with the rule spelled backwards:
- * every three-form language agrees on those three, and what separates a
+ * A three-form rule tested at 1, 2 and 5 passes with the rule spelled
+ * backwards: every Slavic language agrees on those three, and what separates a
  * correct implementation from a plausible one is the teens. 11 takes the
  * "many" form despite ending in 1, and 111 takes the singular despite ending
  * in 11 — the `% 100` term is the whole content of the rule, and both halves
  * of it are checked here rather than assumed.
+ *
+ * The two-form rule has one interesting number and it is zero, which takes the
+ * PLURAL in all three of the languages that use it ("0 items", not "0 item").
+ * Written as `=== 1` rather than `< 2` for exactly that, and checked below.
  */
+
+describe("plural", () => {
+  const item = (n: unknown) => plural(n, "item", "items");
+
+  it("takes the singular for exactly one, and nothing else", () => {
+    assert.equal(item(1), "item");
+    for (const n of [0, 2, 3, 11, 21, 100]) {
+      assert.equal(item(n), "items", `${n} should take the plural`);
+    }
+  });
+
+  it("puts zero on the plural, which is the whole reason it is not `< 2`", () => {
+    // "0 items" in English, German and Spanish alike. A rule written as
+    // "fewer than two takes the singular" is green at 1 and wrong at 0, and 0
+    // is the number an empty collection shows.
+    assert.equal(item(0), "items");
+    assert.equal(plural(0, "Objekt", "Objekte"), "Objekte");
+    assert.equal(plural(0, "objeto", "objetos"), "objetos");
+  });
+
+  it("reads a numeric string and falls to the plural for anything else", () => {
+    // `TranslationParams` values are `string | number`, and a missing param
+    // arrives as `undefined`. "some unknown quantity of items" reads
+    // correctly; the singular would assert there is exactly one.
+    assert.equal(item("1"), "item");
+    for (const bad of [undefined, null, "", "abc", NaN, {}]) {
+      assert.equal(item(bad), "items", `${String(bad)} should fall to the plural`);
+    }
+  });
+
+  it("ignores the sign and the fraction rather than inventing a form", () => {
+    assert.equal(item(-1), "item");
+    assert.equal(item(1.7), "item");
+    assert.equal(item(2.1), "items");
+  });
+});
 
 const ITEM = ["предмет", "предмета", "предметов"] as const;
 const pick = (n: unknown) => slavicPlural(n, ...ITEM);

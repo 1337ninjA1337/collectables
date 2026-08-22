@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { trackEvent } from "@/lib/analytics";
 import { getDefaultLocaleForLanguage } from "@/lib/locale-helpers";
-import { slavicPlural } from "@/lib/plural-slavic";
+import { plural, slavicPlural } from "@/lib/plural";
 import { LANGUAGE_KEY } from "@/lib/storage-keys";
 
 export type AppLanguage = "ru" | "en" | "be" | "pl" | "de" | "es";
@@ -65,10 +65,13 @@ const en = {
   tabSubscribedCollections: "Subscribed",
   followCollection: "Follow collection",
   unfollowCollection: "Unfollow collection",
-  itemsCount: (params?: TranslationParams) => `${params?.count ?? 0} items`,
-  sharedWithPeople: (params?: TranslationParams) => `Shared with ${params?.count ?? 0} people`,
+  itemsCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "item", "items")}`,
+  sharedWithPeople: (params?: TranslationParams) =>
+    `Shared with ${params?.count ?? 0} ${plural(params?.count, "person", "people")}`,
   ownerLabel: (params?: TranslationParams) => `Owner: ${params?.name ?? ""}`,
-  photosCount: (params?: TranslationParams) => `${params?.count ?? 0} photos`,
+  photosCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "photo", "photos")}`,
   community: "Community",
   addFriend: "Add friend",
   removeFriend: "Remove friend",
@@ -83,7 +86,8 @@ const en = {
   profileCollections: "User collections",
   findPeople: "Find people",
   collectionNotFound: "Collection not found",
-  accessOpenFor: (params?: TranslationParams) => `Access is open for ${params?.count ?? 0} people`,
+  accessOpenFor: (params?: TranslationParams) =>
+    `Access is open for ${params?.count ?? 0} ${plural(params?.count, "person", "people")}`,
   viewingCollectionOf: (params?: TranslationParams) => `Viewing ${params?.name ?? ""}'s collection`,
   itemsInside: "Items inside",
   photosSaved: "Photos saved",
@@ -228,10 +232,12 @@ const en = {
   moveToCollection: "Move to collection",
   noOtherCollections: "You have no other collections to move items into.",
   deleteItemsTitle: (params?: TranslationParams) =>
-    `Delete ${params?.count ?? 0} ${Number(params?.count) === 1 ? "item" : "items"}?`,
+    `Delete ${params?.count ?? 0} ${plural(params?.count, "item", "items")}?`,
   deleteItemsText: "The selected items will be removed from this collection permanently.",
-  itemsMoved: (params?: TranslationParams) => `Moved ${params?.count ?? 0} items`,
-  itemsDeleted: (params?: TranslationParams) => `Deleted ${params?.count ?? 0} items`,
+  itemsMoved: (params?: TranslationParams) =>
+    `Moved ${params?.count ?? 0} ${plural(params?.count, "item", "items")}`,
+  itemsDeleted: (params?: TranslationParams) =>
+    `Deleted ${params?.count ?? 0} ${plural(params?.count, "item", "items")}`,
   emptyOwnedTitle: "Start your first collection",
   emptyOwnedHint: "Group items by theme — cards, coins, vinyl, toys — and share them with friends.",
   emptyOwnedCta: "Create collection",
@@ -267,7 +273,8 @@ const en = {
   exportPdfGenerating: "Generating PDF...",
   exportPdfDone: "PDF ready",
   exportPdfFailed: "Could not generate PDF",
-  exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} items`,
+  exportPdfItemCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "item", "items")}`,
   recentlyAdded: "Recently added",
   recentlyAddedHint: "Your latest items across all collections",
   wishlist: "Wishlist",
@@ -510,9 +517,9 @@ const en = {
     "You'll lose unlimited listings and your premium badge. The free cap returns immediately.",
   chatOfflinePill: "Offline · reconnecting",
   syncingPill: (params?: TranslationParams) =>
-    `Syncing ${params?.count ?? 0} change${params?.count === 1 ? "" : "s"}…`,
+    `Syncing ${params?.count ?? 0} ${plural(params?.count, "change", "changes")}…`,
   syncingPillA11y: (params?: TranslationParams) =>
-    `${params?.count ?? 0} change${params?.count === 1 ? "" : "s"} syncing to the cloud`,
+    `${params?.count ?? 0} ${plural(params?.count, "change", "changes")} syncing to the cloud`,
   crashFallbackTitle: "Something went wrong",
   crashFallbackBody:
     "An unexpected error occurred and we've logged it for review. Try again or restart the app.",
@@ -531,7 +538,7 @@ const en = {
   diagnosticsEventsTitle: "Events captured by this app",
   galleryOpen: "Open photo gallery",
   galleryOpenPhotos: (params?: TranslationParams) =>
-    `Open photo gallery, ${params?.count ?? 0} photos`,
+    `Open photo gallery, ${params?.count ?? 0} ${plural(params?.count, "photo", "photos")}`,
   galleryClose: "Close gallery",
   searchOverlayA11y: "Search items, collections and people",
   searchClose: "Close search",
@@ -2214,10 +2221,12 @@ const de: TranslationMap = {
   homeTitle: "Ein persönlicher Katalog von Sammlungen mit Fotos, Geschichten und Zugriff für Freunde.",
   homeSubtitle: "Fotografiere Gegenstände direkt in der App, speichere ihre Herkunft und öffne Sammlungen für die Menschen, denen du sie zeigen möchtest.",
   peopleAndFollowing: "Menschen und Abos",
-  itemsCount: (params?: TranslationParams) => `${params?.count ?? 0} Objekte`,
+  itemsCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "Objekt", "Objekte")}`,
   photosCount: (params?: TranslationParams) =>
-    `${params?.count ?? 0} Fotos`,
-  sharedWithPeople: (params?: TranslationParams) => `Mit ${params?.count ?? 0} Personen geteilt`,
+    `${params?.count ?? 0} ${plural(params?.count, "Foto", "Fotos")}`,
+  sharedWithPeople: (params?: TranslationParams) =>
+    `Mit ${params?.count ?? 0} ${plural(params?.count, "Person", "Personen")} geteilt`,
   cancelInvitation: "Einladung abbrechen",
   changeProfilePhoto: "Profilfoto ändern",
   descriptionLabel: "Beschreibung",
@@ -2497,7 +2506,8 @@ const de: TranslationMap = {
   // Collection-detail screen — the keys app/collection/[id].tsx still inherited.
   followCollection: "Sammlung folgen",
   unfollowCollection: "Nicht mehr folgen",
-  accessOpenFor: (params?: TranslationParams) => `Zugriff haben ${params?.count ?? 0} Personen`,
+  accessOpenFor: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "Person hat", "Personen haben")} Zugriff`,
   viewingCollectionOf: (params?: TranslationParams) =>
     `Du siehst die Sammlung von ${params?.name ?? ""}`,
   itemsInside: "Objekte darin",
@@ -2514,7 +2524,8 @@ const de: TranslationMap = {
   noAccessCover: "Erlaube den Zugriff auf Fotos, damit du ein Sammlungscover wählen kannst.",
   selectItems: "Auswählen",
   noOtherCollections: "Du hast keine anderen Sammlungen, in die du Objekte verschieben kannst.",
-  deleteItemsTitle: (params?: TranslationParams) => `${params?.count ?? 0} Objekte löschen?`,
+  deleteItemsTitle: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "Objekt", "Objekte")} löschen?`,
   deleteItemsText:
     "Die ausgewählten Objekte werden endgültig aus dieser Sammlung entfernt.",
   itemsMoved: (params?: TranslationParams) => `Verschoben: ${params?.count ?? 0}`,
@@ -2523,7 +2534,8 @@ const de: TranslationMap = {
   exportPdfGenerating: "PDF wird erstellt...",
   exportPdfDone: "PDF fertig",
   exportPdfFailed: "PDF konnte nicht erstellt werden",
-  exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} Objekte`,
+  exportPdfItemCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "Objekt", "Objekte")}`,
   sharedCollectionSaved: "Zu deinen Freundes-Sammlungen hinzugefügt",
   // Home screen — the keys app/index.tsx still inherited.
   noEmail: "Keine E-Mail",
@@ -2631,8 +2643,10 @@ const es: TranslationMap = {
     "Informes de fallos: desactivados — nada sale del dispositivo",
   diagnosticsDsnInlined: "Sentry DSN integrado en esta compilación",
   diagnosticsEventsTitle: "Eventos capturados por esta aplicación",
-  loadMoreItems: (params?: TranslationParams) => `Cargar más (${params?.count ?? 0} restantes)`,
-  loadMoreItemsA11y: (params?: TranslationParams) => `Cargar más objetos — ${params?.count ?? 0} restantes`,
+  loadMoreItems: (params?: TranslationParams) =>
+    `Cargar más (${params?.count ?? 0} ${plural(params?.count, "restante", "restantes")})`,
+  loadMoreItemsA11y: (params?: TranslationParams) =>
+    `Cargar más objetos — ${params?.count ?? 0} ${plural(params?.count, "restante", "restantes")}`,
   loadMoreItemsHint: "Carga la siguiente página para que la memoria de iOS no crezca sin control.",
   searchInCollectionPlaceholder: "Buscar por título",
   searchInCollectionA11y: "Buscar objetos de esta colección por título",
@@ -2698,10 +2712,12 @@ const es: TranslationMap = {
   homeSubtitle: "Fotografía objetos dentro de la app, guarda detalles de su origen y abre las colecciones a las personas con las que quieras compartirlas.",
   createCollection: "Crear colección",
   peopleAndFollowing: "Personas y suscripciones",
-  itemsCount: (params?: TranslationParams) => `${params?.count ?? 0} objetos`,
+  itemsCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "objeto", "objetos")}`,
   photosCount: (params?: TranslationParams) =>
-    `${params?.count ?? 0} fotos`,
-  sharedWithPeople: (params?: TranslationParams) => `Compartido con ${params?.count ?? 0} personas`,
+    `${params?.count ?? 0} ${plural(params?.count, "foto", "fotos")}`,
+  sharedWithPeople: (params?: TranslationParams) =>
+    `Compartido con ${params?.count ?? 0} ${plural(params?.count, "persona", "personas")}`,
   cancelInvitation: "Cancelar invitación",
   changeProfilePhoto: "Cambiar foto del perfil",
   descriptionLabel: "Descripción",
@@ -2982,7 +2998,8 @@ const es: TranslationMap = {
   // Collection-detail screen — the keys app/collection/[id].tsx still inherited.
   followCollection: "Seguir colección",
   unfollowCollection: "Dejar de seguir",
-  accessOpenFor: (params?: TranslationParams) => `${params?.count ?? 0} personas tienen acceso`,
+  accessOpenFor: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "persona tiene", "personas tienen")} acceso`,
   viewingCollectionOf: (params?: TranslationParams) =>
     `Viendo la colección de ${params?.name ?? ""}`,
   itemsInside: "Objetos dentro",
@@ -2999,7 +3016,8 @@ const es: TranslationMap = {
   noAccessCover: "Permite el acceso a las fotos para elegir la portada de la colección.",
   selectItems: "Seleccionar",
   noOtherCollections: "No tienes otras colecciones a las que mover los objetos.",
-  deleteItemsTitle: (params?: TranslationParams) => `¿Eliminar ${params?.count ?? 0} objetos?`,
+  deleteItemsTitle: (params?: TranslationParams) =>
+    `¿Eliminar ${params?.count ?? 0} ${plural(params?.count, "objeto", "objetos")}?`,
   deleteItemsText:
     "Los objetos seleccionados se eliminarán de esta colección de forma permanente.",
   itemsMoved: (params?: TranslationParams) => `Movidos: ${params?.count ?? 0}`,
@@ -3008,7 +3026,8 @@ const es: TranslationMap = {
   exportPdfGenerating: "Generando PDF...",
   exportPdfDone: "PDF listo",
   exportPdfFailed: "No se pudo generar el PDF",
-  exportPdfItemCount: (params?: TranslationParams) => `${params?.count ?? 0} objetos`,
+  exportPdfItemCount: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "objeto", "objetos")}`,
   sharedCollectionSaved: "Añadida a tus colecciones de amigos",
   // Home screen — the keys app/index.tsx still inherited.
   noEmail: "Sin correo",
