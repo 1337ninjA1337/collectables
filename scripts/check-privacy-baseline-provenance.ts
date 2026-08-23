@@ -61,6 +61,7 @@ import * as path from "node:path";
 
 import {
   PROVENANCE_TABLES,
+  changedFilesRefusal,
   provenanceRegistryRefusal,
   type ProvenanceTable,
 } from "../lib/provenance-tables";
@@ -286,6 +287,16 @@ function main(): void {
   // would want to have to reason about.
   const changedFiles =
     comparison.kind === "compare" ? changedFilesSince(comparison.ref) : [];
+
+  // Checked once, here, before any table has read it — see
+  // {@link changedFilesRefusal}. A list that is not repo-relative makes every
+  // table's answer wrong in the same way, so it is a stopped run rather than one
+  // false report per entry.
+  const diffRefusal = changedFilesRefusal(CHECK_NAME, changedFiles);
+  if (diffRefusal !== null) {
+    console.error(diffRefusal);
+    process.exit(1);
+  }
 
   const outcomes = PROVENANCE_TABLES.map((table: ProvenanceTable) =>
     table.run(CHECK_NAME, {

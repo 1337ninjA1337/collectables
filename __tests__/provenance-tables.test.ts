@@ -5,6 +5,7 @@ import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
 import { PRIVACY_TRANSLATION_SOURCES } from "../lib/privacy-translated-section";
 import {
   PROVENANCE_TABLES,
+  changedFilesRefusal,
   defineProvenanceTable,
   provenanceRegistryRefusal,
   type ProvenanceBaseRevision,
@@ -288,6 +289,100 @@ describe("PROVENANCE_TABLES — the registry the guard loops over", () => {
     assert.ok(
       refusal.includes(`"${first.id}"`),
       `the refusal does not name the duplicated id: ${refusal}`,
+    );
+  });
+
+  it("accepts the shape a repo-root `git diff --name-only` emits", () => {
+    assert.equal(
+      changedFilesRefusal("guard", [
+        "PRIVACY.md",
+        "PRIVACY.md.de",
+        "lib/privacy-body-baselines.ts",
+        "__tests__/helpers/repo-file.ts",
+      ]),
+      null,
+    );
+    // Nothing touched is not this rule's business: each table already reads an
+    // empty diff as "the file did not move".
+    assert.equal(changedFilesRefusal("guard", []), null);
+  });
+
+  it("refuses a diff that cannot match a recorded path", () => {
+    // Both shapes a real caller produces: absolute paths, and paths re-anchored
+    // by a `git diff` run somewhere other than the repository root. Either one
+    // makes every lookup miss, so every value that moved is reported as
+    // describing an untouched file.
+    for (const file of [
+      "/home/runner/work/collectables/PRIVACY.md",
+      "C:/repo/PRIVACY.md",
+      "./PRIVACY.md",
+      "../collectables/PRIVACY.md",
+      "..",
+      "",
+    ]) {
+      const refusal = changedFilesRefusal("guard", [file]);
+      assert.ok(
+        refusal !== null,
+        `${JSON.stringify(file)} passed as a repo-relative path`,
+      );
+      assert.match(refusal, /^guard: ERROR — /);
+    }
+  });
+
+  it("leaves a legal posix filename alone, backslashes and all", () => {
+    // Git emits forward slashes on Windows too, so a backslash here is a legal
+    // filename or one of git's quoted `"…\303\251…"` paths. A guard that
+    // refused to run because somebody added a file with an accent in its name
+    // is a guard that gets deleted.
+    assert.equal(
+      changedFilesRefusal("guard", [
+        "docs/a\\b.md",
+        '"PRIVACY.md.\\303\\251"',
+        "lib/.hidden.ts",
+        "a..b/PRIVACY.md",
+      ]),
+      null,
+    );
+  });
+
+  it("says what the guard would have concluded, not just that a path is odd", () => {
+    const refusal = changedFilesRefusal("guard", ["/abs/PRIVACY.md", "lib/x.ts"]);
+    assert.ok(refusal !== null);
+    // The count is of OFFENDERS against the whole list, because "1 of 2" and
+    // "2 of 2" are different diagnoses.
+    assert.match(refusal, /1 of 2 changed-file path\(s\)/);
+    assert.match(refusal, /"\/abs\/PRIVACY\.md"/);
+    assert.match(refusal, /untouched file/);
+    assert.match(refusal, /repository root/);
+  });
+
+  it("quotes a few offenders rather than the whole diff", () => {
+    // The failure is systematic — a diff resolved against the wrong root makes
+    // every entry wrong — so the first few are the diagnosis and the rest is
+    // scroll.
+    const files = Array.from({ length: 40 }, (_, index) => `/abs/${index}.md`);
+    const refusal = changedFilesRefusal("guard", files);
+    assert.ok(refusal !== null);
+    assert.match(refusal, /40 of 40 changed-file path\(s\)/);
+    assert.match(refusal, /and 37 more/);
+    assert.ok(
+      !refusal.includes("/abs/39.md"),
+      `the refusal quoted the whole diff: ${refusal}`,
+    );
+  });
+
+  it("is checked by the script before any table reads the list", () => {
+    // The rule is only worth having if it runs first: reached after the loop, it
+    // would print its explanation under six failures it exists to prevent.
+    const script = stripComments(
+      readRepoFile("scripts/check-privacy-baseline-provenance.ts"),
+    );
+    const refusalAt = script.indexOf("changedFilesRefusal(CHECK_NAME");
+    const loopAt = script.indexOf("PROVENANCE_TABLES.map");
+    assert.ok(refusalAt !== -1, "the script does not call changedFilesRefusal");
+    assert.ok(
+      refusalAt < loopAt,
+      "the script checks the diff shape after running the tables over it",
     );
   });
 

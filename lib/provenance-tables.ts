@@ -97,7 +97,21 @@ export type ProvenanceBaseRevision = {
   readonly present: boolean;
   /** The module's source at `ref`, or null when git could not show it. */
   readonly source: string | null;
-  /** Repo-relative posix paths the same diff touched, as `git diff --name-only` emits. */
+  /**
+   * Repo-relative posix paths the same diff touched, as `git diff --name-only`
+   * emits.
+   *
+   * Deliberately UNFILTERED, and deliberately shared. Before the loop each table
+   * asked for its own diff and could in principle have asked a narrower
+   * question; none did. "Which files the diff touched" is now a guard-level fact
+   * rather than a per-table one, so a table wanting a path-filtered view of it
+   * has to change the loop rather than its own entry — which is the right place
+   * for that argument to happen.
+   *
+   * Shape-checked once, by {@link changedFilesRefusal}, for the same reason: a
+   * list that is not repo-relative makes every table's answer wrong in the same
+   * way.
+   */
   readonly changedFiles: readonly string[];
 };
 
@@ -325,6 +339,70 @@ export const PROVENANCE_TABLES: readonly ProvenanceTable[] = [
  *
  * Returns the refusal, or null when the registry is fit to run.
  */
+/**
+ * How many offenders the refusal quotes before it stops. The failure this
+ * catches is systematic — a diff resolved against the wrong root makes EVERY
+ * entry wrong — so the first few are the whole diagnosis and the remaining
+ * hundred are scroll.
+ */
+const CHANGED_FILES_QUOTED = 3;
+
+/**
+ * Why the guard checks the one input nothing else validates.
+ *
+ * Every evaluator validates its own table — dates, checksums, note lengths, keys
+ * against a closed set — and then compares a recorded path against this list,
+ * which arrives from `git diff --name-only` and is trusted on sight. Trusted for
+ * good reason today: one caller builds it, one call, in the repository root. The
+ * failure is what happens when that stops being true.
+ *
+ * A `git diff` run from a subdirectory, or a caller that resolved the entries
+ * against the repo root before passing them, produces absolute or dot-prefixed
+ * paths. Every table looks up `PRIVACY.md` in that set, finds nothing, and
+ * reports the value as unbacked — so the guard prints six failures saying files
+ * were untouched, naming files the reader can see in their own diff, and the
+ * reader spends the morning looking for a bug in the recorded values. A stopped
+ * run with a reason is worth more than six right-shaped failures with the wrong
+ * cause.
+ *
+ * Two shapes are refused and a third deliberately is not. Absolute paths (posix
+ * `/…` or a `C:` drive prefix) and paths re-anchored with `./` or `../` cannot
+ * come out of a repo-root `--name-only` and cannot match a recorded path.
+ * BACKSLASHES are left alone: git emits forward slashes on Windows too, so a
+ * backslash here is either a legal posix filename or one of git's quoted
+ * `"…\303\251…"` paths, and a guard that refused to run because somebody added a
+ * file with an accent in its name would be deleted within the week.
+ *
+ * An EMPTY list is fine and is not this function's business: it means the diff
+ * touched nothing, which each table already reads as "the file did not move".
+ *
+ * Returns the refusal, or null when the list is usable.
+ */
+export function changedFilesRefusal(
+  checkName: string,
+  changedFiles: readonly string[],
+): string | null {
+  const offenders = changedFiles.filter(
+    (file) =>
+      file === "" ||
+      file.startsWith("/") ||
+      /^[A-Za-z]:/.test(file) ||
+      file === ".." ||
+      file.startsWith("./") ||
+      file.startsWith("../"),
+  );
+  if (offenders.length === 0) return null;
+  const quoted = offenders
+    .slice(0, CHANGED_FILES_QUOTED)
+    .map((file) => JSON.stringify(file))
+    .join(", ");
+  const rest =
+    offenders.length > CHANGED_FILES_QUOTED
+      ? ` and ${offenders.length - CHANGED_FILES_QUOTED} more`
+      : "";
+  return `${checkName}: ERROR — ${offenders.length} of ${changedFiles.length} changed-file path(s) are not repo-relative: ${quoted}${rest}. Every table compares a recorded path (PRIVACY.md, PRIVACY.md.de, …) against this list, so none of them would match and every value that moved would be reported as describing an untouched file — six failures naming files you can see in your own diff. That is worse than stopping. The usual cause is a \`git diff --name-only\` run somewhere other than the repository root, or a caller that resolved the paths before passing them.`;
+}
+
 export function provenanceRegistryRefusal(
   checkName: string,
   tables: readonly ProvenanceTable[],
