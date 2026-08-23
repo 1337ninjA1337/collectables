@@ -208,6 +208,35 @@ describe("evaluatePrivacyBaselineShape", () => {
     assert.deepEqual(evaluatePrivacyBaselineShape({ en: baseline() }), []);
   });
 
+  it("reports a language no /privacy page is published for, instead of throwing later", () => {
+    // The drift half asks `privacyPolicySourcePath` for this key's file, and
+    // that helper refuses an unknown code — as an exception, on the one run
+    // where the entry's number happened to move. As a shape rule it is a report,
+    // every run, before anything reads history.
+    const failures = evaluatePrivacyBaselineShape({ "de-DE": baseline() });
+    assert.deepEqual(codesOf(failures), ["unknown_language"]);
+    const message = formatBaselineProvenanceFailure("guard", failures[0]);
+    assert.match(message, /no \/privacy page is published for/);
+    for (const { code } of PRIVACY_PAGE_LANGUAGES) {
+      assert.ok(
+        message.includes(code),
+        `the refusal does not name the known code ${code}: ${message}`,
+      );
+    }
+  });
+
+  it("does not throw on the table it refuses, so the whole report still prints", () => {
+    // A shape half that threw would take the other five entries' findings with
+    // it, which is the failure mode this rule was moved here to avoid.
+    assert.doesNotThrow(() =>
+      evaluatePrivacyBaselineShape({ fr: baseline(), en: baseline() }),
+    );
+    assert.deepEqual(
+      codesOf(evaluatePrivacyBaselineShape({ fr: baseline(), en: baseline() })),
+      ["unknown_language"],
+    );
+  });
+
   it("fails a recordedOn that is not a YYYY-MM-DD date", () => {
     const failures = evaluatePrivacyBaselineShape({
       en: baseline({ recordedOn: "August 2026" }),

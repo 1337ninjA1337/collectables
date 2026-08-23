@@ -26,8 +26,10 @@ import {
   privacyPolicySourcePath,
   type PrivacyBodyBaseline,
 } from "./privacy-body-baselines";
+import { PRIVACY_PAGE_LANGUAGES } from "./privacy-page";
 
 export type BaselineProvenanceFailureCode =
+  | "unknown_language"
   | "malformed_date"
   | "note_too_short"
   | "non_positive_words"
@@ -70,6 +72,19 @@ export function evaluatePrivacyBaselineShape(
 ): readonly BaselineProvenanceFailure[] {
   const failures: BaselineProvenanceFailure[] = [];
   for (const [language, baseline] of Object.entries(baselines)) {
+    // Asked FIRST, and asked here rather than left to `privacyPolicySourcePath`
+    // to throw. The drift half asks that helper for this key's file, so an entry
+    // for a language nothing publishes reaches it as an exception — a stack
+    // trace where every other failure in this guard is an `ERROR — ` line — and
+    // only on the run where that entry's number happened to move. As a shape
+    // rule it is a report, on every run, before anything reads history.
+    if (!PRIVACY_PAGE_LANGUAGES.some(({ code }) => code === language)) {
+      failures.push({
+        language,
+        code: "unknown_language",
+        detail: PRIVACY_PAGE_LANGUAGES.map(({ code }) => code).join(", "),
+      });
+    }
     if (!Number.isInteger(baseline.words) || baseline.words <= 0) {
       failures.push({
         language,
@@ -171,6 +186,8 @@ const BASELINE_PROVENANCE_MESSAGE: Record<
   BaselineProvenanceFailureCode,
   (language: string, detail: string | undefined) => string
 > = {
+  unknown_language: (language, detail) =>
+    `PRIVACY_BODY_BASELINES["${language}"] describes a language no /privacy page is published for — the baseline names PRIVACY.md.${language}, a file that does not exist, and the drift half compares that name against the files a diff touched, so it would report the file as untouched rather than as missing. Known codes: ${detail ?? "see PRIVACY_PAGE_LANGUAGES"}.`,
   non_positive_words: (language, detail) =>
     `PRIVACY_BODY_BASELINES["${language}"].words is ${detail ?? "not a positive integer"} — a baseline is a measured word count, and a zero or negative one makes the ±band around it meaningless.`,
   malformed_date: (language, detail) =>

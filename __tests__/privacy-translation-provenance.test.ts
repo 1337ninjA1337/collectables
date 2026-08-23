@@ -81,6 +81,30 @@ describe("PRIVACY_TRANSLATION_SOURCES — the shipped table", () => {
 });
 
 describe("the shape half", () => {
+  it("reports a language no translated page is published for, instead of throwing later", () => {
+    // The drift half hands this key to `privacyPolicySourcePath`, which refuses
+    // an unknown code — as an exception, on the one run where that entry's
+    // checksum happened to move. As a shape rule it is a report, every run.
+    assert.deepEqual(
+      codesOf(evaluateTranslationProvenanceShape({ "de-DE": entry() })),
+      ["unknown_language"],
+    );
+  });
+
+  it("refuses an `en` entry, because English is the source and not a translation", () => {
+    // A table that recorded a checksum of PRIVACY.md against itself has
+    // misunderstood what it is for, and every other case here would pass on it.
+    assert.deepEqual(
+      codesOf(evaluateTranslationProvenanceShape({ en: entry() })),
+      ["unknown_language"],
+    );
+    assert.deepEqual(
+      codesOf(evaluateTranslationProvenanceShape({ de: entry() })),
+      [],
+      "the rule above rejects a language the table legitimately carries",
+    );
+  });
+
   it("refuses a checksum that cannot have been measured", () => {
     assert.deepEqual(
       codesOf(evaluateTranslationProvenanceShape({ de: entry({ sourceChecksum: "TODO" }) })),

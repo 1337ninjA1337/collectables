@@ -30,9 +30,13 @@
 
 import { privacyPolicySourcePath } from "./privacy-body-baselines";
 import { PRIVACY_DEFAULT_LANGUAGE } from "./privacy-page";
-import type { PrivacyTranslationSource } from "./privacy-translated-section";
+import {
+  PRIVACY_TRANSLATED_LANGUAGES,
+  type PrivacyTranslationSource,
+} from "./privacy-translated-section";
 
 export type TranslationProvenanceFailureCode =
+  | "unknown_language"
   | "malformed_checksum"
   | "malformed_date"
   | "note_too_short"
@@ -65,6 +69,20 @@ export function evaluateTranslationProvenanceShape(
 ): readonly TranslationProvenanceFailure[] {
   const failures: TranslationProvenanceFailure[] = [];
   for (const [language, entry] of Object.entries(table)) {
+    // Asked FIRST, for the same reason its neighbour asks it: the drift half
+    // hands this key to `privacyPolicySourcePath`, which refuses a language no
+    // page is published for — as an exception, on the one run where that entry's
+    // checksum happened to move. Here it is a report instead, every run. English
+    // is excluded on purpose: it is the SOURCE these five are checked against,
+    // not a translation, so an `en` entry is a table that has misunderstood
+    // itself.
+    if (!PRIVACY_TRANSLATED_LANGUAGES.includes(language)) {
+      failures.push({
+        language,
+        code: "unknown_language",
+        detail: PRIVACY_TRANSLATED_LANGUAGES.join(", "),
+      });
+    }
     for (const [field, value] of [
       ["sourceChecksum", entry.sourceChecksum],
       ["translatedChecksum", entry.translatedChecksum],
@@ -168,6 +186,8 @@ const MESSAGE: Record<
   TranslationProvenanceFailureCode,
   (language: string, detail: string | undefined) => string
 > = {
+  unknown_language: (language, detail) =>
+    `PRIVACY_TRANSLATION_SOURCES["${language}"] is not a language a translated /privacy page is published for. The entry records a checksum of PRIVACY.md.${language}, and the drift half compares that name against the files a diff touched, so it would report the page as untouched rather than as missing. Translated pages: ${detail ?? "see PRIVACY_TRANSLATED_LANGUAGES"}.`,
   malformed_checksum: (language, detail) =>
     `PRIVACY_TRANSLATION_SOURCES["${language}"]: ${detail ?? "a checksum"} — expected sixteen lowercase hex characters, which is what privacyTranslatedSectionChecksum emits. A value that shape cannot have been measured.`,
   malformed_date: (language, detail) =>
