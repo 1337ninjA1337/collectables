@@ -4,19 +4,22 @@
  * changed without the provenance that makes the change reviewable. Run via
  * `npm run lint:baseline-provenance`; part of the `lint:all` fan-out.
  *
- * TWO tables, one guard: `PRIVACY_BODY_BASELINES` (a word count per page) and
- * `PRIVACY_TRANSLATION_SOURCES` (a checksum of the English disclosure and of
- * each translation). Same question of both — a measurement moved, did the diff
- * say why — and the same three answers needed from git, which is the part with
- * the CI-specific reasoning in it and the reason they share a script rather than
- * having one each.
+ * N tables, one guard, and this file no longer names any of them. Which tables
+ * exist, how each is parsed and judged, and what each says about itself are
+ * `lib/provenance-tables.ts`; today that is `PRIVACY_BODY_BASELINES` (a word
+ * count per page) and `PRIVACY_TRANSLATION_SOURCES` (a checksum of the English
+ * disclosure and of each translation). Same question of both — a measurement
+ * moved, did the diff say why — and the same three answers needed from git,
+ * which is the part with the CI-specific reasoning in it and the reason they
+ * share a script rather than having one each.
  *
  * The matching logic is pure and lives in `lib/privacy-baseline-provenance.ts`
  * and `lib/privacy-translation-provenance.ts`; this file is the git half — it
- * decides WHAT to compare against and reads the previous revision of each table
- * as text. Both reports are printed before either exit code is honoured: the
- * commit that amends the English disclosure moves the word count AND all five
- * checksums, so stopping at the first would hide half the work behind a fix.
+ * decides WHAT to compare against and reads each table's module at that
+ * revision as text. Every report is printed before any exit code is honoured:
+ * the commit that amends the English disclosure moves the word count AND all
+ * five checksums, so stopping at the first would hide half the work behind a
+ * fix.
  *
  * Base revision, first match wins:
  *
@@ -47,30 +50,20 @@
  * post-build premise work exists to stamp out. The message names the fix. A
  * repository whose HEAD is the ROOT commit is a genuine skip — there is no
  * previous revision, so nothing could have changed a baseline — and so is a
- * base revision from before the table module existed. A base revision where
- * the module DID exist and yields no table is a failure, not a skip: see
- * {@link classifyBaselineRevision}.
+ * base revision from before a table's module existed. A base revision where
+ * that module DID exist and yields no table is a failure, not a skip — for the
+ * tables that ask for the distinction; each declares its own answer in
+ * `lib/provenance-tables.ts`.
  */
 
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 
 import {
-  classifyBaselineRevision,
-  evaluatePrivacyBaselineProvenance,
-  formatBaselineProvenanceReport,
-  formatBaselineRevisionUnparseable,
-  type BaselineRevision,
-} from "../lib/privacy-baseline-provenance";
-import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
-import {
-  PRIVACY_TRANSLATION_SOURCES,
-  parsePrivacyTranslationSources,
-} from "../lib/privacy-translated-section";
-import {
-  evaluateTranslationProvenance,
-  formatTranslationProvenanceReport,
-} from "../lib/privacy-translation-provenance";
+  PROVENANCE_TABLES,
+  provenanceRegistryRefusal,
+  type ProvenanceTable,
+} from "../lib/provenance-tables";
 import {
   GUARD_ROOT_ENV,
   GuardRootError,
@@ -80,39 +73,20 @@ import {
 } from "../lib/guard-root";
 
 const CHECK_NAME = "check-privacy-baseline-provenance";
-const BASELINE_MODULE = "lib/privacy-body-baselines.ts";
-/**
- * The second table this guard covers: the per-language checksums of the English
- * disclosure and of each shipped translation.
- *
- * Here rather than in a guard of its own because the question is identical — a
- * recorded measurement changed, did the diff say why — and because both tables
- * need the same three things this file already works out: which revision to
- * compare against, whether that revision is readable, and which files the same
- * diff touched. A second script would be a second copy of the base-ref
- * resolution, which is the part with the CI-specific reasoning in it.
- *
- * The two passes are otherwise independent: separate parsers, separate
- * evaluators, separate reports, and a failure in one does not suppress the
- * other's report. The `absent` skip is per table too — this module is younger
- * than the baselines one, so there are revisions where one is readable and the
- * other is not.
- */
-const TRANSLATION_MODULE = "lib/privacy-translated-section.ts";
 
 /**
  * Repository whose HISTORY is read. Overridable by
  * `PRIVACY_BASELINE_REPO_ROOT` for exactly one reason: the three
- * {@link classifyBaselineRevision} branches are unreachable from inside this
+ * classification branches a table can produce are unreachable from inside this
  * repository, because `merge-base` is doing its job. A scratch commit that
- * deletes or mangles the module resolves back to the fork point, which still
+ * deletes or mangles a module resolves back to the fork point, which still
  * holds a good table, so `absent` and `unparseable` can be reasoned about here
  * and never executed. `__tests__/privacy-baseline-provenance-script.test.ts`
  * builds a throwaway repository with the history each branch needs and points
  * the script at it.
  *
- * The override moves the history half ONLY — the table being checked is always
- * this repo's imported `PRIVACY_BODY_BASELINES`. It is announced on stdout
+ * The override moves the history half ONLY — the tables being checked are always
+ * the ones `lib/provenance-tables.ts` imported from this checkout. It is announced on stdout
  * whenever it is set, because an env var that silently redirects a guard at an
  * empty repository is a green build that checked nothing, which is the failure
  * mode this whole file was written against.
@@ -258,36 +232,19 @@ function resolveComparison(argv: readonly string[]): Comparison {
 }
 
 /**
- * The table as it stood at `ref` — and, when there is none, WHICH kind of none.
+ * One table's module as it stood at `ref`, as text plus the presence bit.
  *
- * `git cat-file -e` is asked first and separately: "the module was not there
- * yet" is a skip, "the module was there and no table came out of it" is a
- * failure, and the parser cannot tell those apart.
+ * `git cat-file -e` is asked first and separately because "the module was not
+ * there yet" is a skip and "the module was there and no table came out of it" is
+ * a failure, and no parser can tell those apart. Which of the two a given table
+ * makes of it is that table's own business — see `lib/provenance-tables.ts`.
  */
-function baselinesAt(ref: string): BaselineRevision {
-  const present = git("cat-file", "-e", `${ref}:${BASELINE_MODULE}`) !== null;
-  return classifyBaselineRevision(
+function moduleAt(modulePath: string, ref: string) {
+  const present = git("cat-file", "-e", `${ref}:${modulePath}`) !== null;
+  return {
     present,
-    present ? git("show", `${ref}:${BASELINE_MODULE}`) : null,
-  );
-}
-
-/**
- * The checksum table as it stood at `ref`, or null when nothing comparable is
- * there.
- *
- * Null rather than the three-way classification the baselines table gets, and
- * the difference is deliberate. That one distinguishes "the module was not there
- * yet" (skip) from "the module was there and yielded no table" (fail), because a
- * reformat that defeats its parser would silently disable a guard that had been
- * running for months. This table is days old and its parser is round-tripped by
- * the suite on every run, so the same distinction would buy a branch that cannot
- * fire against a cost this file has already paid once. It is worth revisiting
- * the first time this parser is changed.
- */
-function translationSourcesAt(ref: string) {
-  const source = git("show", `${ref}:${TRANSLATION_MODULE}`);
-  return source === null ? null : parsePrivacyTranslationSources(source);
+    source: present ? git("show", `${ref}:${modulePath}`) : null,
+  };
 }
 
 /**
@@ -313,83 +270,82 @@ function main(): void {
     process.exit(1);
   }
 
-  const revision: BaselineRevision =
-    comparison.kind === "compare"
-      ? baselinesAt(comparison.ref)
-      : { kind: "absent" };
-  if (revision.kind === "unparseable" && comparison.kind === "compare") {
-    console.error(
-      formatBaselineRevisionUnparseable(
-        CHECK_NAME,
-        BASELINE_MODULE,
-        comparison.ref,
-      ),
-    );
+  // An empty registry is the one thing a loop can do that two hand-written
+  // passes could not — see {@link provenanceRegistryRefusal}.
+  const registryRefusal = provenanceRegistryRefusal(
+    CHECK_NAME,
+    PROVENANCE_TABLES,
+  );
+  if (registryRefusal !== null) {
+    console.error(registryRefusal);
     process.exit(1);
   }
 
-  const previous = revision.kind === "table" ? revision.table : null;
-  const result = evaluatePrivacyBaselineProvenance({
-    current: PRIVACY_BODY_BASELINES,
-    previous,
-    baseRef: comparison.kind === "compare" ? comparison.ref : null,
-    changedFiles:
-      comparison.kind === "compare" ? changedFilesSince(comparison.ref) : [],
-  });
+  // Read once, not once per table: the diff is the same diff, and two
+  // `git diff --name-only` calls that could disagree is a difference nobody
+  // would want to have to reason about.
+  const changedFiles =
+    comparison.kind === "compare" ? changedFilesSince(comparison.ref) : [];
 
-  // Both reports are printed before either exit code is honoured. A run that
-  // stopped at the first failing table would hide the second one behind a fix,
-  // and these two move together: the commit that amends the English disclosure
-  // touches the word count and all five checksums.
-  const translation = evaluateTranslationProvenance({
-    current: PRIVACY_TRANSLATION_SOURCES,
-    previous:
-      comparison.kind === "compare"
-        ? translationSourcesAt(comparison.ref)
-        : null,
-    baseRef: comparison.kind === "compare" ? comparison.ref : null,
-    changedFiles:
-      comparison.kind === "compare" ? changedFilesSince(comparison.ref) : [],
-  });
+  const outcomes = PROVENANCE_TABLES.map((table: ProvenanceTable) =>
+    table.run(CHECK_NAME, {
+      ref: comparison.kind === "compare" ? comparison.ref : null,
+      changedFiles,
+      ...(comparison.kind === "compare"
+        ? moduleAt(table.module, comparison.ref)
+        : { present: false, source: null }),
+    }),
+  );
 
-  // Each report goes to the stream its OWN verdict earns: one table passing
-  // while the other fails is an ordinary outcome, and a pass line on stderr
-  // reads as part of the failure.
-  (result.ok ? console.log : console.error)(
-    formatBaselineProvenanceReport(CHECK_NAME, result),
-  );
-  (translation.ok ? console.log : console.error)(
-    formatTranslationProvenanceReport(CHECK_NAME, translation),
-  );
-  if (comparison.kind === "skip") {
-    console.log(`${CHECK_NAME}: drift halves skipped — ${comparison.reason}.`);
-  } else {
-    if (previous === null) {
-      console.log(
-        `${CHECK_NAME}: drift half skipped — ${BASELINE_MODULE} did not exist at ${comparison.ref}, so the guard predates it.`,
-      );
-    }
-    if (translation.comparedAgainst === null) {
-      // Worded so it cannot be mistaken for the line above it, by a reader or by
-      // a suite: the two tables skip independently, and "drift half skipped"
-      // reported twice with different modules behind it is how somebody
-      // concludes the whole guard sat out.
-      console.log(
-        `${CHECK_NAME}: translation-checksum drift skipped — no ${TRANSLATION_MODULE} table was readable at ${comparison.ref}, so the guard predates it.`,
-      );
+  // The hard failure first, across ALL tables, before a single report is
+  // printed: a base revision whose module yields no table means that table's
+  // drift half is off, and a report printed alongside that would be a report
+  // from a guard running on one leg.
+  for (const outcome of outcomes) {
+    if (outcome.kind === "unparseable") {
+      console.error(outcome.message);
+      process.exit(1);
     }
   }
+
+  // Every report is printed before any exit code is honoured. A run that
+  // stopped at the first failing table would hide the second one behind a fix,
+  // and these two move together: the commit that amends the English disclosure
+  // touches the word count AND all five checksums.
+  //
+  // Each report goes to the stream its OWN verdict earns: one table passing
+  // while another fails is an ordinary outcome, and a pass line on stderr reads
+  // as part of the failure.
+  for (const outcome of outcomes) {
+    if (outcome.kind !== "evaluated") continue;
+    (outcome.ok ? console.log : console.error)(outcome.report);
+  }
+  if (comparison.kind === "skip") {
+    // One line, not one per table: with no base revision at all, every drift
+    // half sat out for the same reason, and repeating it per table is how a
+    // reader learns to skim these.
+    console.log(`${CHECK_NAME}: drift halves skipped — ${comparison.reason}.`);
+  } else {
+    for (const outcome of outcomes) {
+      if (outcome.kind === "evaluated" && outcome.driftSkipped !== null) {
+        console.log(outcome.driftSkipped);
+      }
+    }
+  }
+  const ok = outcomes.every(
+    (outcome) => outcome.kind === "evaluated" && outcome.ok,
+  );
   if (REPO_ROOT_OVERRIDE !== null) {
     // On the PASS line too, not only twenty lines above it: a green summary
     // that does not mention where it read from is how a redirected guard
     // becomes the guard. "pass" only when it was one — a failing run that
     // called itself a pass would be a stranger sentence than the one it saved.
-    const verdict = result.ok && translation.ok ? "pass" : "run";
+    const verdict = ok ? "pass" : "run";
     console.log(
       `${CHECK_NAME}: that ${verdict} read history from ${REPO_ROOT_OVERRIDE}, not from this checkout.`,
     );
   }
-  if (!result.ok || !translation.ok) process.exit(1);
+  if (!ok) process.exit(1);
 }
 
 main();

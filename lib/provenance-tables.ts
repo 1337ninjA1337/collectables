@@ -1,0 +1,301 @@
+/**
+ * The two provenance tables this repository guards, as DATA the guard loops
+ * over rather than as two hand-written passes in one script.
+ *
+ * `scripts/check-privacy-baseline-provenance.ts` asks the same question of
+ * `PRIVACY_BODY_BASELINES` (a word count per page) and of
+ * `PRIVACY_TRANSLATION_SOURCES` (a checksum of the English disclosure and of
+ * each translation): a recorded measurement moved, did the diff say why. It
+ * asked it twice, in two copies of the same six steps — read the module at the
+ * base revision, classify what came back, evaluate, print the report to the
+ * stream its verdict earns, print a skip line when the drift half could not
+ * run, honour the exit code last.
+ *
+ * Two copies is a shape, not a duplication problem; the third is where it
+ * becomes one, and the third is the copy nobody reviews. So the six steps live
+ * here once, in {@link defineProvenanceTable}, and each table contributes only the
+ * five things that genuinely differ: its module path, its current value, how to
+ * parse a previous revision, how to judge one, and the five sentences it says
+ * about itself. Adding a table is an entry in {@link PROVENANCE_TABLES}; the
+ * script does not change.
+ *
+ * WHAT STAYED IN THE SCRIPT, and why this module is not "the guard": every
+ * question that needs git. Which revision to compare against (`--base`, the env
+ * var, the PR target, `HEAD~1`, all through `merge-base`), whether the root is a
+ * work tree, whether the clone is shallow — that is the CI-specific reasoning,
+ * it is shared by every table by construction, and it is the half that cannot be
+ * unit-tested without a repository. Everything here is pure: text in, verdict
+ * and sentences out.
+ *
+ * The generic parameter is erased at the boundary on purpose. {@link ProvenanceTable}
+ * is a closure over a table's own type, so `PROVENANCE_TABLES` can hold two
+ * entries whose tables share no field name without widening either one to
+ * `unknown` — and so the script cannot reach a parsed table at all, which is the
+ * point: it has nothing left to get wrong about one.
+ */
+
+import {
+  classifyBaselineRevision,
+  evaluatePrivacyBaselineProvenance,
+  formatBaselineProvenanceReport,
+  formatBaselineRevisionUnparseable,
+} from "./privacy-baseline-provenance";
+import { PRIVACY_BODY_BASELINES } from "./privacy-body-baselines";
+import {
+  PRIVACY_TRANSLATION_SOURCES,
+  parsePrivacyTranslationSources,
+} from "./privacy-translated-section";
+import {
+  evaluateTranslationProvenance,
+  formatTranslationProvenanceReport,
+} from "./privacy-translation-provenance";
+
+/**
+ * A table as it stood at some previous revision — and, when there is none,
+ * WHICH kind of none.
+ *
+ * `absent` is a skip (the module predates the guard, so no baseline can have
+ * moved); `unparseable` is a failure (the module was there and yielded nothing,
+ * which is how a rename or a reformat silently turns the drift half off). Only
+ * git can tell those apart, so the presence bit is an input rather than
+ * something inferred from the text.
+ */
+export type ProvenanceRevision<T> =
+  | { readonly kind: "table"; readonly table: T }
+  | { readonly kind: "absent" }
+  | { readonly kind: "unparseable" };
+
+/**
+ * The part of a table's verdict this module needs. Both evaluators return more
+ * than this (their own failure lists, with their own codes); the loop reads only
+ * the two fields it has to branch on, and hands the whole verdict back to that
+ * table's own formatter for the words.
+ */
+export type ProvenanceVerdict = {
+  readonly ok: boolean;
+  /** Base revision the drift half ran against, or null when it did not run. */
+  readonly comparedAgainst: string | null;
+};
+
+/** What the loop knows about a base revision, before any table has read it. */
+export type ProvenanceBaseRevision = {
+  /**
+   * The revision to compare against, or null when there is none at all (an
+   * unborn HEAD, a root commit). Null means every table's drift half sits out
+   * for the same reason, which the script says once rather than per table.
+   */
+  readonly ref: string | null;
+  /** Whether the table's module path existed at `ref`. */
+  readonly present: boolean;
+  /** The module's source at `ref`, or null when git could not show it. */
+  readonly source: string | null;
+  /** Repo-relative posix paths the same diff touched, as `git diff --name-only` emits. */
+  readonly changedFiles: readonly string[];
+};
+
+export type ProvenanceOutcome =
+  /**
+   * The module existed at the base revision and no table came out of it. A
+   * failure rather than a skip, and a HARD one: the script stops here, because
+   * every report printed after it would be a report from a guard whose drift
+   * half is off.
+   */
+  | { readonly kind: "unparseable"; readonly message: string }
+  | {
+      readonly kind: "evaluated";
+      readonly ok: boolean;
+      /** The table's own report, for the stream `ok` earns it. */
+      readonly report: string;
+      /**
+       * Non-null when there WAS a base revision and this table could not be read
+       * there — the one case a shared "drift halves skipped" line would get
+       * wrong, since the other table may have compared fine.
+       */
+      readonly driftSkipped: string | null;
+    };
+
+/**
+ * One table's contribution to the loop: what it is, how to read it, how to judge
+ * it, and what it says about itself.
+ *
+ * `run` is the erased form — see the module note. Build entries with
+ * {@link defineProvenanceTable} rather than by hand, so the type stays tied to
+ * the parser and the evaluator that share it.
+ */
+export type ProvenanceTable = {
+  /** Short name, for tests and for the registry's own parity cases. */
+  readonly id: string;
+  /** Repo-relative path of the module holding the table. */
+  readonly module: string;
+  readonly run: (
+    checkName: string,
+    base: ProvenanceBaseRevision,
+  ) => ProvenanceOutcome;
+};
+
+/**
+ * What one table brings to the loop. `T` is its table type and `V` its
+ * evaluator's verdict; both are erased by {@link defineProvenanceTable}, so no
+ * two entries have to agree on either.
+ */
+export type ProvenanceTableSpec<T, V extends ProvenanceVerdict> = {
+  /** Short name, for tests and for the registry's own parity cases. */
+  readonly id: string;
+  /** Repo-relative path of the module holding the table. */
+  readonly module: string;
+  /** The table as it stands in THIS checkout — never read from history. */
+  readonly current: T;
+  readonly classify: (
+    present: boolean,
+    source: string | null,
+  ) => ProvenanceRevision<T>;
+  readonly evaluate: (input: {
+    readonly current: T;
+    readonly previous: T | null;
+    readonly baseRef: string | null;
+    readonly changedFiles: readonly string[];
+  }) => V;
+  readonly report: (checkName: string, verdict: V) => string;
+  /** The hard failure above, in this table's own words. */
+  readonly unparseable: (checkName: string, ref: string) => string;
+  /** The line printed when this table alone could not be read at the base. */
+  readonly driftSkipped: (checkName: string, ref: string) => string;
+};
+
+/**
+ * The six steps, once. Every table runs exactly this; the differences are the
+ * five callbacks it brought.
+ */
+export function defineProvenanceTable<T, V extends ProvenanceVerdict>(
+  spec: ProvenanceTableSpec<T, V>,
+): ProvenanceTable {
+  return {
+    id: spec.id,
+    module: spec.module,
+    run(checkName, base) {
+      const revision =
+        base.ref === null
+          ? ({ kind: "absent" } as const)
+          : spec.classify(base.present, base.source);
+      if (revision.kind === "unparseable" && base.ref !== null) {
+        return {
+          kind: "unparseable",
+          message: spec.unparseable(checkName, base.ref),
+        };
+      }
+      const previous = revision.kind === "table" ? revision.table : null;
+      const verdict = spec.evaluate({
+        current: spec.current,
+        previous,
+        baseRef: base.ref,
+        changedFiles: base.ref === null ? [] : base.changedFiles,
+      });
+      return {
+        kind: "evaluated",
+        ok: verdict.ok,
+        report: spec.report(checkName, verdict),
+        driftSkipped:
+          base.ref !== null && verdict.comparedAgainst === null
+            ? spec.driftSkipped(checkName, base.ref)
+            : null,
+      };
+    },
+  };
+}
+
+/**
+ * The word count per shipped policy page. The older of the two, and the one
+ * whose `unparseable` branch was written after a reformat nearly turned its
+ * drift half off unnoticed.
+ */
+const BASELINE_MODULE = "lib/privacy-body-baselines.ts";
+
+const BASELINES_TABLE = defineProvenanceTable({
+  id: "body-baselines",
+  module: BASELINE_MODULE,
+  current: PRIVACY_BODY_BASELINES,
+  classify: classifyBaselineRevision,
+  evaluate: evaluatePrivacyBaselineProvenance,
+  report: formatBaselineProvenanceReport,
+  unparseable: (checkName, ref) =>
+    formatBaselineRevisionUnparseable(checkName, BASELINE_MODULE, ref),
+  driftSkipped: (checkName, ref) =>
+    `${checkName}: drift half skipped — ${BASELINE_MODULE} did not exist at ${ref}, so the guard predates it.`,
+});
+
+/**
+ * The per-language checksums of the English disclosure and of each shipped
+ * translation.
+ *
+ * `classify` collapses `unparseable` into `absent`, which is the one place this
+ * entry deliberately differs from its neighbour: the parser is days old and the
+ * suite round-trips it on every run, so the reformat-defeats-parser branch
+ * cannot fire yet. It is worth revisiting the first time this parser changes —
+ * which is now a two-line edit HERE rather than a branch to re-derive in the
+ * script.
+ */
+const TRANSLATION_MODULE = "lib/privacy-translated-section.ts";
+
+const TRANSLATION_TABLE = defineProvenanceTable({
+  id: "translation-sources",
+  module: TRANSLATION_MODULE,
+  current: PRIVACY_TRANSLATION_SOURCES,
+  classify: (_present, source) => {
+    const table =
+      source === null ? null : parsePrivacyTranslationSources(source);
+    return table === null ? { kind: "absent" } : { kind: "table", table };
+  },
+  evaluate: evaluateTranslationProvenance,
+  report: formatTranslationProvenanceReport,
+  unparseable: (checkName, ref) =>
+    `${checkName}: ERROR — ${TRANSLATION_MODULE} exists at ${ref} but no PRIVACY_TRANSLATION_SOURCES table could be read from it.`,
+  // Worded so it cannot be mistaken for the baselines line, by a reader or by a
+  // suite: the tables skip independently, and "drift half skipped" printed twice
+  // with different modules behind it is how somebody concludes the whole guard
+  // sat out.
+  driftSkipped: (checkName, ref) =>
+    `${checkName}: translation-checksum drift skipped — no ${TRANSLATION_MODULE} table was readable at ${ref}, so the guard predates it.`,
+});
+
+/**
+ * Order matters and is the reporting order: reports print in this sequence, and
+ * the first `unparseable` is the one that stops the run.
+ */
+export const PROVENANCE_TABLES: readonly ProvenanceTable[] = [
+  BASELINES_TABLE,
+  TRANSLATION_TABLE,
+];
+
+/**
+ * Why the registry is worth checking BEFORE looping over it, and the one new
+ * failure mode the loop introduced.
+ *
+ * Two hand-written passes could not skip themselves: deleting one was a diff
+ * with a report line missing from it. A loop can — `every` over nothing is
+ * true, so a registry that lost its entries (a bad merge, an entry commented
+ * out during a debugging session and never restored) exits 0 with every report
+ * line gone and nothing saying why. That is precisely the vacuous green each
+ * table's own formatter already refuses one level down ("a pass over zero
+ * baselines is not a pass"); this is the same sentence about the tables
+ * themselves.
+ *
+ * Two entries with one id would be worse than a missing one, because the
+ * reports would still print: `PROVENANCE_TABLES` is addressed by id in the
+ * suites, so the second entry is the one nobody's case ever reaches.
+ *
+ * Returns the refusal, or null when the registry is fit to run.
+ */
+export function provenanceRegistryRefusal(
+  checkName: string,
+  tables: readonly ProvenanceTable[],
+): string | null {
+  if (tables.length === 0) {
+    return `${checkName}: ERROR — no provenance tables are registered, and a pass over zero tables is not a pass. Every report this guard prints comes from an entry in lib/provenance-tables.ts; with none, it exits 0 having read nothing.`;
+  }
+  const ids = tables.map((table) => table.id);
+  const duplicate = ids.find((id, index) => ids.indexOf(id) !== index);
+  if (duplicate !== undefined) {
+    return `${checkName}: ERROR — two provenance tables are registered as "${duplicate}" in lib/provenance-tables.ts. Both would run, and every case that addresses a table by id would reach only the first, so the second is guarded by nothing.`;
+  }
+  return null;
+}
