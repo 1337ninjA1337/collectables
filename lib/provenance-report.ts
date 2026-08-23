@@ -74,7 +74,7 @@ export function provenanceOutput(
       lines: [
         {
           stream: "stderr",
-          text: `${checkName}: ERROR — no provenance table produced an outcome, and a pass over zero tables is not a pass. Tables are registered in lib/provenance-tables.ts; provenanceRegistryRefusal is what should have refused this before the run got here.`,
+          text: `${checkName}: ERROR — no provenance table produced an outcome, and a pass over zero tables is not a pass. Tables are registered in lib/provenance-tables.ts, and provenanceRegistryRefusal — which says the same thing about the REGISTRY, earlier and with the cause named — is what should have refused this before the run got here. Neither is a duplicate of the other: that one can be skipped by a caller that forgets to ask, and this one cannot.`,
         },
       ],
       ok: false,

@@ -4,22 +4,36 @@
  * changed without the provenance that makes the change reviewable. Run via
  * `npm run lint:baseline-provenance`; part of the `lint:all` fan-out.
  *
- * N tables, one guard, and this file no longer names any of them. Which tables
- * exist, how each is parsed and judged, and what each says about itself are
- * `lib/provenance-tables.ts`; today that is `PRIVACY_BODY_BASELINES` (a word
- * count per page) and `PRIVACY_TRANSLATION_SOURCES` (a checksum of the English
- * disclosure and of each translation). Same question of both — a measurement
- * moved, did the diff say why — and the same three answers needed from git,
- * which is the part with the CI-specific reasoning in it and the reason they
- * share a script rather than having one each.
+ * N tables, one guard, and this file names none of them. It asks one question —
+ * a recorded measurement moved, did the diff say why — of every table in a
+ * registry, and the same three answers from git serve all of them, which is the
+ * part with the CI-specific reasoning in it and the reason they share a script
+ * rather than having one each.
  *
- * The matching logic is pure and lives in `lib/privacy-baseline-provenance.ts`
- * and `lib/privacy-translation-provenance.ts`; this file is the git half — it
- * decides WHAT to compare against and reads each table's module at that
- * revision as text. Every report is printed before any exit code is honoured:
- * the commit that amends the English disclosure moves the word count AND all
- * five checksums, so stopping at the first would hide half the work behind a
- * fix.
+ * WHAT IS WHERE, because the pure half is now bigger than this file and is the
+ * thing to read first:
+ *
+ *   - `lib/provenance-tables.ts` — which tables exist, and the six steps each
+ *     one runs. Today: `PRIVACY_BODY_BASELINES` (a word count per policy page),
+ *     `PRIVACY_TRANSLATION_SOURCES` (a checksum of the English disclosure and of
+ *     each translation) and `SCRUB_PROMISE_BASELINE` (a fingerprint of the
+ *     sentence promising what `scrubPII` strips). Also the two refusals that
+ *     stop a run before it reports: an empty registry, and a diff whose paths
+ *     are not repo-relative.
+ *   - `lib/privacy-baseline-provenance.ts`, `lib/privacy-translation-provenance.ts`,
+ *     `lib/scrub-promise-provenance.ts` — one evaluator each: what is
+ *     well-formed, what counts as drift, and the sentences it says about itself.
+ *   - `lib/provenance-key-set.ts` — the closed-set rule the two KEYED tables
+ *     share, so a key no page is published for is a report rather than a throw.
+ *   - `lib/provenance-report.ts` — what gets printed, in what order, to which
+ *     stream. All four of those rules, and none of them need git.
+ *
+ * THIS FILE is the git half and nothing else: which revision to compare against,
+ * whether the root is a work tree, whether the clone is shallow, each table's
+ * module as text at that revision, and the diff. Every report is printed before
+ * any exit code is honoured — the commit that amends the English disclosure
+ * moves the word count AND all five checksums, so stopping at the first would
+ * hide half the work behind a fix.
  *
  * Base revision, first match wins:
  *
@@ -263,18 +277,21 @@ function changedFilesSince(ref: string): readonly string[] {
 }
 
 /**
- * End the run on a refusal, or carry on when there is none.
+ * End the run on a refusal.
  *
  * Three checks stop this guard before it reports anything, and each of them was
- * its own four-line `if` with its own `console.error` and its own
+ * its own four-line block with its own `console.error` and its own
  * `process.exit(1)`. Three copies of an ending is how one of them comes to exit
  * 0, or to print on stdout, in a diff nobody reads twice.
  *
- * Takes the refusal rather than the condition, so a check that decided not to
- * refuse says so in the same call it would have refused in.
+ * `never` rather than a `string | null` in and `void` out, which is what this
+ * was on the run that extracted it. The condition costs each caller two words
+ * and buys the thing a `void` helper cannot give back: the type system knows the
+ * run ended, so `comparison` narrows past its `fail` variant and a later read of
+ * a field that only exists on a refused shape is a compile error rather than a
+ * branch nobody re-derives.
  */
-function stopOn(refusal: string | null): void {
-  if (refusal === null) return;
+function stop(refusal: string): never {
   console.error(refusal);
   process.exit(1);
 }
@@ -293,17 +310,22 @@ function main(): void {
   // Statements rather than a list of checks, and the reason is the data between
   // them: the diff cannot be asked for before a base revision resolves, so a
   // list would be a list of thunks and the order would stop being the visible
-  // thing about it. What the three DO share is the ending, which is `stopOn`.
+  // thing about it. What the three DO share is the ending, which is `stop`.
   const comparison = resolveComparison(argv);
-  stopOn(
-    comparison.kind === "fail"
-      ? `${CHECK_NAME}: ERROR — ${comparison.reason}`
-      : null,
-  );
+  if (comparison.kind === "fail") {
+    stop(`${CHECK_NAME}: ERROR — ${comparison.reason}`);
+  }
 
   // An empty registry is the one thing a loop can do that two hand-written
-  // passes could not — see {@link provenanceRegistryRefusal}.
-  stopOn(provenanceRegistryRefusal(CHECK_NAME, PROVENANCE_TABLES));
+  // passes could not — see {@link provenanceRegistryRefusal}. `provenanceOutput`
+  // refuses the same thing one level down, over the OUTCOMES rather than the
+  // registry; neither is redundant, because this one names the cause and that
+  // one cannot be bypassed by a caller that forgot to ask.
+  const registryRefusal = provenanceRegistryRefusal(
+    CHECK_NAME,
+    PROVENANCE_TABLES,
+  );
+  if (registryRefusal !== null) stop(registryRefusal);
 
   // Read once, not once per table: the diff is the same diff, and two
   // `git diff --name-only` calls that could disagree is a difference nobody
@@ -315,7 +337,8 @@ function main(): void {
   // {@link changedFilesRefusal}. A list that is not repo-relative makes every
   // table's answer wrong in the same way, so it is a stopped run rather than one
   // false report per entry.
-  stopOn(changedFilesRefusal(CHECK_NAME, changedFiles));
+  const diffRefusal = changedFilesRefusal(CHECK_NAME, changedFiles);
+  if (diffRefusal !== null) stop(diffRefusal);
 
   const outcomes = PROVENANCE_TABLES.map((table: ProvenanceTable) =>
     table.run(CHECK_NAME, {

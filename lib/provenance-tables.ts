@@ -408,7 +408,7 @@ export function provenanceRegistryRefusal(
   tables: readonly ProvenanceTable[],
 ): string | null {
   if (tables.length === 0) {
-    return `${checkName}: ERROR — no provenance tables are registered, and a pass over zero tables is not a pass. Every report this guard prints comes from an entry in lib/provenance-tables.ts; with none, it exits 0 having read nothing.`;
+    return `${checkName}: ERROR — no provenance tables are registered, and a pass over zero tables is not a pass. Every report this guard prints comes from an entry in lib/provenance-tables.ts; with none, it exits 0 having read nothing. provenanceOutput refuses the same emptiness one level down, over the outcomes rather than the registry — this one is the earlier and more specific of the two, not a duplicate of it.`;
   }
   const ids = tables.map((table) => table.id);
   const duplicate = ids.find((id, index) => ids.indexOf(id) !== index);
