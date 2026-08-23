@@ -30,6 +30,7 @@ import {
 import { stripComments } from "../lib/strip-comments";
 
 import { readRepoFile } from "./helpers/repo-file";
+import { sourceFiles } from "./helpers/source-files";
 
 /**
  * One closed-set rule for the tables that have keys.
@@ -227,40 +228,120 @@ describe("the two tables that have keys", () => {
 
 describe("the list the closed sets are built from", () => {
   /**
-   * The provenance family's modules, which want six codes and nothing else.
+   * Every module that names one of the two constants, found rather than listed.
    *
    * `lib/privacy-page.ts` also carries an HTML renderer, a markdown pass, a CSP
    * string and a language picker. While the list lived there, every one of these
    * pulled a page renderer into its import graph to ask which codes exist — and
    * `privacy-baseline-provenance` reached the same constant through two paths,
    * which is how an import cycle gets made by somebody moving a helper.
+   *
+   * DERIVED, and the derivation is the interesting part. This was six module
+   * paths typed out, which is a list that goes stale in the one direction a
+   * sweep cannot survive: a seventh module reaching for the renderer is a module
+   * the sweep does not look at, so the guard reports clean about a tree it did
+   * not read. It is also the fourth hand-written module list in this family.
+   *
+   * The population is "modules that want the language list", and the honest way
+   * to ask that is what a module NAMES, not what it imports — deriving it from
+   * the import would make the positive control below vacuous, since every member
+   * would import the leaf by construction. Naming a constant is independent of
+   * where it came from, which is exactly the property the sweep is about.
+   *
+   * `scripts/` is walked too, and picks up a seventh asker the hand-written list
+   * never had: `build-spa-fallback.ts`, which reads both constants to write the
+   * per-language pages and is under the same rule for the same reason.
    */
-  const ASKERS = [
-    "lib/privacy-body-baselines.ts",
-    "lib/privacy-baseline-provenance.ts",
-    "lib/privacy-translated-section.ts",
-    "lib/privacy-translation-provenance.ts",
-    "lib/scrub-promise-provenance.ts",
-    "lib/bundle-smoke.ts",
-  ];
+  const CONSTANTS = ["PRIVACY_PAGE_LANGUAGES", "PRIVACY_DEFAULT_LANGUAGE"];
 
-  it("reaches none of them through the page renderer", () => {
-    const offenders = ASKERS.filter((module) =>
-      stripComments(readRepoFile(module)).includes('from "./privacy-page"'),
+  const ASKERS = sourceFiles("lib", "scripts").filter((file) => {
+    // The two modules that are not askers: the leaf DECLARES the constants, and
+    // the renderer is the module they were moved out of — that it reads the leaf
+    // is asserted in `__tests__/privacy-languages.test.ts`, where the rest of
+    // the leaf's own shape cases live.
+    if (file === "lib/privacy-languages.ts" || file === "lib/privacy-page.ts") {
+      return false;
+    }
+    const source = stripComments(readRepoFile(file));
+    return CONSTANTS.some((constant) => source.includes(constant));
+  });
+
+  it("finds the askers, rather than trusting a list of them", () => {
+    // The floor is what stops a walk that matched nothing — a renamed directory,
+    // a `stripComments` that ate the file — reading as a clean sweep. Six is the
+    // count the hand-written list had, so the walk cannot pass while covering
+    // LESS than the list it replaced.
+    assert.ok(
+      ASKERS.length >= 6,
+      `only ${String(ASKERS.length)} module(s) name the language constants — the sweep below would prove nothing: ${ASKERS.join(", ")}`,
     );
+    // And the seventh the list did not have, named so that a reader can see the
+    // derivation bought something rather than take it on trust.
+    assert.ok(
+      ASKERS.includes("scripts/build-spa-fallback.ts"),
+      "the walk no longer reaches scripts/, which reads both constants to write the per-language pages",
+    );
+  });
+
+  /**
+   * What a module takes FROM the page renderer, or null if it does not import
+   * it at all.
+   *
+   * The rule is not "does not import `privacy-page`" — that was the shape the
+   * hand-written list could get away with, because it happened to contain no
+   * module that legitimately renders a page. The walk found one immediately:
+   * `scripts/build-spa-fallback.ts` imports `renderPrivacyPage` because writing
+   * the six pages is its whole job, and a sweep that called that an offence
+   * would be a sweep somebody deletes. What is banned is taking the LANGUAGE
+   * LIST from the renderer, which is a different clause of the same import.
+   *
+   * Both spellings, matched by suffix: `./privacy-page` from `lib/`,
+   * `../lib/privacy-page` from `scripts/`.
+   */
+  function importedFromPageRenderer(module: string): string | null {
+    const match = /import\s*(\{[^}]*\})\s*from\s*"\.[./a-z-]*privacy-page"/.exec(
+      stripComments(readRepoFile(module)),
+    );
+    return match?.[1] ?? null;
+  }
+
+  it("takes the language list from none of them through the page renderer", () => {
+    const offenders = ASKERS.filter((module) => {
+      const clause = importedFromPageRenderer(module);
+      return (
+        clause !== null &&
+        CONSTANTS.some((constant) => clause.includes(constant))
+      );
+    });
     assert.deepEqual(
       offenders,
       [],
-      `these modules import the /privacy page renderer to ask which languages exist: ${offenders.join(", ")}`,
+      `these modules take a language constant out of the /privacy page renderer rather than the leaf: ${offenders.join(", ")}`,
     );
-    // The positive control: they do still ask, through the leaf.
-    const asking = ASKERS.filter((module) =>
-      stripComments(readRepoFile(module)).includes('from "./privacy-languages"'),
+    // Today the rule above cannot fire, because the constants were MOVED and
+    // `privacy-page` exports neither — an import of one from there does not
+    // compile. That is the guarantee; this is the backstop for the day somebody
+    // adds a convenience re-export, at which point the compiler stops caring and
+    // this is the only thing left that does.
+    assert.ok(
+      !/export\s*\{[^}]*PRIVACY_(PAGE_LANGUAGES|DEFAULT_LANGUAGE)/.test(
+        stripComments(readRepoFile("lib/privacy-page.ts")),
+      ),
+      "lib/privacy-page.ts re-exports a language constant — the split is a redirect again, and the sweep above is now the only thing stopping the old import graph coming back",
+    );
+    // The positive control, and it is not vacuous because the list above was
+    // built from what the modules NAME: a module that names a constant and
+    // imports it from nowhere is a module that got it from somewhere else.
+    const notAsking = ASKERS.filter(
+      (module) =>
+        !/from "\.[./a-z-]*privacy-languages"/.test(
+          stripComments(readRepoFile(module)),
+        ),
     );
     assert.deepEqual(
-      asking,
-      ASKERS,
-      "some of these modules no longer read the language list at all, so the sweep above proves nothing",
+      notAsking,
+      [],
+      `these modules name a language constant without importing the leaf: ${notAsking.join(", ")}`,
     );
   });
 
