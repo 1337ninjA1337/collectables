@@ -11,6 +11,7 @@ import {
 } from "../lib/privacy-baseline-provenance";
 import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
 import { PROVENANCE_TABLES } from "../lib/provenance-tables";
+import { stripComments } from "../lib/strip-comments";
 
 import { readRepoFile, REPO_ROOT, repoPath } from "./helpers/repo-file";
 
@@ -413,5 +414,54 @@ describe("check-privacy-baseline-provenance against a scratch repository", () =>
         `missing the ${failure.code} finding:\n${run.stderr}`,
       );
     }
+  });
+});
+
+/**
+ * The guard prints its refusals from ONE place, and a comment says how many
+ * ways in.
+ *
+ * `stop` was extracted from three four-line `console.error` + `process.exit(1)`
+ * blocks in `main`. Two more callers arrived after it: `git()`, which refuses a
+ * `git` that cannot be run at all during argument resolution, and
+ * `resolveRootOrExit`, which refuses an unresolvable guard root at module load
+ * — earlier than `main` is entered. Both are the reason the comment now says
+ * "the guard's ending rather than `main`'s".
+ *
+ * The count lives in prose, which is how it was wrong for one run already: the
+ * comment said four while a fifth refusal sat in `resolveRootOrExit` spelling
+ * the block out. Neither case below is a rule about how many refusals the guard
+ * may have. They are the rule that a new one cannot arrive silently — raise the
+ * number here and in the sentence together, or find out from a red suite.
+ */
+describe("the guard's single printed ending", () => {
+  const SOURCE = stripComments(
+    readRepoFile("scripts/check-privacy-baseline-provenance.ts"),
+  );
+
+  it("is reached from five places, which is what `stop`'s comment claims", () => {
+    // The declaration is excluded by the keyword in front of it rather than by
+    // counting one fewer, so a `const stop = (…)` rewrite cannot silently drop
+    // the number by one while the callers are unchanged.
+    const calls = SOURCE.match(/(?<!function\s)\bstop\(/g) ?? [];
+    assert.equal(
+      calls.length,
+      5,
+      `\`stop\` is called ${String(calls.length)} time(s) and its doc comment in scripts/check-privacy-baseline-provenance.ts describes five callers — move the two together, or this suite is pinning a sentence the file stopped saying`,
+    );
+  });
+
+  it("is the only thing in the guard that prints a refusal", () => {
+    // The half that catches a refusal added the old way. `process.exit(1)` is
+    // deliberately NOT pinned at one: two of its four sites are the silent
+    // endings after `printProvenanceOutput` has already said everything, and
+    // an exit that prints nothing is not a second copy of `stop`. A second
+    // `console.error` is.
+    const printed = SOURCE.match(/console\.error\(/g) ?? [];
+    assert.equal(
+      printed.length,
+      1,
+      `${String(printed.length)} \`console.error\` call(s) — a refusal that prints for itself is the four-line block \`stop\` was extracted from, arriving back one site at a time`,
+    );
   });
 });

@@ -124,10 +124,12 @@ function resolveRootOrExit(): GuardRootResolution {
       GUARD_ROOT_ENV,
     ]);
   } catch (error) {
-    if (error instanceof GuardRootError) {
-      console.error(error.message);
-      process.exit(1);
-    }
+    // Through `stop`, like every other refusal: this was the last hand-written
+    // `console.error` + `process.exit(1)` pair in the file, and it is the
+    // EARLIEST refusal the guard can raise — root resolution runs at module
+    // load, before `main` exists to be entered. `stop` is hoisted, so the
+    // ending is available to a caller that runs before its declaration.
+    if (error instanceof GuardRootError) stop(error.message);
     throw error;
   }
 }
@@ -308,12 +310,19 @@ function changedFilesSince(ref: string): readonly string[] {
  * `process.exit(1)`. Three copies of an ending is how one of them comes to exit
  * 0, or to print on stdout, in a diff nobody reads twice.
  *
- * FOUR now, and the fourth is not in `main`: `git()` refuses a `git` that could
- * not be run at all, which happens during argument resolution, before `main`
- * has a comparison to stop on. It was the last four-line block of its kind in
- * the file. So this is the guard's ending rather than `main`'s — worth saying,
- * because a reader who has it filed as "one of the three stops in `main`" will
- * eventually move it there.
+ * FIVE now, and two of them are not in `main`. `git()` refuses a `git` that
+ * could not be run at all, during argument resolution, before `main` has a
+ * comparison to stop on; `resolveRootOrExit` refuses an unresolvable guard root
+ * EARLIER still, at module load, before `main` is entered at all. So this is
+ * the guard's ending rather than `main`'s — worth saying, because a reader who
+ * has it filed as "one of the three stops in `main`" will eventually move it
+ * there, and it would then be declared after two of its callers have run.
+ *
+ * The count is prose and prose goes stale, so
+ * `__tests__/privacy-baseline-provenance-script.test.ts` pins it: a sixth
+ * caller turns that suite red until this sentence is rewritten. It also pins
+ * the other half — one `console.error` in the whole file — because a refusal
+ * that prints for itself is how the four-line block comes back.
  *
  * `never` rather than a `string | null` in and `void` out, which is what this
  * was on the run that extracted it. The condition costs each caller two words

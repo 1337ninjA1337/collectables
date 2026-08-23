@@ -60,13 +60,21 @@ describe("checkError", () => {
  * replaced) or spell one (`"guard: ERROR — …"`). Both are matched; a bare
  * mention of the separator with no name before it is not.
  *
+ * A NAME, not any token. The first narrowing of this rule asked for `[\w-]+`,
+ * which is also the shape of a line number: `  1: ERROR — …` inside a quoted
+ * compiler diagnostic — the single most likely thing for a fixture in this tree
+ * to hold — read as a hand-built refusal. A check name here is `check-…` or
+ * some other identifier, so it starts with a letter and is at least two
+ * characters; digits alone are a coordinate, not a guard.
+ *
  * Exported to the cases below rather than inlined in the filter, because a
  * sweep's rule is worth testing against strings a walk over a healthy tree can
  * never produce.
  */
 export function buildsARefusalByHand(source: string): boolean {
-  // `${…}: ERROR — ` (interpolated name) or `<word>: ERROR — ` (spelled name).
-  return /(\$\{[^}]*\}|[\w-]+)(?=: ERROR — )/.test(source);
+  // `${…}: ERROR — ` (interpolated name) or `<name>: ERROR — ` (spelled name),
+  // where a name starts with a letter and is two or more characters long.
+  return /(\$\{[^}]*\}|[A-Za-z][\w-]+)(?=: ERROR — )/.test(source);
 }
 
 describe("the sweep's own rule", () => {
@@ -84,6 +92,22 @@ describe("the sweep's own rule", () => {
     // a case to assert against. Neither is a second copy of the formatter.
     assert.ok(!buildsARefusalByHand('const FORMAT = ": ERROR — ";'));
     assert.ok(!buildsARefusalByHand('expect(out).toContain(": ERROR — ");'));
+  });
+
+  it("tolerates a line NUMBER before the separator, which is not a check name", () => {
+    // What `[\w-]+` also matches: the left-hand side of a quoted compiler
+    // diagnostic. A guard that reported the output it had just refused over
+    // would have been reported for refusing, which is the failure mode this
+    // sweep exists to avoid — a rule collecting exceptions instead of stating
+    // a shape.
+    assert.ok(!buildsARefusalByHand('const out = "  1: ERROR — not assignable";'));
+    assert.ok(!buildsARefusalByHand('const diag = "lib/x.ts:12: ERROR — bad";'));
+  });
+
+  it("still reports a name that merely CONTAINS digits", () => {
+    // The narrowing is "starts with a letter", not "has no digits" — a guard
+    // named `check-i18n` is a name and must stay an offender.
+    assert.ok(buildsARefusalByHand('fail("check-i18n: ERROR — nope");'));
   });
 });
 
