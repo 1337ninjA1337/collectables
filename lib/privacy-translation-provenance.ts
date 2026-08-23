@@ -228,6 +228,46 @@ const MESSAGE: Record<
     `PRIVACY_TRANSLATION_SOURCES["${language}"]: ${detail ?? "a checksum moved with no file behind it"}. The value is measured FROM that file, so either the wrong number was pasted in or the file's change was lost in a merge.`,
 };
 
+/** The least recently confirmed page(s) in the table, and when. */
+export type OldestConfirmation = {
+  readonly checkedOn: string;
+  /** Every language sharing that date, in `PRIVACY_TRANSLATED_LANGUAGES` order. */
+  readonly languages: readonly string[];
+};
+
+/**
+ * Which page has gone longest without somebody looking at it.
+ *
+ * The table's whole subject is "has anyone confirmed this translation since the
+ * English moved", and until now the only way that reached a reader was as a
+ * FAILURE. A page confirmed a year ago against an English section that has not
+ * changed since is green, and indistinguishable in every output from one
+ * confirmed this morning — which is right in the sense that there is nothing to
+ * fix, and hides the case where a disclosure is old because nobody is looking
+ * rather than because nothing moved.
+ *
+ * Ordered by string comparison, which is correct for `YYYY-MM-DD` and is only
+ * ever asked of a table whose dates already passed their shape check — the line
+ * this feeds is printed on a PASS, and a malformed date is a failure.
+ *
+ * Every language sharing the oldest date is named rather than one picked from
+ * them: a table recorded in one sitting has all five on the same day, and a line
+ * naming one of five would read as a fact about that page.
+ */
+export function oldestConfirmation(
+  table: Readonly<Record<string, PrivacyTranslationSource>>,
+): OldestConfirmation | null {
+  const dates = Object.values(table).map((entry) => entry.checkedOn);
+  if (dates.length === 0) return null;
+  const checkedOn = dates.reduce((a, b) => (a <= b ? a : b));
+  // Walked over the CONSTANT rather than over the table's keys, so the order a
+  // reader sees does not depend on how the object literal happens to be written.
+  const languages = PRIVACY_TRANSLATED_LANGUAGES.filter(
+    (code) => table[code]?.checkedOn === checkedOn,
+  );
+  return { checkedOn, languages };
+}
+
 export type TranslationProvenanceResult = {
   readonly ok: boolean;
   readonly failures: readonly TranslationProvenanceFailure[];
@@ -235,6 +275,12 @@ export type TranslationProvenanceResult = {
   readonly checked: number;
   /** Base revision the drift half ran against, or null when it did not run. */
   readonly comparedAgainst: string | null;
+  /**
+   * The least recently confirmed page(s), for the pass line — see
+   * {@link oldestConfirmation}. Null only when the table is empty, which is
+   * itself a failure, so the pass line always has one.
+   */
+  readonly oldest: OldestConfirmation | null;
 };
 
 export function evaluateTranslationProvenance(input: {
@@ -259,6 +305,7 @@ export function evaluateTranslationProvenance(input: {
     failures,
     checked,
     comparedAgainst: compared ? input.baseRef : null,
+    oldest: oldestConfirmation(input.current),
   };
 }
 
@@ -271,7 +318,14 @@ export function formatTranslationProvenanceReport(
       result.comparedAgainst === null
         ? "no previous revision of the table was readable, so only the shape half ran"
         : `compared against ${result.comparedAgainst}`;
-    return `${checkName}: ${String(result.checked)} translation checksum record(s) well-formed (${against}).`;
+    // The age of the oldest confirmation, said on the PASS line, because that
+    // is the only run where anybody reads it. A number a person can act on
+    // before a suite makes them.
+    const age =
+      result.oldest === null
+        ? ""
+        : ` Oldest confirmation ${result.oldest.checkedOn} (${result.oldest.languages.join(", ")}).`;
+    return `${checkName}: ${String(result.checked)} translation checksum record(s) well-formed (${against}).${age}`;
   }
   if (result.checked === 0) {
     return checkError(

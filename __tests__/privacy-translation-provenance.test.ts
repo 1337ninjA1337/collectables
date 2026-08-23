@@ -13,6 +13,7 @@ import {
   evaluateTranslationProvenanceDrift,
   evaluateTranslationProvenanceShape,
   formatTranslationProvenanceReport,
+  oldestConfirmation,
   type TranslationProvenanceFailureCode,
 } from "../lib/privacy-translation-provenance";
 
@@ -266,5 +267,99 @@ describe("the combined result", () => {
     });
     assert.equal(result.ok, true);
     assert.match(formatTranslationProvenanceReport("guard", result), /compared against abc1234/);
+  });
+});
+
+/**
+ * How long a page has gone without anybody looking at it, published.
+ *
+ * The table's subject reached a reader only as a FAILURE: a page confirmed a
+ * year ago against an English section that has not moved since is green, and
+ * indistinguishable in every line the guard printed from one confirmed this
+ * morning. Right in that there is nothing to fix, and it hides the case where a
+ * disclosure is old because nobody is looking rather than because nothing
+ * changed. The pass line now carries the number, which is the kind of thing a
+ * person acts on before a suite makes them.
+ */
+describe("oldestConfirmation", () => {
+  it("is the earliest checkedOn in the table", () => {
+    assert.deepEqual(
+      oldestConfirmation({
+        de: entry({ checkedOn: "2026-08-22" }),
+        es: entry({ checkedOn: "2026-01-04" }),
+        pl: entry({ checkedOn: "2026-06-30" }),
+      }),
+      { checkedOn: "2026-01-04", languages: ["es"] },
+    );
+  });
+
+  it("names every language sharing that date, not one of them", () => {
+    // A table recorded in one sitting has all five on the same day, and a line
+    // naming one page would read as a fact about that page.
+    assert.deepEqual(
+      oldestConfirmation({
+        de: entry({ checkedOn: "2026-02-02" }),
+        ru: entry({ checkedOn: "2026-02-02" }),
+        es: entry({ checkedOn: "2026-09-09" }),
+      }),
+      { checkedOn: "2026-02-02", languages: ["ru", "de"] },
+    );
+  });
+
+  it("orders those languages by the constant, not by the object literal", () => {
+    // `ru` before `de` above is PRIVACY_TRANSLATED_LANGUAGES' order, and the
+    // fixture writes `de` first on purpose — a report whose order came from how
+    // a table literal happens to be typed changes when somebody re-sorts it.
+    const { languages } = oldestConfirmation({
+      es: entry({ checkedOn: "2026-03-03" }),
+      be: entry({ checkedOn: "2026-03-03" }),
+      ru: entry({ checkedOn: "2026-03-03" }),
+    }) ?? { languages: [] };
+    assert.deepEqual(languages, ["ru", "be", "es"]);
+  });
+
+  it("is null for an empty table, which is a failure elsewhere", () => {
+    assert.equal(oldestConfirmation({}), null);
+  });
+
+  it("reaches the pass line, and only the pass line", () => {
+    const passing = evaluateTranslationProvenance({
+      current: { de: entry({ checkedOn: "2026-04-05" }) },
+      previous: null,
+      baseRef: null,
+      changedFiles: [],
+    });
+    assert.match(
+      formatTranslationProvenanceReport("guard", passing),
+      /Oldest confirmation 2026-04-05 \(de\)\./,
+    );
+    // A failing run prints findings; an age line under them would be noise
+    // beside the thing that has to be fixed.
+    const failing = evaluateTranslationProvenance({
+      current: { de: entry({ checkedOn: "nope" }) },
+      previous: null,
+      baseRef: null,
+      changedFiles: [],
+    });
+    assert.equal(failing.ok, false);
+    assert.ok(
+      !formatTranslationProvenanceReport("guard", failing).includes(
+        "Oldest confirmation",
+      ),
+    );
+  });
+
+  it("is carried on the result of the real table, so the shipped line has one", () => {
+    const result = evaluateTranslationProvenance({
+      current: PRIVACY_TRANSLATION_SOURCES,
+      previous: null,
+      baseRef: null,
+      changedFiles: [],
+    });
+    assert.notEqual(result.oldest, null);
+    assert.ok(
+      (result.oldest?.languages.length ?? 0) >= 1,
+      "the shipped table's oldest confirmation names no language",
+    );
   });
 });

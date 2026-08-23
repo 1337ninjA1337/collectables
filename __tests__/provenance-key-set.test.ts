@@ -454,5 +454,8 @@ function translationRefusal(code: string): string {
     ),
     checked: 1,
     comparedAgainst: null,
+    // A refused table has no pass line, so the age this feeds is never read
+    // here — null rather than a fixture date that would look like a claim.
+    oldest: null,
   });
 }
