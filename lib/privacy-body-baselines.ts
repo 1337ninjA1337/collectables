@@ -37,7 +37,7 @@
 import {
   PRIVACY_DEFAULT_LANGUAGE,
   PRIVACY_PAGE_LANGUAGES,
-} from "./privacy-page";
+} from "./privacy-languages";
 
 export type PrivacyBodyBaseline = {
   /**

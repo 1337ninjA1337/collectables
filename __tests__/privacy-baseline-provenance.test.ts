@@ -22,7 +22,7 @@ import {
   privacyPolicySourcePath,
   type PrivacyBodyBaseline,
 } from "../lib/privacy-body-baselines";
-import { PRIVACY_PAGE_LANGUAGES } from "../lib/privacy-page";
+import { PRIVACY_PAGE_LANGUAGES } from "../lib/privacy-languages";
 
 import { readRepoFile, repoPath } from "./helpers/repo-file";
 

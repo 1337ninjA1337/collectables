@@ -34,7 +34,7 @@ import { PRIVACY_BODY_BASELINE_WORDS } from "./privacy-body-baselines";
 import {
   PRIVACY_DEFAULT_LANGUAGE,
   PRIVACY_PAGE_LANGUAGES,
-} from "./privacy-page";
+} from "./privacy-languages";
 
 export {
   PRIVACY_BODY_BASELINES,

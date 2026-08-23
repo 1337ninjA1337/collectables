@@ -10,6 +10,11 @@
  * strict CSP (no scripts, inline style only) and shares the app's palette.
  */
 
+import {
+  PRIVACY_DEFAULT_LANGUAGE,
+  PRIVACY_PAGE_LANGUAGES,
+} from "./privacy-languages";
+
 const HTML_ESCAPES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -148,27 +153,6 @@ export function renderMarkdownBody(markdown: string): string {
   }
   return blocks.join("\n");
 }
-
-export type PrivacyPageLanguage = { code: string; label: string };
-
-/**
- * Languages the /privacy page is offered in. Mirrors `languageOptions` in
- * `lib/i18n-context.tsx` (drift-guarded by `__tests__/privacy-page-i18n.test.ts`)
- * but is declared locally: this module is imported by node build scripts,
- * which cannot load the React/AsyncStorage-importing i18n context. English is
- * the canonical full policy at `/privacy/`; every other code is a translated
- * Sentry-disclosure page (`PRIVACY.md.<code>`) served at `/privacy/<code>/`.
- */
-export const PRIVACY_PAGE_LANGUAGES: readonly PrivacyPageLanguage[] = [
-  { code: "en", label: "English" },
-  { code: "ru", label: "Русский" },
-  { code: "be", label: "Беларуская" },
-  { code: "pl", label: "Polski" },
-  { code: "de", label: "Deutsch" },
-  { code: "es", label: "Español" },
-];
-
-export const PRIVACY_DEFAULT_LANGUAGE = "en";
 
 /**
  * Script-free language picker (the page CSP forbids scripts, so plain links).

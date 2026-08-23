@@ -15,8 +15,8 @@ import {
 import {
   PRIVACY_DEFAULT_LANGUAGE,
   PRIVACY_PAGE_LANGUAGES,
-  renderPrivacyPage,
-} from "../lib/privacy-page";
+} from "../lib/privacy-languages";
+import { renderPrivacyPage } from "../lib/privacy-page";
 
 /** Pre-quoted SHA-256 CSP hash-source for an inline script body. */
 function inlineScriptHash(body: string): string {
