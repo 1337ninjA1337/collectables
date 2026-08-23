@@ -130,6 +130,38 @@ export function policyChecksum(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex").slice(0, 16);
 }
 
+/**
+ * How long a fingerprint is, MEASURED from the function rather than written
+ * down beside it.
+ *
+ * The width was a literal in three validators — `/^[0-9a-f]{16}$/`, in the two
+ * provenance modules and in a suite — and each is what decides whether a
+ * recorded value is well-formed. So widening `policyChecksum` was four
+ * coordinated edits, and the shape of getting it wrong is the bad one: the
+ * tables get re-recorded with correct wider values, a validator somebody missed
+ * REJECTS them, and its failure is `malformed_checksum` with the entry quoted —
+ * a message blaming the data for the width nobody moved.
+ *
+ * Derived, the widening is one edit and it is loud in the right place: every
+ * recorded fingerprint fails until the tables are re-recorded, which is the work
+ * the widening actually implies, and no validator can disagree with another
+ * about what it is validating.
+ */
+export const POLICY_CHECKSUM_LENGTH = policyChecksum("").length;
+
+/**
+ * The shape a RECORDED fingerprint must have, from the same function.
+ *
+ * Lowercase hex is `digest("hex")`'s own output alphabet, so the character class
+ * is a property of the implementation above and not a separate decision; the
+ * length is the one that used to be restated. Anchored, because a pattern that
+ * merely matches somewhere would accept a 64-character digest that was never
+ * sliced.
+ */
+export const POLICY_CHECKSUM_PATTERN = new RegExp(
+  `^[0-9a-f]{${String(POLICY_CHECKSUM_LENGTH)}}$`,
+);
+
 /** The English section the five translations carry, fingerprinted. */
 export function privacyTranslatedSectionChecksum(markdown: string): string {
   return policyChecksum(extractPrivacyTranslatedSection(markdown));

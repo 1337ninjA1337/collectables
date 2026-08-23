@@ -32,6 +32,7 @@ import { checkError } from "./check-error";
 import { privacyPolicySourcePath } from "./privacy-body-baselines";
 import { PRIVACY_DEFAULT_LANGUAGE } from "./privacy-languages";
 import {
+  POLICY_CHECKSUM_PATTERN,
   PRIVACY_TRANSLATED_LANGUAGES,
   type PrivacyTranslationSource,
 } from "./privacy-translated-section";
@@ -67,7 +68,13 @@ export type TranslationProvenanceFailure = {
 export const TRANSLATION_NOTE_MIN_WORDS = 8;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const CHECKSUM = /^[0-9a-f]{16}$/;
+/**
+ * The width is `policyChecksum`'s, measured — not a `{16}` restated here. This
+ * table records that function's output, so "well-formed" has to mean whatever
+ * the function currently produces, or a widening leaves the table holding short
+ * values that every check calls fine.
+ */
+const CHECKSUM = POLICY_CHECKSUM_PATTERN;
 
 /**
  * The five translations, and NOT English — which is the whole difference between

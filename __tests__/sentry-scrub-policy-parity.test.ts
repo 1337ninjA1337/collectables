@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { scrubPII, type SentryEvent } from "../lib/sentry";
-import { extractPrivacyTranslatedSection } from "../lib/privacy-translated-section";
+import {
+  POLICY_CHECKSUM_PATTERN,
+  extractPrivacyTranslatedSection,
+} from "../lib/privacy-translated-section";
 import {
   SCRUB_PROMISE_BASELINE,
   SCRUB_PROMISE_INTRO,
@@ -270,7 +273,7 @@ describe("the wording the probes were matched to", () => {
   });
 
   it("carries provenance the next reader can weigh", () => {
-    assert.match(SCRUB_PROMISE_BASELINE.checksum, /^[0-9a-f]{16}$/);
+    assert.match(SCRUB_PROMISE_BASELINE.checksum, POLICY_CHECKSUM_PATTERN);
     assert.match(SCRUB_PROMISE_BASELINE.recordedOn, /^\d{4}-\d{2}-\d{2}$/);
     // Eight words for the same reason the translation notes ask for eight: this
     // value moves for more than one reason and the note is the only place the

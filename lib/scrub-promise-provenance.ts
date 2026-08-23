@@ -46,6 +46,7 @@
 import { checkError } from "./check-error";
 import { privacyPolicySourcePath } from "./privacy-body-baselines";
 import { PRIVACY_DEFAULT_LANGUAGE } from "./privacy-languages";
+import { POLICY_CHECKSUM_PATTERN } from "./privacy-translated-section";
 import type { ScrubPromiseBaseline } from "./sentry-scrub-promises";
 
 export type ScrubPromiseFailureCode =
@@ -84,7 +85,13 @@ export const SCRUB_PROMISE_SOURCE_FILE = privacyPolicySourcePath(
 );
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const CHECKSUM = /^[0-9a-f]{16}$/;
+/**
+ * Shared with the translation table, and for the same reason: the fingerprint
+ * this table holds comes out of `policyChecksum`, so its shape is that
+ * function's to state. A second `{16}` written here is a second thing to
+ * remember when the fingerprint width changes.
+ */
+const CHECKSUM = POLICY_CHECKSUM_PATTERN;
 
 /** Well-formedness of the record as it stands, independent of any history. */
 export function evaluateScrubPromiseShape(

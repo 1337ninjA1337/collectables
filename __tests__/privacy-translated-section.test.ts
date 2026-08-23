@@ -2,16 +2,20 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  POLICY_CHECKSUM_LENGTH,
+  POLICY_CHECKSUM_PATTERN,
   PRIVACY_TRANSLATED_LANGUAGES,
   PRIVACY_TRANSLATED_SECTION_MARKER,
   PRIVACY_TRANSLATION_SOURCES,
   extractPrivacyTranslatedSection,
   privacyTranslatedSectionChecksum,
+  policyChecksum,
   privacyTranslationChecksum,
 } from "../lib/privacy-translated-section";
 import { privacyPolicySourcePath } from "../lib/privacy-body-baselines";
 
 import { measuredFloor } from "./helpers/coverage-floor";
+import { sourceCode, sourceFiles } from "./helpers/source-files";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -231,8 +235,16 @@ describe("PRIVACY_TRANSLATION_SOURCES — one entry per translated page", () => 
         // documented repair for a red checksum is "paste the new one in", so the
         // field that stops that from being the whole commit is the one a
         // reviewer reads.
-        assert.match(entry.sourceChecksum, /^[0-9a-f]{16}$/, "sourceChecksum is not 16 lowercase hex characters");
-        assert.match(entry.translatedChecksum, /^[0-9a-f]{16}$/, "translatedChecksum is not 16 lowercase hex characters");
+        assert.match(
+          entry.sourceChecksum,
+          POLICY_CHECKSUM_PATTERN,
+          `sourceChecksum is not ${String(POLICY_CHECKSUM_LENGTH)} lowercase hex characters`,
+        );
+        assert.match(
+          entry.translatedChecksum,
+          POLICY_CHECKSUM_PATTERN,
+          `translatedChecksum is not ${String(POLICY_CHECKSUM_LENGTH)} lowercase hex characters`,
+        );
         assert.match(entry.checkedOn, /^\d{4}-\d{2}-\d{2}$/, "checkedOn is not a YYYY-MM-DD date");
         assert.ok(
           entry.note.split(/\s+/).length >= 8,
@@ -258,4 +270,79 @@ describe("PRIVACY_TRANSLATION_SOURCES — one entry per translated page", () => 
       });
     });
   }
+});
+
+/**
+ * The fingerprint's WIDTH, said once.
+ *
+ * `/^[0-9a-f]{16}$/` was written out in three validators — the two provenance
+ * modules and the case above — and each is what decides whether a recorded
+ * value is well-formed. That made widening `policyChecksum` four coordinated
+ * edits with a nasty way to get it wrong: re-record the tables correctly, miss
+ * one validator, and that validator rejects the correct values as
+ * `malformed_checksum` — a red build blaming the entries for a width nobody
+ * moved.
+ *
+ * `POLICY_CHECKSUM_PATTERN` is measured from the function, so the widening
+ * fails every recorded entry until the tables are re-recorded — which is the
+ * work the widening implies. What a derivation cannot do is notice that the
+ * width CHANGED at all, since it would agree with any value; so sixteen is
+ * asserted here, in one place, and a change to it is a line in a diff with a
+ * reason next to it.
+ */
+describe("the policy fingerprint's shape", () => {
+  it("is sixteen characters, which is a decision rather than an observation", () => {
+    // Short enough to read in a diff and to retype into a table, long enough
+    // that two disclosures will not collide. Moving this number means moving
+    // every recorded checksum in the repository, so it is asserted rather than
+    // derived — the one place where a literal is the point.
+    assert.equal(
+      POLICY_CHECKSUM_LENGTH,
+      16,
+      "policyChecksum's output width moved — every entry in PRIVACY_TRANSLATION_SOURCES and SCRUB_PROMISE_BASELINE has to be re-recorded, and this number updated with them",
+    );
+  });
+
+  it("is the shape a real checksum has, not only a shape the tables satisfy", () => {
+    // The pattern is derived from the function's LENGTH; that its alphabet is
+    // lowercase hex comes from `digest("hex")` and is checked here against an
+    // actual call rather than assumed from the implementation.
+    assert.match(policyChecksum("anything at all"), POLICY_CHECKSUM_PATTERN);
+    assert.equal(policyChecksum("").length, POLICY_CHECKSUM_LENGTH);
+  });
+
+  it("is anchored, so an unsliced digest does not pass as a fingerprint", () => {
+    // The failure a `{16}` without anchors would let through: a full SHA-256
+    // recorded by hand contains sixteen hex characters in its first sixteen
+    // positions and is not a fingerprint this table can compare.
+    assert.ok(
+      !POLICY_CHECKSUM_PATTERN.test(
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      ),
+      "a 64-character digest matches the fingerprint pattern",
+    );
+  });
+
+  it("is not restated as a literal anywhere that validates a recorded value", () => {
+    // The sweep that keeps the three sites at one. `lib/` and `scripts/` may
+    // not spell the width again: a fourth table registering its own
+    // `/^[0-9a-f]{16}$/` is exactly how this drifted the first time, and it
+    // reads as correct at the site that writes it.
+    //
+    // A WHOLE-STRING run of hex is the offence, which is what a fingerprint
+    // validator is. `lib/uuid.ts` and `lib/analytics-mirror-payload.ts` both
+    // hold `[0-9a-f]{8}-[0-9a-f]{4}-…`, and a UUID's five runs separated by
+    // hyphens is a different shape validating a different thing — reporting
+    // them would be the first exclusion in a list that then grows.
+    const offenders = sourceFiles("lib", "scripts").filter(
+      (file) =>
+        file !== "lib/privacy-translated-section.ts" &&
+        /\^\[0-9a-f\]\{\d+\}\$/.test(sourceCode(file)),
+    );
+    assert.deepEqual(
+      offenders,
+      [],
+      `these modules spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN: ${offenders.join(", ")}`,
+    );
+  });
 });
