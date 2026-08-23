@@ -25,7 +25,16 @@
  * from a promised phrase to a probe value the scrubber has to remove, which is
  * the part no parser can infer — and it is checked exhaustive against what the
  * sentence actually says.
+ *
+ * The exhaustiveness check catches a field ADDED to the promise and cannot catch
+ * one NARROWED, which is what {@link SCRUB_PROMISE_BASELINE} is for — see its
+ * note.
  */
+
+import {
+  normalisePolicyText,
+  policyChecksum,
+} from "./privacy-translated-section";
 
 /**
  * The phrase that introduces the promise, and the anchor the parenthetical is
@@ -70,3 +79,78 @@ export function extractScrubPromises(policyText: string): readonly string[] {
     .map((item) => item.replace(/`/g, "").trim())
     .filter((item) => item.length > 0);
 }
+
+/**
+ * The promise CLAUSE, from its intro through the sentence it ends.
+ *
+ * Normalised first — the policy is hard-wrapped inside a blockquote, so the
+ * clause spans three lines with `> ` markers in front of two of them, and a
+ * rewrap must not read as an amendment (the same argument
+ * {@link normalisePolicyText} was written for next door).
+ *
+ * Ends at the first sentence-ending period AFTER the parenthetical, because the
+ * parenthetical cannot contain one and the abbreviations that would break a
+ * naive split ("e.g.", "i.e.") are what a legal disclosure is written to avoid.
+ * A clause with no terminator is a throw rather than a slice to end-of-file: a
+ * fingerprint of the whole remaining policy would move on every unrelated edit,
+ * which is a rule nobody keeps.
+ */
+export function scrubPromiseClause(policyText: string): string {
+  const normalised = normalisePolicyText(policyText);
+  const anchor = normalised.indexOf(SCRUB_PROMISE_INTRO);
+  if (anchor === -1) {
+    throw new Error(
+      `the privacy policy no longer says "${SCRUB_PROMISE_INTRO}" — the sentence promising what is stripped from a crash report was rephrased, and lib/sentry.ts's scrubPII has to be read against whatever replaced it.`,
+    );
+  }
+  const close = normalised.indexOf(")", anchor);
+  const stop = close === -1 ? -1 : normalised.indexOf(".", close);
+  if (close === -1 || stop === -1) {
+    throw new Error(
+      `"${SCRUB_PROMISE_INTRO}" is no longer followed by a parenthetical list ending in a sentence — nothing can now fingerprint what the policy promises is stripped.`,
+    );
+  }
+  return normalised.slice(anchor, stop + 1);
+}
+
+/** {@link scrubPromiseClause}, fingerprinted the way every other disclosure here is. */
+export function scrubPromiseChecksum(policyText: string): string {
+  return policyChecksum(scrubPromiseClause(policyText));
+}
+
+/**
+ * The promise as it was last read against `scrubPII`, and the day somebody read
+ * it.
+ *
+ * WHAT THE FIELD LIST CANNOT SEE. `extractScrubPromises` gives the parity suite
+ * the phrases the policy lists, and the suite matches each to a probe by regex —
+ * `/^email/i`, `/^ip\b/i`, `/^authorization/i`. Those patterns are anchored on
+ * one word on purpose (the policy is prose and the event has keys), and that is
+ * also how a NARROWED promise keeps its probe: "email address" reworded to
+ * "email domain" still matches `/^email/i`, still claims the same probe, and
+ * the exhaustiveness case — which asks whether every phrase is claimed and every
+ * probe is used — is satisfied by both. The app would then be stripping the whole
+ * address while the policy promised only the domain, or the reverse, and nothing
+ * in the suite could tell.
+ *
+ * The checksum cannot read the new wording either. What it does is refuse to let
+ * the rewording pass unlooked-at: any edit to the clause turns the suite red, and
+ * the documented repair is to re-read every probe against the new sentence and
+ * then record what was found. Same reviewability guarantee, and the same honest
+ * limit, as the translation checksums next door — the machine makes somebody
+ * look, and looking is still a person's job.
+ *
+ * `recordedOn` and `note` are the provenance the value needs to be worth
+ * anything: a checksum whose repair is a paste is one commit from being a rubber
+ * stamp, and the note is the only place the diff says WHICH kind of edit moved
+ * it — a rewrap that changed nothing, a narrowed field, or a field added.
+ */
+export const SCRUB_PROMISE_BASELINE: {
+  readonly checksum: string;
+  readonly recordedOn: string;
+  readonly note: string;
+} = {
+  checksum: "640db24eb634b89a",
+  recordedOn: "2026-08-23",
+  note: "First fingerprint of the promise clause, taken against the four probes in sentry-scrub-policy-parity as they stand; the field list was already checked exhaustive, this pins the wording those probes were matched to.",
+};

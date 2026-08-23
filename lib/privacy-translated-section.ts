@@ -116,14 +116,20 @@ export function normalisePolicyText(markdown: string): string {
  * two different disclosures will not collide, short enough to read in a diff and
  * to type into the table when a page is refreshed. The field is compared by a
  * machine and READ by a reviewer, and a 64-character line is only the first.
+ *
+ * Exported because a third disclosure fingerprint now lives outside this module
+ * (`lib/sentry-scrub-promises.ts` records one for the sentence promising what
+ * `scrubPII` removes) and a second implementation of "sixteen hex of SHA-256"
+ * is how two recorded values stop being comparable. Every checksum in a
+ * provenance table in this repository comes through here.
  */
-function checksum(text: string): string {
+export function policyChecksum(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex").slice(0, 16);
 }
 
 /** The English section the five translations carry, fingerprinted. */
 export function privacyTranslatedSectionChecksum(markdown: string): string {
-  return checksum(extractPrivacyTranslatedSection(markdown));
+  return policyChecksum(extractPrivacyTranslatedSection(markdown));
 }
 
 /**
@@ -134,7 +140,7 @@ export function privacyTranslatedSectionChecksum(markdown: string): string {
  * and is in English, which is the other half of what art. 12 is asking for.
  */
 export function privacyTranslationChecksum(markdown: string): string {
-  return checksum(normalisePolicyText(markdown));
+  return policyChecksum(normalisePolicyText(markdown));
 }
 
 /** One translation's record of the English text it was written against. */
