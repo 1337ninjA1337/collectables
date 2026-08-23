@@ -13,6 +13,11 @@ import {
   type ProvenanceVerdict,
 } from "../lib/provenance-tables";
 
+import { PRIVACY_DEFAULT_LANGUAGE } from "../lib/privacy-page";
+import { privacyPolicySourcePath } from "../lib/privacy-body-baselines";
+import { SCRUB_PROMISE_SOURCE_FILE } from "../lib/scrub-promise-provenance";
+import { stripComments } from "../lib/strip-comments";
+
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -345,24 +350,31 @@ describe("the real entries and the places they disagree", () => {
     );
   });
 
-  it("reports over the tables this checkout actually ships", () => {
+  it("reports over the tables this checkout actually ships, in the order it declares", () => {
     // A registry entry pointed at an empty table would pass every ordering case
-    // above and check nothing. Held EXHAUSTIVE against the registry in both
-    // directions, so a fourth entry cannot arrive with no evidence line and no
-    // case saying so.
-    const evidence: Record<string, string> = {
-      "body-baselines": String(Object.keys(PRIVACY_BODY_BASELINES).length),
-      "translation-sources": String(
-        Object.keys(PRIVACY_TRANSLATION_SOURCES).length,
-      ),
-      "scrub-promise": "scrub-promise fingerprint",
-    };
+    // above and check nothing. An ORDERED list, because the declaration order is
+    // the reporting order — `__tests__/privacy-baseline-provenance-script.test.ts`
+    // pins that the script honours it — and an array literal is a much easier
+    // thing to reorder by accident than two statements were. Held exhaustive in
+    // both directions, so a fourth entry cannot arrive with no evidence line and
+    // nothing saying so.
+    const evidence: readonly { readonly id: string; readonly shows: string }[] = [
+      {
+        id: "body-baselines",
+        shows: String(Object.keys(PRIVACY_BODY_BASELINES).length),
+      },
+      {
+        id: "translation-sources",
+        shows: String(Object.keys(PRIVACY_TRANSLATION_SOURCES).length),
+      },
+      { id: "scrub-promise", shows: "scrub-promise fingerprint" },
+    ];
     assert.deepEqual(
-      PROVENANCE_TABLES.map((table) => table.id).sort(),
-      Object.keys(evidence).sort(),
-      "every registered table needs a line here saying what its report has to show, or the case below passes over whatever is left",
+      PROVENANCE_TABLES.map((table) => table.id),
+      evidence.map(({ id }) => id),
+      "the registry's contents or its order changed; both are load-bearing, so say so here too",
     );
-    for (const [id, expected] of Object.entries(evidence)) {
+    for (const { id, shows } of evidence) {
       const outcome = entry(id).run("guard", {
         ref: null,
         present: false,
@@ -370,11 +382,61 @@ describe("the real entries and the places they disagree", () => {
         changedFiles: [],
       });
       assert.ok(
-        outcome.kind === "evaluated" && outcome.report.includes(expected),
-        `${id}'s report does not show "${expected}": ${
+        outcome.kind === "evaluated" && outcome.report.includes(shows),
+        `${id}'s report does not show "${shows}": ${
           outcome.kind === "evaluated" ? outcome.report : "not evaluated"
         }`,
       );
     }
+  });
+});
+
+/**
+ * One name for the English policy path.
+ *
+ * Every evaluator here compares a recorded value's provenance against
+ * `git diff --name-only` output, which means every one of them has to spell the
+ * path of the file its value was measured from. `privacyPolicySourcePath` is
+ * that answer, and it was already being bypassed for the English page inside a
+ * two-element array whose OTHER element called it — which is how one of two
+ * adjacent lines stops being true.
+ */
+describe("the file a provenance value is measured from", () => {
+  /** The evaluators that compare a path against a git diff. */
+  const EVALUATORS = [
+    "lib/privacy-baseline-provenance.ts",
+    "lib/privacy-translation-provenance.ts",
+    "lib/scrub-promise-provenance.ts",
+  ];
+
+  it("has one name, which the scrub-promise table uses", () => {
+    assert.equal(
+      SCRUB_PROMISE_SOURCE_FILE,
+      privacyPolicySourcePath(PRIVACY_DEFAULT_LANGUAGE),
+    );
+    // Repo-relative and posix-separated, because that is what it is compared
+    // against.
+    assert.equal(SCRUB_PROMISE_SOURCE_FILE, "PRIVACY.md");
+  });
+
+  it("is spelled out in no evaluator, so a rename has one place to reach", () => {
+    // Comments stripped: two of these files discuss the path in prose, and a
+    // sweep that read prose would report the explanation rather than the copy.
+    const offenders = EVALUATORS.filter((module) =>
+      stripComments(readRepoFile(module)).includes('"PRIVACY.md"'),
+    );
+    assert.deepEqual(
+      offenders,
+      [],
+      `these modules spell the English policy path instead of asking privacyPolicySourcePath for it: ${offenders.join(", ")}`,
+    );
+    // The sweep's own positive control: the helper that OWNS the literal still
+    // has it, so a pattern that stopped matching anything cannot pass as clean.
+    assert.ok(
+      stripComments(readRepoFile("lib/privacy-body-baselines.ts")).includes(
+        '"PRIVACY.md"',
+      ),
+      "the sweep above matches nothing at all, so it would report a clean tree whatever the evaluators say",
+    );
   });
 });

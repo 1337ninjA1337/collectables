@@ -10,6 +10,7 @@ import {
   formatBaselineRevisionUnparseable,
 } from "../lib/privacy-baseline-provenance";
 import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
+import { PROVENANCE_TABLES } from "../lib/provenance-tables";
 
 import { readRepoFile, REPO_ROOT, repoPath } from "./helpers/repo-file";
 
@@ -174,6 +175,40 @@ describe("check-privacy-baseline-provenance against a scratch repository", () =>
     );
   });
 
+  it("prints one report per registered table, in the order the registry declares", () => {
+    // The order became load-bearing when the guard stopped having one pass per
+    // table: reports print in `PROVENANCE_TABLES` order, and an array literal is
+    // a much easier thing to reorder by accident than two statements were.
+    // Derived from the registry rather than from a list of names, so a fourth
+    // table is covered by this on the commit that adds it.
+    const { root, base } = repoWithBase({});
+    const run = runGuard(root, base);
+    assert.equal(run.status, 0, `expected a pass:\n${run.stdout}${run.stderr}`);
+
+    const positions = PROVENANCE_TABLES.map((table) => {
+      const outcome = table.run(CHECK_NAME, {
+        ref: null,
+        present: false,
+        source: null,
+        changedFiles: [],
+      });
+      assert.equal(outcome.kind, "evaluated", `${table.id} did not evaluate`);
+      const report = outcome.kind === "evaluated" ? outcome.report : "";
+      const at = run.stdout.indexOf(report);
+      assert.notEqual(
+        at,
+        -1,
+        `${table.id} is registered and its report is not in the output:\n${report}\n---\n${run.stdout}`,
+      );
+      return at;
+    });
+    assert.deepEqual(
+      positions,
+      [...positions].sort((left, right) => left - right),
+      `the reports printed out of registry order:\n${run.stdout}`,
+    );
+  });
+
   it("skips the drift half when the module did not exist at the base", () => {
     const { root, base } = repoWithBase({});
     const run = runGuard(root, base);
@@ -206,6 +241,14 @@ describe("check-privacy-baseline-provenance against a scratch repository", () =>
     assert.ok(
       !run.stdout.includes("drift half skipped"),
       `an unparseable revision must not read as a skip:\n${run.stdout}`,
+    );
+    // And no OTHER table's report either. The hard failure means one table's
+    // drift half is off, and a pass line printed beside it is a report from a
+    // guard running on one leg — which is the whole reason the loop checks every
+    // table for this before printing anything.
+    assert.ok(
+      !run.stdout.includes("well-formed"),
+      `a table reported a pass alongside the unparseable failure:\n${run.stdout}`,
     );
   });
 

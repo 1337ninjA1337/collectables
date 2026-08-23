@@ -28,9 +28,8 @@
  * which is the part a paste does not do.
  */
 
-import {
-  privacyPolicySourcePath,
-} from "./privacy-body-baselines";
+import { privacyPolicySourcePath } from "./privacy-body-baselines";
+import { PRIVACY_DEFAULT_LANGUAGE } from "./privacy-page";
 import type { PrivacyTranslationSource } from "./privacy-translated-section";
 
 export type TranslationProvenanceFailureCode =
@@ -128,8 +127,11 @@ export function evaluateTranslationProvenanceDrift(
     const pageMoved = before.translatedChecksum !== entry.translatedChecksum;
     if (!sourceMoved && !pageMoved) continue;
 
+    // Both through the same helper, and the English one is not a literal: two
+    // adjacent lines answering "where does this file live" two different ways
+    // is how one of them stops being true.
     for (const [moved, path] of [
-      [sourceMoved, "PRIVACY.md"],
+      [sourceMoved, privacyPolicySourcePath(PRIVACY_DEFAULT_LANGUAGE)],
       [pageMoved, privacyPolicySourcePath(language)],
     ] as const) {
       if (moved && !touched.has(path)) {

@@ -34,6 +34,8 @@
  * to record — the static case does that on every run.
  */
 
+import { privacyPolicySourcePath } from "./privacy-body-baselines";
+import { PRIVACY_DEFAULT_LANGUAGE } from "./privacy-page";
 import type { ScrubPromiseBaseline } from "./sentry-scrub-promises";
 
 export type ScrubPromiseFailureCode =
@@ -58,8 +60,18 @@ export type ScrubPromiseFailure = {
  */
 export const SCRUB_PROMISE_NOTE_MIN_WORDS = 8;
 
-/** The file the checksum is measured FROM, and so the one that has to move with it. */
-export const SCRUB_PROMISE_SOURCE_FILE = "PRIVACY.md";
+/**
+ * The file the checksum is measured FROM, and so the one that has to move with
+ * it.
+ *
+ * Through `privacyPolicySourcePath` rather than as a literal: this value is
+ * compared against `git diff --name-only` output, four other modules ask the
+ * same question, and the answer they share is one function. A fifth copy of
+ * `"PRIVACY.md"` would be the one that survives a rename.
+ */
+export const SCRUB_PROMISE_SOURCE_FILE = privacyPolicySourcePath(
+  PRIVACY_DEFAULT_LANGUAGE,
+);
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CHECKSUM = /^[0-9a-f]{16}$/;
