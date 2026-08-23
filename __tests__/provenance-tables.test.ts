@@ -27,8 +27,12 @@ import { readRepoFile } from "./helpers/repo-file";
  * Two things are pinned here and they are different claims. That the LOOP does
  * the six steps in the right order and skips the right ones — tested against a
  * fabricated table, because a rule about ordering should not need a legal
- * document to state it. And that the two REAL entries still say what they said
- * before the refactor, including the one place they deliberately disagree.
+ * document to state it. And that the REAL entries still say what they said
+ * before the refactor, including the places they deliberately disagree.
+ *
+ * The registry cases below are written over `PROVENANCE_TABLES` rather than over
+ * a list of names, so a table added later is covered by them on the commit that
+ * adds it — which is what the loop was for.
  */
 
 type Fake = { readonly value: string };
@@ -300,7 +304,7 @@ describe("PROVENANCE_TABLES — the registry the guard loops over", () => {
   });
 });
 
-describe("the two real entries and the one place they disagree", () => {
+describe("the real entries and the places they disagree", () => {
   const entry = (id: string): ProvenanceTable => {
     const table = PROVENANCE_TABLES.find((candidate) => candidate.id === id);
     assert.ok(table !== undefined, `no ${id} entry in PROVENANCE_TABLES`);
@@ -342,14 +346,23 @@ describe("the two real entries and the one place they disagree", () => {
   });
 
   it("reports over the tables this checkout actually ships", () => {
-    // A registry entry pointed at an empty object would pass every ordering
-    // case above and check nothing.
-    const counts: Record<string, number> = {
-      "body-baselines": Object.keys(PRIVACY_BODY_BASELINES).length,
-      "translation-sources": Object.keys(PRIVACY_TRANSLATION_SOURCES).length,
+    // A registry entry pointed at an empty table would pass every ordering case
+    // above and check nothing. Held EXHAUSTIVE against the registry in both
+    // directions, so a fourth entry cannot arrive with no evidence line and no
+    // case saying so.
+    const evidence: Record<string, string> = {
+      "body-baselines": String(Object.keys(PRIVACY_BODY_BASELINES).length),
+      "translation-sources": String(
+        Object.keys(PRIVACY_TRANSLATION_SOURCES).length,
+      ),
+      "scrub-promise": "scrub-promise fingerprint",
     };
-    for (const [id, count] of Object.entries(counts)) {
-      assert.ok(count > 0, `${id} ships an empty table`);
+    assert.deepEqual(
+      PROVENANCE_TABLES.map((table) => table.id).sort(),
+      Object.keys(evidence).sort(),
+      "every registered table needs a line here saying what its report has to show, or the case below passes over whatever is left",
+    );
+    for (const [id, expected] of Object.entries(evidence)) {
       const outcome = entry(id).run("guard", {
         ref: null,
         present: false,
@@ -357,8 +370,10 @@ describe("the two real entries and the one place they disagree", () => {
         changedFiles: [],
       });
       assert.ok(
-        outcome.kind === "evaluated" && outcome.report.includes(String(count)),
-        `${id}'s report does not count its ${String(count)} record(s)`,
+        outcome.kind === "evaluated" && outcome.report.includes(expected),
+        `${id}'s report does not show "${expected}": ${
+          outcome.kind === "evaluated" ? outcome.report : "not evaluated"
+        }`,
       );
     }
   });

@@ -145,12 +145,56 @@ export function scrubPromiseChecksum(policyText: string): string {
  * stamp, and the note is the only place the diff says WHICH kind of edit moved
  * it — a rewrap that changed nothing, a narrowed field, or a field added.
  */
-export const SCRUB_PROMISE_BASELINE: {
+export type ScrubPromiseBaseline = {
+  /** {@link scrubPromiseChecksum} of `PRIVACY.md` on `recordedOn`. */
   readonly checksum: string;
+  /** The day somebody read the clause against the probes. ISO, so it orders. */
   readonly recordedOn: string;
+  /** What moved the value, in a sentence. See the note above on why. */
   readonly note: string;
-} = {
+};
+
+export const SCRUB_PROMISE_BASELINE: ScrubPromiseBaseline = {
   checksum: "640db24eb634b89a",
   recordedOn: "2026-08-23",
   note: "First fingerprint of the promise clause, taken against the four probes in sentry-scrub-policy-parity as they stand; the field list was already checked exhaustive, this pins the wording those probes were matched to.",
 };
+
+
+/**
+ * The baseline as it stands in a given revision of this module's SOURCE.
+ *
+ * Text in rather than an import, because the guard that uses it compares this
+ * file against its own previous revision — see
+ * `scripts/check-privacy-baseline-provenance.ts`. Null means "no comparable
+ * record at that revision", which the caller reads as a skip.
+ *
+ * Anchored on the DECLARATION rather than the name, which also appears in this
+ * file's prose above it, and closed by a `};` at column 0 — every field in the
+ * literal is indented, so this needs no brace counting. The literal is
+ * deliberately annotated with a NAMED type rather than an inline one, so the
+ * first `{` after the declaration is the object and not its shape.
+ */
+export function parseScrubPromiseBaseline(
+  source: string,
+): ScrubPromiseBaseline | null {
+  const start = source.indexOf("export const SCRUB_PROMISE_BASELINE");
+  if (start === -1) return null;
+  const open = source.indexOf("{", start);
+  if (open === -1) return null;
+  const close = source.indexOf("\n};", open);
+  if (close === -1) return null;
+  const body = source.slice(open, close);
+
+  const field =
+    /checksum\s*:\s*"([0-9a-f]*)"\s*,\s*recordedOn\s*:\s*"([^"]*)"\s*,\s*note\s*:\s*"((?:[^"\\]|\\.)*)"/;
+  const match = field.exec(body);
+  if (match === null) return null;
+  return {
+    checksum: match[1],
+    recordedOn: match[2],
+    // Only `\"` and `\\` can legally appear; unescaping them keeps a note
+    // containing a quote comparable with the imported object.
+    note: match[3].replace(/\\(["\\])/g, "$1"),
+  };
+}

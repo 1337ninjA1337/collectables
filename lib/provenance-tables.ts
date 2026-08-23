@@ -49,6 +49,14 @@ import {
   evaluateTranslationProvenance,
   formatTranslationProvenanceReport,
 } from "./privacy-translation-provenance";
+import {
+  evaluateScrubPromiseProvenance,
+  formatScrubPromiseProvenanceReport,
+} from "./scrub-promise-provenance";
+import {
+  SCRUB_PROMISE_BASELINE,
+  parseScrubPromiseBaseline,
+} from "./sentry-scrub-promises";
 
 /**
  * A table as it stood at some previous revision — and, when there is none,
@@ -257,6 +265,37 @@ const TRANSLATION_TABLE = defineProvenanceTable({
     `${checkName}: translation-checksum drift skipped — no ${TRANSLATION_MODULE} table was readable at ${ref}, so the guard predates it.`,
 });
 
+const PROMISE_MODULE = "lib/sentry-scrub-promises.ts";
+
+/**
+ * The fingerprint of the sentence promising what `scrubPII` strips from a crash
+ * report.
+ *
+ * The third table, and the one the loop was written for: it is an entry here and
+ * a parser and an evaluator of its own, and `scripts/check-privacy-baseline-provenance.ts`
+ * did not change to accept it. That was the argument for building the registry
+ * before a third table existed rather than after.
+ *
+ * One record rather than a map, which is why nothing here is per-key. Its
+ * `absent`-only classification follows the translation entry's reasoning for the
+ * same reason — the parser is new and round-tripped by the suite on every run.
+ */
+const PROMISE_TABLE = defineProvenanceTable({
+  id: "scrub-promise",
+  module: PROMISE_MODULE,
+  current: SCRUB_PROMISE_BASELINE,
+  classify: (_present, source) => {
+    const record = source === null ? null : parseScrubPromiseBaseline(source);
+    return record === null ? { kind: "absent" } : { kind: "table", table: record };
+  },
+  evaluate: evaluateScrubPromiseProvenance,
+  report: formatScrubPromiseProvenanceReport,
+  unparseable: (checkName, ref) =>
+    `${checkName}: ERROR — ${PROMISE_MODULE} exists at ${ref} but no SCRUB_PROMISE_BASELINE record could be read from it.`,
+  driftSkipped: (checkName, ref) =>
+    `${checkName}: scrub-promise drift skipped — no ${PROMISE_MODULE} record was readable at ${ref}, so the guard predates it.`,
+});
+
 /**
  * Order matters and is the reporting order: reports print in this sequence, and
  * the first `unparseable` is the one that stops the run.
@@ -264,6 +303,7 @@ const TRANSLATION_TABLE = defineProvenanceTable({
 export const PROVENANCE_TABLES: readonly ProvenanceTable[] = [
   BASELINES_TABLE,
   TRANSLATION_TABLE,
+  PROMISE_TABLE,
 ];
 
 /**
