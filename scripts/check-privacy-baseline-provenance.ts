@@ -73,6 +73,7 @@
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 
+import { checkError } from "../lib/check-error";
 import {
   printProvenanceOutput,
   provenanceOutput,
@@ -154,10 +155,12 @@ function git(...args: string[]): string | null {
   if (run.error !== undefined || run.status === null) {
     const cause =
       run.error?.message ?? `killed by ${run.signal ?? "an unknown signal"}`;
-    console.error(
-      `${CHECK_NAME}: ERROR — \`git ${args.join(" ")}\` could not be run in ${REPO_ROOT} (${cause}). This guard reads history and nothing else, so a missing or broken git makes every check below vacuous rather than green.`,
+    stop(
+      checkError(
+        CHECK_NAME,
+        `\`git ${args.join(" ")}\` could not be run in ${REPO_ROOT} (${cause}). This guard reads history and nothing else, so a missing or broken git makes every check below vacuous rather than green.`,
+      ),
     );
-    process.exit(1);
   }
   if (run.status !== 0 || typeof run.stdout !== "string") return null;
   return run.stdout.trim();
@@ -187,7 +190,17 @@ function requestedBase(argv: readonly string[]): RequestedBase | null {
 type Comparison =
   | { readonly kind: "compare"; readonly ref: string }
   | { readonly kind: "skip"; readonly reason: string }
-  | { readonly kind: "fail"; readonly reason: string };
+  /**
+   * A REFUSAL, already formatted — not a reason for `main` to format.
+   *
+   * The other two stops receive a finished line from a pure function
+   * (`provenanceRegistryRefusal`, `changedFilesRefusal`). While this variant
+   * carried a bare `reason`, `main` had to splice the check name and the em dash
+   * back on, which made it the last place in the script where the guard's output
+   * convention was written by hand — and the one caller that could disagree with
+   * the two that cannot. Built here, where the sentence is decided.
+   */
+  | { readonly kind: "fail"; readonly refusal: string };
 
 function resolveComparison(argv: readonly string[]): Comparison {
   // Asked FIRST, because everything below reads a `null` from git as an answer
@@ -200,11 +213,14 @@ function resolveComparison(argv: readonly string[]): Comparison {
   if (git("rev-parse", "--is-inside-work-tree") !== "true") {
     return {
       kind: "fail",
-      reason: `${REPO_ROOT} is not a git work tree, so there is no history to compare against and every check below would skip. ${
+      refusal: checkError(
+        CHECK_NAME,
+        `${REPO_ROOT} is not a git work tree, so there is no history to compare against and every check below would skip. ${
         REPO_ROOT_OVERRIDE === null
           ? "Run this guard from a checkout, not from an exported copy of the sources."
           : `${ROOT.source} is set — point it at a repository or unset it.`
       }`,
+      ),
     };
   }
   const asked = requestedBase(argv);
@@ -215,7 +231,10 @@ function resolveComparison(argv: readonly string[]): Comparison {
   if (REPO_ROOT_OVERRIDE !== null && (asked === null || !asked.strict)) {
     return {
       kind: "fail",
-      reason: `${ROOT.source} is set without an explicit base — pass --base <ref> (or set PRIVACY_BASELINE_BASE_REF). Falling through to HEAD~1 in a redirected repository compares this table against an unrelated commit.`,
+      refusal: checkError(
+        CHECK_NAME,
+        `${ROOT.source} is set without an explicit base — pass --base <ref> (or set PRIVACY_BASELINE_BASE_REF). Falling through to HEAD~1 in a redirected repository compares this table against an unrelated commit.`,
+      ),
     };
   }
   if (asked !== null) {
@@ -225,7 +244,10 @@ function resolveComparison(argv: readonly string[]): Comparison {
     if (asked.strict) {
       return {
         kind: "fail",
-        reason: `base revision "${asked.ref}" does not resolve — fetch it (or drop --base to compare against HEAD~1).`,
+        refusal: checkError(
+          CHECK_NAME,
+          `base revision "${asked.ref}" does not resolve — fetch it (or drop --base to compare against HEAD~1).`,
+        ),
       };
     }
   }
@@ -243,8 +265,10 @@ function resolveComparison(argv: readonly string[]): Comparison {
   if (git("rev-parse", "--is-shallow-repository") === "true") {
     return {
       kind: "fail",
-      reason:
+      refusal: checkError(
+        CHECK_NAME,
         "HEAD has no parent in a SHALLOW clone — the drift half cannot run, and a pass that checked nothing is not a pass. Check out with `fetch-depth: 0` (ci.yml does), or pass --base <ref> with a ref that is present.",
+      ),
     };
   }
   return { kind: "skip", reason: "HEAD is the root commit" };
@@ -312,9 +336,7 @@ function main(): void {
   // list would be a list of thunks and the order would stop being the visible
   // thing about it. What the three DO share is the ending, which is `stop`.
   const comparison = resolveComparison(argv);
-  if (comparison.kind === "fail") {
-    stop(`${CHECK_NAME}: ERROR — ${comparison.reason}`);
-  }
+  if (comparison.kind === "fail") stop(comparison.refusal);
 
   // An empty registry is the one thing a loop can do that two hand-written
   // passes could not — see {@link provenanceRegistryRefusal}. `provenanceOutput`

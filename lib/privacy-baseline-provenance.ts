@@ -21,6 +21,7 @@
  * kind available here.
  */
 
+import { checkError } from "./check-error";
 import {
   parsePrivacyBodyBaselines,
   privacyPolicySourcePath,
@@ -259,7 +260,10 @@ export function formatBaselineRevisionUnparseable(
   modulePath: string,
   ref: string,
 ): string {
-  return `${checkName}: ERROR — ${modulePath} exists at ${ref} but no PRIVACY_BODY_BASELINES table could be read from it. The drift half compares this file against its own previous revision, so a removal, a rename or a reformat that defeats the parser silently turns that half off — which is why this is a failure and not the skip a revision predating the module gets. If the table moved on purpose, update the guard with it.`;
+  return checkError(
+    checkName,
+    `${modulePath} exists at ${ref} but no PRIVACY_BODY_BASELINES table could be read from it. The drift half compares this file against its own previous revision, so a removal, a rename or a reformat that defeats the parser silently turns that half off — which is why this is a failure and not the skip a revision predating the module gets. If the table moved on purpose, update the guard with it.`,
+  );
 }
 
 export type BaselineProvenanceResult = {
@@ -307,7 +311,10 @@ export function formatBaselineProvenanceFailure(
   checkName: string,
   failure: BaselineProvenanceFailure,
 ): string {
-  return `${checkName}: ERROR — ${BASELINE_PROVENANCE_MESSAGE[failure.code](failure.language, failure.detail)}`;
+  return checkError(
+    checkName,
+    BASELINE_PROVENANCE_MESSAGE[failure.code](failure.language, failure.detail),
+  );
 }
 
 export function formatBaselineProvenanceReport(
@@ -322,7 +329,10 @@ export function formatBaselineProvenanceReport(
     return `${checkName}: ${result.checked} baseline(s) well-formed (${against}).`;
   }
   if (result.checked === 0) {
-    return `${checkName}: ERROR — PRIVACY_BODY_BASELINES is empty; a pass over zero baselines is not a pass.`;
+    return checkError(
+      checkName,
+      "PRIVACY_BODY_BASELINES is empty; a pass over zero baselines is not a pass.",
+    );
   }
   return result.failures
     .map((failure) => formatBaselineProvenanceFailure(checkName, failure))

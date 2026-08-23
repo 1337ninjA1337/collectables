@@ -43,6 +43,7 @@
  * to record — the static case does that on every run.
  */
 
+import { checkError } from "./check-error";
 import { privacyPolicySourcePath } from "./privacy-body-baselines";
 import { PRIVACY_DEFAULT_LANGUAGE } from "./privacy-languages";
 import type { ScrubPromiseBaseline } from "./sentry-scrub-promises";
@@ -212,6 +213,6 @@ export function formatScrubPromiseProvenanceReport(
     return `${checkName}: the scrub-promise fingerprint is well-formed (${against}).`;
   }
   return result.failures
-    .map((failure) => `${checkName}: ERROR — ${MESSAGE[failure.code](failure.detail)}`)
+    .map((failure) => checkError(checkName, MESSAGE[failure.code](failure.detail)))
     .join("\n");
 }

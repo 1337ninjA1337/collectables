@@ -30,6 +30,8 @@
 
 import * as path from "node:path";
 
+import { checkError } from "./check-error";
+
 /** The shared override, honoured by every guard wrapper. */
 export const GUARD_ROOT_ENV = "LINT_GUARD_REPO_ROOT";
 
@@ -52,7 +54,7 @@ export class GuardRootError extends Error {
   readonly checkName: string;
 
   constructor(checkName: string, message: string) {
-    super(`${checkName}: ERROR — ${message}`);
+    super(checkError(checkName, message));
     this.name = "GuardRootError";
     this.checkName = checkName;
   }

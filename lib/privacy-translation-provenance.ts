@@ -28,6 +28,7 @@
  * which is the part a paste does not do.
  */
 
+import { checkError } from "./check-error";
 import { privacyPolicySourcePath } from "./privacy-body-baselines";
 import { PRIVACY_DEFAULT_LANGUAGE } from "./privacy-languages";
 import {
@@ -266,12 +267,18 @@ export function formatTranslationProvenanceReport(
     return `${checkName}: ${String(result.checked)} translation checksum record(s) well-formed (${against}).`;
   }
   if (result.checked === 0) {
-    return `${checkName}: ERROR — PRIVACY_TRANSLATION_SOURCES is empty; a pass over zero records is not a pass.`;
+    return checkError(
+      checkName,
+      "PRIVACY_TRANSLATION_SOURCES is empty; a pass over zero records is not a pass.",
+    );
   }
   return result.failures
     .map(
       (failure) =>
-        `${checkName}: ERROR — ${MESSAGE[failure.code](failure.language, failure.detail)}`,
+        checkError(
+          checkName,
+          MESSAGE[failure.code](failure.language, failure.detail),
+        ),
     )
     .join("\n");
 }

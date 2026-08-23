@@ -30,6 +30,7 @@
  * add a token.
  */
 
+import { checkError } from "./check-error";
 import { PRIVACY_BODY_BASELINE_WORDS } from "./privacy-body-baselines";
 import {
   PRIVACY_DEFAULT_LANGUAGE,
@@ -145,7 +146,10 @@ export function formatBundleSmokeReport(
   }
   const lines = result.missing.map(
     (entry) =>
-      `${checkName}: ERROR — expected ${TOKEN_KIND_LABEL[entry.kind]} ${JSON.stringify(entry.token)} not found in any of the ${result.chunkCount} bundle chunk(s).`,
+      checkError(
+        checkName,
+        `expected ${TOKEN_KIND_LABEL[entry.kind]} ${JSON.stringify(entry.token)} not found in any of the ${result.chunkCount} bundle chunk(s).`,
+      ),
   );
   return lines.join("\n");
 }
@@ -761,7 +765,10 @@ export function formatPrivacyPageFailure(
   checkName: string,
   failure: PrivacyPageFailure,
 ): string {
-  return `${checkName}: ERROR — ${PRIVACY_PAGE_MESSAGE[failure.code](failure.target, failure.detail)}`;
+  return checkError(
+    checkName,
+    PRIVACY_PAGE_MESSAGE[failure.code](failure.target, failure.detail),
+  );
 }
 
 export function formatPrivacyPagesReport(
@@ -773,7 +780,10 @@ export function formatPrivacyPagesReport(
     return `${checkName}: ${result.checked} privacy page(s) present and rendered${range === null ? "" : ` (${range})`}.`;
   }
   if (result.checked === 0) {
-    return `${checkName}: ERROR — checked 0 privacy pages; a pass over zero pages is not a pass.`;
+    return checkError(
+      checkName,
+      "checked 0 privacy pages; a pass over zero pages is not a pass.",
+    );
   }
   return result.failures
     .map((failure) => formatPrivacyPageFailure(checkName, failure))

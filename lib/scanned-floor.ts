@@ -48,6 +48,7 @@
  * Node-pure on purpose: imported by the tsx CLI wrappers and by node tests.
  */
 
+import { checkError } from "./check-error";
 import { MARKUP_EXTENSIONS } from "./source-dirs";
 
 /** Why a floor check failed. */
@@ -298,7 +299,7 @@ export function formatScannedFloorFailure(
   checkName: string,
   failure: ScannedFloorFailure,
 ): string {
-  return `${checkName}: ERROR — ${FAILURE_MESSAGE[failure.code](failure)}`;
+  return checkError(checkName, FAILURE_MESSAGE[failure.code](failure));
 }
 
 /** Thrown by {@link assertScanned}; carries the verdict for callers that want it. */

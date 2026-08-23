@@ -23,6 +23,8 @@
  * nothing" from "did not check".
  */
 
+import { checkError } from "./check-error";
+
 /** `dist/_expo/static/js/web`, split so callers can `path.join` it. */
 export const WEB_BUNDLE_DIR_SEGMENTS = [
   "dist",
@@ -169,5 +171,5 @@ export function formatBundlePremiseFailure(
   checkName: string,
   failure: BundlePremiseFailure,
 ): string {
-  return `${checkName}: ERROR — ${FAILURE_MESSAGE[failure.code](failure)}`;
+  return checkError(checkName, FAILURE_MESSAGE[failure.code](failure));
 }

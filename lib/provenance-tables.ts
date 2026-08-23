@@ -34,6 +34,7 @@
  * point: it has nothing left to get wrong about one.
  */
 
+import { checkError } from "./check-error";
 import {
   classifyBaselineRevision,
   evaluatePrivacyBaselineProvenance,
@@ -270,7 +271,10 @@ const TRANSLATION_TABLE = defineProvenanceTable({
   evaluate: evaluateTranslationProvenance,
   report: formatTranslationProvenanceReport,
   unparseable: (checkName, ref) =>
-    `${checkName}: ERROR — ${TRANSLATION_MODULE} exists at ${ref} but no PRIVACY_TRANSLATION_SOURCES table could be read from it.`,
+    checkError(
+      checkName,
+      `${TRANSLATION_MODULE} exists at ${ref} but no PRIVACY_TRANSLATION_SOURCES table could be read from it.`,
+    ),
   // Worded so it cannot be mistaken for the baselines line, by a reader or by a
   // suite: the tables skip independently, and "drift half skipped" printed twice
   // with different modules behind it is how somebody concludes the whole guard
@@ -305,7 +309,10 @@ const PROMISE_TABLE = defineProvenanceTable({
   evaluate: evaluateScrubPromiseProvenance,
   report: formatScrubPromiseProvenanceReport,
   unparseable: (checkName, ref) =>
-    `${checkName}: ERROR — ${PROMISE_MODULE} exists at ${ref} but no SCRUB_PROMISE_BASELINE record could be read from it.`,
+    checkError(
+      checkName,
+      `${PROMISE_MODULE} exists at ${ref} but no SCRUB_PROMISE_BASELINE record could be read from it.`,
+    ),
   driftSkipped: (checkName, ref) =>
     `${checkName}: scrub-promise drift skipped — no ${PROMISE_MODULE} record was readable at ${ref}, so the guard predates it.`,
 });
@@ -400,7 +407,10 @@ export function changedFilesRefusal(
     offenders.length > CHANGED_FILES_QUOTED
       ? ` and ${offenders.length - CHANGED_FILES_QUOTED} more`
       : "";
-  return `${checkName}: ERROR — ${offenders.length} of ${changedFiles.length} changed-file path(s) are not repo-relative: ${quoted}${rest}. Every table compares a recorded path (PRIVACY.md, PRIVACY.md.de, …) against this list, so none of them would match and every value that moved would be reported as describing an untouched file — six failures naming files you can see in your own diff. That is worse than stopping. The usual cause is a \`git diff --name-only\` run somewhere other than the repository root, or a caller that resolved the paths before passing them.`;
+  return checkError(
+    checkName,
+    `${offenders.length} of ${changedFiles.length} changed-file path(s) are not repo-relative: ${quoted}${rest}. Every table compares a recorded path (PRIVACY.md, PRIVACY.md.de, …) against this list, so none of them would match and every value that moved would be reported as describing an untouched file — six failures naming files you can see in your own diff. That is worse than stopping. The usual cause is a \`git diff --name-only\` run somewhere other than the repository root, or a caller that resolved the paths before passing them.`,
+  );
 }
 
 export function provenanceRegistryRefusal(
@@ -408,12 +418,18 @@ export function provenanceRegistryRefusal(
   tables: readonly ProvenanceTable[],
 ): string | null {
   if (tables.length === 0) {
-    return `${checkName}: ERROR — no provenance tables are registered, and a pass over zero tables is not a pass. Every report this guard prints comes from an entry in lib/provenance-tables.ts; with none, it exits 0 having read nothing. provenanceOutput refuses the same emptiness one level down, over the outcomes rather than the registry — this one is the earlier and more specific of the two, not a duplicate of it.`;
+    return checkError(
+      checkName,
+      "no provenance tables are registered, and a pass over zero tables is not a pass. Every report this guard prints comes from an entry in lib/provenance-tables.ts; with none, it exits 0 having read nothing. provenanceOutput refuses the same emptiness one level down, over the outcomes rather than the registry — this one is the earlier and more specific of the two, not a duplicate of it.",
+    );
   }
   const ids = tables.map((table) => table.id);
   const duplicate = ids.find((id, index) => ids.indexOf(id) !== index);
   if (duplicate !== undefined) {
-    return `${checkName}: ERROR — two provenance tables are registered as "${duplicate}" in lib/provenance-tables.ts. Both would run, and every case that addresses a table by id would reach only the first, so the second is guarded by nothing.`;
+    return checkError(
+      checkName,
+      `two provenance tables are registered as "${duplicate}" in lib/provenance-tables.ts. Both would run, and every case that addresses a table by id would reach only the first, so the second is guarded by nothing.`,
+    );
   }
   return null;
 }
