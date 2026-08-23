@@ -246,10 +246,20 @@ describe("check-privacy-baseline-provenance against a scratch repository", () =>
     // drift half is off, and a pass line printed beside it is a report from a
     // guard running on one leg — which is the whole reason the loop checks every
     // table for this before printing anything.
-    assert.ok(
-      !run.stdout.includes("well-formed"),
-      `a table reported a pass alongside the unparseable failure:\n${run.stdout}`,
+    //
+    // Asked as "stdout holds nothing but the redirect announcement" rather than
+    // as "the word well-formed does not appear": three formatters happen to
+    // share that word today, and the day one of them says "valid" instead, a
+    // case spelling the word would pass over a stdout full of pass lines. The
+    // announcement is printed before any table is read, so it is the only line
+    // a halted run is entitled to.
+    const stdoutLines = run.stdout.split("\n").filter((line) => line !== "");
+    assert.equal(
+      stdoutLines.length,
+      1,
+      `a halted run printed more than the redirect announcement:\n${run.stdout}`,
     );
+    assert.match(stdoutLines[0], /history read from /);
   });
 
   it("runs the translation-checksum table against its own previous revision", () => {
