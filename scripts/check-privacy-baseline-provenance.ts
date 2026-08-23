@@ -59,7 +59,10 @@
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 
-import { provenanceOutput } from "../lib/provenance-report";
+import {
+  printProvenanceOutput,
+  provenanceOutput,
+} from "../lib/provenance-report";
 import {
   PROVENANCE_TABLES,
   changedFilesRefusal,
@@ -259,6 +262,23 @@ function changedFilesSince(ref: string): readonly string[] {
   return diff === null || diff === "" ? [] : diff.split("\n");
 }
 
+/**
+ * End the run on a refusal, or carry on when there is none.
+ *
+ * Three checks stop this guard before it reports anything, and each of them was
+ * its own four-line `if` with its own `console.error` and its own
+ * `process.exit(1)`. Three copies of an ending is how one of them comes to exit
+ * 0, or to print on stdout, in a diff nobody reads twice.
+ *
+ * Takes the refusal rather than the condition, so a check that decided not to
+ * refuse says so in the same call it would have refused in.
+ */
+function stopOn(refusal: string | null): void {
+  if (refusal === null) return;
+  console.error(refusal);
+  process.exit(1);
+}
+
 function main(): void {
   if (REPO_ROOT_OVERRIDE !== null) {
     console.log(
@@ -266,22 +286,24 @@ function main(): void {
     );
   }
   const argv = process.argv.slice(2);
+
+  // THE THREE STOPS, in order. Each is a reason this run cannot produce a
+  // trustworthy report, and each ends it rather than degrading it.
+  //
+  // Statements rather than a list of checks, and the reason is the data between
+  // them: the diff cannot be asked for before a base revision resolves, so a
+  // list would be a list of thunks and the order would stop being the visible
+  // thing about it. What the three DO share is the ending, which is `stopOn`.
   const comparison = resolveComparison(argv);
-  if (comparison.kind === "fail") {
-    console.error(`${CHECK_NAME}: ERROR — ${comparison.reason}`);
-    process.exit(1);
-  }
+  stopOn(
+    comparison.kind === "fail"
+      ? `${CHECK_NAME}: ERROR — ${comparison.reason}`
+      : null,
+  );
 
   // An empty registry is the one thing a loop can do that two hand-written
   // passes could not — see {@link provenanceRegistryRefusal}.
-  const registryRefusal = provenanceRegistryRefusal(
-    CHECK_NAME,
-    PROVENANCE_TABLES,
-  );
-  if (registryRefusal !== null) {
-    console.error(registryRefusal);
-    process.exit(1);
-  }
+  stopOn(provenanceRegistryRefusal(CHECK_NAME, PROVENANCE_TABLES));
 
   // Read once, not once per table: the diff is the same diff, and two
   // `git diff --name-only` calls that could disagree is a difference nobody
@@ -293,11 +315,7 @@ function main(): void {
   // {@link changedFilesRefusal}. A list that is not repo-relative makes every
   // table's answer wrong in the same way, so it is a stopped run rather than one
   // false report per entry.
-  const diffRefusal = changedFilesRefusal(CHECK_NAME, changedFiles);
-  if (diffRefusal !== null) {
-    console.error(diffRefusal);
-    process.exit(1);
-  }
+  stopOn(changedFilesRefusal(CHECK_NAME, changedFiles));
 
   const outcomes = PROVENANCE_TABLES.map((table: ProvenanceTable) =>
     table.run(CHECK_NAME, {
@@ -318,9 +336,7 @@ function main(): void {
     outcomes,
     comparison.kind === "skip" ? comparison.reason : null,
   );
-  for (const line of output.lines) {
-    (line.stream === "stdout" ? console.log : console.error)(line.text);
-  }
+  printProvenanceOutput(output);
   // An unparseable table stopped the run before the others were read, so the
   // trailing summary below would be describing something that did not happen.
   if (output.halted) process.exit(1);
