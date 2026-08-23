@@ -264,23 +264,12 @@ describe("the list the closed sets are built from", () => {
     );
   });
 
-  it("is a leaf, so it can never be the module that made a cycle", () => {
-    // Two constants and a type. An import here would be an import every
-    // provenance module inherits.
-    assert.ok(
-      !/^\s*import\s/m.test(stripComments(readRepoFile("lib/privacy-languages.ts"))),
-      "lib/privacy-languages.ts has grown an import — it is depended on by everything and may depend on nothing",
-    );
-  });
-
-  it("is where the page renderer reads them from too, so there is one list", () => {
-    assert.ok(
-      stripComments(readRepoFile("lib/privacy-page.ts")).includes(
-        'from "./privacy-languages"',
-      ),
-      "the /privacy page renderer declares its own language list again",
-    );
-  });
+  // The leaf's other two shape cases — that it has no imports, and that the
+  // page renderer reads the same list — moved to
+  // `__tests__/privacy-languages.test.ts`. Neither was about the provenance
+  // family, and a reader deleting that module would not think to look in a
+  // key-set suite for what breaks. The sweep above stayed here, where the
+  // askers are.
 });
 
 describe("the path a refused key would have named", () => {

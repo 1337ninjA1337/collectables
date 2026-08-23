@@ -39,15 +39,53 @@ export type PrivacyPageLanguage = { code: string; label: string };
  *
  * Order is the picker's order and is not alphabetical: the original first, then
  * the translations in the order they shipped.
+ *
+ * DECLARED `as const satisfies`, not annotated. The annotation
+ * (`: readonly PrivacyPageLanguage[]`) that used to be here widened every code
+ * to `string` and took {@link PrivacyPageLanguageCode} — and with it the tie
+ * between this list and {@link PRIVACY_DEFAULT_LANGUAGE} — down to nothing.
+ * `satisfies` checks the same shape and keeps the literals. That is the whole
+ * mechanism, so `__tests__/privacy-languages.test.ts` pins it directly rather
+ * than trusting a reader to know why the annotation is absent.
  */
-export const PRIVACY_PAGE_LANGUAGES: readonly PrivacyPageLanguage[] = [
+export const PRIVACY_PAGE_LANGUAGES = [
   { code: "en", label: "English" },
   { code: "ru", label: "Русский" },
   { code: "be", label: "Беларуская" },
   { code: "pl", label: "Polski" },
   { code: "de", label: "Deutsch" },
   { code: "es", label: "Español" },
-];
+] as const satisfies readonly PrivacyPageLanguage[];
 
-/** The original the five translations are checked against, not one of them. */
-export const PRIVACY_DEFAULT_LANGUAGE = "en";
+/**
+ * The six codes, as a type.
+ *
+ * DERIVED from the list above, which is the only reason it is worth having: a
+ * seventh language is one line in one place and this union grows with it. Three
+ * modules validate a table key against this set at runtime and will keep doing
+ * so — their keys come out of object literals and git output, which no compiler
+ * sees. What the type buys is the other half: a value written down in SOURCE as
+ * one of the six, checked at the moment it is written rather than on the run
+ * where something happens to read it.
+ *
+ * {@link PRIVACY_DEFAULT_LANGUAGE} is the first such value and was the reason
+ * this type exists — see the note there.
+ */
+export type PrivacyPageLanguageCode =
+  (typeof PRIVACY_PAGE_LANGUAGES)[number]["code"];
+
+/**
+ * The original the five translations are checked against, not one of them.
+ *
+ * TYPED, not inferred, and the annotation is the point: it says this string is
+ * one of the six the list publishes, and the compiler agrees or the build stops.
+ * Before it, the two constants sat next to each other with nothing between them
+ * — a default of `"eng"`, or an `en` entry deleted from the list, was a
+ * contradiction no check in the repository would have found. What it produced
+ * instead was a `/privacy` build whose root page had no picker entry, a
+ * `PRIVACY_TRANSLATED_LANGUAGES` that quietly grew a sixth member, and a
+ * provenance guard measuring `PRIVACY.md.eng` against a diff and reporting the
+ * file as untouched. Every one of those is the same one-word mistake arriving
+ * somewhere far away from it.
+ */
+export const PRIVACY_DEFAULT_LANGUAGE: PrivacyPageLanguageCode = "en";

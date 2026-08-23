@@ -5,7 +5,11 @@ import {
   findOrphanI18nKeys,
   formatOrphanKeyReport,
 } from "@/lib/check-orphan-i18n-keys";
+import { TRANSLATION_LANGUAGES } from "@/lib/i18n-coverage";
 import type { ScannedSource } from "@/lib/i18n-key-usage";
+import { stripComments } from "@/lib/strip-comments";
+
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * The scanner behind `npm run lint:orphan-i18n`.
@@ -166,6 +170,68 @@ describe("finding base keys nothing reads", () => {
       sources(`t("greeting"); t("sortNameAsc"); t("conditionNew"); t("orphan");`),
     );
     assert.deepEqual(findings, []);
+  });
+});
+
+describe("the locales a finding is attributed to", () => {
+  /**
+   * The list was six codes written out in a `for` — a fourth copy of a constant
+   * the rest of the i18n suites derive. It fails quietly: a seventh language
+   * translates the key, the walk never asks that map, and the report says the
+   * orphan is a two-line deletion when it is three. So the case adds a locale
+   * that is in `TRANSLATION_LANGUAGES` and was not in the old hand-written six.
+   */
+  it("covers every language the coverage table knows about", () => {
+    const withSeventh = [
+      TRANSLATIONS,
+      `const de: TranslationMap = {`,
+      `  ...en,`,
+      `  orphan: "Niemand zeichnet mich",`,
+      `};`,
+      ``,
+    ].join("\n");
+    const findings = findOrphanI18nKeys(
+      withSeventh,
+      sources(`t("greeting"); t("sortNameAsc"); t("conditionNew");`),
+    );
+    assert.deepEqual(findings, [{ key: "orphan", declaredIn: ["ru", "en", "de"] }]);
+  });
+
+  it("asks the maps in the order TRANSLATION_LANGUAGES declares", () => {
+    // The order is the picker's, and the report prints it verbatim. Pinned
+    // because the walk is a `for` over the shared constant now: reordering that
+    // constant reorders this, and a reader should find out here rather than in
+    // a diff of the guard's output.
+    const everyLocale = [
+      TRANSLATIONS,
+      ...TRANSLATION_LANGUAGES.filter((code) => code !== "en" && code !== "ru").map(
+        (code) => `const ${code}: TranslationMap = {\n  ...en,\n  orphan: "x",\n};\n`,
+      ),
+    ].join("\n");
+    const findings = findOrphanI18nKeys(
+      everyLocale,
+      sources(`t("greeting"); t("sortNameAsc"); t("conditionNew");`),
+    );
+    assert.deepEqual(findings[0]?.declaredIn, [...TRANSLATION_LANGUAGES]);
+  });
+
+  it("reads the shared constant rather than spelling the codes again", () => {
+    // The two cases above are behavioural and NEITHER can catch the regression
+    // this exists for, because the hand-written list they replaced held the same
+    // six codes in the same order: they pass either way today and diverge only
+    // on the run after a seventh language lands, which is the run the guard is
+    // supposed to already be right on. The mutation is textual, so the case is.
+    const source = stripComments(readRepoFile("lib/check-orphan-i18n-keys.ts"));
+    assert.ok(
+      source.includes("TRANSLATION_LANGUAGES"),
+      "lib/check-orphan-i18n-keys.ts no longer reads TRANSLATION_LANGUAGES — its locale walk is a private list again and will not grow with the picker",
+    );
+    const spelled = source.match(/\[\s*"(?:ru|en|be|pl|de|es)"\s*,[^\]]*\]/);
+    assert.equal(
+      spelled,
+      null,
+      `lib/check-orphan-i18n-keys.ts spells a locale list out again: ${spelled?.[0] ?? ""}`,
+    );
   });
 });
 

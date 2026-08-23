@@ -3,6 +3,7 @@ import {
   unreadI18nKeys,
   type ScannedSource,
 } from "@/lib/i18n-key-usage";
+import { TRANSLATION_LANGUAGES } from "@/lib/i18n-coverage";
 import { findLocaleBlock, TRANSLATION_BASE_LANGUAGE } from "@/lib/i18n-source";
 
 
@@ -76,10 +77,21 @@ function baseKeys(i18nSource: string): readonly string[] {
   return base.keys;
 }
 
-/** Which locale maps declare `key`, in file order. */
+/**
+ * Which locale maps declare `key`, in picker order.
+ *
+ * DERIVED from {@link TRANSLATION_LANGUAGES}, which is the constant every i18n
+ * suite in the tree measures against and the one a seventh language is added
+ * to. It was a fourth hand-written copy of the same six codes, and the way that
+ * copy fails is quiet: the report would keep saying a key is declared in six
+ * locales while the seventh translated it too, so "a two-line deletion" — the
+ * whole reason this function exists — would be a number nobody could act on.
+ * `i18n-coverage` declares no imports back this way, so this is a leaf-ward
+ * edge.
+ */
 function localesDeclaring(i18nSource: string, key: string): readonly string[] {
   const declaring: string[] = [];
-  for (const code of ["ru", "en", "be", "pl", "de", "es"]) {
+  for (const code of TRANSLATION_LANGUAGES) {
     const block = findLocaleBlock(i18nSource, code);
     if (block?.keys.includes(key)) declaring.push(code);
   }
