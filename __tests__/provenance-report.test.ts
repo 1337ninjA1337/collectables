@@ -10,6 +10,7 @@ import type { ProvenanceOutcome } from "../lib/provenance-tables";
 import { stripComments } from "../lib/strip-comments";
 
 import { readRepoFile } from "./helpers/repo-file";
+import { sourceFiles } from "./helpers/source-files";
 
 /**
  * The guard's output decision, asked without a repository.
@@ -219,6 +220,31 @@ describe("provenanceOutput", () => {
     assert.ok(
       !script.includes("output.lines"),
       "the script still walks the lines itself",
+    );
+  });
+
+  it("is named, with every other module in the family, by the script's map", () => {
+    // The script's leading comment is now a map of the pure half — five modules
+    // and what each decides — because the pure half outgrew the script and the
+    // old note still described two tables and a hand-written pass. A map is only
+    // worth having if it is checked, so it is derived from the directory rather
+    // than read.
+    const modules = sourceFiles("lib").filter((file) =>
+      /^lib\/(provenance-.*|.*-provenance)\.ts$/.test(file),
+    );
+    assert.ok(
+      modules.length >= 5,
+      `only ${String(modules.length)} module(s) matched — the sweep below would prove little`,
+    );
+    // The leading comment only — a module named in the import list rather than
+    // in the map is exactly what this is looking for.
+    const script = readRepoFile("scripts/check-privacy-baseline-provenance.ts");
+    const note = script.slice(0, script.indexOf("\nimport "));
+    const unnamed = modules.filter((module) => !note.includes(module));
+    assert.deepEqual(
+      unnamed,
+      [],
+      `the script's map does not name these modules: ${unnamed.join(", ")}`,
     );
   });
 
