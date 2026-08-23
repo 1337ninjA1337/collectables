@@ -265,6 +265,88 @@ describe("PROVENANCE_TABLES — the registry the guard loops over", () => {
     assert.equal(new Set(lines).size, lines.length);
   });
 
+  /**
+   * Every entry declares an `unparseable` sentence and only ONE entry can reach
+   * its own.
+   *
+   * `classify` is where a table decides what "the module was there and yielded
+   * nothing" means. The baselines entry calls it `unparseable` — a hard failure
+   * that stops the whole run before any report prints. The translation and
+   * promise entries collapse it into `absent`, which is a SKIP, and each says
+   * why in a comment: their parsers are new and this suite round-trips them on
+   * every run, so the reformat-defeats-parser branch cannot fire yet.
+   *
+   * That collapse was a comment and nothing else. The two cases below make it a
+   * fact the registry has to keep: which entries stop the run, and — for the one
+   * that does — that its refusal is a sentence a reader can act on. Flipping
+   * either direction is then a decision visible in a diff, which matters more
+   * than usual here because ONE entry's hard failure suppresses every other
+   * table's report.
+   *
+   * `spec.unparseable` is erased by `defineProvenanceTable` and reachable only
+   * through `run`, so the two collapsed entries' sentences cannot be read from
+   * out here at all. That is the honest limit of this pair: prose no run can
+   * print is prose no case can proofread.
+   */
+  it("stops the run on an unreadable module for exactly the entries that say so", () => {
+    // A source that is present and yields no table — the state each `classify`
+    // has to name. Asserted per id rather than counted, because "one of the
+    // three" is the fact and WHICH one is the decision.
+    const HARD_FAILERS = new Set(["body-baselines"]);
+    for (const table of PROVENANCE_TABLES) {
+      const outcome = table.run("guard", {
+        ref: "abc123",
+        present: true,
+        source: "// the module was here and its table was not\n",
+        changedFiles: [],
+      });
+      if (HARD_FAILERS.has(table.id)) {
+        assert.equal(
+          outcome.kind,
+          "unparseable",
+          `${table.id} stopped classifying an unreadable module as a hard failure — its unparseable sentence is now prose no run can reach`,
+        );
+        continue;
+      }
+      assert.equal(
+        outcome.kind,
+        "evaluated",
+        `${table.id} now stops the whole run on an unreadable module, which suppresses every other table's report — deliberate? then add it to HARD_FAILERS and say why beside its classify`,
+      );
+      assert.notEqual(
+        outcome.kind === "evaluated" ? outcome.driftSkipped : null,
+        null,
+        `${table.id} collapses unparseable into absent and then says nothing about having skipped, so a reader sees a pass over a table nothing compared`,
+      );
+    }
+  });
+
+  it("refuses in words that name the module and the revision it could not read", () => {
+    // The one reachable unparseable sentence, held to what the drift-skipped
+    // lines are already held to. It is the message that stops a run, so a reader
+    // meeting it has no other line to work out which module and which base
+    // revision the guard was looking at.
+    const outcome = PROVENANCE_TABLES.find(
+      (table) => table.id === "body-baselines",
+    )?.run("guard", {
+      ref: "abc123",
+      present: true,
+      source: "// the module was here and its table was not\n",
+      changedFiles: [],
+    });
+    assert.equal(outcome?.kind, "unparseable");
+    const message = outcome?.kind === "unparseable" ? outcome.message : "";
+    assert.match(message, /^guard: ERROR — /);
+    assert.ok(
+      message.includes("lib/privacy-body-baselines.ts"),
+      `the refusal does not name the module it could not read: ${message}`,
+    );
+    assert.ok(
+      message.includes("abc123"),
+      `the refusal does not name the revision it read at: ${message}`,
+    );
+  });
+
   it("is fit to run as it stands", () => {
     assert.equal(provenanceRegistryRefusal("guard", PROVENANCE_TABLES), null);
   });
