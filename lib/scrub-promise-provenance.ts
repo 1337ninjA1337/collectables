@@ -27,6 +27,15 @@
  * smuggled in under this change. What IS shared is `policyChecksum`, so the two
  * values stay comparable, and the loop, so neither owns a copy of the git half.
  *
+ * NO KEY, so no closed-set rule, and that is worth one sentence rather than a
+ * reconstruction from three modules. Both tables next door validate their KEYS
+ * against a published-page list (`lib/provenance-key-set.ts`) because each of
+ * their entries names a different file and a key nothing publishes names one
+ * that does not exist. This is a single record measured from a single file, and
+ * that file is a constant here rather than a lookup — there is no key to be
+ * unknown, which is why the rule has nothing to say about it and why adding it
+ * would be a check on nothing.
+ *
  * One deliberate divergence from the rule it copies. The translation drift lets
  * a note stay put when only the DATE moved (a re-confirmation of unchanged
  * text); here the checksum moving means the sentence changed, so the note is

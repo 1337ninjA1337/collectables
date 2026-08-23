@@ -34,6 +34,11 @@ import {
   PRIVACY_TRANSLATED_LANGUAGES,
   type PrivacyTranslationSource,
 } from "./privacy-translated-section";
+import {
+  formatUnknownProvenanceKey,
+  unknownProvenanceKeyDetail,
+  type ProvenanceKeySet,
+} from "./provenance-key-set";
 
 export type TranslationProvenanceFailureCode =
   | "unknown_language"
@@ -63,24 +68,37 @@ export const TRANSLATION_NOTE_MIN_WORDS = 8;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CHECKSUM = /^[0-9a-f]{16}$/;
 
+/**
+ * The five translations, and NOT English — which is the whole difference between
+ * this set and the baselines table's, and the reason the shared rule takes the
+ * set as data instead of reaching for one list.
+ *
+ * English is the SOURCE these five are checked against, not a translation, so an
+ * `en` entry here is a table that has recorded a checksum of `PRIVACY.md`
+ * against itself. Every other case in this suite would pass on it.
+ */
+const TRANSLATION_KEY_SET: ProvenanceKeySet = {
+  table: "PRIVACY_TRANSLATION_SOURCES",
+  outsideMeans: "no TRANSLATED /privacy page is published for",
+  listLabel: "Translated pages",
+  members: PRIVACY_TRANSLATED_LANGUAGES,
+};
+
 /** Well-formedness of the table as it stands, independent of any history. */
 export function evaluateTranslationProvenanceShape(
   table: Readonly<Record<string, PrivacyTranslationSource>>,
 ): readonly TranslationProvenanceFailure[] {
   const failures: TranslationProvenanceFailure[] = [];
   for (const [language, entry] of Object.entries(table)) {
-    // Asked FIRST, for the same reason its neighbour asks it: the drift half
-    // hands this key to `privacyPolicySourcePath`, which refuses a language no
-    // page is published for — as an exception, on the one run where that entry's
-    // checksum happened to move. Here it is a report instead, every run. English
-    // is excluded on purpose: it is the SOURCE these five are checked against,
-    // not a translation, so an `en` entry is a table that has misunderstood
-    // itself.
-    if (!PRIVACY_TRANSLATED_LANGUAGES.includes(language)) {
+    // Asked FIRST, and the rule and its reasoning live in
+    // `lib/provenance-key-set.ts` — this table brings only the set and the three
+    // phrases that name it.
+    const unknownKey = unknownProvenanceKeyDetail(language, TRANSLATION_KEY_SET);
+    if (unknownKey !== null) {
       failures.push({
         language,
         code: "unknown_language",
-        detail: PRIVACY_TRANSLATED_LANGUAGES.join(", "),
+        detail: unknownKey,
       });
     }
     for (const [field, value] of [
@@ -187,7 +205,7 @@ const MESSAGE: Record<
   (language: string, detail: string | undefined) => string
 > = {
   unknown_language: (language, detail) =>
-    `PRIVACY_TRANSLATION_SOURCES["${language}"] is not a language a translated /privacy page is published for. The entry records a checksum of PRIVACY.md.${language}, and the drift half compares that name against the files a diff touched, so it would report the page as untouched rather than as missing. Translated pages: ${detail ?? "see PRIVACY_TRANSLATED_LANGUAGES"}.`,
+    formatUnknownProvenanceKey(language, TRANSLATION_KEY_SET, detail),
   malformed_checksum: (language, detail) =>
     `PRIVACY_TRANSLATION_SOURCES["${language}"]: ${detail ?? "a checksum"} — expected sixteen lowercase hex characters, which is what privacyTranslatedSectionChecksum emits. A value that shape cannot have been measured.`,
   malformed_date: (language, detail) =>
