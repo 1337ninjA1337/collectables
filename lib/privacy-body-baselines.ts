@@ -108,6 +108,30 @@ export const PRIVACY_BODY_BASELINE_WORDS: Readonly<Record<string, number>> =
     ),
   );
 
+/** The canonical English policy, and the stem every translated page hangs off. */
+const POLICY_SOURCE_FILE = "PRIVACY.md";
+
+/**
+ * The path a code names or WOULD name, asked without checking whether the page
+ * exists.
+ *
+ * {@link privacyPolicySourcePath} is the one to call for an answer you intend to
+ * USE — it refuses a code no page is published for, which is the whole point of
+ * it. This is the same template with the refusal removed, and it exists for the
+ * messages that do the refusing: they have to say what the code would have
+ * named, they cannot ask the checked helper (it throws, which is why they are
+ * being written), and a fourth hand-spelled `PRIVACY.md.<code>` is the copy that
+ * survives the rename this pair exists to make cheap.
+ *
+ * Not for reaching a file with. A path from here has not been checked against
+ * anything.
+ */
+export function policySourcePathFor(code: string): string {
+  return code === PRIVACY_DEFAULT_LANGUAGE
+    ? POLICY_SOURCE_FILE
+    : `${POLICY_SOURCE_FILE}.${code}`;
+}
+
 /**
  * The tracked markdown a language's baseline describes — `PRIVACY.md` for
  * English (the canonical full policy) and `PRIVACY.md.<code>` for the five
@@ -131,10 +155,10 @@ export const PRIVACY_BODY_BASELINE_WORDS: Readonly<Record<string, number>> =
 export function privacyPolicySourcePath(code: string): string {
   if (!PRIVACY_PAGE_LANGUAGES.some((language) => language.code === code)) {
     throw new Error(
-      `privacyPolicySourcePath("${code}"): no privacy page is published for that language. It would name PRIVACY.md.${code}, a file that does not exist, and every caller compares that name against the files a diff touched — so the answer would be "untouched" rather than an error. Known codes: ${PRIVACY_PAGE_LANGUAGES.map(({ code: known }) => known).join(", ")}.`,
+      `privacyPolicySourcePath("${code}"): no privacy page is published for that language. It would name ${policySourcePathFor(code)}, a file that does not exist, and every caller compares that name against the files a diff touched — so the answer would be "untouched" rather than an error. Known codes: ${PRIVACY_PAGE_LANGUAGES.map(({ code: known }) => known).join(", ")}.`,
     );
   }
-  return code === PRIVACY_DEFAULT_LANGUAGE ? "PRIVACY.md" : `PRIVACY.md.${code}`;
+  return policySourcePathFor(code);
 }
 
 /**

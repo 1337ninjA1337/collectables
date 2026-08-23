@@ -27,6 +27,11 @@ import {
   type PrivacyBodyBaseline,
 } from "./privacy-body-baselines";
 import { PRIVACY_PAGE_LANGUAGES } from "./privacy-page";
+import {
+  formatUnknownProvenanceKey,
+  unknownProvenanceKeyDetail,
+  type ProvenanceKeySet,
+} from "./provenance-key-set";
 
 export type BaselineProvenanceFailureCode =
   | "unknown_language"
@@ -58,6 +63,19 @@ export const PRIVACY_BASELINE_NOTE_MIN_WORDS = 5;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Every page the picker offers, English included — English IS a page here, and
+ * the biggest baseline in the table. That is the one way this set differs from
+ * the translation table's, which covers the five translations only, and it is
+ * why the two rules validate against different lists rather than sharing one.
+ */
+const BASELINE_KEY_SET: ProvenanceKeySet = {
+  table: "PRIVACY_BODY_BASELINES",
+  outsideMeans: "no /privacy page is published for",
+  listLabel: "Known codes",
+  members: PRIVACY_PAGE_LANGUAGES.map(({ code }) => code),
+};
+
 function noteWordCount(note: string): number {
   return note.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -73,16 +91,14 @@ export function evaluatePrivacyBaselineShape(
   const failures: BaselineProvenanceFailure[] = [];
   for (const [language, baseline] of Object.entries(baselines)) {
     // Asked FIRST, and asked here rather than left to `privacyPolicySourcePath`
-    // to throw. The drift half asks that helper for this key's file, so an entry
-    // for a language nothing publishes reaches it as an exception — a stack
-    // trace where every other failure in this guard is an `ERROR — ` line — and
-    // only on the run where that entry's number happened to move. As a shape
-    // rule it is a report, on every run, before anything reads history.
-    if (!PRIVACY_PAGE_LANGUAGES.some(({ code }) => code === language)) {
+    // to throw — see `lib/provenance-key-set.ts`, which owns the rule and the
+    // reasoning for both tables that have keys.
+    const unknownKey = unknownProvenanceKeyDetail(language, BASELINE_KEY_SET);
+    if (unknownKey !== null) {
       failures.push({
         language,
         code: "unknown_language",
-        detail: PRIVACY_PAGE_LANGUAGES.map(({ code }) => code).join(", "),
+        detail: unknownKey,
       });
     }
     if (!Number.isInteger(baseline.words) || baseline.words <= 0) {
@@ -187,7 +203,7 @@ const BASELINE_PROVENANCE_MESSAGE: Record<
   (language: string, detail: string | undefined) => string
 > = {
   unknown_language: (language, detail) =>
-    `PRIVACY_BODY_BASELINES["${language}"] describes a language no /privacy page is published for — the baseline names PRIVACY.md.${language}, a file that does not exist, and the drift half compares that name against the files a diff touched, so it would report the file as untouched rather than as missing. Known codes: ${detail ?? "see PRIVACY_PAGE_LANGUAGES"}.`,
+    formatUnknownProvenanceKey(language, BASELINE_KEY_SET, detail),
   non_positive_words: (language, detail) =>
     `PRIVACY_BODY_BASELINES["${language}"].words is ${detail ?? "not a positive integer"} — a baseline is a measured word count, and a zero or negative one makes the ±band around it meaningless.`,
   malformed_date: (language, detail) =>
