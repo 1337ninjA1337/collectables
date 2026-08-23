@@ -9,6 +9,7 @@ import { PROVENANCE_TABLES } from "../lib/provenance-tables";
 import type { ProvenanceOutcome } from "../lib/provenance-tables";
 import { stripComments } from "../lib/strip-comments";
 
+import { captureConsole } from "./helpers/capture-console";
 import { measuredFloor } from "./helpers/coverage-floor";
 import { readRepoFile } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
@@ -194,6 +195,26 @@ describe("provenanceOutput", () => {
     );
     assert.deepEqual(log, ["passed", "skipped"]);
     assert.deepEqual(error, ["failed"]);
+  });
+
+  it("prints to the real console when no console is passed", () => {
+    // The overload the SCRIPT uses. Every case above hands in a capturing
+    // object, so the seam was covered and the default — the only spelling that
+    // runs in CI — was not: it could have named a method the console does not
+    // have, or been dropped in favour of a required parameter, and this suite
+    // would have gone on passing while `lint:baseline-provenance` printed
+    // nothing at all.
+    const written = captureConsole(() => {
+      printProvenanceOutput(
+        provenanceOutput(
+          "guard",
+          [evaluated("passed", true, "skipped"), evaluated("failed", false)],
+          null,
+        ),
+      );
+    });
+    assert.deepEqual(written.log, ["passed", "skipped"]);
+    assert.deepEqual(written.error, ["failed"]);
   });
 
   it("is what the script prints with, rather than a second copy of the rules", () => {

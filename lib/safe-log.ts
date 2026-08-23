@@ -89,6 +89,13 @@ export interface DevLogger {
  * Builds a logger whose `debug` channel is a no-op unless `isDev` is true. When
  * active, every object argument is redacted via `redactForLog` first so even a
  * developer console never shows a token / item name in the clear.
+ *
+ * `sink` defaults to the real console, which is what {@link devLog} — the only
+ * caller that ships — is built from. That default has its own case rather than
+ * only the seam beside it: a default naming a method the console does not have
+ * is a crash on a dev build's first debug line, and a suite that always passes
+ * a capturing object would never see it. See
+ * `__tests__/default-console-seams.test.ts`.
  */
 export function createDevLogger(
   isDev: boolean,

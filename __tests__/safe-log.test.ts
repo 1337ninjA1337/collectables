@@ -10,6 +10,7 @@ import {
   createDevLogger,
   devLog,
 } from "../lib/safe-log";
+import { captureConsole } from "./helpers/capture-console";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("safe-log: isSensitiveLogKey", () => {
@@ -111,9 +112,34 @@ describe("safe-log: createDevLogger", () => {
     assert.deepEqual(calls[0][1], { id: "9", name: REDACTED });
   });
 
+  it("forwards to the real console when no sink is passed", () => {
+    // The overload `devLog` is built from, and the one every case above stepped
+    // around by handing in a capturing object. A default that named a method
+    // the console does not have would be a crash on the first debug line of a
+    // dev build, and this suite would have been green the whole way.
+    const written = captureConsole(() => {
+      createDevLogger(true).debug("[tag]", { id: "9", name: "secret" });
+    });
+    assert.equal(written.log.length, 1);
+    assert.ok(written.log[0].includes("[tag]"));
+    // Redaction is not suspended by the default sink — the console is where a
+    // leak would actually be read.
+    assert.ok(!written.log[0].includes("secret"));
+    assert.deepEqual(written.error, []);
+  });
+
   it("module-level devLog is a no-op under the node test runner (__DEV__ unset)", () => {
-    // Should not throw and should produce no console output.
-    assert.doesNotThrow(() => devLog.debug("nothing prints", { secret: "x" }));
+    // "Produces no console output" was the claim in this case's comment and
+    // `doesNotThrow` was the assertion, which is a different claim: the no-op
+    // logger and a logger that printed the argument in the clear both satisfy
+    // it. The sentence is now the assertion.
+    const written = captureConsole(() => {
+      assert.doesNotThrow(() => {
+        devLog.debug("nothing prints", { secret: "x" });
+      });
+    });
+    assert.deepEqual(written.log, []);
+    assert.deepEqual(written.error, []);
   });
 });
 

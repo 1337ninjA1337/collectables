@@ -128,6 +128,12 @@ export function provenanceOutput(
  * method is the last half-sentence of rule 3, and a caller that owns it is a
  * caller that can disagree with the rule that produced the name. The console is
  * a parameter so a test can be the console.
+ *
+ * The DEFAULT is the overload the script runs, and it has its own case — one
+ * that omits the argument and watches the global console. Every other case
+ * passes a capturing object, which covers the seam and not the spelling that
+ * ships; `__tests__/default-console-seams.test.ts` is the rule that keeps a
+ * third seam from arriving without one.
  */
 export function printProvenanceOutput(
   output: ProvenanceOutput,
