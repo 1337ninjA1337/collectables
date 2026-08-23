@@ -53,9 +53,12 @@ export function findOrphanI18nKeys(
   sources: readonly ScannedSource[],
 ): OrphanKeyFinding[] {
   const usage = indexI18nKeyUsage(baseKeys(i18nSource), sources);
+  // Parsed ONCE, here, and handed down as an index. See the note on
+  // {@link localesDeclaring} for why it takes the index rather than the source.
+  const declarations = indexLocaleDeclarations(i18nSource);
   return unreadI18nKeys(usage).map((key) => ({
     key,
-    declaredIn: localesDeclaring(i18nSource, key),
+    declaredIn: localesDeclaring(declarations, key),
   }));
 }
 
@@ -78,22 +81,64 @@ function baseKeys(i18nSource: string): readonly string[] {
 }
 
 /**
- * Which locale maps declare `key`, in picker order.
+ * Which keys each locale map declares — the translations source parsed once.
  *
- * DERIVED from {@link TRANSLATION_LANGUAGES}, which is the constant every i18n
- * suite in the tree measures against and the one a seventh language is added
- * to. It was a fourth hand-written copy of the same six codes, and the way that
- * copy fails is quiet: the report would keep saying a key is declared in six
- * locales while the seventh translated it too, so "a two-line deletion" — the
- * whole reason this function exists — would be a number nobody could act on.
- * `i18n-coverage` declares no imports back this way, so this is a leaf-ward
- * edge.
+ * A locale missing from the source is missing from the map rather than present
+ * and empty, and the two are different facts: "this checkout has no `de` map"
+ * is worth being able to see, and an empty `Set` would report every key as
+ * undeclared there, which reads identically to a locale that translated
+ * nothing.
  */
-function localesDeclaring(i18nSource: string, key: string): readonly string[] {
-  const declaring: string[] = [];
+export type LocaleDeclarations = ReadonlyMap<string, ReadonlySet<string>>;
+
+/**
+ * Build it, over every language {@link TRANSLATION_LANGUAGES} names.
+ *
+ * DERIVED from that constant, which is the one every i18n suite in the tree
+ * measures against and the one a seventh language is added to. It was a fourth
+ * hand-written copy of the same six codes, and the way that copy fails is
+ * quiet: the report would keep saying a key is declared in six locales while
+ * the seventh translated it too, so "a two-line deletion" — the whole reason
+ * this exists — would be a number nobody could act on. `i18n-coverage` declares
+ * no imports back this way, so this is a leaf-ward edge.
+ */
+export function indexLocaleDeclarations(i18nSource: string): LocaleDeclarations {
+  const index = new Map<string, ReadonlySet<string>>();
   for (const code of TRANSLATION_LANGUAGES) {
     const block = findLocaleBlock(i18nSource, code);
-    if (block?.keys.includes(key)) declaring.push(code);
+    if (block) index.set(code, new Set(block.keys));
+  }
+  return index;
+}
+
+/**
+ * Which locale maps declare `key`, in picker order.
+ *
+ * TAKES THE INDEX, NOT THE SOURCE, and that is the point rather than a
+ * convenience. It used to take the source and call `findLocaleBlock` itself,
+ * once per locale per finding — so a run over the real tree re-parsed a
+ * 500-key file `orphans × 6` times and then scanned an array of ~498 keys
+ * linearly for each. Both costs are invisible at three orphans and neither has
+ * a reason to exist.
+ *
+ * The fix is not "remember to hoist the parse": it is that this function no
+ * longer HAS the source, so re-parsing per key is not a thing it can express.
+ * The compiler enforces that; `__tests__/check-orphan-i18n-keys.test.ts` says
+ * so out loud for the reader who would otherwise thread the source back in as
+ * an obvious simplification.
+ *
+ * Order is {@link TRANSLATION_LANGUAGES}' rather than the map's insertion
+ * order, which happens to agree — the report prints this list verbatim and
+ * should depend on the constant that documents itself as picker order, not on
+ * how the index was filled.
+ */
+function localesDeclaring(
+  declarations: LocaleDeclarations,
+  key: string,
+): readonly string[] {
+  const declaring: string[] = [];
+  for (const code of TRANSLATION_LANGUAGES) {
+    if (declarations.get(code)?.has(key)) declaring.push(code);
   }
   return declaring;
 }

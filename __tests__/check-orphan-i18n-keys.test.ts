@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   findOrphanI18nKeys,
   formatOrphanKeyReport,
+  indexLocaleDeclarations,
 } from "@/lib/check-orphan-i18n-keys";
 import { TRANSLATION_LANGUAGES } from "@/lib/i18n-coverage";
 import type { ScannedSource } from "@/lib/i18n-key-usage";
@@ -213,6 +214,41 @@ describe("the locales a finding is attributed to", () => {
       sources(`t("greeting"); t("sortNameAsc"); t("conditionNew");`),
     );
     assert.deepEqual(findings[0]?.declaredIn, [...TRANSLATION_LANGUAGES]);
+  });
+
+  it("is answered from a source parsed once, not once per finding", () => {
+    // The old shape took the translations source and called `findLocaleBlock`
+    // itself, once per locale per orphan — a 500-key file re-parsed six times a
+    // finding, then an array of ~498 keys scanned linearly for each. What
+    // replaced it is not a hoisted call that a reader has to keep hoisted: the
+    // lookup takes an INDEX and cannot reach a source to re-parse. This case is
+    // the sentence that says so, because the guarantee is in a signature nobody
+    // reads until they are already changing it.
+    const source = stripComments(readRepoFile("lib/check-orphan-i18n-keys.ts"));
+    assert.match(
+      source,
+      /function localesDeclaring\(\s*declarations: LocaleDeclarations,/,
+      "localesDeclaring takes the translations source again — it can re-parse per key, which is the shape this replaced",
+    );
+    // And that the one caller builds it BEFORE the walk rather than inside it.
+    // The signature above makes a per-key re-parse impossible; this is the
+    // remaining way to pay the cost twice, and it is a statement order, which
+    // no type can hold.
+    const built = source.indexOf("indexLocaleDeclarations(i18nSource)");
+    const walk = source.indexOf("unreadI18nKeys(usage).map");
+    assert.ok(built > 0 && walk > built, "the index is built inside the per-key walk rather than before it");
+  });
+
+  it("indexes every locale the source declares, and only those", () => {
+    const index = indexLocaleDeclarations(TRANSLATIONS);
+    // The fixture declares `en` and `ru` and nothing else. A locale that is
+    // absent is ABSENT rather than present and empty: "this checkout has no de
+    // map" and "de translated nothing" are different facts and would otherwise
+    // read the same.
+    assert.deepEqual([...index.keys()], ["ru", "en"]);
+    assert.equal(index.get("en")?.has("orphan"), true);
+    assert.equal(index.get("ru")?.has("sortNameAsc"), false);
+    assert.equal(index.get("de"), undefined);
   });
 
   it("reads the shared constant rather than spelling the codes again", () => {
