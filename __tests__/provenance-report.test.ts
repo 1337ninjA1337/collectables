@@ -9,6 +9,7 @@ import { PROVENANCE_TABLES } from "../lib/provenance-tables";
 import type { ProvenanceOutcome } from "../lib/provenance-tables";
 import { stripComments } from "../lib/strip-comments";
 
+import { measuredFloor } from "./helpers/coverage-floor";
 import { readRepoFile } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
 
@@ -232,15 +233,9 @@ describe("provenanceOutput", () => {
     const modules = sourceFiles("lib").filter((file) =>
       /^lib\/(provenance-.*|.*-provenance)\.ts$/.test(file),
     );
-    // A FLOOR THAT IS A MEASUREMENT: five is the count the pattern matches
-    // today, so this catches a pattern that stopped matching and nothing else.
-    // The sibling floor in `__tests__/provenance-key-set.test.ts` is the other
-    // kind — one below its count, so growth does not have to be ratified — and
-    // the two are different on purpose. Editing either to match the other loses
-    // the reason it was written.
     assert.ok(
       modules.length >= 5,
-      `only ${String(modules.length)} module(s) matched — the sweep below would prove little`,
+      measuredFloor(modules.length, 5, "module(s) matched the provenance pattern"),
     );
     // The leading comment only — a module named in the import list rather than
     // in the map is exactly what this is looking for.

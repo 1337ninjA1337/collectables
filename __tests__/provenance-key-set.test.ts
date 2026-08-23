@@ -29,6 +29,7 @@ import {
 } from "../lib/provenance-key-set";
 import { stripComments } from "../lib/strip-comments";
 
+import { arguedFloor } from "./helpers/coverage-floor";
 import { readRepoFile } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
 
@@ -263,10 +264,15 @@ describe("the list the closed sets are built from", () => {
    * for the property that makes it the leaf, so moving the declaration to a
    * differently-named module excludes that one instead, with nothing to update.
    */
+  // Compiled once rather than per constant per file: the filter below runs over
+  // every module in two directories, and a pattern that interpolates a name is
+  // exactly the one that gets rebuilt inside a loop without anybody noticing.
+  const DECLARATION_PATTERNS = CONSTANTS.map(
+    (constant) => new RegExp(`export\\s+const\\s+${constant}\\b`),
+  );
+
   const declaresAConstant = (source: string): boolean =>
-    CONSTANTS.some((constant) =>
-      new RegExp(`export\\s+const\\s+${constant}\\b`).test(source),
-    );
+    DECLARATION_PATTERNS.some((pattern) => pattern.test(source));
 
   /**
    * `lib/privacy-page.ts`, excluded BY NAME because there is no property to
@@ -289,16 +295,18 @@ describe("the list the closed sets are built from", () => {
   });
 
   it("finds the askers, rather than trusting a list of them", () => {
-    // A FLOOR THAT IS AN ARGUMENT, not a measurement: six is what the
-    // hand-written list covered, so the walk cannot pass while covering less
-    // than the thing it replaced. It sits one below the current count of seven
-    // deliberately — raising it to seven every time the tree grows would turn a
-    // "did the walk match anything" check into a target, and the sibling floor
-    // in `__tests__/provenance-report.test.ts` is the other kind (equal to its
-    // count) for its own reasons. Neither should be edited to match the other.
+    // The kind is in the builder's name rather than in a paragraph — see
+    // `./helpers/coverage-floor`. The sibling floor in
+    // `__tests__/provenance-report.test.ts` is the other kind, and the two look
+    // identical written out, which is why they are not written out any more.
     assert.ok(
       ASKERS.length >= 6,
-      `only ${String(ASKERS.length)} module(s) name the language constants — the sweep below would prove nothing: ${ASKERS.join(", ")}`,
+      arguedFloor(
+        ASKERS.length,
+        6,
+        "module(s) name the language constants",
+        "no fewer than the six the hand-written list this replaced covered",
+      ) + `: ${ASKERS.join(", ")}`,
     );
     // The exclusions are derived and a derivation can over-match: a regex that
     // matched every module would leave an empty list, which the floor catches,

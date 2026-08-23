@@ -11,6 +11,7 @@ import {
 } from "../lib/privacy-translated-section";
 import { privacyPolicySourcePath } from "../lib/privacy-body-baselines";
 
+import { measuredFloor } from "./helpers/coverage-floor";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -137,7 +138,11 @@ describe("PRIVACY_TRANSLATION_SOURCES — one entry per translated page", () => 
     );
     assert.ok(
       PRIVACY_TRANSLATED_LANGUAGES.length >= 5,
-      `only ${String(PRIVACY_TRANSLATED_LANGUAGES.length)} translated page(s) — the cases below would prove little`,
+      measuredFloor(
+        PRIVACY_TRANSLATED_LANGUAGES.length,
+        5,
+        "translated page(s) — the cases below would prove little",
+      ),
     );
     assert.ok(
       !PRIVACY_TRANSLATED_LANGUAGES.includes("en"),
