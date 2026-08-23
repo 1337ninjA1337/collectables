@@ -59,6 +59,7 @@
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 
+import { provenanceOutput } from "../lib/provenance-report";
 import {
   PROVENANCE_TABLES,
   changedFilesRefusal,
@@ -308,44 +309,22 @@ function main(): void {
     }),
   );
 
-  // The hard failure first, across ALL tables, before a single report is
-  // printed: a base revision whose module yields no table means that table's
-  // drift half is off, and a report printed alongside that would be a report
-  // from a guard running on one leg.
-  for (const outcome of outcomes) {
-    if (outcome.kind === "unparseable") {
-      console.error(outcome.message);
-      process.exit(1);
-    }
-  }
-
-  // Every report is printed before any exit code is honoured. A run that
-  // stopped at the first failing table would hide the second one behind a fix,
-  // and these two move together: the commit that amends the English disclosure
-  // touches the word count AND all five checksums.
-  //
-  // Each report goes to the stream its OWN verdict earns: one table passing
-  // while another fails is an ordinary outcome, and a pass line on stderr reads
-  // as part of the failure.
-  for (const outcome of outcomes) {
-    if (outcome.kind !== "evaluated") continue;
-    (outcome.ok ? console.log : console.error)(outcome.report);
-  }
-  if (comparison.kind === "skip") {
-    // One line, not one per table: with no base revision at all, every drift
-    // half sat out for the same reason, and repeating it per table is how a
-    // reader learns to skim these.
-    console.log(`${CHECK_NAME}: drift halves skipped — ${comparison.reason}.`);
-  } else {
-    for (const outcome of outcomes) {
-      if (outcome.kind === "evaluated" && outcome.driftSkipped !== null) {
-        console.log(outcome.driftSkipped);
-      }
-    }
-  }
-  const ok = outcomes.every(
-    (outcome) => outcome.kind === "evaluated" && outcome.ok,
+  // WHAT gets printed, in what order, to which stream — all four rules in
+  // {@link provenanceOutput}, none of which need git. This file decides what to
+  // compare against and reads history; it does not decide what a report reads
+  // like.
+  const output = provenanceOutput(
+    CHECK_NAME,
+    outcomes,
+    comparison.kind === "skip" ? comparison.reason : null,
   );
+  for (const line of output.lines) {
+    (line.stream === "stdout" ? console.log : console.error)(line.text);
+  }
+  // An unparseable table stopped the run before the others were read, so the
+  // trailing summary below would be describing something that did not happen.
+  if (output.halted) process.exit(1);
+  const ok = output.ok;
   if (REPO_ROOT_OVERRIDE !== null) {
     // On the PASS line too, not only twenty lines above it: a green summary
     // that does not mention where it read from is how a redirected guard
