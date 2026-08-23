@@ -308,6 +308,13 @@ function changedFilesSince(ref: string): readonly string[] {
  * `process.exit(1)`. Three copies of an ending is how one of them comes to exit
  * 0, or to print on stdout, in a diff nobody reads twice.
  *
+ * FOUR now, and the fourth is not in `main`: `git()` refuses a `git` that could
+ * not be run at all, which happens during argument resolution, before `main`
+ * has a comparison to stop on. It was the last four-line block of its kind in
+ * the file. So this is the guard's ending rather than `main`'s — worth saying,
+ * because a reader who has it filed as "one of the three stops in `main`" will
+ * eventually move it there.
+ *
  * `never` rather than a `string | null` in and `void` out, which is what this
  * was on the run that extracted it. The condition costs each caller two words
  * and buys the thing a `void` helper cannot give back: the type system knows the

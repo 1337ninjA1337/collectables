@@ -44,18 +44,60 @@ describe("checkError", () => {
   });
 });
 
+/**
+ * A refusal line BUILT rather than mentioned.
+ *
+ * The first version of this sweep asked whether a module's source contains the
+ * separator anywhere, which is the offence plus two things that are not: a
+ * fixture that quotes a guard's output, and a module documenting the convention
+ * itself. `lib/provenance-key-set.ts` misses being reported only because its
+ * mention sits in a comment that `stripComments` removes — a mention inside a
+ * real string would have read as a hand-built line.
+ *
+ * What a hand-built line actually looks like is the prefix with a NAME in front
+ * of it, and there are two ways to write that: interpolate one
+ * (`` `${checkName}: ERROR — …` ``, which is all nineteen of the sites this
+ * replaced) or spell one (`"guard: ERROR — …"`). Both are matched; a bare
+ * mention of the separator with no name before it is not.
+ *
+ * Exported to the cases below rather than inlined in the filter, because a
+ * sweep's rule is worth testing against strings a walk over a healthy tree can
+ * never produce.
+ */
+export function buildsARefusalByHand(source: string): boolean {
+  // `${…}: ERROR — ` (interpolated name) or `<word>: ERROR — ` (spelled name).
+  return /(\$\{[^}]*\}|[\w-]+)(?=: ERROR — )/.test(source);
+}
+
+describe("the sweep's own rule", () => {
+  it("reports a line built from an interpolated check name", () => {
+    assert.ok(buildsARefusalByHand("return `${checkName}: ERROR — nope`;"));
+  });
+
+  it("reports a line built from a spelled check name", () => {
+    assert.ok(buildsARefusalByHand('throw new Error("my-guard: ERROR — nope");'));
+  });
+
+  it("tolerates a module that MENTIONS the convention without building one", () => {
+    // The two shapes the first version of this sweep would have reported: a
+    // module explaining the format, and a fixture holding a guard's output for
+    // a case to assert against. Neither is a second copy of the formatter.
+    assert.ok(!buildsARefusalByHand('const FORMAT = ": ERROR — ";'));
+    assert.ok(!buildsARefusalByHand('expect(out).toContain(": ERROR — ");'));
+  });
+});
+
 describe("the guards that print refusals", () => {
   /**
-   * Every module that formats a refusal line, found rather than listed.
+   * Every module that builds a refusal line by hand, found rather than listed.
    *
-   * The population is "spells the separator", which is the thing the helper
-   * exists to own — so a module that writes the prefix by hand is exactly what
-   * the walk is looking for, and a module that stopped refusing anything drops
-   * out on its own.
+   * The population is the offence itself, so a module that stopped refusing
+   * anything drops out on its own and a twelfth guard is covered without being
+   * added to anything.
    */
   const OFFENDERS = sourceFiles("lib", "scripts").filter((file) => {
     if (file === "lib/check-error.ts") return false;
-    return stripComments(readRepoFile(file)).includes(CHECK_ERROR_PREFIX);
+    return buildsARefusalByHand(stripComments(readRepoFile(file)));
   });
 
   it("build the line through the helper, not by hand", () => {
