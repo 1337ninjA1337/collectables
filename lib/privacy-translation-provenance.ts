@@ -29,7 +29,7 @@
  */
 
 import { privacyPolicySourcePath } from "./privacy-body-baselines";
-import { PRIVACY_DEFAULT_LANGUAGE } from "./privacy-page";
+import { PRIVACY_DEFAULT_LANGUAGE } from "./privacy-languages";
 import {
   PRIVACY_TRANSLATED_LANGUAGES,
   type PrivacyTranslationSource,

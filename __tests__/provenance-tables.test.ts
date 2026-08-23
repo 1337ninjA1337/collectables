@@ -14,7 +14,7 @@ import {
   type ProvenanceVerdict,
 } from "../lib/provenance-tables";
 
-import { PRIVACY_DEFAULT_LANGUAGE } from "../lib/privacy-page";
+import { PRIVACY_DEFAULT_LANGUAGE } from "../lib/privacy-languages";
 import { privacyPolicySourcePath } from "../lib/privacy-body-baselines";
 import { SCRUB_PROMISE_SOURCE_FILE } from "../lib/scrub-promise-provenance";
 import { stripComments } from "../lib/strip-comments";

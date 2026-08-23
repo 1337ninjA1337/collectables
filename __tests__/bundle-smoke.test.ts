@@ -31,10 +31,8 @@ import {
   type PrivacyPageInput,
 } from "../lib/bundle-smoke";
 import { LINT_ALL_EXEMPT } from "../lib/lint-guards";
-import {
-  PRIVACY_PAGE_LANGUAGES,
-  renderPrivacyPage,
-} from "../lib/privacy-page";
+import { PRIVACY_PAGE_LANGUAGES } from "../lib/privacy-languages";
+import { renderPrivacyPage } from "../lib/privacy-page";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { readRepoFile as read, repoPath } from "./helpers/repo-file";
 

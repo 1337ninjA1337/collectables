@@ -26,7 +26,7 @@ import {
   privacyPolicySourcePath,
   type PrivacyBodyBaseline,
 } from "./privacy-body-baselines";
-import { PRIVACY_PAGE_LANGUAGES } from "./privacy-page";
+import { PRIVACY_PAGE_LANGUAGES } from "./privacy-languages";
 import {
   formatUnknownProvenanceKey,
   unknownProvenanceKeyDetail,

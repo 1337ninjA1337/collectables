@@ -6,6 +6,8 @@ import { findLanguageOptions } from "@/lib/i18n-source";
 import {
   PRIVACY_DEFAULT_LANGUAGE,
   PRIVACY_PAGE_LANGUAGES,
+} from "@/lib/privacy-languages";
+import {
   renderLanguagePicker,
   renderPrivacyPage,
 } from "@/lib/privacy-page";

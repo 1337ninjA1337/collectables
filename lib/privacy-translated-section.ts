@@ -40,7 +40,10 @@
 
 import { createHash } from "node:crypto";
 
-import { PRIVACY_DEFAULT_LANGUAGE, PRIVACY_PAGE_LANGUAGES } from "./privacy-page";
+import {
+  PRIVACY_DEFAULT_LANGUAGE,
+  PRIVACY_PAGE_LANGUAGES,
+} from "./privacy-languages";
 
 /**
  * The line that opens the section the five translations carry.

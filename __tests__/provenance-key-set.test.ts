@@ -10,7 +10,10 @@ import {
   privacyPolicySourcePath,
   type PrivacyBodyBaseline,
 } from "../lib/privacy-body-baselines";
-import { PRIVACY_DEFAULT_LANGUAGE, PRIVACY_PAGE_LANGUAGES } from "../lib/privacy-page";
+import {
+  PRIVACY_DEFAULT_LANGUAGE,
+  PRIVACY_PAGE_LANGUAGES,
+} from "../lib/privacy-languages";
 import {
   PRIVACY_TRANSLATED_LANGUAGES,
   type PrivacyTranslationSource,
@@ -219,6 +222,64 @@ describe("the two tables that have keys", () => {
         `${module} no longer raises unknown_language, so the sweep above matches nothing`,
       );
     }
+  });
+});
+
+describe("the list the closed sets are built from", () => {
+  /**
+   * The provenance family's modules, which want six codes and nothing else.
+   *
+   * `lib/privacy-page.ts` also carries an HTML renderer, a markdown pass, a CSP
+   * string and a language picker. While the list lived there, every one of these
+   * pulled a page renderer into its import graph to ask which codes exist — and
+   * `privacy-baseline-provenance` reached the same constant through two paths,
+   * which is how an import cycle gets made by somebody moving a helper.
+   */
+  const ASKERS = [
+    "lib/privacy-body-baselines.ts",
+    "lib/privacy-baseline-provenance.ts",
+    "lib/privacy-translated-section.ts",
+    "lib/privacy-translation-provenance.ts",
+    "lib/scrub-promise-provenance.ts",
+    "lib/bundle-smoke.ts",
+  ];
+
+  it("reaches none of them through the page renderer", () => {
+    const offenders = ASKERS.filter((module) =>
+      stripComments(readRepoFile(module)).includes('from "./privacy-page"'),
+    );
+    assert.deepEqual(
+      offenders,
+      [],
+      `these modules import the /privacy page renderer to ask which languages exist: ${offenders.join(", ")}`,
+    );
+    // The positive control: they do still ask, through the leaf.
+    const asking = ASKERS.filter((module) =>
+      stripComments(readRepoFile(module)).includes('from "./privacy-languages"'),
+    );
+    assert.deepEqual(
+      asking,
+      ASKERS,
+      "some of these modules no longer read the language list at all, so the sweep above proves nothing",
+    );
+  });
+
+  it("is a leaf, so it can never be the module that made a cycle", () => {
+    // Two constants and a type. An import here would be an import every
+    // provenance module inherits.
+    assert.ok(
+      !/^\s*import\s/m.test(stripComments(readRepoFile("lib/privacy-languages.ts"))),
+      "lib/privacy-languages.ts has grown an import — it is depended on by everything and may depend on nothing",
+    );
+  });
+
+  it("is where the page renderer reads them from too, so there is one list", () => {
+    assert.ok(
+      stripComments(readRepoFile("lib/privacy-page.ts")).includes(
+        'from "./privacy-languages"',
+      ),
+      "the /privacy page renderer declares its own language list again",
+    );
   });
 });
 
