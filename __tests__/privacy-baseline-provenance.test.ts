@@ -87,6 +87,32 @@ describe("PRIVACY_BODY_BASELINES — the shipped table", () => {
       );
     }
   });
+
+  it("refuses to name a policy file for a language nothing publishes", () => {
+    // The failure this closes is a SILENT one, which is why it is a throw. Every
+    // caller hands the returned name to a set of files a diff touched; a path
+    // that never existed is reported absent, the caller concludes "untouched",
+    // and a guard whose whole job is to notice that a file did not move gives
+    // its right answer for the wrong reason.
+    for (const code of ["de-DE", "EN", "fr", ""]) {
+      assert.throws(
+        () => privacyPolicySourcePath(code),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /no privacy page is published/);
+          // The known set, so the reader does not have to find the list.
+          for (const { code: known } of PRIVACY_PAGE_LANGUAGES) {
+            assert.ok(
+              error.message.includes(known),
+              `the refusal does not name the known code ${known}: ${error.message}`,
+            );
+          }
+          return true;
+        },
+        `privacyPolicySourcePath("${code}") answered instead of refusing`,
+      );
+    }
+  });
 });
 
 describe("parsePrivacyBodyBaselines", () => {

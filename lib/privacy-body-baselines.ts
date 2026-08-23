@@ -34,7 +34,10 @@
  * fails the suite instead of quietly disabling the guard.
  */
 
-import { PRIVACY_DEFAULT_LANGUAGE } from "./privacy-page";
+import {
+  PRIVACY_DEFAULT_LANGUAGE,
+  PRIVACY_PAGE_LANGUAGES,
+} from "./privacy-page";
 
 export type PrivacyBodyBaseline = {
   /**
@@ -112,8 +115,25 @@ export const PRIVACY_BODY_BASELINE_WORDS: Readonly<Record<string, number>> =
  *
  * Repo-relative and posix-separated, because it is compared against
  * `git diff --name-only` output.
+ *
+ * THROWS on a code the picker does not offer, and the reason is the comparison
+ * above rather than tidiness. `PRIVACY.md.de-DE` is a path that has never
+ * existed; every caller hands it to a `Set` of files the diff touched, finds it
+ * absent, and concludes the file was untouched — which is true, and is not what
+ * the caller asked. A wrong answer that reads like a right one is worse here
+ * than a stopped run, because the run it stops is a guard whose whole job is to
+ * notice that a file did not move.
+ *
+ * The languages are a closed set (`PRIVACY_PAGE_LANGUAGES`), so this is a
+ * question with a known list of valid inputs and every real caller passes a key
+ * that came out of a table the parity cases already hold to that list.
  */
 export function privacyPolicySourcePath(code: string): string {
+  if (!PRIVACY_PAGE_LANGUAGES.some((language) => language.code === code)) {
+    throw new Error(
+      `privacyPolicySourcePath("${code}"): no privacy page is published for that language. It would name PRIVACY.md.${code}, a file that does not exist, and every caller compares that name against the files a diff touched — so the answer would be "untouched" rather than an error. Known codes: ${PRIVACY_PAGE_LANGUAGES.map(({ code: known }) => known).join(", ")}.`,
+    );
+  }
   return code === PRIVACY_DEFAULT_LANGUAGE ? "PRIVACY.md" : `PRIVACY.md.${code}`;
 }
 
