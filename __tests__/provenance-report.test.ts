@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { provenanceOutput } from "../lib/provenance-report";
+import {
+  printProvenanceOutput,
+  provenanceOutput,
+} from "../lib/provenance-report";
 import { PROVENANCE_TABLES } from "../lib/provenance-tables";
 import type { ProvenanceOutcome } from "../lib/provenance-tables";
 import { stripComments } from "../lib/strip-comments";
@@ -154,18 +157,41 @@ describe("provenanceOutput", () => {
   });
 
   it("refuses to call an empty run a pass", () => {
-    // `every` over nothing is true. The registry's own refusal is what stops
-    // this reaching here, and a second opinion costs one line.
-    assert.equal(provenanceOutput("guard", [], null).ok, true);
-    // Documented rather than asserted-away: the emptiness check belongs to
-    // `provenanceRegistryRefusal`, which the script calls first. This case
-    // exists so that the day somebody moves it, the move is visible.
+    // `every` over nothing is true, so this would otherwise be a silent pass
+    // with no lines at all. `provenanceRegistryRefusal` should have stopped it
+    // one level up; that guard runs in a caller this module's suite does not
+    // control, which is why the claim is also made here.
+    const output = provenanceOutput("guard", [], null);
+    assert.equal(output.ok, false);
+    assert.equal(output.halted, true);
+    assert.deepEqual(textsOn(output, "stdout"), []);
+    assert.match(textsOn(output, "stderr")[0], /zero tables is not a pass/);
+    // And the guard that should have caught it first is still in the script, so
+    // this is a second opinion rather than the only one.
     assert.ok(
       stripComments(
         readRepoFile("scripts/check-privacy-baseline-provenance.ts"),
       ).includes("provenanceRegistryRefusal("),
       "nothing refuses an empty registry before the output decision is made",
     );
+  });
+
+  it("prints each line to the stream it was assigned", () => {
+    const log: string[] = [];
+    const error: string[] = [];
+    printProvenanceOutput(
+      provenanceOutput(
+        "guard",
+        [evaluated("passed", true, "skipped"), evaluated("failed", false)],
+        null,
+      ),
+      {
+        log: (text: string) => log.push(text),
+        error: (text: string) => error.push(text),
+      } as unknown as Console,
+    );
+    assert.deepEqual(log, ["passed", "skipped"]);
+    assert.deepEqual(error, ["failed"]);
   });
 
   it("is what the script prints with, rather than a second copy of the rules", () => {
@@ -176,13 +202,23 @@ describe("provenanceOutput", () => {
       script.includes("provenanceOutput("),
       "the script no longer calls provenanceOutput",
     );
-    // The positive control for the sweep below: the script does still print.
+    assert.ok(
+      script.includes("printProvenanceOutput("),
+      "the script no longer prints through this module",
+    );
+    // The script still has a console of its own — the redirect announcement and
+    // the three stops are its own lines, and this is the positive control that
+    // keeps the sweep below honest.
     assert.ok(script.includes("console.log"), "the script prints nothing at all");
-    // And it no longer decides the stream itself. `outcome.ok ? console.log :`
-    // was the branch this module took over.
+    // What it must NOT have is a second copy of rules 3 and 4: a stream picked
+    // from a verdict, or a walk over the lines.
     assert.ok(
       !/outcome\.ok\s*\?\s*console/.test(script),
       "the script still picks a stream from a verdict, so there are two copies of rule 3",
+    );
+    assert.ok(
+      !script.includes("output.lines"),
+      "the script still walks the lines itself",
     );
   });
 

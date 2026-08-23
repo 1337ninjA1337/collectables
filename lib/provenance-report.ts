@@ -63,6 +63,24 @@ export function provenanceOutput(
   outcomes: readonly ProvenanceOutcome[],
   skipReason: string | null,
 ): ProvenanceOutput {
+  // `every` over nothing is true, so an empty list would come out of here as a
+  // silent pass with no lines at all. `provenanceRegistryRefusal` is what stops
+  // that reaching this function and it runs one level up, in the script — which
+  // means the claim is guarded by the ORDER of two calls in a caller neither
+  // this module nor its suite controls. Refusing here as well costs four lines
+  // and makes it local.
+  if (outcomes.length === 0) {
+    return {
+      lines: [
+        {
+          stream: "stderr",
+          text: `${checkName}: ERROR — no provenance table produced an outcome, and a pass over zero tables is not a pass. Tables are registered in lib/provenance-tables.ts; provenanceRegistryRefusal is what should have refused this before the run got here.`,
+        },
+      ],
+      ok: false,
+      halted: true,
+    };
+  }
   const unparseable = outcomes.find((outcome) => outcome.kind === "unparseable");
   if (unparseable !== undefined && unparseable.kind === "unparseable") {
     return {
@@ -97,4 +115,22 @@ export function provenanceOutput(
     ok: outcomes.every((outcome) => outcome.kind === "evaluated" && outcome.ok),
     halted: false,
   };
+}
+
+/**
+ * {@link ProvenanceOutput} to a console, each line on the stream it was assigned.
+ *
+ * Here rather than in the caller because the map from a stream name to a console
+ * method is the last half-sentence of rule 3, and a caller that owns it is a
+ * caller that can disagree with the rule that produced the name. The console is
+ * a parameter so a test can be the console.
+ */
+export function printProvenanceOutput(
+  output: ProvenanceOutput,
+  out: Pick<Console, "log" | "error"> = console,
+): void {
+  for (const line of output.lines) {
+    if (line.stream === "stdout") out.log(line.text);
+    else out.error(line.text);
+  }
 }
