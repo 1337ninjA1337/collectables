@@ -254,26 +254,63 @@ describe("the list the closed sets are built from", () => {
    */
   const CONSTANTS = ["PRIVACY_PAGE_LANGUAGES", "PRIVACY_DEFAULT_LANGUAGE"];
 
+  /**
+   * A module that DECLARES one of the constants rather than asking for it.
+   *
+   * Derived, because the alternative is a path written into the filter, which is
+   * the same shape as the list this case just stopped hand-writing at one
+   * twelfth the size. The leaf is not privileged here by name: it is excluded
+   * for the property that makes it the leaf, so moving the declaration to a
+   * differently-named module excludes that one instead, with nothing to update.
+   */
+  const declaresAConstant = (source: string): boolean =>
+    CONSTANTS.some((constant) =>
+      new RegExp(`export\\s+const\\s+${constant}\\b`).test(source),
+    );
+
+  /**
+   * `lib/privacy-page.ts`, excluded BY NAME because there is no property to
+   * derive it from.
+   *
+   * It is not the declarer and it is a genuine asker — it reads the list to
+   * build the picker, exactly like the other seven. What makes it not a subject
+   * of this sweep is history: it is the module the constants were moved OUT of,
+   * so "does it take them from the renderer" is a question about itself. That
+   * it reads the leaf is asserted in `__tests__/privacy-languages.test.ts`,
+   * where the rest of the leaf's own shape cases live.
+   */
+  const THE_RENDERER = "lib/privacy-page.ts";
+
   const ASKERS = sourceFiles("lib", "scripts").filter((file) => {
-    // The two modules that are not askers: the leaf DECLARES the constants, and
-    // the renderer is the module they were moved out of — that it reads the leaf
-    // is asserted in `__tests__/privacy-languages.test.ts`, where the rest of
-    // the leaf's own shape cases live.
-    if (file === "lib/privacy-languages.ts" || file === "lib/privacy-page.ts") {
-      return false;
-    }
+    if (file === THE_RENDERER) return false;
     const source = stripComments(readRepoFile(file));
+    if (declaresAConstant(source)) return false;
     return CONSTANTS.some((constant) => source.includes(constant));
   });
 
   it("finds the askers, rather than trusting a list of them", () => {
-    // The floor is what stops a walk that matched nothing — a renamed directory,
-    // a `stripComments` that ate the file — reading as a clean sweep. Six is the
-    // count the hand-written list had, so the walk cannot pass while covering
-    // LESS than the list it replaced.
+    // A FLOOR THAT IS AN ARGUMENT, not a measurement: six is what the
+    // hand-written list covered, so the walk cannot pass while covering less
+    // than the thing it replaced. It sits one below the current count of seven
+    // deliberately — raising it to seven every time the tree grows would turn a
+    // "did the walk match anything" check into a target, and the sibling floor
+    // in `__tests__/provenance-report.test.ts` is the other kind (equal to its
+    // count) for its own reasons. Neither should be edited to match the other.
     assert.ok(
       ASKERS.length >= 6,
       `only ${String(ASKERS.length)} module(s) name the language constants — the sweep below would prove nothing: ${ASKERS.join(", ")}`,
+    );
+    // The exclusions are derived and a derivation can over-match: a regex that
+    // matched every module would leave an empty list, which the floor catches,
+    // and one that matched nothing would leave the LEAF in the sweep, which
+    // nothing else would. So both exclusions are named.
+    assert.ok(
+      !ASKERS.includes("lib/privacy-languages.ts") && !ASKERS.includes(THE_RENDERER),
+      `the leaf or the renderer is being swept as an asker: ${ASKERS.join(", ")}`,
+    );
+    assert.ok(
+      declaresAConstant(stripComments(readRepoFile("lib/privacy-languages.ts"))),
+      "lib/privacy-languages.ts no longer exports the constants under those names — the exclusion above is now matching nothing and the leaf is only out of the sweep by luck",
     );
     // And the seventh the list did not have, named so that a reader can see the
     // derivation bought something rather than take it on trust.
@@ -323,11 +360,19 @@ describe("the list the closed sets are built from", () => {
     // compile. That is the guarantee; this is the backstop for the day somebody
     // adds a convenience re-export, at which point the compiler stops caring and
     // this is the only thing left that does.
+    const renderer = stripComments(readRepoFile(THE_RENDERER));
     assert.ok(
-      !/export\s*\{[^}]*PRIVACY_(PAGE_LANGUAGES|DEFAULT_LANGUAGE)/.test(
-        stripComments(readRepoFile("lib/privacy-page.ts")),
-      ),
-      "lib/privacy-page.ts re-exports a language constant — the split is a redirect again, and the sweep above is now the only thing stopping the old import graph coming back",
+      !/export\s*\{[^}]*PRIVACY_(PAGE_LANGUAGES|DEFAULT_LANGUAGE)/.test(renderer),
+      `${THE_RENDERER} re-exports a language constant — the split is a redirect again, and the sweep above is now the only thing stopping the old import graph coming back`,
+    );
+    // Its positive control, because a refusal over a pattern the file has never
+    // matched would pass identically against an empty file — and "the module was
+    // emptied" is a thing that happens to a module somebody is mid-way through
+    // moving. So: it still exports what it IS for.
+    assert.match(
+      renderer,
+      /export function renderPrivacyPage\b/,
+      `${THE_RENDERER} no longer exports renderPrivacyPage — the refusal above is being read against a file that is not the page renderer any more`,
     );
     // The positive control, and it is not vacuous because the list above was
     // built from what the modules NAME: a module that names a constant and

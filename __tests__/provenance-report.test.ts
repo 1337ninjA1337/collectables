@@ -232,6 +232,12 @@ describe("provenanceOutput", () => {
     const modules = sourceFiles("lib").filter((file) =>
       /^lib\/(provenance-.*|.*-provenance)\.ts$/.test(file),
     );
+    // A FLOOR THAT IS A MEASUREMENT: five is the count the pattern matches
+    // today, so this catches a pattern that stopped matching and nothing else.
+    // The sibling floor in `__tests__/provenance-key-set.test.ts` is the other
+    // kind — one below its count, so growth does not have to be ratified — and
+    // the two are different on purpose. Editing either to match the other loses
+    // the reason it was written.
     assert.ok(
       modules.length >= 5,
       `only ${String(modules.length)} module(s) matched — the sweep below would prove little`,
