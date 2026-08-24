@@ -10,6 +10,7 @@ import { TRANSLATION_LANGUAGES } from "@/lib/i18n-coverage";
 import type { ScannedSource } from "@/lib/i18n-key-usage";
 import { stripComments } from "@/lib/strip-comments";
 
+import { assertRequiredParameter } from "./helpers/declared-shape";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -225,11 +226,14 @@ describe("the locales a finding is attributed to", () => {
     // the sentence that says so, because the guarantee is in a signature nobody
     // reads until they are already changing it.
     const source = stripComments(readRepoFile("lib/check-orphan-i18n-keys.ts"));
-    assert.match(
-      source,
-      /function localesDeclaring\(\s*declarations: LocaleDeclarations,/,
-      "localesDeclaring takes the translations source again — it can re-parse per key, which is the shape this replaced",
-    );
+    assertRequiredParameter({
+      module: "lib/check-orphan-i18n-keys.ts",
+      fn: "localesDeclaring",
+      name: "declarations",
+      type: "LocaleDeclarations",
+      at: 0,
+      why: "it can re-parse per key again, which is the shape this replaced",
+    });
     // And that the one caller builds it BEFORE the walk rather than inside it.
     // The signature above makes a per-key re-parse impossible; this is the
     // remaining way to pay the cost twice, and it is a statement order, which

@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { stripComments } from "@/lib/strip-comments";
 
 import { arguedFloor, measuredFloor } from "./helpers/coverage-floor";
+import { assertRequiredParameter } from "./helpers/declared-shape";
 import { readRepoFile } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
 
@@ -65,12 +66,13 @@ describe("arguedFloor", () => {
     // that reads as arbitrary later — so the parameter is required rather than
     // optional. Asserted from the signature, since a missing argument is a
     // compile error rather than anything a case can call.
-    const helper = stripComments(readRepoFile("__tests__/helpers/coverage-floor.ts"));
-    assert.match(
-      helper,
-      /export function arguedFloor\([^)]*because: string,?\s*\)/,
-      "arguedFloor's reason is no longer a required parameter — an argued floor with no argument is a measured floor that has not admitted it",
-    );
+    assertRequiredParameter({
+      module: "__tests__/helpers/coverage-floor.ts",
+      fn: "arguedFloor",
+      name: "because",
+      type: "string",
+      why: "an argued floor with no argument is a measured floor that has not admitted it",
+    });
   });
 });
 

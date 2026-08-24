@@ -10,6 +10,7 @@ import {
   SOFT_DESTRUCTIVE_SURFACE,
 } from "@/lib/danger-surface";
 import { CARD_BG_8, DANGER_DEEP_3, DANGER_SOFT, RADIUS_PILL } from "@/lib/design-tokens";
+import { assertRequiredMember } from "./helpers/declared-shape";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
 
@@ -160,9 +161,12 @@ describe("<DangerIconButton> announces itself", () => {
   it("types accessibilityLabel as required, unlike the label-bearing widgets", () => {
     // An icon-only control has no text to fall back on, so the optional-with-
     // fallback shape <SoftDestructiveChip> uses would announce nothing here.
-    const src = read("components/danger-icon-button.tsx");
-    assert.match(src, /^ {2}accessibilityLabel: string;$/m);
-    assert.doesNotMatch(src, /accessibilityLabel\?: string/);
+    assertRequiredMember({
+      module: "components/danger-icon-button.tsx",
+      name: "accessibilityLabel",
+      type: "string",
+      why: "an icon-only control renders no text, so the optional-with-fallback shape would announce nothing",
+    });
   });
 });
 
