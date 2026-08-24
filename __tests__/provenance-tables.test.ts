@@ -50,6 +50,13 @@ function fakeTable(
   over: {
     readonly revision?: ProvenanceRevision<Fake>;
     readonly ok?: boolean;
+    /**
+     * Omit the hard-failure sentence, the way the two collapsed real entries do.
+     * The field is optional so an entry that cannot reach one does not write
+     * prose no run can print; passing `false` here is what a `classify` reaching
+     * for a sentence its entry never wrote looks like from inside the loop.
+     */
+    readonly declaresUnparseable?: boolean;
   } = {},
 ) {
   const evaluated: {
@@ -80,11 +87,29 @@ function fakeTable(
     },
     report: (checkName, verdict) =>
       `${checkName}: fake report, previous=${verdict.seen ?? "none"}`,
-    unparseable: (checkName, ref) => `${checkName}: fake unparseable at ${ref}`,
+    ...(over.declaresUnparseable === false
+      ? {}
+      : {
+          unparseable: (checkName: string, ref: string) =>
+            `${checkName}: fake unparseable at ${ref}`,
+        }),
     driftSkipped: (checkName, ref) => `${checkName}: fake drift skipped at ${ref}`,
   });
   return { table, evaluated, classified };
 }
+
+/**
+ * A source that is PRESENT and yields no table — the one state every `classify`
+ * has to name, and the only fixture in this file with a meaning rather than a
+ * shape. Four cases had written it out by hand and one of the four had already
+ * drifted to a different wording, which is harmless until somebody greps for the
+ * others and finds three.
+ *
+ * It has to be text no parser in the registry can read a table out of, and a
+ * comment is the honest version of that: the module is there, somebody's
+ * reformat or rename took the table with it.
+ */
+const PRESENT_AND_UNREADABLE = "// the module was here and its table was not\n";
 
 const base = (
   over: Partial<ProvenanceBaseRevision> = {},
@@ -126,6 +151,50 @@ describe("defineProvenanceTable — the six steps, once", () => {
     );
     // The point of the hard failure: a report printed alongside it would be a
     // report from a guard whose drift half is off.
+    assert.deepEqual(evaluated, []);
+  });
+
+  /**
+   * The sentence is optional, and its presence is the whole of `stopsTheRun`.
+   *
+   * `spec.unparseable` is erased with the generic — no case can read the prose
+   * from outside the closure — so an entry that writes one it can never reach
+   * ships wording nobody proofreads: the wrong module, the wrong table name, a
+   * copy of a neighbour's line, all green. Making the field optional is what
+   * lets a collapsed entry decline to write one; `stopsTheRun` is what carries
+   * that decision back out to where the registry's cases can hold it against
+   * what `run` actually does.
+   */
+  it("derives stopsTheRun from whether the entry wrote a hard-failure sentence", () => {
+    assert.equal(fakeTable().table.stopsTheRun, true);
+    assert.equal(
+      fakeTable({ declaresUnparseable: false }).table.stopsTheRun,
+      false,
+    );
+  });
+
+  it("refuses in words when a classify reaches for a sentence its entry never wrote", () => {
+    // Not reachable from a well-formed entry, and reached with the drift half
+    // already off — so falling through to the evaluation would print a pass over
+    // a table nothing compared, which is the one ending this guard exists
+    // against. It names the entry and the module instead.
+    const { table, evaluated } = fakeTable({
+      revision: { kind: "unparseable" },
+      declaresUnparseable: false,
+    });
+    const outcome = table.run("guard", base());
+
+    assert.equal(outcome.kind, "unparseable");
+    const message = outcome.kind === "unparseable" ? outcome.message : "";
+    assert.match(message, /^guard: ERROR — /);
+    assert.ok(
+      message.includes("fake") && message.includes("lib/fake-table.ts"),
+      `the refusal names neither the entry nor its module: ${message}`,
+    );
+    assert.ok(
+      message.includes("abc123"),
+      `the refusal does not name the revision it read at: ${message}`,
+    );
     assert.deepEqual(evaluated, []);
   });
 
@@ -284,9 +353,11 @@ describe("PROVENANCE_TABLES — the registry the guard loops over", () => {
    * table's report.
    *
    * `spec.unparseable` is erased by `defineProvenanceTable` and reachable only
-   * through `run`, so the two collapsed entries' sentences cannot be read from
-   * out here at all. That is the honest limit of this pair: prose no run can
-   * print is prose no case can proofread.
+   * through `run`, so no case out here can read the WORDING of a sentence. What
+   * it can read is whether one was written — `stopsTheRun` — and the second case
+   * below holds that against what `run` actually does, in both directions. That
+   * closes the gap this pair used to note as its limit: a sentence written for a
+   * `classify` that can never produce one is now red rather than unreadable.
    */
   it("stops the run on an unreadable module for exactly the entries that say so", () => {
     // A source that is present and yields no table — the state each `classify`
@@ -297,7 +368,7 @@ describe("PROVENANCE_TABLES — the registry the guard loops over", () => {
       const outcome = table.run("guard", {
         ref: "abc123",
         present: true,
-        source: "// the module was here and its table was not\n",
+        source: PRESENT_AND_UNREADABLE,
         changedFiles: [],
       });
       if (HARD_FAILERS.has(table.id)) {
@@ -321,6 +392,28 @@ describe("PROVENANCE_TABLES — the registry the guard loops over", () => {
     }
   });
 
+  it("declares a hard-failure sentence exactly where one can be printed", () => {
+    // The written-but-unreachable state, made visible. `stopsTheRun` is the
+    // presence of the sentence and the outcome is what `classify` does with an
+    // unreadable module; they are two readings of one decision, and the whole
+    // point of the field is that they can be compared from out here.
+    for (const table of PROVENANCE_TABLES) {
+      const outcome = table.run("guard", {
+        ref: "abc123",
+        present: true,
+        source: PRESENT_AND_UNREADABLE,
+        changedFiles: [],
+      });
+      assert.equal(
+        outcome.kind === "unparseable",
+        table.stopsTheRun,
+        table.stopsTheRun
+          ? `${table.id} declares an unparseable sentence its classify can never reach — prose no run prints and no case proofreads; delete it or give the entry the three-way classification`
+          : `${table.id} stops the run on an unreadable module without declaring the sentence that explains it, so the guard halts with a registry bug in place of a diagnosis`,
+      );
+    }
+  });
+
   it("refuses in words that name the module and the revision it could not read", () => {
     // The one reachable unparseable sentence, held to what the drift-skipped
     // lines are already held to. It is the message that stops a run, so a reader
@@ -331,7 +424,7 @@ describe("PROVENANCE_TABLES — the registry the guard loops over", () => {
     )?.run("guard", {
       ref: "abc123",
       present: true,
-      source: "// the module was here and its table was not\n",
+      source: PRESENT_AND_UNREADABLE,
       changedFiles: [],
     });
     assert.equal(outcome?.kind, "unparseable");
@@ -497,7 +590,7 @@ describe("the real entries and the places they disagree", () => {
     table.run("guard", {
       ref: "abc123",
       present: true,
-      source: "// the module was here and the table was not\n",
+      source: PRESENT_AND_UNREADABLE,
       changedFiles: [],
     });
 

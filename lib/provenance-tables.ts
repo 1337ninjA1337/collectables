@@ -14,10 +14,11 @@
  * Two copies is a shape, not a duplication problem; the third is where it
  * becomes one, and the third is the copy nobody reviews. So the six steps live
  * here once, in {@link defineProvenanceTable}, and each table contributes only the
- * five things that genuinely differ: its module path, its current value, how to
- * parse a previous revision, how to judge one, and the five sentences it says
- * about itself. Adding a table is an entry in {@link PROVENANCE_TABLES}; the
- * script does not change.
+ * things that genuinely differ: its module path, its current value, how to
+ * parse a previous revision, how to judge one, and the sentences it says about
+ * itself — one of which, the hard failure, is written only by an entry that can
+ * reach it. Adding a table is an entry in {@link PROVENANCE_TABLES}; the script
+ * does not change.
  *
  * WHAT STAYED IN THE SCRIPT, and why this module is not "the guard": every
  * question that needs git. Which revision to compare against (`--base`, the env
@@ -68,6 +69,11 @@ import {
  * which is how a rename or a reformat silently turns the drift half off). Only
  * git can tell those apart, so the presence bit is an input rather than
  * something inferred from the text.
+ *
+ * Which of the two a table calls it is that table's decision, made in its own
+ * `classify` — and an entry that can return `unparseable` owes the reader a
+ * sentence, so it must declare {@link ProvenanceTableSpec.unparseable}. An entry
+ * that collapses this case into `absent` must not: see that field.
  */
 export type ProvenanceRevision<T> =
   | { readonly kind: "table"; readonly table: T }
@@ -150,6 +156,23 @@ export type ProvenanceTable = {
   readonly id: string;
   /** Repo-relative path of the module holding the table. */
   readonly module: string;
+  /**
+   * Whether an unreadable module at the base revision stops the whole run for
+   * this entry — DERIVED, not declared: it is true exactly when the entry wrote
+   * an {@link ProvenanceTableSpec.unparseable} sentence, so it restates nothing.
+   * The presence of the sentence is the single statement of the fact; this is
+   * that one fact, readable from outside the closure.
+   *
+   * It exists because the sentence itself is not readable from out here — the
+   * generic is erased and `run` is the only way in — so a sentence written for a
+   * `classify` that can never produce one is prose no run can print and no case
+   * can proofread. That state is now visible: the registry's suite runs each
+   * entry against a present-but-unreadable source and requires the OUTCOME to
+   * agree with this flag, in both directions. A declared-but-unreachable
+   * sentence turns it red; so does a `classify` that reaches for a sentence its
+   * entry never wrote.
+   */
+  readonly stopsTheRun: boolean;
   readonly run: (
     checkName: string,
     base: ProvenanceBaseRevision,
@@ -179,22 +202,44 @@ export type ProvenanceTableSpec<T, V extends ProvenanceVerdict> = {
     readonly changedFiles: readonly string[];
   }) => V;
   readonly report: (checkName: string, verdict: V) => string;
-  /** The hard failure above, in this table's own words. */
-  readonly unparseable: (checkName: string, ref: string) => string;
+  /**
+   * The hard failure above, in this table's own words — and OPTIONAL, because
+   * only an entry whose `classify` can return `unparseable` can ever print one.
+   *
+   * Writing one anyway is the failure this field is optional to prevent: the
+   * generic parameter is erased at the boundary, so a sentence here is reachable
+   * only through a `run` its own `classify` decides, and an entry that collapses
+   * `unparseable` into `absent` produces prose no run can print and no case can
+   * proofread. It can name the wrong module, or the wrong table, or be a copy of
+   * a neighbour's wording, and every build stays green.
+   *
+   * So the two entries that collapse do not write one, and
+   * {@link ProvenanceTable.stopsTheRun} carries the presence of this field out
+   * to where the registry's suite can hold it against what `run` actually does.
+   *
+   * Note what declaring one COSTS before adding it: the first `unparseable`
+   * stops the run, so every table after this one in {@link PROVENANCE_TABLES}
+   * loses its report — a mangled module here suppresses a neighbour's failure
+   * that would have been perfectly readable. That blast radius is the reason
+   * this is a per-entry decision and not the default.
+   */
+  readonly unparseable?: (checkName: string, ref: string) => string;
   /** The line printed when this table alone could not be read at the base. */
   readonly driftSkipped: (checkName: string, ref: string) => string;
 };
 
 /**
  * The six steps, once. Every table runs exactly this; the differences are the
- * five callbacks it brought.
+ * callbacks it brought.
  */
 export function defineProvenanceTable<T, V extends ProvenanceVerdict>(
   spec: ProvenanceTableSpec<T, V>,
 ): ProvenanceTable {
+  const unparseable = spec.unparseable;
   return {
     id: spec.id,
     module: spec.module,
+    stopsTheRun: unparseable !== undefined,
     run(checkName, base) {
       const revision =
         base.ref === null
@@ -203,7 +248,17 @@ export function defineProvenanceTable<T, V extends ProvenanceVerdict>(
       if (revision.kind === "unparseable" && base.ref !== null) {
         return {
           kind: "unparseable",
-          message: spec.unparseable(checkName, base.ref),
+          // A `classify` that reaches for a sentence its entry never wrote is a
+          // registry bug, not a table's verdict — but it is reached with the
+          // drift half already off, so it refuses in words rather than falling
+          // through to an evaluation that would print a pass.
+          message:
+            unparseable === undefined
+              ? checkError(
+                  checkName,
+                  `the "${spec.id}" provenance entry classified ${spec.module} at ${base.ref} as unparseable but declares no unparseable sentence, so the guard has stopped with nothing to tell you about it. Either give the entry in lib/provenance-tables.ts a sentence naming the module and the revision, or collapse the classification into "absent" and let its driftSkipped line say the drift half sat out.`,
+                )
+              : unparseable(checkName, base.ref),
         };
       }
       const previous = revision.kind === "table" ? revision.table : null;
@@ -251,11 +306,17 @@ const BASELINES_TABLE = defineProvenanceTable({
  * translation.
  *
  * `classify` collapses `unparseable` into `absent`, which is the one place this
- * entry deliberately differs from its neighbour: the parser is days old and the
- * suite round-trips it on every run, so the reformat-defeats-parser branch
- * cannot fire yet. It is worth revisiting the first time this parser changes —
- * which is now a two-line edit HERE rather than a branch to re-derive in the
- * script.
+ * entry deliberately differs from its neighbour: `parsePrivacyTranslationSources`
+ * is days old and this suite round-trips it on every run, so the
+ * reformat-defeats-parser branch cannot fire yet. Revisit it the first time THAT
+ * parser changes — the trigger is per-parser, so this entry and the scrub-promise
+ * one below stop being ready at different moments and neither reading is evidence
+ * about the other.
+ *
+ * Being collapsed is why it declares no `unparseable` sentence: it could not
+ * reach one, and an unreachable sentence is prose no run prints and no case
+ * proofreads. Adding the classification back means writing the sentence in the
+ * same edit.
  */
 const TRANSLATION_MODULE = "lib/privacy-translated-section.ts";
 
@@ -270,11 +331,6 @@ const TRANSLATION_TABLE = defineProvenanceTable({
   },
   evaluate: evaluateTranslationProvenance,
   report: formatTranslationProvenanceReport,
-  unparseable: (checkName, ref) =>
-    checkError(
-      checkName,
-      `${TRANSLATION_MODULE} exists at ${ref} but no PRIVACY_TRANSLATION_SOURCES table could be read from it.`,
-    ),
   // Worded so it cannot be mistaken for the baselines line, by a reader or by a
   // suite: the tables skip independently, and "drift half skipped" printed twice
   // with different modules behind it is how somebody concludes the whole guard
@@ -295,8 +351,11 @@ const PROMISE_MODULE = "lib/sentry-scrub-promises.ts";
  * before a third table existed rather than after.
  *
  * One record rather than a map, which is why nothing here is per-key. Its
- * `absent`-only classification follows the translation entry's reasoning for the
- * same reason — the parser is new and round-tripped by the suite on every run.
+ * `absent`-only classification is the same SHAPE as the translation entry's and
+ * a separate reading: `parseScrubPromiseBaseline` is new and round-tripped by
+ * this suite on every run. When one of the two parsers hardens the other has not,
+ * so these two entries flip independently — and, like its neighbour, this one
+ * declares no `unparseable` sentence because it cannot reach one.
  */
 const PROMISE_TABLE = defineProvenanceTable({
   id: "scrub-promise",
@@ -308,11 +367,6 @@ const PROMISE_TABLE = defineProvenanceTable({
   },
   evaluate: evaluateScrubPromiseProvenance,
   report: formatScrubPromiseProvenanceReport,
-  unparseable: (checkName, ref) =>
-    checkError(
-      checkName,
-      `${PROMISE_MODULE} exists at ${ref} but no SCRUB_PROMISE_BASELINE record could be read from it.`,
-    ),
   driftSkipped: (checkName, ref) =>
     `${checkName}: scrub-promise drift skipped — no ${PROMISE_MODULE} record was readable at ${ref}, so the guard predates it.`,
 });
