@@ -17,6 +17,11 @@ import { privacyPolicySourcePath } from "../lib/privacy-body-baselines";
 import { measuredFloor } from "./helpers/coverage-floor";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 import { readRepoFile } from "./helpers/repo-file";
+import {
+  assertExemptionsHonest,
+  suiteCode,
+  suiteFiles,
+} from "./helpers/suite-files";
 
 /**
  * The English disclosure moved and five translations did not.
@@ -283,13 +288,46 @@ describe("PRIVACY_TRANSLATION_SOURCES — one entry per translated page", () => 
  * `malformed_checksum` — a red build blaming the entries for a width nobody
  * moved.
  *
- * `POLICY_CHECKSUM_PATTERN` is measured from the function, so the widening
- * fails every recorded entry until the tables are re-recorded — which is the
- * work the widening implies. What a derivation cannot do is notice that the
- * width CHANGED at all, since it would agree with any value; so sixteen is
- * asserted here, in one place, and a change to it is a line in a diff with a
- * reason next to it.
+ * `POLICY_CHECKSUM_PATTERN` reads `POLICY_CHECKSUM_LENGTH` and so does the slice
+ * in `policyChecksum`, so the widening fails every recorded entry until the
+ * tables are re-recorded — which is the work the widening implies. What a single
+ * declaration cannot do is notice that the width CHANGED at all, since the
+ * pattern would agree with any value; so sixteen is asserted here, in one place,
+ * and a change to it is a line in a diff with a reason next to it.
+ *
+ * The other half is new and is why the constant may be declared rather than
+ * measured: the function has to be shown to USE it. `policyChecksum("").length`
+ * once WAS the constant, so a slice that stopped reading it was inexpressible;
+ * now it is expressible and asserted instead.
  */
+/**
+ * The offence: a WHOLE-STRING run of hex, which is what a fingerprint validator
+ * is.
+ *
+ * Written once because two sweeps now ask it — of `lib`/`scripts` and of the
+ * suites — and a rule spelled twice is the shape this whole describe exists
+ * against. Not global or sticky: it is `.test`ed in a filter over hundreds of
+ * files, and a `lastIndex` carried between them would skip offenders.
+ *
+ * `lib/uuid.ts` and `lib/analytics-mirror-payload.ts` both hold
+ * `[0-9a-f]{8}-[0-9a-f]{4}-…`, and a UUID's five runs separated by hyphens is a
+ * different shape validating a different thing — reporting them would be the
+ * first exclusion in a list that then grows.
+ */
+const WHOLE_STRING_HEX_RUN = /\^\[0-9a-f\]\{\d+\}\$/;
+
+/**
+ * The one suite allowed to spell a whole-string hex width, and why.
+ *
+ * `cloudinary-signed-upload.test.ts` asserts that an upload signature is forty
+ * lowercase hex characters. That is Cloudinary's SHA-1, a fingerprint this
+ * repository neither produces nor records — nothing about it moves when
+ * `policyChecksum` widens, and importing `POLICY_CHECKSUM_PATTERN` there would
+ * tie an external API's format to a number we chose. Held honest below, so an
+ * entry that stops needing the hole is a failure rather than an open door.
+ */
+const HEX_WIDTH_EXEMPT: readonly string[] = ["cloudinary-signed-upload.test.ts"];
+
 describe("the policy fingerprint's shape", () => {
   it("is sixteen characters, which is a decision rather than an observation", () => {
     // Short enough to read in a diff and to retype into a table, long enough
@@ -303,12 +341,42 @@ describe("the policy fingerprint's shape", () => {
     );
   });
 
+  it("is the width the function actually cuts to, on more than the empty string", () => {
+    // The declaration's one liability. A constant agrees with any slice, so the
+    // function is asked — over inputs whose digests share no prefix, since a
+    // slice hard-coded to some other number would still be hex and still be
+    // stable, and only its LENGTH gives it away.
+    for (const text of ["", "a", "anything at all", "é中", "x".repeat(4096)]) {
+      assert.equal(
+        policyChecksum(text).length,
+        POLICY_CHECKSUM_LENGTH,
+        `policyChecksum stopped cutting to POLICY_CHECKSUM_LENGTH for ${JSON.stringify(text.slice(0, 12))}`,
+      );
+    }
+  });
+
   it("is the shape a real checksum has, not only a shape the tables satisfy", () => {
-    // The pattern is derived from the function's LENGTH; that its alphabet is
+    // The pattern reads the same constant the slice does; that its alphabet is
     // lowercase hex comes from `digest("hex")` and is checked here against an
     // actual call rather than assumed from the implementation.
     assert.match(policyChecksum("anything at all"), POLICY_CHECKSUM_PATTERN);
     assert.equal(policyChecksum("").length, POLICY_CHECKSUM_LENGTH);
+  });
+
+  it("is one shared RegExp with no lastIndex to carry between validators", () => {
+    // `g` and `y` make `.test` stateful, and this object is imported by both
+    // provenance modules and called from a loop over a table — so the second
+    // entry would be judged from where the first left off. Nothing here needs a
+    // flag, and a flag added by somebody optimising would be silent.
+    assert.equal(POLICY_CHECKSUM_PATTERN.flags, "");
+    const value = policyChecksum("anything at all");
+    assert.equal(POLICY_CHECKSUM_PATTERN.test(value), true);
+    assert.equal(
+      POLICY_CHECKSUM_PATTERN.test(value),
+      true,
+      "a second test of the same value disagreed with the first — the pattern is carrying lastIndex",
+    );
+    assert.equal(POLICY_CHECKSUM_PATTERN.lastIndex, 0);
   });
 
   it("is anchored, so an unsliced digest does not pass as a fingerprint", () => {
@@ -337,12 +405,50 @@ describe("the policy fingerprint's shape", () => {
     const offenders = sourceFiles("lib", "scripts").filter(
       (file) =>
         file !== "lib/privacy-translated-section.ts" &&
-        /\^\[0-9a-f\]\{\d+\}\$/.test(sourceCode(file)),
+        WHOLE_STRING_HEX_RUN.test(sourceCode(file)),
     );
     assert.deepEqual(
       offenders,
       [],
       `these modules spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN: ${offenders.join(", ")}`,
     );
+  });
+
+  /**
+   * The same rule over `__tests__`, which is where the fifth copy would land.
+   *
+   * Two of the three original copies were in suites, and the sweep above could
+   * not reach them: it walks `lib` and `scripts`. A suite writing
+   * `/^[0-9a-f]{16}$/` to check a recorded value is the same drift with the same
+   * failure — it agrees with the tables today and rejects them the morning the
+   * width moves — and it is cheaper to write there than anywhere else, because a
+   * suite's regex needs no import.
+   *
+   * Read with comments stripped, so the prose above may go on quoting the shape
+   * it retired.
+   */
+  it("is not restated as a literal in a suite either", () => {
+    // `suiteFiles()` rather than `topLevelSuites()`: the rule is about what is
+    // WRITTEN, so it has to reach `helpers/` — a shared assertion helper is
+    // exactly where a retired shape hides from a per-suite sweep.
+    const offenders = suiteFiles().filter(
+      (relative) =>
+        !HEX_WIDTH_EXEMPT.includes(relative) &&
+        WHOLE_STRING_HEX_RUN.test(suiteCode(relative)),
+    );
+    assert.deepEqual(
+      offenders,
+      [],
+      `these suites spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN: ${offenders.join(", ")}`,
+    );
+  });
+
+  it("keeps its one exemption honest", () => {
+    assertExemptionsHonest({
+      exemptions: HEX_WIDTH_EXEMPT,
+      expected: ["cloudinary-signed-upload.test.ts"],
+      rule: "whole-string hex width",
+      stillNeeded: (relative) => WHOLE_STRING_HEX_RUN.test(suiteCode(relative)),
+    });
   });
 });

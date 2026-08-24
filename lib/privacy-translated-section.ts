@@ -115,48 +115,67 @@ export function normalisePolicyText(markdown: string): string {
 }
 
 /**
- * A short, stable fingerprint. Sixteen hex characters of SHA-256: enough that
- * two different disclosures will not collide, short enough to read in a diff and
- * to type into the table when a page is refreshed. The field is compared by a
- * machine and READ by a reviewer, and a 64-character line is only the first.
- *
- * Exported because a third disclosure fingerprint now lives outside this module
- * (`lib/sentry-scrub-promises.ts` records one for the sentence promising what
- * `scrubPII` removes) and a second implementation of "sixteen hex of SHA-256"
- * is how two recorded values stop being comparable. Every checksum in a
- * provenance table in this repository comes through here.
- */
-export function policyChecksum(text: string): string {
-  return createHash("sha256").update(text, "utf8").digest("hex").slice(0, 16);
-}
-
-/**
- * How long a fingerprint is, MEASURED from the function rather than written
- * down beside it.
+ * How long a fingerprint is — the decision, declared once and READ by everything
+ * that depends on it, {@link policyChecksum} included.
  *
  * The width was a literal in three validators — `/^[0-9a-f]{16}$/`, in the two
  * provenance modules and in a suite — and each is what decides whether a
- * recorded value is well-formed. So widening `policyChecksum` was four
+ * recorded value is well-formed. So widening the fingerprint was four
  * coordinated edits, and the shape of getting it wrong is the bad one: the
  * tables get re-recorded with correct wider values, a validator somebody missed
  * REJECTS them, and its failure is `malformed_checksum` with the entry quoted —
  * a message blaming the data for the width nobody moved.
  *
- * Derived, the widening is one edit and it is loud in the right place: every
- * recorded fingerprint fails until the tables are re-recorded, which is the work
- * the widening actually implies, and no validator can disagree with another
- * about what it is validating.
+ * It was closed by MEASURING this from the function (`policyChecksum("").length`),
+ * which removed the restatements and left one oddity: a SHA-256 of the empty
+ * string, computed at module load, to learn a number the function's own body
+ * spelled two lines up — and this module is on the app's Sentry path, imported
+ * for `scrubPII`'s promise fingerprint rather than for any guard. Declaring the
+ * number and having the SLICE read it keeps every property the measurement
+ * bought (one statement, no validator able to disagree with another about what
+ * it is validating, a widening that is one edit and fails every recorded entry
+ * until the tables are re-recorded) and costs no hash to start the app.
+ *
+ * What it does not buy, and what the suite therefore still asserts separately:
+ * a declared constant agrees with any slice, so `policyChecksum`'s OUTPUT is
+ * checked against this number rather than assumed to follow from it.
  */
-export const POLICY_CHECKSUM_LENGTH = policyChecksum("").length;
+export const POLICY_CHECKSUM_LENGTH = 16;
 
 /**
- * The shape a RECORDED fingerprint must have, from the same function.
+ * A short, stable fingerprint: {@link POLICY_CHECKSUM_LENGTH} hex characters of
+ * SHA-256 — enough that two different disclosures will not collide, short enough
+ * to read in a diff and to type into the table when a page is refreshed. The
+ * field is compared by a machine and READ by a reviewer, and a 64-character line
+ * is only the first.
+ *
+ * Exported because a third disclosure fingerprint now lives outside this module
+ * (`lib/sentry-scrub-promises.ts` records one for the sentence promising what
+ * `scrubPII` removes) and a second implementation of "hex of SHA-256, cut to
+ * width" is how two recorded values stop being comparable. Every checksum in a
+ * provenance table in this repository comes through here.
+ */
+export function policyChecksum(text: string): string {
+  return createHash("sha256")
+    .update(text, "utf8")
+    .digest("hex")
+    .slice(0, POLICY_CHECKSUM_LENGTH);
+}
+
+/**
+ * The shape a RECORDED fingerprint must have, from the same width.
  *
  * Lowercase hex is `digest("hex")`'s own output alphabet, so the character class
  * is a property of the implementation above and not a separate decision; the
  * length is the one that used to be restated. Anchored, because a pattern that
  * merely matches somewhere would accept a 64-character digest that was never
  * sliced.
+ *
+ * ONE `RegExp` object, shared by every validator that imports it, so it must
+ * carry neither `g` nor `y`: those keep `lastIndex` across calls and two
+ * validators calling `.test` on the same object would then answer differently
+ * depending on who ran first. It carries no flags today, which is correct
+ * rather than lucky only because the suite says so.
  */
 export const POLICY_CHECKSUM_PATTERN = new RegExp(
   `^[0-9a-f]{${String(POLICY_CHECKSUM_LENGTH)}}$`,
