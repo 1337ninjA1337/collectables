@@ -16,6 +16,7 @@ import {
 } from "../lib/analytics-prop-values";
 import { BUNDLE_SMOKE_LANGUAGE_CODES } from "../lib/bundle-smoke";
 import { readRepoFile } from "./helpers/repo-file";
+import { captureConsole } from "./helpers/capture-console";
 
 /**
  * Closed sets of allowed prop VALUES.
@@ -26,19 +27,6 @@ import { readRepoFile } from "./helpers/repo-file";
  * `source: "collectionEdit"` makes a second bucket inside a column somebody
  * HAS, splitting a funnel that is then read as a number that looks too low.
  */
-
-function withCapturedWarns<T>(fn: () => T): { result: T; warns: string[] } {
-  const warns: string[] = [];
-  const original = console.warn;
-  console.warn = (...args: unknown[]) => {
-    warns.push(args.map(String).join(" "));
-  };
-  try {
-    return { result: fn(), warns };
-  } finally {
-    console.warn = original;
-  }
-}
 
 describe("findInvalidPropValues", () => {
   it("accepts every declared member of a set", () => {
@@ -145,7 +133,7 @@ describe("assertValidProps — out-of-set values", () => {
 
   it("KEEPS the value outside dev, unlike an unknown key", () => {
     __resetAnalyticsValidateForTests();
-    const { result, warns } = withCapturedWarns(() =>
+    const { result, warn: warns } = captureConsole(() =>
       assertValidProps("listing_created", { mode: "sale", hasPrice: true }, { failFast: false }),
     );
     // The asymmetry, stated: an unknown KEY is a column nothing was built on,
@@ -161,7 +149,7 @@ describe("assertValidProps — out-of-set values", () => {
 
   it("warns once per event+value, not once per call", () => {
     __resetAnalyticsValidateForTests();
-    const { warns } = withCapturedWarns(() => {
+    const { warn: warns } = captureConsole(() => {
       for (let i = 0; i < 5; i += 1) {
         assertValidProps("listing_created", { mode: "sale" }, { failFast: false });
       }
@@ -173,7 +161,7 @@ describe("assertValidProps — out-of-set values", () => {
     // Both checks run on the same payload, and they disagree about what to do
     // with what they find. This is the case where that could go wrong.
     __resetAnalyticsValidateForTests();
-    const { result } = withCapturedWarns(() =>
+    const { result } = captureConsole(() =>
       assertValidProps("listing_created", { mode: "sale", pirce: 10 }, { failFast: false }),
     );
     assert.deepEqual(result, { mode: "sale" });
@@ -191,7 +179,7 @@ describe("assertValidProps — out-of-set values", () => {
 
   it("leaves a fully valid payload untouched and silent", () => {
     __resetAnalyticsValidateForTests();
-    const { result, warns } = withCapturedWarns(() =>
+    const { result, warn: warns } = captureConsole(() =>
       assertValidProps("listing_created", { mode: "sell", hasPrice: true }, { failFast: true }),
     );
     assert.deepEqual(result, { mode: "sell", hasPrice: true });

@@ -11,21 +11,9 @@ import {
   trackEvent,
   __resetAnalyticsForTests,
 } from "../lib/analytics";
+import { captureConsole } from "./helpers/capture-console";
 
 type DevGlobal = { __DEV__?: boolean };
-
-function withCapturedWarns<T>(fn: () => T): { result: T; warns: string[] } {
-  const warns: string[] = [];
-  const original = console.warn;
-  console.warn = (...args: unknown[]) => {
-    warns.push(args.map(String).join(" "));
-  };
-  try {
-    return { result: fn(), warns };
-  } finally {
-    console.warn = original;
-  }
-}
 
 describe("splitUnknownProps", () => {
   it("passes an undefined payload straight through", () => {
@@ -66,7 +54,7 @@ describe("assertValidProps", () => {
 
   it("returns a fully-declared payload unchanged without warning", () => {
     const payload = { mode: "sell", hasPrice: true };
-    const { result, warns } = withCapturedWarns(() =>
+    const { result, warn: warns } = captureConsole(() =>
       assertValidProps("listing_created", payload),
     );
     assert.equal(result, payload);
@@ -98,7 +86,7 @@ describe("assertValidProps", () => {
   });
 
   it("warns once and strips unknown keys outside dev", () => {
-    const { result: first, warns } = withCapturedWarns(() =>
+    const { result: first, warn: warns } = captureConsole(() =>
       assertValidProps("listing_created", { mode: "sell", pirce: 10 }),
     );
     assert.deepEqual(first, { mode: "sell" });
@@ -107,7 +95,7 @@ describe("assertValidProps", () => {
     assert.match(warns[0], /allowed: mode, hasPrice/);
 
     // Same event+keys again — deduped, no second warning.
-    const { warns: repeatWarns } = withCapturedWarns(() =>
+    const { warn: repeatWarns } = captureConsole(() =>
       assertValidProps("listing_created", { mode: "sell", pirce: 11 }),
     );
     assert.deepEqual(repeatWarns, []);
@@ -153,7 +141,7 @@ describe("trackEvent wiring", () => {
 
   it("strips undeclared props before capture in production", async () => {
     const captures = await initWithFakeSdk();
-    const { warns } = withCapturedWarns(() =>
+    const { warn: warns } = captureConsole(() =>
       trackEvent("listing_created", { mode: "sell", pirce: 10 }),
     );
     assert.equal(captures.length, 1);

@@ -33,6 +33,12 @@ import { suiteCode, topLevelSuites } from "./helpers/suite-files";
  * global console. A suite that imports it and asserts nothing is a way to pass
  * this dishonestly; a suite that never imports it is a seam with no cover, and
  * that is the state the sweep exists to catch.
+ *
+ * THE TWO SEAMS THIS IS ABOUT, named here because both name this file and the
+ * cross-reference ran one way: `printProvenanceOutput` in `lib/provenance-report.ts`
+ * and `createDevLogger` in `lib/safe-log.ts`. The list is a courtesy, not the
+ * rule — {@link SEAMS} is derived, so a third arrives covered by the sweep and
+ * uncovered by this paragraph, which is the right way round.
  */
 
 /**
@@ -111,5 +117,84 @@ describe("a console-defaulted seam", () => {
     // values into one call reads back as one line rather than as three.
     assert.deepEqual(written.log, ["one two"]);
     assert.deepEqual(written.error, ["bad"]);
+  });
+
+  it("watches every stream, not only the two the seams use", () => {
+    // The reason the helper grew three more channels: two suites had written
+    // the same twelve-line `withCapturedWarns` byte for byte, because a helper
+    // that only knew `log` and `error` sent anyone testing a `console.warn`
+    // back to swapping the method by hand.
+    const before = { ...console };
+    const written = captureConsole(() => {
+      console.warn("careful");
+      console.info("fyi");
+      console.debug("noisy");
+    });
+    assert.deepEqual(written.warn, ["careful"]);
+    assert.deepEqual(written.info, ["fyi"]);
+    assert.deepEqual(written.debug, ["noisy"]);
+    for (const method of ["log", "error", "warn", "info", "debug"] as const) {
+      assert.equal(
+        console[method],
+        before[method],
+        `captureConsole did not restore console.${method}`,
+      );
+    }
+  });
+
+  it("hands back what the callback returned, so one call answers both questions", () => {
+    // The shape both retired copies had: run a function, read what it returned
+    // AND what it printed. Without it the adopting suites would have had to
+    // assign into a local from inside the callback at ten sites.
+    const written = captureConsole(() => {
+      console.warn("said something");
+      return { kept: 1 };
+    });
+    assert.deepEqual(written.result, { kept: 1 });
+    assert.deepEqual(written.warn, ["said something"]);
+  });
+
+  /**
+   * The async callback, refused rather than silently half-captured.
+   *
+   * The doc comment used to claim the signature enforced synchrony. It does
+   * not: `() => T` accepts an `async` arrow, and so did the `() => void` it
+   * replaced. An async callback captures up to its first `await` and then logs
+   * through a restored console — or, since the runner interleaves cases,
+   * through the NEXT case's capture, which is a failure that shows up somewhere
+   * else entirely.
+   */
+  it("refuses an async callback, with the console already given back", () => {
+    const before = console.log;
+    assert.throws(
+      () => captureConsole(async () => {
+        await Promise.resolve();
+      }),
+      /async callback/,
+    );
+    assert.equal(
+      console.log,
+      before,
+      "captureConsole refused an async callback without restoring the console first",
+    );
+  });
+
+  it("refuses any thenable, not only a native promise", () => {
+    // The check is on the SHAPE, because a callback returning a hand-rolled
+    // thenable (or a library's promise) has exactly the same problem and would
+    // pass an `instanceof Promise`.
+    assert.throws(
+      () => captureConsole(() => ({ then: () => undefined })),
+      /async callback/,
+    );
+  });
+
+  it("lets an ordinary object through, so the refusal is about thenables", () => {
+    // The negative control: `result` is a normal return channel, and a check
+    // that refused every object would have made it useless.
+    assert.deepEqual(
+      captureConsole(() => ({ then: "not a function" })).result,
+      { then: "not a function" },
+    );
   });
 });
