@@ -29,6 +29,7 @@
  */
 
 import { checkError } from "./check-error";
+import { oldestRecord } from "./oldest-record";
 import { privacyPolicySourcePath } from "./privacy-body-baselines";
 import { PRIVACY_DEFAULT_LANGUAGE } from "./privacy-languages";
 import {
@@ -246,26 +247,25 @@ export type OldestConfirmation = {
  * fix, and hides the case where a disclosure is old because nobody is looking
  * rather than because nothing moved.
  *
- * Ordered by string comparison, which is correct for `YYYY-MM-DD` and is only
- * ever asked of a table whose dates already passed their shape check — the line
- * this feeds is printed on a PASS, and a malformed date is a failure.
- *
- * Every language sharing the oldest date is named rather than one picked from
- * them: a table recorded in one sitting has all five on the same day, and a line
- * naming one of five would read as a fact about that page.
+ * The walk itself is {@link oldestRecord} — shared with the baselines table,
+ * which asks the same question of a `recordedOn` and would otherwise have picked
+ * its own tie-break. What stays here is the naming: this table's date is
+ * `checkedOn` because somebody CONFIRMED the translation on it, and its keys are
+ * languages, so the result keeps those two words rather than the walk's generic
+ * ones.
  */
 export function oldestConfirmation(
   table: Readonly<Record<string, PrivacyTranslationSource>>,
 ): OldestConfirmation | null {
-  const dates = Object.values(table).map((entry) => entry.checkedOn);
-  if (dates.length === 0) return null;
-  const checkedOn = dates.reduce((a, b) => (a <= b ? a : b));
-  // Walked over the CONSTANT rather than over the table's keys, so the order a
-  // reader sees does not depend on how the object literal happens to be written.
-  const languages = PRIVACY_TRANSLATED_LANGUAGES.filter(
-    (code) => table[code]?.checkedOn === checkedOn,
+  // The CONSTANT is the order, not the table's own keys — see oldestRecord.
+  const oldest = oldestRecord(
+    table,
+    (entry) => entry.checkedOn,
+    PRIVACY_TRANSLATED_LANGUAGES,
   );
-  return { checkedOn, languages };
+  return oldest === null
+    ? null
+    : { checkedOn: oldest.recordedOn, languages: oldest.keys };
 }
 
 export type TranslationProvenanceResult = {

@@ -183,6 +183,16 @@ export type ScrubPromiseProvenanceResult = {
   readonly failures: readonly ScrubPromiseFailure[];
   /** Base revision the drift half ran against, or null when it did not run. */
   readonly comparedAgainst: string | null;
+  /**
+   * The day the fingerprint was last read against the clause, for the pass line.
+   *
+   * A plain string and not an `OldestRecord`, which is the honest difference
+   * between this table and the other two: one record has an age, not an oldest,
+   * and there is no key to name beside the date. Carried through the result
+   * rather than read from the constant by the formatter, so the line describes
+   * the record that was actually evaluated.
+   */
+  readonly recordedOn: string;
 };
 
 export function evaluateScrubPromiseProvenance(input: {
@@ -205,6 +215,7 @@ export function evaluateScrubPromiseProvenance(input: {
     ok: failures.length === 0,
     failures,
     comparedAgainst: compared ? input.baseRef : null,
+    recordedOn: input.current.recordedOn,
   };
 }
 
@@ -217,7 +228,10 @@ export function formatScrubPromiseProvenanceReport(
       result.comparedAgainst === null
         ? "no previous revision of the record was readable, so only the shape half ran"
         : `compared against ${result.comparedAgainst}`;
-    return `${checkName}: the scrub-promise fingerprint is well-formed (${against}).`;
+    // The third of three pass lines to say how old its record is. Printed
+    // unconditionally, unlike the other two, because a single record cannot be
+    // absent from a result that got this far.
+    return `${checkName}: the scrub-promise fingerprint is well-formed (${against}). Recorded ${result.recordedOn}.`;
   }
   return result.failures
     .map((failure) => checkError(checkName, MESSAGE[failure.code](failure.detail)))

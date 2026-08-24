@@ -13,7 +13,9 @@ import {
   formatBaselineProvenanceFailure,
   formatBaselineProvenanceReport,
   formatBaselineRevisionUnparseable,
+  oldestBaseline,
   type BaselineProvenanceFailureCode,
+  type BaselineProvenanceResult,
 } from "../lib/privacy-baseline-provenance";
 import {
   PRIVACY_BODY_BASELINES,
@@ -50,6 +52,25 @@ const baseline = (over: Partial<PrivacyBodyBaseline> = {}): PrivacyBodyBaseline 
 const codesOf = (
   failures: readonly { readonly code: BaselineProvenanceFailureCode }[],
 ): readonly BaselineProvenanceFailureCode[] => failures.map((f) => f.code);
+
+/**
+ * A result to hand a formatter, built rather than written out.
+ *
+ * The formatter cases are about WORDING and were hand-building the whole result
+ * literal, so every field the evaluator grows is a compile error in a case that
+ * is not about it — twice this month across two provenance suites. The builder
+ * takes the defaults and the case names only the field it is testing.
+ */
+const result = (
+  over: Partial<BaselineProvenanceResult> = {},
+): BaselineProvenanceResult => ({
+  ok: true,
+  failures: [],
+  checked: 6,
+  comparedAgainst: "abc1234",
+  oldest: { recordedOn: "2026-08-11", languages: ["en"] },
+  ...over,
+});
 
 describe("PRIVACY_BODY_BASELINES — the shipped table", () => {
   it("carries an entry for every language the /privacy page is offered in", () => {
@@ -535,15 +556,17 @@ describe("baseline provenance messages", () => {
   });
 
   it("reports every failure, not just the first", () => {
-    const report = formatBaselineProvenanceReport("check", {
-      ok: false,
-      checked: 2,
-      comparedAgainst: "abc1234",
-      failures: [
-        { language: "de", code: "policy_unchanged", detail: "169 → 140" },
-        { language: "es", code: "note_too_short", detail: "1 word(s)" },
-      ],
-    });
+    const report = formatBaselineProvenanceReport(
+      "check",
+      result({
+        ok: false,
+        checked: 2,
+        failures: [
+          { language: "de", code: "policy_unchanged", detail: "169 → 140" },
+          { language: "es", code: "note_too_short", detail: "1 word(s)" },
+        ],
+      }),
+    );
     assert.equal(report.split("\n").length, 2);
     assert.match(report, /PRIVACY_BODY_BASELINES\["de"\]/);
     assert.match(report, /PRIVACY_BODY_BASELINES\["es"\]/);
@@ -551,14 +574,88 @@ describe("baseline provenance messages", () => {
 
   it("a passing report states what it compared against", () => {
     assert.match(
-      formatBaselineProvenanceReport("check", {
-        ok: true,
-        checked: 6,
-        comparedAgainst: "abc1234",
-        failures: [],
-      }),
+      formatBaselineProvenanceReport("check", result()),
       /6 baseline\(s\) well-formed \(compared against abc1234\)\./,
     );
+  });
+
+  /**
+   * The age, on the pass line, for the same reason the translation guard says it
+   * there: a count on its own cannot tell a table re-measured last week from one
+   * nobody has looked at since it was written, and the green run is the only run
+   * anybody reads.
+   */
+  it("a passing report says how old its oldest measurement is", () => {
+    const report = formatBaselineProvenanceReport(
+      "check",
+      result({ oldest: { recordedOn: "2025-01-02", languages: ["de", "es"] } }),
+    );
+    assert.ok(
+      report.includes("Oldest record 2025-01-02 (de, es)."),
+      `the pass line does not publish the age: ${report}`,
+    );
+  });
+
+  it("says nothing about an age it does not have, rather than 'null'", () => {
+    // Reachable only through a hand-built result — a table with no entries fails
+    // before it can pass — so the branch exists to keep the formatter total
+    // rather than to describe a state the guard produces.
+    const report = formatBaselineProvenanceReport("check", result({ oldest: null }));
+    assert.doesNotMatch(report, /Oldest|null|undefined/);
+  });
+
+  it("keeps the age off the failing report, where a failure is the news", () => {
+    const report = formatBaselineProvenanceReport(
+      "check",
+      result({
+        ok: false,
+        failures: [{ language: "de", code: "note_too_short", detail: "1 word(s)" }],
+      }),
+    );
+    assert.doesNotMatch(report, /Oldest record/);
+  });
+});
+
+describe("oldestBaseline", () => {
+  it("names the oldest date and every page sharing it", () => {
+    assert.deepEqual(
+      oldestBaseline({
+        en: baseline({ recordedOn: "2026-08-11" }),
+        ru: baseline({ recordedOn: "2026-01-02" }),
+        be: baseline({ recordedOn: "2026-01-02" }),
+      }),
+      { recordedOn: "2026-01-02", languages: ["ru", "be"] },
+    );
+  });
+
+  it("reads its order from the language list, not the object literal", () => {
+    // A line whose language order depends on how somebody happened to type the
+    // table is a line that changes for no reason a reader can see.
+    const oldest = oldestBaseline({
+      es: baseline({ recordedOn: "2026-01-02" }),
+      en: baseline({ recordedOn: "2026-01-02" }),
+      ru: baseline({ recordedOn: "2026-01-02" }),
+    });
+    assert.deepEqual(oldest?.languages, ["en", "ru", "es"]);
+  });
+
+  it("covers all six languages, the English original included", () => {
+    // The five translations are measured against en's count, so a stale reading
+    // of the original is the staleness that matters most — and the one a list of
+    // translated codes would have silently left out.
+    const oldest = oldestBaseline(PRIVACY_BODY_BASELINES);
+    assert.ok(oldest !== null);
+    assert.deepEqual(
+      oldestBaseline({
+        ...PRIVACY_BODY_BASELINES,
+        en: baseline({ recordedOn: "2020-01-01" }),
+      }),
+      { recordedOn: "2020-01-01", languages: ["en"] },
+    );
+  });
+
+  it("answers null for an empty table rather than inventing a date", () => {
+    assert.equal(oldestBaseline({}), null);
   });
 });
 

@@ -232,7 +232,44 @@ describe("evaluateScrubPromiseProvenance and its report", () => {
     assert.equal(result.comparedAgainst, "abc123");
     assert.equal(
       formatScrubPromiseProvenanceReport("guard", result),
-      "guard: the scrub-promise fingerprint is well-formed (compared against abc123).",
+      "guard: the scrub-promise fingerprint is well-formed (compared against abc123). Recorded 2026-08-23.",
+    );
+  });
+
+  /**
+   * The third of three pass lines to publish its age.
+   *
+   * A single record has an age rather than an oldest, so there is no key to name
+   * beside the date and no absent case to render — which is the honest
+   * difference from the two tables, and the reason this line is shorter rather
+   * than the reason it was left without one.
+   */
+  it("says how old the record it evaluated is, reading the record and not the constant", () => {
+    const result = evaluateScrubPromiseProvenance({
+      current: baseline({ recordedOn: "2025-01-02" }),
+      previous: null,
+      baseRef: null,
+      changedFiles: [],
+    });
+    assert.equal(result.recordedOn, "2025-01-02");
+    assert.ok(
+      formatScrubPromiseProvenanceReport("guard", result).includes(
+        "Recorded 2025-01-02.",
+      ),
+    );
+  });
+
+  it("keeps the age off the failing report, where a failure is the news", () => {
+    const result = evaluateScrubPromiseProvenance({
+      current: baseline({ checksum: "nope" }),
+      previous: null,
+      baseRef: null,
+      changedFiles: [],
+    });
+    assert.equal(result.ok, false);
+    assert.doesNotMatch(
+      formatScrubPromiseProvenanceReport("guard", result),
+      /Recorded /,
     );
   });
 

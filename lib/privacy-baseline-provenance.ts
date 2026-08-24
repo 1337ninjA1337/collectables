@@ -22,6 +22,7 @@
  */
 
 import { checkError } from "./check-error";
+import { oldestRecord } from "./oldest-record";
 import {
   parsePrivacyBodyBaselines,
   privacyPolicySourcePath,
@@ -266,6 +267,34 @@ export function formatBaselineRevisionUnparseable(
   );
 }
 
+/** The least recently recorded page(s) in the table, and when. */
+export type OldestBaseline = {
+  readonly recordedOn: string;
+  /** Every language sharing that date, in `PRIVACY_PAGE_LANGUAGES` order. */
+  readonly languages: readonly string[];
+};
+
+/**
+ * The oldest `recordedOn` in a baselines table, and every page carrying it.
+ *
+ * The walk is {@link oldestRecord}, shared with the translation table. Six
+ * languages rather than five: the English original has a baseline here, and its
+ * count is the one the five translations are compared against, so a stale
+ * measurement of it is the staleness that matters most.
+ */
+export function oldestBaseline(
+  table: Readonly<Record<string, PrivacyBodyBaseline>>,
+): OldestBaseline | null {
+  const oldest = oldestRecord(
+    table,
+    (entry) => entry.recordedOn,
+    PRIVACY_PAGE_LANGUAGES.map((language) => language.code),
+  );
+  return oldest === null
+    ? null
+    : { recordedOn: oldest.recordedOn, languages: oldest.keys };
+}
+
 export type BaselineProvenanceResult = {
   readonly ok: boolean;
   readonly failures: readonly BaselineProvenanceFailure[];
@@ -277,6 +306,12 @@ export type BaselineProvenanceResult = {
    * printed a pass is the shape this repo's guards are written against.
    */
   readonly comparedAgainst: string | null;
+  /**
+   * The least recently recorded page(s), for the pass line — see
+   * {@link oldestBaseline}. Null only when the table is empty, which is itself a
+   * failure, so the pass line always has one.
+   */
+  readonly oldest: OldestBaseline | null;
 };
 
 export type BaselineProvenanceInput = {
@@ -304,6 +339,7 @@ export function evaluatePrivacyBaselineProvenance(
     failures,
     checked,
     comparedAgainst: compared ? input.baseRef : null,
+    oldest: oldestBaseline(input.current),
   };
 }
 
@@ -326,7 +362,15 @@ export function formatBaselineProvenanceReport(
       result.comparedAgainst === null
         ? "no previous revision of the table was readable, so only the shape half ran"
         : `compared against ${result.comparedAgainst}`;
-    return `${checkName}: ${result.checked} baseline(s) well-formed (${against}).`;
+    // The age of the oldest measurement, on the PASS line, for the reason the
+    // translation guard says it there: a green run is the only run anybody
+    // reads, and a count on its own cannot tell a table maintained last week
+    // from one nobody has re-measured since it was written.
+    const age =
+      result.oldest === null
+        ? ""
+        : ` Oldest record ${result.oldest.recordedOn} (${result.oldest.languages.join(", ")}).`;
+    return `${checkName}: ${result.checked} baseline(s) well-formed (${against}).${age}`;
   }
   if (result.checked === 0) {
     return checkError(
