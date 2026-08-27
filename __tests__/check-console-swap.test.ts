@@ -94,6 +94,26 @@ describe("findConsoleSwaps — matcher", () => {
     }
   });
 
+  it("does not flag an identifier that merely ENDS in the word", () => {
+    // Reachable only since the dotted half widened to any property: without
+    // the `\b`, `myconsole.log = noop` — a local wrapper being configured
+    // rather than the global being replaced — was an offender the report could
+    // only describe as one. Nothing in this tree is named that way, which is
+    // why the first person to do it would have found this.
+    for (const source of [
+      `const my${C} = {}; my${C}.log = () => {};`,
+      `fake${C}["warn"] = collect;`,
+    ]) {
+      assert.deepEqual(
+        findConsoleSwaps("lib/x.ts", source),
+        [],
+        `must not flag: ${source}`,
+      );
+    }
+    // And the global still is, on the same line shape.
+    assert.equal(findConsoleSwaps("lib/x.ts", `${C}.log = () => {};`).length, 1);
+  });
+
   it("does not flag READING a console method, which is the seam it argues for", () => {
     // The whole point of the rule is to push callers towards an injected
     // writer, and `write = console.log` is how every default seam in this tree
@@ -170,7 +190,7 @@ describe("the guard's own positive control", () => {
     // that has already said the tree is clean.
     const wrapper = read("scripts/check-console-swap.ts");
     const probeAt = wrapper.indexOf("CONSOLE_SWAP_PROBE");
-    const cleanAt = wrapper.indexOf("no assignments to a global console method");
+    const cleanAt = wrapper.indexOf("no assignments to a property of the global console");
     assert.ok(probeAt !== -1, "the wrapper no longer runs the probe");
     assert.ok(
       probeAt < cleanAt,
