@@ -28,6 +28,22 @@
  * runner without a console — the failure mode that makes this kind of helper
  * worse than the gap it closes.
  *
+ * TWO SHAPES, BECAUSE ONE SHAPE LEFT FIVE SUITES OUT. {@link captureConsole}
+ * owns the lifetime and is the one to reach for. {@link beginCapture} hands the
+ * lifetime to the caller, for the three things a callback cannot hold: a swap
+ * that spans `beforeEach`/`afterEach`, a body with an `await` in it (which the
+ * thenable refusal exists to reject), and a case that only wants the stream
+ * silenced. Those were five suites swapping a method by hand — a rule saying
+ * "capture through the helper" would have been five exemptions out of seven,
+ * which is a rule that says nothing.
+ *
+ * THE TRADE, STATED: `beginCapture` gives up the `finally`. Its `restore` is
+ * the caller's to call, and a caller that forgets leaves the runner writing
+ * into an array nobody reads. That cannot be made safe from here, so it is made
+ * LOUD instead — captures do not nest, and the next `beginCapture` or
+ * `captureConsole` refuses and names the leak rather than quietly stacking a
+ * second swap on top of the first.
+ *
  * NOTHING HERE IS CONCURRENT-SAFE, and the signature does not make it so. Node's
  * test runner interleaves async cases, so a callback that returns a promise
  * would have its logging captured up to its first `await` and then written
@@ -68,19 +84,20 @@ function isThenable(value: unknown): boolean {
 }
 
 /**
- * `captureConsole(() => printProvenanceOutput(output))` — no console passed, so
- * the default is the thing under test.
+ * The capture currently holding the console, or null.
  *
- * Arguments are joined the way the console joins them, so a caller that spreads
- * several values into one call reads back as one line.
- *
- * The callback's return value comes back as `result`, for the shape both
- * `withCapturedWarns` copies had: run a function, read what it returned AND what
- * it printed. A THENABLE result throws — after the console is restored, so the
- * refusal itself is readable — because an async callback captures only up to its
- * first `await` and hands the rest of its logging to whatever case runs next.
+ * One global, because there is one global console. Its only job is to turn the
+ * two ways of leaving a swap installed — a `restore()` nobody called, an
+ * `afterEach` that did not run — into a refusal at the next capture instead of
+ * silence for the rest of the file.
  */
-export function captureConsole<T>(run: () => T): CapturedConsole<T> {
+let open: OpenCapture | null = null;
+
+/** Swap every stream, collect into fresh arrays, and hand back the undo. */
+function install(): {
+  readonly written: Record<CapturedMethod, string[]>;
+  readonly restore: () => void;
+} {
   const written: Record<CapturedMethod, string[]> = {
     log: [],
     error: [],
@@ -98,11 +115,98 @@ export function captureConsole<T>(run: () => T): CapturedConsole<T> {
       written[method].push(args.map(String).join(" "));
     };
   }
+  let restored = false;
+  return {
+    written,
+    // Idempotent, because the caller-owned form is used in an `afterEach` that
+    // a `finally` in the case may already have reached.
+    restore: () => {
+      if (restored) return;
+      restored = true;
+      for (const method of CAPTURED) console[method] = real[method];
+    },
+  };
+}
+
+/** Refuse to stack a second swap on a console the first one has not given back. */
+function claim(what: string): void {
+  if (open === null) return;
+  const held = open;
+  // Give the console back before throwing, so the refusal is readable and the
+  // rest of the file is not swallowed by the capture that was already leaking.
+  held.restore();
+  open = null;
+  throw new Error(
+    `${what} was called while a beginCapture() was still open, so the console was swapped twice and the first restore would have put the capture back rather than the real console. The capture that leaked has been closed; the usual causes are a restore() the case never reached and an afterEach that did not run.`,
+  );
+}
+
+/**
+ * A capture whose lifetime the CALLER owns, for the bodies a callback cannot
+ * hold: an `await`, a `beforeEach`/`afterEach` pair, a stream that only needs
+ * silencing.
+ *
+ * The arrays are live — a case may read `warn.length` while the capture is
+ * still open — and stay readable after `restore()`, which is what lets an
+ * assertion sit outside the `finally` that closed it.
+ */
+export type OpenCapture = {
+  /** Everything written through `console.log` so far, in order. */
+  readonly log: readonly string[];
+  /** Everything written through `console.error` so far, in order. */
+  readonly error: readonly string[];
+  /** Everything written through `console.warn` so far, in order. */
+  readonly warn: readonly string[];
+  /** Everything written through `console.info` so far, in order. */
+  readonly info: readonly string[];
+  /** Everything written through `console.debug` so far, in order. */
+  readonly debug: readonly string[];
+  /** Puts the real console back. Idempotent, and safe to call twice. */
+  restore: () => void;
+};
+
+/**
+ * `const captured = beginCapture()` … `captured.restore()`.
+ *
+ * Put the `restore()` in a `finally` or an `afterEach` and read the streams
+ * afterwards. Prefer {@link captureConsole} wherever the body fits in a
+ * synchronous callback: it owns the `finally`, and this does not.
+ */
+export function beginCapture(): OpenCapture {
+  claim("beginCapture()");
+  const { written, restore } = install();
+  const capture: OpenCapture = {
+    ...written,
+    restore: () => {
+      restore();
+      if (open === capture) open = null;
+    },
+  };
+  open = capture;
+  return capture;
+}
+
+/**
+ * `captureConsole(() => printProvenanceOutput(output))` — no console passed, so
+ * the default is the thing under test.
+ *
+ * Arguments are joined the way the console joins them, so a caller that spreads
+ * several values into one call reads back as one line.
+ *
+ * The callback's return value comes back as `result`, for the shape both
+ * `withCapturedWarns` copies had: run a function, read what it returned AND what
+ * it printed. A THENABLE result throws — after the console is restored, so the
+ * refusal itself is readable — because an async callback captures only up to its
+ * first `await` and hands the rest of its logging to whatever case runs next.
+ */
+export function captureConsole<T>(run: () => T): CapturedConsole<T> {
+  claim("captureConsole()");
+  const { written, restore } = install();
   let result: T;
   try {
     result = run();
   } finally {
-    for (const method of CAPTURED) console[method] = real[method];
+    restore();
   }
   if (isThenable(result)) {
     throw new Error(

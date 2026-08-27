@@ -8,6 +8,7 @@ import {
   getSentryLastInitError,
   toSentryCaptureContext,
 } from "../lib/sentry";
+import { beginCapture } from "./helpers/capture-console";
 import { readRepoFile } from "./helpers/repo-file";
 
 type Call = { method: string; args: unknown[] };
@@ -170,11 +171,10 @@ describe("lib/sentry — enabled paths", () => {
   });
 
   it("survives a loader rejection by staying disabled", async () => {
-    const originalError = console.error;
-    const errors: unknown[][] = [];
-    console.error = (...args: unknown[]) => {
-      errors.push(args);
-    };
+    // `beginCapture` rather than `captureConsole`: the body awaits, and the
+    // callback form refuses a thenable precisely so this shape asks for the
+    // lifetime instead of getting half a capture.
+    const captured = beginCapture();
     try {
       await initSentry({
         env: {
@@ -189,22 +189,17 @@ describe("lib/sentry — enabled paths", () => {
       // wrappers must still be safe no-ops
       captureException(new Error("safe"));
       addBreadcrumb("safe");
-      // the cause is logged once via console.error and stored for diagnostics
-      assert.equal(errors.length, 1);
-      assert.match(String(errors[0][0]), /\[sentry\] init failed/);
-      assert.equal((getSentryLastInitError() as Error).message, "native bridge missing");
     } finally {
-      console.error = originalError;
+      captured.restore();
     }
+    // the cause is logged once via console.error and stored for diagnostics
+    assert.equal(captured.error.length, 1);
+    assert.match(captured.error[0], /\[sentry\] init failed/);
+    assert.equal((getSentryLastInitError() as Error).message, "native bridge missing");
   });
 
   it("logs the init failure only once across a shutdown + re-init", async () => {
     const { shutdownSentry } = await import("../lib/sentry");
-    const originalError = console.error;
-    const errors: unknown[][] = [];
-    console.error = (...args: unknown[]) => {
-      errors.push(args);
-    };
     const failingLoader = async () => {
       throw new Error("native bridge missing");
     };
@@ -212,16 +207,17 @@ describe("lib/sentry — enabled paths", () => {
       EXPO_PUBLIC_SENTRY_DSN: "https://abc@o0.ingest.sentry.io/42",
       EXPO_PUBLIC_SENTRY_ENV: "production",
     };
+    const captured = beginCapture();
     try {
       await initSentry({ env, loader: failingLoader });
       shutdownSentry();
       await initSentry({ env, loader: failingLoader });
-      // one-shot guard: the second failure is stored but not re-logged
-      assert.equal(errors.length, 1);
-      assert.equal((getSentryLastInitError() as Error).message, "native bridge missing");
     } finally {
-      console.error = originalError;
+      captured.restore();
     }
+    // one-shot guard: the second failure is stored but not re-logged
+    assert.equal(captured.error.length, 1);
+    assert.equal((getSentryLastInitError() as Error).message, "native bridge missing");
   });
 
   it("ignores duplicate initSentry() calls", async () => {

@@ -13,6 +13,7 @@ import {
   __resetAnalyticsForTests,
   type AnalyticsEventName,
 } from "../lib/analytics";
+import { beginCapture } from "./helpers/capture-console";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 type Call = { method: string; args: unknown[] };
@@ -198,8 +199,9 @@ describe("lib/analytics — enabled paths", () => {
   });
 
   it("survives a loader rejection by staying disabled", async () => {
-    const originalWarn = console.warn;
-    console.warn = () => {};
+    // Silencing rather than reading, which `beginCapture` covers too: the
+    // stream goes somewhere instead of to the runner's output.
+    const captured = beginCapture();
     try {
       await initAnalytics({
         env: {
@@ -216,7 +218,7 @@ describe("lib/analytics — enabled paths", () => {
       identifyUser("user-1");
       resetUser();
     } finally {
-      console.warn = originalWarn;
+      captured.restore();
     }
   });
 
@@ -345,8 +347,7 @@ describe("lib/analytics — concurrent init dedup", () => {
   });
 
   it("clears the in-flight promise on failure so a later init can retry", async () => {
-    const originalWarn = console.warn;
-    console.warn = () => {};
+    const captured = beginCapture();
     try {
       await initAnalytics({
         env: PROD_ENV,
@@ -364,7 +365,7 @@ describe("lib/analytics — concurrent init dedup", () => {
       assert.equal(isAnalyticsReady(), true);
       assert.equal(ctorCalls.length, 1);
     } finally {
-      console.warn = originalWarn;
+      captured.restore();
     }
   });
 });

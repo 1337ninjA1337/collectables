@@ -7,6 +7,7 @@ import {
   DEFAULT_TRACES_SAMPLE_RATE,
   __resetSentryConfigWarningForTests,
 } from "../lib/sentry-config";
+import { captureConsole } from "./helpers/capture-console";
 import { readRepoFile } from "./helpers/repo-file";
 
 const packageJson = JSON.parse(
@@ -182,62 +183,41 @@ describe("isValidSentryDsn", () => {
 describe("resolveSentryConfig — DSN validation gate", () => {
   it("disables the SDK when the DSN is present but malformed", () => {
     __resetSentryConfigWarningForTests();
-    const original = console.error;
-    const errs: string[] = [];
-    console.error = (msg?: unknown) => {
-      errs.push(String(msg));
-    };
-    try {
-      const cfg = resolveSentryConfig({
+    const { result: cfg, error: errs } = captureConsole(() =>
+      resolveSentryConfig({
         EXPO_PUBLIC_SENTRY_DSN: "https://hooks.slack.com/services/T/B/x",
         EXPO_PUBLIC_SENTRY_ENV: "production",
-      });
-      assert.equal(cfg.enabled, false);
-    } finally {
-      console.error = original;
-    }
+      }),
+    );
+    assert.equal(cfg.enabled, false);
     assert.equal(errs.length, 1);
     assert.match(errs[0], /malformed/i);
   });
 
   it("warns at most once across repeated malformed resolves", () => {
     __resetSentryConfigWarningForTests();
-    const original = console.error;
-    let count = 0;
-    console.error = () => {
-      count += 1;
+    const env = {
+      EXPO_PUBLIC_SENTRY_DSN: "not-a-dsn",
+      EXPO_PUBLIC_SENTRY_ENV: "production",
     };
-    try {
-      const env = {
-        EXPO_PUBLIC_SENTRY_DSN: "not-a-dsn",
-        EXPO_PUBLIC_SENTRY_ENV: "production",
-      };
+    const { error: errs } = captureConsole(() => {
       resolveSentryConfig(env);
       resolveSentryConfig(env);
       resolveSentryConfig(env);
-    } finally {
-      console.error = original;
-    }
-    assert.equal(count, 1);
+    });
+    assert.equal(errs.length, 1);
   });
 
   it("still enables the SDK for a valid production DSN (no warning)", () => {
     __resetSentryConfigWarningForTests();
-    const original = console.error;
-    let count = 0;
-    console.error = () => {
-      count += 1;
-    };
-    try {
-      const cfg = resolveSentryConfig({
+    const { result: cfg, error: errs } = captureConsole(() =>
+      resolveSentryConfig({
         EXPO_PUBLIC_SENTRY_DSN: "https://abc@o0.ingest.sentry.io/1",
         EXPO_PUBLIC_SENTRY_ENV: "production",
-      });
-      assert.equal(cfg.enabled, true);
-    } finally {
-      console.error = original;
-    }
-    assert.equal(count, 0);
+      }),
+    );
+    assert.equal(cfg.enabled, true);
+    assert.equal(errs.length, 0);
   });
 });
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { captureConsole } from "./helpers/capture-console";
+import { beginCapture, captureConsole } from "./helpers/capture-console";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 import { suiteCode, topLevelSuites } from "./helpers/suite-files";
 
@@ -196,5 +196,116 @@ describe("a console-defaulted seam", () => {
       captureConsole(() => ({ then: "not a function" })).result,
       { then: "not a function" },
     );
+  });
+});
+
+/**
+ * The rule that could not be written while five suites were exempt from it.
+ *
+ * `captureConsole` closed the seam and made the two-suite copy of
+ * `withCapturedWarns` unnecessary, and it still left five suites swapping a
+ * method by hand — `sentry-init`, `sentry-config`, `analytics-init`,
+ * `analytics-status`, `clarity` — for three reasons a callback cannot serve: a
+ * swap held across `beforeEach`/`afterEach`, an `await`ed body (which the
+ * thenable refusal exists to reject), and silencing rather than capturing. A
+ * ban written then would have been five exemptions out of seven, which is a
+ * paragraph pretending to be a rule.
+ *
+ * `beginCapture` serves all three, so the ban is written here with NO
+ * exemptions and the list above is now the list of suites that adopted it. What
+ * it buys is not tidiness: a hand-rolled swap saves and restores ONE method, so
+ * a case that starts writing to a second stream loses it into the runner's
+ * output, and one that throws before its `finally` leaves the next case
+ * pushing into a dead array.
+ */
+describe("the global console in the suites", () => {
+  /**
+   * `console.warn =` and `console[method] =`, however either is spaced.
+   *
+   * Both forms, because the helper itself uses the bracket one — a ban that
+   * only knew the dotted spelling would be dodged by the exact line it is meant
+   * to be the single instance of. `[^=]` keeps `console.warn ===` out.
+   */
+  const SWAPS_A_CONSOLE_METHOD =
+    /console\s*(?:\.(?:log|error|warn|info|debug)|\[[^\]]+\])\s*=[^=]/;
+
+  it("is swapped in exactly one place, and that place is the helper", () => {
+    const swapping = topLevelSuites().filter((suite) =>
+      SWAPS_A_CONSOLE_METHOD.test(suiteCode(suite)),
+    );
+    assert.deepEqual(
+      swapping,
+      [],
+      `these suites swap a console method by hand instead of going through captureConsole/beginCapture, which saves one stream and loses the rest: ${swapping.join(", ")}`,
+    );
+  });
+
+  it("is swept over a rule the helper itself would fail, so the pattern is not dead", () => {
+    // The positive control. A ban that matches nothing is satisfied by a
+    // pattern that no longer matches anything at all, and the one file in the
+    // tree that legitimately does the banned thing is the proof it still bites.
+    assert.match(
+      sourceCode("__tests__/helpers/capture-console.ts"),
+      SWAPS_A_CONSOLE_METHOD,
+      "capture-console.ts stopped assigning to a console method, so the ban above is being read by a pattern that matches nothing",
+    );
+  });
+});
+
+describe("beginCapture", () => {
+  it("keeps collecting across an await, which is what the callback form cannot do", async () => {
+    const captured = beginCapture();
+    try {
+      console.warn("before");
+      await Promise.resolve();
+      console.warn("after");
+    } finally {
+      captured.restore();
+    }
+    // Both halves, and readable AFTER the restore — which is what lets the
+    // assertions sit outside the `finally` that closed the capture.
+    assert.deepEqual(captured.warn, ["before", "after"]);
+  });
+
+  it("restores idempotently, so a late second restore cannot clobber the next capture", () => {
+    // The shape a `finally` and an `afterEach` produce together: the case
+    // restored already, and the hook restores again — by which time the NEXT
+    // case has opened its own capture. A restore that ran twice would put the
+    // pre-first console back over the second swap, and everything the second
+    // capture was opened for would print into the runner's output instead.
+    const first = beginCapture();
+    first.restore();
+    const second = beginCapture();
+    first.restore();
+    console.warn("still captured");
+    second.restore();
+    assert.deepEqual(second.warn, ["still captured"]);
+  });
+
+  it("refuses to nest, and gives the console back to the leaked capture first", () => {
+    // The trade this form makes: no `finally` of its own, so a caller that
+    // forgets `restore()` swallows everything after it. It cannot be made safe
+    // from the helper, so it is made loud at the NEXT capture.
+    const before = console.log;
+    const leaked = beginCapture();
+    assert.throws(() => beginCapture(), /while a beginCapture\(\) was still open/);
+    assert.equal(
+      console.log,
+      before,
+      "the nesting refusal left the leaked capture holding the console",
+    );
+    // And the refusal closed it, so the suite carries on rather than every
+    // later case in the file inheriting the leak.
+    assert.doesNotThrow(() => captureConsole(() => undefined));
+    leaked.restore();
+  });
+
+  it("is refused by captureConsole too, since both take the same one console", () => {
+    const leaked = beginCapture();
+    assert.throws(
+      () => captureConsole(() => undefined),
+      /captureConsole\(\) was called while a beginCapture\(\)/,
+    );
+    leaked.restore();
   });
 });

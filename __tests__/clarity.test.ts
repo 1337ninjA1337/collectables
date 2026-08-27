@@ -15,6 +15,7 @@ import {
   type ClarityRuntime,
 } from "../lib/clarity";
 import { __resetSentryForTests, initSentry } from "../lib/sentry";
+import { beginCapture, type OpenCapture } from "./helpers/capture-console";
 import { setupFakeDom } from "./helpers/fake-dom";
 import { readRepoFile as read } from "./helpers/repo-file";
 
@@ -272,52 +273,50 @@ describe("lib/clarity — 'clarity loaded' Sentry breadcrumb", () => {
 });
 
 describe("lib/clarity — disabled-with-clarityId one-time warning", () => {
-  let warnings: unknown[][] = [];
-  const originalWarn = console.warn;
+  // The lifetime a callback cannot hold: the swap spans the describe, not one
+  // case, so `beginCapture` is the shape and `afterEach` owns the restore.
+  let captured: OpenCapture;
 
   beforeEach(() => {
     __resetClarityForTests();
-    warnings = [];
-    console.warn = (...args: unknown[]) => {
-      warnings.push(args);
-    };
+    captured = beginCapture();
   });
 
   afterEach(() => {
-    console.warn = originalWarn;
+    captured.restore();
   });
 
   it("warns once when clarityId is set but analytics is disabled", () => {
     const ok = initClarity({ runtime: enabledRuntime({ enabled: false }) });
     assert.equal(ok, false);
-    assert.equal(warnings.length, 1);
-    assert.match(String(warnings[0][0]), /clarityId is set but analytics is disabled/);
+    assert.equal(captured.warn.length, 1);
+    assert.match(captured.warn[0], /clarityId is set but analytics is disabled/);
   });
 
   it("does not repeat the warning on subsequent init calls", () => {
     initClarity({ runtime: enabledRuntime({ enabled: false }) });
     initClarity({ runtime: enabledRuntime({ enabled: false }) });
     initClarity({ runtime: enabledRuntime({ enabled: false }) });
-    assert.equal(warnings.length, 1);
+    assert.equal(captured.warn.length, 1);
   });
 
   it("stays silent when clarityId is empty or whitespace", () => {
     initClarity({ runtime: enabledRuntime({ enabled: false, clarityId: "" }) });
     initClarity({ runtime: enabledRuntime({ enabled: false, clarityId: "  " }) });
-    assert.equal(warnings.length, 0);
+    assert.equal(captured.warn.length, 0);
   });
 
   it("stays silent when analytics is enabled (whatever the other gates say)", () => {
     initClarity({ runtime: enabledRuntime({ doNotTrack: true }) });
     initClarity({ runtime: enabledRuntime({ isBrowser: false }) });
-    assert.equal(warnings.length, 0);
+    assert.equal(captured.warn.length, 0);
   });
 
   it("__resetClarityForTests re-arms the warning", () => {
     initClarity({ runtime: enabledRuntime({ enabled: false }) });
     __resetClarityForTests();
     initClarity({ runtime: enabledRuntime({ enabled: false }) });
-    assert.equal(warnings.length, 2);
+    assert.equal(captured.warn.length, 2);
   });
 });
 

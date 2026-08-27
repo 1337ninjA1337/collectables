@@ -7,6 +7,7 @@ import {
   __resetAnalyticsForTests,
 } from "../lib/analytics";
 
+import { beginCapture } from "./helpers/capture-console";
 import { readRepoFile } from "./helpers/repo-file";
 
 
@@ -82,8 +83,7 @@ describe("getAnalyticsStatus", () => {
   });
 
   it("reports init-failed when the SDK loader throws", async () => {
-    const originalWarn = console.warn;
-    console.warn = () => {};
+    const captured = beginCapture();
     try {
       await initAnalytics({
         env: PROD_ENV,
@@ -92,7 +92,7 @@ describe("getAnalyticsStatus", () => {
         },
       });
     } finally {
-      console.warn = originalWarn;
+      captured.restore();
     }
     const status = getAnalyticsStatus();
     assert.equal(status.initialised, true);
