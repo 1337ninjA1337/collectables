@@ -83,3 +83,43 @@ export function oldestRecord<T>(
   const keys = known.filter((key) => dateOf(table[key]) === recordedOn);
   return { recordedOn, keys, unknownKeys };
 }
+
+/**
+ * The sentence a pass line prints INSTEAD of an age, when the walk could not
+ * speak for every entry of the table it measured.
+ *
+ * {@link OldestRecord.unknownKeys} was carried out of the walk and read by
+ * nothing: a field reported so that a caller which lost its shape half would
+ * have something to refuse on, with no caller actually refusing. That is the
+ * shape three sweeps in this tree call "a way to pass dishonestly" — the
+ * safety was asserted in two suites and enforced nowhere.
+ *
+ * It is enforced here. A pass line is the only line anybody reads on a green
+ * run, and one saying `Oldest record 2026-01-01 (en, ru)` over a table that
+ * also holds a key nobody walked is a fact about a subset printed as a fact
+ * about the table. So the age does not render at all: the caller prints this
+ * instead and fails.
+ *
+ * Nothing in this repository reaches it, and that is the claim rather than a
+ * caveat — every caller runs a shape half that fails an unknown key first. The
+ * difference from the prose it replaces is that this is reachable from outside:
+ * the formatters take a plain result, so a case builds one and proofreads the
+ * words.
+ *
+ * The BODY only, without a check-name prefix: this module is a leaf with no
+ * imports so that any evaluator may use it, and `checkError` belongs to the
+ * callers.
+ *
+ * Returns null when every key was walked, which is the usual answer.
+ */
+export function unknownKeysRefusal(
+  tableName: string,
+  orderName: string,
+  unknownKeys: readonly string[],
+): string | null {
+  if (unknownKeys.length === 0) return null;
+  const quoted = unknownKeys.map((key) => JSON.stringify(key)).join(", ");
+  const entries =
+    unknownKeys.length === 1 ? "1 entry" : `${unknownKeys.length} entries`;
+  return `${tableName} carries ${entries} that ${orderName} does not know (${quoted}), so the age this run would have printed was measured over the rest of the table and reads as a fact about all of it. Nothing should reach this line: the shape half fails an unknown key before any pass line is built, so seeing it means that half did not run or no longer checks the keys.`;
+}
