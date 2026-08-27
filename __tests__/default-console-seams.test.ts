@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { CONSOLE_SWAP } from "../lib/check-console-swap";
+
 import { CAPTURED, beginCapture, captureConsole } from "./helpers/capture-console";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 import { suiteCode, topLevelSuites } from "./helpers/suite-files";
@@ -50,6 +52,17 @@ import { suiteCode, topLevelSuites } from "./helpers/suite-files";
  * matched neither of them.
  */
 const DEFAULTS_TO_CONSOLE = /:\s*[^\n=]*Console[^\n=]*=\s*console\s*[,)]/;
+
+/**
+ * `"console"`, kept out of the fixtures below as a literal.
+ *
+ * The cases that check the ban have to write the banned form, and the ban is
+ * swept over every top-level suite with no exemption list — this file included.
+ * Building the fixtures through a constant keeps the rule true of the suite
+ * that enforces it, which is the same trick `CONSOLE_SWAP_PROBE` uses in
+ * `lib/check-console-swap.ts` and `check-console-swap.test.ts` uses beside it.
+ */
+const CONSOLE = "console";
 
 /** Modules declaring a console-defaulted parameter, found rather than listed. */
 const SEAMS = sourceFiles("lib", "scripts").filter((file) =>
@@ -219,21 +232,21 @@ describe("a console-defaulted seam", () => {
  * a case that starts writing to a second stream loses it into the runner's
  * output, and one that throws before its `finally` leaves the next case
  * pushing into a dead array.
+ *
+ * ONE MATCHER, IMPORTED. The rule exists twice — here over `__tests__/`, and in
+ * `lib/check-console-swap.ts` over the four directories this sweep cannot see —
+ * and the pattern used to be written twice with it. The two copies had already
+ * drifted: the guard's knew `trace` and this one did not, and neither knew any
+ * other property of the console. So the pattern is imported, and the drift it
+ * could have is the drift a shared constant has. Each copy of the rule keeps
+ * its OWN positive control (the guard's probe, and the helper below), so a
+ * pattern edited into matching nothing fails in both places rather than
+ * quietly making both sweeps unanimous about a tree they stopped reading.
  */
 describe("the global console in the suites", () => {
-  /**
-   * `console.warn =` and `console[method] =`, however either is spaced.
-   *
-   * Both forms, because the helper itself uses the bracket one — a ban that
-   * only knew the dotted spelling would be dodged by the exact line it is meant
-   * to be the single instance of. `[^=]` keeps `console.warn ===` out.
-   */
-  const SWAPS_A_CONSOLE_METHOD =
-    /console\s*(?:\.(?:log|error|warn|info|debug)|\[[^\]]+\])\s*=[^=]/;
-
   it("is swapped in exactly one place, and that place is the helper", () => {
     const swapping = topLevelSuites().filter((suite) =>
-      SWAPS_A_CONSOLE_METHOD.test(suiteCode(suite)),
+      CONSOLE_SWAP.test(suiteCode(suite)),
     );
     assert.deepEqual(
       swapping,
@@ -248,9 +261,34 @@ describe("the global console in the suites", () => {
     // tree that legitimately does the banned thing is the proof it still bites.
     assert.match(
       sourceCode("__tests__/helpers/capture-console.ts"),
-      SWAPS_A_CONSOLE_METHOD,
+      CONSOLE_SWAP,
       "capture-console.ts stopped assigning to a console method, so the ban above is being read by a pattern that matches nothing",
     );
+  });
+
+  it("bans every stream CAPTURED names, so a sixth is not captured and unbanned", () => {
+    // The gap this closes. The ban used to spell the five method names out in
+    // its own pattern, so `CAPTURED` growing a sixth would have made the helper
+    // swap and restore it while the rule beside it went on knowing five — a
+    // stream a suite could swap by hand with nothing to say it may not. The
+    // pattern matches any property now, which is checked here against the list
+    // rather than assumed from `\w+`.
+    for (const method of CAPTURED) {
+      assert.match(
+        `${CONSOLE}.${method} = () => {};`,
+        CONSOLE_SWAP,
+        `a hand-rolled swap of console.${method} is not banned, so that stream can be captured by the helper and swapped by hand in the same tree`,
+      );
+    }
+  });
+
+  it("bans the streams CAPTURED does not name either, since the rule is the global", () => {
+    // The rule is "do not assign to the global console", not "do not assign to
+    // these five" — `console.dir` and `console.table` outlive their swapper the
+    // same way, and the bracket half of the pattern has always matched them.
+    for (const method of ["dir", "table", "trace", "group"]) {
+      assert.match(`${CONSOLE}.${method} = () => {};`, CONSOLE_SWAP);
+    }
   });
 });
 
@@ -357,17 +395,22 @@ describe("the captured streams and the list they come from", () => {
     }
   });
 
-  it("names each stream once in the helper, not once per result type", () => {
-    // The floor under the derivation. Each method name appears in CAPTURED and
-    // in this suite's prose; a helper that went back to hand-written fields
-    // would carry each of the five twice more.
+  it("names each stream once in the helper, in whatever spelling it is written", () => {
+    // The floor under the derivation, counted as a WORD rather than as a
+    // quoted string. The regression it is for is a result type going back to
+    // hand-written fields, and a field is spelled `log: readonly string[]` —
+    // no quotes — so the earlier count of `"log"` would have watched five
+    // hand-written members reappear and stayed at one apiece. `sourceCode`
+    // strips comments, which is what lets the prose above go on naming the
+    // streams it explains while the code may name each exactly once.
     const helper = sourceCode("__tests__/helpers/capture-console.ts");
     for (const method of CAPTURED) {
-      const occurrences = helper.split(`"${method}"`).length - 1;
+      const occurrences =
+        helper.split(new RegExp(`\\b${method}\\b`)).length - 1;
       assert.equal(
         occurrences,
         1,
-        `"${method}" is written ${occurrences} times in capture-console.ts — the list is CAPTURED, and a second spelling is a stream that can be added to one place and missed in another`,
+        `${method} is written ${occurrences} times in the code of capture-console.ts — the list is CAPTURED, and a second spelling (a "${method}" entry, a bare ${method}: field) is a stream that can be added to one place and missed in another`,
       );
     }
   });

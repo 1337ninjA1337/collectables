@@ -44,6 +44,18 @@ import { stripComments } from "@/lib/strip-comments";
  * relational forms never reach it, because the character after the method name
  * is not an `=` at all.
  *
+ * ANY PROPERTY, NOT AN ENUMERATED SIX. The dotted half used to spell out
+ * `log|error|warn|info|debug|trace` while the bracket half beside it matched
+ * whatever was between the brackets — one pattern whose two halves disagreed
+ * about what the rule was, and the narrower half was the one a `console.dir =`
+ * or a `console.table =` walked straight through. The rule is not "these six
+ * streams"; it is "assigning to the global console at all", which is what the
+ * bracket half already said and what `\w+` now says on both sides. It also ends
+ * the list's second home: `__tests__/helpers/capture-console.ts` derives the
+ * streams it swaps from one array, and this pattern is imported by the suite
+ * ban rather than restated, so a stream added there is banned by the same edit
+ * that captures it.
+ *
  * NO `g` FLAG, deliberately. `.test` on a global pattern advances `lastIndex`
  * between calls, so a pattern reused across a file walk skips every other file
  * and the sweep goes green having read half the tree. The scanner below calls
@@ -51,8 +63,7 @@ import { stripComments } from "@/lib/strip-comments";
  * `__tests__/helpers/offence-sweep.ts` refuses a `g` rule outright; this module
  * exports one pattern and pins the property with a case instead.
  */
-export const CONSOLE_SWAP =
-  /console\s*(?:\.(?:log|error|warn|info|debug|trace)|\[[^\]]+\])\s*=[^=]/;
+export const CONSOLE_SWAP = /console\s*(?:\.\w+|\[[^\]]+\])\s*=[^=]/;
 
 export type ConsoleSwap = {
   readonly file: string;
