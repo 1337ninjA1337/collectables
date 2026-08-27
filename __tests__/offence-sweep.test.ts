@@ -192,4 +192,29 @@ describe("the sweeps built on it", () => {
     assert.ok(sourceCode(sourceFiles()[0]).length > 0);
     assert.ok(suiteCode(suiteFiles()[0]).length > 0);
   });
+
+  /**
+   * How many of them there are, recorded rather than remembered.
+   *
+   * `walk.filter((f) => RULE.test(read(f)))` then `deepEqual(offenders, [])` is
+   * the shape most structural rules in this tree take, and for a day exactly
+   * one pair went through the helper while the rest carried the two hazards it
+   * refuses with nothing saying so. The number is a floor rather than an
+   * equality: a rule DELETED is a real outcome and should not fail here, while
+   * a rule quietly rewritten back into the four lines should. The list is
+   * derived — a suite that imports the helper is an adopter — so a new one
+   * counts without being added anywhere.
+   */
+  it("are counted, so the adoption is a number rather than a memory", () => {
+    const DECLARING = ["helpers/offence-sweep.ts", "offence-sweep.test.ts"];
+    const adopters = suiteFiles().filter(
+      (suite) =>
+        !DECLARING.includes(suite) &&
+        /\bassertNoOffenders\b/.test(suiteCode(suite)),
+    );
+    assert.ok(
+      adopters.length >= 5,
+      `only ${adopters.length} suites sweep through assertNoOffenders (${adopters.join(", ")}) — the floor is 5, and a sweep that went back to walk.filter(...) + deepEqual([]) has given up the stateful-rule and empty-walk refusals`,
+    );
+  });
 });

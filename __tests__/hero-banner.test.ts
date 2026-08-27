@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { RADIUS_HERO_LG, SPACING_CARD, SPACING_GUTTER, SPACING_LIST } from "@/lib/design-tokens";
+import { assertNoOffenders } from "./helpers/offence-sweep";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { tsxFiles } from "./helpers/source-files";
 
@@ -216,14 +217,21 @@ describe("hero-banner — adoption across the UI", () => {
     // than any two of its lines: `app/listing/[id].tsx` renders a legitimately
     // different 11pt amber kicker inside its sold-banner, and a looser regex
     // would flag it forever.
-    const offenders = UI_FILES.filter(
-      (f) =>
-        f !== COMPONENT &&
-        /color: AMBER_LIGHT,\s*\n\s*fontSize: 12,\s*\n\s*textTransform: "uppercase",\s*\n\s*letterSpacing: 1\.2,/.test(
-          read(f),
-        ),
+    assertNoOffenders({
+      rule: /color: AMBER_LIGHT,\s*\n\s*fontSize: 12,\s*\n\s*textTransform: "uppercase",\s*\n\s*letterSpacing: 1\.2,/,
+      files: UI_FILES,
+      read,
+      // The component is the declaration the rule exists to protect, so it is
+      // the one file that must match — asserted below rather than assumed.
+      exempt: [COMPONENT],
+      subject: "files",
+      instead: "re-declare the hero eyebrow — render <HeroBanner> instead",
+    });
+    assert.match(
+      read(COMPONENT),
+      /color: AMBER_LIGHT,\s*\n\s*fontSize: 12,\s*\n\s*textTransform: "uppercase",\s*\n\s*letterSpacing: 1\.2,/,
+      "the exempt component stopped declaring the eyebrow recipe, so the sweep above is a rule with a hole and nothing left to find",
     );
-    assert.deepEqual(offenders, [], "these files re-declare the hero eyebrow — render <HeroBanner> instead");
   });
 
   it("the five secondary screens ask for the solid tone", () => {
@@ -245,10 +253,26 @@ describe("hero-banner — adoption across the UI", () => {
   it("no screen still fills a container with HERO_DARK behind an eyebrow", () => {
     // The tell that a sixth solid banner was hand-rolled rather than asking
     // for tone="solid".
-    const offenders = UI_FILES.filter(
-      (f) => f !== COMPONENT && /backgroundColor: HERO_DARK,[\s\S]{0,160}borderRadius: RADIUS_HERO_LG/.test(read(f)),
+    const SOLID_HERO = /backgroundColor: HERO_DARK,[\s\S]{0,160}borderRadius: RADIUS_HERO_LG/;
+    assertNoOffenders({
+      rule: SOLID_HERO,
+      files: UI_FILES,
+      read,
+      exempt: [COMPONENT],
+      subject: "files",
+      instead: 're-declare the solid hero — pass tone="solid" instead',
+    });
+    // The exemption is policed by what it protects rather than by the rule:
+    // the component splits the fill from the radius (`hero` carries the
+    // geometry, `heroSolid` only the colour), so it cannot match a pattern
+    // whose whole subject is the two written together — which is the shape a
+    // screen hand-rolling the banner produces. What must stay true is that the
+    // component is still the one declaring the solid tone.
+    assert.match(
+      read(COMPONENT),
+      /heroSolid: \{\s*\n\s*backgroundColor: HERO_DARK,/,
+      "the exempt component stopped declaring the solid tone, so the sweep above is a hole around a file that no longer owns the thing",
     );
-    assert.deepEqual(offenders, [], "these files re-declare the solid hero — pass tone=\"solid\" instead");
   });
 
   it("the home screen passes its account row as headerSlot, not as children", () => {

@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { RADIUS_CARD_SM, SPACING_SECTION } from "@/lib/design-tokens";
+import { assertNoOffenders } from "./helpers/offence-sweep";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { tsxFiles } from "./helpers/source-files";
 
@@ -138,10 +139,50 @@ describe("dashboard-banner — adoption across the UI", () => {
     // `app/settings.tsx` is the one allowed non-consumer: its currency chevron
     // trails a settings list row with no icon disc, no hint line and no route —
     // it opens a sheet.
-    const ALLOWED = new Set(["app/settings.tsx"]);
-    const offenders = UI_FILES.filter(
-      (f) => f !== COMPONENT && !ALLOWED.has(f) && /<Text style=\{[^}]*\}>›<\/Text>/.test(read(f)),
-    );
-    assert.deepEqual(offenders, [], "these files render their own chevron row — use <DashboardBanner> instead");
+    // `[^}]*` used to stand between `style={` and the closing brace, which
+    // reads the plain `style={styles.arrow}` form and NOTHING else: the
+    // component's own row is `style={{ ...styles.arrow, color: theme.meta }}`,
+    // an inline object whose nested brace ends the character class early. So
+    // the rule could not see the spelling the extracted component itself uses,
+    // and a screen hand-rolling the row that way walked straight through. Found
+    // by asserting the exemptions still match — the component was exempt from a
+    // sweep that could not have flagged it.
+    const CHEVRON_ROW = /<Text[^>]{0,160}style=[\s\S]{0,160}?>›<\/Text>/;
+    assertNoOffenders({
+      rule: CHEVRON_ROW,
+      files: UI_FILES,
+      read,
+      exempt: [COMPONENT, "app/settings.tsx"],
+      subject: "files",
+      instead: "render their own chevron row — use <DashboardBanner> instead",
+    });
+    // Both holes, checked to still be holes. An exempt file that stopped
+    // matching is a hole standing open for whoever renders the next chevron,
+    // and nothing about a stale entry looks stale.
+    for (const exempt of [COMPONENT, "app/settings.tsx"]) {
+      assert.match(
+        read(exempt),
+        CHEVRON_ROW,
+        `${exempt} is exempt from the chevron sweep and no longer renders one — drop the exemption rather than leaving the hole`,
+      );
+    }
+    // Both spellings, pinned. The named-style form is what the rule always
+    // read; the inline-object form is the one it used to miss, and it is the
+    // one the component and the settings screen actually write.
+    for (const spelling of [
+      '<Text style={styles.arrow}>›</Text>',
+      '<Text style={{ ...styles.arrow, color: theme.meta }}>›</Text>',
+    ]) {
+      assert.match(spelling, CHEVRON_ROW, `the sweep cannot see: ${spelling}`);
+    }
+    // And it is still anchored on the glyph in a styled <Text>, not on any
+    // chevron anywhere: a send button or a search thumb sharing the disc
+    // geometry is not this row.
+    for (const innocent of [
+      "<Text>›</Text>",
+      '<View style={styles.arrow}>{"›"}</View>',
+    ]) {
+      assert.doesNotMatch(innocent, CHEVRON_ROW, `the sweep over-reads: ${innocent}`);
+    }
   });
 });

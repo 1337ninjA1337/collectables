@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { CONSOLE_SWAP } from "../lib/check-console-swap";
 
 import { CAPTURED, beginCapture, captureConsole } from "./helpers/capture-console";
+import { assertNoOffenders } from "./helpers/offence-sweep";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 import { suiteCode, topLevelSuites } from "./helpers/suite-files";
 
@@ -245,14 +246,17 @@ describe("a console-defaulted seam", () => {
  */
 describe("the global console in the suites", () => {
   it("is swapped in exactly one place, and that place is the helper", () => {
-    const swapping = topLevelSuites().filter((suite) =>
-      CONSOLE_SWAP.test(suiteCode(suite)),
-    );
-    assert.deepEqual(
-      swapping,
-      [],
-      `these suites swap a console method by hand instead of going through captureConsole/beginCapture, which saves one stream and loses the rest: ${swapping.join(", ")}`,
-    );
+    // Through the shared sweep, for the two hazards it refuses that this one
+    // carried in prose only: a rule that grew a `g` flag would skip every
+    // other suite, and a walk that stopped matching would report a clean tree.
+    assertNoOffenders({
+      rule: CONSOLE_SWAP,
+      files: topLevelSuites(),
+      read: suiteCode,
+      subject: "suites",
+      instead:
+        "swap a console method by hand instead of going through captureConsole/beginCapture, which saves one stream and loses the rest",
+    });
   });
 
   it("is swept over a rule the helper itself would fail, so the pattern is not dead", () => {
