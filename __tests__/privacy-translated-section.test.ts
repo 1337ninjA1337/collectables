@@ -15,6 +15,7 @@ import {
 import { privacyPolicySourcePath } from "../lib/privacy-body-baselines";
 
 import { measuredFloor } from "./helpers/coverage-floor";
+import { assertNoOffenders } from "./helpers/offence-sweep";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 import { readRepoFile } from "./helpers/repo-file";
 import {
@@ -328,6 +329,17 @@ const WHOLE_STRING_HEX_RUN = /\^\[0-9a-f\]\{\d+\}\$/;
  */
 const HEX_WIDTH_EXEMPT: readonly string[] = ["cloudinary-signed-upload.test.ts"];
 
+/**
+ * The module that DECLARES the width, and so is the one place allowed to spell
+ * it.
+ *
+ * Not in {@link HEX_WIDTH_EXEMPT}: that list is holes in a rule, held honest by
+ * a case, and this is the rule's own subject. Exempting the declaration
+ * alongside a foreign API's format would put the two in one list and invite the
+ * next entry to be neither.
+ */
+const DECLARING_MODULE = "lib/privacy-translated-section.ts";
+
 describe("the policy fingerprint's shape", () => {
   it("is sixteen characters, which is a decision rather than an observation", () => {
     // Short enough to read in a diff and to retype into a table, long enough
@@ -402,16 +414,19 @@ describe("the policy fingerprint's shape", () => {
     // hold `[0-9a-f]{8}-[0-9a-f]{4}-…`, and a UUID's five runs separated by
     // hyphens is a different shape validating a different thing — reporting
     // them would be the first exclusion in a list that then grows.
-    const offenders = sourceFiles("lib", "scripts").filter(
-      (file) =>
-        file !== "lib/privacy-translated-section.ts" &&
-        WHOLE_STRING_HEX_RUN.test(sourceCode(file)),
-    );
-    assert.deepEqual(
-      offenders,
-      [],
-      `these modules spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN: ${offenders.join(", ")}`,
-    );
+    //
+    // The walk is the WHOLE source tree rather than `lib`/`scripts`, which is
+    // what the shared sweep bought: the narrowing was there because a third
+    // root meant a third copy of these four lines, and `app/` and
+    // `components/` were never a place the offence could not land.
+    assertNoOffenders({
+      rule: WHOLE_STRING_HEX_RUN,
+      files: sourceFiles(),
+      read: sourceCode,
+      exempt: [DECLARING_MODULE],
+      subject: "modules",
+      instead: "spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN",
+    });
   });
 
   /**
@@ -431,16 +446,14 @@ describe("the policy fingerprint's shape", () => {
     // `suiteFiles()` rather than `topLevelSuites()`: the rule is about what is
     // WRITTEN, so it has to reach `helpers/` — a shared assertion helper is
     // exactly where a retired shape hides from a per-suite sweep.
-    const offenders = suiteFiles().filter(
-      (relative) =>
-        !HEX_WIDTH_EXEMPT.includes(relative) &&
-        WHOLE_STRING_HEX_RUN.test(suiteCode(relative)),
-    );
-    assert.deepEqual(
-      offenders,
-      [],
-      `these suites spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN: ${offenders.join(", ")}`,
-    );
+    assertNoOffenders({
+      rule: WHOLE_STRING_HEX_RUN,
+      files: suiteFiles(),
+      read: suiteCode,
+      exempt: HEX_WIDTH_EXEMPT,
+      subject: "suites",
+      instead: "spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN",
+    });
   });
 
   it("keeps its one exemption honest", () => {
@@ -449,6 +462,9 @@ describe("the policy fingerprint's shape", () => {
       expected: ["cloudinary-signed-upload.test.ts"],
       rule: "whole-string hex width",
       stillNeeded: (relative) => WHOLE_STRING_HEX_RUN.test(suiteCode(relative)),
+      // The walk the hole is IN, named rather than assumed — it happens to be
+      // the default, and the sweep above it is one of two with different walks.
+      walk: suiteFiles(),
     });
   });
 });

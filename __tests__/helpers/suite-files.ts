@@ -193,12 +193,20 @@ export function suiteCode(relative: string): string {
  * - `stillNeeded` is the guard's own predicate — usually "its source still
  *   contains the shape" — because only the guard knows what its exemption is
  *   for.
+ * - `walk` is the file list the exemptions are holes IN, and defaults to the
+ *   suites because seven of the eight callers sweep those. It is a parameter
+ *   rather than an assumption because the eighth does not: a rule swept over
+ *   `lib`/`scripts` whose exemptions were checked against `suiteFiles()` would
+ *   report every one of them as stale, and a rule swept over a NARROWED walk
+ *   would call a hole live that its own sweep can no longer reach.
  */
 export function assertExemptionsHonest(options: {
   readonly exemptions: readonly string[];
   readonly expected: readonly string[];
   readonly rule: string;
   readonly stillNeeded: (relative: string) => boolean;
+  /** The files the sweep actually walks. Defaults to {@link suiteFiles}. */
+  readonly walk?: readonly string[];
 }): void {
   const { exemptions, expected, rule, stillNeeded } = options;
   assert.deepEqual(
@@ -212,7 +220,7 @@ export function assertExemptionsHonest(options: {
     exemptions.length,
     `the ${rule} exemption list repeats an entry, which hides how wide it is`,
   );
-  const walk = suiteFiles();
+  const walk = options.walk ?? suiteFiles();
   for (const allowed of exemptions) {
     assert.ok(
       walk.includes(allowed),

@@ -177,6 +177,33 @@ describe("the suite directory, walked once", () => {
     );
   });
 
+  it("checks the exemptions against the walk the sweep uses, not always the suites", () => {
+    // The default is `suiteFiles()` because seven of the eight callers sweep
+    // those. The eighth does not, and a hole in a `lib`/`scripts` sweep held to
+    // the suite walk would be reported as stale on every run — a guard failing
+    // on a file it was never about.
+    const foreign = {
+      exemptions: ["lib/somewhere.ts"],
+      expected: ["lib/somewhere.ts"],
+      rule: "the example rule",
+      stillNeeded: () => true,
+    };
+    assert.throws(
+      () => assertExemptionsHonest(foreign),
+      /is not in the walk/,
+      "an exemption outside the suite walk passed against the default walk",
+    );
+    assert.doesNotThrow(() =>
+      assertExemptionsHonest({ ...foreign, walk: ["lib/somewhere.ts", "lib/other.ts"] }),
+    );
+    // And a narrowed walk still catches the stale entry, so the parameter is
+    // not a way out of the check.
+    assert.throws(
+      () => assertExemptionsHonest({ ...foreign, walk: ["lib/other.ts"] }),
+      /is not in the walk/,
+    );
+  });
+
   it("leaves no suite walking the directory for itself", () => {
     // Matches the walk's anchor rather than its body: every copy has to start
     // by naming the directory, however the recursion below it is written. With
