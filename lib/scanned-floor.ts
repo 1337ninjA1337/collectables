@@ -805,6 +805,10 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     count: { label: "file", minimum: 500 },
     note: "the whole-tree walk (minus node_modules/.git/dist and non-text extensions) held 713 files on 2026-08-12; 500 survives ordinary pruning while a walk that lost __tests__/ or lib/ does not.",
   },
+  "check-console-swap": {
+    count: { label: "source file", minimum: 200, roots: ["app", "components", "lib", "scripts"] },
+    note: "app/ + components/ + lib/ + scripts/ held 277 .ts/.tsx files on 2026-08-27 (app 19, components 46, lib 180, scripts 32); 200 leaves 27% deletable. `roots` holds the no-single-root property — a lost scripts/ refuses by name rather than by arithmetic — so this number's remaining job is the walk that shrank without losing a root. Deliberately NOT the same walk as check-profile-id-pii, which also reads data/: this rule is about code that runs, and data/ holds seed literals.",
+  },
   "check-inline-radius": {
     count: { label: "source file", minimum: 48, roots: ["app", "components"] },
     note: "app/ + components/ held 65 .ts/.tsx files on 2026-08-21; 48 leaves 26% deletable. First entry to declare `roots`, on 2026-08-21, after its floor had been re-measured twice in one afternoon because <RelationshipActionRow> made components/ a 46th file and drew level with it. That comparison is gone: the guard asserts every declared root contributed, so a lost app/ refuses by name whatever this number is. The number's remaining job is the walk that shrank without losing a root.",

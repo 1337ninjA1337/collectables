@@ -116,6 +116,7 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // Same five-root walk as check-orphan-i18n-keys and the same floor of 200;
   // `app` at 19 files is nowhere near it.
   "check-profile-id-pii": () => ["app"],
+  "check-console-swap": () => sliceOfEveryRoot("check-console-swap"),
   "check-a11y-jsx": () => sliceOfEveryRoot("check-a11y-jsx"),
   // Walks the whole tree; app/ is a few dozen of the several hundred files.
   "check-secrets": () => ["app"],

@@ -38,6 +38,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "No inline geometry literals (borderRadius 999/22/24, gap 10/12/8) — use RADIUS_*/SPACING_* tokens",
   },
   {
+    npmScript: "lint:console-swap",
+    scriptPath: "scripts/check-console-swap.ts",
+    args: [],
+    description:
+      "No assignment to a global console method in app/components/lib/scripts — the swap outlives its caller; take an injected writer (the suites have captureConsole for their half)",
+  },
+  {
     npmScript: "lint:a11y-jsx",
     scriptPath: "scripts/check-a11y-jsx.ts",
     args: [],

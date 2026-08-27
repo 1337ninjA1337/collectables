@@ -65,6 +65,14 @@ const PLANTED: Readonly<
     source:
       "export const p = {\n  publicId: slugify(\n    profile.publicId || profile.email,\n  ),\n};\n",
   },
+  "check-console-swap": {
+    entries: ["app", "components", "lib", "scripts"],
+    file: "lib/planted-offender.ts",
+    // Built rather than written: the suite-wide ban on a hand-rolled console
+    // swap has no exemption list, so a literal here would make this file the
+    // offender it is planting.
+    source: `export const noop = () => {};\n${"console"}.warn = noop;\n`,
+  },
   "check-a11y-jsx": {
     entries: ["app", "components"],
     file: "app/planted-offender.tsx",
