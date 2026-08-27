@@ -45,7 +45,7 @@ describe("oldestRecord", () => {
         dateOf,
         ["a", "b", "c"],
       ),
-      { recordedOn: "2025-03-04", keys: ["b"] },
+      { recordedOn: "2025-03-04", keys: ["b"], unknownKeys: [] },
     );
   });
 
@@ -57,7 +57,7 @@ describe("oldestRecord", () => {
         "a",
         "b",
       ]),
-      { recordedOn: "2026-01-02", keys: ["a", "b"] },
+      { recordedOn: "2026-01-02", keys: ["a", "b"], unknownKeys: [] },
     );
   });
 
@@ -72,20 +72,35 @@ describe("oldestRecord", () => {
     assert.deepEqual(oldest?.keys, ["a", "b", "c"]);
   });
 
-  it("leaves out a key the caller's order does not know", () => {
-    // Safe because every caller validates its keys against that same list one
-    // step earlier, so a table with an unknown key fails before any pass line
-    // renders — pinned so that stops being an accident if a caller changes.
-    const oldest = oldestRecord(
-      { a: on("2026-01-02"), zz: on("2020-01-01") },
-      dateOf,
-      ["a"],
+  it("keeps an unknown key out of the date as well as out of the keys, and names it", () => {
+    // This case used to assert `{ recordedOn: "2020-01-01", keys: [] }` and
+    // call it safe: the date was the minimum over EVERY entry while the keys
+    // were filtered by `order`, so a table whose oldest entry sat under a key
+    // the order did not know rendered an age attributed to nothing. The two
+    // halves agree now, and the key that was silently setting the date is
+    // reported instead of dropped.
+    assert.deepEqual(
+      oldestRecord({ a: on("2026-01-02"), zz: on("2020-01-01") }, dateOf, ["a"]),
+      { recordedOn: "2026-01-02", keys: ["a"], unknownKeys: ["zz"] },
     );
-    assert.deepEqual(oldest, { recordedOn: "2020-01-01", keys: [] });
   });
 
-  it("answers null for an empty table rather than inventing a date", () => {
+  it("answers null when the order knows no entry, not only when the table is empty", () => {
     assert.equal(oldestRecord({}, dateOf, ["a"]), null);
+    // The other way to have nothing to say: entries exist and none of them is
+    // a key this order can speak about. Both are failures for every caller —
+    // an empty table fails its own count, an unknown key fails the shape half.
+    assert.equal(oldestRecord({ zz: on("2020-01-01") }, dateOf, ["a"]), null);
+  });
+
+  it("ignores an order entry the table does not carry", () => {
+    // The mirror of the unknown key, and it is not a failure: an order is a
+    // constant listing every language, and a table missing one is the shape
+    // half's business rather than this walk's.
+    assert.deepEqual(
+      oldestRecord({ a: on("2026-01-02") }, dateOf, ["a", "b"]),
+      { recordedOn: "2026-01-02", keys: ["a"], unknownKeys: [] },
+    );
   });
 
   it("compares the dates as strings, which is what YYYY-MM-DD is for", () => {
@@ -122,6 +137,7 @@ describe("every provenance pass line publishes an age", () => {
         oldest: {
           recordedOn: "2026-08-11",
           languages: PRIVACY_PAGE_LANGUAGES.map((language) => language.code),
+          unknownLanguages: [],
         },
       }),
     },
@@ -132,7 +148,7 @@ describe("every provenance pass line publishes an age", () => {
         failures: [],
         checked: Object.keys(PRIVACY_TRANSLATION_SOURCES).length,
         comparedAgainst: "abc123",
-        oldest: { checkedOn: "2026-08-22", languages: ["ru"] },
+        oldest: { checkedOn: "2026-08-22", languages: ["ru"], unknownLanguages: [] },
       }),
     },
     {

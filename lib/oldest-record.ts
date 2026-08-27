@@ -20,10 +20,28 @@
 
 /** The least recently recorded entries of a table, and when. */
 export type OldestRecord = {
-  /** The earliest date any entry carries, as `YYYY-MM-DD`. */
+  /**
+   * The earliest date any entry `order` KNOWS carries, as `YYYY-MM-DD`.
+   *
+   * Known-only, and the qualifier is the fix rather than a detail: the date
+   * used to be the minimum over every entry in the table while {@link keys}
+   * was filtered by `order`, so a table whose oldest entry sat under a key the
+   * order did not know rendered a date with no keys beside it — an age
+   * attributed to nothing.
+   */
   readonly recordedOn: string;
   /** Every key sharing that date, in `order`'s order. */
   readonly keys: readonly string[];
+  /**
+   * Table keys `order` does not know, in the table's own order.
+   *
+   * Empty on every call this repository makes, because both callers run a
+   * shape half that fails an unknown key before any pass line is built — and
+   * that is a property of the CALLERS, which is exactly why it is reported
+   * here instead of assumed. A caller without that check gets a list it can
+   * refuse on rather than an age quietly measured over a subset.
+   */
+  readonly unknownKeys: readonly string[];
 };
 
 /**
@@ -39,26 +57,29 @@ export type OldestRecord = {
  * line naming one of six would read as a fact about that entry.
  *
  * `order` is walked rather than the table's own keys, so what a reader sees does
- * not depend on how the object literal happens to be written — and a key the
- * caller's order does not know is left out, which is safe here because every
- * caller validates its keys against that same list one step earlier and a table
- * with an unknown key never reaches a pass line.
+ * not depend on how the object literal happens to be written. A key the order
+ * does not know is left out of BOTH halves and reported as
+ * {@link OldestRecord.unknownKeys}: leaving it out of the keys while letting it
+ * set the date is how this printed an age with nothing beside it, and letting
+ * it set the date while nobody can see it is how a page recorded in 2019 under
+ * a typo would have gone on being the answer.
  *
- * Null only when the table is empty, which every caller already treats as a
- * failure of its own ("a pass over zero baselines is not a pass"), so no pass
- * line has to render the absence.
+ * Null when `order` knows no entry of this table — the empty table, and the
+ * table whose every key is unknown. Both are already failures for every caller
+ * ("a pass over zero baselines is not a pass"; an unknown key fails the shape
+ * half), so no pass line has to render the absence.
  */
 export function oldestRecord<T>(
   table: Readonly<Record<string, T>>,
   dateOf: (entry: T) => string,
   order: readonly string[],
 ): OldestRecord | null {
-  const dates = Object.values(table).map(dateOf);
-  if (dates.length === 0) return null;
-  const recordedOn = dates.reduce((a, b) => (a <= b ? a : b));
-  const keys = order.filter((key) => {
-    const entry = table[key];
-    return entry !== undefined && dateOf(entry) === recordedOn;
-  });
-  return { recordedOn, keys };
+  const unknownKeys = Object.keys(table).filter((key) => !order.includes(key));
+  const known = order.filter((key) => table[key] !== undefined);
+  if (known.length === 0) return null;
+  const recordedOn = known
+    .map((key) => dateOf(table[key]))
+    .reduce((a, b) => (a <= b ? a : b));
+  const keys = known.filter((key) => dateOf(table[key]) === recordedOn);
+  return { recordedOn, keys, unknownKeys };
 }

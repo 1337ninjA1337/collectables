@@ -191,6 +191,15 @@ export type ScrubPromiseProvenanceResult = {
    * and there is no key to name beside the date. Carried through the result
    * rather than read from the constant by the formatter, so the line describes
    * the record that was actually evaluated.
+   *
+   * NOT OPTIONAL, which is the other half of that difference and the reason the
+   * three pass-line formatters no longer branch alike. `oldest` is nullable on
+   * both map-shaped results because a table can be empty; a single record
+   * cannot be absent from a result that reached the formatter at all, so this
+   * one renders unconditionally while the other two render nothing when they
+   * have no age. A fourth table that is a record rather than a map should
+   * follow this, and whoever writes it should not have to re-derive the
+   * reasoning from three formatters that disagree.
    */
   readonly recordedOn: string;
 };

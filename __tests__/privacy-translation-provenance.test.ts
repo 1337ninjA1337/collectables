@@ -289,7 +289,7 @@ describe("oldestConfirmation", () => {
         es: entry({ checkedOn: "2026-01-04" }),
         pl: entry({ checkedOn: "2026-06-30" }),
       }),
-      { checkedOn: "2026-01-04", languages: ["es"] },
+      { checkedOn: "2026-01-04", languages: ["es"], unknownLanguages: [] },
     );
   });
 
@@ -302,7 +302,7 @@ describe("oldestConfirmation", () => {
         ru: entry({ checkedOn: "2026-02-02" }),
         es: entry({ checkedOn: "2026-09-09" }),
       }),
-      { checkedOn: "2026-02-02", languages: ["ru", "de"] },
+      { checkedOn: "2026-02-02", languages: ["ru", "de"], unknownLanguages: [] },
     );
   });
 
@@ -320,6 +320,42 @@ describe("oldestConfirmation", () => {
 
   it("is null for an empty table, which is a failure elsewhere", () => {
     assert.equal(oldestConfirmation({}), null);
+  });
+
+  it("names a language the order does not know instead of measuring around it", () => {
+    // The walk under this used to let an unknown key set the date while
+    // filtering it out of the languages, so a table with a typo'd code
+    // published an age with nothing beside it. The key is reported now, and
+    // the age is the age of the pages the order can actually name.
+    assert.deepEqual(
+      oldestConfirmation({
+        de: entry({ checkedOn: "2026-08-22" }),
+        rus: entry({ checkedOn: "2019-01-01" }),
+      }),
+      {
+        checkedOn: "2026-08-22",
+        languages: ["de"],
+        unknownLanguages: ["rus"],
+      },
+    );
+  });
+
+  it("cannot reach a pass line with an unknown language, because the shape half fails first", () => {
+    // The property `unknownLanguages` exists to stop assuming. It is a fact
+    // about the CALLER — this guard runs a shape half that refuses an unknown
+    // key — so it is asserted about the caller rather than trusted to a
+    // comment in the walk two modules down.
+    const evaluated = evaluateTranslationProvenance({
+      current: { rus: entry({ checkedOn: "2026-04-05" }) },
+      previous: null,
+      baseRef: null,
+      changedFiles: [],
+    });
+    assert.equal(evaluated.ok, false);
+    assert.ok(
+      evaluated.failures.some((failure) => failure.code === "unknown_language"),
+      `an unknown language reached a pass without an unknown_language failure: ${JSON.stringify(evaluated.failures)}`,
+    );
   });
 
   it("reaches the pass line, and only the pass line", () => {

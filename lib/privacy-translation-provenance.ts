@@ -234,6 +234,16 @@ export type OldestConfirmation = {
   readonly checkedOn: string;
   /** Every language sharing that date, in `PRIVACY_TRANSLATED_LANGUAGES` order. */
   readonly languages: readonly string[];
+  /**
+   * Table keys the language order does not know, in the table's own order.
+   *
+   * Empty on every real call: the shape half fails an unknown language before
+   * a pass line is built, so this list existing at all is the walk saying so
+   * rather than the walk assuming it. Carried through instead of dropped
+   * because a caller that lost the shape half would otherwise get an age
+   * measured over a subset with nothing to notice.
+   */
+  readonly unknownLanguages: readonly string[];
 };
 
 /**
@@ -265,7 +275,11 @@ export function oldestConfirmation(
   );
   return oldest === null
     ? null
-    : { checkedOn: oldest.recordedOn, languages: oldest.keys };
+    : {
+        checkedOn: oldest.recordedOn,
+        languages: oldest.keys,
+        unknownLanguages: oldest.unknownKeys,
+      };
 }
 
 export type TranslationProvenanceResult = {

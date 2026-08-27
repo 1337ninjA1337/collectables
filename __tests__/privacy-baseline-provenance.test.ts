@@ -68,7 +68,7 @@ const result = (
   failures: [],
   checked: 6,
   comparedAgainst: "abc1234",
-  oldest: { recordedOn: "2026-08-11", languages: ["en"] },
+  oldest: { recordedOn: "2026-08-11", languages: ["en"], unknownLanguages: [] },
   ...over,
 });
 
@@ -588,7 +588,13 @@ describe("baseline provenance messages", () => {
   it("a passing report says how old its oldest measurement is", () => {
     const report = formatBaselineProvenanceReport(
       "check",
-      result({ oldest: { recordedOn: "2025-01-02", languages: ["de", "es"] } }),
+      result({
+        oldest: {
+          recordedOn: "2025-01-02",
+          languages: ["de", "es"],
+          unknownLanguages: [],
+        },
+      }),
     );
     assert.ok(
       report.includes("Oldest record 2025-01-02 (de, es)."),
@@ -624,7 +630,7 @@ describe("oldestBaseline", () => {
         ru: baseline({ recordedOn: "2026-01-02" }),
         be: baseline({ recordedOn: "2026-01-02" }),
       }),
-      { recordedOn: "2026-01-02", languages: ["ru", "be"] },
+      { recordedOn: "2026-01-02", languages: ["ru", "be"], unknownLanguages: [] },
     );
   });
 
@@ -650,12 +656,42 @@ describe("oldestBaseline", () => {
         ...PRIVACY_BODY_BASELINES,
         en: baseline({ recordedOn: "2020-01-01" }),
       }),
-      { recordedOn: "2020-01-01", languages: ["en"] },
+      { recordedOn: "2020-01-01", languages: ["en"], unknownLanguages: [] },
     );
   });
 
   it("answers null for an empty table rather than inventing a date", () => {
     assert.equal(oldestBaseline({}), null);
+  });
+
+  it("names a language the order does not know instead of measuring around it", () => {
+    assert.deepEqual(
+      oldestBaseline({
+        en: baseline({ recordedOn: "2026-08-11" }),
+        eng: baseline({ recordedOn: "2019-01-01" }),
+      }),
+      {
+        recordedOn: "2026-08-11",
+        languages: ["en"],
+        unknownLanguages: ["eng"],
+      },
+    );
+  });
+
+  it("cannot reach a pass line with an unknown language, because the shape half fails first", () => {
+    // Why `unknownLanguages` is empty on every real call, asserted about the
+    // caller that makes it so rather than assumed in the walk's doc comment.
+    const evaluated = evaluatePrivacyBaselineProvenance({
+      current: { eng: baseline({ recordedOn: "2026-08-11" }) },
+      previous: null,
+      baseRef: null,
+      changedFiles: [],
+    });
+    assert.equal(evaluated.ok, false);
+    assert.ok(
+      evaluated.failures.some((failure) => failure.code === "unknown_language"),
+      `an unknown language reached a pass without an unknown_language failure: ${JSON.stringify(evaluated.failures)}`,
+    );
   });
 });
 

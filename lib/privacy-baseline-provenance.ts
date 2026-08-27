@@ -272,6 +272,16 @@ export type OldestBaseline = {
   readonly recordedOn: string;
   /** Every language sharing that date, in `PRIVACY_PAGE_LANGUAGES` order. */
   readonly languages: readonly string[];
+  /**
+   * Table keys the language order does not know, in the table's own order.
+   *
+   * Empty on every real call: the shape half fails an unknown language before
+   * a pass line is built, so this list existing at all is the walk saying so
+   * rather than the walk assuming it. Carried through instead of dropped
+   * because a caller that lost the shape half would otherwise get an age
+   * measured over a subset with nothing to notice.
+   */
+  readonly unknownLanguages: readonly string[];
 };
 
 /**
@@ -292,7 +302,11 @@ export function oldestBaseline(
   );
   return oldest === null
     ? null
-    : { recordedOn: oldest.recordedOn, languages: oldest.keys };
+    : {
+        recordedOn: oldest.recordedOn,
+        languages: oldest.keys,
+        unknownLanguages: oldest.unknownKeys,
+      };
 }
 
 export type BaselineProvenanceResult = {
