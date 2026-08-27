@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { beginCapture, captureConsole } from "./helpers/capture-console";
+import { CAPTURED, beginCapture, captureConsole } from "./helpers/capture-console";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 import { suiteCode, topLevelSuites } from "./helpers/suite-files";
 
@@ -133,7 +133,9 @@ describe("a console-defaulted seam", () => {
     assert.deepEqual(written.warn, ["careful"]);
     assert.deepEqual(written.info, ["fyi"]);
     assert.deepEqual(written.debug, ["noisy"]);
-    for (const method of ["log", "error", "warn", "info", "debug"] as const) {
+    // CAPTURED rather than a sixth spelling of the same five names — the whole
+    // point of the list being exported is that nothing restates it.
+    for (const method of CAPTURED) {
       assert.equal(
         console[method],
         before[method],
@@ -307,5 +309,66 @@ describe("beginCapture", () => {
       /captureConsole\(\) was called while a beginCapture\(\)/,
     );
     leaked.restore();
+  });
+});
+
+/**
+ * One list, three readers.
+ *
+ * `CAPTURED` is the methods the helper swaps; `CapturedConsole` and
+ * `OpenCapture` are mapped over it, and `install()` builds its collectors from
+ * it. Those were ten hand-written fields and a five-key object literal beside
+ * one array — four places for a sixth stream to be added to three of. The types
+ * cannot disagree with the list any more, because they are the list; what a
+ * type cannot check is that the RUNTIME shape matches too, which is what a
+ * swapped-but-uncollected stream would look like.
+ */
+describe("the captured streams and the list they come from", () => {
+  it("hands back exactly the streams CAPTURED names, and nothing else", () => {
+    const captured = captureConsole(() => {});
+    const { result, ...streams } = captured;
+    assert.equal(result, undefined);
+    assert.deepEqual(Object.keys(streams).sort(), [...CAPTURED].sort());
+  });
+
+  it("gives the caller-owned form the same streams beside its restore", () => {
+    const capture = beginCapture();
+    try {
+      const { restore, ...streams } = capture;
+      assert.equal(typeof restore, "function");
+      assert.deepEqual(Object.keys(streams).sort(), [...CAPTURED].sort());
+    } finally {
+      capture.restore();
+    }
+  });
+
+  it("collects into every stream it swapped, so none is swapped and dropped", () => {
+    // The failure a mapped type cannot see: a method replaced by the installer
+    // whose writes go nowhere reads, from outside, as a stream nobody used.
+    const written = captureConsole(() => {
+      for (const method of CAPTURED) console[method](`from ${method}`);
+    });
+    for (const method of CAPTURED) {
+      assert.deepEqual(
+        written[method],
+        [`from ${method}`],
+        `console.${method} was swapped and what it wrote did not reach the capture`,
+      );
+    }
+  });
+
+  it("names each stream once in the helper, not once per result type", () => {
+    // The floor under the derivation. Each method name appears in CAPTURED and
+    // in this suite's prose; a helper that went back to hand-written fields
+    // would carry each of the five twice more.
+    const helper = sourceCode("__tests__/helpers/capture-console.ts");
+    for (const method of CAPTURED) {
+      const occurrences = helper.split(`"${method}"`).length - 1;
+      assert.equal(
+        occurrences,
+        1,
+        `"${method}" is written ${occurrences} times in capture-console.ts — the list is CAPTURED, and a second spelling is a stream that can be added to one place and missed in another`,
+      );
+    }
   });
 });

@@ -54,26 +54,39 @@
  * the type cannot be.
  */
 
-/** Every stream {@link captureConsole} watches, and what the callback returned. */
-export type CapturedConsole<T = void> = {
-  /** Whatever the callback returned, for a case that wants both. */
-  readonly result: T;
-  /** Everything written through `console.log`, in order. */
-  readonly log: readonly string[];
-  /** Everything written through `console.error`, in order. */
-  readonly error: readonly string[];
-  /** Everything written through `console.warn`, in order. */
-  readonly warn: readonly string[];
-  /** Everything written through `console.info`, in order. */
-  readonly info: readonly string[];
-  /** Everything written through `console.debug`, in order. */
-  readonly debug: readonly string[];
+/**
+ * The methods captured, so the swap and the restore cannot disagree — and, since
+ * both result types are mapped over it, so that a sixth stream is ONE edit.
+ *
+ * It used to be one array and ten hand-written fields: five on
+ * {@link CapturedConsole}, five on {@link OpenCapture}, each with a doc comment
+ * saying "everything written through `console.<its own name>`, in order". Ten
+ * restatements of one array, and the per-stream prose that was the argument for
+ * writing them out said nothing the method name did not — so it is said once,
+ * on {@link CapturedStreams}, and the two shapes are that type plus the one
+ * field each actually adds.
+ */
+export const CAPTURED = ["log", "error", "warn", "info", "debug"] as const;
+
+export type CapturedMethod = (typeof CAPTURED)[number];
+
+/**
+ * Everything written through each captured stream, in order, keyed by the
+ * method that wrote it.
+ *
+ * Arrays rather than one joined string: a case asserting "warned once" is
+ * counting calls, and a caller that spread several values into one call is one
+ * entry here (they are joined the way the console joins them).
+ */
+export type CapturedStreams = {
+  readonly [Method in CapturedMethod]: readonly string[];
 };
 
-/** The methods captured, so the swap and the restore cannot disagree. */
-const CAPTURED = ["log", "error", "warn", "info", "debug"] as const;
-
-type CapturedMethod = (typeof CAPTURED)[number];
+/** Every stream {@link captureConsole} watches, and what the callback returned. */
+export type CapturedConsole<T = void> = CapturedStreams & {
+  /** Whatever the callback returned, for a case that wants both. */
+  readonly result: T;
+};
 
 function isThenable(value: unknown): boolean {
   return (
@@ -98,13 +111,12 @@ function install(): {
   readonly written: Record<CapturedMethod, string[]>;
   readonly restore: () => void;
 } {
-  const written: Record<CapturedMethod, string[]> = {
-    log: [],
-    error: [],
-    warn: [],
-    info: [],
-    debug: [],
-  };
+  // Built from CAPTURED rather than written out, for the reason the types are
+  // mapped over it: a stream present in one of the three places and missing from
+  // another is a capture that swaps a method and drops what it collects.
+  const written = Object.fromEntries(
+    CAPTURED.map((method) => [method, [] as string[]]),
+  ) as Record<CapturedMethod, string[]>;
   // The originals themselves, NOT `.bind(console)` copies: restoring has to put
   // the same function object back, or a case asserting the console was given
   // back compares a bound wrapper against what it saved and reads as a leak.
@@ -150,17 +162,7 @@ function claim(what: string): void {
  * still open — and stay readable after `restore()`, which is what lets an
  * assertion sit outside the `finally` that closed it.
  */
-export type OpenCapture = {
-  /** Everything written through `console.log` so far, in order. */
-  readonly log: readonly string[];
-  /** Everything written through `console.error` so far, in order. */
-  readonly error: readonly string[];
-  /** Everything written through `console.warn` so far, in order. */
-  readonly warn: readonly string[];
-  /** Everything written through `console.info` so far, in order. */
-  readonly info: readonly string[];
-  /** Everything written through `console.debug` so far, in order. */
-  readonly debug: readonly string[];
+export type OpenCapture = CapturedStreams & {
   /** Puts the real console back. Idempotent, and safe to call twice. */
   restore: () => void;
 };
