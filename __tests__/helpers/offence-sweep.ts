@@ -24,6 +24,13 @@
  *      a renamed directory, a filter that got too clever — otherwise reads as a
  *      clean tree.
  *
+ * TWO SHAPES, BECAUSE THE SWEEPS ASK TWO QUESTIONS. {@link assertNoOffenders}
+ * is "nobody does this". {@link assertOnlyTheseMatch} is "these files do this
+ * and no others" — the allowlist shape, which three sweeps here had written as
+ * a sorted `deepEqual` and which carries a third hazard of its own (an
+ * expected entry the walk never reaches). They are two exports rather than one
+ * option, because folding them together would make one name mean two rules.
+ *
  * WHAT IT DELIBERATELY DOES NOT DO. It does not decide the offence, own the
  * exemption LIST, or know what any rule means. `assertExemptionsHonest` in
  * `helpers/suite-files.ts` still holds the "is this hole still needed" half,
@@ -65,4 +72,56 @@ export function assertNoOffenders(options: {
     (relative) => !exempt.includes(relative) && rule.test(read(relative)),
   );
   assert.deepEqual(offenders, [], `these ${subject} ${instead}: ${offenders.join(", ")}`);
+}
+
+/**
+ * The other half of the same shape: these files match the rule, and no others.
+ *
+ * {@link assertNoOffenders} answers "nobody does this". Three sweeps here ask
+ * the sharper question — the sanctioned static Sentry import, the single
+ * `TAG_COLORS` definition, the one component declaring a row — and each had
+ * written it as `deepEqual(matches.sort(), EXPECTED.sort())`. That is the same
+ * loop with the same two hazards plus a third of its own: an `expected` entry
+ * naming a file the walk does not contain passes silently, because a claim
+ * about a file nobody reads is a claim about nothing.
+ *
+ * WHY NOT `exempt`. Passing the sanctioned files as exemptions would keep the
+ * "nobody else does this" half and drop the half that matters more: an
+ * allowlist entry that STOPPED doing the thing is a hole standing open with
+ * nothing about it looking stale. Both directions are reported here, named.
+ */
+export function assertOnlyTheseMatch(options: {
+  readonly rule: RegExp;
+  readonly files: readonly string[];
+  readonly read: (relative: string) => string;
+  /** The files that must match — the sanctioned set, in any order. */
+  readonly expected: readonly string[];
+  /** The plural noun for what is walked: "modules", "files". */
+  readonly subject: string;
+  /** What matching means, phrased to finish "these {subject} …". */
+  readonly what: string;
+}): void {
+  const { rule, files, read, expected, subject, what } = options;
+  assert.ok(
+    !rule.global && !rule.sticky,
+    `the ${subject} sweep's rule carries ${JSON.stringify(rule.flags)}, so .test advances lastIndex between files and the filter skips matches — drop the g/y flag or build a fresh RegExp per file`,
+  );
+  assert.ok(
+    files.length > 0,
+    `the ${subject} sweep walked no files at all, so both halves of its claim are about an empty set — the walk stopped matching, which is a failure rather than a clean result`,
+  );
+  const unwalked = expected.filter((relative) => !files.includes(relative));
+  assert.deepEqual(
+    unwalked,
+    [],
+    `these ${subject} are expected to ${what} and are not in the walk at all, so nothing checks them: ${unwalked.join(", ")}`,
+  );
+  const matched = files.filter((relative) => rule.test(read(relative)));
+  const unexpected = matched.filter((relative) => !expected.includes(relative));
+  const missing = expected.filter((relative) => !matched.includes(relative));
+  assert.deepEqual(
+    { unexpected, missing },
+    { unexpected: [], missing: [] },
+    `${unexpected.length} unsanctioned ${subject} ${what} (${unexpected.join(", ") || "none"}), and ${missing.length} that are supposed to no longer do (${missing.join(", ") || "none"}) — the second kind is a sanctioned entry that has become a hole`,
+  );
 }
