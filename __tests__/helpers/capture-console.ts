@@ -68,7 +68,18 @@
  */
 export const CAPTURED = ["log", "error", "warn", "info", "debug"] as const;
 
-export type CapturedMethod = (typeof CAPTURED)[number];
+/**
+ * Not exported, and neither is {@link CapturedStreams}.
+ *
+ * Both were, for a day, on the argument that a mapped type nobody can name is
+ * awkward to assert against — and then nothing imported either of them. The
+ * two shapes a caller actually holds ({@link CapturedConsole},
+ * {@link OpenCapture}) are exported and name these in their own definitions,
+ * so a suite that needs one back has a one-word edit rather than a design
+ * question. `CAPTURED` stays exported because it has a reader: the seams suite
+ * loops over it rather than writing the five names a sixth time.
+ */
+type CapturedMethod = (typeof CAPTURED)[number];
 
 /**
  * Everything written through each captured stream, in order, keyed by the
@@ -78,7 +89,7 @@ export type CapturedMethod = (typeof CAPTURED)[number];
  * counting calls, and a caller that spread several values into one call is one
  * entry here (they are joined the way the console joins them).
  */
-export type CapturedStreams = {
+type CapturedStreams = {
   readonly [Method in CapturedMethod]: readonly string[];
 };
 

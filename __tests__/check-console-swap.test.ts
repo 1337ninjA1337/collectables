@@ -35,8 +35,25 @@ const C = "console";
  * before a test run.
  */
 describe("findConsoleSwaps — matcher", () => {
-  it("flags the dotted form on every stream", () => {
-    for (const method of ["log", "error", "warn", "info", "debug", "trace"]) {
+  it("flags the dotted form on any property, not on an enumerated list", () => {
+    // `dir`, `table` and `group` are the point. The dotted half used to name
+    // six streams while the bracket half beside it matched anything between
+    // the brackets — one pattern, two answers to "what is the rule", and the
+    // narrower half was the one a `console.dir = () => {}` walked through. The
+    // rule is assigning to the global console at all; the seven names here are
+    // a sample of the property space, not the space.
+    for (const method of [
+      "log",
+      "error",
+      "warn",
+      "info",
+      "debug",
+      "trace",
+      "dir",
+      "table",
+      "group",
+      "somethingNodeAddsNextYear",
+    ]) {
       const source = `${C}.${method} = () => {};`;
       assert.equal(
         findConsoleSwaps("lib/x.ts", source).length,
