@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   assertRequiredMember,
   assertRequiredParameter,
+  declarationBody,
   declaredSource,
   parameterList,
 } from "./helpers/declared-shape";
@@ -48,6 +49,55 @@ export function fixtureGeneric(
   return other + Number(typeof narrowed.log === "function");
 }
 
+// A comma and a closing parenthesis, each inside a string literal where it
+// means nothing to either depth counter. Without quote-awareness the list ends
+// in the middle of `closing` and `"a,b"` splits into two parameters.
+export function fixtureQuoted(
+  separator: "a,b",
+  closing: ")",
+  trailing: number,
+): string {
+  return `${separator}${closing}${String(trailing)}`;
+}
+
+// An overload set: three `function fixtureOverloaded(` in one module, of which
+// the first is a signature no caller of this helper meant.
+export function fixtureOverloaded(value: string): string;
+export function fixtureOverloaded(value: number): string;
+export function fixtureOverloaded(value: string | number): string {
+  return String(value);
+}
+
+// The shape the splitter says it does not read: `=> void` closes a bracket
+// nothing opened, and the old counter went to -1 and carried on.
+export function fixtureCallback(
+  onDone: (value: string) => void,
+  after: number,
+): number {
+  onDone("");
+  return after;
+}
+
+// Two types, one member name, opposite rules. The pair a module-wide read
+// answers from whichever came first.
+export type FixtureAlpha = {
+  readonly shared: string;
+};
+
+export type FixtureBeta = {
+  readonly shared?: number;
+};
+
+// Interface merging is legal TypeScript, so "declared twice" is a real module
+// this could be pointed at rather than a hypothetical.
+export interface FixtureMerged {
+  readonly first: string;
+}
+
+export interface FixtureMerged {
+  readonly second: number;
+}
+
 const FIXTURES = "__tests__/declared-shape.test.ts";
 
 describe("parameterList", () => {
@@ -63,6 +113,25 @@ describe("parameterList", () => {
 
   it("answers null for a function that is not declared", () => {
     assert.equal(parameterList(declaredSource(FIXTURES), "noSuchThing"), null);
+  });
+
+  it("reads past a closing parenthesis that is inside a string literal", () => {
+    // The balanced scan and the `String(1)` case above agree on parentheses
+    // that MEAN something. This one does not: `closing: ")"` is a type, and a
+    // counter that decrements on it ends the list one parameter in.
+    const list = parameterList(declaredSource(FIXTURES), "fixtureQuoted");
+    assert.ok(list !== null);
+    assert.match(list, /trailing: number/);
+  });
+
+  it("refuses a name the module declares more than once", () => {
+    // An overload set. The first signature is `(value: string)`, the
+    // implementation's is `(value: string | number)`, and a first-hit read
+    // answers about the one nobody asked for.
+    assert.throws(
+      () => parameterList(declaredSource(FIXTURES), "fixtureOverloaded"),
+      /fixtureOverloaded is declared 3 times/,
+    );
   });
 });
 
@@ -173,6 +242,59 @@ describe("assertRequiredParameter", () => {
       }),
     );
   });
+
+  it("does not split on a comma that is inside a string-literal type", () => {
+    // `separator: "a,b"` is one parameter. Split naively it is two, and
+    // `trailing` is position 3 rather than 2.
+    assert.doesNotThrow(() =>
+      assertRequiredParameter({
+        module: FIXTURES,
+        fn: "fixtureQuoted",
+        name: "trailing",
+        type: "number",
+        at: 2,
+        why: "the fixture",
+      }),
+    );
+  });
+
+  it("refuses a signature whose brackets it cannot balance", () => {
+    // `(value: string) => void` closes a `>` nothing opened. The old counter
+    // went negative and kept splitting; a wrong answer here is a case that
+    // passes while asserting nothing.
+    assert.throws(
+      () =>
+        assertRequiredParameter({
+          module: FIXTURES,
+          fn: "fixtureCallback",
+          name: "after",
+          type: "number",
+          at: 1,
+          why: "the fixture",
+        }),
+      /cannot read the parameter list .* out of scope/s,
+    );
+  });
+});
+
+describe("declarationBody", () => {
+  it("takes one type's members and not its neighbour's", () => {
+    const alpha = declarationBody(declaredSource(FIXTURES), "FixtureAlpha");
+    assert.ok(alpha !== null);
+    assert.match(alpha, /readonly shared: string;/);
+    assert.doesNotMatch(alpha, /shared\?: number/);
+  });
+
+  it("answers null for a type that is not declared", () => {
+    assert.equal(declarationBody(declaredSource(FIXTURES), "NoSuchType"), null);
+  });
+
+  it("refuses a name declared twice, because merged interfaces are legal", () => {
+    assert.throws(
+      () => declarationBody(declaredSource(FIXTURES), "FixtureMerged"),
+      /FixtureMerged is declared 2 times/,
+    );
+  });
 });
 
 describe("assertRequiredMember", () => {
@@ -180,6 +302,7 @@ describe("assertRequiredMember", () => {
     assert.doesNotThrow(() =>
       assertRequiredMember({
         module: "components/danger-icon-button.tsx",
+        declaration: "Props",
         name: "accessibilityLabel",
         type: "string",
         why: "the shipped rule",
@@ -189,11 +312,52 @@ describe("assertRequiredMember", () => {
       () =>
         assertRequiredMember({
           module: "components/danger-icon-button.tsx",
+          declaration: "Props",
           name: "disabled",
           type: "boolean",
           why: "the fixture",
         }),
-      /became optional — the fixture/,
+      /Props's disabled became optional — the fixture/,
+    );
+  });
+
+  it("answers about the type it was named, not about the module", () => {
+    // The reason `declaration` is required. `shared` is required in
+    // `FixtureAlpha` and optional in `FixtureBeta`; a module-wide read sees
+    // both and gets one of the two questions wrong whichever way it answers.
+    assert.doesNotThrow(() =>
+      assertRequiredMember({
+        module: FIXTURES,
+        declaration: "FixtureAlpha",
+        name: "shared",
+        type: "string",
+        why: "the fixture",
+      }),
+    );
+    assert.throws(
+      () =>
+        assertRequiredMember({
+          module: FIXTURES,
+          declaration: "FixtureBeta",
+          name: "shared",
+          type: "number",
+          why: "the fixture",
+        }),
+      /FixtureBeta's shared became optional/,
+    );
+  });
+
+  it("says so when the type itself is gone, rather than reporting a rename", () => {
+    assert.throws(
+      () =>
+        assertRequiredMember({
+          module: FIXTURES,
+          declaration: "NoSuchType",
+          name: "shared",
+          type: "string",
+          why: "the fixture",
+        }),
+      /declares no type NoSuchType/,
     );
   });
 });

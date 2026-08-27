@@ -163,6 +163,7 @@ describe("<DangerIconButton> announces itself", () => {
     // fallback shape <SoftDestructiveChip> uses would announce nothing here.
     assertRequiredMember({
       module: "components/danger-icon-button.tsx",
+      declaration: "Props",
       name: "accessibilityLabel",
       type: "string",
       why: "an icon-only control renders no text, so the optional-with-fallback shape would announce nothing",
