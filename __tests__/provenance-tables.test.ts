@@ -111,6 +111,18 @@ function fakeTable(
  */
 const PRESENT_AND_UNREADABLE = "// the module was here and its table was not\n";
 
+/**
+ * The entries whose `classify` may stop the whole run, written by hand.
+ *
+ * A DECISION, and the reason it is not derived from `stopsTheRun`: one entry's
+ * hard failure suppresses every other table's report, so which entries have
+ * that power is a thing somebody chose and should have to re-choose in a diff.
+ * `stopsTheRun` is what the code DOES; this is what was agreed. The case
+ * holding the two against each other is below, and it is the one nobody had
+ * written while both existed.
+ */
+const HARD_FAILERS = new Set(["body-baselines"]);
+
 const base = (
   over: Partial<ProvenanceBaseRevision> = {},
 ): ProvenanceBaseRevision => ({
@@ -363,7 +375,6 @@ describe("PROVENANCE_TABLES — the registry the guard loops over", () => {
     // A source that is present and yields no table — the state each `classify`
     // has to name. Asserted per id rather than counted, because "one of the
     // three" is the fact and WHICH one is the decision.
-    const HARD_FAILERS = new Set(["body-baselines"]);
     for (const table of PROVENANCE_TABLES) {
       const outcome = table.run("guard", {
         ref: "abc123",
@@ -410,6 +421,64 @@ describe("PROVENANCE_TABLES — the registry the guard loops over", () => {
         table.stopsTheRun
           ? `${table.id} declares an unparseable sentence its classify can never reach — prose no run prints and no case proofreads; delete it or give the entry the three-way classification`
           : `${table.id} stops the run on an unreadable module without declaring the sentence that explains it, so the guard halts with a registry bug in place of a diagnosis`,
+      );
+    }
+  });
+
+  it("agrees with the recorded decision about which entries may stop the run", () => {
+    // The two statements of one fact, held against each other — the case that
+    // was missing while both existed. `stopsTheRun` is derived from whether the
+    // entry wrote a sentence; `HARD_FAILERS` is the decision that it may. A
+    // fourth table declaring an unparseable sentence is now a red case naming
+    // the id rather than a quiet fourth entry with the power to suppress every
+    // other table's report.
+    assert.deepEqual(
+      PROVENANCE_TABLES.filter((table) => table.stopsTheRun)
+        .map((table) => table.id)
+        .sort(),
+      [...HARD_FAILERS].sort(),
+      "the entries that declare a hard-failure sentence are no longer the entries agreed to have one — either the decision moved and HARD_FAILERS has not, or a spec grew an unparseable sentence nobody argued for",
+    );
+  });
+
+  it("is swept with a fixture no parser can read, which is a claim about the PARSERS", () => {
+    // `PRESENT_AND_UNREADABLE` stands in for three parsers' failure in four
+    // cases, and it works because none of the three can read a table out of a
+    // bare comment — a property of the parsers, not of the fixture. A parser
+    // that one day accepted an empty table would read it as a legitimate empty
+    // result, and those four cases would keep passing while testing nothing
+    // they claim to.
+    //
+    // The control: each entry's OWN module, which its parser can read. An
+    // evaluated outcome that did not skip the drift half is the parser saying
+    // it found a table, and it is the outcome the fixture must not produce.
+    for (const table of PROVENANCE_TABLES) {
+      const read = table.run("guard", {
+        ref: "abc123",
+        present: true,
+        source: readRepoFile(table.module),
+        changedFiles: [],
+      });
+      assert.equal(
+        read.kind,
+        "evaluated",
+        `${table.id}'s parser could not read ${table.module}, its own module — so the unreadable fixture proves nothing about it`,
+      );
+      assert.equal(
+        read.kind === "evaluated" ? read.driftSkipped : "skipped",
+        null,
+        `${table.id} skipped the drift half against its own module, so "the parser read a table" and "the parser did not" are the same outcome and the fixture cannot tell them apart`,
+      );
+      const unread = table.run("guard", {
+        ref: "abc123",
+        present: true,
+        source: PRESENT_AND_UNREADABLE,
+        changedFiles: [],
+      });
+      assert.notEqual(
+        unread.kind === "evaluated" && unread.driftSkipped === null,
+        true,
+        `${table.id} read a table out of ${JSON.stringify(PRESENT_AND_UNREADABLE)} — the fixture four cases lean on is no longer unreadable`,
       );
     }
   });
