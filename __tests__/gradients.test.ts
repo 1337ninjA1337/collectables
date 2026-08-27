@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { HERO_DARK, HERO_DARK_4, HERO_DARK_5 } from "@/lib/design-tokens";
 import { HERO_DARK_GRADIENT, PHOTO_SCRIM_GRADIENT } from "@/lib/gradients";
+import { assertNoOffenders } from "./helpers/offence-sweep";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { tsxFiles } from "./helpers/source-files";
 
@@ -55,17 +56,23 @@ describe("lib/gradients.ts — PHOTO_SCRIM_GRADIENT", () => {
 
 describe("gradients — adoption across the UI", () => {
   it("no file re-declares the hero colour triplet inline", () => {
-    const offenders = UI_FILES.filter((f) =>
-      /colors=\{\[\s*HERO_DARK_4\s*,\s*HERO_DARK\s*,\s*HERO_DARK_5\s*\]\}/.test(read(f)),
-    );
-    assert.deepEqual(offenders, [], "these files should spread HERO_DARK_GRADIENT instead");
+    assertNoOffenders({
+      rule: /colors=\{\[\s*HERO_DARK_4\s*,\s*HERO_DARK\s*,\s*HERO_DARK_5\s*\]\}/,
+      files: UI_FILES,
+      read,
+      subject: "files",
+      instead: "re-declare the hero colour triplet inline — spread HERO_DARK_GRADIENT instead",
+    });
   });
 
   it("no file re-declares the cover-photo scrim inline", () => {
-    const offenders = UI_FILES.filter((f) =>
-      /colors=\{\[\s*"rgba\(34, 24, 17, 0\.08\)"/.test(read(f)),
-    );
-    assert.deepEqual(offenders, [], "these files should spread PHOTO_SCRIM_GRADIENT instead");
+    assertNoOffenders({
+      rule: /colors=\{\[\s*"rgba\(34, 24, 17, 0\.08\)"/,
+      files: UI_FILES,
+      read,
+      subject: "files",
+      instead: "re-declare the cover-photo scrim inline — spread PHOTO_SCRIM_GRADIENT instead",
+    });
   });
 
   it("every <LinearGradient> in the repo either spreads a shared recipe or is genuinely one-off", () => {
