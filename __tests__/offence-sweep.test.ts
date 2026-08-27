@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { assertNoOffenders } from "./helpers/offence-sweep";
+import { assertNoOffenders, assertOnlyTheseMatch } from "./helpers/offence-sweep";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 import { suiteCode, suiteFiles } from "./helpers/suite-files";
 
@@ -173,6 +173,99 @@ describe("assertNoOffenders", () => {
   });
 });
 
+describe("assertOnlyTheseMatch", () => {
+  it("passes when exactly the sanctioned files match", () => {
+    assert.doesNotThrow(() =>
+      assertOnlyTheseMatch({
+        rule: FORBIDDEN,
+        files: FILES,
+        read,
+        expected: ["offends.ts", "also-offends.ts"],
+        subject: "modules",
+        what: "use the sanctioned form",
+      }),
+    );
+  });
+
+  it("names an unsanctioned match", () => {
+    assert.throws(
+      () =>
+        assertOnlyTheseMatch({
+          rule: FORBIDDEN,
+          files: FILES,
+          read,
+          expected: ["offends.ts"],
+          subject: "modules",
+          what: "use the sanctioned form",
+        }),
+      /also-offends\.ts/,
+    );
+  });
+
+  it("names a sanctioned file that has STOPPED matching, which the other shape cannot", () => {
+    // The half an `exempt` list drops. An allowlist entry that no longer does
+    // the thing is a hole standing open, and nothing about it looks stale.
+    assert.throws(
+      () =>
+        assertOnlyTheseMatch({
+          rule: FORBIDDEN,
+          files: FILES,
+          read,
+          expected: ["offends.ts", "also-offends.ts", "clean.ts"],
+          subject: "modules",
+          what: "use the sanctioned form",
+        }),
+      /clean\.ts/,
+    );
+  });
+
+  it("refuses an expected file the walk never reaches", () => {
+    // A claim about a file nobody reads is a claim about nothing, and it is
+    // the failure mode this shape has that the offender shape does not: the
+    // walk narrows, the allowlist keeps naming a path outside it, and the
+    // sweep goes on passing.
+    assert.throws(
+      () =>
+        assertOnlyTheseMatch({
+          rule: FORBIDDEN,
+          files: ["clean.ts"],
+          read,
+          expected: ["offends.ts"],
+          subject: "modules",
+          what: "use the sanctioned form",
+        }),
+      /not in the walk at all/,
+    );
+  });
+
+  it("refuses a stateful rule and an empty walk, like its sibling", () => {
+    assert.throws(
+      () =>
+        assertOnlyTheseMatch({
+          rule: /FORBIDDEN/g,
+          files: FILES,
+          read,
+          expected: ["offends.ts", "also-offends.ts"],
+          subject: "modules",
+          what: "use the sanctioned form",
+        }),
+      /lastIndex/,
+    );
+    assert.throws(
+      () =>
+        assertOnlyTheseMatch({
+          rule: FORBIDDEN,
+          files: [],
+          read,
+          expected: [],
+          subject: "modules",
+          what: "use the sanctioned form",
+        }),
+      /walked no files/,
+    );
+  });
+});
+
 describe("the sweeps built on it", () => {
   /**
    * The two shipped walks, asserted to be non-empty here as well as inside the
@@ -210,11 +303,11 @@ describe("the sweeps built on it", () => {
     const adopters = suiteFiles().filter(
       (suite) =>
         !DECLARING.includes(suite) &&
-        /\bassertNoOffenders\b/.test(suiteCode(suite)),
+        /\bassertNoOffenders\b|\bassertOnlyTheseMatch\b/.test(suiteCode(suite)),
     );
     assert.ok(
-      adopters.length >= 5,
-      `only ${adopters.length} suites sweep through assertNoOffenders (${adopters.join(", ")}) — the floor is 5, and a sweep that went back to walk.filter(...) + deepEqual([]) has given up the stateful-rule and empty-walk refusals`,
+      adopters.length >= 8,
+      `only ${adopters.length} suites sweep through this module (${adopters.join(", ")}) — the floor is 8, and a sweep that went back to walk.filter(...) + deepEqual([]) has given up the stateful-rule and empty-walk refusals`,
     );
   });
 });

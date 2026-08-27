@@ -7,6 +7,7 @@ import {
   assertMatchesInEveryNonBaseLocaleBody,
   localeStrings,
 } from "./helpers/i18n-locales";
+import { assertNoOffenders } from "./helpers/offence-sweep";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
@@ -174,8 +175,17 @@ describe("sheet search rows — every consumer uses the shared component", () =>
 
   it("leaves exactly one declaration of the row shape in the repo", () => {
     // The magnifier + close-circle icon pair is the fingerprint of this row.
-    const declarations = CONSUMERS.map((rel) => read(rel)).filter((src) => /name="close-circle"[\s\S]{0,200}size=\{18\}/.test(src));
-    assert.deepEqual(declarations, [], "a consumer still hand-rolls the clear chip");
+    // Through the shared sweep, which reports the FILE. The hand-written form
+    // mapped the consumers to their sources before filtering, so an offender
+    // came back as a 900-line string and the message could not name it — the
+    // reader was told "a consumer" and left to find which.
+    assertNoOffenders({
+      rule: /name="close-circle"[\s\S]{0,200}size=\{18\}/,
+      files: CONSUMERS,
+      read,
+      subject: "consumers",
+      instead: "still hand-roll the clear chip instead of rendering <SheetSearchRow>",
+    });
   });
 });
 

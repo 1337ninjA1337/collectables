@@ -40,6 +40,7 @@ import {
   findInlineHexLiterals,
   isHexAllowlisted,
 } from "@/lib/check-inline-hex";
+import { assertOnlyTheseMatch } from "./helpers/offence-sweep";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 const TAG_CONSUMERS = ["app/create.tsx", "app/item/[id].tsx"] as const;
@@ -74,15 +75,14 @@ describe("TAG_COLORS shared rotation", () => {
   });
 
   it("is defined exactly once across app/, components/ and lib/", () => {
-    const definitions = [
-      "lib/design-tokens.ts",
-      ...TAG_CONSUMERS,
-    ].filter((file) => /(?:^|\n)(?:export )?const TAG_COLORS\b/.test(read(file)));
-    assert.deepEqual(
-      definitions,
-      ["lib/design-tokens.ts"],
-      "TAG_COLORS must have a single definition — re-inlining a copy re-opens the drift class",
-    );
+    assertOnlyTheseMatch({
+      rule: /(?:^|\n)(?:export )?const TAG_COLORS\b/,
+      files: ["lib/design-tokens.ts", ...TAG_CONSUMERS],
+      read,
+      expected: ["lib/design-tokens.ts"],
+      subject: "modules",
+      what: "declare TAG_COLORS — re-inlining a copy re-opens the drift class the promotion closed, and the token module losing the declaration would leave the sweep with nothing to find",
+    });
   });
 
   for (const file of TAG_CONSUMERS) {

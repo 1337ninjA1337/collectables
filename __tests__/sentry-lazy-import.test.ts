@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { assertOnlyTheseMatch } from "./helpers/offence-sweep";
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, sourceFiles } from "./helpers/source-files";
 
@@ -51,14 +52,20 @@ describe("sentry lazy-import invariant", () => {
   });
 
   it("no app code statically imports the SDK outside the allowlist", () => {
-    const offenders = sourceFiles(...APP_CODE_DIRS)
-      .filter((rel) => STATIC_IMPORT.test(readSource(rel)))
-      .sort();
-    assert.deepEqual(
-      offenders,
-      [...ALLOWLIST].sort(),
-      "static @sentry/react-native imports are only sanctioned in app/_layout.tsx (Sentry.wrap + ErrorBoundary must wrap the root at module scope); route everything else through @/lib/sentry",
-    );
+    // Both directions, which the sorted deepEqual also gave and the shared
+    // sweep now says out loud: an unsanctioned import is the failure everyone
+    // expects, and an allowlist entry that stopped importing is the one that
+    // leaves a hole nobody would notice — plus the refusals the hand-written
+    // loop had no room for (a stateful rule, an empty walk, an allowlist entry
+    // the walk never reaches).
+    assertOnlyTheseMatch({
+      rule: STATIC_IMPORT,
+      files: sourceFiles(...APP_CODE_DIRS),
+      read: readSource,
+      expected: ALLOWLIST,
+      subject: "modules",
+      what: "statically import @sentry/react-native — sanctioned only in app/_layout.tsx, where Sentry.wrap + ErrorBoundary must wrap the root at module scope; everything else routes through @/lib/sentry",
+    });
   });
 
   it("the allowlisted layout uses the static import for wrap/boundary only", () => {
