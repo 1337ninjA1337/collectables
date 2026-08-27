@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { PRIVACY_BODY_BASELINES } from "../lib/privacy-body-baselines";
 import { PRIVACY_TRANSLATION_SOURCES } from "../lib/privacy-translated-section";
 import {
+  HARD_FAILURE_IDS,
   PROVENANCE_TABLES,
   changedFilesRefusal,
   defineProvenanceTable,
@@ -112,16 +113,22 @@ function fakeTable(
 const PRESENT_AND_UNREADABLE = "// the module was here and its table was not\n";
 
 /**
- * The entries whose `classify` may stop the whole run, written by hand.
+ * The entries whose `classify` may stop the whole run.
  *
  * A DECISION, and the reason it is not derived from `stopsTheRun`: one entry's
  * hard failure suppresses every other table's report, so which entries have
  * that power is a thing somebody chose and should have to re-choose in a diff.
- * `stopsTheRun` is what the code DOES; this is what was agreed. The case
- * holding the two against each other is below, and it is the one nobody had
- * written while both existed.
+ * `stopsTheRun` is what the code DOES; `HARD_FAILURE_IDS` is what was agreed.
+ *
+ * It used to be written out here, which put the only statement of the decision
+ * in a test file: a reader who opened `lib/provenance-tables.ts` to decide
+ * whether their new entry may stop the run found the derived flag and nothing
+ * saying who is allowed to set it. It lives beside the registry now, and the
+ * comparison is a refusal `provenanceRegistryRefusal` makes on every run rather
+ * than a case only `npm test` reaches — see the cases below, which check the
+ * refusal in both directions.
  */
-const HARD_FAILERS = new Set(["body-baselines"]);
+const HARD_FAILERS = new Set(HARD_FAILURE_IDS);
 
 const base = (
   over: Partial<ProvenanceBaseRevision> = {},
@@ -426,18 +433,32 @@ describe("PROVENANCE_TABLES — the registry the guard loops over", () => {
   });
 
   it("agrees with the recorded decision about which entries may stop the run", () => {
-    // The two statements of one fact, held against each other — the case that
-    // was missing while both existed. `stopsTheRun` is derived from whether the
-    // entry wrote a sentence; `HARD_FAILERS` is the decision that it may. A
-    // fourth table declaring an unparseable sentence is now a red case naming
-    // the id rather than a quiet fourth entry with the power to suppress every
-    // other table's report.
+    // The two statements of one fact, held against each other. `stopsTheRun` is
+    // derived from whether the entry wrote a sentence; `HARD_FAILURE_IDS` is the
+    // decision that it may. A fourth table declaring an unparseable sentence is
+    // a red case naming the id rather than a quiet fourth entry with the power
+    // to suppress every other table's report.
     assert.deepEqual(
       PROVENANCE_TABLES.filter((table) => table.stopsTheRun)
         .map((table) => table.id)
         .sort(),
-      [...HARD_FAILERS].sort(),
-      "the entries that declare a hard-failure sentence are no longer the entries agreed to have one — either the decision moved and HARD_FAILERS has not, or a spec grew an unparseable sentence nobody argued for",
+      [...HARD_FAILURE_IDS].sort(),
+      "the entries that declare a hard-failure sentence are no longer the entries agreed to have one — either the decision moved and HARD_FAILURE_IDS has not, or a spec grew an unparseable sentence nobody argued for",
+    );
+  });
+
+  it("records the decision beside the registry rather than in this suite", () => {
+    // The point of moving it: somebody deciding whether their new entry may stop
+    // the run reads the module the entry lives in. A list re-typed here would
+    // pass this file's own cases and leave that reader where they were.
+    const module = stripComments(readRepoFile("lib/provenance-tables.ts"));
+    assert.ok(
+      module.includes("export const HARD_FAILURE_IDS"),
+      "lib/provenance-tables.ts no longer exports the recorded hard-failure decision, so this suite is asserting against a list of its own",
+    );
+    assert.ok(
+      HARD_FAILURE_IDS.length > 0,
+      "the recorded decision is empty, which would make the agreement cases vacuous in the one direction that matters",
     );
   });
 
@@ -525,14 +546,83 @@ describe("PROVENANCE_TABLES — the registry the guard loops over", () => {
 
   it("refuses two entries registered under one id", () => {
     const [first] = PROVENANCE_TABLES;
-    const refusal = provenanceRegistryRefusal("guard", [
-      first,
-      { ...first, module: "lib/somewhere-else.ts" },
-    ]);
+    const refusal = provenanceRegistryRefusal(
+      "guard",
+      [first, { ...first, module: "lib/somewhere-else.ts" }],
+      [first.id],
+    );
     assert.ok(refusal !== null);
     assert.ok(
       refusal.includes(`"${first.id}"`),
       `the refusal does not name the duplicated id: ${refusal}`,
+    );
+  });
+
+  it("refuses an entry that grew the power to stop the run without being recorded", () => {
+    // The failure the recorded list exists for, and the reason it is a refusal
+    // rather than only a case: the first unparseable outcome halts the guard
+    // before any later table prints, so an entry that quietly grows a sentence
+    // suppresses its neighbours' reports on a real run.
+    const stopper = fakeTable().table;
+    const refusal = provenanceRegistryRefusal("guard", [stopper], []);
+    assert.ok(refusal !== null);
+    assert.match(refusal, /^guard: ERROR — /);
+    assert.ok(
+      refusal.includes(`"${stopper.id}"`),
+      `the refusal does not name the unrecorded hard failer: ${refusal}`,
+    );
+    assert.match(refusal, /HARD_FAILURE_IDS/);
+    assert.match(refusal, /lib\/provenance-tables\.ts/);
+  });
+
+  it("refuses a recorded id that no longer stops the run", () => {
+    // The other direction, and not a pedantry: an id left in the list after its
+    // entry collapsed reads as "this table halts the guard" to the next person
+    // deciding whether theirs may, and the blast radius they are weighing is the
+    // thing the list is supposed to be an honest count of.
+    const collapsed = fakeTable({ declaresUnparseable: false }).table;
+    const refusal = provenanceRegistryRefusal(
+      "guard",
+      [collapsed],
+      [collapsed.id],
+    );
+    assert.ok(refusal !== null);
+    assert.ok(
+      refusal.includes(`"${collapsed.id}"`),
+      `the refusal does not name the id it could not find a sentence behind: ${refusal}`,
+    );
+    assert.match(refusal, /no longer stops the run/);
+  });
+
+  it("names both halves when the decision and the entries disagree in both directions", () => {
+    // One run, two mistakes: a swap. Naming only the half the check happened to
+    // look at first would send the reader back for the second refusal.
+    const stopper = fakeTable().table;
+    const collapsed = {
+      ...fakeTable({ declaresUnparseable: false }).table,
+      id: "collapsed",
+    };
+    const refusal = provenanceRegistryRefusal(
+      "guard",
+      [stopper, collapsed],
+      ["collapsed"],
+    );
+    assert.ok(refusal !== null);
+    assert.ok(
+      refusal.includes(`"${stopper.id}"`) && refusal.includes(`"collapsed"`),
+      `the refusal names only one side of the swap: ${refusal}`,
+    );
+  });
+
+  it("says nothing about the decision when the entries and the list agree", () => {
+    const collapsed = fakeTable({ declaresUnparseable: false }).table;
+    assert.equal(
+      provenanceRegistryRefusal(
+        "guard",
+        [fakeTable().table, { ...collapsed, id: "collapsed" }],
+        [fakeTable().table.id],
+      ),
+      null,
     );
   });
 

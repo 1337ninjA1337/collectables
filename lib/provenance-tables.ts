@@ -382,6 +382,33 @@ export const PROVENANCE_TABLES: readonly ProvenanceTable[] = [
 ];
 
 /**
+ * WHICH entries are allowed to stop the whole run — the decision, written by
+ * hand, in the module a reader opens to make it.
+ *
+ * {@link ProvenanceTable.stopsTheRun} is what the code DOES: it is derived,
+ * true exactly when the entry wrote an {@link ProvenanceTableSpec.unparseable}
+ * sentence. This is what was AGREED, and the two are held against each other by
+ * {@link provenanceRegistryRefusal} on every run. The pair is not a duplication
+ * for the same reason the empty-registry refusal is not one: an entry can grow
+ * a hard-failure sentence in a diff nobody reads as a decision about the other
+ * tables, and this list is the line that diff has to touch.
+ *
+ * What it costs to add an id here, stated where the adding happens: the first
+ * `unparseable` outcome stops the run, so every entry after it in
+ * {@link PROVENANCE_TABLES} loses its report. A mangled module in a new hard
+ * failer suppresses a neighbour's failure that would have been perfectly
+ * readable. That blast radius is the whole reason the power is enumerated
+ * rather than assumed, and it is why an entry earns it only when its parser is
+ * old enough that "the module was there and yielded nothing" means a reformat
+ * defeated the parser rather than that the parser is simply new — the reading
+ * each collapsed entry's own comment makes for itself.
+ *
+ * Adding an entry to {@link PROVENANCE_TABLES} does not require touching this
+ * list; giving one an `unparseable` sentence does.
+ */
+export const HARD_FAILURE_IDS: readonly string[] = ["body-baselines"];
+
+/**
  * Why the registry is worth checking BEFORE looping over it, and the one new
  * failure mode the loop introduced.
  *
@@ -397,6 +424,17 @@ export const PROVENANCE_TABLES: readonly ProvenanceTable[] = [
  * Two entries with one id would be worse than a missing one, because the
  * reports would still print: `PROVENANCE_TABLES` is addressed by id in the
  * suites, so the second entry is the one nobody's case ever reaches.
+ *
+ * And the third thing checked here is not a shape at all but a DECISION:
+ * {@link HARD_FAILURE_IDS} against the entries that actually stop the run. That
+ * comparison lived in a suite, which meant a reader opening this module to
+ * decide whether their new entry may stop the run found `stopsTheRun` and no
+ * statement of who is allowed to set it. It is a refusal rather than a case
+ * because the consequence is a shipped one: an entry that quietly grows an
+ * unparseable sentence suppresses every later table's report the first time its
+ * module is unreadable, and the run it suppresses them in is this one.
+ * `agreedHardFailers` is a parameter so a fabricated registry can be judged
+ * against its own decision instead of the shipped one.
  *
  * Returns the refusal, or null when the registry is fit to run.
  */
@@ -467,9 +505,18 @@ export function changedFilesRefusal(
   );
 }
 
+/** Ids in `left` that `right` does not hold, in `left`'s own order. */
+function idsMissingFrom(
+  left: readonly string[],
+  right: ReadonlySet<string>,
+): readonly string[] {
+  return left.filter((id) => !right.has(id));
+}
+
 export function provenanceRegistryRefusal(
   checkName: string,
   tables: readonly ProvenanceTable[],
+  agreedHardFailers: readonly string[] = HARD_FAILURE_IDS,
 ): string | null {
   if (tables.length === 0) {
     return checkError(
@@ -483,6 +530,26 @@ export function provenanceRegistryRefusal(
     return checkError(
       checkName,
       `two provenance tables are registered as "${duplicate}" in lib/provenance-tables.ts. Both would run, and every case that addresses a table by id would reach only the first, so the second is guarded by nothing.`,
+    );
+  }
+  const agreed = new Set(agreedHardFailers);
+  const declared = tables
+    .filter((table) => table.stopsTheRun)
+    .map((table) => table.id);
+  const unagreed = idsMissingFrom(declared, agreed);
+  const unclaimed = idsMissingFrom(agreedHardFailers, new Set(declared));
+  if (unagreed.length > 0 || unclaimed.length > 0) {
+    const halves = [
+      unagreed.length > 0
+        ? `${unagreed.map((id) => `"${id}"`).join(", ")} declare${unagreed.length === 1 ? "s" : ""} an unparseable sentence without being listed`
+        : null,
+      unclaimed.length > 0
+        ? `${unclaimed.map((id) => `"${id}"`).join(", ")} ${unclaimed.length === 1 ? "is" : "are"} listed and no longer stop${unclaimed.length === 1 ? "s" : ""} the run`
+        : null,
+    ].filter((half): half is string => half !== null);
+    return checkError(
+      checkName,
+      `the provenance entries that can stop the whole run are not the ones HARD_FAILURE_IDS records: ${halves.join(", and ")}. The first unparseable outcome halts the guard before any later table prints its report, so which entries hold that power is a decision rather than a side effect of writing a sentence. Reconcile the two in lib/provenance-tables.ts: either add the id to HARD_FAILURE_IDS and say beside its classify why its parser is old enough to be trusted, or collapse the classification into "absent" and let its driftSkipped line say the drift half sat out.`,
     );
   }
   return null;
