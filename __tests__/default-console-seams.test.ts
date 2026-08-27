@@ -286,6 +286,21 @@ describe("the global console in the suites", () => {
     }
   });
 
+  it("leaves the seam it argues for alone, which is what a widening would break", () => {
+    // The imported pattern's negative side, asserted where it is RELIED ON. A
+    // rule edited into matching more still matches the helper and still
+    // matches the guard's probe, so neither positive control notices; what
+    // notices is a case saying that reading a console method, comparing one,
+    // and configuring a local wrapper are all fine.
+    for (const innocent of [
+      `const write = ${CONSOLE}.log;`,
+      `if (${CONSOLE}.warn === original) return;`,
+      `my${CONSOLE}.log = () => {};`,
+    ]) {
+      assert.doesNotMatch(innocent, CONSOLE_SWAP, `the ban over-reads: ${innocent}`);
+    }
+  });
+
   it("bans the streams CAPTURED does not name either, since the rule is the global", () => {
     // The rule is "do not assign to the global console", not "do not assign to
     // these five" — `console.dir` and `console.table` outlive their swapper the

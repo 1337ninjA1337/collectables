@@ -2,7 +2,7 @@ import { stripComments } from "@/lib/strip-comments";
 
 /**
  * Scanner behind `scripts/check-console-swap.ts` (`npm run lint:console-swap`):
- * shipped code may not assign to a method of the global `console`.
+ * shipped code may not assign to any property of the global `console`.
  *
  * The suites already had this rule — `__tests__/default-console-seams.test.ts`
  * bans the hand-rolled swap there, because a swap saves and restores ONE stream
@@ -56,6 +56,13 @@ import { stripComments } from "@/lib/strip-comments";
  * ban rather than restated, so a stream added there is banned by the same edit
  * that captures it.
  *
+ * `\bconsole` RATHER THAN `console`, because the widened dotted half made an
+ * old looseness reachable: without the boundary, any identifier ENDING in the
+ * word matched, so `myconsole.log = noop` — a local wrapper being configured,
+ * not the global being replaced — was an offender the report could only
+ * describe as one. Nothing in this tree is named that way, which is exactly
+ * why it would have been found by whoever wrote the first one.
+ *
  * NO `g` FLAG, deliberately. `.test` on a global pattern advances `lastIndex`
  * between calls, so a pattern reused across a file walk skips every other file
  * and the sweep goes green having read half the tree. The scanner below calls
@@ -63,7 +70,7 @@ import { stripComments } from "@/lib/strip-comments";
  * `__tests__/helpers/offence-sweep.ts` refuses a `g` rule outright; this module
  * exports one pattern and pins the property with a case instead.
  */
-export const CONSOLE_SWAP = /console\s*(?:\.\w+|\[[^\]]+\])\s*=[^=]/;
+export const CONSOLE_SWAP = /\bconsole\s*(?:\.\w+|\[[^\]]+\])\s*=[^=]/;
 
 export type ConsoleSwap = {
   readonly file: string;
@@ -120,7 +127,7 @@ export function formatConsoleSwapReport(
     (swap) => `  ${swap.file}:${swap.line}  ${swap.snippet}`,
   );
   return [
-    `${checkName}: ${swaps.length} assignment(s) to a global console method:`,
+    `${checkName}: ${swaps.length} assignment(s) to a property of the global console:`,
     ...lines,
     "",
     "The global console outlives whatever swapped it: in the app it stays swapped for the session, silencing every other caller's warnings including the ones a crash report would have carried; in a guard script the next guard's report goes into somebody's array. Take an injected writer instead — every module in lib/ that logs already has one, defaulting to console at the call site. Suites have their own answer for the same problem: captureConsole/beginCapture in __tests__/helpers/capture-console.ts, which is the ONE place in this repository allowed to do this.",

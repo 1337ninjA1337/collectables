@@ -42,7 +42,7 @@ export const LINT_GUARDS: readonly LintGuard[] = [
     scriptPath: "scripts/check-console-swap.ts",
     args: [],
     description:
-      "No assignment to a global console method in app/components/lib/scripts — the swap outlives its caller; take an injected writer (the suites have captureConsole for their half)",
+      "No assignment to a property of the global console in app/components/lib/scripts — the swap outlives its caller; take an injected writer (the suites have captureConsole for their half)",
   },
   {
     npmScript: "lint:a11y-jsx",
