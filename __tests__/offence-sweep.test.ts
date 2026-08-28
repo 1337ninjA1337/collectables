@@ -704,6 +704,19 @@ describe("the sweeps built on it", () => {
    * so a renamed const or a deleted case leaves an entry that matches nothing
    * and excuses nothing, silently. `unseen` is that refusal: an entry this walk
    * never met is stale whatever the reason.
+   *
+   * ONE READER PER HOLE, not one per rule. The first version of this asked
+   * whether the identifier had a second reader at all, so a rule used by two
+   * sweeps with two exempt lists was satisfied by ONE of them being policed —
+   * and the count then vouched for the other. `privacy-translated-section`
+   * was exactly that: `WHOLE_STRING_HEX_RUN` swept the source tree and the
+   * suites, the suite half is held honest by `assertExemptionsHonest`, and the
+   * source half exempted the declaring module with nothing asking whether it
+   * still offended. It had stopped — the module builds its pattern from
+   * `POLICY_CHECKSUM_LENGTH` and the only whole-string hex left in it is inside
+   * a comment `sourceCode` strips — so the hole stood open over the one module
+   * most likely to re-declare the width. Readers must now number at least the
+   * holes, which is the count that cannot be satisfied by somebody else's case.
    */
   it("share a rule with the case policing the hole, wherever the hole can be asked about", () => {
     /** `suite: RULE` whose exemption is honestly policed by something else. */
@@ -718,10 +731,14 @@ describe("the sweeps built on it", () => {
         if (!call.exempt || call.rule === null) continue;
         if (!/^[A-Za-z_$][\w$]*$/.test(call.rule)) continue;
         // The identifier's readers, minus the one declaration and minus every
-        // `rule:` argument naming it: what is left is a SECOND reader.
+        // `rule:` argument naming it: what is left is what can police a hole.
+        // Held against the number of HOLES this rule opens, not against one,
+        // because a reader answers for the exempt list it actually asks about
+        // and the count cannot tell which that is.
         const uses = [...code.matchAll(new RegExp(`\\b${call.rule}\\b`, "g"))].length;
-        const asRule = calls.filter((other) => other.rule === call.rule).length;
-        const shared = uses > 1 + asRule;
+        const named = calls.filter((other) => other.rule === call.rule);
+        const holes = named.filter((other) => other.exempt).length;
+        const shared = uses - 1 - named.length >= holes;
         const entry = `${suite}: ${call.rule}`;
         seen.push(entry);
         if (POLICED_OTHERWISE.includes(entry)) {

@@ -330,15 +330,21 @@ const WHOLE_STRING_HEX_RUN = /\^\[0-9a-f\]\{\d+\}\$/;
 const HEX_WIDTH_EXEMPT: readonly string[] = ["cloudinary-signed-upload.test.ts"];
 
 /**
- * The module that DECLARES the width, and so is the one place allowed to spell
- * it.
+ * The declaring module needs no exemption, which is the whole point of it.
  *
- * Not in {@link HEX_WIDTH_EXEMPT}: that list is holes in a rule, held honest by
- * a case, and this is the rule's own subject. Exempting the declaration
- * alongside a foreign API's format would put the two in one list and invite the
- * next entry to be neither.
+ * `lib/privacy-translated-section.ts` was exempt from the sweep below on the
+ * reasoning that it DECLARES the width and so is the one place allowed to spell
+ * it. Measured 2026-08-28: it does not spell it. It builds the pattern from
+ * `POLICY_CHECKSUM_LENGTH` — which is exactly what the rule wants of every
+ * module including this one — and the only whole-string run of hex left in the
+ * file is inside a doc comment, which `sourceCode` strips before the rule ever
+ * sees it.
+ *
+ * So the hole stood open over the single module most likely to re-declare the
+ * width, and nothing about it looked stale: the entry was never given an
+ * honesty case, unlike {@link HEX_WIDTH_EXEMPT} one paragraph up. It is gone,
+ * and the sweep now walks the declaring module like everything else.
  */
-const DECLARING_MODULE = "lib/privacy-translated-section.ts";
 
 describe("the policy fingerprint's shape", () => {
   it("is sixteen characters, which is a decision rather than an observation", () => {
@@ -423,7 +429,6 @@ describe("the policy fingerprint's shape", () => {
       rule: WHOLE_STRING_HEX_RUN,
       files: sourceFiles(),
       read: sourceCode,
-      exempt: [DECLARING_MODULE],
       subject: "modules",
       what: "spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN",
     });
