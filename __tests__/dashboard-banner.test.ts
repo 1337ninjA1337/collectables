@@ -154,7 +154,7 @@ describe("dashboard-banner — adoption across the UI", () => {
       read,
       exempt: [COMPONENT, "app/settings.tsx"],
       subject: "files",
-      instead: "render their own chevron row — use <DashboardBanner> instead",
+      what: "render their own chevron row — use <DashboardBanner> instead",
     });
     // Both holes, checked to still be holes. An exempt file that stopped
     // matching is a hole standing open for whoever renders the next chevron,

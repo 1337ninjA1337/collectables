@@ -425,7 +425,7 @@ describe("the policy fingerprint's shape", () => {
       read: sourceCode,
       exempt: [DECLARING_MODULE],
       subject: "modules",
-      instead: "spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN",
+      what: "spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN",
     });
   });
 
@@ -452,7 +452,7 @@ describe("the policy fingerprint's shape", () => {
       read: suiteCode,
       exempt: HEX_WIDTH_EXEMPT,
       subject: "suites",
-      instead: "spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN",
+      what: "spell a hex-fingerprint width instead of importing POLICY_CHECKSUM_PATTERN",
     });
   });
 

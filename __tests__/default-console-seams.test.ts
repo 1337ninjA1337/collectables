@@ -257,7 +257,7 @@ describe("the global console in the suites", () => {
       files: topLevelSuites(),
       read: suiteCode,
       subject: "suites",
-      instead:
+      what:
         "swap a console method by hand instead of going through captureConsole/beginCapture, which saves one stream and loses the rest",
     });
   });

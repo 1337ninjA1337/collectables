@@ -61,7 +61,7 @@ describe("gradients — adoption across the UI", () => {
       files: UI_FILES,
       read,
       subject: "files",
-      instead: "re-declare the hero colour triplet inline — spread HERO_DARK_GRADIENT instead",
+      what: "re-declare the hero colour triplet inline — spread HERO_DARK_GRADIENT instead",
     });
   });
 
@@ -71,7 +71,7 @@ describe("gradients — adoption across the UI", () => {
       files: UI_FILES,
       read,
       subject: "files",
-      instead: "re-declare the cover-photo scrim inline — spread PHOTO_SCRIM_GRADIENT instead",
+      what: "re-declare the cover-photo scrim inline — spread PHOTO_SCRIM_GRADIENT instead",
     });
   });
 
