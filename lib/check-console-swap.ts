@@ -72,6 +72,141 @@ import { stripComments } from "@/lib/strip-comments";
  */
 export const CONSOLE_SWAP = /\bconsole\s*(?:\.\w+|\[[^\]]+\])\s*=[^=]/;
 
+/**
+ * The rule's subject, in the one wording every reader of it prints.
+ *
+ * Four strings said what this rule is and they lived in four files — the
+ * scanner's heading below, the wrapper's clean-tree line, the wrapper's probe
+ * refusal and the `LINT_GUARDS` blurb. Keeping one sentence true across them
+ * was four hand edits, and a fifth reader would have made it five. The check
+ * name was already shared; this is the other half of what those strings say.
+ *
+ * `LINT_GUARDS` does NOT import it — the registry is a pure data module that
+ * depends on no guard, and inverting that for one phrase would make the
+ * registry's imports grow with the guard count. `__tests__/check-console-swap
+ * .test.ts` asserts the blurb still contains this phrase instead, so the
+ * fourth reader is policed rather than merely remembered.
+ */
+export const CONSOLE_SWAP_SUBJECT = "a property of the global console";
+
+/**
+ * The word `console`, never written here as one literal.
+ *
+ * This module is swept by the guard it implements (the walk covers `lib/`), so
+ * every fixture below has to spell the banned form without BEING the banned
+ * form. Four files had independently invented this trick and each explained it
+ * in its own comment; it is stated once here and the fixtures are exported, so
+ * a fifth caller borrows the explanation with the data.
+ */
+const CONSOLE = ["con", "sole"].join("");
+
+/** One `console.<property> = …` line, built without the literal. */
+export function consoleSwapFixture(property: string): string {
+  return `${CONSOLE}.${property} = () => {};`;
+}
+
+/** A line the rule must reach a stated verdict on, and why that verdict. */
+export type ConsoleSwapFixture = {
+  /** The source line, as a scanner would meet it. */
+  readonly line: string;
+  /** True when the line assigns to the global console. */
+  readonly offends: boolean;
+  /** What the line is, for the failure message of whichever suite walks it. */
+  readonly why: string;
+};
+
+/**
+ * Both sides of the rule, in one table two suites walk.
+ *
+ * The negative side used to be asserted in two places that did not agree about
+ * what it covered: `__tests__/check-console-swap.test.ts` pinned the read form,
+ * the comparison form and the wrapper form, while
+ * `__tests__/default-console-seams.test.ts` pinned three lines chosen to be the
+ * ones a widening would break. Two hand-written lists of the same rule is the
+ * two-copies problem the shared `CONSOLE_SWAP` had just solved one level up,
+ * and the sides would have drifted the same way the patterns did — silently,
+ * with both suites still green.
+ *
+ * The `window.` / `globalThis.` rows are the boundary's other half, and they
+ * are must-MATCH on purpose. `\bconsole` reads as "the identifier must be
+ * exactly console"; what it actually says is "the identifier must END at
+ * console", so a qualified spelling of the same global is caught and a local
+ * called `myconsole` is not. Both are right — `window.console` IS the thing the
+ * rule is about — and the difference is invisible from the pattern alone.
+ */
+export const CONSOLE_SWAP_FIXTURES: readonly ConsoleSwapFixture[] = [
+  {
+    line: consoleSwapFixture("warn"),
+    offends: true,
+    why: "the dotted form, which is what a swap is usually written as",
+  },
+  {
+    line: `${CONSOLE}["warn"] = noop;`,
+    offends: true,
+    why: "the bracket form, which means exactly the same thing",
+  },
+  {
+    line: `${CONSOLE}[method] = collect;`,
+    offends: true,
+    why: "the computed form, which is what a loop over method names writes",
+  },
+  {
+    line: `${CONSOLE} [ method ] = collect;`,
+    offends: true,
+    why: "the computed form, spaced the way a formatter might leave it",
+  },
+  {
+    line: consoleSwapFixture("somethingNodeAddsNextYear"),
+    offends: true,
+    why: "a property no version of node has yet — the rule is the global, not an enumerated six",
+  },
+  {
+    line: `window.${consoleSwapFixture("log")}`,
+    offends: true,
+    why: "the window-qualified spelling of the same global, which the boundary admits because the identifier ENDS at console",
+  },
+  {
+    line: `globalThis.${CONSOLE}["warn"] = collect;`,
+    offends: true,
+    why: "the globalThis-qualified spelling, which is the same global under the portable name",
+  },
+  {
+    line: `const write = ${CONSOLE}.log;`,
+    offends: false,
+    why: "reading a method, which is how every default seam in this tree is written — banning it would ban the fix",
+  },
+  {
+    line: `export function log(write: Writer = ${CONSOLE}.error) {}`,
+    offends: false,
+    why: "the default-seam parameter, the shape the rule argues for",
+  },
+  {
+    line: `if (${CONSOLE}.warn === undefined) return;`,
+    offends: false,
+    why: "a comparison — `[^=]` after the `=` is what keeps it out",
+  },
+  {
+    line: `if (${CONSOLE}.warn !== original) throw new Error("swapped");`,
+    offends: false,
+    why: "a negated comparison, which never reaches the `=` at all",
+  },
+  {
+    line: `const swapped = ${CONSOLE}[method] === undefined;`,
+    offends: false,
+    why: "a comparison through the bracket form",
+  },
+  {
+    line: `my${CONSOLE}.log = () => {};`,
+    offends: false,
+    why: "a local wrapper being configured, not the global being replaced — what `\\bconsole` was added for",
+  },
+  {
+    line: `fake${CONSOLE}["warn"] = collect;`,
+    offends: false,
+    why: "the same local-wrapper case through the bracket form",
+  },
+];
+
 export type ConsoleSwap = {
   readonly file: string;
   readonly line: number;
@@ -90,13 +225,14 @@ export type ConsoleSwap = {
  * outside `__tests__/`, so the guard carries its own and refuses to report a
  * clean tree until the scanner has flagged it.
  *
- * SPLIT so that this module's own source does not contain the banned form. The
- * alternative was exempting `lib/check-console-swap.ts` from a sweep that walks
- * `lib/`, which is a hole in the shape of a whole file: a genuine swap written
- * here would then be the one place the rule cannot see. A join is cheaper than
- * an exemption nobody re-reads.
+ * BUILT rather than written, so that this module's own source does not contain
+ * the banned form. The alternative was exempting `lib/check-console-swap.ts`
+ * from a sweep that walks `lib/`, which is a hole in the shape of a whole file:
+ * a genuine swap written here would then be the one place the rule cannot see.
+ * A join is cheaper than an exemption nobody re-reads — and it is now the same
+ * join `CONSOLE_SWAP_FIXTURES` uses, rather than a second copy of the trick.
  */
-export const CONSOLE_SWAP_PROBE = `${"console"}.warn = () => {};\n`;
+export const CONSOLE_SWAP_PROBE = `${consoleSwapFixture("warn")}\n`;
 
 /** Scan one source string for assignments to a console method. */
 export function findConsoleSwaps(
@@ -127,7 +263,7 @@ export function formatConsoleSwapReport(
     (swap) => `  ${swap.file}:${swap.line}  ${swap.snippet}`,
   );
   return [
-    `${checkName}: ${swaps.length} assignment(s) to a property of the global console:`,
+    `${checkName}: ${swaps.length} assignment(s) to ${CONSOLE_SWAP_SUBJECT}:`,
     ...lines,
     "",
     "The global console outlives whatever swapped it: in the app it stays swapped for the session, silencing every other caller's warnings including the ones a crash report would have carried; in a guard script the next guard's report goes into somebody's array. Take an injected writer instead — every module in lib/ that logs already has one, defaulting to console at the call site. Suites have their own answer for the same problem: captureConsole/beginCapture in __tests__/helpers/capture-console.ts, which is the ONE place in this repository allowed to do this.",
