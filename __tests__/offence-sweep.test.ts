@@ -429,6 +429,75 @@ describe("the refusals both shapes share", () => {
   });
 });
 
+/** The two files that DECLARE the shape, so they are never counted as using it. */
+const DECLARING = ["helpers/offence-sweep.ts", "offence-sweep.test.ts"];
+
+/** Every option {@link assertNoOffenders} or {@link assertOnlyTheseMatch} takes. */
+const OPTION_KEYS = "rule|files|read|exempt|expected|subject|what";
+
+/** One call site, as much of it as reading collapsed source can honestly recover. */
+interface SweepCall {
+  /** The `rule:` argument verbatim, or `null` when this walk could not find one. */
+  readonly rule: string | null;
+  /** Whether the call names a hole, which is what gives its rule a second reader. */
+  readonly exempt: boolean;
+}
+
+/**
+ * The sweep calls in one suite, found by opening bracket rather than by shape.
+ *
+ * WHY THE TWO STEPS ARE SEPARATE. Finding a call and reading its arguments are
+ * different reliabilities: an opening `assertNoOffenders({` is the name of the
+ * export followed by two characters, and everything after it is a guess about
+ * formatting. Splitting them is what lets a caller this cannot parse be
+ * REPORTED — one `SweepCall` with a `null` rule — instead of vanishing from a
+ * walk that then declares the tree clean. The previous reader was a single
+ * regex anchored on `rule:` immediately followed by `files:`, so a call written
+ * with `files` first, or built from a spread options object, was not a call it
+ * had ever seen.
+ *
+ * The rule argument is terminated by the next OPTION key rather than by the
+ * next comma, because an inline rule can contain one — `/colors=\{\[\s*
+ * HERO_DARK_4\s*,/` did — and a capture stopping there reports a prefix rather
+ * than the literal a reader has to go and name. Any key ends it, so argument
+ * order is the caller's business.
+ */
+function sweepCalls(code: string): readonly SweepCall[] {
+  const calls: SweepCall[] = [];
+  for (const opening of code.matchAll(
+    /\b(?:assertNoOffenders|assertOnlyTheseMatch)\(\{/g,
+  )) {
+    const from = (opening.index ?? 0) + opening[0].length;
+    // `suiteCode` strips comments and collapses whitespace, so the whole call
+    // arrives on one line and closes at the first `})`. A call this bound cuts
+    // in half loses its rule and is reported as unreadable, which is the loud
+    // failure rather than the silent one.
+    const closes = code.indexOf("})", from);
+    const body = code.slice(from, closes === -1 ? code.length : closes);
+    // Terminated by the next OPTION key in any of its spellings — `files:`,
+    // the shorthand `read,`, or a shorthand `read` sitting last — because a
+    // terminator that only knew `key:` swallowed the shorthand and reported
+    // `RULE, read` as the rule, which is an identifier that is not one.
+    const rule = body.match(
+      new RegExp(`\\brule:\\s*(.*?)\\s*(?:,\\s*(?:${OPTION_KEYS})\\s*(?::|,|$)|,?\\s*$)`),
+    );
+    calls.push({
+      rule: rule ? rule[1].trim() : null,
+      exempt: new RegExp(`\\bexempt\\s*:`).test(body),
+    });
+  }
+  return calls;
+}
+
+/** The suites that sweep through this module, derived rather than listed. */
+function adoptingSuites(): readonly string[] {
+  return suiteFiles().filter(
+    (suite) =>
+      !DECLARING.includes(suite) &&
+      /\bassertNoOffenders\b|\bassertOnlyTheseMatch\b/.test(suiteCode(suite)),
+  );
+}
+
 describe("the sweeps built on it", () => {
   /**
    * The two shipped walks, asserted to be non-empty here as well as inside the
@@ -462,12 +531,7 @@ describe("the sweeps built on it", () => {
    * counts without being added anywhere.
    */
   it("are counted, so the adoption is a number rather than a memory", () => {
-    const DECLARING = ["helpers/offence-sweep.ts", "offence-sweep.test.ts"];
-    const adopters = suiteFiles().filter(
-      (suite) =>
-        !DECLARING.includes(suite) &&
-        /\bassertNoOffenders\b|\bassertOnlyTheseMatch\b/.test(suiteCode(suite)),
-    );
+    const adopters = adoptingSuites();
     assert.ok(
       adopters.length >= 9,
       `only ${adopters.length} suites sweep through this module (${adopters.join(", ")}) — the floor is 9, and a sweep that went back to walk.filter(...) + deepEqual([]) has given up the stateful-rule and empty-walk refusals`,
@@ -492,22 +556,12 @@ describe("the sweeps built on it", () => {
    * the assertion that exists to read it.
    */
   it("name their rule, so the sweep and the case policing its holes can share it", () => {
-    const DECLARING = ["helpers/offence-sweep.ts", "offence-sweep.test.ts"];
     const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
     const inlined: string[] = [];
-    for (const suite of suiteFiles()) {
-      if (DECLARING.includes(suite)) continue;
-      const code = suiteCode(suite);
-      // Anchored on `, files:` rather than on the next comma, because an
-      // inline rule can contain one — `/colors=\{\[\s*HERO_DARK_4\s*,/` did —
-      // and a capture that stopped there would report a prefix rather than the
-      // literal the reader has to go and name. `suiteCode` collapses
-      // whitespace, so the call arrives on one line however it was written.
-      for (const call of code.matchAll(
-        /\b(?:assertNoOffenders|assertOnlyTheseMatch)\(\{\s*rule:\s*(.*?)\s*,\s*files:/g,
-      )) {
-        if (!IDENTIFIER.test(call[1].trim())) {
-          inlined.push(`${suite}: ${call[1].trim()}`);
+    for (const suite of adoptingSuites()) {
+      for (const call of sweepCalls(suiteCode(suite))) {
+        if (call.rule !== null && !IDENTIFIER.test(call.rule)) {
+          inlined.push(`${suite}: ${call.rule}`);
         }
       }
     }
@@ -516,19 +570,114 @@ describe("the sweeps built on it", () => {
       [],
       `these sweeps pass a rule the file cannot name, so the case policing their exempt files has to write the recipe out a second time: ${inlined.join(", ")}`,
     );
-    // The premise: this walk found calls at all. A regex that stopped matching
-    // the call shape reports every sweep clean, which is the failure this whole
-    // module exists to refuse, made about itself.
-    const swept = suiteFiles().filter(
-      (suite) =>
-        !DECLARING.includes(suite) &&
-        /\b(?:assertNoOffenders|assertOnlyTheseMatch)\(\{\s*rule:\s*.*?\s*,\s*files:/.test(
-          suiteCode(suite),
-        ),
+  });
+
+  /**
+   * The premise the case above stands on, stated as an equality rather than a
+   * floor.
+   *
+   * A reader that stopped matching the call shape reports every sweep clean,
+   * which is the failure this whole module exists to refuse, made about itself.
+   * That used to be guarded by "at least nine suites matched the shape I read"
+   * — a number that WAS the current count, so the first sweep written in an
+   * argument order the regex did not know about would have taken the walk from
+   * nine to nine and passed.
+   *
+   * Both halves are derived now. Every suite that names either export must be
+   * one this walk found a call in, and every call it found must be one it could
+   * read a rule out of: a spread options object, a `files`-first call, or a
+   * formatting the `})` bound cuts in half all land in the same list, named.
+   * The floor stays where it belongs — on the adopter count, one case up, where
+   * the number means adoption rather than parseability.
+   */
+  it("are all calls this walk can actually read, so a clean report is about something", () => {
+    const unreadable: string[] = [];
+    for (const suite of adoptingSuites()) {
+      const calls = sweepCalls(suiteCode(suite));
+      if (calls.length === 0) {
+        unreadable.push(`${suite}: names a sweep export and this walk found no call`);
+        continue;
+      }
+      calls.forEach((call, index) => {
+        if (call.rule === null) {
+          unreadable.push(`${suite}: call ${index + 1} of ${calls.length} has no rule this walk could find`);
+        }
+      });
+    }
+    assert.deepEqual(
+      unreadable,
+      [],
+      `these sweeps are invisible to the case that vouches for their rules being named: ${unreadable.join(", ")}`,
+    );
+  });
+
+  /**
+   * A named rule is only worth naming if something else READS it.
+   *
+   * Naming the rule made sharing possible and nothing checked that it happened:
+   * `hero-banner.test.ts` shares its eyebrow recipe between the sweep and the
+   * assert vouching for the exemption because that change did it by hand, and
+   * the next sweep to name a rule could still write the recipe out a second
+   * time in the case below it. So this is the property itself rather than its
+   * precondition — a call that names a HOLE must read its rule somewhere else
+   * in the suite, because the hole's honesty case is asking the sweep's own
+   * question ("would this file still offend") and two copies of the answer
+   * drift the moment one is tightened.
+   *
+   * Only calls carrying `exempt` are held to it. A sweep with no holes has
+   * nothing to police, so its rule legitimately has one reader.
+   *
+   * THE ONE EXEMPTION, and why it is not a loophole. `SOLID_HERO` is policed by
+   * what its exempt file PROTECTS rather than by the rule: the component splits
+   * the fill from the radius across two style objects, so it cannot match a
+   * pattern whose whole subject is the two written together. Sharing the rule
+   * there would assert something false. The entry below is held to that being
+   * still true — an exempt call whose rule IS shared has stopped needing it.
+   */
+  it("share a rule with the case policing the hole, wherever the hole can be asked about", () => {
+    /** `suite: RULE` whose exemption is honestly policed by something else. */
+    const POLICED_OTHERWISE = ["hero-banner.test.ts: SOLID_HERO"];
+    const unshared: string[] = [];
+    const overPoliced: string[] = [];
+    for (const suite of adoptingSuites()) {
+      const code = suiteCode(suite);
+      const calls = sweepCalls(suiteCode(suite));
+      for (const call of calls) {
+        if (!call.exempt || call.rule === null) continue;
+        if (!/^[A-Za-z_$][\w$]*$/.test(call.rule)) continue;
+        // The identifier's readers, minus the one declaration and minus every
+        // `rule:` argument naming it: what is left is a SECOND reader.
+        const uses = [...code.matchAll(new RegExp(`\\b${call.rule}\\b`, "g"))].length;
+        const asRule = calls.filter((other) => other.rule === call.rule).length;
+        const shared = uses > 1 + asRule;
+        const entry = `${suite}: ${call.rule}`;
+        if (POLICED_OTHERWISE.includes(entry)) {
+          if (shared) overPoliced.push(entry);
+        } else if (!shared) {
+          unshared.push(entry);
+        }
+      }
+    }
+    assert.deepEqual(
+      unshared,
+      [],
+      `these sweeps name a hole and name a rule and never put the two together, so the case vouching for the hole is asking its own copy of the question: ${unshared.join(", ")}`,
+    );
+    assert.deepEqual(
+      overPoliced,
+      [],
+      `these entries are recorded as policed by something other than the rule and now read the rule anyway, so the exemption is stale: ${overPoliced.join(", ")}`,
+    );
+    // The premise: a walk that found no exempt-carrying call would report both
+    // directions clean. Four sweeps name holes today; the floor carries one of
+    // slack, since deleting an exemption is an ordinary edit and deleting all
+    // of them is not.
+    const withHoles = adoptingSuites().flatMap((suite) =>
+      sweepCalls(suiteCode(suite)).filter((call) => call.exempt),
     );
     assert.ok(
-      swept.length >= 9,
-      `only ${swept.length} suites matched the call shape this case reads, so it is vouching for sweeps it never saw`,
+      withHoles.length >= 4,
+      `only ${withHoles.length} sweep calls name a hole, so this case is vouching for exemptions it never saw`,
     );
   });
 });
