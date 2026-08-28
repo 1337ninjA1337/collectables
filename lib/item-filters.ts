@@ -1,4 +1,5 @@
 import type { CollectableItem } from "@/lib/types";
+import { compareKeysAsc } from "@/lib/sort-helpers";
 
 /**
  * Pure filter state + matchers shared by the collection-detail screen and the
@@ -272,7 +273,7 @@ function acquiredKey(item: CollectableItem): string | null {
  *  - `cost` — numeric price.
  *  - `acquired` — `YYYY-MM-DD` acquisition date.
  *
- * Two rules make the cost/acquired axes total:
+ * Three rules make every axis total:
  *  1. **Items with no key sort LAST in BOTH directions.** A priceless item is
  *     not "free", and an undated one is not "oldest" — flipping the direction
  *     must not promote the unknowns to the top of the screen. This is why the
@@ -282,6 +283,16 @@ function acquiredKey(item: CollectableItem): string | null {
  *     €10 items would land in whatever order the drag ordering happened to
  *     leave them, so the same collection could render differently after an
  *     unrelated reorder.
+ *  3. **Remaining ties break on `id`**, always ascending. Rule 2 alone does not
+ *     finish the job, and the gap is wider than it looks: the collator runs at
+ *     `sensitivity: "base"`, so "Écu", "ecu" and "ECU" are all EQUAL to it —
+ *     rule 2 leaves every one of those pairs tied, not just literal duplicates.
+ *     And literal duplicates are the common case here anyway: two copies of one
+ *     card, same title, same price, is what a collection app is full of. Until
+ *     this rule the order then fell through to the incoming array, which comes
+ *     from the same id-keyed cloud merge as everything else, so two devices
+ *     could render one collection in two orders. See `lib/sort-helpers.ts` for
+ *     why input order is never a fallback worth relying on.
  *
  * `locale` is a BCP-47 tag — pass the one derived from the user's PINNED app
  * language, not the device's. Omitting it falls back to the JS runtime default,
@@ -312,7 +323,9 @@ export function applySortMode(
     // Negating the comparison (rather than sorting ascending and reversing)
     // keeps equal-title items in their incoming drag order under both
     // directions instead of mirroring them.
-    return [...items].sort((a, b) => sign * collator.compare(a.title, b.title));
+    return [...items].sort(
+      (a, b) => sign * collator.compare(a.title, b.title) || compareKeysAsc(a.id, b.id),
+    );
   }
 
   const keyOf =
@@ -325,13 +338,14 @@ export function applySortMode(
     const bv = keyOf(b);
     // Rule 1 — missing keys sink to the bottom regardless of `sign`.
     if (av === null || bv === null) {
-      if (av === bv) return collator.compare(a.title, b.title);
+      if (av === bv) return collator.compare(a.title, b.title) || compareKeysAsc(a.id, b.id);
       return av === null ? 1 : -1;
     }
     if (av < bv) return -sign;
     if (av > bv) return sign;
-    // Rule 2 — deterministic tiebreak, always ascending by title.
-    return collator.compare(a.title, b.title);
+    // Rules 2 and 3 — deterministic tiebreak, always ascending: collated title
+    // first, then `id` for the pairs the collator itself calls equal.
+    return collator.compare(a.title, b.title) || compareKeysAsc(a.id, b.id);
   });
 }
 
