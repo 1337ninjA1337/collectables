@@ -27,7 +27,7 @@ import {
   subscribeToOwnItems,
 } from "@/lib/supabase-realtime-sync";
 import { userScopedCollectionId } from "@/lib/collections-helpers";
-import { byCreatedAtDesc } from "@/lib/sort-helpers";
+import { byCreatedAtDescThenId } from "@/lib/sort-helpers";
 import {
   appendTransferLogEntry,
 } from "@/lib/marketplace-transfer-log";
@@ -939,7 +939,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     () =>
       localItems
         .filter((item) => item.isWishlist)
-        .sort(byCreatedAtDesc),
+        .sort(byCreatedAtDescThenId),
     [localItems],
   );
 
@@ -1040,7 +1040,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
             if (aHas && bHas) return (a.sortOrder as number) - (b.sortOrder as number);
             if (aHas) return -1;
             if (bHas) return 1;
-            return byCreatedAtDesc(a, b);
+            return byCreatedAtDescThenId(a, b);
           }),
       getCollectionTotalCost: (collectionId) => {
         // A per-collection `currency` override (set via the edit modal or the

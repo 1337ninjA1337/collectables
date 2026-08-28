@@ -1,5 +1,5 @@
 import { ChatMessage } from "@/lib/types";
-import { byCreatedAtAsc, compareIsoDesc } from "@/lib/sort-helpers";
+import { byCreatedAtAscThenId, compareIsoDesc, tieBreakById } from "@/lib/sort-helpers";
 
 /**
  * Chat id is deterministic from the two participant user ids
@@ -27,7 +27,7 @@ export function appendMessage(messages: ChatMessage[], message: ChatMessage): Ch
   if (messages.some((m) => m.id === message.id)) {
     return messages;
   }
-  return [...messages, message].sort(byCreatedAtAsc);
+  return [...messages, message].sort(byCreatedAtAscThenId);
 }
 
 /**
@@ -66,7 +66,10 @@ export function buildChatPreviews(
     const other = getOtherParticipantId(chatId, selfId);
     if (!other) continue;
 
-    const sorted = [...msgs].sort(byCreatedAtAsc);
+    // The tiebreak is not cosmetic here: `last` becomes the preview's
+    // `lastMessage` text, so two messages sharing a millisecond would otherwise
+    // let the chat list show a different one on each device.
+    const sorted = [...msgs].sort(byCreatedAtAscThenId);
     const last = sorted[sorted.length - 1];
     const lastRead = lastReadByChat[chatId] ?? "";
     const unreadCount = sorted.filter((m) => m.fromUserId !== selfId && m.createdAt > lastRead).length;
@@ -80,7 +83,15 @@ export function buildChatPreviews(
     });
   }
 
-  previews.sort((a, b) => compareIsoDesc(a.lastMessageAt, b.lastMessageAt));
+  // `chatId` rather than `id`: a preview has no id of its own, and the chat id
+  // is deterministic from the participant pair (`buildChatId`), so the same two
+  // chats tie-break identically on both sides of the conversation.
+  previews.sort(
+    tieBreakById(
+      (a: ChatPreview, b: ChatPreview) => compareIsoDesc(a.lastMessageAt, b.lastMessageAt),
+      (preview) => preview.chatId,
+    ),
+  );
   return previews;
 }
 
