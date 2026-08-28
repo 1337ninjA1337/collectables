@@ -5,6 +5,7 @@
  */
 
 import { CollectableItem, Collection } from "./types";
+import { byCreatedAtDescThenId, compareKeysAsc } from "./sort-helpers";
 
 /**
  * Naming pattern for system-managed collections (Acquired, Wishlist,
@@ -71,4 +72,40 @@ export function selectOwnedActiveItems(
     (item) =>
       !item.isWishlist && !item.archivedAt && ownedIds.has(item.collectionId),
   );
+}
+
+/**
+ * The collection-detail ordering: the user's manual drag order first, then the
+ * items they never dragged, newest-first.
+ *
+ * Extracted from the inline comparator in `CollectionsProvider` so the rules
+ * below are unit-testable — the provider pulls React Native and cannot be
+ * mounted under `tsx --test`, which left this ordering pinned only by a source
+ * regex even though it is the ordering every collection screen renders.
+ *
+ * Three rules, in order:
+ *  1. **An item WITH a `sortOrder` outranks one without, in that direction
+ *     only.** A dragged item has an explicit place the user chose; an
+ *     undragged one has no opinion, so it sorts after rather than being
+ *     interleaved by timestamp.
+ *  2. **Both dragged → ascending `sortOrder`, ties broken by `id`.**
+ *     `reorderItemsInCollection` writes a dense 0..N-1 run over the whole
+ *     collection (the drag handler appends the unrendered tail precisely so the
+ *     off-screen items keep their places), so one device cannot produce a
+ *     duplicate index. Two can: the same owner reordering on phone and web
+ *     merges per-item by `updated_at`, so one surviving index from each write
+ *     can collide. Without the tiebreak the collision falls through to the
+ *     incoming array, which is the id-keyed cloud-merge order.
+ *  3. **Neither dragged → newest first, ties broken by `id`**
+ *     (`byCreatedAtDescThenId`, for the same reason).
+ */
+export function byCollectionOrder(a: CollectableItem, b: CollectableItem): number {
+  const aHas = typeof a.sortOrder === "number";
+  const bHas = typeof b.sortOrder === "number";
+  if (aHas && bHas) {
+    return (a.sortOrder as number) - (b.sortOrder as number) || compareKeysAsc(a.id, b.id);
+  }
+  if (aHas) return -1;
+  if (bHas) return 1;
+  return byCreatedAtDescThenId(a, b);
 }

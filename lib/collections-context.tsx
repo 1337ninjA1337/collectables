@@ -26,7 +26,7 @@ import {
   subscribeToOwnCollections,
   subscribeToOwnItems,
 } from "@/lib/supabase-realtime-sync";
-import { userScopedCollectionId } from "@/lib/collections-helpers";
+import { byCollectionOrder, userScopedCollectionId } from "@/lib/collections-helpers";
 import { byCreatedAtDescThenId } from "@/lib/sort-helpers";
 import {
   appendTransferLogEntry,
@@ -1034,14 +1034,10 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
               !item.isWishlist &&
               !item.archivedAt,
           )
-          .sort((a, b) => {
-            const aHas = typeof a.sortOrder === "number";
-            const bHas = typeof b.sortOrder === "number";
-            if (aHas && bHas) return (a.sortOrder as number) - (b.sortOrder as number);
-            if (aHas) return -1;
-            if (bHas) return 1;
-            return byCreatedAtDescThenId(a, b);
-          }),
+          // Drag order first, then undragged items newest-first; both tiers tie
+          // on `id`. Lives in collections-helpers so the rules are unit-tested
+          // rather than pinned by a source regex — see `byCollectionOrder`.
+          .sort(byCollectionOrder),
       getCollectionTotalCost: (collectionId) => {
         // A per-collection `currency` override (set via the edit modal or the
         // tap-to-swap chip on the summary card) wins over the user's app-wide
