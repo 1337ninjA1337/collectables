@@ -15,6 +15,7 @@ import {
 } from "./helpers/i18n-locales";
 import { localeKeys } from "@/lib/i18n-source";
 
+import { assertNoOffenders, matchesRule } from "./helpers/offence-sweep";
 import {
   assertExemptionsHonest,
   readSuite,
@@ -489,21 +490,37 @@ describe("the habit stays retired", () => {
    */
   const EXEMPT = ["bundle-smoke.test.ts"];
 
+  /**
+   * The habit, as two conjuncts: the file reads the translations source AND
+   * counts six of something.
+   *
+   * A LIST rather than the `text.includes(…) && /…/.test(text)` this used to
+   * be, so the sweep can go through `assertNoOffenders` and pick up its two
+   * refusals — a stateful pattern skips every other suite, an empty walk proves
+   * nothing — which this sweep carried in prose and in a floor of its own. Both
+   * conjuncts are still checked for the `g` flag, which a single predicate
+   * would have hidden.
+   *
+   * `\s*` rather than a single space: the habit survives prettier wrapping
+   * `assert.equal(\n  matches.length,\n  6,\n)`, and the first draft of this
+   * guard matched only the one-line form — which left three suites reported
+   * clean while still counting.
+   */
+  const COUNTS_LOCALES = [/readI18nSource/, /\.(length|size),\s*6\b/];
+
   it("leaves no suite counting locale hits across the whole translations file", () => {
-    const suites = topLevelSuites().filter((entry) => !EXEMPT.includes(entry));
-    const offenders = suites.filter((entry) => {
-      const text = readSuite(entry);
-      // `\\s*` rather than a single space: the habit survives prettier
-      // wrapping `assert.equal(\n  matches.length,\n  6,\n)`, and the first
-      // draft of this guard matched only the one-line form — which left three
-      // suites reported clean while still counting.
-      return text.includes("readI18nSource") && /\.(length|size),\s*6\b/.test(text);
+    const suites = topLevelSuites();
+    assertNoOffenders({
+      rule: COUNTS_LOCALES,
+      files: suites,
+      read: readSuite,
+      exempt: EXEMPT,
+      subject: "suites",
+      what: "count locale declarations instead of asking each map",
     });
-    assert.deepEqual(
-      offenders,
-      [],
-      `these suites count locale declarations instead of asking each map: ${offenders.join(", ")}`,
-    );
+    // A floor on top of the helper's "walked no files at all": this sweep is
+    // over every top-level suite, so a walk that came back with three of them
+    // is a broken filter rather than a small tree.
     assert.ok(suites.length > 200, `only ${suites.length} suites walked`);
   });
 
@@ -518,9 +535,10 @@ describe("the habit stays retired", () => {
       rule: "the locale-counting rule",
       // Still both halves of what the sweep would catch it for — the six is
       // about build outputs, and it sits in a file that reads the source.
-      stillNeeded: (relative) =>
-        readSuite(relative).includes("readI18nSource") &&
-        /\.(length|size),\s*6\b/.test(readSuite(relative)),
+      // THROUGH THE SAME RULE the sweep uses: the two were written out
+      // separately, so tightening the sweep left this vouching for the hole
+      // against the rule the sweep no longer had.
+      stillNeeded: (relative) => matchesRule(COUNTS_LOCALES, readSuite(relative)),
     });
   });
 });

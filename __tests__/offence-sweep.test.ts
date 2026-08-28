@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { assertNoOffenders, assertOnlyTheseMatch } from "./helpers/offence-sweep";
+import {
+  assertNoOffenders,
+  assertOnlyTheseMatch,
+  matchesRule,
+} from "./helpers/offence-sweep";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 import { suiteCode, suiteFiles } from "./helpers/suite-files";
 
@@ -89,6 +93,71 @@ describe("assertNoOffenders", () => {
     );
   });
 
+  it("takes a compound rule, and offends only when every conjunct matches", () => {
+    // The shape three sweeps in this tree could not adopt: an offence that is a
+    // conjunction, written as `text.includes(…) && /…/.test(text)` inside a
+    // hand-rolled filter and therefore outside both refusals. `also-offends.ts`
+    // is the only file with both halves.
+    assert.throws(
+      () =>
+        assertNoOffenders({
+          rule: [FORBIDDEN, /worse/],
+          files: FILES,
+          read,
+          subject: "modules",
+          what: "do both halves of the thing",
+        }),
+      /these modules do both halves of the thing: also-offends\.ts$/m,
+    );
+  });
+
+  it("refuses a g flag on the conjunct that carries it, not on the rule as a whole", () => {
+    // What the predicate this replaced would have hidden. A closure over a
+    // stateful pattern has nothing in it to read, so the caller would get the
+    // helper's two refusals in name only; a list is still every pattern, and
+    // the message names the one to fix rather than saying "the rule".
+    assert.throws(
+      () =>
+        assertNoOffenders({
+          rule: [FORBIDDEN, /worse/g],
+          files: FILES,
+          read,
+          subject: "modules",
+          what: "offend",
+        }),
+      /carries "g" on worse, so \.test advances lastIndex/,
+    );
+  });
+
+  it("refuses a rule with no conjuncts at all, which would match everything", () => {
+    // A conjunction of nothing is true of everything, so an empty list reports
+    // the whole walk. That is loud, and it is loud in the wrong words: the
+    // reader gets a list of every file and has to work out that the rule, not
+    // the tree, is what changed. A rule reaches this shape by being BUILT — a
+    // filtered list of patterns whose source came back empty.
+    assert.throws(
+      () =>
+        assertNoOffenders({
+          rule: [],
+          files: FILES,
+          read,
+          subject: "modules",
+          what: "offend",
+        }),
+      /rule has no patterns in it, so it matches every file walked/,
+    );
+  });
+
+  it("answers the same question through matchesRule, which is what an exemption asks", () => {
+    // The two readers a compound rule has: the sweep, and the exemption case
+    // asking whether a named hole still needs to be one. Those had been written
+    // out separately per sweep — `stillNeeded` restating the conjunction — so a
+    // rule tightened in one left the other vouching against the old one.
+    assert.equal(matchesRule([FORBIDDEN, /worse/], read("also-offends.ts")), true);
+    assert.equal(matchesRule([FORBIDDEN, /worse/], read("offends.ts")), false);
+    assert.equal(matchesRule(FORBIDDEN, read("offends.ts")), true);
+  });
+
   it("refuses a rule carrying a g flag, because .test would skip every other file", () => {
     // The failure this exists to make impossible: `lastIndex` survives between
     // `.test` calls, so a sweep over a hundred files reads about fifty of them
@@ -102,7 +171,7 @@ describe("assertNoOffenders", () => {
           subject: "modules",
           what: "offend",
         }),
-      /carries "g", so \.test advances lastIndex/,
+      /carries "g" on FORBIDDEN, so \.test advances lastIndex/,
     );
   });
 
@@ -400,8 +469,8 @@ describe("the sweeps built on it", () => {
         /\bassertNoOffenders\b|\bassertOnlyTheseMatch\b/.test(suiteCode(suite)),
     );
     assert.ok(
-      adopters.length >= 8,
-      `only ${adopters.length} suites sweep through this module (${adopters.join(", ")}) — the floor is 8, and a sweep that went back to walk.filter(...) + deepEqual([]) has given up the stateful-rule and empty-walk refusals`,
+      adopters.length >= 9,
+      `only ${adopters.length} suites sweep through this module (${adopters.join(", ")}) — the floor is 9, and a sweep that went back to walk.filter(...) + deepEqual([]) has given up the stateful-rule and empty-walk refusals`,
     );
   });
 });

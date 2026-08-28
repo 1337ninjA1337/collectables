@@ -18,7 +18,9 @@
  *      SKIPS offenders — every other file, in the worst case — and the sweep
  *      goes green while the rule reads half the tree. Two shared patterns in
  *      this repo were flagless by luck and said so only in prose; here it is
- *      refused.
+ *      refused. This is why {@link OffenceRule} takes a LIST of patterns for a
+ *      compound offence rather than the predicate the callers would rather
+ *      write: a predicate is a closure and there is nothing in it to refuse.
  *   2. **The walk may not be empty.** A sweep asserts an ABSENCE, and an empty
  *      file list satisfies any absence perfectly. A walk that stops matching —
  *      a renamed directory, a filter that got too clever — otherwise reads as a
@@ -40,6 +42,43 @@
 import assert from "node:assert/strict";
 
 /**
+ * One pattern, or several that must ALL match before a file offends.
+ *
+ * Three sweeps in this tree could not adopt these helpers because their offence
+ * is a conjunction rather than a pattern — `i18n-locales-helper`'s is "the file
+ * reads the translations source AND counts six of something", which was written
+ * as `text.includes(…) && /…/.test(text)` inside a hand-rolled `filter`. The
+ * obvious fix was a `(source: string) => boolean` predicate, which takes every
+ * such sweep at once and gives up the thing this module exists for: a predicate
+ * can close over a `g`-flagged pattern and the refusal below has nothing to
+ * read. An array keeps every pattern in view, so a stateful one is still
+ * refused by name whichever conjunct it is.
+ *
+ * It does not take the OTHER two shapes — a scan that is per-match rather than
+ * per-file, and the two rules that push offenders out of a line loop — which
+ * need a different walk rather than a different rule.
+ */
+export type OffenceRule = RegExp | readonly RegExp[];
+
+/** The conjuncts of a rule, whether it was written as one pattern or several. */
+function rulePatterns(rule: OffenceRule): readonly RegExp[] {
+  return rule instanceof RegExp ? [rule] : rule;
+}
+
+/**
+ * True when EVERY pattern of `rule` matches `source`.
+ *
+ * Exported because a sweep's exemption case has to ask the same question the
+ * sweep asks — `assertExemptionsHonest`'s `stillNeeded` is "would this file
+ * still offend" — and the two had been written out separately, so a rule
+ * tightened in the sweep left the exemption vouching for a hole against the old
+ * one. One rule, two readers.
+ */
+export function matchesRule(rule: OffenceRule, source: string): boolean {
+  return rulePatterns(rule).every((pattern) => pattern.test(source));
+}
+
+/**
  * The two refusals both shapes owe their caller, checked once.
  *
  * Both exports opened with the same two `assert.ok`s written out word for word,
@@ -56,7 +95,7 @@ import assert from "node:assert/strict";
  * the one they cannot act on.
  */
 function refuseUnsweepableInput(options: {
-  readonly rule: RegExp;
+  readonly rule: OffenceRule;
   readonly files: readonly string[];
   readonly subject: string;
   /** What a stateful rule would skip, in this shape's terms: "offenders", "matches". */
@@ -65,10 +104,20 @@ function refuseUnsweepableInput(options: {
   readonly vacuously: string;
 }): void {
   const { rule, files, subject, skipped, vacuously } = options;
+  const patterns = rulePatterns(rule);
+  // A conjunction of nothing is true of everything, so an empty rule reports
+  // the whole walk as offenders and the reader has to work out from a list of
+  // 200 files that the rule, not the tree, is what changed.
   assert.ok(
-    !rule.global && !rule.sticky,
-    `the ${subject} sweep's rule carries ${JSON.stringify(rule.flags)}, so .test advances lastIndex between files and the filter skips ${skipped} — drop the g/y flag or build a fresh RegExp per file`,
+    patterns.length > 0,
+    `the ${subject} sweep's rule has no patterns in it, so it matches every file walked — an empty conjunct list is a rule that was built rather than written, from a source that came back empty`,
   );
+  for (const pattern of patterns) {
+    assert.ok(
+      !pattern.global && !pattern.sticky,
+      `the ${subject} sweep's rule carries ${JSON.stringify(pattern.flags)} on ${pattern.source}, so .test advances lastIndex between files and the filter skips ${skipped} — drop the g/y flag or build a fresh RegExp per file`,
+    );
+  }
   assert.ok(
     files.length > 0,
     `the ${subject} sweep walked no files at all, so ${vacuously} — the walk stopped matching, which is a failure rather than a clean result`,
@@ -93,7 +142,7 @@ function refuseUnsweepableInput(options: {
  * not a different argument.
  */
 export function assertNoOffenders(options: {
-  readonly rule: RegExp;
+  readonly rule: OffenceRule;
   readonly files: readonly string[];
   readonly read: (relative: string) => string;
   /** Named holes, each of which `assertExemptionsHonest` should also police. */
@@ -112,7 +161,7 @@ export function assertNoOffenders(options: {
     vacuously: "it would pass against a tree that offends everywhere",
   });
   const offenders = files.filter(
-    (relative) => !exempt.includes(relative) && rule.test(read(relative)),
+    (relative) => !exempt.includes(relative) && matchesRule(rule, read(relative)),
   );
   assert.deepEqual(offenders, [], `these ${subject} ${what}: ${offenders.join(", ")}`);
 }
@@ -134,7 +183,7 @@ export function assertNoOffenders(options: {
  * nothing about it looking stale. Both directions are reported here, named.
  */
 export function assertOnlyTheseMatch(options: {
-  readonly rule: RegExp;
+  readonly rule: OffenceRule;
   readonly files: readonly string[];
   readonly read: (relative: string) => string;
   /** The files that must match — the sanctioned set, in any order. */
@@ -158,7 +207,9 @@ export function assertOnlyTheseMatch(options: {
     [],
     `these ${subject} are expected to ${what} and are not in the walk at all, so nothing checks them: ${unwalked.join(", ")}`,
   );
-  const matched = files.filter((relative) => rule.test(read(relative)));
+  const matched = files.filter((relative) =>
+    matchesRule(rule, read(relative)),
+  );
   const unexpected = matched.filter((relative) => !expected.includes(relative));
   const missing = expected.filter((relative) => !matched.includes(relative));
   // ONE assert over a FLAT, LABELLED list rather than over `{unexpected,
