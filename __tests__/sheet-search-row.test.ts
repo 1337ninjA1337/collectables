@@ -184,7 +184,7 @@ describe("sheet search rows — every consumer uses the shared component", () =>
       files: CONSUMERS,
       read,
       subject: "consumers",
-      instead: "still hand-roll the clear chip instead of rendering <SheetSearchRow>",
+      what: "still hand-roll the clear chip instead of rendering <SheetSearchRow>",
     });
   });
 });

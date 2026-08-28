@@ -225,7 +225,7 @@ describe("hero-banner — adoption across the UI", () => {
       // the one file that must match — asserted below rather than assumed.
       exempt: [COMPONENT],
       subject: "files",
-      instead: "re-declare the hero eyebrow — render <HeroBanner> instead",
+      what: "re-declare the hero eyebrow — render <HeroBanner> instead",
     });
     assert.match(
       read(COMPONENT),
@@ -260,7 +260,7 @@ describe("hero-banner — adoption across the UI", () => {
       read,
       exempt: [COMPONENT],
       subject: "files",
-      instead: 're-declare the solid hero — pass tone="solid" instead',
+      what: 're-declare the solid hero — pass tone="solid" instead',
     });
     // The exemption is policed by what it protects rather than by the rule:
     // the component splits the fill from the radius (`hero` carries the

@@ -38,7 +38,7 @@ describe("assertNoOffenders", () => {
         files: ["clean.ts"],
         read,
         subject: "modules",
-        instead: "do the thing",
+        what: "do the thing",
       }),
     );
   });
@@ -51,7 +51,7 @@ describe("assertNoOffenders", () => {
           files: FILES,
           read,
           subject: "modules",
-          instead: "spell the shape instead of importing it",
+          what: "spell the shape instead of importing it",
         }),
       /these modules spell the shape instead of importing it: offends\.ts, also-offends\.ts/,
     );
@@ -66,7 +66,7 @@ describe("assertNoOffenders", () => {
           read,
           exempt: ["offends.ts"],
           subject: "modules",
-          instead: "offend",
+          what: "offend",
         }),
       /these modules offend: also-offends\.ts$/m,
     );
@@ -84,7 +84,7 @@ describe("assertNoOffenders", () => {
         read,
         exempt: ["clean.ts"],
         subject: "modules",
-        instead: "offend",
+        what: "offend",
       }),
     );
   });
@@ -100,7 +100,7 @@ describe("assertNoOffenders", () => {
           files: FILES,
           read,
           subject: "modules",
-          instead: "offend",
+          what: "offend",
         }),
       /carries "g", so \.test advances lastIndex/,
     );
@@ -114,7 +114,7 @@ describe("assertNoOffenders", () => {
           files: FILES,
           read,
           subject: "modules",
-          instead: "offend",
+          what: "offend",
         }),
       /advances lastIndex/,
     );
@@ -131,7 +131,7 @@ describe("assertNoOffenders", () => {
           files: FILES,
           read,
           subject: "modules",
-          instead: "offend",
+          what: "offend",
         }),
       /these modules offend/,
     );
@@ -145,7 +145,7 @@ describe("assertNoOffenders", () => {
           files: [],
           read,
           subject: "suites",
-          instead: "offend",
+          what: "offend",
         }),
       /walked no files at all/,
     );
@@ -166,7 +166,7 @@ describe("assertNoOffenders", () => {
           return read(relative);
         },
         subject: "modules",
-        instead: "offend",
+        what: "offend",
       }),
     );
     assert.deepEqual(seen, ["clean.ts"]);
@@ -262,6 +262,100 @@ describe("assertOnlyTheseMatch", () => {
           what: "use the sanctioned form",
         }),
       /walked no files/,
+    );
+  });
+
+  it("reports BOTH directions in one failure, each path labelled with its kind", () => {
+    // The run where the allowlist is wrong in both directions at once — a file
+    // matching that nobody sanctioned, and a sanctioned file that has stopped.
+    // Two asserts would stop at the first and show half the answer, so both go
+    // through one; the labels are what keep that one from being an object diff
+    // the reader has to decode before reaching the sentence under it.
+    let error: assert.AssertionError | undefined;
+    try {
+      assertOnlyTheseMatch({
+        rule: FORBIDDEN,
+        files: FILES,
+        read,
+        expected: ["offends.ts", "clean.ts"],
+        subject: "modules",
+        what: "use the sanctioned form",
+      });
+    } catch (thrown) {
+      error = thrown as assert.AssertionError;
+    }
+    assert.ok(error !== undefined, "the sweep passed an allowlist wrong both ways");
+    assert.deepEqual(error.actual, [
+      "unsanctioned, use the sanctioned form: also-offends.ts",
+      "sanctioned, no longer does: clean.ts",
+    ]);
+    assert.deepEqual(error.expected, []);
+    assert.match(error.message, /1 unsanctioned modules use the sanctioned form/);
+    assert.match(error.message, /1 sanctioned modules no longer do/);
+  });
+});
+
+describe("the refusals both shapes share", () => {
+  /**
+   * One check, two vocabularies.
+   *
+   * The g/y and empty-walk refusals were written out in both exports, word for
+   * word apart from one noun each. They are checked in one private helper now,
+   * and the nouns that made each message worth reading are still per-shape —
+   * which is the property worth a case, because "say it once" is exactly the
+   * change that would have flattened them into one abstract sentence.
+   */
+  it("tells a stateful rule what it would skip, in each shape's own noun", () => {
+    assert.throws(
+      () =>
+        assertNoOffenders({
+          rule: /FORBIDDEN/g,
+          files: FILES,
+          read,
+          subject: "modules",
+          what: "offend",
+        }),
+      /the filter skips offenders — drop the g\/y flag/,
+    );
+    assert.throws(
+      () =>
+        assertOnlyTheseMatch({
+          rule: /FORBIDDEN/g,
+          files: FILES,
+          read,
+          expected: ["offends.ts", "also-offends.ts"],
+          subject: "modules",
+          what: "use the sanctioned form",
+        }),
+      /the filter skips matches — drop the g\/y flag/,
+    );
+  });
+
+  it("tells an empty walk what it proved, which is a different nothing in each shape", () => {
+    // The offender shape passes an absence; the allowlist shape passes BOTH
+    // halves of a claim. A shared message could only have said one of them.
+    assert.throws(
+      () =>
+        assertNoOffenders({
+          rule: FORBIDDEN,
+          files: [],
+          read,
+          subject: "suites",
+          what: "offend",
+        }),
+      /so it would pass against a tree that offends everywhere — the walk stopped matching/,
+    );
+    assert.throws(
+      () =>
+        assertOnlyTheseMatch({
+          rule: FORBIDDEN,
+          files: [],
+          read,
+          expected: [],
+          subject: "suites",
+          what: "use the sanctioned form",
+        }),
+      /so both halves of its claim are about an empty set — the walk stopped matching/,
     );
   });
 });
