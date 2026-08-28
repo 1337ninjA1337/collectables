@@ -88,10 +88,12 @@ describe("gradients — adoption across the UI", () => {
     // component's own highlight value.
     const ALLOWED_LOCAL = new Set(["components/skeleton.tsx"]);
     const inline: string[] = [];
+    const coloured: string[] = [];
     for (const file of UI_FILES) {
       const src = read(file);
       for (const m of src.matchAll(/<LinearGradient[\s\S]{0,400}?>/g)) {
         if (!/colors=\{/.test(m[0])) continue;
+        coloured.push(file);
         if (!ALLOWED_LOCAL.has(file)) inline.push(file);
       }
     }
@@ -99,6 +101,31 @@ describe("gradients — adoption across the UI", () => {
       [...new Set(inline)],
       [],
       "a new inline gradient appeared — hoist it into lib/gradients.ts or allow-list it",
+    );
+    // The two refusals this loop owes, which `assertNoOffenders` gives its
+    // callers by construction and a hand-rolled per-MATCH walk has to state.
+    // This scan cannot go through the helper — its unit is the element, not the
+    // file — so it says them here.
+    //
+    // The hole, checked to still BE a hole. Nothing asked whether the
+    // allow-listed file still renders the thing it is allowed to render, so an
+    // entry that stopped — the component refactored, renamed, or deleted —
+    // would stand open for whoever hand-rolls the next gradient there, and
+    // nothing about it would look stale.
+    for (const allowed of ALLOWED_LOCAL) {
+      assert.ok(
+        coloured.includes(allowed),
+        `${allowed} is allow-listed for a local gradient and no longer renders one — drop the entry rather than leaving the hole`,
+      );
+    }
+    // And the walk, checked to have walked. A `<LinearGradient` that stopped
+    // matching — the import aliased, the element wrapped — empties `inline` and
+    // reports a clean tree, which is the shape this whole file exists to
+    // refuse. One element is the skeleton's; the floor is what proves the
+    // regex still reads the source at all.
+    assert.ok(
+      coloured.length > 0,
+      "the gradient scan matched no <LinearGradient colors={…}> anywhere, so it is passing against a tree it cannot read",
     );
   });
 
