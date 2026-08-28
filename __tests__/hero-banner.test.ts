@@ -217,8 +217,13 @@ describe("hero-banner — adoption across the UI", () => {
     // than any two of its lines: `app/listing/[id].tsx` renders a legitimately
     // different 11pt amber kicker inside its sold-banner, and a looser regex
     // would flag it forever.
+    // ONE const, read by the sweep AND by the exemption check below. The two
+    // were written out separately — the same four-line recipe twice — so
+    // tightening the rule here would have left the exemption vouching for its
+    // hole against the rule the sweep no longer had.
+    const EYEBROW_RECIPE = /color: AMBER_LIGHT,\s*\n\s*fontSize: 12,\s*\n\s*textTransform: "uppercase",\s*\n\s*letterSpacing: 1\.2,/;
     assertNoOffenders({
-      rule: /color: AMBER_LIGHT,\s*\n\s*fontSize: 12,\s*\n\s*textTransform: "uppercase",\s*\n\s*letterSpacing: 1\.2,/,
+      rule: EYEBROW_RECIPE,
       files: UI_FILES,
       read,
       // The component is the declaration the rule exists to protect, so it is
@@ -229,7 +234,7 @@ describe("hero-banner — adoption across the UI", () => {
     });
     assert.match(
       read(COMPONENT),
-      /color: AMBER_LIGHT,\s*\n\s*fontSize: 12,\s*\n\s*textTransform: "uppercase",\s*\n\s*letterSpacing: 1\.2,/,
+      EYEBROW_RECIPE,
       "the exempt component stopped declaring the eyebrow recipe, so the sweep above is a rule with a hole and nothing left to find",
     );
   });

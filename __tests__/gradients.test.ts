@@ -55,9 +55,16 @@ describe("lib/gradients.ts — PHOTO_SCRIM_GRADIENT", () => {
 });
 
 describe("gradients — adoption across the UI", () => {
+  /** The hero triplet written out on a `colors=` prop instead of spread. */
+  const INLINE_HERO_TRIPLET =
+    /colors=\{\[\s*HERO_DARK_4\s*,\s*HERO_DARK\s*,\s*HERO_DARK_5\s*\]\}/;
+
+  /** The scrim's first stop, which is enough to identify the recipe. */
+  const INLINE_PHOTO_SCRIM = /colors=\{\[\s*"rgba\(34, 24, 17, 0\.08\)"/;
+
   it("no file re-declares the hero colour triplet inline", () => {
     assertNoOffenders({
-      rule: /colors=\{\[\s*HERO_DARK_4\s*,\s*HERO_DARK\s*,\s*HERO_DARK_5\s*\]\}/,
+      rule: INLINE_HERO_TRIPLET,
       files: UI_FILES,
       read,
       subject: "files",
@@ -67,7 +74,7 @@ describe("gradients — adoption across the UI", () => {
 
   it("no file re-declares the cover-photo scrim inline", () => {
     assertNoOffenders({
-      rule: /colors=\{\[\s*"rgba\(34, 24, 17, 0\.08\)"/,
+      rule: INLINE_PHOTO_SCRIM,
       files: UI_FILES,
       read,
       subject: "files",

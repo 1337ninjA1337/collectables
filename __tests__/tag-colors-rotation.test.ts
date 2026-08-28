@@ -74,9 +74,12 @@ describe("TAG_COLORS shared rotation", () => {
     assert.equal(new Set(TAG_COLORS).size, TAG_COLORS.length);
   });
 
+  /** A `const TAG_COLORS` declaration at the start of a line, exported or not. */
+  const DECLARES_TAG_COLORS = /(?:^|\n)(?:export )?const TAG_COLORS\b/;
+
   it("is defined exactly once across app/, components/ and lib/", () => {
     assertOnlyTheseMatch({
-      rule: /(?:^|\n)(?:export )?const TAG_COLORS\b/,
+      rule: DECLARES_TAG_COLORS,
       files: ["lib/design-tokens.ts", ...TAG_CONSUMERS],
       read,
       expected: ["lib/design-tokens.ts"],

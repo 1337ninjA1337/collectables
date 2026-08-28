@@ -473,4 +473,62 @@ describe("the sweeps built on it", () => {
       `only ${adopters.length} suites sweep through this module (${adopters.join(", ")}) — the floor is 9, and a sweep that went back to walk.filter(...) + deepEqual([]) has given up the stateful-rule and empty-walk refusals`,
     );
   });
+
+  /**
+   * Every adopter's rule is a NAMED const, not a literal typed into the call.
+   *
+   * Not a style preference. A sweep's rule has a second reader — the case
+   * asserting the sweep's exempt files still offend, which is the only thing
+   * standing between a named hole and a hole nobody notices — and an inline
+   * literal cannot be shared with it, so the recipe gets typed a second time
+   * and the two drift. `hero-banner.test.ts` had exactly that: the four-line
+   * eyebrow recipe written once as the sweep's rule and once in the assert
+   * vouching for the exemption, where tightening one leaves the other
+   * certifying the hole against a rule the sweep no longer has.
+   *
+   * The helper's OWN suite is excluded, because its rules are the fixtures: a
+   * case about the `g` flag has to hand a `g`-flagged literal straight to the
+   * call, and naming each one would move the interesting character away from
+   * the assertion that exists to read it.
+   */
+  it("name their rule, so the sweep and the case policing its holes can share it", () => {
+    const DECLARING = ["helpers/offence-sweep.ts", "offence-sweep.test.ts"];
+    const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
+    const inlined: string[] = [];
+    for (const suite of suiteFiles()) {
+      if (DECLARING.includes(suite)) continue;
+      const code = suiteCode(suite);
+      // Anchored on `, files:` rather than on the next comma, because an
+      // inline rule can contain one — `/colors=\{\[\s*HERO_DARK_4\s*,/` did —
+      // and a capture that stopped there would report a prefix rather than the
+      // literal the reader has to go and name. `suiteCode` collapses
+      // whitespace, so the call arrives on one line however it was written.
+      for (const call of code.matchAll(
+        /\b(?:assertNoOffenders|assertOnlyTheseMatch)\(\{\s*rule:\s*(.*?)\s*,\s*files:/g,
+      )) {
+        if (!IDENTIFIER.test(call[1].trim())) {
+          inlined.push(`${suite}: ${call[1].trim()}`);
+        }
+      }
+    }
+    assert.deepEqual(
+      inlined,
+      [],
+      `these sweeps pass a rule the file cannot name, so the case policing their exempt files has to write the recipe out a second time: ${inlined.join(", ")}`,
+    );
+    // The premise: this walk found calls at all. A regex that stopped matching
+    // the call shape reports every sweep clean, which is the failure this whole
+    // module exists to refuse, made about itself.
+    const swept = suiteFiles().filter(
+      (suite) =>
+        !DECLARING.includes(suite) &&
+        /\b(?:assertNoOffenders|assertOnlyTheseMatch)\(\{\s*rule:\s*.*?\s*,\s*files:/.test(
+          suiteCode(suite),
+        ),
+    );
+    assert.ok(
+      swept.length >= 9,
+      `only ${swept.length} suites matched the call shape this case reads, so it is vouching for sweeps it never saw`,
+    );
+  });
 });

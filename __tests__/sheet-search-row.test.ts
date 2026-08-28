@@ -173,6 +173,9 @@ describe("sheet search rows — every consumer uses the shared component", () =>
     });
   }
 
+  /** The magnifier + close-circle icon pair, which is this row's fingerprint. */
+  const HAND_ROLLED_CLEAR_CHIP = /name="close-circle"[\s\S]{0,200}size=\{18\}/;
+
   it("leaves exactly one declaration of the row shape in the repo", () => {
     // The magnifier + close-circle icon pair is the fingerprint of this row.
     // Through the shared sweep, which reports the FILE. The hand-written form
@@ -180,7 +183,7 @@ describe("sheet search rows — every consumer uses the shared component", () =>
     // came back as a 900-line string and the message could not name it — the
     // reader was told "a consumer" and left to find which.
     assertNoOffenders({
-      rule: /name="close-circle"[\s\S]{0,200}size=\{18\}/,
+      rule: HAND_ROLLED_CLEAR_CHIP,
       files: CONSUMERS,
       read,
       subject: "consumers",
