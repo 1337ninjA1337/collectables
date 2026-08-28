@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { CONSOLE_SWAP } from "../lib/check-console-swap";
+import {
+  CONSOLE_SWAP,
+  CONSOLE_SWAP_FIXTURES,
+} from "../lib/check-console-swap";
 
 import { CAPTURED, beginCapture, captureConsole } from "./helpers/capture-console";
 import { assertNoOffenders } from "./helpers/offence-sweep";
@@ -286,18 +289,32 @@ describe("the global console in the suites", () => {
     }
   });
 
-  it("leaves the seam it argues for alone, which is what a widening would break", () => {
-    // The imported pattern's negative side, asserted where it is RELIED ON. A
-    // rule edited into matching more still matches the helper and still
+  it("reaches the stated verdict on every line of the shared fixture table", () => {
+    // The imported pattern's two sides, asserted where the rule is RELIED ON.
+    // A rule edited into matching more still matches the helper and still
     // matches the guard's probe, so neither positive control notices; what
-    // notices is a case saying that reading a console method, comparing one,
-    // and configuring a local wrapper are all fine.
-    for (const innocent of [
-      `const write = ${CONSOLE}.log;`,
-      `if (${CONSOLE}.warn === original) return;`,
-      `my${CONSOLE}.log = () => {};`,
-    ]) {
-      assert.doesNotMatch(innocent, CONSOLE_SWAP, `the ban over-reads: ${innocent}`);
+    // notices is this.
+    //
+    // THE SAME TABLE the guard's suite walks. Both suites used to keep a
+    // hand-written list — three lines here chosen to be the ones a widening
+    // would break, a different set there — and two lists of one rule drift
+    // exactly the way the two copies of the PATTERN did, silently and with
+    // both suites green. The table lives beside the pattern it describes; this
+    // walk runs it through the regex, the guard's runs it through the scanner.
+    for (const fixture of CONSOLE_SWAP_FIXTURES) {
+      if (fixture.offends) {
+        assert.match(
+          fixture.line,
+          CONSOLE_SWAP,
+          `the ban under-reads ${fixture.why}: ${fixture.line}`,
+        );
+      } else {
+        assert.doesNotMatch(
+          fixture.line,
+          CONSOLE_SWAP,
+          `the ban over-reads ${fixture.why}: ${fixture.line}`,
+        );
+      }
     }
   });
 

@@ -3,7 +3,10 @@ import { describe, it } from "node:test";
 
 import {
   CONSOLE_SWAP,
+  CONSOLE_SWAP_FIXTURES,
   CONSOLE_SWAP_PROBE,
+  CONSOLE_SWAP_SUBJECT,
+  consoleSwapFixture,
   findConsoleSwaps,
   formatConsoleSwapReport,
 } from "../lib/check-console-swap";
@@ -13,13 +16,14 @@ import { readRepoFile as read } from "./helpers/repo-file";
 import { SUITES_REL } from "./helpers/suite-files";
 
 /**
- * `"console"`, kept out of the fixtures as a literal.
+ * `"console"`, kept out of this file as a literal.
  *
  * This suite has to write the banned form to test the matcher, and
  * `__tests__/default-console-seams.test.ts` bans exactly that form across every
  * top-level suite with no exemption list. Building each fixture through this
- * constant keeps both rules true at once, and it is the same trick
- * `CONSOLE_SWAP_PROBE` uses for the same reason one directory over.
+ * constant keeps both rules true at once. The shared table now carries the
+ * lines that BOTH suites walk; what is left here is the per-property loop,
+ * which is derived from a list of names rather than fixed.
  */
 const C = "console";
 
@@ -63,72 +67,75 @@ describe("findConsoleSwaps — matcher", () => {
     }
   });
 
-  it("flags the bracket form, which a loop over method names writes", () => {
-    // The spelling the suite ban had to learn the hard way: a rule that knew
-    // only the dotted form is dodged by a bracket that means the same thing,
-    // and the computed form is exactly what a `for (const method of …)` writes.
-    for (const source of [
-      `${C}["warn"] = noop;`,
-      `${C}[method] = collect;`,
-      `${C} [ method ] = collect;`,
-    ]) {
+  it("reaches the stated verdict on every line of the shared fixture table", () => {
+    // Both sides of the rule, walked here through the scanner and in
+    // __tests__/default-console-seams.test.ts through the pattern. The two
+    // suites used to keep their own lists — this one pinned the read form, the
+    // comparison form and the wrapper form, the ban's pinned three lines
+    // chosen to be the ones a widening would break — so a rule that grew could
+    // break one list and leave the other green. One table, two walks.
+    for (const fixture of CONSOLE_SWAP_FIXTURES) {
       assert.equal(
-        findConsoleSwaps("lib/x.ts", source).length,
-        1,
-        `must flag: ${source}`,
+        findConsoleSwaps("lib/x.ts", fixture.line).length,
+        fixture.offends ? 1 : 0,
+        `${fixture.offends ? "must flag" : "must not flag"} ${fixture.why}: ${fixture.line}`,
       );
     }
   });
 
-  it("does not flag a comparison, however many equals signs it has", () => {
-    for (const source of [
-      `if (${C}.warn === undefined) return;`,
-      `if (${C}.warn !== original) throw new Error("swapped");`,
-      `const swapped = ${C}[method] === undefined;`,
-    ]) {
-      assert.deepEqual(
-        findConsoleSwaps("lib/x.ts", source),
-        [],
-        `must not flag: ${source}`,
-      );
-    }
+  it("has a fixture table with both sides on it, so neither walk is vacuous", () => {
+    // The premise the two walks rest on. A table that lost its must-not-match
+    // half is a table both suites still pass, having asserted nothing about
+    // over-reading — which is the failure the shared table exists to prevent.
+    const offenders = CONSOLE_SWAP_FIXTURES.filter((f) => f.offends);
+    const innocents = CONSOLE_SWAP_FIXTURES.filter((f) => !f.offends);
+    assert.ok(
+      offenders.length >= 5,
+      `the must-match half of the table is down to ${offenders.length} lines`,
+    );
+    assert.ok(
+      innocents.length >= 5,
+      `the must-not-match half of the table is down to ${innocents.length} lines`,
+    );
+    assert.equal(
+      new Set(CONSOLE_SWAP_FIXTURES.map((f) => f.line)).size,
+      CONSOLE_SWAP_FIXTURES.length,
+      "the table lists a line twice, so one of the counts above is padded",
+    );
   });
 
-  it("does not flag an identifier that merely ENDS in the word", () => {
-    // Reachable only since the dotted half widened to any property: without
-    // the `\b`, `myconsole.log = noop` — a local wrapper being configured
-    // rather than the global being replaced — was an offender the report could
-    // only describe as one. Nothing in this tree is named that way, which is
-    // why the first person to do it would have found this.
-    for (const source of [
-      `const my${C} = {}; my${C}.log = () => {};`,
-      `fake${C}["warn"] = collect;`,
-    ]) {
-      assert.deepEqual(
-        findConsoleSwaps("lib/x.ts", source),
-        [],
-        `must not flag: ${source}`,
-      );
-    }
-    // And the global still is, on the same line shape.
-    assert.equal(findConsoleSwaps("lib/x.ts", `${C}.log = () => {};`).length, 1);
+  it("flags the global under a qualified name, because the identifier ENDS at console", () => {
+    // `\bconsole` reads as "the identifier must be exactly console" and says
+    // "the identifier must END at console" — so `window.console.log = x` and
+    // `globalThis.console.warn = x` are offenders (correctly: both ARE the
+    // global) while `myconsole.log = x` is not. The table carries all three;
+    // this names the asymmetry, because it is the half a reader gets wrong.
+    assert.equal(
+      findConsoleSwaps("lib/x.ts", `window.${consoleSwapFixture("log")}`).length,
+      1,
+    );
+    assert.equal(
+      findConsoleSwaps("lib/x.ts", `globalThis.${consoleSwapFixture("warn")}`)
+        .length,
+      1,
+    );
+    assert.equal(
+      findConsoleSwaps("lib/x.ts", `my${consoleSwapFixture("log")}`).length,
+      0,
+    );
   });
 
-  it("does not flag READING a console method, which is the seam it argues for", () => {
-    // The whole point of the rule is to push callers towards an injected
-    // writer, and `write = console.log` is how every default seam in this tree
-    // is written. Banning it would ban the fix.
-    for (const source of [
-      "const write = console.log;",
-      "export function log(write: Writer = console.error) {}",
-      "const streams = { warn: console.warn, log: console.log };",
-    ]) {
-      assert.deepEqual(
-        findConsoleSwaps("lib/x.ts", source),
-        [],
-        `must not flag: ${source}`,
-      );
-    }
+  it("does not flag a whole line of default seams, which is the shape it argues for", () => {
+    // The table's rows are one construct apiece; this is the crowded line the
+    // rule meets in real code, where three reads sit inside an object literal
+    // whose own `=` is nowhere near a console property.
+    assert.deepEqual(
+      findConsoleSwaps(
+        "lib/x.ts",
+        `const streams = { warn: ${C}.warn, log: ${C}.log, error: ${C}.error };`,
+      ),
+      [],
+    );
   });
 
   it("ignores comments, so a rule can be explained where it is enforced", () => {
@@ -190,7 +197,10 @@ describe("the guard's own positive control", () => {
     // that has already said the tree is clean.
     const wrapper = read("scripts/check-console-swap.ts");
     const probeAt = wrapper.indexOf("CONSOLE_SWAP_PROBE");
-    const cleanAt = wrapper.indexOf("no assignments to a property of the global console");
+    // Anchored on the fragment the pass line still writes out, since the
+    // subject itself is now interpolated from CONSOLE_SWAP_SUBJECT and its
+    // first occurrence in this file is the import.
+    const cleanAt = wrapper.indexOf("no assignments to");
     assert.ok(probeAt !== -1, "the wrapper no longer runs the probe");
     assert.ok(
       probeAt < cleanAt,
@@ -230,6 +240,36 @@ describe("the guard is enforced rather than merely written", () => {
     );
     assert.ok(guard !== undefined, "lint:console-swap is not in LINT_GUARDS");
     assert.equal(guard.scriptPath, "scripts/check-console-swap.ts");
+  });
+
+  it("says what the rule is in the same words everywhere it is said", () => {
+    // Four strings state this rule: the scanner's heading, the wrapper's
+    // clean-tree line, the wrapper's probe refusal and the registry blurb.
+    // Three of them interpolate CONSOLE_SWAP_SUBJECT; the fourth cannot,
+    // because LINT_GUARDS is a pure data module that imports no guard and
+    // inverting that for one phrase would grow its imports with the guard
+    // count. So the fourth is asserted here instead of remembered.
+    const guard = LINT_GUARDS.find(
+      (entry) => entry.npmScript === "lint:console-swap",
+    );
+    assert.ok(guard !== undefined);
+    assert.ok(
+      guard.description.includes(CONSOLE_SWAP_SUBJECT),
+      `the registry blurb no longer says "${CONSOLE_SWAP_SUBJECT}": ${guard.description}`,
+    );
+    // And the three that do interpolate it still reach the reader with the
+    // phrase in them — a constant renamed to something else would compile.
+    assert.ok(
+      formatConsoleSwapReport("check-console-swap", [
+        { file: "lib/a.ts", line: 1, snippet: consoleSwapFixture("warn") },
+      ]).includes(CONSOLE_SWAP_SUBJECT),
+    );
+    const wrapper = read("scripts/check-console-swap.ts");
+    assert.equal(
+      wrapper.split("CONSOLE_SWAP_SUBJECT").length - 1,
+      3,
+      "the wrapper no longer states the rule through the shared subject in both its pass line and its probe refusal",
+    );
   });
 
   it("does not sweep __tests__/, which has the sharper rule", () => {

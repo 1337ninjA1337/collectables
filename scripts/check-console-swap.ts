@@ -15,6 +15,7 @@ import * as path from "node:path";
 
 import {
   CONSOLE_SWAP_PROBE,
+  CONSOLE_SWAP_SUBJECT,
   findConsoleSwaps,
   formatConsoleSwapReport,
   type ConsoleSwap,
@@ -55,7 +56,7 @@ function main(): void {
     console.error(
       checkError(
         CHECK_NAME,
-        "the scanner did not flag its own probe, so it is reading every file in the tree and finding nothing for a reason that has nothing to do with the tree. CONSOLE_SWAP in lib/check-console-swap.ts no longer matches an assignment to a console property.",
+        `the scanner did not flag its own probe, so it is reading every file in the tree and finding nothing for a reason that has nothing to do with the tree. CONSOLE_SWAP in lib/check-console-swap.ts no longer matches an assignment to ${CONSOLE_SWAP_SUBJECT}.`,
       ),
     );
     process.exit(1);
@@ -73,7 +74,7 @@ function main(): void {
 
   if (swaps.length === 0) {
     console.log(
-      `${CHECK_NAME}: scanned ${files.length} file(s), no assignments to a property of the global console.`,
+      `${CHECK_NAME}: scanned ${files.length} file(s), no assignments to ${CONSOLE_SWAP_SUBJECT}.`,
     );
     return;
   }
