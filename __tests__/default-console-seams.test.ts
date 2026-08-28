@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   CONSOLE_SWAP,
   CONSOLE_SWAP_FIXTURES,
+  consoleSwapFixture,
 } from "../lib/check-console-swap";
 
 import { CAPTURED, beginCapture, captureConsole } from "./helpers/capture-console";
@@ -56,17 +57,6 @@ import { suiteCode, topLevelSuites } from "./helpers/suite-files";
  * matched neither of them.
  */
 const DEFAULTS_TO_CONSOLE = /:\s*[^\n=]*Console[^\n=]*=\s*console\s*[,)]/;
-
-/**
- * `"console"`, kept out of the fixtures below as a literal.
- *
- * The cases that check the ban have to write the banned form, and the ban is
- * swept over every top-level suite with no exemption list — this file included.
- * Building the fixtures through a constant keeps the rule true of the suite
- * that enforces it, which is the same trick `CONSOLE_SWAP_PROBE` uses in
- * `lib/check-console-swap.ts` and `check-console-swap.test.ts` uses beside it.
- */
-const CONSOLE = "console";
 
 /** Modules declaring a console-defaulted parameter, found rather than listed. */
 const SEAMS = sourceFiles("lib", "scripts").filter((file) =>
@@ -282,7 +272,7 @@ describe("the global console in the suites", () => {
     // rather than assumed from `\w+`.
     for (const method of CAPTURED) {
       assert.match(
-        `${CONSOLE}.${method} = () => {};`,
+        consoleSwapFixture(method),
         CONSOLE_SWAP,
         `a hand-rolled swap of console.${method} is not banned, so that stream can be captured by the helper and swapped by hand in the same tree`,
       );
@@ -301,6 +291,13 @@ describe("the global console in the suites", () => {
     // exactly the way the two copies of the PATTERN did, silently and with
     // both suites green. The table lives beside the pattern it describes; this
     // walk runs it through the regex, the guard's runs it through the scanner.
+    //
+    // Row by row the two are the same claim — against a one-line source the
+    // scanner IS the regex — so they turn red together and this failure is the
+    // second half of a pair. The claim only this walk makes is that the rule
+    // enforced HERE is the imported pattern rather than the scanner around it;
+    // what the scanner adds is asserted over the whole table as one file, in
+    // `check-console-swap.test.ts`.
     for (const fixture of CONSOLE_SWAP_FIXTURES) {
       if (fixture.offends) {
         assert.match(
@@ -323,7 +320,7 @@ describe("the global console in the suites", () => {
     // these five" — `console.dir` and `console.table` outlive their swapper the
     // same way, and the bracket half of the pattern has always matched them.
     for (const method of ["dir", "table", "trace", "group"]) {
-      assert.match(`${CONSOLE}.${method} = () => {};`, CONSOLE_SWAP);
+      assert.match(consoleSwapFixture(method), CONSOLE_SWAP);
     }
   });
 });

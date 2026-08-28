@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  CONSOLE_IDENTIFIER,
   CONSOLE_SWAP,
   CONSOLE_SWAP_FIXTURES,
   CONSOLE_SWAP_PROBE,
@@ -14,18 +15,6 @@ import { LINT_GUARDS } from "../lib/lint-guards";
 
 import { readRepoFile as read } from "./helpers/repo-file";
 import { SUITES_REL } from "./helpers/suite-files";
-
-/**
- * `"console"`, kept out of this file as a literal.
- *
- * This suite has to write the banned form to test the matcher, and
- * `__tests__/default-console-seams.test.ts` bans exactly that form across every
- * top-level suite with no exemption list. Building each fixture through this
- * constant keeps both rules true at once. The shared table now carries the
- * lines that BOTH suites walk; what is left here is the per-property loop,
- * which is derived from a list of names rather than fixed.
- */
-const C = "console";
 
 /**
  * The suite-only ban, given the two directories the suite sweep cannot see.
@@ -58,7 +47,7 @@ describe("findConsoleSwaps — matcher", () => {
       "group",
       "somethingNodeAddsNextYear",
     ]) {
-      const source = `${C}.${method} = () => {};`;
+      const source = consoleSwapFixture(method);
       assert.equal(
         findConsoleSwaps("lib/x.ts", source).length,
         1,
@@ -83,10 +72,65 @@ describe("findConsoleSwaps — matcher", () => {
     }
   });
 
+  it("finds exactly the offending rows, at the right lines, with the table as one file", () => {
+    // What the two table walks cannot see between them. Both read the rows ONE
+    // AT A TIME — this suite through the scanner, the ban through the pattern —
+    // and against a one-line source the scanner IS the pattern, so the two
+    // walks are the same claim made twice and turn red together on every
+    // mutation. Everything `findConsoleSwaps` does beyond `.test` happens
+    // between lines: it strips comments, splits, and numbers what is left. A
+    // scanner that dropped its first line, numbered from zero, or reported a
+    // row twice would pass both walks and mis-report every real file it read.
+    //
+    // So the table is fed in as one file. The expectation is derived from
+    // `offends`, which means this case cannot drift from the rows the other
+    // walks assert.
+    const source = CONSOLE_SWAP_FIXTURES.map((f) => f.line).join("\n");
+    const expected = CONSOLE_SWAP_FIXTURES.flatMap((fixture, index) =>
+      fixture.offends
+        ? [{ file: "lib/x.ts", line: index + 1, snippet: fixture.line }]
+        : [],
+    );
+    assert.deepEqual(findConsoleSwaps("lib/x.ts", source), expected);
+  });
+
+  it("builds all four spellings of the access, since the table no longer writes any of them", () => {
+    // Every assignment row goes through `consoleSwapFixture` now, so the four
+    // spellings the rule must read are stated in the builder and nowhere else.
+    // A builder that dropped the bracket form would make its rows read
+    // `console"warn" = noop;`, which no longer offends — the walk above would
+    // catch that. What it would NOT catch is a builder that turned every
+    // bracket row into the dotted form: the rows still offend, the walk stays
+    // green, and the bracket half of the pattern goes unasserted by a table
+    // that claims to cover it.
+    assert.equal(
+      consoleSwapFixture("warn"),
+      `${CONSOLE_IDENTIFIER}.warn = () => {};`,
+    );
+    assert.equal(
+      consoleSwapFixture({ key: '"warn"' }, "noop;"),
+      `${CONSOLE_IDENTIFIER}["warn"] = noop;`,
+    );
+    assert.equal(
+      consoleSwapFixture({ key: "method" }, "collect;"),
+      `${CONSOLE_IDENTIFIER}[method] = collect;`,
+    );
+    assert.equal(
+      consoleSwapFixture({ key: "method", spaced: true }, "collect;"),
+      `${CONSOLE_IDENTIFIER} [ method ] = collect;`,
+    );
+  });
+
   it("has a fixture table with both sides on it, so neither walk is vacuous", () => {
     // The premise the two walks rest on. A table that lost its must-not-match
     // half is a table both suites still pass, having asserted nothing about
     // over-reading — which is the failure the shared table exists to prevent.
+    //
+    // FIVE A SIDE against a table of seven and seven: two rows of slack each
+    // way, so deleting a row that has stopped earning its place is an ordinary
+    // edit rather than a case about vacuity turning red. `npm run
+    // remeasure-floors` does not know about floors local to a suite, so the
+    // arithmetic is written down here instead of being rediscovered.
     const offenders = CONSOLE_SWAP_FIXTURES.filter((f) => f.offends);
     const innocents = CONSOLE_SWAP_FIXTURES.filter((f) => !f.offends);
     assert.ok(
@@ -132,7 +176,7 @@ describe("findConsoleSwaps — matcher", () => {
     assert.deepEqual(
       findConsoleSwaps(
         "lib/x.ts",
-        `const streams = { warn: ${C}.warn, log: ${C}.log, error: ${C}.error };`,
+        `const streams = { warn: ${CONSOLE_IDENTIFIER}.warn, log: ${CONSOLE_IDENTIFIER}.log, error: ${CONSOLE_IDENTIFIER}.error };`,
       ),
       [],
     );
@@ -140,15 +184,15 @@ describe("findConsoleSwaps — matcher", () => {
 
   it("ignores comments, so a rule can be explained where it is enforced", () => {
     const source = [
-      `// never write ${C}.warn = () => {} here`,
-      `/** Not this either: ${C}.error = noop; */`,
+      `// never write ${consoleSwapFixture("warn")} here`,
+      `/** Not this either: ${consoleSwapFixture("error", "noop;")} */`,
       "const ok = true;",
     ].join("\n");
     assert.deepEqual(findConsoleSwaps("lib/x.ts", source), []);
   });
 
   it("names the file and the 1-indexed line", () => {
-    const swap = `${C}.warn = () => {};`;
+    const swap = consoleSwapFixture("warn");
     const source = ["const a = 1;", "", swap].join("\n");
     assert.deepEqual(findConsoleSwaps("scripts/x.ts", source), [
       { file: "scripts/x.ts", line: 3, snippet: swap },
@@ -164,7 +208,9 @@ describe("findConsoleSwaps — matcher", () => {
     // property and this one had a paragraph.
     assert.equal(CONSOLE_SWAP.global, false);
     assert.equal(CONSOLE_SWAP.sticky, false);
-    const repeated = Array.from({ length: 4 }, () => `${C}.warn = noop;`);
+    const repeated = Array.from({ length: 4 }, () =>
+      consoleSwapFixture("warn", "noop;"),
+    );
     assert.equal(findConsoleSwaps("lib/x.ts", repeated.join("\n")).length, 4);
   });
 });
@@ -216,8 +262,16 @@ describe("formatConsoleSwapReport", () => {
 
   it("names every offender and points at the seam that replaces it", () => {
     const report = formatConsoleSwapReport("check-console-swap", [
-      { file: "lib/a.ts", line: 4, snippet: `${C}.warn = noop;` },
-      { file: "app/b.tsx", line: 9, snippet: `${C}.log = collect;` },
+      {
+        file: "lib/a.ts",
+        line: 4,
+        snippet: consoleSwapFixture("warn", "noop;"),
+      },
+      {
+        file: "app/b.tsx",
+        line: 9,
+        snippet: consoleSwapFixture("log", "collect;"),
+      },
     ]);
     assert.ok(report.includes("lib/a.ts:4"), report);
     assert.ok(report.includes("app/b.tsx:9"), report);

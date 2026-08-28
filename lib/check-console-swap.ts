@@ -95,14 +95,56 @@ export const CONSOLE_SWAP_SUBJECT = "a property of the global console";
  * This module is swept by the guard it implements (the walk covers `lib/`), so
  * every fixture below has to spell the banned form without BEING the banned
  * form. Four files had independently invented this trick and each explained it
- * in its own comment; it is stated once here and the fixtures are exported, so
- * a fifth caller borrows the explanation with the data.
+ * in its own comment; it is stated once here and exported, so a fifth caller
+ * borrows the explanation with the data.
+ *
+ * EXPORTED for the rows that are not assignments — a read, a default-seam
+ * parameter, three comparisons — which need the identifier and have no shape a
+ * builder could take. Every row that IS an assignment goes through
+ * `consoleSwapFixture` below, so nothing outside this module reassembles the
+ * banned form by hand.
  */
-const CONSOLE = ["con", "sole"].join("");
+export const CONSOLE_IDENTIFIER = ["con", "sole"].join("");
 
-/** One `console.<property> = …` line, built without the literal. */
-export function consoleSwapFixture(property: string): string {
-  return `${CONSOLE}.${property} = () => {};`;
+/**
+ * How a fixture reaches the property, when it is not the dotted form.
+ *
+ * `key` is written as it appears between the brackets — `"warn"` with its
+ * quotes for the literal spelling, a bare `method` for the computed one — so a
+ * row says which shape it is in the same characters the source would, rather
+ * than through a flag per spelling that a reader has to decode back into
+ * JavaScript.
+ */
+export type ConsoleBracket = {
+  /** The text between the brackets, quotes included when there are any. */
+  readonly key: string;
+  /** The bracket spaced out, the way a formatter might leave it. */
+  readonly spaced?: boolean;
+};
+
+/**
+ * One assignment to a console property, built without the literal.
+ *
+ * The builder used to take a property name and always emit the dotted form
+ * with a seam-shaped arrow on the right, which is the common case and half the
+ * table: the four bracket rows could not use it and were written out through
+ * the raw identifier, so the one trick this module states once was restated in
+ * every row that needed a different spelling. `access` takes either — a bare
+ * string is the property behind a dot, a `ConsoleBracket` is the bracket form —
+ * and `value` defaults to the arrow, which is what a real swap looks like and
+ * what all but three rows want.
+ */
+export function consoleSwapFixture(
+  access: string | ConsoleBracket,
+  value = "() => {};",
+): string {
+  const reach =
+    typeof access === "string"
+      ? `.${access}`
+      : access.spaced
+        ? ` [ ${access.key} ]`
+        : `[${access.key}]`;
+  return `${CONSOLE_IDENTIFIER}${reach} = ${value}`;
 }
 
 /** A line the rule must reach a stated verdict on, and why that verdict. */
@@ -141,17 +183,17 @@ export const CONSOLE_SWAP_FIXTURES: readonly ConsoleSwapFixture[] = [
     why: "the dotted form, which is what a swap is usually written as",
   },
   {
-    line: `${CONSOLE}["warn"] = noop;`,
+    line: consoleSwapFixture({ key: '"warn"' }, "noop;"),
     offends: true,
     why: "the bracket form, which means exactly the same thing",
   },
   {
-    line: `${CONSOLE}[method] = collect;`,
+    line: consoleSwapFixture({ key: "method" }, "collect;"),
     offends: true,
     why: "the computed form, which is what a loop over method names writes",
   },
   {
-    line: `${CONSOLE} [ method ] = collect;`,
+    line: consoleSwapFixture({ key: "method", spaced: true }, "collect;"),
     offends: true,
     why: "the computed form, spaced the way a formatter might leave it",
   },
@@ -166,42 +208,42 @@ export const CONSOLE_SWAP_FIXTURES: readonly ConsoleSwapFixture[] = [
     why: "the window-qualified spelling of the same global, which the boundary admits because the identifier ENDS at console",
   },
   {
-    line: `globalThis.${CONSOLE}["warn"] = collect;`,
+    line: `globalThis.${consoleSwapFixture({ key: '"warn"' }, "collect;")}`,
     offends: true,
     why: "the globalThis-qualified spelling, which is the same global under the portable name",
   },
   {
-    line: `const write = ${CONSOLE}.log;`,
+    line: `const write = ${CONSOLE_IDENTIFIER}.log;`,
     offends: false,
     why: "reading a method, which is how every default seam in this tree is written — banning it would ban the fix",
   },
   {
-    line: `export function log(write: Writer = ${CONSOLE}.error) {}`,
+    line: `export function log(write: Writer = ${CONSOLE_IDENTIFIER}.error) {}`,
     offends: false,
     why: "the default-seam parameter, the shape the rule argues for",
   },
   {
-    line: `if (${CONSOLE}.warn === undefined) return;`,
+    line: `if (${CONSOLE_IDENTIFIER}.warn === undefined) return;`,
     offends: false,
     why: "a comparison — `[^=]` after the `=` is what keeps it out",
   },
   {
-    line: `if (${CONSOLE}.warn !== original) throw new Error("swapped");`,
+    line: `if (${CONSOLE_IDENTIFIER}.warn !== original) throw new Error("swapped");`,
     offends: false,
     why: "a negated comparison, which never reaches the `=` at all",
   },
   {
-    line: `const swapped = ${CONSOLE}[method] === undefined;`,
+    line: `const swapped = ${CONSOLE_IDENTIFIER}[method] === undefined;`,
     offends: false,
     why: "a comparison through the bracket form",
   },
   {
-    line: `my${CONSOLE}.log = () => {};`,
+    line: `my${consoleSwapFixture("log")}`,
     offends: false,
     why: "a local wrapper being configured, not the global being replaced — what `\\bconsole` was added for",
   },
   {
-    line: `fake${CONSOLE}["warn"] = collect;`,
+    line: `fake${consoleSwapFixture({ key: '"warn"' }, "collect;")}`,
     offends: false,
     why: "the same local-wrapper case through the bracket form",
   },
