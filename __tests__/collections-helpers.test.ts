@@ -31,7 +31,11 @@ describe("transferItemToBuyer uses userScopedCollectionId", () => {
     const src = read("lib/collections-context.tsx");
     assert.match(
       src,
-      /import\s+\{\s*userScopedCollectionId\s*\}\s+from\s+"@\/lib\/collections-helpers"/,
+      // Named-symbol match, not a whole-clause one: the provider legitimately
+      // pulls more than one helper from this module (`byCollectionOrder`), and
+      // the fact under test is that the id comes from the helper rather than a
+      // template string — not how many siblings share the import.
+      /import\s*\{[^}]*\buserScopedCollectionId\b[^}]*\}\s*from\s*"@\/lib\/collections-helpers"/,
     );
     assert.match(
       src,
