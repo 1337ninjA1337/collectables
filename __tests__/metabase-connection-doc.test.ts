@@ -64,15 +64,47 @@ describe("docs/metabase-connection.md (Power BI platform-parity fallback)", () =
     assert.match(powerbi, /metabase-connection\.md/);
   });
 
+  /**
+   * Quoted snake_case tokens in the guide are event names, or they are named.
+   *
+   * The hole here was written inline and unnamed — `.filter((name) =>
+   * !["item_added_users"].includes(name))`, under a comment about "SQL keywords
+   * / non-event tokens" in the plural over a list of one. Measured 2026-08-28:
+   * the guide does not contain `'item_added_users'` anywhere, and neither does
+   * the taxonomy, so the exclusion had stopped excusing anything — and the day
+   * somebody quotes that token as an event this check would have skipped the
+   * one name it exists to catch. The list is empty because nothing needs it.
+   *
+   * It stays as a NAMED list with the honesty half below rather than being
+   * deleted, because a token that genuinely is not an event will turn up again
+   * (the query language has plenty), and the version of this hole that goes
+   * stale silently is the one written inline at the point of use.
+   */
   it("only uses event names that exist in the typed taxonomy", () => {
+    /** Quoted snake_case tokens in the guide that are NOT event names. */
+    const NOT_EVENTS: readonly string[] = [];
     const taxonomy = read("lib/analytics-events.ts");
     const quoted = src.match(/'([a-z0-9_]+)'/g) ?? [];
-    const eventLike = quoted
+    const snakeCase = quoted
       .map((q) => q.slice(1, -1))
-      .filter((name) => /^[a-z]+(_[a-z]+)+$/.test(name))
-      // SQL keywords / non-event tokens used in the queries.
-      .filter((name) => !["item_added_users"].includes(name));
-    for (const name of eventLike) {
+      .filter((name) => /^[a-z]+(_[a-z]+)+$/.test(name));
+    // Every hole, checked to still be a hole: an entry naming a token the guide
+    // no longer quotes excuses nothing while quietly skipping that name on the
+    // day it comes back.
+    for (const excluded of NOT_EVENTS) {
+      assert.ok(
+        snakeCase.includes(excluded),
+        `${excluded} is excluded from the taxonomy check and the guide no longer quotes it — drop the entry rather than leaving the hole`,
+      );
+    }
+    // And the scan, checked to have scanned: a guide whose queries stopped
+    // quoting anything passes this loop having read nothing.
+    assert.ok(
+      snakeCase.length > 0,
+      "no quoted snake_case token was found in the guide at all, so this check is passing against a document it cannot read",
+    );
+    for (const name of snakeCase) {
+      if (NOT_EVENTS.includes(name)) continue;
       if (taxonomy.includes(`${name}:`)) continue;
       assert.fail(`"${name}" is quoted like an event but is not in ANALYTICS_EVENTS`);
     }
