@@ -6,7 +6,7 @@
  */
 
 import { selectOwnedActiveItems } from "./collections-helpers";
-import { byCreatedAtDesc } from "./sort-helpers";
+import { byCreatedAtDescThenId } from "./sort-helpers";
 import { CollectableItem, Collection } from "./types";
 
 /**
@@ -38,6 +38,6 @@ export function selectRecentItems(
   limit: number = RECENT_ITEMS_LIMIT,
 ): CollectableItem[] {
   return selectOwnedActiveItems(items, collections)
-    .sort(byCreatedAtDesc)
+    .sort(byCreatedAtDescThenId)
     .slice(0, Math.max(0, limit));
 }

@@ -20,7 +20,7 @@ import {
   upsertChatRead,
 } from "@/lib/supabase-chat";
 import { chatCacheKey } from "@/lib/storage-keys";
-import { byCreatedAtAsc } from "@/lib/sort-helpers";
+import { byCreatedAtAscThenId } from "@/lib/sort-helpers";
 import { countPendingUpserts } from "@/lib/pending-upserts";
 import {
   applyFlushToQueue,
@@ -441,7 +441,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   const getMessages = useCallback(
     (chatId: string) => {
       const msgs = store.messagesByChat[chatId] ?? [];
-      return [...msgs].sort(byCreatedAtAsc);
+      return [...msgs].sort(byCreatedAtAscThenId);
     },
     [store],
   );

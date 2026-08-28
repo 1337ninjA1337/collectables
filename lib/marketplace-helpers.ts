@@ -1,5 +1,5 @@
 import { MarketplaceListing, MarketplaceMode } from "@/lib/types";
-import { byCreatedAtDesc, compareIsoDesc } from "@/lib/sort-helpers";
+import { byCreatedAtDescThenId, compareIsoDesc, tieBreakById } from "@/lib/sort-helpers";
 
 /**
  * Pure helpers for the marketplace feature so they're testable without
@@ -15,10 +15,16 @@ export const FREE_LISTING_CAP = 1;
  * arrival, sales, price history), so the fallback lives here rather than being
  * re-derived; a site that forgot it would sort those rows to one end as if
  * they were the oldest in the list.
+ *
+ * Ties break on `id` so the order is total: `recentlySoldListings` cuts a top-12
+ * off this sort, and two sales closed in the same millisecond would otherwise
+ * decide the twelfth slot by whatever order the last cloud delta returned them.
  */
-function bySoldAtDesc(a: MarketplaceListing, b: MarketplaceListing): number {
-  return compareIsoDesc(a.soldAt ?? a.createdAt, b.soldAt ?? b.createdAt);
-}
+const bySoldAtDesc = tieBreakById(
+  (a: MarketplaceListing, b: MarketplaceListing) =>
+    compareIsoDesc(a.soldAt ?? a.createdAt, b.soldAt ?? b.createdAt),
+  (listing) => listing.id,
+);
 
 /**
  * Ensures every `MarketplaceListing` shape has the optional `buyerUserId`
@@ -187,7 +193,7 @@ export function activeListings(
   return listings
     .filter((l) => !l.soldAt)
     .slice()
-    .sort(byCreatedAtDesc);
+    .sort(byCreatedAtDescThenId);
 }
 
 /**
@@ -200,7 +206,7 @@ export function listingsForUser(
   return listings
     .filter((l) => l.ownerUserId === userId)
     .slice()
-    .sort(byCreatedAtDesc);
+    .sort(byCreatedAtDescThenId);
 }
 
 /**
@@ -294,7 +300,7 @@ export function listingsAcquiredByUser(
   return listings
     .filter((l) => l.buyerUserId === userId && l.soldAt != null)
     .slice()
-    .sort(byCreatedAtDesc);
+    .sort(byCreatedAtDescThenId);
 }
 
 /**
@@ -438,6 +444,15 @@ export function priceHistoryForTitle(
       similarity: sim,
     });
   }
-  out.sort((a, b) => compareIsoDesc(a.recordedAt, b.recordedAt));
+  // Total order, not just a consistent one: the `.slice(0, limit)` below cuts a
+  // top-N, so same-`recordedAt` entries at the boundary would otherwise decide
+  // which price point makes the chart by listing-array order alone.
+  out.sort(
+    tieBreakById(
+      (a: PriceHistoryEntry, b: PriceHistoryEntry) =>
+        compareIsoDesc(a.recordedAt, b.recordedAt),
+      (entry) => entry.listingId,
+    ),
+  );
   return out.slice(0, limit);
 }

@@ -168,11 +168,14 @@ describe("no lib/ module re-inlines an inconsistent timestamp comparator", () =>
   it("has the five migrated modules importing the shared comparators", () => {
     // Adoption, so a future refactor cannot quietly re-inline by deleting the
     // import and restoring the ternary in a shape the regex above misses.
+    // The `ThenId` names are the total-order variants (see the tiebreak suite
+    // in sort-helpers-tiebreak.test.ts); a module that dropped back to the
+    // plain comparator would fail here rather than silently de-pinning ties.
     const expected: [string, string][] = [
-      ["lib/home-helpers.ts", "byCreatedAtDesc"],
-      ["lib/chat-helpers.ts", "byCreatedAtAsc"],
-      ["lib/chat-context.tsx", "byCreatedAtAsc"],
-      ["lib/collections-context.tsx", "byCreatedAtDesc"],
+      ["lib/home-helpers.ts", "byCreatedAtDescThenId"],
+      ["lib/chat-helpers.ts", "byCreatedAtAscThenId"],
+      ["lib/chat-context.tsx", "byCreatedAtAscThenId"],
+      ["lib/collections-context.tsx", "byCreatedAtDescThenId"],
       ["lib/marketplace-helpers.ts", "compareIsoDesc"],
       ["lib/db-duplicates.ts", "compareKeysAsc"],
     ];
@@ -191,7 +194,7 @@ describe("no lib/ module re-inlines an inconsistent timestamp comparator", () =>
     // as `bySoldAtDesc`. A sixth site re-deriving it would drift.
     const source = readRepoFile("lib/marketplace-helpers.ts");
     assert.equal(
-      (source.match(/function bySoldAtDesc\b/g) ?? []).length,
+      (source.match(/\bconst bySoldAtDesc\b/g) ?? []).length,
       1,
       "bySoldAtDesc should be declared exactly once",
     );
