@@ -489,12 +489,48 @@ function sweepCalls(code: string): readonly SweepCall[] {
   return calls;
 }
 
-/** The suites that sweep through this module, derived rather than listed. */
-function adoptingSuites(): readonly string[] {
+/**
+ * The suites that CALL a sweep, derived rather than listed.
+ *
+ * This is the set every call-reading case walks, and it is deliberately not the
+ * same set as {@link adoptingSuites}: what a reader of call sites can be held to
+ * is that it found the call sites.
+ */
+function sweepingSuites(): readonly string[] {
   return suiteFiles().filter(
     (suite) =>
       !DECLARING.includes(suite) &&
       /\bassertNoOffenders\b|\bassertOnlyTheseMatch\b/.test(suiteCode(suite)),
+  );
+}
+
+/**
+ * The suites that USE this module, which is a third name wider than the two
+ * that sweep.
+ *
+ * The adoption count had been "suites naming either sweep export", so a suite
+ * importing only `matchesRule` read as a non-adopter. That name exists for a
+ * reason — an exemption case asking the sweep's own question — and the day a
+ * rule is shared between a sweep in one file and the exemption policing it in
+ * another, the second file is using this module by the only route it has.
+ * Counting it is the difference between a floor about adoption and a floor
+ * about call syntax.
+ *
+ * The two sets are separate because the call-reading cases must NOT walk this
+ * one: a `matchesRule`-only suite has no call to find, and reporting it as a
+ * sweep this walk could not read would be the reader blaming a file for not
+ * containing something it never claimed to.
+ */
+const ADOPTION_NAMES = [
+  "assertNoOffenders",
+  "assertOnlyTheseMatch",
+  "matchesRule",
+] as const;
+
+function adoptingSuites(): readonly string[] {
+  const names = new RegExp(ADOPTION_NAMES.map((name) => `\\b${name}\\b`).join("|"));
+  return suiteFiles().filter(
+    (suite) => !DECLARING.includes(suite) && names.test(suiteCode(suite)),
   );
 }
 
@@ -530,6 +566,34 @@ describe("the sweeps built on it", () => {
    * derived — a suite that imports the helper is an adopter — so a new one
    * counts without being added anywhere.
    */
+  /**
+   * The adoption count knows every name adoption can arrive under.
+   *
+   * `ADOPTION_NAMES` was two of the module's three exports, so a suite
+   * importing only `matchesRule` — an exemption case asking a sweep's own
+   * question — read as a non-adopter. Widening the list by hand fixes today and
+   * not the next export, so the list is checked against the module rather than
+   * against a memory: every `export function` here must be a name the walk
+   * counts. A type export is not in it, because a type is not a call.
+   */
+  it("count every name this module exports, so a new one cannot arrive uncounted", () => {
+    const declared = [
+      ...suiteCode("helpers/offence-sweep.ts").matchAll(/export function (\w+)/g),
+    ].map((match) => match[1]);
+    assert.ok(
+      declared.length >= 3,
+      `only ${declared.length} exported functions were found in the helper, so this case is comparing against a list it failed to read`,
+    );
+    const uncounted = declared.filter(
+      (name) => !ADOPTION_NAMES.includes(name as (typeof ADOPTION_NAMES)[number]),
+    );
+    assert.deepEqual(
+      uncounted,
+      [],
+      `these exports are a route into this module that the adoption count cannot see, so a suite using only one of them reads as a non-adopter: ${uncounted.join(", ")}`,
+    );
+  });
+
   it("are counted, so the adoption is a number rather than a memory", () => {
     const adopters = adoptingSuites();
     assert.ok(
@@ -558,7 +622,7 @@ describe("the sweeps built on it", () => {
   it("name their rule, so the sweep and the case policing its holes can share it", () => {
     const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
     const inlined: string[] = [];
-    for (const suite of adoptingSuites()) {
+    for (const suite of sweepingSuites()) {
       for (const call of sweepCalls(suiteCode(suite))) {
         if (call.rule !== null && !IDENTIFIER.test(call.rule)) {
           inlined.push(`${suite}: ${call.rule}`);
@@ -592,7 +656,7 @@ describe("the sweeps built on it", () => {
    */
   it("are all calls this walk can actually read, so a clean report is about something", () => {
     const unreadable: string[] = [];
-    for (const suite of adoptingSuites()) {
+    for (const suite of sweepingSuites()) {
       const calls = sweepCalls(suiteCode(suite));
       if (calls.length === 0) {
         unreadable.push(`${suite}: names a sweep export and this walk found no call`);
@@ -631,15 +695,23 @@ describe("the sweeps built on it", () => {
    * what its exempt file PROTECTS rather than by the rule: the component splits
    * the fill from the radius across two style objects, so it cannot match a
    * pattern whose whole subject is the two written together. Sharing the rule
-   * there would assert something false. The entry below is held to that being
-   * still true — an exempt call whose rule IS shared has stopped needing it.
+   * there would assert something false.
+   *
+   * The entry is held to BOTH halves of still being needed, because it is a
+   * hole and every other exemption list in this tree names a FILE — which the
+   * walk itself refuses when it goes missing — while this one names a file AND
+   * a rule joined into a string. Nothing about the join is checked by the walk,
+   * so a renamed const or a deleted case leaves an entry that matches nothing
+   * and excuses nothing, silently. `unseen` is that refusal: an entry this walk
+   * never met is stale whatever the reason.
    */
   it("share a rule with the case policing the hole, wherever the hole can be asked about", () => {
     /** `suite: RULE` whose exemption is honestly policed by something else. */
     const POLICED_OTHERWISE = ["hero-banner.test.ts: SOLID_HERO"];
+    const seen: string[] = [];
     const unshared: string[] = [];
     const overPoliced: string[] = [];
-    for (const suite of adoptingSuites()) {
+    for (const suite of sweepingSuites()) {
       const code = suiteCode(suite);
       const calls = sweepCalls(suiteCode(suite));
       for (const call of calls) {
@@ -651,6 +723,7 @@ describe("the sweeps built on it", () => {
         const asRule = calls.filter((other) => other.rule === call.rule).length;
         const shared = uses > 1 + asRule;
         const entry = `${suite}: ${call.rule}`;
+        seen.push(entry);
         if (POLICED_OTHERWISE.includes(entry)) {
           if (shared) overPoliced.push(entry);
         } else if (!shared) {
@@ -658,6 +731,12 @@ describe("the sweeps built on it", () => {
         }
       }
     }
+    const unseen = POLICED_OTHERWISE.filter((entry) => !seen.includes(entry));
+    assert.deepEqual(
+      unseen,
+      [],
+      `these entries excuse a sweep call this walk never found, so the exemption is a hole around nothing — the suite, the rule or the exempt list was renamed away from what the entry says: ${unseen.join(", ")}`,
+    );
     assert.deepEqual(
       unshared,
       [],
@@ -672,7 +751,7 @@ describe("the sweeps built on it", () => {
     // directions clean. Four sweeps name holes today; the floor carries one of
     // slack, since deleting an exemption is an ordinary edit and deleting all
     // of them is not.
-    const withHoles = adoptingSuites().flatMap((suite) =>
+    const withHoles = sweepingSuites().flatMap((suite) =>
       sweepCalls(suiteCode(suite)).filter((call) => call.exempt),
     );
     assert.ok(
