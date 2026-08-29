@@ -29,18 +29,24 @@ import { readRepoFile } from "./helpers/repo-file";
 installNativeModuleStubs();
 
 const writes: { key: string; value: string }[] = [];
+const captured: { error: unknown; context: unknown }[] = [];
 let failNextWrite = false;
+let failEveryWrite = false;
 
 mockModule("@react-native-async-storage/async-storage", {
   default: {
     setItem: async (key: string, value: string) => {
-      if (failNextWrite) {
+      if (failEveryWrite || failNextWrite) {
         failNextWrite = false;
         throw new Error("quota exceeded");
       }
       writes.push({ key, value });
     },
   },
+});
+
+mockModule("@/lib/sentry", {
+  captureException: (error: unknown, context: unknown) => captured.push({ error, context }),
 });
 
 /** Mutable render inputs — reassigned between renders, like the provider's state. */
@@ -55,6 +61,7 @@ let collectionsKey: string | null = "collections-user-1";
  * cached here rather than at module scope.
  */
 let hook: typeof import("@/lib/use-persisted-blob").usePersistedBlob | null = null;
+let resetReports: (() => void) | null = null;
 
 /** Two independent blobs under one component, as the provider has five. */
 function TwoBlobs() {
@@ -64,7 +71,10 @@ function TwoBlobs() {
 }
 
 async function mount() {
-  hook ??= (await import("@/lib/use-persisted-blob")).usePersistedBlob;
+  const module = await import("@/lib/use-persisted-blob");
+  hook ??= module.usePersistedBlob;
+  resetReports ??= module.__resetPersistFailureReportsForTests;
+  resetReports();
   return render(createElement(TwoBlobs, null));
 }
 
@@ -74,7 +84,9 @@ function keysWritten(): string[] {
 
 beforeEach(() => {
   writes.length = 0;
+  captured.length = 0;
   failNextWrite = false;
+  failEveryWrite = false;
   collections = ["c1"];
   items = ["i1"];
   enabled = true;
@@ -157,6 +169,47 @@ describe("usePersistedBlob", () => {
     failNextWrite = true;
     await assert.doesNotReject(() => mount());
     assert.deepEqual(keysWritten(), ["items-user-1"], "the sibling blob still persists");
+  });
+});
+
+describe("a rejected write is swallowed, not silent", () => {
+  it("reports the failure to Sentry with the keyspace, never the raw key", async () => {
+    collectionsKey = "collectables-collections-v1-3f1a2b4c-5d6e-4f70-8192-a3b4c5d6e7f8";
+    failEveryWrite = true;
+    await mount();
+
+    assert.equal(captured.length, 2, "one report per failing keyspace");
+    assert.deepEqual(captured[0].context, {
+      scope: "use-persisted-blob.setItem",
+      extra: { keyspace: "collectables-collections-v1-{id}" },
+    });
+    assert.equal(
+      JSON.stringify(captured).includes("3f1a2b4c"),
+      false,
+      "the account's auth id must not reach the crash report — scrubPII does not read `extra`",
+    );
+  });
+
+  it("reports each keyspace once per session, however many writes fail", async () => {
+    failEveryWrite = true;
+    const tree = await mount();
+    assert.equal(captured.length, 2);
+
+    // A full device store fails every write of every render. Sentry's limiter
+    // would eventually cap the volume; this decides which events survive.
+    items = ["i1", "i2"];
+    tree.rerender();
+    items = ["i1", "i2", "i3"];
+    tree.rerender();
+
+    assert.equal(captured.length, 2, "the same keyspace must not report twice");
+  });
+
+  it("reports nothing while writes succeed", async () => {
+    const tree = await mount();
+    items = ["i1", "i2"];
+    tree.rerender();
+    assert.deepEqual(captured, []);
   });
 });
 

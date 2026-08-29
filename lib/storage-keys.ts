@@ -89,6 +89,41 @@ export async function migrateStorageKey(oldKey: string, newKey: string): Promise
 
 export const COLLECTABLES_STORAGE_PREFIX = "collectables-";
 
+/** A user id in a storage key, as every per-user builder above appends one. */
+const UUID =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+/** What replaces the id, so a reader can see that one was there. */
+export const STORAGE_KEY_ID_PLACEHOLDER = "{id}";
+
+/**
+ * A storage key with the user id taken out, for a crash report or a log line.
+ *
+ * Every per-user builder above ends `-${userId}`, and a Supabase auth id is
+ * the account — sending one to Sentry attaches an identifier to a report that
+ * did not need one, in a field `scrubPII` does not know to look at (it reads
+ * event bodies, not the `extra` a caller assembles). The keyspace is what a
+ * report is actually about: "the items blob stopped persisting" is the fact,
+ * and WHOSE items blob is already on the event's user context if it is
+ * anywhere.
+ *
+ * TWO PASSES, BECAUSE THE ID IS NOT ALWAYS A UUID. Replacing the uuid keeps
+ * everything around it, which for `syncCursorKey` / `tombstoneKey` is the
+ * ENTITY (`…-sync-cursor-v1-items-{id}`) — the part that says which pull
+ * broke. A legacy or test id would not match that shape, and returning the key
+ * unchanged there is exactly the case this exists to prevent, so anything
+ * still carrying a `-v1-` suffix is truncated at the version instead: less
+ * detail, and no way for an id to travel. Keys with no per-user half
+ * (`collectables-language-v1`) match neither and come back as they are.
+ */
+export function storageKeyLabel(key: string): string {
+  const withoutIds = key.replace(UUID, STORAGE_KEY_ID_PLACEHOLDER);
+  if (withoutIds !== key) return withoutIds;
+  const version = key.indexOf("-v1-");
+  if (version < 0) return key;
+  return `${key.slice(0, version + "-v1".length)}-${STORAGE_KEY_ID_PLACEHOLDER}`;
+}
+
 /**
  * Returns every AsyncStorage key currently owned by the app (anything matching
  * `collectables-*`). Exposed so a dev-only escape hatch can wipe onboarding

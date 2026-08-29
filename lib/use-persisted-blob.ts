@@ -2,6 +2,9 @@ import { useEffect } from "react";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { captureException } from "@/lib/sentry";
+import { storageKeyLabel } from "@/lib/storage-keys";
+
 /**
  * Persist one JSON blob to AsyncStorage under one key, writing only when that
  * blob's own reference changes.
@@ -41,12 +44,57 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * default of `true` would make the safe value the one a caller has to remember
  * to pass.
  *
- * Failures are swallowed: a blob that fails to persist is re-derived from the
- * cloud on the next pull, and there is nothing useful to do at this level.
+ * ## A failed write is still swallowed, and no longer silent
+ *
+ * The app cannot recover from a rejected `setItem` at this level: there is no
+ * second store to try, and throwing out of an effect would take the provider
+ * tree down over a cache write. So the write is still best-effort.
+ *
+ * What changed is that it is reported. A rejected write is usually a full
+ * device store, which fails EVERY write rather than one, and the user finds out
+ * on the next launch — when their local edits are gone and the cloud pull is
+ * the only truth they have left. Silent local data loss is the failure mode
+ * this hook is closest to, and until now nothing anywhere recorded that it
+ * happened. One `captureException` per keyspace per session says which blob
+ * stopped persisting without turning a full disk into a thousand events.
+ *
+ * The KEYSPACE, not the key: every per-user key ends in the account's auth id,
+ * and `storageKeyLabel` takes it out. `scrubPII` reads event bodies, not the
+ * `extra` a caller assembles, so a raw key here would be an identifier nobody
+ * decided to send.
  */
 export function usePersistedBlob(key: string | null, value: unknown, enabled: boolean): void {
   useEffect(() => {
     if (!enabled || !key) return;
-    AsyncStorage.setItem(key, JSON.stringify(value)).catch(() => undefined);
+    AsyncStorage.setItem(key, JSON.stringify(value)).catch((error: unknown) => {
+      reportPersistFailure(key, error);
+    });
   }, [key, value, enabled]);
+}
+
+/**
+ * Keyspaces already reported this session.
+ *
+ * Per keyspace rather than per key so signing in as a second account does not
+ * re-report the same broken store, and per session rather than per mount so a
+ * provider that remounts on every navigation cannot turn one full disk into a
+ * stream. Sentry's own limiter would eventually cap the volume; this decides
+ * WHICH events survive instead of letting the first minute of a full disk
+ * spend the budget.
+ */
+const reportedKeyspaces = new Set<string>();
+
+function reportPersistFailure(key: string, error: unknown): void {
+  const keyspace = storageKeyLabel(key);
+  if (reportedKeyspaces.has(keyspace)) return;
+  reportedKeyspaces.add(keyspace);
+  captureException(error, {
+    scope: "use-persisted-blob.setItem",
+    extra: { keyspace },
+  });
+}
+
+/** Module scope survives between suites in one process; a seeding suite resets. */
+export function __resetPersistFailureReportsForTests(): void {
+  reportedKeyspaces.clear();
 }

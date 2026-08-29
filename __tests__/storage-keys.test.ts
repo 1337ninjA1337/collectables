@@ -11,6 +11,9 @@ import {
   itemsKey,
   premiumKey,
   socialCacheKey,
+  storageKeyLabel,
+  syncCursorKey,
+  tombstoneKey,
 } from "../lib/storage-keys";
 
 const UID = "user-abc";
@@ -39,5 +42,81 @@ describe("storage-keys", () => {
 
   it("premiumKey matches premiumStorageKey template", () => {
     assert.equal(premiumKey(UID), `collectables-premium-v1-${UID}`);
+  });
+});
+
+/**
+ * The keyspace a crash report may name, given a key that carries an account id.
+ *
+ * `usePersistedBlob` reports a rejected write — usually a full device store,
+ * which loses local edits silently — and every per-user builder above ends in
+ * the Supabase auth id. `scrubPII` reads event bodies, not the `extra` a caller
+ * assembles, so anything this function leaves in the string is an identifier
+ * nobody decided to send.
+ */
+describe("storageKeyLabel", () => {
+  const AUTH_ID = "3f1a2b4c-5d6e-4f70-8192-a3b4c5d6e7f8";
+
+  it("replaces a uuid user id and keeps everything around it", () => {
+    assert.equal(
+      storageKeyLabel(collectionsKey(AUTH_ID)),
+      "collectables-collections-v1-{id}",
+    );
+    assert.equal(storageKeyLabel(itemsKey(AUTH_ID)), "collectables-items-v1-{id}");
+  });
+
+  it("keeps the ENTITY of a per-entity key — the part that says which pull broke", () => {
+    assert.equal(
+      storageKeyLabel(syncCursorKey("items", AUTH_ID)),
+      "collectables-sync-cursor-v1-items-{id}",
+    );
+    assert.equal(
+      storageKeyLabel(tombstoneKey("collections", AUTH_ID)),
+      "collectables-tombstones-v1-collections-{id}",
+    );
+  });
+
+  it("truncates at the version when the id is not a uuid, rather than passing it through", () => {
+    // The case the second pass exists for: a legacy or test id matches no uuid
+    // shape, and returning the key unchanged is exactly the leak this prevents.
+    assert.equal(storageKeyLabel(collectionsKey(UID)), "collectables-collections-v1-{id}");
+    assert.equal(
+      storageKeyLabel(syncCursorKey("items", UID)),
+      "collectables-sync-cursor-v1-{id}",
+      "the entity is lost with a non-uuid id, which is the safe direction",
+    );
+  });
+
+  it("leaves a key with no per-user half alone", () => {
+    assert.equal(storageKeyLabel(LANGUAGE_KEY), LANGUAGE_KEY);
+    assert.equal(storageKeyLabel(SOCIAL_GRAPH_KEY), SOCIAL_GRAPH_KEY);
+    assert.equal(storageKeyLabel(MARKETPLACE_KEY), MARKETPLACE_KEY);
+  });
+
+  it("is case-insensitive about the uuid, as PostgREST is about the id it returns", () => {
+    assert.equal(
+      storageKeyLabel(collectionsKey(AUTH_ID.toUpperCase())),
+      "collectables-collections-v1-{id}",
+    );
+  });
+
+  it("never leaves an id in a key produced by any per-user builder", () => {
+    const builders = [
+      collectionsKey,
+      itemsKey,
+      followedCollectionsKey,
+      chatCacheKey,
+      socialCacheKey,
+      premiumKey,
+    ];
+    for (const build of builders) {
+      for (const id of [AUTH_ID, UID]) {
+        assert.doesNotMatch(
+          storageKeyLabel(build(id)),
+          new RegExp(id, "i"),
+          `${build.name} leaked its id into the label`,
+        );
+      }
+    }
   });
 });
