@@ -1,7 +1,9 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
-import { assertNoOffenders, matchesRule } from "./helpers/offence-sweep";
+import { balancedInner } from "@/lib/balanced-source";
+
+import { assertNoOffenders } from "./helpers/offence-sweep";
 import { installNativeModuleStubs, mockModule } from "./helpers/render";
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, sourceFiles } from "./helpers/source-files";
@@ -220,14 +222,55 @@ describe("the swallowing storage sites route through the shared budget", () => {
   });
 
   /**
-   * The rule the sweep below is built on, named so a positive control can hold
-   * it. A sweep asserting "nothing matches" is satisfied perfectly by a pattern
-   * that has STOPPED matching, and a clean tree looks identical either way —
-   * there is no file left in this repo to control against, so the control is a
-   * fabricated one.
+   * Each AsyncStorage write in `source`, reduced to the call plus what
+   * IMMEDIATELY follows it, one per line.
+   *
+   * The sweep's subject is a write's tail, not a file, and the difference is a
+   * false positive this rule shipped with for exactly one commit. A regex
+   * bridging from `AsyncStorage.setItem(` to a `.catch(() => undefined)` over
+   * a bounded window of source will happily start at a write that reports
+   * correctly and finish at an unrelated promise four lines below — reading, to
+   * whoever meets the failure, as "this module swallows a write" while pointing
+   * at a module that does not.
+   *
+   * `balancedInner` ends the call where the call ends, so the tail begins at
+   * its closing parenthesis and the rule is anchored there. Newlines collapse
+   * to spaces so a `.catch` on the next line is still adjacent; a following
+   * STATEMENT is not, because the `;` or the identifier between them is what
+   * the anchor now refuses. An unclosed call contributes no tail at all rather
+   * than a truncated one — a span read short is a span whose offence was not
+   * seen, which is the silent direction for a sweep asserting an absence.
    */
-  const SWALLOWED_WRITE =
-    /AsyncStorage\.setItem\([\s\S]{0,400}?\)\s*\.?\s*catch\(\s*\(\s*\)\s*=>\s*(undefined|\{\s*\})\s*[,)]/;
+  function writeTails(source: string): string {
+    const write = /\bAsyncStorage\s*\.\s*(?:setItem|multiSet|mergeItem|multiMerge)\s*\(/g;
+    const tails: string[] = [];
+    for (let m = write.exec(source); m !== null; m = write.exec(source)) {
+      const open = m.index + m[0].length - 1;
+      const args = balancedInner(source, open, "(", ")");
+      if (args === null) continue;
+      const closeAt = open + args.length + 1;
+      tails.push(`${WRITE_MARK}${source.slice(closeAt + 1, closeAt + 80).replace(/\s+/g, " ")}`);
+    }
+    return tails.join("\n");
+  }
+
+  /** Opens each tail line, so the rule below can anchor to the call's end. */
+  const WRITE_MARK = "«write»";
+
+  /**
+   * The rule, named so a positive control can hold it. A sweep asserting
+   * "nothing matches" is satisfied perfectly by a pattern that has STOPPED
+   * matching, and a clean tree looks identical either way — there is no file
+   * left in this repo to control against, so the controls are fabricated.
+   */
+  const SWALLOWED_WRITE = new RegExp(
+    `^${WRITE_MARK}\\s*\\.?\\s*catch\\(\\s*\\(\\s*\\)\\s*=>\\s*(undefined|\\{\\s*\\})\\s*[,)]`,
+    "m",
+  );
+
+  function swallows(source: string): boolean {
+    return SWALLOWED_WRITE.test(writeTails(source));
+  }
 
   it("the swallowed-write rule still matches a swallowed write", () => {
     for (const offender of [
@@ -236,8 +279,10 @@ describe("the swallowing storage sites route through the shared budget", () => {
       "await AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(cloud)).catch(() => undefined);",
       "AsyncStorage.setItem(\n  KEY,\n  JSON.stringify({ a, b }),\n).catch(() => undefined);",
       "AsyncStorage.setItem(k, v).catch(\n  () => undefined,\n);",
+      'AsyncStorage.setItem(k, ")").catch(() => undefined);',
+      "AsyncStorage.multiSet(pairs).catch(() => undefined);",
     ]) {
-      assert.ok(matchesRule(SWALLOWED_WRITE, offender), `must flag: ${offender}`);
+      assert.ok(swallows(offender), `must flag: ${offender}`);
     }
   });
 
@@ -250,21 +295,45 @@ describe("the swallowing storage sites route through the shared budget", () => {
       "somethingElse(key).catch(() => undefined);",
       "await AsyncStorage.setItem(key, body);",
     ]) {
-      assert.ok(!matchesRule(SWALLOWED_WRITE, innocent), `must not flag: ${innocent}`);
+      assert.ok(!swallows(innocent), `must not flag: ${innocent}`);
     }
+  });
+
+  it("does not bridge from a reporting write to somebody else's empty catch", () => {
+    // The case the shipped rule failed. A bounded `[\s\S]{0,400}?` window
+    // starting at the reporting `setItem` reaches the `.catch(() => undefined)`
+    // below it, and the module named in the failure is not the one that
+    // offends. Both statements here are legitimate.
+    const source = [
+      'AsyncStorage.setItem(key, JSON.stringify(value)).catch((error: unknown) => {',
+      '  reportStorageFailure("some-context.setItem", key, error);',
+      "});",
+      "",
+      "// A remote write, which is a different rule's business entirely.",
+      "softDeleteRemoteItem(itemId).catch(() => undefined);",
+    ].join("\n");
+    assert.ok(!swallows(source), "the tail of the write ends at the write");
+  });
+
+  it("does not read past an unclosed call into the next statement", () => {
+    // The other direction of the same anchoring: a write whose parenthesis
+    // never closes contributes no tail, so the `.catch` of a LATER statement
+    // cannot be attributed to it.
+    const source = 'AsyncStorage.setItem(key, "unterminated\nfoo().catch(() => undefined);';
+    assert.ok(!swallows(source), "an unreadable call is skipped, not guessed at");
   });
 
   it("no AsyncStorage write is swallowed into an empty catch any more", () => {
     // The sweep, rather than eight source assertions: a NINTH provider is what
-    // the per-module list cannot see. A `setItem` whose rejection reaches
+    // the per-module list cannot see. A write whose rejection reaches
     // `() => undefined` or `() => {}` is silent local data loss, and the user
     // finds out on the next launch when their edits are gone.
     assertNoOffenders({
       rule: SWALLOWED_WRITE,
       files: sourceFiles(),
-      read: readSource,
+      read: (relative) => writeTails(readSource(relative)),
       subject: "modules",
-      what: "swallow a rejected AsyncStorage.setItem into an empty catch — bind the error and report it through reportStorageFailure(scope, key, error)",
+      what: "swallow a rejected AsyncStorage write into an empty catch — bind the error and report it through reportStorageFailure(scope, key, error)",
     });
   });
 

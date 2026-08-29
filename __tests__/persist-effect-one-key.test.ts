@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { balancedInner } from "@/lib/balanced-source";
+
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 
 /**
@@ -31,8 +33,11 @@ import { sourceCode, sourceFiles } from "./helpers/source-files";
  *
  * WHY A SWEEP AND NOT A `lint:all` GUARD. The offence needs a balanced,
  * quote-aware read of a call's argument list rather than a line pattern, and
- * every existing guard's scanner is a regex over stripped source. When a second
- * rule needs the same reader, that is the moment it earns a module.
+ * every existing guard's scanner is a regex over stripped source. This file
+ * used to end by saying a second rule needing the same reader would be the
+ * moment it earned a module; a fourth one arrived and it is
+ * `lib/balanced-source.ts`, which is where the reader's limits are now stated
+ * once instead of in two of the three copies.
  */
 
 /** What a single effect wrote, when it wrote more than one key. */
@@ -44,48 +49,6 @@ type Offence = {
 
 const EFFECT = /\buse(?:Layout)?Effect\s*\(/g;
 const WRITE = /\bAsyncStorage\s*\.\s*(?:setItem|multiSet|mergeItem|multiMerge)\s*\(/g;
-
-const QUOTES = new Set(['"', "'", "`"]);
-
-/** The index just past the string literal opening at `from`, escapes included. */
-function endOfString(text: string, from: number): number {
-  const quote = text[from];
-  for (let i = from + 1; i < text.length; i += 1) {
-    if (text[i] === "\\") {
-      i += 1;
-      continue;
-    }
-    if (text[i] === quote) return i + 1;
-  }
-  return text.length;
-}
-
-/**
- * The text between the balanced parentheses opening at `from`.
- *
- * Quote-aware, because a `")"` inside a string is not a closer and a scan that
- * balanced on it would end the effect early — which for this rule means
- * reporting one write where there are two, the silent direction. Comments are
- * already blanked by `sourceCode`, so only literals are left to skip. Returns
- * null when the parenthesis never closes, which in well-formed source means
- * only that a literal was left open.
- */
-function balancedParens(source: string, from: number): string | null {
-  let depth = 0;
-  for (let i = from; i < source.length; i += 1) {
-    const char = source[i];
-    if (QUOTES.has(char)) {
-      i = endOfString(source, i) - 1;
-      continue;
-    }
-    if (char === "(") depth += 1;
-    else if (char === ")") {
-      depth -= 1;
-      if (depth === 0) return source.slice(from + 1, i);
-    }
-  }
-  return null;
-}
 
 function countMatches(text: string, pattern: RegExp): number {
   // A fresh RegExp per call: `g` patterns carry `lastIndex`, and a shared one
@@ -107,7 +70,7 @@ function scanEffects(file: string, source: string): Offence[] {
     match = effects.exec(source)
   ) {
     const open = match.index + match[0].length - 1;
-    const args = balancedParens(source, open);
+    const args = balancedInner(source, open, "(", ")");
     if (args === null) continue;
     found.push({ file, line: lineOf(source, match.index), writes: countMatches(args, WRITE) });
     // Resume past this call so a nested effect is not read twice.

@@ -1,3 +1,4 @@
+import { balancedThrough } from "@/lib/balanced-source";
 import { stripComments } from "@/lib/strip-comments";
 
 /**
@@ -36,25 +37,15 @@ export type EmptyStateWrapperFinding = {
   source: string;
 };
 
-/** Extract the balanced `{...}` object that starts at `openBrace`. */
-function balancedBraces(text: string, openBrace: number): string | null {
-  let depth = 0;
-  for (let i = openBrace; i < text.length; i += 1) {
-    const ch = text[i];
-    if (ch === "{") depth += 1;
-    else if (ch === "}") {
-      depth -= 1;
-      if (depth === 0) return text.slice(openBrace, i + 1);
-    }
-  }
-  return null;
-}
-
 /** Resolve a `styles.NAME` reference to its object body in this file. */
 function resolveStyleEntry(source: string, name: string): string | null {
   const entry = new RegExp(`(?<=[{,]\\s*)${name}:\\s*\\{`).exec(source);
   if (!entry) return null;
-  return balancedBraces(source, entry.index + entry[0].length - 1);
+  // Through the braces, not between them: `backgroundsOf` reads an object
+  // BODY. Quote-aware since this went through the shared reader — the copy
+  // it replaced counted a `"}"` inside a string literal as a closer, which
+  // ended the entry early and hid every declaration after it.
+  return balancedThrough(source, entry.index + entry[0].length - 1, "{", "}");
 }
 
 const BACKGROUND_RE = /backgroundColor:\s*([^,}\n]+)/g;
@@ -106,7 +97,7 @@ export function findEmptyStateWrapperOverrides(
       const styleAttr = /style=\{/.exec(attrs);
       if (!styleAttr) continue;
       const styleBody =
-        balancedBraces(attrs, styleAttr.index + styleAttr[0].length - 1) ?? "";
+        balancedThrough(attrs, styleAttr.index + styleAttr[0].length - 1, "{", "}") ?? "";
 
       for (const bg of backgroundsOf(styleBody)) {
         if (!isAllowed(bg)) {

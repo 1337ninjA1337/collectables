@@ -18,14 +18,13 @@
  * had been bitten. Both directions are asserted here for every caller.
  *
  * WHAT THIS IS NOT. It is not a parser. It reads a function's parameter list
- * between balanced parentheses and a type's members between balanced braces,
- * skipping over string literals so a `")"` default or an `"a,b"` type cannot
- * move a depth counter. That is enough for every declaration in this tree and
- * it is not enough for, say, a callback parameter — `(value: string) => void`
- * closes a bracket the splitter never opened. A template-literal type with an
- * interpolation in it is the other known gap: `endOfString` stops at the first
- * unescaped backtick and does not descend into `${…}`, so a quote nested there
- * would end the literal early. Neither shape exists in this tree.
+ * between balanced parentheses and a type's members between balanced braces
+ * via `lib/balanced-source.ts`, which skips string literals so a `")"` default
+ * or an `"a,b"` type cannot move a depth counter. That reader's own limits (a
+ * regex literal, a template-literal interpolation) are stated there. The limit
+ * this file adds is its own: a callback parameter — `(value: string) => void`
+ * — closes a bracket the SPLITTER never opened, which is the loop below rather
+ * than the balancer. Neither shape exists in this tree.
  *
  * WHERE IT CANNOT ANSWER, IT REFUSES. Every ambiguity below turns into a throw
  * naming what it could not read, rather than into a confident answer about the
@@ -48,6 +47,8 @@
  */
 
 import assert from "node:assert/strict";
+
+import { QUOTES, balancedInner, endOfString } from "@/lib/balanced-source";
 
 import { stripComments } from "@/lib/strip-comments";
 
@@ -73,34 +74,21 @@ export function declaredSource(relative: string): string {
 }
 
 /**
- * The string delimiters a declaration can contain.
+ * WHY THE LITERAL-SKIPPING LIVES IN `lib/balanced-source.ts`.
  *
  * Comments are gone by the time anything here reads, so the only quote left in
  * a scanned region is a real literal: `"log" | "error"` in a `Pick<>`, an
  * `"a,b"` string-literal type, a `")"` default. Each of those carries
- * characters the depth counters below balance on, and each means nothing there.
- */
-const QUOTES = new Set(['"', "'", "`"]);
-
-/**
- * The index just past the string literal opening at `from`, escapes included.
+ * characters the depth counters balance on, and each means nothing there. The
+ * reader that skips them was written here first and then twice more elsewhere;
+ * it is one module now, and the template-literal gap this file used to
+ * document is stated there.
  *
- * Scanning is always local — from a declaration's opening bracket to its
- * balanced close — rather than over a whole module, because an apostrophe in a
- * JSX text node is not a literal and would otherwise mask the rest of a `.tsx`
- * file. Nothing here reads past the declaration it was asked about.
+ * Scanning stays LOCAL — from a declaration's opening bracket to its balanced
+ * close — rather than over a whole module, because an apostrophe in a JSX text
+ * node is not a literal and would otherwise mask the rest of a `.tsx` file.
+ * Nothing here reads past the declaration it was asked about.
  */
-function endOfString(text: string, from: number): number {
-  const quote = text[from];
-  for (let i = from + 1; i < text.length; i += 1) {
-    if (text[i] === "\\") {
-      i += 1;
-      continue;
-    }
-    if (text[i] === quote) return i + 1;
-  }
-  return text.length;
-}
 
 /** Every index at which `needle` occurs, so "declared twice" is answerable. */
 function occurrences(source: string, needle: string): readonly number[] {
@@ -108,35 +96,6 @@ function occurrences(source: string, needle: string): readonly number[] {
   for (let at = source.indexOf(needle); at >= 0; at = source.indexOf(needle, at + 1))
     found.push(at);
   return found;
-}
-
-/**
- * The text between `source`'s balanced `open`/`close` pair starting at `from`.
- *
- * `from` is the index of the opening bracket. Returns null when the pair never
- * closes, which for well-formed source means only that a quote was left open —
- * and which callers report rather than paper over.
- */
-function balanced(
-  source: string,
-  from: number,
-  open: string,
-  close: string,
-): string | null {
-  let depth = 0;
-  for (let i = from; i < source.length; i += 1) {
-    const char = source[i];
-    if (QUOTES.has(char)) {
-      i = endOfString(source, i) - 1;
-      continue;
-    }
-    if (char === open) depth += 1;
-    else if (char === close) {
-      depth -= 1;
-      if (depth === 0) return source.slice(from + 1, i);
-    }
-  }
-  return null;
 }
 
 /**
@@ -160,7 +119,7 @@ export function parameterList(source: string, fn: string): string | null {
   );
   const start = declarations[0];
   if (start === undefined) return null;
-  const list = balanced(source, source.indexOf("(", start), "(", ")");
+  const list = balancedInner(source, source.indexOf("(", start), "(", ")");
   assert.ok(
     list !== null,
     `declared-shape: ${fn}'s parameter list never closes — an unterminated string literal in the signature is the only way this happens`,
@@ -279,7 +238,7 @@ export function declarationBody(source: string, declaration: string): string | n
   );
   const start = openings[0];
   if (start === undefined) return null;
-  const body = balanced(source, source.indexOf("{", start), "{", "}");
+  const body = balancedInner(source, source.indexOf("{", start), "{", "}");
   assert.ok(
     body !== null,
     `declared-shape: ${declaration}'s body never closes — an unterminated string literal in the declaration is the only way this happens`,
