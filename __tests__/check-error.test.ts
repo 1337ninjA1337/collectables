@@ -20,6 +20,20 @@ import { sourceFiles } from "./helpers/source-files";
  * almost right.
  */
 
+/**
+ * The helper module, which both sweeps below have to skip and for two reasons.
+ *
+ * It builds the refusal prefix by hand — that is what a helper IS — so the
+ * offender sweep would name it every time; and it spells `checkError(` in its
+ * own signature, so the adoption floor would count it as its own first caller.
+ * Two different rules, one file, and until 2026-08-29 the path was written
+ * inline in each of them: once as `if (file === "lib/check-error.ts") return
+ * false;` and once as `file !== "lib/check-error.ts" &&`. One decision in two
+ * spellings, neither declared, is exactly the drift `inline-exclusion.test.ts`
+ * bans — tighten one sweep and the other keeps vouching for the old shape.
+ */
+const HELPER = "lib/check-error.ts";
+
 describe("checkError", () => {
   it("puts the check name first, then the separator, then the prose", () => {
     assert.equal(
@@ -118,11 +132,21 @@ describe("the guards that print refusals", () => {
    * The population is the offence itself, so a module that stopped refusing
    * anything drops out on its own and a twelfth guard is covered without being
    * added to anything.
+   *
+   * THE HELPER IS NOT SKIPPED HERE, AND HAD BEEN SINCE IT STOPPED NEEDING TO
+   * BE (removed 2026-08-29). `buildsARefusalByHand` asks for a NAME in front of
+   * the separator, and `lib/check-error.ts` has never written one — it declares
+   * `CHECK_ERROR_PREFIX = ": ERROR — "` bare and interpolates the caller's name
+   * around it. The skip was correct against the first version of this rule,
+   * which asked whether a module's source contains the separator at all; the
+   * narrowing that made the rule about a BUILT line rather than a mentioned one
+   * left it behind, excusing nothing, in the one file where a second hand-built
+   * line would be least conspicuous. It falls out of the population on its own
+   * merits now, which is what the doc block above claims for every module.
    */
-  const OFFENDERS = sourceFiles("lib", "scripts").filter((file) => {
-    if (file === "lib/check-error.ts") return false;
-    return buildsARefusalByHand(stripComments(readRepoFile(file)));
-  });
+  const OFFENDERS = sourceFiles("lib", "scripts").filter((file) =>
+    buildsARefusalByHand(stripComments(readRepoFile(file))),
+  );
 
   it("build the line through the helper, not by hand", () => {
     assert.deepEqual(
@@ -140,7 +164,7 @@ describe("the guards that print refusals", () => {
     // and a collapse to nothing is caught.
     const callers = sourceFiles("lib", "scripts").filter(
       (file) =>
-        file !== "lib/check-error.ts" &&
+        file !== HELPER &&
         stripComments(readRepoFile(file)).includes("checkError("),
     );
     assert.ok(
@@ -151,8 +175,29 @@ describe("the guards that print refusals", () => {
 
   it("keeps the helper a leaf, because every guard module would import it", () => {
     assert.ok(
-      !/^\s*import\s/m.test(stripComments(readRepoFile("lib/check-error.ts"))),
+      !/^\s*import\s/m.test(stripComments(readRepoFile(HELPER))),
       "lib/check-error.ts has grown an import — it is reached from eleven guard modules and a build script, and may depend on nothing",
+    );
+  });
+
+  it("is still skipped by the adoption floor for the reason it is skipped", () => {
+    // The half neither inline copy could have, and the half that found the
+    // stale one: both skips rested on the sentence "it is the helper", which is
+    // a claim about the FILE and expires quietly when a rule around it moves.
+    // Asked here in the floor's own terms, so a skip that has stopped excusing
+    // anything is a red case rather than a line nobody reads.
+    assert.ok(
+      sourceFiles("lib", "scripts").includes(HELPER),
+      `${HELPER} is skipped by the adoption floor but is not in the walk — a skip over a file nobody reads exempts nothing and hides that it is stale`,
+    );
+    const code = stripComments(readRepoFile(HELPER));
+    assert.ok(
+      code.includes("checkError("),
+      `${HELPER} no longer spells checkError( , so the floor would not miscount it as its own first caller — drop the skip instead of leaving it open`,
+    );
+    assert.ok(
+      !buildsARefusalByHand(code),
+      `${HELPER} has started building a refusal line by hand — the offender sweep above no longer skips it (the skip was stale from the day the rule asked for a name), so this is now a real finding in the module that exists to prevent it`,
     );
   });
 });

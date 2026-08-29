@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  CONTENT_TYPES_PART,
   PBIT_PART_NAMES,
   POWERBI_MEASURE_NAMES,
   POWERBI_PARAMETER_NAMES,
@@ -120,10 +121,10 @@ describe("Collectables-Starter.pbit (committed artifact)", () => {
 
   it("[Content_Types].xml declares an Override for every JSON part", () => {
     const entries = readZipEntries(readFileSync(PBIT));
-    const xml = entries["[Content_Types].xml"].toString("utf8");
+    const xml = entries[CONTENT_TYPES_PART].toString("utf8");
     assert.match(xml, /^<\?xml/);
     for (const part of PBIT_PART_NAMES) {
-      if (part === "[Content_Types].xml") continue;
+      if (part === CONTENT_TYPES_PART) continue;
       assert.match(
         xml,
         new RegExp(`PartName="/${part.replace(/[/[\]]/g, "\\$&")}"`),

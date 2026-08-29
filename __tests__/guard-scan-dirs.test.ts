@@ -166,6 +166,17 @@ describe("the guards' scan lists agree with lib/source-dirs.ts", () => {
   });
 });
 
+/**
+ * The module the sweep below is about, and therefore the one file it may skip.
+ *
+ * "There is exactly one copy of this list" is a rule whose subject writes the
+ * copy, so the skip is structural and permanent. Named rather than spelled
+ * inside the filter (per `inline-exclusion.test.ts`) and held honest by the
+ * case beside the sweep: a skip over a module that stopped declaring the list
+ * is a hole standing open for whoever pastes the second copy in.
+ */
+const DECLARING = "lib/source-dirs.ts";
+
 describe("lib/source-dirs.ts is the one statement of the list", () => {
   it("holds the extension sets the walk takes, and they differ", () => {
     assert.deepEqual([...SOURCE_EXTENSIONS], [".ts", ".tsx"]);
@@ -189,10 +200,26 @@ describe("lib/source-dirs.ts is the one statement of the list", () => {
     // anywhere in the tree is the thing this consolidation removed; the guards
     // declare SUBSETS, which is a different shape and is checked above.
     const offenders = sourceFiles().filter((relative) => {
-      if (relative === "lib/source-dirs.ts") return false;
+      if (relative === DECLARING) return false;
       const code = readRepoFile(relative);
       return /"app",\s*"components",\s*"data",\s*"lib",\s*"scripts"/.test(code);
     });
     assert.deepEqual(offenders, []);
+  });
+
+  it("still declares the list it is skipped for declaring", () => {
+    // The honesty half of the skip above. The reason it exists — "this module
+    // IS the one copy" — is a claim about the file, and the day the list moves
+    // out of it the skip stops excusing anything while still excusing the file
+    // that would hold the next stray copy.
+    assert.ok(
+      sourceFiles().includes(DECLARING),
+      `${DECLARING} is skipped by the sweep above but is not in the walk — a skip over a file nobody reads exempts nothing and hides that it is stale`,
+    );
+    assert.match(
+      readRepoFile(DECLARING),
+      /"app",\s*"components",\s*"data",\s*"lib",\s*"scripts"/,
+      `${DECLARING} no longer spells the list, so the sweep would not report it — drop the skip rather than leaving it open`,
+    );
   });
 });

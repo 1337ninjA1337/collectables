@@ -30,8 +30,19 @@ export const POWERBI_MEASURE_NAMES = [
   "PremiumConversionRate7d",
 ] as const;
 
+/**
+ * The OPC manifest part, which is the one part that cannot describe itself.
+ *
+ * Named because it is excluded twice from the same list — once by the builder
+ * below, once by the suite that checks the built file — and both exclusions
+ * spelled the path where they stood. A part name with brackets in it is also
+ * the kind of literal a reader skims past rather than compares, so the two
+ * copies could have drifted by a character without either side looking wrong.
+ */
+export const CONTENT_TYPES_PART = "[Content_Types].xml";
+
 export const PBIT_PART_NAMES = [
-  "[Content_Types].xml",
+  CONTENT_TYPES_PART,
   "Version",
   "Settings",
   "Metadata",
@@ -240,7 +251,7 @@ export function buildReportLayout(): unknown {
 }
 
 export function buildContentTypesXml(): string {
-  const overrides = PBIT_PART_NAMES.filter((p) => p !== "[Content_Types].xml")
+  const overrides = PBIT_PART_NAMES.filter((p) => p !== CONTENT_TYPES_PART)
     .map((p) => `  <Override PartName="/${p}" ContentType="" />`)
     .join("\n");
   return [

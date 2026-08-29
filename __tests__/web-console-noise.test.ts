@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { readRepoFile as read } from "./helpers/repo-file";
-import { sourceFiles } from "./helpers/source-files";
+import { sourceCode, sourceFiles } from "./helpers/source-files";
 
 /**
  * Two classes of avoidable console noise on the deployed web build, both
@@ -22,13 +22,24 @@ import { sourceFiles } from "./helpers/source-files";
  *
  * Both are noise rather than breakage, which is exactly why they need a guard:
  * nothing fails when they come back, they just bury real errors in the console.
+ *
+ * BOTH SWEEPS READ `sourceCode`, NOT THE RAW FILE (2026-08-29). They read the
+ * raw text until then, so a module that merely NAMED the shape in prose was an
+ * offender — and `lib/animation-driver.ts` names it twice, in the doc block
+ * explaining why the constant exists. It was excluded by hand for that reason,
+ * with the path spelled inside the filter, and the exclusion was the only
+ * thing standing between a guard and a false report about its own subject.
+ * Stripping comments is the fix for both halves at once: the guard stops
+ * reading prose, the hole has nothing left to excuse, and a real
+ * `useNativeDriver: true` inside the driver module — the one file that was
+ * exempt from the rule it declares — is now an offender like any other.
  */
 
 const SOURCE_FILES = sourceFiles("app", "components", "lib");
 
 describe("expo-image-picker — no deprecated MediaTypeOptions", () => {
   it("no source file reaches for the deprecated enum", () => {
-    const offenders = SOURCE_FILES.filter((f) => read(f).includes("MediaTypeOptions"));
+    const offenders = SOURCE_FILES.filter((f) => sourceCode(f).includes("MediaTypeOptions"));
     assert.deepEqual(
       offenders,
       [],
@@ -37,7 +48,7 @@ describe("expo-image-picker — no deprecated MediaTypeOptions", () => {
   });
 
   it("every picker launch still restricts to images", () => {
-    const withPicker = SOURCE_FILES.filter((f) => read(f).includes("launchImageLibraryAsync"));
+    const withPicker = SOURCE_FILES.filter((f) => sourceCode(f).includes("launchImageLibraryAsync"));
     assert.ok(withPicker.length >= 6, `expected the known picker call sites, got ${withPicker.length}`);
     for (const file of withPicker) {
       assert.match(
@@ -58,14 +69,24 @@ describe("Animated — no native-driver warning on web", () => {
   });
 
   it("no source file passes a bare `useNativeDriver: true`", () => {
-    const offenders = SOURCE_FILES.filter(
-      (f) => f !== "lib/animation-driver.ts" && read(f).includes("useNativeDriver: true"),
-    );
+    const offenders = SOURCE_FILES.filter((f) => sourceCode(f).includes("useNativeDriver: true"));
     assert.deepEqual(
       offenders,
       [],
       `route these through USE_NATIVE_DRIVER:\n  ${offenders.join("\n  ")}`,
     );
+  });
+
+  it("the exemption this sweep used to carry was excusing a comment", () => {
+    // Why there is no hole here any more, kept as an assertion rather than as a
+    // sentence: `lib/animation-driver.ts` was the sweep's one exclusion, and
+    // the only thing in it that ever matched sits in the doc block above the
+    // constant. The raw file still says the shape; the code does not. If that
+    // ever stops being true the sweep above turns red — which is the correct
+    // answer for the module that declares the alternative — and this case says
+    // so first, in the words of the exclusion it replaced.
+    assert.ok(read("lib/animation-driver.ts").includes("useNativeDriver: true"));
+    assert.ok(!sourceCode("lib/animation-driver.ts").includes("useNativeDriver: true"));
   });
 
   it("the transform/opacity animations adopted the constant", () => {

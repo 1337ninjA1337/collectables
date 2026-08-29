@@ -15,6 +15,26 @@ import { readSource, sourceFiles } from "./helpers/source-files";
 const SOURCE_FILES = sourceFiles("lib", "components", "app");
 
 /**
+ * The two wrapper modules, exempt from the call-site rules they implement.
+ *
+ * Every sweep below asks "does this CALL SITE pass only allow-listed keys",
+ * and the module that DEFINES the call is not a call site — `lib/analytics.ts`
+ * declares `trackEvent` and `lib/sentry.ts` declares `addBreadcrumb` and
+ * `captureException`, so each matches its own rule by construction and always
+ * will.
+ *
+ * Named rather than spelled in the three loops that skip them, which is where
+ * they lived until 2026-08-29 as `if (file === "lib/sentry.ts") continue;`
+ * under a `// wrapper itself` comment written out twice. That is the shape
+ * `inline-exclusion.test.ts` bans: an exclusion with no declaration is invisible
+ * to `assertExemptionsHonest` and to the reviewer, and this one had already
+ * been copied once — two loops skipping the same module through two
+ * independent lines, either of which could be tightened without the other.
+ */
+const TRACK_EVENT_WRAPPER = "lib/analytics.ts";
+const SENTRY_WRAPPER = "lib/sentry.ts";
+
+/**
  * Extracts the property KEYS from a flat object-literal body (no nested
  * braces) — handles both `key: value` and shorthand `key,` forms while
  * ignoring identifiers that appear on the value side.
@@ -117,7 +137,7 @@ describe("PII guard — trackEvent call sites stay within the taxonomy", () => {
   it("every call site uses a known event with only allow-listed, non-PII keys", () => {
     let callsChecked = 0;
     for (const file of SOURCE_FILES) {
-      if (file === "lib/analytics.ts") continue; // wrapper itself
+      if (file === TRACK_EVENT_WRAPPER) continue;
       const src = readSource(file);
 
       // name + object-literal props
@@ -171,7 +191,7 @@ describe("PII guard — breadcrumb call sites carry no user input", () => {
   it("addBreadcrumb data objects only use route allow-listed keys", () => {
     let calls = 0;
     for (const file of SOURCE_FILES) {
-      if (file === "lib/sentry.ts") continue; // wrapper itself
+      if (file === SENTRY_WRAPPER) continue;
       const src = readSource(file);
       for (const m of src.matchAll(
         /addBreadcrumb\([\s\S]*?\{([\s\S]*?)\}\s*\)/g,
@@ -197,7 +217,7 @@ describe("PII guard — breadcrumb call sites carry no user input", () => {
 describe("PII guard — captureException context is a constant label", () => {
   it("every captureException context value is a plain string literal", () => {
     for (const file of SOURCE_FILES) {
-      if (file === "lib/sentry.ts") continue; // wrapper itself
+      if (file === SENTRY_WRAPPER) continue;
       const src = readSource(file);
       for (const m of src.matchAll(
         /captureException\([\s\S]*?context:\s*([^,}\n]+)/g,
@@ -211,6 +231,37 @@ describe("PII guard — captureException context is a constant label", () => {
       }
     }
   });
+});
+
+describe("PII guard — the wrapper exemptions still exempt something", () => {
+  /**
+   * The half a hole cannot have while its path is spelled inside the loop.
+   *
+   * Each skip above is justified by "this module DEFINES the call", and that
+   * sentence is a claim about the file rather than about the exemption — it
+   * stops being true the day a wrapper moves, is renamed, or has its export
+   * pulled into a sibling. Then three loops skip a module for a reason that
+   * has expired, and nothing about the lines looks stale. So ask directly, in
+   * the words the exclusions are written in.
+   */
+  for (const [wrapper, declares] of [
+    [TRACK_EVENT_WRAPPER, ["export function trackEvent"]],
+    [SENTRY_WRAPPER, ["export function addBreadcrumb", "export function captureException"]],
+  ] as const) {
+    it(`${wrapper} is in the walk and still declares the call it is skipped for`, () => {
+      assert.ok(
+        SOURCE_FILES.includes(wrapper),
+        `${wrapper} is skipped by the sweeps above but is not in the walk — a skip over a file nobody reads exempts nothing and hides that it is stale`,
+      );
+      const src = readSource(wrapper);
+      for (const declaration of declares) {
+        assert.ok(
+          src.includes(declaration),
+          `${wrapper} is skipped as the wrapper itself but no longer declares \`${declaration}\` — drop the skip rather than leaving it open over a file that is now an ordinary call site`,
+        );
+      }
+    });
+  }
 });
 
 describe("PII guard — retention windows are documented", () => {

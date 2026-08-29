@@ -364,6 +364,18 @@ describe("assertRequiredMember", () => {
 
 describe("the suites that pin a signature", () => {
   /**
+   * This suite, which reads the helper's own source and so would count itself.
+   *
+   * A named const rather than the path spelled inside the filter, per
+   * `inline-exclusion.test.ts`: an adoption FLOOR that quietly excludes one
+   * suite is a floor with a hole in it, and the hole should be a thing a
+   * reader can see from the top of the block. Its honesty half is the
+   * `deepEqual` below, which names the three adopters exactly — an entry that
+   * stopped being an adopter turns that case red rather than passing.
+   */
+  const DECLARING = "declared-shape.test.ts";
+
+  /**
    * The population, derived: any suite reading a module's text to make a claim
    * about a declaration should be making it through the helper.
    *
@@ -377,7 +389,7 @@ describe("the suites that pin a signature", () => {
   it("is used by the three that produced it", () => {
     const adopters = suiteFiles().filter(
       (relative) =>
-        relative !== "declared-shape.test.ts" &&
+        relative !== DECLARING &&
         suiteCode(relative).includes("./helpers/declared-shape"),
     );
     assert.deepEqual(
