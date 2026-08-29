@@ -301,9 +301,16 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     (entity: "collections" | "items", ids: string[]) => {
       const activeUser = user;
       if (!activeUser || ids.length === 0) return;
-      void getTombstones(entity, activeUser.id).then((prev) =>
-        setTombstones(entity, activeUser.id, mergeTombstoneIds(prev, ids), prev),
-      );
+      void getTombstones(entity, activeUser.id).then((prev) => {
+        // A null read is unreadable, not empty. Writing `mergeTombstoneIds([],
+        // ids)` over a set we could not read would replace every tombstone this
+        // device holds with the one just made, and the rest come back on the
+        // next hydrate. Skipping leaves the stored set intact; the row is gone
+        // from local state either way, and the cloud PATCH still carries the
+        // delete to every peer including this one.
+        if (prev === null) return;
+        void setTombstones(entity, activeUser.id, mergeTombstoneIds(prev, ids), prev);
+      });
     },
     [user],
   );
@@ -625,10 +632,16 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         // BE-15b: re-apply the persisted tombstone set on hydrate so a cached or
         // seed row for an entity deleted on another device doesn't reappear
         // before the next cloud delta pull confirms the tombstone.
-        const [colTombstones, itemTombstones] = await Promise.all([
+        // `?? []` is the right read HERE and only here: this one applies the set
+        // without writing anything back, so an unreadable store costs one
+        // hydrate that does not re-drop the deleted rows (the next delta pull
+        // does) rather than a narrowed set persisted over the real one.
+        const [storedColTombstones, storedItemTombstones] = await Promise.all([
           getTombstones("collections", activeUser.id),
           getTombstones("items", activeUser.id),
         ]);
+        const colTombstones = storedColTombstones ?? [];
+        const itemTombstones = storedItemTombstones ?? [];
         if (!active) return;
 
         setLocalCollections(applyTombstones(visibleCollections, colTombstones, (c) => c.id));
@@ -724,7 +737,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         // BE-15b: fold the delta's tombstones into the persisted set, then merge
         // the alive rows and drop every tombstoned id — so a cached/seed copy of
         // a remotely deleted collection can't survive the merge.
-        const prevColTombstones = await getTombstones("collections", activeUser.id);
+        const storedColTombstones = await getTombstones("collections", activeUser.id);
+        const prevColTombstones = storedColTombstones ?? [];
         const colTombstones = mergeTombstoneIds(prevColTombstones, colTombstoned);
         if (deltaCollections.length > 0 || colTombstones !== prevColTombstones) {
           setLocalCollections((current) =>
@@ -735,18 +749,32 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
             ),
           );
         }
-        await setTombstones("collections", activeUser.id, colTombstones, prevColTombstones);
-        await setSyncCursor(
-          "collections",
-          activeUser.id,
-          overlapCursor(nextColCursor, colCursor),
-          colCursor,
-        );
+        // THE CURSOR WAITS FOR THE TOMBSTONE. A soft-delete reaches this device
+        // as one UPDATE and nothing re-sends it, so advancing past a tombstone
+        // that did not reach the store loses the delete permanently: the row
+        // stays in the local cache and comes back on the next hydrate. An
+        // unreadable store (`null`, not `[]`) is the same hazard from the other
+        // end — writing the union of a set we could not read would narrow the
+        // stored one — so it skips the write and holds the cursor too. Both
+        // cost a re-pull of a bounded window, which the merges' no-op contract
+        // makes nearly free.
+        const colTombstonesSafe =
+          storedColTombstones !== null &&
+          (await setTombstones("collections", activeUser.id, colTombstones, prevColTombstones));
+        if (colTombstonesSafe) {
+          await setSyncCursor(
+            "collections",
+            activeUser.id,
+            overlapCursor(nextColCursor, colCursor),
+            colCursor,
+          );
+        }
 
         const { data: deltaItems, tombstonedIds: itemTombstoned, cursor: nextItemCursor } =
           await fetchOwnItemsSince(activeUser.id, itemCursor);
         if (cancelled) return;
-        const prevItemTombstones = await getTombstones("items", activeUser.id);
+        const storedItemTombstones = await getTombstones("items", activeUser.id);
+        const prevItemTombstones = storedItemTombstones ?? [];
         const itemTombstones = mergeTombstoneIds(prevItemTombstones, itemTombstoned);
         if (deltaItems.length > 0 || itemTombstones !== prevItemTombstones) {
           setLocalItems((current) =>
@@ -757,13 +785,17 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
             ),
           );
         }
-        await setTombstones("items", activeUser.id, itemTombstones, prevItemTombstones);
-        await setSyncCursor(
-          "items",
-          activeUser.id,
-          overlapCursor(nextItemCursor, itemCursor),
-          itemCursor,
-        );
+        const itemTombstonesSafe =
+          storedItemTombstones !== null &&
+          (await setTombstones("items", activeUser.id, itemTombstones, prevItemTombstones));
+        if (itemTombstonesSafe) {
+          await setSyncCursor(
+            "items",
+            activeUser.id,
+            overlapCursor(nextItemCursor, itemCursor),
+            itemCursor,
+          );
+        }
       } catch {
         // Network/Supabase unavailable — keep the local state intact.
       }

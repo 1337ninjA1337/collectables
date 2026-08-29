@@ -228,6 +228,24 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
     }
   });
 
+  /**
+   * The body of `syncFromCloud`, delimited rather than measured.
+   *
+   * This was `src.slice(syncIdx, syncIdx + 2800)` in four cases, and 2800 is a
+   * length somebody counted once: the moment the function grew — the overlap
+   * cursor, then the tombstone gate that holds it — the window stopped
+   * reaching the items half, and four cases went red about the wrong thing.
+   * The end of the function is a thing the source states (`void
+   * syncFromCloud()` is the call that follows the declaration), so read that.
+   */
+  function syncFromCloudBody(): string {
+    const start = src.indexOf("async function syncFromCloud");
+    assert.ok(start >= 0, "syncFromCloud is no longer declared as a named async function");
+    const end = src.indexOf("void syncFromCloud();", start);
+    assert.ok(end > start, "the call that ends the declaration is gone — the slice has no delimiter");
+    return src.slice(start, end);
+  }
+
   it("declares a cloud-sync useEffect that depends on [user, ready, refreshTick]", () => {
     // The deps array of the new effect must contain all three so refresh() reaches it.
     assert.match(
@@ -241,8 +259,7 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
     // The warm refresh path no longer refetches whole tables — it asks for the
     // user's own rows changed since a per-entity cursor. The cold-bootstrap
     // path still keeps the full `fetchCollectionsByUserId` pull.
-    const syncIdx = src.indexOf("syncFromCloud");
-    const block = src.slice(syncIdx, syncIdx + 2800);
+    const block = syncFromCloudBody();
     assert.match(
       block,
       /fetchOwnCollectionsSince\(activeUser\.id, colCursor\)/,
@@ -277,8 +294,7 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
   it("uses functional setState so cross-device merges don't clobber concurrent local writes", () => {
     // setLocalCollections((current) => ...) and setLocalItems((current) => ...)
     // must both appear in the cloud-sync section to avoid stale-closure overwrites.
-    const syncIdx = src.indexOf("syncFromCloud");
-    const block = src.slice(syncIdx, syncIdx + 2800);
+    const block = syncFromCloudBody();
     assert.match(
       block,
       /setLocalCollections\(\s*\(\s*current\s*\)\s*=>/,
@@ -292,8 +308,7 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
   });
 
   it("re-applies local state when the delta returned rows OR a tombstone changed + persists the advanced cursor", () => {
-    const syncIdx = src.indexOf("syncFromCloud");
-    const block = src.slice(syncIdx, syncIdx + 2800);
+    const block = syncFromCloudBody();
     // A delta row is, by definition, newer than the cursor, so the merge fires
     // on a non-empty delta (no `hasNewCloudEntries` id check). BE-15b also
     // re-applies when the accumulated tombstone set grew, so a soft-deleted row
@@ -316,8 +331,7 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
   });
 
   it("partitions tombstones out of each delta and persists the accumulated set (BE-15b)", () => {
-    const syncIdx = src.indexOf("syncFromCloud");
-    const block = src.slice(syncIdx, syncIdx + 2800);
+    const block = syncFromCloudBody();
     // The delta pull now surfaces tombstoned ids alongside the alive rows.
     assert.match(
       block,
@@ -339,6 +353,52 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
     // The merged set is persisted for re-application on the next hydrate.
     assert.match(block, /setTombstones\("collections", activeUser\.id, colTombstones, prevColTombstones\)/);
     assert.match(block, /setTombstones\("items", activeUser\.id, itemTombstones, prevItemTombstones\)/);
+  });
+
+  it("holds the cursor until the tombstone is safely stored (BE-15b)", () => {
+    const block = syncFromCloudBody();
+    // A soft-delete arrives as ONE update and nothing re-sends it. Advancing
+    // `updated_at=gt` past a tombstone that never reached the store loses the
+    // delete permanently: the row is still in the local cache and comes back on
+    // the next hydrate, with no tombstone, no new id and no second write to
+    // bring it back. So the cursor waits for `setTombstones` to say true.
+    for (const entity of ["col", "item"] as const) {
+      assert.match(
+        block,
+        new RegExp(
+          `const ${entity}TombstonesSafe =\\s*\\n\\s*stored${entity === "col" ? "Col" : "Item"}Tombstones !== null &&`,
+        ),
+        `${entity} cursor must be gated on both halves: a store that could not be READ must not be written over, and a write that failed must not be treated as stored`,
+      );
+      assert.match(
+        block,
+        new RegExp(`if \\(${entity}TombstonesSafe\\) \\{\\s*\\n\\s*await setSyncCursor\\(`),
+        `${entity} cursor must only advance inside the tombstone gate`,
+      );
+    }
+  });
+
+  it("treats an unreadable tombstone store as unreadable, not as empty", () => {
+    const block = syncFromCloudBody();
+    // `getTombstones` answers null for a store it could not read. Merging into
+    // `[]` and writing the union back would replace every tombstone this device
+    // holds with the ones this one pull saw — so the null is kept in its own
+    // binding and the write is what consults it.
+    assert.match(block, /const storedColTombstones = await getTombstones\("collections", activeUser\.id\)/);
+    assert.match(block, /const prevColTombstones = storedColTombstones \?\? \[\]/);
+    assert.match(block, /const storedItemTombstones = await getTombstones\("items", activeUser\.id\)/);
+    assert.match(block, /const prevItemTombstones = storedItemTombstones \?\? \[\]/);
+  });
+
+  it("recordTombstones skips its write when the stored set could not be read", () => {
+    // The local-delete path has the same read-merge-write shape and the same
+    // hazard: a null read folded into `[]` replaces the whole persisted set
+    // with the single id just deleted.
+    assert.match(
+      src,
+      /void getTombstones\(entity, activeUser\.id\)\.then\(\(prev\) => \{[\s\S]{0,600}?if \(prev === null\) return;/,
+      "recordTombstones must not write a merged set over a store it could not read",
+    );
   });
 
   it("soft-deletes owned collections/items and records local tombstones (BE-15b)", () => {

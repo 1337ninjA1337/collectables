@@ -88,37 +88,80 @@ export function mergeTombstoneIds(
   return added.length === 0 ? (existing as string[]) : [...existing, ...added];
 }
 
-/** Read the stored tombstone-id set for an entity, or `[]` if none. */
+/**
+ * Read the stored tombstone-id set for an entity: `[]` when none was stored,
+ * and NULL when the store could not be read.
+ *
+ * The two used to be the same answer, and the difference is a resurrection.
+ * Every caller reads the set only to `mergeTombstoneIds` new ids into it and
+ * write the union back, so a transient read failure answered `[]` narrows the
+ * PERSISTED set to whatever this one pull happened to see — permanently, since
+ * the write succeeds and there is nothing left to re-learn from. The rows whose
+ * tombstones were dropped come back on the next hydrate, out of the local cache
+ * or the seed, and the user sees something they deleted.
+ *
+ * Null is therefore "do not write", not "empty". A caller that treats it as
+ * empty is back where this started, so the shape refuses to be ignored: `?? []`
+ * is a decision somebody has to type.
+ *
+ * ONLY THE STORE'S FAILURE IS NULL, not the content's. Unparseable or
+ * wrong-shaped stored text is `[]`: the store ANSWERED, and what it held is not
+ * a tombstone set, so there is nothing to preserve and re-learning from the
+ * next pull is right. Folding both into one catch would make a corrupt blob
+ * permanently null — and a caller that holds its cursor on null would then hold
+ * it forever, which is a stuck sync rather than the bounded re-pull the null is
+ * supposed to buy.
+ */
 export async function getTombstones(
   entity: TombstoneEntity,
   userId: string,
-): Promise<string[]> {
+): Promise<string[] | null> {
+  let raw: string | null;
   try {
-    const raw = await AsyncStorage.getItem(tombstoneKey(entity, userId));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
+    raw = await AsyncStorage.getItem(tombstoneKey(entity, userId));
+  } catch {
+    // Unreadable store, which is not the same as an empty one — see above.
+    return null;
+  }
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
   } catch {
-    // A read/parse failure just means we re-learn tombstones on the next pull.
+    // Stored garbage: the store answered and held something that is not a set.
     return [];
   }
 }
 
 /**
- * Persist the tombstone-id set for an entity. No-ops when `ids` is the same
- * reference as `previous` (the merge helpers return the original reference when
- * nothing changed), so an idempotent pull doesn't trigger a needless write.
+ * Persist the tombstone-id set for an entity, reporting whether the set on disk
+ * now covers `ids`.
+ *
+ * True when the write landed AND when there was nothing to write (`ids` is the
+ * same reference as `previous`, which the merge helpers return when nothing
+ * changed) — both mean the stored set is current. False only when the write
+ * itself failed.
+ *
+ * THE RETURN VALUE IS THE POINT. This used to be `void` under a comment saying
+ * a failed write just re-learns the tombstones from the next pull, and that was
+ * not true: the delta pull advanced its `updated_at` cursor immediately
+ * afterwards, so the next pull asked for rows newer than the tombstone it had
+ * just failed to store and never saw it again. A soft-delete is an UPDATE like
+ * any other — nothing re-sends it — so the deleted row stayed in the local
+ * cache and came back on the next hydrate. The caller now holds the cursor
+ * until this says the tombstone is safe.
  */
 export async function setTombstones(
   entity: TombstoneEntity,
   userId: string,
   ids: readonly string[],
   previous?: readonly string[],
-): Promise<void> {
-  if (previous !== undefined && ids === previous) return;
+): Promise<boolean> {
+  if (previous !== undefined && ids === previous) return true;
   try {
     await AsyncStorage.setItem(tombstoneKey(entity, userId), JSON.stringify(ids));
+    return true;
   } catch {
-    // Best-effort: a failed write just re-learns tombstones from the next pull.
+    return false;
   }
 }

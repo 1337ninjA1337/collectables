@@ -131,6 +131,31 @@ describe("tombstones storage + key wiring", () => {
 
   it("the AsyncStorage wrappers no-op a persist when the set is unchanged", () => {
     const mod = read("lib/tombstones.ts");
-    assert.match(mod, /if \(previous !== undefined && ids === previous\) return;/);
+    // The no-op reports TRUE: nothing to write means the stored set already
+    // covers `ids`, which is what the caller's cursor gate is asking about.
+    assert.match(mod, /if \(previous !== undefined && ids === previous\) return true;/);
+  });
+
+  it("setTombstones reports whether the stored set now covers the ids", () => {
+    const mod = read("lib/tombstones.ts");
+    assert.match(mod, /\): Promise<boolean> \{/);
+    // The failure arm returns false rather than swallowing into `void`. A
+    // soft-delete arrives as ONE update and nothing re-sends it, so a caller
+    // that advanced its cursor past a tombstone it failed to store would never
+    // be told about that delete again.
+    assert.match(mod, /\} catch \{\s*\n\s*return false;\s*\n\s*\}/);
+  });
+
+  it("getTombstones answers null for an unreadable store, never an empty set", () => {
+    const mod = read("lib/tombstones.ts");
+    assert.match(mod, /\): Promise<string\[\] \| null> \{/);
+    // Every caller merges into what it reads and writes the union back, so `[]`
+    // for a failed read narrows the persisted set to whatever one pull saw —
+    // and the rows whose tombstones were dropped come back on the next hydrate.
+    assert.match(mod, /\} catch \{[\s\S]{0,120}return null;/);
+    // Two catches, not one: only the STORE's failure is null. Stored garbage is
+    // `[]`, or a corrupt blob would be permanently null and a caller holding
+    // its cursor on null would hold it forever.
+    assert.match(mod, /\} catch \{[\s\S]{0,140}return \[\];/);
   });
 });
