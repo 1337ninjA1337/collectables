@@ -2,6 +2,7 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 
+import { assertRequiredParameter, declaredSource, parameterList } from "./helpers/declared-shape";
 import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -156,6 +157,27 @@ describe("usePersistedBlob", () => {
     failNextWrite = true;
     await assert.doesNotReject(() => mount());
     assert.deepEqual(keysWritten(), ["items-user-1"], "the sibling blob still persists");
+  });
+});
+
+describe("usePersistedBlob's signature", () => {
+  it("takes `enabled` as a required parameter with no default", () => {
+    assertRequiredParameter({
+      module: "lib/use-persisted-blob.ts",
+      fn: "usePersistedBlob",
+      name: "enabled",
+      type: "boolean",
+      at: 2,
+      why: "writing before the provider has hydrated persists the empty initial state OVER the stored blob — the one catastrophic thing this hook can do, so the safe value must not be the one a caller has to remember to pass",
+    });
+    // `assertRequiredParameter` reads `?:`, which a DEFAULT does not use: an
+    // `enabled: boolean = true` is required to the type checker and optional to
+    // every caller, so the footgun would be back with the case still green.
+    assert.doesNotMatch(
+      parameterList(declaredSource("lib/use-persisted-blob.ts"), "usePersistedBlob") ?? "",
+      /enabled\s*:\s*boolean\s*=/,
+      "a default value makes the parameter optional at every call site while staying required in the type",
+    );
   });
 });
 

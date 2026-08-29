@@ -385,8 +385,14 @@ describe("the suites that pin a signature", () => {
    * do and should not. What the floor says is that the three that produced it
    * still use it: if adoption goes back below three, the helper is on its way
    * to being the thing one suite imports and two have re-implemented.
+   *
+   * `use-persisted-blob.test.ts` is the fourth, and it is the case that shows
+   * where the helper stops: `assertRequiredParameter` reads `?:`, so a
+   * parameter given a DEFAULT is required to the type checker and optional at
+   * every call site, and that suite carries its own `doesNotMatch` beside the
+   * helper call to close it.
    */
-  it("is used by the three that produced it", () => {
+  it("is used by the three that produced it, and by the one that found its edge", () => {
     const adopters = suiteFiles().filter(
       (relative) =>
         relative !== DECLARING &&
@@ -398,6 +404,7 @@ describe("the suites that pin a signature", () => {
         "check-orphan-i18n-keys.test.ts",
         "coverage-floor.test.ts",
         "danger-icon-button.test.ts",
+        "use-persisted-blob.test.ts",
       ],
       "the declared-shape adopters changed — a suite that stopped using it went back to a hand-written regex, and a new one is worth knowing about",
     );

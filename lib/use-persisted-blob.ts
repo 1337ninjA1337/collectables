@@ -35,19 +35,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * keeps its two literal-building persist effects for exactly that reason.
  *
  * A null `key` or `enabled === false` writes nothing — the caller's "no user
- * yet" / "not hydrated yet" gate. Writing before hydration completes would
- * persist the empty initial state over the stored blob, so `enabled` is the
- * provider's `ready` flag and is not optional in spirit even though it has a
- * default.
+ * yet" / "not hydrated yet" gate. `enabled` is REQUIRED and has no default:
+ * writing before hydration completes persists the empty initial state over the
+ * stored blob, which is the one catastrophic thing this hook can do, and a
+ * default of `true` would make the safe value the one a caller has to remember
+ * to pass.
  *
  * Failures are swallowed: a blob that fails to persist is re-derived from the
  * cloud on the next pull, and there is nothing useful to do at this level.
  */
-export function usePersistedBlob(
-  key: string | null,
-  value: unknown,
-  enabled: boolean = true,
-): void {
+export function usePersistedBlob(key: string | null, value: unknown, enabled: boolean): void {
   useEffect(() => {
     if (!enabled || !key) return;
     AsyncStorage.setItem(key, JSON.stringify(value)).catch(() => undefined);
