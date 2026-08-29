@@ -3511,6 +3511,16 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
           setLanguageState(value as AppLanguage);
         }
       })
+      // A `.finally` HANDLES NOTHING. This chain ended at one, so a rejected
+      // read left the rejection with no handler anywhere — an unhandled
+      // rejection on every mount of a device whose store is broken, which is a
+      // redbox in dev and a logged error nobody sees in production. Exactly the
+      // shape `setLanguage` carried below until this week, on the other half of
+      // the same key. `ready` still flips, because the default language is a
+      // usable app and blocking the tree on a broken store is worse.
+      .catch((error: unknown) => {
+        reportStorageFailure("i18n-context.getItem", LANGUAGE_KEY, error);
+      })
       .finally(() => {
         if (active) {
           setReady(true);

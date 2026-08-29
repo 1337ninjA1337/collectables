@@ -4,10 +4,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useAuth } from "@/lib/auth-context";
 import {
   ChatPreview,
+  ChatStore,
+  EMPTY_CHAT_STORE,
   appendMessage,
   buildChatId,
   buildChatPreviews,
   canChatWith,
+  parseChatStore,
   totalUnread,
 } from "@/lib/chat-helpers";
 import { reportStorageFailure } from "@/lib/report-storage-failure";
@@ -31,12 +34,6 @@ import {
 import { ChatMessage } from "@/lib/types";
 import { generateUuidV4 } from "@/lib/uuid";
 import { createRateLimitedDeliver } from "@/lib/write-rate-limit";
-
-type ChatStore = {
-  messagesByChat: Record<string, ChatMessage[]>;
-  lastReadByChat: Record<string, string>;
-  pendingByChatId: Record<string, ChatMessage[]>;
-};
 
 type ChatContextValue = {
   ready: boolean;
@@ -62,7 +59,7 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 export function ChatProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
   const { friends } = useSocial();
-  const [store, setStore] = useState<ChatStore>({ messagesByChat: {}, lastReadByChat: {}, pendingByChatId: {} });
+  const [store, setStore] = useState<ChatStore>(EMPTY_CHAT_STORE);
   const [ready, setReady] = useState(false);
   const [realtimeOnline, setRealtimeOnline] = useState(false);
   const pendingRef = useRef<Record<string, ChatMessage[]>>({});
@@ -71,7 +68,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     if (!storageKey) {
-      setStore({ messagesByChat: {}, lastReadByChat: {}, pendingByChatId: {} });
+      setStore(EMPTY_CHAT_STORE);
       setReady(false);
       return;
     }
@@ -79,19 +76,23 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     let active = true;
 
     async function hydrate(key: string) {
+      // `try`/`finally` HANDLES NOTHING, and this function is called as `void
+      // hydrate(...)` — so a rejected read or a corrupt cache left the
+      // rejection with no handler anywhere on the way out. An unhandled
+      // rejection on every mount of a device whose store is broken.
       try {
-        const raw = await AsyncStorage.getItem(key);
-        if (!active) return;
-        if (raw) {
-          const parsed = JSON.parse(raw) as Partial<ChatStore>;
-          setStore({
-            messagesByChat: parsed.messagesByChat ?? {},
-            lastReadByChat: parsed.lastReadByChat ?? {},
-            pendingByChatId: parsed.pendingByChatId ?? {},
-          });
-        } else {
-          setStore({ messagesByChat: {}, lastReadByChat: {}, pendingByChatId: {} });
+        let raw: string | null = null;
+        try {
+          raw = await AsyncStorage.getItem(key);
+        } catch (error: unknown) {
+          // An unreadable store is an EMPTY cache here rather than a corrupted
+          // one: nothing merges into what this read returns, and the cloud
+          // refresh re-fills every thread. Reported because it is the same
+          // broken store the persist effect below cannot write to either.
+          reportStorageFailure("chat-context.getItem", key, error);
         }
+        if (!active) return;
+        setStore(parseChatStore(raw));
       } finally {
         if (active) setReady(true);
       }

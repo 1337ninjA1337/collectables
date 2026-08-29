@@ -22,6 +22,7 @@ import {
 } from "@/lib/supabase-profiles";
 import { subscribeToFriendRequests } from "@/lib/supabase-realtime-sync";
 import { reportStorageFailure } from "@/lib/report-storage-failure";
+import { captureException } from "@/lib/sentry";
 import { SOCIAL_GRAPH_KEY, pendingSocialKey, socialCacheKey } from "@/lib/storage-keys";
 import {
   applyDeliveredSocial,
@@ -158,6 +159,29 @@ function hasRequest(friendRequests: FriendRequest[], fromUserId: string, toUserI
   return friendRequests.some((request) => request.fromUserId === fromUserId && request.toUserId === toUserId);
 }
 
+/**
+ * One cached social blob, or null when the store could not be read.
+ *
+ * Three reads land in one `Promise.all` beside a network call, so a bare
+ * `AsyncStorage.getItem` there rejects the whole batch — and since `hydrate` is
+ * `void`-called under a `try`/`finally`, that rejection had nowhere to go. Each
+ * read answering for itself keeps a broken store from taking the fetch down
+ * with it, and vice versa.
+ *
+ * Null lands on the same branch as "nothing stored", which is right HERE and is
+ * the collapse `getTombstones` refuses: none of the three callers merges into
+ * what it read and writes the union back — the persist effects serialise from
+ * React state, which the seeds re-fill.
+ */
+async function readSocialCache(key: string): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(key);
+  } catch (error: unknown) {
+    reportStorageFailure("social-context.getItem", key, error);
+    return null;
+  }
+}
+
 const DEFAULT_VIEWER_PROFILE_TTL_MS = 10 * 60 * 1000;
 
 const VIEWER_PROFILE_TTL_MS = resolveNumericEnv(
@@ -265,12 +289,22 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     let active = true;
 
     async function hydrate() {
+      // `try`/`finally` HANDLES NOTHING, and this is called as `void hydrate()`
+      // — so every rejection below used to leave the chain with no handler
+      // anywhere. Four things reject here and the LIKELIEST of them is not the
+      // store: `fetchFriendRequests` is a network call, so an offline sign-in
+      // produced an unhandled rejection on every mount. Each source now answers
+      // for itself, and the outer arm catches what is left (a corrupt cached
+      // blob, whose `JSON.parse` threw into the same nothing).
       try {
         const [rawPersonal, rawGraph, rawPendingSocial, remoteRequests] = await Promise.all([
-          AsyncStorage.getItem(socialCacheKey(activeUser.id)),
-          AsyncStorage.getItem(SOCIAL_GRAPH_KEY),
-          AsyncStorage.getItem(pendingSocialKey(activeUser.id)),
-          fetchFriendRequests(activeUser.id),
+          readSocialCache(socialCacheKey(activeUser.id)),
+          readSocialCache(SOCIAL_GRAPH_KEY),
+          readSocialCache(pendingSocialKey(activeUser.id)),
+          // NULL RATHER THAN `[]`. A failed fetch is not "this user has no
+          // friend requests" — writing `[]` on an offline mount would clear the
+          // inbox badge and hide requests that are still pending upstream.
+          fetchFriendRequests(activeUser.id).catch(() => null),
         ]);
 
         if (!active) {
@@ -299,12 +333,22 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
           setDeletedProfileIds([]);
         }
 
-        // Friend requests come from Supabase
-        const mapped: FriendRequest[] = remoteRequests.map((r: RemoteFriendRequest) => ({
-          fromUserId: r.from_user_id,
-          toUserId: r.to_user_id,
-        }));
-        setFriendRequests(mapped);
+        // Friend requests come from Supabase, and stay as they were when the
+        // fetch could not answer.
+        if (remoteRequests !== null) {
+          const mapped: FriendRequest[] = remoteRequests.map((r: RemoteFriendRequest) => ({
+            fromUserId: r.from_user_id,
+            toUserId: r.to_user_id,
+          }));
+          setFriendRequests(mapped);
+        }
+      } catch (error: unknown) {
+        // What reaches here is a cached blob that is not JSON, since the reads
+        // and the fetch answer for themselves above. Whatever was applied
+        // before the throw stays; the rest keeps its default. NOT a storage
+        // failure — the store answered — so it goes to Sentry as itself rather
+        // than through the once-per-keyspace budget.
+        captureException(error, { scope: "social-context.hydrate" });
       } finally {
         if (active) {
           setReady(true);

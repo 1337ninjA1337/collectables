@@ -390,17 +390,71 @@ describe("the swallowing storage sites route through the shared budget", () => {
    * direction for a sweep asserting an absence.
    */
   function writeHandlers(source: string): string {
-    const write = /\bAsyncStorage\s*\.\s*(?:setItem|multiSet|mergeItem|multiMerge)\s*\(/g;
     const lines: string[] = [];
-    for (let m = write.exec(source); m !== null; m = write.exec(source)) {
-      const closeAt = balancedEnd(source, m.index + m[0].length - 1, "(", ")");
-      if (closeAt === null) continue;
-      const handler = chainedCatch(source, closeAt + 1) ?? innermostCatchAround(source, m.index);
+    for (const call of storageCalls(source, WRITE_METHODS)) {
       // One line per write, whitespace flattened, so a rule anchored with
       // `^`/`m` sees one handler and `.` cannot run past its end.
-      if (handler !== null) lines.push(`${HANDLER_MARK}${handler.replace(/\s+/g, " ")}`);
+      if (call.handler !== null) {
+        lines.push(`${HANDLER_MARK}${call.handler.replace(/\s+/g, " ")}`);
+      }
     }
     return lines.join("\n");
+  }
+
+  const WRITE_METHODS = "setItem|multiSet|mergeItem|multiMerge";
+
+  /** Every AsyncStorage method, for the sweep that is about the CHAIN. */
+  const EVERY_METHOD = `${WRITE_METHODS}|removeItem|multiRemove|getItem|multiGet|getAllKeys`;
+
+  /**
+   * Each AsyncStorage call in `source`, with the handler its rejection reaches.
+   *
+   * The walk both sweeps share. Written once because they differ only in which
+   * methods they ask about and what they do with the answer — the swallow sweep
+   * reads the handler's TEXT, the unhandled sweep reads whether there is one.
+   */
+  function* storageCalls(
+    source: string,
+    methods: string,
+  ): Generator<{ readonly call: string; readonly handler: string | null }> {
+    // Built per call rather than hoisted: `offence-sweep` refuses a `g`-flagged
+    // rule for the reason this needs to be careful too — a shared `lastIndex`
+    // between files skips whole modules.
+    const pattern = new RegExp(`\\bAsyncStorage\\s*\\.\\s*(?:${methods})\\s*\\(`, "g");
+    for (let m = pattern.exec(source); m !== null; m = pattern.exec(source)) {
+      const closeAt = balancedEnd(source, m.index + m[0].length - 1, "(", ")");
+      if (closeAt === null) continue;
+      yield {
+        call: m[0].replace(/\s+/g, ""),
+        handler: chainedCatch(source, closeAt + 1) ?? innermostCatchAround(source, m.index),
+      };
+    }
+  }
+
+  /**
+   * Each AsyncStorage call, labelled `handled` or `unhandled`.
+   *
+   * THE THIRD SHAPE, and the one the swallow rule is silent about by
+   * construction: a rejection with no handler at all is not swallowed, it is
+   * UNHANDLED — a redbox in dev and a logged error nobody reads in production.
+   * `i18n-context.setLanguage` was this until this week, and on the day this
+   * sweep was written four more were: `i18n-context`'s hydrate ended its chain
+   * at a `.finally` (which handles nothing), and `chat-context` and
+   * `social-context` each ran their hydrate inside a `try`/`finally` (which
+   * also handles nothing) under a `void hydrate(...)` caller. The likeliest
+   * rejection of the four was not even the store — `social-context` awaited
+   * `fetchFriendRequests` in the same `Promise.all`, so an OFFLINE sign-in
+   * produced an unhandled rejection on every mount.
+   *
+   * Over every AsyncStorage method, not just the writes, because the reads were
+   * where four of the five lived. Whether a handled-but-silent READ is an
+   * offence is a separate question this rule does not touch: it asks only
+   * whether anything catches.
+   */
+  function callHandling(source: string): string {
+    return [...storageCalls(source, EVERY_METHOD)]
+      .map((c) => `${CALL_MARK}${c.handler === null ? "unhandled" : "handled"} ${c.call}`)
+      .join("\n");
   }
 
   /**
@@ -450,6 +504,12 @@ describe("the swallowing storage sites route through the shared budget", () => {
 
   /** Opens each handler line, so the rule below can anchor to one handler. */
   const HANDLER_MARK = "«handler»";
+
+  /** Opens each call line for the unhandled sweep. */
+  const CALL_MARK = "«call»";
+
+  /** The other rule, held by name for the same reason {@link SWALLOWED_WRITE} is. */
+  const UNHANDLED_CALL = new RegExp(`^${CALL_MARK}unhandled `, "m");
 
   /**
    * The rule, named so a positive control can hold it. A sweep asserting
@@ -648,6 +708,73 @@ describe("the swallowing storage sites route through the shared budget", () => {
       subject: "modules",
       what: "swallow a rejected AsyncStorage write — into a chained `.catch`, or into the `try`/`catch` around it — that never calls reportStorageFailure(scope, key, error)",
     });
+  });
+
+  /**
+   * Modules whose AsyncStorage rejections deliberately reach their CALLER.
+   *
+   * `getAllCollectablesKeys` and `clearAllUserData` are exported async helpers
+   * with no state of their own: the dev-menu screen that calls them is where a
+   * failed wipe should surface, and catching here would hand it a silent
+   * success. `migrateStorageKey` in the same file has its own `catch`, so this
+   * is about the file's other three calls.
+   */
+  const CALLS_THAT_PROPAGATE = ["lib/storage-keys.ts"];
+
+  function unhandled(source: string): boolean {
+    return UNHANDLED_CALL.test(callHandling(source));
+  }
+
+  it("the unhandled rule matches every chain that ends without a catch", () => {
+    for (const offender of [
+      // The four found the day this rule was written.
+      "AsyncStorage.getItem(KEY).then(apply).finally(() => setReady(true));",
+      "try {\n  const raw = await AsyncStorage.getItem(key);\n  setStore(parse(raw));\n} finally {\n  setReady(true);\n}",
+      "const [a, b] = await Promise.all([AsyncStorage.getItem(x), fetchThings()]);",
+      "await AsyncStorage.setItem(KEY, next);",
+      // Not a write, and just as unhandled.
+      "await AsyncStorage.multiRemove(keys);",
+    ]) {
+      assert.ok(unhandled(offender), `must flag: ${offender}`);
+    }
+  });
+
+  it("the unhandled rule leaves a caught chain alone, however it catches", () => {
+    for (const innocent of [
+      "AsyncStorage.getItem(KEY).catch(() => null);",
+      "AsyncStorage.getItem(KEY).then(apply).catch(report).finally(done);",
+      "try {\n  await AsyncStorage.getItem(key);\n} catch {\n  nothing\n}",
+      // Silent, and this rule has no opinion about that — `SWALLOWED_WRITE`
+      // does, for writes. Two rules, two questions, one reader.
+      "AsyncStorage.getItem(KEY).catch(() => undefined);",
+      "somethingElse().finally(done);",
+    ]) {
+      assert.ok(!unhandled(innocent), `must not flag: ${innocent}`);
+    }
+  });
+
+  it("no AsyncStorage rejection is left without a handler", () => {
+    // A `.finally` handles nothing and a `try`/`finally` handles nothing, which
+    // is what made this class survive four rules about swallowing: an unhandled
+    // rejection is not a swallowed one, and every sweep here was looking for a
+    // catch that did too little rather than for the absence of one.
+    assertNoOffenders({
+      rule: UNHANDLED_CALL,
+      files: sourceFiles(),
+      read: (relative) => callHandling(sourceCode(relative)),
+      exempt: CALLS_THAT_PROPAGATE,
+      subject: "modules",
+      what: "let an AsyncStorage rejection escape with no handler anywhere — a `.finally` and a `try`/`finally` both handle nothing, so add a `.catch` or a `catch` and report it through reportStorageFailure(scope, key, error)",
+    });
+  });
+
+  it("the propagating exemption still propagates, so it is a decision rather than a leftover", () => {
+    for (const relative of CALLS_THAT_PROPAGATE) {
+      assert.ok(
+        unhandled(sourceCode(relative)),
+        `${relative} now catches every AsyncStorage rejection — drop it from CALLS_THAT_PROPAGATE rather than exempting a module that has stopped needing it`,
+      );
+    }
   });
 
   it("the exemption is still an offender, so it is a hole rather than a habit", () => {

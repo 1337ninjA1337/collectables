@@ -7,6 +7,54 @@ import { byCreatedAtAscThenId, compareIsoDesc, tieBreakById } from "@/lib/sort-h
  * without coordination, which lets us persist messages in per-user
  * AsyncStorage yet still address the same conversation on each device.
  */
+/**
+ * The shape `ChatProvider` persists to AsyncStorage, in the module that can be
+ * imported without pulling React Native peers.
+ *
+ * It lives here rather than beside the provider for the reason the rest of this
+ * file does: a rule about it can then be checked by CALLING it. The provider's
+ * own suites read its source text, which is what left the parse below
+ * unexamined for as long as it was inline.
+ */
+export type ChatStore = {
+  messagesByChat: Record<string, ChatMessage[]>;
+  lastReadByChat: Record<string, string>;
+  pendingByChatId: Record<string, ChatMessage[]>;
+};
+
+/** The store a signed-out user, an empty cache and a corrupt one all get. */
+export const EMPTY_CHAT_STORE: ChatStore = {
+  messagesByChat: {},
+  lastReadByChat: {},
+  pendingByChatId: {},
+};
+
+/**
+ * A stored chat cache, or the empty store — never a throw.
+ *
+ * `JSON.parse` on a corrupt cache used to reject out of a `void hydrate(...)`
+ * whose `try`/`finally` catches nothing, so a truncated write became an
+ * UNHANDLED REJECTION rather than a fresh start. The recovery is bounded: the
+ * cloud refresh re-fills every thread, which is why this answers the empty
+ * store instead of reporting.
+ */
+export function parseChatStore(raw: string | null): ChatStore {
+  if (!raw) return EMPTY_CHAT_STORE;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return EMPTY_CHAT_STORE;
+  }
+  if (!parsed || typeof parsed !== "object") return EMPTY_CHAT_STORE;
+  const store = parsed as Partial<ChatStore>;
+  return {
+    messagesByChat: store.messagesByChat ?? {},
+    lastReadByChat: store.lastReadByChat ?? {},
+    pendingByChatId: store.pendingByChatId ?? {},
+  };
+}
+
 export function buildChatId(userA: string, userB: string): string {
   if (!userA || !userB) {
     throw new Error("buildChatId requires two non-empty user ids");
