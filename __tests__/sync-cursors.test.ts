@@ -51,6 +51,47 @@ describe("maxUpdatedAt", () => {
     assert.equal(result, "2026-06-19T12:00:00+00:00");
   });
 
+  it("picks the true maximum inside one millisecond, whatever order the rows arrive in", () => {
+    // `updated_at` is a timestamptz — Postgres keeps microseconds and
+    // `Date.parse` keeps milliseconds, so these three parse to one number and
+    // the pre-2026-08-29 reducer returned whichever came first. The batch is
+    // the ordinary case rather than a contrived one: `moddatetime` stamps every
+    // row of one statement with the same `now()`.
+    const rows = [
+      { updated_at: "2026-06-19T12:00:00.123100+00:00" },
+      { updated_at: "2026-06-19T12:00:00.123900+00:00" },
+      { updated_at: "2026-06-19T12:00:00.123500+00:00" },
+    ];
+    const highest = "2026-06-19T12:00:00.123900+00:00";
+    assert.equal(maxUpdatedAt(null, rows), highest);
+    assert.equal(maxUpdatedAt(null, [...rows].reverse()), highest);
+    assert.equal(maxUpdatedAt(null, [rows[1], rows[0], rows[2]]), highest);
+  });
+
+  it("does not go backwards from a current cursor sharing the batch's millisecond", () => {
+    // The half that makes the tiebreak safe to add: it may raise the cursor
+    // inside a millisecond and must never lower it, or the next pull re-reads
+    // rows this one already applied.
+    const current = "2026-06-19T12:00:00.123900+00:00";
+    assert.equal(
+      maxUpdatedAt(current, [{ updated_at: "2026-06-19T12:00:00.123100+00:00" }]),
+      current,
+    );
+  });
+
+  it("still lets a later millisecond outrank a longer string in an earlier one", () => {
+    // The tiebreak is consulted only between equal milliseconds, so it cannot
+    // outrank the numeric comparison — which is the rule a plain lexicographic
+    // max would break here (".0999" sorts above ".100").
+    assert.equal(
+      maxUpdatedAt(null, [
+        { updated_at: "2026-06-19T12:00:00.099999+00:00" },
+        { updated_at: "2026-06-19T12:00:00.100000+00:00" },
+      ]),
+      "2026-06-19T12:00:00.100000+00:00",
+    );
+  });
+
   it("skips missing / null / unparseable values", () => {
     assert.equal(
       maxUpdatedAt(null, [

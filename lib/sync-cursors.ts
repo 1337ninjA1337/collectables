@@ -25,6 +25,29 @@ export type SyncEntity = "collections" | "items" | "profiles" | "friend_requests
  *
  * Returns `current` unchanged when no row is newer (so an empty delta pull
  * leaves the cursor untouched).
+ *
+ * WITHIN ONE MILLISECOND THE STRING DECIDES (2026-08-29). `Date.parse` resolves
+ * to milliseconds and `updated_at` is a `timestamptz`, which Postgres keeps to
+ * MICROSECONDS — so `.123456` and `.123900` parse to the same number, `ms >
+ * bestMs` was false, and this function returned whichever of them the array
+ * happened to hold first rather than the larger one. Same-millisecond rows are
+ * not a corner case here: `moddatetime` stamps every row of one statement with
+ * the same `now()`, so any multi-row write produces a batch of them.
+ *
+ * The cost is paid by the caller, because the cursor is used as `updated_at=gt`
+ * — a cursor one microsecond short of the batch maximum re-downloads every row
+ * above it on the NEXT pull, and the one after that, until the batch narrows to
+ * a single row. It converges, quietly, having spent the egress this projection
+ * was narrowed to save. It also made the cursor depend on row order, so two
+ * devices reading the same rows stored different cursors.
+ *
+ * The tiebreak is the raw string, which is the sub-millisecond precision
+ * `Date.parse` discarded. It is only ever consulted between two timestamps
+ * already known to name the same millisecond, so the prefix through that
+ * millisecond is identical and what remains to compare is the fractional tail —
+ * the one place lexicographic order is exactly right. Two spellings of the same
+ * instant (`…Z` and `…+00:00`) compare arbitrarily and correctly: either is a
+ * cursor naming that instant.
  */
 export function maxUpdatedAt(
   current: string | null,
@@ -37,7 +60,9 @@ export function maxUpdatedAt(
     if (!raw) continue;
     const ms = Date.parse(raw);
     if (Number.isNaN(ms)) continue;
-    if (Number.isNaN(bestMs) || ms > bestMs) {
+    const newer =
+      Number.isNaN(bestMs) || ms > bestMs || (ms === bestMs && best !== null && raw > best);
+    if (newer) {
       best = raw;
       bestMs = ms;
     }
