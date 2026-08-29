@@ -1,7 +1,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
-import { installNativeModuleStubs, mockModule } from "./helpers/render";
+import { installStorageSpy } from "./helpers/spy-async-storage";
 
 /**
  * The AsyncStorage half of `lib/tombstones.ts`, run rather than read.
@@ -26,30 +26,8 @@ import { installNativeModuleStubs, mockModule } from "./helpers/render";
  *      asked for rows newer than the tombstone it had just failed to store.
  */
 
-installNativeModuleStubs();
-
-const store = new Map<string, string>();
-let readError: Error | null = null;
-let writeError: Error | null = null;
-
-const captured: { error: unknown; context: unknown }[] = [];
-
-mockModule("@react-native-async-storage/async-storage", {
-  default: {
-    getItem: async (key: string) => {
-      if (readError) throw readError;
-      return store.get(key) ?? null;
-    },
-    setItem: async (key: string, value: string) => {
-      if (writeError) throw writeError;
-      store.set(key, value);
-    },
-  },
-});
-
-mockModule("@/lib/sentry", {
-  captureException: (error: unknown, context: unknown) => captured.push({ error, context }),
-});
+const spy = installStorageSpy();
+const { scopes, keyspaces } = spy;
 
 /**
  * A real Supabase auth id rather than "user-1": `storageKeyLabel` replaces a
@@ -65,11 +43,7 @@ async function load() {
 }
 
 beforeEach(async () => {
-  store.clear();
-  readError = null;
-  writeError = null;
-  captured.length = 0;
-  (await import("@/lib/report-storage-failure")).__resetStorageFailureReportsForTests();
+  await spy.reset();
 });
 
 describe("getTombstones", () => {
@@ -87,7 +61,7 @@ describe("getTombstones", () => {
   it("answers null when the store cannot be read — not an empty set", async () => {
     const { getTombstones, setTombstones } = await load();
     await setTombstones("items", USER, ["a", "b"]);
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     assert.equal(await getTombstones("items", USER), null);
   });
 
@@ -96,15 +70,15 @@ describe("getTombstones", () => {
     // not a tombstone set. There is nothing to preserve, so re-learning from
     // the next pull is right here and would be data loss one case up.
     const { getTombstones } = await load();
-    store.set(`collectables-tombstones-v1-items-${USER}`, "{not json");
+    spy.store.set(`collectables-tombstones-v1-items-${USER}`, "{not json");
     assert.deepEqual(await getTombstones("items", USER), []);
-    store.set(`collectables-tombstones-v1-items-${USER}`, '{"a":1}');
+    spy.store.set(`collectables-tombstones-v1-items-${USER}`, '{"a":1}');
     assert.deepEqual(await getTombstones("items", USER), []);
   });
 
   it("drops non-string entries from a stored array", async () => {
     const { getTombstones } = await load();
-    store.set(`collectables-tombstones-v1-items-${USER}`, JSON.stringify(["a", 7, null, "b"]));
+    spy.store.set(`collectables-tombstones-v1-items-${USER}`, JSON.stringify(["a", 7, null, "b"]));
     assert.deepEqual(await getTombstones("items", USER), ["a", "b"]);
   });
 });
@@ -121,7 +95,7 @@ describe("setTombstones", () => {
     const ids = ["a", "b"];
     assert.equal(await setTombstones("items", USER, ids, ids), true);
     assert.equal(
-      store.size,
+      spy.store.size,
       0,
       "the same reference means the merge helpers changed nothing, so no write should have happened",
     );
@@ -129,13 +103,13 @@ describe("setTombstones", () => {
 
   it("reports false when the write fails, so the caller can hold its cursor", async () => {
     const { setTombstones } = await load();
-    writeError = new Error("quota exceeded");
+    spy.writeError = new Error("quota exceeded");
     assert.equal(await setTombstones("items", USER, ["a"]), false);
   });
 
   it("does not throw out of a failed write", async () => {
     const { setTombstones } = await load();
-    writeError = new Error("quota exceeded");
+    spy.writeError = new Error("quota exceeded");
     await assert.doesNotReject(() => setTombstones("items", USER, ["a"]));
   });
 
@@ -162,24 +136,16 @@ describe("a store that stays broken is reported, because holding the cursor has 
    */
   const KEYSPACE = "collectables-tombstones-v1-items-{id}";
 
-  function keyspaces(): string[] {
-    return captured.map((c) => (c.context as { extra: { keyspace: string } }).extra.keyspace);
-  }
-
-  function scopes(): string[] {
-    return captured.map((c) => (c.context as { scope: string }).scope);
-  }
-
   it("reports an unreadable store, with the keyspace and never the user id", async () => {
     const { getTombstones } = await load();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     assert.equal(await getTombstones("items", USER), null);
 
     assert.deepEqual(scopes(), ["tombstones.getItem"]);
     assert.deepEqual(keyspaces(), [KEYSPACE]);
-    assert.equal(captured[0].error, readError);
+    assert.equal(spy.captured[0].error, spy.readError);
     assert.equal(
-      JSON.stringify(captured).includes(USER),
+      JSON.stringify(spy.captured).includes(USER),
       false,
       "the key ends in the account's auth id and only the keyspace may travel",
     );
@@ -187,7 +153,7 @@ describe("a store that stays broken is reported, because holding the cursor has 
 
   it("reports a failed write, which is the same hold from the other end", async () => {
     const { setTombstones } = await load();
-    writeError = new Error("quota exceeded");
+    spy.writeError = new Error("quota exceeded");
     assert.equal(await setTombstones("items", USER, ["a"]), false);
     assert.deepEqual(scopes(), ["tombstones.setItem"]);
     assert.deepEqual(keyspaces(), [KEYSPACE]);
@@ -195,21 +161,21 @@ describe("a store that stays broken is reported, because holding the cursor has 
 
   it("reports the read and the write separately — two diagnoses, two fixes", async () => {
     const { getTombstones, setTombstones } = await load();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     await getTombstones("items", USER);
-    readError = null;
-    writeError = new Error("quota exceeded");
+    spy.readError = null;
+    spy.writeError = new Error("quota exceeded");
     await setTombstones("items", USER, ["a"]);
     assert.deepEqual(scopes(), ["tombstones.getItem", "tombstones.setItem"]);
   });
 
   it("reports once however many refreshes re-pull the same held window", async () => {
     const { getTombstones } = await load();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     await getTombstones("items", USER);
     await getTombstones("items", USER);
     await getTombstones("items", USER);
-    assert.equal(captured.length, 1, "the point of the hold is that it repeats — the report is not");
+    assert.equal(spy.captured.length, 1, "the point of the hold is that it repeats — the report is not");
   });
 
   it("says nothing about stored garbage, which is content rather than a broken store", async () => {
@@ -217,9 +183,9 @@ describe("a store that stays broken is reported, because holding the cursor has 
     // the set. Reporting it would make a corrupt blob indistinguishable from
     // the unbounded case, which is the one worth waking somebody for.
     const { getTombstones } = await load();
-    store.set(`collectables-tombstones-v1-items-${USER}`, "{not json");
+    spy.store.set(`collectables-tombstones-v1-items-${USER}`, "{not json");
     assert.deepEqual(await getTombstones("items", USER), []);
-    assert.deepEqual(captured, []);
+    assert.deepEqual(spy.captured, []);
   });
 
   it("says nothing while the store works, including for the no-op write", async () => {
@@ -228,7 +194,7 @@ describe("a store that stays broken is reported, because holding the cursor has 
     await setTombstones("items", USER, ids, ids);
     await setTombstones("items", USER, ["a"]);
     await getTombstones("items", USER);
-    assert.deepEqual(captured, []);
+    assert.deepEqual(spy.captured, []);
   });
 });
 
@@ -240,9 +206,9 @@ describe("the round trip a failing store must not corrupt", () => {
     const { getTombstones, mergeTombstoneIds, setTombstones } = await load();
     await setTombstones("items", USER, ["old-1", "old-2"]);
 
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     const stored = await getTombstones("items", USER);
-    readError = null;
+    spy.readError = null;
 
     const asIfEmpty = stored ?? [];
     await setTombstones("items", USER, mergeTombstoneIds(asIfEmpty, ["new-1"]), asIfEmpty);
@@ -257,9 +223,9 @@ describe("the round trip a failing store must not corrupt", () => {
     const { getTombstones, mergeTombstoneIds, setTombstones } = await load();
     await setTombstones("items", USER, ["old-1", "old-2"]);
 
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     const stored = await getTombstones("items", USER);
-    readError = null;
+    spy.readError = null;
 
     if (stored !== null) {
       await setTombstones("items", USER, mergeTombstoneIds(stored, ["new-1"]), stored);

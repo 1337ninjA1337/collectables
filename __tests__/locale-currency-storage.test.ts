@@ -1,7 +1,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
-import { installNativeModuleStubs, mockModule } from "./helpers/render";
+import { installStorageSpy } from "./helpers/spy-async-storage";
 
 /**
  * The AsyncStorage half of `lib/locale-helpers.ts` and `lib/currency-rates.ts`,
@@ -38,30 +38,8 @@ import { installNativeModuleStubs, mockModule } from "./helpers/render";
  * silent.
  */
 
-installNativeModuleStubs();
-
-const store = new Map<string, string>();
-let readError: Error | null = null;
-let writeError: Error | null = null;
-
-const captured: { error: unknown; context: unknown }[] = [];
-
-mockModule("@react-native-async-storage/async-storage", {
-  default: {
-    getItem: async (key: string) => {
-      if (readError) throw readError;
-      return store.get(key) ?? null;
-    },
-    setItem: async (key: string, value: string) => {
-      if (writeError) throw writeError;
-      store.set(key, value);
-    },
-  },
-});
-
-mockModule("@/lib/sentry", {
-  captureException: (error: unknown, context: unknown) => captured.push({ error, context }),
-});
+const spy = installStorageSpy();
+const { scopes, keyspaces } = spy;
 
 const CURRENCY_KEY = "collectables-currency-v1";
 const PINNED_KEY = "collectables-pinned-currencies-v1";
@@ -82,40 +60,28 @@ async function rates() {
 }
 
 beforeEach(async () => {
-  store.clear();
-  readError = null;
-  writeError = null;
-  captured.length = 0;
-  (await import("@/lib/report-storage-failure")).__resetStorageFailureReportsForTests();
+  await spy.reset();
 });
-
-function scopes(): string[] {
-  return captured.map((c) => (c.context as { scope: string }).scope);
-}
-
-function keyspaces(): string[] {
-  return captured.map((c) => (c.context as { extra: { keyspace: string } }).extra.keyspace);
-}
 
 describe("the preferred-currency pair", () => {
   it("round-trips a validated code", async () => {
     const { getUserPreferredCurrency, setUserPreferredCurrency } = await locale();
     await setUserPreferredCurrency("jpy");
-    assert.equal(store.get(CURRENCY_KEY), "JPY");
+    assert.equal(spy.store.get(CURRENCY_KEY), "JPY");
     assert.equal(await getUserPreferredCurrency(), "JPY");
   });
 
   it("writes nothing for a malformed code, so junk never reaches the store", async () => {
     const { setUserPreferredCurrency } = await locale();
     await setUserPreferredCurrency("not-a-currency");
-    assert.equal(store.size, 0);
+    assert.equal(spy.store.size, 0);
   });
 
   it("answers null for stored junk — the store answered and what it held is not a code", async () => {
     const { getUserPreferredCurrency } = await locale();
-    store.set(CURRENCY_KEY, "US");
+    spy.store.set(CURRENCY_KEY, "US");
     assert.equal(await getUserPreferredCurrency(), null);
-    assert.deepEqual(captured, [], "unreadable CONTENT is not an unreadable store");
+    assert.deepEqual(spy.captured, [], "unreadable CONTENT is not an unreadable store");
   });
 
   it("reports an unreadable store and still answers null", async () => {
@@ -124,16 +90,16 @@ describe("the preferred-currency pair", () => {
     // report: the caller cannot tell the two apart and nothing else would ever
     // mention that this device's store is broken.
     const { getUserPreferredCurrency } = await locale();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     assert.equal(await getUserPreferredCurrency(), null);
     assert.deepEqual(scopes(), ["locale-helpers.getItem"]);
     assert.deepEqual(keyspaces(), [CURRENCY_KEY]);
-    assert.equal(captured[0].error, readError);
+    assert.equal(spy.captured[0].error, spy.readError);
   });
 
   it("reports a failed write and does not reject, so the form submit survives", async () => {
     const { setUserPreferredCurrency } = await locale();
-    writeError = new Error("quota exceeded");
+    spy.writeError = new Error("quota exceeded");
     await assert.doesNotReject(() => setUserPreferredCurrency("EUR"));
     assert.deepEqual(scopes(), ["locale-helpers.setItem"]);
     assert.deepEqual(keyspaces(), [CURRENCY_KEY]);
@@ -151,7 +117,7 @@ describe("pinCurrency", () => {
   it("writes nothing at all for a malformed code", async () => {
     const { pinCurrency } = await locale();
     await pinCurrency("€");
-    assert.equal(store.size, 0);
+    assert.equal(spy.store.size, 0);
   });
 
   it("does NOT replace the stored list when the read fails", async () => {
@@ -160,14 +126,14 @@ describe("pinCurrency", () => {
     // that failed would write ONE entry over a list of four that is still
     // there and still correct — permanently, because that write succeeds.
     const { pinCurrency } = await locale();
-    store.set(PINNED_KEY, JSON.stringify(["USD", "EUR", "GBP", "JPY"]));
+    spy.store.set(PINNED_KEY, JSON.stringify(["USD", "EUR", "GBP", "JPY"]));
 
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     await pinCurrency("CHF");
 
-    readError = null;
+    spy.readError = null;
     assert.deepEqual(
-      JSON.parse(store.get(PINNED_KEY) ?? "null"),
+      JSON.parse(spy.store.get(PINNED_KEY) ?? "null"),
       ["USD", "EUR", "GBP", "JPY"],
       "an unreadable store is not an empty one — the pins must survive the failed read",
     );
@@ -175,7 +141,7 @@ describe("pinCurrency", () => {
 
   it("reports the failed read rather than merging into what it could not read", async () => {
     const { pinCurrency } = await locale();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     await pinCurrency("CHF");
     assert.deepEqual(scopes(), ["locale-helpers.getItem"]);
     assert.deepEqual(keyspaces(), [PINNED_KEY]);
@@ -187,10 +153,10 @@ describe("pinCurrency", () => {
     // one entry for both would let whichever happened first hide the other for
     // the rest of the session.
     const { getPinnedCurrencies, pinCurrency } = await locale();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     await getPinnedCurrencies();
-    readError = null;
-    writeError = new Error("quota exceeded");
+    spy.readError = null;
+    spy.writeError = new Error("quota exceeded");
     await pinCurrency("CHF");
     assert.deepEqual(scopes(), ["locale-helpers.getItem", "locale-helpers.setItem"]);
     assert.deepEqual(keyspaces(), [PINNED_KEY, PINNED_KEY]);
@@ -198,7 +164,7 @@ describe("pinCurrency", () => {
 
   it("does not reject when the write fails, and reports it", async () => {
     const { pinCurrency } = await locale();
-    writeError = new Error("quota exceeded");
+    spy.writeError = new Error("quota exceeded");
     await assert.doesNotReject(() => pinCurrency("CHF"));
     assert.deepEqual(scopes(), ["locale-helpers.setItem"]);
   });
@@ -208,14 +174,14 @@ describe("getPinnedCurrencies", () => {
   it("answers [] when nothing is stored", async () => {
     const { getPinnedCurrencies } = await locale();
     assert.deepEqual(await getPinnedCurrencies(), []);
-    assert.deepEqual(captured, []);
+    assert.deepEqual(spy.captured, []);
   });
 
   it("answers [] for stored junk without reporting — the store answered", async () => {
     const { getPinnedCurrencies } = await locale();
-    store.set(PINNED_KEY, "{not json");
+    spy.store.set(PINNED_KEY, "{not json");
     assert.deepEqual(await getPinnedCurrencies(), []);
-    assert.deepEqual(captured, []);
+    assert.deepEqual(spy.captured, []);
   });
 
   it("reports an unreadable store, like the read one function down does", async () => {
@@ -224,7 +190,7 @@ describe("getPinnedCurrencies", () => {
     // green while THIS read onto the same key was silent. Which of a module's
     // two paths reports would otherwise be decided by which one ran first.
     const { getPinnedCurrencies } = await locale();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     assert.deepEqual(await getPinnedCurrencies(), []);
     assert.deepEqual(scopes(), ["locale-helpers.getItem"]);
     assert.deepEqual(keyspaces(), [PINNED_KEY]);
@@ -234,11 +200,11 @@ describe("getPinnedCurrencies", () => {
     // Why fixing the silent read costs no extra event volume: the shared budget
     // is keyed by site and keyspace, and both paths pass the same pair.
     const { getPinnedCurrencies, pinCurrency } = await locale();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     await getPinnedCurrencies();
     await pinCurrency("CHF");
     await getPinnedCurrencies();
-    assert.equal(captured.length, 1);
+    assert.equal(spy.captured.length, 1);
   });
 });
 
@@ -253,7 +219,7 @@ describe("the rates cache", () => {
 
   it("answers null for a payload with no usable rates in it", async () => {
     const { getCachedRates } = await rates();
-    store.set(RATES_KEY, JSON.stringify({ rates: { EUR: -1, GBP: "x" }, fetchedAt: 1 }));
+    spy.store.set(RATES_KEY, JSON.stringify({ rates: { EUR: -1, GBP: "x" }, fetchedAt: 1 }));
     assert.equal(await getCachedRates(), null);
   });
 
@@ -262,19 +228,19 @@ describe("the rates cache", () => {
     // per launch against a third-party rate API, and every screen still looks
     // right — which is why this write is worth an event at all.
     const { setCachedRates } = await rates();
-    writeError = new Error("quota exceeded");
+    spy.writeError = new Error("quota exceeded");
     await assert.doesNotReject(() => setCachedRates(PAYLOAD));
     assert.deepEqual(scopes(), ["currency-rates.setItem"]);
     assert.deepEqual(keyspaces(), [RATES_KEY]);
-    assert.equal(captured[0].error, writeError);
+    assert.equal(spy.captured[0].error, spy.writeError);
   });
 
   it("reports the write once per session however many times it fails", async () => {
     const { setCachedRates } = await rates();
-    writeError = new Error("quota exceeded");
+    spy.writeError = new Error("quota exceeded");
     await setCachedRates(PAYLOAD);
     await setCachedRates({ ...PAYLOAD, fetchedAt: PAYLOAD.fetchedAt + 1 });
-    assert.equal(captured.length, 1, "one full disk is one fact about the device");
+    assert.equal(spy.captured.length, 1, "one full disk is one fact about the device");
   });
 
   it("still answers null on an unreadable store, and says nothing — a read this module has not been asked about", async () => {
@@ -284,8 +250,8 @@ describe("the rates cache", () => {
     // tree, not a decision this module made. Pinned so that answering it
     // changes a case rather than slipping past one.
     const { getCachedRates } = await rates();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     assert.equal(await getCachedRates(), null);
-    assert.deepEqual(captured, []);
+    assert.deepEqual(spy.captured, []);
   });
 });

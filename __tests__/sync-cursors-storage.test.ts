@@ -1,7 +1,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
-import { installNativeModuleStubs, mockModule } from "./helpers/render";
+import { installStorageSpy } from "./helpers/spy-async-storage";
 
 /**
  * The AsyncStorage half of `lib/sync-cursors.ts`, run rather than read.
@@ -27,29 +27,8 @@ import { installNativeModuleStubs, mockModule } from "./helpers/render";
  * per session through the shared budget.
  */
 
-installNativeModuleStubs();
-
-const store = new Map<string, string>();
-const captured: { error: unknown; context: unknown }[] = [];
-let readError: Error | null = null;
-let writeError: Error | null = null;
-
-mockModule("@react-native-async-storage/async-storage", {
-  default: {
-    getItem: async (key: string) => {
-      if (readError) throw readError;
-      return store.get(key) ?? null;
-    },
-    setItem: async (key: string, value: string) => {
-      if (writeError) throw writeError;
-      store.set(key, value);
-    },
-  },
-});
-
-mockModule("@/lib/sentry", {
-  captureException: (error: unknown, context: unknown) => captured.push({ error, context }),
-});
+const spy = installStorageSpy();
+const { scopes, keyspaces } = spy;
 
 /** A real auth id, so `storageKeyLabel` keeps the entity instead of truncating. */
 const USER = "11111111-2222-4333-8444-555555555555";
@@ -59,20 +38,8 @@ async function load() {
   return import("@/lib/sync-cursors");
 }
 
-function scopes(): string[] {
-  return captured.map((c) => (c.context as { scope: string }).scope);
-}
-
-function keyspaces(): string[] {
-  return captured.map((c) => (c.context as { extra: { keyspace: string } }).extra.keyspace);
-}
-
 beforeEach(async () => {
-  store.clear();
-  readError = null;
-  writeError = null;
-  captured.length = 0;
-  (await import("@/lib/report-storage-failure")).__resetStorageFailureReportsForTests();
+  await spy.reset();
 });
 
 describe("getSyncCursor / setSyncCursor round trip", () => {
@@ -101,15 +68,15 @@ describe("getSyncCursor / setSyncCursor round trip", () => {
     const { setSyncCursor } = await load();
     await setSyncCursor("items", USER, null);
     await setSyncCursor("items", USER, "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
-    assert.equal(store.size, 0, "a delta pull that returned nothing newer must not write");
+    assert.equal(spy.store.size, 0, "a delta pull that returned nothing newer must not write");
   });
 
   it("does not throw out of a failing store", async () => {
     const { getSyncCursor, setSyncCursor } = await load();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     await assert.doesNotReject(() => getSyncCursor("items", USER));
-    readError = null;
-    writeError = new Error("quota exceeded");
+    spy.readError = null;
+    spy.writeError = new Error("quota exceeded");
     await assert.doesNotReject(() => setSyncCursor("items", USER, "2026-01-01T00:00:00.000Z"));
   });
 });
@@ -117,14 +84,14 @@ describe("getSyncCursor / setSyncCursor round trip", () => {
 describe("a cursor store that stays broken is reported", () => {
   it("reports an unreadable read with the keyspace, never the user id", async () => {
     const { getSyncCursor } = await load();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     assert.equal(await getSyncCursor("items", USER), null);
 
     assert.deepEqual(scopes(), ["sync-cursors.getItem"]);
     assert.deepEqual(keyspaces(), [ITEMS_KEYSPACE]);
-    assert.equal(captured[0].error, readError);
+    assert.equal(spy.captured[0].error, spy.readError);
     assert.equal(
-      JSON.stringify(captured).includes(USER),
+      JSON.stringify(spy.captured).includes(USER),
       false,
       "the key ends in the account's auth id and only the keyspace may travel",
     );
@@ -132,7 +99,7 @@ describe("a cursor store that stays broken is reported", () => {
 
   it("reports a failed write", async () => {
     const { setSyncCursor } = await load();
-    writeError = new Error("quota exceeded");
+    spy.writeError = new Error("quota exceeded");
     await setSyncCursor("items", USER, "2026-01-01T00:00:00.000Z");
     assert.deepEqual(scopes(), ["sync-cursors.setItem"]);
     assert.deepEqual(keyspaces(), [ITEMS_KEYSPACE]);
@@ -140,16 +107,16 @@ describe("a cursor store that stays broken is reported", () => {
 
   it("reports once however many refreshes re-pull the whole table", async () => {
     const { getSyncCursor } = await load();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     await getSyncCursor("items", USER);
     await getSyncCursor("items", USER);
     await getSyncCursor("items", USER);
-    assert.equal(captured.length, 1);
+    assert.equal(spy.captured.length, 1);
   });
 
   it("reports the two entities separately — they are two stores", async () => {
     const { getSyncCursor } = await load();
-    readError = new Error("storage unavailable");
+    spy.readError = new Error("storage unavailable");
     await getSyncCursor("items", USER);
     await getSyncCursor("collections", USER);
     assert.deepEqual(keyspaces(), [
@@ -163,7 +130,7 @@ describe("a cursor store that stays broken is reported", () => {
     // must not look like a broken store on the dashboard.
     const { getSyncCursor } = await load();
     assert.equal(await getSyncCursor("items", USER), null);
-    assert.deepEqual(captured, []);
+    assert.deepEqual(spy.captured, []);
   });
 
   it("says nothing for the no-op write or while the store works", async () => {
@@ -171,6 +138,6 @@ describe("a cursor store that stays broken is reported", () => {
     await setSyncCursor("items", USER, null);
     await setSyncCursor("items", USER, "2026-01-01T00:00:00.000Z");
     await getSyncCursor("items", USER);
-    assert.deepEqual(captured, []);
+    assert.deepEqual(spy.captured, []);
   });
 });

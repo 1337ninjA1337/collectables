@@ -69,16 +69,48 @@ export function isTransferLogEntry(v: unknown): v is MarketplaceTransferLogEntry
   );
 }
 
+/**
+ * The buyer's stored provenance log, or NULL when the store could not be read.
+ *
+ * The null is the same distinction `getTombstones` draws, for the same reason
+ * and with a worse consequence if it is collapsed. Every caller merges into
+ * what it read and writes the union back, so `[]` for a FAILED READ replaces
+ * the log with whatever this one call happened to see — permanently, because
+ * that write succeeds. Here that is the buyer's whole acquisition history,
+ * deleted by one transient storage error, in the one store this app keeps that
+ * nothing upstream can rebuild: the seller's `MarketplaceListing` row is gone
+ * by then, which is why the log exists.
+ *
+ * `[]` means the store ANSWERED and holds no log for this user: no user id, no
+ * stored value, or content that is not a transfer log. Nothing is stuck in any
+ * of those, and re-learning from an empty list is right.
+ */
 export async function loadTransferLog(
   userId: string,
-): Promise<MarketplaceTransferLogEntry[]> {
+): Promise<MarketplaceTransferLogEntry[] | null> {
   if (!userId) return [];
+  const key = marketplaceTransferLogKey(userId);
+  // TWO ARMS, because one cannot say which failed. A single `try` around the
+  // read AND the parse makes stored garbage indistinguishable from a broken
+  // store, which is the distinction this whole function is now about — and it
+  // is the collapse the first draft of this change shipped for one test run.
+  let raw: string | null;
   try {
-    const raw = await AsyncStorage.getItem(marketplaceTransferLogKey(userId));
-    if (!raw) return [];
+    raw = await AsyncStorage.getItem(key);
+  } catch (error: unknown) {
+    // Reported for the reason the write below is: this is an AUDIT history, and
+    // a device that cannot read it is one where every later claim appends to
+    // nothing. The caller holds its write rather than overwriting, so the
+    // symptom is a log that stops growing — invisible from the outside.
+    reportStorageFailure("marketplace-transfer-log.getItem", key, error);
+    return null;
+  }
+  if (!raw) return [];
+  try {
+    // NOT reported: the store ANSWERED and what it held is not a log, so there
+    // is nothing to preserve and appending to `[]` is the honest recovery.
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isTransferLogEntry);
+    return Array.isArray(parsed) ? parsed.filter(isTransferLogEntry) : [];
   } catch {
     return [];
   }
@@ -88,13 +120,18 @@ export async function loadTransferLog(
  * Appends a transfer log entry, deduping by `id`. Newest entries go to the
  * front of the array so a future "Purchases" tab can render them in
  * recency order without re-sorting.
+ *
+ * Answers null when the log could not be READ, having written nothing: the
+ * merge would be into an empty list, and persisting that is how a transient
+ * storage error becomes a deleted audit history. See {@link loadTransferLog}.
  */
 export async function appendTransferLogEntry(
   userId: string,
   entry: MarketplaceTransferLogEntry,
-): Promise<MarketplaceTransferLogEntry[]> {
+): Promise<MarketplaceTransferLogEntry[] | null> {
   if (!userId) return [];
   const existing = await loadTransferLog(userId);
+  if (existing === null) return null;
   const next = mergeTransferLogEntry(existing, entry);
   const key = marketplaceTransferLogKey(userId);
   try {

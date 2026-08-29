@@ -40,6 +40,7 @@ export const STORAGE_FAILURE_SITES = [
   "currency-rates.setItem",
   "locale-helpers.getItem",
   "locale-helpers.setItem",
+  "marketplace-transfer-log.getItem",
   "marketplace-transfer-log.setItem",
 ] as const;
 
