@@ -1,12 +1,12 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
-import { balancedInner } from "@/lib/balanced-source";
+import { balancedEnd, balancedInner } from "@/lib/balanced-source";
 
 import { assertNoOffenders } from "./helpers/offence-sweep";
 import { installNativeModuleStubs, mockModule } from "./helpers/render";
 import { readRepoFile } from "./helpers/repo-file";
-import { readSource, sourceFiles } from "./helpers/source-files";
+import { readSource, sourceCode, sourceFiles } from "./helpers/source-files";
 
 /**
  * `reportStorageFailure` — one budget for every swallowed storage failure.
@@ -293,13 +293,17 @@ describe("the swallowing storage sites route through the shared budget", () => {
     // rather than a swallowed one. All six were invisible to that rule and to
     // the site list alike, because neither asks about a module the other has
     // never heard of.
+    //
+    // Comments blanked, because this case's whole subject is the presence of a
+    // CALL: `reportStorageFailure(` written in a doc block explaining why a
+    // module does not report would satisfy the coarse half exactly backwards.
     const writes = /\bAsyncStorage\s*\.\s*(?:setItem|multiSet|mergeItem|multiMerge)\s*\(/;
     const reports = /reportStorageFailure\(/;
     const problems = sourceFiles()
-      .filter((relative) => writes.test(readSource(relative)))
+      .filter((relative) => writes.test(sourceCode(relative)))
       .filter(
         (relative) =>
-          !WRITES_WITHOUT_A_SITE.includes(relative) && !reports.test(readSource(relative)),
+          !WRITES_WITHOUT_A_SITE.includes(relative) && !reports.test(sourceCode(relative)),
       );
     assert.deepEqual(
       problems,
@@ -336,57 +340,143 @@ describe("the swallowing storage sites route through the shared budget", () => {
   });
 
   /**
-   * Each AsyncStorage write in `source`, reduced to the call plus what
-   * IMMEDIATELY follows it, one per line.
+   * Each AsyncStorage write in `source`, reduced to THE ONE HANDLER ITS
+   * REJECTION REACHES, one per line.
    *
-   * The sweep's subject is a write's tail, not a file, and the difference is a
-   * false positive this rule shipped with for exactly one commit. A regex
+   * ## The subject is a write, not a file
+   *
+   * A false positive this rule shipped with for exactly one commit. A regex
    * bridging from `AsyncStorage.setItem(` to a `.catch(() => undefined)` over
    * a bounded window of source will happily start at a write that reports
    * correctly and finish at an unrelated promise four lines below — reading, to
    * whoever meets the failure, as "this module swallows a write" while pointing
    * at a module that does not.
    *
-   * `balancedInner` ends the call where the call ends, so the tail begins at
-   * its closing parenthesis and the rule is anchored there. Newlines collapse
-   * to spaces so a `.catch` on the next line is still adjacent; a following
-   * STATEMENT is not, because the `;` or the identifier between them is what
-   * the anchor now refuses. An unclosed call contributes no tail at all rather
-   * than a truncated one — a span read short is a span whose offence was not
-   * seen, which is the silent direction for a sweep asserting an absence.
+   * ## Two spellings of swallowing, and why one rule now covers both
+   *
+   * `.catch(() => …)` is one spelling, and the six writes the shipped rule
+   * could not see were the other: five wrapped the write in
+   * `try { … } catch {}`, which no pattern anchored to the call's tail can
+   * reach, and a sixth awaited it bare under a `void` caller. They were found
+   * by the module-level case above, which is coarse on purpose — a module that
+   * reports SOMEWHERE passes it, so `social-context`'s three writes are covered
+   * by one reporting call and a second write there could go silent without
+   * anything going red. Neither half subsumed the other. This is the merge.
+   *
+   * ## Which handler, and why exactly one
+   *
+   * A rejection is handled once, by the first thing that catches it, so the
+   * reader resolves that one handler rather than emitting every candidate:
+   *
+   *   - A `.catch(…)` ANYWHERE IN THE WRITE'S OWN CHAIN wins. `await
+   *     AsyncStorage.setItem(…).catch(report)` inside an unrelated
+   *     `try { … } catch {}` is `marketplace-context`'s cloud-first load, and
+   *     it is correct: the chained handler runs, the await resolves, and the
+   *     enclosing clause never sees the storage error. Emitting the enclosing
+   *     clause too flagged that module on the first draft of this rule.
+   *   - Otherwise the INNERMOST enclosing `catch`, because an inner clause that
+   *     reports is not undone by an outer one that does not, and an inner one
+   *     that swallows means the outer never runs. A `try`/`finally` with no
+   *     catch contributes nothing and the search continues outward, which is
+   *     what re-raising through it does.
+   *   - Otherwise nothing, which is the UNHANDLED case (`i18n-context`'s bug
+   *     before this week) and is a different offence with a different fix.
+   *     Only the module-level case sees it today; filed as a follow-up.
+   *
+   * Every span is read to its own closing bracket by `balancedEnd`, so no
+   * character count decides an answer and no window bridges two statements. An
+   * unclosed call contributes no line at all rather than a truncated one — a
+   * span read short is a span whose offence was not seen, which is the silent
+   * direction for a sweep asserting an absence.
    */
-  function writeTails(source: string): string {
+  function writeHandlers(source: string): string {
     const write = /\bAsyncStorage\s*\.\s*(?:setItem|multiSet|mergeItem|multiMerge)\s*\(/g;
-    const tails: string[] = [];
+    const lines: string[] = [];
     for (let m = write.exec(source); m !== null; m = write.exec(source)) {
-      const open = m.index + m[0].length - 1;
-      const args = balancedInner(source, open, "(", ")");
-      if (args === null) continue;
-      const closeAt = open + args.length + 1;
-      tails.push(`${WRITE_MARK}${source.slice(closeAt + 1, closeAt + 80).replace(/\s+/g, " ")}`);
+      const closeAt = balancedEnd(source, m.index + m[0].length - 1, "(", ")");
+      if (closeAt === null) continue;
+      const handler = chainedCatch(source, closeAt + 1) ?? innermostCatchAround(source, m.index);
+      // One line per write, whitespace flattened, so a rule anchored with
+      // `^`/`m` sees one handler and `.` cannot run past its end.
+      if (handler !== null) lines.push(`${HANDLER_MARK}${handler.replace(/\s+/g, " ")}`);
     }
-    return tails.join("\n");
+    return lines.join("\n");
   }
 
-  /** Opens each tail line, so the rule below can anchor to the call's end. */
-  const WRITE_MARK = "«write»";
+  /**
+   * The argument text of the `.catch(…)` in the method chain starting at
+   * `from`, or null when the chain has none.
+   *
+   * Each link is read to its own closing parenthesis and the walk continues
+   * from there, so `.then(…).catch(…)` finds the second link and a `.catch` on
+   * an unrelated statement below is not in the chain at all. The walk stops at
+   * the first thing that is not `.identifier(` — the `;` or the identifier
+   * beginning the next statement.
+   */
+  function chainedCatch(source: string, from: number): string | null {
+    for (let at = from; ; ) {
+      const link = /^\s*\.\s*([A-Za-z_$][\w$]*)\s*\(/.exec(source.slice(at));
+      if (link === null) return null;
+      const open = at + link[0].length - 1;
+      const args = balancedInner(source, open, "(", ")");
+      if (args === null) return null;
+      if (link[1] === "catch") return args;
+      at = open + args.length + 2;
+    }
+  }
+
+  /**
+   * The body of the innermost `catch` clause whose `try` block contains `at`,
+   * or null when nothing catches there.
+   *
+   * Walked outermost-in: every `try {` before `at` whose balanced block reaches
+   * past it encloses it, and the LAST such one is the innermost. A `try` whose
+   * block closes before `at` is a sibling above the write and contributes
+   * nothing, which is the false attribution this shape exists to refuse.
+   */
+  function innermostCatchAround(source: string, at: number): string | null {
+    const tryBlock = /\btry\s*\{/g;
+    let innermost: string | null = null;
+    for (let m = tryBlock.exec(source); m !== null && m.index < at; m = tryBlock.exec(source)) {
+      const blockEnd = balancedEnd(source, m.index + m[0].length - 1, "{", "}");
+      if (blockEnd === null || blockEnd < at) continue;
+      const clause = /^\s*catch\s*(?:\([^)]*\)\s*)?\{/.exec(source.slice(blockEnd + 1));
+      if (clause === null) continue;
+      const body = balancedInner(source, blockEnd + clause[0].length, "{", "}");
+      if (body !== null) innermost = body;
+    }
+    return innermost;
+  }
+
+  /** Opens each handler line, so the rule below can anchor to one handler. */
+  const HANDLER_MARK = "«handler»";
 
   /**
    * The rule, named so a positive control can hold it. A sweep asserting
    * "nothing matches" is satisfied perfectly by a pattern that has STOPPED
    * matching, and a clean tree looks identical either way — there is no file
    * left in this repo to control against, so the controls are fabricated.
+   *
+   * ONE PATTERN FOR BOTH SPELLINGS, because once the reader has resolved which
+   * handler runs, the two spellings ask the same question of it: does anything
+   * in there report? That is stricter than the `() => undefined` / `() => {}`
+   * pattern it replaces — `.catch((error) => console.warn(error))` is a handler
+   * that is not empty and reports nothing, which the old shape read as
+   * innocent — and it is the same claim the enclosing-clause half has to make,
+   * since a real clause is never empty (every one in this tree carries the
+   * comment saying why the failure is survivable).
+   *
+   * The absence is phrased inside ONE LINE: `.` does not cross a newline
+   * without the `s` flag and each handler was flattened above, so a report in
+   * the NEXT write's handler cannot vouch for this one.
    */
-  const SWALLOWED_WRITE = new RegExp(
-    `^${WRITE_MARK}\\s*\\.?\\s*catch\\(\\s*\\(\\s*\\)\\s*=>\\s*(undefined|\\{\\s*\\})\\s*[,)]`,
-    "m",
-  );
+  const SWALLOWED_WRITE = new RegExp(`^${HANDLER_MARK}(?!.*reportStorageFailure\\()`, "m");
 
   function swallows(source: string): boolean {
-    return SWALLOWED_WRITE.test(writeTails(source));
+    return SWALLOWED_WRITE.test(writeHandlers(source));
   }
 
-  it("the swallowed-write rule still matches a swallowed write", () => {
+  it("the swallowed-write rule still matches a chained catch that reports nothing", () => {
     for (const offender of [
       "AsyncStorage.setItem(key, body).catch(() => undefined);",
       "AsyncStorage.setItem(key, body).catch(() => {});",
@@ -395,6 +485,13 @@ describe("the swallowing storage sites route through the shared budget", () => {
       "AsyncStorage.setItem(k, v).catch(\n  () => undefined,\n);",
       'AsyncStorage.setItem(k, ")").catch(() => undefined);',
       "AsyncStorage.multiSet(pairs).catch(() => undefined);",
+      // Not empty, and reports nothing — the shape the `() => undefined` /
+      // `() => {}` pattern read as innocent. A `console.warn` is invisible in
+      // production and identical to a swallow from Sentry's side.
+      "AsyncStorage.setItem(k, v).catch((error: unknown) => console.warn(error));",
+      // Further down the chain, which a rule anchored to the call's tail sees
+      // only by accident of how many characters the `.then` took up.
+      "AsyncStorage.setItem(k, v).then(noop).catch(() => undefined);",
     ]) {
       assert.ok(swallows(offender), `must flag: ${offender}`);
     }
@@ -405,8 +502,13 @@ describe("the swallowing storage sites route through the shared budget", () => {
     // instead of making the sweep unanimous about a tree it stopped reading.
     for (const innocent of [
       'AsyncStorage.setItem(key, body).catch((error: unknown) => {\n  reportStorageFailure("s", key, error);\n});',
+      'AsyncStorage.setItem(k, v).then(noop).catch((error: unknown) => {\n  reportStorageFailure("s", k, error);\n});',
       "AsyncStorage.getItem(key).catch(() => undefined);",
       "somethingElse(key).catch(() => undefined);",
+      // No handler at all is the UNHANDLED case, not this rule's offence: the
+      // rejection escapes to the caller, which may well be handling it. It is
+      // the module-level case above that has an opinion, and the reason this
+      // rule does not yet subsume that one.
       "await AsyncStorage.setItem(key, body);",
     ]) {
       assert.ok(!swallows(innocent), `must not flag: ${innocent}`);
@@ -426,29 +528,139 @@ describe("the swallowing storage sites route through the shared budget", () => {
       "// A remote write, which is a different rule's business entirely.",
       "softDeleteRemoteItem(itemId).catch(() => undefined);",
     ].join("\n");
-    assert.ok(!swallows(source), "the tail of the write ends at the write");
+    assert.ok(!swallows(source), "the chain of the write ends at the write");
   });
 
   it("does not read past an unclosed call into the next statement", () => {
     // The other direction of the same anchoring: a write whose parenthesis
-    // never closes contributes no tail, so the `.catch` of a LATER statement
+    // never closes contributes no line, so the `.catch` of a LATER statement
     // cannot be attributed to it.
     const source = 'AsyncStorage.setItem(key, "unterminated\nfoo().catch(() => undefined);';
     assert.ok(!swallows(source), "an unreadable call is skipped, not guessed at");
   });
 
-  it("no AsyncStorage write is swallowed into an empty catch any more", () => {
+  it("reads each write's handler separately, so one report cannot vouch for two writes", () => {
+    // The reason the absence is phrased inside one line. Both writes are in
+    // one module and only one of them reports; a rule asking the question of
+    // the whole file — which the coarse module-level case above does — passes
+    // this exactly as it passes a module where both report.
+    const source = [
+      'AsyncStorage.setItem(a, one).catch((error: unknown) => {',
+      '  reportStorageFailure("x.setItem", a, error);',
+      "});",
+      "AsyncStorage.setItem(b, two).catch(() => undefined);",
+    ].join("\n");
+    assert.ok(swallows(source), "the second write is swallowed whatever the first one does");
+  });
+
+  it("matches the OTHER spelling: a write wrapped in a try whose catch reports nothing", () => {
+    // The five writes the `.catch` rule could not see, in the shapes they were
+    // actually written in. `catch {}` with no binding is the one the tree still
+    // contains (in the sanctioned exemption); the others are how a new one
+    // would arrive.
+    for (const offender of [
+      "try {\n  await AsyncStorage.setItem(key, value);\n} catch {\n  best effort\n}",
+      "try {\n  await AsyncStorage.setItem(key, value);\n} catch (error: unknown) {\n  console.warn(error);\n}",
+      "try {\n  await AsyncStorage.multiSet(pairs);\n} catch {}",
+      // Reported, but not through the shared budget — one full disk becomes a
+      // stream of events, which is the outcome `reportStorageFailure` exists
+      // to prevent, so the direct call is not a substitute for it.
+      "try {\n  await AsyncStorage.setItem(key, value);\n} catch (error: unknown) {\n  captureException(error);\n}",
+    ]) {
+      assert.ok(swallows(offender), `must flag: ${offender}`);
+    }
+  });
+
+  it("lets the write's own chained catch answer for it, inside an unrelated try", () => {
+    // `marketplace-context`'s cloud-first load, which the first draft of this
+    // rule flagged. The chained handler runs, the `await` resolves, and the
+    // enclosing clause — which is about a corrupt JSON cache, a different
+    // failure with a different recovery — never sees the storage error.
+    const source = [
+      "try {",
+      "  const cloud = await cloudFetchListings();",
+      "  await AsyncStorage.setItem(KEY, JSON.stringify(cloud)).catch((error: unknown) => {",
+      '    reportStorageFailure("marketplace-context.setItem", KEY, error);',
+      "  });",
+      "} catch {",
+      "  start fresh rather than crashing the provider",
+      "}",
+    ].join("\n");
+    assert.ok(!swallows(source), "the chained handler is the one that runs");
+  });
+
+  it("leaves a write whose enclosing catch reports alone", () => {
+    for (const innocent of [
+      'try {\n  await AsyncStorage.setItem(key, value);\n} catch (error: unknown) {\n  reportStorageFailure("locale-helpers.setItem", key, error);\n}',
+      // A `finally` catches nothing, so the search continues outward and finds
+      // the clause that does. Attributing the write to the inner `try` would
+      // report a module that reports correctly.
+      'try {\n  try {\n    await AsyncStorage.setItem(key, value);\n  } finally {\n    done();\n  }\n} catch (error: unknown) {\n  reportStorageFailure("x.setItem", key, error);\n}',
+      // The innermost clause is the one that runs, so an outer swallow below a
+      // reporting inner one is not this write's problem.
+      'try {\n  try {\n    await AsyncStorage.setItem(key, value);\n  } catch (error: unknown) {\n    reportStorageFailure("x.setItem", key, error);\n  }\n} catch {}',
+    ]) {
+      assert.ok(!swallows(innocent), `must not flag: ${innocent}`);
+    }
+  });
+
+  it("does not attribute a write to a try/catch that closed above it", () => {
+    // The enclosing-catch half of the same anchoring the tail half needed. A
+    // sibling `try { … } catch {}` earlier in the file catches nothing here,
+    // and reading it as this write's handler would name a module whose write
+    // reports perfectly well.
+    const source = [
+      "try {\n  await somethingElse();\n} catch {}",
+      "",
+      'AsyncStorage.setItem(key, value).catch((error: unknown) => {',
+      '  reportStorageFailure("some-context.setItem", key, error);',
+      "});",
+    ].join("\n");
+    assert.ok(!swallows(source), "a try that closed before the write does not enclose it");
+  });
+
+  it("reads each handler whole, so a long body cannot hide the report", () => {
+    // Every span this reader takes is bounded by its own closing bracket rather
+    // than by a character count, which is what lets a comment-heavy clause
+    // (every real one in this tree is) report the same as a terse one. The
+    // shipped rule's `[\s\S]{0,400}?` window is the thing this replaces.
+    const padding = "  doSomething();\n".repeat(60);
+    const source = `try {\n  await AsyncStorage.setItem(key, value);\n} catch (error: unknown) {\n${padding}  reportStorageFailure("x.setItem", key, error);\n}`;
+    assert.ok(!swallows(source), "the whole clause is the subject, not its first N characters");
+  });
+
+  it("no AsyncStorage write is swallowed, by either spelling", () => {
     // The sweep, rather than eight source assertions: a NINTH provider is what
-    // the per-module list cannot see. A write whose rejection reaches
-    // `() => undefined` or `() => {}` is silent local data loss, and the user
-    // finds out on the next launch when their edits are gone.
+    // the per-module list cannot see. A write whose rejection reaches a handler
+    // that reports nothing is silent local data loss, and the user finds out on
+    // the next launch when their edits are gone.
+    //
+    // Read through `sourceCode` rather than `readSource`: a `.catch(() =>
+    // undefined)` quoted in a doc block is not an offence, and — the direction
+    // that would have mattered here — a `reportStorageFailure(` NAMED in a
+    // comment inside a catch clause is not a report, which is exactly what the
+    // real clauses in this tree are full of.
     assertNoOffenders({
       rule: SWALLOWED_WRITE,
       files: sourceFiles(),
-      read: (relative) => writeTails(readSource(relative)),
+      read: (relative) => writeHandlers(sourceCode(relative)),
+      exempt: WRITES_WITHOUT_A_SITE,
       subject: "modules",
-      what: "swallow a rejected AsyncStorage write into an empty catch — bind the error and report it through reportStorageFailure(scope, key, error)",
+      what: "swallow a rejected AsyncStorage write — into a chained `.catch`, or into the `try`/`catch` around it — that never calls reportStorageFailure(scope, key, error)",
     });
+  });
+
+  it("the exemption is still an offender, so it is a hole rather than a habit", () => {
+    // `assertExemptionsHonest` asks this of a named list, and the honesty case
+    // above asks the weaker half — that `storage-keys.ts` still WRITES. It
+    // could write and report and still sit here, at which point the entry is a
+    // hole nobody closed. Asking the sweep's own rule is the difference.
+    for (const relative of WRITES_WITHOUT_A_SITE) {
+      assert.ok(
+        swallows(sourceCode(relative)),
+        `${relative} no longer swallows its write — drop it from WRITES_WITHOUT_A_SITE rather than exempting a module that has stopped offending`,
+      );
+    }
   });
 
 });
