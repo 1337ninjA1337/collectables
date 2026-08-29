@@ -12,8 +12,36 @@
  * before the Pages artifact is uploaded and never ship to browsers).
  */
 
-/** 4.5 MiB. Today's bundle is ~4.32 MiB; ~190 KiB of headroom. */
-export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.5 * 1024 * 1024;
+/**
+ * 4.53 MiB — today's bundle (~4.501 MiB) plus just under 30 KiB.
+ *
+ * THE HEADROOM IS THE GUARD, and it is chosen against the smallest thing this
+ * budget has to catch rather than against how much room feels comfortable.
+ * Clarity is ~30 KiB and PostHog ~60 KiB, so headroom BELOW 30 KiB means a
+ * statically-imported SDK still trips the gate on the commit that adds it.
+ * More headroom than that would make the budget a number that only notices a
+ * regression months later, when nobody can say which change caused it.
+ *
+ * It was 4.5 MiB under a comment claiming "~190 KiB of headroom", which had
+ * stopped being true: the bundle reached 4609.1 KiB against a 4608.0 KiB
+ * budget, so the next ONE KIBIBYTE of ordinary feature work failed CI — and
+ * 190 KiB of headroom could never have caught either SDK anyway. Both halves
+ * of that comment were wrong in opposite directions.
+ *
+ * Raising this is a decision to be argued, not a step in fixing a red build:
+ * `bundle-size.test.ts` asserts the headroom stays under the smaller SDK, so a
+ * raise that gives up the guard fails there instead of passing quietly.
+ */
+export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.53 * 1024 * 1024;
+
+/**
+ * The smallest SDK the budget must still catch as a static import, in bytes.
+ *
+ * Clarity's browser bundle, the smaller of the two the doc block names. The
+ * gate is only meaningful while the headroom above the real bundle is less
+ * than this.
+ */
+export const SMALLEST_GUARDED_SDK_BYTES = 30 * 1024;
 
 export type BundleFile = {
   readonly path: string;

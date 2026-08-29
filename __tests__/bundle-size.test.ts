@@ -7,12 +7,50 @@ import {
   evaluateBundleSize,
   formatBundleSizeReport,
   resolveBundleSizeBudget,
+  SMALLEST_GUARDED_SDK_BYTES,
 } from "../lib/bundle-size";
 import { readRepoFile as read } from "./helpers/repo-file";
 
+describe("the budget is a headroom, not a round number", () => {
+  /**
+   * The bundle at the commit that last moved the budget, from the CI run that
+   * failed against the old one: 4609.1 KiB.
+   *
+   * A measured number rather than a re-measurement, because this case is about
+   * the RELATIONSHIP and not about today's size — reading `dist/` here would
+   * make the claim depend on whether somebody had built, and would turn a real
+   * regression into a case that quietly re-derives its own expectation.
+   */
+  const MEASURED_BUNDLE_BYTES = Math.round(4609.1 * 1024);
+
+  it("keeps less headroom than the smallest SDK it has to catch", () => {
+    // The whole point of the gate. With MORE headroom than Clarity (~30 KiB), a
+    // statically-imported SDK lands under budget and nothing goes red until
+    // months later, when nobody can say which change caused it. The previous
+    // comment claimed 190 KiB of headroom, which could not have caught either
+    // SDK — and by the time it was read the real headroom was 1.1 KiB.
+    const headroom = DEFAULT_BUNDLE_SIZE_BUDGET_BYTES - MEASURED_BUNDLE_BYTES;
+    assert.ok(
+      headroom < SMALLEST_GUARDED_SDK_BYTES,
+      `headroom is ${String(Math.round(headroom / 1024))} KiB, which is more than the ${String(SMALLEST_GUARDED_SDK_BYTES / 1024)} KiB SDK this budget exists to catch — a raise that big gives up the guard`,
+    );
+  });
+
+  it("still leaves room for ordinary feature growth", () => {
+    // The other direction, and the reason the budget moved at all: at 1.1 KiB
+    // of headroom the gate failed on a commit that added five provider guards
+    // and one small module, which is not what it was written to catch.
+    const headroom = DEFAULT_BUNDLE_SIZE_BUDGET_BYTES - MEASURED_BUNDLE_BYTES;
+    assert.ok(
+      headroom > 8 * 1024,
+      `headroom is ${String(Math.round(headroom / 1024))} KiB — a budget this tight fails on ordinary work rather than on an accidental SDK`,
+    );
+  });
+});
+
 describe("resolveBundleSizeBudget", () => {
-  it("defaults to 4.5 MiB when the env var is unset or empty", () => {
-    assert.equal(DEFAULT_BUNDLE_SIZE_BUDGET_BYTES, 4.5 * 1024 * 1024);
+  it("defaults to 4.53 MiB when the env var is unset or empty", () => {
+    assert.equal(DEFAULT_BUNDLE_SIZE_BUDGET_BYTES, 4.53 * 1024 * 1024);
     assert.equal(resolveBundleSizeBudget({}), DEFAULT_BUNDLE_SIZE_BUDGET_BYTES);
     assert.equal(
       resolveBundleSizeBudget({ BUNDLE_SIZE_BUDGET_BYTES: "" }),
