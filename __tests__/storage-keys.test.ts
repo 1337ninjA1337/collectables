@@ -55,7 +55,12 @@ describe("storage-keys", () => {
  * nobody decided to send.
  */
 describe("storageKeyLabel", () => {
-  const AUTH_ID = "3f1a2b4c-5d6e-4f70-8192-a3b4c5d6e7f8";
+  // A UUID with no entropy in it. The first draft used a realistic random one
+  // and gitleaks' `generic-api-key` rule flagged it as a secret on the commit —
+  // a fixture that is indistinguishable from a key IS one, as far as every
+  // scanner is concerned, and turning the scan off for a test file is a worse
+  // trade than typing a boring uuid.
+  const AUTH_ID = "11111111-2222-4333-8444-555555555555";
 
   it("replaces a uuid user id and keeps everything around it", () => {
     assert.equal(

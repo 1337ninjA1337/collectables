@@ -174,7 +174,7 @@ describe("usePersistedBlob", () => {
 
 describe("a rejected write is swallowed, not silent", () => {
   it("reports the failure to Sentry with the keyspace, never the raw key", async () => {
-    collectionsKey = "collectables-collections-v1-3f1a2b4c-5d6e-4f70-8192-a3b4c5d6e7f8";
+    collectionsKey = "collectables-collections-v1-11111111-2222-4333-8444-555555555555";
     failEveryWrite = true;
     await mount();
 
@@ -184,7 +184,7 @@ describe("a rejected write is swallowed, not silent", () => {
       extra: { keyspace: "collectables-collections-v1-{id}" },
     });
     assert.equal(
-      JSON.stringify(captured).includes("3f1a2b4c"),
+      JSON.stringify(captured).includes("11111111"),
       false,
       "the account's auth id must not reach the crash report — scrubPII does not read `extra`",
     );
