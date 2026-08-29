@@ -280,7 +280,13 @@ export function mergePinnedCurrencies(current: readonly string[], code: string):
 export async function getPinnedCurrencies(): Promise<string[]> {
   try {
     return parsePinnedCurrencies(await AsyncStorage.getItem(PINNED_CURRENCIES_KEY));
-  } catch {
+  } catch (error: unknown) {
+    // The SAME read `pinCurrency` reports below, on the same key, and it was
+    // silent here — one of a module's two paths onto one store reporting and
+    // the other not is a coin flip over which call happened first. It costs no
+    // extra events: the site and the keyspace are the pair the shared budget
+    // is keyed on, so whichever path meets the broken store reports once.
+    reportStorageFailure("locale-helpers.getItem", PINNED_CURRENCIES_KEY, error);
     return [];
   }
 }
@@ -300,10 +306,13 @@ export async function pinCurrency(currency: string): Promise<void> {
   try {
     current = parsePinnedCurrencies(await AsyncStorage.getItem(PINNED_CURRENCIES_KEY));
   } catch (error: unknown) {
-    // An unreadable store is not an empty one, and here that is survivable:
-    // the merge below re-pins the one currency just chosen rather than
-    // replacing the list, because a failed read is followed by a failed write
-    // on the same broken store. Reported so the pair is visible.
+    // AN UNREADABLE STORE IS NOT AN EMPTY ONE, so this returns rather than
+    // falling through to the write. Merging into the `[]` above would persist a
+    // one-entry list over a list that is still there and still correct — the
+    // user's other three pins deleted by a read that failed, permanently,
+    // because that write would succeed. The same collapse `getTombstones`
+    // refuses by answering null. Reported so the failure is visible; the pick
+    // itself is not lost, since `setUserPreferredCurrency` holds it.
     reportStorageFailure("locale-helpers.getItem", PINNED_CURRENCIES_KEY, error);
     return;
   }
