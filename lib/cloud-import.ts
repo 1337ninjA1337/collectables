@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { cloudImportedKey } from "@/lib/storage-keys";
 import type { CollectableItem, Collection } from "@/lib/types";
 
@@ -58,10 +59,14 @@ export async function hasCloudImported(userId: string): Promise<boolean> {
 
 /** Record that the one-time import has completed for this user. */
 export async function markCloudImported(userId: string): Promise<void> {
+  const key = cloudImportedKey(userId);
   try {
-    await AsyncStorage.setItem(cloudImportedKey(userId), new Date().toISOString());
-  } catch {
+    await AsyncStorage.setItem(key, new Date().toISOString());
+  } catch (error: unknown) {
     // Best-effort: a failed flag write just re-runs the idempotent import next
-    // load — it never re-uploads stale data because the upserts are by id.
+    // load — it never re-uploads stale data because the upserts are by id. It
+    // is reported because "re-runs the import on every launch" is a whole
+    // cloud round trip per boot that nothing else would ever mention.
+    reportStorageFailure("cloud-import.setItem", key, error);
   }
 }

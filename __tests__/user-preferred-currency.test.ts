@@ -73,13 +73,19 @@ describe("locale-helpers persistence wiring", () => {
     assert.match(setterMatch![0], /parseStoredCurrency\(\s*currency\s*\)/);
   });
 
-  it("guards storage I/O with try/catch so a failure can't crash callers", () => {
+  it("guards storage I/O with try/catch so a failure can't crash callers, and reports it", () => {
+    // The catch BINDS the error now. A guarded failure that nothing records is
+    // a user's currency choice applied and silently forgotten by the next
+    // launch, which is the kind of thing nobody reports as a bug — so the
+    // shape this case pins is the guard AND the report, not the guard alone.
     const src = read("lib/locale-helpers.ts");
     const getter = src.match(/getUserPreferredCurrency[\s\S]*?\n\}\n/);
     const setter = src.match(/setUserPreferredCurrency[\s\S]*?\n\}\n/);
     assert.ok(getter && setter);
-    assert.match(getter![0], /try\s*\{[\s\S]*catch\s*\{/);
-    assert.match(setter![0], /try\s*\{[\s\S]*catch\s*\{/);
+    for (const fn of [getter![0], setter![0]]) {
+      assert.match(fn, /try\s*\{[\s\S]*catch\s*\(error: unknown\)\s*\{/);
+      assert.match(fn, /reportStorageFailure\(\s*"locale-helpers\.(get|set)Item"/);
+    }
   });
 });
 

@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { CURRENCY_KEY, PINNED_CURRENCIES_KEY } from "@/lib/storage-keys";
 
 /**
@@ -200,7 +201,11 @@ export async function getUserPreferredCurrency(): Promise<string | null> {
   try {
     const raw = await AsyncStorage.getItem(CURRENCY_KEY);
     return parseStoredCurrency(raw);
-  } catch {
+  } catch (error: unknown) {
+    // Null is the same answer as "never chosen one", and the fallback that
+    // follows is correct either way. Reported because it is not the same
+    // CAUSE, and a store that cannot be read here cannot be read anywhere.
+    reportStorageFailure("locale-helpers.getItem", CURRENCY_KEY, error);
     return null;
   }
 }
@@ -216,8 +221,11 @@ export async function setUserPreferredCurrency(currency: string): Promise<void> 
   if (!validated) return;
   try {
     await AsyncStorage.setItem(CURRENCY_KEY, validated);
-  } catch {
-    // Best-effort: persistence failure must not crash the form submit.
+  } catch (error: unknown) {
+    // Best-effort: persistence failure must not crash the form submit. The
+    // user's choice is applied and silently forgotten by the next launch,
+    // which is the kind of thing nobody reports as a bug.
+    reportStorageFailure("locale-helpers.setItem", CURRENCY_KEY, error);
   }
 }
 
@@ -285,13 +293,27 @@ export async function getPinnedCurrencies(): Promise<string[]> {
 export async function pinCurrency(currency: string): Promise<void> {
   const validated = parseStoredCurrency(currency);
   if (!validated) return;
+  // TWO TRIES, BECAUSE ONE CATCH CANNOT SAY WHICH HALF FAILED. The read and
+  // the write are different diagnoses with different fixes, and a single arm
+  // would have to report under one site while covering both.
+  let current: readonly string[] = [];
   try {
-    const current = parsePinnedCurrencies(await AsyncStorage.getItem(PINNED_CURRENCIES_KEY));
+    current = parsePinnedCurrencies(await AsyncStorage.getItem(PINNED_CURRENCIES_KEY));
+  } catch (error: unknown) {
+    // An unreadable store is not an empty one, and here that is survivable:
+    // the merge below re-pins the one currency just chosen rather than
+    // replacing the list, because a failed read is followed by a failed write
+    // on the same broken store. Reported so the pair is visible.
+    reportStorageFailure("locale-helpers.getItem", PINNED_CURRENCIES_KEY, error);
+    return;
+  }
+  try {
     await AsyncStorage.setItem(
       PINNED_CURRENCIES_KEY,
       JSON.stringify(mergePinnedCurrencies(current, validated)),
     );
-  } catch {
+  } catch (error: unknown) {
     // Best-effort: persistence failure must not crash the picker.
+    reportStorageFailure("locale-helpers.setItem", PINNED_CURRENCIES_KEY, error);
   }
 }

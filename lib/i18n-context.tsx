@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { getDefaultLocaleForLanguage } from "@/lib/locale-helpers";
 import { plural, slavicPlural } from "@/lib/plural";
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { LANGUAGE_KEY } from "@/lib/storage-keys";
 
 export type AppLanguage = "ru" | "en" | "be" | "pl" | "de" | "es";
@@ -3533,7 +3534,17 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
           });
         }
         setLanguageState(nextLanguage);
-        await AsyncStorage.setItem(LANGUAGE_KEY, nextLanguage);
+        // NOT AWAITED BARE. The one caller is `void setLanguage(...)`, so a
+        // rejected write here became an UNHANDLED REJECTION — a redbox in dev
+        // and a silent drop in production, with the language applied to state
+        // and never persisted. The user picks a language, sees it change, and
+        // finds the old one back on the next launch with nothing anywhere
+        // saying why. The in-memory change above already happened and stays.
+        try {
+          await AsyncStorage.setItem(LANGUAGE_KEY, nextLanguage);
+        } catch (error: unknown) {
+          reportStorageFailure("i18n-context.setItem", LANGUAGE_KEY, error);
+        }
       },
       t: (key: TranslationKey, params?: TranslationParams) => {
         const entry = translations[language][key] ?? translations.en[key];

@@ -221,7 +221,7 @@ describe("the swallowing storage sites route through the shared budget", () => {
     // a real outcome and should not fail here. A site quietly dropped from the
     // union while its module still swallows is caught by the sweep below.
     assert.ok(
-      STORAGE_FAILURE_SITES.length >= 10,
+      STORAGE_FAILURE_SITES.length >= 16,
       `only ${String(STORAGE_FAILURE_SITES.length)} sites are declared: ${STORAGE_FAILURE_SITES.join(", ")}`,
     );
     assert.equal(
@@ -272,6 +272,52 @@ describe("the swallowing storage sites route through the shared budget", () => {
       }
     }
     assert.deepEqual(problems, []);
+  });
+
+  /**
+   * Modules that write to AsyncStorage and deliberately declare no site.
+   *
+   * One entry, and it is the cycle: `storage-keys.ts` owns `storageKeyLabel`,
+   * which `report-storage-failure` calls, so `migrateStorageKey` reporting
+   * would close the loop. Its failure is also the mild kind — the old key
+   * stays put and the next boot retries.
+   */
+  const WRITES_WITHOUT_A_SITE = ["lib/storage-keys.ts"];
+
+  it("every module that writes to AsyncStorage either reports or is a named exception", () => {
+    // THE JOINED QUESTION, and the one that found the hole. The write sweep
+    // below asks "does anybody swallow a rejection into `.catch(() => …)`",
+    // which is one SPELLING of swallowing: five modules wrapped their write in
+    // `try { … } catch {}` instead, and a sixth (`i18n-context`) awaited it
+    // bare under a `void` caller, making a failed write an unhandled rejection
+    // rather than a swallowed one. All six were invisible to that rule and to
+    // the site list alike, because neither asks about a module the other has
+    // never heard of.
+    const writes = /\bAsyncStorage\s*\.\s*(?:setItem|multiSet|mergeItem|multiMerge)\s*\(/;
+    const reports = /reportStorageFailure\(/;
+    const problems = sourceFiles()
+      .filter((relative) => writes.test(readSource(relative)))
+      .filter(
+        (relative) =>
+          !WRITES_WITHOUT_A_SITE.includes(relative) && !reports.test(readSource(relative)),
+      );
+    assert.deepEqual(
+      problems,
+      [],
+      `these modules write to AsyncStorage and never report a failure, by any spelling: ${problems.join(", ")}`,
+    );
+  });
+
+  it("the exception still writes, so the hole is still a hole in something", () => {
+    // An exemption that stopped needing to be one is a hole standing open with
+    // nothing about it looking stale.
+    for (const relative of WRITES_WITHOUT_A_SITE) {
+      assert.match(
+        readSource(relative),
+        /AsyncStorage\s*\.\s*setItem\s*\(/,
+        `${relative} is excused from reporting a write it no longer makes — drop the entry`,
+      );
+    }
   });
 
   it("stays a leaf below storage-keys, which is why migrateStorageKey does NOT report", () => {

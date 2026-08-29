@@ -35,6 +35,12 @@ export const STORAGE_FAILURE_SITES = [
   "marketplace-context.setItem",
   "social-context.setItem",
   "diagnostics-context.setItem",
+  "i18n-context.setItem",
+  "cloud-import.setItem",
+  "currency-rates.setItem",
+  "locale-helpers.getItem",
+  "locale-helpers.setItem",
+  "marketplace-transfer-log.setItem",
 ] as const;
 
 /** One of {@link STORAGE_FAILURE_SITES}. */

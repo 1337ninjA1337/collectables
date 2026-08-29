@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { marketplaceTransferLogKey } from "@/lib/storage-keys";
 import type { MarketplaceMode } from "@/lib/types";
 
@@ -95,14 +96,14 @@ export async function appendTransferLogEntry(
   if (!userId) return [];
   const existing = await loadTransferLog(userId);
   const next = mergeTransferLogEntry(existing, entry);
+  const key = marketplaceTransferLogKey(userId);
   try {
-    await AsyncStorage.setItem(
-      marketplaceTransferLogKey(userId),
-      JSON.stringify(next),
-    );
-  } catch {
+    await AsyncStorage.setItem(key, JSON.stringify(next));
+  } catch (error: unknown) {
     // Storage failure is non-fatal — the log is an audit-history nicety,
-    // not part of the claim's critical path.
+    // not part of the claim's critical path. It is also an AUDIT history, so
+    // a gap in it that nothing recorded is the one kind of gap that matters.
+    reportStorageFailure("marketplace-transfer-log.setItem", key, error);
   }
   return next;
 }

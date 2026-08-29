@@ -19,6 +19,7 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { CURRENCY_RATES_KEY } from "@/lib/storage-keys";
 
 export type UsdRates = Readonly<Record<string, number>>;
@@ -159,8 +160,11 @@ export async function setCachedRates(payload: CurrencyRatesPayload): Promise<voi
       CURRENCY_RATES_KEY,
       JSON.stringify({ rates: payload.rates, fetchedAt: payload.fetchedAt }),
     );
-  } catch {
-    // best-effort
+  } catch (error: unknown) {
+    // Best-effort: the next call re-fetches. Reported because a cache that
+    // never persists turns one request per TTL into one request per launch
+    // against a third-party rate API, and every screen still looks right.
+    reportStorageFailure("currency-rates.setItem", CURRENCY_RATES_KEY, error);
   }
 }
 
