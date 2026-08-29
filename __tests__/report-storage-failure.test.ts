@@ -47,6 +47,12 @@ const AUTH_ID = "11111111-2222-4333-8444-555555555555";
 const ITEMS_KEY = `collectables-items-v1-${AUTH_ID}`;
 const TOMBSTONE_KEY = `collectables-tombstones-v1-items-${AUTH_ID}`;
 
+/**
+ * `mockModule` only takes effect for a module that has not been evaluated yet,
+ * and a static `import` here would pull the REAL `@/lib/sentry` through this
+ * module before the shim is registered. So the helper — and the site list the
+ * adoption cases derive everything from — is loaded lazily.
+ */
 async function load() {
   return import("@/lib/report-storage-failure");
 }
@@ -145,9 +151,21 @@ describe("reportStorageFailure", () => {
     // The separator is the reason this holds: a scope and a keyspace both
     // contain "-", so a "-" join would make ("a-b", "c") and ("a", "b-c") the
     // same entry and silently drop the second report.
+    //
+    // UNREACHABLE FROM OUTSIDE, and that is the claim rather than the caveat:
+    // `StorageFailureSite` is a closed union of ten literals and no pair of
+    // them can collide with any pair of keyspaces. The cast is what lets the
+    // property be asserted at all, and a separator edited back to "-" turns
+    // this red instead of waiting for the eleventh site to be the one that
+    // collides.
     const { reportStorageFailure } = await load();
-    assert.equal(reportStorageFailure("a-b", "c", 1), true);
-    assert.equal(reportStorageFailure("a", "b-c", 2), true);
+    const report = reportStorageFailure as unknown as (
+      scope: string,
+      key: string,
+      error: unknown,
+    ) => boolean;
+    assert.equal(report("a-b", "c", 1), true);
+    assert.equal(report("a", "b-c", 2), true);
     assert.equal(captured.length, 2);
   });
 
@@ -175,50 +193,100 @@ describe("reportStorageFailure", () => {
 // --- Adoption: the silent swallows this exists to end must not come back ---
 
 describe("the swallowing storage sites route through the shared budget", () => {
-  const ADOPTERS = [
-    { module: "lib/use-persisted-blob.ts", scopes: ["use-persisted-blob.setItem"] },
-    { module: "lib/tombstones.ts", scopes: ["tombstones.getItem", "tombstones.setItem"] },
-    { module: "lib/sync-cursors.ts", scopes: ["sync-cursors.getItem", "sync-cursors.setItem"] },
-    { module: "lib/chat-context.tsx", scopes: ["chat-context.setItem"] },
-    { module: "lib/premium-context.tsx", scopes: ["premium-context.setItem"] },
-    { module: "lib/marketplace-context.tsx", scopes: ["marketplace-context.setItem"] },
-    { module: "lib/social-context.tsx", scopes: ["social-context.setItem"] },
-    { module: "lib/diagnostics-context.tsx", scopes: ["diagnostics-context.setItem"] },
-  ] as const;
-
-  for (const { module, scopes } of ADOPTERS) {
-    it(`${module} imports the helper and names each site`, () => {
-      const [dir, file] = module.split("/");
-      const source = readRepoFile(dir, file);
-      assert.match(
-        source,
-        /import \{ reportStorageFailure \} from "@\/lib\/report-storage-failure"/,
-        `${module} must not grow a second copy of the once-per-keyspace budget`,
-      );
-      for (const scope of scopes) {
-        assert.match(
-          source,
-          new RegExp(`reportStorageFailure\\(\\s*"${scope}"`),
-          `${module} must report ${scope} — a silent catch here is the failure this module exists for`,
-        );
-      }
-    });
+  /**
+   * The module each site names, by the convention `STORAGE_FAILURE_SITES`
+   * states: the half before the dot is a module basename under `lib/`.
+   *
+   * Derived rather than tabulated. The hand-written `{module, scopes}` table
+   * this replaces asserted each module's spelling against a list typed by the
+   * same hand in the same hour — a copy of a typo rather than a check on one —
+   * and it could not see the failure that matters here at all: an entry in the
+   * union that nobody passes any more.
+   */
+  function moduleOf(site: string): string {
+    const basename = site.slice(0, site.indexOf("."));
+    const candidates = [`lib/${basename}.ts`, `lib/${basename}.tsx`];
+    const found = candidates.filter((relative) => sourceFiles().includes(relative));
+    assert.equal(
+      found.length,
+      1,
+      `${site} names "${basename}", which is not exactly one module under lib/ (${found.join(", ") || "none"}) — the half before the dot is the module basename, by the convention STORAGE_FAILURE_SITES states`,
+    );
+    return found[0];
   }
 
-  /** The private budget the shared one replaces, named so the sweep can be policed. */
-  const PRIVATE_BUDGET = /reportedKeyspaces/;
+  it("names at least the sites this tree has reasoned about", async () => {
+    const { STORAGE_FAILURE_SITES } = await load();
+    // A floor, not an equality: a site DELETED because its write went away is
+    // a real outcome and should not fail here. A site quietly dropped from the
+    // union while its module still swallows is caught by the sweep below.
+    assert.ok(
+      STORAGE_FAILURE_SITES.length >= 10,
+      `only ${String(STORAGE_FAILURE_SITES.length)} sites are declared: ${STORAGE_FAILURE_SITES.join(", ")}`,
+    );
+    assert.equal(
+      new Set(STORAGE_FAILURE_SITES).size,
+      STORAGE_FAILURE_SITES.length,
+      "a duplicated site is one budget entry under two spellings of the same name",
+    );
+  });
 
-  it("nothing keeps its own reported-keyspace Set", () => {
-    // The floor the shared budget replaces: `use-persisted-blob.ts` held the
-    // only one, and a second module growing its own is how one full disk
-    // starts reporting once per module again.
-    assertNoOffenders({
-      rule: PRIVATE_BUDGET,
-      files: sourceFiles(),
-      read: readSource,
-      subject: "modules",
-      what: "keep a private report budget — import reportStorageFailure instead, so one full device store is one fact rather than one per module that noticed it",
-    });
+  it("every declared site is passed by exactly the module it names", async () => {
+    const { STORAGE_FAILURE_SITES } = await load();
+    // Both directions in one list, because a run where both are wrong should
+    // show the whole answer: a site nobody passes is a write that stopped
+    // reporting, and a site passed by the wrong module is a Sentry scope that
+    // sends the reader to the wrong file.
+    const problems: string[] = [];
+    for (const site of STORAGE_FAILURE_SITES) {
+      const expected = moduleOf(site);
+      const call = new RegExp(`reportStorageFailure\\(\\s*"${site}"`);
+      const passers = sourceFiles().filter((relative) => call.test(readSource(relative)));
+      if (passers.length === 0) {
+        problems.push(`declared, passed by nobody: ${site}`);
+      } else if (passers.length > 1 || passers[0] !== expected) {
+        problems.push(`${site} should be passed only by ${expected}, and is passed by: ${passers.join(", ")}`);
+      }
+    }
+    assert.deepEqual(problems, []);
+  });
+
+  it("every module that reports declares its sites in the union", async () => {
+    const { STORAGE_FAILURE_SITES } = await load();
+    // The compiler already refuses an undeclared literal, so this is the half
+    // it cannot state: a module reporting under a site whose NAME does not
+    // match it — `reportStorageFailure("tombstones.setItem", …)` called from
+    // `sync-cursors.ts` type-checks perfectly and points every crash report at
+    // the wrong file.
+    const declared = new Set<string>(STORAGE_FAILURE_SITES);
+    const anyCall = /reportStorageFailure\(\s*"([^"]+)"/g;
+    const problems: string[] = [];
+    for (const relative of sourceFiles()) {
+      const source = readSource(relative);
+      for (let m = anyCall.exec(source); m !== null; m = anyCall.exec(source)) {
+        const site = m[1];
+        if (!declared.has(site)) problems.push(`${relative} passes an undeclared site: ${site}`);
+        else if (moduleOf(site) !== relative) {
+          problems.push(`${relative} reports as "${site}", which names ${moduleOf(site)}`);
+        }
+      }
+    }
+    assert.deepEqual(problems, []);
+  });
+
+  it("stays a leaf below storage-keys, which is why migrateStorageKey does NOT report", () => {
+    // `storage-keys.ts` owns `storageKeyLabel`, which this module calls. Making
+    // `migrateStorageKey` report would close the cycle, and a helper that
+    // cannot be imported by the module defining its own input is worth more
+    // than one report from a best-effort key rename. The migration's failure is
+    // also the mild kind: the old key stays put and the next boot retries.
+    const helper = readRepoFile("lib", "report-storage-failure.ts");
+    assert.match(helper, /from "@\/lib\/storage-keys"/);
+    assert.doesNotMatch(
+      readRepoFile("lib", "storage-keys.ts"),
+      /report-storage-failure/,
+      "storage-keys.ts must not import the helper that imports it",
+    );
   });
 
   /**
@@ -337,18 +405,4 @@ describe("the swallowing storage sites route through the shared budget", () => {
     });
   });
 
-  it("stays a leaf below storage-keys, which is why migrateStorageKey does NOT report", () => {
-    // `storage-keys.ts` owns `storageKeyLabel`, which this module calls. Making
-    // `migrateStorageKey` report would close the cycle, and a helper that
-    // cannot be imported by the module defining its own input is worth more
-    // than one report from a best-effort key rename. The migration's failure is
-    // also the mild kind: the old key stays put and the next boot retries.
-    const helper = readRepoFile("lib", "report-storage-failure.ts");
-    assert.match(helper, /from "@\/lib\/storage-keys"/);
-    assert.doesNotMatch(
-      readRepoFile("lib", "storage-keys.ts"),
-      /report-storage-failure/,
-      "storage-keys.ts must not import the helper that imports it",
-    );
-  });
 });

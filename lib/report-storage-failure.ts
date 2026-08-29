@@ -2,6 +2,45 @@ import { captureException } from "@/lib/sentry";
 import { storageKeyLabel } from "@/lib/storage-keys";
 
 /**
+ * Every site that may report, as `<module basename>.<AsyncStorage method>`.
+ *
+ * A `string` scope was a convention held by twelve call sites and checkable
+ * from nowhere: `tombstone.setItem` for `tombstones.setItem` buys a second
+ * budget entry and a Sentry scope nobody groups on, with nothing anywhere
+ * going red. The adoption cases that would have caught it asserted each
+ * module's spelling against a list written by the same hand in the same hour,
+ * which is a copy of the typo rather than a check on it.
+ *
+ * THE LIST IS THE SOURCE AND THE TYPE IS DERIVED, not the other way round. A
+ * union written by hand would be checkable by the compiler and invisible to
+ * the suite, and what the suite needs to ask is the half a type cannot answer:
+ * that every entry here is actually PASSED by somebody. An entry nobody passes
+ * is a site that stopped reporting, which is a hole standing open with nothing
+ * about it looking stale.
+ *
+ * The NAME is a convention with a consequence, so it is enforced rather than
+ * described: the half before the dot is the basename of the module that passes
+ * it, under `lib/`. That is what lets a reader go from a Sentry scope to the
+ * write in one step, and what lets the suite check the mapping without a
+ * second table naming the same ten things.
+ */
+export const STORAGE_FAILURE_SITES = [
+  "use-persisted-blob.setItem",
+  "tombstones.getItem",
+  "tombstones.setItem",
+  "sync-cursors.getItem",
+  "sync-cursors.setItem",
+  "chat-context.setItem",
+  "premium-context.setItem",
+  "marketplace-context.setItem",
+  "social-context.setItem",
+  "diagnostics-context.setItem",
+] as const;
+
+/** One of {@link STORAGE_FAILURE_SITES}. */
+export type StorageFailureSite = (typeof STORAGE_FAILURE_SITES)[number];
+
+/**
  * One statement of "a storage read/write failed, and somebody should know".
  *
  * ## Why this is a module rather than four copies
@@ -48,7 +87,11 @@ import { storageKeyLabel } from "@/lib/storage-keys";
  * Returns whether this call reported, so a caller can assert the budget rather
  * than infer it. Nothing is required to read it.
  */
-export function reportStorageFailure(scope: string, key: string, error: unknown): boolean {
+export function reportStorageFailure(
+  scope: StorageFailureSite,
+  key: string,
+  error: unknown,
+): boolean {
   const keyspace = storageKeyLabel(key);
   // NUL rather than ":" — a scope or a keyspace may contain punctuation, and a
   // separator that either half can contain lets two different pairs collide on
