@@ -1,3 +1,4 @@
+import { readStoredObject, type StoredBlob } from "@/lib/stored-blob";
 import { ChatMessage } from "@/lib/types";
 import { byCreatedAtAscThenId, compareIsoDesc, tieBreakById } from "@/lib/sort-helpers";
 
@@ -34,24 +35,31 @@ export const EMPTY_CHAT_STORE: ChatStore = {
  *
  * `JSON.parse` on a corrupt cache used to reject out of a `void hydrate(...)`
  * whose `try`/`finally` catches nothing, so a truncated write became an
- * UNHANDLED REJECTION rather than a fresh start. The recovery is bounded: the
- * cloud refresh re-fills every thread, which is why this answers the empty
- * store instead of reporting.
+ * UNHANDLED REJECTION rather than a fresh start.
+ *
+ * The empty store is what the provider PUTS ON SCREEN for a blob it could not
+ * read; whether it may then write that back is a separate question, and the
+ * answer is no — see {@link chatStoreFrom} and `lib/stored-blob.ts`.
  */
 export function parseChatStore(raw: string | null): ChatStore {
-  if (!raw) return EMPTY_CHAT_STORE;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return EMPTY_CHAT_STORE;
-  }
-  if (!parsed || typeof parsed !== "object") return EMPTY_CHAT_STORE;
-  const store = parsed as Partial<ChatStore>;
+  return chatStoreFrom(readStoredObject<Partial<ChatStore>>(raw));
+}
+
+/**
+ * The same, from an already-classified blob — the form the provider uses,
+ * because it needs the classification for the persist gate as well as the
+ * rows.
+ *
+ * Every missing half becomes an empty map rather than a throw. The three are
+ * filled independently so a blob written by an older version, with two of the
+ * three keys, keeps what it has.
+ */
+export function chatStoreFrom(blob: StoredBlob<Partial<ChatStore>>): ChatStore {
+  if (blob.status !== "stored") return EMPTY_CHAT_STORE;
   return {
-    messagesByChat: store.messagesByChat ?? {},
-    lastReadByChat: store.lastReadByChat ?? {},
-    pendingByChatId: store.pendingByChatId ?? {},
+    messagesByChat: blob.value.messagesByChat ?? {},
+    lastReadByChat: blob.value.lastReadByChat ?? {},
+    pendingByChatId: blob.value.pendingByChatId ?? {},
   };
 }
 

@@ -131,8 +131,13 @@ describe("the hydrate chains that used to end at a finally", () => {
   });
 
   it("ChatProvider reads and parses in two arms, so one cannot hide the other", () => {
+    // The read is classified rather than reduced to a raw string, because the
+    // classification is also what gates the persist — `pendingByChatId` holds
+    // messages sent OFFLINE, so an unreadable store written back as the empty
+    // store loses them. See `hydration-gate-sweep.test.ts`.
     const source = readRepoFile("lib/chat-context.tsx");
     assert.match(source, /reportStorageFailure\("chat-context\.getItem", key, error\)/);
-    assert.match(source, /setStore\(parseChatStore\(raw\)\)/);
+    assert.match(source, /setStore\(chatStoreFrom\(stored\)\)/);
+    assert.match(source, /setHydrationSafeToPersist\(mayPersistHydration\(\[stored\]\)\)/);
   });
 });

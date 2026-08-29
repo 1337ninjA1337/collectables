@@ -10,10 +10,16 @@ import {
   buildChatId,
   buildChatPreviews,
   canChatWith,
-  parseChatStore,
+  chatStoreFrom,
   totalUnread,
 } from "@/lib/chat-helpers";
 import { reportStorageFailure } from "@/lib/report-storage-failure";
+import {
+  mayPersistHydration,
+  readStoredObject,
+  UNREADABLE_BLOB,
+  type StoredBlob,
+} from "@/lib/stored-blob";
 import { captureException } from "@/lib/sentry";
 import { useSocial } from "@/lib/social-context";
 import {
@@ -61,6 +67,8 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   const { friends } = useSocial();
   const [store, setStore] = useState<ChatStore>(EMPTY_CHAT_STORE);
   const [ready, setReady] = useState(false);
+  /** Whether the last hydrate understood the store. See `lib/stored-blob.ts`. */
+  const [hydrationSafeToPersist, setHydrationSafeToPersist] = useState(false);
   const [realtimeOnline, setRealtimeOnline] = useState(false);
   const pendingRef = useRef<Record<string, ChatMessage[]>>({});
 
@@ -70,6 +78,9 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
     if (!storageKey) {
       setStore(EMPTY_CHAT_STORE);
       setReady(false);
+      // Signed out is not "hydrated and safe": the next sign-in must earn it,
+      // or this empty store would be written over the incoming account's.
+      setHydrationSafeToPersist(false);
       return;
     }
 
@@ -81,18 +92,21 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       // rejection with no handler anywhere on the way out. An unhandled
       // rejection on every mount of a device whose store is broken.
       try {
-        let raw: string | null = null;
+        let stored: StoredBlob<ChatStore> = UNREADABLE_BLOB;
         try {
-          raw = await AsyncStorage.getItem(key);
+          stored = readStoredObject<ChatStore>(await AsyncStorage.getItem(key));
         } catch (error: unknown) {
-          // An unreadable store is an EMPTY cache here rather than a corrupted
-          // one: nothing merges into what this read returns, and the cloud
-          // refresh re-fills every thread. Reported because it is the same
-          // broken store the persist effect below cannot write to either.
           reportStorageFailure("chat-context.getItem", key, error);
         }
         if (!active) return;
-        setStore(parseChatStore(raw));
+        // THE PENDING QUEUE IS NOT A CACHE. `messagesByChat` is re-fillable
+        // from the cloud, but `pendingByChatId` holds messages the user sent
+        // OFFLINE and nothing upstream has. An unreadable store used to become
+        // the empty store here, which the persist effect below then wrote over
+        // the real one the moment `ready` flipped — losing exactly the messages
+        // the queue exists to keep. See `lib/stored-blob.ts`.
+        setHydrationSafeToPersist(mayPersistHydration([stored]));
+        setStore(chatStoreFrom(stored));
       } finally {
         if (active) setReady(true);
       }
@@ -106,11 +120,11 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   }, [storageKey]);
 
   useEffect(() => {
-    if (!ready || !storageKey) return;
+    if (!ready || !hydrationSafeToPersist || !storageKey) return;
     AsyncStorage.setItem(storageKey, JSON.stringify(store)).catch((error: unknown) => {
       reportStorageFailure("chat-context.setItem", storageKey, error);
     });
-  }, [ready, storageKey, store]);
+  }, [hydrationSafeToPersist, ready, storageKey, store]);
 
   // Keep a ref in sync with the latest pending queue so flushPending can read
   // it without re-creating refreshFromCloud on every store change.
