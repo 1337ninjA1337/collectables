@@ -6,6 +6,7 @@ import {
   readDoNotTrack,
   resolveDiagnosticsEnabled,
 } from "../lib/diagnostics-context";
+import { readRepoFile } from "./helpers/repo-file";
 
 type MutableGlobal = {
   navigator?: { doNotTrack?: string | null; msDoNotTrack?: string | null };
@@ -116,5 +117,54 @@ describe("Analytics #18 — resolveDiagnosticsEnabled", () => {
   it("no stored choice + DNT off → opt-in", () => {
     assert.equal(resolveDiagnosticsEnabled(null, false), true);
     assert.equal(resolveDiagnosticsEnabled("garbage", false), true);
+  });
+});
+
+describe("an unreadable store lands on the same branch as an empty one", () => {
+  const SOURCE = readRepoFile("lib/diagnostics-context.tsx");
+
+  /**
+   * The provider's hydrate `.catch` had no fallback at all, so a device whose
+   * store could not be read kept this component's `useState(true)` — the
+   * toggle read "on" for a user whose browser says DO NOT TRACK, while the
+   * SDKs stayed off because that arm never started them. The screen and the
+   * behaviour disagreed, in the direction that looks like the preference was
+   * ignored.
+   *
+   * Structural, because mounting the provider would start the real SDK
+   * initialisers. What is asserted by CALLING is the rule the arm now uses:
+   * `resolveDiagnosticsEnabled(null, dnt)` is what an unknown stored choice
+   * means, and it is the same answer a device with nothing stored gets.
+   */
+  it("resolves an unknown stored choice exactly as it resolves no stored choice", () => {
+    assert.equal(resolveDiagnosticsEnabled(null, true), false);
+    assert.equal(resolveDiagnosticsEnabled(null, false), true);
+  });
+
+  it("the catch arm consults Do-Not-Track rather than the useState default", () => {
+    const catchArm = SOURCE.slice(SOURCE.indexOf(".catch((error: unknown) => {"));
+    assert.match(
+      catchArm.slice(0, 1400),
+      /resolveDiagnosticsEnabled\(null, readDoNotTrack\(\)\)/,
+      "an unreadable store must fall back to the same rule an empty one does",
+    );
+  });
+
+  it("the catch arm still starts no SDK, whatever it resolves", () => {
+    // `next` decides what the TOGGLE says and what a later flip will do. An
+    // unknown consent state must not produce telemetry nobody agreed to, so
+    // the initialisers stay out of this arm even when it resolves to opt-in;
+    // the next launch that can read the store starts them.
+    const catchArm = SOURCE.slice(SOURCE.indexOf(".catch((error: unknown) => {"));
+    assert.doesNotMatch(
+      catchArm.slice(0, 1400),
+      /\b(?:initSentry|initAnalytics|initClarity)\(/,
+      "a failed read must not start collection",
+    );
+  });
+
+  it("still reports, because nothing else would mention an unreadable preference", () => {
+    const catchArm = SOURCE.slice(SOURCE.indexOf(".catch((error: unknown) => {"));
+    assert.match(catchArm.slice(0, 1400), /reportStorageFailure\("diagnostics-context\.getItem"/);
   });
 });

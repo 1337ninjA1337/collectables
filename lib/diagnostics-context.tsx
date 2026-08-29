@@ -109,15 +109,31 @@ export function DiagnosticsProvider({ children }: React.PropsWithChildren) {
         setReady(true);
       })
       .catch((error: unknown) => {
-        // The SDKs stay OFF, which is the safe direction and the reason this
-        // arm does not fall back to the default: a stored opt-out that cannot
-        // be read must not become an opt-in. Reported because the toggle then
-        // shows "on" while nothing is initialised, and a privacy preference the
-        // device cannot read is one nobody else would ever hear about.
-        if (!cancelled) {
-          reportStorageFailure("diagnostics-context.getItem", DIAGNOSTICS_KEY, error);
-          setReady(true);
-        }
+        if (cancelled) return;
+        reportStorageFailure("diagnostics-context.getItem", DIAGNOSTICS_KEY, error);
+        // FALL BACK TO DO-NOT-TRACK, not to this component's `useState(true)`.
+        // The stored choice is unknown, which is the same position a device
+        // with nothing stored is in — and there the answer is already written:
+        // honour DNT, otherwise opt in. Leaving the default in place instead
+        // meant the toggle read "on" for a user whose browser says do not
+        // track, while the SDKs stayed off because this arm never started
+        // them: the screen and the behaviour disagreed, in the direction that
+        // looks like the preference was ignored.
+        //
+        // `null` for the stored value rather than a re-read: there is nothing
+        // to re-read, and `resolveDiagnosticsEnabled` already means "no stored
+        // choice" by it.
+        const next = resolveDiagnosticsEnabled(null, readDoNotTrack());
+        setEnabled(next);
+        setSentryOptOut(!next);
+        setAnalyticsOptOut(!next);
+        setClarityOptOut(!next);
+        // The SDKs stay OFF either way. An unreadable store is not a reason to
+        // start collecting: `next` decides what the TOGGLE says and what a
+        // later flip will do, and the one thing an unknown consent state must
+        // not produce is telemetry nobody agreed to. The next launch that can
+        // read the store starts them.
+        setReady(true);
       });
     return () => {
       cancelled = true;
