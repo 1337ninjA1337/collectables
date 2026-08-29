@@ -23,6 +23,13 @@ import {
 import { subscribeToFriendRequests } from "@/lib/supabase-realtime-sync";
 import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { captureException } from "@/lib/sentry";
+import {
+  blobObject,
+  mayPersistHydration,
+  readStoredObject,
+  UNREADABLE_BLOB,
+  type StoredBlob,
+} from "@/lib/stored-blob";
 import { SOCIAL_GRAPH_KEY, pendingSocialKey, socialCacheKey } from "@/lib/storage-keys";
 import {
   applyDeliveredSocial,
@@ -160,25 +167,27 @@ function hasRequest(friendRequests: FriendRequest[], fromUserId: string, toUserI
 }
 
 /**
- * One cached social blob, or null when the store could not be read.
+ * One cached social blob, classified — never a throw.
  *
  * Three reads land in one `Promise.all` beside a network call, so a bare
- * `AsyncStorage.getItem` there rejects the whole batch — and since `hydrate` is
- * `void`-called under a `try`/`finally`, that rejection had nowhere to go. Each
+ * `AsyncStorage.getItem` there rejects the whole batch, and since `hydrate` is
+ * `void`-called under a `try`/`finally` that rejection had nowhere to go. Each
  * read answering for itself keeps a broken store from taking the fetch down
  * with it, and vice versa.
  *
- * Null lands on the same branch as "nothing stored", which is right HERE and is
- * the collapse `getTombstones` refuses: none of the three callers merges into
- * what it read and writes the union back — the persist effects serialise from
- * React state, which the seeds re-fill.
+ * IT MUST NOT ANSWER "NOTHING STORED". An earlier version of this helper
+ * returned null for both, on the reasoning that nothing here merges into what
+ * it read — which was wrong: `setFollowing([])` on a failed read is followed,
+ * one effect down, by a persist that writes that `[]` over the real follow
+ * list. Same shape as the seed-data overwrite in `collections-context`, one
+ * blob smaller. `lib/stored-blob.ts` states the distinction once.
  */
-async function readSocialCache(key: string): Promise<string | null> {
+async function readSocialBlob<T extends object>(key: string): Promise<StoredBlob<T>> {
   try {
-    return await AsyncStorage.getItem(key);
+    return readStoredObject<T>(await AsyncStorage.getItem(key));
   } catch (error: unknown) {
     reportStorageFailure("social-context.getItem", key, error);
-    return null;
+    return UNREADABLE_BLOB;
   }
 }
 
@@ -214,6 +223,14 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [deletedProfileIds, setDeletedProfileIds] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
+  /**
+   * Whether the last hydrate understood every local blob it read.
+   *
+   * SEPARATE FROM `ready`, which is the UI's question — see
+   * `lib/stored-blob.ts`. Starts false, so the three persist effects below
+   * write nothing until a hydrate has said they may.
+   */
+  const [hydrationSafeToPersist, setHydrationSafeToPersist] = useState(false);
   const [remoteProfiles, setRemoteProfiles] = useState<UserProfile[]>([]);
   // Cache of profiles fetched on demand (e.g. non-friend collection viewers,
   // chat counterparts). Lives at the provider level so every screen shares one
@@ -282,6 +299,10 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       setPendingSocial((prev) => (hasPendingSocial(prev) ? {} : prev));
       inFlightProfileIdsRef.current.clear();
       setReady(false);
+      // Signed out is not "hydrated and safe": the next sign-in must earn the
+      // flag again, or the cleared state above would be persisted over whatever
+      // the incoming account has on disk.
+      setHydrationSafeToPersist(false);
       return;
     }
 
@@ -297,10 +318,10 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       // for itself, and the outer arm catches what is left (a corrupt cached
       // blob, whose `JSON.parse` threw into the same nothing).
       try {
-        const [rawPersonal, rawGraph, rawPendingSocial, remoteRequests] = await Promise.all([
-          readSocialCache(socialCacheKey(activeUser.id)),
-          readSocialCache(SOCIAL_GRAPH_KEY),
-          readSocialCache(pendingSocialKey(activeUser.id)),
+        const [storedPersonal, storedGraph, storedPendingSocial, remoteRequests] = await Promise.all([
+          readSocialBlob<SocialStore>(socialCacheKey(activeUser.id)),
+          readSocialBlob<SocialGraphStore>(SOCIAL_GRAPH_KEY),
+          readSocialBlob<PendingSocialQueue>(pendingSocialKey(activeUser.id)),
           // NULL RATHER THAN `[]`. A failed fetch is not "this user has no
           // friend requests" — writing `[]` on an offline mount would clear the
           // inbox badge and hide requests that are still pending upstream.
@@ -311,27 +332,19 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
           return;
         }
 
-        if (rawPendingSocial) {
-          setPendingSocial(JSON.parse(rawPendingSocial) as PendingSocialQueue);
-        } else {
-          setPendingSocial({});
-        }
+        // The three local blobs decide whether anything may be written back:
+        // `ready` says the UI may render, this says the store was understood.
+        setHydrationSafeToPersist(
+          mayPersistHydration([storedPersonal, storedGraph, storedPendingSocial]),
+        );
 
-        if (rawPersonal) {
-          const parsed = JSON.parse(rawPersonal) as SocialStore;
-          setFollowing(parsed.following ?? []);
-          setMyProfileOverride(parsed.myProfile ? normalizeProfile(parsed.myProfile) : null);
-        } else {
-          setFollowing([]);
-          setMyProfileOverride(null);
-        }
+        setPendingSocial(blobObject(storedPendingSocial, {}));
 
-        if (rawGraph) {
-          const parsedGraph = JSON.parse(rawGraph) as SocialGraphStore;
-          setDeletedProfileIds(parsedGraph.deletedProfileIds ?? []);
-        } else {
-          setDeletedProfileIds([]);
-        }
+        const personal = blobObject(storedPersonal, {} as SocialStore);
+        setFollowing(personal.following ?? []);
+        setMyProfileOverride(personal.myProfile ? normalizeProfile(personal.myProfile) : null);
+
+        setDeletedProfileIds(blobObject(storedGraph, {} as SocialGraphStore).deletedProfileIds ?? []);
 
         // Friend requests come from Supabase, and stay as they were when the
         // fetch could not answer.
@@ -348,6 +361,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         // before the throw stays; the rest keeps its default. NOT a storage
         // failure — the store answered — so it goes to Sentry as itself rather
         // than through the once-per-keyspace budget.
+        if (active) setHydrationSafeToPersist(false);
         captureException(error, { scope: "social-context.hydrate" });
       } finally {
         if (active) {
@@ -438,7 +452,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   }, [profiles, user]);
 
   useEffect(() => {
-    if (!user || !ready) {
+    if (!user || !ready || !hydrationSafeToPersist) {
       return;
     }
 
@@ -452,10 +466,10 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     ).catch((error: unknown) => {
       reportStorageFailure("social-context.setItem", key, error);
     });
-  }, [following, myProfileOverride, ready, user]);
+  }, [following, hydrationSafeToPersist, myProfileOverride, ready, user]);
 
   useEffect(() => {
-    if (!ready) {
+    if (!ready || !hydrationSafeToPersist) {
       return;
     }
 
@@ -468,17 +482,17 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     ).catch((error: unknown) => {
       reportStorageFailure("social-context.setItem", SOCIAL_GRAPH_KEY, error);
     });
-  }, [deletedProfileIds, friendRequests, ready]);
+  }, [deletedProfileIds, friendRequests, hydrationSafeToPersist, ready]);
 
   // BE-13d: persist the pending social-mutation queue so parked offline writes
   // survive a reload and re-deliver on the next session.
   useEffect(() => {
-    if (!user || !ready) return;
+    if (!user || !ready || !hydrationSafeToPersist) return;
     const key = pendingSocialKey(user.id);
     AsyncStorage.setItem(key, JSON.stringify(pendingSocial)).catch((error: unknown) => {
       reportStorageFailure("social-context.setItem", key, error);
     });
-  }, [pendingSocial, ready, user]);
+  }, [hydrationSafeToPersist, pendingSocial, ready, user]);
 
   // Sync own profile to Supabase only when myProfileOverride changes. Routed
   // through the BE-13d queue so a failed upsert (offline) is retried on reconnect.

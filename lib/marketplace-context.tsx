@@ -79,6 +79,8 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [ready, setReady] = useState(false);
+  /** Whether the last hydrate read the cache. See `lib/stored-blob.ts`. */
+  const [hydrationSafeToPersist, setHydrationSafeToPersist] = useState(false);
   const [claimingListingId, setClaimingListingId] = useState<string | null>(null);
   const [sellerNotifications, setSellerNotifications] = useState<string[]>([]);
   // Keep `user.id` accessible inside the realtime callback without
@@ -94,10 +96,15 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
     let cancelled = false;
     (async () => {
       try {
-        // Try cloud first; fall back to local cache.
-        const cloud = await cloudFetchListings();
+        // Try cloud first; fall back to local cache. NULL RATHER THAN A THROW —
+        // an offline launch used to jump straight to the `catch` below, skipping
+        // the local-cache read this comment promises, and then persisting the
+        // empty list over the cache. The fallback only exists if the fetch is
+        // allowed to fail.
+        const cloud = await cloudFetchListings().catch(() => null);
         if (!cancelled) {
-          if (cloud.length > 0) {
+          if (cloud && cloud.length > 0) {
+            setHydrationSafeToPersist(true);
             setListings(cloud.map(normalizeListing));
             await AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(cloud)).catch(
               (error: unknown) => {
@@ -107,7 +114,25 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
             return;
           }
         }
-        const raw = await AsyncStorage.getItem(MARKETPLACE_KEY);
+        let raw: string | null = null;
+        try {
+          raw = await AsyncStorage.getItem(MARKETPLACE_KEY);
+          // The read answered, so the cache may be rewritten — unparseable
+          // content included, since these listings are a cache of rows the
+          // cloud owns and replacing a corrupt one is a repair. The WEAKER of
+          // the two gates; `lib/stored-blob.ts` says why this blob takes it and
+          // the collections one does not.
+          if (!cancelled) setHydrationSafeToPersist(true);
+        } catch (error: unknown) {
+          // An unreadable store, which is NOT an empty marketplace: leaving the
+          // list empty and letting the persist effect write it back is how a
+          // transient read failure emptied the cache the fallback exists for.
+          if (!cancelled) {
+            setHydrationSafeToPersist(false);
+            reportStorageFailure("marketplace-context.getItem", MARKETPLACE_KEY, error);
+          }
+          return;
+        }
         if (cancelled) return;
         if (raw) {
           // Drop malformed entries (missing `id` / `mode` / etc.) so a
@@ -115,7 +140,8 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
           setListings(coerceListings(JSON.parse(raw)));
         }
       } catch {
-        // Corrupt cache: start fresh rather than crashing the provider.
+        // Corrupt cache: start fresh rather than crashing the provider. Safe to
+        // rewrite, for the reason above — the cloud owns these rows.
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -126,11 +152,11 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !hydrationSafeToPersist) return;
     AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(listings)).catch((error: unknown) => {
       reportStorageFailure("marketplace-context.setItem", MARKETPLACE_KEY, error);
     });
-  }, [ready, listings]);
+  }, [hydrationSafeToPersist, ready, listings]);
 
   useEffect(() => {
     const sub = subscribeToListings((incoming) => {

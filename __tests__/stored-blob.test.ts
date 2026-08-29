@@ -2,11 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  blobRecord,
+  blobObject,
   blobRows,
   mayPersistHydration,
   readStoredArray,
-  readStoredRecord,
+  readStoredObject,
   UNREADABLE_BLOB,
 } from "@/lib/stored-blob";
 
@@ -69,9 +69,9 @@ describe("readStoredArray", () => {
   });
 });
 
-describe("readStoredRecord", () => {
+describe("readStoredObject", () => {
   it("reads a stored keyed queue", () => {
-    assert.deepEqual(readStoredRecord<number[]>('{"a":[1]}'), {
+    assert.deepEqual(readStoredObject<Record<string, number[]>>('{"a":[1]}'), {
       status: "stored",
       value: { a: [1] },
     });
@@ -81,13 +81,13 @@ describe("readStoredRecord", () => {
     // Both are the shape a different version of this app wrote, so both are
     // unusable rather than empty. `typeof null === "object"` is the one that
     // would otherwise pass through as a queue and crash the first read of it.
-    assert.deepEqual(readStoredRecord("[]"), { status: "unusable" });
-    assert.deepEqual(readStoredRecord("null"), { status: "unusable" });
+    assert.deepEqual(readStoredObject("[]"), { status: "unusable" });
+    assert.deepEqual(readStoredObject("null"), { status: "unusable" });
   });
 
   it("agrees with the array reader about empty and unparseable", () => {
-    assert.deepEqual(readStoredRecord(""), { status: "empty" });
-    assert.deepEqual(readStoredRecord("{not json"), { status: "unusable" });
+    assert.deepEqual(readStoredObject(""), { status: "empty" });
+    assert.deepEqual(readStoredObject("{not json"), { status: "unusable" });
   });
 });
 
@@ -114,12 +114,22 @@ describe("blobRows", () => {
   });
 });
 
-describe("blobRecord", () => {
-  it("hands back the stored queue, and an empty one for everything else", () => {
-    assert.deepEqual(blobRecord({ status: "stored", value: { a: [1] } }), { a: [1] });
-    assert.deepEqual(blobRecord({ status: "empty" }), {});
-    assert.deepEqual(blobRecord(UNREADABLE_BLOB), {});
-    assert.deepEqual(blobRecord({ status: "unusable" }), {});
+describe("blobObject", () => {
+  it("hands back the stored object, and `whenEmpty` for everything else", () => {
+    assert.deepEqual(blobObject({ status: "stored", value: { a: [1] } }, {}), { a: [1] });
+    assert.deepEqual(blobObject({ status: "empty" }, {}), {});
+    assert.deepEqual(blobObject(UNREADABLE_BLOB, {}), {});
+    assert.deepEqual(blobObject({ status: "unusable" }, {}), {});
+  });
+
+  it("does not treat a fresh account and an unreadable store alike when they differ", () => {
+    // `blobRows` copies its seed and answers [] for the two failures;
+    // `blobObject` has ONE fallback for all three because no caller here has a
+    // non-empty default. The day one does, this is the case that will be wrong,
+    // which is why the asymmetry is written down rather than assumed.
+    const fresh = { following: ["a"] };
+    assert.deepEqual(blobObject({ status: "empty" }, fresh), fresh);
+    assert.deepEqual(blobObject(UNREADABLE_BLOB, fresh), fresh);
   });
 });
 
@@ -146,6 +156,11 @@ describe("mayPersistHydration", () => {
   });
 
   it("refuses on an unusable blob too, because that one is still on disk", () => {
+    // The strict half, and the one the two CACHE providers deliberately do not
+    // take: `premium-context` and `marketplace-context` gate on the read alone,
+    // because a corrupt blob of cloud-owned rows has no future but to be
+    // replaced and this rule would refuse to replace it forever. See the note
+    // in `lib/stored-blob.ts`.
     assert.equal(mayPersistHydration([{ status: "unusable" }]), false);
   });
 
@@ -184,5 +199,68 @@ describe("the provider's hydrate adopts the rule", () => {
     // incoming account has on disk, which is the same bug with a different
     // trigger.
     assert.match(SOURCE, /setReady\(false\);[\s\S]{0,400}?setHydrationSafeToPersist\(false\);/);
+  });
+});
+
+describe("the three cache providers gate their persists too", () => {
+  // Same shape, four blobs smaller each: a `catch` that installs a default, a
+  // `finally` that flips `ready`, and a persist effect that follows `ready`.
+  // Found by asking the collections question of every other provider.
+
+  it("PremiumProvider no longer downgrades a payer from a failed READ", () => {
+    const source = readRepoFile("lib/premium-context.tsx");
+    assert.match(
+      source,
+      /if \(!ready \|\| !hydrationSafeToPersist \|\| !storageKey\) return;/,
+      "the persist effect must not run after a hydrate that could not read",
+    );
+    assert.match(source, /reportStorageFailure\("premium-context\.getItem"/);
+    // The catch arm sets the flag and reports, and does NOT touch `state`.
+    // Matched as a statement rather than by scanning a window, because the
+    // comment in that arm names the call it removed.
+    assert.match(
+      source,
+      /catch \(error: unknown\) \{[\s\S]{0,900}?setHydrationSafeToPersist\(false\);\s*\n\s*reportStorageFailure\("premium-context\.getItem"/,
+    );
+    assert.equal(
+      source.match(/^\s*setState\(DEFAULT_PREMIUM_STATE\);$/gm)?.length,
+      1,
+      "the only remaining default-write is the signed-out branch, not the failed read",
+    );
+  });
+
+  it("MarketplaceProvider actually falls back to the cache its comment promises", () => {
+    // `await cloudFetchListings()` throwing jumped straight past the local read
+    // to the catch, leaving an empty list that the persist effect then wrote
+    // over the cache. An offline launch emptied the very cache it was for.
+    const source = readRepoFile("lib/marketplace-context.tsx");
+    assert.match(source, /cloudFetchListings\(\)\.catch\(\(\) => null\)/);
+    assert.match(source, /if \(!ready \|\| !hydrationSafeToPersist\) return;/);
+    assert.match(source, /reportStorageFailure\("marketplace-context\.getItem"/);
+  });
+
+  it("DiagnosticsProvider reports an unreadable opt-out and keeps the SDKs off", () => {
+    // No persist effect here — the write is user-initiated — so the risk is the
+    // other way round: a stored opt-out that cannot be read must not become an
+    // opt-in, and nothing else would ever mention that it happened.
+    const source = readRepoFile("lib/diagnostics-context.tsx");
+    assert.match(source, /reportStorageFailure\("diagnostics-context\.getItem"/);
+    const catchArm = source.slice(source.indexOf(".catch((error: unknown) => {"));
+    assert.doesNotMatch(
+      catchArm.slice(0, 600),
+      /initSentry|initAnalytics|initClarity/,
+      "a failed read must not start the SDKs the stored choice may have refused",
+    );
+  });
+
+  it("SocialProvider gates all three of its persist effects", () => {
+    // Named guards rather than a count of the identifier: a count moves when
+    // anybody adds a dependency-array entry, and would then be "fixed" by
+    // editing the number rather than by looking at what changed.
+    const source = readRepoFile("lib/social-context.tsx");
+    const guards = source.match(/if \((?:!user \|\| )?!ready \|\| !hydrationSafeToPersist\)/g);
+    assert.equal(guards?.length, 3, "the social cache, the graph and the pending queue");
+    assert.match(source, /setHydrationSafeToPersist\(\s*mayPersistHydration\(/, "set by the hydrate");
+    assert.match(source, /setReady\(false\);[\s\S]{0,400}?setHydrationSafeToPersist\(false\);/, "cleared on sign-out");
   });
 });

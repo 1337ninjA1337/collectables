@@ -85,11 +85,11 @@ import { normalizeOwnItemIds } from "@/lib/item-id";
 import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { captureException } from "@/lib/sentry";
 import {
-  blobRecord,
+  blobObject,
   blobRows,
   mayPersistHydration,
   readStoredArray,
-  readStoredRecord,
+  readStoredObject,
   UNREADABLE_BLOB,
   type StoredBlob,
 } from "@/lib/stored-blob";
@@ -266,9 +266,9 @@ async function readArrayBlob<T>(key: string): Promise<StoredBlob<T[]>> {
 }
 
 /** The same for the two offline queues, which are records rather than arrays. */
-async function readRecordBlob<V>(key: string): Promise<StoredBlob<Record<string, V>>> {
+async function readRecordBlob<T>(key: string): Promise<StoredBlob<PendingUpsertQueue<T>>> {
   try {
-    return readStoredRecord<V>(await AsyncStorage.getItem(key));
+    return readStoredObject<PendingUpsertQueue<T>>(await AsyncStorage.getItem(key));
   } catch (error: unknown) {
     reportStorageFailure("collections-context.getItem", key, error);
     return UNREADABLE_BLOB;
@@ -601,8 +601,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           readArrayBlob<Collection>(collectionsKey(activeUser.id)),
           readArrayBlob<CollectableItem>(itemsKey(activeUser.id)),
           readArrayBlob<string>(followedCollectionsKey(activeUser.id)),
-          readRecordBlob<Collection[]>(pendingCollectionsKey(activeUser.id)),
-          readRecordBlob<CollectableItem[]>(pendingItemsKey(activeUser.id)),
+          readRecordBlob<Collection>(pendingCollectionsKey(activeUser.id)),
+          readRecordBlob<CollectableItem>(pendingItemsKey(activeUser.id)),
           // Null rather than a throw: a network failure says nothing about the
           // local blobs, and taking the whole hydrate down with it is what made
           // an offline launch destructive.
@@ -628,8 +628,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
 
         // Rehydrate any offline writes parked before the last reload so the
         // flush effect can re-deliver them once the network is back (BE-13c).
-        setPendingCollections(blobRecord(storedPendingCollections));
-        setPendingItems(blobRecord(storedPendingItems));
+        setPendingCollections(blobObject(storedPendingCollections, {}));
+        setPendingItems(blobObject(storedPendingItems, {}));
 
         const parsedCollections = blobRows(storedCollections, seedCollections);
         let visibleCollections = parsedCollections.filter(

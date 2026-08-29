@@ -77,19 +77,26 @@ export function readStoredArray<T>(raw: string | null | undefined): StoredBlob<T
 }
 
 /**
- * The same for a keyed store — the two offline queues, which are records rather
- * than arrays and would otherwise be UNUSABLE on every launch that has one.
+ * The same for a stored OBJECT — the offline queues, and the two social blobs,
+ * which are records and shaped objects rather than arrays and would otherwise
+ * be UNUSABLE on every launch that has one.
  *
- * `null` is an object to `typeof` and is not a queue, so it is refused
- * explicitly; an array is refused too, because a queue that arrived as one is a
- * blob written by a different version of this app.
+ * `null` is an object to `typeof` and is not one of these, so it is refused
+ * explicitly; an array is refused too, because a blob that arrived as one was
+ * written by a different version of this app.
+ *
+ * The cast is the caller's shape, unchecked — every caller was already casting
+ * a `JSON.parse` result, and narrowing each blob's fields is a per-blob job
+ * (`coerceListings` and `parsePremiumState` do it) rather than this module's.
+ * What this decides is the one thing all of them share: whether there is
+ * anything here at all, and whether it is safe to write over.
  */
-export function readStoredRecord<V>(raw: string | null | undefined): StoredBlob<Record<string, V>> {
+export function readStoredObject<T extends object>(raw: string | null | undefined): StoredBlob<T> {
   const blob = parseStored(raw);
   if (blob.status !== "stored") return blob;
   const value = blob.value;
   if (!value || typeof value !== "object" || Array.isArray(value)) return { status: "unusable" };
-  return { status: "stored", value: value as Record<string, V> };
+  return { status: "stored", value: value as T };
 }
 
 /**
@@ -106,9 +113,9 @@ export function blobRows<T>(blob: StoredBlob<T[]>, whenEmpty: readonly T[]): T[]
   return [];
 }
 
-/** The same for a keyed store: what was stored, or an empty queue. */
-export function blobRecord<V>(blob: StoredBlob<Record<string, V>>): Record<string, V> {
-  return blob.status === "stored" ? blob.value : {};
+/** The same for an object blob: what was stored, or `whenEmpty`. */
+export function blobObject<T extends object>(blob: StoredBlob<T>, whenEmpty: T): T {
+  return blob.status === "stored" ? blob.value : whenEmpty;
 }
 
 /**
@@ -125,3 +132,24 @@ export function blobRecord<V>(blob: StoredBlob<Record<string, V>>): Record<strin
 export function mayPersistHydration(blobs: readonly StoredBlob<unknown>[]): boolean {
   return blobs.every((blob) => blob.status === "stored" || blob.status === "empty");
 }
+
+/**
+ * ## The two cache providers do NOT take this rule, and that is a decision
+ *
+ * `premium-context` and `marketplace-context` gate their persists on whether
+ * the READ worked and nothing more, because their blobs are caches of rows the
+ * cloud owns: both re-fetch from the server on the same mount, so a blob
+ * nothing can parse is a blob whose only future is to be replaced, and
+ * refusing to write over it means refusing for as long as the corruption sits
+ * on disk — which is forever.
+ *
+ * The blobs THIS rule is for are the local-first ones — collections, items, the
+ * social graph, the offline queues. Nothing upstream can rebuild them, so a
+ * blob that cannot be parsed today may still be recoverable by hand tomorrow,
+ * and the cost of being wrong is the user's data.
+ *
+ * Two call sites with different policies rather than a second exported
+ * predicate: a `mayRepairHydration` that only ever refused `unreadable` would
+ * be equivalent to the status check its callers already make, and an
+ * abstraction no caller exercises is one nobody can check.
+ */

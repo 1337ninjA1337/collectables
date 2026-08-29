@@ -108,8 +108,16 @@ export function DiagnosticsProvider({ children }: React.PropsWithChildren) {
         }
         setReady(true);
       })
-      .catch(() => {
-        if (!cancelled) setReady(true);
+      .catch((error: unknown) => {
+        // The SDKs stay OFF, which is the safe direction and the reason this
+        // arm does not fall back to the default: a stored opt-out that cannot
+        // be read must not become an opt-in. Reported because the toggle then
+        // shows "on" while nothing is initialised, and a privacy preference the
+        // device cannot read is one nobody else would ever hear about.
+        if (!cancelled) {
+          reportStorageFailure("diagnostics-context.getItem", DIAGNOSTICS_KEY, error);
+          setReady(true);
+        }
       });
     return () => {
       cancelled = true;

@@ -55,6 +55,8 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
   const { user } = useAuth();
   const [state, setState] = useState<PremiumState>(DEFAULT_PREMIUM_STATE);
   const [ready, setReady] = useState(false);
+  /** Whether the last hydrate read the cache. See `lib/stored-blob.ts`. */
+  const [hydrationSafeToPersist, setHydrationSafeToPersist] = useState(false);
 
   const storageKey = useMemo(() => premiumStorageKey(user?.id ?? null), [user]);
 
@@ -63,17 +65,33 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
     setReady(false);
     if (!storageKey) {
       setState(DEFAULT_PREMIUM_STATE);
+      setHydrationSafeToPersist(false);
       setReady(true);
       return;
     }
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(storageKey);
+        const stored = await AsyncStorage.getItem(storageKey);
         if (cancelled) return;
-        const parsed = parsePremiumState(raw);
+        // The read SUCCEEDED, so the cache may be rewritten — including when
+        // its content is unparseable, which `parsePremiumState` answers with
+        // the default and the cloud validation below repairs. This is the
+        // WEAKER of the two gates on purpose; `lib/stored-blob.ts` says why a
+        // cloud-owned cache takes it and the local-first blobs do not.
+        setHydrationSafeToPersist(true);
+        const parsed = parsePremiumState(stored);
         setState(isPremiumExpired(parsed) ? cancelPremiumState(parsed) : parsed);
-      } catch {
-        if (!cancelled) setState(DEFAULT_PREMIUM_STATE);
+      } catch (error: unknown) {
+        // WITHOUT `setState(DEFAULT_PREMIUM_STATE)`. That is what this arm used
+        // to do, and the persist effect below then wrote "free" over a PAYING
+        // user's stored entitlement — a downgrade caused by a storage read, the
+        // one thing the cloud-validation comment two lines down is careful to
+        // avoid on the network side. The state stays at its default in memory
+        // and nothing is written until a launch reads the store.
+        if (!cancelled) {
+          setHydrationSafeToPersist(false);
+          reportStorageFailure("premium-context.getItem", storageKey, error);
+        }
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -90,11 +108,11 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
   }, [storageKey]);
 
   useEffect(() => {
-    if (!ready || !storageKey) return;
+    if (!ready || !hydrationSafeToPersist || !storageKey) return;
     AsyncStorage.setItem(storageKey, JSON.stringify(state)).catch((error: unknown) => {
       reportStorageFailure("premium-context.setItem", storageKey, error);
     });
-  }, [ready, storageKey, state]);
+  }, [hydrationSafeToPersist, ready, storageKey, state]);
 
   // The intent must be recorded BEFORE the state flip so the transition hook
   // observing isPremium sees it on the very render the flip commits.

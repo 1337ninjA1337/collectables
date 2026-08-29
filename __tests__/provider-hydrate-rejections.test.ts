@@ -99,10 +99,15 @@ describe("the hydrate chains that used to end at a finally", () => {
     );
   });
 
-  it("SocialProvider reads each cached blob through a reporting helper", () => {
+  it("SocialProvider reads each cached blob through a reporting, CLASSIFYING helper", () => {
+    // `readSocialCache` answered `string | null` at first, collapsing "nothing
+    // stored" into "could not read" — and `setFollowing([])` on a failed read
+    // is persisted one effect down, over the real follow list. It classifies
+    // now, and the persist effects are gated on the classification.
     const source = readRepoFile("lib/social-context.tsx");
-    assert.match(source, /async function readSocialCache\(key: string\)/);
+    assert.match(source, /async function readSocialBlob<T extends object>\(key: string\)/);
     assert.match(source, /reportStorageFailure\("social-context\.getItem", key, error\)/);
+    assert.match(source, /setHydrationSafeToPersist\(\s*mayPersistHydration\(/);
     assert.doesNotMatch(
       source,
       /Promise\.all\(\[\s*AsyncStorage\.getItem/,
