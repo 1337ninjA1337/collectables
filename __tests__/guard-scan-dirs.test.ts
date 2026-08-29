@@ -10,7 +10,7 @@ import {
 
 import { readRepoFile } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
-import { SUITES_REL } from "./helpers/suite-files";
+import { assertExemptionsHonest, SUITES_REL } from "./helpers/suite-files";
 
 /**
  * What the five walking guards under `scripts/` actually look at.
@@ -208,18 +208,18 @@ describe("lib/source-dirs.ts is the one statement of the list", () => {
   });
 
   it("still declares the list it is skipped for declaring", () => {
-    // The honesty half of the skip above. The reason it exists — "this module
-    // IS the one copy" — is a claim about the file, and the day the list moves
-    // out of it the skip stops excusing anything while still excusing the file
-    // that would hold the next stray copy.
-    assert.ok(
-      sourceFiles().includes(DECLARING),
-      `${DECLARING} is skipped by the sweep above but is not in the walk — a skip over a file nobody reads exempts nothing and hides that it is stale`,
-    );
-    assert.match(
-      readRepoFile(DECLARING),
-      /"app",\s*"components",\s*"data",\s*"lib",\s*"scripts"/,
-      `${DECLARING} no longer spells the list, so the sweep would not report it — drop the skip rather than leaving it open`,
-    );
+    // The honesty half of the skip above, through the helper that owns the
+    // question. The reason the skip exists — "this module IS the one copy" — is
+    // a claim about the file, and the day the list moves out of it the skip
+    // stops excusing anything while still excusing the file that would hold the
+    // next stray copy.
+    assertExemptionsHonest({
+      exemptions: [DECLARING],
+      expected: ["lib/source-dirs.ts"],
+      rule: "the one-copy-of-the-list sweep",
+      walk: sourceFiles(),
+      stillNeeded: (module) =>
+        /"app",\s*"components",\s*"data",\s*"lib",\s*"scripts"/.test(readRepoFile(module)),
+    });
   });
 });

@@ -36,7 +36,7 @@ import {
 } from "./helpers/guard-fixture";
 
 import { readRepoFile, repoPath } from "./helpers/repo-file";
-
+import { assertExemptionsHonest } from "./helpers/suite-files";
 
 /**
  * The first `take` repo-relative entries of a directory, sorted — so a fixture
@@ -301,15 +301,30 @@ describe("every count-shaped guard refuses a partial scan root", () => {
  * the guard's own `SCANNED_DIRS` literal, because that is a fact about the
  * guard's SOURCE and belongs to a test.
  *
- * `check-problem-phrasing-imports` walks five roots and is in that table too;
- * it is excluded here because its fixtures would each copy a 400-file
- * `__tests__/` tree, and the property is asserted for it by the script rather
- * than by five spawns. That is a cost decision, and it is the reason this list
- * is a subset rather than the table itself.
+ * The one guard this list leaves out is {@link TOO_EXPENSIVE_TO_SPAWN}.
  */
+/**
+ * The guard whose fixtures would be too expensive to build, and the reason.
+ *
+ * `check-problem-phrasing-imports` walks five roots and is in `FLOOR_WALKS`
+ * like the rest; it is excluded here because its fixtures would each copy a
+ * 400-file `__tests__/` tree, and the property is asserted for it by
+ * `remeasure-floors` rather than by five spawns. That is a cost decision, and
+ * it is the reason this list is a subset rather than the table itself.
+ *
+ * Named rather than spelled inside the `.filter`, per
+ * `inline-exclusion.test.ts` (2026-08-29). The reason above lived in the doc
+ * block already — this hole was better explained than most — and explanation is
+ * not the property that was missing: nothing asked whether the guard is still
+ * IN the table it is being filtered out of. Drop it from `FLOOR_WALKS`, or
+ * rename it, and the filter goes on excluding nothing while reading exactly as
+ * it does now. The case beside the locks asks.
+ */
+const TOO_EXPENSIVE_TO_SPAWN = "check-problem-phrasing-imports";
+
 const SINGLE_ROOT_LOCKS: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
   floorWalks()
-    .filter((walk) => walk.checkName !== "check-problem-phrasing-imports")
+    .filter((walk) => walk.checkName !== TOO_EXPENSIVE_TO_SPAWN)
     .map((walk) => [walk.checkName, walk.roots]),
 );
 
@@ -321,6 +336,21 @@ function parseScanned(output: string): number {
 }
 
 describe("no single scan root clears a multi-root guard's floor", () => {
+  it("still leaves out a guard that is still in the table", () => {
+    // The honesty half of the one exclusion above. Its REASON has always been
+    // written down; what was missing is whether the exclusion still excludes
+    // anything, and that is the half that expires on its own — the guard
+    // dropped from `FLOOR_WALKS`, or renamed, leaves a filter that reads
+    // exactly as it does now and removes nothing.
+    assertExemptionsHonest({
+      exemptions: [TOO_EXPENSIVE_TO_SPAWN],
+      expected: ["check-problem-phrasing-imports"],
+      rule: "the single-root lock table",
+      walk: floorWalks().map((walk) => walk.checkName),
+      stillNeeded: (checkName) => !Object.hasOwn(SINGLE_ROOT_LOCKS, checkName),
+    });
+  });
+
   for (const [checkName, roots] of Object.entries(SINGLE_ROOT_LOCKS)) {
     const guard = LINT_GUARDS.find(
       (g) => checkNameOf(g.scriptPath) === checkName,

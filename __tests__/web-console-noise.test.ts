@@ -77,6 +77,22 @@ describe("Animated — no native-driver warning on web", () => {
     );
   });
 
+  it("is reading a tree that still passes the option at all", () => {
+    // The control the sweep never had, and needs more since 2026-08-29 than it
+    // did before: dropping the raw read took its match count in the whole walk
+    // to zero, so it now asserts an absence over a tree where the offending
+    // spelling is extinct. Nothing in it would notice `useNativeDriver` being
+    // renamed by a react-native major, or every animation moving to Reanimated
+    // — the sweep would go on reporting a clean tree about a property no file
+    // states any more. Four modules pass the option today; the floor is three
+    // so one of them can stop animating without a ratification.
+    const passers = SOURCE_FILES.filter((f) => sourceCode(f).includes("useNativeDriver"));
+    assert.ok(
+      passers.length >= 3,
+      `only ${passers.length} module(s) pass useNativeDriver at all — the sweep above is reading a tree that stopped using the option, so its clean report is about nothing (four at the last count): ${passers.join(", ")}`,
+    );
+  });
+
   it("the exemption this sweep used to carry was excusing a comment", () => {
     // Why there is no hole here any more, kept as an assertion rather than as a
     // sentence: `lib/animation-driver.ts` was the sweep's one exclusion, and

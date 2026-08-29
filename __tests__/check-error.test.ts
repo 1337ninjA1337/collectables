@@ -6,6 +6,7 @@ import { stripComments } from "@/lib/strip-comments";
 
 import { readRepoFile } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
+import { assertExemptionsHonest } from "./helpers/suite-files";
 
 /**
  * The line every build-time guard refuses in, and the sweep that keeps it one
@@ -21,16 +22,17 @@ import { sourceFiles } from "./helpers/source-files";
  */
 
 /**
- * The helper module, which both sweeps below have to skip and for two reasons.
+ * The helper module, which the adoption floor has to skip: it spells
+ * `checkError(` in its own signature and would otherwise count as its own first
+ * caller.
  *
- * It builds the refusal prefix by hand — that is what a helper IS — so the
- * offender sweep would name it every time; and it spells `checkError(` in its
- * own signature, so the adoption floor would count it as its own first caller.
- * Two different rules, one file, and until 2026-08-29 the path was written
- * inline in each of them: once as `if (file === "lib/check-error.ts") return
- * false;` and once as `file !== "lib/check-error.ts" &&`. One decision in two
- * spellings, neither declared, is exactly the drift `inline-exclusion.test.ts`
- * bans — tighten one sweep and the other keeps vouching for the old shape.
+ * Until 2026-08-29 the path was written inline in TWO sweeps, in two different
+ * spellings — `if (file === "lib/check-error.ts") return false;` in the offender
+ * filter and `file !== "lib/check-error.ts" &&` in the floor. One decision in
+ * two spellings, neither declared, is the drift `inline-exclusion.test.ts` bans,
+ * and it had already happened here: the first skip was stale (see the offender
+ * sweep's own note) while the second was live, and nothing could tell them
+ * apart because neither was a thing a reader could ask about.
  */
 const HELPER = "lib/check-error.ts";
 
@@ -184,19 +186,18 @@ describe("the guards that print refusals", () => {
     // The half neither inline copy could have, and the half that found the
     // stale one: both skips rested on the sentence "it is the helper", which is
     // a claim about the FILE and expires quietly when a rule around it moves.
-    // Asked here in the floor's own terms, so a skip that has stopped excusing
-    // anything is a red case rather than a line nobody reads.
+    // Through the shared helper, which is where this tree keeps the "is this
+    // hole still needed" question — a one-entry hole is as entitled to it as a
+    // list, and `expected` is the tripwire that keeps the widening visible.
+    assertExemptionsHonest({
+      exemptions: [HELPER],
+      expected: ["lib/check-error.ts"],
+      rule: "the checkError adoption floor",
+      walk: sourceFiles("lib", "scripts"),
+      stillNeeded: (module) => stripComments(readRepoFile(module)).includes("checkError("),
+    });
     assert.ok(
-      sourceFiles("lib", "scripts").includes(HELPER),
-      `${HELPER} is skipped by the adoption floor but is not in the walk — a skip over a file nobody reads exempts nothing and hides that it is stale`,
-    );
-    const code = stripComments(readRepoFile(HELPER));
-    assert.ok(
-      code.includes("checkError("),
-      `${HELPER} no longer spells checkError( , so the floor would not miscount it as its own first caller — drop the skip instead of leaving it open`,
-    );
-    assert.ok(
-      !buildsARefusalByHand(code),
+      !buildsARefusalByHand(stripComments(readRepoFile(HELPER))),
       `${HELPER} has started building a refusal line by hand — the offender sweep above no longer skips it (the skip was stale from the day the rule asked for a name), so this is now a real finding in the module that exists to prevent it`,
     );
   });

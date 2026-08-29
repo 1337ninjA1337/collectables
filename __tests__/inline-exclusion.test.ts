@@ -44,12 +44,14 @@ import { suiteCode, suiteFiles } from "./helpers/suite-files";
  * THE SECOND RULE, ADDED 2026-08-29. `!` + array literal + `.includes` is ONE
  * spelling of "drop this from the walk", and the metabase hole happened to be
  * written in it. Three others say the same thing and none of them matched:
- * `file !== "lib/x.ts" &&` as a conjunct in a filter predicate, and the two
- * early exits — `if (file === "lib/x.ts") continue;` in a loop, `… return
- * false;` inside a `.filter` callback. The rule's NAME promised the decision
- * and the pattern delivered one syntax for it, so the next hole had three ways
- * out; the widening found eight live ones in six suites, two of them the same
- * decision copied rather than shared. See {@link INLINE_FILE_EXCLUSION}.
+ * `file !== "lib/x.ts"` in a filter predicate, and the two early exits — `if
+ * (file === "lib/x.ts") continue;` in a loop, `… return false;` inside a
+ * `.filter` callback. The rule's NAME promised the decision and the pattern
+ * delivered one syntax for it, so the next hole had three ways out; the
+ * widening found nine live ones in seven suites, two of them the same decision
+ * copied rather than shared. `!new Set([…]).has(` is the fourth spelling and is
+ * banned unused, because it is the one a reader reaches for the moment the
+ * other three are closed. See {@link INLINE_WALK_EXCLUSION}.
  */
 
 /**
@@ -62,27 +64,46 @@ import { suiteCode, suiteFiles } from "./helpers/suite-files";
 const INLINE_EXCLUSION = /!\s*\[\s*"[^"]*"(?:\s*,\s*"[^"]*")*\s*\]\s*\.\s*includes\s*\(/;
 
 /**
- * A string literal that names a FILE — a path segment, or a source extension.
+ * A string literal that names something a WALK yields, not a domain value.
  *
- * This is the half that separates a hole from a domain skip, and it is why the
- * second rule is narrower than "an exclusion by literal". Ten exclusions in
+ * This is the half that separates a hole from an ordinary skip, and it is why
+ * the second rule is narrower than "an exclusion by literal". Ten exclusions in
  * this tree are written in exactly the banned syntax over a VALUE — `if (code
  * === "en") continue;` in three i18n suites, `mode !== "default" &&` in the
  * render helper, `if (id === "invalid_floor") continue;` in the floor cases —
  * and every one of them is the rule rather than an escape from it: the base
  * locale genuinely has nothing to translate, and naming that would be
- * ceremony. A hole is an exclusion from a WALK, and a walk here yields file
- * paths, so the literal is what tells the two apart.
+ * ceremony. A hole is an exclusion from a WALK, so what the walk YIELDS is what
+ * tells the two apart.
+ *
+ * TWO CLASSES, BECAUSE THIS TREE WALKS TWO THINGS (guard ids added 2026-08-29).
+ * Most walks here yield paths, and the first version of this rule read only
+ * those — which left a live hole standing that the same day's suggestion had
+ * to record by hand: `lint-guard-partial-root` narrows the guard table with
+ * `walk.checkName !== "check-problem-phrasing-imports"`, an exclusion from a
+ * walk whose members are guard NAMES. Every guard in this repository is
+ * `check-…`, so that class is as recognisable as a path and needs no
+ * judgement. A walk yielding a third kind of member is outside the rule again;
+ * the suggestion file carries that, because the alternative is a rule that
+ * guesses.
  */
-const FILE_LITERAL = String.raw`[^"]*(?:/[^"]*|\.(?:ts|tsx|js|jsx|json|md|xml|yml|yaml))`;
+const WALKED_MEMBER = String.raw`[^"]*(?:/[^"]*|\.(?:ts|tsx|js|jsx|json|md|xml|yml|yaml))|check-[a-z0-9-]+`;
 
 /**
- * The other three spellings of "drop this file", each excluding one path.
+ * The other three spellings of "drop this one", each excluding one member.
  *
- * `!== "p" &&` catches the conjunct form, because a lone `!==` in a filter is
- * the whole predicate and a predicate that only excludes is a walk narrowing
- * rather than a hole in a rule. The two early exits are caught on the exit
- * keyword, which is what makes them exclusions rather than comparisons.
+ * `!== "m"` catches the inequality wherever it stands. It was written `!== "m"
+ * &&` for a day, on the reasoning that a LONE `!==` is a whole predicate and so
+ * narrows a walk rather than holing a rule — which is a real distinction and
+ * was not this rule's to draw: `SINGLE_ROOT_LOCKS` is built by a lone `!==` and
+ * is a documented hole in a lock table, and the carve-out was what let it
+ * through. Measured across the suites the conjunct requirement was excusing
+ * exactly that one site and this file's own fixture, so it bought nothing.
+ * The two early exits are caught on the exit keyword, which is what makes them
+ * exclusions rather than comparisons; `!new Set([…]).has(` is the fourth
+ * spelling, live nowhere today and one character from being reached for — the
+ * 36 `!someName.has(` calls in 23 suites are all over NAMED sets and are what
+ * the negation is measured against.
  *
  * One entry apiece is the point rather than a limitation. `!["a"].includes(x)`
  * is a list, and this is the shape a list GROWS FROM — the metabase hole had
@@ -90,9 +111,10 @@ const FILE_LITERAL = String.raw`[^"]*(?:/[^"]*|\.(?:ts|tsx|js|jsx|json|md|xml|ym
  * cheap; naming the third, after two people have copied the line, is a
  * refactor nobody does.
  */
-const INLINE_FILE_EXCLUSION = new RegExp(
-  `!==\\s*"${FILE_LITERAL}"\\s*&&` +
-    `|===\\s*"${FILE_LITERAL}"\\s*\\)\\s*(?:continue|return\\s+false)\\s*;`,
+const INLINE_WALK_EXCLUSION = new RegExp(
+  `!==\\s*"(?:${WALKED_MEMBER})"` +
+    `|===\\s*"(?:${WALKED_MEMBER})"\\s*\\)\\s*(?:continue|return\\s+false)\\s*;` +
+    `|!\\s*new\\s+Set\\s*\\(\\s*\\[`,
 );
 
 /** This suite, which must write the banned shape in order to assert on it. */
@@ -123,7 +145,7 @@ describe("exclusions are named", () => {
 
   it("no suite drops one file from a walk with the path spelled at the point of use", () => {
     assertNoOffenders({
-      rule: INLINE_FILE_EXCLUSION,
+      rule: INLINE_WALK_EXCLUSION,
       files: suiteFiles(),
       read: suiteCode,
       // Same reason as above, and the same policing: the negative control below
@@ -136,26 +158,32 @@ describe("exclusions are named", () => {
     });
     assert.match(
       suiteCode(DECLARING),
-      INLINE_FILE_EXCLUSION,
+      INLINE_WALK_EXCLUSION,
       "the exempt suite stopped writing the shape it exists to describe, so the hole is standing open over nothing",
     );
   });
 
-  it("reads all three spellings, and none of the ten value skips written the same way", () => {
-    // The three forms the first rule missed, which is the whole reason for the
-    // second one.
-    assert.match('const x = files.filter((f) => f !== "lib/a.ts" && read(f));', INLINE_FILE_EXCLUSION);
-    assert.match('if (file === "lib/sentry.ts") continue;', INLINE_FILE_EXCLUSION);
-    assert.match('if (relative === "lib/source-dirs.ts") return false;', INLINE_FILE_EXCLUSION);
+  it("reads all four spellings, and none of the ten value skips written the same way", () => {
+    // The forms the first rule missed, which is the whole reason for the second
+    // one. The lone `!==` is here rather than in the tolerated set below: it was
+    // carved out for a day and the carve-out is what left `SINGLE_ROOT_LOCKS`
+    // standing.
+    assert.match('const x = files.filter((f) => f !== "lib/a.ts" && read(f));', INLINE_WALK_EXCLUSION);
+    assert.match('const others = files.filter((f) => f !== "lib/a.ts");', INLINE_WALK_EXCLUSION);
+    assert.match('if (file === "lib/sentry.ts") continue;', INLINE_WALK_EXCLUSION);
+    assert.match('if (relative === "lib/source-dirs.ts") return false;', INLINE_WALK_EXCLUSION);
+    assert.match('walks.filter((w) => w.checkName !== "check-inline-hex")', INLINE_WALK_EXCLUSION);
+    assert.match('.filter((f) => !new Set(["a.ts", "b.ts"]).has(f))', INLINE_WALK_EXCLUSION);
     // And the ten that are the rule rather than a hole in it. Same syntax, a
-    // literal that names a value instead of a file, so the narrowing is doing
-    // the work rather than an exemption list.
-    assert.doesNotMatch('if (code === "en") continue;', INLINE_FILE_EXCLUSION);
-    assert.doesNotMatch('.filter((m) => m !== "default" && known(m))', INLINE_FILE_EXCLUSION);
-    assert.doesNotMatch('if (id === "invalid_floor") continue;', INLINE_FILE_EXCLUSION);
-    // A lone `!==` predicate is a narrowed WALK, not a hole in a rule: there is
-    // no assertion behind it for the exclusion to be an escape from.
-    assert.doesNotMatch('const others = files.filter((f) => f !== "lib/a.ts");', INLINE_FILE_EXCLUSION);
+    // literal that names a value instead of a walk member, so the narrowing is
+    // doing the work rather than an exemption list.
+    assert.doesNotMatch('if (code === "en") continue;', INLINE_WALK_EXCLUSION);
+    assert.doesNotMatch('.filter((m) => m !== "default" && known(m))', INLINE_WALK_EXCLUSION);
+    assert.doesNotMatch('if (id === "invalid_floor") continue;', INLINE_WALK_EXCLUSION);
+    // The 36 negated set reads in this tree, every one over a NAMED set. The
+    // fourth spelling is banned on the `new Set([` that follows the negation,
+    // not on the negation, so none of them is touched.
+    assert.doesNotMatch('const missing = keys.filter((k) => !declared.has(k));', INLINE_WALK_EXCLUSION);
   });
 
   it("still allows the membership check, which is an assertion rather than a hole", () => {
@@ -199,7 +227,7 @@ describe("exclusions are named", () => {
   /**
    * The same premise for the second rule, whose two halves can go blind apart.
    *
-   * {@link INLINE_FILE_EXCLUSION} is "this syntax" AND "this literal names a
+   * {@link INLINE_WALK_EXCLUSION} is "this syntax" AND "this literal names a
    * file", and a clean report follows from either half ceasing to match — a
    * prettier rewrap that puts the `&&` on the next line, an exit keyword the
    * tree stops using. The syntax half is the one with a control: ten
@@ -211,7 +239,7 @@ describe("exclusions are named", () => {
     const EXCLUSION_SYNTAX = /!==\s*"[^"]*"\s*&&|===\s*"[^"]*"\s*\)\s*(?:continue|return\s+false)\s*;/g;
     const skips = suiteFiles().filter((suite) =>
       [...suiteCode(suite).matchAll(EXCLUSION_SYNTAX)].some(
-        (match) => !INLINE_FILE_EXCLUSION.test(match[0]),
+        (match) => !INLINE_WALK_EXCLUSION.test(match[0]),
       ),
     );
     assert.ok(

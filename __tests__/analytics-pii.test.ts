@@ -10,6 +10,7 @@ import {
 } from "../lib/analytics-pii";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { readSource, sourceFiles } from "./helpers/source-files";
+import { assertExemptionsHonest } from "./helpers/suite-files";
 
 // Directories that hold telemetry call sites.
 const SOURCE_FILES = sourceFiles("lib", "components", "app");
@@ -235,33 +236,36 @@ describe("PII guard — captureException context is a constant label", () => {
 
 describe("PII guard — the wrapper exemptions still exempt something", () => {
   /**
-   * The half a hole cannot have while its path is spelled inside the loop.
+   * What each wrapper has to still declare to go on being skipped.
    *
-   * Each skip above is justified by "this module DEFINES the call", and that
-   * sentence is a claim about the file rather than about the exemption — it
-   * stops being true the day a wrapper moves, is renamed, or has its export
-   * pulled into a sibling. Then three loops skip a module for a reason that
-   * has expired, and nothing about the lines looks stale. So ask directly, in
-   * the words the exclusions are written in.
+   * The half a hole cannot have while its path is spelled inside the loop. Each
+   * skip above is justified by "this module DEFINES the call", and that is a
+   * claim about the FILE rather than about the exemption — it stops being true
+   * the day a wrapper moves, is renamed, or has its export pulled into a
+   * sibling, and then three loops skip a module for a reason that has expired
+   * with nothing about the lines looking stale.
    */
-  for (const [wrapper, declares] of [
-    [TRACK_EVENT_WRAPPER, ["export function trackEvent"]],
-    [SENTRY_WRAPPER, ["export function addBreadcrumb", "export function captureException"]],
-  ] as const) {
-    it(`${wrapper} is in the walk and still declares the call it is skipped for`, () => {
-      assert.ok(
-        SOURCE_FILES.includes(wrapper),
-        `${wrapper} is skipped by the sweeps above but is not in the walk — a skip over a file nobody reads exempts nothing and hides that it is stale`,
-      );
-      const src = readSource(wrapper);
-      for (const declaration of declares) {
-        assert.ok(
-          src.includes(declaration),
-          `${wrapper} is skipped as the wrapper itself but no longer declares \`${declaration}\` — drop the skip rather than leaving it open over a file that is now an ordinary call site`,
-        );
-      }
+  const DECLARES: Readonly<Record<string, readonly string[]>> = {
+    [TRACK_EVENT_WRAPPER]: ["export function trackEvent"],
+    [SENTRY_WRAPPER]: ["export function addBreadcrumb", "export function captureException"],
+  };
+
+  it("are in the walk and still declare the calls they are skipped for", () => {
+    // Through the shared helper rather than by hand: "is this hole still
+    // needed" is the question `assertExemptionsHonest` exists to be the one
+    // place for, and a single-entry hole is as entitled to it as a list. The
+    // `expected` literal is the tripwire — the names live at module scope and
+    // this call is two hundred lines down, so widening the skip means finding
+    // both.
+    assertExemptionsHonest({
+      exemptions: [TRACK_EVENT_WRAPPER, SENTRY_WRAPPER],
+      expected: ["lib/analytics.ts", "lib/sentry.ts"],
+      rule: "the trackEvent / breadcrumb / captureException call-site sweeps",
+      walk: SOURCE_FILES,
+      stillNeeded: (wrapper) =>
+        DECLARES[wrapper].every((declaration) => readSource(wrapper).includes(declaration)),
     });
-  }
+  });
 });
 
 describe("PII guard — retention windows are documented", () => {
