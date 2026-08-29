@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { maxUpdatedAt } from "@/lib/sync-cursors";
+import { SYNC_OVERLAP_MS, maxUpdatedAt, overlapCursor } from "@/lib/sync-cursors";
 
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -106,6 +106,45 @@ describe("maxUpdatedAt", () => {
   });
 });
 
+// --- overlapCursor (what actually gets persisted) ---
+describe("overlapCursor", () => {
+  it("persists a cursor a margin behind the batch maximum", () => {
+    // The race it covers: `moddatetime` writes `now()`, which is the
+    // transaction's START time, while the row becomes readable at COMMIT. A
+    // write straddling this pull's snapshot is absent from the batch and
+    // carries a timestamp at or below its maximum, so a cursor set to that
+    // maximum steps over it — permanently, since no tombstone covers an edit
+    // and nothing else asks for a row that is not new.
+    assert.equal(
+      overlapCursor("2026-06-19T12:00:30.000Z", null),
+      "2026-06-19T12:00:20.000Z",
+    );
+    assert.equal(SYNC_OVERLAP_MS, 10_000);
+  });
+
+  it("never walks the cursor backwards into rows already applied", () => {
+    // A short batch whose maximum is barely above the stored cursor would
+    // otherwise rewind past it and re-read everything the last pull merged.
+    const previous = "2026-06-19T12:00:25.000Z";
+    assert.equal(overlapCursor("2026-06-19T12:00:30.000Z", previous), previous);
+  });
+
+  it("leaves the cursor alone when there is nothing to advance to", () => {
+    assert.equal(overlapCursor(null, "2026-06-19T12:00:00.000Z"), "2026-06-19T12:00:00.000Z");
+    assert.equal(overlapCursor(null, null), null);
+    // An unparseable maximum is not a reason to move: the alternative is
+    // NaN arithmetic producing an invalid date and a cursor nothing matches.
+    assert.equal(overlapCursor("garbage", "2026-06-19T12:00:00.000Z"), "2026-06-19T12:00:00.000Z");
+  });
+
+  it("takes the margin as a parameter so the window is one number, not a scattered constant", () => {
+    assert.equal(
+      overlapCursor("2026-06-19T12:00:30.000Z", null, 1_000),
+      "2026-06-19T12:00:29.000Z",
+    );
+  });
+});
+
 // --- structural: storage key + wiring (file-scan, no AsyncStorage needed) ---
 const read = (p: string) => readRepoFile(p);
 
@@ -127,6 +166,17 @@ describe("sync-cursors storage + context wiring", () => {
     assert.match(ctx, /getSyncCursor\("collections", activeUser\.id\)/);
     assert.match(ctx, /fetchOwnCollectionsSince\(activeUser\.id, colCursor\)/);
     assert.match(ctx, /fetchOwnItemsSince\(activeUser\.id, itemCursor\)/);
-    assert.match(ctx, /setSyncCursor\("items", activeUser\.id, nextItemCursor, itemCursor\)/);
+    assert.match(ctx, /overlapCursor\(nextItemCursor, itemCursor\)/);
+  });
+
+  it("persists BOTH cursors through overlapCursor, not the raw batch maximum", () => {
+    // The adoption case. The whole point of the margin is that it is applied at
+    // every persist site — one call site left writing `nextCursor` directly
+    // keeps that entity's edits losable, and nothing else in the pull would say
+    // so.
+    const ctx = read("lib/collections-context.tsx");
+    assert.match(ctx, /overlapCursor\(nextColCursor, colCursor\)/);
+    assert.match(ctx, /overlapCursor\(nextItemCursor, itemCursor\)/);
+    assert.doesNotMatch(ctx, /setSyncCursor\(\s*"\w+",\s*activeUser\.id,\s*next\w+Cursor,/);
   });
 });

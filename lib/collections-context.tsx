@@ -71,7 +71,7 @@ import {
   pendingCollectionsKey,
   pendingItemsKey,
 } from "@/lib/storage-keys";
-import { getSyncCursor, setSyncCursor } from "@/lib/sync-cursors";
+import { getSyncCursor, overlapCursor, setSyncCursor } from "@/lib/sync-cursors";
 import {
   applyTombstones,
   getTombstones,
@@ -725,7 +725,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           );
         }
         await setTombstones("collections", activeUser.id, colTombstones, prevColTombstones);
-        await setSyncCursor("collections", activeUser.id, nextColCursor, colCursor);
+        await setSyncCursor(
+          "collections",
+          activeUser.id,
+          overlapCursor(nextColCursor, colCursor),
+          colCursor,
+        );
 
         const { data: deltaItems, tombstonedIds: itemTombstoned, cursor: nextItemCursor } =
           await fetchOwnItemsSince(activeUser.id, itemCursor);
@@ -742,7 +747,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           );
         }
         await setTombstones("items", activeUser.id, itemTombstones, prevItemTombstones);
-        await setSyncCursor("items", activeUser.id, nextItemCursor, itemCursor);
+        await setSyncCursor(
+          "items",
+          activeUser.id,
+          overlapCursor(nextItemCursor, itemCursor),
+          itemCursor,
+        );
       } catch {
         // Network/Supabase unavailable — keep the local state intact.
       }

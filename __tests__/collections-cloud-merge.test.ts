@@ -310,8 +310,8 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
     );
     assert.match(
       block,
-      /setSyncCursor\("collections", activeUser\.id, nextColCursor, colCursor\)/,
-      "cloud-sync effect must persist the advanced collections cursor",
+      /setSyncCursor\(\s*"collections",\s*activeUser\.id,\s*overlapCursor\(nextColCursor, colCursor\),/,
+      "cloud-sync effect must persist the advanced collections cursor, through the overlap margin",
     );
   });
 
