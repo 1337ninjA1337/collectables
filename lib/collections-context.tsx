@@ -79,6 +79,7 @@ import {
   setTombstones,
 } from "@/lib/tombstones";
 import { Collection, CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
+import { usePersistedBlob } from "@/lib/use-persisted-blob";
 import { generateUuidV4 } from "@/lib/uuid";
 import { normalizeOwnItemIds } from "@/lib/item-id";
 import {
@@ -663,19 +664,29 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     };
   }, [user]);
 
-  useEffect(() => {
-    if (!ready || !user) {
-      return;
-    }
-
-    Promise.all([
-      AsyncStorage.setItem(collectionsKey(user.id), JSON.stringify(localCollections)),
-      AsyncStorage.setItem(itemsKey(user.id), JSON.stringify(localItems)),
-      AsyncStorage.setItem(followedCollectionsKey(user.id), JSON.stringify(followedCollectionIds)),
-      AsyncStorage.setItem(pendingCollectionsKey(user.id), JSON.stringify(pendingCollections)),
-      AsyncStorage.setItem(pendingItemsKey(user.id), JSON.stringify(pendingItems)),
-    ]).catch(() => undefined);
-  }, [localCollections, localItems, followedCollectionIds, pendingCollections, pendingItems, ready, user]);
+  // One effect PER KEY, via `usePersistedBlob`. These five blobs used to share
+  // a single effect whose dependency array listed all five states, so any one
+  // of them changing rewrote all five — adding an item re-serialised the
+  // followed-id list and both offline queues, and a delta pull that touched
+  // only collections still rewrote the (largest) items blob. That also silently
+  // cancelled the no-op contract the two cloud merges keep: returning the local
+  // array by reference means "nothing changed, write nothing", which is only
+  // true once each blob owns its own dependency list. See
+  // `lib/use-persisted-blob.ts` for the reference-identity contract on `value`.
+  const persistEnabled = ready && !!user;
+  usePersistedBlob(user ? collectionsKey(user.id) : null, localCollections, persistEnabled);
+  usePersistedBlob(user ? itemsKey(user.id) : null, localItems, persistEnabled);
+  usePersistedBlob(
+    user ? followedCollectionsKey(user.id) : null,
+    followedCollectionIds,
+    persistEnabled,
+  );
+  usePersistedBlob(
+    user ? pendingCollectionsKey(user.id) : null,
+    pendingCollections,
+    persistEnabled,
+  );
+  usePersistedBlob(user ? pendingItemsKey(user.id) : null, pendingItems, persistEnabled);
 
   // Best-effort cloud refresh: after the local-first paint completes (`ready`),
   // fetch the user's collections + items from Supabase and merge any new
