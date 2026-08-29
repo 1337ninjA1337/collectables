@@ -132,6 +132,66 @@ describe("mergeItemsFromCloud", () => {
   });
 });
 
+describe("the cloud merges keep their input reference when nothing changed", () => {
+  /**
+   * The no-op contract every neighbouring helper states and these two did not.
+   *
+   * The delta window is `updated_at=gt` over a timestamp, so the boundary row
+   * comes back on the next pull by construction — and a merge that always
+   * allocated made `setLocalItems` see a new reference for it, which re-rendered
+   * every collection screen and rewrote both AsyncStorage blobs for a row the
+   * device already held.
+   *
+   * `structuredClone` rather than the same object: a re-fetched row is freshly
+   * parsed JSON, so equal-but-not-identical is the whole point. A reference test
+   * against the identical object would pass without the field comparison.
+   */
+  it("returns the local items when the cloud row is an equal copy", () => {
+    const local = [makeItem({ id: "i-1", photos: ["a.jpg"], tags: [{ label: "rare", color: "#d89c5b" }] })];
+    assert.equal(mergeItemsFromCloud(local, structuredClone(local)), local);
+  });
+
+  it("returns the local collections when the cloud row is an equal copy", () => {
+    const local = [makeCollection({ id: "c-1", role: "owner", sharedWithUserIds: ["u-2"] })];
+    assert.equal(mergeCollectionsFromCloud(local, structuredClone(local), ownerId), local);
+  });
+
+  it("still allocates when one field of one row differs", () => {
+    const local = [makeItem({ id: "i-1", title: "Charizard" }), makeItem({ id: "i-2" })];
+    const cloud = structuredClone(local);
+    cloud[1] = { ...cloud[1], description: "changed" };
+    const out = mergeItemsFromCloud(local, cloud);
+    assert.notEqual(out, local);
+    assert.equal(out[1].description, "changed");
+  });
+
+  it("still allocates for a nested value that differs only inside an array", () => {
+    // The depth `===` cannot see and the reason the comparison is structural:
+    // `photos` and `tags` arrive as new arrays on every fetch, so an identity
+    // test would call every row changed and a one-level test would miss this.
+    const local = [makeItem({ id: "i-1", tags: [{ label: "rare", color: "#d89c5b" }] })];
+    const cloud = [makeItem({ id: "i-1", tags: [{ label: "rare", color: "#000000" }] })];
+    assert.notEqual(mergeItemsFromCloud(local, cloud), local);
+  });
+
+  it("still allocates when the cloud brings an id the local list does not have", () => {
+    const local = [makeItem({ id: "i-1" })];
+    const out = mergeItemsFromCloud(local, [makeItem({ id: "i-2" })]);
+    assert.notEqual(out, local);
+    assert.equal(out.length, 2);
+  });
+
+  it("keeps the local reference when the cloud row only re-states the owner role", () => {
+    // The promotion path: a cloud read hardcodes `viewer`, the merge promotes it
+    // back to `owner` for the signed-in owner, and the result equals what was
+    // already held. That is the COMMON delta row for one's own collection, so
+    // treating it as a change would have made the contract useless in practice.
+    const local = [makeCollection({ id: "c-1", role: "owner" })];
+    const cloud = [makeCollection({ id: "c-1", role: "viewer" })];
+    assert.equal(mergeCollectionsFromCloud(local, cloud, ownerId), local);
+  });
+});
+
 describe("hasNewCloudEntries", () => {
   it("returns true when cloud has an ID not in local", () => {
     assert.equal(hasNewCloudEntries(new Set(["a"]), ["a", "b"]), true);
