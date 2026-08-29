@@ -16,6 +16,7 @@ import {
   setSentryOptOut,
   shutdownSentry,
 } from "@/lib/sentry";
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { DIAGNOSTICS_KEY } from "@/lib/storage-keys";
 
 type DiagnosticsContextValue = {
@@ -121,10 +122,11 @@ export function DiagnosticsProvider({ children }: React.PropsWithChildren) {
       setSentryOptOut(!next);
       setAnalyticsOptOut(!next);
       setClarityOptOut(!next);
-      AsyncStorage.setItem(
-        DIAGNOSTICS_KEY,
-        JSON.stringify({ enabled: next }),
-      ).catch(() => undefined);
+      AsyncStorage.setItem(DIAGNOSTICS_KEY, JSON.stringify({ enabled: next })).catch(
+        (error: unknown) => {
+          reportStorageFailure("diagnostics-context.setItem", DIAGNOSTICS_KEY, error);
+        },
+      );
       if (next) {
         void initSentry();
         void initAnalytics();

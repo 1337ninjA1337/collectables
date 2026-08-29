@@ -2,8 +2,7 @@ import { useEffect } from "react";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { captureException } from "@/lib/sentry";
-import { storageKeyLabel } from "@/lib/storage-keys";
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 
 /**
  * Persist one JSON blob to AsyncStorage under one key, writing only when that
@@ -55,46 +54,21 @@ import { storageKeyLabel } from "@/lib/storage-keys";
  * on the next launch — when their local edits are gone and the cloud pull is
  * the only truth they have left. Silent local data loss is the failure mode
  * this hook is closest to, and until now nothing anywhere recorded that it
- * happened. One `captureException` per keyspace per session says which blob
- * stopped persisting without turning a full disk into a thousand events.
+ * happened. One report per keyspace per session says which blob stopped
+ * persisting without turning a full disk into a thousand events.
  *
- * The KEYSPACE, not the key: every per-user key ends in the account's auth id,
- * and `storageKeyLabel` takes it out. `scrubPII` reads event bodies, not the
- * `extra` a caller assembles, so a raw key here would be an identifier nobody
- * decided to send.
+ * The once-per-keyspace budget, and the rule that the KEYSPACE travels and the
+ * key does not, now live in `lib/report-storage-failure.ts` — this hook was
+ * the first site to need them and is no longer the only one. The sync writes
+ * whose failure corrupts rather than merely loses (`lib/tombstones.ts`,
+ * `lib/sync-cursors.ts`) share the same budget, so a full device store is one
+ * fact reported once per store rather than once per module that noticed it.
  */
 export function usePersistedBlob(key: string | null, value: unknown, enabled: boolean): void {
   useEffect(() => {
     if (!enabled || !key) return;
     AsyncStorage.setItem(key, JSON.stringify(value)).catch((error: unknown) => {
-      reportPersistFailure(key, error);
+      reportStorageFailure("use-persisted-blob.setItem", key, error);
     });
   }, [key, value, enabled]);
-}
-
-/**
- * Keyspaces already reported this session.
- *
- * Per keyspace rather than per key so signing in as a second account does not
- * re-report the same broken store, and per session rather than per mount so a
- * provider that remounts on every navigation cannot turn one full disk into a
- * stream. Sentry's own limiter would eventually cap the volume; this decides
- * WHICH events survive instead of letting the first minute of a full disk
- * spend the budget.
- */
-const reportedKeyspaces = new Set<string>();
-
-function reportPersistFailure(key: string, error: unknown): void {
-  const keyspace = storageKeyLabel(key);
-  if (reportedKeyspaces.has(keyspace)) return;
-  reportedKeyspaces.add(keyspace);
-  captureException(error, {
-    scope: "use-persisted-blob.setItem",
-    extra: { keyspace },
-  });
-}
-
-/** Module scope survives between suites in one process; a seeding suite resets. */
-export function __resetPersistFailureReportsForTests(): void {
-  reportedKeyspaces.clear();
 }

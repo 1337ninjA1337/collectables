@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { syncCursorKey } from "@/lib/storage-keys";
 
 /**
@@ -125,15 +126,30 @@ export function overlapCursor(
   return previousMs >= Date.parse(rewound) ? previous : rewound;
 }
 
-/** Read the stored delta-pull cursor for an entity, or null if never synced. */
+/**
+ * Read the stored delta-pull cursor for an entity, or null if never synced.
+ *
+ * NULL IS TWO ANSWERS HERE AND THAT IS DELIBERATE — unlike `getTombstones`,
+ * where the same collapse was a resurrection. A cold start and an unreadable
+ * store both want the same behaviour: pull the whole table. There is nothing
+ * to narrow, because the caller does not merge this value into anything it
+ * writes back; it hands it to PostgREST as a lower bound, and no bound is the
+ * safe bound.
+ *
+ * What the two share is the COST, which is a full pull of both tables on every
+ * refresh for as long as the store stays unreadable. That is silent, correct
+ * and unbounded, so it is reported once per session.
+ */
 export async function getSyncCursor(
   entity: SyncEntity,
   userId: string,
 ): Promise<string | null> {
+  const key = syncCursorKey(entity, userId);
   try {
-    return await AsyncStorage.getItem(syncCursorKey(entity, userId));
-  } catch {
+    return await AsyncStorage.getItem(key);
+  } catch (error: unknown) {
     // A read failure just means we fall back to a full pull — never fatal.
+    reportStorageFailure("sync-cursors.getItem", key, error);
     return null;
   }
 }
@@ -142,6 +158,13 @@ export async function getSyncCursor(
  * Persist the delta-pull cursor for an entity. No-ops when `cursor` is null or
  * equal to `previous`, so a delta pull that returned nothing newer doesn't
  * trigger a needless AsyncStorage write.
+ *
+ * A failed write is still best-effort — there is no second store to try, and
+ * the next pull asking for a wider window is the whole recovery. It is
+ * reported because the delta path exists to spend one small query instead of
+ * two whole tables, and a cursor that never persists quietly returns the app
+ * to the behaviour BE-14 replaced while every screen still looks correct. The
+ * only visible symptom is somebody's egress bill.
  */
 export async function setSyncCursor(
   entity: SyncEntity,
@@ -150,9 +173,10 @@ export async function setSyncCursor(
   previous?: string | null,
 ): Promise<void> {
   if (!cursor || cursor === previous) return;
+  const key = syncCursorKey(entity, userId);
   try {
-    await AsyncStorage.setItem(syncCursorKey(entity, userId), cursor);
-  } catch {
-    // Best-effort: a failed cursor write just re-pulls more next time.
+    await AsyncStorage.setItem(key, cursor);
+  } catch (error: unknown) {
+    reportStorageFailure("sync-cursors.setItem", key, error);
   }
 }

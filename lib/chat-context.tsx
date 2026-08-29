@@ -10,6 +10,7 @@ import {
   canChatWith,
   totalUnread,
 } from "@/lib/chat-helpers";
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { captureException } from "@/lib/sentry";
 import { useSocial } from "@/lib/social-context";
 import {
@@ -105,7 +106,9 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     if (!ready || !storageKey) return;
-    AsyncStorage.setItem(storageKey, JSON.stringify(store)).catch(() => undefined);
+    AsyncStorage.setItem(storageKey, JSON.stringify(store)).catch((error: unknown) => {
+      reportStorageFailure("chat-context.setItem", storageKey, error);
+    });
   }, [ready, storageKey, store]);
 
   // Keep a ref in sync with the latest pending queue so flushPending can read

@@ -14,6 +14,7 @@ import {
   premiumExpiresAt,
   premiumStorageKey,
 } from "@/lib/premium-helpers";
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { validationToPremiumState } from "@/lib/subscriptions";
 import { cloudValidatePremium } from "@/lib/supabase-subscriptions";
 
@@ -90,7 +91,9 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     if (!ready || !storageKey) return;
-    AsyncStorage.setItem(storageKey, JSON.stringify(state)).catch(() => undefined);
+    AsyncStorage.setItem(storageKey, JSON.stringify(state)).catch((error: unknown) => {
+      reportStorageFailure("premium-context.setItem", storageKey, error);
+    });
   }, [ready, storageKey, state]);
 
   // The intent must be recorded BEFORE the state flip so the transition hook

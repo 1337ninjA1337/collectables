@@ -27,6 +27,7 @@ import {
   cloudRemoveListing,
   subscribeToListings,
 } from "@/lib/supabase-marketplace";
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { MARKETPLACE_KEY } from "@/lib/storage-keys";
 import { MarketplaceListing, MarketplaceMode } from "@/lib/types";
 
@@ -98,7 +99,11 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
         if (!cancelled) {
           if (cloud.length > 0) {
             setListings(cloud.map(normalizeListing));
-            await AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(cloud)).catch(() => undefined);
+            await AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(cloud)).catch(
+              (error: unknown) => {
+                reportStorageFailure("marketplace-context.setItem", MARKETPLACE_KEY, error);
+              },
+            );
             return;
           }
         }
@@ -122,7 +127,9 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     if (!ready) return;
-    AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(listings)).catch(() => undefined);
+    AsyncStorage.setItem(MARKETPLACE_KEY, JSON.stringify(listings)).catch((error: unknown) => {
+      reportStorageFailure("marketplace-context.setItem", MARKETPLACE_KEY, error);
+    });
   }, [ready, listings]);
 
   useEffect(() => {

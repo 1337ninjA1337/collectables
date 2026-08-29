@@ -21,6 +21,7 @@ import {
   RemoteFriendRequest,
 } from "@/lib/supabase-profiles";
 import { subscribeToFriendRequests } from "@/lib/supabase-realtime-sync";
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { SOCIAL_GRAPH_KEY, pendingSocialKey, socialCacheKey } from "@/lib/storage-keys";
 import {
   applyDeliveredSocial,
@@ -397,13 +398,16 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       return;
     }
 
+    const key = socialCacheKey(user.id);
     AsyncStorage.setItem(
-      socialCacheKey(user.id),
+      key,
       JSON.stringify({
         following,
         myProfile: myProfileOverride ? normalizeProfile(myProfileOverride) : null,
       } satisfies SocialStore),
-    ).catch(() => undefined);
+    ).catch((error: unknown) => {
+      reportStorageFailure("social-context.setItem", key, error);
+    });
   }, [following, myProfileOverride, ready, user]);
 
   useEffect(() => {
@@ -417,16 +421,19 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         friendRequests,
         deletedProfileIds,
       } satisfies SocialGraphStore),
-    ).catch(() => undefined);
+    ).catch((error: unknown) => {
+      reportStorageFailure("social-context.setItem", SOCIAL_GRAPH_KEY, error);
+    });
   }, [deletedProfileIds, friendRequests, ready]);
 
   // BE-13d: persist the pending social-mutation queue so parked offline writes
   // survive a reload and re-deliver on the next session.
   useEffect(() => {
     if (!user || !ready) return;
-    AsyncStorage.setItem(pendingSocialKey(user.id), JSON.stringify(pendingSocial)).catch(
-      () => undefined,
-    );
+    const key = pendingSocialKey(user.id);
+    AsyncStorage.setItem(key, JSON.stringify(pendingSocial)).catch((error: unknown) => {
+      reportStorageFailure("social-context.setItem", key, error);
+    });
   }, [pendingSocial, ready, user]);
 
   // Sync own profile to Supabase only when myProfileOverride changes. Routed

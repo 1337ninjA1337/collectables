@@ -143,7 +143,13 @@ describe("tombstones storage + key wiring", () => {
     // soft-delete arrives as ONE update and nothing re-sends it, so a caller
     // that advanced its cursor past a tombstone it failed to store would never
     // be told about that delete again.
-    assert.match(mod, /\} catch \{\s*\n\s*return false;\s*\n\s*\}/);
+    // The catch BINDS the error now, because the false is reported as well as
+    // returned: holding the cursor is correct and has no ceiling, so a store
+    // that stays full must be distinguishable from one that recovered.
+    assert.match(
+      mod,
+      /\} catch \(error: unknown\) \{\s*\n\s*reportStorageFailure\("tombstones\.setItem", key, error\);\s*\n\s*return false;\s*\n\s*\}/,
+    );
   });
 
   it("getTombstones answers null for an unreadable store, never an empty set", () => {
@@ -152,10 +158,13 @@ describe("tombstones storage + key wiring", () => {
     // Every caller merges into what it reads and writes the union back, so `[]`
     // for a failed read narrows the persisted set to whatever one pull saw —
     // and the rows whose tombstones were dropped come back on the next hydrate.
-    assert.match(mod, /\} catch \{[\s\S]{0,120}return null;/);
+    assert.match(mod, /\} catch \(error: unknown\) \{[\s\S]{0,200}return null;/);
+    assert.match(mod, /reportStorageFailure\("tombstones\.getItem", key, error\);/);
     // Two catches, not one: only the STORE's failure is null. Stored garbage is
     // `[]`, or a corrupt blob would be permanently null and a caller holding
     // its cursor on null would hold it forever.
-    assert.match(mod, /\} catch \{[\s\S]{0,140}return \[\];/);
+    // The garbage arm stays an unbound `catch {}` and reports NOTHING: the store
+    // answered, so nothing is stuck and the next pull re-learns the set.
+    assert.match(mod, /\} catch \{[\s\S]{0,240}return \[\];/);
   });
 });

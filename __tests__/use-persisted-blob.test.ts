@@ -73,7 +73,10 @@ function TwoBlobs() {
 async function mount() {
   const module = await import("@/lib/use-persisted-blob");
   hook ??= module.usePersistedBlob;
-  resetReports ??= module.__resetPersistFailureReportsForTests;
+  // The budget lives in `report-storage-failure`, shared with the sync writes,
+  // so a full device store is one fact rather than one per module that noticed.
+  resetReports ??= (await import("@/lib/report-storage-failure"))
+    .__resetStorageFailureReportsForTests;
   resetReports();
   return render(createElement(TwoBlobs, null));
 }

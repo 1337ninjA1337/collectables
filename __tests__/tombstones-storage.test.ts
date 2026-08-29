@@ -32,6 +32,8 @@ const store = new Map<string, string>();
 let readError: Error | null = null;
 let writeError: Error | null = null;
 
+const captured: { error: unknown; context: unknown }[] = [];
+
 mockModule("@react-native-async-storage/async-storage", {
   default: {
     getItem: async (key: string) => {
@@ -45,16 +47,29 @@ mockModule("@react-native-async-storage/async-storage", {
   },
 });
 
-const USER = "user-1";
+mockModule("@/lib/sentry", {
+  captureException: (error: unknown, context: unknown) => captured.push({ error, context }),
+});
+
+/**
+ * A real Supabase auth id rather than "user-1": `storageKeyLabel` replaces a
+ * UUID and keeps what surrounds it, which for a tombstone key is the ENTITY —
+ * the part of a crash report that says which pull broke. A non-uuid id matches
+ * no shape and is truncated at the version instead, so a fixture id would have
+ * quietly asserted the fallback rather than the path the app takes.
+ */
+const USER = "11111111-2222-4333-8444-555555555555";
 
 async function load() {
   return import("@/lib/tombstones");
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   store.clear();
   readError = null;
   writeError = null;
+  captured.length = 0;
+  (await import("@/lib/report-storage-failure")).__resetStorageFailureReportsForTests();
 });
 
 describe("getTombstones", () => {
@@ -132,6 +147,88 @@ describe("setTombstones", () => {
     assert.deepEqual(await getTombstones("items", USER), ["i"]);
     assert.deepEqual(await getTombstones("collections", USER), ["c"]);
     assert.deepEqual(await getTombstones("items", "user-2"), ["other"]);
+  });
+});
+
+describe("a store that stays broken is reported, because holding the cursor has no ceiling", () => {
+  /**
+   * The safe answers this module gives — null for an unreadable read, false for
+   * a failed write — both make the delta pull HOLD its `updated_at` cursor. That
+   * is right, and it is also open-ended: the same window re-pulls on every
+   * refresh until the store works, nothing counts the retries, and a device
+   * whose store is permanently full looks from the outside exactly like one
+   * that is quietly syncing. One report per session is what makes the loop
+   * visible.
+   */
+  const KEYSPACE = "collectables-tombstones-v1-items-{id}";
+
+  function keyspaces(): string[] {
+    return captured.map((c) => (c.context as { extra: { keyspace: string } }).extra.keyspace);
+  }
+
+  function scopes(): string[] {
+    return captured.map((c) => (c.context as { scope: string }).scope);
+  }
+
+  it("reports an unreadable store, with the keyspace and never the user id", async () => {
+    const { getTombstones } = await load();
+    readError = new Error("storage unavailable");
+    assert.equal(await getTombstones("items", USER), null);
+
+    assert.deepEqual(scopes(), ["tombstones.getItem"]);
+    assert.deepEqual(keyspaces(), [KEYSPACE]);
+    assert.equal(captured[0].error, readError);
+    assert.equal(
+      JSON.stringify(captured).includes(USER),
+      false,
+      "the key ends in the account's auth id and only the keyspace may travel",
+    );
+  });
+
+  it("reports a failed write, which is the same hold from the other end", async () => {
+    const { setTombstones } = await load();
+    writeError = new Error("quota exceeded");
+    assert.equal(await setTombstones("items", USER, ["a"]), false);
+    assert.deepEqual(scopes(), ["tombstones.setItem"]);
+    assert.deepEqual(keyspaces(), [KEYSPACE]);
+  });
+
+  it("reports the read and the write separately — two diagnoses, two fixes", async () => {
+    const { getTombstones, setTombstones } = await load();
+    readError = new Error("storage unavailable");
+    await getTombstones("items", USER);
+    readError = null;
+    writeError = new Error("quota exceeded");
+    await setTombstones("items", USER, ["a"]);
+    assert.deepEqual(scopes(), ["tombstones.getItem", "tombstones.setItem"]);
+  });
+
+  it("reports once however many refreshes re-pull the same held window", async () => {
+    const { getTombstones } = await load();
+    readError = new Error("storage unavailable");
+    await getTombstones("items", USER);
+    await getTombstones("items", USER);
+    await getTombstones("items", USER);
+    assert.equal(captured.length, 1, "the point of the hold is that it repeats — the report is not");
+  });
+
+  it("says nothing about stored garbage, which is content rather than a broken store", async () => {
+    // The store ANSWERED, so nothing is stuck: `[]` lets the next pull re-learn
+    // the set. Reporting it would make a corrupt blob indistinguishable from
+    // the unbounded case, which is the one worth waking somebody for.
+    const { getTombstones } = await load();
+    store.set(`collectables-tombstones-v1-items-${USER}`, "{not json");
+    assert.deepEqual(await getTombstones("items", USER), []);
+    assert.deepEqual(captured, []);
+  });
+
+  it("says nothing while the store works, including for the no-op write", async () => {
+    const { getTombstones, setTombstones } = await load();
+    const ids = ["a", "b"];
+    await setTombstones("items", USER, ids, ids);
+    await setTombstones("items", USER, ["a"]);
+    await getTombstones("items", USER);
+    assert.deepEqual(captured, []);
   });
 });
 

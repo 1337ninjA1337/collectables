@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { tombstoneKey } from "@/lib/storage-keys";
 
 /**
@@ -111,20 +112,33 @@ export function mergeTombstoneIds(
  * permanently null — and a caller that holds its cursor on null would then hold
  * it forever, which is a stuck sync rather than the bounded re-pull the null is
  * supposed to buy.
+ *
+ * AND IT IS REPORTED, because the safe answer is also an unbounded one. Every
+ * caller of this null holds something: the delta pull holds its `updated_at`
+ * cursor, so the same window re-pulls on every refresh with no ceiling and no
+ * counter. A store that is permanently unreadable rather than transiently one
+ * looks, from the outside, exactly like a device that is simply syncing —
+ * which is why it would never be investigated. One report per session says the
+ * loop is a loop.
  */
 export async function getTombstones(
   entity: TombstoneEntity,
   userId: string,
 ): Promise<string[] | null> {
+  const key = tombstoneKey(entity, userId);
   let raw: string | null;
   try {
-    raw = await AsyncStorage.getItem(tombstoneKey(entity, userId));
-  } catch {
+    raw = await AsyncStorage.getItem(key);
+  } catch (error: unknown) {
     // Unreadable store, which is not the same as an empty one — see above.
+    reportStorageFailure("tombstones.getItem", key, error);
     return null;
   }
   if (!raw) return [];
   try {
+    // NOT reported: the store ANSWERED, so nothing is stuck. The `[]` this
+    // returns lets the next pull re-learn the set, which is a bounded recovery
+    // rather than the open-ended hold the null above buys.
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
   } catch {
@@ -150,6 +164,12 @@ export async function getTombstones(
  * any other — nothing re-sends it — so the deleted row stayed in the local
  * cache and came back on the next hydrate. The caller now holds the cursor
  * until this says the tombstone is safe.
+ *
+ * FALSE IS ALSO REPORTED. The held cursor is correct and has no ceiling: the
+ * delta re-pulls the same window on every refresh until the write lands, and
+ * on a device whose store is permanently full it never lands. Returning the
+ * boolean fixes the resurrection; the report is what makes a store that stays
+ * broken distinguishable from one that recovered on the second try.
  */
 export async function setTombstones(
   entity: TombstoneEntity,
@@ -158,10 +178,12 @@ export async function setTombstones(
   previous?: readonly string[],
 ): Promise<boolean> {
   if (previous !== undefined && ids === previous) return true;
+  const key = tombstoneKey(entity, userId);
   try {
-    await AsyncStorage.setItem(tombstoneKey(entity, userId), JSON.stringify(ids));
+    await AsyncStorage.setItem(key, JSON.stringify(ids));
     return true;
-  } catch {
+  } catch (error: unknown) {
+    reportStorageFailure("tombstones.setItem", key, error);
     return false;
   }
 }
