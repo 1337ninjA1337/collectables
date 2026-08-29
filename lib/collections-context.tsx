@@ -82,6 +82,17 @@ import { Collection, CollectableItem, ItemCondition, ItemTag, MarketplaceMode } 
 import { usePersistedBlob } from "@/lib/use-persisted-blob";
 import { generateUuidV4 } from "@/lib/uuid";
 import { normalizeOwnItemIds } from "@/lib/item-id";
+import { reportStorageFailure } from "@/lib/report-storage-failure";
+import { captureException } from "@/lib/sentry";
+import {
+  blobRecord,
+  blobRows,
+  mayPersistHydration,
+  readStoredArray,
+  readStoredRecord,
+  UNREADABLE_BLOB,
+  type StoredBlob,
+} from "@/lib/stored-blob";
 import {
   applyDeliveredUpserts,
   countPendingUpserts,
@@ -236,6 +247,34 @@ type CollectionsContextValue = {
   refresh: () => Promise<void>;
 };
 
+/**
+ * One local blob, classified — never a throw.
+ *
+ * A bare `AsyncStorage.getItem` in the hydrate's `Promise.all` rejects the
+ * whole batch, which is what let one broken read (or one offline fetch beside
+ * it) reach a `catch` that installed the seed data. Each read answers for
+ * itself now, and an unreadable one is reported and marked so the persist gate
+ * can refuse: see `lib/stored-blob.ts`.
+ */
+async function readArrayBlob<T>(key: string): Promise<StoredBlob<T[]>> {
+  try {
+    return readStoredArray<T>(await AsyncStorage.getItem(key));
+  } catch (error: unknown) {
+    reportStorageFailure("collections-context.getItem", key, error);
+    return UNREADABLE_BLOB;
+  }
+}
+
+/** The same for the two offline queues, which are records rather than arrays. */
+async function readRecordBlob<V>(key: string): Promise<StoredBlob<Record<string, V>>> {
+  try {
+    return readStoredRecord<V>(await AsyncStorage.getItem(key));
+  } catch (error: unknown) {
+    reportStorageFailure("collections-context.getItem", key, error);
+    return UNREADABLE_BLOB;
+  }
+}
+
 const CollectionsContext = createContext<CollectionsContextValue | null>(null);
 
 // Stable id accessors for the BE-13c pending-upsert queues.
@@ -261,6 +300,16 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   const [sharedWithMeCollections, setSharedWithMeCollections] = useState<Collection[]>([]);
   const [sharedWithMeItems, setSharedWithMeItems] = useState<CollectableItem[]>([]);
   const [ready, setReady] = useState(false);
+  /**
+   * Whether the last hydrate understood every local blob it read.
+   *
+   * SEPARATE FROM `ready`, which is the UI's question. These were one boolean,
+   * and that is how an offline launch came to write the demo seed data over a
+   * real account: `ready` flipped in a `finally` that ran whether or not the
+   * hydrate had learned anything, and the persist effects follow `ready`.
+   * Starts false, so nothing is written before a hydrate has said it may be.
+   */
+  const [hydrationSafeToPersist, setHydrationSafeToPersist] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   // BE-13c: uuid-keyed pending-upsert queues. A failed cloud write (offline /
   // Supabase unreachable) parks the full entity here; the flush effect below
@@ -521,6 +570,10 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       setPendingCollections((prev) => (hasPendingUpserts(prev) ? {} : prev));
       setPendingItems((prev) => (hasPendingUpserts(prev) ? {} : prev));
       setReady(false);
+      // Signed out is not "hydrated and safe": the next sign-in must earn the
+      // flag again, or the empty state above would be persisted over whatever
+      // the incoming account has on disk.
+      setHydrationSafeToPersist(false);
       return;
     }
 
@@ -528,35 +581,57 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     let active = true;
 
     async function hydrate() {
+      // EVERY SOURCE ANSWERS FOR ITSELF. This batch used to be seven bare
+      // awaits under one `try` whose `catch` installed the demo seed data and
+      // whose `finally` flipped `ready` — which is what enables the five
+      // persist effects. So one rejection anywhere replaced the user's
+      // collections and items with the seeds AND WROTE THEM OVER the real
+      // blobs, permanently. Two of the seven are network calls, so an offline
+      // launch was enough. See `lib/stored-blob.ts`.
       try {
-        const [rawCollections, rawItems, rawFollowed, rawPendingCollections, rawPendingItems, remoteFollowedIds, remoteWishlist] = await Promise.all([
-          AsyncStorage.getItem(collectionsKey(activeUser.id)),
-          AsyncStorage.getItem(itemsKey(activeUser.id)),
-          AsyncStorage.getItem(followedCollectionsKey(activeUser.id)),
-          AsyncStorage.getItem(pendingCollectionsKey(activeUser.id)),
-          AsyncStorage.getItem(pendingItemsKey(activeUser.id)),
-          fetchFollowedCollectionIds(activeUser.id),
-          fetchWishlistItemsByUserId(activeUser.id),
+        const [
+          storedCollections,
+          storedItems,
+          storedFollowed,
+          storedPendingCollections,
+          storedPendingItems,
+          remoteFollowedIds,
+          remoteWishlist,
+        ] = await Promise.all([
+          readArrayBlob<Collection>(collectionsKey(activeUser.id)),
+          readArrayBlob<CollectableItem>(itemsKey(activeUser.id)),
+          readArrayBlob<string>(followedCollectionsKey(activeUser.id)),
+          readRecordBlob<Collection[]>(pendingCollectionsKey(activeUser.id)),
+          readRecordBlob<CollectableItem[]>(pendingItemsKey(activeUser.id)),
+          // Null rather than a throw: a network failure says nothing about the
+          // local blobs, and taking the whole hydrate down with it is what made
+          // an offline launch destructive.
+          fetchFollowedCollectionIds(activeUser.id).catch(() => null),
+          fetchWishlistItemsByUserId(activeUser.id).catch(() => null),
         ]);
 
         if (!active) {
           return;
         }
 
-        // Rehydrate any offline writes parked before the last reload so the
-        // flush effect can re-deliver them once the network is back (BE-13c).
-        setPendingCollections(
-          rawPendingCollections
-            ? (JSON.parse(rawPendingCollections) as PendingUpsertQueue<Collection>)
-            : {},
-        );
-        setPendingItems(
-          rawPendingItems
-            ? (JSON.parse(rawPendingItems) as PendingUpsertQueue<CollectableItem>)
-            : {},
+        // The five local blobs decide whether anything may be written back.
+        // `ready` says the UI may render; this says the store is understood.
+        setHydrationSafeToPersist(
+          mayPersistHydration([
+            storedCollections,
+            storedItems,
+            storedFollowed,
+            storedPendingCollections,
+            storedPendingItems,
+          ]),
         );
 
-        const parsedCollections = rawCollections ? (JSON.parse(rawCollections) as Collection[]) : seedCollections;
+        // Rehydrate any offline writes parked before the last reload so the
+        // flush effect can re-deliver them once the network is back (BE-13c).
+        setPendingCollections(blobRecord(storedPendingCollections));
+        setPendingItems(blobRecord(storedPendingItems));
+
+        const parsedCollections = blobRows(storedCollections, seedCollections);
         let visibleCollections = parsedCollections.filter(
           (collection) =>
             collection.ownerUserId === activeUser.id || collection.sharedWithUserIds?.includes(activeUser.id),
@@ -586,7 +661,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         }
 
         const visibleCollectionIds = new Set(visibleCollections.map((collection) => collection.id));
-        const parsedItems = rawItems ? (JSON.parse(rawItems) as CollectableItem[]) : seedItems;
+        const parsedItems = blobRows(storedItems, seedItems);
         const visibleItems = parsedItems.filter((item) => visibleCollectionIds.has(item.collectionId) || item.isWishlist);
 
         // After a remote-bootstrap, also pull each collection's items so the
@@ -614,7 +689,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         }
 
         const seenIds = new Set(visibleItems.map((i) => i.id));
-        for (const wi of remoteWishlist) {
+        for (const wi of remoteWishlist ?? []) {
           if (!seenIds.has(wi.id)) {
             visibleItems.push(wi);
             seenIds.add(wi.id);
@@ -652,17 +727,23 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         for (const item of rewritten) {
           upsertItem(item).catch(() => undefined);
         }
-        // Prefer remote followed IDs; fall back to local cache
-        if (remoteFollowedIds.length > 0) {
+        // Prefer remote followed IDs; fall back to local cache. A fetch that
+        // could not answer is null, not an empty list, so it falls back rather
+        // than clearing what the device already knows.
+        if (remoteFollowedIds && remoteFollowedIds.length > 0) {
           setFollowedCollectionIds(remoteFollowedIds);
         } else {
-          setFollowedCollectionIds(rawFollowed ? (JSON.parse(rawFollowed) as string[]) : []);
+          setFollowedCollectionIds(blobRows(storedFollowed, []));
         }
-      } catch {
-        if (active) {
-          setLocalCollections(seedCollections);
-          setLocalItems(seedItems);
-        }
+      } catch (error: unknown) {
+        // NO SEEDS HERE. This arm used to install `seedCollections` /
+        // `seedItems`, which the persist effects below then wrote over the
+        // user's real blobs the moment `ready` flipped. What reaches this arm
+        // now is a bug rather than a broken device — every read and both
+        // fetches answer for themselves above — so the safe response is to
+        // leave state alone and refuse to persist anything this session.
+        if (active) setHydrationSafeToPersist(false);
+        captureException(error, { scope: "collections-context.hydrate" });
       } finally {
         if (active) {
           setReady(true);
@@ -686,7 +767,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   // array by reference means "nothing changed, write nothing", which is only
   // true once each blob owns its own dependency list. See
   // `lib/use-persisted-blob.ts` for the reference-identity contract on `value`.
-  const persistEnabled = ready && !!user;
+  const persistEnabled = ready && hydrationSafeToPersist && !!user;
   usePersistedBlob(user ? collectionsKey(user.id) : null, localCollections, persistEnabled);
   usePersistedBlob(user ? itemsKey(user.id) : null, localItems, persistEnabled);
   usePersistedBlob(

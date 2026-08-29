@@ -30,6 +30,7 @@ export const STORAGE_FAILURE_SITES = [
   "tombstones.setItem",
   "sync-cursors.getItem",
   "sync-cursors.setItem",
+  "collections-context.getItem",
   "chat-context.getItem",
   "chat-context.setItem",
   "premium-context.setItem",
