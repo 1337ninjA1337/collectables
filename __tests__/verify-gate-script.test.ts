@@ -158,9 +158,46 @@ describe("the local gate matches what CI runs", () => {
     .filter((line) => !/^\s*#/.test(line))
     .join("\n");
 
-  const CI_STEPS = ["npm run typecheck", "npm run lint:all", "npm test", "npm run build"];
+  /**
+   * Every npm script ci.yml actually runs, READ FROM ci.yml.
+   *
+   * This was a hand-written list of four, and that is precisely how a green
+   * `verify` came to precede a red CI: `lint:secrets:bundle`,
+   * `lint:bundle-size` and `lint:bundle-smoke` run after the build on CI and
+   * were in nobody's list, so the case below compared `verify` against a copy
+   * of the four legs it already ran. A list restating the thing it checks
+   * cannot notice a fifth.
+   *
+   * Derived, so the day somebody adds an eighth step the gate either grows or
+   * goes red — and the failure names the step rather than the number.
+   */
+  const CI_SCRIPTS = [
+    ...new Set(
+      [...ciCommands.matchAll(/run:\s*npm\s+(?:run\s+)?([\w:-]+)/g)].map((m) => m[1]),
+    ),
+  ].filter((name) => pkg.scripts[name] !== undefined);
 
-  for (const step of CI_STEPS) {
+  /**
+   * CI steps deliberately outside the local gate, each because it needs the
+   * NETWORK and would turn an offline `verify` red for a reason that is not
+   * the contributor's change.
+   *
+   * `lint:expo-install` degrades to a skip on an unreachable registry, which
+   * is exactly why it is worth nothing locally; `npm audit` is
+   * `continue-on-error` in ci.yml, so it is not part of the gate there either.
+   */
+  const NOT_IN_THE_LOCAL_GATE = ["lint:expo-install"];
+
+  it("finds a real list of scripts in ci.yml rather than an empty one", () => {
+    // The sweep hazard this file's own subject has: a walk that stops matching
+    // satisfies "nothing is missing" perfectly.
+    assert.ok(
+      CI_SCRIPTS.length >= 6,
+      `only ${String(CI_SCRIPTS.length)} npm scripts found in ci.yml — the reader stopped matching, which passes the case below vacuously`,
+    );
+  });
+
+  for (const step of ["npm run typecheck", "npm run lint:all", "npm test", "npm run build"]) {
     it(`ci.yml still runs \`${step}\``, () => {
       assert.ok(
         ciCommands.includes(step),
@@ -171,17 +208,26 @@ describe("the local gate matches what CI runs", () => {
 
   it("runs nothing in CI's gate that `npm run verify` would skip locally", () => {
     const expanded = resolveScript("verify");
-    const missing = CI_STEPS.filter((step) => {
-      const script = step.replace(/^npm (run )?/, "");
-      const body = pkg.scripts[script];
-      // Compare on the resolved command, not the npm spelling: `verify`
-      // reaches `test` through `lint:ci`, never by naming it.
-      return body ? !expanded.includes(resolveScript(script)) : false;
-    });
+    const missing = CI_SCRIPTS.filter(
+      (script) =>
+        !NOT_IN_THE_LOCAL_GATE.includes(script) &&
+        !expanded.includes(resolveScript(script)),
+    );
     assert.deepEqual(
       missing,
       [],
-      `these CI steps are not reachable from \`npm run verify\`: ${missing.join(", ")}`,
+      `these CI steps are not reachable from \`npm run verify\`: ${missing.join(", ")} — a green verify has to mean a green CI or it means nothing`,
+    );
+  });
+
+  it("keeps every deliberate exclusion a step CI still runs", () => {
+    // An exclusion for a step that has left ci.yml is a hole with nothing
+    // about it looking stale.
+    const gone = NOT_IN_THE_LOCAL_GATE.filter((script) => !CI_SCRIPTS.includes(script));
+    assert.deepEqual(
+      gone,
+      [],
+      `these are excluded from the local gate and CI no longer runs them: ${gone.join(", ")}`,
     );
   });
 });

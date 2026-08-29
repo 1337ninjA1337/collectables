@@ -37,14 +37,23 @@ npm run typecheck  # tsc --noEmit on its own
 npm run test:only  # same suites, skipping the typecheck (tight iteration loop)
 npm run lint:all   # every pure code-style guard in lib/lint-guards.ts
 npm run lint:ci    # typecheck → lint:all → test
-npm run verify     # lint:ci → build, the full gate — run THIS before committing
+npm run verify:dist # the three guards that read dist/ (needs a build first)
+npm run verify     # lint:ci → build → verify:dist, the full gate — run THIS before committing
 ```
 
 `npm run verify` is the single command to run before every commit. It chains
-the four legs CI runs (typecheck → lint:all → test → build) in the same order,
-fail-fast, so a green `verify` locally means the same four steps are green on
-CI. Running the legs by hand is only for iterating on one of them — a
-hand-assembled sequence is exactly how a leg gets silently skipped.
+the SEVEN steps CI runs (typecheck → lint:all → test → build → bundle secrets
+→ bundle size → bundle smoke) in the same order, fail-fast, so a green
+`verify` locally means a green CI. Running the legs by hand is only for
+iterating on one of them — a hand-assembled sequence is exactly how a leg gets
+silently skipped.
+
+It said "the four legs" until the day the last three cost a red CI: the
+post-build guards run against `dist/`, so they were left out of the gate and
+out of the case that was supposed to compare the gate with ci.yml — which
+compared it against a hand-written copy of the same four. `verify-gate-script.test.ts`
+reads the step list out of ci.yml now, so an eighth step either joins the gate
+or turns that case red.
 
 `npm test` runs `tsc --noEmit` first because `tsx` strips types without
 checking them: a type-broken test file passes the runner and fails CI. Prefer
