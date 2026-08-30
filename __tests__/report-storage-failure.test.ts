@@ -275,6 +275,59 @@ describe("classifyStorageError", () => {
     assert.equal(observed, "full");
   });
 
+  it("agrees for every input the classifier reads, not for the one somebody picked", async () => {
+    const {
+      reportStorageFailure,
+      observeStorageFailures,
+      classifyStorageError,
+      __resetStorageFailureReportsForTests,
+    } = await load();
+
+    // The case above proves the pair agrees for ONE error, which is what an
+    // example can do. The claim its comment makes — "a second call site would
+    // let them drift" — is a property over the classifier's whole input space,
+    // and a drift introduced for the quota spellings alone (a `name` read at
+    // one site and a `message` at the other) would pass it. Everything the
+    // classifier is documented to read goes through both consumers here.
+    const inputs: readonly unknown[] = [
+      ...full,
+      Object.assign(new Error("localStorage is not available"), { name: "SecurityError" }),
+      new Error("write failed"),
+      null,
+      undefined,
+      "quota exceeded",
+      { code: 22 },
+    ];
+
+    for (const [index, error] of inputs.entries()) {
+      // One budget entry per input: the reporter reports a site/keyspace pair
+      // once per session, so a shared key would leave every case after the
+      // first asserting on an empty array.
+      __resetStorageFailureReportsForTests();
+      captured.length = 0;
+
+      let observed: unknown = null;
+      const unsubscribe = observeStorageFailures((event) => {
+        observed = event.reason;
+      });
+      reportStorageFailure("chat-context.setItem", "collectables-chats-v1", error);
+      unsubscribe();
+
+      const sent = (captured[0]?.context as { extra?: { reason?: unknown } } | undefined)?.extra
+        ?.reason;
+      assert.equal(
+        observed,
+        sent,
+        `input ${String(index)}: the toast said ${String(observed)} and the crash report said ${String(sent)}`,
+      );
+      assert.equal(
+        sent,
+        classifyStorageError(error),
+        `input ${String(index)}: the event carries something other than the classifier's answer`,
+      );
+    }
+  });
+
   it("hands the reason to every observer, beside the scope and the keyspace", async () => {
     const { reportStorageFailure, observeStorageFailures } = await load();
     const heard: { scope: string; keyspace: string; reason: string }[] = [];

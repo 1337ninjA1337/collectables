@@ -30,7 +30,7 @@ installNativeModuleStubs();
 const toasts = installSpyToast();
 installStubI18n();
 
-installSpyCapture();
+const captured = installSpyCapture();
 
 type NoticeModule = typeof import("../lib/storage-notice");
 type ReportingModule = typeof import("../lib/report-storage-failure");
@@ -74,6 +74,7 @@ beforeEach(async () => {
   reporting!.__clearStorageFailureObserversForTests();
   reporting!.__resetStorageFailureReportsForTests();
   toasts.length = 0;
+  captured.length = 0;
   refusing = false;
 });
 
@@ -246,6 +247,28 @@ describe("useStorageFailureNotice — a write that was rejected mid-session", ()
       toasts,
       [],
       "the next launch opens in the previous language; that is not 'changes aren't being saved'",
+    );
+  });
+
+  it("still REPORTS the quiet writes, which is the other half of ignoring them", async () => {
+    const module = await load();
+    const tree = render(createElement(Listener));
+    await drain(tree);
+
+    // The filter is the OBSERVER's, not the reporter's, and the difference is
+    // the whole diagnosis for three sites. A regression that moved
+    // `losesUserData` into `reportStorageFailure` would pass the case above —
+    // no toast, correctly — and silently stop sending Sentry anything about a
+    // language, a currency or an FX table that will not persist.
+    for (const site of module.PREFERENCE_WRITE_SITES) {
+      reporting!.reportStorageFailure(site, `preference-${site}`, new Error("full"));
+    }
+
+    assert.deepEqual(toasts, [], "still nothing on screen");
+    assert.deepEqual(
+      captured.map((report) => report.context.scope),
+      [...module.PREFERENCE_WRITE_SITES],
+      "quiet to the user is not quiet to the crash report",
     );
   });
 
