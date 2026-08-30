@@ -1,7 +1,11 @@
 import { useCallback, useEffect } from "react";
 
 import { useI18n } from "@/lib/i18n-context";
-import { observeStorageFailures, type StorageFailureSite } from "@/lib/report-storage-failure";
+import {
+  observeStorageFailures,
+  STORAGE_FAILURE_SITES,
+  type StorageFailureSite,
+} from "@/lib/report-storage-failure";
 import { useToast } from "@/lib/toast-context";
 
 /**
@@ -57,13 +61,21 @@ import { useToast } from "@/lib/toast-context";
  * one would previously have been heard by whichever of them happened to be
  * mounted.
  *
- * ## Only writes, on the observer half
+ * ## Only writes that cost the user something, on the observer half
  *
  * A failed READ reaches the observer too and is deliberately ignored there: a
  * currency preference or a language that could not be read costs the user a
  * default, not their data, and the five reads that DO cost data are the ones
  * whose gate already reports through `refusing`. Saying "changes aren't being
  * saved" because `locale-helpers.getItem` threw would be false.
+ *
+ * The same judgement applies to three WRITES, which is the half that was
+ * missing: a language, a currency and a cached FX table are a preference and a
+ * derived cache. One that will not persist costs the user a default at the next
+ * launch and a refetch, not their collections — and "Changes aren't being
+ * saved" is the wrong sentence for it in the same way it is for the read.
+ * {@link PREFERENCE_WRITE_SITES} names them; every other `.setItem` holds
+ * something the user typed, bought or synced, so it raises.
  */
 
 let noticeShown = false;
@@ -78,10 +90,45 @@ export function storageNoticeShown(): boolean {
   return noticeShown;
 }
 
-/** The half of {@link StorageFailureSite} that means "the user's data did not land". */
+/** Every failure that is a write rather than a read. */
 export function isWriteFailure(scope: StorageFailureSite): boolean {
   return scope.endsWith(".setItem");
 }
+
+/**
+ * The writes whose failure costs a preference or a refetch, not the user's data.
+ *
+ * - `i18n-context.setItem` and `locale-helpers.setItem` hold the chosen
+ *   language and currency: the next launch opens in the previous one.
+ * - `currency-rates.setItem` is a cached FX table with a TTL; a write that
+ *   fails means the next conversion fetches again.
+ *
+ * Every OTHER `.setItem` in {@link STORAGE_FAILURE_SITES} holds something the
+ * user typed, bought or synced, which is why the default is to raise: a site
+ * added without a decision joins the loud half. `storage-notice.test.ts`
+ * requires the decision anyway — the two halves must together cover every
+ * write site exactly once.
+ */
+export const PREFERENCE_WRITE_SITES: readonly StorageFailureSite[] = [
+  "i18n-context.setItem",
+  "locale-helpers.setItem",
+  "currency-rates.setItem",
+];
+
+/** The half of {@link StorageFailureSite} that means "the user's data did not land". */
+export function losesUserData(scope: StorageFailureSite): boolean {
+  return isWriteFailure(scope) && !PREFERENCE_WRITE_SITES.includes(scope);
+}
+
+/**
+ * Every write site that DOES raise the notice, derived rather than listed.
+ *
+ * A new entry in {@link STORAGE_FAILURE_SITES} lands here by itself, which is
+ * the safe default and also the one a suite can see: the case that pins this
+ * list turns red until somebody says which half the new site belongs in.
+ */
+export const DATA_WRITE_SITES: readonly StorageFailureSite[] =
+  STORAGE_FAILURE_SITES.filter(losesUserData);
 
 /** The one sentence, raised at most once per session whichever half asks. */
 function useRaiseStorageNotice(): () => void {
@@ -136,7 +183,7 @@ export function useStorageFailureNotice(): void {
   useEffect(
     () =>
       observeStorageFailures((event) => {
-        if (isWriteFailure(event.scope)) raise();
+        if (losesUserData(event.scope)) raise();
       }),
     [raise],
   );

@@ -194,6 +194,20 @@ describe("useStorageFailureNotice — a write that was rejected mid-session", ()
     assert.equal(toasts.length, 1, "the observer is what reaches the UI from lib/sync-cursors.ts");
   });
 
+  it("ignores a language that could not be SAVED, for the reason it ignores a read", async () => {
+    await load();
+    const tree = render(createElement(Listener));
+    await drain(tree);
+
+    reporting!.reportStorageFailure("i18n-context.setItem", "language", new Error("full"));
+
+    assert.deepEqual(
+      toasts,
+      [],
+      "the next launch opens in the previous language; that is not 'changes aren't being saved'",
+    );
+  });
+
   it("ignores a failed READ, which costs a default rather than the user's data", async () => {
     await load();
     const tree = render(createElement(Listener));
@@ -335,6 +349,54 @@ describe("the write half subscribes once, not once per provider", () => {
     // carry the write half, so `app/_layout.tsx` mounting `<StorageNotice />`
     // is the whole of it, which is why the adoption cases below check for it.
     assert.deepEqual(toasts, [], "the providers hear writes through nobody now");
+  });
+});
+
+/**
+ * Which writes are worth a sentence, and which are a preference.
+ *
+ * The read filter always made this judgement — "a currency that could not be
+ * read costs a default, not their data" — and the write half was applying it to
+ * half the cases: a language that could not be SAVED raised "Changes aren't
+ * being saved", which is a claim about the user's collections.
+ */
+describe("the write filter", () => {
+  it("names every write site exactly once, across the two halves", async () => {
+    const module = await load();
+    const reportingModule = reporting!;
+    const writes = reportingModule.STORAGE_FAILURE_SITES.filter(module.isWriteFailure);
+
+    assert.deepEqual(
+      [...module.DATA_WRITE_SITES, ...module.PREFERENCE_WRITE_SITES].sort(),
+      [...writes].sort(),
+      "a new .setItem site is a decision — loud by default, and this case is where somebody makes it",
+    );
+    assert.deepEqual(
+      module.DATA_WRITE_SITES.filter((site) => module.PREFERENCE_WRITE_SITES.includes(site)),
+      [],
+      "the halves are disjoint",
+    );
+  });
+
+  it("holds the three preferences and nothing else", async () => {
+    const module = await load();
+
+    assert.deepEqual(
+      [...module.PREFERENCE_WRITE_SITES],
+      ["i18n-context.setItem", "locale-helpers.setItem", "currency-rates.setItem"],
+      "a language, a currency and a cached FX table — a default and a refetch, not data",
+    );
+  });
+
+  it("does not silence a read on the same module as a quiet write", async () => {
+    const module = await load();
+
+    // `locale-helpers.setItem` is quiet; the gate half is what covers the reads,
+    // and losesUserData must answer false for both halves of a read pair rather
+    // than for the whole module.
+    assert.equal(module.losesUserData("locale-helpers.getItem"), false);
+    assert.equal(module.losesUserData("chat-context.getItem"), false);
+    assert.equal(module.losesUserData("chat-context.setItem"), true);
   });
 });
 
