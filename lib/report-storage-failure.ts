@@ -144,7 +144,10 @@ const observers = new Set<StorageFailureObserver>();
  * three that could would each need the decision written out again.
  *
  * `lib/storage-notice.ts` is the only subscriber today and it filters to
- * writes; the registry itself takes no position on which failures matter.
+ * writes; the registry itself takes no position on which failures matter. It
+ * subscribes ONCE, from `components/storage-notice.tsx` — a registry that
+ * reaches the whole tree needs one listener, not one per provider that happens
+ * to render the same sentence.
  *
  * ## Observers fire on EVERY failure, budget or no budget
  *
@@ -167,6 +170,18 @@ export function observeStorageFailures(observer: StorageFailureObserver): () => 
 /** Test seam: a suite that subscribed and threw must not leak into the next. */
 export function __clearStorageFailureObserversForTests(): void {
   observers.clear();
+}
+
+/**
+ * Test seam: how many observers the registry holds.
+ *
+ * The registry has no cap, and every subscriber works — so five providers each
+ * subscribing raises exactly the same one toast as one component doing it, and
+ * nothing about the extra four looks wrong from the outside. This is what lets
+ * a case assert the COUNT rather than the outcome.
+ */
+export function __storageFailureObserverCountForTests(): number {
+  return observers.size;
 }
 
 function notifyObservers(event: StorageFailureEvent): void {

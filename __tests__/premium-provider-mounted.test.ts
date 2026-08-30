@@ -8,6 +8,7 @@ import {
   installSpyAsyncStorage,
   installSpyToast,
   installStubI18n,
+  mountStorageNoticeListener,
   providerHarness,
   resetStorageNotice,
 } from "./helpers/mount-provider";
@@ -186,8 +187,16 @@ describe("PremiumProvider — the user acts", () => {
   });
 });
 
+/**
+ * The listener is mounted explicitly here because the provider no longer
+ * carries it: the write half of the notice is one component under
+ * `ToastProvider` in `app/_layout.tsx`, and the provider's part is to REPORT.
+ * Both cases mount it, so the silent one is a fact about a healthy session
+ * rather than about a missing subscriber.
+ */
 describe("PremiumProvider — the store stops accepting writes", () => {
   it("tells the user, through the same notice the refused hydrate uses", async () => {
+    await mountStorageNoticeListener();
     const tree = await mount();
     assert.deepEqual(toasts, [], "the hydrate worked, so nothing has been said yet");
 
@@ -206,6 +215,7 @@ describe("PremiumProvider — the store stops accepting writes", () => {
   });
 
   it("says nothing while writes are landing", async () => {
+    await mountStorageNoticeListener();
     const tree = await mount();
 
     seen()!.activatePremium("settings");

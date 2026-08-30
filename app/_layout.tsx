@@ -16,6 +16,7 @@ import { LoginScreen } from "@/components/login-screen";
 import { NavigationBreadcrumbs } from "@/components/navigation-breadcrumbs";
 import { SearchOverlay } from "@/components/search-overlay";
 import { SoldListingPrompt } from "@/components/sold-listing-prompt";
+import { StorageNotice } from "@/components/storage-notice";
 import { AnalyticsProvider } from "@/lib/analytics-provider";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ChatProvider, useChat } from "@/lib/chat-context";
@@ -115,6 +116,9 @@ export default Sentry.wrap(function RootLayout() {
       <I18nProvider>
         <DiagnosticsProvider>
           <ToastProvider>
+            {/* One subscriber for every rejected write in the tree, above the
+                auth gate so a sign-out does not unmount it. */}
+            <StorageNotice />
             <RealtimeStatusProvider>
               <AuthProvider>
                 <SocialProvider>

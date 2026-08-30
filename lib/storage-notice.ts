@@ -40,6 +40,23 @@ import { useToast } from "@/lib/toast-context";
  * still broken for the next account, and the second sign-in of a session does
  * not need to be told again.
  *
+ * ## Two hooks, because the two halves have different multiplicities
+ *
+ * The gate half is PER PROVIDER — each one computes its own "a hydrate has
+ * finished and left the gate shut", and that expression cannot be derived here
+ * (see {@link useStorageNotice}). The write half is PER DEVICE: it arrives
+ * through a module-level registry that already carries every call site in the
+ * tree, so subscribing from the same hook meant five providers each adding a
+ * closure to that registry to raise, between them, one latched toast. Four of
+ * those five subscriptions did nothing but pay for themselves.
+ *
+ * {@link useStorageFailureNotice} is that half, mounted exactly once by
+ * `components/storage-notice.tsx` beside `ToastProvider`. Splitting it also
+ * makes the write half independent of whether a user is signed in: the
+ * providers unmount around an account switch, and a store that fills up during
+ * one would previously have been heard by whichever of them happened to be
+ * mounted.
+ *
  * ## Only writes, on the observer half
  *
  * A failed READ reaches the observer too and is deliberately ignored there: a
@@ -66,7 +83,21 @@ export function isWriteFailure(scope: StorageFailureSite): boolean {
   return scope.endsWith(".setItem");
 }
 
+/** The one sentence, raised at most once per session whichever half asks. */
+function useRaiseStorageNotice(): () => void {
+  const toast = useToast();
+  const { t } = useI18n();
+
+  return useCallback(() => {
+    if (noticeShown) return;
+    noticeShown = true;
+    toast.error(t("storagePersistRefusedMessage"), t("storagePersistRefusedTitle"));
+  }, [t, toast]);
+}
+
 /**
+ * The gate half. Called by every provider that holds `hydrationSafeToPersist`.
+ *
  * @param gateRefusing `true` once a hydrate has FINISHED and left the gate shut.
  *
  * Each provider computes this itself, because "finished" differs: the
@@ -77,25 +108,30 @@ export function isWriteFailure(scope: StorageFailureSite): boolean {
  * `premium-context` sets `ready` true with the gate legitimately shut — from
  * raising a toast at every launch.
  *
- * The write half needs no argument: it arrives from
- * {@link observeStorageFailures}, so a write that fails in `lib/tombstones.ts`
- * or `lib/sync-cursors.ts` — modules with no React in them at all — reaches the
- * same sentence as one that fails in a provider.
+ * This hook does NOT subscribe to {@link observeStorageFailures}; that is
+ * {@link useStorageFailureNotice}, mounted once. Both raise through the same
+ * latch, so a device that fails both ways still says it once.
  */
 export function useStorageNotice(gateRefusing: boolean): void {
-  const toast = useToast();
-  const { t } = useI18n();
-
-  const raise = useCallback(() => {
-    if (noticeShown) return;
-    noticeShown = true;
-    toast.error(t("storagePersistRefusedMessage"), t("storagePersistRefusedTitle"));
-  }, [t, toast]);
+  const raise = useRaiseStorageNotice();
 
   useEffect(() => {
     if (!gateRefusing) return;
     raise();
   }, [gateRefusing, raise]);
+}
+
+/**
+ * The write half. ONE subscriber for the whole app — see
+ * `components/storage-notice.tsx`, which is the only caller.
+ *
+ * It needs no argument: a rejected write arrives from
+ * {@link observeStorageFailures}, so one that fails in `lib/tombstones.ts` or
+ * `lib/sync-cursors.ts` — modules with no React in them at all — reaches the
+ * same sentence as one that fails in a provider.
+ */
+export function useStorageFailureNotice(): void {
+  const raise = useRaiseStorageNotice();
 
   useEffect(
     () =>

@@ -44,6 +44,16 @@ function SecondProbe() {
   return createElement("View", null);
 }
 
+/**
+ * The write half, which is mounted ONCE for the whole app rather than by each
+ * provider. `components/storage-notice.tsx` is this and nothing else; the
+ * adoption cases below check that `app/_layout.tsx` renders it.
+ */
+function Listener() {
+  notice!.useStorageFailureNotice();
+  return createElement("View", null);
+}
+
 let reporting: ReportingModule | null = null;
 
 async function load(): Promise<NoticeModule> {
@@ -152,10 +162,10 @@ describe("useStorageNotice", () => {
   });
 });
 
-describe("useStorageNotice — a write that was rejected mid-session", () => {
+describe("useStorageFailureNotice — a write that was rejected mid-session", () => {
   it("says the same thing when a persisted blob could not be written", async () => {
     await load();
-    const tree = render(createElement(Probe));
+    const tree = render(createElement(Listener));
     await drain(tree);
     assert.deepEqual(toasts, [], "nothing has failed yet");
 
@@ -176,7 +186,7 @@ describe("useStorageNotice — a write that was rejected mid-session", () => {
 
   it("hears a write from a module with no React in it", async () => {
     await load();
-    const tree = render(createElement(Probe));
+    const tree = render(createElement(Listener));
     await drain(tree);
 
     reporting!.reportStorageFailure("sync-cursors.setItem", "sync-cursor", new Error("full"));
@@ -186,7 +196,7 @@ describe("useStorageNotice — a write that was rejected mid-session", () => {
 
   it("ignores a failed READ, which costs a default rather than the user's data", async () => {
     await load();
-    const tree = render(createElement(Probe));
+    const tree = render(createElement(Listener));
     await drain(tree);
 
     reporting!.reportStorageFailure("locale-helpers.getItem", "currency", new Error("blocked"));
@@ -208,7 +218,7 @@ describe("useStorageNotice — a write that was rejected mid-session", () => {
       "collectables-items-v1-user-a",
       new Error("full"),
     );
-    const tree = render(createElement(Probe));
+    const tree = render(createElement(Listener));
     await drain(tree);
 
     reporting!.reportStorageFailure(
@@ -248,6 +258,75 @@ describe("useStorageNotice — a write that was rejected mid-session", () => {
       reporting!.reportStorageFailure("tombstones.setItem", "tombstones", new Error("full")),
     );
     unsubscribe();
+  });
+});
+
+/**
+ * One listener for a registry that already reaches the whole tree.
+ *
+ * The latch means the OUTCOME is one toast however many providers subscribe,
+ * which is exactly why nothing looked wrong while five of them did: the cost
+ * was five closures and five `Set` entries, invisible from every assertion
+ * about what the user sees. These cases assert the count instead.
+ */
+describe("the write half subscribes once, not once per provider", () => {
+  it("a gated provider adds no observer at all", async () => {
+    await load();
+    const tree = render(
+      createElement("View", null, createElement(Probe), createElement(SecondProbe)),
+    );
+    await drain(tree);
+
+    assert.equal(
+      reporting!.__storageFailureObserverCountForTests(),
+      0,
+      "the gate half is per provider; the registry half is per device",
+    );
+  });
+
+  it("the listener adds exactly one, and a re-render does not add a second", async () => {
+    await load();
+    const tree = render(createElement(Listener));
+    await drain(tree);
+    assert.equal(reporting!.__storageFailureObserverCountForTests(), 1);
+
+    tree.rerender();
+    await drain(tree);
+
+    assert.equal(
+      reporting!.__storageFailureObserverCountForTests(),
+      1,
+      "the effect depends on a memoised raise, so a render is not a subscription",
+    );
+  });
+
+  it("both halves raise through the same latch", async () => {
+    await load();
+    refusing = true;
+    const tree = render(createElement("View", null, createElement(Probe), createElement(Listener)));
+    await drain(tree);
+    assert.equal(toasts.length, 1, "the gate said it");
+
+    reporting!.reportStorageFailure("tombstones.setItem", "tombstones", new Error("full"));
+
+    assert.equal(
+      toasts.length,
+      1,
+      "a device that fails both ways is one broken device, not two sentences",
+    );
+  });
+
+  it("says nothing about a rejected write when the listener is not mounted", async () => {
+    await load();
+    const tree = render(createElement(Probe));
+    await drain(tree);
+
+    reporting!.reportStorageFailure("tombstones.setItem", "tombstones", new Error("full"));
+
+    // Not a wish — a statement of what the split costs. The providers no longer
+    // carry the write half, so `app/_layout.tsx` mounting `<StorageNotice />`
+    // is the whole of it, which is why the adoption cases below check for it.
+    assert.deepEqual(toasts, [], "the providers hear writes through nobody now");
   });
 });
 
@@ -306,6 +385,82 @@ describe("every gated provider raises the notice", () => {
       inlined,
       [],
       "the once-per-device latch only works if every provider goes through the hook",
+    );
+  });
+
+  it("and none of them subscribes to the registry any more", () => {
+    const subscribers = gatedModules().filter((relative) =>
+      readSource(relative).includes("useStorageFailureNotice("),
+    );
+
+    assert.deepEqual(
+      subscribers,
+      [],
+      "five providers listening to a module-level registry is five closures for one toast",
+    );
+  });
+});
+
+/**
+ * The write half has exactly one host, and it is above the auth gate.
+ *
+ * A registry with no subscriber is silent in the same way the providers were
+ * before the notice existed, so the mount is the adoption requirement now. It
+ * is checked by source rather than by mounting `app/_layout.tsx`, which pulls
+ * in expo-router, the font loader and eight providers.
+ */
+describe("the listener is mounted once, under the toast provider", () => {
+  const LISTENER = "components/storage-notice.tsx";
+  /** The module that DECLARES the hook; its signature reads like a call. */
+  const DECLARATION = "lib/storage-notice.ts";
+
+  /**
+   * Every module that CALLS the write-half hook, found rather than listed.
+   *
+   * `lib/storage-notice.ts` is excluded by name because it declares the hook,
+   * and a signature reads the same as a call to any regex that does not parse.
+   */
+  function subscribingModules(): string[] {
+    return sourceFiles()
+      .filter((relative) => relative !== DECLARATION)
+      .filter((relative) => /\buseStorageFailureNotice\(\s*\)/.test(readSource(relative)));
+  }
+
+  it("exactly one module in the tree calls the hook", () => {
+    assert.deepEqual(
+      subscribingModules(),
+      [LISTENER],
+      "a second caller is a second observer on a registry that needs one",
+    );
+  });
+
+  it("app/_layout.tsx renders it", () => {
+    assert.match(
+      readSource("app/_layout.tsx"),
+      /<StorageNotice\s*\/>/,
+      "the hook is only reached by mounting the component; nothing else does",
+    );
+  });
+
+  it("inside ToastProvider, which is where its two contexts exist", () => {
+    const layout = readSource("app/_layout.tsx");
+    const opened = layout.indexOf("<ToastProvider>");
+    const mounted = layout.indexOf("<StorageNotice />");
+    const closed = layout.indexOf("</ToastProvider>");
+
+    assert.ok(opened >= 0 && mounted >= 0 && closed >= 0, "all three tags are in the tree");
+    assert.ok(
+      opened < mounted && mounted < closed,
+      "useToast and useI18n both throw outside their providers, and I18nProvider is above ToastProvider",
+    );
+  });
+
+  it("above the auth gate, so a sign-out does not unmount it", () => {
+    const layout = readSource("app/_layout.tsx");
+
+    assert.ok(
+      layout.indexOf("<StorageNotice />") < layout.indexOf("<AuthProvider>"),
+      "a store that fills up during an account switch is exactly when the user needs telling",
     );
   });
 });

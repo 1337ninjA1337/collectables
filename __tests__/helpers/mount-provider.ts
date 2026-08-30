@@ -157,6 +157,33 @@ export async function resetStorageNotice(): Promise<void> {
   (await import("../../lib/report-storage-failure")).__clearStorageFailureObserversForTests();
 }
 
+/**
+ * Mounts the app shell's storage-failure listener beside a provider under test.
+ *
+ * The write half of the notice lives in ONE component
+ * (`components/storage-notice.tsx`, rendered under `ToastProvider` in
+ * `app/_layout.tsx`) rather than in every gated provider, so a suite that
+ * mounts a provider alone hears nothing when its `setItem` is rejected — the
+ * provider reports to a registry with no subscriber. This is that subscriber.
+ *
+ * Rendered as its own tree, which is also where it sits in the app: above the
+ * auth gate, outliving the providers below it. The observer is module-level, so
+ * a failure reported from any tree reaches it; `resetStorageNotice` in a
+ * `beforeEach` is what keeps it from outliving the case.
+ */
+export async function mountStorageNoticeListener(): Promise<RenderResult> {
+  const notice = await import("../../lib/storage-notice");
+
+  function StorageNoticeProbe() {
+    notice.useStorageFailureNotice();
+    return createElement("View", null);
+  }
+
+  const tree = render(createElement(StorageNoticeProbe));
+  await drain(tree);
+  return tree;
+}
+
 /** One macrotask, which is what a resolved `AsyncStorage` promise needs. */
 export function settle(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
