@@ -164,6 +164,27 @@ describe("the crash-report promise and what scrubPII actually removes", () => {
     });
   }
 
+  it("passes `extra` through untouched, which is the premise the call-site sweep rests on", () => {
+    // The scrubber reads `user` and `request` and nothing else, so an `extra`
+    // a caller assembles reaches Sentry verbatim. That is not a bug — `extra`
+    // is where a caller puts the labels that make an event diagnosable — but it
+    // means the LAST line of defence for that object is the call site, which is
+    // what `analytics-pii.test.ts` sweeps ("captureException extra carries
+    // labels, never content"). Written here rather than only in that suite's
+    // prose, because a scrubber that grew an `extra` arm would make the sweep's
+    // stated reason false while every case in both files stayed green.
+    const event: SentryEvent = {
+      user: { id: "user-uuid-kept-on-purpose" },
+      extra: { keyspace: "collectables-items-v1-{id}", reason: "full" },
+    };
+
+    assert.deepEqual(
+      scrubPII(event, "production").extra,
+      { keyspace: "collectables-items-v1-{id}", reason: "full" },
+      "scrubPII now touches `extra` — if that is deliberate, the call-site sweep in analytics-pii.test.ts is no longer the only thing keeping user content out of it, and its doc comment says otherwise",
+    );
+  });
+
   it("keeps the one identifier the policy says it keeps", () => {
     // The promise has two halves and the other one is a commitment too: "the
     // crash payload includes your Supabase user identifier so we can correlate
