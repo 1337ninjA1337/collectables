@@ -6,6 +6,7 @@ import { mockModule } from "./helpers/render";
 import {
   drain,
   installSpyAsyncStorage,
+  installSpyCapture,
   installSpyToast,
   installStubI18n,
   mountStorageNoticeListener,
@@ -31,7 +32,6 @@ import {
 
 const spy = installSpyAsyncStorage();
 const { reads, writes, store } = spy;
-const captured: { error: unknown; context: { scope?: string } }[] = [];
 /** What `useAuth()` answers — reassigned between renders, like a sign-in. */
 let user: { id: string } | null = { id: "user-a" };
 /** What the cloud says; `null` is the transient-failure answer. */
@@ -40,10 +40,7 @@ let validation: unknown = null;
 const toasts = installSpyToast();
 installStubI18n();
 
-mockModule("@/lib/sentry", {
-  captureException: (error: unknown, context: { scope?: string }) =>
-    captured.push({ error, context }),
-});
+const captured = installSpyCapture();
 
 mockModule("@/lib/auth-context", {
   useAuth: () => ({ user }),

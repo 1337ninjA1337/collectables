@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 
+import type { CaptureContext } from "../../lib/sentry";
+import type { StorageFailureReason } from "../../lib/report-storage-failure";
+
 /**
  * The one assertion every suite that spies on `captureException` was writing
  * out by hand, and the reason it must stay strict.
@@ -17,17 +20,33 @@ import assert from "node:assert/strict";
  * So the strictness lives here once. A new field in the report is still one
  * red case per suite — the shape below stops compiling and the message says
  * what to do — but the comparison itself is written in one place.
+ *
+ * ## Both types are IMPORTED, not restated
+ *
+ * `reason` was a hand-written `"full" | "unavailable"` union and `context` was
+ * `unknown`, because a helper that pulled `lib/` in at module scope would
+ * evaluate the very modules its suites mock. `import type` is erased before the
+ * runner sees it — nothing is loaded — so the union and the context shape are
+ * now the app's own. A third reason, or a fourth field on `CaptureContext`,
+ * reaches these suites through the compiler instead of leaving them checking a
+ * copy of what the app used to do.
  */
 
-/** What a spy `captureException` pushes: the error and the context beside it. */
-export type CapturedReport = { error: unknown; context: unknown };
+/**
+ * What a spy `captureException` pushes: the error and the context beside it.
+ *
+ * The context is the app's {@link CaptureContext} rather than `unknown`, so a
+ * case that only cares WHICH write broke can read `report.context.scope`
+ * without restating the shape — which is what three suites were doing.
+ */
+export type CapturedReport = { error: unknown; context: CaptureContext };
 
 /** Everything `reportStorageFailure` puts in one event. */
 export type ExpectedStorageReport = {
   scope: string;
   keyspace: string;
   /** The classification the user's toast was chosen from. */
-  reason: "full" | "unavailable";
+  reason: StorageFailureReason;
 };
 
 /**

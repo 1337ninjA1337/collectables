@@ -2,8 +2,12 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement, useEffect, useState } from "react";
 
+import { balancedInner } from "@/lib/balanced-source";
+import { stripComments } from "@/lib/strip-comments";
+
 import { render } from "./helpers/render";
 import { drain, providerHarness, settle } from "./helpers/mount-provider";
+import { readRepoFile } from "./helpers/repo-file";
 import { assertExemptionsHonest, readSuite, topLevelSuites } from "./helpers/suite-files";
 
 /**
@@ -16,9 +20,13 @@ import { assertExemptionsHonest, readSuite, topLevelSuites } from "./helpers/sui
  * passes. Nothing tested the drain itself, which is how the fixed pass counts
  * it replaced survived four suites.
  *
- * `installSpyAsyncStorage` is deliberately NOT exercised here: it registers a
- * process-wide module mock, and a suite that installed it would be mocking
- * AsyncStorage for its own imports too.
+ * `installSpyAsyncStorage` and `installSpyCapture` are deliberately NOT
+ * exercised here: both register a process-wide module mock, and a suite that
+ * installed one would be mocking AsyncStorage — or `@/lib/sentry` — for its own
+ * imports too. They are covered by the nine suites that use them, plus the
+ * source cases in Adoption below, which is where the two facts a caller relies
+ * on live: that the spy RECORDS rather than discards, and that a caller's extra
+ * exports cannot displace the recorder.
  */
 
 // ---------------------------------------------------------------------------
@@ -174,6 +182,17 @@ const OWN_STORE_DOUBLE = [
   "i18n-provider-mounted.test.ts",
 ];
 
+/** The shape the capture sweep looks for, and the reason it must be a `const`. */
+const CAPTURE_DOUBLE = 'mockModule("@/lib/sentry"';
+
+/**
+ * The sweep below has to spell the shape it forbids, which makes this file its
+ * own only offender — a guard cannot search for a string without containing it.
+ * `assertExemptionsHonest` keeps the hole from outliving the search: the entry
+ * is live only while this suite still holds the needle.
+ */
+const OWN_CAPTURE_DOUBLE = ["mount-provider-harness.test.ts"];
+
 describe("the mounted-provider suites share one harness", () => {
   it("the two suites keeping their own double still have one", () => {
     assertExemptionsHonest({
@@ -200,6 +219,67 @@ describe("the mounted-provider suites share one harness", () => {
       offenders,
       [],
       "use installSpyAsyncStorage() from ./helpers/mount-provider — it records reads, writes, and both failure modes",
+    );
+  });
+
+  it("the suite that searches for the shape is the only one that may contain it", () => {
+    assertExemptionsHonest({
+      exemptions: OWN_CAPTURE_DOUBLE,
+      expected: ["mount-provider-harness.test.ts"],
+      rule: "shared Sentry capture spy",
+      walk: topLevelSuites(),
+      stillNeeded: (name) => readSuite(name).includes(CAPTURE_DOUBLE),
+    });
+  });
+
+  it("no suite hand-rolls a Sentry capture double", () => {
+    const offenders = topLevelSuites()
+      .filter((name) => !OWN_CAPTURE_DOUBLE.includes(name))
+      .filter((name) => readSuite(name).includes(CAPTURE_DOUBLE));
+
+    assert.deepEqual(
+      offenders,
+      [],
+      "use installSpyCapture() from ./helpers/mount-provider — pass extra exports as its argument, since a second mockModule call for one specifier replaces the first",
+    );
+  });
+
+  it("the capture spy records rather than discards, so silence stays a question", () => {
+    const source = readRepoFile("__tests__/helpers/mount-provider.ts");
+    const start = source.indexOf("export function installSpyCapture");
+    // The `{` after the RETURN TYPE, not the one in the `= {}` default.
+    const open = source.indexOf("{", source.indexOf("CapturedReport[]", start));
+    const body = balancedInner(source, open, "{", "}") ?? "";
+
+    assert.match(
+      body,
+      /captured\.push\(\{ error, context \}\)/,
+      "a discarding double answers 'was anything reported?' the same way a broken report path does",
+    );
+    assert.match(
+      body,
+      /\.\.\.extraExports,\s*\n\s*captureException:/,
+      "the spread must come FIRST — an extraExports entry named captureException would otherwise silently replace the recorder",
+    );
+  });
+
+  it("the report helper imports the app's reason and context types rather than restating them", () => {
+    const source = readRepoFile("__tests__/helpers/storage-failure-report.ts");
+
+    assert.match(
+      source,
+      /import type \{ CaptureContext \} from "\.\.\/\.\.\/lib\/sentry"/,
+      "`context: unknown` is what forced three suites to restate the shape they read `.scope` off",
+    );
+    assert.match(
+      source,
+      /import type \{ StorageFailureReason \} from "\.\.\/\.\.\/lib\/report-storage-failure"/,
+      "a hand-written union keeps compiling after a third reason is added, and only the app knows",
+    );
+    assert.doesNotMatch(
+      stripComments(source),
+      /"full" \| "unavailable"/,
+      "the union is the app's — a copy of it here is the thing the type import removed",
     );
   });
 

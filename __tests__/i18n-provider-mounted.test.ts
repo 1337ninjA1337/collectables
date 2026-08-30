@@ -2,6 +2,7 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 
+import { installSpyCapture } from "./helpers/mount-provider";
 import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
 
 /**
@@ -29,7 +30,6 @@ installNativeModuleStubs();
 const reads: string[] = [];
 const writes: { key: string; value: string }[] = [];
 const events: { name: string; props: unknown }[] = [];
-const captured: { error: unknown; context: { scope?: string } }[] = [];
 let stored: string | null = null;
 let readError: Error | null = null;
 let writeError: Error | null = null;
@@ -49,10 +49,7 @@ mockModule("@react-native-async-storage/async-storage", {
   },
 });
 
-mockModule("@/lib/sentry", {
-  captureException: (error: unknown, context: { scope?: string }) =>
-    captured.push({ error, context }),
-});
+const captured = installSpyCapture();
 
 mockModule("@/lib/analytics", {
   trackEvent: (name: string, props: unknown) => events.push({ name, props }),

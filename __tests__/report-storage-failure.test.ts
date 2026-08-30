@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 
 import { balancedEnd, balancedInner } from "@/lib/balanced-source";
 
+import { installSpyCapture } from "./helpers/mount-provider";
 import { assertNoOffenders } from "./helpers/offence-sweep";
-import { installNativeModuleStubs, mockModule } from "./helpers/render";
+import { installNativeModuleStubs } from "./helpers/render";
 import { expectStorageReport } from "./helpers/storage-failure-report";
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, sourceCode, sourceFiles } from "./helpers/source-files";
@@ -37,11 +38,7 @@ import { readSource, sourceCode, sourceFiles } from "./helpers/source-files";
 
 installNativeModuleStubs();
 
-const captured: { error: unknown; context: unknown }[] = [];
-
-mockModule("@/lib/sentry", {
-  captureException: (error: unknown, context: unknown) => captured.push({ error, context }),
-});
+const captured = installSpyCapture();
 
 /** A real per-user key: every builder in `storage-keys.ts` ends in the auth id. */
 const AUTH_ID = "11111111-2222-4333-8444-555555555555";

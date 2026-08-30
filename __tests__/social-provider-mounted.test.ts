@@ -6,6 +6,7 @@ import { mockModule } from "./helpers/render";
 import {
   drain,
   installSpyAsyncStorage,
+  installSpyCapture,
   installSpyToast,
   installStubI18n,
   providerHarness,
@@ -40,7 +41,7 @@ let remoteRequests: { from_user_id: string; to_user_id: string }[] | null = [];
 const toasts = installSpyToast();
 installStubI18n();
 
-mockModule("@/lib/sentry", { captureException: () => undefined });
+installSpyCapture();
 
 mockModule("@/lib/analytics", { trackEvent: () => undefined });
 

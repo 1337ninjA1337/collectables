@@ -2,6 +2,7 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 
+import { installSpyCapture } from "./helpers/mount-provider";
 import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
 
 /**
@@ -41,7 +42,6 @@ const calls: string[] = [];
 /** Keys the provider actually read and wrote, in order. */
 const reads: string[] = [];
 const writes: { key: string; value: string }[] = [];
-const captured: { error: unknown; context: { scope?: string } }[] = [];
 /** What the device holds — `null` is "nothing stored yet". */
 let stored: string | null = null;
 let readError: Error | null = null;
@@ -63,9 +63,7 @@ mockModule("@react-native-async-storage/async-storage", {
   },
 });
 
-mockModule("@/lib/sentry", {
-  captureException: (error: unknown, context: { scope?: string }) =>
-    captured.push({ error, context }),
+const captured = installSpyCapture({
   initSentry: async () => {
     calls.push("initSentry");
   },

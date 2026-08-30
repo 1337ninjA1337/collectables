@@ -1,6 +1,7 @@
 import { createElement, type ComponentType, type PropsWithChildren } from "react";
 
 import { installNativeModuleStubs, mockModule, render, type RenderResult } from "./render";
+import type { CapturedReport } from "./storage-failure-report";
 
 /**
  * The twenty lines every mounted-provider suite was writing out by hand.
@@ -19,6 +20,11 @@ import { installNativeModuleStubs, mockModule, render, type RenderResult } from 
  * `helpers/spy-async-storage.ts` covers a different job — it refuses a second
  * install per process, which is right for the module-level singletons it was
  * written for and unusable here, where the store must be cleared per case.
+ *
+ * The Sentry double was the last copied block: NINE suites installed it, in
+ * three spellings that differed only by accident. {@link installSpyCapture} is
+ * the one of them, and `mount-provider-harness.test.ts` sweeps for the shape it
+ * replaced.
  *
  * ## The fixed-count drain, and why it is gone
  *
@@ -127,6 +133,40 @@ export function installSpyToast(): ToastRecord[] {
     useToast: () => ({ success: record("success"), error: record("error"), info: record("info") }),
   });
   return toasts;
+}
+
+/**
+ * Replaces `@/lib/sentry` with a recorder and returns what was captured.
+ *
+ * Nine suites installed this double by hand and no two spelled it the same
+ * way: four discarded the call (`captureException: () => undefined`), three
+ * pushed into an array typed `{ scope?: string }` because that is the only
+ * field they read, and two typed the context `unknown` because they compare the
+ * whole object. The differences were accidental — every one of them is the same
+ * spy — and the `unknown` half was the reason `expectStorageReport` had to take
+ * a context it could not describe.
+ *
+ * Recording is the DEFAULT rather than an option, including for the four suites
+ * that ignore the array. A discarding double answers "was anything reported?"
+ * with silence, which is the same answer a broken report path gives; keeping
+ * the events costs one array and leaves the question askable.
+ *
+ * `extraExports` is for the suites that mock more of `@/lib/sentry` than the
+ * capture — `diagnostics-context` drives `initSentry` and `setSentryOptOut`
+ * through the same module, and a second `mockModule` call for one specifier
+ * REPLACES the first rather than merging with it.
+ *
+ * Reset in a `beforeEach` with `captured.length = 0`, like {@link installSpyToast}.
+ */
+export function installSpyCapture(extraExports: Record<string, unknown> = {}): CapturedReport[] {
+  const captured: CapturedReport[] = [];
+  mockModule("@/lib/sentry", {
+    ...extraExports,
+    captureException: (error: unknown, context: CapturedReport["context"]) => {
+      captured.push({ error, context });
+    },
+  });
+  return captured;
 }
 
 /**

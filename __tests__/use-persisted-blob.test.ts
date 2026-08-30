@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 
 import { assertRequiredParameter, declaredSource, parameterList } from "./helpers/declared-shape";
+import { installSpyCapture } from "./helpers/mount-provider";
 import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
 import { readRepoFile } from "./helpers/repo-file";
 import { expectStorageReport } from "./helpers/storage-failure-report";
@@ -30,7 +31,6 @@ import { expectStorageReport } from "./helpers/storage-failure-report";
 installNativeModuleStubs();
 
 const writes: { key: string; value: string }[] = [];
-const captured: { error: unknown; context: unknown }[] = [];
 let failNextWrite = false;
 let failEveryWrite = false;
 
@@ -46,9 +46,7 @@ mockModule("@react-native-async-storage/async-storage", {
   },
 });
 
-mockModule("@/lib/sentry", {
-  captureException: (error: unknown, context: unknown) => captured.push({ error, context }),
-});
+const captured = installSpyCapture();
 
 /** Mutable render inputs — reassigned between renders, like the provider's state. */
 let collections: unknown = ["c1"];
@@ -190,6 +188,18 @@ describe("a rejected write is swallowed, not silent", () => {
       keyspace: "collectables-collections-v1-{id}",
       reason: "full",
     });
+    // The SECOND blob, which had gone unasserted: one hook, two keys, and the
+    // budget is per keyspace — so the report that proves the two blobs are
+    // independent is the one nothing was reading.
+    expectStorageReport(
+      captured,
+      {
+        scope: "use-persisted-blob.setItem",
+        keyspace: "items-user-1",
+        reason: "full",
+      },
+      1,
+    );
     assert.equal(
       JSON.stringify(captured).includes("11111111"),
       false,

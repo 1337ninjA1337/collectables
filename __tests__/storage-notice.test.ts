@@ -3,8 +3,12 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 
 import { installNativeModuleStubs, render } from "./helpers/render";
-import { drain, installSpyToast, installStubI18n } from "./helpers/mount-provider";
-import { mockModule } from "./helpers/render";
+import {
+  drain,
+  installSpyCapture,
+  installSpyToast,
+  installStubI18n,
+} from "./helpers/mount-provider";
 import { readSource, sourceFiles } from "./helpers/source-files";
 
 /**
@@ -23,7 +27,7 @@ installNativeModuleStubs();
 const toasts = installSpyToast();
 installStubI18n();
 
-mockModule("@/lib/sentry", { captureException: () => undefined });
+installSpyCapture();
 
 type NoticeModule = typeof import("../lib/storage-notice");
 type ReportingModule = typeof import("../lib/report-storage-failure");

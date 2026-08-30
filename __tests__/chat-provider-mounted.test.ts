@@ -6,6 +6,7 @@ import { mockModule } from "./helpers/render";
 import {
   drain,
   installSpyAsyncStorage,
+  installSpyCapture,
   installSpyToast,
   installStubI18n,
   providerHarness,
@@ -36,7 +37,7 @@ let user: { id: string } | null = { id: "user-a" };
 const toasts = installSpyToast();
 installStubI18n();
 
-mockModule("@/lib/sentry", { captureException: () => undefined });
+installSpyCapture();
 
 mockModule("@/lib/auth-context", { useAuth: () => ({ user }) });
 
