@@ -451,7 +451,13 @@ describe("translation floors", () => {
     // threshold somebody would eventually be tempted to lower. The map still
     // holds 501 keys, which is what `row.baseKeys` reports and why the two
     // numbers are separate fields.
-    assert.match(report, /en: 498\/498 keys \(100\.0%\)/);
+    // 500 since 2026-08-30: `storagePersistRefusedTitle` and
+    // `storagePersistRefusedMessage`, the toast raised the first time a
+    // hydration gate refuses to persist — written in all six, so every row
+    // rose by two and none of them started inheriting. The strings are the
+    // user-facing half of a flag five providers have held silently since the
+    // seed-overwrite fix; see `lib/hydration-gate-notice.ts`.
+    assert.match(report, /en: 500\/500 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

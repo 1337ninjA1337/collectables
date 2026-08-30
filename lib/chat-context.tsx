@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
+import { useHydrationGateNotice } from "@/lib/hydration-gate-notice";
 import {
   ChatPreview,
   ChatStore,
@@ -128,6 +129,10 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       active = false;
     };
   }, [storageKey]);
+
+  // A closed gate means the OFFLINE QUEUE is not being written at all, and
+  // nothing upstream holds it. See `lib/hydration-gate-notice.ts`.
+  useHydrationGateNotice(ready && !hydrationSafeToPersist && !!storageKey);
 
   useEffect(() => {
     // The account half of the gate. Both booleans are still true on the render

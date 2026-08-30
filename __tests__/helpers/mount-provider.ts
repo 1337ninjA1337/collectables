@@ -103,6 +103,59 @@ export function installSpyAsyncStorage(): SpyAsyncStorage {
   return spy;
 }
 
+export type ToastRecord = {
+  level: "success" | "error" | "info";
+  message: string;
+  title?: string;
+};
+
+/**
+ * Replaces `@/lib/toast-context` with a recorder and returns what was raised.
+ *
+ * Every provider that holds a hydration gate now calls `useHydrationGateNotice`
+ * (see `lib/hydration-gate-notice.ts`), so `useToast` is on the mount path of
+ * all five — and the toast it raises is the only user-visible consequence of a
+ * refused persist, which makes it a thing to assert rather than a thing to stub
+ * into silence.
+ */
+export function installSpyToast(): ToastRecord[] {
+  const toasts: ToastRecord[] = [];
+  const record = (level: ToastRecord["level"]) => (message: string, title?: string) => {
+    toasts.push({ level, message, title });
+  };
+  mockModule("@/lib/toast-context", {
+    useToast: () => ({ success: record("success"), error: record("error"), info: record("info") }),
+  });
+  return toasts;
+}
+
+/**
+ * Replaces `@/lib/i18n-context` with an identity `t()`.
+ *
+ * A key rather than a sentence, so a case asserts which STRING was chosen
+ * without pinning its English wording — the wording is the translators' and
+ * changes; the key is the contract.
+ */
+export function installStubI18n(language = "en"): void {
+  mockModule("@/lib/i18n-context", {
+    useI18n: () => ({ t: (key: string) => key, language }),
+  });
+}
+
+/**
+ * Clears the once-per-session latch in `lib/hydration-gate-notice.ts`.
+ *
+ * Module-level by design — the notice is about a DEVICE, so five providers
+ * refusing raise one toast between them — which makes it state that survives
+ * across cases in one process. Dynamic, because the module reaches i18n and the
+ * toast host, and a static import would resolve both before a suite's mocks
+ * registered.
+ */
+export async function resetHydrationGateNotice(): Promise<void> {
+  const notice = await import("../../lib/hydration-gate-notice");
+  notice.__resetHydrationGateNoticeForTests();
+}
+
 /** One macrotask, which is what a resolved `AsyncStorage` promise needs. */
 export function settle(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));

@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
+import { useHydrationGateNotice } from "@/lib/hydration-gate-notice";
 import {
   DEFAULT_PREMIUM_STATE,
   PremiumState,
@@ -117,6 +118,11 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
       cancelled = true;
     };
   }, [storageKey]);
+
+  // The gate refused every write this session and nothing on screen says so:
+  // an activation made here is gone on relaunch. See
+  // `lib/hydration-gate-notice.ts`.
+  useHydrationGateNotice(ready && !hydrationSafeToPersist && !!storageKey);
 
   useEffect(() => {
     // `hydrationMatchesKey` is the account half of the gate: the booleans are

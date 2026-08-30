@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 
 import { mockModule } from "./helpers/render";
-import { drain, installSpyAsyncStorage, providerHarness } from "./helpers/mount-provider";
+import {
+  drain,
+  installSpyAsyncStorage,
+  installSpyToast,
+  installStubI18n,
+  providerHarness,
+  resetHydrationGateNotice,
+} from "./helpers/mount-provider";
 
 /**
  * `PremiumProvider`, mounted.
@@ -28,6 +35,9 @@ const captured: { error: unknown; context: { scope?: string } }[] = [];
 let user: { id: string } | null = { id: "user-a" };
 /** What the cloud says; `null` is the transient-failure answer. */
 let validation: unknown = null;
+
+const toasts = installSpyToast();
+installStubI18n();
 
 mockModule("@/lib/sentry", {
   captureException: (error: unknown, context: { scope?: string }) =>
@@ -73,9 +83,11 @@ function keysWritten(): string[] {
   return writes.map((write) => write.key);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   spy.reset();
   harness.reset();
+  toasts.length = 0;
+  await resetHydrationGateNotice();
   captured.length = 0;
   user = { id: "user-a" };
   validation = null;

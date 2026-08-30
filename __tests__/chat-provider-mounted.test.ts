@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 
 import { mockModule } from "./helpers/render";
-import { drain, installSpyAsyncStorage, providerHarness } from "./helpers/mount-provider";
+import {
+  drain,
+  installSpyAsyncStorage,
+  installSpyToast,
+  installStubI18n,
+  providerHarness,
+  resetHydrationGateNotice,
+} from "./helpers/mount-provider";
 
 /**
  * `ChatProvider`, mounted — the account switch, asked of the provider whose
@@ -25,6 +32,9 @@ import { drain, installSpyAsyncStorage, providerHarness } from "./helpers/mount-
 const spy = installSpyAsyncStorage();
 const { reads, writes, store } = spy;
 let user: { id: string } | null = { id: "user-a" };
+
+const toasts = installSpyToast();
+installStubI18n();
 
 mockModule("@/lib/sentry", { captureException: () => undefined });
 
@@ -72,9 +82,11 @@ const A_PENDING = JSON.stringify({
   },
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   spy.reset();
   harness.reset();
+  toasts.length = 0;
+  await resetHydrationGateNotice();
   user = { id: "user-a" };
 });
 

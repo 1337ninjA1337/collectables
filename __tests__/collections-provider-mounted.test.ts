@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 
 import { mockModule } from "./helpers/render";
-import { drain, installSpyAsyncStorage, providerHarness } from "./helpers/mount-provider";
+import {
+  drain,
+  installSpyAsyncStorage,
+  installSpyToast,
+  installStubI18n,
+  providerHarness,
+  resetHydrationGateNotice,
+} from "./helpers/mount-provider";
 
 /**
  * `CollectionsProvider`, mounted — the last unmounted provider in the tree, and
@@ -38,13 +45,12 @@ const spy = installSpyAsyncStorage();
 const { reads, writes, store } = spy;
 let user: { id: string } | null = { id: "user-a" };
 
+const toasts = installSpyToast();
+installStubI18n();
+
 mockModule("@/lib/sentry", { captureException: () => undefined });
 
 mockModule("@/lib/auth-context", { useAuth: () => ({ user }) });
-
-mockModule("@/lib/i18n-context", {
-  useI18n: () => ({ t: (key: string) => key, language: "en" }),
-});
 
 mockModule("@/lib/social-context", {
   useSocial: () => ({
@@ -164,9 +170,11 @@ function writesTo(key: string) {
   return writes.filter((write) => write.key === key);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   spy.reset();
   harness.reset();
+  toasts.length = 0;
+  await resetHydrationGateNotice();
   user = { id: "user-a" };
 });
 
@@ -241,6 +249,28 @@ describe("CollectionsProvider — a store that could not be read", () => {
     const seeded = writes.filter((write) => write.value.includes('"seed'));
     assert.deepEqual(seeded, [], "the seed rows are a first-run affordance, not a recovery plan");
     assert.deepEqual(writes, []);
+  });
+
+  it("tells the user their changes are not being saved", async () => {
+    spy.readError = new Error("SecurityError");
+    const tree = await mount();
+    await drain(tree);
+
+    assert.deepEqual(toasts, [
+      {
+        level: "error",
+        message: "storagePersistRefusedMessage",
+        title: "storagePersistRefusedTitle",
+      },
+    ]);
+  });
+
+  it("says nothing when the hydrate worked", async () => {
+    store.set(COLLECTIONS_A, A_COLLECTIONS);
+    const tree = await mount();
+    await drain(tree);
+
+    assert.deepEqual(toasts, [], "a healthy session must not be interrupted");
   });
 
   it("still readies the UI, because a broken store is not a reason to block the tree", async () => {

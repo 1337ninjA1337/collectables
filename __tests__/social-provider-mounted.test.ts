@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 
 import { mockModule } from "./helpers/render";
-import { drain, installSpyAsyncStorage, providerHarness } from "./helpers/mount-provider";
+import {
+  drain,
+  installSpyAsyncStorage,
+  installSpyToast,
+  installStubI18n,
+  providerHarness,
+  resetHydrationGateNotice,
+} from "./helpers/mount-provider";
 
 /**
  * `SocialProvider`, mounted — the fifth provider to be run rather than read,
@@ -30,19 +37,14 @@ let user: { id: string; email?: string } | null = { id: "user-a" };
 /** What `fetchFriendRequests` answers; `null` stands for an offline mount. */
 let remoteRequests: { from_user_id: string; to_user_id: string }[] | null = [];
 
+const toasts = installSpyToast();
+installStubI18n();
+
 mockModule("@/lib/sentry", { captureException: () => undefined });
 
 mockModule("@/lib/analytics", { trackEvent: () => undefined });
 
 mockModule("@/lib/auth-context", { useAuth: () => ({ user }) });
-
-mockModule("@/lib/toast-context", {
-  useToast: () => ({ success: () => undefined, error: () => undefined, info: () => undefined }),
-});
-
-mockModule("@/lib/i18n-context", {
-  useI18n: () => ({ t: (key: string) => key, language: "en" }),
-});
 
 mockModule("@/lib/supabase-profiles", {
   fetchFriendRequests: async () => {
@@ -93,9 +95,11 @@ function writesTo(key: string) {
   return writes.filter((write) => write.key === key);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   spy.reset();
   harness.reset();
+  toasts.length = 0;
+  await resetHydrationGateNotice();
   user = { id: "user-a" };
   remoteRequests = [];
 });

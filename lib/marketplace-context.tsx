@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
+import { useHydrationGateNotice } from "@/lib/hydration-gate-notice";
 import {
   activeListings,
   canCreateAnotherListing,
@@ -150,6 +151,10 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
       cancelled = true;
     };
   }, []);
+
+  // One global key and no account, so a closed gate here means the read
+  // itself failed. See `lib/hydration-gate-notice.ts`.
+  useHydrationGateNotice(ready && !hydrationSafeToPersist);
 
   useEffect(() => {
     if (!ready || !hydrationSafeToPersist) return;
