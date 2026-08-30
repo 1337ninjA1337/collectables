@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { assertRequiredParameter, declaredSource, parameterList } from "./helpers/declared-shape";
 import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
 import { readRepoFile } from "./helpers/repo-file";
+import { expectStorageReport } from "./helpers/storage-failure-report";
 
 /**
  * `usePersistedBlob` — one AsyncStorage key per effect.
@@ -182,11 +183,12 @@ describe("a rejected write is swallowed, not silent", () => {
     await mount();
 
     assert.equal(captured.length, 2, "one report per failing keyspace");
-    assert.deepEqual(captured[0].context, {
+    // `reason` is the app's reading of the error — "quota exceeded" here — and
+    // it rides along because it decides which sentence the user was shown.
+    expectStorageReport(captured, {
       scope: "use-persisted-blob.setItem",
-      // `reason` is the app's reading of the error — "quota exceeded" here — and
-      // it rides along because it decides which sentence the user was shown.
-      extra: { keyspace: "collectables-collections-v1-{id}", reason: "full" },
+      keyspace: "collectables-collections-v1-{id}",
+      reason: "full",
     });
     assert.equal(
       JSON.stringify(captured).includes("11111111"),

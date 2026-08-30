@@ -5,6 +5,7 @@ import { balancedEnd, balancedInner } from "@/lib/balanced-source";
 
 import { assertNoOffenders } from "./helpers/offence-sweep";
 import { installNativeModuleStubs, mockModule } from "./helpers/render";
+import { expectStorageReport } from "./helpers/storage-failure-report";
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, sourceCode, sourceFiles } from "./helpers/source-files";
 
@@ -71,9 +72,10 @@ describe("reportStorageFailure", () => {
 
     assert.equal(captured.length, 1);
     assert.equal(captured[0].error, error);
-    assert.deepEqual(captured[0].context, {
+    expectStorageReport(captured, {
       scope: "tombstones.setItem",
-      extra: { keyspace: "collectables-tombstones-v1-items-{id}", reason: "full" },
+      keyspace: "collectables-tombstones-v1-items-{id}",
+      reason: "full",
     });
     assert.equal(
       JSON.stringify(captured).includes(AUTH_ID),
@@ -172,7 +174,8 @@ describe("reportStorageFailure", () => {
   it("keeps a key with no per-user half intact", async () => {
     const { reportStorageFailure } = await load();
     reportStorageFailure("use-persisted-blob.setItem", "collectables-language-v1", 1);
-    assert.deepEqual((captured[0].context as { extra: unknown }).extra, {
+    expectStorageReport(captured, {
+      scope: "use-persisted-blob.setItem",
       keyspace: "collectables-language-v1",
       reason: "unavailable",
     });
@@ -210,7 +213,8 @@ describe("classifyStorageError", () => {
       Object.assign(new Error("localStorage is not available"), { name: "SecurityError" }),
     );
 
-    assert.deepEqual((captured[0].context as { extra: unknown }).extra, {
+    expectStorageReport(captured, {
+      scope: "premium-context.setItem",
       keyspace: "collectables-premium-v1-{id}",
       reason: "unavailable",
     });
@@ -254,6 +258,24 @@ describe("classifyStorageError", () => {
     assert.equal(classifyStorageError(undefined), "unavailable");
     assert.equal(classifyStorageError("quota exceeded"), "full", "a thrown string is still a signal");
     assert.equal(classifyStorageError({ code: 22 }), "full");
+  });
+
+  it("tells the observer and Sentry the same thing, by construction", async () => {
+    const { reportStorageFailure, observeStorageFailures } = await load();
+    let observed: string | null = null;
+    const unsubscribe = observeStorageFailures((event) => {
+      observed = event.reason;
+    });
+
+    // The classification runs once and is passed to both, so these cannot
+    // differ today. The case exists for the day somebody re-classifies at one
+    // of the two call sites: the toast and the crash report would then disagree
+    // about the same failure, and nothing else here would notice.
+    reportStorageFailure("chat-context.setItem", "collectables-chats-v1", new Error("quota"));
+    unsubscribe();
+
+    assert.equal(observed, (captured[0].context as { extra: { reason: string } }).extra.reason);
+    assert.equal(observed, "full");
   });
 
   it("hands the reason to every observer, beside the scope and the keyspace", async () => {
