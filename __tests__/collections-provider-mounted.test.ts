@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 
-import { mockModule } from "./helpers/render";
+import { autoUnmount, mockModule } from "./helpers/render";
 import {
   drain,
   installSpyAsyncStorage,
@@ -41,6 +41,9 @@ import {
  * the read set below exactly the five blobs the gate is about, so a case
  * asserting what was read is asserting something.
  */
+
+// Ends every tree a case rendered, including the cases that fail early.
+autoUnmount();
 
 const spy = installSpyAsyncStorage();
 const { reads, writes, store } = spy;

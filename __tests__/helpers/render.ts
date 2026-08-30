@@ -1,5 +1,6 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { registerHooks } from "node:module";
+import { afterEach } from "node:test";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -855,10 +856,59 @@ export function render(element: React.ReactElement): RenderResult {
     unmount: () => {
       if (unmounted) return;
       unmounted = true;
+      liveTrees.delete(result);
       pass.unmountAll();
       root = { type: "#root", props: {}, children: [] };
     },
   };
 
+  liveTrees.add(result);
   return result;
+}
+
+/**
+ * Every tree that has been rendered and not unmounted, in this process.
+ *
+ * A case that renders, asserts and returns leaves its effects MOUNTED: the
+ * subscription an effect opened is still in whatever module-level registry it
+ * joined, and the next case's assertions see it. Four suites carry a
+ * `resetStorageNotice`-shaped `beforeEach` for exactly that reason — clearing
+ * the registry the leak lands in, rather than ending the tree that leaked into
+ * it, which works for the registries somebody thought of and for no others.
+ */
+const liveTrees = new Set<RenderResult>();
+
+/** Test seam: how many trees are still mounted. See {@link liveTrees}. */
+export function __mountedTreeCountForTests(): number {
+  return liveTrees.size;
+}
+
+/**
+ * Unmounts every tree this process rendered and has not torn down.
+ *
+ * Idempotent, and safe to call on a tree a case already unmounted — `unmount`
+ * removes itself from the set and refuses a second teardown.
+ */
+export function unmountAllTrees(): void {
+  for (const tree of [...liveTrees]) tree.unmount();
+  liveTrees.clear();
+}
+
+/**
+ * Registers an `afterEach` that ends every tree the case rendered.
+ *
+ * Call at MODULE scope of a suite, beside the other installers. `node:test`
+ * takes a root-level `afterEach` from anywhere in the file, so this is one line
+ * in place of an `unmount()` at the end of every case — and unlike that, it
+ * also covers the cases that fail, which are precisely the ones that return
+ * early and leave a subscription behind for the next assertion to read.
+ *
+ * Opt-in rather than automatic: a suite that renders a tree in one case and
+ * asserts on it in the next is doing something this would break, and whether
+ * any does is a question about that suite rather than about the harness.
+ */
+export function autoUnmount(): void {
+  afterEach(() => {
+    unmountAllTrees();
+  });
 }

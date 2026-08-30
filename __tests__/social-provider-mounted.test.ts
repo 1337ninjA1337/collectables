@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 
-import { mockModule } from "./helpers/render";
+import { autoUnmount, mockModule } from "./helpers/render";
 import {
   drain,
   installSpyAsyncStorage,
@@ -31,6 +31,9 @@ import {
  * analytics, Sentry and the store. All eight are `mockModule` calls, and none
  * of them is a dev-dep.
  */
+
+// Ends every tree a case rendered, including the cases that fail early.
+autoUnmount();
 
 const spy = installSpyAsyncStorage();
 const { reads, writes, store } = spy;

@@ -14,12 +14,14 @@ import {
 } from "react";
 
 import {
+  __mountedTreeCountForTests,
   flattenStyle,
   installNativeModuleStubs,
   mockModule,
   render,
   styleOf,
   stubbedModuleSpecifiers,
+  unmountAllTrees,
 } from "./helpers/render";
 
 installNativeModuleStubs();
@@ -652,6 +654,74 @@ describe("render harness — unmount", () => {
         return true;
       },
     );
+  });
+});
+
+/**
+ * A tree a case drops on the floor stays mounted for the rest of the process.
+ *
+ * `unmount()` made teardown possible; nothing made it happen. A case that
+ * renders, asserts and returns leaves its effects live — the subscription an
+ * effect opened is still in whatever module-level registry it joined, and the
+ * NEXT case's assertions see it. Four provider suites carry a
+ * `resetStorageNotice`-shaped `beforeEach` for exactly that reason: clearing
+ * the registry the leak lands in, rather than ending the tree that leaked into
+ * it, which works for the registries somebody thought of and for no others.
+ */
+describe("render harness — trees that outlive their case", () => {
+  it("counts a rendered tree as live until it is unmounted", () => {
+    function Probe() {
+      return null;
+    }
+    const before = __mountedTreeCountForTests();
+
+    const tree = render(createElement(Probe));
+    assert.equal(__mountedTreeCountForTests(), before + 1);
+
+    tree.unmount();
+    assert.equal(__mountedTreeCountForTests(), before, "an ended tree is not live");
+  });
+
+  it("unmountAllTrees ends what a case forgot, and runs its cleanups", () => {
+    const log: string[] = [];
+    function Subscriber() {
+      useEffect(() => {
+        log.push("subscribe");
+        return () => {
+          log.push("unsubscribe");
+        };
+      }, []);
+      return null;
+    }
+    const before = __mountedTreeCountForTests();
+
+    // Deliberately dropped: no `const tree =`, which is the shape of every case
+    // that renders to assert on `texts()` and returns.
+    render(createElement(Subscriber));
+    render(createElement(Subscriber));
+    assert.equal(__mountedTreeCountForTests(), before + 2);
+
+    unmountAllTrees();
+
+    assert.deepEqual(log, ["subscribe", "subscribe", "unsubscribe", "unsubscribe"]);
+    assert.equal(__mountedTreeCountForTests(), 0, "and the registry is empty, not merely smaller");
+  });
+
+  it("is idempotent, and safe over a tree the case already ended", () => {
+    let cleanups = 0;
+    function Subscriber() {
+      useEffect(() => () => {
+        cleanups += 1;
+      }, []);
+      return null;
+    }
+    const tree = render(createElement(Subscriber));
+    tree.unmount();
+
+    assert.doesNotThrow(() => {
+      unmountAllTrees();
+    });
+    assert.equal(cleanups, 1, "a tree that ended itself must not be torn down twice");
   });
 });
 

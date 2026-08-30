@@ -4,7 +4,7 @@ import { createElement } from "react";
 
 import { findLocaleBlock } from "@/lib/i18n-source";
 
-import { installNativeModuleStubs, render } from "./helpers/render";
+import { autoUnmount, installNativeModuleStubs, render } from "./helpers/render";
 import {
   drain,
   installSpyCapture,
@@ -26,6 +26,8 @@ import { readSource, sourceFiles } from "./helpers/source-files";
  */
 
 installNativeModuleStubs();
+// Ends every tree a case rendered, including the cases that fail early.
+autoUnmount();
 
 const toasts = installSpyToast();
 installStubI18n();
