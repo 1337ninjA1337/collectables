@@ -151,16 +151,18 @@ export function installSpyToast(): ToastRecord[] {
  * with silence, which is the same answer a broken report path gives; keeping
  * the events costs one array and leaves the question askable.
  *
- * `extraExports` is for the suites that mock more of `@/lib/sentry` than the
+ * `extraExports` is for the suites that WATCH more of `@/lib/sentry` than the
  * capture — `diagnostics-context` drives `initSentry` and `setSentryOptOut`
- * through the same module, and a second `mockModule` call for one specifier
- * REPLACES the first rather than merging with it.
+ * through the same module and records the calls — and a second `mockModule`
+ * call for one specifier REPLACES the first rather than merging with it, so
+ * they have to arrive here.
  *
  * Reset in a `beforeEach` with `captured.length = 0`, like {@link installSpyToast}.
  */
 export function installSpyCapture(extraExports: Record<string, unknown> = {}): CapturedReport[] {
   const captured: CapturedReport[] = [];
   mockModule("@/lib/sentry", {
+    ...INERT_SENTRY,
     ...extraExports,
     captureException: (error: unknown, context: CapturedReport["context"]) => {
       captured.push({ error, context });
@@ -168,6 +170,41 @@ export function installSpyCapture(extraExports: Record<string, unknown> = {}): C
   });
   return captured;
 }
+
+/**
+ * Every name the app imports from `@/lib/sentry` for its VALUE.
+ *
+ * The double replaces the whole module, so a name it does not answer for is
+ * `undefined` at the call site — and the failure is `x is not a function`
+ * several frames inside a provider, which reads as a bug in the provider. The
+ * spy answered for exactly one name; `DiagnosticsProvider` was the only suite
+ * that had noticed, and it had noticed by writing three stubs by hand.
+ *
+ * Inert rather than recording: the point is that a provider reaching for one of
+ * these gets a function rather than a crash. A suite that wants the CALLS
+ * passes its own recorder through `extraExports`, which wins over the no-op
+ * because it is spread second.
+ *
+ * `mount-provider-harness.test.ts` derives the same list from the app's imports
+ * and fails when the two disagree, so a ninth name is one red case rather than
+ * a confusing crash in whichever suite reaches it first.
+ */
+const INERT_SENTRY: Readonly<Record<string, () => unknown>> = {
+  addBreadcrumb: () => undefined,
+  captureException: () => undefined,
+  getSentryStatus: () => ({}),
+  // A promise, because every caller in the tree awaits or chains this one and a
+  // bare `undefined` turns a missing stub into a different crash rather than
+  // none.
+  initSentry: () => Promise.resolve(),
+  setSentryOptOut: () => undefined,
+  setSentryUser: () => undefined,
+  shutdownSentry: () => undefined,
+  triggerSentryTestError: () => undefined,
+};
+
+/** The names {@link INERT_SENTRY} answers for — what the derivation case compares. */
+export const SENTRY_NAMES_THE_APP_CALLS: readonly string[] = Object.keys(INERT_SENTRY);
 
 /**
  * Replaces `@/lib/i18n-context` with an identity `t()`.

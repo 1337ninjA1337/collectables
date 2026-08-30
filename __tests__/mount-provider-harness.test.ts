@@ -6,8 +6,14 @@ import { balancedInner } from "@/lib/balanced-source";
 import { stripComments } from "@/lib/strip-comments";
 
 import { render } from "./helpers/render";
-import { drain, providerHarness, settle } from "./helpers/mount-provider";
+import {
+  drain,
+  providerHarness,
+  settle,
+  SENTRY_NAMES_THE_APP_CALLS,
+} from "./helpers/mount-provider";
 import { readRepoFile } from "./helpers/repo-file";
+import { readSource, sourceFiles } from "./helpers/source-files";
 import { assertExemptionsHonest, readSuite, topLevelSuites } from "./helpers/suite-files";
 
 /**
@@ -260,6 +266,34 @@ describe("the mounted-provider suites share one harness", () => {
       body,
       /\.\.\.extraExports,\s*\n\s*captureException:/,
       "the spread must come FIRST — an extraExports entry named captureException would otherwise silently replace the recorder",
+    );
+  });
+
+  it("the capture spy answers for every name the app imports from @/lib/sentry", () => {
+    // The double replaces the WHOLE module, so a name it does not answer for is
+    // `undefined` at the call site and the failure is "x is not a function"
+    // several frames inside a provider — which reads as a bug in the provider.
+    // Derived from the app's own imports rather than from `lib/sentry`'s
+    // exports: a helper nobody calls needs no stub, and a ninth name that
+    // somebody starts calling needs one before the crash.
+    const imported = new Set<string>();
+    for (const file of sourceFiles("lib", "components", "app")) {
+      for (const m of readSource(file).matchAll(
+        /import\s+(type\s+)?\{([^}]*)\}\s+from\s+"@\/lib\/sentry"/g,
+      )) {
+        if (m[1]) continue;
+        for (const entry of m[2].split(",")) {
+          const name = entry.trim().split(/\s+as\s+/)[0].trim();
+          if (name && !name.startsWith("type ")) imported.add(name);
+        }
+      }
+    }
+
+    assert.ok(imported.size > 0, "the import sweep found nothing — the parse, not the app");
+    assert.deepEqual(
+      [...SENTRY_NAMES_THE_APP_CALLS].sort(),
+      [...imported].sort(),
+      "add the name to INERT_SENTRY in helpers/mount-provider.ts, or drop it if the app stopped calling it",
     );
   });
 
