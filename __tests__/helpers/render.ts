@@ -258,7 +258,14 @@ export function styleOf(node: TestNode): Record<string, unknown> {
 // ---------------------------------------------------------------------------
 
 type HookCell = { value: unknown; deps?: unknown[] };
-type Instance = { hooks: HookCell[] };
+/**
+ * `effectCells` is the half that makes teardown possible: an effect's cleanup
+ * is stored in its own hook cell, and `useCallback` stores a function in one
+ * too, so "every cell holding a function" cannot tell a cleanup from a
+ * memoised handler. The set is written when an effect is queued, in mount
+ * order, and read backwards when the instance goes away.
+ */
+type Instance = { hooks: HookCell[]; effectCells: Set<HookCell> };
 
 type EffectFn = () => void | (() => void);
 
@@ -298,6 +305,19 @@ class RenderPass {
   readonly contextStack = new Map<unknown, unknown[]>();
   effects: QueuedEffect[] = [];
   dirty = false;
+
+  /**
+   * The instance keys this pass actually rendered.
+   *
+   * What is in `instances` and NOT in here is a component the tree stopped
+   * rendering — a conditional branch that closed, a list row that was removed,
+   * a probe a case took out to watch what unmounting does. Before this set
+   * existed those instances simply stayed in the map with their effects still
+   * live, so a subscription set up on mount was never torn down and nothing
+   * anywhere could tell an effect that returns its cleanup from one that
+   * forgets to.
+   */
+  private visited = new Set<string>();
 
   private current: Instance | null = null;
   private hookIndex = 0;
@@ -382,6 +402,7 @@ class RenderPass {
   strictDepth = 0;
 
   private queueEffect(effect: EffectFn, cell: HookCell): void {
+    this.current?.effectCells.add(cell);
     const queued: QueuedEffect = {
       effect,
       cell,
@@ -407,10 +428,49 @@ class RenderPass {
     return (context as { _currentValue?: unknown })._currentValue;
   }
 
+  /** Called at the start of every pass; what it forgets, {@link sweep} tears down. */
+  beginPass(): void {
+    this.visited.clear();
+  }
+
+  /**
+   * Tears down every instance this pass did not render, child before parent.
+   *
+   * Reverse insertion order is depth-first-parent-first read backwards, which
+   * is the order React destroys a deleted subtree in: a child's cleanup runs
+   * while its parent's context and subscriptions are still standing.
+   */
+  sweep(): void {
+    const removed = [...this.instances.keys()].filter((key) => !this.visited.has(key)).reverse();
+    for (const key of removed) {
+      const instance = this.instances.get(key);
+      if (instance) this.unmountInstance(instance);
+      this.instances.delete(key);
+    }
+  }
+
+  /** Tears the whole tree down, child before parent. See {@link sweep}. */
+  unmountAll(): void {
+    for (const instance of [...this.instances.values()].reverse()) this.unmountInstance(instance);
+    this.instances.clear();
+    this.visited.clear();
+    this.effects = [];
+  }
+
+  private unmountInstance(instance: Instance): void {
+    for (const cell of [...instance.effectCells].reverse()) {
+      const cleanup = cell.value;
+      cell.value = undefined;
+      if (typeof cleanup === "function") (cleanup as () => void)();
+    }
+    instance.effectCells.clear();
+  }
+
   runComponent(component: (props: unknown) => unknown, props: unknown, key: string): unknown {
+    this.visited.add(key);
     let instance = this.instances.get(key);
     if (!instance) {
-      instance = { hooks: [] };
+      instance = { hooks: [], effectCells: new Set() };
       this.instances.set(key, instance);
     }
     const previousInstance = this.current;
@@ -611,6 +671,19 @@ export type RenderResult = {
   press(node: TestNode): void;
   /** Re-runs the tree with hook state preserved. */
   rerender(next?: React.ReactElement): RenderResult;
+  /**
+   * Unmounts the tree: every effect cleanup runs, child before parent.
+   *
+   * Until this existed, "does this effect return its cleanup?" was unaskable
+   * here — a suite that wanted to prove an unsubscribe had to call the
+   * subscription API by hand and assert on the registry, which tests the
+   * registry rather than the component. A component that forgets its cleanup
+   * now leaves the subscription live and a case can say so.
+   *
+   * Idempotent; `rerender` and `press` throw afterwards, because a tree that
+   * has been torn down has no state left to re-render from.
+   */
+  unmount(): void;
 };
 
 function collect(node: TestNode, into: TestNode[]): TestNode[] {
@@ -637,7 +710,12 @@ export function render(element: React.ReactElement): RenderResult {
   function build(current: React.ReactElement): TestNode {
     pass.effects = [];
     pass.dirty = false;
+    pass.beginPass();
     const children = renderNode(pass, current, "root");
+    // Before the new effects mount, so a subtree that moved (removed here,
+    // re-rendered there) releases what it held before its replacement takes it
+    // — which is the order React commits a deletion in.
+    pass.sweep();
     const queued = pass.effects;
     pass.effects = [];
     for (const queuedEffect of queued) queuedEffect.mount();
@@ -652,8 +730,15 @@ export function render(element: React.ReactElement): RenderResult {
   }
 
   let currentElement = element;
+  let unmounted = false;
   let root = build(currentElement);
   if (pass.dirty) root = build(currentElement);
+
+  function requireMounted(action: string): void {
+    if (unmounted) {
+      throw new Error(`render: ${action}() after unmount() — the tree's hook state is gone`);
+    }
+  }
 
   const result: RenderResult = {
     get root() {
@@ -688,6 +773,7 @@ export function render(element: React.ReactElement): RenderResult {
         .filter((node) => node.type === TEXT_NODE)
         .map((node) => node.text ?? ""),
     press: (node) => {
+      requireMounted("press");
       const onPress = node.props.onPress;
       if (typeof onPress !== "function") {
         throw new Error(`${describeNode(node)} has no onPress`);
@@ -696,9 +782,16 @@ export function render(element: React.ReactElement): RenderResult {
       if (pass.dirty) root = build(currentElement);
     },
     rerender: (next) => {
+      requireMounted("rerender");
       if (next) currentElement = next;
       root = build(currentElement);
       return result;
+    },
+    unmount: () => {
+      if (unmounted) return;
+      unmounted = true;
+      pass.unmountAll();
+      root = { type: "#root", props: {}, children: [] };
     },
   };
 

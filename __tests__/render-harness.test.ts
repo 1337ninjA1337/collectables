@@ -241,6 +241,26 @@ describe("render harness — hooks", () => {
     );
   });
 
+  it("re-runs an effect whose deps changed, cleaning the previous one up first", () => {
+    const order: string[] = [];
+    let topic = "a";
+    function Subscriber() {
+      useEffect(() => {
+        order.push(`subscribe:${topic}`);
+        const held = topic;
+        return () => {
+          order.push(`unsubscribe:${held}`);
+        };
+      }, [topic]);
+      return null;
+    }
+    const tree = render(createElement(Subscriber));
+    topic = "b";
+    tree.rerender();
+
+    assert.deepEqual(order, ["subscribe:a", "unsubscribe:a", "subscribe:b"]);
+  });
+
   it("pops the provider stack on the way out so siblings see the outer value", async () => {
     const Ctx = createContext("outer");
     const { useContext } = await import("react");
@@ -333,6 +353,147 @@ describe("render harness — StrictMode", () => {
     const tree = render(createElement(Watcher, { topic: "a" }));
     tree.rerender(createElement(Watcher, { topic: "b" }));
     assert.deepEqual(log, ["open:a", "close:a", "open:b"]);
+  });
+});
+
+/**
+ * Teardown, which the harness had no phase for.
+ *
+ * An effect's cleanup ran only when its deps changed, so "this component
+ * unsubscribes when it goes away" was a fact no case could ask about: a probe
+ * dropped from the tree kept its instance, its state and its subscription, and
+ * a component that never returned a cleanup looked exactly like one that did.
+ * Suites that cared worked around it by calling the subscription API by hand
+ * and asserting on the registry — which tests the registry.
+ */
+describe("render harness — unmount", () => {
+  it("runs an effect cleanup when the tree is unmounted", () => {
+    const order: string[] = [];
+    function Subscriber() {
+      useEffect(() => {
+        order.push("subscribe");
+        return () => {
+          order.push("unsubscribe");
+        };
+      }, []);
+      return createElement("Text", null, "up");
+    }
+    const tree = render(createElement(Subscriber));
+    assert.deepEqual(order, ["subscribe"]);
+
+    tree.unmount();
+
+    assert.deepEqual(order, ["subscribe", "unsubscribe"]);
+    assert.deepEqual(tree.texts(), [], "the tree is gone, not merely quiet");
+  });
+
+  it("cleans up child before parent", () => {
+    const order: string[] = [];
+    function Leaf() {
+      useEffect(() => () => {
+        order.push("leaf");
+      }, []);
+      return null;
+    }
+    function Branch() {
+      useEffect(() => () => {
+        order.push("branch");
+      }, []);
+      return createElement(Leaf);
+    }
+    const tree = render(createElement(Branch));
+    tree.unmount();
+
+    assert.deepEqual(
+      order,
+      ["leaf", "branch"],
+      "a child tears down while its parent's context and subscriptions still stand",
+    );
+  });
+
+  it("is idempotent, so a second unmount does not run a cleanup twice", () => {
+    let cleanups = 0;
+    function Subscriber() {
+      useEffect(() => () => {
+        cleanups += 1;
+      }, []);
+      return null;
+    }
+    const tree = render(createElement(Subscriber));
+    tree.unmount();
+    tree.unmount();
+
+    assert.equal(cleanups, 1);
+  });
+
+  it("refuses to re-render afterwards, because the hook state is gone", () => {
+    function Component() {
+      const [value] = useState("x");
+      return createElement("Text", null, value);
+    }
+    const tree = render(createElement(Component));
+    tree.unmount();
+
+    assert.throws(() => tree.rerender(), /after unmount/);
+  });
+
+  it("tears down a subtree the next render stopped producing", () => {
+    const order: string[] = [];
+    let showChild = true;
+    function Child() {
+      useEffect(() => {
+        order.push("subscribe");
+        return () => {
+          order.push("unsubscribe");
+        };
+      }, []);
+      return createElement("Text", null, "child");
+    }
+    function Parent() {
+      return createElement("View", null, showChild ? createElement(Child) : null);
+    }
+    const tree = render(createElement(Parent));
+    assert.deepEqual(order, ["subscribe"]);
+
+    showChild = false;
+    tree.rerender();
+
+    assert.deepEqual(order, ["subscribe", "unsubscribe"], "a closed branch is an unmount");
+  });
+
+  it("gives a re-added subtree fresh state, as React does", () => {
+    let showChild = true;
+    let seen: string | null = null;
+    function Child() {
+      const [value, setValue] = useState("initial");
+      seen = value;
+      return createElement("Pressable", { onPress: () => setValue("edited") }, value);
+    }
+    function Parent() {
+      return createElement("View", null, showChild ? createElement(Child) : null);
+    }
+    const tree = render(createElement(Parent));
+    tree.press(tree.findByType("Pressable"));
+    assert.equal(seen, "edited");
+
+    showChild = false;
+    tree.rerender();
+    showChild = true;
+    tree.rerender();
+
+    assert.equal(seen, "initial", "state does not survive the branch that held it");
+  });
+
+  it("leaves an effect that returns nothing alone", () => {
+    function Silent() {
+      useEffect(() => {
+        // No cleanup, which is legal and must not become a call to undefined.
+      }, []);
+      return null;
+    }
+    const tree = render(createElement(Silent));
+
+    assert.doesNotThrow(() => tree.unmount());
   });
 });
 

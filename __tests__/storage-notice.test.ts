@@ -230,22 +230,30 @@ describe("useStorageFailureNotice — a write that was rejected mid-session", ()
     assert.equal(toasts.length, 1, "the budget is Sentry's; the latch is the user's");
   });
 
-  it("hands back an unsubscribe, which is what the effect returns on unmount", async () => {
+  it("unsubscribes when its host unmounts, rather than outliving it", async () => {
     await load();
-    let heard = 0;
-    const unsubscribe = reporting!.observeStorageFailures(() => {
-      heard += 1;
-    });
+    const tree = render(createElement(Listener));
+    await drain(tree);
+    assert.equal(reporting!.__storageFailureObserverCountForTests(), 1);
+
+    tree.unmount();
+
+    assert.equal(
+      reporting!.__storageFailureObserverCountForTests(),
+      0,
+      "an observer that outlives its toast host is a leak, and its toast reaches nobody",
+    );
+  });
+
+  it("and says nothing after that, because the host that would show it is gone", async () => {
+    await load();
+    const tree = render(createElement(Listener));
+    await drain(tree);
+    tree.unmount();
 
     reporting!.reportStorageFailure("chat-context.setItem", "collectables-chats-v1", new Error("x"));
-    unsubscribe();
-    reporting!.reportStorageFailure("chat-context.setItem", "collectables-chats-v1", new Error("x"));
 
-    // Asserted on the registry rather than through a React unmount: the render
-    // harness has no unmount phase (it cleans an effect up only when its
-    // dependencies change), so a case that removed the probe from the tree
-    // would pass whether or not the hook returned its unsubscribe at all.
-    assert.equal(heard, 1, "an observer that outlives its toast host is a leak");
+    assert.deepEqual(toasts, [], "the effect's cleanup is what makes this true");
   });
 
   it("a throwing observer does not take the storage catch down with it", async () => {
