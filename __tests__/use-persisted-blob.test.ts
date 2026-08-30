@@ -272,14 +272,20 @@ describe("collections-context.tsx persists one blob per effect", () => {
     );
   });
 
-  it("gates the five hooks on ready && user AND on the hydrate having understood the store", async () => {
+  it("gates the five hooks on ready, on the hydrate, AND on which account it read", async () => {
     // Was `ready && !!user`, which is what the batched effect used and what
     // this case pinned. `ready` flips in a `finally` that runs whether the
     // hydrate learned anything or not, so those two alone enabled five writes
     // after a hydrate that had just installed the demo seed data — see
-    // `stored-blob.test.ts`. The third conjunct is strictly narrower: nothing
-    // that was persisted before is skipped now, and a hydrate that could not
-    // read the store no longer writes over it.
-    assert.match(CONTEXT_SOURCE, /const persistEnabled = ready && hydrationSafeToPersist && !!user;/);
+    // `stored-blob.test.ts`.
+    //
+    // `!!user` then went the same way: it is true on the render where the
+    // account CHANGED, with the previous account's five blobs still in state,
+    // so the five writes landed under the new user's keys. `hydrationMatchesKey`
+    // compares the account the state was hydrated FOR with the one in hand.
+    assert.match(
+      CONTEXT_SOURCE.replace(/\s+/g, " "),
+      /const persistEnabled = ready && hydrationSafeToPersist && hydrationMatchesKey\(hydratedUserId, user\?\.id \?\? null\);/,
+    );
   });
 });

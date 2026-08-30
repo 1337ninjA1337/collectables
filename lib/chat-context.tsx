@@ -15,6 +15,7 @@ import {
 } from "@/lib/chat-helpers";
 import { reportStorageFailure } from "@/lib/report-storage-failure";
 import {
+  hydrationMatchesKey,
   mayPersistHydration,
   readStoredObject,
   UNREADABLE_BLOB,
@@ -69,6 +70,13 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   const [ready, setReady] = useState(false);
   /** Whether the last hydrate understood the store. See `lib/stored-blob.ts`. */
   const [hydrationSafeToPersist, setHydrationSafeToPersist] = useState(false);
+  /**
+   * WHICH key the store in hand was hydrated from. On the render where the
+   * account changes, the booleans above still describe the PREVIOUS account —
+   * and this store holds A's messages and A's offline queue. See
+   * `hydrationMatchesKey`.
+   */
+  const [hydratedKey, setHydratedKey] = useState<string | null>(null);
   const [realtimeOnline, setRealtimeOnline] = useState(false);
   const pendingRef = useRef<Record<string, ChatMessage[]>>({});
 
@@ -81,6 +89,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
       // Signed out is not "hydrated and safe": the next sign-in must earn it,
       // or this empty store would be written over the incoming account's.
       setHydrationSafeToPersist(false);
+      setHydratedKey(null);
       return;
     }
 
@@ -106,6 +115,7 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
         // the real one the moment `ready` flipped — losing exactly the messages
         // the queue exists to keep. See `lib/stored-blob.ts`.
         setHydrationSafeToPersist(mayPersistHydration([stored]));
+        setHydratedKey(key);
         setStore(chatStoreFrom(stored));
       } finally {
         if (active) setReady(true);
@@ -120,11 +130,17 @@ export function ChatProvider({ children }: React.PropsWithChildren) {
   }, [storageKey]);
 
   useEffect(() => {
-    if (!ready || !hydrationSafeToPersist || !storageKey) return;
+    // The account half of the gate. Both booleans are still true on the render
+    // where `user` changed, and this store came from the PREVIOUS account —
+    // writing it here would put A's messages, and the offline queue nothing
+    // upstream holds, under B's key on a shared device.
+    if (!ready || !hydrationSafeToPersist || !hydrationMatchesKey(hydratedKey, storageKey)) {
+      return;
+    }
     AsyncStorage.setItem(storageKey, JSON.stringify(store)).catch((error: unknown) => {
       reportStorageFailure("chat-context.setItem", storageKey, error);
     });
-  }, [hydrationSafeToPersist, ready, storageKey, store]);
+  }, [hydratedKey, hydrationSafeToPersist, ready, storageKey, store]);
 
   // Keep a ref in sync with the latest pending queue so flushPending can read
   // it without re-creating refreshFromCloud on every store change.

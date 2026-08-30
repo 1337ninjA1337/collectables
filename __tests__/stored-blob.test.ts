@@ -172,11 +172,16 @@ describe("mayPersistHydration", () => {
 describe("the provider's hydrate adopts the rule", () => {
   const SOURCE = readRepoFile("lib/collections-context.tsx");
 
-  it("gates persistence on the hydrate as well as on ready", () => {
-    // The two questions that were one boolean. `ready` says the UI may render;
-    // `hydrationSafeToPersist` says the store was understood. Collapsing them
-    // is what let a `finally` that ran on failure enable five writes.
-    assert.match(SOURCE, /const persistEnabled = ready && hydrationSafeToPersist && !!user;/);
+  it("gates persistence on the hydrate and on the account, as well as on ready", () => {
+    // The three questions that were one boolean. `ready` says the UI may
+    // render; `hydrationSafeToPersist` says the store was understood; and
+    // `hydrationMatchesKey` says WHICH account the state in hand came from —
+    // `!!user` was true on the render where the account changed, which is how
+    // the previous user's five blobs reached the new user's keys.
+    assert.match(
+      SOURCE.replace(/\s+/g, " "),
+      /const persistEnabled = ready && hydrationSafeToPersist && hydrationMatchesKey\(hydratedUserId, user\?\.id \?\? null\);/,
+    );
     assert.match(SOURCE, /useState\(false\)/);
   });
 
@@ -210,17 +215,17 @@ describe("the three cache providers gate their persists too", () => {
   it("PremiumProvider no longer downgrades a payer from a failed READ", () => {
     const source = readRepoFile("lib/premium-context.tsx");
     assert.match(
-      source,
-      /if \(!ready \|\| !hydrationSafeToPersist \|\| !storageKey\) return;/,
-      "the persist effect must not run after a hydrate that could not read",
+      source.replace(/\s+/g, " "),
+      /if \(!ready \|\| !hydrationSafeToPersist \|\| !hydrationMatchesKey\(hydratedKey, storageKey\)\) \{ return; \}/,
+      "the persist effect must not run after a hydrate that could not read, or one that read a DIFFERENT account",
     );
     assert.match(source, /reportStorageFailure\("premium-context\.getItem"/);
     // The catch arm sets the flag and reports, and does NOT touch `state`.
     // Matched as a statement rather than by scanning a window, because the
     // comment in that arm names the call it removed.
     assert.match(
-      source,
-      /catch \(error: unknown\) \{[\s\S]{0,900}?setHydrationSafeToPersist\(false\);\s*\n\s*reportStorageFailure\("premium-context\.getItem"/,
+      source.replace(/\s+/g, " "),
+      /catch \(error: unknown\) \{.{0,900}?setHydrationSafeToPersist\(false\); setHydratedKey\(null\); reportStorageFailure\("premium-context\.getItem"/,
     );
     assert.equal(
       source.match(/^\s*setState\(DEFAULT_PREMIUM_STATE\);$/gm)?.length,
@@ -258,8 +263,19 @@ describe("the three cache providers gate their persists too", () => {
     // anybody adds a dependency-array entry, and would then be "fixed" by
     // editing the number rather than by looking at what changed.
     const source = readRepoFile("lib/social-context.tsx");
-    const guards = source.match(/if \((?:!user \|\| )?!ready \|\| !hydrationSafeToPersist\)/g);
+    const flat = source.replace(/\s+/g, " ");
+    const guards = flat.match(
+      /if \((?:!user \|\| )?!ready \|\| !hydrationSafeToPersist(?: \|\| !hydrationMatchesKey\(hydratedUserId, user\.id\))?\)/g,
+    );
     assert.equal(guards?.length, 3, "the social cache, the graph and the pending queue");
+    // Two of the three write a key with the user id in it, and those two also
+    // ask WHICH account the state was hydrated for — the third writes one
+    // global graph key, where there is no other account's blob to land on.
+    assert.equal(
+      flat.match(/!hydrationMatchesKey\(hydratedUserId, user\.id\)/g)?.length,
+      2,
+      "the social cache and the pending queue are user-scoped; the graph key is not",
+    );
     assert.match(source, /setHydrationSafeToPersist\(\s*mayPersistHydration\(/, "set by the hydrate");
     assert.match(source, /setReady\(false\);[\s\S]{0,400}?setHydrationSafeToPersist\(false\);/, "cleared on sign-out");
   });

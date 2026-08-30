@@ -25,6 +25,7 @@ import { reportStorageFailure } from "@/lib/report-storage-failure";
 import { captureException } from "@/lib/sentry";
 import {
   blobObject,
+  hydrationMatchesKey,
   mayPersistHydration,
   readStoredObject,
   UNREADABLE_BLOB,
@@ -231,6 +232,12 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
    * write nothing until a hydrate has said they may.
    */
   const [hydrationSafeToPersist, setHydrationSafeToPersist] = useState(false);
+  /**
+   * WHICH account the social blobs in state were hydrated for. On the render
+   * where `user` changes, the boolean above still says "safe" about the
+   * PREVIOUS account's follow list and offline queue. See `hydrationMatchesKey`.
+   */
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
   const [remoteProfiles, setRemoteProfiles] = useState<UserProfile[]>([]);
   // Cache of profiles fetched on demand (e.g. non-friend collection viewers,
   // chat counterparts). Lives at the provider level so every screen shares one
@@ -303,6 +310,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       // flag again, or the cleared state above would be persisted over whatever
       // the incoming account has on disk.
       setHydrationSafeToPersist(false);
+      setHydratedUserId(null);
       return;
     }
 
@@ -334,6 +342,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
 
         // The three local blobs decide whether anything may be written back:
         // `ready` says the UI may render, this says the store was understood.
+        setHydratedUserId(activeUser.id);
         setHydrationSafeToPersist(
           mayPersistHydration([storedPersonal, storedGraph, storedPendingSocial]),
         );
@@ -361,7 +370,10 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         // before the throw stays; the rest keeps its default. NOT a storage
         // failure — the store answered — so it goes to Sentry as itself rather
         // than through the once-per-keyspace budget.
-        if (active) setHydrationSafeToPersist(false);
+        if (active) {
+          setHydrationSafeToPersist(false);
+          setHydratedUserId(null);
+        }
         captureException(error, { scope: "social-context.hydrate" });
       } finally {
         if (active) {
@@ -452,7 +464,9 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   }, [profiles, user]);
 
   useEffect(() => {
-    if (!user || !ready || !hydrationSafeToPersist) {
+    // The account half of the gate: `!!user` was true on the render where the
+    // account CHANGED, with the previous account's follow list still in state.
+    if (!user || !ready || !hydrationSafeToPersist || !hydrationMatchesKey(hydratedUserId, user.id)) {
       return;
     }
 
@@ -466,7 +480,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     ).catch((error: unknown) => {
       reportStorageFailure("social-context.setItem", key, error);
     });
-  }, [following, hydrationSafeToPersist, myProfileOverride, ready, user]);
+  }, [following, hydratedUserId, hydrationSafeToPersist, myProfileOverride, ready, user]);
 
   useEffect(() => {
     if (!ready || !hydrationSafeToPersist) {
@@ -487,12 +501,14 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   // BE-13d: persist the pending social-mutation queue so parked offline writes
   // survive a reload and re-deliver on the next session.
   useEffect(() => {
-    if (!user || !ready || !hydrationSafeToPersist) return;
+    if (!user || !ready || !hydrationSafeToPersist || !hydrationMatchesKey(hydratedUserId, user.id)) {
+      return;
+    }
     const key = pendingSocialKey(user.id);
     AsyncStorage.setItem(key, JSON.stringify(pendingSocial)).catch((error: unknown) => {
       reportStorageFailure("social-context.setItem", key, error);
     });
-  }, [hydrationSafeToPersist, pendingSocial, ready, user]);
+  }, [hydratedUserId, hydrationSafeToPersist, pendingSocial, ready, user]);
 
   // Sync own profile to Supabase only when myProfileOverride changes. Routed
   // through the BE-13d queue so a failed upsert (offline) is retried on reconnect.

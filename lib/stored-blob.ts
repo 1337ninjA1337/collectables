@@ -153,3 +153,47 @@ export function mayPersistHydration(blobs: readonly StoredBlob<unknown>[]): bool
  * be equivalent to the status check its callers already make, and an
  * abstraction no caller exercises is one nobody can check.
  */
+
+/**
+ * Whether the state in hand belongs to the key that is about to be written.
+ *
+ * ## The hole every boolean gate had
+ *
+ * `hydrationSafeToPersist` answers "did a read work", which is a fact about
+ * the PAST and not about the account in front of you. When `user` changes, the
+ * render that first sees the new key still holds the previous account's state,
+ * `ready` and gate — and both effects run against THAT render. The hydrate
+ * effect calls `setReady(false)`, but a scheduled state update is not a
+ * current one: the persist effect beside it reads the values it was rendered
+ * with (`ready: true`, gate open) and writes the previous account's blob under
+ * the new account's key.
+ *
+ * It was found by mounting `premium-context` and switching `user` — user A's
+ * paid entitlement landed under user B's key, on a device they share — and
+ * `chat-context` had the same shape, where the leaked blob would have been A's
+ * messages, including the offline queue nothing upstream holds. The
+ * hydration-gate sweep's "the gate is cleared when the account changes" case
+ * passes on both, because both DO call `setHydrationSafeToPersist(false)`;
+ * what it cannot see is that the call lands one render too late.
+ *
+ * So the gate needs a fact that is stale in the same way the state is: which
+ * key the state was hydrated FROM. That value is a state of its own, so on the
+ * account-change render it still names the OLD key, and comparing it with the
+ * fresh `storageKey` refuses the write.
+ *
+ * It narrows `storageKey`, so a guard that calls it replaces the `!storageKey`
+ * check rather than sitting beside one: two conditions for one fact is how the
+ * weaker of them ends up being the one a later edit keeps.
+ *
+ * `hydratedKey` subsumes `hydrationSafeToPersist` today — it is only ever set
+ * on a successful read — and both stay: five providers share the boolean, the
+ * sweep names it, and the two answer different questions ("did the read work"
+ * versus "for whom"). Merging them is one change across five providers and is
+ * filed rather than smuggled in here.
+ */
+export function hydrationMatchesKey(
+  hydratedKey: string | null,
+  storageKey: string | null,
+): storageKey is string {
+  return storageKey !== null && hydratedKey === storageKey;
+}

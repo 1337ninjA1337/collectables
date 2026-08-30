@@ -87,6 +87,7 @@ import { captureException } from "@/lib/sentry";
 import {
   blobObject,
   blobRows,
+  hydrationMatchesKey,
   mayPersistHydration,
   readStoredArray,
   readStoredObject,
@@ -310,6 +311,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
    * Starts false, so nothing is written before a hydrate has said it may be.
    */
   const [hydrationSafeToPersist, setHydrationSafeToPersist] = useState(false);
+  /**
+   * WHICH account the five blobs in state were hydrated for. The boolean above
+   * cannot answer that, and on the render where `user` changes it still says
+   * "safe" about the PREVIOUS account's data. See `hydrationMatchesKey`.
+   */
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   // BE-13c: uuid-keyed pending-upsert queues. A failed cloud write (offline /
   // Supabase unreachable) parks the full entity here; the flush effect below
@@ -574,6 +581,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       // flag again, or the empty state above would be persisted over whatever
       // the incoming account has on disk.
       setHydrationSafeToPersist(false);
+      setHydratedUserId(null);
       return;
     }
 
@@ -616,6 +624,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
 
         // The five local blobs decide whether anything may be written back.
         // `ready` says the UI may render; this says the store is understood.
+        setHydratedUserId(activeUser.id);
         setHydrationSafeToPersist(
           mayPersistHydration([
             storedCollections,
@@ -742,7 +751,10 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         // now is a bug rather than a broken device — every read and both
         // fetches answer for themselves above — so the safe response is to
         // leave state alone and refuse to persist anything this session.
-        if (active) setHydrationSafeToPersist(false);
+        if (active) {
+          setHydrationSafeToPersist(false);
+          setHydratedUserId(null);
+        }
         captureException(error, { scope: "collections-context.hydrate" });
       } finally {
         if (active) {
@@ -767,7 +779,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   // array by reference means "nothing changed, write nothing", which is only
   // true once each blob owns its own dependency list. See
   // `lib/use-persisted-blob.ts` for the reference-identity contract on `value`.
-  const persistEnabled = ready && hydrationSafeToPersist && !!user;
+  // `hydrationMatchesKey` is the account half of the gate. `!!user` was true
+  // on the render where the account CHANGED — with the previous account's five
+  // blobs still in state and `ready` still true — so the five writes below
+  // landed under the new user's keys. See `lib/stored-blob.ts`.
+  const persistEnabled =
+    ready && hydrationSafeToPersist && hydrationMatchesKey(hydratedUserId, user?.id ?? null);
   usePersistedBlob(user ? collectionsKey(user.id) : null, localCollections, persistEnabled);
   usePersistedBlob(user ? itemsKey(user.id) : null, localItems, persistEnabled);
   usePersistedBlob(

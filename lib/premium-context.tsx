@@ -15,6 +15,7 @@ import {
   premiumStorageKey,
 } from "@/lib/premium-helpers";
 import { reportStorageFailure } from "@/lib/report-storage-failure";
+import { hydrationMatchesKey } from "@/lib/stored-blob";
 import { validationToPremiumState } from "@/lib/subscriptions";
 import { cloudValidatePremium } from "@/lib/supabase-subscriptions";
 
@@ -57,6 +58,13 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
   const [ready, setReady] = useState(false);
   /** Whether the last hydrate read the cache. See `lib/stored-blob.ts`. */
   const [hydrationSafeToPersist, setHydrationSafeToPersist] = useState(false);
+  /**
+   * WHICH key the state in hand was hydrated from. The boolean above cannot
+   * answer that, and on the render where the account changes it is the only
+   * thing standing between user A's entitlement and user B's blob — see
+   * `hydrationMatchesKey`.
+   */
+  const [hydratedKey, setHydratedKey] = useState<string | null>(null);
 
   const storageKey = useMemo(() => premiumStorageKey(user?.id ?? null), [user]);
 
@@ -66,6 +74,7 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
     if (!storageKey) {
       setState(DEFAULT_PREMIUM_STATE);
       setHydrationSafeToPersist(false);
+      setHydratedKey(null);
       setReady(true);
       return;
     }
@@ -79,6 +88,7 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
         // WEAKER of the two gates on purpose; `lib/stored-blob.ts` says why a
         // cloud-owned cache takes it and the local-first blobs do not.
         setHydrationSafeToPersist(true);
+        setHydratedKey(storageKey);
         const parsed = parsePremiumState(stored);
         setState(isPremiumExpired(parsed) ? cancelPremiumState(parsed) : parsed);
       } catch (error: unknown) {
@@ -90,6 +100,7 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
         // and nothing is written until a launch reads the store.
         if (!cancelled) {
           setHydrationSafeToPersist(false);
+          setHydratedKey(null);
           reportStorageFailure("premium-context.getItem", storageKey, error);
         }
       } finally {
@@ -108,11 +119,17 @@ export function PremiumProvider({ children }: React.PropsWithChildren) {
   }, [storageKey]);
 
   useEffect(() => {
-    if (!ready || !hydrationSafeToPersist || !storageKey) return;
+    // `hydrationMatchesKey` is the account half of the gate: the booleans are
+    // both still true on the render where `user` changed, and this state came
+    // from the PREVIOUS account. Without it a shared device hands user B user
+    // A's entitlement.
+    if (!ready || !hydrationSafeToPersist || !hydrationMatchesKey(hydratedKey, storageKey)) {
+      return;
+    }
     AsyncStorage.setItem(storageKey, JSON.stringify(state)).catch((error: unknown) => {
       reportStorageFailure("premium-context.setItem", storageKey, error);
     });
-  }, [hydrationSafeToPersist, ready, storageKey, state]);
+  }, [hydratedKey, hydrationSafeToPersist, ready, storageKey, state]);
 
   // The intent must be recorded BEFORE the state flip so the transition hook
   // observing isPremium sees it on the very render the flip commits.

@@ -167,6 +167,29 @@ describe("every hydrating provider gates its persist", () => {
     );
   });
 
+  it("every user-scoped provider gates its persist on the account too", () => {
+    // The case below asks whether the gate is CLOSED on an account change, and
+    // it passes on every provider here — while four of them still wrote one
+    // account's blob under the next account's key. Closing it is a `setState`,
+    // and the persist effect running beside the hydrate in that same commit
+    // reads the values it was RENDERED with: `ready` true, gate open, previous
+    // account's data. Found by mounting `premium-context` and reassigning
+    // `user`; `hydrationMatchesKey` is the fact that is stale in the same way
+    // the state is, so it refuses the write. See `lib/stored-blob.ts`.
+    const userScoped = hydratingProviders().filter(
+      (relative) => !NOT_USER_SCOPED.includes(relative),
+    );
+    assert.ok(userScoped.length >= 4, "the walk lost the user-scoped providers");
+    const problems = userScoped.filter(
+      (relative) => !/hydrationMatchesKey\s*\(/.test(sourceCode(relative)),
+    );
+    assert.deepEqual(
+      problems,
+      [],
+      `these providers persist without checking WHICH account the state came from, so an account switch writes the previous user's blob under the new user's key: ${problems.join(", ")}`,
+    );
+  });
+
   it("the gate is cleared when the account changes", () => {
     // Signed out is not "hydrated and safe". Without this the cleared state a
     // sign-out installs is persisted over whatever the NEXT account has on
