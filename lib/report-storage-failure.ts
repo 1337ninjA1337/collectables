@@ -111,13 +111,19 @@ export function reportStorageFailure(
   // separator that either half can contain lets two different pairs collide on
   // one budget entry, which silently drops the second one's report.
   const budget = `${scope}\u0000${keyspace}`;
+  const reason = classifyStorageError(error);
   // BEFORE the budget check: an observer's idea of repetition is its own, and a
   // read that already spent this pair's budget must not hide the first WRITE
   // from a user who is losing edits. See `observeStorageFailures`.
-  notifyObservers({ scope, keyspace, reason: classifyStorageError(error) });
+  notifyObservers({ scope, keyspace, reason });
   if (reported.has(budget)) return false;
   reported.add(budget);
-  captureException(error, { scope, extra: { keyspace } });
+  // The REASON goes with it because it is this app's opinion about the error
+  // rather than something the error says: it decides which sentence the user
+  // was shown, and "how often does the guess say full?" is a question only the
+  // events can answer. Without it the classification exists solely in a toast
+  // that vanishes, and a spelling the table misses looks like nothing at all.
+  captureException(error, { scope, extra: { keyspace, reason } });
   return true;
 }
 

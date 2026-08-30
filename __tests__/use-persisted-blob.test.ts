@@ -184,7 +184,9 @@ describe("a rejected write is swallowed, not silent", () => {
     assert.equal(captured.length, 2, "one report per failing keyspace");
     assert.deepEqual(captured[0].context, {
       scope: "use-persisted-blob.setItem",
-      extra: { keyspace: "collectables-collections-v1-{id}" },
+      // `reason` is the app's reading of the error — "quota exceeded" here — and
+      // it rides along because it decides which sentence the user was shown.
+      extra: { keyspace: "collectables-collections-v1-{id}", reason: "full" },
     });
     assert.equal(
       JSON.stringify(captured).includes("11111111"),

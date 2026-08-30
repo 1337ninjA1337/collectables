@@ -73,7 +73,7 @@ describe("reportStorageFailure", () => {
     assert.equal(captured[0].error, error);
     assert.deepEqual(captured[0].context, {
       scope: "tombstones.setItem",
-      extra: { keyspace: "collectables-tombstones-v1-items-{id}" },
+      extra: { keyspace: "collectables-tombstones-v1-items-{id}", reason: "full" },
     });
     assert.equal(
       JSON.stringify(captured).includes(AUTH_ID),
@@ -174,6 +174,7 @@ describe("reportStorageFailure", () => {
     reportStorageFailure("use-persisted-blob.setItem", "collectables-language-v1", 1);
     assert.deepEqual((captured[0].context as { extra: unknown }).extra, {
       keyspace: "collectables-language-v1",
+      reason: "unavailable",
     });
   });
 
@@ -200,6 +201,21 @@ describe("reportStorageFailure", () => {
  * does not send somebody deleting photos for a `SecurityError`.
  */
 describe("classifyStorageError", () => {
+  it("rides along to Sentry, so the guess can be measured rather than believed", async () => {
+    const { reportStorageFailure } = await load();
+
+    reportStorageFailure(
+      "premium-context.setItem",
+      "collectables-premium-v1-user-a",
+      Object.assign(new Error("localStorage is not available"), { name: "SecurityError" }),
+    );
+
+    assert.deepEqual((captured[0].context as { extra: unknown }).extra, {
+      keyspace: "collectables-premium-v1-{id}",
+      reason: "unavailable",
+    });
+  });
+
   const full = [
     Object.assign(new Error("The quota has been exceeded."), { name: "QuotaExceededError" }),
     Object.assign(new Error("persistent storage maximum size reached"), {
