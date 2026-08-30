@@ -555,7 +555,7 @@ const en = {
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS is set below 30 seconds. Aggressive overrides can hammer Supabase rate limits.",
   storagePersistRefusedTitle: "Changes aren't being saved",
   storagePersistRefusedMessage:
-    "This device's storage could not be read, so nothing you change now will survive a restart. Restarting the app usually fixes it.",
+    "This device's storage is not available, so changes you make now may not survive a restart. Restarting the app usually fixes it.",
 } as const;
 
 /**
@@ -1100,7 +1100,7 @@ const ru: TranslationMap = {
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS установлен ниже 30 секунд. Слишком агрессивные значения нагружают лимиты Supabase.",
   storagePersistRefusedTitle: "Изменения не сохраняются",
   storagePersistRefusedMessage:
-    "Не удалось прочитать хранилище устройства, поэтому изменения не переживут перезапуск. Обычно помогает перезапуск приложения.",
+    "Хранилище устройства недоступно, поэтому изменения могут не пережить перезапуск. Обычно помогает перезапуск приложения.",
 };
 
 const be: TranslationMap = {
@@ -1448,7 +1448,7 @@ const be: TranslationMap = {
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS усталяваны ніжэй за 30 секунд. Занадта агрэсіўныя значэнні нагружаюць ліміты Supabase.",
   storagePersistRefusedTitle: "Змены не захоўваюцца",
   storagePersistRefusedMessage:
-    "Не ўдалося прачытаць сховішча прылады, таму змены не перажывуць перазапуск. Звычайна дапамагае перазапуск праграмы.",
+    "Сховішча прылады недаступнае, таму змены могуць не перажыць перазапуск. Звычайна дапамагае перазапуск праграмы.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Пачніце сваю першую калекцыю",
   emptyOwnedHint:
@@ -2006,7 +2006,7 @@ const pl: TranslationMap = {
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS jest ustawiony poniżej 30 sekund. Zbyt agresywne wartości obciążają limity Supabase.",
   storagePersistRefusedTitle: "Zmiany nie są zapisywane",
   storagePersistRefusedMessage:
-    "Nie udało się odczytać pamięci urządzenia, więc zmiany nie przetrwają ponownego uruchomienia. Zwykle pomaga restart aplikacji.",
+    "Pamięć urządzenia jest niedostępna, więc zmiany mogą nie przetrwać ponownego uruchomienia. Zwykle pomaga restart aplikacji.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Zacznij swoją pierwszą kolekcję",
   emptyOwnedHint:
@@ -2572,7 +2572,7 @@ const de: TranslationMap = {
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS ist auf unter 30 Sekunden gesetzt. Zu aggressive Werte belasten die Supabase-Limits.",
   storagePersistRefusedTitle: "Änderungen werden nicht gespeichert",
   storagePersistRefusedMessage:
-    "Der Speicher dieses Geräts konnte nicht gelesen werden, daher überstehen Änderungen keinen Neustart. Ein Neustart der App hilft meist.",
+    "Der Speicher dieses Geräts ist nicht verfügbar, daher überstehen Änderungen möglicherweise keinen Neustart. Ein Neustart der App hilft meist.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Starte deine erste Sammlung",
   emptyOwnedHint:
@@ -3150,7 +3150,7 @@ const es: TranslationMap = {
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS está por debajo de 30 segundos. Valores demasiado agresivos saturan los límites de Supabase.",
   storagePersistRefusedTitle: "Los cambios no se están guardando",
   storagePersistRefusedMessage:
-    "No se pudo leer el almacenamiento del dispositivo, así que los cambios no sobrevivirán a un reinicio. Reiniciar la app suele solucionarlo.",
+    "El almacenamiento del dispositivo no está disponible, así que los cambios podrían no sobrevivir a un reinicio. Reiniciar la app suele solucionarlo.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Empieza tu primera colección",
   emptyOwnedHint:

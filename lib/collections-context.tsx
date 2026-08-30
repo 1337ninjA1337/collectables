@@ -11,7 +11,7 @@ import {
 } from "@/lib/currency-rates";
 import { convertItemCost, type ConvertedItemCost } from "@/lib/item-cost";
 import { useI18n } from "@/lib/i18n-context";
-import { useHydrationGateNotice } from "@/lib/hydration-gate-notice";
+import { useStorageNotice } from "@/lib/storage-notice";
 import {
   getDefaultCurrencyForLanguage,
   getUserPreferredCurrency,
@@ -786,8 +786,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   // landed under the new user's keys. See `lib/stored-blob.ts`.
   // Five blobs behind one flag, and a closed gate means the user's own
   // collections are not being written for the whole session. See
-  // `lib/hydration-gate-notice.ts`.
-  useHydrationGateNotice(ready && !hydrationSafeToPersist && !!user);
+  // `lib/storage-notice.ts`.
+  useStorageNotice(ready && !hydrationSafeToPersist && !!user);
 
   const persistEnabled =
     ready && hydrationSafeToPersist && hydrationMatchesKey(hydratedUserId, user?.id ?? null);

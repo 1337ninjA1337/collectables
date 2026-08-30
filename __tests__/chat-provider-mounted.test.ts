@@ -9,7 +9,7 @@ import {
   installSpyToast,
   installStubI18n,
   providerHarness,
-  resetHydrationGateNotice,
+  resetStorageNotice,
 } from "./helpers/mount-provider";
 
 /**
@@ -86,7 +86,7 @@ beforeEach(async () => {
   spy.reset();
   harness.reset();
   toasts.length = 0;
-  await resetHydrationGateNotice();
+  await resetStorageNotice();
   user = { id: "user-a" };
 });
 

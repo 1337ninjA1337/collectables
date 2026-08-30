@@ -10,7 +10,7 @@ import {
   resolveNumericEnv,
 } from "@/lib/env";
 import { useI18n } from "@/lib/i18n-context";
-import { useHydrationGateNotice } from "@/lib/hydration-gate-notice";
+import { useStorageNotice } from "@/lib/storage-notice";
 import { useToast } from "@/lib/toast-context";
 import {
   upsertMyProfile,
@@ -478,8 +478,8 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   }, [profiles, user]);
 
   // Three persist effects follow, and a closed gate silences all three for the
-  // whole session. See `lib/hydration-gate-notice.ts`.
-  useHydrationGateNotice(ready && !hydrationSafeToPersist && !!user);
+  // whole session. See `lib/storage-notice.ts`.
+  useStorageNotice(ready && !hydrationSafeToPersist && !!user);
 
   useEffect(() => {
     // The account half of the gate: `!!user` was true on the render where the

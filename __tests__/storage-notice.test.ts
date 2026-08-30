@@ -4,6 +4,7 @@ import { createElement } from "react";
 
 import { installNativeModuleStubs, render } from "./helpers/render";
 import { drain, installSpyToast, installStubI18n } from "./helpers/mount-provider";
+import { mockModule } from "./helpers/render";
 import { readSource, sourceFiles } from "./helpers/source-files";
 
 /**
@@ -22,7 +23,10 @@ installNativeModuleStubs();
 const toasts = installSpyToast();
 installStubI18n();
 
-type NoticeModule = typeof import("../lib/hydration-gate-notice");
+mockModule("@/lib/sentry", { captureException: () => undefined });
+
+type NoticeModule = typeof import("../lib/storage-notice");
+type ReportingModule = typeof import("../lib/report-storage-failure");
 
 let notice: NoticeModule | null = null;
 
@@ -30,35 +34,40 @@ let notice: NoticeModule | null = null;
 let refusing = false;
 
 function Probe() {
-  notice!.useHydrationGateNotice(refusing);
+  notice!.useStorageNotice(refusing);
   return createElement("View", null);
 }
 
 /** A second provider on the same device, refusing for the same reason. */
 function SecondProbe() {
-  notice!.useHydrationGateNotice(refusing);
+  notice!.useStorageNotice(refusing);
   return createElement("View", null);
 }
 
+let reporting: ReportingModule | null = null;
+
 async function load(): Promise<NoticeModule> {
-  notice ??= await import("../lib/hydration-gate-notice");
+  notice ??= await import("../lib/storage-notice");
+  reporting ??= await import("../lib/report-storage-failure");
   return notice;
 }
 
 beforeEach(async () => {
-  (await load()).__resetHydrationGateNoticeForTests();
+  (await load()).__resetStorageNoticeForTests();
+  reporting!.__clearStorageFailureObserversForTests();
+  reporting!.__resetStorageFailureReportsForTests();
   toasts.length = 0;
   refusing = false;
 });
 
-describe("useHydrationGateNotice", () => {
+describe("useStorageNotice", () => {
   it("says nothing while the gate is open", async () => {
     await load();
     const tree = render(createElement(Probe));
     await drain(tree);
 
     assert.deepEqual(toasts, [], "a healthy session must not be interrupted");
-    assert.equal(notice!.hydrationGateNoticeShown(), false);
+    assert.equal(notice!.storageNoticeShown(), false);
   });
 
   it("raises one error toast the first time a gate refuses", async () => {
@@ -143,6 +152,105 @@ describe("useHydrationGateNotice", () => {
   });
 });
 
+describe("useStorageNotice — a write that was rejected mid-session", () => {
+  it("says the same thing when a persisted blob could not be written", async () => {
+    await load();
+    const tree = render(createElement(Probe));
+    await drain(tree);
+    assert.deepEqual(toasts, [], "nothing has failed yet");
+
+    reporting!.reportStorageFailure(
+      "use-persisted-blob.setItem",
+      "collectables-items-v1-user-a",
+      new Error("QuotaExceededError"),
+    );
+
+    assert.deepEqual(toasts, [
+      {
+        level: "error",
+        message: "storagePersistRefusedMessage",
+        title: "storagePersistRefusedTitle",
+      },
+    ]);
+  });
+
+  it("hears a write from a module with no React in it", async () => {
+    await load();
+    const tree = render(createElement(Probe));
+    await drain(tree);
+
+    reporting!.reportStorageFailure("sync-cursors.setItem", "sync-cursor", new Error("full"));
+
+    assert.equal(toasts.length, 1, "the observer is what reaches the UI from lib/sync-cursors.ts");
+  });
+
+  it("ignores a failed READ, which costs a default rather than the user's data", async () => {
+    await load();
+    const tree = render(createElement(Probe));
+    await drain(tree);
+
+    reporting!.reportStorageFailure("locale-helpers.getItem", "currency", new Error("blocked"));
+
+    assert.deepEqual(
+      toasts,
+      [],
+      "a currency preference that could not be read is not 'changes are not being saved'",
+    );
+  });
+
+  it("still fires when the Sentry budget for that pair is already spent", async () => {
+    await load();
+    // A read on the same keyspace, before the tree exists, spends nothing the
+    // write needs — but it does spend its own budget entry, and an earlier
+    // draft gated the observer behind the same check.
+    reporting!.reportStorageFailure(
+      "use-persisted-blob.setItem",
+      "collectables-items-v1-user-a",
+      new Error("full"),
+    );
+    const tree = render(createElement(Probe));
+    await drain(tree);
+
+    reporting!.reportStorageFailure(
+      "use-persisted-blob.setItem",
+      "collectables-items-v1-user-a",
+      new Error("full"),
+    );
+
+    assert.equal(toasts.length, 1, "the budget is Sentry's; the latch is the user's");
+  });
+
+  it("hands back an unsubscribe, which is what the effect returns on unmount", async () => {
+    await load();
+    let heard = 0;
+    const unsubscribe = reporting!.observeStorageFailures(() => {
+      heard += 1;
+    });
+
+    reporting!.reportStorageFailure("chat-context.setItem", "collectables-chats-v1", new Error("x"));
+    unsubscribe();
+    reporting!.reportStorageFailure("chat-context.setItem", "collectables-chats-v1", new Error("x"));
+
+    // Asserted on the registry rather than through a React unmount: the render
+    // harness has no unmount phase (it cleans an effect up only when its
+    // dependencies change), so a case that removed the probe from the tree
+    // would pass whether or not the hook returned its unsubscribe at all.
+    assert.equal(heard, 1, "an observer that outlives its toast host is a leak");
+  });
+
+  it("a throwing observer does not take the storage catch down with it", async () => {
+    await load();
+    const unsubscribe = reporting!.observeStorageFailures(() => {
+      throw new Error("observer exploded");
+    });
+
+    assert.doesNotThrow(() =>
+      reporting!.reportStorageFailure("tombstones.setItem", "tombstones", new Error("full")),
+    );
+    unsubscribe();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Adoption
 // ---------------------------------------------------------------------------
@@ -177,9 +285,9 @@ describe("every gated provider raises the notice", () => {
     );
   });
 
-  it("each of them calls useHydrationGateNotice", () => {
+  it("each of them calls useStorageNotice", () => {
     const silent = gatedModules().filter(
-      (relative) => !readSource(relative).includes("useHydrationGateNotice("),
+      (relative) => !readSource(relative).includes("useStorageNotice("),
     );
 
     assert.deepEqual(

@@ -111,10 +111,72 @@ export function reportStorageFailure(
   // separator that either half can contain lets two different pairs collide on
   // one budget entry, which silently drops the second one's report.
   const budget = `${scope}\u0000${keyspace}`;
+  // BEFORE the budget check: an observer's idea of repetition is its own, and a
+  // read that already spent this pair's budget must not hide the first WRITE
+  // from a user who is losing edits. See `observeStorageFailures`.
+  notifyObservers({ scope, keyspace });
   if (reported.has(budget)) return false;
   reported.add(budget);
   captureException(error, { scope, extra: { keyspace } });
   return true;
+}
+
+/** What an observer is handed. The KEYSPACE, never the key — see above. */
+export type StorageFailureEvent = {
+  readonly scope: StorageFailureSite;
+  readonly keyspace: string;
+};
+
+export type StorageFailureObserver = (event: StorageFailureEvent) => void;
+
+const observers = new Set<StorageFailureObserver>();
+
+/**
+ * Watch every storage failure this session reports, and return an unsubscribe.
+ *
+ * ## Why a registry rather than a return value
+ *
+ * A rejected write is the one failure mode with a user-visible consequence
+ * (their edits are not being kept) and no path to the UI. Nine of the twelve
+ * call sites are inside a `.catch()` in a module with no React in it —
+ * `lib/tombstones.ts`, `lib/sync-cursors.ts`, `lib/currency-rates.ts` — so
+ * "have the caller raise a toast" is not available at most of them, and the
+ * three that could would each need the decision written out again.
+ *
+ * `lib/storage-notice.ts` is the only subscriber today and it filters to
+ * writes; the registry itself takes no position on which failures matter.
+ *
+ * ## Observers fire on EVERY failure, budget or no budget
+ *
+ * The once-per-site/keyspace budget exists to keep a full disk from becoming a
+ * stream of Sentry events. An observer has its own idea of repetition — the
+ * notice raises one toast per session across all sites — and letting the Sentry
+ * budget gate it would mean a read that spent the budget could hide the first
+ * write from the user entirely.
+ *
+ * A throwing observer must not take a storage `.catch()` down with it, so each
+ * one is called inside its own `try`. Its failure goes to Sentry as itself.
+ */
+export function observeStorageFailures(observer: StorageFailureObserver): () => void {
+  observers.add(observer);
+  return () => {
+    observers.delete(observer);
+  };
+}
+
+/** Test seam: a suite that subscribed and threw must not leak into the next. */
+export function __clearStorageFailureObserversForTests(): void {
+  observers.clear();
+}
+
+function notifyObservers(event: StorageFailureEvent): void {
+  for (const observer of observers) {
+    try {
+      observer(event);
+    } catch (error: unknown) {
+      captureException(error, { scope: "report-storage-failure.observer" });
+    }
+  }
 }
 
 /**

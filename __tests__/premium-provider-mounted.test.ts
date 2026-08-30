@@ -9,7 +9,7 @@ import {
   installSpyToast,
   installStubI18n,
   providerHarness,
-  resetHydrationGateNotice,
+  resetStorageNotice,
 } from "./helpers/mount-provider";
 
 /**
@@ -87,7 +87,7 @@ beforeEach(async () => {
   spy.reset();
   harness.reset();
   toasts.length = 0;
-  await resetHydrationGateNotice();
+  await resetStorageNotice();
   captured.length = 0;
   user = { id: "user-a" };
   validation = null;
@@ -183,6 +183,36 @@ describe("PremiumProvider — the user acts", () => {
     // reason the refusal deserves to be visible to the user somewhere.
     assert.equal(seen()?.isPremium, true);
     assert.deepEqual(writes, []);
+  });
+});
+
+describe("PremiumProvider — the store stops accepting writes", () => {
+  it("tells the user, through the same notice the refused hydrate uses", async () => {
+    const tree = await mount();
+    assert.deepEqual(toasts, [], "the hydrate worked, so nothing has been said yet");
+
+    spy.writeError = new Error("QuotaExceededError");
+    seen()!.activatePremium("settings");
+    tree.rerender();
+    await drain(tree);
+
+    assert.deepEqual(toasts, [
+      {
+        level: "error",
+        message: "storagePersistRefusedMessage",
+        title: "storagePersistRefusedTitle",
+      },
+    ]);
+  });
+
+  it("says nothing while writes are landing", async () => {
+    const tree = await mount();
+
+    seen()!.activatePremium("settings");
+    tree.rerender();
+    await drain(tree);
+
+    assert.deepEqual(toasts, [], "a healthy session must not be interrupted");
   });
 });
 
