@@ -202,13 +202,14 @@ describe("PremiumProvider — the store stops accepting writes", () => {
     tree.rerender();
     await drain(tree);
 
-    // `storageFullMessage` rather than the gate's sentence because the error
-    // names a quota: a device that is out of space is told to free some, and
-    // "restart the app" would be advice that cannot work.
+    // A full-storage sentence rather than the gate's because the error names a
+    // quota: a store that is out of space is told to free some, and "restart
+    // the app" would be advice that cannot work. The web wording because the
+    // harness's `react-native` stub reports `Platform.OS === "web"`.
     assert.deepEqual(toasts, [
       {
         level: "error",
-        message: "storageFullMessage",
+        message: "storageFullWebMessage",
         title: "storagePersistRefusedTitle",
       },
     ]);

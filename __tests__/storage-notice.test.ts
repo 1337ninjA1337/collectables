@@ -2,6 +2,8 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 
+import { findLocaleBlock } from "@/lib/i18n-source";
+
 import { installNativeModuleStubs, render } from "./helpers/render";
 import {
   drain,
@@ -9,6 +11,7 @@ import {
   installSpyToast,
   installStubI18n,
 } from "./helpers/mount-provider";
+import { readI18nSource } from "./helpers/i18n-source-file";
 import { readSource, sourceFiles } from "./helpers/source-files";
 
 /**
@@ -179,18 +182,20 @@ describe("useStorageFailureNotice — a write that was rejected mid-session", ()
       new Error("QuotaExceededError"),
     );
 
-    // The quota spelling in the error is why this reads `storageFullMessage`
-    // rather than the gate's sentence: same title, same latch, the fix differs.
+    // The quota spelling in the error is why this reads a full-storage sentence
+    // rather than the gate's: same title, same latch, the fix differs. The WEB
+    // one, because the harness's `react-native` stub reports `Platform.OS ===
+    // "web"` — which is also the build this repo deploys.
     assert.deepEqual(toasts, [
       {
         level: "error",
-        message: "storageFullMessage",
+        message: "storageFullWebMessage",
         title: "storagePersistRefusedTitle",
       },
     ]);
   });
 
-  it("tells a full device to free up space rather than to restart", async () => {
+  it("tells a full store to free up space rather than to restart", async () => {
     await load();
     const tree = render(createElement(Listener));
     await drain(tree);
@@ -202,7 +207,7 @@ describe("useStorageFailureNotice — a write that was rejected mid-session", ()
     assert.deepEqual(toasts, [
       {
         level: "error",
-        message: "storageFullMessage",
+        message: "storageFullWebMessage",
         title: "storagePersistRefusedTitle",
       },
     ]);
@@ -433,6 +438,71 @@ describe("the write filter", () => {
     assert.equal(module.losesUserData("locale-helpers.getItem"), false);
     assert.equal(module.losesUserData("chat-context.getItem"), false);
     assert.equal(module.losesUserData("chat-context.setItem"), true);
+  });
+});
+
+/**
+ * `"full"` is one error class and two situations, and the fix is not the same.
+ *
+ * On a phone the store is the device's disk and "free up space" is a thing the
+ * user can go and do. On web the quota is PER-ORIGIN: this site ran out of its
+ * slice, and the phone's storage screen does not list this app at all. The
+ * native sentence sends a browser user deleting photos over a limit that has
+ * nothing to do with them, and web is the build this repo deploys.
+ *
+ * The key selection is a pure function taking the OS because the harness's
+ * `react-native` stub reports `"web"` and cannot report anything else — a hook
+ * reading `Platform` directly would leave the NATIVE sentence unreachable from
+ * any case, which is the one this repo's own CI would never have run.
+ */
+describe("which full-storage sentence a platform gets", () => {
+  it("sends a browser to its own quota and a phone to its storage screen", async () => {
+    const module = await load();
+
+    assert.equal(module.storageNoticeMessageKey("full", "web"), "storageFullWebMessage");
+    assert.equal(module.storageNoticeMessageKey("full", "ios"), "storageFullMessage");
+    assert.equal(module.storageNoticeMessageKey("full", "android"), "storageFullMessage");
+  });
+
+  it("gives every platform the same sentence when the store is merely blocked", async () => {
+    const module = await load();
+
+    // A `SecurityError` behind a privacy setting reads the same everywhere, and
+    // splitting it would be two strings for one situation.
+    for (const os of ["web", "ios", "android", "windows"]) {
+      assert.equal(
+        module.storageNoticeMessageKey("unavailable", os),
+        "storagePersistRefusedMessage",
+        `${os} must get the restart sentence for a store that is not full`,
+      );
+    }
+  });
+
+  it("never tells a web user to clear this site's data", () => {
+    // The browser's own remedy for a full origin is exactly the action that
+    // destroys what the toast is warning the user they might lose. Freeing
+    // space on the DEVICE is the honest half — every engine sizes the origin
+    // quota against free disk — so it is both true and safe.
+    // Through the shared reader and the shared parser rather than a regex over
+    // the whole file: a `key:[\s\S]*?SHAPE` match is satisfied by the shape
+    // turning up under a LATER key, which is the mistake `findLocaleBlock` and
+    // its `values` map exist to end.
+    const source = readI18nSource();
+
+    for (const language of ["en", "ru", "be", "pl", "de", "es"]) {
+      const block = findLocaleBlock(source, language);
+      assert.ok(block, `no \`const ${language}\` translation map in the source`);
+      const sentence = block.values.get("storageFullWebMessage");
+      assert.ok(
+        sentence,
+        `${language} does not write storageFullWebMessage — inheriting the English one would tell a browser user the wrong thing in their own language`,
+      );
+      assert.doesNotMatch(
+        sentence.toLowerCase(),
+        /clear|очист|ачыс|wyczy|löschen|borrar/,
+        `${language}: ${sentence} tells the user to clear data — that is the one action that loses what this toast exists to warn about`,
+      );
+    }
   });
 });
 

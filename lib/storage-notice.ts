@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from "react";
+import { Platform } from "react-native";
 
 import { useI18n } from "@/lib/i18n-context";
 import {
@@ -135,6 +136,38 @@ export const DATA_WRITE_SITES: readonly StorageFailureSite[] =
   STORAGE_FAILURE_SITES.filter(losesUserData);
 
 /**
+ * Which sentence a cause gets, and on which platform the user is reading it.
+ *
+ * ## Why the platform is part of the question
+ *
+ * `"full"` names ONE error class and two different situations. On a phone the
+ * store is the device's disk, the number the user sees is in Settings, and
+ * "free up space" is a thing they can go and do. On web the quota is
+ * PER-ORIGIN: this site has run out of its slice, the phone's storage screen
+ * does not list this app at all, and the sentence written for native sends
+ * somebody deleting photos over a limit that has nothing to do with them. Web
+ * is also the build this repo actually deploys.
+ *
+ * The web sentence deliberately does NOT say "clear this site's data", which
+ * is the browser's own remedy for a full origin and is the one action that
+ * destroys exactly what the toast is warning the user they might lose. Freeing
+ * space on the device is the honest half: every engine sizes the origin quota
+ * against free disk, so it is both true and safe.
+ *
+ * Taking the OS as an argument rather than reading `Platform` inside is what
+ * lets both branches be asserted: the test harness's `react-native` stub
+ * reports `"web"` and cannot report anything else, so a hook that read the
+ * module directly would leave the native sentence unreachable from any case.
+ */
+export function storageNoticeMessageKey(
+  reason: StorageFailureReason,
+  os: string,
+): "storageFullWebMessage" | "storageFullMessage" | "storagePersistRefusedMessage" {
+  if (reason !== "full") return "storagePersistRefusedMessage";
+  return os === "web" ? "storageFullWebMessage" : "storageFullMessage";
+}
+
+/**
  * The one sentence, raised at most once per session whichever half asks.
  *
  * The TITLE is the same either way — "Changes aren't being saved" is what
@@ -156,7 +189,7 @@ function useRaiseStorageNotice(): (reason: StorageFailureReason) => void {
       if (noticeShown) return;
       noticeShown = true;
       toast.error(
-        reason === "full" ? t("storageFullMessage") : t("storagePersistRefusedMessage"),
+        t(storageNoticeMessageKey(reason, Platform.OS)),
         t("storagePersistRefusedTitle"),
       );
     },

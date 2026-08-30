@@ -461,7 +461,12 @@ describe("translation floors", () => {
     // sentence. The title covers both causes ("Changes aren't being saved");
     // the message is the half that says what to DO, and "restart the app" is
     // useless advice on a device that is out of space. Written in all six.
-    assert.match(report, /en: 501\/501 keys \(100\.0%\)/);
+    // 502 later still: `storageFullWebMessage`, the third sentence of the same
+    // toast. "Free up space" is a native answer — on web the quota is
+    // per-origin, the phone's storage screen does not list this app, and web is
+    // the build this repo deploys. Written in all six, so every row rose by one
+    // and none of them started inheriting.
+    assert.match(report, /en: 502\/502 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

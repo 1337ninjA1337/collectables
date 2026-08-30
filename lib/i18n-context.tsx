@@ -558,6 +558,8 @@ const en = {
     "This device's storage is not available, so changes you make now may not survive a restart. Restarting the app usually fixes it.",
   storageFullMessage:
     "This device has run out of storage, so changes you make now may not survive a restart. Freeing up space usually fixes it.",
+  storageFullWebMessage:
+    "Your browser has no room left for this site's data, so changes you make now may not survive a reload. Freeing up space on your device usually fixes it.",
 } as const;
 
 /**
@@ -1105,6 +1107,8 @@ const ru: TranslationMap = {
     "Хранилище устройства недоступно, поэтому изменения могут не пережить перезапуск. Обычно помогает перезапуск приложения.",
   storageFullMessage:
     "На устройстве закончилось место, поэтому изменения могут не пережить перезапуск. Обычно помогает освободить место.",
+  storageFullWebMessage:
+    "В браузере не осталось места для данных этого сайта, поэтому изменения могут не пережить перезагрузку страницы. Обычно помогает освободить место на устройстве.",
 };
 
 const be: TranslationMap = {
@@ -1455,6 +1459,8 @@ const be: TranslationMap = {
     "Сховішча прылады недаступнае, таму змены могуць не перажыць перазапуск. Звычайна дапамагае перазапуск праграмы.",
   storageFullMessage:
     "На прыладзе скончылася месца, таму змены могуць не перажыць перазапуск. Звычайна дапамагае вызваліць месца.",
+  storageFullWebMessage:
+    "У браўзеры не засталося месца для даных гэтага сайта, таму змены могуць не перажыць перазагрузку старонкі. Звычайна дапамагае вызваліць месца на прыладзе.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Пачніце сваю першую калекцыю",
   emptyOwnedHint:
@@ -2015,6 +2021,8 @@ const pl: TranslationMap = {
     "Pamięć urządzenia jest niedostępna, więc zmiany mogą nie przetrwać ponownego uruchomienia. Zwykle pomaga restart aplikacji.",
   storageFullMessage:
     "W urządzeniu zabrakło miejsca, więc zmiany mogą nie przetrwać ponownego uruchomienia. Zwykle pomaga zwolnienie miejsca.",
+  storageFullWebMessage:
+    "Przeglądarka nie ma już miejsca na dane tej witryny, więc zmiany mogą nie przetrwać odświeżenia strony. Zwykle pomaga zwolnienie miejsca na urządzeniu.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Zacznij swoją pierwszą kolekcję",
   emptyOwnedHint:
@@ -2583,6 +2591,8 @@ const de: TranslationMap = {
     "Der Speicher dieses Geräts ist nicht verfügbar, daher überstehen Änderungen möglicherweise keinen Neustart. Ein Neustart der App hilft meist.",
   storageFullMessage:
     "Auf diesem Gerät ist kein Speicherplatz mehr frei, daher überstehen Änderungen möglicherweise keinen Neustart. Speicherplatz freizugeben hilft meist.",
+  storageFullWebMessage:
+    "Der Browser hat keinen Speicherplatz mehr für die Daten dieser Website, daher überstehen Änderungen möglicherweise kein Neuladen. Speicherplatz auf dem Gerät freizugeben hilft meist.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Starte deine erste Sammlung",
   emptyOwnedHint:
@@ -3163,6 +3173,8 @@ const es: TranslationMap = {
     "El almacenamiento del dispositivo no está disponible, así que los cambios podrían no sobrevivir a un reinicio. Reiniciar la app suele solucionarlo.",
   storageFullMessage:
     "El dispositivo se quedó sin espacio, así que los cambios podrían no sobrevivir a un reinicio. Liberar espacio suele solucionarlo.",
+  storageFullWebMessage:
+    "El navegador se quedó sin espacio para los datos de este sitio, así que los cambios podrían no sobrevivir a una recarga. Liberar espacio en el dispositivo suele solucionarlo.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Empieza tu primera colección",
   emptyOwnedHint:
