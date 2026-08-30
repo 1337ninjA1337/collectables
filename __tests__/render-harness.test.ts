@@ -339,6 +339,48 @@ describe("render harness — StrictMode", () => {
     assert.deepEqual(log, ["subscribe"]);
   });
 
+  it("tears down every strict effect even when one cleanup throws", () => {
+    // The same bug the unmount sweep had, one function away: a bare loop lets
+    // the first throw skip the rest, and the `mount()` that follows then
+    // re-runs an effect whose previous instance is still subscribed — a
+    // duplicated subscription reported as a cleanup failure.
+    const log: string[] = [];
+    function Broken() {
+      useEffect(() => () => {
+        throw new Error("strict cleanup threw");
+      }, []);
+      return null;
+    }
+    function Healthy() {
+      useEffect(() => () => {
+        log.push("healthy unsubscribed");
+      }, []);
+      return null;
+    }
+
+    assert.throws(
+      () =>
+        render(
+          createElement(
+            StrictMode,
+            null,
+            createElement(Broken, { key: "broken" }),
+            createElement(Healthy, { key: "healthy" }),
+          ),
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.match(error.message, /strict cleanup threw/);
+        return true;
+      },
+    );
+    assert.deepEqual(
+      log,
+      ["healthy unsubscribed"],
+      "the sibling's cleanup must run whatever the first one did",
+    );
+  });
+
   it("runs the previous cleanup before re-running an effect whose deps changed", () => {
     const log: string[] = [];
     function Watcher({ topic }: { topic: string }) {
@@ -494,6 +536,122 @@ describe("render harness — unmount", () => {
     const tree = render(createElement(Silent));
 
     assert.doesNotThrow(() => tree.unmount());
+  });
+
+  /**
+   * A destructor that throws must not decide whether the rest of the tree comes
+   * down.
+   *
+   * The loop was bare, so the first throw skipped every remaining cleanup — the
+   * throwing component's own siblings, and then every LATER instance, parent
+   * included. One broken component therefore left live subscriptions behind in
+   * five healthy ones, and the failure named only the first. React logs and
+   * continues; this collects and reports, which keeps the evidence.
+   */
+  it("runs every other cleanup when one of them throws", () => {
+    const order: string[] = [];
+    function Leaf() {
+      useEffect(() => () => {
+        order.push("leaf");
+        throw new Error("leaf unsubscribe blew up");
+      }, []);
+      return null;
+    }
+    function Branch() {
+      useEffect(() => () => {
+        order.push("branch");
+      }, []);
+      return createElement("View", null, createElement(Leaf));
+    }
+    const tree = render(createElement(Branch));
+
+    assert.throws(
+      () => tree.unmount(),
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError, "one shape whatever the count");
+        assert.equal(error.errors.length, 1);
+        assert.match(error.message, /leaf unsubscribe blew up/);
+        return true;
+      },
+    );
+    assert.deepEqual(
+      order,
+      ["leaf", "branch"],
+      "the parent's cleanup must run even though the child's threw",
+    );
+  });
+
+  it("reports every failure together rather than the first one", () => {
+    function Broken({ label }: { label: string }) {
+      useEffect(() => () => {
+        throw new Error(`${label} threw`);
+      }, []);
+      return null;
+    }
+    const tree = render(
+      createElement(
+        "View",
+        null,
+        createElement(Broken, { key: "a", label: "first" }),
+        createElement(Broken, { key: "b", label: "second" }),
+      ),
+    );
+
+    assert.throws(
+      () => tree.unmount(),
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length, 2, "both, not the first");
+        assert.match(error.message, /first threw/);
+        assert.match(error.message, /second threw/);
+        return true;
+      },
+    );
+  });
+
+  it("does not re-run a cleanup that threw", () => {
+    let calls = 0;
+    function Broken() {
+      useEffect(() => () => {
+        calls += 1;
+        throw new Error("nope");
+      }, []);
+      return null;
+    }
+    const tree = render(createElement(Broken));
+
+    // The cell is cleared BEFORE the call, so the throw does not leave the
+    // destructor armed for a second unmount.
+    assert.throws(() => tree.unmount(), AggregateError);
+    assert.doesNotThrow(() => tree.unmount());
+    assert.equal(calls, 1);
+  });
+
+  it("reports a cleanup that throws while a branch closes, not only on unmount", () => {
+    // A closed conditional branch is an unmount too, and it runs inside the
+    // render pass rather than from `unmount()` — the same collection has to
+    // cover it or a broken cleanup there takes the re-render down mid-sweep.
+    let showChild = true;
+    function Child() {
+      useEffect(() => () => {
+        throw new Error("branch cleanup threw");
+      }, []);
+      return null;
+    }
+    function Parent() {
+      return createElement("View", null, showChild ? createElement(Child) : null);
+    }
+    const tree = render(createElement(Parent));
+
+    showChild = false;
+    assert.throws(
+      () => tree.rerender(),
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.match(error.message, /branch cleanup threw/);
+        return true;
+      },
+    );
   });
 });
 

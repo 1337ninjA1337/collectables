@@ -5,6 +5,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import * as React from "react";
 
+import { describeThrown } from "../../lib/thrown-value";
+
 import { repoPath } from "./repo-file";
 import { SUITES_REL } from "./suite-files";
 
@@ -442,26 +444,50 @@ class RenderPass {
    */
   sweep(): void {
     const removed = [...this.instances.keys()].filter((key) => !this.visited.has(key)).reverse();
+    const thrown: unknown[] = [];
     for (const key of removed) {
       const instance = this.instances.get(key);
-      if (instance) this.unmountInstance(instance);
+      if (instance) this.unmountInstance(instance, thrown);
       this.instances.delete(key);
     }
+    throwCleanupFailures(thrown);
   }
 
   /** Tears the whole tree down, child before parent. See {@link sweep}. */
   unmountAll(): void {
-    for (const instance of [...this.instances.values()].reverse()) this.unmountInstance(instance);
+    const thrown: unknown[] = [];
+    for (const instance of [...this.instances.values()].reverse()) {
+      this.unmountInstance(instance, thrown);
+    }
     this.instances.clear();
     this.visited.clear();
     this.effects = [];
+    throwCleanupFailures(thrown);
   }
 
-  private unmountInstance(instance: Instance): void {
+  /**
+   * Runs one instance's cleanups, collecting throws rather than propagating.
+   *
+   * A destructor that throws must not decide whether the other components get
+   * torn down. In a bare loop the first throw skipped every remaining cleanup —
+   * this instance's, and then every LATER instance in the sweep, parent
+   * included — so one broken component left five live subscriptions behind and
+   * the failure named only the first of them. React logs and continues; this
+   * collects and reports, which is the same guarantee with the evidence kept.
+   *
+   * The cell is cleared BEFORE the call, so a cleanup that throws is still not
+   * run twice by a second unmount.
+   */
+  private unmountInstance(instance: Instance, thrown: unknown[]): void {
     for (const cell of [...instance.effectCells].reverse()) {
       const cleanup = cell.value;
       cell.value = undefined;
-      if (typeof cleanup === "function") (cleanup as () => void)();
+      if (typeof cleanup !== "function") continue;
+      try {
+        (cleanup as () => void)();
+      } catch (error: unknown) {
+        thrown.push(error);
+      }
     }
     instance.effectCells.clear();
   }
@@ -682,9 +708,36 @@ export type RenderResult = {
    *
    * Idempotent; `rerender` and `press` throw afterwards, because a tree that
    * has been torn down has no state left to re-render from.
+   *
+   * Every cleanup runs even if one throws: the failures are collected and
+   * reported together as an `AggregateError` once the tree is down. A bare loop
+   * let the first broken destructor decide whether the other components were
+   * torn down at all, which is how one throwing cleanup hides five live
+   * subscriptions.
    */
   unmount(): void;
 };
+
+/**
+ * Reports the cleanups that threw during one unmount, after all of them ran.
+ *
+ * An `AggregateError` even for a single failure, because the number of broken
+ * cleanups is the thing a reader needs and a shape that changes with it hides
+ * it: a suite whose matcher was written against the one-error form would go
+ * green-then-confusing the day a second component broke the same way. The
+ * message carries every cause inline so `assert.throws(..., /unsubscribe/)`
+ * still finds what it is looking for, and `error.errors` holds them intact for
+ * a case that wants to count.
+ */
+function throwCleanupFailures(thrown: readonly unknown[]): void {
+  if (thrown.length === 0) return;
+  throw new AggregateError(
+    thrown,
+    `unmount: ${String(thrown.length)} effect cleanup(s) threw — ${thrown
+      .map((error) => describeThrown(error))
+      .join("; ")}`,
+  );
+}
 
 function collect(node: TestNode, into: TestNode[]): TestNode[] {
   into.push(node);
@@ -724,7 +777,19 @@ export function render(element: React.ReactElement): RenderResult {
     // the pass that catches an effect which is not idempotent — a duplicated
     // subscription, a second analytics identify, a doubled network call.
     const strict = queued.filter((queuedEffect) => queuedEffect.strict);
-    for (const queuedEffect of strict) queuedEffect.cleanup();
+    // Collected rather than propagated, for the reason `sweep()` collects: one
+    // throwing destructor must not decide whether the OTHER strict effects are
+    // torn down, or the second `mount()` below re-runs an effect whose previous
+    // instance is still subscribed. Same shape, same message.
+    const strictThrown: unknown[] = [];
+    for (const queuedEffect of strict) {
+      try {
+        queuedEffect.cleanup();
+      } catch (error: unknown) {
+        strictThrown.push(error);
+      }
+    }
+    throwCleanupFailures(strictThrown);
     for (const queuedEffect of strict) queuedEffect.mount();
     return { type: "#root", props: {}, children };
   }
