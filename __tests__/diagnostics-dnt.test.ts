@@ -6,7 +6,6 @@ import {
   readDoNotTrack,
   resolveDiagnosticsEnabled,
 } from "../lib/diagnostics-context";
-import { readRepoFile } from "./helpers/repo-file";
 
 type MutableGlobal = {
   navigator?: { doNotTrack?: string | null; msDoNotTrack?: string | null };
@@ -121,8 +120,6 @@ describe("Analytics #18 — resolveDiagnosticsEnabled", () => {
 });
 
 describe("an unreadable store lands on the same branch as an empty one", () => {
-  const SOURCE = readRepoFile("lib/diagnostics-context.tsx");
-
   /**
    * The provider's hydrate `.catch` had no fallback at all, so a device whose
    * store could not be read kept this component's `useState(true)` — the
@@ -131,40 +128,23 @@ describe("an unreadable store lands on the same branch as an empty one", () => {
    * behaviour disagreed, in the direction that looks like the preference was
    * ignored.
    *
-   * Structural, because mounting the provider would start the real SDK
-   * initialisers. What is asserted by CALLING is the rule the arm now uses:
-   * `resolveDiagnosticsEnabled(null, dnt)` is what an unknown stored choice
-   * means, and it is the same answer a device with nothing stored gets.
+   * This is the pure half: `resolveDiagnosticsEnabled(null, dnt)` is what an
+   * unknown stored choice means, and it is the same answer a device with
+   * nothing stored gets.
+   *
+   * The three cases that used to sit here were regexes over the catch arm's
+   * TEXT — "does it mention `resolveDiagnosticsEnabled(null, readDoNotTrack())`",
+   * "does it not mention `initSentry`" — written under a comment saying the
+   * provider could not be mounted because that would start the real SDKs. It
+   * can: `mockModule` replaces the three initialisers, and
+   * `diagnostics-provider-mounted.test.ts` now asserts the same three facts by
+   * running the arm, plus the ordering a source scan cannot see. They are gone
+   * rather than kept beside it, because a rule that reads a regex over a
+   * comment block is not a second opinion on the behaviour — it is a second
+   * way to pass while the behaviour is wrong.
    */
   it("resolves an unknown stored choice exactly as it resolves no stored choice", () => {
     assert.equal(resolveDiagnosticsEnabled(null, true), false);
     assert.equal(resolveDiagnosticsEnabled(null, false), true);
-  });
-
-  it("the catch arm consults Do-Not-Track rather than the useState default", () => {
-    const catchArm = SOURCE.slice(SOURCE.indexOf(".catch((error: unknown) => {"));
-    assert.match(
-      catchArm.slice(0, 1400),
-      /resolveDiagnosticsEnabled\(null, readDoNotTrack\(\)\)/,
-      "an unreadable store must fall back to the same rule an empty one does",
-    );
-  });
-
-  it("the catch arm still starts no SDK, whatever it resolves", () => {
-    // `next` decides what the TOGGLE says and what a later flip will do. An
-    // unknown consent state must not produce telemetry nobody agreed to, so
-    // the initialisers stay out of this arm even when it resolves to opt-in;
-    // the next launch that can read the store starts them.
-    const catchArm = SOURCE.slice(SOURCE.indexOf(".catch((error: unknown) => {"));
-    assert.doesNotMatch(
-      catchArm.slice(0, 1400),
-      /\b(?:initSentry|initAnalytics|initClarity)\(/,
-      "a failed read must not start collection",
-    );
-  });
-
-  it("still reports, because nothing else would mention an unreadable preference", () => {
-    const catchArm = SOURCE.slice(SOURCE.indexOf(".catch((error: unknown) => {"));
-    assert.match(catchArm.slice(0, 1400), /reportStorageFailure\("diagnostics-context\.getItem"/);
   });
 });
