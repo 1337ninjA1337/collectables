@@ -2,7 +2,8 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 
-import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
+import { mockModule } from "./helpers/render";
+import { drain, installSpyAsyncStorage, providerHarness } from "./helpers/mount-provider";
 
 /**
  * `CollectionsProvider`, mounted — the last unmounted provider in the tree, and
@@ -33,27 +34,9 @@ import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
  * asserting what was read is asserting something.
  */
 
-installNativeModuleStubs();
-
-const writes: { key: string; value: string }[] = [];
-const reads: string[] = [];
-const store = new Map<string, string>();
-let readError: Error | null = null;
+const spy = installSpyAsyncStorage();
+const { reads, writes, store } = spy;
 let user: { id: string } | null = { id: "user-a" };
-
-mockModule("@react-native-async-storage/async-storage", {
-  default: {
-    getItem: async (key: string) => {
-      reads.push(key);
-      if (readError) throw readError;
-      return store.get(key) ?? null;
-    },
-    setItem: async (key: string, value: string) => {
-      writes.push({ key, value });
-      store.set(key, value);
-    },
-  },
-});
 
 mockModule("@/lib/sentry", { captureException: () => undefined });
 
@@ -141,35 +124,13 @@ mockModule("@/lib/locale-helpers", {
 type CollectionsModule = typeof import("../lib/collections-context");
 type ContextValue = ReturnType<CollectionsModule["useCollections"]>;
 
-let collections: CollectionsModule | null = null;
-let seen: ContextValue | null = null;
+const harness = providerHarness<ContextValue>(async () => {
+  const module: CollectionsModule = await import("../lib/collections-context");
+  return { Provider: module.CollectionsProvider, useValue: module.useCollections };
+});
 
-function Probe() {
-  seen = collections!.useCollections();
-  return createElement("View", null);
-}
-
-async function settle(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-async function mount() {
-  collections ??= await import("../lib/collections-context");
-  (await import("../lib/report-storage-failure")).__resetStorageFailureReportsForTests();
-  const tree = render(
-    createElement(collections.CollectionsProvider, null, createElement(Probe)),
-  );
-  await drain(tree);
-  return tree;
-}
-
-/** The hydrate holds several awaits; one settle is not the whole chain. */
-async function drain(tree: { rerender: () => unknown }, passes = 4) {
-  for (let index = 0; index < passes; index += 1) {
-    await settle();
-    tree.rerender();
-  }
-}
+const mount = () => harness.mount();
+const seen = () => harness.seen;
 
 const COLLECTIONS_A = "collectables-collections-v1-user-a";
 const ITEMS_A = "collectables-items-v1-user-a";
@@ -204,12 +165,9 @@ function writesTo(key: string) {
 }
 
 beforeEach(() => {
-  writes.length = 0;
-  reads.length = 0;
-  store.clear();
-  readError = null;
+  spy.reset();
+  harness.reset();
   user = { id: "user-a" };
-  seen = null;
 });
 
 describe("CollectionsProvider — one account", () => {
@@ -230,7 +188,7 @@ describe("CollectionsProvider — one account", () => {
       "the literals below are the real builders' output",
     );
     assert.deepEqual([...new Set(reads)].sort(), [...KEYS_A].sort());
-    assert.equal(seen?.ready, true);
+    assert.equal(seen()?.ready, true);
   });
 
   it("persists all five blobs once the hydrate says it may", async () => {
@@ -252,11 +210,11 @@ describe("CollectionsProvider — one account", () => {
     await mount();
 
     assert.deepEqual(
-      seen?.collections.map((collection) => collection.id),
+      seen()?.collections.map((collection) => collection.id),
       ["col-a"],
     );
     assert.deepEqual(
-      seen?.items.map((item) => item.title),
+      seen()?.items.map((item) => item.title),
       ["Kind of Blue"],
     );
   });
@@ -266,7 +224,7 @@ describe("CollectionsProvider — a store that could not be read", () => {
   it("writes NOTHING, so a bad read never costs the collections on disk", async () => {
     store.set(COLLECTIONS_A, A_COLLECTIONS);
     store.set(ITEMS_A, A_ITEMS);
-    readError = new Error("SecurityError: localStorage is not available");
+    spy.readError = new Error("SecurityError: localStorage is not available");
     const tree = await mount();
     await drain(tree);
 
@@ -276,7 +234,7 @@ describe("CollectionsProvider — a store that could not be read", () => {
   });
 
   it("never persists the demo seed data over a real account", async () => {
-    readError = new Error("QuotaExceededError");
+    spy.readError = new Error("QuotaExceededError");
     const tree = await mount();
     await drain(tree);
 
@@ -286,10 +244,10 @@ describe("CollectionsProvider — a store that could not be read", () => {
   });
 
   it("still readies the UI, because a broken store is not a reason to block the tree", async () => {
-    readError = new Error("SecurityError");
+    spy.readError = new Error("SecurityError");
     await mount();
 
-    assert.equal(seen?.ready, true);
+    assert.equal(seen()?.ready, true);
   });
 
   it("an unparseable blob refuses the whole session's writes, not just that key", async () => {
@@ -347,6 +305,6 @@ describe("CollectionsProvider — the account changes under it", () => {
 
     assert.deepEqual(writes, []);
     assert.equal(store.get(COLLECTIONS_A), A_COLLECTIONS, "what A had is still A's");
-    assert.deepEqual(seen?.collections, []);
+    assert.deepEqual(seen()?.collections, []);
   });
 });

@@ -2,7 +2,8 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 
-import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
+import { mockModule } from "./helpers/render";
+import { drain, installSpyAsyncStorage, providerHarness } from "./helpers/mount-provider";
 
 /**
  * `PremiumProvider`, mounted.
@@ -20,33 +21,13 @@ import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
  * sweep; these cases are the first time anything has run it.
  */
 
-installNativeModuleStubs();
-
-const reads: string[] = [];
-const writes: { key: string; value: string }[] = [];
+const spy = installSpyAsyncStorage();
+const { reads, writes, store } = spy;
 const captured: { error: unknown; context: { scope?: string } }[] = [];
-const store = new Map<string, string>();
-let readError: Error | null = null;
-let writeError: Error | null = null;
 /** What `useAuth()` answers — reassigned between renders, like a sign-in. */
 let user: { id: string } | null = { id: "user-a" };
 /** What the cloud says; `null` is the transient-failure answer. */
 let validation: unknown = null;
-
-mockModule("@react-native-async-storage/async-storage", {
-  default: {
-    getItem: async (key: string) => {
-      reads.push(key);
-      if (readError) throw readError;
-      return store.get(key) ?? null;
-    },
-    setItem: async (key: string, value: string) => {
-      if (writeError) throw writeError;
-      writes.push({ key, value });
-      store.set(key, value);
-    },
-  },
-});
 
 mockModule("@/lib/sentry", {
   captureException: (error: unknown, context: { scope?: string }) =>
@@ -64,28 +45,13 @@ mockModule("@/lib/supabase-subscriptions", {
 type PremiumModule = typeof import("../lib/premium-context");
 type ContextValue = ReturnType<PremiumModule["usePremium"]>;
 
-let premium: PremiumModule | null = null;
-let seen: ContextValue | null = null;
+const harness = providerHarness<ContextValue>(async () => {
+  const premium: PremiumModule = await import("../lib/premium-context");
+  return { Provider: premium.PremiumProvider, useValue: premium.usePremium };
+});
 
-function Probe() {
-  seen = premium!.usePremium();
-  return createElement("View", null);
-}
-
-async function settle(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-async function mount() {
-  premium ??= await import("../lib/premium-context");
-  (await import("../lib/report-storage-failure")).__resetStorageFailureReportsForTests();
-  const tree = render(createElement(premium.PremiumProvider, null, createElement(Probe)));
-  await settle();
-  tree.rerender();
-  await settle();
-  tree.rerender();
-  return tree;
-}
+const mount = () => harness.mount();
+const seen = () => harness.seen;
 
 const KEY_A = "collectables-premium-v1-user-a";
 const KEY_B = "collectables-premium-v1-user-b";
@@ -108,15 +74,11 @@ function keysWritten(): string[] {
 }
 
 beforeEach(() => {
-  reads.length = 0;
-  writes.length = 0;
+  spy.reset();
+  harness.reset();
   captured.length = 0;
-  store.clear();
-  readError = null;
-  writeError = null;
   user = { id: "user-a" };
   validation = null;
-  seen = null;
 });
 
 describe("PremiumProvider — hydrating one account", () => {
@@ -125,8 +87,8 @@ describe("PremiumProvider — hydrating one account", () => {
     await mount();
 
     assert.deepEqual(reads, [KEY_A]);
-    assert.equal(seen?.isPremium, true);
-    assert.equal(seen?.ready, true);
+    assert.equal(seen()?.isPremium, true);
+    assert.equal(seen()?.ready, true);
   });
 
   it("a signed-out session reads nothing and writes nothing", async () => {
@@ -135,13 +97,13 @@ describe("PremiumProvider — hydrating one account", () => {
 
     assert.deepEqual(reads, []);
     assert.deepEqual(writes, []);
-    assert.equal(seen?.ready, true);
-    assert.equal(seen?.isPremium, false);
+    assert.equal(seen()?.ready, true);
+    assert.equal(seen()?.isPremium, false);
   });
 
   it("a failed read does NOT write, because that would downgrade a payer", async () => {
     store.set(KEY_A, PAID);
-    readError = new Error("SecurityError: localStorage is not available");
+    spy.readError = new Error("SecurityError: localStorage is not available");
     await mount();
 
     assert.deepEqual(writes, [], "a storage read must never cost somebody their entitlement");
@@ -157,7 +119,7 @@ describe("PremiumProvider — hydrating one account", () => {
     // The WEAKER of the two gates, on purpose: the read succeeded, so the blob
     // may be replaced. A cache nothing can parse has no future but repair.
     assert.deepEqual(keysWritten(), [KEY_A]);
-    assert.equal(seen?.isPremium, false);
+    assert.equal(seen()?.isPremium, false);
   });
 
   it("a transient cloud failure keeps the cached entitlement", async () => {
@@ -165,7 +127,7 @@ describe("PremiumProvider — hydrating one account", () => {
     validation = null;
     await mount();
 
-    assert.equal(seen?.isPremium, true, "null means 'ask again later', not 'not a subscriber'");
+    assert.equal(seen()?.isPremium, true, "null means 'ask again later', not 'not a subscriber'");
   });
 });
 
@@ -174,11 +136,11 @@ describe("PremiumProvider — the user acts", () => {
     const tree = await mount();
     writes.length = 0;
 
-    seen!.activatePremium("settings");
+    seen()!.activatePremium("settings");
     tree.rerender();
-    await settle();
+    await drain(tree);
 
-    assert.equal(seen?.isPremium, true);
+    assert.equal(seen()?.isPremium, true);
     assert.deepEqual(keysWritten(), [KEY_A]);
     assert.equal(JSON.parse(writes[0].value).isPremium, true);
   });
@@ -186,28 +148,28 @@ describe("PremiumProvider — the user acts", () => {
   it("the activation source is one-shot: consuming it resets to server_sync", async () => {
     const tree = await mount();
 
-    seen!.activatePremium("upsell_sheet");
+    seen()!.activatePremium("upsell_sheet");
     tree.rerender();
 
-    assert.equal(seen!.consumeLastPremiumIntent(), "upsell_sheet");
-    assert.equal(seen!.consumeLastPremiumIntent(), "server_sync");
+    assert.equal(seen()!.consumeLastPremiumIntent(), "upsell_sheet");
+    assert.equal(seen()!.consumeLastPremiumIntent(), "server_sync");
   });
 
   it("a session that could not READ still refuses to write what the user does", async () => {
     store.set(KEY_A, PAID);
-    readError = new Error("SecurityError");
+    spy.readError = new Error("SecurityError");
     const tree = await mount();
     writes.length = 0;
 
-    seen!.activatePremium("settings");
+    seen()!.activatePremium("settings");
     tree.rerender();
-    await settle();
+    await drain(tree);
 
     // The known cost of the gate, stated rather than discovered: this session
     // writes nothing at all, so the flip lives until relaunch. It is the right
     // trade against writing "free" over a paying user's blob, and it is the
     // reason the refusal deserves to be visible to the user somewhere.
-    assert.equal(seen?.isPremium, true);
+    assert.equal(seen()?.isPremium, true);
     assert.deepEqual(writes, []);
   });
 });
@@ -233,8 +195,7 @@ describe("PremiumProvider — the account changes under it", () => {
 
     user = { id: "user-b" };
     tree.rerender();
-    await settle();
-    tree.rerender();
+    await drain(tree);
 
     assert.deepEqual(
       writes.filter((write) => write.key === KEY_B && JSON.parse(write.value).isPremium === true),
@@ -250,10 +211,9 @@ describe("PremiumProvider — the account changes under it", () => {
 
     user = null;
     tree.rerender();
-    await settle();
-    tree.rerender();
+    await drain(tree);
 
-    assert.equal(seen?.isPremium, false);
+    assert.equal(seen()?.isPremium, false);
     assert.deepEqual(writes, [], "there is no key to write to, and nothing to say");
   });
 
@@ -264,10 +224,9 @@ describe("PremiumProvider — the account changes under it", () => {
 
     user = { id: "user-b" };
     tree.rerender();
-    await settle();
-    tree.rerender();
+    await drain(tree);
 
     assert.deepEqual(reads, [KEY_B]);
-    assert.equal(seen?.isPremium, false, "user B has nothing stored and is not a subscriber");
+    assert.equal(seen()?.isPremium, false, "user B has nothing stored and is not a subscriber");
   });
 });

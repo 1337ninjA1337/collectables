@@ -2,7 +2,8 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 
-import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
+import { mockModule } from "./helpers/render";
+import { drain, installSpyAsyncStorage, providerHarness } from "./helpers/mount-provider";
 
 /**
  * `ChatProvider`, mounted — the account switch, asked of the provider whose
@@ -21,27 +22,9 @@ import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
  * `mockModule` calls; none of them is a dev-dep.
  */
 
-installNativeModuleStubs();
-
-const writes: { key: string; value: string }[] = [];
-const reads: string[] = [];
-const store = new Map<string, string>();
-let readError: Error | null = null;
+const spy = installSpyAsyncStorage();
+const { reads, writes, store } = spy;
 let user: { id: string } | null = { id: "user-a" };
-
-mockModule("@react-native-async-storage/async-storage", {
-  default: {
-    getItem: async (key: string) => {
-      reads.push(key);
-      if (readError) throw readError;
-      return store.get(key) ?? null;
-    },
-    setItem: async (key: string, value: string) => {
-      writes.push({ key, value });
-      store.set(key, value);
-    },
-  },
-});
 
 mockModule("@/lib/sentry", { captureException: () => undefined });
 
@@ -60,28 +43,13 @@ mockModule("@/lib/supabase-chat", {
 type ChatModule = typeof import("../lib/chat-context");
 type ContextValue = ReturnType<ChatModule["useChat"]>;
 
-let chat: ChatModule | null = null;
-let seen: ContextValue | null = null;
+const harness = providerHarness<ContextValue>(async () => {
+  const chat: ChatModule = await import("../lib/chat-context");
+  return { Provider: chat.ChatProvider, useValue: chat.useChat };
+});
 
-function Probe() {
-  seen = chat!.useChat();
-  return createElement("View", null);
-}
-
-async function settle(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-async function mount() {
-  chat ??= await import("../lib/chat-context");
-  (await import("../lib/report-storage-failure")).__resetStorageFailureReportsForTests();
-  const tree = render(createElement(chat.ChatProvider, null, createElement(Probe)));
-  await settle();
-  tree.rerender();
-  await settle();
-  tree.rerender();
-  return tree;
-}
+const mount = () => harness.mount();
+const seen = () => harness.seen;
 
 const KEY_A = "collectables-chats-v1-user-a";
 const KEY_B = "collectables-chats-v1-user-b";
@@ -105,12 +73,9 @@ const A_PENDING = JSON.stringify({
 });
 
 beforeEach(() => {
-  writes.length = 0;
-  reads.length = 0;
-  store.clear();
-  readError = null;
+  spy.reset();
+  harness.reset();
   user = { id: "user-a" };
-  seen = null;
 });
 
 describe("ChatProvider — one account", () => {
@@ -121,12 +86,12 @@ describe("ChatProvider — one account", () => {
 
     assert.equal(chatCacheKey("user-a"), KEY_A);
     assert.deepEqual(reads, [KEY_A]);
-    assert.equal(seen?.ready, true);
+    assert.equal(seen()?.ready, true);
   });
 
   it("a failed read writes nothing, because the pending queue is not re-fetchable", async () => {
     store.set(KEY_A, A_PENDING);
-    readError = new Error("SecurityError: localStorage is not available");
+    spy.readError = new Error("SecurityError: localStorage is not available");
     await mount();
 
     assert.deepEqual(writes, []);
@@ -142,8 +107,7 @@ describe("ChatProvider — the account changes under it", () => {
 
     user = { id: "user-b" };
     tree.rerender();
-    await settle();
-    tree.rerender();
+    await drain(tree);
 
     const leaked = writes.filter((write) => write.key === KEY_B && write.value.includes("local-1"));
     assert.deepEqual(leaked, [], "user B must not receive user A's offline queue");
@@ -156,8 +120,7 @@ describe("ChatProvider — the account changes under it", () => {
 
     user = { id: "user-b" };
     tree.rerender();
-    await settle();
-    tree.rerender();
+    await drain(tree);
 
     assert.deepEqual(reads, [KEY_B]);
   });
@@ -169,8 +132,7 @@ describe("ChatProvider — the account changes under it", () => {
 
     user = null;
     tree.rerender();
-    await settle();
-    tree.rerender();
+    await drain(tree);
 
     assert.deepEqual(writes, []);
     assert.equal(store.get(KEY_A), A_PENDING, "what A had is still A's");

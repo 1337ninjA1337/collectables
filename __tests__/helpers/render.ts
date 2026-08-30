@@ -586,6 +586,18 @@ function renderNode(pass: RenderPass, node: unknown, keyPath: string): TestNode[
 export type RenderResult = {
   /** Synthetic root; its `children` are what the element rendered to. */
   root: TestNode;
+  /**
+   * Whether the last pass set state — i.e. whether another `rerender()` would
+   * produce a different tree.
+   *
+   * The provider suites used to drain their async hydrate chains with a FIXED
+   * number of `settle()`/`rerender()` pairs, arrived at by watching a case
+   * fail: two for `chat-context`, four for `collections-context`. A fixed count
+   * cannot tell "settled" from "not yet", so an extra await added to a hydrate
+   * would make a leak case pass by not having run. `drain()` in
+   * `./mount-provider.ts` loops on this instead.
+   */
+  dirty: boolean;
   /** Every node in the tree, root first, depth-first. */
   all(): TestNode[];
   /** Depth-first search; throws when nothing matches. */
@@ -646,6 +658,9 @@ export function render(element: React.ReactElement): RenderResult {
   const result: RenderResult = {
     get root() {
       return root;
+    },
+    get dirty() {
+      return pass.dirty;
     },
     all: () => collect(root, []).slice(1),
     findAll: (predicate) => result.all().filter(predicate),

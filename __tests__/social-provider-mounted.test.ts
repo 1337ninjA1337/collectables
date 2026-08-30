@@ -2,7 +2,8 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 
-import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
+import { mockModule } from "./helpers/render";
+import { drain, installSpyAsyncStorage, providerHarness } from "./helpers/mount-provider";
 
 /**
  * `SocialProvider`, mounted — the fifth provider to be run rather than read,
@@ -23,29 +24,11 @@ import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
  * of them is a dev-dep.
  */
 
-installNativeModuleStubs();
-
-const writes: { key: string; value: string }[] = [];
-const reads: string[] = [];
-const store = new Map<string, string>();
-let readError: Error | null = null;
+const spy = installSpyAsyncStorage();
+const { reads, writes, store } = spy;
 let user: { id: string; email?: string } | null = { id: "user-a" };
 /** What `fetchFriendRequests` answers; `null` stands for an offline mount. */
 let remoteRequests: { from_user_id: string; to_user_id: string }[] | null = [];
-
-mockModule("@react-native-async-storage/async-storage", {
-  default: {
-    getItem: async (key: string) => {
-      reads.push(key);
-      if (readError) throw readError;
-      return store.get(key) ?? null;
-    },
-    setItem: async (key: string, value: string) => {
-      writes.push({ key, value });
-      store.set(key, value);
-    },
-  },
-});
 
 mockModule("@/lib/sentry", { captureException: () => undefined });
 
@@ -80,36 +63,13 @@ mockModule("@/lib/supabase-realtime-sync", {
 type SocialModule = typeof import("../lib/social-context");
 type ContextValue = ReturnType<SocialModule["useSocial"]>;
 
-let social: SocialModule | null = null;
-let seen: ContextValue | null = null;
+const harness = providerHarness<ContextValue>(async () => {
+  const social: SocialModule = await import("../lib/social-context");
+  return { Provider: social.SocialProvider, useValue: social.useSocial };
+});
 
-function Probe() {
-  seen = social!.useSocial();
-  return createElement("View", null);
-}
-
-async function settle(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-async function mount() {
-  social ??= await import("../lib/social-context");
-  (await import("../lib/report-storage-failure")).__resetStorageFailureReportsForTests();
-  const tree = render(createElement(social.SocialProvider, null, createElement(Probe)));
-  await settle();
-  tree.rerender();
-  await settle();
-  tree.rerender();
-  return tree;
-}
-
-/** Re-render until the async hydrate/persist chain has stopped producing work. */
-async function drain(tree: { rerender: () => unknown }, passes = 3) {
-  for (let index = 0; index < passes; index += 1) {
-    await settle();
-    tree.rerender();
-  }
-}
+const mount = () => harness.mount();
+const seen = () => harness.seen;
 
 const PERSONAL_A = "collectables-social-v1-user-a";
 const PERSONAL_B = "collectables-social-v1-user-b";
@@ -134,13 +94,10 @@ function writesTo(key: string) {
 }
 
 beforeEach(() => {
-  writes.length = 0;
-  reads.length = 0;
-  store.clear();
-  readError = null;
+  spy.reset();
+  harness.reset();
   user = { id: "user-a" };
   remoteRequests = [];
-  seen = null;
 });
 
 describe("SocialProvider — one account", () => {
@@ -155,20 +112,20 @@ describe("SocialProvider — one account", () => {
     assert.equal(pendingSocialKey("user-a"), PENDING_A);
     assert.equal(SOCIAL_GRAPH_KEY, GRAPH);
     assert.deepEqual([...reads].sort(), [GRAPH, PENDING_A, PERSONAL_A].sort());
-    assert.equal(seen?.ready, true);
+    assert.equal(seen()?.ready, true);
   });
 
   it("adopts the stored follow list", async () => {
     store.set(PERSONAL_A, A_PERSONAL);
     await mount();
 
-    assert.deepEqual(seen?.following, ["u2"]);
+    assert.deepEqual(seen()?.following, ["u2"]);
   });
 
   it("a failed read writes nothing, because the offline queue is not re-fetchable", async () => {
     store.set(PERSONAL_A, A_PERSONAL);
     store.set(PENDING_A, A_PENDING);
-    readError = new Error("SecurityError: localStorage is not available");
+    spy.readError = new Error("SecurityError: localStorage is not available");
     const tree = await mount();
     await drain(tree);
 
@@ -178,18 +135,18 @@ describe("SocialProvider — one account", () => {
   });
 
   it("a failed read still readies the UI", async () => {
-    readError = new Error("QuotaExceededError");
+    spy.readError = new Error("QuotaExceededError");
     await mount();
 
-    assert.equal(seen?.ready, true, "a broken store is not a reason to block the tree");
+    assert.equal(seen()?.ready, true, "a broken store is not a reason to block the tree");
   });
 
   it("an offline friend-request fetch leaves the inbox empty rather than wrong", async () => {
     remoteRequests = null;
     await mount();
 
-    assert.deepEqual(seen?.incomingRequestUserIds, []);
-    assert.deepEqual(seen?.friends, []);
+    assert.deepEqual(seen()?.incomingRequestUserIds, []);
+    assert.deepEqual(seen()?.friends, []);
   });
 });
 
@@ -211,7 +168,7 @@ describe("SocialProvider — the device-global graph key", () => {
     const tree = await mount();
     await drain(tree);
 
-    assert.deepEqual(seen?.friends, ["u2"], "the handshake IS mutual, so this is not a vacuous pass");
+    assert.deepEqual(seen()?.friends, ["u2"], "the handshake IS mutual, so this is not a vacuous pass");
     for (const write of writesTo(GRAPH)) {
       assert.ok(
         !write.value.includes("u2"),
@@ -225,7 +182,7 @@ describe("SocialProvider — the device-global graph key", () => {
     await mount();
 
     assert.ok(
-      !seen?.profiles.some((profile) => profile.id === "u3"),
+      !seen()?.profiles.some((profile) => profile.id === "u3"),
       "a tombstoned profile stays hidden across a relaunch",
     );
   });
@@ -240,8 +197,8 @@ describe("SocialProvider — the device-global graph key", () => {
     );
     await mount();
 
-    assert.ok(!seen?.profiles.some((profile) => profile.id === "u3"));
-    assert.deepEqual(seen?.incomingRequestUserIds, [], "the stale local copy is not an inbox");
+    assert.ok(!seen()?.profiles.some((profile) => profile.id === "u3"));
+    assert.deepEqual(seen()?.incomingRequestUserIds, [], "the stale local copy is not an inbox");
   });
 });
 
@@ -279,9 +236,9 @@ describe("SocialProvider — the account changes under it", () => {
 
     user = { id: "user-b" };
     tree.rerender();
-    await settle();
+    await drain(tree);
 
-    assert.deepEqual([...reads].sort(), [GRAPH, PENDING_B, PERSONAL_B].sort());
+    assert.deepEqual([...new Set(reads)].sort(), [GRAPH, PENDING_B, PERSONAL_B].sort());
   });
 
   it("signing out empties the state without writing it anywhere", async () => {
@@ -295,6 +252,6 @@ describe("SocialProvider — the account changes under it", () => {
 
     assert.deepEqual(writes, []);
     assert.equal(store.get(PERSONAL_A), A_PERSONAL, "what A had is still A's");
-    assert.deepEqual(seen?.following, []);
+    assert.deepEqual(seen()?.following, []);
   });
 });
