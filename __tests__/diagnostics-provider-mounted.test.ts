@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 
 import { installSpyCapture } from "./helpers/mount-provider";
-import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
+import { autoUnmount, installNativeModuleStubs, mockModule, render } from "./helpers/render";
 
 /**
  * `DiagnosticsProvider`, mounted.
@@ -36,6 +36,8 @@ import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
  */
 
 installNativeModuleStubs();
+// Ends every tree a case rendered, including the cases that fail early.
+autoUnmount();
 
 /** Every SDK call and storage write this render made, in order. */
 const calls: string[] = [];

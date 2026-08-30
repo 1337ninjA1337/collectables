@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createElement, type ReactElement } from "react";
 
-import { installNativeModuleStubs, render, styleOf, type RenderResult } from "./helpers/render";
+import { autoUnmount, installNativeModuleStubs, render, styleOf, type RenderResult } from "./helpers/render";
 import {
   DESTRUCTIVE_ICON_FOREGROUND,
   DESTRUCTIVE_ICON_SURFACE,
@@ -15,6 +15,8 @@ import { readRepoFile as read } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
 
 installNativeModuleStubs();
+// Ends every tree a case rendered, including the cases that fail early.
+autoUnmount();
 
 /**
  * `<DangerIconButton>` is the icon-only member of the destructive family — the

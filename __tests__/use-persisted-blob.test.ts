@@ -4,7 +4,7 @@ import { createElement } from "react";
 
 import { assertRequiredParameter, declaredSource, parameterList } from "./helpers/declared-shape";
 import { installSpyCapture } from "./helpers/mount-provider";
-import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
+import { autoUnmount, installNativeModuleStubs, mockModule, render } from "./helpers/render";
 import { readRepoFile } from "./helpers/repo-file";
 import { expectStorageReport } from "./helpers/storage-failure-report";
 
@@ -29,6 +29,8 @@ import { expectStorageReport } from "./helpers/storage-failure-report";
  */
 
 installNativeModuleStubs();
+// Ends every tree a case rendered, including the cases that fail early.
+autoUnmount();
 
 const writes: { key: string; value: string }[] = [];
 let failNextWrite = false;

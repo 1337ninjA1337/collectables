@@ -2,17 +2,13 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createElement, type ReactElement } from "react";
 
-import {
-  installNativeModuleStubs,
-  render,
-  styleOf,
-  type RenderResult,
-  type TestNode,
-} from "./helpers/render";
+import { autoUnmount, installNativeModuleStubs, render, styleOf, type RenderResult, type TestNode } from "./helpers/render";
 import { HERO_DARK } from "@/lib/design-tokens";
 import { PRICE_RANGE_ERROR_I18N_KEY, type ItemFilters } from "@/lib/item-filters";
 
 installNativeModuleStubs();
+// Ends every tree a case rendered, including the cases that fail early.
+autoUnmount();
 
 /**
  * Apply is gated on `validatePriceRange`.

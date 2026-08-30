@@ -23,6 +23,7 @@ import {
   stubbedModuleSpecifiers,
   unmountAllTrees,
 } from "./helpers/render";
+import { assertExemptionsHonest, suiteCode, topLevelSuites } from "./helpers/suite-files";
 
 installNativeModuleStubs();
 
@@ -722,6 +723,60 @@ describe("render harness — trees that outlive their case", () => {
       unmountAllTrees();
     });
     assert.equal(cleanups, 1, "a tree that ended itself must not be torn down twice");
+  });
+});
+
+/**
+ * The suite that OWNS the lifetime rule is the one suite that must not follow it.
+ *
+ * Three cases here render trees on purpose and assert on the count, including
+ * one that leaves two mounted to prove `unmountAllTrees()` ends them. An
+ * `afterEach` tearing those down between cases would not break them — but it
+ * would mean the harness's own contract was being checked through the thing it
+ * is a contract about.
+ */
+const OWNS_THE_LIFETIME_RULE = ["render-harness.test.ts"];
+
+describe("every suite that mounts a tree ends it", () => {
+  /** Suites that build a tree: directly, or through the provider harness. */
+  function mountsATree(name: string): boolean {
+    const code = suiteCode(name);
+    return (
+      /import \{[^}]*\brender\b[^}]*\} from "\.\/helpers\/render"/.test(code) ||
+      /import \{[^}]*\bproviderHarness\b[^}]*\} from "\.\/helpers\/mount-provider"/.test(code)
+    );
+  }
+
+  it("finds the suites it is about, so the sweep is not scanning an empty room", () => {
+    const mounting = topLevelSuites().filter(mountsATree);
+
+    assert.ok(
+      mounting.length >= 15,
+      `only ${String(mounting.length)} suites mount a tree — the parse, not the tree`,
+    );
+  });
+
+  it("no suite renders without an autoUnmount()", () => {
+    const offenders = topLevelSuites()
+      .filter((name) => !OWNS_THE_LIFETIME_RULE.includes(name))
+      .filter(mountsATree)
+      .filter((name) => !suiteCode(name).includes("autoUnmount()"));
+
+    assert.deepEqual(
+      offenders,
+      [],
+      "call autoUnmount() at module scope — a case that renders, asserts and returns leaves its effects subscribed for every case after it",
+    );
+  });
+
+  it("the one exempt suite still owns the rule it is exempt from", () => {
+    assertExemptionsHonest({
+      exemptions: OWNS_THE_LIFETIME_RULE,
+      expected: ["render-harness.test.ts"],
+      rule: "the autoUnmount rule",
+      walk: topLevelSuites(),
+      stillNeeded: (name) => suiteCode(name).includes("unmountAllTrees()"),
+    });
   });
 });
 

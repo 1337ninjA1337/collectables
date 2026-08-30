@@ -5,7 +5,10 @@ import { createElement, useEffect, useState } from "react";
 import { balancedInner } from "@/lib/balanced-source";
 import { stripComments } from "@/lib/strip-comments";
 
-import { render } from "./helpers/render";
+import { autoUnmount, render } from "./helpers/render";
+
+// Ends every tree a case rendered, including the cases that fail early.
+autoUnmount();
 import {
   drain,
   providerHarness,

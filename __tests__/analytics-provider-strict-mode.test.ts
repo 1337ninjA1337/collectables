@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement, StrictMode, type ReactElement } from "react";
 
-import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
+import { autoUnmount, installNativeModuleStubs, mockModule, render } from "./helpers/render";
 
 /**
  * The real Strict-Mode mount test for `<AnalyticsProvider>`.
@@ -29,6 +29,8 @@ import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
  */
 
 installNativeModuleStubs();
+// Ends every tree a case rendered, including the cases that fail early.
+autoUnmount();
 
 type Identity = { id: string } | null;
 

@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createElement, type ReactElement } from "react";
 
-import { installNativeModuleStubs, render, styleOf, type RenderResult } from "./helpers/render";
+import { autoUnmount, installNativeModuleStubs, render, styleOf, type RenderResult } from "./helpers/render";
 import {
   SOFT_DESTRUCTIVE_FOREGROUND,
   SOFT_DESTRUCTIVE_SURFACE,
@@ -20,6 +20,8 @@ import {
 import type { ItemFilters } from "@/lib/item-filters";
 
 installNativeModuleStubs();
+// Ends every tree a case rendered, including the cases that fail early.
+autoUnmount();
 
 /**
  * RUNTIME design-token assertions: mount a component and compare the colour it

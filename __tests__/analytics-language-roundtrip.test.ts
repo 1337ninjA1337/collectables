@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement, type ReactElement } from "react";
 
-import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
+import { autoUnmount, installNativeModuleStubs, mockModule, render } from "./helpers/render";
 
 /**
  * Integration coverage for the `language_switched` no-op guard.
@@ -23,6 +23,8 @@ import { installNativeModuleStubs, mockModule, render } from "./helpers/render";
  */
 
 installNativeModuleStubs();
+// Ends every tree a case rendered, including the cases that fail early.
+autoUnmount();
 
 type TrackedEvent = { name: string; props: unknown };
 
