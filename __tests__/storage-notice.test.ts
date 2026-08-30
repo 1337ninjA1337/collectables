@@ -175,13 +175,45 @@ describe("useStorageFailureNotice — a write that was rejected mid-session", ()
       new Error("QuotaExceededError"),
     );
 
+    // The quota spelling in the error is why this reads `storageFullMessage`
+    // rather than the gate's sentence: same title, same latch, the fix differs.
     assert.deepEqual(toasts, [
       {
         level: "error",
-        message: "storagePersistRefusedMessage",
+        message: "storageFullMessage",
         title: "storagePersistRefusedTitle",
       },
     ]);
+  });
+
+  it("tells a full device to free up space rather than to restart", async () => {
+    await load();
+    const tree = render(createElement(Listener));
+    await drain(tree);
+
+    const quota = new Error("The quota has been exceeded.");
+    quota.name = "QuotaExceededError";
+    reporting!.reportStorageFailure("chat-context.setItem", "collectables-chats-v1", quota);
+
+    assert.deepEqual(toasts, [
+      {
+        level: "error",
+        message: "storageFullMessage",
+        title: "storagePersistRefusedTitle",
+      },
+    ]);
+  });
+
+  it("keeps the restart sentence for a store that is merely blocked", async () => {
+    await load();
+    const tree = render(createElement(Listener));
+    await drain(tree);
+
+    const blocked = new Error("localStorage is not available");
+    blocked.name = "SecurityError";
+    reporting!.reportStorageFailure("chat-context.setItem", "collectables-chats-v1", blocked);
+
+    assert.equal(toasts[0]?.message, "storagePersistRefusedMessage");
   });
 
   it("hears a write from a module with no React in it", async () => {

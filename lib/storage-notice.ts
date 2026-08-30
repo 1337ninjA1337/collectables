@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n-context";
 import {
   observeStorageFailures,
   STORAGE_FAILURE_SITES,
+  type StorageFailureReason,
   type StorageFailureSite,
 } from "@/lib/report-storage-failure";
 import { useToast } from "@/lib/toast-context";
@@ -28,8 +29,11 @@ import { useToast } from "@/lib/toast-context";
  * ever closes and nothing at all is different on screen.
  *
  * Both end in "what you are doing now is not being kept", which is why they
- * share a latch and a string rather than being told apart for the user. The
- * DIAGNOSIS differs and goes to Sentry, where somebody can act on it.
+ * share a latch and a TITLE rather than being told apart for the user. What
+ * differs is the fix, and only where the error is clear about it: a rejected
+ * write carrying a quota signal says "free up space", everything else says
+ * "the storage is not available". The full DIAGNOSIS still goes to Sentry,
+ * where somebody can act on more than one sentence of it.
  *
  * ## Once per session, across all five providers
  *
@@ -130,16 +134,34 @@ export function losesUserData(scope: StorageFailureSite): boolean {
 export const DATA_WRITE_SITES: readonly StorageFailureSite[] =
   STORAGE_FAILURE_SITES.filter(losesUserData);
 
-/** The one sentence, raised at most once per session whichever half asks. */
-function useRaiseStorageNotice(): () => void {
+/**
+ * The one sentence, raised at most once per session whichever half asks.
+ *
+ * The TITLE is the same either way — "Changes aren't being saved" is what
+ * happened, and it is true of both causes — and the message is the half that
+ * says what to DO. A full disk does not care that the app was restarted, and a
+ * store behind a privacy setting has nothing to delete; a single sentence
+ * covering both had to offer the wrong fix to somebody.
+ *
+ * The gate half passes `"unavailable"` because that is what a refused hydrate
+ * means: the store answered with an error when it was READ, before anything
+ * was written, so nothing about it says the device is out of space.
+ */
+function useRaiseStorageNotice(): (reason: StorageFailureReason) => void {
   const toast = useToast();
   const { t } = useI18n();
 
-  return useCallback(() => {
-    if (noticeShown) return;
-    noticeShown = true;
-    toast.error(t("storagePersistRefusedMessage"), t("storagePersistRefusedTitle"));
-  }, [t, toast]);
+  return useCallback(
+    (reason: StorageFailureReason) => {
+      if (noticeShown) return;
+      noticeShown = true;
+      toast.error(
+        reason === "full" ? t("storageFullMessage") : t("storagePersistRefusedMessage"),
+        t("storagePersistRefusedTitle"),
+      );
+    },
+    [t, toast],
+  );
 }
 
 /**
@@ -164,7 +186,7 @@ export function useStorageNotice(gateRefusing: boolean): void {
 
   useEffect(() => {
     if (!gateRefusing) return;
-    raise();
+    raise("unavailable");
   }, [gateRefusing, raise]);
 }
 
@@ -183,7 +205,7 @@ export function useStorageFailureNotice(): void {
   useEffect(
     () =>
       observeStorageFailures((event) => {
-        if (losesUserData(event.scope)) raise();
+        if (losesUserData(event.scope)) raise(event.reason);
       }),
     [raise],
   );

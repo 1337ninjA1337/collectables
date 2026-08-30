@@ -556,6 +556,8 @@ const en = {
   storagePersistRefusedTitle: "Changes aren't being saved",
   storagePersistRefusedMessage:
     "This device's storage is not available, so changes you make now may not survive a restart. Restarting the app usually fixes it.",
+  storageFullMessage:
+    "This device has run out of storage, so changes you make now may not survive a restart. Freeing up space usually fixes it.",
 } as const;
 
 /**
@@ -1101,6 +1103,8 @@ const ru: TranslationMap = {
   storagePersistRefusedTitle: "Изменения не сохраняются",
   storagePersistRefusedMessage:
     "Хранилище устройства недоступно, поэтому изменения могут не пережить перезапуск. Обычно помогает перезапуск приложения.",
+  storageFullMessage:
+    "На устройстве закончилось место, поэтому изменения могут не пережить перезапуск. Обычно помогает освободить место.",
 };
 
 const be: TranslationMap = {
@@ -1449,6 +1453,8 @@ const be: TranslationMap = {
   storagePersistRefusedTitle: "Змены не захоўваюцца",
   storagePersistRefusedMessage:
     "Сховішча прылады недаступнае, таму змены могуць не перажыць перазапуск. Звычайна дапамагае перазапуск праграмы.",
+  storageFullMessage:
+    "На прыладзе скончылася месца, таму змены могуць не перажыць перазапуск. Звычайна дапамагае вызваліць месца.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Пачніце сваю першую калекцыю",
   emptyOwnedHint:
@@ -2007,6 +2013,8 @@ const pl: TranslationMap = {
   storagePersistRefusedTitle: "Zmiany nie są zapisywane",
   storagePersistRefusedMessage:
     "Pamięć urządzenia jest niedostępna, więc zmiany mogą nie przetrwać ponownego uruchomienia. Zwykle pomaga restart aplikacji.",
+  storageFullMessage:
+    "W urządzeniu zabrakło miejsca, więc zmiany mogą nie przetrwać ponownego uruchomienia. Zwykle pomaga zwolnienie miejsca.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Zacznij swoją pierwszą kolekcję",
   emptyOwnedHint:
@@ -2573,6 +2581,8 @@ const de: TranslationMap = {
   storagePersistRefusedTitle: "Änderungen werden nicht gespeichert",
   storagePersistRefusedMessage:
     "Der Speicher dieses Geräts ist nicht verfügbar, daher überstehen Änderungen möglicherweise keinen Neustart. Ein Neustart der App hilft meist.",
+  storageFullMessage:
+    "Auf diesem Gerät ist kein Speicherplatz mehr frei, daher überstehen Änderungen möglicherweise keinen Neustart. Speicherplatz freizugeben hilft meist.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Starte deine erste Sammlung",
   emptyOwnedHint:
@@ -3151,6 +3161,8 @@ const es: TranslationMap = {
   storagePersistRefusedTitle: "Los cambios no se están guardando",
   storagePersistRefusedMessage:
     "El almacenamiento del dispositivo no está disponible, así que los cambios podrían no sobrevivir a un reinicio. Reiniciar la app suele solucionarlo.",
+  storageFullMessage:
+    "El dispositivo se quedó sin espacio, así que los cambios podrían no sobrevivir a un reinicio. Liberar espacio suele solucionarlo.",
   // Empty states — the first screen a new account sees on every tab.
   emptyOwnedTitle: "Empieza tu primera colección",
   emptyOwnedHint:

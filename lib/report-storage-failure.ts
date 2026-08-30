@@ -114,17 +114,56 @@ export function reportStorageFailure(
   // BEFORE the budget check: an observer's idea of repetition is its own, and a
   // read that already spent this pair's budget must not hide the first WRITE
   // from a user who is losing edits. See `observeStorageFailures`.
-  notifyObservers({ scope, keyspace });
+  notifyObservers({ scope, keyspace, reason: classifyStorageError(error) });
   if (reported.has(budget)) return false;
   reported.add(budget);
   captureException(error, { scope, extra: { keyspace } });
   return true;
 }
 
+/**
+ * WHY the store said no, as far as the error can be trusted to say.
+ *
+ * `"full"` is the one cause with a different fix for the user: free up space.
+ * Everything else — a `SecurityError` behind a privacy setting, a disabled
+ * store, a `localStorage` that is not there at all — is `"unavailable"`, which
+ * a restart may well clear. The distinction is the difference between telling
+ * somebody to restart the app (useless on a full disk) and telling them to
+ * delete something (useless when the store is blocked).
+ */
+export type StorageFailureReason = "full" | "unavailable";
+
+/**
+ * Reads the quota signals every engine spells differently.
+ *
+ * Web spells it `QuotaExceededError` (code 22) and Firefox
+ * `NS_ERROR_DOM_QUOTA_REACHED` (code 1014); the React Native AsyncStorage
+ * backends surface a SQLite or a `Errno 28: No space left on device` string
+ * with no `name` at all, so the message is read too. Anything unrecognised is
+ * `"unavailable"`: the honest default, because it is the sentence that does not
+ * blame the user's photo library for a store that is merely blocked.
+ */
+export function classifyStorageError(error: unknown): StorageFailureReason {
+  const name = typeof error === "object" && error !== null ? String((error as { name?: unknown }).name ?? "") : "";
+  const code = typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined;
+  const message =
+    typeof error === "object" && error !== null
+      ? String((error as { message?: unknown }).message ?? "")
+      : String(error ?? "");
+  const haystack = `${name} ${message}`.toLowerCase();
+  if (code === 22 || code === 1014) return "full";
+  if (haystack.includes("quota")) return "full";
+  if (haystack.includes("no space left")) return "full";
+  if (haystack.includes("disk is full") || haystack.includes("database or disk is full")) return "full";
+  return "unavailable";
+}
+
 /** What an observer is handed. The KEYSPACE, never the key — see above. */
 export type StorageFailureEvent = {
   readonly scope: StorageFailureSite;
   readonly keyspace: string;
+  /** See {@link StorageFailureReason} — what to tell the user to DO about it. */
+  readonly reason: StorageFailureReason;
 };
 
 export type StorageFailureObserver = (event: StorageFailureEvent) => void;

@@ -456,8 +456,12 @@ describe("translation floors", () => {
     // hydration gate refuses to persist — written in all six, so every row
     // rose by two and none of them started inheriting. The strings are the
     // user-facing half of a flag five providers have held silently since the
-    // seed-overwrite fix; see `lib/hydration-gate-notice.ts`.
-    assert.match(report, /en: 500\/500 keys \(100\.0%\)/);
+    // seed-overwrite fix; see `lib/storage-notice.ts`.
+    // 501 later the same day: `storageFullMessage`, the same toast's other
+    // sentence. The title covers both causes ("Changes aren't being saved");
+    // the message is the half that says what to DO, and "restart the app" is
+    // useless advice on a device that is out of space. Written in all six.
+    assert.match(report, /en: 501\/501 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

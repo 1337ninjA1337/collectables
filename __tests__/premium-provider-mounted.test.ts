@@ -205,10 +205,13 @@ describe("PremiumProvider — the store stops accepting writes", () => {
     tree.rerender();
     await drain(tree);
 
+    // `storageFullMessage` rather than the gate's sentence because the error
+    // names a quota: a device that is out of space is told to free some, and
+    // "restart the app" would be advice that cannot work.
     assert.deepEqual(toasts, [
       {
         level: "error",
-        message: "storagePersistRefusedMessage",
+        message: "storageFullMessage",
         title: "storagePersistRefusedTitle",
       },
     ]);

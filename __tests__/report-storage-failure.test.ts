@@ -190,6 +190,80 @@ describe("reportStorageFailure", () => {
   });
 });
 
+/**
+ * The one thing about a storage failure the USER can act on.
+ *
+ * A full disk and a blocked store both end in "changes aren't being saved" and
+ * have opposite fixes — free up space, or restart — so the notice needs the
+ * cause, and the cause is only ever a guess read off an error object every
+ * engine spells differently. The default when nothing matches is the one that
+ * does not send somebody deleting photos for a `SecurityError`.
+ */
+describe("classifyStorageError", () => {
+  const full = [
+    Object.assign(new Error("The quota has been exceeded."), { name: "QuotaExceededError" }),
+    Object.assign(new Error("persistent storage maximum size reached"), {
+      name: "NS_ERROR_DOM_QUOTA_REACHED",
+    }),
+    Object.assign(new Error("QuotaExceededError: storage full"), { code: 22 }),
+    Object.assign(new Error("something failed"), { code: 1014 }),
+    new Error("SQLITE_FULL: database or disk is full"),
+    new Error("Errno 28: No space left on device"),
+  ];
+
+  it("reads a quota signal in any of the spellings the engines use", async () => {
+    const { classifyStorageError } = await load();
+
+    for (const error of full) {
+      assert.equal(classifyStorageError(error), "full", `${error.name}: ${error.message}`);
+    }
+  });
+
+  it("calls everything else unavailable, which is the sentence that blames nobody", async () => {
+    const { classifyStorageError } = await load();
+
+    assert.equal(
+      classifyStorageError(
+        Object.assign(new Error("localStorage is not available"), { name: "SecurityError" }),
+      ),
+      "unavailable",
+    );
+    assert.equal(classifyStorageError(new Error("write failed")), "unavailable");
+  });
+
+  it("survives the values a catch block can actually receive", async () => {
+    const { classifyStorageError } = await load();
+
+    assert.equal(classifyStorageError(null), "unavailable");
+    assert.equal(classifyStorageError(undefined), "unavailable");
+    assert.equal(classifyStorageError("quota exceeded"), "full", "a thrown string is still a signal");
+    assert.equal(classifyStorageError({ code: 22 }), "full");
+  });
+
+  it("hands the reason to every observer, beside the scope and the keyspace", async () => {
+    const { reportStorageFailure, observeStorageFailures } = await load();
+    const heard: { scope: string; keyspace: string; reason: string }[] = [];
+    const unsubscribe = observeStorageFailures((event) => {
+      heard.push({ scope: event.scope, keyspace: event.keyspace, reason: event.reason });
+    });
+
+    reportStorageFailure(
+      "tombstones.setItem",
+      TOMBSTONE_KEY,
+      Object.assign(new Error("full"), { name: "QuotaExceededError" }),
+    );
+    unsubscribe();
+
+    assert.deepEqual(heard, [
+      {
+        scope: "tombstones.setItem",
+        keyspace: "collectables-tombstones-v1-items-{id}",
+        reason: "full",
+      },
+    ]);
+  });
+});
+
 // --- Adoption: the silent swallows this exists to end must not come back ---
 
 describe("the swallowing storage sites route through the shared budget", () => {
