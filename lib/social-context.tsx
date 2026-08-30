@@ -67,8 +67,21 @@ type FriendRequest = {
   toUserId: string;
 };
 
+/**
+ * The one blob in this provider that is NOT keyed by account.
+ *
+ * `deletedProfileIds` is an admin tombstone list — the same set for every
+ * account on the device — which is why one global key is right for it.
+ *
+ * `friendRequests` was written here too and never read back: the hydrate takes
+ * `deletedProfileIds` out of this blob and gets the requests from
+ * `fetchFriendRequests`, because they are cloud-owned. So the field was pure
+ * cost — one account's pending handshake pairs parked under a key the NEXT
+ * account on a shared device both reads and overwrites. It stays in the type as
+ * optional so a blob written before 2026-08-30 still parses; nothing reads it.
+ */
 type SocialGraphStore = {
-  friendRequests: FriendRequest[];
+  friendRequests?: FriendRequest[];
   deletedProfileIds: string[];
 };
 
@@ -487,16 +500,18 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       return;
     }
 
+    // NO `friendRequests` — see `SocialGraphStore`. They are cloud-owned and
+    // never read back out of this blob, and this key is shared by every account
+    // on the device, so writing them was a per-account list on a global key
+    // with no reader. Dropping them from the dependency list is the other half:
+    // an inbox that changes no longer rewrites a blob it cannot affect.
     AsyncStorage.setItem(
       SOCIAL_GRAPH_KEY,
-      JSON.stringify({
-        friendRequests,
-        deletedProfileIds,
-      } satisfies SocialGraphStore),
+      JSON.stringify({ deletedProfileIds } satisfies SocialGraphStore),
     ).catch((error: unknown) => {
       reportStorageFailure("social-context.setItem", SOCIAL_GRAPH_KEY, error);
     });
-  }, [deletedProfileIds, friendRequests, hydrationSafeToPersist, ready]);
+  }, [deletedProfileIds, hydrationSafeToPersist, ready]);
 
   // BE-13d: persist the pending social-mutation queue so parked offline writes
   // survive a reload and re-deliver on the next session.
