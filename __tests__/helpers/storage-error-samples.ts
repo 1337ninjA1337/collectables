@@ -75,12 +75,9 @@ export const STORAGE_ERROR_SAMPLES: readonly {
     reason: "full",
   },
   { signal: "no space left", error: new Error("Errno 28: No space left on device"), reason: "full" },
+  // SQLite's own wording, which reaches the `disk is full` signal because it
+  // contains it — the reason the separate longer clause was dead code.
   { signal: "disk is full", error: new Error("SQLITE_FULL: database or disk is full"), reason: "full" },
-  {
-    signal: "database or disk is full",
-    error: new Error("database or disk is full"),
-    reason: "full",
-  },
   {
     signal: "none — a blocked store",
     error: Object.assign(new Error("localStorage is not available"), { name: "SecurityError" }),
@@ -127,4 +124,4 @@ export function classifierSignals(): readonly string[] {
  * would otherwise shrink the population silently and leave the loop passing
  * over less than it used to.
  */
-export const KNOWN_CLASSIFIER_SIGNALS = 6;
+export const KNOWN_CLASSIFIER_SIGNALS = 5;
