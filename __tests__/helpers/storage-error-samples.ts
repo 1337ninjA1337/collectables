@@ -120,6 +120,48 @@ export function allSignals(signals: ClassifierSignals): readonly string[] {
 }
 
 /**
+ * The declaration shapes {@link signalsInSource} follows, in the order it tries.
+ *
+ * `arrow` is not decoration: it decides where the body starts. A `function`
+ * declaration's brace is the first one after the parameter list, past whatever
+ * return-type annotation sits between; an arrow's is the first one after `=>`,
+ * AND it has to be the very next thing there, because an expression-bodied
+ * arrow has no body span at all and `indexOf("{")` would happily return a
+ * neighbouring function's brace and read ITS signals as the classifier's.
+ */
+const DECLARATION_FORMS: readonly { readonly opener: string; readonly arrow: boolean }[] = [
+  { opener: "function classifyStorageError(", arrow: false },
+  { opener: "const classifyStorageError = (", arrow: true },
+];
+
+/**
+ * The index of the body's opening brace, refusing a body that is not braced.
+ *
+ * `from` is just past the parameter list's `)`. Both shapes may carry a return
+ * type here, which is why the function form still scans forward for the brace
+ * rather than demanding one immediately — an object-literal return type
+ * (`: { reason: string }`) would be misread as the body, the same limitation
+ * this reader has always had and the reason it belongs in one place now.
+ */
+function bodyBrace(source: string, from: number, form: (typeof DECLARATION_FORMS)[number]): number {
+  if (!form.arrow) {
+    const brace = source.indexOf("{", from);
+    assert.ok(brace >= 0, "storage-error-samples: classifyStorageError's signature is followed by no body at all");
+    return brace;
+  }
+  const arrow = source.indexOf("=>", from);
+  assert.ok(
+    arrow >= 0,
+    "storage-error-samples: `const classifyStorageError = (…)` with no `=>` after the parameters — this is not an arrow function, and whatever it is this reader cannot follow it",
+  );
+  assert.ok(
+    source.slice(arrow + 2).trimStart().startsWith("{"),
+    "storage-error-samples: classifyStorageError is an expression-bodied arrow (`=> …` with no braces) — there is no body span to scan, and the next brace in the file belongs to something else entirely",
+  );
+  return source.indexOf("{", arrow + 2);
+}
+
+/**
  * The literal signals a classifier's source tests, read out of its body.
  *
  * Two shapes and no more, because those are the two the classifier uses: a
@@ -136,21 +178,33 @@ export function allSignals(signals: ClassifierSignals): readonly string[] {
  *
  * REFUSES rather than returning nothing when it cannot find the declaration.
  * An empty result and a classifier with no signals are the same value, and the
- * reader is the layer that knows which one it is holding: `const
- * classifyStorageError = (error) => …` is a legal rewrite this `indexOf` does
- * not match, and the floor two layers up would report it as "the signal count
- * dropped to 0" — true, and about the wrong file. `parameterList` in
+ * reader is the layer that knows which one it is holding — the floor two layers
+ * up would report an unreadable declaration as "the signal count dropped to 0",
+ * which is true and about the wrong file. `parameterList` in
  * `declared-shape.ts` refuses an overload set out loud for the same reason.
+ *
+ * It follows BOTH declaration shapes. `const classifyStorageError = (error) =>
+ * { … }` used to be a refusal, and refusing it made this helper a rule the
+ * codebase never agreed to: nothing lints against the arrow form, so the first
+ * contributor to write one would have got a red suite explaining a reader's
+ * limitation rather than a problem with their code. What survives as a refusal
+ * is the arrow with no braces at all — see {@link DECLARATION_FORMS}.
  */
 export function signalsInSource(source: string): ClassifierSignals {
-  const start = source.indexOf("function classifyStorageError(");
+  const form = DECLARATION_FORMS.find((candidate) => source.includes(candidate.opener));
   assert.ok(
-    start >= 0,
+    form !== undefined,
     source.includes("classifyStorageError")
-      ? "storage-error-samples: classifyStorageError is in this source but not as `function classifyStorageError(` — an arrow const or a rewritten signature, which this reader cannot follow"
+      ? "storage-error-samples: classifyStorageError is in this source but in neither shape this reader follows — `function classifyStorageError(` or `const classifyStorageError = (` — so a rewritten signature"
       : "storage-error-samples: no classifyStorageError declaration in this source — renamed, moved, or the wrong file",
   );
-  const body = balancedInner(source, source.indexOf("{", source.indexOf(")", start)), "{", "}");
+  const openParen = source.indexOf(form.opener) + form.opener.length - 1;
+  const parameters = balancedInner(source, openParen, "(", ")");
+  assert.ok(
+    parameters !== null,
+    "storage-error-samples: classifyStorageError's parameter list never closes — an unterminated string literal in the signature is the only way this happens",
+  );
+  const body = balancedInner(source, bodyBrace(source, openParen + parameters.length + 2, form), "{", "}");
   assert.ok(
     body !== null,
     "storage-error-samples: classifyStorageError's body never closes — an unterminated string literal is the only way this happens",
@@ -220,24 +274,47 @@ export function classifyTheStore(error: unknown): StorageFailureReason {
   return "unavailable";
 }`,
   /**
-   * A legal rewrite the `indexOf` cannot follow.
+   * A legal rewrite, and the reader follows it now.
    *
-   * The nastier of the two absences: the name IS here, so a reader that only
-   * asked "is the identifier present?" would be satisfied, and every signal in
-   * the body is invisible. Its refusal says which of the two it is.
+   * It was a refusal, and the nastier of the two absences while it was one: the
+   * name IS here, so a reader that only asked "is the identifier present?"
+   * would be satisfied while every signal in the body was invisible. Nothing in
+   * this repo forbids the arrow form, so the reader learned it rather than the
+   * codebase acquiring a rule it never agreed to.
    */
   arrowConst: `
 export const classifyStorageError = (error: unknown): StorageFailureReason => {
   if (String(error).includes("quota")) return "full";
   return "unavailable";
 };`,
+  /**
+   * The absence the arrow form introduces: an arrow with no body span at all.
+   *
+   * The trailing function is the point. A reader that took "the first `{` after
+   * `=>`" would land in `elsewhere` and report `"neighbour"` as a signal
+   * `classifyStorageError` tests — a wrong answer, which is worse than a
+   * refusal, and the one shape where scanning forward for a brace can silently
+   * cross into a different declaration.
+   */
+  conciseArrow: `
+export const classifyStorageError = (error: unknown): StorageFailureReason =>
+  String(error).includes("quota") ? "full" : "unavailable";
+
+function elsewhere(value: unknown): void {
+  if (String(value).includes("neighbour")) return;
+}`,
 };
 
 /** The needles that must PARSE — everything but the two deliberate absences. */
-export const READABLE_PLANTED_CLASSIFIERS = ["deadSubstring", "unsampledSignal", "bothKinds"];
+export const READABLE_PLANTED_CLASSIFIERS = [
+  "deadSubstring",
+  "unsampledSignal",
+  "bothKinds",
+  "arrowConst",
+];
 
 /** The needles the reader must REFUSE, and the word its message must carry. */
 export const UNREADABLE_PLANTED_CLASSIFIERS: Readonly<Record<string, RegExp>> = {
   renamedAway: /no classifyStorageError declaration/,
-  arrowConst: /an arrow const or a rewritten signature/,
+  conciseArrow: /expression-bodied arrow/,
 };

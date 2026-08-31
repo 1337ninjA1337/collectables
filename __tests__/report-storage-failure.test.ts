@@ -320,12 +320,31 @@ describe("classifyStorageError", () => {
       assert.deepEqual(phrases, ["quota"], "a code must not reach the substring rule");
     });
 
+    it("follows the arrow-const form to the signals in its body", () => {
+      // This one used to be a refusal, which made the reader a rule the
+      // codebase never agreed to: nothing lints against `const
+      // classifyStorageError = (…) => {…}`, so writing one would have turned
+      // the suite red over a reader's limitation rather than over the code.
+      // Asserting the exact signals, not merely that it did not throw — the
+      // failure worth catching is a reader that finds the declaration and then
+      // scans the wrong span.
+      assert.deepEqual(signalsInSource(PLANTED_CLASSIFIERS.arrowConst), {
+        codes: [],
+        phrases: ["quota"],
+      });
+    });
+
     it("refuses the two absences instead of reporting zero signals", () => {
       // The failure mode a derived rule has and a hand-written list does not:
       // "found nothing" and "there is nothing to find" are the same value. The
       // reader is the layer that knows which it is holding, so it says so —
-      // the floor two layers up would have called an arrow-const rewrite "the
+      // the floor two layers up would have called a renamed classifier "the
       // signal count dropped to 0", which is true and about the wrong file.
+      //
+      // `conciseArrow` is the absence the arrow form brought with it, and the
+      // only one where the wrong answer is worse than none: its needle carries
+      // a neighbouring function, so a reader that scanned forward for a brace
+      // would return that function's `"neighbour"` as a signal of this one.
       for (const [needle, message] of Object.entries(UNREADABLE_PLANTED_CLASSIFIERS)) {
         assert.throws(
           () => {
@@ -350,11 +369,30 @@ describe("classifyStorageError", () => {
           `${needle} parsed to no signals at all — the needle is broken, not the tree`,
         );
       }
-      assert.equal(
-        READABLE_PLANTED_CLASSIFIERS.length + Object.keys(UNREADABLE_PLANTED_CLASSIFIERS).length,
-        Object.keys(PLANTED_CLASSIFIERS).length,
-        "every needle is either expected to parse or expected to be refused — one that is in neither list is checked by nothing",
-      );
+    });
+
+    it("sorts every needle into exactly one of the two lists, by name", () => {
+      // This counted `readable + unreadable === total` and counting was all it
+      // did: a needle renamed in one place kept the total, and a list naming a
+      // key that no longer exists balanced against a key no list names. The
+      // sets are what matter, so both directions are asserted — every needle
+      // lands in exactly one list, and every listed name is a real needle.
+      const readable = new Set(READABLE_PLANTED_CLASSIFIERS);
+      const unreadable = new Set(Object.keys(UNREADABLE_PLANTED_CLASSIFIERS));
+      for (const needle of Object.keys(PLANTED_CLASSIFIERS)) {
+        assert.ok(
+          readable.has(needle) !== unreadable.has(needle),
+          readable.has(needle)
+            ? `${needle} is listed as both readable and unreadable — it cannot be asserted to parse and to be refused`
+            : `${needle} is in neither list, so it is checked by nothing — say whether the reader must parse it or refuse it`,
+        );
+      }
+      for (const needle of [...readable, ...unreadable]) {
+        assert.ok(
+          Object.hasOwn(PLANTED_CLASSIFIERS, needle),
+          `${needle} is listed but is not a needle — PLANTED_CLASSIFIERS has no such key, so the list is asserting over nothing`,
+        );
+      }
     });
   });
 
