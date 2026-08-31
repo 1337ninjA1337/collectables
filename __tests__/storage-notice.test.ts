@@ -11,6 +11,7 @@ import {
   installSpyToast,
   installStubI18n,
 } from "./helpers/mount-provider";
+import { STORAGE_ERROR_INPUTS } from "./helpers/storage-error-samples";
 import { expectStorageReport } from "./helpers/storage-failure-report";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { readSource, sourceFiles } from "./helpers/source-files";
@@ -367,23 +368,16 @@ describe("useStorageFailureNotice — a write that was rejected mid-session", ()
 describe("the sentence and the crash report describe the same failure", () => {
   /**
    * Everything `classifyStorageError` is documented to read, in the shapes a
-   * store really throws: the four quota signals (two codes, a `name`, a bare
-   * message), a store that is merely blocked, and the values a `catch` binds
-   * when nothing threw an `Error` at all.
+   * store really throws — from the shared samples rather than from a list
+   * written out here.
+   *
+   * This suite and `report-storage-failure.test.ts` each had their own copy,
+   * differing by a quota spelling nobody chose, and neither was derived from
+   * the classifier: a signal added to it got an input in neither, and both
+   * suites stayed green over the branch nothing exercised. The samples are tied
+   * to the classifier's own body in `helpers/storage-error-samples.ts`.
    */
-  const INPUTS: readonly unknown[] = [
-    Object.assign(new Error("The quota has been exceeded."), { name: "QuotaExceededError" }),
-    Object.assign(new Error("persistence failed"), { code: 22 }),
-    Object.assign(new Error("NS_ERROR_DOM_QUOTA_REACHED"), { code: 1014 }),
-    new Error("Errno 28: No space left on device"),
-    new Error("database or disk is full"),
-    Object.assign(new Error("localStorage is not available"), { name: "SecurityError" }),
-    new Error("write failed"),
-    null,
-    undefined,
-    "quota exceeded",
-    { code: 22 },
-  ];
+  const INPUTS = STORAGE_ERROR_INPUTS;
 
   it("picks the sentence for the reason the report carries, for every input", async () => {
     const module = await load();

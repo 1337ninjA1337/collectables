@@ -6,6 +6,12 @@ import { balancedEnd, balancedInner } from "@/lib/balanced-source";
 import { installSpyCapture } from "./helpers/mount-provider";
 import { assertNoOffenders } from "./helpers/offence-sweep";
 import { installNativeModuleStubs } from "./helpers/render";
+import {
+  classifierSignals,
+  KNOWN_CLASSIFIER_SIGNALS,
+  STORAGE_ERROR_INPUTS,
+  STORAGE_ERROR_SAMPLES,
+} from "./helpers/storage-error-samples";
 import { expectStorageReport } from "./helpers/storage-failure-report";
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, sourceCode, sourceFiles } from "./helpers/source-files";
@@ -217,22 +223,36 @@ describe("classifyStorageError", () => {
     });
   });
 
-  const full = [
-    Object.assign(new Error("The quota has been exceeded."), { name: "QuotaExceededError" }),
-    Object.assign(new Error("persistent storage maximum size reached"), {
-      name: "NS_ERROR_DOM_QUOTA_REACHED",
-    }),
-    Object.assign(new Error("QuotaExceededError: storage full"), { code: 22 }),
-    Object.assign(new Error("something failed"), { code: 1014 }),
-    new Error("SQLITE_FULL: database or disk is full"),
-    new Error("Errno 28: No space left on device"),
-  ];
-
-  it("reads a quota signal in any of the spellings the engines use", async () => {
+  it("classifies every shared sample the way the sample says it does", async () => {
     const { classifyStorageError } = await load();
 
-    for (const error of full) {
-      assert.equal(classifyStorageError(error), "full", `${error.name}: ${error.message}`);
+    // The samples carry their expected reason so the OTHER suites reading them
+    // do not each have to restate it. That only works if the pairs are true,
+    // which is this case: the quota spellings the engines use, a store that is
+    // merely blocked, and the values a `catch` binds when nothing threw an
+    // `Error` at all.
+    for (const { signal, error, reason } of STORAGE_ERROR_SAMPLES) {
+      assert.equal(classifyStorageError(error), reason, `signal ${signal}: ${String(error)}`);
+    }
+  });
+
+  it("has a sample for every signal its own body reads", () => {
+    // The lists this replaced were hand-made samples of the classifier's input
+    // space with no edge back to it: a fifth signal added to the classifier got
+    // an input in neither suite, and every case written as a property over
+    // "everything the classifier reads" kept passing over less than it said.
+    // The edge is this — the signals come out of the classifier's own body.
+    const signals = classifierSignals();
+    assert.ok(
+      signals.length >= KNOWN_CLASSIFIER_SIGNALS,
+      `classifier signals dropped to ${String(signals.length)} from ${String(KNOWN_CLASSIFIER_SIGNALS)} — a removed branch takes its sample's meaning with it, and a shape this reader does not know (a regex, a startsWith) is a signal with no sample at all`,
+    );
+    const sampled = new Set(STORAGE_ERROR_SAMPLES.map((sample) => sample.signal));
+    for (const signal of signals) {
+      assert.ok(
+        sampled.has(signal),
+        `classifyStorageError reads "${signal}" and no sample carries it — add one to STORAGE_ERROR_SAMPLES, or the branch is exercised by nothing`,
+      );
     }
   });
 
@@ -288,16 +308,11 @@ describe("classifyStorageError", () => {
     // let them drift" — is a property over the classifier's whole input space,
     // and a drift introduced for the quota spellings alone (a `name` read at
     // one site and a `message` at the other) would pass it. Everything the
-    // classifier is documented to read goes through both consumers here.
-    const inputs: readonly unknown[] = [
-      ...full,
-      Object.assign(new Error("localStorage is not available"), { name: "SecurityError" }),
-      new Error("write failed"),
-      null,
-      undefined,
-      "quota exceeded",
-      { code: 22 },
-    ];
+    // classifier is documented to read goes through both consumers here — from
+    // the shared samples, which the case above ties to the classifier's own
+    // signals, so a branch added to the classifier widens this loop rather than
+    // slipping past a list somebody wrote by hand once.
+    const inputs = STORAGE_ERROR_INPUTS;
 
     for (const [index, error] of inputs.entries()) {
       // One budget entry per input: the reporter reports a site/keyspace pair
