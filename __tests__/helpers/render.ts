@@ -758,13 +758,23 @@ export class CleanupFailures extends AggregateError {}
  * message and nothing names the tree it was in, so the count is the dimension a
  * reader would otherwise have to guess: three failures in one tree and three in
  * three are different diagnoses.
+ *
+ * BOTH numbers, because the first draft reported only the broken one: `across 2
+ * tree(s)` after a sweep of five says the useful thing (two components are
+ * broken) in the words of a different one (the sweep found two trees), and a
+ * reader chasing a leak cannot tell which. `in 2 of 5 tree(s)` carries the
+ * ratio, so three healthy trees came down and are accounted for.
  */
-function throwCleanupFailures(thrown: readonly unknown[], trees?: number): void {
+function throwCleanupFailures(
+  thrown: readonly unknown[],
+  trees?: { broken: number; swept: number },
+): void {
   if (thrown.length === 0) return;
   const shown = thrown.slice(0, MESSAGE_CAUSE_LIMIT).map((error) => describeThrown(error));
   const hidden = thrown.length - shown.length;
   if (hidden > 0) shown.push(`… and ${String(hidden)} more (see error.errors)`);
-  const across = trees === undefined ? "" : ` across ${String(trees)} tree(s)`;
+  const across =
+    trees === undefined ? "" : ` in ${String(trees.broken)} of ${String(trees.swept)} tree(s)`;
   throw new CleanupFailures(
     thrown,
     `unmount: ${String(thrown.length)} effect cleanup(s)${across} threw — ${shown.join("; ")}`,
@@ -936,8 +946,9 @@ export function __mountedTreeCountForTests(): number {
  */
 export function unmountAllTrees(): void {
   const thrown: unknown[] = [];
+  const swept = [...liveTrees];
   let brokenTrees = 0;
-  for (const tree of [...liveTrees]) {
+  for (const tree of swept) {
     try {
       tree.unmount();
     } catch (error: unknown) {
@@ -947,7 +958,7 @@ export function unmountAllTrees(): void {
     }
   }
   liveTrees.clear();
-  throwCleanupFailures(thrown, brokenTrees);
+  throwCleanupFailures(thrown, { broken: brokenTrees, swept: swept.length });
 }
 
 /**
