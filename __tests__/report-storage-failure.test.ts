@@ -7,8 +7,11 @@ import { installSpyCapture } from "./helpers/mount-provider";
 import { assertNoOffenders } from "./helpers/offence-sweep";
 import { installNativeModuleStubs } from "./helpers/render";
 import {
+  allSignals,
   classifierSignals,
   KNOWN_CLASSIFIER_SIGNALS,
+  PLANTED_CLASSIFIERS,
+  signalsInSource,
   STORAGE_ERROR_INPUTS,
   STORAGE_ERROR_SAMPLES,
 } from "./helpers/storage-error-samples";
@@ -242,7 +245,7 @@ describe("classifyStorageError", () => {
     // an input in neither suite, and every case written as a property over
     // "everything the classifier reads" kept passing over less than it said.
     // The edge is this — the signals come out of the classifier's own body.
-    const signals = classifierSignals();
+    const signals = allSignals(classifierSignals());
     assert.ok(
       signals.length >= KNOWN_CLASSIFIER_SIGNALS,
       `classifier signals dropped to ${String(signals.length)} from ${String(KNOWN_CLASSIFIER_SIGNALS)} — a removed branch takes its sample's meaning with it, and a shape this reader does not know (a regex, a startsWith) is a signal with no sample at all`,
@@ -262,17 +265,70 @@ describe("classifyStorageError", () => {
     // containing it contains the first. A substring pair is dead source that
     // reads as thoroughness — two spellings, one of them unreachable — and it
     // survived because nothing put the two clauses side by side until the
-    // samples derived them from the body. The string signals only: a numeric
-    // `code` is compared, not searched.
-    const strings = classifierSignals().filter((signal) => !/^\d+$/.test(signal));
-    for (const signal of strings) {
-      for (const other of strings) {
+    // samples derived them from the body. `phrases` only: a numeric `code` is
+    // compared rather than searched, so "22" inside "1022" means nothing.
+    assertNoDeadPhrase(classifierSignals().phrases);
+  });
+
+  /**
+   * The rule the case above applies, so a planted classifier can be held to it.
+   *
+   * A guard that only ever runs over source satisfying it is green for two
+   * indistinguishable reasons: the tree is clean, or the reader found nothing.
+   */
+  function assertNoDeadPhrase(phrases: readonly string[]): void {
+    for (const phrase of phrases) {
+      for (const other of phrases) {
         assert.ok(
-          signal === other || !signal.includes(other),
-          `classifyStorageError checks "${signal}" and "${other}" separately, but the second is a substring of the first — the longer clause can never decide, so it is dead source`,
+          phrase === other || !phrase.includes(other),
+          `classifyStorageError checks "${phrase}" and "${other}" separately, but the second is a substring of the first — the longer clause can never decide, so it is dead source`,
         );
       }
     }
+  }
+
+  describe("the signal reader, held to classifiers that are not ours", () => {
+    // The dead pair in the real classifier was proven by editing `lib/` by
+    // hand, running the suite and putting the file back — evidence that lived
+    // in a terminal, for a guard whose entire value is that it fails on that
+    // input. These are the same needles, in the repo.
+
+    it("rejects the substring pair that was really there", () => {
+      const { phrases } = signalsInSource(PLANTED_CLASSIFIERS.deadSubstring);
+      assert.deepEqual(phrases, ["disk is full", "database or disk is full"]);
+      assert.throws(
+        () => {
+          assertNoDeadPhrase(phrases);
+        },
+        /the longer clause can never decide/,
+        "the rule that found the dead clause has to fail on it",
+      );
+    });
+
+    it("sees a signal that no sample carries", () => {
+      const signals = allSignals(signalsInSource(PLANTED_CLASSIFIERS.unsampledSignal));
+      assert.deepEqual(signals, ["storage is over capacity"]);
+      const sampled = new Set(STORAGE_ERROR_SAMPLES.map((sample) => sample.signal));
+      assert.ok(!sampled.has(signals[0]), "an added signal is what the coverage loop must catch");
+    });
+
+    it("keeps the two kinds apart rather than flattening them", () => {
+      const { codes, phrases } = signalsInSource(PLANTED_CLASSIFIERS.bothKinds);
+      assert.deepEqual(codes, ["22", "1014"]);
+      assert.deepEqual(phrases, ["quota"], "a code must not reach the substring rule");
+    });
+
+    it("says nothing when the function is not there, which the floor is for", () => {
+      // The failure mode a derived rule has that a hand-written list does not:
+      // a parse that finds nothing reads exactly like a classifier with no
+      // signals, and every loop over it passes.
+      const signals = signalsInSource(PLANTED_CLASSIFIERS.renamedAway);
+      assert.deepEqual(allSignals(signals), []);
+      assert.ok(
+        signals.codes.length + signals.phrases.length < KNOWN_CLASSIFIER_SIGNALS,
+        "so the floor is the assertion that turns a broken read red",
+      );
+    });
   });
 
   it("calls everything else unavailable, which is the sentence that blames nobody", async () => {
