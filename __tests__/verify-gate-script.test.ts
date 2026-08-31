@@ -183,8 +183,13 @@ describe("the local gate matches what CI runs", () => {
    * the contributor's change.
    *
    * `lint:expo-install` degrades to a skip on an unreachable registry, which
-   * is exactly why it is worth nothing locally; `npm audit` is
-   * `continue-on-error` in ci.yml, so it is not part of the gate there either.
+   * is exactly why it is worth nothing locally, and it is advisory in ci.yml
+   * so a green CI never depended on it.
+   *
+   * `lint:audit-baseline` used to sit here too, on the second half of that
+   * reasoning: it was `npm audit --audit-level=high` with
+   * `continue-on-error: true`. It BLOCKS now, so it joined the gate instead —
+   * an exclusion is only ever for a step whose failure CI itself ignores.
    */
   const NOT_IN_THE_LOCAL_GATE = ["lint:expo-install"];
 

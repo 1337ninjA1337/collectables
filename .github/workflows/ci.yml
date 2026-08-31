@@ -110,12 +110,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # SEC-8: surface new high/critical dependency advisories on every PR.
-      # Non-blocking (continue-on-error) — the deploy isn't wedged when the only
-      # fix is a breaking major bump of a build-time dep. Triage in SECURITY.md.
-      - name: Dependency audit (high+)
-        continue-on-error: true
-        run: npm audit --audit-level=high
+      # SEC-8: fail on a high/critical advisory root SECURITY.md has not
+      # triaged. This replaced a bare `npm audit --audit-level=high` that had
+      # to be `continue-on-error` — the accepted advisories made it red every
+      # run, so it reported the same red for an advisory somebody had read and
+      # one nobody had ever seen, and thirteen accumulated under a green-looking
+      # PR list. Blocking, because it is now silent until something CHANGES.
+      # A registry it cannot reach is a soft skip, not a failure.
+      - name: Dependency advisory baseline
+        run: npm run lint:audit-baseline
 
       # Fails only on drift in the watched posthog-* packages (pinned
       # manually because the dev sandbox can't reach the Expo registry);

@@ -158,6 +158,8 @@ export const LINT_ALL_EXEMPT: Readonly<Record<string, string>> = {
     "a node:test invocation — already part of the npm test suite",
   "lint:expo-install":
     "network-dependent (npm registry) — its own advisory CI step",
+  "lint:audit-baseline":
+    "network-dependent (npm registry) — its own blocking CI step, soft-skips offline",
 };
 
 export interface LintGuardResult {

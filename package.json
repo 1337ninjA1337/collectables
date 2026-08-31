@@ -36,6 +36,7 @@
     "lint:sentry-version": "tsx scripts/check-sentry-version.ts",
     "lint:baseline-provenance": "tsx scripts/check-privacy-baseline-provenance.ts",
     "lint:expo-install": "tsx scripts/check-expo-install.ts",
+    "lint:audit-baseline": "tsx scripts/check-audit-baseline.ts",
     "privacy:generate": "tsx scripts/generate-privacy-manifest.ts",
     "powerbi:schema-doc": "tsx scripts/generate-powerbi-schema-doc.ts",
     "db:find-duplicates": "tsx scripts/find-db-duplicates.ts",
@@ -47,7 +48,7 @@
     "lint:console-swap": "tsx scripts/check-console-swap.ts",
     "lint:ci": "npm run typecheck && npm run lint:all && npm test",
     "verify:dist": "npm run lint:secrets:bundle && npm run lint:bundle-size && npm run lint:bundle-smoke",
-    "verify": "npm run lint:ci && npm run build && npm run verify:dist",
+    "verify": "npm run lint:ci && npm run lint:audit-baseline && npm run build && npm run verify:dist",
     "postinstall": "npx expo install --check || true",
     "build": "npx expo export --platform web && tsx scripts/build-spa-fallback.ts",
     "deploy": "cross-env-shell 'set -a && [ -f .env ] && . ./.env; set +a && EXPO_PUBLIC_APP_URL=https://1337ninja1337.github.io/collectables npx expo export --platform web --clear && tsx scripts/build-spa-fallback.ts && touch dist/.nojekyll && echo > dist/.gitignore && npx gh-pages -d dist --dotfiles'"
