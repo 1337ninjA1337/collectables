@@ -96,24 +96,57 @@ export const STORAGE_ERROR_INPUTS: readonly unknown[] = STORAGE_ERROR_SAMPLES.ma
 );
 
 /**
- * The literal signals `classifyStorageError` tests, read out of its body.
+ * The two kinds of signal the classifier tests, kept apart.
+ *
+ * Apart rather than in one list, because the two are compared differently and a
+ * caller that flattens them has to tell them apart again: the substring rule
+ * applies to `phrases` and is nonsense over `codes` (`"22"` occurs inside
+ * `"1022"`, which means nothing). The first draft flattened and filtered with a
+ * `/^\d+$/`, which is a second place that had to know a code renders as a bare
+ * number.
+ */
+export type ClassifierSignals = {
+  /** `code === N` — compared, never searched. */
+  readonly codes: readonly string[];
+  /** `haystack.includes("…")` — searched, so one may contain another. */
+  readonly phrases: readonly string[];
+};
+
+/** Every signal in one list, for the coverage loop that does not care which. */
+export function allSignals(signals: ClassifierSignals): readonly string[] {
+  return [...signals.codes, ...signals.phrases];
+}
+
+/**
+ * The literal signals a classifier's source tests, read out of its body.
  *
  * Two shapes and no more, because those are the two the classifier uses: a
  * numeric `code === N` comparison, and a `haystack.includes("…")`. A third
  * shape (a regex, a `startsWith`) is invisible here and would be a signal with
- * no sample and nothing red — which is why {@link assertSamplesCoverClassifier}
- * also asserts the population is not smaller than the one that exists today.
+ * no sample and nothing red — which is why the coverage case also asserts the
+ * population is not smaller than {@link KNOWN_CLASSIFIER_SIGNALS}.
+ *
+ * Takes the SOURCE rather than reading the file, so the rules built on it can
+ * be handed a planted classifier and shown to reject it. The dead-substring
+ * pair this found in the real one was proven by editing `lib/` by hand and
+ * putting it back — evidence that lived in a terminal, for a guard whose whole
+ * value is that it fails on that input.
  */
-export function classifierSignals(): readonly string[] {
-  const source = declaredSource(CLASSIFIER_REL);
+export function signalsInSource(source: string): ClassifierSignals {
   const start = source.indexOf("function classifyStorageError(");
-  if (start < 0) return [];
+  if (start < 0) return { codes: [], phrases: [] };
   const body = balancedInner(source, source.indexOf("{", source.indexOf(")", start)), "{", "}");
-  if (body === null) return [];
-  const signals = new Set<string>();
-  for (const [, code] of body.matchAll(/code === (\d+)/g)) signals.add(code);
-  for (const [, text] of body.matchAll(/includes\("([^"]+)"\)/g)) signals.add(text);
-  return [...signals];
+  if (body === null) return { codes: [], phrases: [] };
+  const codes = new Set<string>();
+  const phrases = new Set<string>();
+  for (const [, code] of body.matchAll(/code === (\d+)/g)) codes.add(code);
+  for (const [, text] of body.matchAll(/includes\("([^"]+)"\)/g)) phrases.add(text);
+  return { codes: [...codes], phrases: [...phrases] };
+}
+
+/** {@link signalsInSource} over the real classifier. */
+export function classifierSignals(): ClassifierSignals {
+  return signalsInSource(declaredSource(CLASSIFIER_REL));
 }
 
 /**
@@ -125,3 +158,47 @@ export function classifierSignals(): readonly string[] {
  * over less than it used to.
  */
 export const KNOWN_CLASSIFIER_SIGNALS = 5;
+
+/**
+ * Classifiers that are not this repo's, for showing what the rules reject.
+ *
+ * A guard that only ever runs over source that satisfies it is green for two
+ * indistinguishable reasons — the tree is clean, or the reader found nothing.
+ * These are the needles: each is a `classifyStorageError` the reader must parse
+ * and a rule must have an opinion about.
+ *
+ * Written as source strings rather than committed `.ts` fixtures because a real
+ * file under `lib/` would be swept by every OTHER guard in this tree, and a
+ * deliberately broken classifier is exactly what those are looking for.
+ */
+export const PLANTED_CLASSIFIERS: Readonly<Record<string, string>> = {
+  /** The pair that was really there: the longer clause can never decide. */
+  deadSubstring: `
+export function classifyStorageError(error: unknown): StorageFailureReason {
+  const haystack = String(error).toLowerCase();
+  if (haystack.includes("disk is full") || haystack.includes("database or disk is full")) return "full";
+  return "unavailable";
+}`,
+  /** A signal added with no sample — what the coverage loop is for. */
+  unsampledSignal: `
+export function classifyStorageError(error: unknown): StorageFailureReason {
+  const haystack = String(error).toLowerCase();
+  if (haystack.includes("storage is over capacity")) return "full";
+  return "unavailable";
+}`,
+  /** Both kinds, so the reader is shown to separate them rather than flatten. */
+  bothKinds: `
+export function classifyStorageError(error: unknown): StorageFailureReason {
+  const code = (error as { code?: unknown }).code;
+  const haystack = String(error).toLowerCase();
+  if (code === 22 || code === 1014) return "full";
+  if (haystack.includes("quota")) return "full";
+  return "unavailable";
+}`,
+  /** No such function: the reader must say nothing, and the floor must catch it. */
+  renamedAway: `
+export function classifyTheStore(error: unknown): StorageFailureReason {
+  if (String(error).includes("quota")) return "full";
+  return "unavailable";
+}`,
+};
