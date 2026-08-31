@@ -797,12 +797,54 @@ describe("render harness — trees that outlive their case", () => {
         assert.match(error.message, /third threw/);
         assert.match(
           error.message,
-          /across 2 tree\(s\)/,
+          /in 2 of 2 tree\(s\)/,
           "three failures in one tree and three in three are different diagnoses",
         );
         return true;
       },
     );
+  });
+
+  it("counts the trees that threw AGAINST the trees it swept", () => {
+    // The count on its own was ambiguous in the direction that matters: `2
+    // tree(s)` after a sweep of five is two broken components, and reads as a
+    // registry holding two trees. The ratio says which — and says that the
+    // three healthy ones came down rather than being skipped behind the throw.
+    let healthyCleanups = 0;
+    function Broken() {
+      useEffect(() => () => {
+        throw new Error("only this one threw");
+      }, []);
+      return null;
+    }
+    function Healthy() {
+      useEffect(() => () => {
+        healthyCleanups += 1;
+      }, []);
+      return null;
+    }
+    render(createElement(Healthy));
+    render(createElement(Broken));
+    render(createElement(Healthy));
+
+    assert.throws(
+      () => {
+        unmountAllTrees();
+      },
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length, 1, "one broken component");
+        assert.match(
+          error.message,
+          /1 effect cleanup\(s\) in 1 of 3 tree\(s\) threw/,
+          "the broken count alone cannot say how much of the sweep was fine",
+        );
+        return true;
+      },
+    );
+
+    assert.equal(healthyCleanups, 2, "both healthy trees came down");
+    assert.equal(__mountedTreeCountForTests(), 0, "and the registry is empty");
   });
 
   it("keeps an aggregate a component's own cleanup threw as one cause", () => {
@@ -862,7 +904,7 @@ describe("render harness — trees that outlive their case", () => {
       (error: unknown) => {
         assert.ok(error instanceof AggregateError);
         assert.equal(error.errors.length, labels.length, "every cause is kept");
-        assert.match(error.message, /7 effect cleanup\(s\) across 1 tree\(s\) threw/);
+        assert.match(error.message, /7 effect cleanup\(s\) in 1 of 1 tree\(s\) threw/);
         assert.match(error.message, /… and 2 more \(see error\.errors\)/);
         assert.equal(
           error.message.split("cleanup ").length - 1,
