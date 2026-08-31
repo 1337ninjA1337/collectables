@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 
 import {
   ACCEPTED_HIGH_ADVISORIES,
+  advisoryKey,
   evaluateAudit,
   formatAuditVerdict,
-  isAdvisoryRoot,
+  observedAdvisories,
   type AcceptedAdvisory,
   type AuditReport,
 } from "@/lib/audit-baseline";
-
 import { LINT_ALL_EXEMPT, LINT_GUARDS } from "@/lib/lint-guards";
 
 import { readRepoFile } from "./helpers/repo-file";
@@ -26,104 +26,173 @@ import { readRepoFile } from "./helpers/repo-file";
  * 2026-06-28; the tree carried thirteen by 2026-08-31, and the step failed
  * quietly through all of it.
  *
- * These cases are about the two directions an exemption list can rot in — a
- * new advisory it silently covers, and an entry that stopped applying.
+ * ## And what went wrong WITH it, one version in
+ *
+ * The first baseline keyed on the package NAME. `nanoid` was already carrying
+ * two high advisories the day it was written, and the entry's reasoning
+ * covered one of them — so the list silently accepted an advisory nobody had
+ * read, which is the failure it exists to prevent, one layer in. Keys are
+ * `package#advisoryId` now.
  */
 
+/**
+ * A report in npm's shape. `advisories` are advisory objects (a root);
+ * `dependsOn` is the bare-string `via` npm uses for a package that is only
+ * vulnerable through something else.
+ */
 function report(
-  entries: Record<string, { severity: string; root?: boolean }>,
+  entries: Record<
+    string,
+    { advisories?: { source: number; severity: string }[]; dependsOn?: string[] }
+  >,
 ): AuditReport {
   return {
     vulnerabilities: Object.fromEntries(
-      Object.entries(entries).map(([name, { severity, root = true }]) => [
+      Object.entries(entries).map(([name, { advisories = [], dependsOn = [] }]) => [
         name,
-        { severity, via: root ? [{ title: `${name} advisory` }] : ["some-other-package"] },
+        {
+          severity: advisories[0]?.severity ?? "high",
+          via: [...advisories.map((a) => ({ ...a, title: `${name} advisory` })), ...dependsOn],
+        },
       ]),
     ),
   };
 }
 
 const FIXTURE: readonly AcceptedAdvisory[] = [
-  { package: "nanoid", shipsToClient: true, why: "vulnerable path unreachable" },
-  { package: "postcss", shipsToClient: false, why: "build-time only" },
+  { package: "nanoid", advisories: [1], shipsToClient: true, why: "vulnerable path unreachable" },
+  { package: "postcss", advisories: [2, 3], shipsToClient: false, why: "build-time only" },
 ];
 
 describe("evaluateAudit", () => {
-  it("passes when every high root is on the baseline", () => {
-    const verdict = evaluateAudit(
-      report({ nanoid: { severity: "high" }, postcss: { severity: "high" } }),
-      FIXTURE,
-    );
-    assert.deepEqual(verdict.unexpected, []);
-    assert.deepEqual(verdict.stillPresent, ["nanoid", "postcss"]);
-    assert.deepEqual(verdict.stale, []);
-  });
-
-  it("fails on a high advisory nobody has triaged", () => {
-    // The case the whole gate exists for: the accepted ones stay quiet, and
-    // the new one is the only thing in the output.
+  it("passes when every high advisory is on the baseline", () => {
     const verdict = evaluateAudit(
       report({
-        nanoid: { severity: "high" },
-        postcss: { severity: "high" },
-        "left-pad": { severity: "critical" },
+        nanoid: { advisories: [{ source: 1, severity: "high" }] },
+        postcss: {
+          advisories: [
+            { source: 2, severity: "high" },
+            { source: 3, severity: "critical" },
+          ],
+        },
       }),
       FIXTURE,
     );
-    assert.deepEqual(verdict.unexpected, ["left-pad"]);
-    assert.match(formatAuditVerdict(verdict, "check"), /NEW {2}left-pad/);
+    assert.deepEqual(verdict.unexpected, []);
+    assert.deepEqual(verdict.stillPresent, ["nanoid#1", "postcss#2", "postcss#3"]);
+    assert.deepEqual(verdict.stale, []);
   });
 
-  it("reports a baseline entry the audit no longer names as stale", () => {
+  it("fails on a SECOND advisory in an already-accepted package", () => {
+    // The hole the name-keyed version had, and the reason this one exists:
+    // `nanoid` shipped two high advisories and the entry reasoned about one.
+    // An accepted package must not be a blanket licence for its next CVE.
+    const verdict = evaluateAudit(
+      report({
+        nanoid: {
+          advisories: [
+            { source: 1, severity: "high" },
+            { source: 999, severity: "high" },
+          ],
+        },
+      }),
+      FIXTURE,
+    );
+    assert.deepEqual(verdict.unexpected, ["nanoid#999"]);
+    assert.match(formatAuditVerdict(verdict, "check"), /NEW {2}nanoid#999/);
+  });
+
+  it("fails on a high advisory in a package nobody has triaged", () => {
+    const verdict = evaluateAudit(
+      report({ "left-pad": { advisories: [{ source: 42, severity: "critical" }] } }),
+      FIXTURE,
+    );
+    assert.deepEqual(verdict.unexpected, ["left-pad#42"]);
+  });
+
+  it("reports a baseline advisory the audit no longer names as stale", () => {
     // The other direction. An exemption nobody prunes stops describing the
     // tree, and then starts covering something somebody would want to see.
-    const verdict = evaluateAudit(report({ nanoid: { severity: "high" } }), FIXTURE);
-    assert.deepEqual(verdict.stale, ["postcss"]);
+    const verdict = evaluateAudit(
+      report({ nanoid: { advisories: [{ source: 1, severity: "high" }] } }),
+      FIXTURE,
+    );
+    assert.deepEqual(verdict.stale, ["postcss#2", "postcss#3"]);
     assert.match(formatAuditVerdict(verdict, "check"), /no longer reported/);
   });
 
-  it("ignores moderate and low, which are not what this gate is for", () => {
+  it("reads severity off the ADVISORY, not off the package", () => {
+    // npm reports a package at the highest severity among its advisories, so
+    // `postcss` shows "high" while two of its four are moderate. A gate that
+    // trusted the package's number would accept those two without reading
+    // them — the same blanket-licence shape as the name keying.
     const verdict = evaluateAudit(
-      report({ "some-dev-tool": { severity: "moderate" }, esbuild: { severity: "low" } }),
+      report({
+        postcss: {
+          advisories: [
+            { source: 2, severity: "high" },
+            { source: 3, severity: "high" },
+            { source: 500, severity: "moderate" },
+          ],
+        },
+      }),
       FIXTURE,
     );
-    assert.deepEqual(verdict.unexpected, []);
+    assert.deepEqual(verdict.unexpected, [], "the moderate one is not this gate's business");
   });
 
   it("ignores a package that is only vulnerable through a dependency", () => {
     // npm reports both kinds. The dependent kind changes whenever the tree is
-    // reshaped and says nothing new about exposure — seven of the thirteen
-    // high entries in this tree are that kind, and a baseline listing them
-    // would need editing on every lockfile churn.
-    const verdict = evaluateAudit(
-      report({ expo: { severity: "high", root: false } }),
-      FIXTURE,
-    );
+    // reshaped and says nothing new about exposure — seven of the high entries
+    // in this tree are that kind, and a baseline listing them would need
+    // editing on every lockfile churn.
+    const verdict = evaluateAudit(report({ expo: { dependsOn: ["nanoid"] } }), FIXTURE);
     assert.deepEqual(verdict.unexpected, [], "a dependent is not a triage decision");
   });
 
   it("treats an empty report as clean rather than as a broken read", () => {
     assert.deepEqual(evaluateAudit({}, FIXTURE).unexpected, []);
-    assert.deepEqual(evaluateAudit({}, FIXTURE).stale, ["nanoid", "postcss"]);
+    assert.deepEqual(evaluateAudit({}, FIXTURE).stale, ["nanoid#1", "postcss#2", "postcss#3"]);
   });
 });
 
-describe("isAdvisoryRoot", () => {
-  it("is the presence of an advisory object in `via`", () => {
-    assert.equal(isAdvisoryRoot([{ title: "an advisory" }]), true);
-    assert.equal(isAdvisoryRoot(["another-package"]), false);
-    assert.equal(isAdvisoryRoot([]), false);
-    assert.equal(isAdvisoryRoot(undefined), false);
+describe("observedAdvisories", () => {
+  it("keys every advisory by package and id", () => {
+    assert.deepEqual(
+      observedAdvisories(
+        report({ tar: { advisories: [{ source: 7, severity: "high" }], dependsOn: ["glob"] } }),
+      ),
+      ["tar#7"],
+    );
+  });
+
+  it("skips an advisory object with no id, which cannot be triaged by id", () => {
+    const malformed: AuditReport = {
+      vulnerabilities: { mystery: { severity: "high", via: [{ severity: "high" }] } },
+    };
+    assert.deepEqual(observedAdvisories(malformed), []);
+  });
+
+  it("advisoryKey is the one place the format lives", () => {
+    assert.equal(advisoryKey("nanoid", 1138811), "nanoid#1138811");
   });
 });
 
 describe("the accepted list is a triage record, not a pile", () => {
-  it("gives every entry a reason and a client-reachability answer", () => {
+  it("gives every entry read advisory ids, a reason, and a reachability answer", () => {
     // `shipsToClient` is the field the severity number cannot answer, and the
     // one that was wrong in SECURITY.md: it claimed every remaining advisory
     // was dev/build-time when `nanoid` had been shipping to users for months.
     for (const entry of ACCEPTED_HIGH_ADVISORIES) {
       assert.ok(entry.package.length > 0);
+      assert.ok(
+        entry.advisories.length > 0,
+        `${entry.package}: an entry with no advisory ids accepts nothing and hides everything`,
+      );
+      assert.ok(
+        entry.advisories.every((id) => Number.isInteger(id) && id > 0),
+        `${entry.package}: advisory ids are npm's numeric \`via[].source\``,
+      );
       assert.ok(
         entry.why.length > 20,
         `${entry.package}: "accepted" needs a reason somebody can disagree with`,
@@ -132,9 +201,11 @@ describe("the accepted list is a triage record, not a pile", () => {
     }
   });
 
-  it("names no package twice", () => {
+  it("names no package twice and no advisory id twice", () => {
     const names = ACCEPTED_HIGH_ADVISORIES.map((entry) => entry.package);
     assert.deepEqual([...new Set(names)].sort(), [...names].sort());
+    const ids = ACCEPTED_HIGH_ADVISORIES.flatMap((entry) => entry.advisories);
+    assert.deepEqual([...new Set(ids)].sort(), [...ids].sort());
   });
 
   it("is mirrored in SECURITY.md, which is where a human reads it", () => {
@@ -150,20 +221,17 @@ describe("the accepted list is a triage record, not a pile", () => {
   });
 
   it("is wired as its own CI step, not as a network-free lint guard", () => {
-    // `LINT_GUARDS` documents itself as needing "no network"; this one needs
-    // the registry, so it follows `lint:expo-install` and stands alone.
+    // The registry, not the file: `LINT_ALL_EXEMPT` lives in the same module
+    // and names this script, which a substring read over the source counts as
+    // membership.
     const ci = readRepoFile(".github/workflows/ci.yml");
     assert.match(ci, /^\s*run: npm run lint:audit-baseline$/m);
     // A `run:` line, not any mention: the comment above the step explains what
-    // it replaced and names the old command, which the first draft of this
-    // assertion read as the old step still being there.
+    // it replaced and names the old command.
     assert.ok(
       !/^\s*run: npm audit --audit-level=/m.test(ci),
       "the always-red step this replaced must not come back beside it",
     );
-    // The registry, not the file: `LINT_ALL_EXEMPT` lives in the same module
-    // and names this script, which a substring read over the source counts as
-    // membership. That is twice now in this one suite.
     assert.ok(
       !LINT_GUARDS.some((guard) => guard.npmScript === "lint:audit-baseline"),
       "a network check is not a code-style guard",
