@@ -720,23 +720,33 @@ export type RenderResult = {
 };
 
 /**
+ * How many causes the message spells out before it stops and says how many are
+ * left. `describeThrown` caps each cause at 200 characters and nothing capped
+ * the count, so a tree with fifty broken components produced a fifty-clause
+ * sentence before the reader reached `error.errors` — where all of them still
+ * are, uncapped, for a case that wants to count.
+ */
+const MESSAGE_CAUSE_LIMIT = 5;
+
+/**
  * Reports the cleanups that threw during one unmount, after all of them ran.
  *
  * An `AggregateError` even for a single failure, because the number of broken
  * cleanups is the thing a reader needs and a shape that changes with it hides
  * it: a suite whose matcher was written against the one-error form would go
  * green-then-confusing the day a second component broke the same way. The
- * message carries every cause inline so `assert.throws(..., /unsubscribe/)`
- * still finds what it is looking for, and `error.errors` holds them intact for
- * a case that wants to count.
+ * message carries the first {@link MESSAGE_CAUSE_LIMIT} causes inline so
+ * `assert.throws(..., /unsubscribe/)` still finds what it is looking for, and
+ * `error.errors` holds every one of them intact.
  */
 function throwCleanupFailures(thrown: readonly unknown[]): void {
   if (thrown.length === 0) return;
+  const shown = thrown.slice(0, MESSAGE_CAUSE_LIMIT).map((error) => describeThrown(error));
+  const hidden = thrown.length - shown.length;
+  if (hidden > 0) shown.push(`… and ${String(hidden)} more (see error.errors)`);
   throw new AggregateError(
     thrown,
-    `unmount: ${String(thrown.length)} effect cleanup(s) threw — ${thrown
-      .map((error) => describeThrown(error))
-      .join("; ")}`,
+    `unmount: ${String(thrown.length)} effect cleanup(s) threw — ${shown.join("; ")}`,
   );
 }
 
@@ -888,10 +898,31 @@ export function __mountedTreeCountForTests(): number {
  *
  * Idempotent, and safe to call on a tree a case already unmounted — `unmount`
  * removes itself from the set and refuses a second teardown.
+ *
+ * Collects across TREES for the reason `unmountAll` collects across instances,
+ * one level up: the loop was bare, so a single broken destructor in the first
+ * tree ended the sweep and left every later tree mounted — which is exactly the
+ * leak this registry exists to close, reopened by the failure that proves a
+ * component is broken. From the `autoUnmount` hook that meant one throwing
+ * cleanup handed its live subscriptions to the next case, and the next case's
+ * assertions read them.
+ *
+ * The per-tree `AggregateError`s are flattened rather than nested: `unmount()`
+ * has already aggregated one tree's failures, and an `AggregateError` whose
+ * `errors` are `AggregateError`s buries the causes a case counts.
  */
 export function unmountAllTrees(): void {
-  for (const tree of [...liveTrees]) tree.unmount();
+  const thrown: unknown[] = [];
+  for (const tree of [...liveTrees]) {
+    try {
+      tree.unmount();
+    } catch (error: unknown) {
+      if (error instanceof AggregateError) thrown.push(...error.errors);
+      else thrown.push(error);
+    }
+  }
   liveTrees.clear();
+  throwCleanupFailures(thrown);
 }
 
 /**

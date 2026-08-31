@@ -724,6 +724,119 @@ describe("render harness — trees that outlive their case", () => {
     });
     assert.equal(cleanups, 1, "a tree that ended itself must not be torn down twice");
   });
+
+  it("ends every tree even when the first one's cleanup throws", () => {
+    // The bare loop was the same bug `unmountAll` fixed one level down: the
+    // first broken destructor ended the sweep, so the trees behind it stayed
+    // mounted — the failure that proves a component is broken reopening the
+    // very leak this registry closes. From the `autoUnmount` hook that means
+    // handing live subscriptions to the next case.
+    let survivorCleanups = 0;
+    function Broken() {
+      useEffect(() => () => {
+        throw new Error("broken tree cleanup");
+      }, []);
+      return null;
+    }
+    function Survivor() {
+      useEffect(() => () => {
+        survivorCleanups += 1;
+      }, []);
+      return null;
+    }
+    render(createElement(Broken));
+    render(createElement(Survivor));
+
+    assert.throws(
+      () => {
+        unmountAllTrees();
+      },
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length, 1);
+        assert.match(error.message, /broken tree cleanup/);
+        return true;
+      },
+    );
+
+    assert.equal(survivorCleanups, 1, "the tree behind the broken one still came down");
+    assert.equal(__mountedTreeCountForTests(), 0, "and nothing was left in the registry");
+  });
+
+  it("flattens the per-tree aggregates instead of nesting them", () => {
+    function Broken({ label }: { label: string }) {
+      useEffect(() => () => {
+        throw new Error(`${label} threw`);
+      }, []);
+      return null;
+    }
+    // Two broken components in one tree, then a third in a second tree: one
+    // aggregate with three causes, not two aggregates one of which holds two.
+    render(
+      createElement(
+        "View",
+        null,
+        createElement(Broken, { key: "a", label: "first" }),
+        createElement(Broken, { key: "b", label: "second" }),
+      ),
+    );
+    render(createElement(Broken, { label: "third" }));
+
+    assert.throws(
+      () => {
+        unmountAllTrees();
+      },
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length, 3, "flat, not two aggregates");
+        assert.ok(
+          error.errors.every((cause: unknown) => !(cause instanceof AggregateError)),
+          "no cause is itself an aggregate",
+        );
+        assert.match(error.message, /first threw/);
+        assert.match(error.message, /third threw/);
+        return true;
+      },
+    );
+  });
+
+  it("spells out the first five causes and counts the rest", () => {
+    // `error.errors` keeps all of them; the MESSAGE stops, because a tree with
+    // fifty broken components otherwise produces a fifty-clause sentence before
+    // the reader reaches the list.
+    function Broken({ label }: { label: string }) {
+      useEffect(() => () => {
+        throw new Error(`cleanup ${label} threw`);
+      }, []);
+      return null;
+    }
+    const labels = ["1", "2", "3", "4", "5", "6", "7"];
+    render(
+      createElement(
+        "View",
+        null,
+        ...labels.map((label) => createElement(Broken, { key: label, label })),
+      ),
+    );
+
+    assert.throws(
+      () => {
+        unmountAllTrees();
+      },
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length, labels.length, "every cause is kept");
+        assert.match(error.message, /7 effect cleanup\(s\) threw/);
+        assert.match(error.message, /… and 2 more \(see error\.errors\)/);
+        assert.equal(
+          error.message.split("cleanup ").length - 1,
+          5,
+          "five spelled out, not seven",
+        );
+        return true;
+      },
+    );
+  });
 });
 
 /**
