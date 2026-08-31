@@ -256,6 +256,25 @@ describe("classifyStorageError", () => {
     }
   });
 
+  it("reads no signal that another signal already covers", () => {
+    // `disk is full` and `database or disk is full` were both checked, in that
+    // order, and the second could never be the one that returned: every string
+    // containing it contains the first. A substring pair is dead source that
+    // reads as thoroughness — two spellings, one of them unreachable — and it
+    // survived because nothing put the two clauses side by side until the
+    // samples derived them from the body. The string signals only: a numeric
+    // `code` is compared, not searched.
+    const strings = classifierSignals().filter((signal) => !/^\d+$/.test(signal));
+    for (const signal of strings) {
+      for (const other of strings) {
+        assert.ok(
+          signal === other || !signal.includes(other),
+          `classifyStorageError checks "${signal}" and "${other}" separately, but the second is a substring of the first — the longer clause can never decide, so it is dead source`,
+        );
+      }
+    }
+  });
+
   it("calls everything else unavailable, which is the sentence that blames nobody", async () => {
     const { classifyStorageError } = await load();
 

@@ -148,6 +148,12 @@ export type StorageFailureReason = "full" | "unavailable";
  * with no `name` at all, so the message is read too. Anything unrecognised is
  * `"unavailable"`: the honest default, because it is the sentence that does not
  * blame the user's photo library for a store that is merely blocked.
+ *
+ * SQLite's own wording is `database or disk is full`, and it was checked for
+ * SEPARATELY until the samples made the pair visible side by side: every string
+ * containing it contains `disk is full`, so the longer clause could never be
+ * the one that returned. It is gone, and its spelling is written here instead —
+ * which is where it was actually doing its work.
  */
 export function classifyStorageError(error: unknown): StorageFailureReason {
   const name = typeof error === "object" && error !== null ? String((error as { name?: unknown }).name ?? "") : "";
@@ -160,7 +166,7 @@ export function classifyStorageError(error: unknown): StorageFailureReason {
   if (code === 22 || code === 1014) return "full";
   if (haystack.includes("quota")) return "full";
   if (haystack.includes("no space left")) return "full";
-  if (haystack.includes("disk is full") || haystack.includes("database or disk is full")) return "full";
+  if (haystack.includes("disk is full")) return "full";
   return "unavailable";
 }
 
