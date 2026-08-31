@@ -795,6 +795,42 @@ describe("render harness — trees that outlive their case", () => {
         );
         assert.match(error.message, /first threw/);
         assert.match(error.message, /third threw/);
+        assert.match(
+          error.message,
+          /across 2 tree\(s\)/,
+          "three failures in one tree and three in three are different diagnoses",
+        );
+        return true;
+      },
+    );
+  });
+
+  it("keeps an aggregate a component's own cleanup threw as one cause", () => {
+    // The unwrap recognises the harness's own aggregate by its subclass, not by
+    // `instanceof AggregateError` — which a destructor rethrowing a
+    // `Promise.any` rejection also satisfies. Splicing that one's causes in
+    // would turn one broken component into two and grow the count in the
+    // message with it.
+    const componentAggregate = new AggregateError(
+      [new Error("inner one"), new Error("inner two")],
+      "the component's own aggregate",
+    );
+    function Broken() {
+      useEffect(() => () => {
+        throw componentAggregate;
+      }, []);
+      return null;
+    }
+    render(createElement(Broken));
+
+    assert.throws(
+      () => {
+        unmountAllTrees();
+      },
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.equal(error.errors.length, 1, "one broken component, one cause");
+        assert.equal(error.errors[0], componentAggregate, "and it arrives intact");
         return true;
       },
     );
@@ -826,7 +862,7 @@ describe("render harness — trees that outlive their case", () => {
       (error: unknown) => {
         assert.ok(error instanceof AggregateError);
         assert.equal(error.errors.length, labels.length, "every cause is kept");
-        assert.match(error.message, /7 effect cleanup\(s\) threw/);
+        assert.match(error.message, /7 effect cleanup\(s\) across 1 tree\(s\) threw/);
         assert.match(error.message, /… and 2 more \(see error\.errors\)/);
         assert.equal(
           error.message.split("cleanup ").length - 1,

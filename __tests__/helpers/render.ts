@@ -729,6 +729,20 @@ export type RenderResult = {
 const MESSAGE_CAUSE_LIMIT = 5;
 
 /**
+ * The harness's own aggregate, so unwrapping one cannot unwrap somebody else's.
+ *
+ * `unmountAllTrees` flattens the per-tree aggregates into one list, and it
+ * recognised them by `instanceof AggregateError` — which is also true of an
+ * aggregate a COMPONENT'S cleanup threw. A destructor that rejects a
+ * `Promise.any` and rethrows would have had its causes spliced into the
+ * tree-level list, silently growing the count in the message and turning one
+ * broken component into three. A subclass costs a line and makes the unwrap say
+ * what it is unwrapping; `instanceof AggregateError` still holds, so every case
+ * written against that keeps working.
+ */
+export class CleanupFailures extends AggregateError {}
+
+/**
  * Reports the cleanups that threw during one unmount, after all of them ran.
  *
  * An `AggregateError` even for a single failure, because the number of broken
@@ -738,15 +752,22 @@ const MESSAGE_CAUSE_LIMIT = 5;
  * message carries the first {@link MESSAGE_CAUSE_LIMIT} causes inline so
  * `assert.throws(..., /unsubscribe/)` still finds what it is looking for, and
  * `error.errors` holds every one of them intact.
+ *
+ * `trees` is passed only by {@link unmountAllTrees}, which is the one caller
+ * whose failures span more than one tree. The causes name the component's
+ * message and nothing names the tree it was in, so the count is the dimension a
+ * reader would otherwise have to guess: three failures in one tree and three in
+ * three are different diagnoses.
  */
-function throwCleanupFailures(thrown: readonly unknown[]): void {
+function throwCleanupFailures(thrown: readonly unknown[], trees?: number): void {
   if (thrown.length === 0) return;
   const shown = thrown.slice(0, MESSAGE_CAUSE_LIMIT).map((error) => describeThrown(error));
   const hidden = thrown.length - shown.length;
   if (hidden > 0) shown.push(`… and ${String(hidden)} more (see error.errors)`);
-  throw new AggregateError(
+  const across = trees === undefined ? "" : ` across ${String(trees)} tree(s)`;
+  throw new CleanupFailures(
     thrown,
-    `unmount: ${String(thrown.length)} effect cleanup(s) threw — ${shown.join("; ")}`,
+    `unmount: ${String(thrown.length)} effect cleanup(s)${across} threw — ${shown.join("; ")}`,
   );
 }
 
@@ -907,22 +928,26 @@ export function __mountedTreeCountForTests(): number {
  * cleanup handed its live subscriptions to the next case, and the next case's
  * assertions read them.
  *
- * The per-tree `AggregateError`s are flattened rather than nested: `unmount()`
- * has already aggregated one tree's failures, and an `AggregateError` whose
- * `errors` are `AggregateError`s buries the causes a case counts.
+ * The per-tree aggregates are flattened rather than nested: `unmount()` has
+ * already aggregated one tree's failures, and an `AggregateError` whose
+ * `errors` are `AggregateError`s buries the causes a case counts. Only
+ * {@link CleanupFailures} is unwrapped — an aggregate a component's own cleanup
+ * threw stays one cause, because it is one broken component.
  */
 export function unmountAllTrees(): void {
   const thrown: unknown[] = [];
+  let brokenTrees = 0;
   for (const tree of [...liveTrees]) {
     try {
       tree.unmount();
     } catch (error: unknown) {
-      if (error instanceof AggregateError) thrown.push(...error.errors);
+      brokenTrees += 1;
+      if (error instanceof CleanupFailures) thrown.push(...error.errors);
       else thrown.push(error);
     }
   }
   liveTrees.clear();
-  throwCleanupFailures(thrown);
+  throwCleanupFailures(thrown, brokenTrees);
 }
 
 /**
