@@ -925,6 +925,18 @@ export function __mountedTreeCountForTests(): number {
 }
 
 /**
+ * How many times {@link unmountAllTrees} re-reads the registry before it gives
+ * up and says so.
+ *
+ * One pass ends every tree that existed when the sweep started; a second exists
+ * for the trees their cleanups mounted, a third for those trees' cleanups, and
+ * beyond that the honest reading is that teardown does not terminate rather
+ * than that it needs one more go. The cap is what turns "the process hangs in
+ * an `afterEach`" into a named failure.
+ */
+const SWEEP_PASS_LIMIT = 5;
+
+/**
  * Unmounts every tree this process rendered and has not torn down.
  *
  * Idempotent, and safe to call on a tree a case already unmounted — `unmount`
@@ -943,22 +955,53 @@ export function __mountedTreeCountForTests(): number {
  * `errors` are `AggregateError`s buries the causes a case counts. Only
  * {@link CleanupFailures} is unwrapped — an aggregate a component's own cleanup
  * threw stays one cause, because it is one broken component.
+ *
+ * Sweeps until the registry is EMPTY rather than over one snapshot of it. A
+ * cleanup is arbitrary code and may render — a teardown probe, a fallback tree
+ * put up as a subscription closes — and that tree joins `liveTrees` after the
+ * snapshot was taken. The previous shape swept the snapshot and then called
+ * `liveTrees.clear()`, which dropped the newcomer from the registry with its
+ * effects still live: a leak of the exact kind this registry exists to make
+ * visible, made INVISIBLE, with `__mountedTreeCountForTests()` reporting zero
+ * to the case that would have caught it. `unmount()` removes a tree from the
+ * set before running any cleanup, so a throwing teardown leaves nothing behind
+ * and the loop always makes progress.
  */
 export function unmountAllTrees(): void {
   const thrown: unknown[] = [];
-  const swept = [...liveTrees];
   let brokenTrees = 0;
-  for (const tree of swept) {
-    try {
-      tree.unmount();
-    } catch (error: unknown) {
-      brokenTrees += 1;
-      if (error instanceof CleanupFailures) thrown.push(...error.errors);
-      else thrown.push(error);
+  let sweptTrees = 0;
+  let passes = 0;
+  while (liveTrees.size > 0) {
+    passes += 1;
+    if (passes > SWEEP_PASS_LIMIT) {
+      // A cleanup that mounts a tree whose cleanup mounts another never settles.
+      // Reported as one more cause rather than as a throw of its own, so the
+      // broken cleanups found on the way out are still in the message; the
+      // registry is dropped because leaving it would hand the runaway to the
+      // next case as well.
+      thrown.push(
+        new Error(
+          `unmountAllTrees: still ${String(liveTrees.size)} tree(s) after ${String(SWEEP_PASS_LIMIT)} sweeps — a cleanup is mounting a new tree`,
+        ),
+      );
+      brokenTrees += liveTrees.size;
+      sweptTrees += liveTrees.size;
+      liveTrees.clear();
+      break;
+    }
+    for (const tree of [...liveTrees]) {
+      sweptTrees += 1;
+      try {
+        tree.unmount();
+      } catch (error: unknown) {
+        brokenTrees += 1;
+        if (error instanceof CleanupFailures) thrown.push(...error.errors);
+        else thrown.push(error);
+      }
     }
   }
-  liveTrees.clear();
-  throwCleanupFailures(thrown, { broken: brokenTrees, swept: swept.length });
+  throwCleanupFailures(thrown, { broken: brokenTrees, swept: sweptTrees });
 }
 
 /**

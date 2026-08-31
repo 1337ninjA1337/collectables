@@ -805,6 +805,71 @@ describe("render harness — trees that outlive their case", () => {
     );
   });
 
+  it("ends a tree a cleanup mounted during the sweep, instead of dropping it", () => {
+    // The sweep used to run over one snapshot of the registry and then call
+    // `liveTrees.clear()`. A cleanup is arbitrary code and may render — a
+    // fallback tree put up as a subscription closes — and that tree joined the
+    // registry after the snapshot, so the clear erased it with its effects
+    // still live: the leak this registry exists to expose, hidden by the
+    // sweep that was supposed to close it.
+    const log: string[] = [];
+    function Latecomer() {
+      useEffect(() => () => {
+        log.push("latecomer cleanup");
+      }, []);
+      return null;
+    }
+    function Opener() {
+      useEffect(() => () => {
+        log.push("opener cleanup");
+        render(createElement(Latecomer));
+      }, []);
+      return null;
+    }
+    render(createElement(Opener));
+
+    assert.doesNotThrow(() => {
+      unmountAllTrees();
+    });
+    assert.deepEqual(log, ["opener cleanup", "latecomer cleanup"], "the newcomer came down too");
+    assert.equal(__mountedTreeCountForTests(), 0, "and the count is honest about it");
+  });
+
+  it("gives up on a cleanup that keeps mounting trees, and names it", () => {
+    // Terminating is the point: without the cap the loop re-reads a registry
+    // that refills itself and the process hangs inside an `afterEach`, which
+    // reads as a runner that stopped rather than as a component that will not
+    // let go.
+    let mounted = 0;
+    function Runaway() {
+      useEffect(() => () => {
+        mounted += 1;
+        render(createElement(Runaway));
+      }, []);
+      return null;
+    }
+    render(createElement(Runaway));
+
+    assert.throws(
+      () => {
+        unmountAllTrees();
+      },
+      (error: unknown) => {
+        assert.ok(error instanceof AggregateError);
+        assert.match(error.message, /a cleanup is mounting a new tree/);
+        assert.match(error.message, /after 5 sweeps/);
+        return true;
+      },
+    );
+
+    assert.equal(mounted, 5, "one mount per sweep, and no sweep beyond the cap");
+    assert.equal(
+      __mountedTreeCountForTests(),
+      0,
+      "the runaway is not handed to the next case as well",
+    );
+  });
+
   it("counts the trees that threw AGAINST the trees it swept", () => {
     // The count on its own was ambiguous in the direction that matters: `2
     // tree(s)` after a sweep of five is two broken components, and reads as a
