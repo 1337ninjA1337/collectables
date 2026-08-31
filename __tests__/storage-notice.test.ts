@@ -11,6 +11,7 @@ import {
   installSpyToast,
   installStubI18n,
 } from "./helpers/mount-provider";
+import { expectStorageReport } from "./helpers/storage-failure-report";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { readSource, sourceFiles } from "./helpers/source-files";
 
@@ -346,6 +347,130 @@ describe("useStorageFailureNotice — a write that was rejected mid-session", ()
       reporting!.reportStorageFailure("tombstones.setItem", "tombstones", new Error("full")),
     );
     unsubscribe();
+  });
+});
+
+/**
+ * The two ends, joined — the sentence on screen and the reason in the report.
+ *
+ * `report-storage-failure.test.ts` proves the observer and Sentry agree for
+ * every input the classifier reads, and it proves it about the REGISTRY: its
+ * observer is a local subscription in that file, and `lib/storage-notice.ts` —
+ * the real consumer, the one that decides WHICH SENTENCE the user reads off
+ * `event.reason` — is not in that suite's graph at all. So "the toast and the
+ * crash report agree" was two claims proven separately and never joined: a
+ * notice that read the reason backwards would satisfy both.
+ *
+ * These cases run the real `reportStorageFailure` past the real
+ * `useStorageFailureNotice` and read both outputs from one call.
+ */
+describe("the sentence and the crash report describe the same failure", () => {
+  /**
+   * Everything `classifyStorageError` is documented to read, in the shapes a
+   * store really throws: the four quota signals (two codes, a `name`, a bare
+   * message), a store that is merely blocked, and the values a `catch` binds
+   * when nothing threw an `Error` at all.
+   */
+  const INPUTS: readonly unknown[] = [
+    Object.assign(new Error("The quota has been exceeded."), { name: "QuotaExceededError" }),
+    Object.assign(new Error("persistence failed"), { code: 22 }),
+    Object.assign(new Error("NS_ERROR_DOM_QUOTA_REACHED"), { code: 1014 }),
+    new Error("Errno 28: No space left on device"),
+    new Error("database or disk is full"),
+    Object.assign(new Error("localStorage is not available"), { name: "SecurityError" }),
+    new Error("write failed"),
+    null,
+    undefined,
+    "quota exceeded",
+    { code: 22 },
+  ];
+
+  it("picks the sentence for the reason the report carries, for every input", async () => {
+    const module = await load();
+    const tree = render(createElement(Listener));
+    await drain(tree);
+    const sentences = new Set<string>();
+
+    for (const [index, error] of INPUTS.entries()) {
+      // Three resets per input, and each is for a different piece of
+      // once-per-session state: the toast latch (the user hears it once), the
+      // Sentry budget (a site/keyspace pair reports once), and the spy arrays.
+      // Without them every iteration after the first asserts on empty lists,
+      // which is how a loop like this passes without running.
+      module.__resetStorageNoticeForTests();
+      reporting!.__resetStorageFailureReportsForTests();
+      toasts.length = 0;
+      captured.length = 0;
+
+      reporting!.reportStorageFailure(
+        "chat-context.setItem",
+        "collectables-chats-v1",
+        error,
+      );
+
+      const reason = reporting!.classifyStorageError(error);
+      const sent = (captured[0]?.context as { extra?: { reason?: unknown } } | undefined)?.extra
+        ?.reason;
+
+      assert.equal(
+        toasts.length,
+        1,
+        `input ${String(index)}: a data write must always reach the user`,
+      );
+      assert.equal(
+        captured.length,
+        1,
+        `input ${String(index)}: and must always reach the crash report`,
+      );
+      assert.equal(sent, reason, `input ${String(index)}: the report carries the classification`);
+      assert.equal(
+        toasts[0].message,
+        // "web", because the harness's `react-native` stub reports it and
+        // because it is the build this repo deploys.
+        module.storageNoticeMessageKey(reason, "web"),
+        `input ${String(index)}: the sentence is the one that reason chooses`,
+      );
+      sentences.add(toasts[0].message);
+    }
+
+    // The property is only a property if the inputs reach both answers. A list
+    // that had drifted to eleven quota spellings would satisfy every assertion
+    // above and say nothing about the branch a blocked store takes.
+    assert.deepEqual(
+      [...sentences].sort(),
+      ["storageFullWebMessage", "storagePersistRefusedMessage"],
+      "both sentences have to be reached, or this is one branch asserted eleven times",
+    );
+  });
+
+  it("reports a data write as well as toasting it, which nothing said before", async () => {
+    // The mirror of "still REPORTS the quiet writes". That case proves the
+    // quiet half is quiet only to the USER; this one proves the loud half is
+    // loud in both directions. Without it, a regression that stopped reporting
+    // the sites that DO toast leaves every case here green — the toast is
+    // asserted eleven times above and the report was assumed.
+    const module = await load();
+    const tree = render(createElement(Listener));
+    await drain(tree);
+
+    reporting!.reportStorageFailure(
+      "use-persisted-blob.setItem",
+      "collectables-items-v1-user-a",
+      new Error("quota"),
+    );
+
+    expectStorageReport(captured, {
+      scope: "use-persisted-blob.setItem",
+      // The KEYSPACE, never the key: the account id is masked on the way out,
+      // which is the property the report helper's strict comparison exists for.
+      keyspace: "collectables-items-v1-{id}",
+      reason: "full",
+    });
+    assert.equal(toasts.length, 1, "and the user was told, in the same breath");
+    assert.ok(
+      module.losesUserData("use-persisted-blob.setItem"),
+      "the site under test has to be in the loud half or this proves nothing",
+    );
   });
 });
 
