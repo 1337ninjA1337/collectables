@@ -10,6 +10,7 @@ import {
   assertExemptionsHonest,
   readSuite,
   suiteCode,
+  suiteLines,
   suiteFiles,
   suiteText,
   topLevelSuites,
@@ -105,6 +106,26 @@ describe("the suite directory, walked once", () => {
     assert.ok(suiteCode(HELPER).includes("export function suiteFiles"));
   });
 
+  it("keeps the line breaks in the fourth read, which is the one a ^ anchor needs", () => {
+    // `suiteCode` and `suiteLines` differ by one call and by whether a
+    // `/^import .../gm` finds anything. A sweep in `helper-lib-imports.test.ts`
+    // reached for the flattened one and reported a population of zero, which
+    // reads as a clean tree rather than as a broken parse.
+    const lines = suiteLines(HELPER);
+
+    assert.ok(lines.includes("\n"), "the whole point: the flattened read has none");
+    assert.ok(!lines.includes("* Two shapes"), "comments are gone, same as suiteCode");
+    assert.ok(
+      /^import assert from "node:assert\/strict";$/m.test(lines),
+      "a line-anchored regex has to match, which is what suiteCode cannot offer",
+    );
+    assert.equal(
+      suiteCode(HELPER),
+      lines.replace(/\s+/g, " "),
+      "the pair differs by the flatten and nothing else — suiteText is the one that keeps comments",
+    );
+  });
+
   it("throws on a name that is not a suite rather than answering with nothing", () => {
     assert.throws(() => readSuite("no-such-suite.test.ts"), /ENOENT/);
   });
@@ -118,6 +139,7 @@ describe("the suite directory, walked once", () => {
     assert.equal(readSuite(HELPER), readSuite(HELPER));
     assert.equal(suiteText(HELPER), suiteText(HELPER));
     assert.equal(suiteCode(HELPER), suiteCode(HELPER));
+    assert.equal(suiteLines(HELPER), suiteLines(HELPER));
     // A miss still throws rather than caching the failure as an empty answer.
     assert.throws(() => readSuite("no-such-suite.test.ts"), /ENOENT/);
   });

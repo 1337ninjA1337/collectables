@@ -6,7 +6,7 @@ import path from "node:path";
 import { stripComments } from "@/lib/strip-comments";
 
 import { readRepoFile, repoPath } from "./helpers/repo-file";
-import { readSuite, suiteFiles, topLevelSuites, SUITES_REL } from "./helpers/suite-files";
+import { suiteFiles, suiteLines, topLevelSuites, SUITES_REL } from "./helpers/suite-files";
 
 /**
  * What a test helper may import from `lib/`, and why the answer is not "anything".
@@ -221,18 +221,6 @@ describe("what a test helper may take from lib/", () => {
  * mocking a fifth module extends this rule without anyone editing it.
  */
 
-/**
- * One suite's source with the comments gone and its LINE structure kept.
- *
- * `suiteCode()` flattens whitespace, which is right for the shape sweeps and
- * wrong here: `LIB_IMPORT` is anchored at a line start on purpose, so over a
- * one-line file it matches at most once and the rule reads as a clean tree.
- * That is how the first draft of this sweep found a population of zero.
- */
-function suiteSource(relative: string): string {
-  return stripComments(readSuite(relative));
-}
-
 /** Every `helpers/*.ts` module that registers mocks, and what each replaces. */
 function helperMockMap(): Map<string, ReadonlySet<string>> {
   const map = new Map<string, ReadonlySet<string>>();
@@ -331,7 +319,7 @@ describe("what a suite may take from lib/ before its mocks register", () => {
     );
 
     const population = topLevelSuites().filter((relative) => {
-      const source = suiteSource(relative);
+      const source = suiteLines(relative);
       return (
         mockedBySuite(source, helpers).size > 0 && eagerLibValueImports(source).length > 0
       );
@@ -347,7 +335,7 @@ describe("what a suite may take from lib/ before its mocks register", () => {
     const helpers = helperMockMap();
     const offenders: string[] = [];
     for (const relative of topLevelSuites()) {
-      for (const offence of eagerImportOffences(suiteSource(relative), helpers)) {
+      for (const offence of eagerImportOffences(suiteLines(relative), helpers)) {
         offenders.push(`${relative} ${offence}`);
       }
     }

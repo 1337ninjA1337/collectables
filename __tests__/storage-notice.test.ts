@@ -472,6 +472,23 @@ describe("the sentence and the crash report describe the same failure", () => {
       "the site under test has to be in the loud half or this proves nothing",
     );
   });
+
+  it("says the gate's sentence and sends no report, because nothing threw", async () => {
+    // The third path through the same latch, and the one with no error to
+    // classify: a refused hydrate means the store answered when it was READ,
+    // before anything was written. `useStorageNotice` passes `"unavailable"`
+    // as a constant and reports nothing, which is right and was assumed — a
+    // regression that started capturing here would send Sentry an event with
+    // no error in it, once per launch, on every device with the gate shut.
+    await load();
+    refusing = true;
+    const tree = render(createElement(Probe));
+    await drain(tree);
+
+    assert.equal(toasts.length, 1);
+    assert.equal(toasts[0].message, "storagePersistRefusedMessage", "no error, so no full-disk fix");
+    assert.deepEqual(captured, [], "there is no failure to report — the gate refused, it did not throw");
+  });
 });
 
 /**

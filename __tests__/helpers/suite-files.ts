@@ -77,6 +77,7 @@ let walked: readonly string[] | null = null;
 const readCache = new Map<string, string>();
 const textCache = new Map<string, string>();
 const codeCache = new Map<string, string>();
+const lineCache = new Map<string, string>();
 
 /**
  * Forget the walk and the reads, for a suite that changes the tree under them.
@@ -90,6 +91,7 @@ export function __resetSuiteFilesCacheForTests(): void {
   readCache.clear();
   textCache.clear();
   codeCache.clear();
+  lineCache.clear();
 }
 
 /**
@@ -170,6 +172,28 @@ export function suiteCode(relative: string): string {
   if (cached !== undefined) return cached;
   const stripped = stripComments(readSuite(relative)).replace(/\s+/g, " ");
   codeCache.set(relative, stripped);
+  return stripped;
+}
+
+/**
+ * Comments removed and the LINE structure kept — the other half of {@link suiteCode}.
+ *
+ * `suiteCode` flattens whitespace, which is what a shape sweep wants: a rule
+ * matching `assert.equal(x, 6)` should not care where prettier put the line
+ * breaks. A rule anchored at a line START wants the opposite, and the two are
+ * one character apart at the call site. `helper-lib-imports.test.ts` reads
+ * imports with a `/^import .../gm` and reached for `suiteCode` first; over a
+ * one-line file that regex matches at most once, so the sweep reported a
+ * population of zero and read as a clean tree.
+ *
+ * Named for what it preserves, and sitting beside the one it is easy to
+ * confuse, so the next caller chooses rather than discovers.
+ */
+export function suiteLines(relative: string): string {
+  const cached = lineCache.get(relative);
+  if (cached !== undefined) return cached;
+  const stripped = stripComments(readSuite(relative));
+  lineCache.set(relative, stripped);
   return stripped;
 }
 
