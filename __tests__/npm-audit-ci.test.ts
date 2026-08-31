@@ -1,54 +1,91 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { ACCEPTED_HIGH_ADVISORIES } from "@/lib/audit-baseline";
+
 import { readRepoFile } from "./helpers/repo-file";
 
 const CI = readRepoFile(".github/workflows/ci.yml");
 const SECURITY = readRepoFile("SECURITY.md");
 
-describe("SEC-8: npm audit triage", () => {
-  it("CI runs a high-level dependency audit", () => {
-    assert.match(CI, /npm audit --audit-level=high/);
+/**
+ * SEC-8's CI policy, which changed on 2026-08-31.
+ *
+ * This suite used to pin the OPPOSITE arrangement — a bare
+ * `npm audit --audit-level=high` that had to carry `continue-on-error: true`
+ * — and it was right to, given the step that existed. What neither the step
+ * nor this suite could see is that a permanently-red check reports the same
+ * red for an advisory somebody triaged and one nobody has ever seen: the
+ * recorded state said "0 high/critical" while thirteen accumulated.
+ *
+ * The cases below pin the replacement and, more importantly, the property
+ * that makes it worth having: the gate is SILENT on the accepted set and
+ * BLOCKING on anything else, so it can be blocking at all.
+ */
+describe("SEC-8: dependency advisory baseline", () => {
+  it("CI runs the baseline gate", () => {
+    assert.match(CI, /^\s*run: npm run lint:audit-baseline$/m);
   });
 
-  it("the audit step is non-blocking", () => {
-    // The audit step and its non-blocking marker must travel together: locate
-    // the `npm audit` step block and assert it carries continue-on-error: true.
-    const idx = CI.indexOf("npm audit --audit-level=high");
-    assert.ok(idx >= 0, "expected an npm audit step in CI");
-    // Look at the step header preceding the run line (a step is `- name:` …).
+  it("the gate is blocking, which is the whole change", () => {
+    // A step that is red every run gets `continue-on-error` and then gets
+    // ignored. This one is quiet until the advisory set changes, so it can
+    // fail the build — and it must not inherit the old escape hatch.
+    const idx = CI.indexOf("npm run lint:audit-baseline");
+    assert.ok(idx >= 0, "expected the baseline step in CI");
     const stepStart = CI.lastIndexOf("- name:", idx);
     const block = CI.slice(stepStart, idx);
-    assert.match(
-      block,
-      /continue-on-error:\s*true/,
-      "the npm audit step must be non-blocking (continue-on-error: true)",
+    assert.ok(
+      !/continue-on-error:\s*true/.test(block),
+      "the baseline step must block — it is silent unless something changed",
     );
   });
 
-  it("SECURITY.md documents the audit triage", () => {
-    assert.match(SECURITY, /##\s+Dependency advisory triage/i);
-    // Names the CI gate and that it is non-blocking.
-    assert.match(SECURITY, /npm audit --audit-level=high/);
-    assert.match(SECURITY, /non-blocking|continue-on-error/i);
+  it("no bare audit-level step remains beside it", () => {
+    // A `run:` line, not any mention: the comment above the step explains what
+    // it replaced and names the old command.
+    assert.ok(
+      !/^\s*run: npm audit --audit-level=/m.test(CI),
+      "two audit steps means the always-red one is back",
+    );
   });
 
-  it("records the resolved high/critical advisories and the accepted remainder", () => {
-    assert.match(SECURITY, /Resolved/i);
-    assert.match(SECURITY, /Accepted|unfixable/i);
-    // The packages whose high/critical advisories were cleared by `npm audit fix`.
+  it("SECURITY.md documents the gate and that it blocks", () => {
+    assert.match(SECURITY, /##\s+Dependency advisory triage/i);
+    assert.match(SECURITY, /npm run lint:audit-baseline/);
+    assert.match(SECURITY, /\*\*blocking\*\*/i);
+  });
+
+  it("tables every accepted advisory, with whether it reaches the client", () => {
+    // The claim that was wrong for two months was not a severity number: it
+    // was the sentence saying every remaining advisory was dev/build-time,
+    // while `nanoid` shipped to every user. So the reachability answer is the
+    // column this asserts, per package, rather than a prose summary.
+    assert.match(SECURITY, /Ships to client\?/i);
+    for (const entry of ACCEPTED_HIGH_ADVISORIES) {
+      assert.ok(
+        SECURITY.includes(`\`${entry.package}\``),
+        `triage must table the accepted advisory for ${entry.package}`,
+      );
+    }
+  });
+
+  it("keeps the record of what the previous pass resolved", () => {
+    // The 2026-06-28 `npm audit fix` pass really did clear a critical and four
+    // highs; deleting that history would make the next reader think the tree
+    // has never been cleaned.
+    assert.match(SECURITY, /2026-06-28/);
+    assert.match(SECURITY, /1 critical \+ 4 high/i);
     for (const pkg of ["shell-quote", "xmldom", "undici", "ws", "protobufjs"]) {
       assert.ok(
         SECURITY.includes(pkg),
-        `triage must list the resolved advisory for ${pkg}`,
+        `the resolved-advisory history must keep ${pkg} — a security record is not tidied away`,
       );
     }
-    // The accepted remainder (build-time tooling, breaking-bump-only fixes).
-    for (const pkg of ["js-yaml", "postcss", "uuid", "esbuild"]) {
-      assert.ok(
-        SECURITY.includes(pkg),
-        `triage must list the accepted advisory for ${pkg}`,
-      );
-    }
+  });
+
+  it("says how the record went stale, so the next reader can spot the shape", () => {
+    assert.match(SECURITY, /continue-on-error/i);
+    assert.match(SECURITY, /13 high|thirteen high/i);
   });
 });

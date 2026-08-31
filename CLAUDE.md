@@ -42,8 +42,8 @@ npm run verify     # lint:ci → build → verify:dist, the full gate — run TH
 ```
 
 `npm run verify` is the single command to run before every commit. It chains
-the SEVEN steps CI runs (typecheck → lint:all → test → build → bundle secrets
-→ bundle size → bundle smoke) in the same order, fail-fast, so a green
+the EIGHT steps CI runs (typecheck → lint:all → test → audit baseline → build
+→ bundle secrets → bundle size → bundle smoke) in the same order, fail-fast, so a green
 `verify` locally means a green CI. Running the legs by hand is only for
 iterating on one of them — a hand-assembled sequence is exactly how a leg gets
 silently skipped.

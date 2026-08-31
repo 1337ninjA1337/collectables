@@ -140,42 +140,77 @@ injects them.
 ## Dependency advisory triage (`npm audit`)
 
 The supply chain is scanned two ways: a `gitleaks` full-history secret scan and
-an `npm audit --audit-level=high` step in **CI** (`.github/workflows/ci.yml`).
-The audit step is **non-blocking** (`continue-on-error: true`) — it surfaces new
-high/critical advisories on every PR for review without wedging the deploy when
-the only available fix is a breaking major bump of a build-time dependency.
+a **dependency advisory baseline** step in **CI**
+(`.github/workflows/ci.yml` → `npm run lint:audit-baseline`).
 
-Re-run the triage with `npm audit` (full report) or `npm audit --audit-level=high`
+The baseline step is **blocking**, and it is blocking precisely because it is
+quiet: it fails only on a high/critical advisory root that is not already
+triaged in `lib/audit-baseline.ts` and tabled below. A bare
+`npm audit --audit-level=high` cannot be blocking while any advisory is
+accepted, and the non-blocking version it replaced is how thirteen high
+advisories accumulated unnoticed (see below).
+
+Re-run the triage with `npm audit` (full report) or `npm run lint:audit-baseline`
 (the CI gate). When a new high/critical appears, prefer `npm audit fix` (no
-breaking changes); if the only fix is a major bump, record the decision below.
+breaking changes); if the only fix is a major bump, triage it and record the
+decision below **and** in `ACCEPTED_HIGH_ADVISORIES` — the test keeps the two
+in step.
 
-### Resolved (SEC-8, 2026-06-28)
+### Re-triaged 2026-08-31 — the "0 high" record had gone stale
 
-`npm audit fix` (no breaking changes) cleared **all** high/critical advisories —
-1 critical + 4 high → **0**:
+The 2026-06-28 pass cleared 1 critical + 4 high with a non-breaking
+`npm audit fix` and recorded **0 high/critical**. On 2026-08-31 the same
+lockfile audited at **27 advisories (13 high, 13 moderate, 1 low)**, and
+`npm audit fix` had nothing non-breaking left to offer.
+
+Two things had been wrong for those two months, and neither was visible:
+
+- The CI step was `npm audit --audit-level=high` with
+  `continue-on-error: true`. It has to be non-blocking while accepted
+  advisories exist, and a step that is red on every run reports the same red
+  for an advisory somebody triaged and one nobody has ever seen.
+- The paragraph below this table asserted the remaining advisories "live
+  entirely in dev/build-time tooling". `nanoid` is high, and it ships to every
+  user.
+
+The step is now `npm run lint:audit-baseline`, which compares the audit
+against the list in `lib/audit-baseline.ts` and **fails only on a high or
+critical root that is not on it** — so it is silent until something changes,
+and blocking when it does. It also reports an accepted entry the audit has
+stopped naming, so the list cannot quietly stop describing the tree.
+
+### Resolved by the 2026-06-28 pass (kept for history)
+
+`npm audit fix` (no breaking changes) cleared 1 critical + 4 high:
 
 | Package | Sev | Advisory | Reached the client? |
 | --- | --- | --- | --- |
-| `shell-quote` | critical | quote() newline escaping (GHSA — via `react-devtools-core`) | No — dev tooling only |
+| `shell-quote` | critical | quote() newline escaping (via `react-devtools-core`) | No — dev tooling only |
 | `@xmldom/xmldom` | high | XML serialization DoS / injection (via `@expo/plist`, iOS build) | No — build-time only |
 | `undici` | high | HTTP header injection / queue poisoning (via `@expo/cli`) | No — dev/build-time only |
 | `ws` | high | memory-disclosure / DoS (via `@supabase/realtime-js`, expo, metro, RN) | Patched in shipped `realtime-js` chain |
 | `protobufjs` | high | unbounded recursion DoS (via `posthog-js` → `@opentelemetry`) | Patched via `posthog-js` minor bump |
 
-### Accepted / unfixable (no breaking bump)
+### Accepted high/critical (6 roots, 2026-08-31)
 
-The remaining advisories are all **moderate or low** and live entirely in
-**dev/build-time tooling** that never reaches the production web bundle's
-runtime attack surface. Their only `npm audit fix --force` path is a breaking
-major bump of `react-native` (→ 0.86) or `expo` (→ 56), which is out of scope
-for a security-patch task and is tracked separately as a framework-upgrade item.
+`npm audit` reports 13 high entries; seven are Expo/metro packages that merely
+depend on one of these six. "Ships to client" is not the same question as
+"vulnerable" — a package can be in the bundle with its vulnerable entry point
+unreachable.
 
-| Package | Sev | Source (dev/build only) | Why accepted |
+| Package | Ships to client? | Source | Why accepted |
 | --- | --- | --- | --- |
-| `js-yaml` | moderate | `@expo/xcpretty` (iOS build), `babel-jest` (test coverage) | Fix = react-native@0.86 (breaking); not on the runtime path |
-| `postcss` | moderate | `@expo/metro-config` (build-time CSS transform) | Fix = expo@56 (breaking); build-time only |
-| `uuid` | moderate | `@expo/ngrok`, `xcode` (tunnel / iOS tooling) | Fix = expo@56 (breaking); vulnerable v3/v5/v6 `buf` path unused |
-| `esbuild` | low | `tsx` (test runner) | Dev-server-only, Windows-only; not used in CI/deploy |
+| `nanoid` | **Yes** | `@react-navigation/routers` (expo-router), route keys | The DoS needs a negative `size`; every bundled call site is `nanoid()` with no argument |
+| `brace-expansion` | No | glob/minimatch under the build toolchain | Never evaluated at runtime |
+| `image-size` | No | metro asset pipeline | Build-time only — the `image-size-select-actual` string in the bundle is an icon name, not this package |
+| `js-yaml` | No | `@expo/xcpretty` (iOS build), `babel-jest` | Fix = `react-native@0.86`, a breaking major |
+| `postcss` | No | `@expo/metro-config` CSS transform | Fix = `expo@56`, a breaking major |
+| `tar` | No | npm / expo install-time archive handling | Never on the runtime path |
 
-These are revisited on each `expo` / `react-native` upgrade; if any is later
-shown to reach the deployed client at runtime, it is promoted to a blocking fix.
+The moderate and low advisories (14 of the 27) remain dev/build-time only and
+are not gated; they are revisited on each `expo` / `react-native` upgrade.
+
+Any of these shown to reach the deployed client at runtime **through its
+vulnerable path** is promoted to a blocking fix. Adding a package to
+`ACCEPTED_HIGH_ADVISORIES` without a row here turns
+`__tests__/audit-baseline.test.ts` red.
