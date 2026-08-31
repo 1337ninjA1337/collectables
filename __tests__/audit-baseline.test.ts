@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   ACCEPTED_HIGH_ADVISORIES,
+  advisoryIdentity,
   advisoryKey,
   evaluateAudit,
   formatAuditVerdict,
@@ -43,7 +44,10 @@ import { readRepoFile } from "./helpers/repo-file";
 function report(
   entries: Record<
     string,
-    { advisories?: { source: number; severity: string }[]; dependsOn?: string[] }
+    {
+      advisories?: { ghsa?: string; source?: number; severity: string }[];
+      dependsOn?: string[];
+    }
   >,
 ): AuditReport {
   return {
@@ -52,34 +56,46 @@ function report(
         name,
         {
           severity: advisories[0]?.severity ?? "high",
-          via: [...advisories.map((a) => ({ ...a, title: `${name} advisory` })), ...dependsOn],
+          via: [
+            ...advisories.map((a) => ({
+              source: a.source,
+              severity: a.severity,
+              url: a.ghsa === undefined ? undefined : `https://github.com/advisories/${a.ghsa}`,
+              title: `${name} advisory`,
+            })),
+            ...dependsOn,
+          ],
         },
       ]),
     ),
   };
 }
 
+const A1 = "GHSA-aaaa-aaaa-aaa1";
+const A2 = "GHSA-bbbb-bbbb-bbb2";
+const A3 = "GHSA-cccc-cccc-ccc3";
+
 const FIXTURE: readonly AcceptedAdvisory[] = [
-  { package: "nanoid", advisories: [1], shipsToClient: true, why: "vulnerable path unreachable" },
-  { package: "postcss", advisories: [2, 3], shipsToClient: false, why: "build-time only" },
+  { package: "nanoid", advisories: [A1], shipsToClient: true, why: "vulnerable path unreachable" },
+  { package: "postcss", advisories: [A2, A3], shipsToClient: false, why: "build-time only" },
 ];
 
 describe("evaluateAudit", () => {
   it("passes when every high advisory is on the baseline", () => {
     const verdict = evaluateAudit(
       report({
-        nanoid: { advisories: [{ source: 1, severity: "high" }] },
+        nanoid: { advisories: [{ ghsa: A1, severity: "high" }] },
         postcss: {
           advisories: [
-            { source: 2, severity: "high" },
-            { source: 3, severity: "critical" },
+            { ghsa: A2, severity: "high" },
+            { ghsa: A3, severity: "critical" },
           ],
         },
       }),
       FIXTURE,
     );
     assert.deepEqual(verdict.unexpected, []);
-    assert.deepEqual(verdict.stillPresent, ["nanoid#1", "postcss#2", "postcss#3"]);
+    assert.deepEqual(verdict.stillPresent, [`nanoid#${A1}`, `postcss#${A2}`, `postcss#${A3}`]);
     assert.deepEqual(verdict.stale, []);
   });
 
@@ -91,33 +107,33 @@ describe("evaluateAudit", () => {
       report({
         nanoid: {
           advisories: [
-            { source: 1, severity: "high" },
-            { source: 999, severity: "high" },
+            { ghsa: A1, severity: "high" },
+            { ghsa: "GHSA-zzzz-zzzz-zzz9", severity: "high" },
           ],
         },
       }),
       FIXTURE,
     );
-    assert.deepEqual(verdict.unexpected, ["nanoid#999"]);
-    assert.match(formatAuditVerdict(verdict, "check"), /NEW {2}nanoid#999/);
+    assert.deepEqual(verdict.unexpected, ["nanoid#GHSA-zzzz-zzzz-zzz9"]);
+    assert.match(formatAuditVerdict(verdict, "check"), /NEW {2}nanoid#GHSA-zzzz-zzzz-zzz9/);
   });
 
   it("fails on a high advisory in a package nobody has triaged", () => {
     const verdict = evaluateAudit(
-      report({ "left-pad": { advisories: [{ source: 42, severity: "critical" }] } }),
+      report({ "left-pad": { advisories: [{ ghsa: "GHSA-dddd-dddd-ddd4", severity: "critical" }] } }),
       FIXTURE,
     );
-    assert.deepEqual(verdict.unexpected, ["left-pad#42"]);
+    assert.deepEqual(verdict.unexpected, ["left-pad#GHSA-dddd-dddd-ddd4"]);
   });
 
   it("reports a baseline advisory the audit no longer names as stale", () => {
     // The other direction. An exemption nobody prunes stops describing the
     // tree, and then starts covering something somebody would want to see.
     const verdict = evaluateAudit(
-      report({ nanoid: { advisories: [{ source: 1, severity: "high" }] } }),
+      report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }),
       FIXTURE,
     );
-    assert.deepEqual(verdict.stale, ["postcss#2", "postcss#3"]);
+    assert.deepEqual(verdict.stale, [`postcss#${A2}`, `postcss#${A3}`]);
     assert.match(formatAuditVerdict(verdict, "check"), /no longer reported/);
   });
 
@@ -130,9 +146,9 @@ describe("evaluateAudit", () => {
       report({
         postcss: {
           advisories: [
-            { source: 2, severity: "high" },
-            { source: 3, severity: "high" },
-            { source: 500, severity: "moderate" },
+            { ghsa: A2, severity: "high" },
+            { ghsa: A3, severity: "high" },
+            { ghsa: "GHSA-eeee-eeee-eee5", severity: "moderate" },
           ],
         },
       }),
@@ -152,7 +168,7 @@ describe("evaluateAudit", () => {
 
   it("treats an empty report as clean rather than as a broken read", () => {
     assert.deepEqual(evaluateAudit({}, FIXTURE).unexpected, []);
-    assert.deepEqual(evaluateAudit({}, FIXTURE).stale, ["nanoid#1", "postcss#2", "postcss#3"]);
+    assert.deepEqual(evaluateAudit({}, FIXTURE).stale, [`nanoid#${A1}`, `postcss#${A2}`, `postcss#${A3}`]);
   });
 });
 
@@ -160,21 +176,57 @@ describe("observedAdvisories", () => {
   it("keys every advisory by package and id", () => {
     assert.deepEqual(
       observedAdvisories(
-        report({ tar: { advisories: [{ source: 7, severity: "high" }], dependsOn: ["glob"] } }),
+        report({
+          tar: { advisories: [{ ghsa: "GHSA-ffff-ffff-fff7", severity: "high" }], dependsOn: ["glob"] },
+        }),
       ),
-      ["tar#7"],
+      ["tar#GHSA-ffff-ffff-fff7"],
     );
   });
 
-  it("skips an advisory object with no id, which cannot be triaged by id", () => {
+  it("collapses one advisory seen down several dependency paths", () => {
+    // npm emits a `via` object per path, so `brace-expansion`'s three
+    // advisories arrived as nine. Keyed on the per-path `source` id the
+    // baseline churned with the lockfile — a BLOCKING gate going red for a
+    // tree-shape change with no security content, which is how a gate ends up
+    // switched off.
+    const threePaths = report({
+      "brace-expansion": {
+        advisories: [
+          { ghsa: A1, source: 1, severity: "high" },
+          { ghsa: A1, source: 2, severity: "high" },
+          { ghsa: A1, source: 3, severity: "high" },
+        ],
+      },
+    });
+    assert.deepEqual(observedAdvisories(threePaths), [`brace-expansion#${A1}`]);
+  });
+
+  it("skips an advisory object with neither a GHSA nor an id", () => {
     const malformed: AuditReport = {
       vulnerabilities: { mystery: { severity: "high", via: [{ severity: "high" }] } },
     };
     assert.deepEqual(observedAdvisories(malformed), []);
   });
 
+  it("falls back to the numeric id rather than dropping an un-GHSA'd advisory", () => {
+    // A worse key — path-sensitive — and still better than a silent hole in a
+    // gate whose whole job is to have none.
+    assert.equal(advisoryIdentity({ source: 1138811 }), "1138811");
+    assert.equal(advisoryIdentity({ source: 1, url: "https://example.test/not-an-advisory" }), "1");
+    assert.equal(advisoryIdentity({}), null);
+  });
+
+  it("reads the GHSA out of the advisory url", () => {
+    assert.equal(
+      advisoryIdentity({ source: 9, url: "https://github.com/advisories/GHSA-28wg-ghj8-5hjv" }),
+      "GHSA-28wg-ghj8-5hjv",
+      "the GHSA wins over the per-path id",
+    );
+  });
+
   it("advisoryKey is the one place the format lives", () => {
-    assert.equal(advisoryKey("nanoid", 1138811), "nanoid#1138811");
+    assert.equal(advisoryKey("nanoid", "GHSA-28wg-ghj8-5hjv"), "nanoid#GHSA-28wg-ghj8-5hjv");
   });
 });
 
@@ -190,8 +242,8 @@ describe("the accepted list is a triage record, not a pile", () => {
         `${entry.package}: an entry with no advisory ids accepts nothing and hides everything`,
       );
       assert.ok(
-        entry.advisories.every((id) => Number.isInteger(id) && id > 0),
-        `${entry.package}: advisory ids are npm's numeric \`via[].source\``,
+        entry.advisories.every((id) => /^GHSA-[\w-]+$/.test(id)),
+        `${entry.package}: advisories are GHSA ids — npm's numeric \`source\` is per dependency PATH and churns with the lockfile`,
       );
       assert.ok(
         entry.why.length > 20,

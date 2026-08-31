@@ -22,15 +22,15 @@
  *
  * Only ever "read, understood, and not exploitable HERE" — never "old", and
  * never "some other advisory in the same package was fine". Each entry lists
- * the advisory IDS it has read and says whether the package reaches the
- * production web bundle, because that is the question the severity number
- * cannot answer: `nanoid` is high, ships to every user, and both of its
- * advisories need an argument shape no call site in this app passes.
+ * the GHSA ids it has read and says whether the package reaches the production
+ * web bundle, because that is the question the severity number cannot answer:
+ * `nanoid` is high, ships to every user, and both of its advisories need an
+ * argument shape no call site in this app passes.
  *
- * Keying on ids rather than names was the second version. The first keyed on
- * the package, and `nanoid` already had TWO high advisories the day it was
- * written — so the list accepted one nobody had read, which is the failure a
- * baseline exists to prevent, reproduced inside the baseline.
+ * The KEY took three versions, and each wrong one failed differently. The
+ * package name accepted every future CVE in an accepted package. npm's
+ * per-path `source` id made the list churn with the lockfile, which turns a
+ * blocking gate into noise. The GHSA is the advisory's own name and neither.
  */
 
 /** One triaged advisory root. Transitive dependents are not listed. */
@@ -38,17 +38,24 @@ export interface AcceptedAdvisory {
   /** The package `npm audit` names as the advisory's root. */
   readonly package: string;
   /**
-   * The npm advisory ids (`via[].source`) this entry has actually read.
+   * The GHSA identifiers this entry has actually read.
    *
-   * The ids are the point. The first version of this list keyed on the package
-   * NAME, and `nanoid` was already carrying TWO high advisories when it was
-   * written — 1138811 (negative `size`) and 1139427 (custom generators). The
-   * `why` below reasoned about the first one and silently accepted the second,
-   * which is the exact failure a baseline exists to prevent, reproduced inside
-   * the baseline. A name covers every future CVE in that package; an id covers
-   * the one somebody read.
+   * Identity is the point, and it took two goes to get right. The first
+   * version keyed on the package NAME, and `nanoid` was already carrying two
+   * high advisories — so the `why` reasoned about one and silently accepted
+   * the other, which is the failure a baseline exists to prevent, reproduced
+   * inside the baseline. The second keyed on npm's `via[].source`, which is
+   * reported ONCE PER DEPENDENCY PATH: `brace-expansion`'s three advisories
+   * arrived as nine ids, so a lockfile reshuffle that added or dropped a path
+   * would have turned a BLOCKING gate red for a tree-shape change with no
+   * security content — and a gate that cries wolf on churn is a gate somebody
+   * switches off.
+   *
+   * The GHSA is the advisory's own name: stable across paths, across
+   * lockfiles, and the thing a person actually reads at
+   * `https://github.com/advisories/<id>`.
    */
-  readonly advisories: readonly number[];
+  readonly advisories: readonly string[];
   /**
    * Whether the package's code reaches the production web bundle.
    *
@@ -63,44 +70,46 @@ export interface AcceptedAdvisory {
 /**
  * Triaged 2026-08-31 against `npm audit` on the committed lockfile.
  *
- * Six root packages carrying 18 high advisories between them; the other seven
- * high ENTRIES `npm audit` reports are Expo/metro packages that merely depend
- * on these, and carry no advisory of their own.
+ * Six root packages carrying 11 distinct advisories between them. `npm audit`
+ * reports 13 high ENTRIES and 18 `via` objects for those 11: the extra entries
+ * are Expo/metro packages that merely depend on these and carry no advisory of
+ * their own, and the extra objects are one advisory seen down several
+ * dependency paths.
  */
 export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
   {
     package: "nanoid",
-    advisories: [1138811, 1139427],
+    advisories: ["GHSA-28wg-ghj8-5hjv", "GHSA-2v37-7h3g-55p8"],
     shipsToClient: true,
-    why: "ships via @react-navigation/routers for route keys; 1138811 needs a negative size argument and 1139427 needs a custom generator, and every bundled call site is nanoid() with neither",
+    why: "ships via @react-navigation/routers for route keys; the first needs a negative size argument and the second a custom generator, and every bundled call site is nanoid() with neither",
   },
   {
     package: "brace-expansion",
-    advisories: [1123896, 1123897, 1123898, 1130588, 1130589, 1130591, 1130734, 1130736, 1130737],
+    advisories: ["GHSA-3jxr-9vmj-r5cp", "GHSA-mh99-v99m-4gvg", "GHSA-rgw5-rvv9-x895"],
     shipsToClient: false,
-    why: "three DoS advisories, each reported once per dependency path, in glob/minimatch under the build toolchain; never evaluated at runtime",
+    why: "three expansion DoS advisories in glob/minimatch under the build toolchain; never evaluated at runtime",
   },
   {
     package: "image-size",
-    advisories: [1138808, 1138809],
+    advisories: ["GHSA-5p2g-fcmc-qvqq", "GHSA-w3rx-r6r6-pgpr"],
     shipsToClient: false,
-    why: "ICNS and JXL/HEIF parser DoS in metro's asset pipeline, build-time only (the string in the bundle is the icon name image-size-select-actual, not this package)",
+    why: "JXL/HEIF and ICNS parser DoS in metro's asset pipeline, build-time only (the string in the bundle is the icon name image-size-select-actual, not this package)",
   },
   {
     package: "js-yaml",
-    advisories: [1138114, 1138115],
+    advisories: ["GHSA-5p4m-2wfm-xmqj"],
     shipsToClient: false,
     why: "!!omap quadratic CPU in @expo/xcpretty and babel-jest; fix is react-native@0.86, a breaking major",
   },
   {
     package: "postcss",
-    advisories: [1124252, 1139510],
+    advisories: ["GHSA-6g55-p6wh-862q", "GHSA-r28c-9q8g-f849"],
     shipsToClient: false,
     why: "arbitrary file read and source-map path traversal in @expo/metro-config's build-time CSS transform; fix is expo@56, a breaking major",
   },
   {
     package: "tar",
-    advisories: [1145647],
+    advisories: ["GHSA-r292-9mhp-454m"],
     shipsToClient: false,
     why: "uncontrolled recursion in npm/expo install-time archive handling; never on the runtime path",
   },
@@ -128,26 +137,53 @@ export function advisoryKey(pkg: string, id: number | string): string {
 }
 
 /**
- * The high/critical advisory ids `npm audit` attributes to each root package.
+ * The advisory's own name, from its `url`, falling back to npm's numeric id.
+ *
+ * `https://github.com/advisories/GHSA-xxxx-xxxx-xxxx` → `GHSA-xxxx-xxxx-xxxx`.
+ * The fallback matters more than it looks: an advisory with no GHSA url is
+ * still an advisory, and dropping it would be a silent hole in a gate whose
+ * whole job is to have none. It keys by `source` instead and is therefore
+ * path-sensitive, which is a worse key and still better than no key.
+ */
+export function advisoryIdentity(advisory: {
+  source?: unknown;
+  url?: unknown;
+}): string | null {
+  const url = typeof advisory.url === "string" ? advisory.url : "";
+  const slug = url.split("/").pop() ?? "";
+  if (/^GHSA-[\w-]+$/.test(slug)) return slug;
+  if (advisory.source === undefined || advisory.source === null) return null;
+  return String(advisory.source);
+}
+
+/**
+ * The high/critical advisories `npm audit` attributes to each root package.
  *
  * A `via` entry is an advisory object on a root and a bare package name on
  * something that merely depends on one; the second kind changes whenever the
  * dependency tree is reshaped and says nothing new about exposure, so only the
- * first is collected. Severity is read from the ADVISORY, not the package: npm
- * reports a package at the highest severity among its advisories, so `postcss`
- * is "high" while two of its four advisories are moderate — and a baseline
- * built from the package's severity would silently accept those two.
+ * first is collected.
+ *
+ * Severity is read from the ADVISORY, not the package: npm reports a package
+ * at the highest severity among its advisories, so `postcss` is "high" while
+ * two of its four are moderate — and a baseline built from the package's
+ * severity would silently accept those two.
+ *
+ * The result is a SET, which is the fix for npm reporting one entry per
+ * dependency path: `brace-expansion`'s three advisories arrive as nine `via`
+ * objects carrying three GHSAs, and nine collapse to three here.
  */
 export function observedAdvisories(report: AuditReport): readonly string[] {
   const found = new Set<string>();
   for (const [name, entry] of Object.entries(report.vulnerabilities ?? {})) {
     for (const via of entry.via ?? []) {
       if (typeof via !== "object" || via === null) continue;
-      const advisory = via as { source?: unknown; severity?: unknown };
+      const advisory = via as { source?: unknown; url?: unknown; severity?: unknown };
       const severity = String(advisory.severity ?? "");
       if (severity !== "high" && severity !== "critical") continue;
-      if (advisory.source === undefined || advisory.source === null) continue;
-      found.add(advisoryKey(name, advisory.source as number));
+      const identity = advisoryIdentity(advisory);
+      if (identity === null) continue;
+      found.add(advisoryKey(name, identity));
     }
   }
   return [...found];

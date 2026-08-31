@@ -191,28 +191,35 @@ stopped naming, so the list cannot quietly stop describing the tree.
 | `ws` | high | memory-disclosure / DoS (via `@supabase/realtime-js`, expo, metro, RN) | Patched in shipped `realtime-js` chain |
 | `protobufjs` | high | unbounded recursion DoS (via `posthog-js` → `@opentelemetry`) | Patched via `posthog-js` minor bump |
 
-### Accepted high/critical — 6 roots, 18 advisories (2026-08-31)
+### Accepted high/critical — 6 roots, 11 advisories (2026-08-31)
 
-`npm audit` reports 13 high *entries*; seven are Expo/metro packages that merely
-depend on one of these six and carry no advisory of their own. The six roots
-carry 18 high advisories between them.
+`npm audit` reports 13 high *entries* and 18 `via` objects for these 11
+advisories: the extra entries are Expo/metro packages that merely depend on one
+of these six and carry no advisory of their own, and the extra objects are one
+advisory seen down several dependency paths.
 
-The baseline keys on **advisory ID**, not package name. It keyed on the name
-first, and `nanoid` already had two high advisories that day — so the entry's
-reasoning covered one and silently accepted the other. An accepted package must
-never be a blanket licence for its next CVE.
+The baseline keys on the **GHSA id**. It took three versions and each wrong one
+failed differently:
+
+- the **package name** accepted every future CVE in an accepted package —
+  `nanoid` already had two advisories and the entry's reasoning covered one;
+- npm's per-path **`source` id** made the list churn with the lockfile
+  (`brace-expansion`'s three advisories arrive as nine ids), turning a blocking
+  gate red for a tree-shape change with no security content;
+- the **GHSA** is the advisory's own name: stable across paths and lockfiles,
+  and the thing a person reads at `https://github.com/advisories/<id>`.
 
 "Ships to client" is not the same question as "vulnerable": a package can be in
 the bundle with its vulnerable entry point unreachable.
 
-| Package | Advisory IDs | Ships to client? | Why accepted |
+| Package | Advisories | Ships to client? | Why accepted |
 | --- | --- | --- | --- |
-| `nanoid` | 1138811, 1139427 | **Yes** — `@react-navigation/routers` route keys | 1138811 needs a negative `size`; 1139427 needs a custom generator. Every bundled call site is `nanoid()` with neither |
-| `brace-expansion` | 1123896–98, 1130588/89/91, 1130734/36/37 | No | Three DoS advisories, each reported once per dependency path, in glob/minimatch under the build toolchain |
-| `image-size` | 1138808, 1138809 | No | ICNS and JXL/HEIF parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package) |
-| `js-yaml` | 1138114, 1138115 | No | `!!omap` quadratic CPU in `@expo/xcpretty` / `babel-jest`; fix = `react-native@0.86`, breaking |
-| `postcss` | 1124252, 1139510 | No | Arbitrary file read and source-map path traversal in `@expo/metro-config`'s build-time CSS transform; fix = `expo@56`, breaking |
-| `tar` | 1145647 | No | Uncontrolled recursion in npm/expo install-time archive handling |
+| `nanoid` | GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8 | **Yes** — `@react-navigation/routers` route keys | The first needs a negative `size`, the second a custom generator. Every bundled call site is `nanoid()` with neither |
+| `brace-expansion` | GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895 | No | Three expansion DoS advisories in glob/minimatch under the build toolchain |
+| `image-size` | GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr | No | JXL/HEIF and ICNS parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package) |
+| `js-yaml` | GHSA-5p4m-2wfm-xmqj | No | `!!omap` quadratic CPU in `@expo/xcpretty` / `babel-jest`; fix = `react-native@0.86`, breaking |
+| `postcss` | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | No | Arbitrary file read and source-map path traversal in `@expo/metro-config`'s build-time CSS transform; fix = `expo@56`, breaking |
+| `tar` | GHSA-r292-9mhp-454m | No | Uncontrolled recursion in npm/expo install-time archive handling |
 
 Severity is read off each **advisory**, not off the package: npm reports a
 package at the highest severity among its advisories, so `postcss` shows "high"
