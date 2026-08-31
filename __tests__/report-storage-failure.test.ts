@@ -334,7 +334,19 @@ describe("classifyStorageError", () => {
       });
     });
 
-    it("refuses the two absences instead of reporting zero signals", () => {
+    it("walks past a return type's own arrow to the one that ends the signature", () => {
+      // `: ((e: unknown) => StorageFailureReason) => {` has two arrows and the
+      // second is the body's. The first sits inside the annotation's parens —
+      // at depth 1, which is the distinction an `indexOf("=>")` cannot make,
+      // and it would have refused this declaration for not having `{` after
+      // `StorageFailureReason`.
+      assert.deepEqual(signalsInSource(PLANTED_CLASSIFIERS.functionTypedReturn), {
+        codes: [],
+        phrases: ["quota"],
+      });
+    });
+
+    it("refuses every absence instead of reporting zero signals", () => {
       // The failure mode a derived rule has and a hand-written list does not:
       // "found nothing" and "there is nothing to find" are the same value. The
       // reader is the layer that knows which it is holding, so it says so —

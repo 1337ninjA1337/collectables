@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { balancedInner } from "@/lib/balanced-source";
+import { balancedInner, endOfString, QUOTES } from "@/lib/balanced-source";
 import type { StorageFailureReason } from "@/lib/report-storage-failure";
 
 import { declaredSource } from "./declared-shape";
@@ -135,30 +135,80 @@ const DECLARATION_FORMS: readonly { readonly opener: string; readonly arrow: boo
 ];
 
 /**
- * The index of the body's opening brace, refusing a body that is not braced.
+ * The first `token` at bracket depth zero from `from`, or -1.
  *
- * `from` is just past the parameter list's `)`. Both shapes may carry a return
- * type here, which is why the function form still scans forward for the brace
- * rather than demanding one immediately — an object-literal return type
- * (`: { reason: string }`) would be misread as the body, the same limitation
- * this reader has always had and the reason it belongs in one place now.
+ * Depth over `(`, `[` and `{`, string literals skipped with the same set
+ * `balancedInner` uses. Angle brackets are NOT counted: `>` is the second
+ * character of `=>`, so a counter that tracked them would go negative on the
+ * very token this is usually looking for. That costs nothing here because a
+ * generic argument cannot contain a top-level `=>` or `{` without also opening
+ * one of the three brackets that ARE counted.
+ *
+ * Depth is what tells a return type apart from a body. `: (e: unknown) =>
+ * StorageFailureReason => {` has two arrows, and the one that ends the
+ * signature is the second — the first is inside the annotation's parens, at
+ * depth 1, which is exactly the distinction an `indexOf` cannot make.
+ */
+function atDepthZero(source: string, from: number, token: string): number {
+  let depth = 0;
+  for (let i = from; i < source.length; i += 1) {
+    const char = source[i];
+    if (QUOTES.has(char)) {
+      i = endOfString(source, i) - 1;
+      continue;
+    }
+    if (depth === 0 && source.startsWith(token, i)) return i;
+    if (char === "(" || char === "[" || char === "{") depth += 1;
+    else if (char === ")" || char === "]" || char === "}") depth -= 1;
+    if (depth < 0) return -1;
+  }
+  return -1;
+}
+
+/**
+ * What may legally sit just before a `function` body's brace.
+ *
+ * `)` for a signature with no return type, and the last character of a type
+ * name (`StorageFailureReason`, `Promise<Reason>`, `Reason[]`) for one with.
+ * Anything else means the brace belongs to the ANNOTATION rather than to the
+ * body — `: { reason: string }` is the shape that makes this necessary, and
+ * `Promise<{ reason: string }>` the one that makes a `:` check insufficient.
+ */
+const BEFORE_A_BODY = /[)\w$>\]]/;
+
+/**
+ * The index of the body's opening brace, refusing anything it cannot place.
+ *
+ * `from` is just past the parameter list's `)`. Every refusal here is a case
+ * where scanning on would produce a WRONG answer rather than none: the span it
+ * would read belongs to a return-type annotation or to the next declaration
+ * down the file, and its signals would be reported as this classifier's.
  */
 function bodyBrace(source: string, from: number, form: (typeof DECLARATION_FORMS)[number]): number {
-  if (!form.arrow) {
-    const brace = source.indexOf("{", from);
-    assert.ok(brace >= 0, "storage-error-samples: classifyStorageError's signature is followed by no body at all");
-    return brace;
+  let start = from;
+  if (form.arrow) {
+    const arrow = atDepthZero(source, from, "=>");
+    assert.ok(
+      arrow >= 0,
+      "storage-error-samples: `const classifyStorageError = (…)` with no `=>` after the parameters — this is not an arrow function, and whatever it is this reader cannot follow it",
+    );
+    start = arrow + 2;
+    assert.ok(
+      source.slice(start).trimStart().startsWith("{"),
+      "storage-error-samples: classifyStorageError is an expression-bodied arrow (`=> …` with no braces) — there is no body span to scan, and the next brace in the file belongs to something else entirely",
+    );
   }
-  const arrow = source.indexOf("=>", from);
+  const brace = atDepthZero(source, start, "{");
   assert.ok(
-    arrow >= 0,
-    "storage-error-samples: `const classifyStorageError = (…)` with no `=>` after the parameters — this is not an arrow function, and whatever it is this reader cannot follow it",
+    brace >= 0,
+    "storage-error-samples: classifyStorageError's signature is followed by no body at all",
   );
+  const before = source.slice(start, brace).trimEnd().slice(-1);
   assert.ok(
-    source.slice(arrow + 2).trimStart().startsWith("{"),
-    "storage-error-samples: classifyStorageError is an expression-bodied arrow (`=> …` with no braces) — there is no body span to scan, and the next brace in the file belongs to something else entirely",
+    before === "" || BEFORE_A_BODY.test(before),
+    `storage-error-samples: the first brace after classifyStorageError's signature follows "${before}", so it opens the RETURN TYPE and not the body — an annotation this reader cannot skip, and reading it would report the annotation's contents as the classifier's signals`,
   );
-  return source.indexOf("{", arrow + 2);
+  return brace;
 }
 
 /**
@@ -303,6 +353,55 @@ export const classifyStorageError = (error: unknown): StorageFailureReason =>
 function elsewhere(value: unknown): void {
   if (String(value).includes("neighbour")) return;
 }`,
+  /**
+   * A return type whose own arrow is not the one that ends the signature.
+   *
+   * READABLE: the annotation's `=>` sits inside its parens, at depth 1, so a
+   * depth-aware scan walks past it to the real one. An `indexOf("=>")` stops at
+   * the first, finds `StorageFailureReason` rather than `{` after it, and
+   * refuses a perfectly ordinary declaration.
+   */
+  functionTypedReturn: `
+export const classifyStorageError = (error: unknown): ((e: unknown) => StorageFailureReason) => {
+  if (String(error).includes("quota")) return "full";
+  return "unavailable";
+};`,
+  /**
+   * An object-literal return type: the first brace is not the body.
+   *
+   * Reading it would report `reason` and `retryable` as the span this reader
+   * scans — a wrong answer dressed as a successful parse, which is the failure
+   * this whole helper is built to refuse rather than commit.
+   */
+  objectReturnType: `
+export function classifyStorageError(error: unknown): { reason: StorageFailureReason } {
+  if (String(error).includes("quota")) return { reason: "full" };
+  return { reason: "unavailable" };
+}`,
+  /**
+   * The same brace one level in, where a `:` check would not have seen it.
+   *
+   * `Promise<{ … }>` puts the annotation's brace after `<` rather than after
+   * `:`, which is why the guard asks what a body's brace may FOLLOW instead of
+   * looking for the one shape that went wrong first.
+   */
+  genericObjectReturnType: `
+export function classifyStorageError(error: unknown): Promise<{ reason: string }> {
+  if (String(error).includes("quota")) return Promise.resolve({ reason: "full" });
+  return Promise.resolve({ reason: "unavailable" });
+}`,
+  /** A signature that never closes: the parameter list runs off the end. */
+  unclosedParameters: `
+export function classifyStorageError(error: unknown {
+  if (String(error).includes("quota")) return "full";
+}`,
+  /** A body that never closes, which only an unterminated literal produces. */
+  unclosedBody: `
+export function classifyStorageError(error: unknown): StorageFailureReason {
+  if (String(error).includes("quota")) return "full";`,
+  /** A `const` binding that is not a function at all. */
+  notAnArrow: `
+export const classifyStorageError = (error: unknown) as StorageFailureReason;`,
 };
 
 /** The needles that must PARSE — everything but the two deliberate absences. */
@@ -311,10 +410,24 @@ export const READABLE_PLANTED_CLASSIFIERS = [
   "unsampledSignal",
   "bothKinds",
   "arrowConst",
+  "functionTypedReturn",
 ];
 
-/** The needles the reader must REFUSE, and the word its message must carry. */
+/**
+ * The needles the reader must REFUSE, and the word its message must carry.
+ *
+ * One entry per `assert` in the reader, which is the point: a branch whose
+ * whole job is to fire on input nobody writes by hand is a branch nothing
+ * exercises, and "nothing exercises it" is indistinguishable from "it works"
+ * until the day it is the only thing standing between a rewrite and a silently
+ * wrong answer.
+ */
 export const UNREADABLE_PLANTED_CLASSIFIERS: Readonly<Record<string, RegExp>> = {
   renamedAway: /no classifyStorageError declaration/,
   conciseArrow: /expression-bodied arrow/,
+  objectReturnType: /opens the RETURN TYPE and not the body/,
+  genericObjectReturnType: /opens the RETURN TYPE and not the body/,
+  unclosedParameters: /parameter list never closes/,
+  unclosedBody: /body never closes/,
+  notAnArrow: /with no `=>` after the parameters/,
 };
