@@ -191,24 +191,34 @@ stopped naming, so the list cannot quietly stop describing the tree.
 | `ws` | high | memory-disclosure / DoS (via `@supabase/realtime-js`, expo, metro, RN) | Patched in shipped `realtime-js` chain |
 | `protobufjs` | high | unbounded recursion DoS (via `posthog-js` → `@opentelemetry`) | Patched via `posthog-js` minor bump |
 
-### Accepted high/critical (6 roots, 2026-08-31)
+### Accepted high/critical — 6 roots, 18 advisories (2026-08-31)
 
-`npm audit` reports 13 high entries; seven are Expo/metro packages that merely
-depend on one of these six. "Ships to client" is not the same question as
-"vulnerable" — a package can be in the bundle with its vulnerable entry point
-unreachable.
+`npm audit` reports 13 high *entries*; seven are Expo/metro packages that merely
+depend on one of these six and carry no advisory of their own. The six roots
+carry 18 high advisories between them.
 
-| Package | Ships to client? | Source | Why accepted |
+The baseline keys on **advisory ID**, not package name. It keyed on the name
+first, and `nanoid` already had two high advisories that day — so the entry's
+reasoning covered one and silently accepted the other. An accepted package must
+never be a blanket licence for its next CVE.
+
+"Ships to client" is not the same question as "vulnerable": a package can be in
+the bundle with its vulnerable entry point unreachable.
+
+| Package | Advisory IDs | Ships to client? | Why accepted |
 | --- | --- | --- | --- |
-| `nanoid` | **Yes** | `@react-navigation/routers` (expo-router), route keys | The DoS needs a negative `size`; every bundled call site is `nanoid()` with no argument |
-| `brace-expansion` | No | glob/minimatch under the build toolchain | Never evaluated at runtime |
-| `image-size` | No | metro asset pipeline | Build-time only — the `image-size-select-actual` string in the bundle is an icon name, not this package |
-| `js-yaml` | No | `@expo/xcpretty` (iOS build), `babel-jest` | Fix = `react-native@0.86`, a breaking major |
-| `postcss` | No | `@expo/metro-config` CSS transform | Fix = `expo@56`, a breaking major |
-| `tar` | No | npm / expo install-time archive handling | Never on the runtime path |
+| `nanoid` | 1138811, 1139427 | **Yes** — `@react-navigation/routers` route keys | 1138811 needs a negative `size`; 1139427 needs a custom generator. Every bundled call site is `nanoid()` with neither |
+| `brace-expansion` | 1123896–98, 1130588/89/91, 1130734/36/37 | No | Three DoS advisories, each reported once per dependency path, in glob/minimatch under the build toolchain |
+| `image-size` | 1138808, 1138809 | No | ICNS and JXL/HEIF parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package) |
+| `js-yaml` | 1138114, 1138115 | No | `!!omap` quadratic CPU in `@expo/xcpretty` / `babel-jest`; fix = `react-native@0.86`, breaking |
+| `postcss` | 1124252, 1139510 | No | Arbitrary file read and source-map path traversal in `@expo/metro-config`'s build-time CSS transform; fix = `expo@56`, breaking |
+| `tar` | 1145647 | No | Uncontrolled recursion in npm/expo install-time archive handling |
 
-The moderate and low advisories (14 of the 27) remain dev/build-time only and
-are not gated; they are revisited on each `expo` / `react-native` upgrade.
+Severity is read off each **advisory**, not off the package: npm reports a
+package at the highest severity among its advisories, so `postcss` shows "high"
+while two of its four are moderate. Those two are not gated here — the moderate
+and low advisories (14 of the 27) remain dev/build-time only and are revisited
+on each `expo` / `react-native` upgrade.
 
 Any of these shown to reach the deployed client at runtime **through its
 vulnerable path** is promoted to a blocking fix. Adding a package to
