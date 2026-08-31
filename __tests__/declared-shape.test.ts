@@ -5,6 +5,7 @@ import {
   assertRequiredMember,
   assertRequiredParameter,
   declarationBody,
+  declaredMembers,
   declaredSource,
   parameterList,
 } from "./helpers/declared-shape";
@@ -86,6 +87,24 @@ export type FixtureAlpha = {
 
 export type FixtureBeta = {
   readonly shared?: number;
+};
+
+// The three shapes a member NAME reader gets wrong: an inline object type whose
+// members belong to it, a string-union member whose alternatives look like
+// nothing but happen to sit on their own lines, and an optional member — which
+// is still a member and must be listed.
+export type FixtureMembers = {
+  readonly plain: string;
+  optional?: number;
+  nested: {
+    readonly buried: string;
+    alsoBuried: number;
+  };
+  union:
+    | "ready"
+    | "not-ready";
+  callback: (value: string) => void;
+  list: { inList: string }[];
 };
 
 // Interface merging is legal TypeScript, so "declared twice" is a real module
@@ -297,6 +316,49 @@ describe("declarationBody", () => {
   });
 });
 
+describe("declaredMembers", () => {
+  it("lists the top-level members, optional ones included, in declaration order", () => {
+    // Order is the declaration's, because a caller comparing against a stub
+    // sorts both — and a reader diffing the two by eye should not also have to
+    // reconcile an arbitrary reordering.
+    assert.deepEqual(declaredMembers(declaredSource(FIXTURES), "FixtureMembers"), [
+      "plain",
+      "optional",
+      "nested",
+      "union",
+      "callback",
+      "list",
+    ]);
+  });
+
+  it("does not claim a nested type's members as its parent's", () => {
+    const members = declaredMembers(declaredSource(FIXTURES), "FixtureMembers");
+
+    assert.ok(!members.includes("buried"), "an inline object type's members are its own");
+    assert.ok(!members.includes("alsoBuried"));
+    assert.ok(!members.includes("inList"), "and so are an array element type's");
+  });
+
+  it("reads no member out of a string union's alternatives", () => {
+    // `| "ready"` on its own line is one `identifier:` away from being read as
+    // a member, which is why the strings are blanked rather than skipped by
+    // line shape — `reason` in `SentryStatus` is exactly this.
+    const members = declaredMembers(declaredSource(FIXTURES), "FixtureMembers");
+
+    assert.ok(!members.includes("ready"));
+    assert.ok(!members.includes("not-ready"));
+  });
+
+  it("refuses a type that is not declared, rather than answering an empty list", () => {
+    // The failure a name-set comparison cannot survive quietly: an empty list
+    // makes a stub with no fields correct.
+    assert.throws(
+      () => declaredMembers(declaredSource(FIXTURES), "NoSuchType"),
+      /no type NoSuchType to read members from/,
+    );
+  });
+});
+
 describe("assertRequiredMember", () => {
   it("passes a required member and refuses an optional one", () => {
     assert.doesNotThrow(() =>
@@ -404,6 +466,7 @@ describe("the suites that pin a signature", () => {
         "check-orphan-i18n-keys.test.ts",
         "coverage-floor.test.ts",
         "danger-icon-button.test.ts",
+        "mount-provider-harness.test.ts",
         "use-persisted-blob.test.ts",
       ],
       "the declared-shape adopters changed — a suite that stopped using it went back to a hand-written regex, and a new one is worth knowing about",

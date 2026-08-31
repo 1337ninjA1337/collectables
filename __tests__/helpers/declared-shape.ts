@@ -247,6 +247,49 @@ export function declarationBody(source: string, declaration: string): string | n
 }
 
 /**
+ * Every member a type declares AT ITS TOP LEVEL, in declaration order.
+ *
+ * `assertRequiredMember` answers about one member the caller already knows the
+ * name of; this answers the question a test DOUBLE has to ask, which is the
+ * other one: what is the full set, so a stub returning the shape can be checked
+ * for a field the type grew. A name list is the only form that catches an
+ * ADDED member — an assertion per known name is green over a type that has
+ * moved on, which is exactly how a stub goes stale.
+ *
+ * Nested braces and string literals are blanked before the members are read, so
+ * an inline object type's members belong to it rather than to its parent, and a
+ * `reason: "ready" | "not-initialised"` union cannot contribute a member called
+ * `not-initialised`. That is the same reader `declarationBody` leans on, run
+ * one level in.
+ */
+export function declaredMembers(source: string, declaration: string): readonly string[] {
+  const body = declarationBody(source, declaration);
+  assert.ok(body !== null, `declared-shape: no type ${declaration} to read members from`);
+  let flat = "";
+  let depth = 0;
+  for (let i = 0; i < body.length; i += 1) {
+    const character = body[i];
+    if (QUOTES.has(character)) {
+      const end = endOfString(body, i);
+      // Kept as blanks rather than dropped, so the line structure survives.
+      flat += " ".repeat(end - i);
+      i = end - 1;
+      continue;
+    }
+    if (character === "{" || character === "(" || character === "[") depth += 1;
+    else if (character === "}" || character === ")" || character === "]") depth -= 1;
+    else if (depth === 0) {
+      flat += character;
+      continue;
+    }
+    flat += character === "\n" ? "\n" : " ";
+  }
+  return [...flat.matchAll(/^\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*\??\s*:/gm)].map(
+    (match) => match[1],
+  );
+}
+
+/**
  * A type's `name` member is declared, required, and typed `type`.
  *
  * The same rule one level over, for the shape a props type has. Matched against

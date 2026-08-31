@@ -1,6 +1,10 @@
 import { createElement, type ComponentType, type PropsWithChildren } from "react";
 
 import { installNativeModuleStubs, mockModule, render, type RenderResult } from "./render";
+// Type-only, and it has to stay that way: a helper is evaluated before any
+// suite's mocks register, so a VALUE import here would pull the real
+// `@/lib/sentry` into every suite that mocks it. See `helper-lib-imports.test.ts`.
+import type { SentryStatus } from "@/lib/sentry";
 import type { CapturedReport } from "./storage-failure-report";
 
 /**
@@ -189,10 +193,50 @@ export function installSpyCapture(extraExports: Record<string, unknown> = {}): C
  * and fails when the two disagree, so a ninth name is one red case rather than
  * a confusing crash in whichever suite reaches it first.
  */
+/**
+ * What `getSentryStatus()` really answers when nothing has been initialised.
+ *
+ * The stub returned `{}`, which is a different KIND of wrong from a missing
+ * name: a provider reading `.ready` off it gets `undefined` rather than a
+ * crash, so a component that BRANCHES on the status takes the falsy path
+ * silently and the case passes for the wrong reason. `reason` is the one that
+ * bites — it is a union with no falsy member, so a `switch` over it falls
+ * through a default the app never expects to reach.
+ *
+ * These are the values the real module returns before `initSentry` runs, which
+ * is the state a mounted provider suite is actually in. Typed as `SentryStatus`
+ * rather than as a loose object so a tenth field turns into a compile error
+ * here; `sentry-status-stub-shape` in `mount-provider-harness.test.ts` says the
+ * same thing from the other side, for the day the type is edited in a way
+ * inference absorbs.
+ */
+const INERT_SENTRY_STATUS: SentryStatus = {
+  ready: false,
+  initialised: false,
+  optedOut: false,
+  dsnPresent: false,
+  environment: null,
+  release: null,
+  lastEventSentAt: null,
+  sourcemapsExpected: false,
+  reason: "not-initialised",
+};
+
+/**
+ * A fresh {@link INERT_SENTRY_STATUS} per call.
+ *
+ * The real one builds its snapshot each time; a shared literal would let a case
+ * that mutates what it read change what the next case sees, which is the shape
+ * of leak this harness closes one level up.
+ */
+export function inertSentryStatus(): SentryStatus {
+  return { ...INERT_SENTRY_STATUS };
+}
+
 const INERT_SENTRY: Readonly<Record<string, () => unknown>> = {
   addBreadcrumb: () => undefined,
   captureException: () => undefined,
-  getSentryStatus: () => ({}),
+  getSentryStatus: inertSentryStatus,
   // A promise, because every caller in the tree awaits or chains this one and a
   // bare `undefined` turns a missing stub into a different crash rather than
   // none.
@@ -205,6 +249,10 @@ const INERT_SENTRY: Readonly<Record<string, () => unknown>> = {
 
 /** The names {@link INERT_SENTRY} answers for — what the derivation case compares. */
 export const SENTRY_NAMES_THE_APP_CALLS: readonly string[] = Object.keys(INERT_SENTRY);
+
+/** The fields {@link INERT_SENTRY_STATUS} fills — what the shape case compares. */
+export const SENTRY_STATUS_FIELDS_THE_STUB_ANSWERS: readonly string[] =
+  Object.keys(INERT_SENTRY_STATUS);
 
 /**
  * Replaces `@/lib/i18n-context` with an identity `t()`.

@@ -11,10 +11,13 @@ import { autoUnmount, render } from "./helpers/render";
 autoUnmount();
 import {
   drain,
+  inertSentryStatus,
   providerHarness,
   settle,
   SENTRY_NAMES_THE_APP_CALLS,
+  SENTRY_STATUS_FIELDS_THE_STUB_ANSWERS,
 } from "./helpers/mount-provider";
+import { declaredMembers, declaredSource } from "./helpers/declared-shape";
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, sourceFiles } from "./helpers/source-files";
 import { assertExemptionsHonest, readSuite, topLevelSuites } from "./helpers/suite-files";
@@ -298,6 +301,42 @@ describe("the mounted-provider suites share one harness", () => {
       [...imported].sort(),
       "add the name to INERT_SENTRY in helpers/mount-provider.ts, or drop it if the app stopped calling it",
     );
+  });
+
+  it("the getSentryStatus stub answers for every field SentryStatus declares", () => {
+    // A missing NAME crashes; a missing FIELD does not, which is the worse of
+    // the two. The stub returned `{}`, so a provider reading `.ready` off it
+    // got `undefined` and took the falsy path — the same path a not-ready
+    // Sentry produces, so the case passed and proved nothing. `reason` is the
+    // field with no falsy member at all: a `switch` over it falls through a
+    // default the app never expects to reach.
+    //
+    // Derived from the TYPE rather than from the app's reads, unlike the name
+    // sweep above: the whole object crosses the boundary in one return value,
+    // so a field the app has not read yet is one `status.x` away from being
+    // read, and the stub is either the shape or it is a subset that happens to
+    // work today.
+    const declared = declaredMembers(declaredSource("lib/sentry.ts"), "SentryStatus");
+
+    assert.ok(declared.length > 0, "the member read found nothing — the parse, not the type");
+    assert.deepEqual(
+      [...SENTRY_STATUS_FIELDS_THE_STUB_ANSWERS].sort(),
+      [...declared].sort(),
+      "fill the field in INERT_SENTRY_STATUS in helpers/mount-provider.ts, or drop it if SentryStatus did",
+    );
+  });
+
+  it("the stub hands out a fresh status object per call", () => {
+    // The real one builds its snapshot each time. A shared literal would let a
+    // case that mutates what it read change what the next case sees, which is
+    // the shape of leak this harness exists to close one level up.
+    const first = inertSentryStatus();
+    const second = inertSentryStatus();
+
+    assert.notEqual(first, second, "same object twice — one case's mutation is every case's");
+    assert.deepEqual(first, second);
+    assert.equal(first.reason, "not-initialised", "the state a mounted suite is really in");
+    assert.equal(first.ready, false);
   });
 
   it("the report helper imports the app's reason and context types rather than restating them", () => {
