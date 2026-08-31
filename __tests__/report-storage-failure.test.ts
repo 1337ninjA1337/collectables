@@ -11,9 +11,11 @@ import {
   classifierSignals,
   KNOWN_CLASSIFIER_SIGNALS,
   PLANTED_CLASSIFIERS,
+  READABLE_PLANTED_CLASSIFIERS,
   signalsInSource,
   STORAGE_ERROR_INPUTS,
   STORAGE_ERROR_SAMPLES,
+  UNREADABLE_PLANTED_CLASSIFIERS,
 } from "./helpers/storage-error-samples";
 import { expectStorageReport } from "./helpers/storage-failure-report";
 import { readRepoFile } from "./helpers/repo-file";
@@ -318,15 +320,40 @@ describe("classifyStorageError", () => {
       assert.deepEqual(phrases, ["quota"], "a code must not reach the substring rule");
     });
 
-    it("says nothing when the function is not there, which the floor is for", () => {
-      // The failure mode a derived rule has that a hand-written list does not:
-      // a parse that finds nothing reads exactly like a classifier with no
-      // signals, and every loop over it passes.
-      const signals = signalsInSource(PLANTED_CLASSIFIERS.renamedAway);
-      assert.deepEqual(allSignals(signals), []);
-      assert.ok(
-        signals.codes.length + signals.phrases.length < KNOWN_CLASSIFIER_SIGNALS,
-        "so the floor is the assertion that turns a broken read red",
+    it("refuses the two absences instead of reporting zero signals", () => {
+      // The failure mode a derived rule has and a hand-written list does not:
+      // "found nothing" and "there is nothing to find" are the same value. The
+      // reader is the layer that knows which it is holding, so it says so —
+      // the floor two layers up would have called an arrow-const rewrite "the
+      // signal count dropped to 0", which is true and about the wrong file.
+      for (const [needle, message] of Object.entries(UNREADABLE_PLANTED_CLASSIFIERS)) {
+        assert.throws(
+          () => {
+            signalsInSource(PLANTED_CLASSIFIERS[needle]);
+          },
+          message,
+          `${needle}: the reader must name which absence this is`,
+        );
+      }
+    });
+
+    it("parses every needle that is supposed to parse", () => {
+      // The needles are source strings nothing else compiles, so a typo in one
+      // degrades to "the reader found nothing" and its own case passes for the
+      // wrong reason. Two of them assert exact signal lists and were already
+      // pinned; this covers the rest, and any needle added later.
+      for (const needle of READABLE_PLANTED_CLASSIFIERS) {
+        const source = PLANTED_CLASSIFIERS[needle];
+        assert.ok(source !== undefined, `${needle} is listed as readable and does not exist`);
+        assert.ok(
+          allSignals(signalsInSource(source)).length > 0,
+          `${needle} parsed to no signals at all — the needle is broken, not the tree`,
+        );
+      }
+      assert.equal(
+        READABLE_PLANTED_CLASSIFIERS.length + Object.keys(UNREADABLE_PLANTED_CLASSIFIERS).length,
+        Object.keys(PLANTED_CLASSIFIERS).length,
+        "every needle is either expected to parse or expected to be refused — one that is in neither list is checked by nothing",
       );
     });
   });

@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+
 import { balancedInner } from "@/lib/balanced-source";
 import type { StorageFailureReason } from "@/lib/report-storage-failure";
 
@@ -131,12 +133,28 @@ export function allSignals(signals: ClassifierSignals): readonly string[] {
  * pair this found in the real one was proven by editing `lib/` by hand and
  * putting it back — evidence that lived in a terminal, for a guard whose whole
  * value is that it fails on that input.
+ *
+ * REFUSES rather than returning nothing when it cannot find the declaration.
+ * An empty result and a classifier with no signals are the same value, and the
+ * reader is the layer that knows which one it is holding: `const
+ * classifyStorageError = (error) => …` is a legal rewrite this `indexOf` does
+ * not match, and the floor two layers up would report it as "the signal count
+ * dropped to 0" — true, and about the wrong file. `parameterList` in
+ * `declared-shape.ts` refuses an overload set out loud for the same reason.
  */
 export function signalsInSource(source: string): ClassifierSignals {
   const start = source.indexOf("function classifyStorageError(");
-  if (start < 0) return { codes: [], phrases: [] };
+  assert.ok(
+    start >= 0,
+    source.includes("classifyStorageError")
+      ? "storage-error-samples: classifyStorageError is in this source but not as `function classifyStorageError(` — an arrow const or a rewritten signature, which this reader cannot follow"
+      : "storage-error-samples: no classifyStorageError declaration in this source — renamed, moved, or the wrong file",
+  );
   const body = balancedInner(source, source.indexOf("{", source.indexOf(")", start)), "{", "}");
-  if (body === null) return { codes: [], phrases: [] };
+  assert.ok(
+    body !== null,
+    "storage-error-samples: classifyStorageError's body never closes — an unterminated string literal is the only way this happens",
+  );
   const codes = new Set<string>();
   const phrases = new Set<string>();
   for (const [, code] of body.matchAll(/code === (\d+)/g)) codes.add(code);
@@ -195,10 +213,31 @@ export function classifyStorageError(error: unknown): StorageFailureReason {
   if (haystack.includes("quota")) return "full";
   return "unavailable";
 }`,
-  /** No such function: the reader must say nothing, and the floor must catch it. */
+  /** No such function: the reader must refuse rather than report zero signals. */
   renamedAway: `
 export function classifyTheStore(error: unknown): StorageFailureReason {
   if (String(error).includes("quota")) return "full";
   return "unavailable";
 }`,
+  /**
+   * A legal rewrite the `indexOf` cannot follow.
+   *
+   * The nastier of the two absences: the name IS here, so a reader that only
+   * asked "is the identifier present?" would be satisfied, and every signal in
+   * the body is invisible. Its refusal says which of the two it is.
+   */
+  arrowConst: `
+export const classifyStorageError = (error: unknown): StorageFailureReason => {
+  if (String(error).includes("quota")) return "full";
+  return "unavailable";
+};`,
+};
+
+/** The needles that must PARSE — everything but the two deliberate absences. */
+export const READABLE_PLANTED_CLASSIFIERS = ["deadSubstring", "unsampledSignal", "bothKinds"];
+
+/** The needles the reader must REFUSE, and the word its message must carry. */
+export const UNREADABLE_PLANTED_CLASSIFIERS: Readonly<Record<string, RegExp>> = {
+  renamedAway: /no classifyStorageError declaration/,
+  arrowConst: /an arrow const or a rewritten signature/,
 };
