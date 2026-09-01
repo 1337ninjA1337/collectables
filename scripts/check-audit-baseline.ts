@@ -1,7 +1,9 @@
 #!/usr/bin/env tsx
 /**
  * Dependency-advisory drift gate: fails when `npm audit` reports a
- * high/critical advisory root that SECURITY.md has not triaged.
+ * high/critical advisory root that SECURITY.md has not triaged, when npm can
+ * clear one without a major version change, or when the accepted list names an
+ * advisory the audit no longer reports.
  *
  * Replaces a bare `npm audit --audit-level=high` that was
  * `continue-on-error: true` and therefore reported the same red for an
@@ -21,6 +23,7 @@ import { execFileSync } from "node:child_process";
 import {
   evaluateAudit,
   formatAuditVerdict,
+  isClean,
   type AuditReport,
 } from "../lib/audit-baseline";
 
@@ -57,7 +60,13 @@ function main(): void {
   }
   const verdict = evaluateAudit(report);
   console.log(formatAuditVerdict(verdict, CHECK_NAME));
-  if (verdict.unexpected.length > 0) process.exit(1);
+  // Three ways to be red and `isClean` is the one place that says which, so a
+  // finding cannot be printed by a step that exits 0. `stale` joined the
+  // failing side with `fixableInRange`, and because of it: fixing an in-range
+  // advisory is what MAKES its baseline entry stale, so leaving that half
+  // advisory-only would mean every fix this gate now demands leaves the
+  // accepted list describing a tree that no longer exists — and green.
+  if (!isClean(verdict)) process.exit(1);
 }
 
 main();
