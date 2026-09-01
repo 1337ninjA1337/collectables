@@ -64,16 +64,31 @@ export type GraphReader = (repoRelative: string) => string | null;
 /**
  * Every repo-local specifier in `source`, as written.
  *
- * Static `from "…"` and dynamic `import("…")` both, because node's loader
- * follows both and a graph that missed the dynamic half would check less than
- * it claims. Bare specifiers (`node:path`, a package) are not repo-local and
- * are node's to resolve however it likes, so only `.`-relative ones are
- * returned — the same set the rules above apply to.
+ * Three shapes, because node's loader follows all three and a walk that missed
+ * one would check less than it claims:
+ *
+ *  - `from "…"`, which covers plain imports, type-only imports and
+ *    `export … from` re-exports in one pattern;
+ *  - `import("…")`, the dynamic form;
+ *  - `import "…"`, the side-effect form with no bindings and therefore no
+ *    `from` — the one the first version of this function missed entirely.
+ *
+ * Bare specifiers (`node:path`, a package) are node's to resolve however it
+ * likes, so only `.`-relative ones are returned: the same set the two rules
+ * above apply to.
+ *
+ * This is a scan over text and not a parse, so it is the CHEAP half on
+ * purpose — its findings name every broken import at once, where node's loader
+ * stops at the first. What it cannot see, the measured graph does:
+ * {@link missingFromWalk} compares this list against the files node actually
+ * loaded, so a shape the regex does not know about is reported rather than
+ * silently dropped.
  */
 export function repoLocalSpecifiers(source: string): string[] {
   const found: string[] = [];
   for (const match of source.matchAll(/\bfrom\s*"(\.[^"]*)"/g)) found.push(match[1]);
   for (const match of source.matchAll(/\bimport\s*\(\s*"(\.[^"]*)"\s*\)/g)) found.push(match[1]);
+  for (const match of source.matchAll(/\bimport\s+"(\.[^"]*)"/g)) found.push(match[1]);
   return found;
 }
 
@@ -127,6 +142,57 @@ export function walkReporterGraph(
   }
 
   return { files, unreadable, extensionless };
+}
+
+/**
+ * The line `scripts/record-loaded-files.ts` prints for each file node loads.
+ *
+ * Distinctive because the recorder shares stderr with node's own warnings, and
+ * a prefix a warning could produce would make the measured graph include
+ * whatever node happened to complain about. The recorder carries this string
+ * as a LITERAL rather than importing it: an import would put this module on
+ * the loader's thread and into its own measurement, which is the one file that
+ * must not be in it. `check-reporter-graph.test.ts` pins the two spellings.
+ */
+export const LOADED_FILE_MARKER = "__reporter-graph-loaded__";
+
+/**
+ * Repo-relative paths of the files node actually loaded, read off the
+ * recorder's output.
+ *
+ * Anything that is not a marker line is node's — a warning, a stack — and is
+ * dropped. Paths outside `repoRoot` are dropped too: node loads its own
+ * internals and, in principle, a package's files, and neither is under the
+ * rules this guard enforces.
+ */
+export function parseLoadedFiles(stderr: string, repoRoot: string): string[] {
+  const files: string[] = [];
+  for (const line of stderr.split("\n")) {
+    const marked = line.trim();
+    if (!marked.startsWith(`${LOADED_FILE_MARKER} `)) continue;
+    const absolute = marked.slice(LOADED_FILE_MARKER.length + 1);
+    const relative = path.posix.relative(repoRoot, absolute);
+    if (relative === "" || relative.startsWith("..") || path.posix.isAbsolute(relative)) continue;
+    if (!files.includes(relative)) files.push(relative);
+  }
+  return files;
+}
+
+/**
+ * Files node loaded that the text walk never reached.
+ *
+ * This is the guard auditing its own cheaper half. A miss here is not a broken
+ * tree — the run loaded fine — it is the walk's findings being incomplete
+ * without saying so, which is how a guard starts quietly checking less than it
+ * reports. The direction matters and only one direction is a finding: the walk
+ * seeing MORE than node loaded is ordinary (a dynamic import on a branch that
+ * did not run is still a file under the rules).
+ */
+export function missingFromWalk(
+  walked: readonly string[],
+  loaded: readonly string[],
+): string[] {
+  return loaded.filter((file) => !walked.includes(file));
 }
 
 /**
