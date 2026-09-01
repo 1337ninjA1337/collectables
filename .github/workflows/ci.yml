@@ -144,6 +144,14 @@ jobs:
       - name: Code-style guards (lint:all)
         run: npm run lint:all
 
+      # `npm test` runs TWO reporters: tap on stdout (the play-by-play, and
+      # what any log annotation reads), and scripts/test-failure-reporter.ts on
+      # stderr, which stays silent all run and then writes the name of every
+      # test that failed. That second one exists because PR #473 reported
+      # `# fail 1` of 7213 and the case could not be named: tap prints the name
+      # inline, thousands of lines before the end, and its trailer is counts
+      # only — so a log tail returned the counts and the only diagnosis
+      # available was a re-run. The names are now in the last lines of the job.
       - name: Run tests
         run: npm test
 

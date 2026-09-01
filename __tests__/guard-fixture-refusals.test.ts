@@ -46,6 +46,7 @@ import {
   nodeModulesChain,
   OBSTRUCTION_PHRASE,
   obstructionClause,
+  PARTIAL_ROOT_PREFIX,
   PATCHED_REPO_MARKER,
   probeAbsentLink,
   probeNearestLink,
@@ -87,19 +88,25 @@ function leadingSentence(message: string): string {
 }
 
 /**
- * Names of the scratch roots the fixture has open right now.
+ * Names of the scratch roots THIS PROCESS has open right now.
  *
  * Every refusal in `makePartialRoot` happens after `mkdtempSync`, so "it threw
  * the right sentence" is only half the claim — the other half is that the
  * directory it had already created is gone. Comparing the set before and after
  * is the only way to see that from outside: the function throws instead of
  * returning, so the path it would have cleaned up is never handed back.
+ *
+ * The filter is {@link PARTIAL_ROOT_PREFIX}, which carries this process's pid,
+ * and NOT the bare `lint-guard-partial-` literal it used to be. `os.tmpdir()`
+ * is shared with the five other suites that build fixtures, node runs each of
+ * them in a concurrent child process, and one of their directories appearing
+ * between the two snapshots was read here as a leak by this refusal — a
+ * failure that names an innocent case, happens once in thousands of runs, and
+ * cannot be reproduced.
  */
 function scratchRoots(): Set<string> {
   return new Set(
-    fs
-      .readdirSync(os.tmpdir())
-      .filter((entry) => entry.startsWith("lint-guard-partial-")),
+    fs.readdirSync(os.tmpdir()).filter((entry) => entry.startsWith(PARTIAL_ROOT_PREFIX)),
   );
 }
 
@@ -1674,6 +1681,27 @@ describe("makePartialRoot refusals", () => {
       () => makePartialRoot(["lib/lint-guards.ts", "lib/no-such-file.ts"]),
       /does not exist in this repository/,
     );
+  });
+
+  it("does not blame this refusal for a directory another suite's process made", () => {
+    // The regression, reproduced: `os.tmpdir()` is shared, six suites build
+    // fixtures under the same name, and node runs each of them in a concurrent
+    // child process. The decoy below appears BETWEEN the two snapshots, which
+    // is exactly when another file's `makePartialRoot` would — and against the
+    // bare `lint-guard-partial-` literal this used to filter on, it was
+    // reported as a root this refusal leaked. The failure named an innocent
+    // case, fired once in thousands of runs, and survived no re-run.
+    let decoy = "";
+    try {
+      assertRefusesWithoutLeaking(() => {
+        decoy = fs.mkdtempSync(
+          path.join(os.tmpdir(), `lint-guard-partial-${process.pid + 1}-`),
+        );
+        return makePartialRoot(["lib/no-such-file.ts"]);
+      }, /does not exist in this repository/);
+    } finally {
+      if (decoy) fs.rmSync(decoy, { recursive: true, force: true });
+    }
   });
 
   it("builds what it was asked for and nothing else", () => {
