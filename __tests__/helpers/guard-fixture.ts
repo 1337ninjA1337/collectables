@@ -909,6 +909,29 @@ function tsxLoader(): string {
   return tsxLoaderIn(REPO_ROOT);
 }
 
+/**
+ * Prefix of the scratch roots {@link makePartialRoot} creates — with THIS
+ * process's pid in it.
+ *
+ * The pid is not decoration. `guard-fixture-refusals.test.ts` proves that a
+ * refused spec leaves no directory behind, and the only way to see that from
+ * outside is to diff `os.tmpdir()` across the throw: the helper throws instead
+ * of returning, so the path it would have cleaned up is never handed back. Six
+ * suites call `makePartialRoot`, node runs each suite in its own child process
+ * CONCURRENTLY, and every one of them creates directories under this prefix —
+ * so a fixture built by another file between the two snapshots was read as a
+ * root this refusal leaked. One failure in 7253, attributable to nothing,
+ * reproducing on no re-run: observed here on 2026-09-01 and the same shape as
+ * the anonymous `# fail 1` on PR #473.
+ *
+ * Scoping the name to the process makes the diff a statement about this
+ * process's own directories, which is what it was always meant to be. The
+ * trailing dash keeps the pids unambiguous — without it `…-123-` would prefix
+ * `…-1234-`. Stale roots from an earlier crashed run stop counting too, since
+ * their pid is not this one.
+ */
+export const PARTIAL_ROOT_PREFIX = `lint-guard-partial-${process.pid}-`;
+
 export type PartialRoot = {
   /** Absolute path of the scratch root, for `LINT_GUARD_REPO_ROOT`. */
   readonly root: string;
@@ -951,7 +974,7 @@ export function makePartialRoot(
       "makePartialRoot: a partial root with no entries and no files is an EMPTY root — use the empty-root harness, which asserts the other failure code.",
     );
   }
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "lint-guard-partial-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), PARTIAL_ROOT_PREFIX));
   // Every refusal below happens AFTER the scratch directory exists, so each one
   // has to take it back down again: a suite that asserts a bad spec is refused
   // would otherwise leave a directory in `os.tmpdir()` per assertion, and the
