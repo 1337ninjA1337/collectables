@@ -22,15 +22,18 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
 import {
+  LOADED_FILE_MARKER,
   NATIVE_LOADER_REASON,
   REPORTER_GRAPH_ENTRY,
   formatGraphIssues,
+  missingFromWalk,
+  parseLoadedFiles,
   repoLocalSpecifiers,
   resolveSpecifier,
   walkReporterGraph,
@@ -71,6 +74,59 @@ describe("repoLocalSpecifiers", () => {
     assert.deepEqual(repoLocalSpecifiers('import { type T } from "./types.ts";'), [
       "./types.ts",
     ]);
+  });
+
+  it("takes a re-export, which the `from` pattern already covers", () => {
+    assert.deepEqual(repoLocalSpecifiers('export { a } from "./re.ts";'), ["./re.ts"]);
+    assert.deepEqual(repoLocalSpecifiers('export * from "./star.ts";'), ["./star.ts"]);
+  });
+
+  it("takes a side-effect import, which has no `from` at all", () => {
+    // The shape the first version of this scan missed entirely: no bindings,
+    // so nothing for the `from` pattern to anchor on, and node follows it
+    // exactly like any other import.
+    assert.deepEqual(repoLocalSpecifiers('import "./setup.ts";'), ["./setup.ts"]);
+  });
+});
+
+describe("parseLoadedFiles", () => {
+  it("reads the recorder's marked lines and drops node's own output", () => {
+    const stderr = [
+      "(node:1) Warning: something node felt strongly about",
+      `${LOADED_FILE_MARKER} /repo/scripts/a.ts`,
+      "    at someFrame (node:internal/x:1:1)",
+      `${LOADED_FILE_MARKER} /repo/lib/b.ts`,
+    ].join("\n");
+    assert.deepEqual(parseLoadedFiles(stderr, "/repo"), ["scripts/a.ts", "lib/b.ts"]);
+  });
+
+  it("drops files outside the scan root", () => {
+    // node loads its own internals and, in principle, a package's files.
+    // Neither is under the two rules this guard enforces.
+    const stderr = `${LOADED_FILE_MARKER} /elsewhere/x.ts\n${LOADED_FILE_MARKER} /repo/ok.ts`;
+    assert.deepEqual(parseLoadedFiles(stderr, "/repo"), ["ok.ts"]);
+  });
+
+  it("reports each file once even when node loads it twice", () => {
+    const stderr = `${LOADED_FILE_MARKER} /repo/a.ts\n${LOADED_FILE_MARKER} /repo/a.ts`;
+    assert.deepEqual(parseLoadedFiles(stderr, "/repo"), ["a.ts"]);
+  });
+
+  it("finds nothing in output that carries no markers", () => {
+    assert.deepEqual(parseLoadedFiles("just a stack trace\n  at x", "/repo"), []);
+  });
+});
+
+describe("missingFromWalk", () => {
+  it("names a file node loaded that the walk never reached", () => {
+    assert.deepEqual(missingFromWalk(["a.ts"], ["a.ts", "hidden.ts"]), ["hidden.ts"]);
+  });
+
+  it("is silent when the walk saw more than node loaded", () => {
+    // Only one direction is a finding. A dynamic import on a branch that did
+    // not run is still a file under the rules, and the walk is right to have
+    // it; node not loading it says nothing about the graph.
+    assert.deepEqual(missingFromWalk(["a.ts", "lazy.ts"], ["a.ts"]), []);
   });
 });
 
@@ -181,6 +237,27 @@ describe("the guard is wired into the fleet", () => {
     assert.ok(guard, `${GUARD_SCRIPT} must be registered in lib/lint-guards.ts`);
   });
 
+  it("keeps the recorder's marker literal in step with the constant", () => {
+    // The recorder cannot import the constant: a hook module is loaded on the
+    // loader thread before the graph it watches, so anything it pulls in would
+    // appear inside its own measurement. The copy is deliberate; this is what
+    // keeps the two spellings honest.
+    const recorder = read("scripts", "record-loaded-files.ts");
+    assert.ok(
+      recorder.includes(`"${LOADED_FILE_MARKER}"`),
+      `scripts/record-loaded-files.ts must carry "${LOADED_FILE_MARKER}" as a literal`,
+    );
+  });
+
+  it("keeps the recorder free of imports, so it stays outside its own measurement", () => {
+    const recorder = read("scripts", "record-loaded-files.ts");
+    assert.deepEqual(
+      [...recorder.matchAll(/^\s*import\s/gm)].map((m) => m[0]),
+      [],
+      "an import here would be loaded by the hook thread and recorded as part of the graph it measures",
+    );
+  });
+
   it("declares its entry point as its input floor and nothing else", () => {
     // The graph BELOW the entry is walked, not declared. Listing
     // lib/thrown-value.ts here would turn "the reporter stopped needing that
@@ -273,6 +350,34 @@ describe("node itself is the oracle, and it has to be", () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("the recorder reports the graph node really loaded, not the one text found", () => {
+    // The end-to-end of the measurement half: register the hook, import the
+    // entry the way the guard does, and read the markers back. A recorder that
+    // silently stopped printing would leave the guard reporting an empty graph
+    // as a pass, which is the vacuous green this whole fleet refuses — the
+    // guard has its own assertion for that, and this is the case that proves
+    // the mechanism works at all.
+    const program = [
+      'import { register } from "node:module";',
+      `register(${JSON.stringify(`file://${path.join(REPO_ROOT, "scripts/record-loaded-files.ts")}`)});`,
+      `await import(${JSON.stringify(`file://${path.join(REPO_ROOT, REPORTER_GRAPH_ENTRY)}`)});`,
+    ].join("\n");
+    const run = spawnSync(process.execPath, ["--input-type=module", "-e", program], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 30_000,
+    });
+    assert.equal(run.status, 0, `the recorded import failed:\n${run.stderr}`);
+    const measured = parseLoadedFiles(run.stderr ?? "", REPO_ROOT);
+    assert.ok(measured.includes(REPORTER_GRAPH_ENTRY), `entry missing from ${measured.join(", ")}`);
+    assert.deepEqual(
+      [...measured].sort(),
+      [...graphFiles].sort(),
+      "the measured graph and the text walk disagree — one of the two is checking the wrong set of files",
+    );
   });
 
   it("every file in the working tree's graph loads under node's own loader", () => {
