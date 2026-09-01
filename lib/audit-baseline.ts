@@ -90,6 +90,12 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
     why: "three expansion DoS advisories in glob/minimatch under the build toolchain; never evaluated at runtime",
   },
   {
+    package: "browserslist",
+    advisories: ["GHSA-73wf-gq98-2v4g", "GHSA-c83g-rgw3-j3cx"],
+    shipsToClient: false,
+    why: "target resolution for @expo/metro-config and babel's core-js-compat, absent from both shipped chunks; the OOM needs an attacker feeding distinct queries to a build, and the prototype write needs an untrusted browserslist-stats.json in this repo — npm reports fixAvailable but `npm audit fix` moves 134 packages including 12 majors (expo-router 56→57)",
+  },
+  {
     package: "image-size",
     advisories: ["GHSA-5p2g-fcmc-qvqq", "GHSA-w3rx-r6r6-pgpr"],
     shipsToClient: false,

@@ -191,7 +191,7 @@ stopped naming, so the list cannot quietly stop describing the tree.
 | `ws` | high | memory-disclosure / DoS (via `@supabase/realtime-js`, expo, metro, RN) | Patched in shipped `realtime-js` chain |
 | `protobufjs` | high | unbounded recursion DoS (via `posthog-js` → `@opentelemetry`) | Patched via `posthog-js` minor bump |
 
-### Accepted high/critical — 6 roots, 11 advisories (2026-08-31)
+### Accepted high/critical — 7 roots, 13 advisories (2026-08-31, browserslist added 2026-09-01)
 
 `npm audit` reports 13 high *entries* and 18 `via` objects for these 11
 advisories: the extra entries are Expo/metro packages that merely depend on one
@@ -215,6 +215,7 @@ the bundle with its vulnerable entry point unreachable.
 | Package | Advisories | Ships to client? | Why accepted |
 | --- | --- | --- | --- |
 | `nanoid` | GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8 | **Yes** — `@react-navigation/routers` route keys | The first needs a negative `size`, the second a custom generator. Every bundled call site is `nanoid()` with neither |
+| `browserslist` | GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx | No | Target resolution for `@expo/metro-config` and babel's `core-js-compat`; absent from both shipped chunks. The OOM needs an attacker feeding distinct queries to a build; the prototype write needs an untrusted `browserslist-stats.json` in this repo. npm reports `fixAvailable: true`, but `npm audit fix` moves 134 packages including 12 majors (expo-router 56→57) — a framework upgrade, not a security patch |
 | `brace-expansion` | GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895 | No | Three expansion DoS advisories in glob/minimatch under the build toolchain |
 | `image-size` | GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr | No | JXL/HEIF and ICNS parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package) |
 | `js-yaml` | GHSA-5p4m-2wfm-xmqj | No | `!!omap` quadratic CPU in `@expo/xcpretty` / `babel-jest`; fix = `react-native@0.86`, breaking |
