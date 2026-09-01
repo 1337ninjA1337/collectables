@@ -72,6 +72,16 @@ const GUARD_SCANS: Readonly<
       scripts: "build and guard code renders nothing",
     },
   },
+  "check-comment-terminators": {
+    // The widest walk in the registry: every root, SOURCE_DIRS entire plus the
+    // suites, and therefore no exclusions to explain. The subject is PROSE
+    // rather than code that ships — the doc comments this repository opens
+    // every module with — and the suites hold more of it than everything else
+    // put together, so narrowing to SOURCE_DIRS would leave two thirds of the
+    // paragraphs unscanned.
+    dirs: ["app", "components", "data", "lib", "scripts", SUITES_REL],
+    excludes: {},
+  },
   "check-problem-phrasing-imports": {
     // The one guard that WIDENS past SOURCE_DIRS: its subject is how the
     // scanned-floor phrasing parts are imported, and the suites import them
@@ -177,6 +187,22 @@ describe("the guards' scan lists agree with lib/source-dirs.ts", () => {
  */
 const DECLARING = "lib/source-dirs.ts";
 
+/**
+ * The one guard that has to write the five out, and why it is not a copy.
+ *
+ * `check-comment-terminators` walks SOURCE_DIRS entire plus the suites, and
+ * `declaredDirs` above reads scan lists by PARSING the source for a literal
+ * array — a `[...SOURCE_DIRS, …]` spread would satisfy the one-copy rule and
+ * defeat the pin that keeps every guard's list readable from its own file. So
+ * the five appear there in order, inside a six-element superset, structurally
+ * rather than by anyone deciding to restate the list.
+ *
+ * Named here rather than excused by regex, and held honest below: the day that
+ * guard narrows its walk, the entry stops being a superset and the skip stops
+ * excusing anything.
+ */
+const SUPERSET = "scripts/check-comment-terminators.ts";
+
 describe("lib/source-dirs.ts is the one statement of the list", () => {
   it("holds the extension sets the walk takes, and they differ", () => {
     assert.deepEqual([...SOURCE_EXTENSIONS], [".ts", ".tsx"]);
@@ -200,7 +226,7 @@ describe("lib/source-dirs.ts is the one statement of the list", () => {
     // anywhere in the tree is the thing this consolidation removed; the guards
     // declare SUBSETS, which is a different shape and is checked above.
     const offenders = sourceFiles().filter((relative) => {
-      if (relative === DECLARING) return false;
+      if (relative === DECLARING || relative === SUPERSET) return false;
       const code = readRepoFile(relative);
       return /"app",\s*"components",\s*"data",\s*"lib",\s*"scripts"/.test(code);
     });
@@ -214,8 +240,8 @@ describe("lib/source-dirs.ts is the one statement of the list", () => {
     // stops excusing anything while still excusing the file that would hold the
     // next stray copy.
     assertExemptionsHonest({
-      exemptions: [DECLARING],
-      expected: ["lib/source-dirs.ts"],
+      exemptions: [DECLARING, SUPERSET],
+      expected: ["lib/source-dirs.ts", "scripts/check-comment-terminators.ts"],
       rule: "the one-copy-of-the-list sweep",
       walk: sourceFiles(),
       stillNeeded: (module) =>

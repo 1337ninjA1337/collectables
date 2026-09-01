@@ -97,6 +97,17 @@ const EMPTY_INPUT_FIXTURES: Readonly<
       expect: "MANUAL-TASKS.md",
     },
   ],
+  "check-reporter-graph": [
+    {
+      // No `entries` at all: this guard walks nothing, so the whitespace-only
+      // entry point is the entire tree it needs. An empty reporter would LOAD
+      // — node imports a blank module happily — which is exactly why the
+      // emptiness has to be caught as a premise rather than left to the
+      // spawned import to shrug at.
+      files: { "scripts/test-failure-reporter.ts": "   \n" },
+      expect: "scripts/test-failure-reporter.ts",
+    },
+  ],
   "generate-powerbi-schema-doc": [
     {
       // Counts ANALYTICS_EVENTS, which is imported rather than walked, so the

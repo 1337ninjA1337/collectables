@@ -138,6 +138,20 @@ export const LINT_GUARDS: readonly LintGuard[] = [
     description:
       "docs/powerbi-connection.md schema table matches ANALYTICS_EVENTS (drift fails, regenerate via powerbi:schema-doc)",
   },
+  {
+    npmScript: "lint:comment-terminators",
+    scriptPath: "scripts/check-comment-terminators.ts",
+    args: [],
+    description:
+      "No block comment that ends inside its own body — the prose after the terminator is parsed as code, and the compiler reports it as syntax errors pointing at English",
+  },
+  {
+    npmScript: "lint:reporter-graph",
+    scriptPath: "scripts/check-reporter-graph.ts",
+    args: [],
+    description:
+      "The test reporter's module graph still loads under node's own loader — extensions named, syntax erasable; both failures kill the whole `npm test` run before any suite can report them",
+  },
 ] as const;
 
 /**
