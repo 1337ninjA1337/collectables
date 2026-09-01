@@ -8,6 +8,7 @@ import { LINT_GUARDS } from "@/lib/lint-guards";
 
 import { checkNameOf, makePartialRoot, runGuardIn } from "./helpers/guard-fixture";
 import { readRepoFile } from "./helpers/repo-file";
+import { SUITES_REL } from "./helpers/suite-files";
 
 /**
  * A guard's report names a file. Can a reader open it?
@@ -72,6 +73,15 @@ const PLANTED: Readonly<
     // swap has no exemption list, so a literal here would make this file the
     // offender it is planting.
     source: `export const noop = () => {};\n${"console"}.warn = noop;\n`,
+  },
+  "check-comment-terminators": {
+    entries: ["app", "components", "data", "lib", "scripts", SUITES_REL],
+    file: "lib/planted-offender.ts",
+    // BUILT, not written, and for the same reason as the console-swap plant
+    // above: the two characters this rule is about would end this file's own
+    // block comments, so a literal here would make the suite the offender it
+    // is planting. That is the rule working on its own test.
+    source: `/${"*"}*\n * A glob written out: \`**${"*"}${"/"}.ts\`, and this became code.\n ${"*"}${"/"}\nexport const x = 1;\n`,
   },
   "check-a11y-jsx": {
     entries: ["app", "components"],

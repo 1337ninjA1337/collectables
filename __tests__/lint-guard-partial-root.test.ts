@@ -117,6 +117,11 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // `app` at 19 files is nowhere near it.
   "check-profile-id-pii": () => ["app"],
   "check-console-swap": () => sliceOfEveryRoot("check-console-swap"),
+  // The widest walk in the registry — six roots, 810 files, a floor of 600.
+  // Same slice-of-every-root shape as the others: `__tests__` alone is 511
+  // files, so handing over whole roots would either copy most of the tree or
+  // trip the per-root assertion instead of the floor.
+  "check-comment-terminators": () => sliceOfEveryRoot("check-comment-terminators"),
   "check-a11y-jsx": () => sliceOfEveryRoot("check-a11y-jsx"),
   // Walks the whole tree; app/ is a few dozen of the several hundred files.
   "check-secrets": () => ["app"],

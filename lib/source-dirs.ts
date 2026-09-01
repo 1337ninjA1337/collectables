@@ -37,6 +37,20 @@
 export const SOURCE_DIRS: readonly string[] = ["app", "components", "data", "lib", "scripts"];
 
 /**
+ * The suite tree, named once.
+ *
+ * It is the one non-app root a guard has any business walking — a rule about
+ * PROSE reaches it, since the suites hold more doc comments than everything
+ * else here put together — so the name is worth having beside
+ * {@link SOURCE_DIRS} rather than being recovered from position 0 of the list
+ * below. `__tests__/helpers/suite-files.ts` exports the same string as
+ * `SUITES_REL` for the suites' own side of the split, which cannot import from
+ * `lib/` guards' constants without inverting the dependency the two halves
+ * were separated to keep.
+ */
+export const SUITES_DIR = "__tests__";
+
+/**
  * Top-level directories that hold `.ts` and are deliberately NOT app source.
  *
  * `__tests__` is walked by `__tests__/helpers/suite-files.ts`, which knows
@@ -48,7 +62,7 @@ export const SOURCE_DIRS: readonly string[] = ["app", "components", "data", "lib
  * Listed rather than left implicit so the partition check is a statement about
  * the whole tree instead of about the half somebody remembered.
  */
-export const NON_APP_TS_DIRS: readonly string[] = ["__tests__", "supabase", "types"];
+export const NON_APP_TS_DIRS: readonly string[] = [SUITES_DIR, "supabase", "types"];
 
 /**
  * The two extension sets a scan can want, named for what they mean.
