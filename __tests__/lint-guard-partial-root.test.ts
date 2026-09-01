@@ -146,6 +146,8 @@ const NO_REACHABLE_COUNT: Readonly<Record<string, string>> = {
     "inputs-shaped — reads one fixed app.json, so there is no count to shrink",
   "check-sentry-version":
     "inputs-shaped — reads package.json and package-lock.json by name",
+  "check-reporter-graph":
+    "inputs-shaped — follows one named entry point and asks node to import it; a partial tree makes the entry unreadable, which is the no_files code the empty-root harness already covers",
   "check-privacy-baseline-provenance":
     "delegates its premise to evaluatePrivacyBaselineProvenance's checked === 0 refusal",
   "generate-powerbi-schema-doc":
