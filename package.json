@@ -47,6 +47,7 @@
     "lint:all": "tsx scripts/lint-all.ts",
     "lint:console-swap": "tsx scripts/check-console-swap.ts",
     "lint:reporter-graph": "tsx scripts/check-reporter-graph.ts",
+    "lint:comment-terminators": "tsx scripts/check-comment-terminators.ts",
     "lint:ci": "npm run typecheck && npm run lint:all && npm test",
     "verify:dist": "npm run lint:secrets:bundle && npm run lint:bundle-size && npm run lint:bundle-smoke",
     "verify": "npm run lint:ci && npm run lint:audit-baseline && npm run build && npm run verify:dist",

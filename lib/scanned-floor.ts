@@ -49,7 +49,7 @@
  */
 
 import { checkError } from "./check-error";
-import { MARKUP_EXTENSIONS } from "./source-dirs";
+import { MARKUP_EXTENSIONS, SOURCE_DIRS, SUITES_DIR } from "./source-dirs";
 
 /** Why a floor check failed. */
 export type ScannedFloorFailureCode =
@@ -873,6 +873,18 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     count: { label: "taxonomy event", minimum: 12 },
     inputs: ["docs/powerbi-connection.md"],
     note: "the only guard needing both shapes. ANALYTICS_EVENTS held 17 events on 2026-08-12; an empty taxonomy renders a header-only table that matches a header-only doc and reports 'up to date', which is the drift check passing precisely because there is no schema left to drift. The doc file is the fixed input beside it.",
+  },
+  "check-comment-terminators": {
+    count: {
+      label: "source file",
+      minimum: 600,
+      // Through the constants, not spelled out: `guard-scan-dirs.test.ts`
+      // keeps exactly one copy of the SOURCE_DIRS list in the tree, and the
+      // guard's own wrapper already holds the only sanctioned near-copy (its
+      // scan list must be a literal for that suite's parser to read).
+      roots: [...SOURCE_DIRS, SUITES_DIR],
+    },
+    note: "the six hand-written source roots held 810 .ts/.tsx files on 2026-09-01 (app 19, components 46, data 5, lib 190, scripts 39, tests 511); 600 leaves 26% deletable. The widest walk in the registry, and deliberately so: the rule is about PROSE rather than about code that ships, and every one of these roots is full of it — the file that demonstrated the failure was in scripts/, which the hex and radius walks never read. `roots` carries the no-single-root property, so the number's remaining job is a walk that shrank without losing a root; __tests__/ alone contributes 511, which no floor could ride above without re-measuring monthly.",
   },
   "check-reporter-graph": {
     inputs: ["scripts/test-failure-reporter.ts"],
