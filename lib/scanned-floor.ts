@@ -874,6 +874,10 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     inputs: ["docs/powerbi-connection.md"],
     note: "the only guard needing both shapes. ANALYTICS_EVENTS held 17 events on 2026-08-12; an empty taxonomy renders a header-only table that matches a header-only doc and reports 'up to date', which is the drift check passing precisely because there is no schema left to drift. The doc file is the fixed input beside it.",
   },
+  "check-reporter-graph": {
+    inputs: ["scripts/test-failure-reporter.ts"],
+    note: "one fixed entry point, and the graph below it is WALKED rather than declared — listing lib/test-failure-report.ts and lib/thrown-value.ts here would turn a legitimate 'the reporter stopped needing that helper' into a premise failure, the same trap check-sentry-version's note describes for the resolved version strings. The entry is the honest input: without it there is no graph to check, and an empty one is a reporter that would load and do nothing.",
+  },
   "check-privacy-baseline-provenance": {
     delegatedTo:
       "evaluatePrivacyBaselineProvenance's `checked === 0` refusal in lib/privacy-baseline-provenance.ts",
