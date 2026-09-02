@@ -144,8 +144,9 @@ a **dependency advisory baseline** step in **CI**
 (`.github/workflows/ci.yml` → `npm run lint:audit-baseline`).
 
 The baseline step is **blocking**, and it is blocking precisely because it is
-quiet: it fails only on a high/critical advisory root that is not already
-triaged in `lib/audit-baseline.ts` and tabled below. A bare
+quiet: it fails on a high/critical advisory root that is not already triaged in
+`lib/audit-baseline.ts` and tabled below, and on any advisory npm can fix
+without a major — and on nothing else. A bare
 `npm audit --audit-level=high` cannot be blocking while any advisory is
 accepted, and the non-blocking version it replaced is how thirteen high
 advisories accumulated unnoticed (see below).
@@ -157,11 +158,47 @@ decision below **and** in `ACCEPTED_HIGH_ADVISORIES` — the test keeps the two
 in step.
 
 That preference is no longer a preference. The gate reads npm's own
-`fixAvailable` for every high/critical it sees and **fails on any advisory npm
-can clear without a semver-major**, accepted or not — see
+`fixAvailable` for **every advisory it sees, at every severity**, and **fails
+on any advisory npm can clear without a semver-major**, accepted or not — see
 "Seven exemptions npm could already fix" below for why. A major-only fix is
 still acceptable; it is reported on every run instead of resting on a sentence
 somebody wrote once.
+
+The gate therefore reads two different severity scopes, and the split is the
+point:
+
+| Question | Severities | Cost of the answer |
+| --- | --- | --- |
+| Has a human triaged this? (`unexpected` / `stale`) | high, critical | a paragraph and a table row |
+| Can npm already fix this? (`fixableInRange`) | **all five** | one `npm update` |
+
+Demanding a `why` sentence for every low would produce fourteen sentences
+nobody reads instead of the two somebody does. Demanding a lockfile bump costs
+a command, so severity is the wrong question for it.
+
+### Three roots below "high" that npm could already fix (2026-09-02)
+
+The fix rule shipped the day before reading high/critical only, because it was
+written inside a high/critical baseline. Measured the next morning, three roots
+had an in-range fix waiting and not one of them was high:
+
+| Package | Advisories | Sev | Cleared by |
+| --- | --- | --- | --- |
+| `dompurify` | GHSA-c2j3-45gr-mqc4, GHSA-55q2-fjhq-7xh7 | low, moderate | `npm update dompurify` (3.4.11 → 3.4.14) |
+| `undici` | GHSA-8xcm-r25x-g524, GHSA-m8rv-5g2x-5cg5, GHSA-v3r7-h72x-cjcm | moderate ×3 | `npm update undici` (6.27.0 → 6.28.0) |
+| `esbuild` | GHSA-g7r4-m6w7-qqqr | low | `npm update tsx` (4.21.0 → 4.23.13, pulling esbuild 0.28.2) |
+
+Ten of the tree's fourteen distinct advisories were moderate or low and nothing
+was asking about any of them. The `esbuild` row is the one that needed a second
+look: `npm update esbuild` moved nothing, because `tsx` pins `esbuild@~0.27.0`
+and the fix is `>=0.28.1`. npm reported `fixAvailable: true` anyway, and it was
+right — `tsx@4.23.13` is inside the root's own `^4.21.0`. **npm's in-range fix
+is not always an update of the package the advisory names.**
+
+`postcss` is the argument for blocking rather than merely reporting: moderate
+when it was first triaged in June, high by August, on a lockfile nobody had
+touched. A moderate with a published fix is a high with a published fix that
+has not been re-scored yet.
 
 ### Seven exemptions npm could already fix (2026-09-01)
 

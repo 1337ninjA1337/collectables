@@ -88,4 +88,27 @@ describe("SEC-8: dependency advisory baseline", () => {
     assert.match(SECURITY, /continue-on-error/i);
     assert.match(SECURITY, /13 high|thirteen high/i);
   });
+
+  it("documents that the fix rule reads every severity and the triage list does not", () => {
+    // Two scopes in one gate is the thing a reader gets wrong, and getting it
+    // wrong in the safe-looking direction ("it only cares about highs") is
+    // what left three moderate/low roots fixable for a month. The table in
+    // SECURITY.md is where that split is stated to a human.
+    assert.match(SECURITY, /at every severity/i);
+    assert.match(SECURITY, /\|\s*Question\s*\|\s*Severities\s*\|/i);
+    assert.match(SECURITY, /\*\*all five\*\*/i);
+  });
+
+  it("records the three sub-high roots the widened rule found", () => {
+    // The measurement is the evidence for the rule, and a rule whose evidence
+    // is deleted is a rule the next reader narrows again.
+    for (const pkg of ["dompurify", "esbuild"]) {
+      assert.ok(SECURITY.includes(pkg), `the 2026-09-02 measurement must keep ${pkg}`);
+    }
+    assert.match(
+      SECURITY,
+      /not always an update of the package the advisory names/i,
+      "`npm update esbuild` moved nothing; `npm update tsx` did, and that surprise is worth keeping",
+    );
+  });
 });

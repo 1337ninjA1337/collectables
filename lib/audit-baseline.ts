@@ -60,6 +60,35 @@
  * A major-only fix stays acceptable and is reported rather than failed —
  * `expo@57` is a migration, not a gate's call to make — but it is now stated
  * by npm on every run instead of by a `why` sentence written once.
+ *
+ * ## The fixability question is not a high/critical question
+ *
+ * That rule shipped reading high and critical only, because it was written
+ * inside the baseline and the baseline is a high/critical triage list. The two
+ * are different questions and only one of them needs a severity: "has somebody
+ * read this?" is worth a human's attention at high, and "can npm already fix
+ * it?" costs one `npm update` at any severity at all.
+ *
+ * Measured on 2026-09-02, the day after that rule landed: THREE roots had an
+ * in-range fix waiting and none of them was high — `dompurify` (low +
+ * moderate), `undici` (three moderates) and `esbuild` (low, reachable by
+ * moving `tsx` inside its own declared range). Ten of the tree's fourteen
+ * distinct advisories were moderate or low, and nothing was asking about any
+ * of them.
+ *
+ * The event that makes this worth blocking on is not any of those three. It is
+ * `postcss`: moderate when it was first triaged in June, high by August, on a
+ * lockfile nobody had touched. A moderate with a published fix is a high with
+ * a published fix that has not been re-scored yet, and the run that would have
+ * noticed is the one where it was still cheap.
+ *
+ * So {@link observedAdvisoryDetails} walks every severity and
+ * {@link evaluateAudit} builds `fixableInRange` and `majorOnly` from ALL of
+ * them, while `unexpected`, `stillPresent` and `stale` stay high/critical:
+ * widening those would demand a triage sentence for ten advisories nobody has
+ * argued about, which is the exemption-list-as-paperwork failure this file
+ * already carries the scar of. Widening the fix rule demands a lockfile bump
+ * and nothing else.
  */
 
 /** One triaged advisory root. Transitive dependents are not listed. */
@@ -179,6 +208,35 @@ export function fixKind(fixAvailable: unknown): FixKind {
     : "in-range";
 }
 
+/**
+ * The severities a baseline entry is required for.
+ *
+ * npm reports five (`info`, `low`, `moderate`, `high`, `critical`) and this
+ * gate demands a read-and-argued exemption for two of them. That is a
+ * deliberate ceiling on how much prose a dependency tree can require: ten of
+ * this tree's fourteen advisories are moderate or low, and a rule that made
+ * each one need a `why` sentence would produce fourteen sentences nobody reads
+ * rather than two somebody does.
+ */
+const TRIAGED_SEVERITIES: ReadonlySet<string> = new Set(["high", "critical"]);
+
+/**
+ * Most severe first, and everything npm has not used yet last.
+ *
+ * Only affects the order findings print in. An unknown severity sorting to the
+ * bottom is the same choice {@link fixKind} makes about an unknown fix shape:
+ * a field npm changes must not decide anything.
+ */
+const SEVERITY_ORDER: readonly string[] = ["critical", "high", "moderate", "low", "info"];
+
+/** One advisory npm has an opinion about how to fix. */
+export interface FixableAdvisory {
+  /** `package#id`, the same key the baseline lists use. */
+  readonly key: string;
+  /** npm's severity for the ADVISORY, which is not the package's severity. */
+  readonly severity: string;
+}
+
 export interface AuditVerdict {
   /** High/critical advisories with no entry in the baseline — the failure. */
   readonly unexpected: readonly string[];
@@ -187,19 +245,27 @@ export interface AuditVerdict {
   /** Baseline advisories the audit no longer reports — stale, remove them. */
   readonly stale: readonly string[];
   /**
-   * Observed advisories npm can fix without a major — the other failure.
+   * Advisories npm can fix without a major, at EVERY severity — the other
+   * failure.
    *
-   * Accepted or not: "npm update clears this today" is the same finding either
-   * way, and neither is a triage decision. Carries the package name to update,
-   * because a key alone leaves the reader to work out the command.
+   * Accepted or not, high or low: "npm update clears this today" is the same
+   * finding every way, and none of them is a triage decision. Carries the
+   * package name to update, because a key alone leaves the reader to work out
+   * the command, and the severity, because a reader who sees four of these
+   * wants to know which one to read first.
    */
-  readonly fixableInRange: readonly string[];
+  readonly fixableInRange: readonly FixableAdvisory[];
   /**
-   * Observed advisories whose only fix is a semver-major. Reported, never
-   * failed: this is the claim each `why` sentence makes, restated by npm on
-   * the run rather than by an author months ago.
+   * Advisories at every severity whose only fix is a semver-major. Reported,
+   * never failed: this is the claim each `why` sentence makes, restated by npm
+   * on the run rather than by an author months ago.
+   *
+   * Same population as {@link fixableInRange} on purpose. Two lists answering
+   * "what did npm say about this advisory?" over two different sets of
+   * advisories would mean an advisory could leave the first list by changing
+   * severity rather than by being fixed.
    */
-  readonly majorOnly: readonly string[];
+  readonly majorOnly: readonly FixableAdvisory[];
 }
 
 /** `package#id`, the form every list in {@link AuditVerdict} carries. */
@@ -228,33 +294,21 @@ export function advisoryIdentity(advisory: {
 }
 
 /**
- * The high/critical advisories `npm audit` attributes to each root package.
+ * The high/critical advisories `npm audit` attributes to each root package —
+ * the population the baseline demands an entry for.
  *
- * A `via` entry is an advisory object on a root and a bare package name on
- * something that merely depends on one; the second kind changes whenever the
- * dependency tree is reshaped and says nothing new about exposure, so only the
- * first is collected.
- *
- * Severity is read from the ADVISORY, not the package: npm reports a package
- * at the highest severity among its advisories, so `postcss` is "high" while
- * two of its four are moderate — and a baseline built from the package's
- * severity would silently accept those two.
- *
- * The result is a SET, which is the fix for npm reporting one entry per
- * dependency path: `brace-expansion`'s three advisories arrive as nine `via`
- * objects carrying three GHSAs, and nine collapse to three here.
+ * {@link observedAdvisoryDetails} filtered to {@link TRIAGED_SEVERITIES} and
+ * stripped of the fix verdict. The severity filter belongs HERE rather than in
+ * the walk, because it is a fact about the exemption list ("what needs a `why`
+ * sentence") and not about the audit: the fix rule reads the same walk and
+ * wants every severity in it.
  */
 export function observedAdvisories(report: AuditReport): readonly string[] {
   return [...observedAdvisoryFixes(report).keys()];
 }
 
 /**
- * The same walk as {@link observedAdvisories}, keeping npm's fix verdict.
- *
- * One walk rather than two, and this is the one that does it: "observed" is a
- * definition with four conditions in it (an advisory OBJECT, high or critical,
- * with an identity, keyed per package) and a second copy of it would be a
- * second chance to disagree about which advisories the gate is looking at.
+ * The same population as {@link observedAdvisories}, keeping npm's fix verdict.
  *
  * `fixAvailable` is reported per VULNERABLE PACKAGE, not per advisory, so
  * every advisory on a root inherits the root's verdict. That is npm's
@@ -262,17 +316,57 @@ export function observedAdvisories(report: AuditReport): readonly string[] {
  * package, and it moves all of its advisories or none of them.
  */
 export function observedAdvisoryFixes(report: AuditReport): ReadonlyMap<string, FixKind> {
-  const found = new Map<string, FixKind>();
+  return new Map(
+    [...observedAdvisoryDetails(report)]
+      .filter(([, detail]) => TRIAGED_SEVERITIES.has(detail.severity))
+      .map(([key, detail]) => [key, detail.fix]),
+  );
+}
+
+/** What one walk of the report knows about an advisory. */
+export interface ObservedAdvisory {
+  /** npm's severity for this advisory object. */
+  readonly severity: string;
+  /** npm's verdict on the ROOT PACKAGE, inherited by each of its advisories. */
+  readonly fix: FixKind;
+}
+
+/**
+ * Every advisory in the report, at every severity, with its fix verdict.
+ *
+ * The one walk. {@link observedAdvisoryFixes} is this filtered to the
+ * severities the baseline triages and {@link evaluateAudit}'s fix lists are
+ * this unfiltered — so the two questions the gate asks read the same
+ * traversal, and "which advisories is the gate looking at?" has one answer per
+ * question rather than two implementations that can drift.
+ *
+ * The four conditions that make an entry observable live here and nowhere
+ * else: it must be an advisory OBJECT (a bare string `via` is a package that
+ * merely depends on a vulnerable one, which changes with every tree reshape
+ * and says nothing new about exposure), it must have an identity, it is keyed
+ * per package, and the result is a SET — `brace-expansion`'s three advisories
+ * arrive as nine `via` objects down nine paths and collapse to three here.
+ *
+ * Severity is read from the ADVISORY, never from the package: npm reports a
+ * package at the highest severity among its advisories, so `postcss` is "high"
+ * while two of its four are moderate, and a severity read off the package
+ * would file those two under a number nobody assigned them.
+ */
+export function observedAdvisoryDetails(
+  report: AuditReport,
+): ReadonlyMap<string, ObservedAdvisory> {
+  const found = new Map<string, ObservedAdvisory>();
   for (const [name, entry] of Object.entries(report.vulnerabilities ?? {})) {
-    const kind = fixKind(entry.fixAvailable);
+    const fix = fixKind(entry.fixAvailable);
     for (const via of entry.via ?? []) {
       if (typeof via !== "object" || via === null) continue;
       const advisory = via as { source?: unknown; url?: unknown; severity?: unknown };
-      const severity = String(advisory.severity ?? "");
-      if (severity !== "high" && severity !== "critical") continue;
       const identity = advisoryIdentity(advisory);
       if (identity === null) continue;
-      found.set(advisoryKey(name, identity), kind);
+      found.set(advisoryKey(name, identity), {
+        severity: String(advisory.severity ?? ""),
+        fix,
+      });
     }
   }
   return found;
@@ -294,10 +388,16 @@ export function evaluateAudit(
   const acceptedKeys = new Set(
     accepted.flatMap((entry) => entry.advisories.map((id) => advisoryKey(entry.package, id))),
   );
-  const fixes = observedAdvisoryFixes(report);
-  const observed = new Set(fixes.keys());
-  const withFix = (kind: FixKind): string[] =>
-    [...fixes].filter(([, found]) => found === kind).map(([key]) => key).sort();
+  const observed = new Set(observedAdvisories(report));
+  // Severity-blind on purpose: see "The fixability question is not a
+  // high/critical question" above. `observed` stays high/critical because it
+  // is what the baseline is a list OF.
+  const everything = observedAdvisoryDetails(report);
+  const withFix = (kind: FixKind): FixableAdvisory[] =>
+    [...everything]
+      .filter(([, detail]) => detail.fix === kind)
+      .map(([key, detail]) => ({ key, severity: detail.severity }))
+      .sort(bySeverityThenKey);
   return {
     unexpected: [...observed].filter((key) => !acceptedKeys.has(key)).sort(),
     stillPresent: [...acceptedKeys].filter((key) => observed.has(key)).sort(),
@@ -305,6 +405,21 @@ export function evaluateAudit(
     fixableInRange: withFix("in-range"),
     majorOnly: withFix("major"),
   };
+}
+
+/**
+ * Most severe first, then by key so the order is total.
+ *
+ * Without the tiebreak two advisories of the same severity would print in
+ * whatever order `Object.entries` walked the report, which is lockfile order —
+ * and a findings list that reshuffles between runs is one nobody can diff.
+ */
+function bySeverityThenKey(a: FixableAdvisory, b: FixableAdvisory): number {
+  const rank = (severity: string): number => {
+    const at = SEVERITY_ORDER.indexOf(severity);
+    return at < 0 ? SEVERITY_ORDER.length : at;
+  };
+  return rank(a.severity) - rank(b.severity) || a.key.localeCompare(b.key);
 }
 
 /** `1 advisory` / `18 advisories` — the report is read by people, not matched. */
@@ -326,11 +441,13 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
   }
   if (verdict.fixableInRange.length > 0) {
     lines.push(
-      `${checkName}: npm can fix ${plural(verdict.fixableInRange.length, "high/critical advisory", "high/critical advisories")} without a major version change:`,
+      `${checkName}: npm can fix ${plural(verdict.fixableInRange.length, "advisory", "advisories")} without a major version change:`,
     );
-    for (const key of verdict.fixableInRange) lines.push(`  FIXABLE  ${key}`);
+    for (const found of verdict.fixableInRange) {
+      lines.push(`  FIXABLE  ${found.severity.padEnd(8)}  ${found.key}`);
+    }
     lines.push(
-      `Run \`npm update ${[...new Set(verdict.fixableInRange.map(advisoryPackage))].join(" ")}\` and commit the lockfile. An advisory a lockfile bump clears is not a triage decision — accepting one is how seven of these sat on the baseline being read as read.`,
+      `Run \`npm update ${fixCommandPackages(verdict.fixableInRange).join(" ")}\` and commit the lockfile. An advisory a lockfile bump clears is not a triage decision, at any severity — accepting one is how seven of these sat on the baseline being read as read, and how three moderate/low roots went a month without anybody asking.`,
     );
   }
   if (verdict.stale.length > 0) {
@@ -343,7 +460,7 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
       `${checkName}: OK — ${plural(verdict.stillPresent.length, "accepted high/critical advisory", "accepted high/critical advisories")}, no new ones${
         verdict.majorOnly.length === 0
           ? ""
-          : `, and npm offers no fix short of a semver-major for ${plural(verdict.majorOnly.length, "advisory", "advisories")} (${verdict.majorOnly.join(", ")})`
+          : `, and npm offers no fix short of a semver-major for ${plural(verdict.majorOnly.length, "advisory", "advisories")} (${verdict.majorOnly.map((found) => `${found.key} [${found.severity}]`).join(", ")})`
       }.`,
     );
   }
@@ -363,6 +480,25 @@ export function advisoryPackage(key: string): string {
 }
 
 /**
+ * The packages one `npm update` should name, in the order they were reported.
+ *
+ * Deduplicated, because three advisories on one root are one upgrade: a
+ * command reading `npm update brace-expansion brace-expansion brace-expansion`
+ * is one a reader stops trusting.
+ *
+ * npm's own fix may be a DIFFERENT package — `esbuild`'s in-range fix was
+ * reached by moving `tsx`, which declares `esbuild: ~0.27.0` and had a newer
+ * release inside the root's own `^4.21.0`. So this names the vulnerable
+ * package and the command is a starting point rather than a guarantee; the
+ * gate re-runs and says so if the advisory is still there.
+ */
+export function fixCommandPackages(
+  fixable: readonly FixableAdvisory[],
+): readonly string[] {
+  return [...new Set(fixable.map((found) => advisoryPackage(found.key)))];
+}
+
+/**
  * Whether the gate passes.
  *
  * Three failure lists and one informational one, in one predicate, because
@@ -371,6 +507,11 @@ export function advisoryPackage(key: string): string {
  * deliberately absent: it is npm restating what each `why` sentence claims,
  * and a gate that failed on it would be demanding an `expo` major upgrade on
  * every PR.
+ *
+ * `fixableInRange` reads every severity, so this is the predicate that turns a
+ * moderate npm can already fix into a red run. That is affordable only because
+ * it stays true of the accepted list that a low or moderate needs no entry:
+ * the demand is a lockfile bump, never a paragraph.
  */
 export function isClean(verdict: AuditVerdict): boolean {
   return (

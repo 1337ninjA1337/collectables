@@ -2,8 +2,12 @@
 /**
  * Dependency-advisory drift gate: fails when `npm audit` reports a
  * high/critical advisory root that SECURITY.md has not triaged, when npm can
- * clear one without a major version change, or when the accepted list names an
- * advisory the audit no longer reports.
+ * clear an advisory AT ANY SEVERITY without a major version change, or when
+ * the accepted list names an advisory the audit no longer reports.
+ *
+ * The two severity scopes are deliberate and different. Needing a triage
+ * sentence is expensive, so it is asked at high/critical; needing a lockfile
+ * bump costs one command, so it is asked at all five.
  *
  * Replaces a bare `npm audit --audit-level=high` that was
  * `continue-on-error: true` and therefore reported the same red for an

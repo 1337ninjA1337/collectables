@@ -7,10 +7,12 @@ import {
   advisoryKey,
   advisoryPackage,
   evaluateAudit,
+  fixCommandPackages,
   fixKind,
   formatAuditVerdict,
   isClean,
   observedAdvisories,
+  observedAdvisoryDetails,
   observedAdvisoryFixes,
   type AcceptedAdvisory,
   type AuditReport,
@@ -220,7 +222,7 @@ describe("evaluateAudit — an advisory npm can fix is not a triage decision", (
     );
     assert.deepEqual(verdict.unexpected, [], "it is on the list, so it is not new");
     assert.deepEqual(verdict.stillPresent, [`nanoid#${A1}`], "and the exemption is still matched");
-    assert.deepEqual(verdict.fixableInRange, [`nanoid#${A1}`]);
+    assert.deepEqual(verdict.fixableInRange, [{ key: `nanoid#${A1}`, severity: "high" }]);
     assert.equal(isClean(verdict), false, "being on the baseline must not excuse an available fix");
   });
 
@@ -241,7 +243,10 @@ describe("evaluateAudit — an advisory npm can fix is not a triage decision", (
       FIXTURE,
     );
     assert.deepEqual(verdict.fixableInRange, []);
-    assert.deepEqual(verdict.majorOnly, [`postcss#${A2}`, `postcss#${A3}`]);
+    assert.deepEqual(verdict.majorOnly, [
+      { key: `postcss#${A2}`, severity: "high" },
+      { key: `postcss#${A3}`, severity: "high" },
+    ]);
     assert.equal(isClean(verdict), true);
     assert.match(formatAuditVerdict(verdict, "check"), /no fix short of a semver-major/);
   });
@@ -260,7 +265,9 @@ describe("evaluateAudit — an advisory npm can fix is not a triage decision", (
       FIXTURE,
     );
     assert.deepEqual(verdict.unexpected, ["browserslist#GHSA-73wf-gq98-2v4g"]);
-    assert.deepEqual(verdict.fixableInRange, ["browserslist#GHSA-73wf-gq98-2v4g"]);
+    assert.deepEqual(verdict.fixableInRange, [
+      { key: "browserslist#GHSA-73wf-gq98-2v4g", severity: "high" },
+    ]);
   });
 
   it("names each package once in the command it tells you to run", () => {
@@ -278,7 +285,7 @@ describe("evaluateAudit — an advisory npm can fix is not a triage decision", (
       FIXTURE,
     );
     const printed = formatAuditVerdict(verdict, "check");
-    assert.match(printed, /FIXABLE {2}brace-expansion#/);
+    assert.match(printed, /FIXABLE {2}high {6}brace-expansion#/);
     assert.match(
       printed,
       /npm update brace-expansion`/,
@@ -336,6 +343,221 @@ describe("evaluateAudit — an advisory npm can fix is not a triage decision", (
   });
 });
 
+/**
+ * The third question, added 2026-09-02.
+ *
+ * The fix rule shipped reading high/critical only, because it was written
+ * inside a high/critical baseline. Measured the next day, THREE roots had an
+ * in-range fix waiting and not one of them was high: `dompurify` (low +
+ * moderate), `undici` (three moderates), `esbuild` (low). Ten of the tree's
+ * fourteen distinct advisories were moderate or low and nothing asked about
+ * any of them.
+ *
+ * `postcss` is the argument. Moderate when it was triaged in June, high by
+ * August, on a lockfile nobody had touched — so a moderate with a published
+ * fix is a high with a published fix that has not been re-scored yet.
+ */
+describe("evaluateAudit — the fix rule reads every severity, the baseline does not", () => {
+  it("FAILS on a moderate npm can clear in range, with no baseline entry needed", () => {
+    // The case the rule was widened for. `undici` was exactly this shape:
+    // three moderates, `fixAvailable: true`, invisible to a high/critical scan.
+    const verdict = evaluateAudit(
+      report({
+        undici: {
+          advisories: [
+            { ghsa: A1, severity: "moderate" },
+            { ghsa: A2, severity: "moderate" },
+          ],
+          fixAvailable: true,
+        },
+      }),
+      FIXTURE,
+    );
+    assert.deepEqual(verdict.fixableInRange, [
+      { key: `undici#${A1}`, severity: "moderate" },
+      { key: `undici#${A2}`, severity: "moderate" },
+    ]);
+    assert.equal(isClean(verdict), false);
+    assert.deepEqual(
+      verdict.unexpected,
+      [],
+      "widening the FIX rule must not widen the demand for a triage sentence",
+    );
+  });
+
+  it("fails on a low one too — the demand is a lockfile bump, not a paragraph", () => {
+    // `esbuild`, at CVSS 2.5. Cheap enough that severity is the wrong question:
+    // the cost of the fix is what decides, and it is one command either way.
+    const verdict = evaluateAudit(
+      report({ esbuild: { advisories: [{ ghsa: A3, severity: "low" }], fixAvailable: true } }),
+      FIXTURE,
+    );
+    assert.deepEqual(verdict.fixableInRange, [{ key: `esbuild#${A3}`, severity: "low" }]);
+    assert.equal(isClean(verdict), false);
+  });
+
+  it("stays SILENT on a moderate npm cannot fix, and on one only a major fixes", () => {
+    // The ceiling that makes the widening affordable. A moderate with no
+    // cheap fix needs no entry, no sentence and no red run — otherwise ten
+    // advisories would each need an argument nobody has, which is the
+    // exemption-list-as-paperwork failure this file already has a scar from.
+    const verdict = evaluateAudit(
+      report({
+        "decode-uri-component": {
+          advisories: [{ ghsa: A1, severity: "moderate" }],
+          fixAvailable: { name: "expo-router", version: "5.1.11", isSemVerMajor: true },
+        },
+        mystery: { advisories: [{ ghsa: A2, severity: "low" }], fixAvailable: false },
+      }),
+      [],
+    );
+    assert.deepEqual(verdict.unexpected, []);
+    assert.deepEqual(verdict.fixableInRange, []);
+    assert.deepEqual(verdict.majorOnly, [
+      { key: `decode-uri-component#${A1}`, severity: "moderate" },
+    ]);
+    assert.equal(isClean(verdict), true);
+  });
+
+  it("reports the two moderates on a high root that the baseline never sees", () => {
+    // `postcss` really carries four advisories, two high and two moderate, and
+    // the accepted entry lists the two high ones. The moderates were outside
+    // every list the gate kept until now; they are in the fix lists' population
+    // now, which is how the June-moderate-becomes-August-high event gets seen.
+    const verdict = evaluateAudit(
+      report({
+        postcss: {
+          advisories: [
+            { ghsa: A2, severity: "high" },
+            { ghsa: A3, severity: "moderate" },
+          ],
+          fixAvailable: true,
+        },
+      }),
+      FIXTURE,
+    );
+    assert.deepEqual(
+      verdict.stillPresent,
+      [`postcss#${A2}`],
+      "the baseline still matches on the high one alone",
+    );
+    assert.deepEqual(verdict.fixableInRange, [
+      { key: `postcss#${A2}`, severity: "high" },
+      { key: `postcss#${A3}`, severity: "moderate" },
+    ]);
+  });
+
+  it("prints most severe first, and orders ties so two runs can be diffed", () => {
+    // Without the key tiebreak the order is whatever `Object.entries` walked,
+    // which is lockfile order — a findings list that reshuffles between runs.
+    const verdict = evaluateAudit(
+      report({
+        zeta: { advisories: [{ ghsa: A1, severity: "moderate" }], fixAvailable: true },
+        alpha: { advisories: [{ ghsa: A1, severity: "moderate" }], fixAvailable: true },
+        omega: { advisories: [{ ghsa: A2, severity: "critical" }], fixAvailable: true },
+        beta: { advisories: [{ ghsa: A3, severity: "low" }], fixAvailable: true },
+      }),
+      [],
+    );
+    assert.deepEqual(
+      verdict.fixableInRange.map((found) => found.key),
+      [`omega#${A2}`, `alpha#${A1}`, `zeta#${A1}`, `beta#${A3}`],
+    );
+  });
+
+  it("sorts a severity npm has not used yet to the bottom rather than crashing", () => {
+    // Same direction as `fixKind`'s unknown shape: a field npm changes must not
+    // decide anything, and least of all whether this gate can produce a report.
+    const verdict = evaluateAudit(
+      report({
+        weird: { advisories: [{ ghsa: A1, severity: "spicy" }], fixAvailable: true },
+        known: { advisories: [{ ghsa: A2, severity: "low" }], fixAvailable: true },
+      }),
+      [],
+    );
+    assert.deepEqual(
+      verdict.fixableInRange.map((found) => found.severity),
+      ["low", "spicy"],
+    );
+  });
+
+  it("names the severity on every printed finding", () => {
+    const printed = formatAuditVerdict(
+      evaluateAudit(
+        report({ undici: { advisories: [{ ghsa: A1, severity: "moderate" }], fixAvailable: true } }),
+        [],
+      ),
+      "check",
+    );
+    assert.match(printed, /FIXABLE {2}moderate {2}undici#/);
+    assert.doesNotMatch(
+      printed,
+      /can fix .* high\/critical/,
+      "the heading claimed a population the rule no longer reads",
+    );
+  });
+
+  it("names each package once in the update command, whatever the severity", () => {
+    assert.deepEqual(
+      fixCommandPackages([
+        { key: `undici#${A1}`, severity: "moderate" },
+        { key: `undici#${A2}`, severity: "moderate" },
+        { key: `esbuild#${A3}`, severity: "low" },
+      ]),
+      ["undici", "esbuild"],
+    );
+  });
+});
+
+describe("observedAdvisoryDetails — one walk, two populations", () => {
+  const mixed = report({
+    dompurify: {
+      advisories: [
+        { ghsa: A1, severity: "low" },
+        { ghsa: A2, severity: "moderate" },
+      ],
+      fixAvailable: true,
+    },
+    "image-size": { advisories: [{ ghsa: A3, severity: "high" }], fixAvailable: false },
+  });
+
+  it("keeps every severity, where `observedAdvisories` keeps two", () => {
+    assert.deepEqual(
+      [...observedAdvisoryDetails(mixed).keys()],
+      [`dompurify#${A1}`, `dompurify#${A2}`, `image-size#${A3}`],
+    );
+    assert.deepEqual(observedAdvisories(mixed), [`image-size#${A3}`]);
+  });
+
+  it("is the walk the narrow one is built from, not a second copy of it", () => {
+    // The four conditions that decide what is observable (an advisory OBJECT,
+    // with an identity, keyed per package, collapsed to a set) live in one
+    // place; the severity filter is a fact about the exemption list and sits
+    // outside them.
+    const narrow = observedAdvisoryFixes(mixed);
+    for (const [key, kind] of narrow) {
+      assert.equal(kind, observedAdvisoryDetails(mixed).get(key)?.fix);
+    }
+    assert.deepEqual([...narrow.keys()], observedAdvisories(mixed));
+  });
+
+  it("reads severity off the ADVISORY, never off the package npm rolled it up to", () => {
+    // npm reports a package at the highest severity among its advisories, so
+    // `dompurify`'s entry says "moderate" while one of its two is low.
+    assert.deepEqual(
+      [...observedAdvisoryDetails(mixed).values()].map((detail) => detail.severity),
+      ["low", "moderate", "high"],
+    );
+  });
+
+  it("inherits the root's fix verdict for every advisory on it, at any severity", () => {
+    assert.deepEqual(
+      [...observedAdvisoryDetails(mixed).values()].map((detail) => detail.fix),
+      ["in-range", "in-range", "none"],
+    );
+  });
+});
+
 describe("isClean — the one place that decides the exit code", () => {
   const clean = evaluateAudit(report({}), []);
 
@@ -352,10 +574,10 @@ describe("isClean — the one place that decides the exit code", () => {
   it("passes only when all three lists are empty", () => {
     assert.equal(isClean(clean), true);
     assert.equal(isClean({ ...clean, unexpected: ["x#y"] }), false);
-    assert.equal(isClean({ ...clean, fixableInRange: ["x#y"] }), false);
+    assert.equal(isClean({ ...clean, fixableInRange: [{ key: "x#y", severity: "low" }] }), false);
     assert.equal(isClean({ ...clean, stale: ["x#y"] }), false);
     assert.equal(
-      isClean({ ...clean, majorOnly: ["x#y"] }),
+      isClean({ ...clean, majorOnly: [{ key: "x#y", severity: "critical" }] }),
       true,
       "npm restating a `why` sentence is not a finding",
     );
