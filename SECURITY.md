@@ -170,8 +170,10 @@ Two things had been wrong for those two months, and neither was visible:
   advisories exist, and a step that is red on every run reports the same red
   for an advisory somebody triaged and one nobody has ever seen.
 - The paragraph below this table asserted the remaining advisories "live
-  entirely in dev/build-time tooling". `nanoid` is high, and it ships to every
-  user.
+  entirely in dev/build-time tooling". `nanoid` is high, and it shipped to
+  every user. It was accepted with that stated for a day, then pinned and
+  removed from the list on 2026-09-02; the claim is true of what remains, and
+  it is true because it was checked rather than because it was repeated.
 
 The step is now `npm run lint:audit-baseline`, which compares the audit
 against the list in `lib/audit-baseline.ts` and **fails only on a high or
@@ -191,12 +193,30 @@ stopped naming, so the list cannot quietly stop describing the tree.
 | `ws` | high | memory-disclosure / DoS (via `@supabase/realtime-js`, expo, metro, RN) | Patched in shipped `realtime-js` chain |
 | `protobufjs` | high | unbounded recursion DoS (via `posthog-js` → `@opentelemetry`) | Patched via `posthog-js` minor bump |
 
-### Accepted high/critical — 7 roots, 13 advisories (2026-08-31, browserslist added 2026-09-01)
+### Fixed rather than accepted — `nanoid`, 3 advisories (2026-09-02)
 
-`npm audit` reports 13 high *entries* and 18 `via` objects for these 11
-advisories: the extra entries are Expo/metro packages that merely depend on one
-of these six and carry no advisory of their own, and the extra objects are one
-advisory seen down several dependency paths.
+`nanoid` was the only accepted root that shipped to the client, on the argument
+that no bundled call site passes the argument shape its two advisories need.
+A third arrived on 2026-09-02 — **GHSA-xwg4-73v4-xw9w**, an integer wraparound
+in versions below 3.3.12 — and the entry was removed instead of extended.
+
+| Package | Advisories | Fix |
+| --- | --- | --- |
+| `nanoid` | GHSA-xwg4-73v4-xw9w, GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8 | `overrides: { "nanoid": "^3.3.18" }` in `package.json` — same major, clears all three, no other package moves |
+
+An acceptance whose argument has to be rewritten every time the package is
+re-audited is a fix deferred. The three transitive dependents that pull it
+(`@react-navigation/routers`, `expo-router`, `postcss`) all ask for a `^3.3.x`
+range, so the pin is inside every one of them and `npm audit fix`'s 134-package
+move — the reason `browserslist` is still accepted below — is not needed here.
+
+### Accepted high/critical — 6 roots, 11 advisories (2026-08-31, browserslist added 2026-09-01, nanoid fixed 2026-09-02)
+
+`npm audit` reports more high *entries* and more `via` objects than there are
+advisories here: the extra entries are Expo/metro packages that merely depend
+on one of these six and carry no advisory of their own, and the extra objects
+are one advisory seen down several dependency paths. Every root left on the
+list is build-time tooling.
 
 The baseline keys on the **GHSA id**. It took three versions and each wrong one
 failed differently:
@@ -214,7 +234,6 @@ the bundle with its vulnerable entry point unreachable.
 
 | Package | Advisories | Ships to client? | Why accepted |
 | --- | --- | --- | --- |
-| `nanoid` | GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8 | **Yes** — `@react-navigation/routers` route keys | The first needs a negative `size`, the second a custom generator. Every bundled call site is `nanoid()` with neither |
 | `browserslist` | GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx | No | Target resolution for `@expo/metro-config` and babel's `core-js-compat`; absent from both shipped chunks. The OOM needs an attacker feeding distinct queries to a build; the prototype write needs an untrusted `browserslist-stats.json` in this repo. npm reports `fixAvailable: true`, but `npm audit fix` moves 134 packages including 12 majors (expo-router 56→57) — a framework upgrade, not a security patch |
 | `brace-expansion` | GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895 | No | Three expansion DoS advisories in glob/minimatch under the build toolchain |
 | `image-size` | GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr | No | JXL/HEIF and ICNS parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package) |
