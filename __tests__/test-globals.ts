@@ -40,6 +40,45 @@ import { repoPath } from "./helpers/repo-file";
  */
 const require = createRequire(import.meta.url);
 
+/**
+ * `npm test` may not reach the network, and this is what enforces it.
+ *
+ * The audit gate's failure note tells every contributor that it is "the one
+ * check here whose answer can change while the repository does not", and
+ * `verify-gate-script.test.ts` measures that by scanning the gate's 27 CLI
+ * wrappers for a remote read. The suites were the hole in it: `npm test` runs
+ * 1420 files, they stub `fetch` by name in dozens of places, and a marker scan
+ * cannot tell a stub from a call — so the leg most likely to acquire a real
+ * request was the one leg nothing looked at.
+ *
+ * A scan was never going to answer this. Whether a call goes out is a runtime
+ * question, so it is answered at runtime: the global is replaced before any
+ * suite loads, and a request that reaches it throws instead of leaving.
+ *
+ * STUBBING STILL WORKS, and that is the design rather than a leak. A suite
+ * that assigns its own `globalThis.fetch` has said what the response is; what
+ * this refuses is the call NOBODY stubbed, which is the one that would go out
+ * to a real host. A suite that saves and restores the global puts this back.
+ *
+ * The honest limit: `node:http`, `node:https` and anything spawning `curl` are
+ * untouched. Nothing here uses them and the same runtime argument would apply
+ * if something did — this is the shape a second refusal would take, not a
+ * claim that one is unnecessary.
+ */
+function refuseNetwork(input: unknown): never {
+  const target =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.href
+        : ((input as { url?: string } | null)?.url ?? "an unnamed request");
+  throw new Error(
+    `A test tried to fetch ${target}. The suites are a leg of \`npm run verify\` and every leg but the audit gate answers the same for the same commit next year — a real request breaks that, and makes this suite fail on somebody else's outage. Stub \`globalThis.fetch\` for the case that needs a response; __tests__/test-globals.ts installed this refusal.`,
+  );
+}
+
+globalThis.fetch = refuseNetwork as unknown as typeof globalThis.fetch;
+
 const REALTIME_MODULE_PATH = repoPath("lib", "supabase-realtime.ts");
 
 interface RealtimeModuleExports {

@@ -7,6 +7,7 @@ import { PUBLISHED_ELSEWHERE_NOTE } from "@/lib/audit-baseline";
 import { gateScriptPaths, networkMarkerHit } from "./helpers/gate-legs";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
+import { SUITES_REL } from "./helpers/suite-files";
 
 /**
  * Pins `npm run verify` as the ONE command that runs the full gate.
@@ -261,10 +262,18 @@ describe("the local gate matches what CI runs", () => {
  * spawns one at a time. That is where every shell-out and every HTTP call in
  * this repository lives.
  *
- * The suites are deliberately out of scope even though `npm test` is a leg.
+ * The suites are out of scope for the SCAN even though `npm test` is a leg.
  * They stub `fetch` by name in dozens of files, and a marker scan cannot tell
  * a stub from a call — the scan would report a hundred hits and get read as
  * noise, which is the failure every guard here is written against.
+ *
+ * They are not out of scope for the CLAIM. Whether a call goes out is a
+ * runtime fact rather than a textual one, so `__tests__/test-globals.ts`
+ * replaces `globalThis.fetch` in every test process before any suite loads and
+ * a request nobody stubbed throws. `network-refusal.test.ts` owns that; the
+ * case below only checks the wiring is still there, because this file is where
+ * the note's claim is measured and a leg covered somewhere else is still a leg
+ * this file is answering for.
  */
 describe("only one leg of the gate reads anything outside the tree", () => {
   /**
@@ -334,6 +343,23 @@ describe("only one leg of the gate reads anything outside the tree", () => {
       PUBLISHED_ELSEWHERE_NOTE,
       /the one check here whose answer can change while the repository does not/,
       "the note no longer claims to be the only non-hermetic leg — the case above is measuring nothing",
+    );
+  });
+
+  it("covers the one leg the scan cannot read, at runtime instead", () => {
+    // `npm test` is a leg and the scan skips all 1420 of its files. The
+    // bootstrap is what makes the note's claim true about them; without it,
+    // "the one check here" would rest on the biggest leg being unexamined.
+    const bootstrap = read(path.join(SUITES_REL, "test-globals.ts"));
+    assert.match(
+      bootstrap,
+      /globalThis\.fetch = /,
+      "__tests__/test-globals.ts no longer refuses an unstubbed request — the `test` leg is unexamined again, by this scan and by anything else",
+    );
+    assert.match(
+      pkg.scripts.test,
+      /--import \.\/__tests__\/test-globals\.ts/,
+      "`npm test` no longer preloads the bootstrap, so nothing installs the refusal",
     );
   });
 
