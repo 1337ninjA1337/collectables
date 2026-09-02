@@ -177,8 +177,8 @@ nobody reads instead of the two somebody does. Demanding a lockfile bump costs
 a command, so severity is the wrong question for it.
 
 **A red gate here may not be your branch's fault.** This is the only one of
-`verify`'s eight legs that reads something outside the repository — the other
-seven give the same answer for the same commit next year, and this one asks the
+`verify`'s nine legs that reads something outside the repository — the other
+eight give the same answer for the same commit next year, and this one asks the
 npm registry what the world knows today. An advisory published overnight, a fix
 published overnight, or an advisory withdrawn turns a green tree red with no
 commit in between, so the run that fails is not the run that caused it. Every
@@ -337,6 +337,19 @@ failed differently:
 
 "Ships to client" is not the same question as "vulnerable": a package can be in
 the bundle with its vulnerable entry point unreachable.
+
+**A "No" in that column is checked against the build.** It was the load-bearing
+half of every exemption here and the half nothing re-derived — the one entry
+that ever did ship (`nanoid`) was found by a person reading call sites. Each
+`No` now names a string literal out of the package's own code, and
+`lint:ships-to-client` greps the exported chunks for it after every build. A
+minified bundle carries no package names, so the name would not do: the bundle
+contains `image-size-select-actual` and always has, which is an icon name.
+
+A hit is not proof — a coincidental literal reads the same — and a miss is not
+proof either: it says this string is absent, not that no code from the package
+shipped. The claim moves from "somebody wrote this down" to "the build does not
+contradict it", which is the improvement available.
 
 | Package | Advisories | Ships to client? | Why accepted |
 | --- | --- | --- | --- |

@@ -173,7 +173,7 @@ describe("the local gate matches what CI runs", () => {
    * of the four legs it already ran. A list restating the thing it checks
    * cannot notice a fifth.
    *
-   * Derived, so the day somebody adds an eighth step the gate either grows or
+   * Derived, so the day somebody adds a ninth step the gate either grows or
    * goes red — and the failure names the step rather than the number.
    */
   const CI_SCRIPTS = [
