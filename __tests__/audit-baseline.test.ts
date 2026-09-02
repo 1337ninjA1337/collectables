@@ -91,6 +91,9 @@ function report(
   };
 }
 
+/** npm's "only a major fixes this, and here is what I would install". */
+const majorFix = (name: string): unknown => ({ name, version: "1.0.0", isSemVerMajor: true });
+
 const A1 = "GHSA-aaaa-aaaa-aaa1";
 const A2 = "GHSA-bbbb-bbbb-bbb2";
 const A3 = "GHSA-cccc-cccc-ccc3";
@@ -717,6 +720,140 @@ describe("the package the command names — npm's report, not the vulnerable one
     assert.equal(named(true), "undici");
     assert.equal(named(null), "undici");
     assert.equal(fixPackage({}, "undici"), "undici", "a report with no vulnerabilities at all");
+  });
+});
+
+/**
+ * What a passing run is allowed to say, decided 2026-09-02.
+ *
+ * The OK line listed every major-only advisory by `package#GHSA` and severity.
+ * That was four names when the fix rule read high/critical only, and became
+ * EIGHT the day it widened to every severity — a green line long enough to
+ * wrap, half of it moderates the baseline deliberately does not triage. Noise
+ * on the green path is how the previous version of this gate stopped being
+ * read, and nothing decided how much a passing run could say.
+ *
+ * It says UPGRADES now: bounded by how many packages would clear the
+ * advisories rather than by how many advisories there are, and in the same
+ * vocabulary the failing path has used since it started naming npm's own fix
+ * target.
+ */
+describe("the OK line — upgrades, never advisories", () => {
+  /**
+   * The real tree's shape: two highs the baseline has read, two moderates it
+   * deliberately has not, four advisories over three vulnerable packages, and
+   * two upgrades that clear all of them.
+   */
+  const expoTree = (): AuditReport =>
+    report({
+      postcss: {
+        advisories: [
+          { ghsa: A1, severity: "high" },
+          { ghsa: A2, severity: "moderate" },
+        ],
+        fixAvailable: majorFix("expo"),
+      },
+      "image-size": {
+        advisories: [{ ghsa: A3, severity: "high" }],
+        fixAvailable: majorFix("expo"),
+      },
+      "decode-uri-component": {
+        advisories: [{ ghsa: A1, severity: "moderate" }],
+        fixAvailable: majorFix("expo-router"),
+      },
+    });
+
+  /** The two highs above, triaged — otherwise they are findings, not an OK line. */
+  const TRIAGED: readonly AcceptedAdvisory[] = [
+    { package: "postcss", advisories: [A1], shipsToClient: false, why: "build-time only" },
+    { package: "image-size", advisories: [A3], shipsToClient: false, why: "build-time only" },
+  ];
+
+  /**
+   * Default `[]`: a baseline entry the fixture does not produce is STALE, and
+   * a stale entry is a failing run with no OK line to read.
+   */
+  const okLine = (fixture: AuditReport, accepted: readonly AcceptedAdvisory[] = []): string =>
+    formatAuditVerdict(evaluateAudit(fixture, accepted), "check");
+
+  it("counts advisories and names the upgrades that clear them", () => {
+    assert.equal(
+      isClean(evaluateAudit(expoTree(), TRIAGED)),
+      true,
+      "major-only is reported, never failed",
+    );
+    const printed = okLine(expoTree(), TRIAGED);
+    assert.match(printed, /no fix short of a semver-major for 4 advisories, cleared by 2 upgrades/);
+    assert.match(printed, /expo \(3, up to high\)/);
+    assert.match(printed, /expo-router \(1, up to moderate\)/);
+  });
+
+  it("prints no advisory ids at all on the green path", () => {
+    // The ids are what a FAILING run prints. A reader who wants them on a
+    // green run wants `npm audit`, and eight of them was the noise this line
+    // was rewritten to stop producing.
+    assert.doesNotMatch(okLine(expoTree(), TRIAGED), /GHSA-/);
+  });
+
+  it("names each upgrade once, however many advisories it covers", () => {
+    assert.equal(
+      okLine(expoTree(), TRIAGED).match(/\bexpo \(/g)?.length,
+      1,
+      "three advisories cleared by `expo` are one upgrade, not three",
+    );
+  });
+
+  it("orders most severe first, then by how much the upgrade buys", () => {
+    // An OK line that reshuffles between runs is one nobody can diff — the
+    // same reason the findings have a total order.
+    const printed = okLine(
+      report({
+        low1: { advisories: [{ ghsa: A1, severity: "low" }], fixAvailable: majorFix("zeta") },
+        low2: { advisories: [{ ghsa: A2, severity: "low" }], fixAvailable: majorFix("zeta") },
+        alpha: { advisories: [{ ghsa: A3, severity: "low" }], fixAvailable: majorFix("alpha") },
+        mid: { advisories: [{ ghsa: A1, severity: "moderate" }], fixAvailable: majorFix("omega") },
+      }),
+    );
+    const order = [...printed.matchAll(/([\w-]+) \(\d+, up to/g)].map((m) => m[1]);
+    assert.deepEqual(order, ["omega", "zeta", "alpha"]);
+  });
+
+  it("derives each group's worst severity rather than trusting the list's order", () => {
+    // `majorOnly` arrives sorted, so the worst of a group is first BY LUCK.
+    // The verdict is built by hand here precisely because no report can
+    // produce this order — which is the point: a summary that read position 0
+    // would be wrong the day the ordering is decided somewhere else.
+    const printed = formatAuditVerdict(
+      {
+        unexpected: [],
+        stillPresent: [],
+        stale: [],
+        fixableInRange: [],
+        majorOnly: [
+          { key: `mild#${A1}`, severity: "low", updatePackage: "one-root" },
+          { key: `severe#${A2}`, severity: "high", updatePackage: "one-root" },
+        ],
+      },
+      "check",
+    );
+    assert.match(printed, /one-root \(2, up to high\)/);
+  });
+
+  it("says nothing at all when npm has no major-only advisory to report", () => {
+    const printed = okLine(report({}));
+    assert.match(printed, /no new ones\.$/);
+    assert.doesNotMatch(printed, /semver-major/, "a clause about an empty list is pure noise");
+  });
+
+  it("is absent from a failing run, where the findings are the message", () => {
+    const printed = formatAuditVerdict(
+      evaluateAudit(
+        report({ undici: { advisories: [{ ghsa: A1, severity: "moderate" }], fixAvailable: true } }),
+        [],
+      ),
+      "check",
+    );
+    assert.doesNotMatch(printed, /OK —/);
   });
 });
 

@@ -517,11 +517,20 @@ export function evaluateAudit(
  * and a findings list that reshuffles between runs is one nobody can diff.
  */
 function bySeverityThenKey(a: FixableAdvisory, b: FixableAdvisory): number {
-  const rank = (severity: string): number => {
-    const at = SEVERITY_ORDER.indexOf(severity);
-    return at < 0 ? SEVERITY_ORDER.length : at;
-  };
-  return rank(a.severity) - rank(b.severity) || a.key.localeCompare(b.key);
+  return severityRank(a.severity) - severityRank(b.severity) || a.key.localeCompare(b.key);
+}
+
+/**
+ * How severe, as a sortable number — lower is worse.
+ *
+ * A severity npm has not used yet sorts to the bottom rather than throwing:
+ * the same choice {@link fixKind} makes about an unknown fix shape, for the
+ * same reason. A field npm changes must not decide anything here, and least of
+ * all whether this gate can produce a report at all.
+ */
+function severityRank(severity: string): number {
+  const at = SEVERITY_ORDER.indexOf(severity);
+  return at < 0 ? SEVERITY_ORDER.length : at;
 }
 
 /**
@@ -555,6 +564,60 @@ export const PUBLISHED_ELSEWHERE_NOTE =
 /** `1 advisory` / `18 advisories` — the report is read by people, not matched. */
 function plural(count: number, one: string, many: string): string {
   return `${String(count)} ${count === 1 ? one : many}`;
+}
+
+/**
+ * What a PASSING run is allowed to say about the advisories it let through.
+ *
+ * Upgrades, never advisories. The first version listed every major-only
+ * finding by `package#GHSA` and severity, which was four names when the fix
+ * rule read high/critical and became EIGHT the day it widened to every
+ * severity — a green line long enough to wrap, half of it a list of moderates
+ * the baseline deliberately does not triage. Noise on the green path is how
+ * the previous version of this gate stopped being read, and nothing decided
+ * how much a passing run was allowed to say.
+ *
+ * Grouping by {@link FixableAdvisory.updatePackage} answers both halves at
+ * once. It bounds the line by the number of UPGRADES rather than the number of
+ * advisories — eight advisories across five vulnerable packages are two
+ * upgrades, `expo` and `expo-router` — and it puts the green path in the same
+ * vocabulary as the red one, which names roots since the day it started
+ * reading npm's own fix target.
+ *
+ * The count and the worst severity ride each group because they are what a
+ * reader does something with ("is any of this high?", "how much does that one
+ * upgrade buy?"). The advisory ids do not: they are what a FAILING run prints,
+ * and a reader who wants them on a green run wants `npm audit`.
+ */
+function majorOnlySummary(majorOnly: readonly FixableAdvisory[]): string {
+  if (majorOnly.length === 0) return "";
+  const byPackage = new Map<string, FixableAdvisory[]>();
+  for (const found of majorOnly) {
+    const group = byPackage.get(found.updatePackage);
+    if (group === undefined) byPackage.set(found.updatePackage, [found]);
+    else group.push(found);
+  }
+  const groups = [...byPackage]
+    // Most severe group first, then the one that buys the most, then by name:
+    // an OK line that reshuffles between runs is one nobody can diff, same
+    // reason `bySeverityThenKey` exists for the findings.
+    // The worst severity is derived, not read off position 0: it happens to be
+    // first because `majorOnly` arrives sorted, and a summary that depended on
+    // that would be wrong the day the list's order is decided elsewhere.
+    .map(([name, found]) => ({
+      name,
+      found,
+      worst: found.reduce((a, b) => (severityRank(b.severity) < severityRank(a.severity) ? b : a))
+        .severity,
+    }))
+    .sort(
+      (a, b) =>
+        severityRank(a.worst) - severityRank(b.worst) ||
+        b.found.length - a.found.length ||
+        a.name.localeCompare(b.name),
+    )
+    .map((group) => `${group.name} (${String(group.found.length)}, up to ${group.worst})`);
+  return `, and npm offers no fix short of a semver-major for ${plural(majorOnly.length, "advisory", "advisories")}, cleared by ${plural(groups.length, "upgrade", "upgrades")}: ${groups.join(", ")}`;
 }
 
 /** Human-readable report; the CLI prints this and nothing else. */
@@ -595,11 +658,7 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
   }
   if (isClean(verdict)) {
     lines.push(
-      `${checkName}: OK — ${plural(verdict.stillPresent.length, "accepted high/critical advisory", "accepted high/critical advisories")}, no new ones${
-        verdict.majorOnly.length === 0
-          ? ""
-          : `, and npm offers no fix short of a semver-major for ${plural(verdict.majorOnly.length, "advisory", "advisories")} (${verdict.majorOnly.map((found) => `${found.key} [${found.severity}]`).join(", ")})`
-      }.`,
+      `${checkName}: OK — ${plural(verdict.stillPresent.length, "accepted high/critical advisory", "accepted high/critical advisories")}, no new ones${majorOnlySummary(verdict.majorOnly)}.`,
     );
   } else {
     lines.push("", PUBLISHED_ELSEWHERE_NOTE);
