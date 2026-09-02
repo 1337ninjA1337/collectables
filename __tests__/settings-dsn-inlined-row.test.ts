@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 
 import { localeKeys } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 import { readRepoFile } from "./helpers/repo-file";
 
 const settingsSrc = readRepoFile("app/settings.tsx");
 const i18nSrc = readI18nSource();
 
-const LANGUAGES = ["en", "ru", "be", "pl", "de", "es"] as const;
+const LANGUAGES = locales(i18nSrc);
 
 describe("settings — Sentry DSN inlined diagnostics row", () => {
   it("gates the row on dev builds or admins, never plain production users", () => {

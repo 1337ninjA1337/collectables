@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { formatChatPreviewTimestamp, formatRelativeDate } from "../lib/i18n-context";
+import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 
 function isoAt(offsetMs: number): string {
   return new Date(Date.now() + offsetMs).toISOString();
@@ -14,9 +16,9 @@ describe("formatChatPreviewTimestamp", () => {
   });
 
   it("renders a stable HH:mm shape across all supported locales", () => {
-    const locales = ["en", "ru", "de", "pl", "es", "be"] as const;
+    const supported = locales(readI18nSource());
     const recent = isoAt(-10 * 60 * 1000);
-    for (const locale of locales) {
+    for (const locale of supported) {
       const result = formatChatPreviewTimestamp(recent, locale);
       assert.match(
         result,

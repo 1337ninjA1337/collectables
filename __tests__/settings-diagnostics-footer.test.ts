@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { localeKeys } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 import { readRepoFile } from "./helpers/repo-file";
 
 const settingsSrc = readRepoFile("app/settings.tsx");
@@ -14,7 +15,7 @@ const FOOTER_KEYS = [
   "diagnosticsCrashFooterDisabled",
 ] as const;
 
-const LANGUAGES = ["en", "ru", "be", "pl", "de", "es"] as const;
+const LANGUAGES = locales(i18nSrc);
 
 describe("settings — diagnostics crash-report footer", () => {
   it("reads the Sentry snapshot via getSentryStatus and ticks with useNow", () => {

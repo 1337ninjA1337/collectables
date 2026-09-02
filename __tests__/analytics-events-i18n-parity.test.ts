@@ -8,6 +8,7 @@ import {
 
 import { localeKeys } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 
 /**
  * Event descriptions are EN-only by design today — they live in
@@ -23,7 +24,7 @@ import { readI18nSource } from "./helpers/i18n-source-file";
 
 const i18nSrc = readI18nSource();
 
-const LANGUAGES = ["en", "ru", "be", "pl", "de", "es"] as const;
+const LANGUAGES = locales(i18nSrc);
 
 describe("analytics event descriptions — i18n parity", () => {
   it("every event has a non-empty English description in the taxonomy", () => {
