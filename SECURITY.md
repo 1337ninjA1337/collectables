@@ -204,6 +204,13 @@ and the fix is `>=0.28.1`. npm reported `fixAvailable: true` anyway, and it was
 right — `tsx@4.23.13` is inside the root's own `^4.21.0`. **npm's in-range fix
 is not always an update of the package the advisory names.**
 
+That was worked out by hand, and the gate printed `npm update esbuild` the
+whole time. It reads the report properly now: `fixAvailable.name` when npm
+names the install it would perform, and otherwise npm's `effects` walked to the
+first dependent `package.json` declares (`isDirect`) — `tsx`, for this row. A
+finding whose fix lives in another package says so on its own line, and the
+printed command names packages that can actually move.
+
 `postcss` is the argument for blocking rather than merely reporting: moderate
 when it was first triaged in June, high by August, on a lockfile nobody had
 touched. A moderate with a published fix is a high with a published fix that

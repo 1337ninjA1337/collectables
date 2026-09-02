@@ -89,6 +89,28 @@
  * argued about, which is the exemption-list-as-paperwork failure this file
  * already carries the scar of. Widening the fix rule demands a lockfile bump
  * and nothing else.
+ *
+ * ## And the command it prints has to name the package npm would move
+ *
+ * The rule shipped printing `npm update <vulnerable package>`, and on the
+ * first run that demanded three fixes, one of the three was wrong: `esbuild`'s
+ * in-range fix was `npm update tsx`, because `tsx` declares `esbuild: ~0.27.0`
+ * and the fixed release was outside it. The vulnerable package could not move
+ * on its own, so the printed command exited 0 having changed nothing — the
+ * worst failure a fix instruction has, because it looks like it worked.
+ *
+ * The report said so twice over and neither was read. `fixAvailable`'s object
+ * shape carries the `name` of the install npm would perform — `expo` for
+ * `postcss`, `expo-router` for `decode-uri-component` — and the field was read
+ * for {@link fixKind} with its name thrown away. And where npm names nobody, as
+ * it did for `esbuild`, `effects` lists the dependents the advisory reaches and
+ * `isDirect` says which of them the manifest declares: `tsx`, from the same
+ * report the wrong command was printed from.
+ *
+ * {@link fixPackage} reads both, {@link fixCommandPackages} builds the command
+ * out of them, and a finding whose fix lives in another package says so on its
+ * own line — a contributor who runs the command should not have to work out
+ * why it was the right one.
  */
 
 /** One triaged advisory root. Transitive dependents are not listed. */
@@ -171,6 +193,10 @@ export interface AuditReport {
          * `true` (an in-range update), or the upgrade it would perform.
          */
         readonly fixAvailable?: unknown;
+        /** Whether `package.json` declares this package itself. */
+        readonly isDirect?: boolean;
+        /** The vulnerable dependents this advisory reaches. See {@link fixPackage}. */
+        readonly effects?: readonly string[];
       }
     >
   >;
@@ -209,6 +235,66 @@ export function fixKind(fixAvailable: unknown): FixKind {
 }
 
 /**
+ * The package `npm update` has to name, which is not always the vulnerable one.
+ *
+ * Three sources, in the order of how much npm committed to them.
+ *
+ * **npm's own name.** The object shape of `fixAvailable` carries one, and it is
+ * npm's answer to "what would I install?" — `expo` for `postcss`,
+ * `expo-router` for `decode-uri-component`. Nothing here can beat that.
+ *
+ * **The dependent, when npm named nobody.** A bare `true` says only that a fix
+ * exists inside the declared ranges, and that is where the wrong command came
+ * from: `esbuild`'s fix was `npm update tsx`, because `tsx` pinned
+ * `esbuild@~0.27.0` while the fix was `>=0.28.1` — the vulnerable package
+ * could not move at all, and `npm update esbuild` exited 0 having changed
+ * nothing, which is the worst thing a fix instruction can do. `effects` is
+ * npm's list of the dependents an advisory reaches, so walking it to a package
+ * the manifest declares (`isDirect`) finds the one that CAN move. That walk
+ * answers `tsx` for `esbuild`, from the same report the old command was
+ * printed from.
+ *
+ * **The vulnerable package**, when neither of those says otherwise — a direct
+ * dependency is already the thing to move, and a chain that reaches no direct
+ * package leaves nothing better to say. Same direction as {@link fixKind} on an
+ * unrecognised shape: fall back to what was true before the field was
+ * consulted, never to a guess.
+ *
+ * Breadth-first and sorted at each step, so a package reachable two ways gets
+ * the same answer on every run; `effects` is cyclic in this tree (`metro` and
+ * `metro-config` list each other), so the visited set is load-bearing rather
+ * than defensive.
+ */
+export function fixPackage(report: AuditReport, vulnerablePackage: string): string {
+  const entries = report.vulnerabilities ?? {};
+  const named = namedFix(entries[vulnerablePackage]?.fixAvailable);
+  if (named !== null) return named;
+  if (entries[vulnerablePackage]?.isDirect === true) return vulnerablePackage;
+  const seen = new Set([vulnerablePackage]);
+  let frontier = [vulnerablePackage];
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const name of frontier) {
+      for (const effect of [...(entries[name]?.effects ?? [])].sort()) {
+        if (seen.has(effect)) continue;
+        seen.add(effect);
+        if (entries[effect]?.isDirect === true) return effect;
+        next.push(effect);
+      }
+    }
+    frontier = next;
+  }
+  return vulnerablePackage;
+}
+
+/** npm's `fixAvailable.name`, or `null` when it did not name a package. */
+function namedFix(fixAvailable: unknown): string | null {
+  if (typeof fixAvailable !== "object" || fixAvailable === null) return null;
+  const named = (fixAvailable as { name?: unknown }).name;
+  return typeof named === "string" && named !== "" ? named : null;
+}
+
+/**
  * The severities a baseline entry is required for.
  *
  * npm reports five (`info`, `low`, `moderate`, `high`, `critical`) and this
@@ -235,6 +321,11 @@ export interface FixableAdvisory {
   readonly key: string;
   /** npm's severity for the ADVISORY, which is not the package's severity. */
   readonly severity: string;
+  /**
+   * The package `npm update` must name — npm's `fixAvailable.name` when it has
+   * one, the vulnerable package otherwise. See {@link fixPackage}.
+   */
+  readonly updatePackage: string;
 }
 
 export interface AuditVerdict {
@@ -329,6 +420,11 @@ export interface ObservedAdvisory {
   readonly severity: string;
   /** npm's verdict on the ROOT PACKAGE, inherited by each of its advisories. */
   readonly fix: FixKind;
+  /**
+   * The package that carries the fix, read off the same `fixAvailable` the
+   * verdict came from and inherited the same way. See {@link fixPackage}.
+   */
+  readonly updatePackage: string;
 }
 
 /**
@@ -358,6 +454,7 @@ export function observedAdvisoryDetails(
   const found = new Map<string, ObservedAdvisory>();
   for (const [name, entry] of Object.entries(report.vulnerabilities ?? {})) {
     const fix = fixKind(entry.fixAvailable);
+    const updatePackage = fixPackage(report, name);
     for (const via of entry.via ?? []) {
       if (typeof via !== "object" || via === null) continue;
       const advisory = via as { source?: unknown; url?: unknown; severity?: unknown };
@@ -366,6 +463,7 @@ export function observedAdvisoryDetails(
       found.set(advisoryKey(name, identity), {
         severity: String(advisory.severity ?? ""),
         fix,
+        updatePackage,
       });
     }
   }
@@ -396,7 +494,11 @@ export function evaluateAudit(
   const withFix = (kind: FixKind): FixableAdvisory[] =>
     [...everything]
       .filter(([, detail]) => detail.fix === kind)
-      .map(([key, detail]) => ({ key, severity: detail.severity }))
+      .map(([key, detail]) => ({
+        key,
+        severity: detail.severity,
+        updatePackage: detail.updatePackage,
+      }))
       .sort(bySeverityThenKey);
   return {
     unexpected: [...observed].filter((key) => !acceptedKeys.has(key)).sort(),
@@ -466,7 +568,15 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
       `${checkName}: npm can fix ${plural(verdict.fixableInRange.length, "advisory", "advisories")} without a major version change:`,
     );
     for (const found of verdict.fixableInRange) {
-      lines.push(`  FIXABLE  ${found.severity.padEnd(8)}  ${found.key}`);
+      // The redirect is printed only when there IS one. A finding whose fix
+      // lives in its own package needs no explanation, and "(fix in undici)"
+      // on every line is how the redirect stops being read on the one line
+      // where it is the whole answer.
+      const via =
+        found.updatePackage === advisoryPackage(found.key)
+          ? ""
+          : `  (fix in ${found.updatePackage})`;
+      lines.push(`  FIXABLE  ${found.severity.padEnd(8)}  ${found.key}${via}`);
     }
     lines.push(
       `Run \`npm update ${fixCommandPackages(verdict.fixableInRange).join(" ")}\` and commit the lockfile. An advisory a lockfile bump clears is not a triage decision, at any severity — accepting one is how seven of these sat on the baseline being read as read, and how three moderate/low roots went a month without anybody asking.`,
@@ -508,18 +618,22 @@ export function advisoryPackage(key: string): string {
  *
  * Deduplicated, because three advisories on one root are one upgrade: a
  * command reading `npm update brace-expansion brace-expansion brace-expansion`
- * is one a reader stops trusting.
+ * is one a reader stops trusting. The dedupe now collapses ACROSS roots as
+ * well — twelve advisories whose fix is `expo@57` are one `npm update expo`,
+ * where naming the vulnerable packages produced twelve names for one upgrade.
  *
- * npm's own fix may be a DIFFERENT package — `esbuild`'s in-range fix was
- * reached by moving `tsx`, which declares `esbuild: ~0.27.0` and had a newer
- * release inside the root's own `^4.21.0`. So this names the vulnerable
- * package and the command is a starting point rather than a guarantee; the
- * gate re-runs and says so if the advisory is still there.
+ * Reads {@link FixableAdvisory.updatePackage}, so npm's own report decides. The
+ * first version named the vulnerable package instead and printed
+ * `npm update esbuild` for a fix that lived in `tsx`; a contributor following
+ * the printed instruction literally saw it no-op with no way to tell why. The
+ * command is still a starting point rather than a guarantee — the gate re-runs
+ * and says so if the advisory survives it — but it now names a package that
+ * can actually move.
  */
 export function fixCommandPackages(
   fixable: readonly FixableAdvisory[],
 ): readonly string[] {
-  return [...new Set(fixable.map((found) => advisoryPackage(found.key)))];
+  return [...new Set(fixable.map((found) => found.updatePackage))];
 }
 
 /**

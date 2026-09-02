@@ -9,6 +9,7 @@ import {
   evaluateAudit,
   fixCommandPackages,
   fixKind,
+  fixPackage,
   formatAuditVerdict,
   isClean,
   observedAdvisories,
@@ -57,16 +58,23 @@ function report(
       dependsOn?: string[];
       /** npm's `fixAvailable`, in any of the three shapes it uses. */
       fixAvailable?: unknown;
+      /** npm's `isDirect` — whether `package.json` declares this package. */
+      isDirect?: boolean;
+      /** npm's `effects` — the vulnerable dependents this advisory reaches. */
+      effects?: string[];
     }
   >,
 ): AuditReport {
   return {
     vulnerabilities: Object.fromEntries(
-      Object.entries(entries).map(([name, { advisories = [], dependsOn = [], fixAvailable }]) => [
+      Object.entries(entries).map(
+        ([name, { advisories = [], dependsOn = [], fixAvailable, isDirect, effects = [] }]) => [
         name,
         {
           severity: advisories[0]?.severity ?? "high",
           fixAvailable,
+          isDirect,
+          effects,
           via: [
             ...advisories.map((a) => ({
               source: a.source,
@@ -77,7 +85,8 @@ function report(
             ...dependsOn,
           ],
         },
-      ]),
+        ],
+      ),
     ),
   };
 }
@@ -224,7 +233,9 @@ describe("evaluateAudit — an advisory npm can fix is not a triage decision", (
     );
     assert.deepEqual(verdict.unexpected, [], "it is on the list, so it is not new");
     assert.deepEqual(verdict.stillPresent, [`nanoid#${A1}`], "and the exemption is still matched");
-    assert.deepEqual(verdict.fixableInRange, [{ key: `nanoid#${A1}`, severity: "high" }]);
+    assert.deepEqual(verdict.fixableInRange, [
+      { key: `nanoid#${A1}`, severity: "high", updatePackage: "nanoid" },
+    ]);
     assert.equal(isClean(verdict), false, "being on the baseline must not excuse an available fix");
   });
 
@@ -246,8 +257,8 @@ describe("evaluateAudit — an advisory npm can fix is not a triage decision", (
     );
     assert.deepEqual(verdict.fixableInRange, []);
     assert.deepEqual(verdict.majorOnly, [
-      { key: `postcss#${A2}`, severity: "high" },
-      { key: `postcss#${A3}`, severity: "high" },
+      { key: `postcss#${A2}`, severity: "high", updatePackage: "expo" },
+      { key: `postcss#${A3}`, severity: "high", updatePackage: "expo" },
     ]);
     assert.equal(isClean(verdict), true);
     assert.match(formatAuditVerdict(verdict, "check"), /no fix short of a semver-major/);
@@ -268,7 +279,7 @@ describe("evaluateAudit — an advisory npm can fix is not a triage decision", (
     );
     assert.deepEqual(verdict.unexpected, ["browserslist#GHSA-73wf-gq98-2v4g"]);
     assert.deepEqual(verdict.fixableInRange, [
-      { key: "browserslist#GHSA-73wf-gq98-2v4g", severity: "high" },
+      { key: "browserslist#GHSA-73wf-gq98-2v4g", severity: "high", updatePackage: "browserslist" },
     ]);
   });
 
@@ -376,8 +387,8 @@ describe("evaluateAudit — the fix rule reads every severity, the baseline does
       FIXTURE,
     );
     assert.deepEqual(verdict.fixableInRange, [
-      { key: `undici#${A1}`, severity: "moderate" },
-      { key: `undici#${A2}`, severity: "moderate" },
+      { key: `undici#${A1}`, severity: "moderate", updatePackage: "undici" },
+      { key: `undici#${A2}`, severity: "moderate", updatePackage: "undici" },
     ]);
     assert.equal(isClean(verdict), false);
     assert.deepEqual(
@@ -394,7 +405,9 @@ describe("evaluateAudit — the fix rule reads every severity, the baseline does
       report({ esbuild: { advisories: [{ ghsa: A3, severity: "low" }], fixAvailable: true } }),
       FIXTURE,
     );
-    assert.deepEqual(verdict.fixableInRange, [{ key: `esbuild#${A3}`, severity: "low" }]);
+    assert.deepEqual(verdict.fixableInRange, [
+      { key: `esbuild#${A3}`, severity: "low", updatePackage: "esbuild" },
+    ]);
     assert.equal(isClean(verdict), false);
   });
 
@@ -416,7 +429,7 @@ describe("evaluateAudit — the fix rule reads every severity, the baseline does
     assert.deepEqual(verdict.unexpected, []);
     assert.deepEqual(verdict.fixableInRange, []);
     assert.deepEqual(verdict.majorOnly, [
-      { key: `decode-uri-component#${A1}`, severity: "moderate" },
+      { key: `decode-uri-component#${A1}`, severity: "moderate", updatePackage: "expo-router" },
     ]);
     assert.equal(isClean(verdict), true);
   });
@@ -444,8 +457,8 @@ describe("evaluateAudit — the fix rule reads every severity, the baseline does
       "the baseline still matches on the high one alone",
     );
     assert.deepEqual(verdict.fixableInRange, [
-      { key: `postcss#${A2}`, severity: "high" },
-      { key: `postcss#${A3}`, severity: "moderate" },
+      { key: `postcss#${A2}`, severity: "high", updatePackage: "postcss" },
+      { key: `postcss#${A3}`, severity: "moderate", updatePackage: "postcss" },
     ]);
   });
 
@@ -502,12 +515,208 @@ describe("evaluateAudit — the fix rule reads every severity, the baseline does
   it("names each package once in the update command, whatever the severity", () => {
     assert.deepEqual(
       fixCommandPackages([
-        { key: `undici#${A1}`, severity: "moderate" },
-        { key: `undici#${A2}`, severity: "moderate" },
-        { key: `esbuild#${A3}`, severity: "low" },
+        { key: `undici#${A1}`, severity: "moderate", updatePackage: "undici" },
+        { key: `undici#${A2}`, severity: "moderate", updatePackage: "undici" },
+        { key: `esbuild#${A3}`, severity: "low", updatePackage: "esbuild" },
       ]),
       ["undici", "esbuild"],
     );
+  });
+});
+
+/**
+ * The command that ran clean and fixed nothing, found 2026-09-02.
+ *
+ * The fix rule's first run in anger demanded three updates and printed the
+ * wrong package for one of them: `esbuild`'s in-range fix was `npm update
+ * tsx`, because `tsx` pinned `esbuild@~0.27.0` while the fix was `>=0.28.1`.
+ * `npm update esbuild` exits 0 having changed nothing, which is the worst
+ * thing a fix instruction can do — a contributor who follows it literally has
+ * no way to tell it did not work except by re-running the gate.
+ *
+ * The report answered twice over and neither was read: `fixAvailable`'s object
+ * shape carries the `name` of the install npm would perform, and where npm
+ * names nobody, `effects` plus `isDirect` say which dependent the manifest
+ * declares.
+ */
+describe("the package the command names — npm's report, not the vulnerable one", () => {
+  it("names npm's own package when it named one", () => {
+    // The strongest source, because npm committed to it: `fixAvailable.name`
+    // is the install npm would perform, whatever the advisory is filed under.
+    const verdict = evaluateAudit(
+      report({
+        postcss: {
+          advisories: [{ ghsa: A2, severity: "high" }],
+          fixAvailable: { name: "expo", version: "57.0.19", isSemVerMajor: false },
+        },
+      }),
+      [],
+    );
+    assert.deepEqual(verdict.fixableInRange, [
+      { key: `postcss#${A2}`, severity: "high", updatePackage: "expo" },
+    ]);
+    assert.deepEqual(fixCommandPackages(verdict.fixableInRange), ["expo"]);
+  });
+
+  it("walks to the dependent the manifest declares when npm named nobody", () => {
+    // The `esbuild` shape exactly, and the reason this task exists: npm said
+    // `true` and nothing else, `tsx` is what `package.json` declares, and
+    // `npm update esbuild` could not have moved anything.
+    const verdict = evaluateAudit(
+      report({
+        esbuild: {
+          advisories: [{ ghsa: A3, severity: "low" }],
+          fixAvailable: true,
+          effects: ["tsx"],
+        },
+        tsx: { fixAvailable: true, isDirect: true },
+      }),
+      [],
+    );
+    assert.deepEqual(verdict.fixableInRange, [
+      { key: `esbuild#${A3}`, severity: "low", updatePackage: "tsx" },
+    ]);
+    assert.deepEqual(fixCommandPackages(verdict.fixableInRange), ["tsx"]);
+  });
+
+  it("keeps a direct dependency as its own fix", () => {
+    // `package.json` declares it, so it is already the thing `npm update`
+    // moves. Walking anywhere from here would name a package further from the
+    // problem than the one npm reported.
+    const verdict = evaluateAudit(
+      report({
+        undici: {
+          advisories: [{ ghsa: A1, severity: "moderate" }],
+          fixAvailable: true,
+          isDirect: true,
+          effects: ["some-dependent"],
+        },
+      }),
+      [],
+    );
+    assert.deepEqual(fixCommandPackages(verdict.fixableInRange), ["undici"]);
+  });
+
+  it("keeps the vulnerable package when the chain reaches no direct one", () => {
+    // Same direction as `fixKind` on an unrecognised shape: fall back to what
+    // was true before the field was consulted, never to a guess.
+    const verdict = evaluateAudit(
+      report({
+        "@react-navigation/elements": {
+          advisories: [{ ghsa: A1, severity: "moderate" }],
+          fixAvailable: true,
+          effects: ["@react-navigation/native-stack"],
+        },
+        "@react-navigation/native-stack": { fixAvailable: true },
+      }),
+      [],
+    );
+    assert.deepEqual(fixCommandPackages(verdict.fixableInRange), [
+      "@react-navigation/elements",
+    ]);
+  });
+
+  it("terminates on the cyclic effects this tree actually has", () => {
+    // `metro` and `metro-config` list each other. Without the visited set this
+    // walk never returns, and the gate hangs rather than fails.
+    const cyclic = report({
+      metro: { advisories: [{ ghsa: A1, severity: "moderate" }], effects: ["metro-config"] },
+      "metro-config": { effects: ["metro"] },
+    });
+    assert.equal(fixPackage(cyclic, "metro"), "metro");
+  });
+
+  it("gives one answer for a package two chains reach", () => {
+    // Breadth-first and sorted at each step, so the answer does not depend on
+    // which order npm happened to write the report in.
+    const diamond = (effects: string[]): AuditReport =>
+      report({
+        leaf: { advisories: [{ ghsa: A1, severity: "low" }], effects },
+        "aaa-root": { isDirect: true },
+        "zzz-root": { isDirect: true },
+      });
+    assert.equal(fixPackage(diamond(["zzz-root", "aaa-root"]), "leaf"), "aaa-root");
+    assert.equal(fixPackage(diamond(["aaa-root", "zzz-root"]), "leaf"), "aaa-root");
+  });
+
+  it("prefers a nearer direct dependent to a further one", () => {
+    // Breadth-first, not depth-first: the shortest path out of the advisory is
+    // the smallest upgrade that can clear it.
+    const deep = report({
+      leaf: { advisories: [{ ghsa: A1, severity: "low" }], effects: ["middle"] },
+      middle: { effects: ["far-root"], isDirect: true },
+      "far-root": { isDirect: true },
+    });
+    assert.equal(fixPackage(deep, "leaf"), "middle");
+  });
+
+  it("collapses many vulnerable packages onto the one upgrade that clears them", () => {
+    // Twelve advisories whose fix is `expo@57` are one `npm update expo`.
+    // Naming the vulnerable packages produced a command with twelve names for
+    // a single upgrade, which is a command a reader stops trusting.
+    const verdict = evaluateAudit(
+      report({
+        postcss: {
+          advisories: [{ ghsa: A1, severity: "high" }],
+          fixAvailable: { name: "expo", version: "57.0.19", isSemVerMajor: false },
+        },
+        "image-size": {
+          advisories: [{ ghsa: A2, severity: "moderate" }],
+          fixAvailable: { name: "expo", version: "57.0.19", isSemVerMajor: false },
+        },
+      }),
+      [],
+    );
+    assert.deepEqual(fixCommandPackages(verdict.fixableInRange), ["expo"]);
+  });
+
+  it("says on the finding itself where the fix lives, and only when it moved", () => {
+    // A redirect on every line is how the redirect stops being read on the one
+    // line where it is the whole answer.
+    const printed = formatAuditVerdict(
+      evaluateAudit(
+        report({
+          esbuild: {
+            advisories: [{ ghsa: A3, severity: "low" }],
+            fixAvailable: true,
+            effects: ["tsx"],
+          },
+          tsx: { fixAvailable: true, isDirect: true },
+          undici: {
+            advisories: [{ ghsa: A1, severity: "moderate" }],
+            fixAvailable: true,
+            isDirect: true,
+          },
+        }),
+        [],
+      ),
+      "check",
+    );
+    assert.match(printed, /FIXABLE {2}low {7}esbuild#[\w-]+ {2}\(fix in tsx\)/);
+    assert.doesNotMatch(
+      printed,
+      /undici#[\w-]+ {2}\(fix in/,
+      "a fix in the package's own name is not a redirect worth printing",
+    );
+    assert.match(
+      printed,
+      /npm update undici tsx`/,
+      "the command names both, in the order the findings printed",
+    );
+  });
+
+  it("reads a `name` npm has not used yet as no name at all", () => {
+    // The shape guard `fixKind` already has, for the same reason: a field npm
+    // changes must not be able to put a nonsense token in a command a
+    // contributor is told to run.
+    const named = (fixAvailable: unknown): string =>
+      fixPackage(report({ undici: { fixAvailable } }), "undici");
+    assert.equal(named({ isSemVerMajor: false }), "undici");
+    assert.equal(named({ name: "" }), "undici");
+    assert.equal(named({ name: 7 }), "undici");
+    assert.equal(named(true), "undici");
+    assert.equal(named(null), "undici");
+    assert.equal(fixPackage({}, "undici"), "undici", "a report with no vulnerabilities at all");
   });
 });
 
@@ -643,10 +852,13 @@ describe("isClean — the one place that decides the exit code", () => {
   it("passes only when all three lists are empty", () => {
     assert.equal(isClean(clean), true);
     assert.equal(isClean({ ...clean, unexpected: ["x#y"] }), false);
-    assert.equal(isClean({ ...clean, fixableInRange: [{ key: "x#y", severity: "low" }] }), false);
+    assert.equal(
+      isClean({ ...clean, fixableInRange: [{ key: "x#y", severity: "low", updatePackage: "x" }] }),
+      false,
+    );
     assert.equal(isClean({ ...clean, stale: ["x#y"] }), false);
     assert.equal(
-      isClean({ ...clean, majorOnly: [{ key: "x#y", severity: "critical" }] }),
+      isClean({ ...clean, majorOnly: [{ key: "x#y", severity: "critical", updatePackage: "x" }] }),
       true,
       "npm restating a `why` sentence is not a finding",
     );
