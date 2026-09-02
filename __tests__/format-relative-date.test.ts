@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { formatRelativeDate } from "../lib/i18n-context";
+import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 
 const NOW = new Date("2026-05-01T12:00:00Z");
 
@@ -26,9 +28,9 @@ describe("formatRelativeDate", () => {
   });
 
   it("accepts different locales without throwing", () => {
-    const locales = ["en", "ru", "de", "pl", "es", "be"] as const;
+    const supported = locales(readI18nSource());
     const testIso = iso(-1000 * 60 * 60 * 24 * 10);
-    for (const locale of locales) {
+    for (const locale of supported) {
       assert.ok(formatRelativeDate(testIso, locale).length > 0);
     }
   });

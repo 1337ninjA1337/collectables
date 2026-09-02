@@ -21,7 +21,16 @@ import { readI18nSource } from "./helpers/i18n-source-file";
 
 const SOURCE = readI18nSource();
 
-const EXPECTED_LANGUAGES = ["ru", "en", "be", "pl", "de", "es"] as const;
+/**
+ * The picker's list, not a restatement of it.
+ *
+ * A seventh language added to `lib/i18n-context.tsx` has to be checked here
+ * rather than counted: with a literal, every case below would keep asserting
+ * the six it knew about and pass. The one place the six ARE written down is
+ * `i18n-source-file.test.ts`, against the real file — that is the pin, and
+ * this is a consumer of it.
+ */
+const EXPECTED_LANGUAGES = languageOptionCodes(SOURCE);
 
 const blockFor = (code: string) => {
   const block = findLocaleBlock(SOURCE, code);
@@ -38,7 +47,7 @@ describe("i18n translations", () => {
     }
   });
 
-  it("registers all six languages in the translations record", () => {
+  it("registers every offered language in the translations record", () => {
     const record = findObjectLiteral(SOURCE, "translations");
     assert.ok(record, "translations record not found");
     for (const code of EXPECTED_LANGUAGES) {

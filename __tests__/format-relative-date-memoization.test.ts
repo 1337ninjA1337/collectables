@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { formatRelativeDate } from "../lib/i18n-context";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 
 const NOW_MS = Date.parse("2026-05-21T12:00:00Z");
 
@@ -59,7 +60,7 @@ describe("formatRelativeDate — Intl.RelativeTimeFormat memoization", () => {
     // a cached instance still formats correctly on subsequent calls.
     const past = iso(-1000 * 60 * 60 * 24 * 7);
     const future = iso(1000 * 60 * 60 * 24 * 7);
-    for (const locale of ["en", "ru", "de", "pl", "es", "be"] as const) {
+    for (const locale of locales(readI18nSource())) {
       assert.ok(formatRelativeDate(past, locale).length > 0);
       assert.ok(formatRelativeDate(future, locale).length > 0);
       // Second call goes through the cache — output must be unchanged.
