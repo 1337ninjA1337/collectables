@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import path from "node:path";
+
+import { PUBLISHED_ELSEWHERE_NOTE } from "@/lib/audit-baseline";
+import { LINT_GUARDS } from "@/lib/lint-guards";
+
 import { readRepoFile as read } from "./helpers/repo-file";
+import { sourceFiles } from "./helpers/source-files";
 
 /**
  * Pins `npm run verify` as the ONE command that runs the full gate.
@@ -233,6 +238,127 @@ describe("the local gate matches what CI runs", () => {
       gone,
       [],
       `these are excluded from the local gate and CI no longer runs them: ${gone.join(", ")}`,
+    );
+  });
+});
+
+/**
+ * Which legs of the gate can change their answer while the tree does not.
+ *
+ * `PUBLISHED_ELSEWHERE_NOTE` rides every failure of the audit gate and says
+ * the thing a contributor needs to hear on a red run they did not cause: this
+ * is "the one check here whose answer can change while the repository does
+ * not". That sentence was true when it was written and nothing checked it.
+ *
+ * A ninth leg that shelled out to a registry would make it false silently, in
+ * the one message written to be trusted — and the failure would land on
+ * whoever met the audit gate next, not on whoever added the leg.
+ *
+ * ## What is scanned, and what that leaves out
+ *
+ * The CLI wrappers under `scripts/` that the gate reaches: the ones named in
+ * `verify`'s expanded chain, plus every `LINT_GUARDS` entry, which `lint:all`
+ * spawns one at a time. That is where every shell-out and every HTTP call in
+ * this repository lives.
+ *
+ * The suites are deliberately out of scope even though `npm test` is a leg.
+ * They stub `fetch` by name in dozens of files, and a marker scan cannot tell
+ * a stub from a call — the scan would report a hundred hits and get read as
+ * noise, which is the failure every guard here is written against.
+ */
+describe("only one leg of the gate reads anything outside the tree", () => {
+  /**
+   * What a network call looks like in a script here, each named so the failure
+   * says what it found rather than which pattern matched.
+   *
+   * `npx tsx` is deliberately not one: `lint:all` spawns every guard that way
+   * and `tsx` is a devDependency, so it resolves locally. The marker is the
+   * REMOTE read — `npm audit` asking the registry about advisories,
+   * `expo install --check` asking it about compatible versions, an HTTP call.
+   */
+  const NETWORK_MARKERS: ReadonlyArray<readonly [string, RegExp]> = [
+    ["an `npm audit` of the registry", /["'`]npm["'`]\s*,\s*\[\s*["'`]audit["'`]/],
+    [
+      "`expo install --check`, which resolves versions against the registry",
+      /["'`]npx["'`]\s*,\s*\[\s*["'`]expo["'`]\s*,\s*["'`]install["'`]/,
+    ],
+    ["a `fetch` call", /\bfetch\s*\(/],
+    ["an http/https client import", /["'`]node:https?["'`]/],
+  ];
+
+  /** Every `scripts/*.ts` the gate runs — named in `verify`, or via lint:all. */
+  const GATE_SCRIPTS: readonly string[] = [
+    ...new Set([
+      ...[...resolveScript("verify").matchAll(/\bscripts\/[\w.-]+\.ts\b/g)].map((m) => m[0]),
+      ...LINT_GUARDS.map((guard) => guard.scriptPath),
+    ]),
+  ].sort();
+
+  /** The files in a set whose source reaches something outside the tree. */
+  const reachOut = (files: readonly string[]): { file: string; why: string }[] =>
+    files.flatMap((file) => {
+      const source = read(file);
+      const hit = NETWORK_MARKERS.find(([, pattern]) => pattern.test(source));
+      return hit === undefined ? [] : [{ file, why: hit[0] }];
+    });
+
+  it("finds a real population of gate scripts rather than an empty one", () => {
+    // The sweep hazard the file above already carries: a walk that stopped
+    // matching would satisfy "nothing reaches the network" perfectly.
+    assert.ok(
+      GATE_SCRIPTS.length >= 20,
+      `only ${String(GATE_SCRIPTS.length)} gate scripts found — the resolver stopped matching, which passes the case below vacuously`,
+    );
+    assert.ok(
+      GATE_SCRIPTS.includes("scripts/check-audit-baseline.ts"),
+      "the audit gate is a leg of `verify` and must be in the scanned set",
+    );
+  });
+
+  it("detects a network call at all, on scripts the gate does NOT run", () => {
+    // The other half of anti-vacuous: the markers have to fire on something.
+    // `db:find-duplicates` and `sentry:check` are standalone scripts that both
+    // call `fetch`, and neither is reachable from `verify` — so they prove the
+    // scan works without being findings.
+    const everyScript = sourceFiles("scripts");
+    const outsideTheGate = reachOut(everyScript)
+      .map((found) => found.file)
+      .filter((file) => !GATE_SCRIPTS.includes(file));
+    assert.ok(
+      outsideTheGate.length >= 2,
+      `the markers found no network call anywhere outside the gate, so they would not find one inside it either; scanned ${String(everyScript.length)} scripts`,
+    );
+  });
+
+  it("names the audit gate as the only leg that reads a live feed", () => {
+    assert.deepEqual(
+      reachOut(GATE_SCRIPTS),
+      [
+        {
+          file: "scripts/check-audit-baseline.ts",
+          why: "an `npm audit` of the registry",
+        },
+      ],
+      "a second leg of `verify` now reads something outside the tree, which makes PUBLISHED_ELSEWHERE_NOTE's \"the one check here\" false — either keep the new leg hermetic, or rewrite that sentence and this case together",
+    );
+  });
+
+  it("keeps the note claiming singularity, which is what this case measures", () => {
+    // Pinned against the note rather than a paraphrase: a rewrite that dropped
+    // the claim would leave this suite asserting a property nothing depends on.
+    assert.match(
+      PUBLISHED_ELSEWHERE_NOTE,
+      /the one check here whose answer can change while the repository does not/,
+      "the note no longer claims to be the only non-hermetic leg — the case above is measuring nothing",
+    );
+  });
+
+  it("leaves the excluded network step out of the gate, where it can stay", () => {
+    // `lint:expo-install` is the one that would have to join this list, and it
+    // is excluded from the local gate for exactly this reason.
+    assert.ok(
+      !GATE_SCRIPTS.includes("scripts/check-expo-install.ts"),
+      "`check-expo-install` reaches the registry; a `verify` that ran it would make the note wrong",
     );
   });
 });
