@@ -27,6 +27,10 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync, execSync } from "node:child_process";
+import http from "node:http";
+import https from "node:https";
+import { request } from "node:https";
 import { describe, it } from "node:test";
 
 import { readRepoFile } from "./helpers/repo-file";
@@ -66,7 +70,7 @@ describe("a test that reaches the network fails instead", () => {
     // A failure nobody can act on gets worked around. This one names the file
     // that installed it and the one legitimate way past it.
     assert.throws(() => installed("https://example.test"), {
-      message: /Stub `globalThis\.fetch`/,
+      message: /Stub the call for the case that needs a response/,
     });
     assert.throws(() => installed("https://example.test"), {
       message: /__tests__\/test-globals\.ts/,
@@ -85,6 +89,51 @@ describe("a test that reaches the network fails instead", () => {
     // And restoring puts the refusal back, which is what every suite that
     // saves and restores the global is relying on without knowing it.
     assert.throws(() => globalThis.fetch("https://example.test"), /tried to fetch/);
+  });
+});
+
+describe("the other three ways out of the tree", () => {
+  // The audit gate's scan names four markers for a read outside the tree: an
+  // `npm audit` (the gate that is allowed to), a `fetch`, an http/https
+  // client, and — in a script — a spawned tool. A refusal that covered the
+  // first of those would leave the rest exactly as invisible as `fetch` was.
+
+  it("refuses http and https, through the module object", () => {
+    for (const client of [http, https]) {
+      assert.throws(
+        () => client.request("http://example.test/x"),
+        /open an http connection to http:\/\/example\.test\/x/,
+      );
+      assert.throws(() => client.get("http://example.test/y"), /example\.test\/y/);
+    }
+  });
+
+  it("refuses a NAMED import of the same function", () => {
+    // The shape the patch is not obviously able to reach, and the reason it
+    // does: `tsx` transpiles these suites to CommonJS, so a named import
+    // compiles to a property read at CALL time. Under a native-ESM runner the
+    // binding would be made when the builtin was evaluated and this case would
+    // go red — which is the point of pinning it rather than assuming it.
+    assert.throws(() => request("https://example.test/named"), /example\.test\/named/);
+  });
+
+  it("refuses a spawned curl or wget, whatever path they are given as", () => {
+    for (const spawnCurl of [
+      () => execFileSync("curl", ["https://example.test"]),
+      () => execFileSync("/usr/bin/curl", ["https://example.test"]),
+      () => execSync("wget https://example.test -O -"),
+    ]) {
+      assert.throws(spawnCurl, /tried to spawn (?:curl|wget)/);
+    }
+  });
+
+  it("lets the spawns this repository actually makes through", () => {
+    // Refusing spawning outright would break the guard-fixture suites, which
+    // run `node`, `tsx` and `git` dozens of times — and those are reads of
+    // THIS TREE, which is the thing the whole rule is about.
+    assert.equal(execFileSync(process.execPath, ["-e", "process.stdout.write('ok')"], {
+      encoding: "utf8",
+    }), "ok");
   });
 });
 

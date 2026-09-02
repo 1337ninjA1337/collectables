@@ -1,3 +1,6 @@
+import childProcess from "node:child_process";
+import http from "node:http";
+import https from "node:https";
 import { beforeEach } from "node:test";
 import { createRequire } from "node:module";
 import { __resetSentryForTests } from "../lib/sentry";
@@ -60,24 +63,78 @@ const require = createRequire(import.meta.url);
  * this refuses is the call NOBODY stubbed, which is the one that would go out
  * to a real host. A suite that saves and restores the global puts this back.
  *
- * The honest limit: `node:http`, `node:https` and anything spawning `curl` are
- * untouched. Nothing here uses them and the same runtime argument would apply
- * if something did — this is the shape a second refusal would take, not a
- * claim that one is unnecessary.
+ * ALL FOUR MARKERS, because the audit gate's scan names four ways a script
+ * here reaches outside the tree and a refusal that covered one of them would
+ * leave the other three exactly as invisible as `fetch` was: a `fetch` call,
+ * an http/https client, and a spawned network tool. The fourth — `npm audit`
+ * itself — is the gate that is allowed to.
+ *
+ * PATCHED ON THE MODULE OBJECT, and a named import is covered too — which is
+ * a fact about this runner rather than about JavaScript. `tsx` transpiles the
+ * suites to CommonJS, so `import { request } from "node:https"` compiles to a
+ * property read at CALL time and sees the patch; under a native-ESM runner it
+ * would be a binding made when the builtin was first evaluated, and would not.
+ * A case pins the named-import shape, so the day that changes it goes red
+ * rather than going quiet.
  */
-function refuseNetwork(input: unknown): never {
-  const target =
-    typeof input === "string"
-      ? input
-      : input instanceof URL
-        ? input.href
-        : ((input as { url?: string } | null)?.url ?? "an unnamed request");
+function refuseNetwork(what: string, target: string): never {
   throw new Error(
-    `A test tried to fetch ${target}. The suites are a leg of \`npm run verify\` and every leg but the audit gate answers the same for the same commit next year — a real request breaks that, and makes this suite fail on somebody else's outage. Stub \`globalThis.fetch\` for the case that needs a response; __tests__/test-globals.ts installed this refusal.`,
+    `A test tried to ${what} ${target}. The suites are a leg of \`npm run verify\` and every leg but the audit gate answers the same for the same commit next year — a real request breaks that, and makes this suite fail on somebody else's outage. Stub the call for the case that needs a response; __tests__/test-globals.ts installed this refusal.`,
   );
 }
 
-globalThis.fetch = refuseNetwork as unknown as typeof globalThis.fetch;
+/** The URL out of all three shapes `fetch` takes, for a message worth reading. */
+function requested(input: unknown): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.href;
+  return (input as { url?: string } | null)?.url ?? "an unnamed request";
+}
+
+globalThis.fetch = ((input: unknown) =>
+  refuseNetwork("fetch", requested(input))) as unknown as typeof globalThis.fetch;
+
+/**
+ * `http.request`, `http.get` and their https twins.
+ *
+ * Patched on the module object rather than replaced by a loader hook: node's
+ * own runner and `tsx` load these too, and a refusal that took the module out
+ * from under them would fail the run for a reason that is not a test's.
+ */
+for (const client of [http, https] as const) {
+  for (const method of ["request", "get"] as const) {
+    const mutable = client as unknown as Record<string, unknown>;
+    mutable[method] = (input: unknown) =>
+      refuseNetwork(`open an http connection to`, requested(input));
+  }
+}
+
+/**
+ * A spawned `curl` or `wget`, which is how a script reaches the network
+ * without importing anything at all.
+ *
+ * The tool name only. Refusing spawning outright would break the guard-fixture
+ * suites, which run `node`, `tsx` and `git` dozens of times — and those are
+ * reads of this tree, which is the thing the whole rule is about.
+ */
+const NETWORK_TOOLS = new Set(["curl", "wget"]);
+
+function networkTool(command: unknown): string | undefined {
+  if (typeof command !== "string") return undefined;
+  // `exec` takes a whole command line, `execFile`/`spawn` take a path.
+  const first = command.trim().split(/\s+/)[0] ?? "";
+  const name = first.split(/[\\/]/).pop() ?? "";
+  return NETWORK_TOOLS.has(name) ? name : undefined;
+}
+
+for (const method of ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync"] as const) {
+  const mutable = childProcess as unknown as Record<string, unknown>;
+  const real = mutable[method] as (...args: unknown[]) => unknown;
+  mutable[method] = (...args: unknown[]) => {
+    const tool = networkTool(args[0]);
+    if (tool !== undefined) refuseNetwork("spawn", tool);
+    return real(...args);
+  };
+}
 
 const REALTIME_MODULE_PATH = repoPath("lib", "supabase-realtime.ts");
 

@@ -269,10 +269,12 @@ describe("the local gate matches what CI runs", () => {
  *
  * They are not out of scope for the CLAIM. Whether a call goes out is a
  * runtime fact rather than a textual one, so `__tests__/test-globals.ts`
- * replaces `globalThis.fetch` in every test process before any suite loads and
- * a request nobody stubbed throws. `network-refusal.test.ts` owns that; the
- * case below only checks the wiring is still there, because this file is where
- * the note's claim is measured and a leg covered somewhere else is still a leg
+ * refuses one at runtime in every test process, before any suite loads: the
+ * `fetch` global, `http`/`https`'s `request` and `get`, and a spawned `curl`
+ * or `wget` — the same three markers this scan reads, minus the `npm audit`
+ * the gate is allowed to make. `network-refusal.test.ts` owns that; the case
+ * below only checks the wiring is still there, because this file is where the
+ * note's claim is measured and a leg covered somewhere else is still a leg
  * this file is answering for.
  */
 describe("only one leg of the gate reads anything outside the tree", () => {
@@ -351,11 +353,17 @@ describe("only one leg of the gate reads anything outside the tree", () => {
     // bootstrap is what makes the note's claim true about them; without it,
     // "the one check here" would rest on the biggest leg being unexamined.
     const bootstrap = read(path.join(SUITES_REL, "test-globals.ts"));
-    assert.match(
-      bootstrap,
-      /globalThis\.fetch = /,
-      "__tests__/test-globals.ts no longer refuses an unstubbed request — the `test` leg is unexamined again, by this scan and by anything else",
-    );
+    for (const [marker, pattern] of [
+      ["the `fetch` global", /globalThis\.fetch = /],
+      ["http/https `request` and `get`", /\[http, https\]/],
+      ["a spawned network tool", /NETWORK_TOOLS/],
+    ] as const) {
+      assert.match(
+        bootstrap,
+        pattern,
+        `__tests__/test-globals.ts no longer refuses ${marker} — the \`test\` leg is unexamined for it again, by this scan and by anything else`,
+      );
+    }
     assert.match(
       pkg.scripts.test,
       /--import \.\/__tests__\/test-globals\.ts/,

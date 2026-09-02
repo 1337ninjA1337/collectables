@@ -182,8 +182,9 @@ export function networkMarkerHit(source: string): string | undefined {
  * The suites are judged by their wrappers only: `test` is a leg, `npm test`
  * runs 1420 files, and they stub `fetch` by name in dozens of places — a
  * marker scan cannot tell a stub from a call. What answers for them instead is
- * `__tests__/test-globals.ts`, which replaces `globalThis.fetch` in every test
- * process so a request nobody stubbed throws; `network-refusal.test.ts` owns
+ * `__tests__/test-globals.ts`, which refuses at runtime in every test process
+ * what these markers look for in text — `fetch`, `http`/`https`, a spawned
+ * `curl` — so a call nobody stubbed throws; `network-refusal.test.ts` owns
  * that half. The same division is written out where the scan is used.
  */
 export function legReadsOutsideTheTree(leg: GateLeg): string | undefined {
