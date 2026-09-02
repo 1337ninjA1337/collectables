@@ -580,8 +580,12 @@ function severityRank(severity: string): number {
  * "The one check here" is a claim about the other legs, and it is measured
  * rather than remembered: `verify-gate-script.test.ts` scans every script the
  * gate runs for a read outside the tree and fails if a second one appears. A
- * ninth leg that shelled out to a registry would otherwise make this sentence
+ * tenth leg that shelled out to a registry would otherwise make this sentence
  * false silently, in the one message written to be trusted.
+ *
+ * "The other eight" is the same kind of claim one level down, and it said
+ * SEVEN for a day after `lint:ships-to-client` joined. `gate-legs-restated.test.ts`
+ * counts the legs out of the script chain and reads this comment.
  */
 export const PUBLISHED_ELSEWHERE_NOTE =
   "This gate reads the npm registry, so it is the one check here whose answer can change while the repository does not — a finding above may have been published since the last green run rather than caused by this branch. The fix is the same either way, and it belongs on this branch: the tree is only green when it is green today.";

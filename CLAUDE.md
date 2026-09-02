@@ -52,8 +52,11 @@ It said "the four legs" until the day the last three cost a red CI: the
 post-build guards run against `dist/`, so they were left out of the gate and
 out of the case that was supposed to compare the gate with ci.yml — which
 compared it against a hand-written copy of the same four. `verify-gate-script.test.ts`
-reads the step list out of ci.yml now, so a ninth step either joins the gate
-or turns that case red — which is how `lint:ships-to-client` came to be in both.
+reads the step list out of ci.yml now, so a tenth step either joins the gate
+or turns that case red — which is how `lint:ships-to-client`, the ninth, came
+to be in both. The sentences ABOUT that list are checked the same way:
+`gate-legs-restated.test.ts` derives the count from the script chain and reads
+every document that states it, including this one.
 
 `npm test` runs `tsc --noEmit` first because `tsx` strips types without
 checking them: a type-broken test file passes the runner and fails CI. Prefer

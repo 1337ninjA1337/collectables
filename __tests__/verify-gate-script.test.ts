@@ -3,8 +3,8 @@ import { describe, it } from "node:test";
 import path from "node:path";
 
 import { PUBLISHED_ELSEWHERE_NOTE } from "@/lib/audit-baseline";
-import { LINT_GUARDS } from "@/lib/lint-guards";
 
+import { gateScriptPaths, networkMarkerHit } from "./helpers/gate-legs";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
 
@@ -173,7 +173,7 @@ describe("the local gate matches what CI runs", () => {
    * of the four legs it already ran. A list restating the thing it checks
    * cannot notice a fifth.
    *
-   * Derived, so the day somebody adds a ninth step the gate either grows or
+   * Derived, so the day somebody adds a tenth step the gate either grows or
    * goes red — and the failure names the step rather than the number.
    */
   const CI_SCRIPTS = [
@@ -250,7 +250,7 @@ describe("the local gate matches what CI runs", () => {
  * is "the one check here whose answer can change while the repository does
  * not". That sentence was true when it was written and nothing checked it.
  *
- * A ninth leg that shelled out to a registry would make it false silently, in
+ * A tenth leg that shelled out to a registry would make it false silently, in
  * the one message written to be trusted — and the failure would land on
  * whoever met the audit gate next, not on whoever added the leg.
  *
@@ -268,38 +268,22 @@ describe("the local gate matches what CI runs", () => {
  */
 describe("only one leg of the gate reads anything outside the tree", () => {
   /**
-   * What a network call looks like in a script here, each named so the failure
-   * says what it found rather than which pattern matched.
+   * The markers and the scanned set both live in `helpers/gate-legs.ts`.
    *
-   * `npx tsx` is deliberately not one: `lint:all` spawns every guard that way
-   * and `tsx` is a devDependency, so it resolves locally. The marker is the
-   * REMOTE read — `npm audit` asking the registry about advisories,
-   * `expo install --check` asking it about compatible versions, an HTTP call.
+   * They were written here and moved when the leg COUNT needed them too:
+   * "the other eight legs read the tree" is this scan's answer subtracted
+   * from the number of legs, and `gate-legs-restated.test.ts` checks that
+   * sentence wherever it is written down. Two copies of the marker list would
+   * have let the two rules disagree about which legs are hermetic — the exact
+   * shape of drift both files exist to catch.
    */
-  const NETWORK_MARKERS: ReadonlyArray<readonly [string, RegExp]> = [
-    ["an `npm audit` of the registry", /["'`]npm["'`]\s*,\s*\[\s*["'`]audit["'`]/],
-    [
-      "`expo install --check`, which resolves versions against the registry",
-      /["'`]npx["'`]\s*,\s*\[\s*["'`]expo["'`]\s*,\s*["'`]install["'`]/,
-    ],
-    ["a `fetch` call", /\bfetch\s*\(/],
-    ["an http/https client import", /["'`]node:https?["'`]/],
-  ];
-
-  /** Every `scripts/*.ts` the gate runs — named in `verify`, or via lint:all. */
-  const GATE_SCRIPTS: readonly string[] = [
-    ...new Set([
-      ...[...resolveScript("verify").matchAll(/\bscripts\/[\w.-]+\.ts\b/g)].map((m) => m[0]),
-      ...LINT_GUARDS.map((guard) => guard.scriptPath),
-    ]),
-  ].sort();
+  const GATE_SCRIPTS = gateScriptPaths();
 
   /** The files in a set whose source reaches something outside the tree. */
   const reachOut = (files: readonly string[]): { file: string; why: string }[] =>
     files.flatMap((file) => {
-      const source = read(file);
-      const hit = NETWORK_MARKERS.find(([, pattern]) => pattern.test(source));
-      return hit === undefined ? [] : [{ file, why: hit[0] }];
+      const why = networkMarkerHit(read(file));
+      return why === undefined ? [] : [{ file, why }];
     });
 
   it("finds a real population of gate scripts rather than an empty one", () => {
