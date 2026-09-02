@@ -57,6 +57,7 @@ import {
 } from "./helpers/guard-fixture";
 import { assertPhraseTable } from "./helpers/phrase-table";
 
+import { installedPackagePath, installedRoot } from "./helpers/installed-packages";
 import { REPO_ROOT, readRepoFile, repoPath } from "./helpers/repo-file";
 import { SUITES_REL } from "./helpers/suite-files";
 
@@ -709,7 +710,7 @@ describe("the loader check", () => {
     inScratchCheckout((root) => {
       fs.mkdirSync(path.join(root, "node_modules"), { recursive: true });
       fs.symlinkSync(
-        repoPath("node_modules", "tsx"),
+        installedPackagePath("tsx"),
         path.join(root, "node_modules", "tsx"),
       );
       assert.equal(tsxLoaderIn(root), "tsx");
@@ -1164,7 +1165,7 @@ describe("nodeModulesChain", () => {
   });
 
   it("never comes back empty, so no caller needs a branch for a root without a nearest link", () => {
-    for (const root of [FS_ROOT, FS_ROOT_LINK, "/a/b", REPO_ROOT, repoPath("node_modules")]) {
+    for (const root of [FS_ROOT, FS_ROOT_LINK, "/a/b", REPO_ROOT, installedRoot()]) {
       const chain = nodeModulesChain(root);
       assert.ok(chain.length >= 1, `${root} produced an empty chain`);
       assert.equal(

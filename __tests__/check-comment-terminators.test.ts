@@ -55,7 +55,7 @@ import {
 } from "../lib/check-comment-terminators";
 import { LINT_GUARDS } from "../lib/lint-guards";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
-import { REPO_ROOT } from "./helpers/repo-file";
+import { installedBin } from "./helpers/installed-packages";
 import { SUITES_REL } from "./helpers/suite-files";
 
 /**
@@ -377,7 +377,7 @@ describe("the compiler's own report is why this exists", () => {
       let output = "";
       try {
         execFileSync(
-          path.join(REPO_ROOT, "node_modules", ".bin", "tsc"),
+          installedBin("tsc"),
           ["--noEmit", "--skipLibCheck", file],
           { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 120_000 },
         );

@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
-import { repoPath } from "./helpers/repo-file";
+import { installedPackagePath } from "./helpers/installed-packages";
 
 /**
  * The dependency behaviour that `sheet-modal-semantics` argues FROM.
@@ -30,11 +30,11 @@ import { repoPath } from "./helpers/repo-file";
  * React Native peer and `tsx --test` cannot transform its entry points.
  */
 
-const MODAL_DIR = ["node_modules", "react-native-web", "dist", "exports", "Modal"] as const;
+const MODAL_DIR = ["dist", "exports", "Modal"] as const;
 
 /** The installed version, for a failure message that says WHICH version broke. */
 function installedVersion(): string {
-  const pkg = repoPath("node_modules", "react-native-web", "package.json");
+  const pkg = installedPackagePath("react-native-web", "package.json");
   if (!existsSync(pkg)) return "not installed";
   return (JSON.parse(readFileSync(pkg, "utf8")) as { version?: string }).version ?? "unknown";
 }
@@ -48,7 +48,7 @@ function installedVersion(): string {
  * returning `""` would turn every case below into a silent pass.
  */
 function modalSource(file: string): string {
-  const at = repoPath(...MODAL_DIR, file);
+  const at = installedPackagePath("react-native-web", ...MODAL_DIR, file);
   assert.ok(
     existsSync(at),
     `react-native-web ${installedVersion()} no longer ships exports/Modal/${file}. The sheet suite's premise — that <Modal> provides aria-modal, a focus trap and Escape-to-close on web — was read out of this file. Re-read the new implementation and update sheet-modal-semantics.test.ts before deleting this case.`,

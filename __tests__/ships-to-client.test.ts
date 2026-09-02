@@ -10,8 +10,8 @@ import {
   isShipsToClientClean,
 } from "@/lib/ships-to-client";
 
-import { listFilesUnder } from "../scripts/guard-io";
-import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { installedPackageFiles, readInstalledFile } from "./helpers/installed-packages";
+import { readRepoFile } from "./helpers/repo-file";
 
 /**
  * `shipsToClient` stops being a sentence.
@@ -167,16 +167,12 @@ describe("every fingerprint is a real string in its own package", () => {
       // Its own installed code, its own nested dependencies excluded: a string
       // borrowed from something the package merely depends on would go missing
       // the day that dependency moves, and the guard would quietly stop asking.
-      const root = repoPath("node_modules", ...entry.package.split("/"));
-      const files = listFilesUnder(root, {
-        extensions: [".js", ".mjs", ".cjs"],
-        skipDirs: ["node_modules"],
-      });
+      // Through `helpers/installed-packages`, which is where the exclusion and
+      // the reason this read is different from every other read here live.
+      const files = installedPackageFiles(entry.package);
       assert.ok(files.length > 0, `no JavaScript under node_modules/${entry.package}`);
       const found = files.some((relative) =>
-        readRepoFile(path.join("node_modules", entry.package, relative)).includes(
-          entry.absentFingerprint ?? "",
-        ),
+        readInstalledFile(entry.package, relative).includes(entry.absentFingerprint ?? ""),
       );
       assert.ok(
         found,
