@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { scanComments, stripComments } from "@/lib/strip-comments";
+import { codeOffsets, scanComments, scanSpans, stripComments } from "@/lib/strip-comments";
 
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, sourceFiles } from "./helpers/source-files";
@@ -327,6 +327,103 @@ describe("scanComments", () => {
         assert.equal(stripped[i], " ", `character ${i} is inside a span and survived`);
         assert.ok(changed);
       }
+    }
+  });
+});
+
+/**
+ * The full span reader — comments AND literals.
+ *
+ * `scanComments` is a filter over this, and the literals were already tracked
+ * by the same machine; what changed is that they are now reported. The value
+ * is the COMPLEMENT: everything outside every span is code, which is the only
+ * way to ask whether a shape found by a text search is real. The first caller
+ * is the rule that looks for a comment terminator standing in code — a thing
+ * no valid program contains, and the wreckage every comment that ended early
+ * leaves behind.
+ */
+describe("scanSpans", () => {
+  const CLOSE = `*${"/"}`;
+  const OPEN = `/${"*"}`;
+
+  it("reports each literal kind with the terminator inside the span", () => {
+    for (const [label, source] of [
+      ["single", `const a = 'x ${CLOSE} y';\n`],
+      ["double", `const a = "x ${CLOSE} y";\n`],
+      ["template", `const a = \`x ${CLOSE} y\`;\n`],
+    ] as const) {
+      const spans = scanSpans(source);
+      assert.equal(spans.length, 1, label);
+      assert.equal(spans[0].kind, label);
+      assert.equal(spans[0].closed, true, label);
+      assert.ok(source.slice(spans[0].start, spans[0].end).includes(CLOSE), label);
+    }
+  });
+
+  it("reports a regex literal, character class included", () => {
+    // The class is the only place a pattern can hold the two characters
+    // without the `/` of them ending it, so it is the only shape that tests
+    // what this claims: `/a*\/b/` would simply be the pattern `/a*/` followed
+    // by more code, and asserting on it would assert nothing about classes.
+    const source = `const c = /[${"*"}${"/"}]/.test(s);\n`;
+    const [span] = scanSpans(source).filter((entry) => entry.kind === "regex");
+    assert.ok(span, "the pattern must be a span");
+    assert.equal(source.slice(span.start, span.end), `/[${CLOSE}]/`);
+    assert.equal(span.closed, true);
+    assert.equal(
+      codeOffsets(source)(source.indexOf(CLOSE)),
+      false,
+      "the terminator inside the class is content, not code",
+    );
+  });
+
+  it("marks an unterminated quote unclosed and stops it before the newline", () => {
+    const source = "const a = 'x\nconst b = 2;\n";
+    const [span] = scanSpans(source);
+    assert.equal(span.kind, "single");
+    assert.equal(span.closed, false);
+    assert.equal(source[span.end], "\n", "the newline that cut it is outside the span");
+    // A template literal is the quote that MAY span lines, so the same shape
+    // is closed rather than cut.
+    const [tpl] = scanSpans("const a = `x\ny`;\n");
+    assert.equal(tpl.kind, "template");
+    assert.equal(tpl.closed, true);
+  });
+
+  it("is what scanComments filters, not a second walk", () => {
+    const source = `// one\n${OPEN}* two ${CLOSE}\nconst a = "three";\n`;
+    assert.deepEqual(
+      scanComments(source),
+      scanSpans(source).filter((span) => span.kind === "line" || span.kind === "block"),
+    );
+  });
+});
+
+describe("codeOffsets", () => {
+  const CLOSE = `*${"/"}`;
+
+  it("answers false inside every span and true in the code between them", () => {
+    const source = `const a = "${CLOSE}"; // tail\n`;
+    const inCode = codeOffsets(source);
+    assert.equal(inCode(0), true, "`c` of const is code");
+    assert.equal(inCode(source.indexOf(CLOSE)), false, "inside the string literal");
+    assert.equal(inCode(source.indexOf("//")), false, "inside the line comment");
+    assert.equal(inCode(source.indexOf(";")), true, "the semicolon between them");
+  });
+
+  it("is false outside the file rather than throwing", () => {
+    const inCode = codeOffsets("const a = 1;\n");
+    assert.equal(inCode(-1), false);
+    assert.equal(inCode(9999), false);
+  });
+
+  it("takes a span list rather than rescanning, and agrees with the scan", () => {
+    const source = readSource("lib/check-comment-terminators.ts");
+    const spans = scanSpans(source);
+    const shared = codeOffsets(source, spans);
+    const rescanned = codeOffsets(source);
+    for (let i = 0; i < source.length; i += 97) {
+      assert.equal(shared(i), rescanned(i), `offset ${i} disagreed`);
     }
   });
 });

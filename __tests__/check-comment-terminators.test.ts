@@ -18,10 +18,18 @@
  * tree: zero findings across 812 files, and it flags the real case.
  *
  * It reads COMMENT SPANS now rather than lines that begin with a star, which
- * is the difference the cases below are mostly about: a continuation line with
- * no star prefix is in scope, a terminator inside a string literal is not a
- * terminator, and a file's SECOND broken comment is only reported when the
+ * is the difference many of the cases below are about: a continuation line
+ * with no star prefix is in scope, a terminator inside a string literal is not
+ * a terminator, and a file's SECOND broken comment is only reported when the
  * code the first one spilled into resynchronises.
+ *
+ * A SECOND rule stands behind the JSX exemption. The skip is defended by a
+ * claim about English — that no orphaned paragraph begins with a brace — which
+ * nobody can write a counter-example to without inventing it, and inventing it
+ * is what the case below does. It reaches the exemption, the first rule says
+ * nothing, and the ORIGINAL terminator the broken comment left standing in
+ * code names the file anyway. Cause beats symptom where both are visible, so
+ * the orphans of a file with an early finding are dropped.
  *
  * This suite cannot write the terminator out either, which is why its fixtures
  * build it from parts. That is not a trick to get around the rule; it is the
@@ -37,9 +45,13 @@ import * as path from "node:path";
 
 import {
   EARLY_TERMINATOR_ADVICE,
+  ORPHAN_TERMINATOR_ADVICE,
   TRAILING_LIMIT,
   findEarlyTerminators,
+  findOrphanTerminators,
   formatEarlyTerminatorReport,
+  formatOrphanTerminatorReport,
+  orphansWithoutCause,
 } from "../lib/check-comment-terminators";
 import { LINT_GUARDS } from "../lib/lint-guards";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
@@ -180,6 +192,117 @@ describe("findEarlyTerminators", () => {
 
   it("finds nothing in a file with no comments at all", () => {
     assert.deepEqual(findEarlyTerminators("lib/plain.ts", "export const x = 1;\n"), []);
+  });
+});
+
+describe("findOrphanTerminators", () => {
+  it("names a terminator standing in code", () => {
+    // The wreckage of a comment that ended early: its ORIGINAL close is left
+    // in what is now code, where no valid program puts one.
+    const source = [OPEN, ` * glob is src${CLOSE}*.ts`, ` ${CLOSE}`, "export const x = 1;"].join(
+      "\n",
+    );
+    const found = findOrphanTerminators("lib/wreck.ts", source);
+    assert.equal(found.length, 1);
+    assert.equal(found[0].line, 3);
+    assert.ok(found[0].text.includes(CLOSE));
+  });
+
+  it("says nothing about a healthy file", () => {
+    const source = [OPEN, " * An ordinary paragraph.", ` ${CLOSE}`, "export const x = 1;"].join(
+      "\n",
+    );
+    assert.deepEqual(findOrphanTerminators("lib/fine.ts", source), []);
+  });
+
+  it("does not read a terminator inside a string, a template or a regex as one", () => {
+    // Every one of these is ordinary content, and this suite writes the first
+    // shape on nearly every line. A text scan for the two characters would
+    // report all three.
+    assert.deepEqual(findOrphanTerminators("lib/q.ts", `const a = "${CLOSE}";\n`), []);
+    assert.deepEqual(findOrphanTerminators("lib/t.ts", `const b = \`x ${CLOSE} y\`;\n`), []);
+    assert.deepEqual(findOrphanTerminators("lib/r.ts", `const c = /[${CLOSE}]/.test(s);\n`), []);
+  });
+
+  it("catches the broken JSX container the early rule's one exemption skips", () => {
+    // The reason this rule exists. `{/* … */}` wrapped across lines is
+    // legitimate, so the early rule skips a comment opened after a `{` whose
+    // trailing text starts with `}` — and that skip was defended by a claim
+    // about English, which nothing can check. Here the skip fires on a REAL
+    // early terminator, the early rule reports nothing, and the orphan its
+    // comment left behind names the file anyway.
+    const source = [
+      `      {${OPEN.slice(0, 2)} the include list is every ts file under`,
+      `          src, written out as src${CLOSE} } .ts and the rest is prose ${CLOSE}}`,
+      "      <Foo />",
+    ].join("\n");
+    assert.deepEqual(
+      findEarlyTerminators("app/x.tsx", source),
+      [],
+      "this case must reach the exemption — otherwise it is not testing the hole",
+    );
+    const found = findOrphanTerminators("app/x.tsx", source);
+    assert.equal(found.length, 1);
+    assert.equal(found[0].line, 2);
+  });
+
+  it("leaves a healthy wrapped JSX container alone", () => {
+    const source = [
+      `      {${OPEN.slice(0, 2)} One subscriber for every rejected write, above`,
+      `          the gate so a sign-out does not unmount it. ${CLOSE}}`,
+      "      <StorageNotice />",
+    ].join("\n");
+    assert.deepEqual(findOrphanTerminators("app/_layout.tsx", source), []);
+  });
+});
+
+describe("orphansWithoutCause", () => {
+  it("drops the symptoms of a file whose cause is already named", () => {
+    // One offence reported twice — once by the terminator that ended the
+    // comment, once by the close it orphaned — is one offence too many, and
+    // only the first is the thing a reader can act on.
+    const early = [{ file: "lib/a.ts", line: 2, column: 5, trailing: ".ts and prose" }];
+    const orphans = [{ file: "lib/a.ts", line: 4, column: 2, text: `  ${CLOSE}` }];
+    assert.deepEqual(orphansWithoutCause(early, orphans), []);
+  });
+
+  it("keeps an orphan in a file with no early finding", () => {
+    const orphans = [{ file: "app/x.tsx", line: 2, column: 65, text: `prose ${CLOSE}}` }];
+    assert.deepEqual(orphansWithoutCause([], orphans), orphans);
+  });
+
+  it("is per file, not per repository", () => {
+    const early = [{ file: "lib/a.ts", line: 2, column: 5, trailing: "x" }];
+    const orphans = [
+      { file: "lib/a.ts", line: 4, column: 2, text: "a" },
+      { file: "lib/b.ts", line: 7, column: 2, text: "b" },
+    ];
+    assert.deepEqual(
+      orphansWithoutCause(early, orphans).map((entry) => entry.file),
+      ["lib/b.ts"],
+    );
+  });
+});
+
+describe("formatOrphanTerminatorReport", () => {
+  it("is empty when there is nothing to say", () => {
+    assert.equal(formatOrphanTerminatorReport([]), "");
+  });
+
+  it("carries its own advice, not the early rule's", () => {
+    const report = formatOrphanTerminatorReport([
+      { file: "lib/a.ts", line: 4, column: 12, text: `prose ${CLOSE}` },
+    ]);
+    assert.ok(report.includes("lib/a.ts"));
+    assert.ok(report.includes("4:12"));
+    assert.ok(
+      report.includes(ORPHAN_TERMINATOR_ADVICE),
+      "an orphan's reader has to be told to look UP for the cause",
+    );
+    assert.ok(
+      !report.includes(EARLY_TERMINATOR_ADVICE),
+      "the glob sentence is about the other rule and would send this reader nowhere",
+    );
   });
 });
 

@@ -51,14 +51,36 @@
  * which the text match could only avoid by never looking at lines that start
  * with code.
  *
- * Measured against this tree at 810 files: zero findings, and it flags both
- * the real case and the unprefixed one the text match missed.
+ * TWO RULES, because the first one has an exemption and the second is what
+ * makes the exemption safe. The wrapped JSX comment container — the only way
+ * to write a comment in JSX, and prettier wraps the long ones across lines —
+ * legitimately puts a closing brace after a terminator, so the first rule
+ * skips a comment opened straight after a `{` whose trailing text starts with
+ * `}`. That skip was defended by a claim about ENGLISH: no orphaned paragraph
+ * begins with a brace. Nobody can write the counter-example without inventing
+ * it, which is the same thing as nobody being able to check it.
  *
- * This module still cannot write the terminator out — the rule is its own
- * first customer, and the paragraph above escapes the one it quotes.
+ * So the second rule does not depend on it. A comment that ends early leaves
+ * its ORIGINAL terminator standing in what is now code, and a terminator in
+ * code is a thing no valid program contains — `tsc` calls it a syntax error
+ * wherever it lands. {@link findOrphanTerminators} looks for exactly that,
+ * using {@link scanSpans}' complement (everything outside every comment and
+ * every literal), so a broken comment the first rule skipped is still named,
+ * by the wreckage rather than by the cause.
+ *
+ * The two are reported as CAUSE and SYMPTOM, never both for one offence: an
+ * early terminator in a file is the reason its orphan exists, so the orphans
+ * of a file with an early finding are dropped. A file with orphans and no
+ * early finding is the case the second rule exists for, and its message says
+ * so rather than repeating the first rule's advice.
+ *
+ * Measured against this tree at 812 files: zero findings from either rule.
+ *
+ * This module still cannot write the terminator out — the rules are their own
+ * first customer, and the paragraphs above escape the one they quote.
  */
 
-import { scanComments } from "./strip-comments";
+import { scanComments, scanSpans, codeOffsets } from "./strip-comments";
 
 /** One line whose block comment ended before its author meant it to. */
 export interface EarlyTerminator {
@@ -87,6 +109,44 @@ export const EARLY_TERMINATOR_ADVICE =
 const TERMINATOR_LENGTH = 2;
 
 /**
+ * The terminator, assembled rather than typed.
+ *
+ * Spelling it out here would end this module's own doc comment on the day
+ * somebody moves this constant above one, which is the bug under guard. Both
+ * rules search with it.
+ */
+const TERMINATOR = `*${"/"}`;
+
+/**
+ * Line starts and an index-to-line lookup, built once per file.
+ *
+ * Both rules turn offsets into `line:column`, and a re-split per finding is
+ * how the cheap one becomes the expensive one on a file with many.
+ */
+function lineIndex(source: string): {
+  starts: readonly number[];
+  lineOf: (index: number) => number;
+} {
+  const starts = [0];
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] === "\n") starts.push(i + 1);
+  }
+  return {
+    starts,
+    lineOf: (index: number): number => {
+      let low = 0;
+      let high = starts.length - 1;
+      while (low < high) {
+        const mid = Math.ceil((low + high) / 2);
+        if (starts[mid] <= index) low = mid;
+        else high = mid - 1;
+      }
+      return low;
+    },
+  };
+}
+
+/**
  * Every place in `source` where a multi-line block comment closes with prose
  * still to come.
  *
@@ -101,22 +161,7 @@ const TERMINATOR_LENGTH = 2;
  */
 export function findEarlyTerminators(file: string, source: string): EarlyTerminator[] {
   const found: EarlyTerminator[] = [];
-  // Offset of the start of each line, so a span index becomes a line/column
-  // in one lookup rather than a re-split per finding.
-  const lineStarts = [0];
-  for (let i = 0; i < source.length; i++) {
-    if (source[i] === "\n") lineStarts.push(i + 1);
-  }
-  const lineOf = (index: number): number => {
-    let low = 0;
-    let high = lineStarts.length - 1;
-    while (low < high) {
-      const mid = Math.ceil((low + high) / 2);
-      if (lineStarts[mid] <= index) low = mid;
-      else high = mid - 1;
-    }
-    return low;
-  };
+  const { starts: lineStarts, lineOf } = lineIndex(source);
 
   for (const span of scanComments(source)) {
     if (span.kind !== "block" || !span.closed) continue;
@@ -149,6 +194,101 @@ export function findEarlyTerminators(file: string, source: string): EarlyTermina
     });
   }
   return found;
+}
+
+/** One comment terminator standing in code, closing nothing. */
+export interface OrphanTerminator {
+  /** Repo-relative path of the file. */
+  readonly file: string;
+  /** 1-indexed line number. */
+  readonly line: number;
+  /** 1-indexed column of the `*`. */
+  readonly column: number;
+  /** The line it stands on, trimmed — the reader's clue. */
+  readonly text: string;
+}
+
+/**
+ * The advice for an orphan, which is not the advice for its cause.
+ *
+ * A reader who reaches this message has a terminator with no comment above it,
+ * and the useful instruction is to go LOOK for the comment that ended early —
+ * not to stop writing globs, which is what the other sentence says.
+ */
+export const ORPHAN_TERMINATOR_ADVICE =
+  "no valid program contains a comment terminator in code, so a block comment above this one ended before its author meant it to — find the terminator inside its body";
+
+/**
+ * Every comment terminator in `source` that stands in code.
+ *
+ * Not inside a comment (it would be that comment's own close, or content) and
+ * not inside a string, template or regex literal (where it is ordinary text —
+ * this module's suite writes it, and so does anything quoting a glob). What is
+ * left is a terminator the compiler will reject, and the only way one gets
+ * there is a comment that ended somewhere earlier than its author intended.
+ *
+ * The rule needs no exemption and has none. That is the point of it: the first
+ * rule has one, and this is what stands behind the skip.
+ */
+export function findOrphanTerminators(file: string, source: string): OrphanTerminator[] {
+  const found: OrphanTerminator[] = [];
+  const spans = scanSpans(source);
+  const inCode = codeOffsets(source, spans);
+  const { starts: lineStarts, lineOf } = lineIndex(source);
+  for (let at = source.indexOf(TERMINATOR); at >= 0; at = source.indexOf(TERMINATOR, at + 1)) {
+    if (!inCode(at)) continue;
+    const line = lineOf(at);
+    const nextBreak = source.indexOf("\n", lineStarts[line]);
+    const text = source.slice(lineStarts[line], nextBreak < 0 ? source.length : nextBreak).trim();
+    found.push({
+      file,
+      line: line + 1,
+      column: at - lineStarts[line] + 1,
+      text: text.length > TRAILING_LIMIT ? `${text.slice(0, TRAILING_LIMIT)}…` : text,
+    });
+  }
+  return found;
+}
+
+/**
+ * The orphans worth reporting: those in files with no early finding.
+ *
+ * An early terminator is the REASON the orphans below it exist — the comment
+ * it ended left its original close standing in code — so reporting both names
+ * one offence twice, once by its cause and once by its wreckage. The cause is
+ * the one a reader can act on, so it wins and the symptoms are dropped.
+ *
+ * What survives is the case this rule was added for: a file whose broken
+ * comment the first rule could not see, because its one exemption skipped it.
+ */
+export function orphansWithoutCause(
+  early: readonly EarlyTerminator[],
+  orphans: readonly OrphanTerminator[],
+): OrphanTerminator[] {
+  const explained = new Set(early.map((entry) => entry.file));
+  return orphans.filter((entry) => !explained.has(entry.file));
+}
+
+/** Human-readable report, or `""` when there is nothing to say. */
+export function formatOrphanTerminatorReport(found: readonly OrphanTerminator[]): string {
+  if (found.length === 0) return "";
+  const lines = [
+    `Found ${found.length} comment terminator(s) standing in code, closing nothing.`,
+    `${ORPHAN_TERMINATOR_ADVICE}.`,
+  ];
+  const byFile = new Map<string, OrphanTerminator[]>();
+  for (const entry of found) {
+    const list = byFile.get(entry.file) ?? [];
+    list.push(entry);
+    byFile.set(entry.file, list);
+  }
+  for (const [file, list] of byFile) {
+    lines.push("", `  ${file}`);
+    for (const entry of list) {
+      lines.push(`    ${entry.line}:${entry.column}  in code: ${entry.text}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 /** Human-readable report, or `""` when there is nothing to say. */
