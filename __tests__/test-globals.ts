@@ -109,14 +109,20 @@ for (const client of [http, https] as const) {
 }
 
 /**
- * A spawned `curl` or `wget`, which is how a script reaches the network
+ * A spawned tool that reaches a remote, which is how code gets out of the tree
  * without importing anything at all.
  *
- * The tool name only. Refusing spawning outright would break the guard-fixture
- * suites, which run `node`, `tsx` and `git` dozens of times — and those are
- * reads of this tree, which is the thing the whole rule is about.
+ * `curl` and `wget` are the obvious two. `npm` and `npx` are here because the
+ * scan's other two markers are exactly those spawns — `npm audit` asking the
+ * registry about advisories, `npx expo install --check` asking it about
+ * versions — and a refusal that covered two of the scan's four shapes would
+ * leave the same hole one level down. No suite spawns either; the guard
+ * fixtures run `node --import tsx` directly, which is a read of this tree.
+ *
+ * The tool NAME only. Refusing spawning outright would break those fixtures,
+ * which run `node`, `tsx` and `git` dozens of times.
  */
-const NETWORK_TOOLS = new Set(["curl", "wget"]);
+const NETWORK_TOOLS = new Set(["curl", "wget", "npm", "npx"]);
 
 function networkTool(command: unknown): string | undefined {
   if (typeof command !== "string") return undefined;

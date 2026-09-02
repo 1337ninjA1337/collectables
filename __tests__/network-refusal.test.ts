@@ -33,6 +33,7 @@ import https from "node:https";
 import { request } from "node:https";
 import { describe, it } from "node:test";
 
+import { NETWORK_MARKERS } from "./helpers/gate-legs";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -92,11 +93,12 @@ describe("a test that reaches the network fails instead", () => {
   });
 });
 
-describe("the other three ways out of the tree", () => {
-  // The audit gate's scan names four markers for a read outside the tree: an
-  // `npm audit` (the gate that is allowed to), a `fetch`, an http/https
-  // client, and — in a script — a spawned tool. A refusal that covered the
-  // first of those would leave the rest exactly as invisible as `fetch` was.
+describe("the other ways out of the tree", () => {
+  // The audit gate's scan names four shapes for a read outside the tree: a
+  // `fetch`, an http/https client, an `npm audit` and an `npx expo install`.
+  // The refusal shipped covering the first, and a refusal that covered one of
+  // four would leave the other three exactly as invisible as `fetch` was on
+  // the morning the case for it was made.
 
   it("refuses http and https, through the module object", () => {
     for (const client of [http, https]) {
@@ -117,13 +119,15 @@ describe("the other three ways out of the tree", () => {
     assert.throws(() => request("https://example.test/named"), /example\.test\/named/);
   });
 
-  it("refuses a spawned curl or wget, whatever path they are given as", () => {
+  it("refuses a spawned network tool, whatever path it is given as", () => {
     for (const spawnCurl of [
       () => execFileSync("curl", ["https://example.test"]),
       () => execFileSync("/usr/bin/curl", ["https://example.test"]),
       () => execSync("wget https://example.test -O -"),
+      () => execFileSync("npm", ["audit"]),
+      () => execFileSync("npx", ["expo", "install", "--check"]),
     ]) {
-      assert.throws(spawnCurl, /tried to spawn (?:curl|wget)/);
+      assert.throws(spawnCurl, /tried to spawn (?:curl|wget|npm|npx)/);
     }
   });
 
@@ -134,6 +138,41 @@ describe("the other three ways out of the tree", () => {
     assert.equal(execFileSync(process.execPath, ["-e", "process.stdout.write('ok')"], {
       encoding: "utf8",
     }), "ok");
+  });
+});
+
+/**
+ * The scan and the refusal describe the same property and were written apart.
+ *
+ * `NETWORK_MARKERS` is what `verify-gate-script.test.ts` looks for in a gate
+ * script's TEXT; the bootstrap's patches are what a suite is refused at
+ * RUNTIME. They agreed on the day the second was written from the first by
+ * hand, which is the arrangement every "two copies" entry in `.tasks/` is
+ * about — so the population comes from the scan's list here, and a fifth
+ * marker with no runtime probe is a red run rather than a quiet asymmetry.
+ */
+describe("every marker the scan reads is refused at runtime", () => {
+  const PROBES: Readonly<Record<string, () => unknown>> = {
+    "an `npm audit` of the registry": () => execFileSync("npm", ["audit", "--json"]),
+    "`expo install --check`, which resolves versions against the registry": () =>
+      execFileSync("npx", ["expo", "install", "--check"]),
+    "a `fetch` call": () => installed("https://example.test"),
+    "an http/https client import": () => https.request("https://example.test"),
+  };
+
+  it("has a probe for every marker, and no probe for a marker that has gone", () => {
+    const markers = NETWORK_MARKERS.map(([label]) => label).sort();
+    assert.deepEqual(
+      Object.keys(PROBES).sort(),
+      markers,
+      "the scan's markers and the runtime probes have drifted — a marker with no probe is a shape the suites can still perform, and a probe with no marker is a refusal nothing asks for",
+    );
+  });
+
+  it("refuses each of them, so the two describe one property", () => {
+    for (const [label, probe] of Object.entries(PROBES)) {
+      assert.throws(probe, /A test tried to/, `${label} is not refused at runtime`);
+    }
   });
 });
 
