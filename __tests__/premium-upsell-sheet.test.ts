@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("PremiumUpsellSheet component", () => {
@@ -45,7 +46,7 @@ describe("PremiumUpsellSheet component", () => {
 
 describe("premium upsell translations", () => {
   const src = readI18nSource();
-  const langs = ["en", "ru", "be", "pl", "de", "es"] as const;
+  const langs = locales(src);
 
   // The new upsell keys must exist in every language (or be inherited via
   // `...en`). Since en is the spread base, asserting en + a per-language count

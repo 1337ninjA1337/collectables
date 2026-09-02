@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
@@ -17,7 +18,7 @@ import { readRepoFile as read } from "./helpers/repo-file";
 describe("marketplaceTransferredBadge i18n parity", () => {
   it("declares marketplaceTransferredBadge in every supported language", () => {
     const src = readI18nSource();
-    const languages = ["en", "ru", "be", "pl", "de", "es"] as const;
+    const languages = locales(src);
     for (const code of languages) {
       const blockMatch = src.match(
         new RegExp(`const\\s+${code}\\s*:?\\s*(?:TranslationMap)?\\s*=\\s*{([\\s\\S]*?)\\n};`),

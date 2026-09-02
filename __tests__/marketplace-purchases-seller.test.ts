@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { localeKeys } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("marketplace screen — purchases 'From @seller' chip", () => {
@@ -39,7 +40,7 @@ describe("marketplaceBoughtFrom i18n parity", () => {
   const src = readI18nSource();
 
   it("declares marketplaceBoughtFrom in every supported language map", () => {
-    for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
+    for (const lang of locales(src)) {
       const declared = localeKeys(src, lang);
       assert.ok(
         declared.has("marketplaceBoughtFrom"),

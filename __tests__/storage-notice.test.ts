@@ -14,6 +14,7 @@ import {
 import { STORAGE_ERROR_INPUTS } from "./helpers/storage-error-samples";
 import { expectStorageReport } from "./helpers/storage-failure-report";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 import { readSource, sourceFiles } from "./helpers/source-files";
 
 /**
@@ -650,7 +651,7 @@ describe("which full-storage sentence a platform gets", () => {
     // its `values` map exist to end.
     const source = readI18nSource();
 
-    for (const language of ["en", "ru", "be", "pl", "de", "es"]) {
+    for (const language of locales(source)) {
       const block = findLocaleBlock(source, language);
       assert.ok(block, `no \`const ${language}\` translation map in the source`);
       const sentence = block.values.get("storageFullWebMessage");

@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { formatAbsoluteDate } from "../lib/i18n-context";
+import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 
 describe("formatAbsoluteDate", () => {
   it("returns a non-empty locale-formatted string for a valid ISO", () => {
@@ -17,9 +19,9 @@ describe("formatAbsoluteDate", () => {
   });
 
   it("accepts every supported locale without throwing", () => {
-    const locales = ["en", "ru", "de", "pl", "es", "be"] as const;
+    const supported = locales(readI18nSource());
     const testIso = "2026-05-26T12:34:56Z";
-    for (const locale of locales) {
+    for (const locale of supported) {
       const result = formatAbsoluteDate(testIso, locale);
       assert.ok(result.length > 0, `expected non-empty for locale "${locale}"`);
     }

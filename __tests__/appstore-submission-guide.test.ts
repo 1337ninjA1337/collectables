@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 
 const guidePath = repoPath("APPSTORE-SUBMISSION.md");
 const guide = readFileSync(guidePath, "utf8");
@@ -83,8 +85,10 @@ describe("APPSTORE-SUBMISSION.md", () => {
   });
 
   it("lists every supported app language for CFBundleLocalizations", () => {
-    const languages = ["en", "ru", "be", "pl", "de", "es"];
-    for (const lang of languages) {
+    // Read from the picker rather than restated: a seventh language that
+    // shipped in the app and not in the guide is exactly the drift this case
+    // exists to catch, and a literal list here would go quiet on it.
+    for (const lang of locales(readI18nSource())) {
       assert.match(
         guide,
         new RegExp(`['"]${lang}['"]`),

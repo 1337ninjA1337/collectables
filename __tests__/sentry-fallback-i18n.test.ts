@@ -1,8 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { findLocaleBlock, localeKeys } from "@/lib/i18n-source";
+import { findLocaleBlock, localeKeys, TRANSLATION_BASE_LANGUAGE } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 import { readRepoFile } from "./helpers/repo-file";
 
 const i18nSrc = readI18nSource();
@@ -15,7 +16,7 @@ const REQUIRED_KEYS = [
   "crashFallbackRetry",
 ] as const;
 
-const LANGUAGES = ["en", "ru", "be", "pl", "de", "es"] as const;
+const LANGUAGES = locales(i18nSrc);
 
 describe("Crash #13 — i18n keys present in English master map", () => {
   for (const key of REQUIRED_KEYS) {
@@ -48,7 +49,10 @@ describe("Crash #13 — every locale either spreads ...en or declares the key", 
 
 describe("Crash #13 — non-English locales declare localised crash strings", () => {
   // Ensures the strings are actually translated, not just inherited from English.
-  const localised = ["ru", "be", "pl", "de", "es"] as const;
+  // Every locale the picker offers except the base one, derived: a seventh
+  // language must be required to translate these strings rather than silently
+  // excused by a list written before it existed.
+  const localised = locales(i18nSrc).filter((code) => code !== TRANSLATION_BASE_LANGUAGE);
   for (const lang of localised) {
     it(`'${lang}' declares its own crashFallbackTitle override`, () => {
       assert.ok(

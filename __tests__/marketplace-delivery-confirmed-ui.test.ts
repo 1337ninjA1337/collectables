@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { localeKeys } from "@/lib/i18n-source";
 import { readI18nSource } from "./helpers/i18n-source-file";
+import { locales } from "./helpers/i18n-locales";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
@@ -44,7 +45,7 @@ describe("marketplace My-sales — delivery confirmed indicator", () => {
 describe("delivery-confirmed translations", () => {
   it("declares marketplaceDeliveryConfirmed in every language map", () => {
     const src = readI18nSource();
-    for (const lang of ["en", "ru", "be", "pl", "de", "es"] as const) {
+    for (const lang of locales(src)) {
       const declared = localeKeys(src, lang);
       assert.ok(
         declared.has("marketplaceDeliveryConfirmed"),
