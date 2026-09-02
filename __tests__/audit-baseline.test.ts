@@ -841,8 +841,56 @@ describe("the OK line — upgrades, never advisories", () => {
 
   it("says nothing at all when npm has no major-only advisory to report", () => {
     const printed = okLine(report({}));
-    assert.match(printed, /no new ones\.$/);
+    assert.match(printed, /none accepted\.$/);
     assert.doesNotMatch(printed, /semver-major/, "a clause about an empty list is pure noise");
+  });
+
+  it("names the packages the run is still accepting, not just how many", () => {
+    // The half of the line that records a HUMAN decision was a bare count
+    // while the half npm computes had been given a vocabulary. "4 accepted
+    // high/critical advisories" tells a reader nothing to look up; the
+    // packages are what SECURITY.md is indexed by.
+    const printed = okLine(expoTree(), TRIAGED);
+    assert.match(printed, /2 still accepted, in image-size \(1\), postcss \(1\)/);
+    assert.doesNotMatch(printed, /GHSA-/, "the ids stay on the failing path");
+  });
+
+  it("groups the accepted half by the vulnerable package, not the upgrade", () => {
+    // The two halves group by different things on purpose: one reader is
+    // about to run `npm update`, the other is about to re-read a `why`
+    // sentence. `postcss` is accepted here and cleared by `expo` there, and
+    // the line says both.
+    const printed = okLine(expoTree(), TRIAGED);
+    assert.match(printed, /still accepted, in [^;]*postcss/);
+    assert.match(printed, /cleared by 2 upgrades: expo \(/);
+    assert.doesNotMatch(printed, /still accepted, in [^;]*\bexpo\b/);
+  });
+
+  it("orders the accepted packages widest first, then by name", () => {
+    // Same total order the upgrade groups have, minus the severity: every
+    // key here is high or critical, because that is what the baseline is a
+    // list of. A green line that reshuffles is one nobody can diff.
+    const printed = formatAuditVerdict(
+      {
+        unexpected: [],
+        stillPresent: [`alpha#${A1}`, `wide#${A1}`, `wide#${A2}`, `mid#${A3}`],
+        stale: [],
+        fixableInRange: [],
+        majorOnly: [],
+      },
+      "check",
+    );
+    const order = [...printed.matchAll(/([\w-]+) \(\d+\)/g)].map((m) => m[1]);
+    assert.deepEqual(order, ["wide", "alpha", "mid"]);
+  });
+
+  it("separates the three clauses with semicolons, because two end in lists", () => {
+    // `image-size (2), postcss (2), and npm offers…` put the last group and
+    // the next clause in the same punctuation, which is how a reader loses
+    // track of which list they are still in.
+    const printed = okLine(expoTree(), TRIAGED);
+    assert.match(printed, /OK — no new high\/critical advisories; /);
+    assert.match(printed, /; and npm offers no fix/);
   });
 
   it("is absent from a failing run, where the findings are the message", () => {

@@ -620,13 +620,7 @@ function plural(count: number, one: string, many: string): string {
  */
 function majorOnlySummary(majorOnly: readonly FixableAdvisory[]): string {
   if (majorOnly.length === 0) return "";
-  const byPackage = new Map<string, FixableAdvisory[]>();
-  for (const found of majorOnly) {
-    const group = byPackage.get(found.updatePackage);
-    if (group === undefined) byPackage.set(found.updatePackage, [found]);
-    else group.push(found);
-  }
-  const groups = [...byPackage]
+  const groups = [...groupByPackage(majorOnly, (found) => found.updatePackage)]
     // Most severe group first, then the one that buys the most, then by name:
     // an OK line that reshuffles between runs is one nobody can diff, same
     // reason `bySeverityThenKey` exists for the findings.
@@ -646,7 +640,56 @@ function majorOnlySummary(majorOnly: readonly FixableAdvisory[]): string {
         a.name.localeCompare(b.name),
     )
     .map((group) => `${group.name} (${String(group.found.length)}, up to ${group.worst})`);
-  return `, and npm offers no fix short of a semver-major for ${plural(majorOnly.length, "advisory", "advisories")}, cleared by ${plural(groups.length, "upgrade", "upgrades")}: ${groups.join(", ")}`;
+  return `; and npm offers no fix short of a semver-major for ${plural(majorOnly.length, "advisory", "advisories")}, cleared by ${plural(groups.length, "upgrade", "upgrades")}: ${groups.join(", ")}`;
+}
+
+/**
+ * Which packages the run is still relying on an exemption for.
+ *
+ * `stillPresent` was a bare count — "4 accepted high/critical advisories" —
+ * while the major-only half beside it had been given a vocabulary the day
+ * before. The half nobody argued about got the redesign, and this is the half
+ * that records a HUMAN decision: every key here is an advisory somebody read,
+ * wrote a `why` for, and accepted. "Four of them" says nothing a reader can
+ * act on; `image-size (2), postcss (2)` names what to look up in SECURITY.md.
+ *
+ * The VULNERABLE package, not the update target, and the difference is the
+ * point: `majorOnlySummary` groups by what `npm update` would move, because
+ * its reader is about to run a command, and this groups by what the baseline
+ * is a list of, because its reader is about to re-read an argument. The same
+ * advisory appears under `postcss` here and under `expo` there, correctly.
+ *
+ * Bounded by the baseline, which is the one list in this report a person
+ * curates: `majorOnly`'s length is whatever npm reports today, and this is as
+ * long as somebody has been willing to write `why` sentences for.
+ */
+function acceptedSummary(stillPresent: readonly string[]): string {
+  if (stillPresent.length === 0) return "none accepted";
+  const groups = [...groupByPackage(stillPresent, advisoryPackage)]
+    // Widest first, then by name — the same total order the other summary
+    // has, minus the severity it has no opinion about: every key here is
+    // high or critical, because that is what the baseline is a list of.
+    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+    .map(([name, keys]) => `${name} (${String(keys.length)})`);
+  return `${String(stillPresent.length)} still accepted, in ${groups.join(", ")}`;
+}
+
+/**
+ * `[package, members]`, for the two summaries that both group by one.
+ *
+ * Written twice would be the smaller problem; the real one is that the two
+ * lines are the halves of one sentence a contributor reads on a green run, and
+ * a grouping that drifted between them would print two different shapes for
+ * the same idea. That is the drift the OK-line rewrite was about.
+ */
+function groupByPackage<T>(items: readonly T[], name: (item: T) => string): Map<string, T[]> {
+  const grouped = new Map<string, T[]>();
+  for (const item of items) {
+    const group = grouped.get(name(item));
+    if (group === undefined) grouped.set(name(item), [item]);
+    else group.push(item);
+  }
+  return grouped;
 }
 
 /** Human-readable report; the CLI prints this and nothing else. */
@@ -687,7 +730,12 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
   }
   if (isClean(verdict)) {
     lines.push(
-      `${checkName}: OK — ${plural(verdict.stillPresent.length, "accepted high/critical advisory", "accepted high/critical advisories")}, no new ones${majorOnlySummary(verdict.majorOnly)}.`,
+      // Three clauses, one per question a green run answers: is anything new,
+      // what am I still accepting, and what would clearing the rest cost.
+      // Semicolons between them because two of the three END in a
+      // comma-separated list of packages, and a comma joining the clauses put
+      // the list's last entry and the next clause in the same punctuation.
+      `${checkName}: OK — no new high/critical advisories; ${acceptedSummary(verdict.stillPresent)}${majorOnlySummary(verdict.majorOnly)}.`,
     );
   } else {
     lines.push("", PUBLISHED_ELSEWHERE_NOTE);
