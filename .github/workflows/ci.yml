@@ -176,3 +176,11 @@ jobs:
       # so the watched token lists are testable instead of living in YAML.
       - name: Bundle + privacy page smoke check
         run: npm run lint:bundle-smoke
+
+      # Every advisory the baseline accepts as "build-time only" names a string
+      # from its own package; this fails if one is in the exported bundle.
+      # `shipsToClient` is the half of an exemption that makes a high advisory
+      # acceptable rather than urgent, and it was a sentence nobody re-derived
+      # — the one entry that ever did ship (`nanoid`) was found by reading.
+      - name: Accepted advisories still do not reach the client
+        run: npm run lint:ships-to-client

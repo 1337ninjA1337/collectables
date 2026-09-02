@@ -143,6 +143,29 @@ export interface AcceptedAdvisory {
    * the vulnerable entry point is unreachable from this app's call sites.
    */
   readonly shipsToClient: boolean;
+  /**
+   * A string from the package's own code that would appear in `dist/` if it
+   * shipped — required of every `shipsToClient: false` entry, meaningless on
+   * the others.
+   *
+   * `shipsToClient` was the load-bearing half of every exemption here and the
+   * half nothing checked: "build-time only" was a sentence somebody wrote once,
+   * and the one entry that ever DID ship (`nanoid`) was found by reading rather
+   * than by measuring. `check-ships-to-client` greps the built bundle for this
+   * string, so the column is an assertion the build can refute.
+   *
+   * A STRING LITERAL, never an identifier: minification renames every symbol
+   * and rewrites no string, so `'CssSyntaxError'` survives into the bundle and
+   * `class CssSyntaxError` does not. Distinctive enough that a hit means this
+   * package — `image-size` cannot be its own fingerprint, because the bundle
+   * carries the icon name `image-size-select-actual` and always has.
+   *
+   * Optional in the type and required by a case, deliberately: the six
+   * `AcceptedAdvisory` fixtures in the suite exist to exercise `evaluateAudit`
+   * and never build a bundle, and a compile-time demand would put a
+   * fingerprint in all of them to satisfy the compiler rather than the reader.
+   */
+  readonly absentFingerprint?: string;
   /** Why these are accepted rather than fixed. One sentence. */
   readonly why: string;
 }
@@ -170,12 +193,14 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
     package: "image-size",
     advisories: ["GHSA-5p2g-fcmc-qvqq", "GHSA-w3rx-r6r6-pgpr"],
     shipsToClient: false,
+    absentFingerprint: "invalid invocation. input should be a Uint8Array",
     why: "JXL/HEIF and ICNS parser DoS in metro's asset pipeline, build-time only (the string in the bundle is the icon name image-size-select-actual, not this package); fix is expo@57, a breaking major",
   },
   {
     package: "postcss",
     advisories: ["GHSA-6g55-p6wh-862q", "GHSA-r28c-9q8g-f849"],
     shipsToClient: false,
+    absentFingerprint: "CssSyntaxError",
     why: "arbitrary file read and source-map path traversal in @expo/metro-config's build-time CSS transform; fix is expo@57, a breaking major",
   },
 ];
@@ -537,7 +562,7 @@ function severityRank(severity: string): number {
  * The sentence every failure of this gate ends with.
  *
  * This is the one `verify` leg whose verdict can change while the repository
- * does not. The other seven read the tree: the same commit gives the same
+ * does not. The other eight read the tree: the same commit gives the same
  * answer next year. This one asks the npm registry what the world knows about
  * these packages TODAY, so an advisory published overnight, or a fix published
  * overnight, turns a green tree red with no commit in between.
