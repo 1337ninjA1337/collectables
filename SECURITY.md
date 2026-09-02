@@ -176,6 +176,15 @@ Demanding a `why` sentence for every low would produce fourteen sentences
 nobody reads instead of the two somebody does. Demanding a lockfile bump costs
 a command, so severity is the wrong question for it.
 
+**A red gate here may not be your branch's fault.** This is the only one of
+`verify`'s eight legs that reads something outside the repository — the other
+seven give the same answer for the same commit next year, and this one asks the
+npm registry what the world knows today. An advisory published overnight, a fix
+published overnight, or an advisory withdrawn turns a green tree red with no
+commit in between, so the run that fails is not the run that caused it. Every
+failure of this gate says so on its last line. The fix still belongs on the
+branch that met it: the tree is only green when it is green *today*.
+
 ### Three roots below "high" that npm could already fix (2026-09-02)
 
 The fix rule shipped the day before reading high/critical only, because it was

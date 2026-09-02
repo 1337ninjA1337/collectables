@@ -422,6 +422,28 @@ function bySeverityThenKey(a: FixableAdvisory, b: FixableAdvisory): number {
   return rank(a.severity) - rank(b.severity) || a.key.localeCompare(b.key);
 }
 
+/**
+ * The sentence every failure of this gate ends with.
+ *
+ * This is the one `verify` leg whose verdict can change while the repository
+ * does not. The other seven read the tree: the same commit gives the same
+ * answer next year. This one asks the npm registry what the world knows about
+ * these packages TODAY, so an advisory published overnight, or a fix published
+ * overnight, turns a green tree red with no commit in between.
+ *
+ * That is the point of it and it is also a failure shape contributors have not
+ * met before: the run that fails is not the run that caused it, and the first
+ * reading of a red gate on your own PR is that your diff did it. Every other
+ * red in this repo means exactly that. One sentence is the whole difference
+ * between "what did I break?" and "something was published; here is the fix".
+ *
+ * Printed on every failing path rather than only on `unexpected`, because all
+ * three can arrive this way: an advisory published (unexpected), a fix
+ * published (fixableInRange), an advisory withdrawn (stale).
+ */
+export const PUBLISHED_ELSEWHERE_NOTE =
+  "This gate reads the npm registry, so it is the one check here whose answer can change while the repository does not — a finding above may have been published since the last green run rather than caused by this branch. The fix is the same either way, and it belongs on this branch: the tree is only green when it is green today.";
+
 /** `1 advisory` / `18 advisories` — the report is read by people, not matched. */
 function plural(count: number, one: string, many: string): string {
   return `${String(count)} ${count === 1 ? one : many}`;
@@ -463,6 +485,8 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
           : `, and npm offers no fix short of a semver-major for ${plural(verdict.majorOnly.length, "advisory", "advisories")} (${verdict.majorOnly.map((found) => `${found.key} [${found.severity}]`).join(", ")})`
       }.`,
     );
+  } else {
+    lines.push("", PUBLISHED_ELSEWHERE_NOTE);
   }
   return lines.join("\n");
 }

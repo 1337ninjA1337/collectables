@@ -99,6 +99,14 @@ describe("SEC-8: dependency advisory baseline", () => {
     assert.match(SECURITY, /\*\*all five\*\*/i);
   });
 
+  it("warns that this is the one leg whose answer can change with no commit", () => {
+    // Every other red in this repo means "your diff did this", so that is how
+    // a contributor reads this one too. The gate says otherwise on its last
+    // line; SECURITY.md is where somebody looks after reading it.
+    assert.match(SECURITY, /may not be your branch's fault/i);
+    assert.match(SECURITY, /green when it is green \*today\*/i);
+  });
+
   it("records the three sub-high roots the widened rule found", () => {
     // The measurement is the evidence for the rule, and a rule whose evidence
     // is deleted is a rule the next reader narrows again.

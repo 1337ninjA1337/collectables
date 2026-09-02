@@ -14,8 +14,10 @@ import {
   observedAdvisories,
   observedAdvisoryDetails,
   observedAdvisoryFixes,
+  PUBLISHED_ELSEWHERE_NOTE,
   type AcceptedAdvisory,
   type AuditReport,
+  type AuditVerdict,
 } from "@/lib/audit-baseline";
 import { LINT_ALL_EXEMPT, LINT_GUARDS } from "@/lib/lint-guards";
 
@@ -505,6 +507,73 @@ describe("evaluateAudit — the fix rule reads every severity, the baseline does
         { key: `esbuild#${A3}`, severity: "low" },
       ]),
       ["undici", "esbuild"],
+    );
+  });
+});
+
+/**
+ * The failure shape nobody had met, added 2026-09-02.
+ *
+ * Seven of the eight `verify` legs read the tree: the same commit gives the
+ * same answer next year. This one asks the registry what the world knows
+ * today, so a green tree goes red with no commit in between — and the first
+ * reading of a red gate on your own PR is that your diff did it, because every
+ * other red in this repo means exactly that.
+ */
+describe("the note on every failure — the run that fails is not the run that caused it", () => {
+  const failing = (verdict: AuditVerdict): string => formatAuditVerdict(verdict, "check");
+
+  it("rides on all three failing paths, not just the untriaged one", () => {
+    // An advisory published makes `unexpected`, a fix published makes
+    // `fixableInRange`, an advisory withdrawn makes `stale`. All three can
+    // arrive overnight, so all three carry the sentence.
+    const unexpected = evaluateAudit(
+      report({ browserslist: { advisories: [{ ghsa: A1, severity: "high" }] } }),
+      FIXTURE,
+    );
+    const fixable = evaluateAudit(
+      report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }], fixAvailable: true } }),
+      FIXTURE,
+    );
+    const stale = evaluateAudit(report({}), FIXTURE);
+    for (const [label, verdict] of [
+      ["unexpected", unexpected],
+      ["fixableInRange", fixable],
+      ["stale", stale],
+    ] as const) {
+      assert.equal(isClean(verdict), false, label);
+      assert.ok(failing(verdict).includes(PUBLISHED_ELSEWHERE_NOTE), label);
+    }
+  });
+
+  it("is absent from a passing run, where it would be noise on the green path", () => {
+    const clean = evaluateAudit(report({}), []);
+    assert.equal(isClean(clean), true);
+    assert.ok(!failing(clean).includes(PUBLISHED_ELSEWHERE_NOTE));
+  });
+
+  it("says the fix still belongs on this branch, rather than excusing the red", () => {
+    // The sentence exists to stop a reader hunting their own diff. It must not
+    // also read as permission to merge past the gate, which is the direction
+    // "your PR did not do this" slides in on its own.
+    assert.match(PUBLISHED_ELSEWHERE_NOTE, /npm registry/);
+    assert.match(PUBLISHED_ELSEWHERE_NOTE, /belongs on this branch/);
+  });
+
+  it("comes last, after the findings and the instruction that fixes them", () => {
+    // A reader who stops at the first line has to see the finding, not the
+    // caveat. Its position is the difference between context and an excuse.
+    const printed = failing(
+      evaluateAudit(
+        report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }], fixAvailable: true } }),
+        FIXTURE,
+      ),
+    );
+    const lines = printed.split("\n");
+    assert.equal(lines.at(-1), PUBLISHED_ELSEWHERE_NOTE);
+    assert.ok(
+      lines.findIndex((line) => line.includes("FIXABLE")) < lines.length - 1,
+      "the finding must be printed above the note",
     );
   });
 });
