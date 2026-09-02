@@ -72,6 +72,25 @@ const GUARD_SCANS: Readonly<
       scripts: "build and guard code renders nothing",
     },
   },
+  "check-a11y-jsx": {
+    // The same walk as check-clarity-input-mask, down to the extensions, and
+    // it was the guard this table did NOT have — for two months, because the
+    // loop below iterates this object and so cannot notice a guard that is
+    // absent from it. `guard-registration.test.ts` reads the wrappers instead
+    // and found this one and check-console-swap on its first run.
+    dirs: ["app", "components"],
+    excludes: {
+      data: "seed fixtures declare no elements, so there is no unnamed control to find",
+      lib: "a lib module returns values rather than markup; an accessibility prop there would have nothing to be on",
+      scripts: "build and guard code renders nothing a screen reader will ever reach",
+    },
+  },
+  "check-console-swap": {
+    dirs: ["app", "components", "lib", "scripts"],
+    excludes: {
+      data: "seed fixtures are literals with no statements, so nothing there can assign to console; `__tests__/default-console-seams.test.ts` owns the suites' half of this rule, where the swap is legitimate in exactly one file",
+    },
+  },
   "check-comment-terminators": {
     // The widest walk in the registry: every root, SOURCE_DIRS entire plus the
     // suites, and therefore no exclusions to explain. The subject is PROSE
@@ -159,13 +178,20 @@ describe("the guards' scan lists agree with lib/source-dirs.ts", () => {
     }
   });
 
-  it("keeps the markup guard on the markup extensions", () => {
-    // `check-clarity-input-mask` is the only `.tsx`-only scan, and the reason
-    // is the rule's subject rather than an optimisation: a `.ts` module cannot
-    // render a `<TextInput>`, and reporting one would be a finding in a file
-    // with no markup in it.
-    const source = readRepoFile("scripts/check-clarity-input-mask.ts");
-    assert.match(source, /listSourceFiles\(repoRoot, SCANNED_DIRS, MARKUP_EXTENSIONS\)/);
+  it("keeps the markup guards on the markup extensions", () => {
+    // Two `.tsx`-only scans, and for both the reason is the rule's subject
+    // rather than an optimisation: a `.ts` module cannot render a
+    // `<TextInput>` or an unnamed icon button, and reporting one would be a
+    // finding in a file with no markup in it. This case said "the only" and
+    // named one of them until `guard-registration.test.ts` turned up the
+    // second — which had the same walk and no entry in this table at all.
+    for (const markup of ["check-clarity-input-mask", "check-a11y-jsx"]) {
+      assert.match(
+        readRepoFile("scripts", `${markup}.ts`),
+        /listSourceFiles\(repoRoot, SCANNED_DIRS, MARKUP_EXTENSIONS\)/,
+        `${markup} is a markup rule and must walk only .tsx`,
+      );
+    }
     for (const other of ["check-inline-hex", "check-inline-radius", "check-analytics-imports"]) {
       assert.doesNotMatch(
         readRepoFile("scripts", `${other}.ts`),
