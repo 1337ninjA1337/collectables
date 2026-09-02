@@ -79,6 +79,28 @@ export interface ShipsToClientVerdict {
   readonly unmeasured: readonly string[];
   /** How many claims the bundle was actually asked about. */
   readonly checked: number;
+  /**
+   * Entries claiming `shipsToClient: true` that name no call sites.
+   *
+   * The half of the column that shipped. An entry here says the package
+   * reaches the browser and is accepted anyway, on an argument about which
+   * call sites exist — and with nothing naming them, that argument cannot be
+   * re-read, only believed. `nanoid` sat in exactly this state for two months
+   * and was found by a person reading, which is the same way `shipsToClient`
+   * itself used to be checked.
+   */
+  readonly unargued: readonly string[];
+  /**
+   * Entries claiming `shipsToClient: false` that name call sites anyway.
+   *
+   * Reported rather than ignored because the two fields answer different
+   * questions and a `reachedFrom` on a build-time entry means one of them is
+   * wrong: either the entry ships and the boolean is stale, or the paths are
+   * left over from an argument that no longer applies.
+   */
+  readonly misplaced: readonly string[];
+  /** How many "reaches the client" claims name where they were argued from. */
+  readonly argued: number;
 }
 
 /**
@@ -87,10 +109,14 @@ export interface ShipsToClientVerdict {
  * Takes chunk TEXT rather than paths, the same shape `evaluateBundleSmoke`
  * takes, so the logic is testable without a build.
  *
- * `shipsToClient: true` entries are not examined. Their exemption argues that
- * the vulnerable path is unreachable from this app's call sites, which is a
- * claim about reachability that no amount of grepping can settle — and they
- * already say the package ships, so finding it would confirm nothing.
+ * `shipsToClient: true` entries are not held to the BUNDLE: they already say
+ * the package ships, so finding it would confirm nothing, and their exemption
+ * argues unreachability from this app's call sites, which no amount of
+ * grepping can settle. They are held to naming those call sites. The argument
+ * is not checkable and its address is, and an acceptance whose address is
+ * missing is one nobody can re-read — which is the state `shipsToClient`
+ * itself was in before the fingerprints existed, in the half where being
+ * wrong means shipping a vulnerability.
  */
 export function evaluateShipsToClient(
   accepted: readonly AcceptedAdvisory[],
@@ -98,9 +124,20 @@ export function evaluateShipsToClient(
 ): ShipsToClientVerdict {
   const contradicted: FingerprintSighting[] = [];
   const unmeasured: string[] = [];
+  const unargued: string[] = [];
+  const misplaced: string[] = [];
   let checked = 0;
+  let argued = 0;
   for (const entry of accepted) {
-    if (entry.shipsToClient) continue;
+    const sites = entry.reachedFrom ?? [];
+    if (entry.shipsToClient) {
+      // The bundle cannot refute an entry that says it ships. What it CAN be
+      // held to is naming the call sites its acceptance was argued from.
+      if (sites.length === 0) unargued.push(entry.package);
+      else argued += 1;
+      continue;
+    }
+    if (sites.length > 0) misplaced.push(entry.package);
     const fingerprint = entry.absentFingerprint;
     if (fingerprint === undefined || fingerprint === "") {
       unmeasured.push(entry.package);
@@ -119,12 +156,20 @@ export function evaluateShipsToClient(
     contradicted: [...contradicted].sort((a, b) => a.package.localeCompare(b.package)),
     unmeasured: unmeasured.sort(),
     checked,
+    unargued: unargued.sort(),
+    misplaced: misplaced.sort(),
+    argued,
   };
 }
 
 /** Whether the guard passes. Both lists are failures, for different reasons. */
 export function isShipsToClientClean(verdict: ShipsToClientVerdict): boolean {
-  return verdict.contradicted.length === 0 && verdict.unmeasured.length === 0;
+  return (
+    verdict.contradicted.length === 0 &&
+    verdict.unmeasured.length === 0 &&
+    verdict.unargued.length === 0 &&
+    verdict.misplaced.length === 0
+  );
 }
 
 /** Human-readable report; the CLI prints this and nothing else. */
@@ -150,9 +195,26 @@ export function formatShipsToClientReport(
       `${checkName}: ${name} claims it does not reach the client and names no \`absentFingerprint\`, so nothing checked it — add a distinctive string literal from that package's own code.`,
     );
   }
-  if (isShipsToClientClean(verdict)) {
+  for (const name of verdict.unargued) {
     lines.push(
-      `${checkName}: OK — ${String(verdict.checked)} "build-time only" ${verdict.checked === 1 ? "claim" : "claims"} the bundle does not contradict.`,
+      `${checkName}: ${name} is accepted WHILE reaching the client and names no \`reachedFrom\`, so the argument that made it acceptable cannot be re-read — list the call sites it was argued from, or fix the advisory.`,
+    );
+  }
+  for (const name of verdict.misplaced) {
+    lines.push(
+      `${checkName}: ${name} claims it does not reach the client and names \`reachedFrom\` anyway — either the boolean is stale or the paths are left over from an argument that no longer applies.`,
+    );
+  }
+  if (isShipsToClientClean(verdict)) {
+    // The second clause only when there is one: a "0 reachability claims" on
+    // every green run is the noise the audit gate's OK line was rewritten to
+    // stop printing.
+    const reachability =
+      verdict.argued === 0
+        ? ""
+        : `; ${String(verdict.argued)} "reaches the client" ${verdict.argued === 1 ? "claim names its" : "claims name their"} call sites`;
+    lines.push(
+      `${checkName}: OK — ${String(verdict.checked)} "build-time only" ${verdict.checked === 1 ? "claim" : "claims"} the bundle does not contradict${reachability}.`,
     );
   }
   return lines.join("\n");

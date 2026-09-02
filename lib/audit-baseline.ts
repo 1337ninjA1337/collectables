@@ -144,6 +144,26 @@ export interface AcceptedAdvisory {
    */
   readonly shipsToClient: boolean;
   /**
+   * The call sites the reachability argument was made about — required of
+   * every `shipsToClient: true` entry, meaningless on the others.
+   *
+   * This is the other half of the column, and it is the half that shipped.
+   * `nanoid` is the only entry that ever reached a browser, accepted on the
+   * argument that no bundled call site passes the shape its advisories need.
+   * That argument was true, was written once, and was re-derived by nobody —
+   * and being wrong about it means shipping a vulnerability rather than
+   * mislabelling a build tool, which is the opposite way round from the risk
+   * `absentFingerprint` covers.
+   *
+   * Repo-relative paths, because the argument is only checkable if it says
+   * WHERE it was made: `ships-to-client.test.ts` asserts each file is still in
+   * the tree and still names the package. Neither settles reachability — no
+   * grep can — but "the files this was argued from still exist and still use
+   * it" is the difference between a claim somebody can re-read and a sentence
+   * nobody can locate.
+   */
+  readonly reachedFrom?: readonly string[];
+  /**
    * A string from the package's own code that would appear in `dist/` if it
    * shipped — required of every `shipsToClient: false` entry, meaningless on
    * the others.

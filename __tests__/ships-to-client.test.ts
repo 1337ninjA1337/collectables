@@ -38,8 +38,92 @@ const buildTime = (name: string, fingerprint?: string): AcceptedAdvisory => ({
   why: "build-time only, a sentence long enough to satisfy the list's own rule",
 });
 
+const shipping = (name: string, reachedFrom?: readonly string[]): AcceptedAdvisory => ({
+  package: name,
+  advisories: ["GHSA-aaaa-aaaa-aaa2"],
+  shipsToClient: true,
+  ...(reachedFrom === undefined ? {} : { reachedFrom }),
+  why: "reaches the client; no bundled call site passes the shape the advisory needs",
+});
+
 const chunks = (entries: Record<string, string>): ReadonlyMap<string, string> =>
   new Map(Object.entries(entries));
+
+/**
+ * The other half of the column, and the half that shipped.
+ *
+ * `absentFingerprint` made "build-time only" an assertion the build can
+ * refute. The entries that say they DO reach the client were skipped by that
+ * guard on the correct reasoning that no grep can settle reachability — and
+ * so nothing asked them anything at all, which is precisely the state the
+ * whole column was in. `nanoid` is the one entry that was ever in this
+ * position, and being wrong about it means shipping a vulnerability rather
+ * than mislabelling a build tool.
+ *
+ * What is checkable is not the argument but its ADDRESS: an entry that ships
+ * has to name the call sites its acceptance was argued from, so the next
+ * person can re-read them. The suite below then holds those paths to still
+ * existing and still naming the package.
+ */
+describe("evaluateShipsToClient — the half that reaches the client", () => {
+  it("reports an entry that ships and names no call sites", () => {
+    const verdict = evaluateShipsToClient([shipping("nanoid")], chunks({}));
+    assert.deepEqual(verdict.unargued, ["nanoid"]);
+    assert.equal(isShipsToClientClean(verdict), false);
+    assert.match(
+      formatShipsToClientReport("check", verdict),
+      /nanoid is accepted WHILE reaching the client and names no `reachedFrom`/,
+    );
+  });
+
+  it("accepts one that names them, and counts it", () => {
+    const verdict = evaluateShipsToClient([shipping("nanoid", ["lib/ids.ts"])], chunks({}));
+    assert.deepEqual(verdict.unargued, []);
+    assert.equal(verdict.argued, 1);
+    assert.equal(isShipsToClientClean(verdict), true);
+  });
+
+  it("treats an empty call-site list as no list at all", () => {
+    // `reachedFrom: []` is what a shape rule satisfied to satisfy the compiler
+    // looks like, and it argues exactly as much as omitting the field.
+    const verdict = evaluateShipsToClient([shipping("nanoid", [])], chunks({}));
+    assert.deepEqual(verdict.unargued, ["nanoid"]);
+  });
+
+  it("reports call sites named on a build-time-only entry", () => {
+    // The two fields answer different questions; both being set means one of
+    // them is wrong, and neither is safe to guess at.
+    const verdict = evaluateShipsToClient(
+      [{ ...buildTime("postcss", "CssSyntaxError"), reachedFrom: ["lib/ids.ts"] }],
+      chunks({}),
+    );
+    assert.deepEqual(verdict.misplaced, ["postcss"]);
+    assert.equal(isShipsToClientClean(verdict), false);
+  });
+
+  it("says nothing about reachability on a run with no shipping entry", () => {
+    // Today's tree, and the reason the clause is conditional: "0 reachability
+    // claims" on every green run is the noise the audit gate's OK line was
+    // rewritten to stop printing.
+    const printed = formatShipsToClientReport(
+      "check",
+      evaluateShipsToClient([buildTime("postcss", "CssSyntaxError")], chunks({})),
+    );
+    assert.match(printed, /OK — 1 "build-time only" claim the bundle does not contradict\.$/);
+    assert.doesNotMatch(printed, /reaches the client/);
+  });
+
+  it("names the reachability count on the OK line when there is one", () => {
+    const printed = formatShipsToClientReport(
+      "check",
+      evaluateShipsToClient(
+        [buildTime("postcss", "CssSyntaxError"), shipping("nanoid", ["lib/ids.ts"])],
+        chunks({}),
+      ),
+    );
+    assert.match(printed, /1 "reaches the client" claim names its call sites\.$/);
+  });
+});
 
 describe("evaluateShipsToClient — the bundle answers, not the author", () => {
   it("reports a build-time-only package whose fingerprint is in a chunk", () => {
@@ -180,6 +264,26 @@ describe("every fingerprint is a real string in its own package", () => {
       );
     });
   }
+
+  it("holds every named call site to existing and still using the package", () => {
+    // The argument is not checkable; its ADDRESS is. A path that has been
+    // deleted or refactored away leaves an acceptance pointing at nothing,
+    // which reads exactly like one somebody re-read this morning.
+    //
+    // Vacuous today — the baseline has no `shipsToClient: true` entry, and
+    // `nanoid` was the only one there has ever been. That is why the rule is
+    // here before it is needed: the day one is added, its call sites are
+    // asked for by a red run rather than by a reviewer noticing.
+    for (const entry of ACCEPTED_HIGH_ADVISORIES.filter((candidate) => candidate.shipsToClient)) {
+      for (const site of entry.reachedFrom ?? []) {
+        const source = readRepoFile(site);
+        assert.ok(
+          source.includes(entry.package),
+          `${entry.package}'s acceptance is argued from ${site}, which no longer names the package — re-read the argument rather than re-pointing the path`,
+        );
+      }
+    }
+  });
 
   it("keeps each fingerprint long enough that a coincidence is unlikely", () => {
     // Not a rule with a principled threshold — a short literal is simply more

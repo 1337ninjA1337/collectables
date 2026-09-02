@@ -351,6 +351,16 @@ proof either: it says this string is absent, not that no code from the package
 shipped. The claim moves from "somebody wrote this down" to "the build does not
 contradict it", which is the improvement available.
 
+**A "Yes" in that column has to name where it was argued.** No grep can settle
+reachability, so the build is asked nothing about these — and for a while that
+meant nothing asked them anything at all, which is the state the whole column
+was in. `nanoid` was the only entry ever in this position, and being wrong
+about one of these means shipping a vulnerability rather than mislabelling a
+build tool. A `Yes` now lists the call sites its acceptance was argued from, a
+case holds each of them to still existing and still naming the package, and an
+entry that names none fails the guard. The argument is not checkable; its
+address is, and an acceptance nobody can locate is one nobody re-reads.
+
 | Package | Advisories | Ships to client? | Why accepted |
 | --- | --- | --- | --- |
 | `image-size` | GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr | No | JXL/HEIF and ICNS parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package); fix = `expo@57`, breaking |
