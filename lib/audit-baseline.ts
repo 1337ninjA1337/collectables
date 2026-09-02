@@ -24,8 +24,17 @@
  * never "some other advisory in the same package was fine". Each entry lists
  * the GHSA ids it has read and says whether the package reaches the production
  * web bundle, because that is the question the severity number cannot answer:
- * `nanoid` is high, ships to every user, and both of its advisories need an
- * argument shape no call site in this app passes.
+ * every package left on this list is build-time tooling, so the vulnerable
+ * code never runs where a user's input can reach it.
+ *
+ * `nanoid` was the one entry that shipped, accepted on the argument that no
+ * bundled call site passes the shape its two advisories need. A THIRD nanoid
+ * advisory arrived on 2026-09-02 — GHSA-xwg4-73v4-xw9w, an integer wraparound
+ * in versions below 3.3.12 — and the entry was removed rather than extended:
+ * an `overrides` pin to `^3.3.18` in `package.json` clears all three, in the
+ * same major, with no other package moving. An acceptance whose argument has
+ * to be rewritten each time the package is re-audited is a fix deferred, and
+ * this one shipped to every user.
  *
  * The KEY took three versions, and each wrong one failed differently. The
  * package name accepted every future CVE in an accepted package. npm's
@@ -68,21 +77,16 @@ export interface AcceptedAdvisory {
 }
 
 /**
- * Triaged 2026-08-31 against `npm audit` on the committed lockfile.
+ * Triaged 2026-08-31 against `npm audit` on the committed lockfile, re-triaged
+ * 2026-09-02 when `nanoid` was fixed instead.
  *
- * Six root packages carrying 11 distinct advisories between them. `npm audit`
- * reports 13 high ENTRIES and 18 `via` objects for those 11: the extra entries
- * are Expo/metro packages that merely depend on these and carry no advisory of
- * their own, and the extra objects are one advisory seen down several
- * dependency paths.
+ * Six root packages carrying 11 distinct advisories between them, none of
+ * which reaches the client. `npm audit` reports more high ENTRIES and more `via`
+ * objects than there are advisories here: the extra entries are Expo/metro
+ * packages that merely depend on these and carry no advisory of their own, and
+ * the extra objects are one advisory seen down several dependency paths.
  */
 export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
-  {
-    package: "nanoid",
-    advisories: ["GHSA-28wg-ghj8-5hjv", "GHSA-2v37-7h3g-55p8"],
-    shipsToClient: true,
-    why: "ships via @react-navigation/routers for route keys; the first needs a negative size argument and the second a custom generator, and every bundled call site is nanoid() with neither",
-  },
   {
     package: "brace-expansion",
     advisories: ["GHSA-3jxr-9vmj-r5cp", "GHSA-mh99-v99m-4gvg", "GHSA-rgw5-rvv9-x895"],

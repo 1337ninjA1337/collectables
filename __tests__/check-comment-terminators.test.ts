@@ -12,11 +12,16 @@
  * is the whole value of the guard: a contributor whose only change was a
  * paragraph gets a list of complaints about code they did not write.
  *
- * The rule is narrow because a wider one would be disabled. It looks only at
- * lines beginning with a star — the continuation lines of a doc comment, where
- * every line is one — so an inline block comment with code after it on the same
- * line is untouched. Measured over this tree: zero findings across 810 files,
- * and it flags the real case.
+ * The rule is narrow because a wider one would be disabled: an inline block
+ * comment with code after it on the same line is untouched, and so is the JSX
+ * expression container that holds nothing but a comment. Measured over this
+ * tree: zero findings across 812 files, and it flags the real case.
+ *
+ * It reads COMMENT SPANS now rather than lines that begin with a star, which
+ * is the difference the cases below are mostly about: a continuation line with
+ * no star prefix is in scope, a terminator inside a string literal is not a
+ * terminator, and a file's SECOND broken comment is only reported when the
+ * code the first one spilled into resynchronises.
  *
  * This suite cannot write the terminator out either, which is why its fixtures
  * build it from parts. That is not a trick to get around the rule; it is the
@@ -85,12 +90,84 @@ describe("findEarlyTerminators", () => {
     assert.equal(found[0].column, line.indexOf(CLOSE) + 1);
   });
 
-  it("finds every occurrence, not only the first", () => {
-    const bad = ` * one \`**${CLOSE}.ts\` here`;
-    const found = findEarlyTerminators("lib/many.ts", [OPEN, bad, " * fine", bad, ` ${CLOSE}`].join("\n"));
+  it("flags a continuation line that does not begin with a star", () => {
+    // The gap the per-line version had, and the reason this rule reads spans:
+    // an unprefixed continuation line is legal, is what a pasted-in paragraph
+    // looks like before anything formats it, and carried the two characters
+    // completely invisibly.
+    const source = [
+      OPEN.slice(0, 2),
+      `   the include glob is \`**${CLOSE}.ts\`, and this is now code`,
+      `   more prose`,
+      ` ${CLOSE}`,
+    ].join("\n");
+    const found = findEarlyTerminators("lib/unprefixed.ts", source);
+    assert.equal(found.length, 1);
+    assert.equal(found[0].line, 2);
+    assert.ok(found[0].trailing.startsWith(".ts`, and this is now code"));
+  });
+
+  it("does not read a terminator inside a string literal as one", () => {
+    // This module's own suite is full of them. The per-line rule was safe here
+    // only because such a line never begins with a star.
+    const source = [OPEN, " * A paragraph.", ` ${CLOSE}`, `const close = "${CLOSE}" + rest;`].join(
+      "\n",
+    );
+    assert.deepEqual(findEarlyTerminators("lib/quoted.ts", source), []);
+  });
+
+  it("leaves a wrapped JSX comment container alone", () => {
+    // `{/* … */}` is the only way to write a comment in JSX and prettier wraps
+    // the long ones, so the brace after the terminator is the container's own.
+    // Twelve of these are in this tree.
+    const source = [
+      `      {${OPEN.slice(0, 2)} One subscriber for every rejected write, above`,
+      `          the gate so a sign-out does not unmount it. ${CLOSE}}`,
+      "      <StorageNotice />",
+    ].join("\n");
+    assert.deepEqual(findEarlyTerminators("app/_layout.tsx", source), []);
+  });
+
+  it("still flags a stray terminator inside a JSX comment container", () => {
+    // The exemption is the container shape, not the syntax: what follows a
+    // real early terminator is the author's own paragraph, which does not
+    // begin with a brace.
+    const source = [
+      `      {${OPEN.slice(0, 2)} the glob is`,
+      `          \`**${CLOSE}.ts\`, so the rest of this is code ${CLOSE}}`,
+      "      <StorageNotice />",
+    ].join("\n");
+    const found = findEarlyTerminators("app/broken.tsx", source);
+    assert.equal(found.length, 1);
+    assert.equal(found[0].line, 2);
+  });
+
+  it("says nothing about a block comment that never closes", () => {
+    // A different failure with a different diagnosis: the compiler names the
+    // comment itself, and no fragment after it became code.
+    const source = [OPEN, " * A paragraph that runs off the end of the file.", ""].join("\n");
+    assert.deepEqual(findEarlyTerminators("lib/unclosed.ts", source), []);
+  });
+
+  it("finds a second broken comment once the code between them resynchronises", () => {
+    // The honest limit of reading spans instead of lines: everything after an
+    // early terminator is CODE, so whether a later comment is seen at all
+    // depends on what that code does. Here the orphaned terminator on line 3
+    // is read as a regex that ends at the newline, and the block on line 4
+    // opens cleanly — so both are reported. A first offence that opens a
+    // template literal would swallow the second, and the run that fixes one
+    // reports the other.
+    const source = [
+      OPEN,
+      ` * one \`**${CLOSE} tail one`,
+      ` ${CLOSE}`,
+      OPEN,
+      ` * two \`**${CLOSE} tail two`,
+      ` ${CLOSE}`,
+    ].join("\n");
     assert.deepEqual(
-      found.map((entry) => entry.line),
-      [2, 4],
+      findEarlyTerminators("lib/many.ts", source).map((entry) => entry.line),
+      [2, 5],
     );
   });
 

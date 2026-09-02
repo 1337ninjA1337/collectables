@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { stripComments } from "@/lib/strip-comments";
+import { scanComments, stripComments } from "@/lib/strip-comments";
 
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, sourceFiles } from "./helpers/source-files";
@@ -245,5 +245,88 @@ describe("stripComments", () => {
     }
     // And the module it left still uses it, through the same one door.
     assert.match(readRepoFile("lib/env-inlining.ts"), /from "\.\/strip-comments"/);
+  });
+});
+
+/**
+ * The span reader `stripComments` is now built on.
+ *
+ * It was extracted rather than written: the state machine had tracked comment,
+ * string and regex modes for eleven callers already, and the only thing it did
+ * not do was SAY where a comment was — which blanked text cannot, since a
+ * comment and the spaces around it are the same characters. The alternative
+ * was a second copy of it inside `lib/check-comment-terminators.ts`, whose
+ * whole subject is comments read wrongly.
+ *
+ * The cases below are about the span boundaries specifically, because that is
+ * the part `stripComments`' own suite cannot see: two spans that blank to the
+ * same text can still end in different places, and the terminator rule reports
+ * the place.
+ */
+describe("scanComments", () => {
+  const CLOSE = `*${"/"}`;
+  const OPEN = `/${"*"}*`;
+
+  it("gives a line comment a span that stops before its newline", () => {
+    const source = "const a = 1; // trailing\nconst b = 2;\n";
+    const spans = scanComments(source);
+    assert.equal(spans.length, 1);
+    assert.equal(spans[0].kind, "line");
+    assert.equal(source.slice(spans[0].start, spans[0].end), "// trailing");
+    assert.equal(source[spans[0].end], "\n", "the newline must stay outside the span");
+    assert.equal(spans[0].closed, true);
+  });
+
+  it("ends a block comment one character past its terminator", () => {
+    const source = `${OPEN}\n * body\n ${CLOSE}\nexport const x = 1;\n`;
+    const spans = scanComments(source);
+    assert.equal(spans.length, 1);
+    assert.equal(spans[0].kind, "block");
+    assert.ok(source.slice(spans[0].start, spans[0].end).endsWith(CLOSE));
+    assert.equal(source[spans[0].end], "\n");
+  });
+
+  it("marks an unterminated block comment unclosed and a trailing line comment closed", () => {
+    const [block] = scanComments(`${OPEN}\n * runs off the end\n`);
+    assert.equal(block.closed, false, "a block comment ends nowhere its author chose");
+    const [line] = scanComments("const a = 1; // no newline after this");
+    assert.equal(line.closed, true, "end of source closes a line comment legitimately");
+  });
+
+  it("reports nothing for a terminator inside a string or a regex literal", () => {
+    // The two shapes that make a text scan for comments wrong, and the reason
+    // this reader is the state machine rather than an `indexOf`.
+    assert.deepEqual(scanComments(`const close = "${CLOSE}";\n`), []);
+    assert.deepEqual(scanComments('const re = /["\']key["\']/;\nconst b = 2;\n'), []);
+  });
+
+  it("finds both comments of a file, in the order they open", () => {
+    const source = `// first\n${OPEN}\n * second\n ${CLOSE}\n`;
+    assert.deepEqual(
+      scanComments(source).map((span) => span.kind),
+      ["line", "block"],
+    );
+  });
+
+  it("blanks exactly the spans it reports", () => {
+    // The property that makes the extraction safe: `stripComments` is now
+    // nothing but this reader plus a blanking rule, so every character it
+    // changes is inside a span and every character it keeps is outside one.
+    const source = readSource("lib/check-comment-terminators.ts");
+    const stripped = stripComments(source);
+    const inSpan = new Set<number>();
+    for (const span of scanComments(source)) {
+      for (let i = span.start; i < span.end; i++) inSpan.add(i);
+    }
+    for (let i = 0; i < source.length; i++) {
+      if (source[i] === "\n") continue;
+      const changed = stripped[i] !== source[i] || source[i] === " ";
+      if (!inSpan.has(i)) {
+        assert.equal(stripped[i], source[i], `character ${i} is outside every span but changed`);
+      } else {
+        assert.equal(stripped[i], " ", `character ${i} is inside a span and survived`);
+        assert.ok(changed);
+      }
+    }
   });
 });
