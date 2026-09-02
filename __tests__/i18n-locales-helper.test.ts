@@ -85,6 +85,103 @@ const ru: TranslationMap = {
 };
 `;
 
+/**
+ * The seventh language, as a case rather than as something somebody did once.
+ *
+ * The whole argument for reading the picker instead of asserting `6` rests on
+ * what happens when a seventh arrives, and the evidence for it was a terminal:
+ * `lib/i18n-context.tsx` was edited to add an `it` row, the suites were run,
+ * and the edit was reverted. That is the strongest measurement in the
+ * migration and it survived nowhere.
+ *
+ * The helpers take source TEXT, so the edit can be a value. These build it.
+ */
+const ITALIAN_ROW = `  { code: "it", label: "Italiano" },\n];`;
+
+/** The real picker with a seventh row and no map behind it. */
+function withSeventhLanguage(source: string): string {
+  const before = `  { code: "es", label: "Español" },\n];`;
+  assert.ok(
+    source.includes(before),
+    "the picker's last row moved — this fixture edits the real declaration, so it has to find it",
+  );
+  return source.replace(before, `  { code: "es", label: "Español" },\n${ITALIAN_ROW}`);
+}
+
+/** The same, plus a map that declares `key` for itself. */
+function withSeventhLocaleMap(source: string, key: string): string {
+  const anchor = "const languageOptions: { code: AppLanguage; label: string }[] = [";
+  return withSeventhLanguage(source).replace(
+    anchor,
+    `const it: TranslationMap = {\n  ...en,\n  ${key}: "Ciao",\n};\n\n${anchor}`,
+  );
+}
+
+describe("a seventh language, which is what the picker-derived list is FOR", () => {
+  const source = readI18nSource();
+  // A key every one of the six declares for itself, chosen from the file
+  // rather than written here: a hardcoded name would make this case go red on
+  // a copy change, which is the failure the whole migration was about.
+  const shared = localeKeysOf(source, "es").find((candidate) =>
+    locales(source).every((code) => localeKeys(source, code).has(candidate)),
+  );
+
+  it("is picked up the moment the picker declares it", () => {
+    // Derived from the real list rather than restated as seven codes: a case
+    // proving a list must not be written out is a poor place to write it out.
+    assert.deepEqual(locales(withSeventhLanguage(source)), [...locales(source), "it"]);
+  });
+
+  it("turns every map-walking helper red, naming the missing map", () => {
+    // The point of the migration, stated as the difference between two
+    // messages. The old rule said "expected 6, got 7" — which reads as the new
+    // locale being wrong. Every one of these says a map for `it` is absent.
+    //
+    // Two different sentences reach the reader ("no translation map for 'it'"
+    // from the helpers, "no `const it` translation map in the source" from the
+    // parser), so the assertion is the PROPERTY they share rather than either
+    // wording: it names the language, and it says the map is what is missing.
+    const seventh = withSeventhLanguage(source);
+    assert.ok(shared, "expected at least one key declared by every locale");
+    const namesTheMissingMap = (error: unknown): true => {
+      const message = (error as Error).message;
+      assert.match(message, /translation map/, message);
+      assert.match(message, /\bit\b/, message);
+      return true;
+    };
+    for (const [label, run] of [
+      ["localeBodies", () => localeBodies(seventh)],
+      ["assertDeclaredInEveryLocale", () => assertDeclaredInEveryLocale(seventh, shared!)],
+      ["localeValuesOf", () => localeValuesOf(seventh, shared!)],
+      ["assertValueInEveryLocale", () => assertValueInEveryLocale(seventh, shared!, /./, "any")],
+      ["assertMatchesInEveryLocaleBody", () => assertMatchesInEveryLocaleBody(seventh, /./, "any")],
+      [
+        "assertMatchesInEveryNonBaseLocaleBody",
+        () => assertMatchesInEveryNonBaseLocaleBody(seventh, /./, "any"),
+      ],
+      ["assertNoLocaleDeclares", () => assertNoLocaleDeclares(seventh, () => false, "any")],
+    ] as const) {
+      assert.throws(run, namesTheMissingMap, label);
+    }
+  });
+
+  it("goes green again once the seventh map exists, so the redness is about the MAP", () => {
+    // Without this half the cases above would be satisfied by a helper that
+    // simply refused any list longer than the one it was written against.
+    assert.ok(shared, "expected at least one key declared by every locale");
+    const complete = withSeventhLocaleMap(source, shared!);
+    assertDeclaredInEveryLocale(complete, shared!);
+    assert.deepEqual([...localeBodies(complete).keys()], [...locales(source), "it"]);
+  });
+
+  it("is silent on the unedited tree, so the fixture is the only thing adding a locale", () => {
+    // A seventh row committed by accident would make the cases above pass for
+    // the wrong reason, and this is the assertion that would catch it.
+    assert.ok(!locales(source).includes("it"), "the real picker must not carry the fixture's row");
+    assert.ok(!source.includes(ITALIAN_ROW), "nor the fixture's exact text");
+  });
+});
+
 describe("asking each locale instead of counting the file", () => {
   it("reads the locale list from the picker rather than from a literal six", () => {
     // The `6` in twenty-two assertions was a literal, so a seventh language
