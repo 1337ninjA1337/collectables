@@ -82,12 +82,52 @@
 import { opensRegExp } from "./js-tokens";
 
 /**
- * Comment bodies replaced by spaces, newlines and string literals preserved.
+ * One comment, as a half-open span of the source it was found in.
+ *
+ * Exported because blanking is not the only question a caller has about a
+ * comment. `lib/check-comment-terminators.ts` asks WHERE one ended, which the
+ * stripped text cannot answer — a blanked comment and the spaces around it are
+ * the same characters — and the alternative was a second copy of the state
+ * machine below, in a module whose whole subject is comments read wrongly.
  */
-export function stripComments(source: string): string {
-  const out = source.split("");
+export interface CommentSpan {
+  /** `"line"` for `//`, `"block"` for the paired form. */
+  readonly kind: "line" | "block";
+  /** Index of the `/` that opened it. */
+  readonly start: number;
+  /**
+   * Index one past the comment: the newline ending a line comment (or the end
+   * of the source), the character after the terminator of a block one. A line
+   * comment's newline is therefore OUTSIDE the span, which is what lets
+   * {@link stripComments} blank every span by the same rule.
+   */
+  readonly end: number;
+  /**
+   * Whether the comment was terminated before the file ended.
+   *
+   * Only a block comment can be `false`: a line comment is closed by the end
+   * of the source as legitimately as by a newline. A caller reasoning about
+   * where a comment ENDED has to know the difference, since an unclosed block
+   * ends nowhere its author chose.
+   */
+  readonly closed: boolean;
+}
+
+/**
+ * Every comment in `source`, in the order they open.
+ *
+ * The state machine is here rather than in {@link stripComments} because both
+ * callers need the same one and only one of them needs the blanking. String
+ * literals and regex literals are tracked for the reason the module header
+ * gives: a quote inside a pattern puts a scanner without that knowledge into
+ * string mode, after which every comment below it is invisible.
+ */
+export function scanComments(source: string): CommentSpan[] {
+  const found: CommentSpan[] = [];
   type Mode = "code" | "line" | "block" | "single" | "double" | "template" | "regex";
   let mode: Mode = "code";
+  /** Index of the `/` that opened the comment being read. */
+  let start = 0;
   /** Last non-whitespace character seen in code — the `/` rule's left side. */
   let prev = "";
   /** The identifier run ending at {@link prev}, for the keyword rows. */
@@ -114,7 +154,7 @@ export function stripComments(source: string): string {
       else if (c === '"') mode = "double";
       else if (c === "`") mode = "template";
       else if (c === "/" && opensRegExp(prev, prevWord)) mode = "regex";
-      if (mode === "line" || mode === "block") out[i] = " ";
+      if (mode === "line" || mode === "block") start = i;
       if (mode === "code" && !/\s/.test(c)) {
         if (/[A-Za-z0-9_$]/.test(c)) {
           // The flag is read at the START of a run and held for the rest of
@@ -148,16 +188,15 @@ export function stripComments(source: string): string {
         inWord = false;
       }
     } else if (mode === "line") {
-      if (c === "\n") mode = "code";
-      else out[i] = " ";
+      if (c === "\n") {
+        found.push({ kind: "line", start, end: i, closed: true });
+        mode = "code";
+      }
     } else if (mode === "block") {
       if (c === "*" && next === "/") {
-        out[i] = " ";
-        out[i + 1] = " ";
         i++;
         mode = "code";
-      } else if (c !== "\n") {
-        out[i] = " ";
+        found.push({ kind: "block", start, end: i + 1, closed: true });
       }
     } else {
       // Inside a string literal: honour escapes, exit on the matching quote.
@@ -172,6 +211,29 @@ export function stripComments(source: string): string {
         prevWord = "";
         inWord = false;
       }
+    }
+  }
+  // A comment still open at the end of the file ends there. The line form is
+  // closed by end-of-source as legitimately as by a newline; the block form is
+  // not, and says so, because a caller asking where a comment ended must not
+  // read "the last character of the file" as an answer its author chose.
+  if (mode === "line") found.push({ kind: "line", start, end: source.length, closed: true });
+  if (mode === "block") found.push({ kind: "block", start, end: source.length, closed: false });
+  return found;
+}
+
+/**
+ * Comment bodies replaced by spaces, newlines and string literals preserved.
+ */
+export function stripComments(source: string): string {
+  const out = source.split("");
+  for (const span of scanComments(source)) {
+    for (let i = span.start; i < span.end; i++) {
+      // Newlines survive so offsets and line numbers still map to the
+      // original. One rule covers both forms: a line comment's span stops
+      // BEFORE its newline, so there is never one inside it to preserve.
+      if (source[i] === "\n") continue;
+      out[i] = " ";
     }
   }
   return out.join("");
