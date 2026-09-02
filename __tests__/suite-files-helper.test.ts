@@ -2,6 +2,10 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 
+// Aliased: `SUITES_DIR` in `helpers/suite-files` is the ABSOLUTE path, and
+// this is the repo-relative name the guards walk by. Two different values under
+// one name is exactly the confusion the case below exists to prevent.
+import { SUITES_DIR as GUARDS_SUITES_DIR } from "../lib/source-dirs";
 import { readRepoFile, repoPath } from "./helpers/repo-file";
 import {
   SUITES_DIR,
@@ -50,6 +54,13 @@ const ALLOWED_TO_NAME_THE_DIRECTORY: readonly string[] = [
 describe("the suite directory, walked once", () => {
   it("resolves to the directory the suites are actually in", () => {
     assert.equal(SUITES_REL, "__tests__");
+    // The same string is exported from `lib/source-dirs.ts` as `SUITES_DIR`,
+    // for the guards, which cannot import from this tree without inverting the
+    // dependency the two halves were split to keep. Both are load-bearing now
+    // — a guard's scan roots on one side, the suites' walk on the other — and
+    // until this line nothing said they were the same directory. Rename one
+    // and a guard and a suite walk different trees, both greenly.
+    assert.equal(SUITES_REL, GUARDS_SUITES_DIR);
     assert.equal(SUITES_DIR, repoPath(SUITES_REL));
     assert.equal(SUITES_DIR, path.dirname(new URL(import.meta.url).pathname));
   });
