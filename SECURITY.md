@@ -213,8 +213,10 @@ Two things had been wrong for those two months, and neither was visible:
   advisories exist, and a step that is red on every run reports the same red
   for an advisory somebody triaged and one nobody has ever seen.
 - The paragraph below this table asserted the remaining advisories "live
-  entirely in dev/build-time tooling". `nanoid` is high, and it ships to every
-  user.
+  entirely in dev/build-time tooling". `nanoid` is high, and it shipped to
+  every user. It was accepted with that stated for a day, then pinned and
+  removed from the list on 2026-09-02; the claim is true of what remains, and
+  it is true because it was checked rather than because it was repeated.
 
 The step is now `npm run lint:audit-baseline`, which compares the audit
 against the list in `lib/audit-baseline.ts` and **fails only on a high or
@@ -234,6 +236,30 @@ stopped naming, so the list cannot quietly stop describing the tree.
 | `ws` | high | memory-disclosure / DoS (via `@supabase/realtime-js`, expo, metro, RN) | Patched in shipped `realtime-js` chain |
 | `protobufjs` | high | unbounded recursion DoS (via `posthog-js` → `@opentelemetry`) | Patched via `posthog-js` minor bump |
 
+### Fixed rather than accepted — seven advisories, five roots (2026-09-01/02)
+
+Two passes in two days took seven advisories off the accepted list by fixing
+them rather than re-arguing them.
+
+| Package | Advisories | Fix |
+| --- | --- | --- |
+| `nanoid` | GHSA-xwg4-73v4-xw9w, GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8 | `npm update`, plus an `overrides` pin to `^3.3.18` in `package.json` so the fix survives a lockfile regeneration |
+| `brace-expansion` | GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895 | `npm update` — in range |
+| `js-yaml` | GHSA-5p4m-2wfm-xmqj | `npm update` — in range |
+| `tar` | GHSA-r292-9mhp-454m | `npm update` — in range |
+| `browserslist` | GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx | `npm update` — in range, lockfile only |
+
+`nanoid` was the only one of the five that shipped to the client, accepted on
+the argument that no bundled call site passes the argument shape its advisories
+need. A third arrived on 2026-09-02 — **GHSA-xwg4-73v4-xw9w**, an integer
+wraparound below 3.3.12 — and an acceptance whose argument has to be rewritten
+every time the package is re-audited is a fix deferred.
+
+The rest were not re-argued either: npm reported an in-range fix for every one
+of them, and `evaluateAudit` now FAILS on an advisory npm can clear without a
+major, so an exemption one command away from gone cannot sit on the list being
+read as triage again.
+
 ### Accepted high/critical — 2 roots, 4 advisories (2026-09-01)
 
 `npm audit` reports 9 high *entries* for these 4 advisories: the extra entries
@@ -242,7 +268,8 @@ advisory of their own, and one advisory is seen down several dependency paths.
 
 Both roots are fixed only by `expo@57`, a major — which is the whole reason
 they are still on this list, and npm now restates it on every run rather than
-this sentence standing in for it.
+this sentence standing in for it. Both are build-time tooling, so nothing left
+on the list reaches the client.
 
 The baseline keys on the **GHSA id**. It took three versions and each wrong one
 failed differently:

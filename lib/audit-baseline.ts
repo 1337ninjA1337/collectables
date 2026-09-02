@@ -24,8 +24,17 @@
  * never "some other advisory in the same package was fine". Each entry lists
  * the GHSA ids it has read and says whether the package reaches the production
  * web bundle, because that is the question the severity number cannot answer:
- * `nanoid` is high, ships to every user, and both of its advisories need an
- * argument shape no call site in this app passes.
+ * every package left on this list is build-time tooling, so the vulnerable
+ * code never runs where a user's input can reach it.
+ *
+ * `nanoid` was the one entry that shipped, accepted on the argument that no
+ * bundled call site passes the shape its two advisories need. A THIRD nanoid
+ * advisory arrived on 2026-09-02 — GHSA-xwg4-73v4-xw9w, an integer wraparound
+ * in versions below 3.3.12 — and the entry was removed rather than extended.
+ * `package.json` also carries an `overrides` pin to `^3.3.18`, so the fix
+ * survives a lockfile regeneration rather than depending on one. An acceptance
+ * whose argument has to be rewritten each time the package is re-audited is a
+ * fix deferred, and this one shipped to every user.
  *
  * The KEY took three versions, and each wrong one failed differently. The
  * package name accepted every future CVE in an accepted package. npm's
