@@ -82,51 +82,90 @@
 import { opensRegExp } from "./js-tokens";
 
 /**
- * One comment, as a half-open span of the source it was found in.
+ * The six things in a source file that are not code.
  *
- * Exported because blanking is not the only question a caller has about a
- * comment. `lib/check-comment-terminators.ts` asks WHERE one ended, which the
- * stripped text cannot answer — a blanked comment and the spaces around it are
- * the same characters — and the alternative was a second copy of the state
- * machine below, in a module whose whole subject is comments read wrongly.
+ * Named individually rather than collapsed to "comment" and "literal" because
+ * every caller so far cares about a different subset, and the distinctions are
+ * not cosmetic: a line comment ends at a newline and a block one does not, a
+ * template literal spans lines and the other two quotes do not.
  */
-export interface CommentSpan {
-  /** `"line"` for `//`, `"block"` for the paired form. */
-  readonly kind: "line" | "block";
-  /** Index of the `/` that opened it. */
+export type SpanKind = "line" | "block" | "single" | "double" | "template" | "regex";
+
+/**
+ * One comment or literal, as a half-open span of the source it was found in.
+ *
+ * Exported because blanking is not the only question a caller has. `WHERE did
+ * this comment end` cannot be answered from stripped text — a blanked comment
+ * and the spaces around it are the same characters — and `is this offset in
+ * code at all` needs the literals as well as the comments. Both callers would
+ * otherwise have been a second copy of the state machine below, one of them in
+ * a module whose entire subject is source read wrongly.
+ */
+export interface SourceSpan {
+  /** Which of the six. */
+  readonly kind: SpanKind;
+  /** Index of the character that opened it: the `/`, or the quote. */
   readonly start: number;
   /**
-   * Index one past the comment: the newline ending a line comment (or the end
-   * of the source), the character after the terminator of a block one. A line
-   * comment's newline is therefore OUTSIDE the span, which is what lets
-   * {@link stripComments} blank every span by the same rule.
+   * Index one past the span.
+   *
+   * For anything with a terminator — a block comment, a closed literal — that
+   * is the character after it. For a span a NEWLINE ended (a line comment, an
+   * unterminated `'` or `"`) the newline is outside, which is what lets
+   * {@link stripComments} blank every span by one rule and keep line numbers.
    */
   readonly end: number;
   /**
-   * Whether the comment was terminated before the file ended.
+   * Whether the span reached its own terminator rather than an end it was
+   * handed.
    *
-   * Only a block comment can be `false`: a line comment is closed by the end
-   * of the source as legitimately as by a newline. A caller reasoning about
-   * where a comment ENDED has to know the difference, since an unclosed block
-   * ends nowhere its author chose.
+   * A line comment is closed by end-of-source as legitimately as by a newline,
+   * so it is the one kind that is always `true`. Everything else can be
+   * `false`, and a caller reasoning about where something ENDED has to know:
+   * an unterminated literal or block comment ends nowhere its author chose.
    */
   readonly closed: boolean;
+}
+
+/** A {@link SourceSpan} that is one of the two comment kinds. */
+export interface CommentSpan extends SourceSpan {
+  readonly kind: "line" | "block";
 }
 
 /**
  * Every comment in `source`, in the order they open.
  *
- * The state machine is here rather than in {@link stripComments} because both
- * callers need the same one and only one of them needs the blanking. String
- * literals and regex literals are tracked for the reason the module header
- * gives: a quote inside a pattern puts a scanner without that knowledge into
- * string mode, after which every comment below it is invisible.
+ * The comment-only view of {@link scanSpans}, which is what the two callers
+ * that do not care about literals want — and a filter rather than a second
+ * walk, so the two views cannot disagree about where a comment is.
  */
 export function scanComments(source: string): CommentSpan[] {
-  const found: CommentSpan[] = [];
-  type Mode = "code" | "line" | "block" | "single" | "double" | "template" | "regex";
+  return scanSpans(source).filter(
+    (span): span is CommentSpan => span.kind === "line" || span.kind === "block",
+  );
+}
+
+/**
+ * Every comment and literal in `source`, in the order they open.
+ *
+ * The state machine, and the only one in this module. Regex literals are
+ * tracked for the reason the module header gives — a quote inside a pattern
+ * puts a scanner without that knowledge into string mode, after which every
+ * comment below it is invisible — and they are REPORTED for the same reason a
+ * string literal is: everything this returns is a place where two characters
+ * that look like syntax are content instead.
+ *
+ * What is NOT a span is code. That complement is the whole value to a caller
+ * asking whether a shape it found is real: `lib/check-comment-terminators.ts`
+ * reads it to find a comment terminator standing in code, which is a thing no
+ * valid program contains and a thing every comment that ended early leaves
+ * behind.
+ */
+export function scanSpans(source: string): SourceSpan[] {
+  const found: SourceSpan[] = [];
+  type Mode = "code" | SpanKind;
   let mode: Mode = "code";
-  /** Index of the `/` that opened the comment being read. */
+  /** Index of the character that opened the span being read. */
   let start = 0;
   /** Last non-whitespace character seen in code — the `/` rule's left side. */
   let prev = "";
@@ -154,7 +193,7 @@ export function scanComments(source: string): CommentSpan[] {
       else if (c === '"') mode = "double";
       else if (c === "`") mode = "template";
       else if (c === "/" && opensRegExp(prev, prevWord)) mode = "regex";
-      if (mode === "line" || mode === "block") start = i;
+      if (mode !== "code") start = i;
       if (mode === "code" && !/\s/.test(c)) {
         if (/[A-Za-z0-9_$]/.test(c)) {
           // The flag is read at the START of a run and held for the rest of
@@ -182,6 +221,10 @@ export function scanComments(source: string): CommentSpan[] {
           i += source[i] === "\\" ? 2 : 1;
         }
       } else if (c === "/" || c === "\n") {
+        // A newline here means the `/` was a division after all, so the span
+        // is unclosed and stops before the newline — the same boundary rule a
+        // line comment gets, for the same reason.
+        found.push({ kind: "regex", start, end: c === "/" ? i + 1 : i, closed: c === "/" });
         mode = "code";
         prev = "/";
         prevWord = "";
@@ -201,25 +244,55 @@ export function scanComments(source: string): CommentSpan[] {
     } else {
       // Inside a string literal: honour escapes, exit on the matching quote.
       if (c === "\\") i++;
-      else if (mode === "single" && (c === "'" || c === "\n")) mode = "code";
-      else if (mode === "double" && (c === '"' || c === "\n")) mode = "code";
-      else if (mode === "template" && c === "`") mode = "code";
-      // A closing quote ends an expression, so a `/` after it is division —
-      // which is what `DIVISION_FOLLOWS` says about all three characters.
-      if (mode === "code") {
-        prev = c === "\n" ? prev : c;
-        prevWord = "";
-        inWord = false;
+      else {
+        const terminated =
+          (mode === "single" && c === "'") ||
+          (mode === "double" && c === '"') ||
+          (mode === "template" && c === "`");
+        // A raw newline ends `'` and `"` and not a template literal, which is
+        // the one quote allowed to span lines. The literal is unclosed in that
+        // case, and the newline is outside it.
+        const cutByNewline = c === "\n" && (mode === "single" || mode === "double");
+        if (terminated || cutByNewline) {
+          found.push({
+            kind: mode,
+            start,
+            end: terminated ? i + 1 : i,
+            closed: terminated,
+          });
+          mode = "code";
+          // A closing quote ends an expression, so a `/` after it is division —
+          // which is what `DIVISION_FOLLOWS` says about all three characters.
+          prev = c === "\n" ? prev : c;
+          prevWord = "";
+          inWord = false;
+        }
       }
     }
   }
-  // A comment still open at the end of the file ends there. The line form is
-  // closed by end-of-source as legitimately as by a newline; the block form is
-  // not, and says so, because a caller asking where a comment ended must not
-  // read "the last character of the file" as an answer its author chose.
-  if (mode === "line") found.push({ kind: "line", start, end: source.length, closed: true });
-  if (mode === "block") found.push({ kind: "block", start, end: source.length, closed: false });
+  // Anything still open at the end of the file ends there. The line comment is
+  // closed by end-of-source as legitimately as by a newline; nothing else is,
+  // and says so, because a caller asking where something ended must not read
+  // "the last character of the file" as an answer its author chose.
+  if (mode !== "code") {
+    found.push({ kind: mode, start, end: source.length, closed: mode === "line" });
+  }
   return found;
+}
+
+/**
+ * Whether `index` is in code — outside every comment and every literal.
+ *
+ * The complement of {@link scanSpans}, as a lookup, because the question is
+ * always asked about many offsets at once and a linear scan per offset is the
+ * shape that turns a guard into the slow one.
+ */
+export function codeOffsets(source: string, spans?: readonly SourceSpan[]): (index: number) => boolean {
+  const covered = new Uint8Array(source.length);
+  for (const span of spans ?? scanSpans(source)) {
+    for (let i = span.start; i < span.end; i++) covered[i] = 1;
+  }
+  return (index) => index >= 0 && index < source.length && covered[index] === 0;
 }
 
 /**

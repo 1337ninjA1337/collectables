@@ -20,9 +20,14 @@ import * as path from "node:path";
 
 import {
   EARLY_TERMINATOR_ADVICE,
+  ORPHAN_TERMINATOR_ADVICE,
   findEarlyTerminators,
+  findOrphanTerminators,
   formatEarlyTerminatorReport,
+  formatOrphanTerminatorReport,
+  orphansWithoutCause,
   type EarlyTerminator,
+  type OrphanTerminator,
 } from "../lib/check-comment-terminators";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedWalk } from "../lib/scanned-floor";
@@ -73,6 +78,21 @@ function annotations(found: readonly EarlyTerminator[]): string[] {
   );
 }
 
+/**
+ * The same, for an orphan — a separate function because the message is a
+ * different one and sharing it would put a sentence about globs on a line
+ * whose problem is a comment that ended above it.
+ */
+function orphanAnnotations(found: readonly OrphanTerminator[]): string[] {
+  return found.map(
+    (entry) =>
+      `::error file=${escapeAnnotationProperty(entry.file)},line=${entry.line},col=${entry.column}::` +
+      escapeAnnotationMessage(
+        `This comment terminator stands in code and closes nothing — ${ORPHAN_TERMINATOR_ADVICE}`,
+      ),
+  );
+}
+
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
   const files = listSourceFiles(repoRoot, SCANNED_DIRS);
@@ -82,21 +102,28 @@ function main(): void {
   assertScannedWalk(CHECK_NAME, files);
 
   const found: EarlyTerminator[] = [];
+  const allOrphans: OrphanTerminator[] = [];
   for (const file of files) {
     const source = fs.readFileSync(path.join(repoRoot, file), "utf8");
     found.push(...findEarlyTerminators(file, source));
+    allOrphans.push(...findOrphanTerminators(file, source));
   }
+  // Symptoms of a cause already named are dropped rather than printed beside
+  // it: a file with an early terminator has orphans BECAUSE of it.
+  const orphans = orphansWithoutCause(found, allOrphans);
 
-  if (found.length === 0) {
+  if (found.length === 0 && orphans.length === 0) {
     console.log(
-      `${CHECK_NAME}: scanned ${files.length} file(s), no block comment ends inside its own body.`,
+      `${CHECK_NAME}: scanned ${files.length} file(s), no block comment ends inside its own body and no terminator stands in code.`,
     );
     return;
   }
 
-  console.error(formatEarlyTerminatorReport(found));
+  if (found.length > 0) console.error(formatEarlyTerminatorReport(found));
+  if (orphans.length > 0) console.error(formatOrphanTerminatorReport(orphans));
   if (process.env.GITHUB_ACTIONS === "true") {
     for (const annotation of annotations(found)) console.log(annotation);
+    for (const annotation of orphanAnnotations(orphans)) console.log(annotation);
   }
   process.exit(1);
 }
