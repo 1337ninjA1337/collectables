@@ -156,6 +156,49 @@ breaking changes); if the only fix is a major bump, triage it and record the
 decision below **and** in `ACCEPTED_HIGH_ADVISORIES` — the test keeps the two
 in step.
 
+That preference is no longer a preference. The gate reads npm's own
+`fixAvailable` for every high/critical it sees and **fails on any advisory npm
+can clear without a semver-major**, accepted or not — see
+"Seven exemptions npm could already fix" below for why. A major-only fix is
+still acceptable; it is reported on every run instead of resting on a sentence
+somebody wrote once.
+
+### Seven exemptions npm could already fix (2026-09-01)
+
+The baseline answered *"is this advisory new?"* and nothing ever asked
+*"is it still unfixable?"*. On 2026-09-01 `npm audit` reported a fix available
+**within the installed ranges** for four of the six accepted roots — `nanoid`,
+`brace-expansion`, `js-yaml`, `tar`, seven GHSAs between them — and a single
+`npm update` on those four cleared every one. `nanoid` ships to the client and
+had been on the list for a day short of a month.
+
+Two new `browserslist` advisories (`GHSA-73wf-gq98-2v4g`,
+`GHSA-c83g-rgw3-j3cx`) turned the gate red the same day and were fixed by the
+same command — which is how the four were found at all. Nothing was looking.
+
+The gate now fails on three things rather than one: an untriaged advisory, an
+advisory npm can fix in range, and a baseline entry the audit no longer
+reports. The third joined the failing side *because of* the second: fixing an
+in-range advisory is exactly what makes its baseline entry stale, so leaving
+staleness advisory-only would mean every fix this gate demands leaves the
+accepted list describing a tree that no longer exists — and green.
+
+### Resolved 2026-09-01 by an in-range `npm update` (kept for history)
+
+| Package | Advisories | Reached the client? |
+| --- | --- | --- |
+| `nanoid` | GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8 | **Yes** — `@react-navigation/routers` route keys |
+| `brace-expansion` | GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895 | No — glob/minimatch under the build toolchain |
+| `js-yaml` | GHSA-5p4m-2wfm-xmqj | No — `@expo/xcpretty` / `babel-jest` |
+| `tar` | GHSA-r292-9mhp-454m | No — npm/expo install-time archive handling |
+| `browserslist` | GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx | No — build-time target resolution |
+
+The `js-yaml` row is the one worth reading twice: its accepted reason said the
+fix was `react-native@0.86`, a breaking major. That was true of the *direct*
+dependency and false of the tree, which had a patched version in range the
+whole time. A `why` sentence is a claim about the dependency graph on the day
+it was written.
+
 ### Re-triaged 2026-08-31 — the "0 high" record had gone stale
 
 The 2026-06-28 pass cleared 1 critical + 4 high with a non-breaking
@@ -193,30 +236,40 @@ stopped naming, so the list cannot quietly stop describing the tree.
 | `ws` | high | memory-disclosure / DoS (via `@supabase/realtime-js`, expo, metro, RN) | Patched in shipped `realtime-js` chain |
 | `protobufjs` | high | unbounded recursion DoS (via `posthog-js` → `@opentelemetry`) | Patched via `posthog-js` minor bump |
 
-### Fixed rather than accepted — `nanoid`, 3 advisories (2026-09-02)
+### Fixed rather than accepted — seven advisories, five roots (2026-09-01/02)
 
-`nanoid` was the only accepted root that shipped to the client, on the argument
-that no bundled call site passes the argument shape its two advisories need.
-A third arrived on 2026-09-02 — **GHSA-xwg4-73v4-xw9w**, an integer wraparound
-in versions below 3.3.12 — and the entry was removed instead of extended.
+Two passes in two days took seven advisories off the accepted list by fixing
+them rather than re-arguing them.
 
 | Package | Advisories | Fix |
 | --- | --- | --- |
-| `nanoid` | GHSA-xwg4-73v4-xw9w, GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8 | `overrides: { "nanoid": "^3.3.18" }` in `package.json` — same major, clears all three, no other package moves |
+| `nanoid` | GHSA-xwg4-73v4-xw9w, GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8 | `npm update`, plus an `overrides` pin to `^3.3.18` in `package.json` so the fix survives a lockfile regeneration |
+| `brace-expansion` | GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895 | `npm update` — in range |
+| `js-yaml` | GHSA-5p4m-2wfm-xmqj | `npm update` — in range |
+| `tar` | GHSA-r292-9mhp-454m | `npm update` — in range |
+| `browserslist` | GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx | `npm update` — in range, lockfile only |
 
-An acceptance whose argument has to be rewritten every time the package is
-re-audited is a fix deferred. The three transitive dependents that pull it
-(`@react-navigation/routers`, `expo-router`, `postcss`) all ask for a `^3.3.x`
-range, so the pin is inside every one of them and `npm audit fix`'s 134-package
-move — the reason `browserslist` is still accepted below — is not needed here.
+`nanoid` was the only one of the five that shipped to the client, accepted on
+the argument that no bundled call site passes the argument shape its advisories
+need. A third arrived on 2026-09-02 — **GHSA-xwg4-73v4-xw9w**, an integer
+wraparound below 3.3.12 — and an acceptance whose argument has to be rewritten
+every time the package is re-audited is a fix deferred.
 
-### Accepted high/critical — 6 roots, 11 advisories (2026-08-31, browserslist added 2026-09-01, nanoid fixed 2026-09-02)
+The rest were not re-argued either: npm reported an in-range fix for every one
+of them, and `evaluateAudit` now FAILS on an advisory npm can clear without a
+major, so an exemption one command away from gone cannot sit on the list being
+read as triage again.
 
-`npm audit` reports more high *entries* and more `via` objects than there are
-advisories here: the extra entries are Expo/metro packages that merely depend
-on one of these six and carry no advisory of their own, and the extra objects
-are one advisory seen down several dependency paths. Every root left on the
-list is build-time tooling.
+### Accepted high/critical — 2 roots, 4 advisories (2026-09-01)
+
+`npm audit` reports 9 high *entries* for these 4 advisories: the extra entries
+are Expo/metro packages that merely depend on one of these two and carry no
+advisory of their own, and one advisory is seen down several dependency paths.
+
+Both roots are fixed only by `expo@57`, a major — which is the whole reason
+they are still on this list, and npm now restates it on every run rather than
+this sentence standing in for it. Both are build-time tooling, so nothing left
+on the list reaches the client.
 
 The baseline keys on the **GHSA id**. It took three versions and each wrong one
 failed differently:
@@ -234,18 +287,16 @@ the bundle with its vulnerable entry point unreachable.
 
 | Package | Advisories | Ships to client? | Why accepted |
 | --- | --- | --- | --- |
-| `browserslist` | GHSA-73wf-gq98-2v4g, GHSA-c83g-rgw3-j3cx | No | Target resolution for `@expo/metro-config` and babel's `core-js-compat`; absent from both shipped chunks. The OOM needs an attacker feeding distinct queries to a build; the prototype write needs an untrusted `browserslist-stats.json` in this repo. npm reports `fixAvailable: true`, but `npm audit fix` moves 134 packages including 12 majors (expo-router 56→57) — a framework upgrade, not a security patch |
-| `brace-expansion` | GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895 | No | Three expansion DoS advisories in glob/minimatch under the build toolchain |
-| `image-size` | GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr | No | JXL/HEIF and ICNS parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package) |
-| `js-yaml` | GHSA-5p4m-2wfm-xmqj | No | `!!omap` quadratic CPU in `@expo/xcpretty` / `babel-jest`; fix = `react-native@0.86`, breaking |
-| `postcss` | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | No | Arbitrary file read and source-map path traversal in `@expo/metro-config`'s build-time CSS transform; fix = `expo@56`, breaking |
-| `tar` | GHSA-r292-9mhp-454m | No | Uncontrolled recursion in npm/expo install-time archive handling |
+| `image-size` | GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr | No | JXL/HEIF and ICNS parser DoS in metro's asset pipeline (the `image-size-select-actual` string in the bundle is an icon name, not this package); fix = `expo@57`, breaking |
+| `postcss` | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | No | Arbitrary file read and source-map path traversal in `@expo/metro-config`'s build-time CSS transform; fix = `expo@57`, breaking |
 
 Severity is read off each **advisory**, not off the package: npm reports a
 package at the highest severity among its advisories, so `postcss` shows "high"
 while two of its four are moderate. Those two are not gated here — the moderate
-and low advisories (14 of the 27) remain dev/build-time only and are revisited
-on each `expo` / `react-native` upgrade.
+and low advisories remain dev/build-time only and are revisited on each `expo`
+/ `react-native` upgrade. They are also not covered by the in-range fix rule,
+which reads high/critical only: a moderate with a fix available stays invisible
+until it is promoted.
 
 Any of these shown to reach the deployed client at runtime **through its
 vulnerable path** is promoted to a blocking fix. Adding a package to

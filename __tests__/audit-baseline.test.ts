@@ -5,9 +5,13 @@ import {
   ACCEPTED_HIGH_ADVISORIES,
   advisoryIdentity,
   advisoryKey,
+  advisoryPackage,
   evaluateAudit,
+  fixKind,
   formatAuditVerdict,
+  isClean,
   observedAdvisories,
+  observedAdvisoryFixes,
   type AcceptedAdvisory,
   type AuditReport,
 } from "@/lib/audit-baseline";
@@ -47,15 +51,18 @@ function report(
     {
       advisories?: { ghsa?: string; source?: number; severity: string }[];
       dependsOn?: string[];
+      /** npm's `fixAvailable`, in any of the three shapes it uses. */
+      fixAvailable?: unknown;
     }
   >,
 ): AuditReport {
   return {
     vulnerabilities: Object.fromEntries(
-      Object.entries(entries).map(([name, { advisories = [], dependsOn = [] }]) => [
+      Object.entries(entries).map(([name, { advisories = [], dependsOn = [], fixAvailable }]) => [
         name,
         {
           severity: advisories[0]?.severity ?? "high",
+          fixAvailable,
           via: [
             ...advisories.map((a) => ({
               source: a.source,
@@ -169,6 +176,202 @@ describe("evaluateAudit", () => {
   it("treats an empty report as clean rather than as a broken read", () => {
     assert.deepEqual(evaluateAudit({}, FIXTURE).unexpected, []);
     assert.deepEqual(evaluateAudit({}, FIXTURE).stale, [`nanoid#${A1}`, `postcss#${A2}`, `postcss#${A3}`]);
+  });
+});
+
+/**
+ * The second question, added 2026-09-01.
+ *
+ * The gate above only ever asked whether an advisory was NEW. Four of the six
+ * accepted roots — `nanoid`, `brace-expansion`, `js-yaml`, `tar`, seven GHSAs
+ * — had an in-range fix available, and one `npm update` cleared all seven.
+ * They were on an exemption list being read as triage, and `nanoid` ships to
+ * the client. Nothing asked, so nothing found it; two new `browserslist`
+ * advisories turning the gate red the same day is what did.
+ */
+describe("fixKind — npm's three answers to \"can I fix this?\"", () => {
+  it("reads a bare `true` as the in-range fix it is", () => {
+    // The shape that cost seven exemptions: from anywhere except this field it
+    // is indistinguishable from `false`.
+    assert.equal(fixKind(true), "in-range");
+  });
+
+  it("separates a semver-major upgrade from one `npm update` performs", () => {
+    assert.equal(fixKind({ name: "expo", version: "57.0.19", isSemVerMajor: true }), "major");
+    assert.equal(fixKind({ name: "nanoid", version: "3.3.18", isSemVerMajor: false }), "in-range");
+  });
+
+  it("reads anything it does not recognise as no fix, never as a failure", () => {
+    // The gate fails on "in-range" only, so an unrecognised shape must land on
+    // the side that cannot invent a red run out of a field npm changed.
+    assert.equal(fixKind(false), "none");
+    assert.equal(fixKind(undefined), "none");
+    assert.equal(fixKind("yes"), "none");
+    assert.equal(fixKind(null), "none");
+    assert.equal(fixKind({}), "in-range", "an upgrade object with no major flag is still an upgrade");
+  });
+});
+
+describe("evaluateAudit — an advisory npm can fix is not a triage decision", () => {
+  it("fails on an ACCEPTED advisory npm can clear without a major", () => {
+    const verdict = evaluateAudit(
+      report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }], fixAvailable: true } }),
+      FIXTURE,
+    );
+    assert.deepEqual(verdict.unexpected, [], "it is on the list, so it is not new");
+    assert.deepEqual(verdict.stillPresent, [`nanoid#${A1}`], "and the exemption is still matched");
+    assert.deepEqual(verdict.fixableInRange, [`nanoid#${A1}`]);
+    assert.equal(isClean(verdict), false, "being on the baseline must not excuse an available fix");
+  });
+
+  it("passes a major-only fix through as information, not as a failure", () => {
+    // `expo@57` is a migration. A gate that failed on it would be demanding a
+    // major upgrade on every PR, which is how a gate gets switched off.
+    const verdict = evaluateAudit(
+      report({
+        postcss: {
+          advisories: [
+            { ghsa: A2, severity: "high" },
+            { ghsa: A3, severity: "high" },
+          ],
+          fixAvailable: { name: "expo", version: "57.0.19", isSemVerMajor: true },
+        },
+        nanoid: { advisories: [{ ghsa: A1, severity: "high" }] },
+      }),
+      FIXTURE,
+    );
+    assert.deepEqual(verdict.fixableInRange, []);
+    assert.deepEqual(verdict.majorOnly, [`postcss#${A2}`, `postcss#${A3}`]);
+    assert.equal(isClean(verdict), true);
+    assert.match(formatAuditVerdict(verdict, "check"), /no fix short of a semver-major/);
+  });
+
+  it("reports a NEW advisory with an in-range fix under both headings", () => {
+    // Untriaged AND fixable are two true things about one advisory, and the
+    // second is the one that says what to do about it. `browserslist` was
+    // exactly this: it arrived as NEW and 4.28.7 was already published.
+    const verdict = evaluateAudit(
+      report({
+        browserslist: {
+          advisories: [{ ghsa: "GHSA-73wf-gq98-2v4g", severity: "high" }],
+          fixAvailable: true,
+        },
+      }),
+      FIXTURE,
+    );
+    assert.deepEqual(verdict.unexpected, ["browserslist#GHSA-73wf-gq98-2v4g"]);
+    assert.deepEqual(verdict.fixableInRange, ["browserslist#GHSA-73wf-gq98-2v4g"]);
+  });
+
+  it("names each package once in the command it tells you to run", () => {
+    const verdict = evaluateAudit(
+      report({
+        "brace-expansion": {
+          advisories: [
+            { ghsa: A1, severity: "high" },
+            { ghsa: A2, severity: "high" },
+            { ghsa: A3, severity: "high" },
+          ],
+          fixAvailable: true,
+        },
+      }),
+      FIXTURE,
+    );
+    const printed = formatAuditVerdict(verdict, "check");
+    assert.match(printed, /FIXABLE {2}brace-expansion#/);
+    assert.match(
+      printed,
+      /npm update brace-expansion`/,
+      "three advisories on one root are one upgrade, not three",
+    );
+    assert.doesNotMatch(printed, /brace-expansion brace-expansion/);
+  });
+
+  it("a package with no fix at all is neither fixable nor major-only", () => {
+    const verdict = evaluateAudit(
+      report({
+        nanoid: { advisories: [{ ghsa: A1, severity: "high" }], fixAvailable: false },
+        postcss: {
+          advisories: [
+            { ghsa: A2, severity: "high" },
+            { ghsa: A3, severity: "high" },
+          ],
+          fixAvailable: false,
+        },
+      }),
+      FIXTURE,
+    );
+    assert.deepEqual(verdict.fixableInRange, []);
+    assert.deepEqual(verdict.majorOnly, []);
+    assert.equal(isClean(verdict), true, "an unfixable accepted advisory is what the list is FOR");
+  });
+
+  it("inherits the root's fix verdict for every advisory on it", () => {
+    // npm reports `fixAvailable` per vulnerable PACKAGE, and that is its real
+    // granularity rather than a simplification here: the fix is an upgrade of
+    // the package, so it moves all of its advisories or none.
+    const fixes = observedAdvisoryFixes(
+      report({
+        postcss: {
+          advisories: [
+            { ghsa: A2, severity: "high" },
+            { ghsa: A3, severity: "critical" },
+          ],
+          fixAvailable: true,
+        },
+      }),
+    );
+    assert.deepEqual([...fixes.values()], ["in-range", "in-range"]);
+  });
+
+  it("keeps one definition of `observed` for both questions", () => {
+    // Two walks would be two chances to disagree about which advisories the
+    // gate is even looking at.
+    const fixture = report({
+      postcss: { advisories: [{ ghsa: A2, severity: "high" }], fixAvailable: true },
+      expo: { dependsOn: ["postcss"], fixAvailable: true },
+    });
+    assert.deepEqual(observedAdvisories(fixture), [...observedAdvisoryFixes(fixture).keys()]);
+    assert.deepEqual(observedAdvisories(fixture), [`postcss#${A2}`]);
+  });
+});
+
+describe("isClean — the one place that decides the exit code", () => {
+  const clean = evaluateAudit(report({}), []);
+
+  it("fails on a stale entry, because fixing one is what MAKES it stale", () => {
+    // The gate now demands in-range fixes. Applying one removes the advisory
+    // from the report, which strands its baseline entry — so leaving staleness
+    // advisory-only would mean every fix this gate asks for leaves the accepted
+    // list describing a tree that no longer exists, and green.
+    const verdict = evaluateAudit(report({}), FIXTURE);
+    assert.deepEqual(verdict.stale, [`nanoid#${A1}`, `postcss#${A2}`, `postcss#${A3}`]);
+    assert.equal(isClean(verdict), false);
+  });
+
+  it("passes only when all three lists are empty", () => {
+    assert.equal(isClean(clean), true);
+    assert.equal(isClean({ ...clean, unexpected: ["x#y"] }), false);
+    assert.equal(isClean({ ...clean, fixableInRange: ["x#y"] }), false);
+    assert.equal(isClean({ ...clean, stale: ["x#y"] }), false);
+    assert.equal(
+      isClean({ ...clean, majorOnly: ["x#y"] }),
+      true,
+      "npm restating a `why` sentence is not a finding",
+    );
+  });
+
+  it("is what the CLI exits on, rather than a second list of its own", () => {
+    // A finding printed by a step that exits 0 is the shape this whole gate
+    // replaced, one layer in.
+    const script = readRepoFile("scripts/check-audit-baseline.ts");
+    assert.match(script, /if \(!isClean\(verdict\)\) process\.exit\(1\)/);
+  });
+
+  it("splits `package#advisory` on the LAST separator", () => {
+    assert.equal(advisoryPackage("nanoid#GHSA-28wg-ghj8-5hjv"), "nanoid");
+    assert.equal(advisoryPackage("@expo/cli#GHSA-1234"), "@expo/cli");
+    assert.equal(advisoryPackage("no-separator"), "no-separator");
   });
 });
 
