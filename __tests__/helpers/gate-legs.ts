@@ -172,7 +172,15 @@ export interface NetworkMarker {
    * about nothing, fixed by a copy-paste that teaches nobody anything.
    */
   readonly id: string;
-  /** Why this reaches outside the tree, as a failure message reads it. */
+  /**
+   * Why this reaches outside the tree, as a failure message reads it.
+   *
+   * This is the ONLY field a failure prints — `networkMarkerHit` answers with
+   * it and nothing else — so it has to say more than the pattern already
+   * does. Giving the identifier job to {@link id} freed this one to be
+   * reworded, and the same move makes shortening it to the id free too;
+   * `verify-gate-script.test.ts` is what keeps it a sentence.
+   */
   readonly why: string;
   /**
    * What the shape looks like in a script's text.
@@ -185,6 +193,16 @@ export interface NetworkMarker {
    */
   readonly pattern: RegExp;
 }
+
+/**
+ * What an {@link NetworkMarker.id} looks like: a short identifier, no prose.
+ *
+ * Exported so the two rules that need it read one definition. One asserts
+ * every id matches; the other asserts no `why` does, and a pair of rules
+ * pointing at the same regex from opposite directions is the whole statement
+ * that these two fields have different jobs.
+ */
+export const MARKER_ID_SHAPE = /^[a-z][a-z0-9-]*$/;
 
 export const NETWORK_MARKERS: readonly NetworkMarker[] = [
   {
