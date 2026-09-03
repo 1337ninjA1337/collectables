@@ -36,10 +36,12 @@ import { execFileSync, execSync } from "node:child_process";
 import http from "node:http";
 import https from "node:https";
 import { request } from "node:https";
-import { basename } from "node:path";
 import { describe, it } from "node:test";
 
 import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
+// The bootstrap's own reduction from a spawn argument to the tool it names, so
+// the case below asks the refusal's question rather than a copy of it.
+import { networkTool } from "./test-globals";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -344,15 +346,24 @@ describe("every marker the scan reads is refused at runtime", () => {
   /**
    * The tool a probe's spawn would have started, as the bootstrap names it.
    *
-   * The first argument of the recorded call, reduced the way the refusal
-   * reduces it: `exec` takes a whole command line, `execFile` and `spawn` take
-   * a path, and the message names the tool either way. Taken from the call and
-   * not from the source, so the case below relates a refusal to the spawn that
-   * earned it rather than to a word in a probe's text.
+   * The first argument of the recorded call, put through the bootstrap's own
+   * `networkTool` — the function the refusal uses to decide what a spawn is
+   * asking for. This was a second reduction written here (first token, then
+   * basename), correct on the day it was written and load-bearing only while it
+   * agreed with the one that matters; the two-copies arrangement four entries in
+   * `.tasks/` are about.
+   *
+   * `undefined` means the probe's spawn names nothing the refusal covers, which
+   * is not a tool-naming problem but a probe that would never have been refused.
    */
   function spawnToolOf(probe: () => unknown): string {
-    const called = String(spawnCallOf(probe, false)[0] ?? "");
-    return basename(called.split(/\s+/)[0] ?? "");
+    const called = spawnCallOf(probe, false)[0];
+    const tool = networkTool(called);
+    assert.ok(
+      tool !== undefined,
+      `a probe that spawns names \`${String(called)}\`, which the bootstrap does not count as a network tool — it would run rather than be refused, and the case below would be asking which refusal it let through when there was never going to be one`,
+    );
+    return tool;
   }
 
   /** The module's spawn methods as they stand right now, in `SPAWN_NAMES` order. */
