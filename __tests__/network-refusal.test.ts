@@ -256,6 +256,34 @@ describe("every marker the scan reads is refused at runtime", () => {
     assert.deepEqual(patternPerformedBy(swapped.fetch), ["http-client"]);
   });
 
+  it("bounds every probe that spawns, not the two somebody remembered", () => {
+    // `BOUNDED` was applied by hand to the two spawn probes that existed when
+    // it was written, which is how the four probes came to be keyed by prose
+    // in the first place. The population is not a list: a probe that spawns
+    // says so in the source the pairing case above already reads.
+    //
+    // A closing paren counts as well as an opening one, because `tsx` compiles
+    // `execFileSync(…)` to `(0, import_node_child_process.execFileSync)(…)` —
+    // the call is still there and the name is no longer against its own
+    // bracket. Same transpiler dependency the pairing case runs on, and the
+    // control below is what says the reading still finds anything.
+    const spawns = Object.entries(PROBES).filter(([, probe]) =>
+      /\b(?:exec|execFile|execSync|execFileSync|spawn|spawnSync)\s*[()]/.test(probe.toString()),
+    );
+    // A detector that matched nothing would agree with every probe there is.
+    assert.ok(
+      spawns.length >= 2,
+      `only ${String(spawns.length)} probes read as spawning — the two that do are no longer being seen, so this case bounds nothing`,
+    );
+    for (const [id, probe] of spawns) {
+      assert.match(
+        probe.toString(),
+        /\bBOUNDED\b/,
+        `the \`${id}\` probe spawns without a bound — if its refusal went missing the case below would hang on a real process instead of failing`,
+      );
+    }
+  });
+
   it("bounds a spawn that got through, so the failure is red rather than a hang", () => {
     // The control for `BOUNDED`, measured on a spawn the refusal does not
     // touch: a node process that would never exit on its own. If the bound
