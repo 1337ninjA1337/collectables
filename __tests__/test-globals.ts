@@ -124,7 +124,16 @@ for (const client of [http, https] as const) {
  */
 const NETWORK_TOOLS = new Set(["curl", "wget", "npm", "npx"]);
 
-function networkTool(command: unknown): string | undefined {
+/**
+ * The tool a spawn's first argument names, or `undefined` if it is not one the
+ * refusal covers.
+ *
+ * Exported because `network-refusal.test.ts` asks the same question of a probe's
+ * recorded call — which refusal a spawn should have earned — and had written its
+ * own reduction to answer it. Two copies of "a path or a command line reduces to
+ * a tool name" agreeing is the only thing that made that case mean anything.
+ */
+export function networkTool(command: unknown): string | undefined {
   if (typeof command !== "string") return undefined;
   // `exec` takes a whole command line, `execFile`/`spawn` take a path.
   const first = command.trim().split(/\s+/)[0] ?? "";
