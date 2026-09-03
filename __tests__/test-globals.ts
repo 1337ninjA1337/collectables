@@ -122,6 +122,30 @@ for (const client of [http, https] as const) {
  * The tool NAME only. Refusing spawning outright would break those fixtures,
  * which run `node`, `tsx` and `git` dozens of times.
  */
+/**
+ * How many times this module body has run in this process.
+ *
+ * The refusal is installed by side effect: `globalThis.fetch` is replaced and
+ * every spawn method is wrapped around the one it found. Running the body twice
+ * wraps the wrappers — the refusal still fires, every identity check in
+ * `network-refusal.test.ts` compares against whatever it found at import, and
+ * nothing anywhere goes red. A suite imports this module now (for
+ * `networkTool`), so "the same instance the `--import` loaded" went from a
+ * property nobody could break to one a specifier could, proved by hand once.
+ *
+ * The count lives on `globalThis` under a REGISTERED symbol rather than in a
+ * module-scope `let`: two instances of this module would each have their own
+ * `let` and each answer one, which is the answer that hides the problem.
+ */
+const INSTANCES = Symbol.for("collectables/test-globals#instances");
+const globalCounts = globalThis as unknown as Record<symbol, number | undefined>;
+globalCounts[INSTANCES] = (globalCounts[INSTANCES] ?? 0) + 1;
+
+/** How many times this bootstrap has been evaluated in this process. */
+export function bootstrapInstances(): number {
+  return globalCounts[INSTANCES] ?? 0;
+}
+
 const NETWORK_TOOLS = new Set(["curl", "wget", "npm", "npx"]);
 
 /**

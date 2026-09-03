@@ -41,7 +41,7 @@ import { describe, it } from "node:test";
 import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
 // The bootstrap's own reduction from a spawn argument to the tool it names, so
 // the case below asks the refusal's question rather than a copy of it.
-import { networkTool } from "./test-globals";
+import { bootstrapInstances, networkTool } from "./test-globals";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -784,6 +784,24 @@ describe("the refusal is wired into every test process", () => {
         `\`npm run ${script}\` runs suites without the bootstrap, so nothing refuses a request in them`,
       );
     }
+  });
+
+  it("is one instance of the bootstrap, however a suite reaches it", () => {
+    // This file imports the bootstrap for `networkTool`, so the module the
+    // `--import` evaluated and the module a suite names have to be the same
+    // one. A second instance would wrap every spawn method around the first's
+    // wrapper and re-assign `fetch` — and nothing would go red: the refusal
+    // still fires, and every identity check here compares against whatever was
+    // installed by the time it read the module. The `beforeEach` this
+    // bootstrap registers would also run twice per test.
+    //
+    // It was proved once by putting a `console.error` in the module body and
+    // counting lines, which is not a thing the tree can do again.
+    assert.equal(
+      bootstrapInstances(),
+      1,
+      `the bootstrap has been evaluated ${String(bootstrapInstances())} times — a suite is importing it by a specifier that resolves to a second module instance, so the refusal is wrapped around itself and every case here is measuring the copy that happened to be installed last`,
+    );
   });
 
   it("installs the refusal at module scope rather than in a beforeEach", () => {
