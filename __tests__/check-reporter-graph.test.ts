@@ -87,6 +87,29 @@ describe("repoLocalSpecifiers", () => {
     // exactly like any other import.
     assert.deepEqual(repoLocalSpecifiers('import "./setup.ts";'), ["./setup.ts"]);
   });
+
+  it("leaves a `require` alone, which is not an edge in an ESM graph", () => {
+    // The shared reader returns all five shapes and this walk models node's
+    // OWN loader, which loads this graph as ESM: a `require` there is a call
+    // built with `createRequire`, resolved at runtime and absent from the
+    // module graph. Following it would put a file in the text walk that node
+    // never asked for, and `missingFromWalk` would report the difference as a
+    // missing import rather than as the impossible one it is.
+    assert.deepEqual(repoLocalSpecifiers('const a = require("./one.ts");'), []);
+  });
+
+  it("ignores an import that only appears in a comment", () => {
+    // The scan strips comments now, through the shared reader. It did not
+    // before, so a commented-out import was an edge this half followed and
+    // node's loader did not — a disagreement reported as a missing file.
+    assert.deepEqual(repoLocalSpecifiers('// import { a } from "./gone.ts";'), []);
+  });
+
+  it("reads a single-quoted specifier, which node resolves the same", () => {
+    // Prettier writes double quotes here, so the old pattern's single-quote
+    // blindness was a rule about the formatter rather than about the loader.
+    assert.deepEqual(repoLocalSpecifiers("import { a } from './one.ts';"), ["./one.ts"]);
+  });
 });
 
 describe("parseLoadedFiles", () => {

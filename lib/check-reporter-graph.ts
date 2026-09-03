@@ -67,12 +67,19 @@ export type GraphReader = (repoRelative: string) => string | null;
  * Every repo-local specifier in `source`, as written.
  *
  * The shapes are `lib/import-specifiers.ts`'s — plain imports, type-only
- * imports, `export … from` re-exports, the dynamic form, the side-effect form
- * with no bindings, and `require` — because node's loader follows them and a
- * walk that missed one would check less than it claims. Two differences from
- * the pattern this used to carry, both in the direction of following MORE:
- * a single-quoted specifier (which this repository's prettier config never
- * writes and node reads exactly the same) and a `require`.
+ * imports, `export … from` re-exports, the dynamic form and the side-effect
+ * form with no bindings — because node's loader follows them and a walk that
+ * missed one would check less than it claims. One difference from the pattern
+ * this used to carry: a single-quoted specifier, which this repository's
+ * prettier config never writes and node reads exactly the same.
+ *
+ * A `require` is the one shape the shared reader returns and this drops. The
+ * graph is loaded as ESM by node's own loader, where `require` is not a
+ * specifier at all — it is a call somebody built with `createRequire`, made at
+ * runtime and invisible to the module graph the two rules above are about.
+ * Following it would put a file in the text walk that node never asked for,
+ * and {@link missingFromWalk} would report the difference as a missing import
+ * rather than as the impossible one it is.
  *
  * Comments are stripped there, which this did not do: a commented-out import
  * was an edge this walk followed and node's loader did not, so the two halves
@@ -91,8 +98,8 @@ export type GraphReader = (repoRelative: string) => string | null;
  */
 export function repoLocalSpecifiers(source: string): string[] {
   return importSpecifiers(source)
-    .map((record) => record.specifier)
-    .filter((specifier) => specifier.startsWith("."));
+    .filter((record) => record.kind !== "require" && record.specifier.startsWith("."))
+    .map((record) => record.specifier);
 }
 
 /**
