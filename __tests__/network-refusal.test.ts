@@ -382,6 +382,42 @@ describe("every marker the scan reads is refused at runtime", () => {
   };
 
   /**
+   * Every probe in the file, from the two tables that hold them.
+   *
+   * The swallow rule spread them together — `{ ...PROBES, ...THROWING_PROBES }`
+   * — which silently keeps ONE probe when an id appears in both, and the one it
+   * keeps is the throwing one. A marker's probe could be shadowed out of the
+   * rule that judges it while the parity case, which reads `PROBES` alone, went
+   * on passing. Two tables keyed by strings deserve better than a reader that
+   * assumes they are disjoint, so this says so.
+   */
+  function allProbes(): readonly (readonly [string, () => unknown])[] {
+    const shared = Object.keys(PROBES).filter((id) => id in THROWING_PROBES);
+    assert.deepEqual(
+      shared,
+      [],
+      `\`${shared.join("`, `")}\` is an id in both probe tables — merging them drops one, so a rule that reads the merge would judge the wrong body under that name`,
+    );
+    return [...Object.entries(PROBES), ...Object.entries(THROWING_PROBES)];
+  }
+
+  /**
+   * The probes whose source reads as swallowing something.
+   *
+   * The population the swallow rules ask their question of, with the floor
+   * inside it: a detector that matched nothing would agree with every probe
+   * there is.
+   */
+  function probesThatCatch(): readonly (readonly [string, () => unknown])[] {
+    const catching = allProbes().filter(([, probe]) => /\bcatch\b/.test(probe.toString()));
+    assert.ok(
+      catching.length >= 1,
+      "no probe reads as catching anything — either the swallowing probe has gone or its `catch` is no longer in the source these rules read, and both are now vacuous",
+    );
+    return catching;
+  }
+
+  /**
    * A `catch` that binds what it caught, as it survives `tsx`.
    *
    * The shape a probe needs in order to be ABLE to tell the recorder's stop
@@ -610,15 +646,7 @@ describe("every marker the scan reads is refused at runtime", () => {
     //
     // Read off the source, like the marker and spawn rules, and asked of a
     // population rather than of the two bodies that exist today.
-    const catching = Object.entries({ ...PROBES, ...THROWING_PROBES }).filter(([, probe]) =>
-      /\bcatch\b/.test(probe.toString()),
-    );
-    // A rule that found nothing to judge would agree with every probe there is.
-    assert.ok(
-      catching.length >= 1,
-      "no probe reads as catching anything — either the swallowing probe has gone or its `catch` is no longer in the source this rule reads, and the rule is now vacuous",
-    );
-    for (const [id, probe] of catching) {
+    for (const [id, probe] of probesThatCatch()) {
       const source = probe.toString();
       assert.match(
         source,
@@ -629,6 +657,35 @@ describe("every marker the scan reads is refused at runtime", () => {
         source,
         /\bRECORDER_STOP\b/,
         `the \`${id}\` probe catches without comparing against \`RECORDER_STOP\` — whatever it swallows, it swallows the bootstrap's refusal too`,
+      );
+    }
+  });
+
+  it("lets a refusal through, measured by handing a swallowing probe one", () => {
+    // The rule above matches the identifier `RECORDER_STOP` in a probe's
+    // source, which proves the name is in the text. A probe that compared
+    // against it and swallowed anyway reads exactly the same — the shape the
+    // bound rule was retired for one entry ago, reappearing in the rule written
+    // to close a different instance of it.
+    //
+    // What the probe has to DO is re-raise anything that is not the stop, and
+    // the way to measure that is to hand it something else. Called directly —
+    // no recorder installed, because `optionsPassedBy` is not in this call —
+    // the probe's spawn meets the bootstrap's refusal, which is the error a
+    // bare `catch` ate. Nothing is spawned: the refusal is why.
+    const spawningCatchers = probesThatCatch().filter(([, probe]) =>
+      SPAWN_CALL.test(probe.toString()),
+    );
+    assert.ok(
+      spawningCatchers.length >= 1,
+      "no probe both spawns and catches — the source rule above is still checking spelling, and this case has nothing left to measure it against",
+    );
+    for (const [id, probe] of spawningCatchers) {
+      assert.throws(
+        probe,
+        (error: unknown) =>
+          error !== PROBE_BOOM && error instanceof Error && /A test tried to/.test(error.message),
+        `the \`${id}\` probe swallowed the bootstrap's refusal and threw its own error instead — whatever its source says it compares against, what it does is eat the one throw that says a spawn was attempted`,
       );
     }
   });
