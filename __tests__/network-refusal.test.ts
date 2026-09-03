@@ -343,27 +343,79 @@ describe("every marker the scan reads is refused at runtime", () => {
     }
   }
 
+  /** What the probes below throw as their OWN failure, told apart by identity. */
+  const PROBE_BOOM = new Error("the probe's own failure, not the recorder's stop");
+
+  /**
+   * The probes that fail on purpose, named so their source can be read.
+   *
+   * Two things want them. The cases below ask whether `optionsPassedBy` restores
+   * the module on each of the paths a probe can throw on; the swallow rule asks
+   * whether a probe that catches a spawn's throw catches the right one. The
+   * second cannot ask that of a closure written inside a case body, which is
+   * where both of these lived — and the hole it exists to close was live in
+   * exactly such a closure for one commit.
+   */
+  const THROWING_PROBES: Readonly<Record<string, () => unknown>> = {
+    // Never reaches a spawn: recorders installed, nothing recorded.
+    "before-spawning": () => {
+      throw PROBE_BOOM;
+    },
+    // The state a real probe fails in: recorders installed, one call recorded,
+    // and a throw of its own after the spawn's throw was swallowed.
+    "after-recording": () => {
+      try {
+        // Hits a recorder, which throws rather than starting anything. The
+        // bound rides along because a probe that reached a real spawn here
+        // would be the failure this whole file is about.
+        execFileSync("npm", ["audit", "--json"], BOUNDED);
+      } catch (error) {
+        // By identity, not with a bare `catch`: a bare one swallows the
+        // bootstrap's refusal too, so if no recorder were installed this probe
+        // would spawn a real `npm audit`, drop whatever came back, and still
+        // throw its own error — the case passing while a child had started,
+        // which is the one outcome this file exists to make impossible.
+        if (error !== RECORDER_STOP) throw error;
+      }
+      throw PROBE_BOOM;
+    },
+  };
+
+  /**
+   * A `catch` that binds what it caught, as it survives `tsx`.
+   *
+   * The shape a probe needs in order to be ABLE to tell the recorder's stop
+   * from a real spawn's error. `catch {}` — no binding — cannot, which is the
+   * whole of the hole.
+   */
+  const CATCH_BINDING = /catch\s*\(\s*[A-Za-z_$][\w$]*\s*\)/;
+
   /**
    * A function written to be READ, for the premise the source rules share.
    *
-   * Two rules in this describe judge a probe by its transpiled text —
+   * Three rules in this describe judge a probe by its transpiled text —
    * `patternPerformedBy` runs the markers over it, `SPAWN_CALL` finds the
-   * probes that start a process. Both rest on `Function.prototype.toString`
-   * still handing back the source somebody wrote, and each stated that
-   * dependency in its own comment before anything asserted it.
+   * probes that start a process, `CATCH_BINDING` finds the ones that can tell
+   * what they swallowed. All rest on `Function.prototype.toString` still
+   * handing back the source somebody wrote, and each stated that dependency in
+   * its own comment before anything asserted it.
    *
-   * It is never called. Its body carries one of each shape the two readers
-   * look for — two marker literals and a spawn call name — so a runner that
-   * minified these suites, or a `toString` that answered `[native code]`, is
-   * named by this case rather than by the cases below whose messages all blame
-   * the probes.
+   * It is never called. Its body carries one of each shape the three readers
+   * look for — two marker literals, a spawn call name, and a `catch` that
+   * binds — so a runner that minified these suites, or a `toString` that
+   * answered `[native code]`, is named by this case rather than by the cases
+   * below whose messages all blame the probes.
    */
   function sourcePremiseControl(): void {
-    execFileSync("npm", ["audit"], BOUNDED);
+    try {
+      execFileSync("npm", ["audit"], BOUNDED);
+    } catch (error) {
+      if (error !== RECORDER_STOP) throw error;
+    }
     void fetch("https://example.test");
   }
 
-  it("reads a function's source as the text somebody wrote, which the two rules below assume", () => {
+  it("reads a function's source as the text somebody wrote, which the rules below assume", () => {
     const source = sourcePremiseControl.toString();
     assert.ok(
       !source.includes("[native code]"),
@@ -381,6 +433,11 @@ describe("every marker the scan reads is refused at runtime", () => {
       source,
       SPAWN_CALL,
       "a spawn call in the source is no longer found by name — the bound case below would report that as no probe spawning at all",
+    );
+    assert.match(
+      source,
+      CATCH_BINDING,
+      "a `catch` that binds what it caught is no longer found in a body that has one — the swallow rule below would read every probe as catching nothing and pass on all of them",
     );
   });
 
@@ -509,13 +566,9 @@ describe("every marker the scan reads is refused at runtime", () => {
     // `finally` is what makes that true, and this is the throw that exercises
     // the path `optionsPassedBy` re-raises rather than swallows.
     const before = spawnMethods();
-    const boom = new Error("the probe threw before spawning");
     assert.throws(
-      () =>
-        optionsPassedBy(() => {
-          throw boom;
-        }),
-      (error: unknown) => error === boom,
+      () => optionsPassedBy(THROWING_PROBES["before-spawning"]),
+      (error: unknown) => error === PROBE_BOOM,
       "a probe that throws before spawning is being swallowed or reported as something else",
     );
     assertRestored(
@@ -533,30 +586,9 @@ describe("every marker the scan reads is refused at runtime", () => {
     // one call recorded, and the re-raise path taken. Both halves of the
     // `finally`'s job were being proved on the same half of its input.
     const before = spawnMethods();
-    const boom = new Error("the probe threw after its spawn was recorded");
     assert.throws(
-      () =>
-        optionsPassedBy(() => {
-          try {
-            // Hits a recorder, which throws rather than starting anything. The
-            // bound rides along because a probe that reached a real spawn here
-            // would be the failure this whole file is about.
-            execFileSync("npm", ["audit", "--json"], BOUNDED);
-          } catch (error) {
-            // Swallowed the way a probe holding its own `try` would swallow it,
-            // which is what puts the recorder's stop out of `optionsPassedBy`'s
-            // reach and leaves the throw below as the one it sees.
-            //
-            // By identity, not with a bare `catch`: a bare one swallows the
-            // refusal too, so if no recorder were installed this probe would
-            // spawn a real `npm audit`, drop whatever came back, and still
-            // throw `boom` — the case passing while a child had started, which
-            // is the one outcome this file exists to make impossible.
-            if (error !== RECORDER_STOP) throw error;
-          }
-          throw boom;
-        }),
-      (error: unknown) => error === boom,
+      () => optionsPassedBy(THROWING_PROBES["after-recording"]),
+      (error: unknown) => error === PROBE_BOOM,
       "a probe that throws after spawning is being swallowed or reported as the recorder's own stop",
     );
     assertRestored(
@@ -564,6 +596,41 @@ describe("every marker the scan reads is refused at runtime", () => {
       (name) =>
         `a probe that threw after recording left \`${name}\` replaced — the restore covers the path where a probe fails before its spawn and not the one where it fails after`,
     );
+  });
+
+  it("swallows the recorder's stop by identity, in every probe that swallows at all", () => {
+    // The hole this closes was live for one commit. The `after-recording`
+    // probe caught its spawn's throw with a bare `catch`, which swallows the
+    // bootstrap's refusal exactly as quietly: with no recorder installed the
+    // probe would have spawned a real `npm audit`, dropped whatever came back,
+    // and still thrown its own error — green while a child had started. It was
+    // found by reading the diff, fixed in the probe, and nothing in the tree
+    // said so, which leaves the next probe that needs to swallow a spawn one
+    // `catch {}` away from reopening it.
+    //
+    // Read off the source, like the marker and spawn rules, and asked of a
+    // population rather than of the two bodies that exist today.
+    const catching = Object.entries({ ...PROBES, ...THROWING_PROBES }).filter(([, probe]) =>
+      /\bcatch\b/.test(probe.toString()),
+    );
+    // A rule that found nothing to judge would agree with every probe there is.
+    assert.ok(
+      catching.length >= 1,
+      "no probe reads as catching anything — either the swallowing probe has gone or its `catch` is no longer in the source this rule reads, and the rule is now vacuous",
+    );
+    for (const [id, probe] of catching) {
+      const source = probe.toString();
+      assert.match(
+        source,
+        CATCH_BINDING,
+        `the \`${id}\` probe swallows with a bare \`catch\` — it cannot tell the recorder's stop from a real spawn's refusal, so a missing recorder would let it start a child and still pass`,
+      );
+      assert.match(
+        source,
+        /\bRECORDER_STOP\b/,
+        `the \`${id}\` probe catches without comparing against \`RECORDER_STOP\` — whatever it swallows, it swallows the bootstrap's refusal too`,
+      );
+    }
   });
 
   it("bounds a spawn that got through, so the failure is red rather than a hang", () => {
