@@ -280,22 +280,33 @@ describe("every marker the scan reads is refused at runtime", () => {
    * `finally`: leaving a recorder behind would disarm the refusal for every
    * suite that runs after this one.
    */
+  /**
+   * What a recorder throws in place of starting a child, as one shared object.
+   *
+   * It was created fresh inside `optionsPassedBy`, which is all that function
+   * needs — it compares by identity against the one it just made. A probe that
+   * wants to swallow the stop and keep going cannot: it has nothing to compare
+   * against, so it swallows with a bare `catch` and would swallow a REAL
+   * spawn's error exactly as quietly. Naming the sentinel once is what lets a
+   * probe say "the recorder's stop, and nothing else".
+   */
+  const RECORDER_STOP = new Error("recorded — the probe stops here rather than starting a child");
+
   function optionsPassedBy(probe: () => unknown): unknown {
     const mutable = childProcess as unknown as Record<string, unknown>;
     const saved = SPAWN_NAMES.map((name) => [name, mutable[name]] as const);
     const recorded: unknown[][] = [];
-    const stop = new Error("recorded — the probe stops here rather than starting a child");
     try {
       for (const name of SPAWN_NAMES) {
         mutable[name] = (...args: unknown[]) => {
           recorded.push(args);
-          throw stop;
+          throw RECORDER_STOP;
         };
       }
       try {
         probe();
       } catch (error) {
-        if (error !== stop) throw error;
+        if (error !== RECORDER_STOP) throw error;
       }
     } finally {
       for (const [name, value] of saved) mutable[name] = value;
@@ -531,10 +542,17 @@ describe("every marker the scan reads is refused at runtime", () => {
             // bound rides along because a probe that reached a real spawn here
             // would be the failure this whole file is about.
             execFileSync("npm", ["audit", "--json"], BOUNDED);
-          } catch {
+          } catch (error) {
             // Swallowed the way a probe holding its own `try` would swallow it,
             // which is what puts the recorder's stop out of `optionsPassedBy`'s
             // reach and leaves the throw below as the one it sees.
+            //
+            // By identity, not with a bare `catch`: a bare one swallows the
+            // refusal too, so if no recorder were installed this probe would
+            // spawn a real `npm audit`, drop whatever came back, and still
+            // throw `boom` — the case passing while a child had started, which
+            // is the one outcome this file exists to make impossible.
+            if (error !== RECORDER_STOP) throw error;
           }
           throw boom;
         }),
