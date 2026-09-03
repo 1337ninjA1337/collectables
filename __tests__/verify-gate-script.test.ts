@@ -4,7 +4,12 @@ import path from "node:path";
 
 import { PUBLISHED_ELSEWHERE_NOTE } from "@/lib/audit-baseline";
 
-import { gateScriptPaths, networkMarkerHit } from "./helpers/gate-legs";
+import {
+  MARKER_ID_SHAPE,
+  NETWORK_MARKERS,
+  gateScriptPaths,
+  networkMarkerHit,
+} from "./helpers/gate-legs";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
 import { SUITES_REL } from "./helpers/suite-files";
@@ -377,6 +382,79 @@ describe("only one leg of the gate reads anything outside the tree", () => {
     assert.ok(
       !GATE_SCRIPTS.includes("scripts/check-expo-install.ts"),
       "`check-expo-install` reaches the registry; a `verify` that ran it would make the note wrong",
+    );
+  });
+});
+
+/**
+ * The marker's `why` is the whole failure message, so it has to be a sentence.
+ *
+ * `networkMarkerHit` answers with `why` and nothing else: every finding this
+ * scan reports, and the one `legReadsOutsideTheTree` reports, is that string
+ * beside a filename. It used to be the identifier too, and rewording one for
+ * clarity broke a parity case — so 2026-09-03 gave the markers an `id` and
+ * freed the prose.
+ *
+ * Freeing it cuts both ways. Nothing now stops a `why` being shortened to the
+ * id it sits beside, and `fetch` as a failure message says strictly less than
+ * the pattern a reader could have looked at instead. These are the two rules
+ * that keep the fields doing different jobs, and they read the same regex from
+ * opposite directions: every id matches {@link MARKER_ID_SHAPE}
+ * (`network-refusal.test.ts` owns that half), no `why` does.
+ */
+describe("a marker's reason stays readable, because it is all a failure says", () => {
+  it("is prose rather than the identifier a second time", () => {
+    for (const marker of NETWORK_MARKERS) {
+      assert.doesNotMatch(
+        marker.why,
+        MARKER_ID_SHAPE,
+        `the \`${marker.id}\` marker's reason is shaped like an id — a finding that reads "${marker.why}" tells a contributor less than the pattern would have`,
+      );
+      assert.ok(
+        marker.why.trim().split(/\s+/).length >= 3,
+        `the \`${marker.id}\` marker's reason is not a phrase: "${marker.why}"`,
+      );
+      assert.notEqual(
+        marker.why.replace(/[\s`]/g, "-").toLowerCase(),
+        marker.id,
+        `the \`${marker.id}\` marker's reason is its id with the dashes taken out, which is the same collapse spelled differently`,
+      );
+    }
+  });
+
+  it("says something different for each marker, so a finding identifies one", () => {
+    // Two markers printing one sentence would leave a reader unable to tell
+    // which shape was found — the id is what distinguishes them in the wiring
+    // and the reader never sees it.
+    const reasons = NETWORK_MARKERS.map((marker) => marker.why);
+    assert.equal(new Set(reasons).size, reasons.length, "two markers give the same reason");
+  });
+
+  it("is what the scan actually reports, measured on the real tree", () => {
+    // Not a structural claim about the return type. The scripts outside the
+    // gate are the population the anti-vacuous case above already leans on —
+    // `db:find-duplicates` and `sentry:check` call `fetch`, `check-expo-install`
+    // asks the registry about versions — so this asserts what a reader of
+    // those findings is actually handed, and it is two different sentences.
+    const ids = new Set(NETWORK_MARKERS.map((marker) => marker.id));
+    const reasons = new Set(NETWORK_MARKERS.map((marker) => marker.why));
+    const gate = gateScriptPaths();
+    const found = sourceFiles("scripts")
+      .filter((file) => !gate.includes(file))
+      .flatMap((file) => {
+        const why = networkMarkerHit(read(file));
+        return why === undefined ? [] : [{ file, why }];
+      });
+    assert.ok(found.length >= 2, "no script outside the gate reaches the network any more");
+    for (const hit of found) {
+      assert.ok(
+        reasons.has(hit.why) && !ids.has(hit.why),
+        `${hit.file} is reported as "${hit.why}", which is not a marker's reason`,
+      );
+    }
+    assert.ok(
+      new Set(found.map((hit) => hit.why)).size >= 2,
+      "every finding outside the gate reads the same, so the reasons are not telling the shapes apart on a real tree",
     );
   });
 });

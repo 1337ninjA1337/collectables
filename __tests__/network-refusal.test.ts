@@ -33,7 +33,7 @@ import https from "node:https";
 import { request } from "node:https";
 import { describe, it } from "node:test";
 
-import { NETWORK_MARKERS } from "./helpers/gate-legs";
+import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -246,7 +246,7 @@ describe("every marker the scan reads is refused at runtime", () => {
     const ids = NETWORK_MARKERS.map((marker) => marker.id);
     assert.equal(new Set(ids).size, ids.length, "two markers share an id");
     for (const id of ids) {
-      assert.match(id, /^[a-z][a-z0-9-]*$/, `\`${id}\` is a sentence, not an identifier`);
+      assert.match(id, MARKER_ID_SHAPE, `\`${id}\` is a sentence, not an identifier`);
     }
   });
 });
