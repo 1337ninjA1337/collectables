@@ -36,6 +36,7 @@ import { execFileSync, execSync } from "node:child_process";
 import http from "node:http";
 import https from "node:https";
 import { request } from "node:https";
+import { basename } from "node:path";
 import { describe, it } from "node:test";
 
 import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
@@ -265,22 +266,6 @@ describe("every marker the scan reads is refused at runtime", () => {
   }
 
   /**
-   * The options a probe hands its spawn, taken from the call itself.
-   *
-   * The bound used to be checked by matching `BOUNDED` in the probe's source,
-   * which proves the word is in the text and not that the object reached the
-   * spawn: a probe naming it in a comment, or handing it to the wrong
-   * parameter, read exactly the same. The property is that the child cannot
-   * outlive the case, and the only thing carrying it is the options argument.
-   *
-   * Every name in `SPAWN_NAMES` is replaced on the live module — the same
-   * object the bootstrap patched, which is why this file imports the default
-   * rather than a namespace — with a recorder that throws instead of calling
-   * through, so the probe stops before a child exists. Restoring is in a
-   * `finally`: leaving a recorder behind would disarm the refusal for every
-   * suite that runs after this one.
-   */
-  /**
    * What a recorder throws in place of starting a child, as one shared object.
    *
    * It was created fresh inside `optionsPassedBy`, which is all that function
@@ -292,7 +277,27 @@ describe("every marker the scan reads is refused at runtime", () => {
    */
   const RECORDER_STOP = new Error("recorded — the probe stops here rather than starting a child");
 
-  function optionsPassedBy(probe: () => unknown): unknown {
+  /**
+   * The arguments a probe hands its spawn, taken from the call itself.
+   *
+   * Every name in `SPAWN_NAMES` is replaced on the live module — the same
+   * object the bootstrap patched, which is why this file imports the default
+   * rather than a namespace — with a recorder that throws instead of calling
+   * through, so the probe stops before a child exists. Restoring is in a
+   * `finally`: leaving a recorder behind would disarm the refusal for every
+   * suite that runs after this one.
+   *
+   * Two readers want different arguments out of the same call — the bound is
+   * the last one, the tool is the first — so what this returns is the call.
+   *
+   * `reraise` is what the probe's OWN failure does. The restore cases need it
+   * thrown: that path is their subject. A reader that only wants the recorded
+   * arguments does not, and one probe here throws deliberately after its spawn
+   * — asking it what it called would otherwise mean catching its failure at
+   * every call site. The recorded call is complete either way; the probe had
+   * already made it.
+   */
+  function spawnCallOf(probe: () => unknown, reraise = true): readonly unknown[] {
     const mutable = childProcess as unknown as Record<string, unknown>;
     const saved = SPAWN_NAMES.map((name) => [name, mutable[name]] as const);
     const recorded: unknown[][] = [];
@@ -306,7 +311,7 @@ describe("every marker the scan reads is refused at runtime", () => {
       try {
         probe();
       } catch (error) {
-        if (error !== RECORDER_STOP) throw error;
+        if (error !== RECORDER_STOP && reraise) throw error;
       }
     } finally {
       for (const [name, value] of saved) mutable[name] = value;
@@ -316,10 +321,38 @@ describe("every marker the scan reads is refused at runtime", () => {
       1,
       `a probe that reads as spawning made ${String(recorded.length)} calls into \`node:child_process\` — the recorder is on the wrong object, or the source and the runtime disagree about what this probe does`,
     );
-    // Every probe here spawns synchronously, and a sync spawn's options are
-    // its last argument. An async one would end in a callback and fail this,
-    // which is correct: what bounds an async child is a different question.
-    return recorded[0]?.at(-1);
+    return recorded[0] ?? [];
+  }
+
+  /**
+   * The options a probe hands its spawn.
+   *
+   * The bound used to be checked by matching `BOUNDED` in the probe's source,
+   * which proves the word is in the text and not that the object reached the
+   * spawn: a probe naming it in a comment, or handing it to the wrong
+   * parameter, read exactly the same. The property is that the child cannot
+   * outlive the case, and the only thing carrying it is the options argument.
+   *
+   * Every probe here spawns synchronously, and a sync spawn's options are its
+   * last argument. An async one would end in a callback and fail this, which is
+   * correct: what bounds an async child is a different question.
+   */
+  function optionsPassedBy(probe: () => unknown): unknown {
+    return spawnCallOf(probe).at(-1);
+  }
+
+  /**
+   * The tool a probe's spawn would have started, as the bootstrap names it.
+   *
+   * The first argument of the recorded call, reduced the way the refusal
+   * reduces it: `exec` takes a whole command line, `execFile` and `spawn` take
+   * a path, and the message names the tool either way. Taken from the call and
+   * not from the source, so the case below relates a refusal to the spawn that
+   * earned it rather than to a word in a probe's text.
+   */
+  function spawnToolOf(probe: () => unknown): string {
+    const called = String(spawnCallOf(probe, false)[0] ?? "");
+    return basename(called.split(/\s+/)[0] ?? "");
   }
 
   /** The module's spawn methods as they stand right now, in `SPAWN_NAMES` order. */
@@ -681,11 +714,19 @@ describe("every marker the scan reads is refused at runtime", () => {
       "no probe both spawns and catches — the source rule above is still checking spelling, and this case has nothing left to measure it against",
     );
     for (const [id, probe] of spawningCatchers) {
+      // The tool comes off the recorded call, so what is asserted is that the
+      // refusal the probe let through is the one ITS OWN spawn earned.
+      // `/A test tried to/` is the prefix of all four refusals: a probe that
+      // fetched instead would have satisfied it just as well, which makes it a
+      // check that some refusal happened rather than that this one did.
+      const tool = spawnToolOf(probe);
       assert.throws(
         probe,
         (error: unknown) =>
-          error !== PROBE_BOOM && error instanceof Error && /A test tried to/.test(error.message),
-        `the \`${id}\` probe swallowed the bootstrap's refusal and threw its own error instead — whatever its source says it compares against, what it does is eat the one throw that says a spawn was attempted`,
+          error !== PROBE_BOOM &&
+          error instanceof Error &&
+          new RegExp(`tried to spawn ${tool}\\b`).test(error.message),
+        `the \`${id}\` probe did not let through the refusal for spawning \`${tool}\` — whatever its source says it compares against, what it does is eat the one throw that says its own spawn was attempted`,
       );
     }
   });
