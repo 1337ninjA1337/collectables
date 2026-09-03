@@ -440,25 +440,37 @@ describe("every marker the scan reads is refused at runtime", () => {
     }
   });
 
-  it("leaves the shared module exactly as it found it, so later suites stay refused", () => {
+  it("leaves the shared module exactly as it found it, after every probe that spawns", () => {
     // `optionsPassedBy` replaces every spawn name on the live module and puts
     // them back in a `finally`. That restore is the only thing standing between
     // this case and every suite that runs after it: a recorder left installed
     // does not call through, so a later spawn hits `throw stop` instead of the
     // bootstrap's refusal — and it fails for a reason with this file's name
     // nowhere in it. The `finally` is correct today and nothing watched it.
+    //
+    // Ran on `npm-audit` alone at first, which is a claim about one probe read
+    // as a claim about the function: the other spawn probe passes a different
+    // body through the same swap, and "they share `optionsPassedBy`" is the
+    // very assumption a case about a shared module should not be making. The
+    // population is the same derived one the bound case reads, so a third
+    // spawning probe is covered by existing rather than by being remembered.
     const mutable = childProcess as unknown as Record<string, unknown>;
+    // Snapshotted once, OUTSIDE the loop: each probe is asserted back to the
+    // wrappers the bootstrap installed, not merely to whatever the probe before
+    // it left behind — which a per-probe snapshot would quietly accept.
     const before = SPAWN_NAMES.map((name) => mutable[name]);
-    optionsPassedBy(PROBES["npm-audit"]);
-    for (const [index, name] of SPAWN_NAMES.entries()) {
-      assert.equal(
-        mutable[name],
-        before[index],
-        `\`optionsPassedBy\` left \`${name}\` replaced — a recorder now outlives the call, so every later suite spawns into it instead of the refusal`,
-      );
+    for (const [id, probe] of probesThatSpawn()) {
+      optionsPassedBy(probe);
+      for (const [index, name] of SPAWN_NAMES.entries()) {
+        assert.equal(
+          mutable[name],
+          before[index],
+          `\`optionsPassedBy\` left \`${name}\` replaced after the \`${id}\` probe — a recorder now outlives the call, so every later suite spawns into it instead of the refusal`,
+        );
+      }
     }
     // The property the identity check stands in for, measured end to end: the
-    // refusal the whole file exists to install still fires after the swap.
+    // refusal the whole file exists to install still fires after the swaps.
     assert.throws(() => execFileSync("curl", ["https://example.test"]), /tried to spawn curl/);
   });
 
