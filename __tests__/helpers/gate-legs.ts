@@ -174,7 +174,15 @@ export interface NetworkMarker {
   readonly id: string;
   /** Why this reaches outside the tree, as a failure message reads it. */
   readonly why: string;
-  /** What the shape looks like in a script's text. */
+  /**
+   * What the shape looks like in a script's text.
+   *
+   * This is the half `network-refusal.test.ts`'s probe has to agree with. The
+   * probe is looked up by {@link id}, which relates the two by name only — so
+   * that suite judges each probe's own SOURCE against this pattern, and a
+   * probe filed under the wrong marker is a red run rather than a pass. A
+   * pattern rewritten to read a different shape has to take its probe with it.
+   */
   readonly pattern: RegExp;
 }
 
