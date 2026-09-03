@@ -152,15 +152,45 @@ describe("the other ways out of the tree", () => {
  * marker with no runtime probe is a red run rather than a quiet asymmetry.
  */
 describe("every marker the scan reads is refused at runtime", () => {
+  /**
+   * The http client a specifier names, so a probe can take it the way the
+   * marker's pattern reads it.
+   *
+   * The other three markers describe a CALL, which a probe body can simply
+   * be. This one describes an import specifier, and a probe cannot import at
+   * call time — so it names the module the same way an import would and the
+   * lookup happens at runtime. That is what lets `patternPerformedBy` below
+   * relate this probe to its own marker instead of to any of the others; it
+   * is not evidence that an import of `node:https` is refused, which is a
+   * claim nothing here makes and nothing here needs.
+   */
+  function httpClient(specifier: "node:http" | "node:https"): {
+    request: (url: string) => unknown;
+  } {
+    return specifier === "node:https" ? https : http;
+  }
+
   // Keyed by the marker's `id`, not by its sentence. The sentence is written
   // to be read in a failure message and rewording one for clarity used to
   // break this parity case — a red run about nothing, fixed by a copy-paste.
+  //
+  // Each body is written as the SHAPE its marker's pattern reads, because the
+  // key relates the two by name and only the text relates them by meaning.
+  // `fetch` is taken off `globalThis` at call time rather than through the
+  // captured `installed`, which is both what the pattern reads and what a real
+  // suite would do; the cases above are the ones that need the capture.
   const PROBES: Readonly<Record<string, () => unknown>> = {
     "npm-audit": () => execFileSync("npm", ["audit", "--json"]),
     "expo-install-check": () => execFileSync("npx", ["expo", "install", "--check"]),
-    fetch: () => installed("https://example.test"),
-    "http-client": () => https.request("https://example.test"),
+    fetch: () => globalThis.fetch("https://example.test"),
+    "http-client": () => httpClient("node:https").request("https://example.test"),
   };
+
+  /** The markers whose pattern fires on this probe's own source text. */
+  function patternPerformedBy(probe: () => unknown): readonly string[] {
+    const source = probe.toString();
+    return NETWORK_MARKERS.filter((marker) => marker.pattern.test(source)).map((m) => m.id);
+  }
 
   it("has a probe for every marker, and no probe for a marker that has gone", () => {
     const markers = NETWORK_MARKERS.map((marker) => marker.id).sort();
@@ -177,6 +207,36 @@ describe("every marker the scan reads is refused at runtime", () => {
       // a reader recognises and the wiring names something stable.
       assert.throws(PROBES[marker.id], /A test tried to/, `${marker.why} is not refused at runtime`);
     }
+  });
+
+  it("performs the shape its own marker's pattern reads, and no other", () => {
+    // The gap this closes: the parity case compares two key sets and the
+    // refusal case looks a probe up by the same key, so `fetch` could be the
+    // id on the http-client marker and every case would still pass. A key
+    // relates the two by NAME. The pair that has to agree in MEANING is the
+    // pattern and the probe, and the one text both can be judged against is
+    // the probe's own source — the same thing the scan reads in a script.
+    for (const marker of NETWORK_MARKERS) {
+      assert.deepEqual(
+        patternPerformedBy(PROBES[marker.id]),
+        [marker.id],
+        `the \`${marker.id}\` probe is not the shape its pattern reads — a probe pointed at the wrong marker throws the same way and passes every other case here`,
+      );
+    }
+  });
+
+  it("would fail on the swap it exists to catch", () => {
+    // The planted offender, because a rule nobody has watched refuse anything
+    // is one that reads as passing whether it works or not: the two probes
+    // that used to be indistinguishable here, exchanged. The mechanism names
+    // the marker each one really performs, not the key it was filed under.
+    const swapped: Readonly<Record<string, () => unknown>> = {
+      ...PROBES,
+      fetch: PROBES["http-client"],
+      "http-client": PROBES.fetch,
+    };
+    assert.deepEqual(patternPerformedBy(swapped["http-client"]), ["fetch"]);
+    assert.deepEqual(patternPerformedBy(swapped.fetch), ["http-client"]);
   });
 
   it("keeps the ids distinct and free of prose", () => {
