@@ -440,6 +440,53 @@ describe("every marker the scan reads is refused at runtime", () => {
     }
   });
 
+  it("leaves the shared module exactly as it found it, so later suites stay refused", () => {
+    // `optionsPassedBy` replaces every spawn name on the live module and puts
+    // them back in a `finally`. That restore is the only thing standing between
+    // this case and every suite that runs after it: a recorder left installed
+    // does not call through, so a later spawn hits `throw stop` instead of the
+    // bootstrap's refusal — and it fails for a reason with this file's name
+    // nowhere in it. The `finally` is correct today and nothing watched it.
+    const mutable = childProcess as unknown as Record<string, unknown>;
+    const before = SPAWN_NAMES.map((name) => mutable[name]);
+    optionsPassedBy(PROBES["npm-audit"]);
+    for (const [index, name] of SPAWN_NAMES.entries()) {
+      assert.equal(
+        mutable[name],
+        before[index],
+        `\`optionsPassedBy\` left \`${name}\` replaced — a recorder now outlives the call, so every later suite spawns into it instead of the refusal`,
+      );
+    }
+    // The property the identity check stands in for, measured end to end: the
+    // refusal the whole file exists to install still fires after the swap.
+    assert.throws(() => execFileSync("curl", ["https://example.test"]), /tried to spawn curl/);
+  });
+
+  it("restores the module even when the probe throws something that is not the recorder's stop", () => {
+    // The restore has to survive a probe that throws before it ever spawns —
+    // otherwise a probe with a bug would take the refusal down with it. The
+    // `finally` is what makes that true, and this is the throw that exercises
+    // the path `optionsPassedBy` re-raises rather than swallows.
+    const mutable = childProcess as unknown as Record<string, unknown>;
+    const before = SPAWN_NAMES.map((name) => mutable[name]);
+    const boom = new Error("the probe threw before spawning");
+    assert.throws(
+      () =>
+        optionsPassedBy(() => {
+          throw boom;
+        }),
+      (error: unknown) => error === boom,
+      "a probe that throws before spawning is being swallowed or reported as something else",
+    );
+    for (const [index, name] of SPAWN_NAMES.entries()) {
+      assert.equal(
+        mutable[name],
+        before[index],
+        `a throwing probe left \`${name}\` replaced — the restore does not cover the path where the probe fails before it spawns`,
+      );
+    }
+  });
+
   it("bounds a spawn that got through, so the failure is red rather than a hang", () => {
     // The control for `BOUNDED`, measured on a spawn the refusal does not
     // touch: a node process that would never exit on its own. If the bound
