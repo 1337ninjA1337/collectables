@@ -209,6 +209,65 @@ describe("every marker the scan reads is refused at runtime", () => {
     return NETWORK_MARKERS.filter((marker) => marker.pattern.test(source)).map((m) => m.id);
   }
 
+  /**
+   * A call that starts a process, as it survives `tsx`.
+   *
+   * A closing paren counts as well as an opening one, because `tsx` compiles
+   * `execFileSync(…)` to `(0, import_node_child_process.execFileSync)(…)` —
+   * the call is still there and the name is no longer against its own bracket.
+   */
+  const SPAWN_CALL = /\b(?:exec|execFile|execSync|execFileSync|spawn|spawnSync)\s*[()]/;
+
+  /** The bound, named in the source of the probe that applies it. */
+  const BOUND_APPLIED = /\bBOUNDED\b/;
+
+  /**
+   * A function written to be READ, for the premise the source rules share.
+   *
+   * Three rules in this describe judge a probe by its transpiled text —
+   * `patternPerformedBy` runs the markers over it, `SPAWN_CALL` finds the
+   * probes that start a process, `BOUND_APPLIED` finds the ones that bound it.
+   * All three rest on `Function.prototype.toString` still handing back the
+   * source somebody wrote, and until now each stated that dependency in its
+   * own comment and none of them asserted it.
+   *
+   * It is never called. Its body carries one of each shape the three readers
+   * look for — two marker literals, a spawn call name, the bound's identifier
+   * — so a runner that minified these suites, or a `toString` that answered
+   * `[native code]`, is named by this case rather than by three cases below
+   * whose messages all blame the probes.
+   */
+  function sourcePremiseControl(): void {
+    execFileSync("npm", ["audit"], BOUNDED);
+    void fetch("https://example.test");
+  }
+
+  it("reads a function's source as the text somebody wrote, which the three rules below assume", () => {
+    const source = sourcePremiseControl.toString();
+    assert.ok(
+      !source.includes("[native code]"),
+      "`Function.prototype.toString` no longer returns a body — every rule here that reads a probe's source is now asking a question about the string `[native code]`",
+    );
+    // The marker reader, given a body that performs two of the four shapes:
+    // an exact answer no single probe produces, so a pattern that had stopped
+    // firing and a pattern that fired on everything both show up here.
+    assert.deepEqual(
+      patternPerformedBy(sourcePremiseControl),
+      ["npm-audit", "fetch"],
+      "the marker patterns no longer read this source the way they read a gate script's text — the pairing case below would report that as probes filed under the wrong markers",
+    );
+    assert.match(
+      source,
+      SPAWN_CALL,
+      "a spawn call in the source is no longer found by name — the bound case below would report that as no probe spawning at all",
+    );
+    assert.match(
+      source,
+      BOUND_APPLIED,
+      "a closure identifier no longer survives into the source — the bound case below would be matching a name the runner had renamed",
+    );
+  });
+
   it("has a probe for every marker, and no probe for a marker that has gone", () => {
     const markers = NETWORK_MARKERS.map((marker) => marker.id).sort();
     assert.deepEqual(
@@ -262,14 +321,10 @@ describe("every marker the scan reads is refused at runtime", () => {
     // in the first place. The population is not a list: a probe that spawns
     // says so in the source the pairing case above already reads.
     //
-    // A closing paren counts as well as an opening one, because `tsx` compiles
-    // `execFileSync(…)` to `(0, import_node_child_process.execFileSync)(…)` —
-    // the call is still there and the name is no longer against its own
-    // bracket. Same transpiler dependency the pairing case runs on, and the
-    // control below is what says the reading still finds anything.
-    const spawns = Object.entries(PROBES).filter(([, probe]) =>
-      /\b(?:exec|execFile|execSync|execFileSync|spawn|spawnSync)\s*[()]/.test(probe.toString()),
-    );
+    // The reading depends on the transpiler leaving the call name in the
+    // source, which is the premise `sourcePremiseControl` above asserts
+    // for this rule and for the two others that share it.
+    const spawns = Object.entries(PROBES).filter(([, probe]) => SPAWN_CALL.test(probe.toString()));
     // A detector that matched nothing would agree with every probe there is.
     assert.ok(
       spawns.length >= 2,
@@ -278,7 +333,7 @@ describe("every marker the scan reads is refused at runtime", () => {
     for (const [id, probe] of spawns) {
       assert.match(
         probe.toString(),
-        /\bBOUNDED\b/,
+        BOUND_APPLIED,
         `the \`${id}\` probe spawns without a bound — if its refusal went missing the case below would hang on a real process instead of failing`,
       );
     }
