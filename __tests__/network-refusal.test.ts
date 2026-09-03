@@ -170,6 +170,23 @@ describe("every marker the scan reads is refused at runtime", () => {
     return specifier === "node:https" ? https : http;
   }
 
+  /**
+   * What bounds a spawn probe when the thing it is probing has gone.
+   *
+   * Two of the four probes ask a real `npm` and a real `npx` to do something,
+   * and rely entirely on `NETWORK_TOOLS` refusing them before the process
+   * starts. If it stopped covering either name, the probe would not fail — it
+   * would RUN, and `npm audit` against the registry is slow, needs a network,
+   * and is precisely what this whole file exists to prevent. The failure mode
+   * of the case that guards the refusal would be a hang.
+   *
+   * A killed spawn turns that back into an assertion: the child gets a
+   * millisecond and SIGKILL, `execFileSync` throws for the wrong reason, and
+   * `assert.throws` reports a message that is not the refusal's. Nothing here
+   * is load-bearing while the refusal works — it never reaches a spawn at all.
+   */
+  const BOUNDED = { timeout: 1, killSignal: "SIGKILL", stdio: "ignore" } as const;
+
   // Keyed by the marker's `id`, not by its sentence. The sentence is written
   // to be read in a failure message and rewording one for clarity used to
   // break this parity case — a red run about nothing, fixed by a copy-paste.
@@ -180,8 +197,8 @@ describe("every marker the scan reads is refused at runtime", () => {
   // captured `installed`, which is both what the pattern reads and what a real
   // suite would do; the cases above are the ones that need the capture.
   const PROBES: Readonly<Record<string, () => unknown>> = {
-    "npm-audit": () => execFileSync("npm", ["audit", "--json"]),
-    "expo-install-check": () => execFileSync("npx", ["expo", "install", "--check"]),
+    "npm-audit": () => execFileSync("npm", ["audit", "--json"], BOUNDED),
+    "expo-install-check": () => execFileSync("npx", ["expo", "install", "--check"], BOUNDED),
     fetch: () => globalThis.fetch("https://example.test"),
     "http-client": () => httpClient("node:https").request("https://example.test"),
   };
@@ -237,6 +254,23 @@ describe("every marker the scan reads is refused at runtime", () => {
     };
     assert.deepEqual(patternPerformedBy(swapped["http-client"]), ["fetch"]);
     assert.deepEqual(patternPerformedBy(swapped.fetch), ["http-client"]);
+  });
+
+  it("bounds a spawn that got through, so the failure is red rather than a hang", () => {
+    // The control for `BOUNDED`, measured on a spawn the refusal does not
+    // touch: a node process that would never exit on its own. If the bound
+    // were wrong, this case is the one that hangs — and it hangs on a spin
+    // loop instead of on a suite quietly asking the npm registry a question.
+    const started = Date.now();
+    assert.throws(
+      () => execFileSync(process.execPath, ["-e", "while (true) {}"], BOUNDED),
+      (error: unknown) => error instanceof Error,
+      "an unrefused spawn is unbounded again, so a probe whose refusal went missing would hang instead of failing",
+    );
+    assert.ok(
+      Date.now() - started < 10_000,
+      "the bound let a spawn run for ten seconds, which is long enough for a real `npm audit` to reach the registry",
+    );
   });
 
   it("keeps the ids distinct and free of prose", () => {
