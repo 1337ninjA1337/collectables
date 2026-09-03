@@ -311,6 +311,27 @@ describe("every marker the scan reads is refused at runtime", () => {
     return recorded[0]?.at(-1);
   }
 
+  /** The module's spawn methods as they stand right now, in `SPAWN_NAMES` order. */
+  function spawnMethods(): readonly unknown[] {
+    const mutable = childProcess as unknown as Record<string, unknown>;
+    return SPAWN_NAMES.map((name) => mutable[name]);
+  }
+
+  /**
+   * That every spawn method is the one `before` held, name by name.
+   *
+   * Three cases below make this comparison — after each spawning probe, and
+   * after each of the two paths a probe can throw on. They were three copies of
+   * one loop differing only in the sentence, which is the arrangement that lets
+   * a fourth reader be written slightly wrong.
+   */
+  function assertRestored(before: readonly unknown[], why: (name: string) => string): void {
+    const mutable = childProcess as unknown as Record<string, unknown>;
+    for (const [index, name] of SPAWN_NAMES.entries()) {
+      assert.equal(mutable[name], before[index], why(name));
+    }
+  }
+
   /**
    * A function written to be READ, for the premise the source rules share.
    *
@@ -454,20 +475,17 @@ describe("every marker the scan reads is refused at runtime", () => {
     // very assumption a case about a shared module should not be making. The
     // population is the same derived one the bound case reads, so a third
     // spawning probe is covered by existing rather than by being remembered.
-    const mutable = childProcess as unknown as Record<string, unknown>;
     // Snapshotted once, OUTSIDE the loop: each probe is asserted back to the
     // wrappers the bootstrap installed, not merely to whatever the probe before
     // it left behind — which a per-probe snapshot would quietly accept.
-    const before = SPAWN_NAMES.map((name) => mutable[name]);
+    const before = spawnMethods();
     for (const [id, probe] of probesThatSpawn()) {
       optionsPassedBy(probe);
-      for (const [index, name] of SPAWN_NAMES.entries()) {
-        assert.equal(
-          mutable[name],
-          before[index],
+      assertRestored(
+        before,
+        (name) =>
           `\`optionsPassedBy\` left \`${name}\` replaced after the \`${id}\` probe — a recorder now outlives the call, so every later suite spawns into it instead of the refusal`,
-        );
-      }
+      );
     }
     // The property the identity check stands in for, measured end to end: the
     // refusal the whole file exists to install still fires after the swaps.
@@ -479,8 +497,7 @@ describe("every marker the scan reads is refused at runtime", () => {
     // otherwise a probe with a bug would take the refusal down with it. The
     // `finally` is what makes that true, and this is the throw that exercises
     // the path `optionsPassedBy` re-raises rather than swallows.
-    const mutable = childProcess as unknown as Record<string, unknown>;
-    const before = SPAWN_NAMES.map((name) => mutable[name]);
+    const before = spawnMethods();
     const boom = new Error("the probe threw before spawning");
     assert.throws(
       () =>
@@ -490,13 +507,45 @@ describe("every marker the scan reads is refused at runtime", () => {
       (error: unknown) => error === boom,
       "a probe that throws before spawning is being swallowed or reported as something else",
     );
-    for (const [index, name] of SPAWN_NAMES.entries()) {
-      assert.equal(
-        mutable[name],
-        before[index],
+    assertRestored(
+      before,
+      (name) =>
         `a throwing probe left \`${name}\` replaced — the restore does not cover the path where the probe fails before it spawns`,
-      );
-    }
+    );
+  });
+
+  it("restores the module when the probe throws AFTER a recorder has fired", () => {
+    // The case above never reaches a spawn, so the state it leaves behind is
+    // recorders installed and nothing recorded. That is not the state a real
+    // probe fails in: a probe with its own `try` around its spawn swallows the
+    // stop, keeps going, and throws something of its own — recorders installed,
+    // one call recorded, and the re-raise path taken. Both halves of the
+    // `finally`'s job were being proved on the same half of its input.
+    const before = spawnMethods();
+    const boom = new Error("the probe threw after its spawn was recorded");
+    assert.throws(
+      () =>
+        optionsPassedBy(() => {
+          try {
+            // Hits a recorder, which throws rather than starting anything. The
+            // bound rides along because a probe that reached a real spawn here
+            // would be the failure this whole file is about.
+            execFileSync("npm", ["audit", "--json"], BOUNDED);
+          } catch {
+            // Swallowed the way a probe holding its own `try` would swallow it,
+            // which is what puts the recorder's stop out of `optionsPassedBy`'s
+            // reach and leaves the throw below as the one it sees.
+          }
+          throw boom;
+        }),
+      (error: unknown) => error === boom,
+      "a probe that throws after spawning is being swallowed or reported as the recorder's own stop",
+    );
+    assertRestored(
+      before,
+      (name) =>
+        `a probe that threw after recording left \`${name}\` replaced — the restore covers the path where a probe fails before its spawn and not the one where it fails after`,
+    );
   });
 
   it("bounds a spawn that got through, so the failure is red rather than a hang", () => {
