@@ -27,6 +27,7 @@
  */
 
 import assert from "node:assert/strict";
+import * as childProcess from "node:child_process";
 import { execFileSync, execSync } from "node:child_process";
 import http from "node:http";
 import https from "node:https";
@@ -210,13 +211,36 @@ describe("every marker the scan reads is refused at runtime", () => {
   }
 
   /**
+   * Every way `node:child_process` starts a process, asked of the module.
+   *
+   * This was six names typed out, chosen because they covered the two probes
+   * that spawned the day it was written — `fork` was not among them, and a
+   * probe that forked would have read as not spawning at all. The module knows
+   * its own surface: what it exports and what a suite can call are the same
+   * list, so the only thing left to write down is the two exports that are not
+   * a way to start a process.
+   *
+   * `ChildProcess` is the class a spawn RETURNS, told apart by node's own
+   * convention that a constructor is capitalised; `_forkChild` is the internal
+   * entry point node calls inside a child it already made, told apart by the
+   * underscore that says so. Neither starts anything.
+   */
+  const SPAWN_NAMES = Object.entries(childProcess)
+    .filter(([name, value]) => typeof value === "function" && /^[a-z]/.test(name))
+    .map(([name]) => name)
+    // Longest first, so `execFileSync` is not matched as `exec` and then
+    // rejected for the `F` that follows. Alternation backtracking would find
+    // it anyway; ordering means the reader does not have to know that.
+    .sort((a, b) => b.length - a.length);
+
+  /**
    * A call that starts a process, as it survives `tsx`.
    *
    * A closing paren counts as well as an opening one, because `tsx` compiles
    * `execFileSync(…)` to `(0, import_node_child_process.execFileSync)(…)` —
    * the call is still there and the name is no longer against its own bracket.
    */
-  const SPAWN_CALL = /\b(?:exec|execFile|execSync|execFileSync|spawn|spawnSync)\s*[()]/;
+  const SPAWN_CALL = new RegExp(`\\b(?:${SPAWN_NAMES.join("|")})\\s*[()]`);
 
   /** The bound, named in the source of the probe that applies it. */
   const BOUND_APPLIED = /\bBOUNDED\b/;
@@ -313,6 +337,28 @@ describe("every marker the scan reads is refused at runtime", () => {
     };
     assert.deepEqual(patternPerformedBy(swapped["http-client"]), ["fetch"]);
     assert.deepEqual(patternPerformedBy(swapped.fetch), ["http-client"]);
+  });
+
+  it("takes the ways to start a process from the module, not from a list", () => {
+    // The six names this replaced, kept as the floor rather than as the rule:
+    // a derivation that quietly dropped one would leave a probe reading as not
+    // spawning, which is the same silence the hand list produced for `fork`.
+    for (const name of ["exec", "execFile", "execSync", "execFileSync", "spawn", "spawnSync"]) {
+      assert.ok(
+        SPAWN_NAMES.includes(name),
+        `\`${name}\` was in the hand-written list and the module no longer offers it — a probe calling it reads as not spawning, so its bound would go unchecked`,
+      );
+    }
+    // And the one the hand list missed, which is the whole argument for asking
+    // the module: nobody left it out on purpose, no probe forked that morning.
+    assert.ok(
+      SPAWN_NAMES.includes("fork"),
+      "`fork` is a way to start a process and is not in the set — the derivation is reproducing the omission it was written to end",
+    );
+    // The two exports that are not a way to start anything. Including either
+    // would make `SPAWN_CALL` match a probe that only handled a child.
+    assert.ok(!SPAWN_NAMES.includes("ChildProcess"), "the class a spawn returns is being read as a spawn");
+    assert.ok(!SPAWN_NAMES.includes("_forkChild"), "node's internal child entry point is being read as a spawn");
   });
 
   it("bounds every probe that spawns, not the two somebody remembered", () => {
