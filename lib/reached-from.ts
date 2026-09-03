@@ -23,7 +23,9 @@
  * does this file take a module out of that package? Comments are stripped
  * first, so prose about the package is prose; the specifier has to be the
  * package itself or a subpath of it, so `nanoid` is not matched by
- * `nanoid-esm`.
+ * `nanoid-esm`. Both halves of that are `lib/import-specifiers.ts`, which is
+ * where the four spellings of an import live for the three rules here that
+ * read the module graph.
  *
  * ## The half nobody was asking at all
  *
@@ -54,45 +56,19 @@
  * naming a path the sweep does not — never as a silent pass on a dead address.
  */
 
-import { stripComments } from "./strip-comments";
-
-/**
- * Every module specifier the source imports, requires, or re-exports from.
- *
- * One pattern for all five spellings, because they all put the specifier in a
- * quoted string directly after a keyword: `import x from "p"`, a bare
- * `import "p"`, `export … from "p"`, `require("p")` and a dynamic `import("p")`.
- * A type-only import is included — `import type { X } from "p"` still says the
- * argument was made about this file's relationship to the package, and a file
- * that only names its types is one the reader should still be sent to.
- *
- * Comments are blanked first (to spaces, so nothing shifts), which is the
- * difference between this and the substring test it replaces: the file that
- * documents why a package was dropped is the file most likely to mention it.
- */
-export function moduleSpecifiers(source: string): readonly string[] {
-  const found = new Set<string>();
-  for (const match of stripComments(source).matchAll(
-    /\b(?:from|import|require)\s*\(?\s*["']([^"'\n]*)["']/g,
-  )) {
-    found.add(match[1]);
-  }
-  return [...found].sort();
-}
+import { importedModules, specifierIsPackage } from "./import-specifiers";
 
 /**
  * Whether the source takes a module out of that package.
  *
- * Exact specifier or a subpath of it: `nanoid` and `nanoid/non-secure` are the
- * package, `nanoid-esm` and `@scoped/nanoid` are other packages that happen to
- * start with the same letters. The prefix rule is what the substring match was
- * missing — it is also why a scoped package works without a special case, its
- * name being `@scope/pkg` and its subpaths `@scope/pkg/…`.
+ * The four spellings and the comment stripping are `lib/import-specifiers.ts`,
+ * shared with the two other rules that read the module graph; what is decided
+ * here is that a type-only import counts. `import type { X } from "p"` still
+ * says the argument was made about this file's relationship to the package,
+ * and a call site that got narrower is one the reader should still be sent to.
  */
 export function importsPackage(source: string, pkg: string): boolean {
-  return moduleSpecifiers(source).some(
-    (specifier) => specifier === pkg || specifier.startsWith(`${pkg}/`),
-  );
+  return importedModules(source).some((specifier) => specifierIsPackage(specifier, pkg));
 }
 
 /** What a `shipsToClient: true` entry's listed call sites turned out to be. */

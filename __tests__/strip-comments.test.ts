@@ -235,12 +235,23 @@ describe("stripComments", () => {
       "lib/check-empty-state-wrappers.ts",
       "lib/check-problem-phrasing-imports.ts",
     ]) {
+      const source = readRepoFile(guard);
+      // The property, stated directly: not through the bundling module.
+      assert.doesNotMatch(
+        source,
+        /from "[^"]*env-inlining"/,
+        `${guard} still goes via env-inlining`,
+      );
+      // And it does reach a stripper, by one of the two sanctioned addresses.
       // Either spelling of the module — these four came in on the `@/` alias
       // and `env-inlining.ts` on the relative form, and each kept its own.
+      // `import-specifiers` is the second: `check-analytics-imports` stopped
+      // stripping for itself when the four import patterns here were made one,
+      // and that module takes the stripper from the same one door.
       assert.match(
-        readRepoFile(guard),
-        /from "(?:@\/lib|\.)\/strip-comments"/,
-        `${guard} still goes via env-inlining`,
+        source,
+        /from "(?:@\/lib|\.)\/(?:strip-comments|import-specifiers)"/,
+        `${guard} strips comments through neither strip-comments nor import-specifiers`,
       );
     }
     // And the module it left still uses it, through the same one door.

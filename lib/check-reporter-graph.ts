@@ -34,6 +34,8 @@
 
 import * as path from "node:path";
 
+import { importSpecifiers } from "./import-specifiers";
+
 /** The file node's test runner is pointed at, and the root of the graph. */
 export const REPORTER_GRAPH_ENTRY = "scripts/test-failure-reporter.ts";
 
@@ -64,14 +66,17 @@ export type GraphReader = (repoRelative: string) => string | null;
 /**
  * Every repo-local specifier in `source`, as written.
  *
- * Three shapes, because node's loader follows all three and a walk that missed
- * one would check less than it claims:
+ * The shapes are `lib/import-specifiers.ts`'s — plain imports, type-only
+ * imports, `export … from` re-exports, the dynamic form, the side-effect form
+ * with no bindings, and `require` — because node's loader follows them and a
+ * walk that missed one would check less than it claims. Two differences from
+ * the pattern this used to carry, both in the direction of following MORE:
+ * a single-quoted specifier (which this repository's prettier config never
+ * writes and node reads exactly the same) and a `require`.
  *
- *  - `from "…"`, which covers plain imports, type-only imports and
- *    `export … from` re-exports in one pattern;
- *  - `import("…")`, the dynamic form;
- *  - `import "…"`, the side-effect form with no bindings and therefore no
- *    `from` — the one the first version of this function missed entirely.
+ * Comments are stripped there, which this did not do: a commented-out import
+ * was an edge this walk followed and node's loader did not, so the two halves
+ * disagreed and the difference was reported as a missing file.
  *
  * Bare specifiers (`node:path`, a package) are node's to resolve however it
  * likes, so only `.`-relative ones are returned: the same set the two rules
@@ -85,11 +90,9 @@ export type GraphReader = (repoRelative: string) => string | null;
  * silently dropped.
  */
 export function repoLocalSpecifiers(source: string): string[] {
-  const found: string[] = [];
-  for (const match of source.matchAll(/\bfrom\s*"(\.[^"]*)"/g)) found.push(match[1]);
-  for (const match of source.matchAll(/\bimport\s*\(\s*"(\.[^"]*)"\s*\)/g)) found.push(match[1]);
-  for (const match of source.matchAll(/\bimport\s+"(\.[^"]*)"/g)) found.push(match[1]);
-  return found;
+  return importSpecifiers(source)
+    .map((record) => record.specifier)
+    .filter((specifier) => specifier.startsWith("."));
 }
 
 /**

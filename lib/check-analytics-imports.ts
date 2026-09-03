@@ -1,4 +1,4 @@
-import { stripComments } from "@/lib/strip-comments";
+import { importSpecifiers, specifierEndsWithModule } from "@/lib/import-specifiers";
 
 /**
  * Scanner behind `scripts/check-analytics-imports.ts` (`npm run
@@ -16,14 +16,13 @@ import { stripComments } from "@/lib/strip-comments";
  */
 
 /**
- * Matches static imports, re-exports, `require(...)` and dynamic
- * `import(...)` whose specifier resolves to the taxonomy module — the
- * `@/lib/...` alias or any relative path ending in `/analytics-events`
- * (with or without extension). Longer names (`analytics-events-migration`)
- * do not match.
+ * The taxonomy module, named by the suffix of a specifier that reaches it.
+ *
+ * `specifierEndsWithModule` applies the rule: the `@/lib/...` alias or any
+ * relative path ending in `/analytics-events`, with or without extension, and
+ * longer names (`analytics-events-migration`) do not match.
  */
-export const ANALYTICS_EVENTS_IMPORT_PATTERN =
-  /(?:from\s*|require\s*\(\s*|import\s*\(\s*)["'][^"']*\/analytics-events(?:\.[jt]sx?)?["']/g;
+const ANALYTICS_EVENTS_MODULE = "analytics-events";
 
 export type AnalyticsImportMatch = {
   file: string;
@@ -35,23 +34,27 @@ export type AnalyticsImportMatch = {
 /**
  * Scan one source string for direct taxonomy imports. Comments are ignored
  * so prose like this module's own doc block can mention the specifier.
+ *
+ * The four spellings come from `lib/import-specifiers.ts` rather than from a
+ * pattern written here. That is one shape wider than what this guard used to
+ * match: the side-effect `import "@/lib/analytics-events"` has no `from` and
+ * was invisible to a rule whose whole subject is what a UI file drags into the
+ * bundle. Offsets survive the comment strip, so `file:line` and the reported
+ * snippet are still the real ones.
  */
 export function findAnalyticsEventsImports(
   file: string,
   source: string,
 ): AnalyticsImportMatch[] {
   const matches: AnalyticsImportMatch[] = [];
-  const stripped = stripComments(source);
-  const re = new RegExp(ANALYTICS_EVENTS_IMPORT_PATTERN.source, "g");
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(stripped)) !== null) {
-    const before = stripped.slice(0, m.index);
-    const line = before.split("\n").length;
+  for (const record of importSpecifiers(source)) {
+    if (!specifierEndsWithModule(record.specifier, ANALYTICS_EVENTS_MODULE)) continue;
+    const before = source.slice(0, record.index);
     const lineStart = before.lastIndexOf("\n") + 1;
-    const lineEnd = source.indexOf("\n", m.index);
+    const lineEnd = source.indexOf("\n", record.index);
     matches.push({
       file,
-      line,
+      line: before.split("\n").length,
       snippet: source
         .slice(lineStart, lineEnd === -1 ? undefined : lineEnd)
         .trim(),

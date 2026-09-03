@@ -5,7 +5,6 @@ import {
   evaluateReachedFrom,
   formatReachedFromFindings,
   importsPackage,
-  moduleSpecifiers,
 } from "@/lib/reached-from";
 
 /**
@@ -24,45 +23,6 @@ import {
  * subject to be proved against. Fixtures are the only way to pin the shape
  * before the day it is needed.
  */
-describe("moduleSpecifiers", () => {
-  it("reads all five spellings of taking a module", () => {
-    const source = [
-      `import { nanoid } from "nanoid";`,
-      `import "./side-effect";`,
-      `export { customAlphabet } from "nanoid/non-secure";`,
-      `const x = require("node:path");`,
-      `const y = await import("expo-router");`,
-    ].join("\n");
-    assert.deepEqual(moduleSpecifiers(source), [
-      "./side-effect",
-      "expo-router",
-      "nanoid",
-      "nanoid/non-secure",
-      "node:path",
-    ]);
-  });
-
-  it("includes a type-only import", () => {
-    // The argument is about this file's relationship to the package, and a
-    // file that names only its types is one the reader should still be sent
-    // to — it is a call site that got narrower, not one that went away.
-    assert.deepEqual(moduleSpecifiers(`import type { Nano } from "nanoid";`), ["nanoid"]);
-  });
-
-  it("ignores a specifier that is only mentioned in a comment", () => {
-    // The whole reason this is not a substring match: the file that documents
-    // why a package was dropped is the file most likely to mention it.
-    const source = `// we used to \`import { nanoid } from "nanoid"\` here\nexport const id = 1;`;
-    assert.deepEqual(moduleSpecifiers(source), []);
-  });
-
-  it("keeps a quoted specifier that a comment sits beside", () => {
-    // `stripComments` blanks to spaces, so nothing shifts and the `from` is
-    // still adjacent to its string.
-    assert.deepEqual(moduleSpecifiers(`import { a } from /* keep */ "nanoid";`), ["nanoid"]);
-  });
-});
-
 describe("importsPackage", () => {
   it("matches the package itself and its subpaths", () => {
     assert.equal(importsPackage(`import { nanoid } from "nanoid";`, "nanoid"), true);
