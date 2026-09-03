@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import path from "node:path";
 
 import { ACCEPTED_HIGH_ADVISORIES, type AcceptedAdvisory } from "@/lib/audit-baseline";
 import { LINT_ALL_EXEMPT, LINT_GUARDS } from "@/lib/lint-guards";
+import { evaluateReachedFrom, formatReachedFromFindings } from "@/lib/reached-from";
 import {
   evaluateShipsToClient,
   formatShipsToClientReport,
@@ -11,7 +13,8 @@ import {
 } from "@/lib/ships-to-client";
 
 import { installedPackageFiles, readInstalledFile } from "./helpers/installed-packages";
-import { readRepoFile } from "./helpers/repo-file";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { readSource, sourceFiles } from "./helpers/source-files";
 
 /**
  * `shipsToClient` stops being a sentence.
@@ -265,23 +268,42 @@ describe("every fingerprint is a real string in its own package", () => {
     });
   }
 
-  it("holds every named call site to existing and still using the package", () => {
+  it("holds every named call site to importing the package, and to being all of them", () => {
     // The argument is not checkable; its ADDRESS is. A path that has been
     // deleted or refactored away leaves an acceptance pointing at nothing,
     // which reads exactly like one somebody re-read this morning.
+    //
+    // Two directions, one pass. "Still names the package" used to be
+    // `source.includes(pkg)`, which passes on a doc comment about the removal
+    // and on an import left behind after its call was deleted — the dead
+    // address reading as live. And nothing asked the other direction at all:
+    // an entry could name one file while the package was imported in six, the
+    // five unread call sites being exactly the ones where the argument might
+    // not hold. `lib/reached-from.ts` argues both and what a text match can
+    // and cannot see.
     //
     // Vacuous today — the baseline has no `shipsToClient: true` entry, and
     // `nanoid` was the only one there has ever been. That is why the rule is
     // here before it is needed: the day one is added, its call sites are
     // asked for by a red run rather than by a reviewer noticing.
+    const tree = new Map(sourceFiles().map((relative) => [relative, readSource(relative)]));
     for (const entry of ACCEPTED_HIGH_ADVISORIES.filter((candidate) => candidate.shipsToClient)) {
-      for (const site of entry.reachedFrom ?? []) {
-        const source = readRepoFile(site);
+      const sites = entry.reachedFrom ?? [];
+      // Existence stays a separate read: a listed path outside the source tree
+      // is not in the map, and "the file is gone" and "the file is there and
+      // no longer imports it" are different things to be told.
+      for (const site of sites) {
         assert.ok(
-          source.includes(entry.package),
-          `${entry.package}'s acceptance is argued from ${site}, which no longer names the package — re-read the argument rather than re-pointing the path`,
+          existsSync(repoPath(site)),
+          `${entry.package}'s acceptance is argued from ${site}, which is not in the tree — re-read the argument rather than re-pointing the path`,
         );
       }
+      const verdict = evaluateReachedFrom(entry.package, sites, tree);
+      assert.deepEqual(
+        formatReachedFromFindings(entry.package, verdict),
+        [],
+        formatReachedFromFindings(entry.package, verdict).join("\n"),
+      );
     }
   });
 
