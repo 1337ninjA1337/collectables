@@ -161,19 +161,41 @@ export function gateScriptPaths(): readonly string[] {
  * markers fire on, so it is derived from the same scan that decides the audit
  * gate is the only one.
  */
-export const NETWORK_MARKERS: ReadonlyArray<readonly [string, RegExp]> = [
-  ["an `npm audit` of the registry", /["'`]npm["'`]\s*,\s*\[\s*["'`]audit["'`]/],
-  [
-    "`expo install --check`, which resolves versions against the registry",
-    /["'`]npx["'`]\s*,\s*\[\s*["'`]expo["'`]\s*,\s*["'`]install["'`]/,
-  ],
-  ["a `fetch` call", /\bfetch\s*\(/],
-  ["an http/https client import", /["'`]node:https?["'`]/],
+export interface NetworkMarker {
+  /**
+   * A short, stable name for the shape — the identifier other code keys on.
+   *
+   * Separate from {@link why} because the two have opposite lifetimes.
+   * `network-refusal.test.ts` pairs a runtime probe with every marker, and it
+   * keyed those by the sentence: rewording a failure message for clarity —
+   * which is what a sentence written to be read is FOR — turned into a red run
+   * about nothing, fixed by a copy-paste that teaches nobody anything.
+   */
+  readonly id: string;
+  /** Why this reaches outside the tree, as a failure message reads it. */
+  readonly why: string;
+  /** What the shape looks like in a script's text. */
+  readonly pattern: RegExp;
+}
+
+export const NETWORK_MARKERS: readonly NetworkMarker[] = [
+  {
+    id: "npm-audit",
+    why: "an `npm audit` of the registry",
+    pattern: /["'`]npm["'`]\s*,\s*\[\s*["'`]audit["'`]/,
+  },
+  {
+    id: "expo-install-check",
+    why: "`expo install --check`, which resolves versions against the registry",
+    pattern: /["'`]npx["'`]\s*,\s*\[\s*["'`]expo["'`]\s*,\s*["'`]install["'`]/,
+  },
+  { id: "fetch", why: "a `fetch` call", pattern: /\bfetch\s*\(/ },
+  { id: "http-client", why: "an http/https client import", pattern: /["'`]node:https?["'`]/ },
 ];
 
 /** Why this source reaches outside the tree, or `undefined` if it does not. */
 export function networkMarkerHit(source: string): string | undefined {
-  return NETWORK_MARKERS.find(([, pattern]) => pattern.test(source))?.[0];
+  return NETWORK_MARKERS.find((marker) => marker.pattern.test(source))?.why;
 }
 
 /**

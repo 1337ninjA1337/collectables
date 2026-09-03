@@ -152,16 +152,18 @@ describe("the other ways out of the tree", () => {
  * marker with no runtime probe is a red run rather than a quiet asymmetry.
  */
 describe("every marker the scan reads is refused at runtime", () => {
+  // Keyed by the marker's `id`, not by its sentence. The sentence is written
+  // to be read in a failure message and rewording one for clarity used to
+  // break this parity case — a red run about nothing, fixed by a copy-paste.
   const PROBES: Readonly<Record<string, () => unknown>> = {
-    "an `npm audit` of the registry": () => execFileSync("npm", ["audit", "--json"]),
-    "`expo install --check`, which resolves versions against the registry": () =>
-      execFileSync("npx", ["expo", "install", "--check"]),
-    "a `fetch` call": () => installed("https://example.test"),
-    "an http/https client import": () => https.request("https://example.test"),
+    "npm-audit": () => execFileSync("npm", ["audit", "--json"]),
+    "expo-install-check": () => execFileSync("npx", ["expo", "install", "--check"]),
+    fetch: () => installed("https://example.test"),
+    "http-client": () => https.request("https://example.test"),
   };
 
   it("has a probe for every marker, and no probe for a marker that has gone", () => {
-    const markers = NETWORK_MARKERS.map(([label]) => label).sort();
+    const markers = NETWORK_MARKERS.map((marker) => marker.id).sort();
     assert.deepEqual(
       Object.keys(PROBES).sort(),
       markers,
@@ -170,8 +172,21 @@ describe("every marker the scan reads is refused at runtime", () => {
   });
 
   it("refuses each of them, so the two describe one property", () => {
-    for (const [label, probe] of Object.entries(PROBES)) {
-      assert.throws(probe, /A test tried to/, `${label} is not refused at runtime`);
+    for (const marker of NETWORK_MARKERS) {
+      // Reported by the sentence, keyed by the id: the failure names the shape
+      // a reader recognises and the wiring names something stable.
+      assert.throws(PROBES[marker.id], /A test tried to/, `${marker.why} is not refused at runtime`);
+    }
+  });
+
+  it("keeps the ids distinct and free of prose", () => {
+    // An id that drifted back into being a sentence would put this suite back
+    // where it started, and two markers sharing one would hide a missing probe
+    // behind a passing key comparison.
+    const ids = NETWORK_MARKERS.map((marker) => marker.id);
+    assert.equal(new Set(ids).size, ids.length, "two markers share an id");
+    for (const id of ids) {
+      assert.match(id, /^[a-z][a-z0-9-]*$/, `\`${id}\` is a sentence, not an identifier`);
     }
   });
 });
