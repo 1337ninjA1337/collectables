@@ -27,7 +27,11 @@
  */
 
 import assert from "node:assert/strict";
-import * as childProcess from "node:child_process";
+// The default import, deliberately: `import * as` compiles to a namespace COPY
+// under `tsx`, and `optionsPassedBy` below has to replace the methods on the
+// object a call site actually reads — the same live module the bootstrap
+// patches to refuse a spawned network tool.
+import childProcess from "node:child_process";
 import { execFileSync, execSync } from "node:child_process";
 import http from "node:http";
 import https from "node:https";
@@ -242,31 +246,92 @@ describe("every marker the scan reads is refused at runtime", () => {
    */
   const SPAWN_CALL = new RegExp(`\\b(?:${SPAWN_NAMES.join("|")})\\s*[()]`);
 
-  /** The bound, named in the source of the probe that applies it. */
-  const BOUND_APPLIED = /\bBOUNDED\b/;
+  /**
+   * The probes whose source reads as starting a process.
+   *
+   * `BOUNDED` went onto the two that existed the hour it was written, and a
+   * third would be written next to two that carry it and inherit nothing. The
+   * population is not a list: a probe that spawns says so in the source the
+   * pairing case already reads.
+   */
+  function probesThatSpawn(): readonly (readonly [string, () => unknown])[] {
+    const spawns = Object.entries(PROBES).filter(([, probe]) => SPAWN_CALL.test(probe.toString()));
+    // A detector that matched nothing would agree with every probe there is.
+    assert.ok(
+      spawns.length >= 2,
+      `only ${String(spawns.length)} probes read as spawning — the two that do are no longer being seen, so nothing here bounds anything`,
+    );
+    return spawns;
+  }
+
+  /**
+   * The options a probe hands its spawn, taken from the call itself.
+   *
+   * The bound used to be checked by matching `BOUNDED` in the probe's source,
+   * which proves the word is in the text and not that the object reached the
+   * spawn: a probe naming it in a comment, or handing it to the wrong
+   * parameter, read exactly the same. The property is that the child cannot
+   * outlive the case, and the only thing carrying it is the options argument.
+   *
+   * Every name in `SPAWN_NAMES` is replaced on the live module — the same
+   * object the bootstrap patched, which is why this file imports the default
+   * rather than a namespace — with a recorder that throws instead of calling
+   * through, so the probe stops before a child exists. Restoring is in a
+   * `finally`: leaving a recorder behind would disarm the refusal for every
+   * suite that runs after this one.
+   */
+  function optionsPassedBy(probe: () => unknown): unknown {
+    const mutable = childProcess as unknown as Record<string, unknown>;
+    const saved = SPAWN_NAMES.map((name) => [name, mutable[name]] as const);
+    const recorded: unknown[][] = [];
+    const stop = new Error("recorded — the probe stops here rather than starting a child");
+    try {
+      for (const name of SPAWN_NAMES) {
+        mutable[name] = (...args: unknown[]) => {
+          recorded.push(args);
+          throw stop;
+        };
+      }
+      try {
+        probe();
+      } catch (error) {
+        if (error !== stop) throw error;
+      }
+    } finally {
+      for (const [name, value] of saved) mutable[name] = value;
+    }
+    assert.equal(
+      recorded.length,
+      1,
+      `a probe that reads as spawning made ${String(recorded.length)} calls into \`node:child_process\` — the recorder is on the wrong object, or the source and the runtime disagree about what this probe does`,
+    );
+    // Every probe here spawns synchronously, and a sync spawn's options are
+    // its last argument. An async one would end in a callback and fail this,
+    // which is correct: what bounds an async child is a different question.
+    return recorded[0]?.at(-1);
+  }
 
   /**
    * A function written to be READ, for the premise the source rules share.
    *
-   * Three rules in this describe judge a probe by its transpiled text —
+   * Two rules in this describe judge a probe by its transpiled text —
    * `patternPerformedBy` runs the markers over it, `SPAWN_CALL` finds the
-   * probes that start a process, `BOUND_APPLIED` finds the ones that bound it.
-   * All three rest on `Function.prototype.toString` still handing back the
-   * source somebody wrote, and until now each stated that dependency in its
-   * own comment and none of them asserted it.
+   * probes that start a process. Both rest on `Function.prototype.toString`
+   * still handing back the source somebody wrote, and each stated that
+   * dependency in its own comment before anything asserted it.
    *
-   * It is never called. Its body carries one of each shape the three readers
-   * look for — two marker literals, a spawn call name, the bound's identifier
-   * — so a runner that minified these suites, or a `toString` that answered
-   * `[native code]`, is named by this case rather than by three cases below
-   * whose messages all blame the probes.
+   * It is never called. Its body carries one of each shape the two readers
+   * look for — two marker literals and a spawn call name — so a runner that
+   * minified these suites, or a `toString` that answered `[native code]`, is
+   * named by this case rather than by the cases below whose messages all blame
+   * the probes.
    */
   function sourcePremiseControl(): void {
     execFileSync("npm", ["audit"], BOUNDED);
     void fetch("https://example.test");
   }
 
-  it("reads a function's source as the text somebody wrote, which the three rules below assume", () => {
+  it("reads a function's source as the text somebody wrote, which the two rules below assume", () => {
     const source = sourcePremiseControl.toString();
     assert.ok(
       !source.includes("[native code]"),
@@ -284,11 +349,6 @@ describe("every marker the scan reads is refused at runtime", () => {
       source,
       SPAWN_CALL,
       "a spawn call in the source is no longer found by name — the bound case below would report that as no probe spawning at all",
-    );
-    assert.match(
-      source,
-      BOUND_APPLIED,
-      "a closure identifier no longer survives into the source — the bound case below would be matching a name the runner had renamed",
     );
   });
 
@@ -361,26 +421,21 @@ describe("every marker the scan reads is refused at runtime", () => {
     assert.ok(!SPAWN_NAMES.includes("_forkChild"), "node's internal child entry point is being read as a spawn");
   });
 
-  it("bounds every probe that spawns, not the two somebody remembered", () => {
-    // `BOUNDED` was applied by hand to the two spawn probes that existed when
-    // it was written, which is how the four probes came to be keyed by prose
-    // in the first place. The population is not a list: a probe that spawns
-    // says so in the source the pairing case above already reads.
+  it("hands the bound to every spawn, rather than naming it in the source", () => {
+    // This was `assert.match(probe.toString(), /\bBOUNDED\b/)`, which measures
+    // that the word is in the text. A probe naming it in a comment, or handing
+    // it to the wrong parameter, satisfied that and would still have started a
+    // child nothing could interrupt — so the reading is of the call now, and
+    // the comparison is identity: this exact options object, at the position a
+    // sync spawn reads its options from.
     //
-    // The reading depends on the transpiler leaving the call name in the
-    // source, which is the premise `sourcePremiseControl` above asserts
-    // for this rule and for the two others that share it.
-    const spawns = Object.entries(PROBES).filter(([, probe]) => SPAWN_CALL.test(probe.toString()));
-    // A detector that matched nothing would agree with every probe there is.
-    assert.ok(
-      spawns.length >= 2,
-      `only ${String(spawns.length)} probes read as spawning — the two that do are no longer being seen, so this case bounds nothing`,
-    );
-    for (const [id, probe] of spawns) {
-      assert.match(
-        probe.toString(),
-        BOUND_APPLIED,
-        `the \`${id}\` probe spawns without a bound — if its refusal went missing the case below would hang on a real process instead of failing`,
+    // Which probes are asked is still a source question, and that reading is
+    // the premise `sourcePremiseControl` above asserts.
+    for (const [id, probe] of probesThatSpawn()) {
+      assert.equal(
+        optionsPassedBy(probe),
+        BOUNDED,
+        `the \`${id}\` probe spawns without the bound reaching the call — if its refusal went missing the case below would hang on a real process instead of failing`,
       );
     }
   });
