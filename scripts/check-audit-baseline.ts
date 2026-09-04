@@ -26,6 +26,13 @@
  * what "every accepted advisory has been withdrawn" looks like from in here.
  * `isAuditReport` is the line between the two; see its doc comment for the run
  * that made the case for it.
+ *
+ * That line catches a registry that fails LOUDLY. One that fails quietly — a
+ * well-formed report whose findings are simply missing — gets through it, and
+ * did, on 2026-09-04. `triagedCompleteness` is the second line: it checks the
+ * report's entries against the report's own totals and withholds the staleness
+ * half of the verdict when they disagree, rather than failing the run over
+ * advisories npm did not mention.
  */
 
 import { execFileSync } from "node:child_process";
@@ -99,6 +106,19 @@ function main(): void {
   }
   const verdict = evaluateAudit(read.report);
   console.log(formatAuditVerdict(verdict, CHECK_NAME));
+  // A withheld staleness check is a half-answered run, and the half it did not
+  // answer exits 0. The same argument the skip's annotation makes: without a
+  // mark on the run summary, "we could not ask" is only ever visible in a log
+  // nobody opens on a green run.
+  if (!verdict.completeness.complete && runningUnderActions()) {
+    console.log(
+      annotation(
+        "warning",
+        `npm counted ${String(verdict.completeness.claimed)} high/critical roots and reported ${String(verdict.completeness.carried)}. Baseline staleness was NOT checked on this run.`,
+        { title: `${CHECK_NAME}: npm's report was short of its own totals` },
+      ),
+    );
+  }
   // Three ways to be red and `isClean` is the one place that says which, so a
   // finding cannot be printed by a step that exits 0. `stale` joined the
   // failing side with `fixableInRange`, and because of it: fixing an in-range

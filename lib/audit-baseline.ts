@@ -437,6 +437,22 @@ export interface AuditReport {
       }
     >
   >;
+  /**
+   * npm's own totals, one number per severity.
+   *
+   * Counted over the same population `vulnerabilities` keys — one tally per
+   * vulnerable ROOT, at the root's severity — which is what makes the two
+   * halves of the report checkable against each other. Measured on this tree:
+   * `metadata.vulnerabilities` said `high: 9`, and the `vulnerabilities` map
+   * carried exactly nine entries at `"high"`.
+   *
+   * Read for one question only, and see {@link triagedCompleteness} for it:
+   * whether the entries account for the totals. A report that says nine and
+   * carries none is the shape that cost a red CI on 2026-09-04.
+   */
+  readonly metadata?: {
+    readonly vulnerabilities?: Readonly<Record<string, unknown>>;
+  };
 }
 
 /** What `npm audit` says it would take to make an advisory go away. */
@@ -570,8 +586,24 @@ export interface AuditVerdict {
   readonly unexpected: readonly string[];
   /** Baseline advisories that still appear, i.e. the exemption still earns it. */
   readonly stillPresent: readonly string[];
-  /** Baseline advisories the audit no longer reports — stale, remove them. */
+  /**
+   * Baseline advisories the audit no longer reports — stale, remove them.
+   *
+   * Empty whenever {@link completeness} says the report is short of its own
+   * totals, and empty for two different reasons as a result: nothing was
+   * withdrawn, or nothing could be asked. `completeness.complete` is which.
+   */
   readonly stale: readonly string[];
+  /**
+   * Whether the report accounted for the advisories it counted — and therefore
+   * whether {@link stale} was computed at all.
+   *
+   * On the verdict rather than left to the caller because `stale` is the one
+   * list whose emptiness is ambiguous, and the ambiguity has to travel with it:
+   * a formatter or a predicate handed a `stale: []` has no other way to tell
+   * "npm reported these as gone" from "npm did not mention them".
+   */
+  readonly completeness: ReportCompleteness;
   /**
    * Advisories npm can fix without a major, at EVERY severity — the other
    * failure.
@@ -707,6 +739,70 @@ export function observedAdvisoryDetails(
   return found;
 }
 
+/** Whether a report's entries account for the report's own totals. */
+export interface ReportCompleteness {
+  /** How many high/critical roots `metadata.vulnerabilities` counts. */
+  readonly claimed: number;
+  /** How many the `vulnerabilities` map actually carries. */
+  readonly carried: number;
+  /** `carried >= claimed` — the report said nothing it then failed to say. */
+  readonly complete: boolean;
+}
+
+/**
+ * The report checked against itself: does it carry the advisories it counts?
+ *
+ * ## The shape neither the reader nor the skip covers
+ *
+ * {@link isAuditReport} draws the line at "npm answered at all", and
+ * {@link readAuditPayload} at "the answer is readable". Both were written for a
+ * registry that fails LOUDLY — an error object, a timeout, a truncated stream.
+ * On 2026-09-04 the registry failed quietly instead: `npm audit --json` returned
+ * a well-formed, parseable report whose high/critical entries were simply
+ * missing. Every predicate above said yes, `observedAdvisories` came back empty,
+ * every baseline entry read as `stale`, and the gate turned CI red demanding the
+ * removal of four advisories that were all still live. Two calls nine minutes
+ * apart disagreed; a third agreed with the baseline again.
+ *
+ * ## Why staleness is the verdict that needs this and the others do not
+ *
+ * `unexpected` and `fixableInRange` need a FINDING to fire, so a report that
+ * says less makes them quieter — the safe direction, and the reason a partial
+ * report is still worth evaluating rather than skipping outright. `stale` is the
+ * one verdict that fires on the ABSENCE of data, so it fires HARDER the less the
+ * report says, and it sits on the failing side of {@link isClean}. That
+ * asymmetry is what turns a degraded read into a red run, and it is the whole
+ * reason this function exists.
+ *
+ * ## What it can and cannot see
+ *
+ * `metadata.vulnerabilities` is npm's own tally over the entries it emitted, so
+ * a report short of its totals has definitely lost entries. The converse is not
+ * true: a report whose totals were dropped along with its entries is
+ * indistinguishable from a clean tree from in here, and no number in the payload
+ * can tell them apart. Absent totals therefore claim nothing — a report with no
+ * `metadata` is read as complete, because the alternative is refusing to check
+ * staleness on any npm that stops emitting the key.
+ */
+export function triagedCompleteness(report: AuditReport): ReportCompleteness {
+  const carried = Object.values(report.vulnerabilities ?? {}).filter((entry) =>
+    TRIAGED_SEVERITIES.has(String(entry.severity ?? "")),
+  ).length;
+  const totals = report.metadata?.vulnerabilities;
+  // No totals is no claim, not a claim of zero. See "What it can and cannot
+  // see" above: this is the direction that keeps checking staleness.
+  if (typeof totals !== "object" || totals === null) {
+    return { claimed: carried, carried, complete: true };
+  }
+  let claimed = 0;
+  for (const severity of TRIAGED_SEVERITIES) {
+    const count = totals[severity];
+    // A negative or non-finite tally is npm saying something this cannot use,
+    // and reading it as a claim would withhold staleness over a junk number.
+    if (typeof count === "number" && Number.isFinite(count) && count > 0) claimed += count;
+  }
+  return { claimed, carried, complete: carried >= claimed };
+}
 
 /**
  * Compares an `npm audit --json` report against {@link ACCEPTED_HIGH_ADVISORIES}.
@@ -728,6 +824,7 @@ export function evaluateAudit(
   // high/critical question" above. `observed` stays high/critical because it
   // is what the baseline is a list OF.
   const everything = observedAdvisoryDetails(report);
+  const completeness = triagedCompleteness(report);
   const withFix = (kind: FixKind): FixableAdvisory[] =>
     [...everything]
       .filter(([, detail]) => detail.fix === kind)
@@ -740,7 +837,14 @@ export function evaluateAudit(
   return {
     unexpected: [...observed].filter((key) => !acceptedKeys.has(key)).sort(),
     stillPresent: [...acceptedKeys].filter((key) => observed.has(key)).sort(),
-    stale: [...acceptedKeys].filter((key) => !observed.has(key)).sort(),
+    // Withheld rather than computed on a report short of its own totals: an
+    // advisory the report never mentioned is not an advisory that was
+    // withdrawn, and this is the only list that cannot tell those apart on its
+    // own. See {@link triagedCompleteness} for the run that made the case.
+    stale: completeness.complete
+      ? [...acceptedKeys].filter((key) => !observed.has(key)).sort()
+      : [],
+    completeness,
     fixableInRange: withFix("in-range"),
     majorOnly: withFix("major"),
   };
@@ -789,6 +893,13 @@ function severityRank(severity: string): number {
  * three can arrive this way: an advisory published (unexpected), a fix
  * published (fixableInRange), an advisory withdrawn (stale).
  *
+ * And it names the withdrawal as well as the publication, because two of those
+ * three are not publications. The sentence said "may have been published since
+ * the last green run" on all three paths, which sends the reader of a `stale`
+ * finding looking for an event that cannot have caused it: nothing is published
+ * INTO that list. What the three share is "the registry moved, not your diff",
+ * and that is what it has to say to be true on each of them.
+ *
  * "The one check here" is a claim about the other legs, and it is measured
  * rather than remembered: `verify-gate-script.test.ts` scans every script the
  * gate runs for a read outside the tree and fails if a second one appears. A
@@ -800,7 +911,7 @@ function severityRank(severity: string): number {
  * counts the legs out of the script chain and reads this comment.
  */
 export const PUBLISHED_ELSEWHERE_NOTE =
-  "This gate reads the npm registry, so it is the one check here whose answer can change while the repository does not — a finding above may have been published since the last green run rather than caused by this branch. The fix is the same either way, and it belongs on this branch: the tree is only green when it is green today.";
+  "This gate reads the npm registry, so it is the one check here whose answer can change while the repository does not — a finding above may have been published, or withdrawn, since the last green run rather than caused by this branch. The fix is the same either way, and it belongs on this branch: the tree is only green when it is green today.";
 
 /**
  * `1 advisory` / `18 advisories` — the report is read by people, not matched.
@@ -948,6 +1059,14 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
   if (verdict.stale.length > 0) {
     lines.push(
       `${checkName}: ${counted(verdict.stale.length, "baseline entry", "baseline entries")} no longer reported — remove ${plural(verdict.stale.length, "it", "them")}: ${verdict.stale.join(", ")}`,
+    );
+  }
+  if (!verdict.completeness.complete) {
+    // Printed on the green path as well as the red one, and that is the point:
+    // the run is passing because a question was not asked, and a green line
+    // that does not say so is how the half-checked run gets read as checked.
+    lines.push(
+      `${checkName}: npm's report is short of its own totals — \`metadata.vulnerabilities\` counts ${counted(verdict.completeness.claimed, "high/critical root", "high/critical roots")} and \`vulnerabilities\` carries ${String(verdict.completeness.carried)}. Staleness was NOT checked on this run: an advisory the report never mentioned is not an advisory that was withdrawn, and deleting the baseline over a degraded read is the one edit that lets a real advisory through in silence. Re-run the gate.`,
     );
   }
   if (isClean(verdict)) {

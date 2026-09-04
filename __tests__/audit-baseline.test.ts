@@ -22,6 +22,7 @@ import {
   observedAdvisoryDetails,
   observedAdvisoryFixes,
   PUBLISHED_ELSEWHERE_NOTE,
+  triagedCompleteness,
   type AcceptedAdvisory,
   type AuditRead,
   type AuditReport,
@@ -97,6 +98,17 @@ function report(
     ),
   };
 }
+
+/**
+ * What a report that accounted for its own totals produces, for the two cases
+ * that build a verdict by hand rather than from a report.
+ *
+ * Those cases are about the printed ORDER of a list no report can produce, so
+ * the completeness half is beside their point — but it is not optional, because
+ * a `stale: []` means two different things and the verdict is where they are
+ * told apart.
+ */
+const ACCOUNTED_FOR = { claimed: 0, carried: 0, complete: true } as const;
 
 /** npm's "only a major fixes this, and here is what I would install". */
 const majorFix = (name: string): unknown => ({ name, version: "1.0.0", isSemVerMajor: true });
@@ -857,6 +869,7 @@ describe("the OK line — upgrades, never advisories", () => {
         unexpected: [],
         stillPresent: [],
         stale: [],
+        completeness: ACCOUNTED_FOR,
         fixableInRange: [],
         majorOnly: [
           { key: `mild#${A1}`, severity: "low", updatePackage: "one-root" },
@@ -904,6 +917,7 @@ describe("the OK line — upgrades, never advisories", () => {
         unexpected: [],
         stillPresent: [`alpha#${A1}`, `wide#${A1}`, `wide#${A2}`, `mid#${A3}`],
         stale: [],
+        completeness: ACCOUNTED_FOR,
         fixableInRange: [],
         majorOnly: [],
       },
@@ -981,6 +995,14 @@ describe("the note on every failure — the run that fails is not the run that c
     // "your PR did not do this" slides in on its own.
     assert.match(PUBLISHED_ELSEWHERE_NOTE, /npm registry/);
     assert.match(PUBLISHED_ELSEWHERE_NOTE, /belongs on this branch/);
+  });
+
+  it("names the event that produces each of the three lists, not just publication", () => {
+    // It rode all three paths saying "may have been published since the last
+    // green run", and nothing is published INTO `stale` — an entry lands there
+    // when an advisory is WITHDRAWN. A reader of a stale finding was being sent
+    // to look for an event that cannot have caused it.
+    assert.match(PUBLISHED_ELSEWHERE_NOTE, /published, or withdrawn,/);
   });
 
   it("comes last, after the findings and the instruction that fixes them", () => {
@@ -1311,6 +1333,178 @@ describe("isAuditReport — npm failing is not npm reporting nothing", () => {
       undefined,
       "npm answering with a clean tree is being skipped, which hides the day the baseline empties",
     );
+  });
+});
+
+describe("triagedCompleteness — the registry failing quietly, which no predicate caught", () => {
+  // WHAT WENT WRONG. `isAuditReport` draws the line at "npm answered", and
+  // `readAuditPayload` at "the answer is readable". Both were written for a
+  // registry that fails LOUDLY. On 2026-09-04 it failed quietly: `npm audit
+  // --json` returned a well-formed report whose high/critical entries were
+  // missing, every predicate said yes, `observedAdvisories` came back empty,
+  // every baseline entry read as stale, and the gate turned CI red demanding
+  // the removal of four advisories that were all still live. Two calls nine
+  // minutes apart disagreed; a third agreed with the baseline again.
+  //
+  // The report says so itself: `metadata.vulnerabilities` is npm's own tally
+  // over the entries it emitted. Measured against this tree's real audit on
+  // 2026-09-04: `high: 9` in the totals, nine entries at `"high"` in the map.
+
+  /** A report whose totals and entries can be set independently. */
+  const withTotals = (
+    totals: Record<string, unknown> | undefined,
+    entries: Record<string, { severity: string }> = {},
+  ): AuditReport => ({
+    vulnerabilities: Object.fromEntries(
+      Object.entries(entries).map(([name, { severity }]) => [name, { severity, via: [] }]),
+    ),
+    ...(totals === undefined ? {} : { metadata: { vulnerabilities: totals } }),
+  });
+
+  it("reads a report that accounts for its totals as complete", () => {
+    const answered = withTotals({ moderate: 19, high: 2, critical: 0, total: 21 }, {
+      nanoid: { severity: "high" },
+      postcss: { severity: "high" },
+    });
+    assert.deepEqual(triagedCompleteness(answered), { claimed: 2, carried: 2, complete: true });
+  });
+
+  it("catches the shape that cost the red run: totals counted, entries missing", () => {
+    const degraded = withTotals({ moderate: 19, high: 9, critical: 0, total: 28 });
+    assert.deepEqual(triagedCompleteness(degraded), { claimed: 9, carried: 0, complete: false });
+  });
+
+  it("counts high and critical together, and ignores the severities the baseline does not triage", () => {
+    // The baseline is a list of high/critical roots, so those are the only
+    // totals whose absence can invent a withdrawal. Nineteen unreported
+    // moderates say nothing about it.
+    assert.equal(triagedCompleteness(withTotals({ moderate: 19, low: 4 })).complete, true);
+    assert.deepEqual(
+      triagedCompleteness(withTotals({ high: 2, critical: 3 }, { one: { severity: "critical" } })),
+      { claimed: 5, carried: 1, complete: false },
+    );
+  });
+
+  it("reads absent totals as no claim rather than as a claim of zero", () => {
+    // Every fixture in this file, and any npm that stops emitting the key. The
+    // alternative direction — treating a missing tally as "npm said zero" —
+    // would withhold the staleness check on every run, which is the check
+    // being switched off to protect it.
+    assert.deepEqual(triagedCompleteness(withTotals(undefined, { nanoid: { severity: "high" } })), {
+      claimed: 1,
+      carried: 1,
+      complete: true,
+    });
+    assert.equal(triagedCompleteness({ vulnerabilities: {} }).complete, true);
+    assert.equal(triagedCompleteness({ metadata: {} }).complete, true);
+  });
+
+  it("does not let a junk tally withhold the check", () => {
+    // A negative, a NaN, a string, a null: npm saying something this cannot
+    // use. Reading any of them as a claim would switch off staleness over a
+    // number nobody can act on.
+    for (const high of [-3, Number.NaN, Number.POSITIVE_INFINITY, "9", null, {}]) {
+      assert.equal(
+        triagedCompleteness(withTotals({ high })).complete,
+        true,
+        `a \`high\` of ${JSON.stringify(high) ?? "undefined"} was read as a claim`,
+      );
+    }
+    assert.equal(triagedCompleteness(withTotals({ vulnerabilities: null } as never)).complete, true);
+  });
+
+  it("carries more than it counts, which is odd and is not this function's failure", () => {
+    // Over-reporting cannot invent a withdrawal — the direction that matters
+    // here is entries MISSING. A report with more entries than totals is npm
+    // being strange and is not a reason to stop checking staleness.
+    assert.equal(
+      triagedCompleteness(withTotals({ high: 1 }, { a: { severity: "high" }, b: { severity: "high" } }))
+        .complete,
+      true,
+    );
+  });
+});
+
+describe("evaluateAudit on a report short of its own totals", () => {
+  const degraded = (accepted: readonly AcceptedAdvisory[] = FIXTURE) =>
+    evaluateAudit(
+      { vulnerabilities: {}, metadata: { vulnerabilities: { high: 9, critical: 0 } } },
+      accepted,
+    );
+
+  it("does not read a whole baseline as withdrawn, which is the red run", () => {
+    const verdict = degraded();
+    assert.deepEqual(verdict.stale, [], "the baseline was pruned on a report that said nothing");
+    assert.equal(
+      isClean(verdict),
+      true,
+      "the gate is still failing over advisories npm never mentioned",
+    );
+  });
+
+  it("says why the list is empty, because an empty `stale` means two things", () => {
+    // "npm reported these as gone" and "npm did not mention them" produce the
+    // same list. The verdict is where they are told apart, so the ambiguity
+    // travels with the list rather than being left to each caller.
+    assert.equal(degraded().completeness.complete, false);
+    assert.equal(evaluateAudit(report({}), []).completeness.complete, true);
+  });
+
+  it("still reports what a partial report can only under-report", () => {
+    // `unexpected` and `fixableInRange` need a FINDING to fire, so a report
+    // that says less makes them quieter — the safe direction, and the reason
+    // a partial report is evaluated rather than skipped outright.
+    const verdict = evaluateAudit(
+      {
+        vulnerabilities: {
+          browserslist: {
+            severity: "high",
+            fixAvailable: true,
+            via: [{ severity: "high", url: `https://github.com/advisories/${A1}` }],
+          },
+        },
+        metadata: { vulnerabilities: { high: 9 } },
+      },
+      FIXTURE,
+    );
+    assert.deepEqual(verdict.unexpected, [`browserslist#${A1}`]);
+    assert.deepEqual(
+      verdict.fixableInRange.map((found) => found.key),
+      [`browserslist#${A1}`],
+    );
+    assert.equal(isClean(verdict), false);
+    assert.deepEqual(verdict.stale, [], "staleness was computed from a report known to be short");
+  });
+
+  it("prints the withholding on the green path, where nothing else would say so", () => {
+    // A run that passes because a question was not asked, and a green line
+    // that does not say so, is how a half-checked run gets read as checked.
+    const printed = formatAuditVerdict(degraded(), "check");
+    assert.match(printed, /short of its own totals/);
+    assert.match(printed, /counts 9 high\/critical roots and `vulnerabilities` carries 0/);
+    assert.match(printed, /Staleness was NOT checked/);
+    assert.match(printed, /OK — no new high\/critical advisories/);
+  });
+
+  it("agrees with the number the annotation on the run summary carries", () => {
+    // The log line and the annotation are two sentences about one measurement,
+    // and the gate builds the second from the same verdict field.
+    const script = readRepoFile("scripts/check-audit-baseline.ts");
+    assert.match(
+      script,
+      /!verdict\.completeness\.complete && runningUnderActions\(\)/,
+      "a withheld staleness check no longer leaves a mark on the run summary, so it is only visible in a log nobody opens on a green run",
+    );
+    assert.match(script, /verdict\.completeness\.claimed/);
+    assert.match(script, /verdict\.completeness\.carried/);
+  });
+
+  it("says the singular when npm counted one", () => {
+    const printed = formatAuditVerdict(
+      evaluateAudit({ vulnerabilities: {}, metadata: { vulnerabilities: { high: 1 } } }, FIXTURE),
+      "check",
+    );
+    assert.match(printed, /counts 1 high\/critical root and/);
   });
 });
 
