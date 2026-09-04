@@ -33,14 +33,14 @@ import { execFileSync } from "node:child_process";
 import {
   evaluateAudit,
   formatAuditVerdict,
-  isAuditReport,
   isClean,
-  type AuditReport,
+  readAuditPayload,
+  type AuditRead,
 } from "../lib/audit-baseline";
 
 const CHECK_NAME = "check-audit-baseline";
 
-function readAudit(): AuditReport | null {
+function readAudit(): AuditRead {
   let raw: string;
   try {
     raw = execFileSync("npm", ["audit", "--json"], {
@@ -55,26 +55,21 @@ function readAudit(): AuditReport | null {
     const stdout = (error as { stdout?: unknown }).stdout;
     raw = typeof stdout === "string" ? stdout : "";
   }
-  if (raw.trim() === "") return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  // Parsing is not the line. npm answers a registry failure with a JSON error
-  // object, which parses and carries no findings — and an empty findings set
-  // is what "every accepted advisory has been withdrawn" looks like from here.
-  return isAuditReport(parsed) ? parsed : null;
+  // Parsing is not the line, and neither is "something went wrong". npm answers
+  // a registry failure with a JSON error object, which parses and carries no
+  // findings — and an empty findings set is what "every accepted advisory has
+  // been withdrawn" looks like from here. `readAuditPayload` decides and says
+  // why in one place.
+  return readAuditPayload(raw);
 }
 
 function main(): void {
-  const report = readAudit();
-  if (report === null) {
-    console.log(`${CHECK_NAME}: no parseable audit report (registry unreachable?) — skipping.`);
+  const read = readAudit();
+  if (read.report === undefined) {
+    console.log(`${CHECK_NAME}: skipping — ${read.skip}.`);
     return;
   }
-  const verdict = evaluateAudit(report);
+  const verdict = evaluateAudit(read.report);
   console.log(formatAuditVerdict(verdict, CHECK_NAME));
   // Three ways to be red and `isClean` is the one place that says which, so a
   // finding cannot be printed by a step that exits 0. `stale` joined the

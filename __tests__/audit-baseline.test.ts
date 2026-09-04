@@ -13,6 +13,7 @@ import {
   formatAuditVerdict,
   isAuditReport,
   isClean,
+  readAuditPayload,
   observedAdvisories,
   observedAdvisoryDetails,
   observedAdvisoryFixes,
@@ -1263,15 +1264,96 @@ describe("isAuditReport — npm failing is not npm reporting nothing", () => {
     assert.equal(isAuditReport(asIfItWereAReport), false);
   });
 
-  it("is the reader the gate actually uses, not a spare predicate", () => {
-    // A guard this file owns for a script it does not run: the fix is one line
-    // in `readAudit`, and a revert of that line would leave every case above
-    // green while the hole they describe is open again.
+  it("is the predicate the gate's reader applies, not a spare one", () => {
+    // Related by behaviour rather than by a line of source: `readAuditPayload`
+    // is what the gate calls, and what makes this predicate load-bearing is
+    // that the two agree about every payload. A reader that stopped consulting
+    // it would turn these comparisons red without anything reading a file.
+    for (const raw of ['{"error":{"code":"ENOTFOUND"}}', "{}", '{"vulnerabilities":null}']) {
+      assert.equal(isAuditReport(JSON.parse(raw)), false, `${raw} is not a report`);
+      assert.equal(
+        readAuditPayload(raw).report,
+        undefined,
+        `${raw} reached evaluateAudit even though it is not a report`,
+      );
+    }
+    const answered = '{"vulnerabilities":{}}';
+    assert.equal(isAuditReport(JSON.parse(answered)), true);
+    assert.notEqual(
+      readAuditPayload(answered).report,
+      undefined,
+      "npm answering with a clean tree is being skipped, which hides the day the baseline empties",
+    );
+  });
+});
+
+describe("readAuditPayload — a skip that says which failure it was", () => {
+  // The skip printed one sentence for every way of failing: "no parseable
+  // audit report (registry unreachable?)". Two red runs on `main` were read as
+  // the registry moving rather than as the registry being down, and that
+  // sentence is why — it cannot tell a contributor whether npm answered, and
+  // it appears whether or not npm said what went wrong.
+
+  it("hands back npm's own account of the failure, code and summary", () => {
+    const read = readAuditPayload(
+      JSON.stringify({
+        error: { code: "ENOTFOUND", summary: "request to https://registry.npmjs.org/ failed" },
+      }),
+    );
+    assert.equal(read.report, undefined);
+    assert.match(String(read.skip), /ENOTFOUND/);
+    assert.match(String(read.skip), /request to https:\/\/registry\.npmjs\.org\/ failed/);
+  });
+
+  it("still skips when npm names the error and nothing else", () => {
+    // `code` without `summary`, and an error object with neither: npm having
+    // less to say is not a reason to read its failure as a clean tree.
+    assert.match(String(readAuditPayload('{"error":{"code":"EAI_AGAIN"}}').skip), /EAI_AGAIN/);
+    assert.match(String(readAuditPayload('{"error":{}}').skip), /no code/);
+    assert.match(String(readAuditPayload('{"error":"broke"}').skip), /npm reported an error/);
+  });
+
+  it("tells the four failures apart", () => {
+    // Different problems with different fixes: npm never ran, npm printed
+    // something that is not JSON, npm printed a JSON value that is not an
+    // object, npm printed an object with no findings in it.
+    assert.match(String(readAuditPayload("").skip), /printed nothing/);
+    assert.match(String(readAuditPayload("   ").skip), /printed nothing/);
+    assert.match(String(readAuditPayload("npm ERR! code E401").skip), /not JSON/);
+    assert.match(String(readAuditPayload("null").skip), /is a null/);
+    assert.match(String(readAuditPayload('"done"').skip), /is a string/);
+    assert.match(String(readAuditPayload("{}").skip), /no `vulnerabilities`/);
+  });
+
+  it("bounds what it quotes back, because this goes into a CI log", () => {
+    // npm's non-JSON output on a bad day is a stack trace, and a skip line that
+    // reprints all of it is a skip nobody reads.
+    const skip = String(readAuditPayload("x".repeat(5000)).skip);
+    assert.ok(skip.length < 200, `the skip line is ${String(skip.length)} characters long`);
+  });
+
+  it("hands back the report when npm answered, clean tree included", () => {
+    const findings = readAuditPayload('{"vulnerabilities":{"postcss":{"severity":"high"}}}');
+    assert.equal(findings.skip, undefined);
+    assert.deepEqual(Object.keys(findings.report?.vulnerabilities ?? {}), ["postcss"]);
+    // The empty-but-present key is npm saying "nothing is open", which is an
+    // answer and must not be swallowed by the reader that catches its silence.
+    const clean = readAuditPayload('{"vulnerabilities":{}}');
+    assert.equal(clean.skip, undefined);
+    assert.deepEqual(clean.report, { vulnerabilities: {} });
+  });
+
+  it("is the reader the gate uses, and the gate prints its sentence", () => {
     const script = readRepoFile("scripts/check-audit-baseline.ts");
     assert.match(
       script,
-      /isAuditReport\(parsed\)/,
-      "check-audit-baseline no longer filters the parsed payload, so npm's error object reaches evaluateAudit again",
+      /readAuditPayload\(raw\)/,
+      "check-audit-baseline no longer decides through readAuditPayload, so its skip and its reason are two statements again",
+    );
+    assert.match(
+      script,
+      /skipping — \$\{read\.skip\}/,
+      "the gate skips without printing the reason it was handed, which is the whole of this",
     );
   });
 });
