@@ -40,8 +40,15 @@ import { describe, it } from "node:test";
 
 import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
 // The bootstrap's own reduction from a spawn argument to the tool it names, so
-// the case below asks the refusal's question rather than a copy of it.
-import { networkTool } from "./test-globals";
+// the case below asks the refusal's question rather than a copy of it. The
+// other three are what the bootstrap says about ITSELF — how many times its
+// body ran, and which functions the run that is speaking installed.
+import {
+  bootstrapEvaluations,
+  installedRefusal,
+  installedRefusalAddresses,
+  networkTool,
+} from "./test-globals";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -52,6 +59,26 @@ import { readRepoFile } from "./helpers/repo-file";
  * This is the value every OTHER suite starts its life with.
  */
 const installed = globalThis.fetch;
+
+/**
+ * What is in force at each address the bootstrap replaced, captured at this
+ * suite's import for the same reason `installed` is.
+ *
+ * `optionsPassedBy` below puts a recorder over every `node:child_process`
+ * method and restores it in a `finally`, so a case that read those at call time
+ * would be asking about whatever ran last rather than about what the bootstrap
+ * left. The addresses come from the bootstrap — a list typed out here would be
+ * a second copy of what it patches, which is the arrangement `SPAWN_NAMES` and
+ * the marker list were both rewritten to end.
+ */
+const IN_FORCE: ReadonlyMap<string, unknown> = new Map(
+  installedRefusalAddresses().map((address) => {
+    if (address === "globalThis.fetch") return [address, installed] as const;
+    const [object, method] = address.split(".");
+    const objects: Record<string, unknown> = { http, https, child_process: childProcess };
+    return [address, (objects[object] as Record<string, unknown> | undefined)?.[method]] as const;
+  }),
+);
 
 describe("a test that reaches the network fails instead", () => {
   it("throws rather than returning a promise, so nothing awaits a real host", () => {
@@ -798,5 +825,60 @@ describe("the refusal is wired into every test process", () => {
       !/beforeEach\([^)]*\{[^}]*globalThis\.fetch/s.test(bootstrap),
       "the refusal is being reinstalled per test, which would overwrite a suite's own stub",
     );
+  });
+
+  /**
+   * ONE instance, and this is where that stops being a claim.
+   *
+   * The bootstrap reaches this process twice by two addresses — `--import
+   * ./__tests__/test-globals.ts` before any suite loads, and this file's own
+   * `import … from "./test-globals"`. They resolve to the same module and the
+   * body runs once; that was measured with a `console.error` added and removed,
+   * which is a demonstration that lived in a terminal.
+   *
+   * The reason it needs to live here instead is that a second instance is
+   * INVISIBLE to every other case in this file. It would re-wrap each spawn
+   * method over the first instance's wrappers and re-assign `fetch`, and every
+   * identity case compares against what it found at its own import — so all of
+   * them would still pass, while the refusal a suite meets belonged to a module
+   * nothing in the tree could name and `optionsPassedBy` restored the wrong
+   * layer of two.
+   *
+   * Two readings, because which one fires depends on which instance THIS suite
+   * imported. If it got the later one, the count is 2 and the identities agree;
+   * if it got the earlier one, the identities disagree and the count is 2 as
+   * well — the count is the reading that holds either way, and the identity is
+   * what says WHICH address a stale instance is speaking for.
+   */
+  it("the bootstrap's module body ran exactly once in this process", () => {
+    const runs = bootstrapEvaluations();
+    assert.equal(
+      runs,
+      1,
+      `__tests__/test-globals.ts evaluated ${String(runs)} times. \`--import\` preloads it and this suite imports it, and the two are meant to resolve to one module — a second instance re-wraps every spawn method over the first one's wrappers and re-assigns \`fetch\`, which every other case in this file would pass straight through.`,
+    );
+  });
+
+  it("every refusal in force is the one the instance this suite imported installed", () => {
+    const addresses = installedRefusalAddresses();
+    // All four of the scan's shapes, so the reading is not one address wide: a
+    // bootstrap that had stopped recording what it patches would otherwise
+    // satisfy the loop below by having nothing to loop over.
+    for (const prefix of ["globalThis.", "http.", "https.", "child_process."]) {
+      assert.ok(
+        addresses.some((address) => address.startsWith(prefix)),
+        `the bootstrap records nothing installed at \`${prefix}…\`, so this case says nothing about that shape`,
+      );
+    }
+
+    for (const address of addresses) {
+      const live = IN_FORCE.get(address);
+      assert.equal(typeof live, "function", `nothing is installed at \`${address}\``);
+      assert.equal(
+        live,
+        installedRefusal(address),
+        `the \`${address}\` a suite meets is not the one installed by the bootstrap instance this file imported — two instances of __tests__/test-globals.ts ran, and the later one is what is actually in force`,
+      );
+    }
   });
 });

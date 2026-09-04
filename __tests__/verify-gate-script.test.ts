@@ -12,7 +12,9 @@ import {
 } from "./helpers/gate-legs";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
-import { SUITES_REL } from "./helpers/suite-files";
+// The bootstrap answering about itself: which addresses it is refusing at, and
+// its own reduction from a spawn argument to the tool name it refuses.
+import { installedRefusalAddresses, networkTool } from "./test-globals";
 
 /**
  * Pins `npm run verify` as the ONE command that runs the full gate.
@@ -357,18 +359,36 @@ describe("only one leg of the gate reads anything outside the tree", () => {
     // `npm test` is a leg and the scan skips all 1420 of its files. The
     // bootstrap is what makes the note's claim true about them; without it,
     // "the one check here" would rest on the biggest leg being unexamined.
-    const bootstrap = read(path.join(SUITES_REL, "test-globals.ts"));
-    for (const [marker, pattern] of [
-      ["the `fetch` global", /globalThis\.fetch = /],
-      ["http/https `request` and `get`", /\[http, https\]/],
-      ["a spawned network tool", /NETWORK_TOOLS/],
+    //
+    // Asked of the bootstrap rather than of its source. The three markers were
+    // three regexes over the file, `/\[http, https\]/` among them — a spelling
+    // of one loop rather than a property, which went red the day that loop
+    // learned the names of the clients it patches. What the markers are about
+    // is which addresses are refusing, and the bootstrap records that now.
+    const refusing = installedRefusalAddresses();
+    for (const [marker, addresses] of [
+      ["the `fetch` global", ["globalThis.fetch"]],
+      [
+        "http/https `request` and `get`",
+        ["http.request", "http.get", "https.request", "https.get"],
+      ],
+      ["a spawned network tool", ["child_process.spawn", "child_process.execFileSync"]],
     ] as const) {
-      assert.match(
-        bootstrap,
-        pattern,
-        `__tests__/test-globals.ts no longer refuses ${marker} — the \`test\` leg is unexamined for it again, by this scan and by anything else`,
-      );
+      for (const address of addresses) {
+        assert.ok(
+          refusing.includes(address),
+          `__tests__/test-globals.ts no longer refuses ${marker} — nothing is installed at \`${address}\`, so the \`test\` leg is unexamined for it again, by this scan and by anything else`,
+        );
+      }
     }
+    // The spawn addresses say a spawn is intercepted; which spawns are REFUSED
+    // is the tool list, and that stays private to the bootstrap. Its reduction
+    // is the one door onto it.
+    assert.equal(
+      networkTool("/usr/bin/curl"),
+      "curl",
+      "the bootstrap wraps every spawn and no longer counts a network tool among what it refuses",
+    );
     assert.match(
       pkg.scripts.test,
       /--import \.\/__tests__\/test-globals\.ts/,

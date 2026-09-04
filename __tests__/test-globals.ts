@@ -83,6 +83,62 @@ function refuseNetwork(what: string, target: string): never {
   );
 }
 
+/**
+ * How many times this module's BODY has run in this process, and which refusals
+ * the run that is speaking installed.
+ *
+ * `--import ./__tests__/test-globals.ts` preloads this file and
+ * `network-refusal.test.ts` imports it by a second address. They resolve to one
+ * instance and the body runs once — which was measured with a `console.error`
+ * added and removed, a demonstration that lived in a terminal and never in the
+ * tree. A SECOND instance would re-wrap every spawn method over the first
+ * instance's wrappers and re-assign `fetch`, and every identity case over in
+ * `network-refusal.test.ts` compares against whatever it found at ITS import,
+ * so all of them would still pass while the refusal a suite actually meets
+ * belonged to a module nothing in the tree could name.
+ *
+ * Two readings close that and it takes both, because which one fires depends on
+ * which instance the suite imported. The COUNT lives on `globalThis` rather
+ * than in a module-scope `let`: a second instance gets its own module scope and
+ * would count itself as the first, and the global object is the one place two
+ * instances of this file would share. The IDENTITY is per-instance by
+ * construction — `installedRefusal` answers with what THIS body assigned, so a
+ * suite holding the earlier instance is handed a function that is no longer the
+ * one in force. Two instances fail one reading each, whichever they got.
+ */
+const EVALUATIONS = "__collectablesTestGlobalsEvaluations";
+
+const evaluationCounts = globalThis as unknown as Record<string, number | undefined>;
+evaluationCounts[EVALUATIONS] = (evaluationCounts[EVALUATIONS] ?? 0) + 1;
+
+/** How many times this module's body has run in this process. One, or a bug. */
+export function bootstrapEvaluations(): number {
+  return evaluationCounts[EVALUATIONS] ?? 0;
+}
+
+/**
+ * The refusals this module instance installed, keyed by the address it replaced
+ * — `globalThis.fetch`, `http.request`, `child_process.spawnSync` and the rest,
+ * spelled the way a reader would write the thing being replaced.
+ */
+const installedRefusals = new Map<string, unknown>();
+
+/** Record what this body is assigning at `address`, and hand it back to assign. */
+function installing<T>(address: string, refusal: T): T {
+  installedRefusals.set(address, refusal);
+  return refusal;
+}
+
+/** The refusal THIS module instance installed at `address`, or `undefined`. */
+export function installedRefusal(address: string): unknown {
+  return installedRefusals.get(address);
+}
+
+/** Every address this module instance replaced, sorted. */
+export function installedRefusalAddresses(): readonly string[] {
+  return [...installedRefusals.keys()].sort();
+}
+
 /** The URL out of all three shapes `fetch` takes, for a message worth reading. */
 function requested(input: unknown): string {
   if (typeof input === "string") return input;
@@ -90,8 +146,10 @@ function requested(input: unknown): string {
   return (input as { url?: string } | null)?.url ?? "an unnamed request";
 }
 
-globalThis.fetch = ((input: unknown) =>
-  refuseNetwork("fetch", requested(input))) as unknown as typeof globalThis.fetch;
+globalThis.fetch = installing(
+  "globalThis.fetch",
+  ((input: unknown) => refuseNetwork("fetch", requested(input))) as unknown as typeof globalThis.fetch,
+);
 
 /**
  * `http.request`, `http.get` and their https twins.
@@ -100,11 +158,15 @@ globalThis.fetch = ((input: unknown) =>
  * own runner and `tsx` load these too, and a refusal that took the module out
  * from under them would fail the run for a reason that is not a test's.
  */
-for (const client of [http, https] as const) {
+for (const [address, client] of [
+  ["http", http],
+  ["https", https],
+] as const) {
   for (const method of ["request", "get"] as const) {
     const mutable = client as unknown as Record<string, unknown>;
-    mutable[method] = (input: unknown) =>
-      refuseNetwork(`open an http connection to`, requested(input));
+    mutable[method] = installing(`${address}.${method}`, (input: unknown) =>
+      refuseNetwork(`open an http connection to`, requested(input)),
+    );
   }
 }
 
@@ -144,11 +206,11 @@ export function networkTool(command: unknown): string | undefined {
 for (const method of ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync"] as const) {
   const mutable = childProcess as unknown as Record<string, unknown>;
   const real = mutable[method] as (...args: unknown[]) => unknown;
-  mutable[method] = (...args: unknown[]) => {
+  mutable[method] = installing(`child_process.${method}`, (...args: unknown[]) => {
     const tool = networkTool(args[0]);
     if (tool !== undefined) refuseNetwork("spawn", tool);
     return real(...args);
-  };
+  });
 }
 
 const REALTIME_MODULE_PATH = repoPath("lib", "supabase-realtime.ts");
