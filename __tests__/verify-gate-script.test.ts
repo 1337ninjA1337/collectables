@@ -12,7 +12,9 @@ import {
 } from "./helpers/gate-legs";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
-import { SUITES_REL } from "./helpers/suite-files";
+// The bootstrap's own record of what it patched, so the case below asks it
+// rather than matching the source it happens to be written in today.
+import { networkTool, refusalPoints } from "./test-globals";
 
 /**
  * Pins `npm run verify` as the ONE command that runs the full gate.
@@ -357,18 +359,46 @@ describe("only one leg of the gate reads anything outside the tree", () => {
     // `npm test` is a leg and the scan skips all 1420 of its files. The
     // bootstrap is what makes the note's claim true about them; without it,
     // "the one check here" would rest on the biggest leg being unexamined.
-    const bootstrap = read(path.join(SUITES_REL, "test-globals.ts"));
-    for (const [marker, pattern] of [
-      ["the `fetch` global", /globalThis\.fetch = /],
-      ["http/https `request` and `get`", /\[http, https\]/],
-      ["a spawned network tool", /NETWORK_TOOLS/],
+    //
+    // Asked of the bootstrap rather than matched against its text. This read
+    // `/\[http, https\]/` until the loop that literal was in got rewritten for
+    // an unrelated reason, and went red about a rewording — the shape this
+    // repository keeps retiring. `refusalPoints()` is the registry the
+    // bootstrap fills as it patches, so what is asserted is what a caller in a
+    // test process would actually reach.
+    const points = new Set(refusalPoints());
+    for (const [marker, required] of [
+      ["the `fetch` global", ["globalThis.fetch"]],
+      [
+        "http/https `request` and `get`",
+        ["http.request", "http.get", "https.request", "https.get"],
+      ],
+      [
+        "a spawn",
+        [
+          "childProcess.spawn",
+          "childProcess.spawnSync",
+          "childProcess.exec",
+          "childProcess.execSync",
+          "childProcess.execFile",
+          "childProcess.execFileSync",
+        ],
+      ],
     ] as const) {
-      assert.match(
-        bootstrap,
-        pattern,
-        `__tests__/test-globals.ts no longer refuses ${marker} — the \`test\` leg is unexamined for it again, by this scan and by anything else`,
-      );
+      for (const point of required) {
+        assert.ok(
+          points.has(point),
+          `__tests__/test-globals.ts no longer refuses ${marker} — \`${point}\` is not one of the points it patched, so the \`test\` leg is unexamined for it again, by this scan and by anything else`,
+        );
+      }
     }
+    // A patched spawn says nothing about what it counts as reaching outside the
+    // tree, and the marker this stands in for is the TOOL rather than the call.
+    assert.notEqual(
+      networkTool("curl"),
+      undefined,
+      "__tests__/test-globals.ts no longer counts a spawned network tool as one, so every spawn method it patched now calls straight through",
+    );
     assert.match(
       pkg.scripts.test,
       /--import \.\/__tests__\/test-globals\.ts/,
