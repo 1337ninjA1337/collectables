@@ -254,6 +254,57 @@ export function isAuditReport(parsed: unknown): parsed is AuditReport {
   return typeof payload.vulnerabilities === "object" && payload.vulnerabilities !== null;
 }
 
+/**
+ * What `npm audit --json` produced: a report, or the reason there is not one.
+ *
+ * The skip used to print one sentence — "no parseable audit report (registry
+ * unreachable?)" — for every way of failing, and a skip nobody can tell from a
+ * pass is how two red runs were read as the registry moving rather than as the
+ * registry being down. npm's error object carries a `code` and a `summary`
+ * that name the actual failure; a truncated read and a renamed field are
+ * different problems with different fixes, and all three said the same thing.
+ *
+ * Pure, and it owns the parse: the decision and the sentence explaining it come
+ * out of one place, so a caller cannot skip for one reason and report another.
+ */
+export type AuditRead =
+  | { readonly report: AuditReport; readonly skip?: undefined }
+  | { readonly report?: undefined; readonly skip: string };
+
+/** As much of npm's own account of a failure as it gave. */
+function npmErrorSentence(error: unknown): string {
+  if (typeof error !== "object" || error === null) return `npm reported an error (${typeof error})`;
+  const { code, summary } = error as { code?: unknown; summary?: unknown };
+  const named = typeof code === "string" && code !== "" ? code : "no code";
+  const said = typeof summary === "string" && summary !== "" ? ` — ${summary}` : "";
+  return `npm reported an error: ${named}${said}`;
+}
+
+export function readAuditPayload(raw: string): AuditRead {
+  if (raw.trim() === "") {
+    return { skip: "npm printed nothing, so it did not get as far as an answer" };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // Bounded on purpose: this goes to a CI log, and npm's non-JSON output on a
+    // bad day is a stack trace.
+    return { skip: `npm's output is not JSON: ${JSON.stringify(raw.trim().slice(0, 120))}` };
+  }
+  if (typeof parsed !== "object" || parsed === null) {
+    return { skip: `npm's output is a ${parsed === null ? "null" : typeof parsed}, not a report` };
+  }
+  const payload = parsed as { error?: unknown };
+  if (payload.error !== undefined) return { skip: npmErrorSentence(payload.error) };
+  if (!isAuditReport(parsed)) {
+    return {
+      skip: "npm's output carries no `vulnerabilities`, so it does not say which advisories are open",
+    };
+  }
+  return { report: parsed };
+}
+
 /** Shape of the slice of `npm audit --json` this reads. */
 export interface AuditReport {
   readonly vulnerabilities?: Readonly<
