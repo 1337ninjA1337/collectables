@@ -41,7 +41,7 @@ import { describe, it } from "node:test";
 import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
 // The bootstrap's own reduction from a spawn argument to the tool it names, so
 // the case below asks the refusal's question rather than a copy of it.
-import { bootstrapInstances, networkTool } from "./test-globals";
+import { bootstrapInstances, networkTool, rewrappedSpawnMethods } from "./test-globals";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -801,6 +801,22 @@ describe("the refusal is wired into every test process", () => {
       bootstrapInstances(),
       1,
       `the bootstrap has been evaluated ${String(bootstrapInstances())} times — a suite is importing it by a specifier that resolves to a second module instance, so the refusal is wrapped around itself and every case here is measuring the copy that happened to be installed last`,
+    );
+  });
+
+  it("is the outermost thing on every spawn method, not merely present", () => {
+    // The instance count above says the module body ran once. That is not the
+    // same question as how deep the refusal is stacked: anything that wraps a
+    // spawn method AFTER the bootstrap — a second bootstrap, or a helper that
+    // saves and restores wrongly — leaves the count at one and puts a layer
+    // between a caller and this refusal. The wrapper still refuses, so nothing
+    // in this file goes red; it also gets to see, change or drop the call
+    // first, and `optionsPassedBy` in the describe above is proof that code
+    // here does exactly that kind of swapping.
+    assert.deepEqual(
+      rewrappedSpawnMethods(),
+      [],
+      "a spawn method is no longer the wrapper the bootstrap installed — something replaced or wrapped it and did not put it back, so every spawn in the suites now goes through that first",
     );
   });
 

@@ -109,20 +109,6 @@ for (const client of [http, https] as const) {
 }
 
 /**
- * A spawned tool that reaches a remote, which is how code gets out of the tree
- * without importing anything at all.
- *
- * `curl` and `wget` are the obvious two. `npm` and `npx` are here because the
- * scan's other two markers are exactly those spawns — `npm audit` asking the
- * registry about advisories, `npx expo install --check` asking it about
- * versions — and a refusal that covered two of the scan's four shapes would
- * leave the same hole one level down. No suite spawns either; the guard
- * fixtures run `node --import tsx` directly, which is a read of this tree.
- *
- * The tool NAME only. Refusing spawning outright would break those fixtures,
- * which run `node`, `tsx` and `git` dozens of times.
- */
-/**
  * How many times this module body has run in this process.
  *
  * The refusal is installed by side effect: `globalThis.fetch` is replaced and
@@ -146,6 +132,20 @@ export function bootstrapInstances(): number {
   return globalCounts[INSTANCES] ?? 0;
 }
 
+/**
+ * A spawned tool that reaches a remote, which is how code gets out of the tree
+ * without importing anything at all.
+ *
+ * `curl` and `wget` are the obvious two. `npm` and `npx` are here because the
+ * scan's other two markers are exactly those spawns — `npm audit` asking the
+ * registry about advisories, `npx expo install --check` asking it about
+ * versions — and a refusal that covered two of the scan's four shapes would
+ * leave the same hole one level down. No suite spawns either; the guard
+ * fixtures run `node --import tsx` directly, which is a read of this tree.
+ *
+ * The tool NAME only. Refusing spawning outright would break those fixtures,
+ * which run `node`, `tsx` and `git` dozens of times.
+ */
 const NETWORK_TOOLS = new Set(["curl", "wget", "npm", "npx"]);
 
 /**
@@ -165,14 +165,44 @@ export function networkTool(command: unknown): string | undefined {
   return NETWORK_TOOLS.has(name) ? name : undefined;
 }
 
+/**
+ * The wrapper this bootstrap put on each spawn method, kept so it can be asked
+ * later whether it is still the one there.
+ *
+ * `bootstrapInstances()` answers how many times this module body ran, which is
+ * not the same question as how deep the refusal is stacked. Anything that wraps
+ * a spawn method AFTER this — a second bootstrap, or a helper saving and
+ * restoring wrongly — leaves the count at one and puts a layer between a caller
+ * and this refusal. A wrapper around this one still refuses, so nothing goes
+ * red; it also gets to see, change or drop the call first.
+ */
+const installedSpawnPatches = new Map<string, unknown>();
+
 for (const method of ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync"] as const) {
   const mutable = childProcess as unknown as Record<string, unknown>;
   const real = mutable[method] as (...args: unknown[]) => unknown;
-  mutable[method] = (...args: unknown[]) => {
+  const wrapper = (...args: unknown[]) => {
     const tool = networkTool(args[0]);
     if (tool !== undefined) refuseNetwork("spawn", tool);
     return real(...args);
   };
+  mutable[method] = wrapper;
+  installedSpawnPatches.set(method, wrapper);
+}
+
+/**
+ * The spawn methods whose current value is not the wrapper this bootstrap
+ * installed — empty while the refusal is what a caller reaches first.
+ *
+ * A suite that swaps a method and restores it (this repository has one) is
+ * invisible here, which is right: what this answers is whether the swap is
+ * still in place, not whether one ever happened.
+ */
+export function rewrappedSpawnMethods(): readonly string[] {
+  const mutable = childProcess as unknown as Record<string, unknown>;
+  return [...installedSpawnPatches]
+    .filter(([method, wrapper]) => mutable[method] !== wrapper)
+    .map(([method]) => method);
 }
 
 const REALTIME_MODULE_PATH = repoPath("lib", "supabase-realtime.ts");
