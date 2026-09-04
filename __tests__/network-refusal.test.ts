@@ -41,7 +41,14 @@ import { describe, it } from "node:test";
 import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
 // The bootstrap's own reduction from a spawn argument to the tool it names, so
 // the case below asks the refusal's question rather than a copy of it.
-import { bootstrapInstances, networkTool, refusalAt, refusalPoints, rewrappedRefusals } from "./test-globals";
+import {
+  bootstrapInstances,
+  networkTool,
+  refusalAt,
+  refusalPoints,
+  refusalVerbAt,
+  rewrappedRefusals,
+} from "./test-globals";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -844,12 +851,28 @@ describe("the refusal is wired into every test process", () => {
     // one argument: it is a network tool to a spawn, and not a URL to the
     // other two. The bound rides along for the reason it rides on the probes —
     // a spawn point that had stopped refusing would otherwise run it.
+    //
+    // The refusal has to be THIS point's. `/A test tried to/` is the prefix all
+    // four share, so it says some refusal fired and not which — a point
+    // registered against another surface's wrapper reads exactly the same, and
+    // that is the fault a registry of eleven names invites. The verb comes from
+    // the bootstrap, which passes it to `refuseNetwork` and to the registry in
+    // one expression, so nothing here restates the sentence.
     const points = refusalPoints();
     for (const point of points) {
       const live = refusalAt(point) as (...args: unknown[]) => unknown;
+      const verb = refusalVerbAt(point);
+      assert.equal(typeof verb, "string", `\`${point}\` is registered with no verb`);
       assert.throws(
         () => live("curl", BOUNDED),
-        /A test tried to/,
+        (error: unknown) => {
+          assert.ok(error instanceof Error, `\`${point}\` threw something that is not an Error`);
+          assert.ok(
+            error.message.startsWith(`A test tried to ${String(verb)} `),
+            `\`${point}\` answered with "${error.message.slice(0, 72)}…" — that is not the refusal this surface installs, so the point is registered against another surface's wrapper`,
+          );
+          return true;
+        },
         `\`${point}\` is registered as a refusal and did not refuse a call`,
       );
     }
