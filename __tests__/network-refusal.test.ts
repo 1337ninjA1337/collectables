@@ -44,7 +44,7 @@ import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
 // other three are what the bootstrap says about ITSELF — how many times its
 // body ran, and which functions the run that is speaking installed.
 import {
-  bootstrapEvaluations,
+  bootstrapInstances,
   installedRefusal,
   installedRefusalAddresses,
   networkTool,
@@ -813,6 +813,24 @@ describe("the refusal is wired into every test process", () => {
     }
   });
 
+  it("is one instance of the bootstrap, however a suite reaches it", () => {
+    // This file imports the bootstrap for `networkTool`, so the module the
+    // `--import` evaluated and the module a suite names have to be the same
+    // one. A second instance would wrap every spawn method around the first's
+    // wrapper and re-assign `fetch` — and nothing would go red: the refusal
+    // still fires, and every identity check here compares against whatever was
+    // installed by the time it read the module. The `beforeEach` this
+    // bootstrap registers would also run twice per test.
+    //
+    // It was proved once by putting a `console.error` in the module body and
+    // counting lines, which is not a thing the tree can do again.
+    assert.equal(
+      bootstrapInstances(),
+      1,
+      `the bootstrap has been evaluated ${String(bootstrapInstances())} times — a suite is importing it by a specifier that resolves to a second module instance, so the refusal is wrapped around itself and every case here is measuring the copy that happened to be installed last`,
+    );
+  });
+
   it("installs the refusal at module scope rather than in a beforeEach", () => {
     // A `beforeEach` would fight every suite that stubs `fetch` in a `before`
     // or at module scope — it would reinstall the refusal underneath a stub
@@ -828,37 +846,20 @@ describe("the refusal is wired into every test process", () => {
   });
 
   /**
-   * ONE instance, and this is where that stops being a claim.
+   * WHICH instance, which is the half the count above cannot reach.
    *
-   * The bootstrap reaches this process twice by two addresses — `--import
-   * ./__tests__/test-globals.ts` before any suite loads, and this file's own
-   * `import … from "./test-globals"`. They resolve to the same module and the
-   * body runs once; that was measured with a `console.error` added and removed,
-   * which is a demonstration that lived in a terminal.
+   * `bootstrapInstances()` says a second module body ran. It does not say which
+   * of the two this file is holding, and the two are not interchangeable: a
+   * suite that imported the LATER instance is comparing against the refusals in
+   * force and would notice nothing beyond the count, while a suite that
+   * imported the EARLIER one is holding functions that were wrapped over and
+   * are no longer what a call reaches. That is the state where `optionsPassedBy`
+   * restores the wrong layer of two.
    *
-   * The reason it needs to live here instead is that a second instance is
-   * INVISIBLE to every other case in this file. It would re-wrap each spawn
-   * method over the first instance's wrappers and re-assign `fetch`, and every
-   * identity case compares against what it found at its own import — so all of
-   * them would still pass, while the refusal a suite meets belonged to a module
-   * nothing in the tree could name and `optionsPassedBy` restored the wrong
-   * layer of two.
-   *
-   * Two readings, because which one fires depends on which instance THIS suite
-   * imported. If it got the later one, the count is 2 and the identities agree;
-   * if it got the earlier one, the identities disagree and the count is 2 as
-   * well — the count is the reading that holds either way, and the identity is
-   * what says WHICH address a stale instance is speaking for.
+   * The bootstrap records what THIS body assigned, per address, so the question
+   * is answerable at all. The count is the reading that holds either way; this
+   * is the one that names the address.
    */
-  it("the bootstrap's module body ran exactly once in this process", () => {
-    const runs = bootstrapEvaluations();
-    assert.equal(
-      runs,
-      1,
-      `__tests__/test-globals.ts evaluated ${String(runs)} times. \`--import\` preloads it and this suite imports it, and the two are meant to resolve to one module — a second instance re-wraps every spawn method over the first one's wrappers and re-assigns \`fetch\`, which every other case in this file would pass straight through.`,
-    );
-  });
-
   it("every refusal in force is the one the instance this suite imported installed", () => {
     const addresses = installedRefusalAddresses();
     // All four of the scan's shapes, so the reading is not one address wide: a

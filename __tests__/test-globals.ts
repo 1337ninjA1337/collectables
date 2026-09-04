@@ -84,42 +84,24 @@ function refuseNetwork(what: string, target: string): never {
 }
 
 /**
- * How many times this module's BODY has run in this process, and which refusals
- * the run that is speaking installed.
+ * Which refusals THIS run of the module body installed, keyed by the address it
+ * replaced — `globalThis.fetch`, `http.request`, `child_process.spawnSync` and
+ * the rest, spelled the way a reader would write the thing being replaced.
  *
- * `--import ./__tests__/test-globals.ts` preloads this file and
- * `network-refusal.test.ts` imports it by a second address. They resolve to one
- * instance and the body runs once — which was measured with a `console.error`
- * added and removed, a demonstration that lived in a terminal and never in the
- * tree. A SECOND instance would re-wrap every spawn method over the first
- * instance's wrappers and re-assign `fetch`, and every identity case over in
- * `network-refusal.test.ts` compares against whatever it found at ITS import,
- * so all of them would still pass while the refusal a suite actually meets
- * belonged to a module nothing in the tree could name.
+ * The other half of what `bootstrapInstances()` below counts, and the half a
+ * count cannot give. A second instance re-wraps every spawn method over the
+ * first one's wrappers and re-assigns `fetch`; the count says that happened,
+ * and this says WHICH addresses the instance a suite is holding is speaking
+ * for. `installedRefusal` answers per-instance by construction, so a suite that
+ * imported the earlier one is handed a function that is no longer in force —
+ * which is a comparison every identity case in `network-refusal.test.ts` was
+ * unable to make, because each of them compares against whatever it found at
+ * its own import.
  *
- * Two readings close that and it takes both, because which one fires depends on
- * which instance the suite imported. The COUNT lives on `globalThis` rather
- * than in a module-scope `let`: a second instance gets its own module scope and
- * would count itself as the first, and the global object is the one place two
- * instances of this file would share. The IDENTITY is per-instance by
- * construction — `installedRefusal` answers with what THIS body assigned, so a
- * suite holding the earlier instance is handed a function that is no longer the
- * one in force. Two instances fail one reading each, whichever they got.
- */
-const EVALUATIONS = "__collectablesTestGlobalsEvaluations";
-
-const evaluationCounts = globalThis as unknown as Record<string, number | undefined>;
-evaluationCounts[EVALUATIONS] = (evaluationCounts[EVALUATIONS] ?? 0) + 1;
-
-/** How many times this module's body has run in this process. One, or a bug. */
-export function bootstrapEvaluations(): number {
-  return evaluationCounts[EVALUATIONS] ?? 0;
-}
-
-/**
- * The refusals this module instance installed, keyed by the address it replaced
- * — `globalThis.fetch`, `http.request`, `child_process.spawnSync` and the rest,
- * spelled the way a reader would write the thing being replaced.
+ * It is also the one door onto what the bootstrap patches:
+ * `verify-gate-script.test.ts` used to read three regexes over this file's
+ * SOURCE to say the `test` leg is covered, one of them a spelling of the loop
+ * below rather than a property of it.
  */
 const installedRefusals = new Map<string, unknown>();
 
@@ -184,6 +166,30 @@ for (const [address, client] of [
  * The tool NAME only. Refusing spawning outright would break those fixtures,
  * which run `node`, `tsx` and `git` dozens of times.
  */
+/**
+ * How many times this module body has run in this process.
+ *
+ * The refusal is installed by side effect: `globalThis.fetch` is replaced and
+ * every spawn method is wrapped around the one it found. Running the body twice
+ * wraps the wrappers — the refusal still fires, every identity check in
+ * `network-refusal.test.ts` compares against whatever it found at import, and
+ * nothing anywhere goes red. A suite imports this module now (for
+ * `networkTool`), so "the same instance the `--import` loaded" went from a
+ * property nobody could break to one a specifier could, proved by hand once.
+ *
+ * The count lives on `globalThis` under a REGISTERED symbol rather than in a
+ * module-scope `let`: two instances of this module would each have their own
+ * `let` and each answer one, which is the answer that hides the problem.
+ */
+const INSTANCES = Symbol.for("collectables/test-globals#instances");
+const globalCounts = globalThis as unknown as Record<symbol, number | undefined>;
+globalCounts[INSTANCES] = (globalCounts[INSTANCES] ?? 0) + 1;
+
+/** How many times this bootstrap has been evaluated in this process. */
+export function bootstrapInstances(): number {
+  return globalCounts[INSTANCES] ?? 0;
+}
+
 const NETWORK_TOOLS = new Set(["curl", "wget", "npm", "npx"]);
 
 /**
