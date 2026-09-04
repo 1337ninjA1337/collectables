@@ -227,6 +227,22 @@ describe("the doc comment this case reads", () => {
     assert.doesNotMatch(moduleDoc(source), /impostor/);
   });
 
+  it("returns the real header of the real file, which the fixtures cannot show", () => {
+    // The three cases above prove the extraction on shapes this tree does not
+    // have. What they cannot say is that it still returns the BLOCK when run on
+    // the file the case above reads — an extraction that quietly returned the
+    // whole file would pass every one of them, and the caller list would keep
+    // agreeing because the names are in there somewhere.
+    const doc = moduleDoc(readRepoFile("lib/plural.ts"));
+    assert.ok(doc.startsWith("/**"), "the extracted text does not begin at a doc comment opener");
+    assert.ok(
+      doc.length >= 2000,
+      measuredFloor(doc.length, 2000, "character(s) of header — this module's doc comment is the long one the caller list lives in"),
+    );
+    // The half a length floor cannot state: the block ends before the code.
+    assert.doesNotMatch(doc, /export function plural/);
+  });
+
   it("refuses a file with no doc comment rather than reading one as empty", () => {
     // An empty search text agrees that nothing is named, which is the wrong
     // answer given confidently: every caller would read as unnamed.
