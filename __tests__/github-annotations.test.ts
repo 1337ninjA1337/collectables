@@ -1,0 +1,137 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  annotation,
+  escapeAnnotationMessage,
+  escapeAnnotationProperty,
+  runningUnderActions,
+} from "@/lib/github-annotations";
+import { formatGitHubAnnotations } from "@/lib/check-inline-hex";
+
+import { readRepoFile } from "./helpers/repo-file";
+
+/**
+ * Workflow commands, extracted from `check-inline-hex` when a second producer
+ * arrived.
+ *
+ * The escapers were private to the hex scanner. The audit gate now annotates a
+ * SKIP — the case for which is that a skip exits 0, so the one leg allowed to
+ * read a live feed could decline to answer and leave nothing behind but a line
+ * in a log nobody opens on a green run. Writing the five replacements a second
+ * time is how two copies of one rule stop agreeing, so there is one copy.
+ */
+
+describe("escapeAnnotationMessage", () => {
+  it("escapes what would end the line early", () => {
+    // `%` first, or the escapes escape each other's output.
+    assert.equal(escapeAnnotationMessage("100%"), "100%25");
+    assert.equal(escapeAnnotationMessage("a\nb"), "a%0Ab");
+    assert.equal(escapeAnnotationMessage("a\r\nb"), "a%0D%0Ab");
+    assert.equal(escapeAnnotationMessage("%0A"), "%250A", "an existing escape must not be undone");
+  });
+
+  it("leaves the separators alone, which a message may contain", () => {
+    // A message is everything after `::`, so a colon in it is just a colon.
+    // This is the whole difference between the two escapers.
+    assert.equal(escapeAnnotationMessage("ENOTFOUND: request failed, retrying"), "ENOTFOUND: request failed, retrying");
+  });
+});
+
+describe("escapeAnnotationProperty", () => {
+  it("escapes the separators as well, because a property ends at one", () => {
+    // `,` ends a property and `:` ends the property list. Every check here
+    // names itself with a colon, so a title is exactly where this bites.
+    assert.equal(escapeAnnotationProperty("check: skipped"), "check%3A skipped");
+    assert.equal(escapeAnnotationProperty("a,b"), "a%2Cb");
+  });
+
+  it("does everything the message escaper does, by doing it", () => {
+    // Related by construction rather than by two lists that have to match: the
+    // property escaper is the message escaper plus two replacements, and that
+    // is what makes a change to one reach the other.
+    for (const value of ["100%", "a\nb", "a\r\nb", "%0A"]) {
+      assert.equal(escapeAnnotationProperty(value), escapeAnnotationMessage(value));
+    }
+  });
+});
+
+describe("annotation", () => {
+  it("writes a bare command when there are no properties", () => {
+    assert.equal(annotation("notice", "nothing to say"), "::notice::nothing to say");
+  });
+
+  it("writes the properties it was given and omits the rest", () => {
+    // `file=` with nothing after it is a property GitHub tries to resolve, so
+    // an absent property is absent rather than empty.
+    assert.equal(
+      annotation("warning", "careful", { title: "a title" }),
+      "::warning title=a title::careful",
+    );
+    assert.equal(
+      annotation("error", "here", { file: "lib/a.ts", line: 4, col: 9 }),
+      "::error file=lib/a.ts,line=4,col=9::here",
+    );
+  });
+
+  it("escapes the properties as properties and the message as a message", () => {
+    const line = annotation("warning", "ENOTFOUND: it failed", { title: "gate: skipped" });
+    assert.equal(line, "::warning title=gate%3A skipped::ENOTFOUND: it failed");
+    // One `::` separator in the line, which is the property of it that the
+    // escaping exists to keep true.
+    assert.equal(line.split("::").length - 1, 2);
+  });
+
+  it("keeps a multi-line message on one line", () => {
+    // A workflow command IS a line; a message with a newline in it would end
+    // the command and leave the rest as ordinary log output.
+    const line = annotation("warning", "first\nsecond", { title: "t" });
+    assert.ok(!line.includes("\n"), "the annotation spans two lines");
+    assert.match(line, /first%0Asecond/);
+  });
+});
+
+describe("runningUnderActions", () => {
+  it("is the exact string, not the presence of the variable", () => {
+    // Locally the variable is unset; in other CI systems it can be set to
+    // something else, and a truthiness check would print workflow commands at
+    // a runner that shows them raw.
+    assert.equal(runningUnderActions({ GITHUB_ACTIONS: "true" }), true);
+    assert.equal(runningUnderActions({ GITHUB_ACTIONS: "false" }), false);
+    assert.equal(runningUnderActions({ GITHUB_ACTIONS: "1" }), false);
+    assert.equal(runningUnderActions({}), false);
+  });
+});
+
+describe("the two producers, related by the module rather than by a copy", () => {
+  it("still formats a hex finding exactly as it did privately", () => {
+    // The escapers moved out of `check-inline-hex`; this is the shape they
+    // produced before they did, written out rather than derived, so the move
+    // is checked against the old output and not against the new code.
+    assert.deepEqual(
+      formatGitHubAnnotations([
+        { file: "app/a.tsx", line: 3, column: 12, value: "#ff00aa" },
+      ]),
+      [
+        "::error file=app/a.tsx,line=3,col=12::Inline hex literal #ff00aa — route it through a named export from lib/design-tokens.ts",
+      ],
+    );
+  });
+
+  it("is what the audit gate reaches for when it skips", () => {
+    // The gate's skip is the reason this module exists, and the annotation is
+    // the half that survives a green run. A revert to a bare `console.log`
+    // would leave every case above green.
+    const script = readRepoFile("scripts/check-audit-baseline.ts");
+    assert.match(
+      script,
+      /runningUnderActions\(\)/,
+      "the audit gate no longer decides when to annotate through the shared reader",
+    );
+    assert.match(
+      script,
+      /annotation\("warning",/,
+      "the audit gate's skip is a plain log line again, so a run that did not check advisories looks like one that did",
+    );
+  });
+});
