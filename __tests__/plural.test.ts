@@ -161,6 +161,28 @@ describe("slavicPlural", () => {
 /** The module the rule lives in. It is not a caller of itself. */
 const NOT_CALLERS = ["lib/plural.ts"];
 
+/**
+ * A module's own doc comment: the first `/**` block, from its opener to the
+ * `*\/` that closes THAT block.
+ *
+ * Written first as `slice(0, indexOf("*\/"))` — the leading text up to the
+ * first close, which is the doc comment only while the doc comment is the
+ * first thing in the file. A `/* eslint … *\/` line above it, or a licence
+ * header, would cut the search text down to that line and report every caller
+ * as unnamed: a red run about the extraction, wearing a message about the
+ * paragraph. Anchoring on `/**` and closing from there answers the question
+ * asked, and an unparseable file is refused rather than read as empty.
+ */
+function moduleDoc(source: string): string {
+  const open = source.indexOf("/**");
+  const close = open === -1 ? -1 : source.indexOf("*/", open);
+  assert.ok(
+    open !== -1 && close !== -1,
+    "the module has no doc comment to read, so a caller list cannot be looked for in it",
+  );
+  return source.slice(open, close);
+}
+
 describe("who the rule says asks it", () => {
   it("names every module that imports it, so a new caller cannot arrive unlisted", () => {
     // Suites are excluded: a case importing `plural` to test it is not a
@@ -181,13 +203,33 @@ describe("who the rule says asks it", () => {
       measuredFloor(callers.length, 3, "caller(s) of lib/plural outside its own suites"),
     );
 
-    const source = readRepoFile("lib/plural.ts");
-    const doc = source.slice(0, source.indexOf("*/"));
+    const doc = moduleDoc(readRepoFile("lib/plural.ts"));
     const unnamed = callers.filter((caller) => !doc.includes(caller));
     assert.deepEqual(
       unnamed,
       [],
       `these modules import the plural rule and the doc comment in lib/plural.ts does not name them: ${unnamed.join(", ")} — the "who else asks" paragraph is what tells the next reader whether this module is about translations or about agreement`,
     );
+  });
+});
+
+describe("the doc comment this case reads", () => {
+  it("is the first /** block, not the text before the first close", () => {
+    // The shape that broke it: a comment above the doc comment. The old
+    // extraction returned the eslint line and nothing else.
+    const source = ["/* eslint-disable no-bitwise */", "/**", " * lib/caller.ts asks.", " */", "export const x = 1;"].join("\n");
+    assert.match(moduleDoc(source), /lib\/caller\.ts asks\./);
+    assert.doesNotMatch(moduleDoc(source), /eslint-disable/);
+  });
+
+  it("stops at its own close, so the whole file is not the doc comment", () => {
+    const source = ["/**", " * lib/caller.ts asks.", " */", "// lib/impostor.ts does not.", ""].join("\n");
+    assert.doesNotMatch(moduleDoc(source), /impostor/);
+  });
+
+  it("refuses a file with no doc comment rather than reading one as empty", () => {
+    // An empty search text agrees that nothing is named, which is the wrong
+    // answer given confidently: every caller would read as unnamed.
+    assert.throws(() => moduleDoc("export const x = 1;\n"), /no doc comment/);
   });
 });
