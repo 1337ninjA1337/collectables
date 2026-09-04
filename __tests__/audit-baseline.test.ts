@@ -11,6 +11,8 @@ import {
   fixKind,
   fixPackage,
   formatAuditVerdict,
+  AUDIT_TIMEOUT_MS,
+  auditInvocationSkip,
   isAuditReport,
   isClean,
   readAuditPayload,
@@ -1354,6 +1356,74 @@ describe("readAuditPayload — a skip that says which failure it was", () => {
       script,
       /skipping — \$\{read\.skip\}/,
       "the gate skips without printing the reason it was handed, which is the whole of this",
+    );
+  });
+});
+
+describe("auditInvocationSkip — a registry that never answers held the whole run", () => {
+  // The gate had no time bound. What that cost is measured, not imagined: a
+  // healthy run answers in 49 seconds, and on 2026-09-04 three runs on `main`
+  // sat in `npm audit` for 5m35s, 7m and past 13m against a degraded registry.
+  // The first two then produced a WRONG answer — every baseline entry read as
+  // withdrawn — and the third was still running when this was written.
+
+  it("skips when the child was killed, whichever way node says so", () => {
+    // The timeout kills the child, so the signal is the reliable half.
+    assert.match(
+      String(auditInvocationSkip({ signal: "SIGKILL", status: null }, 180_000)),
+      /killed with SIGKILL after 180s/,
+    );
+    // `ETIMEDOUT` is node's own name for it, checked separately because a
+    // future node could set one without the other.
+    assert.match(
+      String(auditInvocationSkip({ code: "ETIMEDOUT" }, 180_000)),
+      /did not answer within 180s/,
+    );
+  });
+
+  it("does NOT skip an ordinary findings-present exit", () => {
+    // `npm audit` exits non-zero whenever it finds anything, and that exit
+    // carries the whole report on stdout. Treating it as a kill would skip
+    // every run of a tree that has advisories in it — which is every run.
+    assert.equal(auditInvocationSkip({ status: 1, signal: null }, 180_000), undefined);
+    assert.equal(auditInvocationSkip({ status: 1 }, 180_000), undefined);
+    // An empty signal is not a signal.
+    assert.equal(auditInvocationSkip({ signal: "" }, 180_000), undefined);
+  });
+
+  it("does not read a failure out of something that is not one", () => {
+    for (const failure of [null, undefined, "boom", 7]) {
+      assert.equal(auditInvocationSkip(failure, 180_000), undefined);
+    }
+  });
+
+  it("says how long it waited, from the bound the gate actually uses", () => {
+    // The number in the sentence comes from the argument, so the message
+    // cannot claim a bound the call did not apply.
+    assert.match(String(auditInvocationSkip({ signal: "SIGKILL" }, 30_000)), /after 30s/);
+    assert.match(
+      String(auditInvocationSkip({ signal: "SIGKILL" }, AUDIT_TIMEOUT_MS)),
+      new RegExp(`after ${String(AUDIT_TIMEOUT_MS / 1000)}s`),
+    );
+  });
+
+  it("is a bound with headroom over a healthy run, and it is applied", () => {
+    // Three minutes against a 49-second healthy answer. A bound that is hit
+    // produces a skip — a run that did not check advisories and says so on the
+    // summary — so being slightly too tight costs one annotated skip, while
+    // having no bound cost the run and, twice, the answer.
+    assert.ok(AUDIT_TIMEOUT_MS >= 120_000, "the bound is tighter than a slow but healthy answer");
+    assert.ok(AUDIT_TIMEOUT_MS <= 300_000, "the bound is longer than the failures it exists to cut");
+    const script = readRepoFile("scripts/check-audit-baseline.ts");
+    assert.match(
+      script,
+      /timeout: AUDIT_TIMEOUT_MS/,
+      "the gate no longer bounds the audit call, so a registry that never answers holds the run again",
+    );
+    assert.match(
+      script,
+      /auditInvocationSkip\(error, AUDIT_TIMEOUT_MS\)/,
+      "a killed audit's partial output is being parsed as though it were an answer",
     );
   });
 });

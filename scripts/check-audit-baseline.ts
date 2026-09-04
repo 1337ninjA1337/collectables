@@ -31,6 +31,8 @@
 import { execFileSync } from "node:child_process";
 
 import {
+  AUDIT_TIMEOUT_MS,
+  auditInvocationSkip,
   evaluateAudit,
   formatAuditVerdict,
   isClean,
@@ -48,11 +50,19 @@ function readAudit(): AuditRead {
       encoding: "utf8",
       maxBuffer: 32 * 1024 * 1024,
       stdio: ["ignore", "pipe", "ignore"],
+      // A registry that never answers used to hold the whole run: three times
+      // today, for 5m35s, 7m and past 13m. SIGKILL rather than SIGTERM
+      // because what is being given up on is a process waiting on a socket.
+      timeout: AUDIT_TIMEOUT_MS,
+      killSignal: "SIGKILL",
     });
   } catch (error: unknown) {
     // A findings-present exit still carries the report on stdout; a registry
     // failure carries nothing parseable. The difference is the payload, not
-    // the status.
+    // the status — EXCEPT when the process was killed, where the payload is
+    // whatever had been flushed and means nothing either way.
+    const killed = auditInvocationSkip(error, AUDIT_TIMEOUT_MS);
+    if (killed !== undefined) return { skip: killed };
     const stdout = (error as { stdout?: unknown }).stdout;
     raw = typeof stdout === "string" ? stdout : "";
   }

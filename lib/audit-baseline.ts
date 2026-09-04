@@ -280,6 +280,49 @@ function npmErrorSentence(error: unknown): string {
   return `npm reported an error: ${named}${said}`;
 }
 
+/**
+ * How long `npm audit` gets to answer before the gate stops waiting.
+ *
+ * The gate had no bound at all, and what that costs is measured rather than
+ * imagined: a healthy run answers in 49 seconds, and on 2026-09-04 three runs
+ * on `main` sat in it for 5m35s, 7m and past 13m while the registry was
+ * degraded — the first two then produced a WRONG answer (every baseline entry
+ * read as withdrawn), and the third was still running when this was written.
+ *
+ * Three minutes is a little under four times the healthy run. A bound that is
+ * hit is cheap on purpose: it produces a skip, which is a run that did not
+ * check advisories and says so on the summary, not a red one and not a wrong
+ * one. Being slightly too tight costs one annotated skip; having no bound at
+ * all costs the run and, twice today, the answer.
+ */
+export const AUDIT_TIMEOUT_MS = 180_000;
+
+/**
+ * Why a failed `npm audit` INVOCATION produced no answer worth reading, or
+ * `undefined` if what it did print should be parsed after all.
+ *
+ * `npm audit` exits non-zero whenever it finds anything, and that exit still
+ * carries the whole report on stdout — so a failed invocation is normally a
+ * successful read. What is different about a killed one is that its output is
+ * whatever had been flushed when the signal arrived: not an answer, and not
+ * npm's account of why there is none either.
+ */
+export function auditInvocationSkip(failure: unknown, timeoutMs: number): string | undefined {
+  if (typeof failure !== "object" || failure === null) return undefined;
+  const { signal, code } = failure as { signal?: unknown; code?: unknown };
+  const waited = `${String(Math.round(timeoutMs / 1000))}s`;
+  // A timeout kills the child, so the signal is the reliable half; `ETIMEDOUT`
+  // is node's own name for it and is checked because a future node could set
+  // one without the other.
+  if (typeof signal === "string" && signal !== "") {
+    return `npm audit was killed with ${signal} after ${waited} — the registry was not answering, and a partial read is not an answer`;
+  }
+  if (code === "ETIMEDOUT") {
+    return `npm audit did not answer within ${waited} — the registry was not answering, and a partial read is not an answer`;
+  }
+  return undefined;
+}
+
 export function readAuditPayload(raw: string): AuditRead {
   if (raw.trim() === "") {
     return { skip: "npm printed nothing, so it did not get as far as an answer" };
