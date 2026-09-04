@@ -889,6 +889,41 @@ describe("the refusal is wired into every test process", () => {
     );
   });
 
+  it("keeps the verbs able to tell one refusal from another", () => {
+    // The case above reads a point's refusal by the verb its registry entry
+    // names, and it reads it with a PREFIX test — the message is one sentence
+    // and the verb sits inside it, so there is nowhere to cut it out of.
+    //
+    // A prefix test is only as strong as the verbs are unambiguous, and one
+    // verb being another's opening WORDS is what breaks it: "fetch" reads
+    // `A test tried to fetch `, and a refusal saying "fetch and follow" starts
+    // with exactly that. The space is what makes this the only shape that
+    // matters — "fetching" is not a hole, because the character after the
+    // shorter verb is `i` rather than the space the match requires.
+    //
+    // Two verbs that are simply EQUAL are the same statement, and http/https
+    // sharing one is the design: both refuse identically, so a point of one
+    // registered against the other is not a fault anything here needs to name.
+    const verbs = [...new Set(refusalPoints().map((point) => String(refusalVerbAt(point))))];
+
+    // One verb everywhere would make the case above a restatement of the
+    // prefix it replaced, and this check a loop with no pairs in it.
+    assert.ok(
+      verbs.length >= 2,
+      `the registry names ${String(verbs.length)} distinct verb(s) — every point answers with the same sentence, so reading the verb tells a caller nothing the shared prefix did not`,
+    );
+
+    for (const verb of verbs) {
+      for (const other of verbs) {
+        if (verb === other) continue;
+        assert.ok(
+          !other.startsWith(`${verb} `),
+          `"${other}" opens with "${verb}", so a refusal from the longer one satisfies the shorter one's match — the case above would accept it for a point registered against the wrong surface`,
+        );
+      }
+    }
+  });
+
   it("installs the refusal at module scope rather than in a beforeEach", () => {
     // A `beforeEach` would fight every suite that stubs `fetch` in a `before`
     // or at module scope — it would reinstall the refusal underneath a stub
