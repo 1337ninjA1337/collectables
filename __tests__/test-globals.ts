@@ -90,8 +90,62 @@ function requested(input: unknown): string {
   return (input as { url?: string } | null)?.url ?? "an unnamed request";
 }
 
-globalThis.fetch = ((input: unknown) =>
-  refuseNetwork("fetch", requested(input))) as unknown as typeof globalThis.fetch;
+/**
+ * Every refusal this bootstrap installs, with the value it put there.
+ *
+ * `bootstrapInstances()` answers how many times this module body ran, which is
+ * not the same question as how deep a refusal is stacked: anything that wraps
+ * one AFTER this leaves the count at one and puts a layer between a caller and
+ * the refusal. That layer still refuses, so nothing goes red; it also gets to
+ * see, change or drop the call first.
+ *
+ * The spawn methods were asked that question first and the other five were not,
+ * for no better reason than that a spawn wrapper was the one somebody had just
+ * written. `fetch` is the one the suites really do replace — dozens of them
+ * stub it — which makes it the likeliest to keep a layer, not the least.
+ */
+const installedRefusals = new Map<string, { readonly now: () => unknown; readonly wrapper: unknown }>();
+
+/** Put `wrapper` on `holder[key]` and remember that this is what should be there. */
+function installRefusal(
+  name: string,
+  holder: Record<string, unknown>,
+  key: string,
+  wrapper: unknown,
+): void {
+  holder[key] = wrapper;
+  installedRefusals.set(name, { now: () => holder[key], wrapper });
+}
+
+/**
+ * What this bootstrap refuses, by name.
+ *
+ * `verify-gate-script.test.ts` asks whether the `test` leg is covered for each
+ * of the scan's shapes, and used to answer it by matching three literals in
+ * THIS FILE's source — two of which broke the day the installs were tidied into
+ * one registry. What is installed is a runtime fact and the registry has it.
+ *
+ * A suite that swaps a refusal and restores it (this repository has several) is
+ * invisible to `rewrappedRefusals` below, which is right: what that answers is
+ * whether the swap is still in place, not whether one ever happened.
+ */
+export function installedRefusalNames(): readonly string[] {
+  return [...installedRefusals.keys()];
+}
+
+/**
+ * The refusals whose current value is not what this bootstrap installed — empty
+ * while every one of them is what a caller reaches first.
+ */
+export function rewrappedRefusals(): readonly string[] {
+  return [...installedRefusals]
+    .filter(([, { now, wrapper }]) => now() !== wrapper)
+    .map(([name]) => name);
+}
+
+installRefusal("globalThis.fetch", globalThis as unknown as Record<string, unknown>, "fetch", (input: unknown) =>
+  refuseNetwork("fetch", requested(input)),
+);
 
 /**
  * `http.request`, `http.get` and their https twins.
@@ -100,11 +154,17 @@ globalThis.fetch = ((input: unknown) =>
  * own runner and `tsx` load these too, and a refusal that took the module out
  * from under them would fail the run for a reason that is not a test's.
  */
-for (const client of [http, https] as const) {
+for (const [scheme, client] of [
+  ["http", http],
+  ["https", https],
+] as const) {
   for (const method of ["request", "get"] as const) {
-    const mutable = client as unknown as Record<string, unknown>;
-    mutable[method] = (input: unknown) =>
-      refuseNetwork(`open an http connection to`, requested(input));
+    installRefusal(
+      `${scheme}.${method}`,
+      client as unknown as Record<string, unknown>,
+      method,
+      (input: unknown) => refuseNetwork(`open an http connection to`, requested(input)),
+    );
   }
 }
 
@@ -165,45 +225,16 @@ export function networkTool(command: unknown): string | undefined {
   return NETWORK_TOOLS.has(name) ? name : undefined;
 }
 
-/**
- * The wrapper this bootstrap put on each spawn method, kept so it can be asked
- * later whether it is still the one there.
- *
- * `bootstrapInstances()` answers how many times this module body ran, which is
- * not the same question as how deep the refusal is stacked. Anything that wraps
- * a spawn method AFTER this — a second bootstrap, or a helper saving and
- * restoring wrongly — leaves the count at one and puts a layer between a caller
- * and this refusal. A wrapper around this one still refuses, so nothing goes
- * red; it also gets to see, change or drop the call first.
- */
-const installedSpawnPatches = new Map<string, unknown>();
-
 for (const method of ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync"] as const) {
   const mutable = childProcess as unknown as Record<string, unknown>;
   const real = mutable[method] as (...args: unknown[]) => unknown;
-  const wrapper = (...args: unknown[]) => {
+  installRefusal(`child_process.${method}`, mutable, method, (...args: unknown[]) => {
     const tool = networkTool(args[0]);
     if (tool !== undefined) refuseNetwork("spawn", tool);
     return real(...args);
-  };
-  mutable[method] = wrapper;
-  installedSpawnPatches.set(method, wrapper);
+  });
 }
 
-/**
- * The spawn methods whose current value is not the wrapper this bootstrap
- * installed — empty while the refusal is what a caller reaches first.
- *
- * A suite that swaps a method and restores it (this repository has one) is
- * invisible here, which is right: what this answers is whether the swap is
- * still in place, not whether one ever happened.
- */
-export function rewrappedSpawnMethods(): readonly string[] {
-  const mutable = childProcess as unknown as Record<string, unknown>;
-  return [...installedSpawnPatches]
-    .filter(([method, wrapper]) => mutable[method] !== wrapper)
-    .map(([method]) => method);
-}
 
 const REALTIME_MODULE_PATH = repoPath("lib", "supabase-realtime.ts");
 

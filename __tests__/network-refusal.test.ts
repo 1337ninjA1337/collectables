@@ -41,7 +41,7 @@ import { describe, it } from "node:test";
 import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
 // The bootstrap's own reduction from a spawn argument to the tool it names, so
 // the case below asks the refusal's question rather than a copy of it.
-import { bootstrapInstances, networkTool, rewrappedSpawnMethods } from "./test-globals";
+import { bootstrapInstances, networkTool, rewrappedRefusals } from "./test-globals";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -804,7 +804,7 @@ describe("the refusal is wired into every test process", () => {
     );
   });
 
-  it("is the outermost thing on every spawn method, not merely present", () => {
+  it("is the outermost thing on every refusal it installed, not merely present", () => {
     // The instance count above says the module body ran once. That is not the
     // same question as how deep the refusal is stacked: anything that wraps a
     // spawn method AFTER the bootstrap — a second bootstrap, or a helper that
@@ -813,10 +813,16 @@ describe("the refusal is wired into every test process", () => {
     // in this file goes red; it also gets to see, change or drop the call
     // first, and `optionsPassedBy` in the describe above is proof that code
     // here does exactly that kind of swapping.
+    //
+    // All eleven now, not the six spawn methods: `fetch` and the four http
+    // client methods are installed by the same bootstrap and were left out
+    // because a spawn wrapper was what somebody had just written. `fetch` is
+    // the one the suites really do replace — dozens of them stub it — which
+    // makes it the likeliest of the eleven to keep a layer, not the least.
     assert.deepEqual(
-      rewrappedSpawnMethods(),
+      rewrappedRefusals(),
       [],
-      "a spawn method is no longer the wrapper the bootstrap installed — something replaced or wrapped it and did not put it back, so every spawn in the suites now goes through that first",
+      "a refusal is no longer the wrapper the bootstrap installed — something replaced or wrapped it and did not put it back, so every call it covers now goes through that first",
     );
   });
 
@@ -825,11 +831,24 @@ describe("the refusal is wired into every test process", () => {
     // or at module scope — it would reinstall the refusal underneath a stub
     // that was deliberately put there. Once, at import, is the only placement
     // that refuses the unstubbed call without breaking the stubbed one.
+    // That the bootstrap replaces `fetch` at all is measured at runtime by the
+    // first describe in this file, which calls the thing and reads its message.
+    // What is left for a source rule is the PLACEMENT, which no call can show:
+    // a refusal reinstalled per test refuses exactly as well when you call it.
+    //
+    // The anchor moved with the code: the bootstrap keeps its refusals in one
+    // registry now, so the assignment this used to find by hand — the literal
+    // `globalThis.fetch = ` — is an `installRefusal` call. A rule reading
+    // source for a spelling follows the spelling; that is the cost of it, and
+    // the reason the other half of this case is the one worth having.
     const bootstrap = readRepoFile("__tests__/test-globals.ts");
-    const assignment = bootstrap.indexOf("globalThis.fetch = ");
-    assert.ok(assignment > 0, "the bootstrap no longer replaces `fetch`");
+    assert.match(
+      bootstrap,
+      /installRefusal\("globalThis\.fetch"/,
+      "the bootstrap no longer installs a refusal for `fetch`",
+    );
     assert.ok(
-      !/beforeEach\([^)]*\{[^}]*globalThis\.fetch/s.test(bootstrap),
+      !/beforeEach\([^)]*\{[^}]*(?:globalThis\.fetch|installRefusal)/s.test(bootstrap),
       "the refusal is being reinstalled per test, which would overwrite a suite's own stub",
     );
   });

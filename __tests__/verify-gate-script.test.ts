@@ -13,6 +13,9 @@ import {
 import { readRepoFile as read } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
 import { SUITES_REL } from "./helpers/suite-files";
+// The bootstrap's own record of what it refuses, so this case reads the
+// runtime rather than three literals in that file's source.
+import { installedRefusalNames } from "./test-globals";
 
 /**
  * Pins `npm run verify` as the ONE command that runs the full gate.
@@ -357,17 +360,23 @@ describe("only one leg of the gate reads anything outside the tree", () => {
     // `npm test` is a leg and the scan skips all 1420 of its files. The
     // bootstrap is what makes the note's claim true about them; without it,
     // "the one check here" would rest on the biggest leg being unexamined.
-    const bootstrap = read(path.join(SUITES_REL, "test-globals.ts"));
-    for (const [marker, pattern] of [
-      ["the `fetch` global", /globalThis\.fetch = /],
-      ["http/https `request` and `get`", /\[http, https\]/],
-      ["a spawned network tool", /NETWORK_TOOLS/],
+    // Asked of the bootstrap's registry, not of its source. This was three
+    // literals matched against `test-globals.ts` — `globalThis.fetch = `,
+    // `[http, https]`, `NETWORK_TOOLS` — and two of them broke on the day the
+    // installs were tidied into one place, while every refusal they stood for
+    // was still installed. What a bootstrap covers is a runtime fact.
+    const refusals = installedRefusalNames();
+    for (const [marker, required] of [
+      ["the `fetch` global", ["globalThis.fetch"]],
+      ["http/https `request` and `get`", ["http.request", "http.get", "https.request", "https.get"]],
+      ["a spawned network tool", ["child_process.spawn", "child_process.execFileSync"]],
     ] as const) {
-      assert.match(
-        bootstrap,
-        pattern,
-        `__tests__/test-globals.ts no longer refuses ${marker} — the \`test\` leg is unexamined for it again, by this scan and by anything else`,
-      );
+      for (const name of required) {
+        assert.ok(
+          refusals.includes(name),
+          `__tests__/test-globals.ts no longer refuses ${marker} (\`${name}\` is not installed) — the \`test\` leg is unexamined for it again, by this scan and by anything else`,
+        );
+      }
     }
     assert.match(
       pkg.scripts.test,
