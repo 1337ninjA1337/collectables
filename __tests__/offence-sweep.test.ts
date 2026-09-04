@@ -359,8 +359,45 @@ describe("assertOnlyTheseMatch", () => {
       "sanctioned, no longer does: clean.ts",
     ]);
     assert.deepEqual(error.expected, []);
-    assert.match(error.message, /1 unsanctioned modules use the sanctioned form/);
-    assert.match(error.message, /1 sanctioned modules no longer do/);
+    assert.match(error.message, /unsanctioned modules that use the sanctioned form: 1/);
+    assert.match(error.message, /sanctioned modules that no longer do: 1/);
+  });
+
+  it("counts behind a label, so one offender does not read as '1 modules'", () => {
+    // `subject` is a plural noun every caller writes plural, and the sentence
+    // used to put a count in front of it. One is the commonest count a sweep
+    // fails with, and the count is what a reader sees first.
+    let error: assert.AssertionError | undefined;
+    try {
+      assertOnlyTheseMatch({
+        rule: FORBIDDEN,
+        files: FILES,
+        read,
+        expected: ["offends.ts", "also-offends.ts"],
+        subject: "modules",
+        what: "use the sanctioned form",
+      });
+    } catch (thrown) {
+      error = thrown as assert.AssertionError;
+    }
+    assert.ok(error === undefined, "the sanctioned set was exactly the matching one");
+    // And the shape that would fail: one unsanctioned match, none missing.
+    try {
+      assertOnlyTheseMatch({
+        rule: FORBIDDEN,
+        files: FILES,
+        read,
+        expected: ["offends.ts"],
+        subject: "modules",
+        what: "use the sanctioned form",
+      });
+    } catch (thrown) {
+      error = thrown as assert.AssertionError;
+    }
+    assert.ok(error !== undefined, "an unsanctioned match passed the sweep");
+    assert.doesNotMatch(error.message, /\d+ (un)?sanctioned modules/);
+    assert.match(error.message, /: 1;/);
+    assert.match(error.message, /no longer do: 0/);
   });
 });
 

@@ -26,7 +26,7 @@ import { sourceFiles } from "./helpers/source-files";
 describe("measuredFloor", () => {
   it("says the number is the count, so a failure means the pattern stopped matching", () => {
     const message = measuredFloor(2, 5, "module(s) matched");
-    assert.match(message, /only 2 module\(s\) matched/);
+    assert.match(message, /only 2 modules matched/);
     assert.match(message, /MEASURED/);
     assert.match(message, /the pattern stopped matching/);
   });
@@ -34,7 +34,48 @@ describe("measuredFloor", () => {
   it("does not tell the reader the tree fell below a target, which it did not", () => {
     // The wrong reading is the expensive one: a measured floor going red is a
     // broken walk, and "raise the number" is the fix that hides it forever.
-    assert.doesNotMatch(measuredFloor(2, 5, "things"), /ARGUED/);
+    assert.doesNotMatch(measuredFloor(2, 5, "thing(s)"), /ARGUED/);
+  });
+});
+
+describe("the count and its noun agree", () => {
+  // A count of one is the likeliest failure a floor of one or two produces, and
+  // it is the one the shared string used to get wrong: "only 1 probes read as
+  // spawning", in six suites at once, because the phrase was a bare plural.
+  it("drops the marker when the walk found exactly one", () => {
+    assert.match(
+      measuredFloor(1, 2, "probe(s) read as spawning"),
+      /only 1 probe read as spawning —/,
+    );
+  });
+
+  it("expands the marker for none and for many, where the plural is right", () => {
+    assert.match(measuredFloor(0, 2, "probe(s) read as spawning"), /only 0 probes read/);
+    assert.match(measuredFloor(3, 5, "probe(s) read as spawning"), /only 3 probes read/);
+  });
+
+  it("inflects on both helpers, so the kind of floor does not decide the grammar", () => {
+    assert.match(arguedFloor(1, 2, "distinct verb(s)", "two tell each other apart"), /only 1 distinct verb —/);
+    assert.match(arguedFloor(4, 2, "distinct verb(s)", "two tell each other apart"), /only 4 distinct verbs —/);
+  });
+
+  it("leaves no marker in anything a reader is shown", () => {
+    // The workaround the marker replaced was printing "(s)" — two call sites
+    // wrote "module(s) matched" and let the reader do the inflection. A message
+    // that still carries the parens has passed the phrase through unhandled.
+    for (const count of [0, 1, 2]) {
+      assert.doesNotMatch(measuredFloor(count, 2, "module(s) matched"), /\(s\)/);
+      assert.doesNotMatch(arguedFloor(count, 2, "module(s) matched", "why"), /\(s\)/);
+    }
+  });
+
+  it("inflects every marker in the phrase, not just the first", () => {
+    // "page(s) whose section(s) moved" is one phrase with two head nouns, and a
+    // replacement that stopped at the first would print a mixed sentence.
+    assert.match(
+      measuredFloor(2, 3, "page(s) whose section(s) moved"),
+      /only 2 pages whose sections moved/,
+    );
   });
 });
 
@@ -46,7 +87,7 @@ describe("arguedFloor", () => {
       "module(s) name the language constants",
       "no fewer than the six the hand-written list this replaced covered",
     );
-    assert.match(message, /only 5 module\(s\) name the language constants/);
+    assert.match(message, /only 5 modules name the language constants/);
     assert.match(message, /ARGUED: no fewer than the six/);
     assert.match(message, /below the current count on purpose/);
   });
@@ -55,7 +96,7 @@ describe("arguedFloor", () => {
     // The whole point of arguing a floor below the count: growth needs no edit,
     // and arrival at the floor is a finding rather than bookkeeping.
     assert.match(
-      arguedFloor(6, 6, "things", "because"),
+      arguedFloor(6, 6, "thing(s)", "because"),
       /a real loss of coverage rather than a number needing an update/,
     );
   });

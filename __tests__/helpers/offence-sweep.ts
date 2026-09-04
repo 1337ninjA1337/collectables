@@ -223,9 +223,13 @@ export function assertOnlyTheseMatch(options: {
     ...unexpected.map((relative) => `unsanctioned, ${what}: ${relative}`),
     ...missing.map((relative) => `sanctioned, no longer does: ${relative}`),
   ];
+  // Counts LAST, behind a label. Written the other way round — "1 unsanctioned
+  // modules use the sanctioned form" — the shared sentence has to agree with a
+  // number it cannot see, and the count this sweep reports most often is one.
+  // A label followed by its count needs no agreement at any count.
   assert.deepEqual(
     problems,
     [],
-    `${unexpected.length} unsanctioned ${subject} ${what}, and ${missing.length} sanctioned ${subject} no longer do — the second kind is an entry that has become a hole, which is the half an exempt list cannot see`,
+    `unsanctioned ${subject} that ${what}: ${unexpected.length}; sanctioned ${subject} that no longer do: ${missing.length} — the second kind is an entry that has become a hole, which is the half an exempt list cannot see`,
   );
 }

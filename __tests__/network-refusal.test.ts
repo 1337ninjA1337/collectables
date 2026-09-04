@@ -273,7 +273,7 @@ describe("every marker the scan reads is refused at runtime", () => {
   function probesThatSpawn(): readonly (readonly [string, () => unknown])[] {
     const spawns = Object.entries(PROBES).filter(([, probe]) => SPAWN_CALL.test(probe.toString()));
     // A detector that matched nothing would agree with every probe there is.
-    assert.ok(spawns.length >= 2, measuredFloor(spawns.length, 2, "probes read as spawning"));
+    assert.ok(spawns.length >= 2, measuredFloor(spawns.length, 2, "probe(s) read as spawning"));
     return spawns;
   }
 
@@ -466,7 +466,7 @@ describe("every marker the scan reads is refused at runtime", () => {
     const catching = allProbes().filter(([, probe]) => /\bcatch\b/.test(probe.toString()));
     assert.ok(
       catching.length >= 1,
-      measuredFloor(catching.length, 1, "probes read as catching anything"),
+      measuredFloor(catching.length, 1, "probe(s) read as catching anything"),
     );
     return catching;
   }
@@ -732,7 +732,7 @@ describe("every marker the scan reads is refused at runtime", () => {
     );
     assert.ok(
       spawningCatchers.length >= 1,
-      measuredFloor(spawningCatchers.length, 1, "probes both spawn and catch"),
+      measuredFloor(spawningCatchers.length, 1, "probe(s) both spawning and catching"),
     );
     for (const [id, probe] of spawningCatchers) {
       // The tool comes off the recorded call, so what is asserted is that the
@@ -911,7 +911,7 @@ describe("the refusal is wired into every test process", () => {
       arguedFloor(
         verbs.length,
         2,
-        "distinct verbs among the registry's refusals",
+        "distinct verb(s) among the registry's refusals",
         "two is the fewest that lets a verb tell one refusal from another; with one verb everywhere, reading it says nothing the shared prefix did not",
       ),
     );
