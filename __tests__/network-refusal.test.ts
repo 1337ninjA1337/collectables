@@ -44,11 +44,14 @@ import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
 // the case below asks the refusal's question rather than a copy of it.
 import {
   bootstrapInstances,
+  HTTP_METHODS,
+  HTTP_SURFACES,
   networkTool,
   refusalAt,
   refusalPoints,
   refusalVerbAt,
   rewrappedRefusals,
+  SPAWN_METHODS,
 } from "./test-globals";
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -884,6 +887,49 @@ describe("the refusal is wired into every test process", () => {
       surfaces,
       ["childProcess", "globalThis", "http", "https"],
       "the bootstrap refuses on four surfaces and the registry no longer names them all — a caller reaching an unnamed one reaches whatever is there, and nothing here would say so",
+    );
+  });
+
+  it("registers exactly the points the bootstrap patches, no more and no fewer", () => {
+    // The case above reads the registry's MEMBERS and says nothing about its
+    // population: a point registered for a surface nobody patches passes every
+    // assertion in it (it refuses, it names a known surface), and a patch made
+    // with no registration is invisible to all of it. Both are the same fault
+    // — a wrapper the registry cannot compare against — and neither had a
+    // reader.
+    //
+    // Derived from the lists the bootstrap patches FROM, so a method joining
+    // `SPAWN_METHODS` moves both sides together and a name written by hand
+    // moves only one. `globalThis.fetch` is the hand-written registration and
+    // therefore the one this is really about.
+    const expected = [
+      "globalThis.fetch",
+      ...HTTP_SURFACES.flatMap((surface) => HTTP_METHODS.map((method) => `${surface}.${method}`)),
+      ...SPAWN_METHODS.map((method) => `childProcess.${method}`),
+    ];
+    assert.deepEqual(
+      [...refusalPoints()].sort(),
+      [...expected].sort(),
+      "the registry and the surfaces the bootstrap patches have stopped agreeing — a point it names and does not patch refuses nothing, and a point it patches and does not name is a wrapper nothing can notice a layer over",
+    );
+  });
+
+  it("refuses to register one address twice, rather than keeping the last", () => {
+    // `Map.set` on a name already present keeps the LAST entry, which
+    // reproduces the exact failure this registry exists to catch: the first
+    // call's wrapper is still on the surface, still between a caller and the
+    // refusal, and no longer remembered — so `rewrappedRefusals()` compares
+    // the second wrapper against itself and reports a clean process.
+    //
+    // Read from the source rather than by calling the function, because the
+    // registration happens once, in a module body `--import` has already run:
+    // there is no way to install a twelfth point from in here without patching
+    // a surface for real.
+    const bootstrap = readRepoFile("__tests__/test-globals.ts");
+    assert.match(
+      bootstrap,
+      /if \(installedRefusals\.has\(point\)\) \{\s*throw new Error\(/,
+      "installRefusal no longer refuses a duplicate address, so a second registration silently forgets the first wrapper while leaving it installed",
     );
   });
 

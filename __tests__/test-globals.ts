@@ -100,12 +100,16 @@ function requested(input: unknown): string {
  * and the refusal. That layer still refuses, so nothing goes red; it also gets
  * to see, change or drop the call first.
  *
- * ALL ELEVEN POINTS, not the six spawn methods. `globalThis.fetch` and the four
- * http client methods are installed by this same body and were remembered by
- * nothing, so a wrapper around the fetch refusal was exactly as invisible as a
- * spawn wrapper was before any of this was written. The suites stub `fetch`
- * constantly, which is what makes it the likeliest point to acquire a layer and
- * the hardest one to have left unwatched.
+ * EVERY POINT THIS BODY PATCHES, not only the spawn methods. `globalThis.fetch`
+ * and the http client methods are installed by this same body and were
+ * remembered by nothing, so a wrapper around the fetch refusal was exactly as
+ * invisible as a spawn wrapper was before any of this was written. The suites
+ * stub `fetch` constantly, which is what makes it the likeliest point to acquire
+ * a layer and the hardest one to have left unwatched.
+ *
+ * The population is not written down here, in a number that would go stale the
+ * day a method joins {@link SPAWN_METHODS}. {@link refusalPoints} is compared
+ * against the lists this body patches from, in `network-refusal.test.ts`.
  *
  * What is remembered per point is a value and a CLOSURE that reads the current
  * one, because the three surfaces are not the same shape: `fetch` is a property
@@ -127,12 +131,33 @@ interface InstalledRefusal {
 
 const installedRefusals = new Map<string, InstalledRefusal>();
 
+/**
+ * Registers one point, and refuses to register a second under the same name.
+ *
+ * A `Map.set` on a name already in the map keeps the LAST entry, which is the
+ * one failure this registry exists to catch, reproduced inside it: the wrapper
+ * the first call installed is still on the surface, still between a caller and
+ * the refusal, and no longer remembered by anything — so
+ * {@link rewrappedRefusals} compares the second wrapper against itself, finds
+ * them equal, and reports a clean process. Silently keeping one of two is the
+ * shape that reads as green.
+ *
+ * A throw, and it happens while this module body is running: the bootstrap is
+ * loaded by `--import` before any suite, so a duplicate address fails the
+ * process at load rather than turning one case red somewhere downstream of a
+ * registry that has already lied.
+ */
 function installRefusal(
   point: string,
   verb: string,
   refusal: unknown,
   current: () => unknown,
 ): void {
+  if (installedRefusals.has(point)) {
+    throw new Error(
+      `test-globals: \`${point}\` was registered twice. The registry holds one entry per address, so the second registration forgets the first wrapper while leaving it installed — which is precisely the invisible layer rewrappedRefusals() exists to notice.`,
+    );
+  }
   installedRefusals.set(point, { refusal, current, verb });
 }
 
@@ -151,12 +176,22 @@ installRefusal("globalThis.fetch", FETCH_VERB, fetchRefusal, () => globalThis.fe
  */
 const HTTP_VERB = "open an http connection to";
 
-for (const [surface, client] of [
-  ["http", http],
-  ["https", https],
-] as const) {
-  for (const method of ["request", "get"] as const) {
-    const mutable = client as unknown as Record<string, unknown>;
+/**
+ * The client surfaces patched, and the methods patched on each.
+ *
+ * Exported so the registry's population has ONE source. The point names are
+ * built from these in the loop below, and `network-refusal.test.ts` builds the
+ * set it expects from the same lists — where writing the eleven names out a
+ * second time would be a copy that agrees with the bootstrap on the day it is
+ * written and never again.
+ */
+const HTTP_CLIENTS: Readonly<Record<string, unknown>> = { http, https };
+export const HTTP_SURFACES: readonly string[] = Object.keys(HTTP_CLIENTS);
+export const HTTP_METHODS = ["request", "get"] as const;
+
+for (const surface of HTTP_SURFACES) {
+  for (const method of HTTP_METHODS) {
+    const mutable = HTTP_CLIENTS[surface] as Record<string, unknown>;
     const refusal = (input: unknown) => refuseNetwork(HTTP_VERB, requested(input));
     mutable[method] = refusal;
     installRefusal(`${surface}.${method}`, HTTP_VERB, refusal, () => mutable[method]);
@@ -222,7 +257,30 @@ export function networkTool(command: unknown): string | undefined {
 
 const SPAWN_VERB = "spawn";
 
-for (const method of ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync"] as const) {
+/**
+ * The `node:child_process` methods wrapped.
+ *
+ * `fork` is deliberately absent: it starts a node process with a module path
+ * rather than a command line, so `networkTool` has nothing to read off its first
+ * argument and no suite reaches a registry through it. That the module knows
+ * SEVEN lowercase functions and this list names six is the one place the two
+ * populations are meant to differ — see the `SPAWN_NAMES` derivation in
+ * `network-refusal.test.ts`, which reads the module rather than this list.
+ *
+ * Exported for the same reason as {@link HTTP_METHODS}: the point names below
+ * are built from it, so the case that pins the registry's population reads this
+ * list rather than a second copy of it.
+ */
+export const SPAWN_METHODS = [
+  "spawn",
+  "spawnSync",
+  "exec",
+  "execSync",
+  "execFile",
+  "execFileSync",
+] as const;
+
+for (const method of SPAWN_METHODS) {
   const mutable = childProcess as unknown as Record<string, unknown>;
   const real = mutable[method] as (...args: unknown[]) => unknown;
   const wrapper = (...args: unknown[]) => {
@@ -240,6 +298,11 @@ for (const method of ["spawn", "spawnSync", "exec", "execSync", "execFile", "exe
  * Exported so the identity check below cannot be satisfied by remembering
  * nothing: an empty registry has no rewrapped points, and a point nothing
  * remembers is a point nothing can notice a layer over.
+ *
+ * The names are built from {@link HTTP_SURFACES}, {@link HTTP_METHODS} and
+ * {@link SPAWN_METHODS}, plus one written by hand for `globalThis.fetch` — the
+ * hand-written one is why a case compares this against those lists rather than
+ * trusting that a registration exists for everything patched.
  */
 export function refusalPoints(): readonly string[] {
   return [...installedRefusals.keys()];
