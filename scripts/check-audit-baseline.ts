@@ -33,6 +33,7 @@ import { execFileSync } from "node:child_process";
 import {
   AUDIT_TIMEOUT_MS,
   auditInvocationSkip,
+  auditSkipHeadline,
   evaluateAudit,
   formatAuditVerdict,
   isClean,
@@ -62,7 +63,7 @@ function readAudit(): AuditRead {
     // the status — EXCEPT when the process was killed, where the payload is
     // whatever had been flushed and means nothing either way.
     const killed = auditInvocationSkip(error, AUDIT_TIMEOUT_MS);
-    if (killed !== undefined) return { skip: killed };
+    if (killed !== undefined) return killed;
     const stdout = (error as { stdout?: unknown }).stdout;
     raw = typeof stdout === "string" ? stdout : "";
   }
@@ -77,7 +78,12 @@ function readAudit(): AuditRead {
 function main(): void {
   const read = readAudit();
   if (read.report === undefined) {
-    console.log(`${CHECK_NAME}: skipping — ${read.skip}.`);
+    // The headline is who gave up, which the sentence alone does not carry: a
+    // run of "we stopped waiting" says the bound may be too tight, a run of
+    // "npm reported a failure" says the registry answered and the bound is
+    // beside the point. Three skips in a row used to read identically.
+    const headline = auditSkipHeadline(read.cause);
+    console.log(`${CHECK_NAME}: skipping (${headline}) — ${read.skip}.`);
     // A skip exits 0, so without this a week of registry outages is a week of
     // green runs with the reason in a log nobody opens on a green run. The
     // annotation puts it on the run summary, where the one leg allowed a live
@@ -85,7 +91,7 @@ function main(): void {
     if (runningUnderActions()) {
       console.log(
         annotation("warning", `${read.skip}. The advisory baseline was NOT checked on this run.`, {
-          title: `${CHECK_NAME} skipped`,
+          title: `${CHECK_NAME} skipped: ${headline}`,
         }),
       );
     }
