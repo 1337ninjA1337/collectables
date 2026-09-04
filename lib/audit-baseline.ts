@@ -446,9 +446,9 @@ export interface AuditReport {
    * `metadata.vulnerabilities` said `high: 9`, and the `vulnerabilities` map
    * carried exactly nine entries at `"high"`.
    *
-   * Read for one question only, and see {@link triagedCompleteness} for it:
-   * whether the entries account for the totals. A report that says nine and
-   * carries none is the shape that cost a red CI on 2026-09-04.
+   * Read by {@link reportTally} for one question: whether the entries account
+   * for the totals. A report that says nine and carries none is the shape that
+   * cost a red CI on 2026-09-04; see {@link reportCompleteness}.
    */
   readonly metadata?: {
     readonly vulnerabilities?: Readonly<Record<string, unknown>>;
@@ -739,14 +739,87 @@ export function observedAdvisoryDetails(
   return found;
 }
 
+/** One severity, as npm counted it and as npm reported it. */
+export interface SeverityTally {
+  /** npm's own name for the severity. Unrecognised ones are kept, not dropped. */
+  readonly severity: string;
+  /** What `metadata.vulnerabilities` counts here — the carried count if it says nothing. */
+  readonly claimed: number;
+  /** How many roots at this severity the `vulnerabilities` map carries. */
+  readonly carried: number;
+}
+
+/**
+ * npm's totals against npm's entries, one row per severity either of them names.
+ *
+ * `metadata.vulnerabilities` is a tally over the same population
+ * `vulnerabilities` keys — one count per vulnerable ROOT, at the root's
+ * severity — which is what makes the two halves of a report checkable against
+ * each other. Measured on this tree on 2026-09-04: the totals said
+ * `moderate: 19, high: 9` and the map carried exactly nineteen and nine.
+ *
+ * `total` is skipped: it is the sum of the others, not a severity, and a row
+ * for it would read as "npm counted 28 roots at severity `total`".
+ *
+ * A severity the totals do not mention claims whatever it carries. That is the
+ * "no claim is not a claim of zero" rule {@link reportCompleteness} is built on,
+ * applied per row so it survives an npm that stops emitting one key rather than
+ * all of them.
+ */
+export function reportTally(report: AuditReport): readonly SeverityTally[] {
+  const carried = new Map<string, number>();
+  for (const entry of Object.values(report.vulnerabilities ?? {})) {
+    const severity = String(entry.severity ?? "");
+    carried.set(severity, (carried.get(severity) ?? 0) + 1);
+  }
+  const totals = report.metadata?.vulnerabilities;
+  const claimed = new Map<string, number>();
+  if (typeof totals === "object" && totals !== null) {
+    for (const [severity, count] of Object.entries(totals)) {
+      if (severity === "total") continue;
+      // A negative, a NaN, a string: npm saying something this cannot use, and
+      // reading it as a claim would report an under-count over a junk number.
+      if (typeof count === "number" && Number.isFinite(count) && count > 0) {
+        claimed.set(severity, count);
+      }
+    }
+  }
+  return [...new Set([...claimed.keys(), ...carried.keys()])]
+    .map((severity) => ({
+      severity,
+      claimed: claimed.get(severity) ?? carried.get(severity) ?? 0,
+      carried: carried.get(severity) ?? 0,
+    }))
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || a.severity.localeCompare(b.severity));
+}
+
 /** Whether a report's entries account for the report's own totals. */
 export interface ReportCompleteness {
-  /** How many high/critical roots `metadata.vulnerabilities` counts. */
+  /**
+   * How many high/critical roots `metadata.vulnerabilities` counts.
+   *
+   * The TRIAGED severities only, because {@link AuditVerdict.stale} is the
+   * verdict this decides and the baseline is a list of high/critical roots. A
+   * report that lost its moderates has said nothing about staleness either way.
+   */
   readonly claimed: number;
-  /** How many the `vulnerabilities` map actually carries. */
+  /** How many of those the `vulnerabilities` map actually carries. */
   readonly carried: number;
   /** `carried >= claimed` — the report said nothing it then failed to say. */
   readonly complete: boolean;
+  /**
+   * Every severity npm under-counted, at ALL five rather than at the two above.
+   *
+   * Reported, never failed, and never used to withhold anything — the two
+   * questions have different scopes on purpose. Staleness is a high/critical
+   * question, so {@link complete} is asked there; but the FIX rule reads every
+   * severity, so a report that dropped nineteen moderates leaves
+   * {@link AuditVerdict.fixableInRange} under-reporting with `complete` true and
+   * nothing on the run saying the population shrank. Under-reporting can only
+   * make a finding list quieter, which is why this is a sentence on the run
+   * rather than a red one.
+   */
+  readonly underReported: readonly SeverityTally[];
 }
 
 /**
@@ -776,32 +849,33 @@ export interface ReportCompleteness {
  *
  * ## What it can and cannot see
  *
- * `metadata.vulnerabilities` is npm's own tally over the entries it emitted, so
- * a report short of its totals has definitely lost entries. The converse is not
+ * {@link reportTally} is npm's own count over the entries it emitted, so a
+ * report short of its totals has definitely lost entries. The converse is not
  * true: a report whose totals were dropped along with its entries is
  * indistinguishable from a clean tree from in here, and no number in the payload
  * can tell them apart. Absent totals therefore claim nothing — a report with no
  * `metadata` is read as complete, because the alternative is refusing to check
  * staleness on any npm that stops emitting the key.
+ *
+ * ## Two scopes, and they are not the same question
+ *
+ * {@link ReportCompleteness.complete} reads the two severities the baseline
+ * triages, because staleness is the verdict it withholds and the baseline is a
+ * list of high/critical roots. {@link ReportCompleteness.underReported} reads
+ * all five, because the FIX rule does — and it changes nothing, it is only said
+ * out loud. See those two fields for the argument.
  */
-export function triagedCompleteness(report: AuditReport): ReportCompleteness {
-  const carried = Object.values(report.vulnerabilities ?? {}).filter((entry) =>
-    TRIAGED_SEVERITIES.has(String(entry.severity ?? "")),
-  ).length;
-  const totals = report.metadata?.vulnerabilities;
-  // No totals is no claim, not a claim of zero. See "What it can and cannot
-  // see" above: this is the direction that keeps checking staleness.
-  if (typeof totals !== "object" || totals === null) {
-    return { claimed: carried, carried, complete: true };
-  }
-  let claimed = 0;
-  for (const severity of TRIAGED_SEVERITIES) {
-    const count = totals[severity];
-    // A negative or non-finite tally is npm saying something this cannot use,
-    // and reading it as a claim would withhold staleness over a junk number.
-    if (typeof count === "number" && Number.isFinite(count) && count > 0) claimed += count;
-  }
-  return { claimed, carried, complete: carried >= claimed };
+export function reportCompleteness(report: AuditReport): ReportCompleteness {
+  const rows = reportTally(report);
+  const triaged = rows.filter((row) => TRIAGED_SEVERITIES.has(row.severity));
+  const claimed = triaged.reduce((total, row) => total + row.claimed, 0);
+  const carried = triaged.reduce((total, row) => total + row.carried, 0);
+  return {
+    claimed,
+    carried,
+    complete: carried >= claimed,
+    underReported: rows.filter((row) => row.carried < row.claimed),
+  };
 }
 
 /**
@@ -824,7 +898,7 @@ export function evaluateAudit(
   // high/critical question" above. `observed` stays high/critical because it
   // is what the baseline is a list OF.
   const everything = observedAdvisoryDetails(report);
-  const completeness = triagedCompleteness(report);
+  const completeness = reportCompleteness(report);
   const withFix = (kind: FixKind): FixableAdvisory[] =>
     [...everything]
       .filter(([, detail]) => detail.fix === kind)
@@ -840,7 +914,7 @@ export function evaluateAudit(
     // Withheld rather than computed on a report short of its own totals: an
     // advisory the report never mentioned is not an advisory that was
     // withdrawn, and this is the only list that cannot tell those apart on its
-    // own. See {@link triagedCompleteness} for the run that made the case.
+    // own. See {@link reportCompleteness} for the run that made the case.
     stale: completeness.complete
       ? [...acceptedKeys].filter((key) => !observed.has(key)).sort()
       : [],
@@ -1061,12 +1135,24 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
       `${checkName}: ${counted(verdict.stale.length, "baseline entry", "baseline entries")} no longer reported — remove ${plural(verdict.stale.length, "it", "them")}: ${verdict.stale.join(", ")}`,
     );
   }
-  if (!verdict.completeness.complete) {
-    // Printed on the green path as well as the red one, and that is the point:
-    // the run is passing because a question was not asked, and a green line
-    // that does not say so is how the half-checked run gets read as checked.
+  // The measurement, then what it cost. Both are printed on the GREEN path as
+  // well as the red one, and that is the point: the run is passing partly
+  // because a question was not asked, and a green line that does not say so is
+  // how a half-checked run gets read as checked.
+  if (verdict.completeness.underReported.length > 0) {
     lines.push(
-      `${checkName}: npm's report is short of its own totals — \`metadata.vulnerabilities\` counts ${counted(verdict.completeness.claimed, "high/critical root", "high/critical roots")} and \`vulnerabilities\` carries ${String(verdict.completeness.carried)}. Staleness was NOT checked on this run: an advisory the report never mentioned is not an advisory that was withdrawn, and deleting the baseline over a degraded read is the one edit that lets a real advisory through in silence. Re-run the gate.`,
+      `${checkName}: npm's report is short of its own totals — it counted more roots than it reported, at ${verdict.completeness.underReported
+        .map((row) => `${row.severity} (${String(row.carried)} of ${String(row.claimed)})`)
+        .join(", ")}. Every finding above is an UNDER-count; re-run the gate.`,
+    );
+  }
+  if (!verdict.completeness.complete) {
+    lines.push(
+      // "npm counted N and reported M" rather than "N were counted": the
+      // subject is the count, so a verb after it has to agree with it, and this
+      // sentence is printed at one. `counted` inflects the noun and cannot
+      // reach a verb three words later.
+      `${checkName}: staleness was NOT checked on this run — npm counted ${counted(verdict.completeness.claimed, "high/critical root", "high/critical roots")} and reported ${String(verdict.completeness.carried)}. An advisory the report never mentioned is not an advisory that was withdrawn, and pruning the baseline over a degraded read is the one edit that lets a real advisory through in silence.`,
     );
   }
   if (isClean(verdict)) {

@@ -29,7 +29,7 @@
  *
  * That line catches a registry that fails LOUDLY. One that fails quietly — a
  * well-formed report whose findings are simply missing — gets through it, and
- * did, on 2026-09-04. `triagedCompleteness` is the second line: it checks the
+ * did, on 2026-09-04. `reportCompleteness` is the second line: it checks the
  * report's entries against the report's own totals and withholds the staleness
  * half of the verdict when they disagree, rather than failing the run over
  * advisories npm did not mention.
@@ -110,11 +110,16 @@ function main(): void {
   // answer exits 0. The same argument the skip's annotation makes: without a
   // mark on the run summary, "we could not ask" is only ever visible in a log
   // nobody opens on a green run.
-  if (!verdict.completeness.complete && runningUnderActions()) {
+  if (verdict.completeness.underReported.length > 0 && runningUnderActions()) {
+    const withheld = verdict.completeness.complete
+      ? "Baseline staleness was still checked — the shortfall is below the severities it reads."
+      : `Baseline staleness was NOT checked: ${String(verdict.completeness.claimed)} high/critical roots counted, ${String(verdict.completeness.carried)} reported.`;
     console.log(
       annotation(
         "warning",
-        `npm counted ${String(verdict.completeness.claimed)} high/critical roots and reported ${String(verdict.completeness.carried)}. Baseline staleness was NOT checked on this run.`,
+        `npm counted more roots than it reported, at ${verdict.completeness.underReported
+          .map((row) => `${row.severity} (${String(row.carried)} of ${String(row.claimed)})`)
+          .join(", ")}. ${withheld}`,
         { title: `${CHECK_NAME}: npm's report was short of its own totals` },
       ),
     );

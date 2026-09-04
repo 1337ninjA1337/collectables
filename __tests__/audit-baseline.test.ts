@@ -22,7 +22,8 @@ import {
   observedAdvisoryDetails,
   observedAdvisoryFixes,
   PUBLISHED_ELSEWHERE_NOTE,
-  triagedCompleteness,
+  reportCompleteness,
+  reportTally,
   type AcceptedAdvisory,
   type AuditRead,
   type AuditReport,
@@ -108,7 +109,7 @@ function report(
  * a `stale: []` means two different things and the verdict is where they are
  * told apart.
  */
-const ACCOUNTED_FOR = { claimed: 0, carried: 0, complete: true } as const;
+const ACCOUNTED_FOR = { claimed: 0, carried: 0, complete: true, underReported: [] } as const;
 
 /** npm's "only a major fixes this, and here is what I would install". */
 const majorFix = (name: string): unknown => ({ name, version: "1.0.0", isSemVerMajor: true });
@@ -1336,7 +1337,7 @@ describe("isAuditReport — npm failing is not npm reporting nothing", () => {
   });
 });
 
-describe("triagedCompleteness — the registry failing quietly, which no predicate caught", () => {
+describe("reportCompleteness — the registry failing quietly, which no predicate caught", () => {
   // WHAT WENT WRONG. `isAuditReport` draws the line at "npm answered", and
   // `readAuditPayload` at "the answer is readable". Both were written for a
   // registry that fails LOUDLY. On 2026-09-04 it failed quietly: `npm audit
@@ -1362,26 +1363,52 @@ describe("triagedCompleteness — the registry failing quietly, which no predica
   });
 
   it("reads a report that accounts for its totals as complete", () => {
-    const answered = withTotals({ moderate: 19, high: 2, critical: 0, total: 21 }, {
+    const answered = withTotals({ moderate: 1, high: 2, critical: 0, total: 3 }, {
       nanoid: { severity: "high" },
       postcss: { severity: "high" },
+      undici: { severity: "moderate" },
     });
-    assert.deepEqual(triagedCompleteness(answered), { claimed: 2, carried: 2, complete: true });
+    assert.deepEqual(reportCompleteness(answered), {
+      claimed: 2,
+      carried: 2,
+      complete: true,
+      underReported: [],
+    });
   });
 
   it("catches the shape that cost the red run: totals counted, entries missing", () => {
-    const degraded = withTotals({ moderate: 19, high: 9, critical: 0, total: 28 });
-    assert.deepEqual(triagedCompleteness(degraded), { claimed: 9, carried: 0, complete: false });
+    const degraded = withTotals({ moderate: 0, high: 9, critical: 0, total: 9 });
+    assert.deepEqual(reportCompleteness(degraded), {
+      claimed: 9,
+      carried: 0,
+      complete: false,
+      underReported: [{ severity: "high", claimed: 9, carried: 0 }],
+    });
   });
 
   it("counts high and critical together, and ignores the severities the baseline does not triage", () => {
     // The baseline is a list of high/critical roots, so those are the only
     // totals whose absence can invent a withdrawal. Nineteen unreported
-    // moderates say nothing about it.
-    assert.equal(triagedCompleteness(withTotals({ moderate: 19, low: 4 })).complete, true);
+    // moderates say nothing about it — and are still RECORDED, because the fix
+    // rule reads every severity and a shortfall there is a quieter finding
+    // list rather than a wrong one.
+    const shy = reportCompleteness(withTotals({ moderate: 19, low: 4 }));
+    assert.equal(shy.complete, true);
+    assert.deepEqual(shy.underReported, [
+      { severity: "moderate", claimed: 19, carried: 0 },
+      { severity: "low", claimed: 4, carried: 0 },
+    ]);
     assert.deepEqual(
-      triagedCompleteness(withTotals({ high: 2, critical: 3 }, { one: { severity: "critical" } })),
-      { claimed: 5, carried: 1, complete: false },
+      reportCompleteness(withTotals({ high: 2, critical: 3 }, { one: { severity: "critical" } })),
+      {
+        claimed: 5,
+        carried: 1,
+        complete: false,
+        underReported: [
+          { severity: "critical", claimed: 3, carried: 1 },
+          { severity: "high", claimed: 2, carried: 0 },
+        ],
+      },
     );
   });
 
@@ -1390,13 +1417,14 @@ describe("triagedCompleteness — the registry failing quietly, which no predica
     // alternative direction — treating a missing tally as "npm said zero" —
     // would withhold the staleness check on every run, which is the check
     // being switched off to protect it.
-    assert.deepEqual(triagedCompleteness(withTotals(undefined, { nanoid: { severity: "high" } })), {
+    assert.deepEqual(reportCompleteness(withTotals(undefined, { nanoid: { severity: "high" } })), {
       claimed: 1,
       carried: 1,
       complete: true,
+      underReported: [],
     });
-    assert.equal(triagedCompleteness({ vulnerabilities: {} }).complete, true);
-    assert.equal(triagedCompleteness({ metadata: {} }).complete, true);
+    assert.equal(reportCompleteness({ vulnerabilities: {} }).complete, true);
+    assert.equal(reportCompleteness({ metadata: {} }).complete, true);
   });
 
   it("does not let a junk tally withhold the check", () => {
@@ -1405,12 +1433,53 @@ describe("triagedCompleteness — the registry failing quietly, which no predica
     // number nobody can act on.
     for (const high of [-3, Number.NaN, Number.POSITIVE_INFINITY, "9", null, {}]) {
       assert.equal(
-        triagedCompleteness(withTotals({ high })).complete,
+        reportCompleteness(withTotals({ high })).complete,
         true,
         `a \`high\` of ${JSON.stringify(high) ?? "undefined"} was read as a claim`,
       );
     }
-    assert.equal(triagedCompleteness(withTotals({ vulnerabilities: null } as never)).complete, true);
+    assert.equal(reportCompleteness(withTotals({ vulnerabilities: null } as never)).complete, true);
+  });
+
+  it("skips `total`, which is the sum of the others and not a severity", () => {
+    // A row for it would read as "npm counted 28 roots at severity `total`",
+    // and would be under-reported on every run of every healthy report.
+    const rows = reportTally(withTotals({ moderate: 1, total: 1 }, { a: { severity: "moderate" } }));
+    assert.deepEqual(
+      rows.map((row) => row.severity),
+      ["moderate"],
+    );
+  });
+
+  it("orders the rows worst-severity first, so a printed list is diffable", () => {
+    const rows = reportTally(
+      withTotals({ low: 1, critical: 1, moderate: 1, high: 1, info: 1, spicy: 1 }),
+    );
+    assert.deepEqual(
+      rows.map((row) => row.severity),
+      ["critical", "high", "moderate", "low", "info", "spicy"],
+    );
+  });
+
+  it("keeps a severity npm has not used yet rather than dropping it", () => {
+    // The same choice `fixKind` and `severityRank` make about a field npm
+    // changes: an unrecognised value sorts to the bottom and is still counted.
+    assert.deepEqual(reportTally(withTotals({ spicy: 3 })), [
+      { severity: "spicy", claimed: 3, carried: 0 },
+    ]);
+  });
+
+  it("applies the no-claim rule per row, not to the whole `metadata` block", () => {
+    // An npm that stops emitting ONE severity's tally is not an npm that
+    // stopped emitting totals, and the row it did not mention must not read as
+    // a claim of zero against the entries that are right there.
+    assert.deepEqual(
+      reportTally(withTotals({ high: 1 }, { a: { severity: "high" }, b: { severity: "low" } })),
+      [
+        { severity: "high", claimed: 1, carried: 1 },
+        { severity: "low", claimed: 1, carried: 1 },
+      ],
+    );
   });
 
   it("carries more than it counts, which is odd and is not this function's failure", () => {
@@ -1418,7 +1487,7 @@ describe("triagedCompleteness — the registry failing quietly, which no predica
     // here is entries MISSING. A report with more entries than totals is npm
     // being strange and is not a reason to stop checking staleness.
     assert.equal(
-      triagedCompleteness(withTotals({ high: 1 }, { a: { severity: "high" }, b: { severity: "high" } }))
+      reportCompleteness(withTotals({ high: 1 }, { a: { severity: "high" }, b: { severity: "high" } }))
         .complete,
       true,
     );
@@ -1481,9 +1550,50 @@ describe("evaluateAudit on a report short of its own totals", () => {
     // that does not say so, is how a half-checked run gets read as checked.
     const printed = formatAuditVerdict(degraded(), "check");
     assert.match(printed, /short of its own totals/);
-    assert.match(printed, /counts 9 high\/critical roots and `vulnerabilities` carries 0/);
-    assert.match(printed, /Staleness was NOT checked/);
+    assert.match(printed, /high \(0 of 9\)/);
+    assert.match(
+      printed,
+      /staleness was NOT checked on this run — npm counted 9 high\/critical roots and reported 0\./,
+    );
     assert.match(printed, /OK — no new high\/critical advisories/);
+  });
+
+  it("says the shortfall even where it withholds nothing, because the fix rule reads it", () => {
+    // Nineteen moderates npm counted and did not report: staleness is a
+    // high/critical question and is still answered, and `fixableInRange` reads
+    // every severity and has just been handed a population it cannot see the
+    // size of.
+    const printed = formatAuditVerdict(
+      evaluateAudit({ vulnerabilities: {}, metadata: { vulnerabilities: { moderate: 19 } } }, []),
+      "check",
+    );
+    assert.match(printed, /it counted more roots than it reported, at moderate \(0 of 19\)/);
+    assert.match(printed, /an UNDER-count/);
+    assert.doesNotMatch(
+      printed,
+      /staleness was NOT checked/,
+      "a shortfall below the triaged severities switched off a check it says nothing about",
+    );
+  });
+
+  it("names every short severity on the one line, worst first", () => {
+    const printed = formatAuditVerdict(
+      evaluateAudit(
+        { vulnerabilities: {}, metadata: { vulnerabilities: { low: 4, high: 2, moderate: 19 } } },
+        [],
+      ),
+      "check",
+    );
+    assert.match(printed, /at high \(0 of 2\), moderate \(0 of 19\), low \(0 of 4\)\./);
+  });
+
+  it("says nothing at all when the report accounts for itself", () => {
+    // The overwhelming majority of runs, including every fixture in this file
+    // and the live gate on a healthy registry. A caveat printed on a sound run
+    // is how the caveat stops being read on the run that needs it.
+    const printed = formatAuditVerdict(evaluateAudit(report({}), []), "check");
+    assert.doesNotMatch(printed, /short of its own totals/);
+    assert.doesNotMatch(printed, /NOT checked/);
   });
 
   it("agrees with the number the annotation on the run summary carries", () => {
@@ -1492,11 +1602,30 @@ describe("evaluateAudit on a report short of its own totals", () => {
     const script = readRepoFile("scripts/check-audit-baseline.ts");
     assert.match(
       script,
-      /!verdict\.completeness\.complete && runningUnderActions\(\)/,
+      /verdict\.completeness\.underReported\.length > 0 && runningUnderActions\(\)/,
       "a withheld staleness check no longer leaves a mark on the run summary, so it is only visible in a log nobody opens on a green run",
     );
     assert.match(script, /verdict\.completeness\.claimed/);
     assert.match(script, /verdict\.completeness\.carried/);
+  });
+
+  it("pins what a report with no `vulnerabilities` key at all does", () => {
+    // `AuditReport` declares the key optional, `observedAdvisories` handles the
+    // `undefined`, and what falls out is "the whole baseline is stale" — a
+    // decision no case stated and no reader would predict from the type. It is
+    // the right one: such a payload never reaches here, because `isAuditReport`
+    // is what the gate's reader consults, and the alternative would be a gate
+    // that silently passes on a shape it cannot read.
+    assert.equal(isAuditReport({}), false);
+    const verdict = evaluateAudit({}, FIXTURE);
+    assert.deepEqual(verdict.stale, [`nanoid#${A1}`, `postcss#${A2}`, `postcss#${A3}`]);
+    assert.deepEqual(verdict.completeness, {
+      claimed: 0,
+      carried: 0,
+      complete: true,
+      underReported: [],
+    });
+    assert.equal(isClean(verdict), false);
   });
 
   it("says the singular when npm counted one", () => {
@@ -1504,7 +1633,7 @@ describe("evaluateAudit on a report short of its own totals", () => {
       evaluateAudit({ vulnerabilities: {}, metadata: { vulnerabilities: { high: 1 } } }, FIXTURE),
       "check",
     );
-    assert.match(printed, /counts 1 high\/critical root and/);
+    assert.match(printed, /npm counted 1 high\/critical root and reported 0\./);
   });
 });
 
