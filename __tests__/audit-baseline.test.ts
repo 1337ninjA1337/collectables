@@ -23,6 +23,7 @@ import {
   observedAdvisoryFixes,
   PUBLISHED_ELSEWHERE_NOTE,
   type AcceptedAdvisory,
+  type AuditRead,
   type AuditReport,
   type AuditVerdict,
 } from "@/lib/audit-baseline";
@@ -1505,24 +1506,59 @@ describe("the declared causes and the produced ones are the same set", () => {
     );
   });
 
+  /**
+   * One input per way the readers can decide to skip, each named by the branch
+   * it exercises.
+   *
+   * It was six expressions in an array literal, and what they were a sample OF
+   * was not written down anywhere — so the seventh branch was simply missing:
+   * a JSON payload that parses to something which is not an object had no
+   * input, and nothing could have said so. A sample nobody can audit is a
+   * sample that quietly shrinks.
+   *
+   * Naming the branch is the whole of the fix: a reader that grew an eighth way
+   * to skip is still not covered automatically, but the omission is now visible
+   * as a branch with no row rather than as an array that looks complete.
+   */
+  const SKIP_INPUTS: Readonly<Record<string, () => AuditRead | undefined>> = {
+    "killed, reported as a signal": () => auditInvocationSkip({ signal: "SIGKILL" }, 180_000),
+    "killed, reported as ETIMEDOUT": () => auditInvocationSkip({ code: "ETIMEDOUT" }, 180_000),
+    "npm named an error": () => readAuditPayload('{"error":{"code":"ENOTFOUND"}}'),
+    "npm printed nothing": () => readAuditPayload(""),
+    "npm printed something that is not JSON": () => readAuditPayload("npm ERR!"),
+    "npm printed JSON that is not an object": () => readAuditPayload("null"),
+    "npm printed an object with no findings key": () => readAuditPayload("{}"),
+  };
+
+  it("skips on every input in the sample, so none of them is dead", () => {
+    // An input that stopped producing a skip would drop out of the set below
+    // silently, and the comparison would go on passing as long as some other
+    // input still reached the same cause. This is what makes each row carry
+    // its own weight.
+    for (const [branch, read] of Object.entries(SKIP_INPUTS)) {
+      const answer = read();
+      assert.notEqual(answer, undefined, `\`${branch}\` no longer produces anything`);
+      assert.equal(answer?.report, undefined, `\`${branch}\` is being read as an answer now`);
+      assert.ok(
+        answer?.cause !== undefined,
+        `\`${branch}\` produces a skip with no cause on it`,
+      );
+    }
+  });
+
   it("produces every cause it declares, and declares every cause it produces", () => {
     // The array is the one door onto the population, and a door onto nothing is
     // what the derivation would otherwise buy: a cause could be declared, given
     // a headline, looped over by every case here, and never returned by any
     // reader for any input.
     //
-    // The inputs are real ones — a killed call, npm's error object, and output
-    // that is not a report — so what this compares is the declaration against
-    // the behaviour rather than against another list.
+    // The inputs are real ones — a killed call, npm's error object, and five
+    // shapes of output that is not a report — so what this compares is the
+    // declaration against the behaviour rather than against another list.
     const produced = new Set(
-      [
-        auditInvocationSkip({ signal: "SIGKILL" }, 180_000)?.cause,
-        auditInvocationSkip({ code: "ETIMEDOUT" }, 180_000)?.cause,
-        readAuditPayload('{"error":{"code":"ENOTFOUND"}}').cause,
-        readAuditPayload("").cause,
-        readAuditPayload("npm ERR!").cause,
-        readAuditPayload("{}").cause,
-      ].filter((cause) => cause !== undefined),
+      Object.values(SKIP_INPUTS)
+        .map((read) => read()?.cause)
+        .filter((cause) => cause !== undefined),
     );
     assert.deepEqual(
       [...produced].sort(),
