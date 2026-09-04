@@ -112,22 +112,35 @@ function requested(input: unknown): string {
  * of `globalThis`, the clients are properties of two module objects, and the
  * spawn methods of a third. A caller reads whichever one it names at call time,
  * and that read is what a comparison here has to be against.
+ *
+ * The VERB is remembered too — the word this point's refusal puts after "A test
+ * tried to". All four refusals share that prefix, so a reader matching it learns
+ * that SOME refusal fired and not that it was this surface's: a point registered
+ * against another surface's wrapper reads identically. The verb is passed to
+ * `refuseNetwork` and to this in one expression, so the two cannot drift.
  */
 interface InstalledRefusal {
   readonly refusal: unknown;
   readonly current: () => unknown;
+  readonly verb: string;
 }
 
 const installedRefusals = new Map<string, InstalledRefusal>();
 
-function installRefusal(point: string, refusal: unknown, current: () => unknown): void {
-  installedRefusals.set(point, { refusal, current });
+function installRefusal(
+  point: string,
+  verb: string,
+  refusal: unknown,
+  current: () => unknown,
+): void {
+  installedRefusals.set(point, { refusal, current, verb });
 }
 
+const FETCH_VERB = "fetch";
 const fetchRefusal = ((input: unknown) =>
-  refuseNetwork("fetch", requested(input))) as unknown as typeof globalThis.fetch;
+  refuseNetwork(FETCH_VERB, requested(input))) as unknown as typeof globalThis.fetch;
 globalThis.fetch = fetchRefusal;
-installRefusal("globalThis.fetch", fetchRefusal, () => globalThis.fetch);
+installRefusal("globalThis.fetch", FETCH_VERB, fetchRefusal, () => globalThis.fetch);
 
 /**
  * `http.request`, `http.get` and their https twins.
@@ -136,16 +149,17 @@ installRefusal("globalThis.fetch", fetchRefusal, () => globalThis.fetch);
  * own runner and `tsx` load these too, and a refusal that took the module out
  * from under them would fail the run for a reason that is not a test's.
  */
+const HTTP_VERB = "open an http connection to";
+
 for (const [surface, client] of [
   ["http", http],
   ["https", https],
 ] as const) {
   for (const method of ["request", "get"] as const) {
     const mutable = client as unknown as Record<string, unknown>;
-    const refusal = (input: unknown) =>
-      refuseNetwork(`open an http connection to`, requested(input));
+    const refusal = (input: unknown) => refuseNetwork(HTTP_VERB, requested(input));
     mutable[method] = refusal;
-    installRefusal(`${surface}.${method}`, refusal, () => mutable[method]);
+    installRefusal(`${surface}.${method}`, HTTP_VERB, refusal, () => mutable[method]);
   }
 }
 
@@ -206,16 +220,18 @@ export function networkTool(command: unknown): string | undefined {
   return NETWORK_TOOLS.has(name) ? name : undefined;
 }
 
+const SPAWN_VERB = "spawn";
+
 for (const method of ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync"] as const) {
   const mutable = childProcess as unknown as Record<string, unknown>;
   const real = mutable[method] as (...args: unknown[]) => unknown;
   const wrapper = (...args: unknown[]) => {
     const tool = networkTool(args[0]);
-    if (tool !== undefined) refuseNetwork("spawn", tool);
+    if (tool !== undefined) refuseNetwork(SPAWN_VERB, tool);
     return real(...args);
   };
   mutable[method] = wrapper;
-  installRefusal(`childProcess.${method}`, wrapper, () => mutable[method]);
+  installRefusal(`childProcess.${method}`, SPAWN_VERB, wrapper, () => mutable[method]);
 }
 
 /**
@@ -240,6 +256,20 @@ export function refusalPoints(): readonly string[] {
  */
 export function refusalAt(point: string): unknown {
   return installedRefusals.get(point)?.current();
+}
+
+/**
+ * The word this point's refusal puts after "A test tried to", or `undefined` if
+ * the point is not one this bootstrap patched.
+ *
+ * Exported because the prefix is shared by all four refusals: a reader that
+ * matched it would learn that SOME refusal fired, which is what the whole
+ * `spawnToolOf` argument one file over is about. The verb is what tells a
+ * spawn's refusal from a fetch's, and a point holding another surface's wrapper
+ * is the fault that reads identically without it.
+ */
+export function refusalVerbAt(point: string): string | undefined {
+  return installedRefusals.get(point)?.verb;
 }
 
 /**
