@@ -327,8 +327,12 @@ describe("check-inline-hex script wiring", () => {
   it("scripts/check-inline-hex.ts emits PR annotations under GitHub Actions", () => {
     const src = read("scripts/check-inline-hex.ts");
     assert.match(src, /\bformatGitHubAnnotations\b/);
-    // Gated on the Actions env so local runs stay noise-free.
-    assert.match(src, /GITHUB_ACTIONS/);
+    // Gated so local runs stay noise-free. The gate is `runningUnderActions`
+    // now rather than the variable spelled out here: three scripts wrote that
+    // comparison, and `github-annotations.test.ts` fails any file that writes
+    // it again, so pinning the old spelling would fight the guard that ended
+    // the duplication.
+    assert.match(src, /\brunningUnderActions\(\)/);
   });
 
   it("scripts/check-inline-hex.ts walks .ts AND .tsx files", () => {

@@ -29,6 +29,7 @@ import {
   type EarlyTerminator,
   type OrphanTerminator,
 } from "../lib/check-comment-terminators";
+import { annotation, runningUnderActions } from "../lib/github-annotations";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedWalk } from "../lib/scanned-floor";
 import { guardScanRoot, listSourceFiles } from "./guard-io";
@@ -46,21 +47,6 @@ const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
  */
 const SCANNED_DIRS = ["app", "components", "data", "lib", "scripts", "__tests__"] as const;
 
-/** Escape a workflow-command property value (file=..., etc.). */
-function escapeAnnotationProperty(value: string): string {
-  return value
-    .replace(/%/g, "%25")
-    .replace(/\r/g, "%0D")
-    .replace(/\n/g, "%0A")
-    .replace(/:/g, "%3A")
-    .replace(/,/g, "%2C");
-}
-
-/** Escape a workflow-command message (the part after the double colon). */
-function escapeAnnotationMessage(value: string): string {
-  return value.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
-}
-
 /**
  * One `::error` per finding, so CI puts it on the line of the PR diff.
  *
@@ -69,12 +55,12 @@ function escapeAnnotationMessage(value: string): string {
  * complaints about code and nothing at all on the comment that caused them.
  */
 function annotations(found: readonly EarlyTerminator[]): string[] {
-  return found.map(
-    (entry) =>
-      `::error file=${escapeAnnotationProperty(entry.file)},line=${entry.line},col=${entry.column}::` +
-      escapeAnnotationMessage(
-        `This block comment ends here; "${entry.trailing}" after it is parsed as code — ${EARLY_TERMINATOR_ADVICE}`,
-      ),
+  return found.map((entry) =>
+    annotation(
+      "error",
+      `This block comment ends here; "${entry.trailing}" after it is parsed as code — ${EARLY_TERMINATOR_ADVICE}`,
+      { file: entry.file, line: entry.line, col: entry.column },
+    ),
   );
 }
 
@@ -84,12 +70,12 @@ function annotations(found: readonly EarlyTerminator[]): string[] {
  * whose problem is a comment that ended above it.
  */
 function orphanAnnotations(found: readonly OrphanTerminator[]): string[] {
-  return found.map(
-    (entry) =>
-      `::error file=${escapeAnnotationProperty(entry.file)},line=${entry.line},col=${entry.column}::` +
-      escapeAnnotationMessage(
-        `This comment terminator stands in code and closes nothing — ${ORPHAN_TERMINATOR_ADVICE}`,
-      ),
+  return found.map((entry) =>
+    annotation(
+      "error",
+      `This comment terminator stands in code and closes nothing — ${ORPHAN_TERMINATOR_ADVICE}`,
+      { file: entry.file, line: entry.line, col: entry.column },
+    ),
   );
 }
 
@@ -121,9 +107,8 @@ function main(): void {
 
   if (found.length > 0) console.error(formatEarlyTerminatorReport(found));
   if (orphans.length > 0) console.error(formatOrphanTerminatorReport(orphans));
-  if (process.env.GITHUB_ACTIONS === "true") {
-    for (const annotation of annotations(found)) console.log(annotation);
-    for (const annotation of orphanAnnotations(orphans)) console.log(annotation);
+  if (runningUnderActions()) {
+    for (const line of [...annotations(found), ...orphanAnnotations(orphans)]) console.log(line);
   }
   process.exit(1);
 }

@@ -19,6 +19,7 @@ import {
   formatHexReport,
   type HexMatch,
 } from "../lib/check-inline-hex";
+import { runningUnderActions } from "../lib/github-annotations";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedWalk } from "../lib/scanned-floor";
 import { guardScanRoot, listSourceFiles } from "./guard-io";
@@ -50,7 +51,7 @@ function main(): void {
   }
 
   console.error(formatHexReport(allMatches));
-  if (process.env.GITHUB_ACTIONS === "true") {
+  if (runningUnderActions()) {
     // Surface each finding as a line-level annotation on the PR diff.
     for (const annotation of formatGitHubAnnotations(allMatches)) {
       console.log(annotation);
