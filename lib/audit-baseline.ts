@@ -225,6 +225,35 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
   },
 ];
 
+/**
+ * Whether a parsed payload is an audit REPORT, rather than npm's account of
+ * why it could not produce one.
+ *
+ * The gate is documented as soft-skipping a run that cannot reach the registry,
+ * and the reader that implements it treats an unparseable payload as the
+ * signal. npm's registry failures are not unparseable: `npm audit --json`
+ * emits `{"error":{"code":…,"summary":…}}`, which parses perfectly, carries no
+ * `vulnerabilities`, and is therefore indistinguishable from a tree with no
+ * advisories in it. {@link evaluateAudit} then reports every entry in
+ * {@link ACCEPTED_HIGH_ADVISORIES} as stale, and the gate fails telling a
+ * contributor to delete the whole baseline — which is the one edit that would
+ * let a real advisory through in silence. It has happened: CI run 1573 spent
+ * five and a half minutes in `npm audit` and failed with all four entries
+ * "no longer reported", on a commit whose diff was four test files.
+ *
+ * A CLEAN tree is a different thing and must still get through: npm answers it
+ * with `"vulnerabilities": {}`, the key present and empty. The key's presence
+ * is exactly the line between "npm answered" and "npm failed", which is why it
+ * is what this asks about.
+ */
+export function isAuditReport(parsed: unknown): parsed is AuditReport {
+  if (typeof parsed !== "object" || parsed === null) return false;
+  const payload = parsed as { error?: unknown; vulnerabilities?: unknown };
+  // npm's own failure shape, and the reason this predicate exists.
+  if (payload.error !== undefined) return false;
+  return typeof payload.vulnerabilities === "object" && payload.vulnerabilities !== null;
+}
+
 /** Shape of the slice of `npm audit --json` this reads. */
 export interface AuditReport {
   readonly vulnerabilities?: Readonly<
