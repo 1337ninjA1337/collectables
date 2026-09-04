@@ -52,6 +52,7 @@
  */
 
 import type { AcceptedAdvisory } from "./audit-baseline";
+import { plural } from "./plural";
 
 /** One entry's fingerprint, and whether the built bundle contains it. */
 export interface FingerprintSighting {
@@ -212,9 +213,9 @@ export function formatShipsToClientReport(
     const reachability =
       verdict.argued === 0
         ? ""
-        : `; ${String(verdict.argued)} "reaches the client" ${verdict.argued === 1 ? "claim names its" : "claims name their"} call sites`;
+        : `; ${String(verdict.argued)} "reaches the client" ${plural(verdict.argued, "claim names its", "claims name their")} call sites`;
     lines.push(
-      `${checkName}: OK — ${String(verdict.checked)} "build-time only" ${verdict.checked === 1 ? "claim" : "claims"} the bundle does not contradict${reachability}.`,
+      `${checkName}: OK — ${String(verdict.checked)} "build-time only" ${plural(verdict.checked, "claim", "claims")} the bundle does not contradict${reachability}.`,
     );
   }
   return lines.join("\n");

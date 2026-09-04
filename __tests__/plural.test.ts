@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 
 import { plural, slavicPlural } from "@/lib/plural";
 
+import { assertOnlyTheseMatch } from "./helpers/offence-sweep";
+import { sourceFiles, sourceCode } from "./helpers/source-files";
+
 /**
  * Both branches, exercised at the numbers that distinguish them.
  *
@@ -141,5 +144,47 @@ describe("slavicPlural", () => {
         `${n} produced '${pick(n)}', which is none of the three forms given`,
       );
     }
+  });
+});
+
+describe("the one-versus-many rule lives in one module", () => {
+  /**
+   * `count === 1 ? one : other`, wherever a module writes it out.
+   *
+   * The rule was in this module for the app's six locales, and the tooling
+   * wrote it again anyway: `lib/audit-baseline.ts` had its own `plural`,
+   * `lib/ships-to-client.ts` two ternaries, `lib/provenance-tables.ts` two more
+   * (one of them twice in a sentence), `lib/oldest-record.ts` one that also
+   * spelled the count, and `__tests__/helpers/coverage-floor.ts` the `(s)`
+   * inflection. Six copies of one fact, and the way that ends is a message
+   * reading "1 probes" — which is exactly what it did, in six suites at once,
+   * before the entry above this one.
+   *
+   * A CI message is not a different rule from a UI string: exactly one takes
+   * the singular, and zero does not.
+   */
+  const INLINE_RULE = /=== 1 \?/;
+
+  it("is not written out again anywhere else in the tree", () => {
+    assertOnlyTheseMatch({
+      rule: INLINE_RULE,
+      files: sourceFiles("lib", "scripts", "__tests__/helpers"),
+      read: sourceCode,
+      // The rule's own module, and the one module that may not import it:
+      // `oldest-record.ts` is a documented LEAF — no imports, so any evaluator
+      // can reach for it and it can never close a cycle — and
+      // `oldest-record.test.ts` asserts that. Two words are not worth trading
+      // that for, so it writes the rule out and is named here rather than
+      // being quietly missed.
+      //
+      // Read comment-stripped, so
+      // `i18n-source.ts` — which quotes `Number(count) === 1 ? "item" :
+      // "items"` in prose, as the example of the shape its scanner cannot see
+      // — is not an offender and does not need exempting: a sweep that made it
+      // rewrite that sentence would be reading a comment as code.
+      expected: ["lib/plural.ts", "lib/oldest-record.ts"],
+      subject: "modules",
+      what: "spell out the one-versus-many rule",
+    });
   });
 });

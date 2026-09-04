@@ -42,6 +42,8 @@
  * a regular head noun.
  */
 
+import { plural } from "@/lib/plural";
+
 /**
  * A noun phrase for the thing being counted, carrying `(s)` on its head noun.
  *
@@ -51,7 +53,7 @@ export type CountedPhrase = `${string}(s)${string}`;
 
 /** Drops or expands the `(s)` markers to agree with the count. */
 function inflect(what: CountedPhrase, count: number): string {
-  return what.replace(/\(s\)/g, count === 1 ? "" : "s");
+  return what.replace(/\(s\)/g, plural(count, "", "s"));
 }
 
 /**
