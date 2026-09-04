@@ -145,18 +145,50 @@ describe("one copy of the rule, which is what the module is for", () => {
     );
   }
 
+  /**
+   * The five replacement TEXTS a workflow-command escaper produces.
+   *
+   * Not a spelling check, which is what reading for `'"%3A"'` was: the quotes
+   * around it were the guard's, and a copy written with single quotes or a
+   * template literal walked past. What makes this a rule about behaviour is
+   * that a percent-escape has to APPEAR in the source to be produced — there
+   * is no computing `%3A` from a colon, only writing it — so the text is the
+   * one handle a source-read gets on a thing with no runtime surface.
+   *
+   * All five, because a copy is not always a whole table: the message escaper
+   * is three of them and the property escaper is those three plus two.
+   */
+  const ESCAPE_OUTPUTS = /%(?:25|0D|0A|3A|2C)\b/;
+
   it("is the only place the escape table is written", () => {
     // Three copies existed: `check-inline-hex` had both escapers, and
     // `check-comment-terminators` had both again — found when the module was
-    // written, not by the entry that predicted only the env check. `%3A` is
-    // the character that tells the property escaper from the message one, so
-    // it is the one that says a fourth copy has appeared.
-    const copies = everyoneElse().filter((file) => sourceCode(file).includes('"%3A"'));
+    // written, not by the entry that predicted only the env check.
+    const copies = everyoneElse().filter((file) => ESCAPE_OUTPUTS.test(sourceCode(file)));
     assert.deepEqual(
       copies,
       [],
       "a workflow-command escape table has been written again — the property and message rules differ by two replacements and two copies stop agreeing",
     );
+  });
+
+  it("would see a copy however it was quoted", () => {
+    // The three ways to write the same replacement, and the half-table that a
+    // message-only escaper is. Asserted against the pattern rather than by
+    // editing a file, because the guard above is the thing being measured and
+    // a fixture on disk would be a fifth copy.
+    for (const copy of [
+      'value.replace(/:/g, "%3A")',
+      "value.replace(/:/g, '%3A')",
+      "value.replace(/:/g, `%3A`)",
+      'v.replace(/%/g, "%25").replace(/\\n/g, "%0A")',
+      "const COMMA_ESCAPE = '%2C';",
+    ]) {
+      assert.match(copy, ESCAPE_OUTPUTS, `a copy written as \`${copy}\` would go unnoticed`);
+    }
+    // And it does not fire on prose that merely mentions the idea, which is
+    // why the scan reads code with its comments stripped.
+    assert.doesNotMatch("escapes the colon and the comma", ESCAPE_OUTPUTS);
   });
 
   it("is the only place the Actions check is written", () => {
