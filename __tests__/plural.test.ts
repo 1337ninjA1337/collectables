@@ -233,14 +233,24 @@ describe("the doc comment this case reads", () => {
     // the file the case above reads — an extraction that quietly returned the
     // whole file would pass every one of them, and the caller list would keep
     // agreeing because the names are in there somewhere.
-    const doc = moduleDoc(readRepoFile("lib/plural.ts"));
+    const source = readRepoFile("lib/plural.ts");
+    const doc = moduleDoc(source);
     assert.ok(doc.startsWith("/**"), "the extracted text does not begin at a doc comment opener");
+    // Longer than every FUNCTION doc in the same file, derived rather than
+    // written: an anchor on `/**` can land on either, and a number typed here
+    // would be a third thing to keep in step with the prose above it.
+    const others = [...source.matchAll(/\/\*\*[\s\S]*?\*\//g)]
+      .slice(1)
+      .map((match) => match[0].length);
+    const longest = Math.max(...others);
     assert.ok(
-      doc.length >= 2000,
-      measuredFloor(doc.length, 2000, "character(s) of header — this module's doc comment is the long one the caller list lives in"),
+      others.length > 0 && doc.length > longest,
+      `the extracted block is ${String(doc.length)} characters and the longest function doc in the file is ${String(longest)} — the header is the one the caller list lives in, and this is not it`,
     );
-    // The half a length floor cannot state: the block ends before the code.
-    assert.doesNotMatch(doc, /export function plural/);
+    // The half a length floor cannot state: the block ends before the code. Any
+    // export, not `plural` by name — the property is "stops at the source", and
+    // pinning one identifier makes a rename the thing that would notice.
+    assert.doesNotMatch(doc, /^export /m);
   });
 
   it("refuses a file with no doc comment rather than reading one as empty", () => {
