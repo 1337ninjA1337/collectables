@@ -113,6 +113,8 @@
  * why it was the right one.
  */
 
+import { plural } from "./plural";
+
 /** One triaged advisory root. Transitive dependents are not listed. */
 export interface AcceptedAdvisory {
   /** The package `npm audit` names as the advisory's root. */
@@ -800,9 +802,19 @@ function severityRank(severity: string): number {
 export const PUBLISHED_ELSEWHERE_NOTE =
   "This gate reads the npm registry, so it is the one check here whose answer can change while the repository does not — a finding above may have been published since the last green run rather than caused by this branch. The fix is the same either way, and it belongs on this branch: the tree is only green when it is green today.";
 
-/** `1 advisory` / `18 advisories` — the report is read by people, not matched. */
-function plural(count: number, one: string, many: string): string {
-  return `${String(count)} ${count === 1 ? one : many}`;
+/**
+ * `1 advisory` / `18 advisories` — the report is read by people, not matched.
+ *
+ * The AGREEMENT is not decided here. `plural` in lib/plural.ts is where this
+ * app settled "exactly one takes the singular, and zero does not", for the six
+ * languages it speaks; this had a second copy of that comparison, written
+ * `count === 1` beside a count that is always a length. What is left is the
+ * part lib/plural deliberately does not do — put the number in front of the
+ * word — because a rule that knows no vocabulary is what lets one function
+ * serve `предмет`/`предмета`/`предметов` and `advisory`/`advisories` alike.
+ */
+function counted(count: number, one: string, many: string): string {
+  return `${String(count)} ${plural(count, one, many)}`;
 }
 
 /**
@@ -850,7 +862,7 @@ function majorOnlySummary(majorOnly: readonly FixableAdvisory[]): string {
         a.name.localeCompare(b.name),
     )
     .map((group) => `${group.name} (${String(group.found.length)}, up to ${group.worst})`);
-  return `; and npm offers no fix short of a semver-major for ${plural(majorOnly.length, "advisory", "advisories")}, cleared by ${plural(groups.length, "upgrade", "upgrades")}: ${groups.join(", ")}`;
+  return `; and npm offers no fix short of a semver-major for ${counted(majorOnly.length, "advisory", "advisories")}, cleared by ${counted(groups.length, "upgrade", "upgrades")}: ${groups.join(", ")}`;
 }
 
 /**
@@ -907,7 +919,7 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
   const lines: string[] = [];
   if (verdict.unexpected.length > 0) {
     lines.push(
-      `${checkName}: ${plural(verdict.unexpected.length, "high/critical advisory", "high/critical advisories")} not in the baseline:`,
+      `${checkName}: ${counted(verdict.unexpected.length, "high/critical advisory", "high/critical advisories")} not in the baseline:`,
     );
     for (const key of verdict.unexpected) lines.push(`  NEW  ${key}`);
     lines.push(
@@ -916,7 +928,7 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
   }
   if (verdict.fixableInRange.length > 0) {
     lines.push(
-      `${checkName}: npm can fix ${plural(verdict.fixableInRange.length, "advisory", "advisories")} without a major version change:`,
+      `${checkName}: npm can fix ${counted(verdict.fixableInRange.length, "advisory", "advisories")} without a major version change:`,
     );
     for (const found of verdict.fixableInRange) {
       // The redirect is printed only when there IS one. A finding whose fix
@@ -935,7 +947,7 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
   }
   if (verdict.stale.length > 0) {
     lines.push(
-      `${checkName}: ${plural(verdict.stale.length, "baseline entry", "baseline entries")} no longer reported — remove ${verdict.stale.length === 1 ? "it" : "them"}: ${verdict.stale.join(", ")}`,
+      `${checkName}: ${counted(verdict.stale.length, "baseline entry", "baseline entries")} no longer reported — remove ${plural(verdict.stale.length, "it", "them")}: ${verdict.stale.join(", ")}`,
     );
   }
   if (isClean(verdict)) {

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { plural } from "@/lib/plural";
 import { stripComments } from "@/lib/strip-comments";
 
 import { arguedFloor, measuredFloor } from "./helpers/coverage-floor";
@@ -66,6 +67,28 @@ describe("the count and its noun agree", () => {
     for (const count of [0, 1, 2]) {
       assert.doesNotMatch(measuredFloor(count, 2, "module(s) matched"), /\(s\)/);
       assert.doesNotMatch(arguedFloor(count, 2, "module(s) matched", "why"), /\(s\)/);
+    }
+  });
+
+  it("takes both forms for an irregular noun, which no suffix can produce", () => {
+    // "advisor(y|ies)" rather than a phrase rewritten around a regular head
+    // noun. The alternation is the general case and "(s)" is short for "(|s)".
+    assert.match(measuredFloor(1, 2, "advisor(y|ies) triaged"), /only 1 advisory triaged/);
+    assert.match(measuredFloor(4, 2, "advisor(y|ies) triaged"), /only 4 advisories triaged/);
+  });
+
+  it("agrees by lib/plural's rule rather than by one of its own", () => {
+    // The comparison — exactly one takes the singular, and zero does not — is
+    // argued in lib/plural.ts for the six languages the app speaks. A helper
+    // that re-implemented it would agree at 1 and 2 and could disagree
+    // anywhere else, so the two are compared across the numbers a walk returns.
+    for (const count of [0, 1, 2, 3, 11, 21, 100]) {
+      assert.ok(
+        measuredFloor(count, 1, "probe(s)").includes(
+          `only ${String(count)} ${plural(count, "probe", "probes")} —`,
+        ),
+        `the marker and lib/plural disagree at ${String(count)}`,
+      );
     }
   });
 

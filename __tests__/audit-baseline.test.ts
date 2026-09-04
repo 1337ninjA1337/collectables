@@ -167,6 +167,28 @@ describe("evaluateAudit", () => {
     assert.match(formatAuditVerdict(verdict, "check"), /no longer reported/);
   });
 
+  it("agrees the stale line with how many entries it names", () => {
+    // Three words in one sentence move with the count — "entry"/"entries" and
+    // "it"/"them" — and the report is read by a contributor rather than matched
+    // by anything. The rule is lib/plural's, which this module used to have a
+    // second copy of; these are the two counts that tell the forms apart.
+    const two = evaluateAudit(
+      report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }),
+      FIXTURE,
+    );
+    assert.match(formatAuditVerdict(two, "check"), /2 baseline entries no longer reported — remove them:/);
+
+    const one = evaluateAudit(
+      report({
+        nanoid: { advisories: [{ ghsa: A1, severity: "high" }] },
+        postcss: { advisories: [{ ghsa: A2, severity: "high" }] },
+      }),
+      FIXTURE,
+    );
+    assert.deepEqual(one.stale, [`postcss#${A3}`]);
+    assert.match(formatAuditVerdict(one, "check"), /1 baseline entry no longer reported — remove it:/);
+  });
+
   it("reads severity off the ADVISORY, not off the package", () => {
     // npm reports a package at the highest severity among its advisories, so
     // `postcss` shows "high" while two of its four are moderate. A gate that

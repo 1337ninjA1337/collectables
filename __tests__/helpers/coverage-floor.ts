@@ -38,20 +38,36 @@
  * dropped when the count is one and becomes "s" otherwise, so "probe(s) read as
  * spawning" prints "1 probe read as spawning" and "0 probes read as spawning".
  * The type requires it, so a bare plural does not compile rather than reaching a
- * reader ungrammatical. Irregular plurals have no marker and want rephrasing to
- * a regular head noun.
+ * reader ungrammatical.
+ *
+ * WHERE THE RULE ITSELF LIVES. Not here. "exactly one takes the singular, and
+ * zero does not" is `plural` in `lib/plural.ts`, written for the six languages
+ * the app speaks and argued there at length — zero takes the plural in all
+ * three two-form locales, which is why it is not "less than two". A second copy
+ * of that comparison in a test helper is the shape this repository keeps
+ * retiring, and `lib/audit-baseline.ts` had a third. The marker below is a
+ * SPELLING of the two forms, not a rule: it splits "probe(s)" into "probe" and
+ * "probes" and asks `plural` which one this count takes.
  */
+
+import { plural } from "@/lib/plural";
 
 /**
- * A noun phrase for the thing being counted, carrying `(s)` on its head noun.
+ * A noun phrase for the thing being counted, with its head noun marked.
  *
- * "module(s) matched the provenance pattern", not "modules matched …".
+ * `(s)` is the regular case — "module(s) matched the provenance pattern" — and
+ * is short for `(|s)`: no suffix at one, "s" otherwise. An irregular noun
+ * writes both forms, "advisor(y|ies)", so a phrase that cannot be regularised
+ * does not have to be rephrased around the marker.
  */
-export type CountedPhrase = `${string}(s)${string}`;
+export type CountedPhrase = `${string}(${string})${string}`;
 
-/** Drops or expands the `(s)` markers to agree with the count. */
+/** Resolves every marker in the phrase to the form this count takes. */
 function inflect(what: CountedPhrase, count: number): string {
-  return what.replace(/\(s\)/g, count === 1 ? "" : "s");
+  return what.replace(/\(([^()]*)\)/g, (_whole, forms: string) => {
+    const [one, other] = forms.includes("|") ? forms.split("|") : ["", forms];
+    return plural(count, one ?? "", other ?? "");
+  });
 }
 
 /**
