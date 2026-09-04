@@ -90,8 +90,44 @@ function requested(input: unknown): string {
   return (input as { url?: string } | null)?.url ?? "an unnamed request";
 }
 
-globalThis.fetch = ((input: unknown) =>
+/**
+ * Every refusal this bootstrap installed, and how to read what is there NOW.
+ *
+ * `bootstrapInstances()` answers how many times this module body ran, which is
+ * a different question from how deep a refusal is stacked. Anything that wraps
+ * a patch point after this — a second bootstrap, or a helper that saves and
+ * restores wrongly — leaves the count at one and puts a layer between a caller
+ * and the refusal. That layer still refuses, so nothing goes red; it also gets
+ * to see, change or drop the call first.
+ *
+ * ALL ELEVEN POINTS, not the six spawn methods. `globalThis.fetch` and the four
+ * http client methods are installed by this same body and were remembered by
+ * nothing, so a wrapper around the fetch refusal was exactly as invisible as a
+ * spawn wrapper was before any of this was written. The suites stub `fetch`
+ * constantly, which is what makes it the likeliest point to acquire a layer and
+ * the hardest one to have left unwatched.
+ *
+ * What is remembered per point is a value and a CLOSURE that reads the current
+ * one, because the three surfaces are not the same shape: `fetch` is a property
+ * of `globalThis`, the clients are properties of two module objects, and the
+ * spawn methods of a third. A caller reads whichever one it names at call time,
+ * and that read is what a comparison here has to be against.
+ */
+interface InstalledRefusal {
+  readonly refusal: unknown;
+  readonly current: () => unknown;
+}
+
+const installedRefusals = new Map<string, InstalledRefusal>();
+
+function installRefusal(point: string, refusal: unknown, current: () => unknown): void {
+  installedRefusals.set(point, { refusal, current });
+}
+
+const fetchRefusal = ((input: unknown) =>
   refuseNetwork("fetch", requested(input))) as unknown as typeof globalThis.fetch;
+globalThis.fetch = fetchRefusal;
+installRefusal("globalThis.fetch", fetchRefusal, () => globalThis.fetch);
 
 /**
  * `http.request`, `http.get` and their https twins.
@@ -100,11 +136,16 @@ globalThis.fetch = ((input: unknown) =>
  * own runner and `tsx` load these too, and a refusal that took the module out
  * from under them would fail the run for a reason that is not a test's.
  */
-for (const client of [http, https] as const) {
+for (const [surface, client] of [
+  ["http", http],
+  ["https", https],
+] as const) {
   for (const method of ["request", "get"] as const) {
     const mutable = client as unknown as Record<string, unknown>;
-    mutable[method] = (input: unknown) =>
+    const refusal = (input: unknown) =>
       refuseNetwork(`open an http connection to`, requested(input));
+    mutable[method] = refusal;
+    installRefusal(`${surface}.${method}`, refusal, () => mutable[method]);
   }
 }
 
@@ -165,19 +206,6 @@ export function networkTool(command: unknown): string | undefined {
   return NETWORK_TOOLS.has(name) ? name : undefined;
 }
 
-/**
- * The wrapper this bootstrap put on each spawn method, kept so it can be asked
- * later whether it is still the one there.
- *
- * `bootstrapInstances()` answers how many times this module body ran, which is
- * not the same question as how deep the refusal is stacked. Anything that wraps
- * a spawn method AFTER this — a second bootstrap, or a helper saving and
- * restoring wrongly — leaves the count at one and puts a layer between a caller
- * and this refusal. A wrapper around this one still refuses, so nothing goes
- * red; it also gets to see, change or drop the call first.
- */
-const installedSpawnPatches = new Map<string, unknown>();
-
 for (const method of ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync"] as const) {
   const mutable = childProcess as unknown as Record<string, unknown>;
   const real = mutable[method] as (...args: unknown[]) => unknown;
@@ -187,22 +215,46 @@ for (const method of ["spawn", "spawnSync", "exec", "execSync", "execFile", "exe
     return real(...args);
   };
   mutable[method] = wrapper;
-  installedSpawnPatches.set(method, wrapper);
+  installRefusal(`childProcess.${method}`, wrapper, () => mutable[method]);
 }
 
 /**
- * The spawn methods whose current value is not the wrapper this bootstrap
- * installed — empty while the refusal is what a caller reaches first.
+ * Every point this bootstrap installed a refusal at, in the order it did.
  *
- * A suite that swaps a method and restores it (this repository has one) is
- * invisible here, which is right: what this answers is whether the swap is
- * still in place, not whether one ever happened.
+ * Exported so the identity check below cannot be satisfied by remembering
+ * nothing: an empty registry has no rewrapped points, and a point nothing
+ * remembers is a point nothing can notice a layer over.
  */
-export function rewrappedSpawnMethods(): readonly string[] {
-  const mutable = childProcess as unknown as Record<string, unknown>;
-  return [...installedSpawnPatches]
-    .filter(([method, wrapper]) => mutable[method] !== wrapper)
-    .map(([method]) => method);
+export function refusalPoints(): readonly string[] {
+  return [...installedRefusals.keys()];
+}
+
+/**
+ * What a caller reaches at this point right now, or `undefined` if the point is
+ * not one this bootstrap patched.
+ *
+ * The read is the point's own — `globalThis.fetch` off the global, a client
+ * method off its module object — so a reader asking "does this still refuse?"
+ * asks it of the value a call site would get, rather than rebuilding a second
+ * copy of which surface each point lives on.
+ */
+export function refusalAt(point: string): unknown {
+  return installedRefusals.get(point)?.current();
+}
+
+/**
+ * The points whose current value is not the refusal this bootstrap installed —
+ * empty while the refusal is what a caller reaches first.
+ *
+ * A suite that swaps a value and restores it (this repository has several, and
+ * `fetch` is stubbed all over the tree) is invisible here, which is right: what
+ * this answers is whether the swap is still in place, not whether one ever
+ * happened. It answers for THIS process, which is the only one it can see.
+ */
+export function rewrappedRefusals(): readonly string[] {
+  return [...installedRefusals]
+    .filter(([, point]) => point.current() !== point.refusal)
+    .map(([point]) => point);
 }
 
 const REALTIME_MODULE_PATH = repoPath("lib", "supabase-realtime.ts");

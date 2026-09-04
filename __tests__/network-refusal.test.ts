@@ -41,7 +41,7 @@ import { describe, it } from "node:test";
 import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
 // The bootstrap's own reduction from a spawn argument to the tool it names, so
 // the case below asks the refusal's question rather than a copy of it.
-import { bootstrapInstances, networkTool, rewrappedSpawnMethods } from "./test-globals";
+import { bootstrapInstances, networkTool, refusalAt, refusalPoints, rewrappedRefusals } from "./test-globals";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -52,6 +52,28 @@ import { readRepoFile } from "./helpers/repo-file";
  * This is the value every OTHER suite starts its life with.
  */
 const installed = globalThis.fetch;
+
+/**
+ * What bounds a call when the refusal it is probing has gone.
+ *
+ * Two of the four probes ask a real `npm` and a real `npx` to do something, and
+ * rely entirely on `NETWORK_TOOLS` refusing them before the process starts. If
+ * it stopped covering either name, the probe would not fail — it would RUN, and
+ * `npm audit` against the registry is slow, needs a network, and is precisely
+ * what this whole file exists to prevent. The failure mode of the case that
+ * guards the refusal would be a hang.
+ *
+ * A killed spawn turns that back into an assertion: the child gets a
+ * millisecond and SIGKILL, `execFileSync` throws for the wrong reason, and
+ * `assert.throws` reports a message that is not the refusal's. Nothing here is
+ * load-bearing while the refusal works — it never reaches a spawn at all.
+ *
+ * At file scope rather than inside the probe describe, because the wiring
+ * describe at the bottom calls every registered refusal directly and needs the
+ * same bound for the same reason: those calls are spawns too when the thing
+ * they are checking is the thing that broke.
+ */
+const BOUNDED = { timeout: 1, killSignal: "SIGKILL", stdio: "ignore" } as const;
 
 describe("a test that reaches the network fails instead", () => {
   it("throws rather than returning a promise, so nothing awaits a real host", () => {
@@ -177,23 +199,6 @@ describe("every marker the scan reads is refused at runtime", () => {
   } {
     return specifier === "node:https" ? https : http;
   }
-
-  /**
-   * What bounds a spawn probe when the thing it is probing has gone.
-   *
-   * Two of the four probes ask a real `npm` and a real `npx` to do something,
-   * and rely entirely on `NETWORK_TOOLS` refusing them before the process
-   * starts. If it stopped covering either name, the probe would not fail — it
-   * would RUN, and `npm audit` against the registry is slow, needs a network,
-   * and is precisely what this whole file exists to prevent. The failure mode
-   * of the case that guards the refusal would be a hang.
-   *
-   * A killed spawn turns that back into an assertion: the child gets a
-   * millisecond and SIGKILL, `execFileSync` throws for the wrong reason, and
-   * `assert.throws` reports a message that is not the refusal's. Nothing here
-   * is load-bearing while the refusal works — it never reaches a spawn at all.
-   */
-  const BOUNDED = { timeout: 1, killSignal: "SIGKILL", stdio: "ignore" } as const;
 
   // Keyed by the marker's `id`, not by its sentence. The sentence is written
   // to be read in a failure message and rewording one for clarity used to
@@ -804,19 +809,60 @@ describe("the refusal is wired into every test process", () => {
     );
   });
 
-  it("is the outermost thing on every spawn method, not merely present", () => {
+  it("is the outermost thing at every point it patched, not merely present", () => {
     // The instance count above says the module body ran once. That is not the
     // same question as how deep the refusal is stacked: anything that wraps a
-    // spawn method AFTER the bootstrap — a second bootstrap, or a helper that
+    // patched point AFTER the bootstrap — a second bootstrap, or a helper that
     // saves and restores wrongly — leaves the count at one and puts a layer
     // between a caller and this refusal. The wrapper still refuses, so nothing
     // in this file goes red; it also gets to see, change or drop the call
     // first, and `optionsPassedBy` in the describe above is proof that code
     // here does exactly that kind of swapping.
+    //
+    // Every point, not the six spawn methods: `globalThis.fetch` and the four
+    // http client methods come from the same module body, and until the
+    // bootstrap remembered them a layer over the fetch refusal was exactly as
+    // invisible as a spawn wrapper was before any of this was written. `fetch`
+    // is the one the suites stub constantly, so it is both the likeliest point
+    // to acquire a layer and, in this process, the one a leaked stub shows up
+    // at — which is a thing worth being red about rather than an exemption.
     assert.deepEqual(
-      rewrappedSpawnMethods(),
+      rewrappedRefusals(),
       [],
-      "a spawn method is no longer the wrapper the bootstrap installed — something replaced or wrapped it and did not put it back, so every spawn in the suites now goes through that first",
+      "a refusal is no longer the value the bootstrap installed at that point — something replaced or wrapped it and did not put it back, so every call through it now goes through that first",
+    );
+  });
+
+  it("remembers a refusal for every surface, not only the spawn methods", () => {
+    // The case above is an identity comparison against a registry, and a
+    // registry that remembered nothing would satisfy it perfectly: no entries,
+    // no differences, green. Two things make it mean something.
+    //
+    // First, every point it names has to REFUSE when called — read live, the
+    // way a call site reads it, so a name registered against something that is
+    // not a refusal is not a member. `"curl"` reaches all three surfaces with
+    // one argument: it is a network tool to a spawn, and not a URL to the
+    // other two. The bound rides along for the reason it rides on the probes —
+    // a spawn point that had stopped refusing would otherwise run it.
+    const points = refusalPoints();
+    for (const point of points) {
+      const live = refusalAt(point) as (...args: unknown[]) => unknown;
+      assert.throws(
+        () => live("curl", BOUNDED),
+        /A test tried to/,
+        `\`${point}\` is registered as a refusal and did not refuse a call`,
+      );
+    }
+
+    // Second, every surface the bootstrap patches has to still be represented.
+    // A surface that lost its points would leave the case above silent about
+    // it, which is the state `globalThis.fetch` and the http clients were in
+    // for as long as the registry was a map of spawn methods.
+    const surfaces = [...new Set(points.map((point) => point.split(".")[0]))].sort();
+    assert.deepEqual(
+      surfaces,
+      ["childProcess", "globalThis", "http", "https"],
+      "the bootstrap refuses on four surfaces and the registry no longer names them all — a caller reaching an unnamed one reaches whatever is there, and nothing here would say so",
     );
   });
 
