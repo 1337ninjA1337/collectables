@@ -38,6 +38,7 @@ import https from "node:https";
 import { request } from "node:https";
 import { describe, it } from "node:test";
 
+import { arguedFloor, measuredFloor } from "./helpers/coverage-floor";
 import { MARKER_ID_SHAPE, NETWORK_MARKERS } from "./helpers/gate-legs";
 // The bootstrap's own reduction from a spawn argument to the tool it names, so
 // the case below asks the refusal's question rather than a copy of it.
@@ -272,10 +273,7 @@ describe("every marker the scan reads is refused at runtime", () => {
   function probesThatSpawn(): readonly (readonly [string, () => unknown])[] {
     const spawns = Object.entries(PROBES).filter(([, probe]) => SPAWN_CALL.test(probe.toString()));
     // A detector that matched nothing would agree with every probe there is.
-    assert.ok(
-      spawns.length >= 2,
-      `only ${String(spawns.length)} probes read as spawning — the two that do are no longer being seen, so nothing here bounds anything`,
-    );
+    assert.ok(spawns.length >= 2, measuredFloor(spawns.length, 2, "probes read as spawning"));
     return spawns;
   }
 
@@ -468,7 +466,7 @@ describe("every marker the scan reads is refused at runtime", () => {
     const catching = allProbes().filter(([, probe]) => /\bcatch\b/.test(probe.toString()));
     assert.ok(
       catching.length >= 1,
-      "no probe reads as catching anything — either the swallowing probe has gone or its `catch` is no longer in the source these rules read, and both are now vacuous",
+      measuredFloor(catching.length, 1, "probes read as catching anything"),
     );
     return catching;
   }
@@ -734,7 +732,7 @@ describe("every marker the scan reads is refused at runtime", () => {
     );
     assert.ok(
       spawningCatchers.length >= 1,
-      "no probe both spawns and catches — the source rule above is still checking spelling, and this case has nothing left to measure it against",
+      measuredFloor(spawningCatchers.length, 1, "probes both spawn and catch"),
     );
     for (const [id, probe] of spawningCatchers) {
       // The tool comes off the recorded call, so what is asserted is that the
@@ -910,7 +908,12 @@ describe("the refusal is wired into every test process", () => {
     // prefix it replaced, and this check a loop with no pairs in it.
     assert.ok(
       verbs.length >= 2,
-      `the registry names ${String(verbs.length)} distinct verb(s) — every point answers with the same sentence, so reading the verb tells a caller nothing the shared prefix did not`,
+      arguedFloor(
+        verbs.length,
+        2,
+        "distinct verbs among the registry's refusals",
+        "two is the fewest that lets a verb tell one refusal from another; with one verb everywhere, reading it says nothing the shared prefix did not",
+      ),
     );
 
     // The pair loop below is about verbs telling each other apart, and it says
