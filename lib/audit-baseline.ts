@@ -268,8 +268,37 @@ export function isAuditReport(parsed: unknown): parsed is AuditReport {
  * out of one place, so a caller cannot skip for one reason and report another.
  */
 export type AuditRead =
-  | { readonly report: AuditReport; readonly skip?: undefined }
-  | { readonly report?: undefined; readonly skip: string };
+  | { readonly report: AuditReport; readonly skip?: undefined; readonly cause?: undefined }
+  | { readonly report?: undefined; readonly skip: string; readonly cause: AuditSkipCause };
+
+/**
+ * WHO gave up, which is the half the sentence alone does not carry.
+ *
+ * Three skips in a row read identically today, and they call for opposite
+ * responses: if this gate abandoned the call, the bound may be too tight and
+ * the registry may be fine; if npm reported a failure, the registry answered
+ * and the bound is irrelevant; if the output was unreadable, neither of them
+ * said anything and something has changed about npm itself.
+ */
+export type AuditSkipCause =
+  /** The gate stopped waiting. Nobody said the registry was down. */
+  | "abandoned"
+  /** npm named a failure — the registry was reached and refused. */
+  | "refused"
+  /** npm produced something that is not a report, and did not say why. */
+  | "unreadable";
+
+/** A few words naming who gave up, for the front of a log line. */
+export function auditSkipHeadline(cause: AuditSkipCause): string {
+  switch (cause) {
+    case "abandoned":
+      return "we stopped waiting";
+    case "refused":
+      return "npm reported a failure";
+    case "unreadable":
+      return "npm's output was not a report";
+  }
+}
 
 /** As much of npm's own account of a failure as it gave. */
 function npmErrorSentence(error: unknown): string {
@@ -307,25 +336,39 @@ export const AUDIT_TIMEOUT_MS = 180_000;
  * whatever had been flushed when the signal arrived: not an answer, and not
  * npm's account of why there is none either.
  */
-export function auditInvocationSkip(failure: unknown, timeoutMs: number): string | undefined {
+export function auditInvocationSkip(failure: unknown, timeoutMs: number): AuditRead | undefined {
   if (typeof failure !== "object" || failure === null) return undefined;
   const { signal, code } = failure as { signal?: unknown; code?: unknown };
   const waited = `${String(Math.round(timeoutMs / 1000))}s`;
+  // "abandoned" in both branches, and it is the whole point of the label: the
+  // registry never said anything here. THIS gate stopped waiting, so a run of
+  // these means the bound may be too tight, where a run of "refused" means the
+  // registry answered and the bound is irrelevant.
+  //
   // A timeout kills the child, so the signal is the reliable half; `ETIMEDOUT`
   // is node's own name for it and is checked because a future node could set
   // one without the other.
   if (typeof signal === "string" && signal !== "") {
-    return `npm audit was killed with ${signal} after ${waited} — the registry was not answering, and a partial read is not an answer`;
+    return {
+      cause: "abandoned",
+      skip: `npm audit was killed with ${signal} after ${waited} — the registry was not answering, and a partial read is not an answer`,
+    };
   }
   if (code === "ETIMEDOUT") {
-    return `npm audit did not answer within ${waited} — the registry was not answering, and a partial read is not an answer`;
+    return {
+      cause: "abandoned",
+      skip: `npm audit did not answer within ${waited} — the registry was not answering, and a partial read is not an answer`,
+    };
   }
   return undefined;
 }
 
 export function readAuditPayload(raw: string): AuditRead {
   if (raw.trim() === "") {
-    return { skip: "npm printed nothing, so it did not get as far as an answer" };
+    return {
+      cause: "unreadable",
+      skip: "npm printed nothing, so it did not get as far as an answer",
+    };
   }
   let parsed: unknown;
   try {
@@ -333,15 +376,24 @@ export function readAuditPayload(raw: string): AuditRead {
   } catch {
     // Bounded on purpose: this goes to a CI log, and npm's non-JSON output on a
     // bad day is a stack trace.
-    return { skip: `npm's output is not JSON: ${JSON.stringify(raw.trim().slice(0, 120))}` };
+    return {
+      cause: "unreadable",
+      skip: `npm's output is not JSON: ${JSON.stringify(raw.trim().slice(0, 120))}`,
+    };
   }
   if (typeof parsed !== "object" || parsed === null) {
-    return { skip: `npm's output is a ${parsed === null ? "null" : typeof parsed}, not a report` };
+    return {
+      cause: "unreadable",
+      skip: `npm's output is a ${parsed === null ? "null" : typeof parsed}, not a report`,
+    };
   }
   const payload = parsed as { error?: unknown };
-  if (payload.error !== undefined) return { skip: npmErrorSentence(payload.error) };
+  if (payload.error !== undefined) {
+    return { cause: "refused", skip: npmErrorSentence(payload.error) };
+  }
   if (!isAuditReport(parsed)) {
     return {
+      cause: "unreadable",
       skip: "npm's output carries no `vulnerabilities`, so it does not say which advisories are open",
     };
   }

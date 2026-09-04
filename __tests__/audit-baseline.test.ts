@@ -13,6 +13,7 @@ import {
   formatAuditVerdict,
   AUDIT_TIMEOUT_MS,
   auditInvocationSkip,
+  auditSkipHeadline,
   isAuditReport,
   isClean,
   readAuditPayload,
@@ -1354,7 +1355,7 @@ describe("readAuditPayload — a skip that says which failure it was", () => {
     );
     assert.match(
       script,
-      /skipping — \$\{read\.skip\}/,
+      /skipping \([^)]*\) — \$\{read\.skip\}/,
       "the gate skips without printing the reason it was handed, which is the whole of this",
     );
   });
@@ -1370,13 +1371,13 @@ describe("auditInvocationSkip — a registry that never answers held the whole r
   it("skips when the child was killed, whichever way node says so", () => {
     // The timeout kills the child, so the signal is the reliable half.
     assert.match(
-      String(auditInvocationSkip({ signal: "SIGKILL", status: null }, 180_000)),
+      String(auditInvocationSkip({ signal: "SIGKILL", status: null }, 180_000)?.skip),
       /killed with SIGKILL after 180s/,
     );
     // `ETIMEDOUT` is node's own name for it, checked separately because a
     // future node could set one without the other.
     assert.match(
-      String(auditInvocationSkip({ code: "ETIMEDOUT" }, 180_000)),
+      String(auditInvocationSkip({ code: "ETIMEDOUT" }, 180_000)?.skip),
       /did not answer within 180s/,
     );
   });
@@ -1400,9 +1401,9 @@ describe("auditInvocationSkip — a registry that never answers held the whole r
   it("says how long it waited, from the bound the gate actually uses", () => {
     // The number in the sentence comes from the argument, so the message
     // cannot claim a bound the call did not apply.
-    assert.match(String(auditInvocationSkip({ signal: "SIGKILL" }, 30_000)), /after 30s/);
+    assert.match(String(auditInvocationSkip({ signal: "SIGKILL" }, 30_000)?.skip), /after 30s/);
     assert.match(
-      String(auditInvocationSkip({ signal: "SIGKILL" }, AUDIT_TIMEOUT_MS)),
+      String(auditInvocationSkip({ signal: "SIGKILL" }, AUDIT_TIMEOUT_MS)?.skip),
       new RegExp(`after ${String(AUDIT_TIMEOUT_MS / 1000)}s`),
     );
   });
@@ -1424,6 +1425,69 @@ describe("auditInvocationSkip — a registry that never answers held the whole r
       script,
       /auditInvocationSkip\(error, AUDIT_TIMEOUT_MS\)/,
       "a killed audit's partial output is being parsed as though it were an answer",
+    );
+  });
+});
+
+describe("the skip's cause — who gave up, which the sentence does not say", () => {
+  // Three skips in a row read identically and called for opposite responses.
+  // A bound this gate applied means the registry may be perfectly fine and the
+  // three minutes may be too few; an error npm reported means the registry was
+  // reached and refused, and the bound is beside the point; output that is not
+  // a report means neither of them said anything and npm itself has changed.
+
+  it("blames the gate when the gate stopped waiting", () => {
+    // Both timeout shapes, because both are this gate giving up.
+    assert.equal(auditInvocationSkip({ signal: "SIGKILL" }, 180_000)?.cause, "abandoned");
+    assert.equal(auditInvocationSkip({ code: "ETIMEDOUT" }, 180_000)?.cause, "abandoned");
+  });
+
+  it("blames npm when npm named the failure", () => {
+    // The registry answered here. It said no, which is an answer.
+    assert.equal(readAuditPayload('{"error":{"code":"ENOTFOUND"}}').cause, "refused");
+    assert.equal(readAuditPayload('{"error":{}}').cause, "refused");
+  });
+
+  it("blames nobody when the output is not a report", () => {
+    // Nothing said the registry was down; what arrived just is not an answer.
+    for (const raw of ["", "   ", "npm ERR! code E401", "null", '"done"', "{}"]) {
+      assert.equal(
+        readAuditPayload(raw).cause,
+        "unreadable",
+        `${JSON.stringify(raw)} should be unreadable rather than blamed on either side`,
+      );
+    }
+  });
+
+  it("carries no cause when npm answered", () => {
+    // The success arm has no cause, and the type says so — a reader that
+    // switched on it would have to handle the report case first.
+    assert.equal(readAuditPayload('{"vulnerabilities":{}}').cause, undefined);
+  });
+
+  it("gives each cause a headline a reader can tell apart at a glance", () => {
+    const headlines = (["abandoned", "refused", "unreadable"] as const).map(auditSkipHeadline);
+    assert.deepEqual(new Set(headlines).size, headlines.length, "two causes read the same");
+    for (const headline of headlines) {
+      assert.ok(headline.length > 0 && headline.length < 40, `"${headline}" is not a headline`);
+    }
+    // The one distinction the whole thing exists for: whether WE gave up.
+    assert.match(auditSkipHeadline("abandoned"), /^we /);
+    assert.doesNotMatch(auditSkipHeadline("refused"), /^we /);
+    assert.doesNotMatch(auditSkipHeadline("unreadable"), /^we /);
+  });
+
+  it("is printed by the gate, in the log line and on the annotation", () => {
+    const script = readRepoFile("scripts/check-audit-baseline.ts");
+    assert.match(
+      script,
+      /skipping \(\$\{headline\}\)/,
+      "the gate prints a skip without saying who gave up, so three skips read alike again",
+    );
+    assert.match(
+      script,
+      /title: `\$\{CHECK_NAME\} skipped: \$\{headline\}`/,
+      "the annotation title no longer distinguishes the causes, and the title is what a run summary shows",
     );
   });
 });
