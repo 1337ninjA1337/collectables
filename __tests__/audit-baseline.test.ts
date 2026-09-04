@@ -11,6 +11,7 @@ import {
   fixKind,
   fixPackage,
   formatAuditVerdict,
+  isAuditReport,
   isClean,
   observedAdvisories,
   observedAdvisoryDetails,
@@ -1182,6 +1183,95 @@ describe("the accepted list is a triage record, not a pile", () => {
     assert.ok(
       "lint:audit-baseline" in LINT_ALL_EXEMPT,
       "and it has to say why it is not one, or lint-guards.test.ts fails it",
+    );
+  });
+});
+
+describe("isAuditReport — npm failing is not npm reporting nothing", () => {
+  // The gate's own doc comment promises a soft skip when the registry cannot
+  // be reached, and the reader that implements it asked whether the payload
+  // PARSES. npm's registry failures parse: `npm audit --json` answers with a
+  // JSON error object, which carries no `vulnerabilities` — and no findings is
+  // exactly what "every accepted advisory has been withdrawn" looks like from
+  // inside `evaluateAudit`.
+  //
+  // CI run 1573 is the case for these: five and a half minutes in `npm audit`,
+  // then a red naming all four baseline entries as no longer reported, on a
+  // commit whose diff was four test files. The edit it asked for — delete the
+  // baseline — is the one edit that lets a real advisory through in silence.
+
+  it("rejects npm's error payload, which parses and says nothing", () => {
+    assert.equal(
+      isAuditReport({ error: { code: "ENOTFOUND", summary: "request to registry failed" } }),
+      false,
+    );
+    // With `vulnerabilities` alongside it, too: an error is an error, and the
+    // findings beside one are whatever npm had before it gave up.
+    assert.equal(isAuditReport({ error: { code: "EAI_AGAIN" }, vulnerabilities: {} }), false);
+  });
+
+  it("rejects a payload with no findings key at all", () => {
+    // Neither an error npm named nor a report: a truncated read, a proxy's
+    // interstitial, a future npm that renamed the field. What they share is
+    // that the answer to "which advisories are open?" is not in there.
+    assert.equal(isAuditReport({}), false);
+    assert.equal(isAuditReport({ metadata: { vulnerabilities: { high: 9 } } }), false);
+    assert.equal(isAuditReport({ vulnerabilities: null }), false);
+    assert.equal(isAuditReport({ vulnerabilities: "none" }), false);
+  });
+
+  it("rejects what is not an object, including the JSON literals", () => {
+    for (const parsed of [null, undefined, 0, "", "npm ERR!", true, []]) {
+      // An array has `typeof "object"` and no `vulnerabilities`, which is the
+      // one non-object shape that would otherwise reach the findings walk.
+      assert.equal(isAuditReport(parsed), false, `${JSON.stringify(parsed) ?? "undefined"} is not a report`);
+    }
+  });
+
+  it("accepts a CLEAN tree, which is the answer this must not swallow", () => {
+    // npm answers a tree with nothing open as `"vulnerabilities": {}` — the key
+    // present and empty. That is a report, and the staleness it produces is
+    // real: every accepted entry has genuinely been fixed. A predicate that
+    // rejected it would turn the day the baseline empties into a silent skip.
+    assert.equal(isAuditReport({ vulnerabilities: {} }), true);
+  });
+
+  it("accepts a report with findings in it", () => {
+    assert.equal(
+      isAuditReport({ vulnerabilities: { postcss: { severity: "high", via: [] } } }),
+      true,
+    );
+  });
+
+  it("is what stands between a registry failure and an empty baseline", () => {
+    // The consequence, stated as a measurement rather than as prose: hand the
+    // error payload to the evaluator and every accepted advisory comes back
+    // stale, with nothing unexpected beside it — which is precisely the red CI
+    // printed, and precisely the red a contributor would "fix" by deleting the
+    // list.
+    const asIfItWereAReport = { error: { code: "ENOTFOUND" } } as AuditReport;
+    const verdict = evaluateAudit(asIfItWereAReport);
+    assert.equal(verdict.unexpected.length, 0);
+    assert.equal(verdict.stillPresent.length, 0);
+    assert.equal(
+      verdict.stale.length,
+      ACCEPTED_HIGH_ADVISORIES.reduce((total, entry) => total + entry.advisories.length, 0),
+      "the whole baseline reads as withdrawn, which is why the payload must never reach here",
+    );
+    assert.equal(isClean(verdict), false);
+    // And the gate is only safe because the payload is turned away first.
+    assert.equal(isAuditReport(asIfItWereAReport), false);
+  });
+
+  it("is the reader the gate actually uses, not a spare predicate", () => {
+    // A guard this file owns for a script it does not run: the fix is one line
+    // in `readAudit`, and a revert of that line would leave every case above
+    // green while the hole they describe is open again.
+    const script = readRepoFile("scripts/check-audit-baseline.ts");
+    assert.match(
+      script,
+      /isAuditReport\(parsed\)/,
+      "check-audit-baseline no longer filters the parsed payload, so npm's error object reaches evaluateAudit again",
     );
   });
 });

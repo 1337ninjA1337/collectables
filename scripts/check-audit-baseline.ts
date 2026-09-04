@@ -20,6 +20,12 @@
  * availability of a third party must not decide whether this repo's tests can
  * run. `npm audit` exits non-zero WHENEVER it finds anything at or above the
  * default level, so its exit code says nothing here — only its JSON does.
+ *
+ * And not merely whether that JSON PARSES. npm reports a registry failure as a
+ * JSON error object, which parses and carries no findings, and no findings is
+ * what "every accepted advisory has been withdrawn" looks like from in here.
+ * `isAuditReport` is the line between the two; see its doc comment for the run
+ * that made the case for it.
  */
 
 import { execFileSync } from "node:child_process";
@@ -27,6 +33,7 @@ import { execFileSync } from "node:child_process";
 import {
   evaluateAudit,
   formatAuditVerdict,
+  isAuditReport,
   isClean,
   type AuditReport,
 } from "../lib/audit-baseline";
@@ -49,11 +56,16 @@ function readAudit(): AuditReport | null {
     raw = typeof stdout === "string" ? stdout : "";
   }
   if (raw.trim() === "") return null;
+  let parsed: unknown;
   try {
-    return JSON.parse(raw) as AuditReport;
+    parsed = JSON.parse(raw);
   } catch {
     return null;
   }
+  // Parsing is not the line. npm answers a registry failure with a JSON error
+  // object, which parses and carries no findings — and an empty findings set
+  // is what "every accepted advisory has been withdrawn" looks like from here.
+  return isAuditReport(parsed) ? parsed : null;
 }
 
 function main(): void {
