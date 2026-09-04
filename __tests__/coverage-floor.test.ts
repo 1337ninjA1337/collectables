@@ -92,6 +92,16 @@ describe("the count and its noun agree", () => {
     }
   });
 
+  it("refuses a third form rather than dropping it", () => {
+    // The Slavic rule takes three and this one takes two. A phrase written for
+    // the wrong rule used to inflect to the first two forms and lose the third
+    // silently, in a string whose whole job is to be read and believed.
+    assert.throws(
+      () => measuredFloor(2, 1, "предмет(|а|ов)"),
+      /marks a head noun with 3 forms and this rule picks between two/,
+    );
+  });
+
   it("inflects every marker in the phrase, not just the first", () => {
     // "page(s) whose section(s) moved" is one phrase with two head nouns, and a
     // replacement that stopped at the first would print a mixed sentence.

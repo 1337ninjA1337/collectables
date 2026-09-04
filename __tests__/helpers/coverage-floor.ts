@@ -62,11 +62,28 @@ import { plural } from "@/lib/plural";
  */
 export type CountedPhrase = `${string}(${string})${string}`;
 
-/** Resolves every marker in the phrase to the form this count takes. */
+/**
+ * Resolves every marker in the phrase to the form this count takes.
+ *
+ * A marker with THREE forms is refused rather than truncated. `plural` picks
+ * between two, and a phrase written `"(a|b|c)"` would otherwise inflect to "a"
+ * or "b" and drop "c" with nothing said — a silent wrong answer in the one
+ * string a reader is meant to trust. Three forms is what `slavicPlural` is for,
+ * and no message here is written in a language that needs it.
+ *
+ * The throw lands on the GREEN path, which is where it should: `assert.ok(x, m)`
+ * builds `m` whether or not it fires, so a phrase this cannot resolve fails the
+ * first run that reaches the line rather than the first run that goes red.
+ */
 function inflect(what: CountedPhrase, count: number): string {
   return what.replace(/\(([^()]*)\)/g, (_whole, forms: string) => {
-    const [one, other] = forms.includes("|") ? forms.split("|") : ["", forms];
-    return plural(count, one ?? "", other ?? "");
+    const parts = forms.includes("|") ? forms.split("|") : ["", forms];
+    if (parts.length > 2) {
+      throw new Error(
+        `"${what}" marks a head noun with ${String(parts.length)} forms and this rule picks between two — write "(singular|plural)", or "(s)" for the regular case`,
+      );
+    }
+    return plural(count, parts[0] ?? "", parts[1] ?? "");
   });
 }
 

@@ -48,6 +48,21 @@
  *
  * Node-pure, so `__tests__/plural.test.ts` exercises both branches directly
  * rather than through `lib/i18n-context.tsx`, which pulls React Native peers.
+ *
+ * WHO ELSE ASKS, because it is no longer only the translation maps. Everything
+ * above is about the six languages and the sixteen count-bearing keys, and that
+ * is where the rule was argued — but the same sentence gets written wherever a
+ * number meets a word, and this repository wrote it twice more before noticing.
+ * `lib/audit-baseline.ts` prints "1 advisory" / "18 advisories" for a human
+ * reading a failing gate, and `__tests__/helpers/coverage-floor.ts` prints "only
+ * 1 probe" / "only 0 probes" for a human reading a failing assertion. Both used
+ * to carry their own `count === 1`.
+ *
+ * Nothing about `plural` is specific to a translation map — it knows no
+ * vocabulary at all, which is exactly what makes it the two-form rule for a
+ * gate's English as much as for `en`, `de` and `es`. `slavicPlural` has no
+ * caller outside the maps and wants none: this tree produces no Russian failure
+ * messages.
  */
 
 /**
