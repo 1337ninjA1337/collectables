@@ -37,6 +37,7 @@ import {
   readAuditPayload,
   type AuditRead,
 } from "../lib/audit-baseline";
+import { annotation, runningUnderActions } from "../lib/github-annotations";
 
 const CHECK_NAME = "check-audit-baseline";
 
@@ -67,6 +68,17 @@ function main(): void {
   const read = readAudit();
   if (read.report === undefined) {
     console.log(`${CHECK_NAME}: skipping — ${read.skip}.`);
+    // A skip exits 0, so without this a week of registry outages is a week of
+    // green runs with the reason in a log nobody opens on a green run. The
+    // annotation puts it on the run summary, where the one leg allowed a live
+    // feed cannot decline to answer without leaving a mark.
+    if (runningUnderActions()) {
+      console.log(
+        annotation("warning", `${read.skip}. The advisory baseline was NOT checked on this run.`, {
+          title: `${CHECK_NAME} skipped`,
+        }),
+      );
+    }
     return;
   }
   const verdict = evaluateAudit(read.report);

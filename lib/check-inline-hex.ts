@@ -17,6 +17,7 @@
  * alpha overlays (pending the OVERLAY_* family) are still exempt by design.
  */
 
+import { annotation } from "./github-annotations";
 import { stripComments } from "./strip-comments";
 
 /** Regex matching a 6-digit hex literal (case-insensitive, no word boundary). */
@@ -167,21 +168,6 @@ export function formatHexReport(matches: HexMatch[]): string {
   return lines.join("\n");
 }
 
-/** Escape a workflow-command property value (file=..., etc.). */
-function escapeAnnotationProperty(value: string): string {
-  return value
-    .replace(/%/g, "%25")
-    .replace(/\r/g, "%0D")
-    .replace(/\n/g, "%0A")
-    .replace(/:/g, "%3A")
-    .replace(/,/g, "%2C");
-}
-
-/** Escape a workflow-command message (the part after `::`). */
-function escapeAnnotationMessage(value: string): string {
-  return value.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
-}
-
 /**
  * Format matches as GitHub Actions `::error` workflow commands — one line per
  * finding — so CI surfaces each inline hex as a click-through annotation on
@@ -190,11 +176,11 @@ function escapeAnnotationMessage(value: string): string {
  * (`GITHUB_ACTIONS=true`); locally they are skipped as noise.
  */
 export function formatGitHubAnnotations(matches: HexMatch[]): string[] {
-  return matches.map(
-    (m) =>
-      `::error file=${escapeAnnotationProperty(m.file)},line=${m.line},col=${m.column}::` +
-      escapeAnnotationMessage(
-        `Inline hex literal ${m.value} — route it through a named export from lib/design-tokens.ts`,
-      ),
+  return matches.map((m) =>
+    annotation(
+      "error",
+      `Inline hex literal ${m.value} — route it through a named export from lib/design-tokens.ts`,
+      { file: m.file, line: m.line, col: m.column },
+    ),
   );
 }
