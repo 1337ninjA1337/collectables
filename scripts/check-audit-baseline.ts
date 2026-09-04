@@ -33,6 +33,13 @@
  * report's entries against the report's own totals and withholds the staleness
  * half of the verdict when they disagree, rather than failing the run over
  * advisories npm did not mention.
+ *
+ * And the third line is asking again. Both of the above turn a wrong answer
+ * into a withheld one, which is better and is still not an answer; this is the
+ * only leg of `verify` whose answer can change while the tree does not, and
+ * `answer()` is what lets it check rather than leaving that to whoever re-runs
+ * the step by hand. Spent only where it can change the outcome — see
+ * `worthAsking` — so a healthy run costs exactly what it did.
  */
 
 import { execFileSync } from "node:child_process";
@@ -45,7 +52,10 @@ import {
   formatAuditVerdict,
   isClean,
   readAuditPayload,
+  reconcileAudit,
+  worthAsking,
   type AuditRead,
+  type AuditVerdict,
 } from "../lib/audit-baseline";
 import { annotation, runningUnderActions } from "../lib/github-annotations";
 
@@ -82,6 +92,38 @@ function readAudit(): AuditRead {
   return readAuditPayload(raw);
 }
 
+/**
+ * The verdict to act on, asking npm a second time when the first answer was
+ * about what it did NOT say.
+ *
+ * This is the only leg of `verify` that can answer differently for one commit,
+ * and until now it was also the only one that could not check. On 2026-09-04 a
+ * degraded registry produced two red runs claiming the whole baseline had been
+ * withdrawn, and a human re-running the step by hand is what established
+ * otherwise — twice, nine minutes apart, for the cost of one call each time.
+ *
+ * The second call is spent only where it can change the answer: see
+ * {@link worthAsking}, which is a stale-only red or a report short of its own
+ * totals. A healthy run never reaches it, so the gate's cost on the runs that
+ * pass is unchanged; a degraded one pays about 49 seconds for the difference
+ * between a red CI and a green one.
+ */
+function answer(first: AuditVerdict): AuditVerdict {
+  if (!worthAsking(first)) return first;
+  console.log(
+    `${CHECK_NAME}: this answer rests on what npm did NOT report, so asking once more before acting on it.`,
+  );
+  const again = readAudit();
+  if (again.report === undefined) {
+    // The registry stopped answering between the two calls. That says nothing
+    // about the first answer either way, so the first answer stands — and it
+    // is printed with the same withholding it always had.
+    console.log(`${CHECK_NAME}: the second read did not land (${again.skip}); reporting the first.`);
+    return first;
+  }
+  return reconcileAudit(first, evaluateAudit(again.report));
+}
+
 function main(): void {
   const read = readAudit();
   if (read.report === undefined) {
@@ -104,7 +146,7 @@ function main(): void {
     }
     return;
   }
-  const verdict = evaluateAudit(read.report);
+  const verdict = answer(evaluateAudit(read.report));
   console.log(formatAuditVerdict(verdict, CHECK_NAME));
   // A withheld staleness check is a half-answered run, and the half it did not
   // answer exits 0. The same argument the skip's annotation makes: without a

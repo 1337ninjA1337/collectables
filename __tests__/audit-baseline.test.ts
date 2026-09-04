@@ -22,6 +22,8 @@ import {
   observedAdvisoryDetails,
   observedAdvisoryFixes,
   PUBLISHED_ELSEWHERE_NOTE,
+  worthAsking,
+  reconcileAudit,
   reportCompleteness,
   reportTally,
   type AcceptedAdvisory,
@@ -1634,6 +1636,177 @@ describe("evaluateAudit on a report short of its own totals", () => {
       "check",
     );
     assert.match(printed, /npm counted 1 high\/critical root and reported 0\./);
+  });
+});
+
+describe("worthAsking — the one leg that can answer differently, and could not check", () => {
+  // On 2026-09-04 a degraded registry produced two red runs claiming the whole
+  // baseline had been withdrawn. What established otherwise was a human
+  // re-running the step by hand — twice, nine minutes apart, one call each
+  // time. The gate had no way to do that for itself.
+
+  const staleOnly = evaluateAudit(report({}), FIXTURE);
+  const short = evaluateAudit(
+    { vulnerabilities: {}, metadata: { vulnerabilities: { high: 9 } } },
+    FIXTURE,
+  );
+
+  it("asks again about a red built entirely out of what npm did not say", () => {
+    assert.equal(isClean(staleOnly), false);
+    assert.deepEqual(staleOnly.unexpected, []);
+    assert.deepEqual(staleOnly.fixableInRange, []);
+    assert.equal(worthAsking(staleOnly), true);
+  });
+
+  it("asks again about a report short of its own totals, red or not", () => {
+    // The same claim caught one layer earlier: the run passes, and it passes
+    // because a question was withheld rather than answered.
+    assert.equal(isClean(short), true);
+    assert.equal(worthAsking(short), true);
+  });
+
+  it("does not spend a call on a finding npm positively reported", () => {
+    // A second read of a `unexpected` or `fixableInRange` red can only agree or
+    // say less, and saying less is the degraded direction. Neither outcome is
+    // worth 49 seconds on every failing run.
+    const unexpected = evaluateAudit(
+      report({ browserslist: { advisories: [{ ghsa: A1, severity: "high" }] } }),
+      FIXTURE,
+    );
+    const fixable = evaluateAudit(
+      report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }], fixAvailable: true } }),
+      FIXTURE,
+    );
+    for (const [label, verdict] of [
+      ["unexpected", unexpected],
+      ["fixableInRange", fixable],
+    ] as const) {
+      assert.equal(isClean(verdict), false, label);
+      assert.equal(worthAsking(verdict), false, label);
+    }
+  });
+
+  it("does not spend a call on a run that is simply clean", () => {
+    // The overwhelming majority, and the reason this costs nothing on a healthy
+    // registry: the second read is reached by the runs that would otherwise be
+    // red or half-answered, and by no others.
+    assert.equal(worthAsking(evaluateAudit(report({}), [])), false);
+    assert.equal(
+      worthAsking(
+        evaluateAudit(
+          report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }),
+          [{ package: "nanoid", advisories: [A1], shipsToClient: true, why: "unreachable" }],
+        ),
+      ),
+      false,
+    );
+  });
+
+  it("is the predicate the gate spends its second call on", () => {
+    const script = readRepoFile("scripts/check-audit-baseline.ts");
+    assert.match(
+      script,
+      /if \(!worthAsking\(first\)\) return first;/,
+      "the gate no longer decides through worthAsking, so which runs pay for a second read is a second statement of the same rule",
+    );
+    assert.match(script, /reconcileAudit\(first, evaluateAudit\(again\.report\)\)/);
+  });
+});
+
+describe("reconcileAudit — findings unioned, staleness intersected", () => {
+  // The asymmetry `reportCompleteness` is built on, applied to two answers: a
+  // finding is something npm SAID, so either read having said it is enough and
+  // no union can invent one. Staleness is something npm did not say, so it
+  // takes both reads failing to mention an advisory before the baseline is
+  // told to drop it — the edit that, if wrong, lets a real advisory through.
+
+  const complete = (entries: Parameters<typeof report>[0]) => evaluateAudit(report(entries), FIXTURE);
+
+  it("keeps a finding either read reported", () => {
+    const sawNanoid = complete({
+      nanoid: { advisories: [{ ghsa: A1, severity: "high" }], fixAvailable: true },
+    });
+    const sawBrowserslist = complete({
+      browserslist: { advisories: [{ ghsa: A2, severity: "high" }] },
+    });
+    const both = reconcileAudit(sawNanoid, sawBrowserslist);
+    assert.deepEqual(both.unexpected, [`browserslist#${A2}`]);
+    assert.deepEqual(
+      both.fixableInRange.map((found) => found.key),
+      [`nanoid#${A1}`],
+    );
+  });
+
+  it("prunes only what both reads failed to mention", () => {
+    // The whole point. One read saw nothing and one saw `nanoid` — an advisory
+    // one call says is gone and the other says is live is not one to delete a
+    // baseline entry over.
+    const sawNothing = complete({});
+    const sawNanoid = complete({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } });
+    assert.deepEqual(sawNothing.stale, [`nanoid#${A1}`, `postcss#${A2}`, `postcss#${A3}`]);
+    assert.deepEqual(reconcileAudit(sawNothing, sawNanoid).stale, [
+      `postcss#${A2}`,
+      `postcss#${A3}`,
+    ]);
+  });
+
+  it("agrees with both reads when both reads agree", () => {
+    const twice = reconcileAudit(complete({}), complete({}));
+    assert.deepEqual(twice.stale, [`nanoid#${A1}`, `postcss#${A2}`, `postcss#${A3}`]);
+    assert.equal(isClean(twice), false);
+  });
+
+  it("lets an incomplete read abstain rather than vote empty", () => {
+    // A read that lost its entries observed neither a withdrawal nor a
+    // survival. Intersecting its empty `stale` with a complete read's would let
+    // the degraded answer decide, which is the failure this whole mechanism
+    // exists to undo.
+    const degraded = evaluateAudit(
+      { vulnerabilities: {}, metadata: { vulnerabilities: { high: 9 } } },
+      FIXTURE,
+    );
+    const sound = complete({});
+    assert.deepEqual(degraded.stale, []);
+    for (const [label, merged] of [
+      ["degraded first", reconcileAudit(degraded, sound)],
+      ["degraded second", reconcileAudit(sound, degraded)],
+    ] as const) {
+      assert.deepEqual(
+        merged.stale,
+        [`nanoid#${A1}`, `postcss#${A2}`, `postcss#${A3}`],
+        `${label}: the read that could not answer decided the answer`,
+      );
+      assert.equal(merged.completeness.complete, true, label);
+    }
+  });
+
+  it("answers nothing when neither read could", () => {
+    const degraded = evaluateAudit(
+      { vulnerabilities: {}, metadata: { vulnerabilities: { high: 9 } } },
+      FIXTURE,
+    );
+    const merged = reconcileAudit(degraded, degraded);
+    assert.deepEqual(merged.stale, []);
+    assert.equal(merged.completeness.complete, false);
+    assert.match(
+      formatAuditVerdict(merged, "check"),
+      /staleness was NOT checked/,
+      "two degraded reads print as an answered run",
+    );
+  });
+
+  it("keeps the printed findings in the one total order they are diffed in", () => {
+    const first = complete({
+      undici: { advisories: [{ ghsa: A1, severity: "moderate" }], fixAvailable: true },
+    });
+    const second = complete({
+      nanoid: { advisories: [{ ghsa: A2, severity: "high" }], fixAvailable: true },
+    });
+    assert.deepEqual(
+      reconcileAudit(first, second).fixableInRange.map((found) => found.key),
+      [`nanoid#${A2}`, `undici#${A1}`],
+      "the merged list is not in severity-then-key order, so two runs of the same pair print differently",
+    );
   });
 });
 

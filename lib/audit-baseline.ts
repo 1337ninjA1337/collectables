@@ -1227,3 +1227,80 @@ export function isClean(verdict: AuditVerdict): boolean {
     verdict.stale.length === 0
   );
 }
+
+/**
+ * Whether this answer is one to ask a SECOND time before acting on it.
+ *
+ * This is the one leg of `verify` whose answer can change while the repository
+ * does not, and it was also the one leg with no way to re-ask: a red run here
+ * was indistinguishable from a red run the branch caused until somebody ran it
+ * again by hand — which is exactly what happened on 2026-09-04, twice, and both
+ * times the second answer was different.
+ *
+ * Two shapes qualify, and they are the same shape underneath. A verdict red
+ * ONLY on `stale` is a claim built entirely out of what the report did not say.
+ * An incomplete report is the same claim, caught one layer earlier. Both are the
+ * absence-sensitive half of this gate, and re-asking is what turns a guess about
+ * silence into two observations of it.
+ *
+ * Nothing ELSE is worth a second call, and the reasons differ. A red on
+ * `unexpected` or `fixableInRange` was caused by something npm positively
+ * reported, so a second read can only agree or say less. A skip already exits 0,
+ * so there is nothing a second answer could win; and a skip whose cause was
+ * `"abandoned"` has already spent three minutes not being answered.
+ */
+export function worthAsking(verdict: AuditVerdict): boolean {
+  if (!verdict.completeness.complete) return true;
+  return (
+    verdict.stale.length > 0 &&
+    verdict.unexpected.length === 0 &&
+    verdict.fixableInRange.length === 0
+  );
+}
+
+/**
+ * Two reads of the same tree, resolved into the verdict to act on.
+ *
+ * The findings are UNIONED and the staleness is INTERSECTED, and the asymmetry
+ * is the same one {@link reportCompleteness} is built on: a finding is something
+ * npm said, so either read having said it is enough, and no union can invent
+ * one. Staleness is something npm did NOT say, so it takes both reads failing to
+ * mention an advisory before the baseline is told to drop it — the edit that, if
+ * it is wrong, lets a real advisory through in silence.
+ *
+ * An INCOMPLETE read abstains from the staleness question rather than voting
+ * empty in it. A read that lost its entries did not observe a withdrawal and did
+ * not observe a survival, so intersecting its empty `stale` with a complete
+ * read's would let the degraded answer win — which is the failure this whole
+ * mechanism exists to undo. If exactly one read was complete, that read decides;
+ * if neither was, nobody has answered and the list is empty with
+ * `completeness.complete` false to say so.
+ */
+export function reconcileAudit(first: AuditVerdict, second: AuditVerdict): AuditVerdict {
+  const votes = [first, second].filter((verdict) => verdict.completeness.complete);
+  const stale =
+    votes.length === 0
+      ? []
+      : votes
+          .map((verdict) => new Set(verdict.stale))
+          .reduce((both, next) => new Set([...both].filter((key) => next.has(key))));
+  const union = (keys: readonly string[], more: readonly string[]): readonly string[] =>
+    [...new Set([...keys, ...more])].sort();
+  const byKey = (
+    a: readonly FixableAdvisory[],
+    b: readonly FixableAdvisory[],
+  ): readonly FixableAdvisory[] =>
+    [...new Map([...a, ...b].map((found) => [found.key, found])).values()].sort(bySeverityThenKey);
+  return {
+    unexpected: union(first.unexpected, second.unexpected),
+    stillPresent: union(first.stillPresent, second.stillPresent),
+    stale: [...stale].sort(),
+    // The completeness of the read that DECIDED the staleness list, so the
+    // printed sentence describes the answer it is printed beside. With neither
+    // read complete there is no such read, and the second is the more recent
+    // account of a registry that is still degraded.
+    completeness: votes.at(-1)?.completeness ?? second.completeness,
+    fixableInRange: byKey(first.fixableInRange, second.fixableInRange),
+    majorOnly: byKey(first.majorOnly, second.majorOnly),
+  };
+}
