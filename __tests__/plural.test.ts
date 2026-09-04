@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 
 import { plural, slavicPlural } from "@/lib/plural";
 
+import { measuredFloor } from "./helpers/coverage-floor";
+import { readRepoFile } from "./helpers/repo-file";
+import { sourceCode, sourceFiles } from "./helpers/source-files";
+import { suiteCode, suiteFiles } from "./helpers/suite-files";
+
 /**
  * Both branches, exercised at the numbers that distinguish them.
  *
@@ -141,5 +146,48 @@ describe("slavicPlural", () => {
         `${n} produced '${pick(n)}', which is none of the three forms given`,
       );
     }
+  });
+});
+
+/**
+ * The header stopped being true before it stopped being read.
+ *
+ * `lib/plural.ts` was written for the translation maps and its doc comment is
+ * fifty lines about the six languages. Two callers arrived that are not the app
+ * — a build-time gate printing "1 advisory" and a test helper printing "only 1
+ * probe" — and the paragraph naming them is prose, so the fourth caller would
+ * leave it describing three and nothing would say so.
+ */
+/** The module the rule lives in. It is not a caller of itself. */
+const NOT_CALLERS = ["lib/plural.ts"];
+
+describe("who the rule says asks it", () => {
+  it("names every module that imports it, so a new caller cannot arrive unlisted", () => {
+    // Suites are excluded: a case importing `plural` to test it is not a
+    // caller of the rule in the sense the paragraph is about. A HELPER is —
+    // it builds a message somebody reads — which is why the walk keeps
+    // `__tests__/helpers/` and drops `*.test.ts`.
+    const IMPORTS_PLURAL = /from "(?:@\/lib\/plural|\.\/plural|\.\.\/lib\/plural)"/;
+    const callers = [
+      ...sourceFiles("lib", "scripts", "app", "components").filter(
+        (file) => !NOT_CALLERS.includes(file) && IMPORTS_PLURAL.test(sourceCode(file)),
+      ),
+      ...suiteFiles()
+        .filter((file) => !file.endsWith(".test.ts") && IMPORTS_PLURAL.test(suiteCode(file)))
+        .map((file) => `__tests__/${file}`),
+    ];
+    assert.ok(
+      callers.length >= 3,
+      measuredFloor(callers.length, 3, "caller(s) of lib/plural outside its own suites"),
+    );
+
+    const source = readRepoFile("lib/plural.ts");
+    const doc = source.slice(0, source.indexOf("*/"));
+    const unnamed = callers.filter((caller) => !doc.includes(caller));
+    assert.deepEqual(
+      unnamed,
+      [],
+      `these modules import the plural rule and the doc comment in lib/plural.ts does not name them: ${unnamed.join(", ")} — the "who else asks" paragraph is what tells the next reader whether this module is about translations or about agreement`,
+    );
   });
 });

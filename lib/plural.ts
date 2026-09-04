@@ -61,8 +61,14 @@
  * Nothing about `plural` is specific to a translation map — it knows no
  * vocabulary at all, which is exactly what makes it the two-form rule for a
  * gate's English as much as for `en`, `de` and `es`. `slavicPlural` has no
- * caller outside the maps and wants none: this tree produces no Russian failure
- * messages.
+ * caller outside `lib/i18n-context.tsx` and wants none: this tree produces no
+ * Russian failure messages.
+ *
+ * The three of them — `lib/i18n-context.tsx`, `lib/audit-baseline.ts`,
+ * `__tests__/helpers/coverage-floor.ts` — are named here rather than counted,
+ * and `__tests__/plural.test.ts` walks the tree for importers and fails on one
+ * this paragraph does not mention. A list in prose is a list that goes stale;
+ * this one goes red instead.
  */
 
 /**
