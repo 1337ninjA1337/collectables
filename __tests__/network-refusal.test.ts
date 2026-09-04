@@ -913,6 +913,26 @@ describe("the refusal is wired into every test process", () => {
       `the registry names ${String(verbs.length)} distinct verb(s) — every point answers with the same sentence, so reading the verb tells a caller nothing the shared prefix did not`,
     );
 
+    // The pair loop below is about verbs telling each other apart, and it says
+    // nothing about the one verb that tells NOTHING apart. `""` is registered,
+    // matched and reported like any other: the sentence becomes "A test tried
+    // to  curl", the expected prefix becomes "A test tried to  ", and the two
+    // agree — while the pair loop asks whether another verb opens with `" "`
+    // and finds that none does. An empty verb passes every reader here and
+    // identifies no surface at all.
+    //
+    // A verb is words: the message puts exactly one space on each side of it,
+    // so an edge space or a doubled one shifts the prefix the population case
+    // builds by a character it did not intend.
+    const VERB_SHAPE = /^\S+(?: \S+)*$/;
+    for (const verb of verbs) {
+      assert.match(
+        verb,
+        VERB_SHAPE,
+        `"${verb}" is not a verb the message can carry — the sentence spaces it on both sides, so an empty one, or one with an edge or doubled space, moves the prefix the case above compares against`,
+      );
+    }
+
     for (const verb of verbs) {
       for (const other of verbs) {
         if (verb === other) continue;
