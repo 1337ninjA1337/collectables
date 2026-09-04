@@ -10,6 +10,7 @@ import {
 import { formatGitHubAnnotations } from "@/lib/check-inline-hex";
 
 import { readRepoFile } from "./helpers/repo-file";
+import { sourceCode, sourceFiles } from "./helpers/source-files";
 
 /**
  * Workflow commands, extracted from `check-inline-hex` when a second producer
@@ -132,6 +133,51 @@ describe("the two producers, related by the module rather than by a copy", () =>
       script,
       /annotation\("warning",/,
       "the audit gate's skip is a plain log line again, so a run that did not check advisories looks like one that did",
+    );
+  });
+});
+
+describe("one copy of the rule, which is what the module is for", () => {
+  /** Every `lib/` and `scripts/` file except the module itself. */
+  function everyoneElse(): readonly string[] {
+    return sourceFiles("lib", "scripts").filter(
+      (file) => !file.endsWith("lib/github-annotations.ts"),
+    );
+  }
+
+  it("is the only place the escape table is written", () => {
+    // Three copies existed: `check-inline-hex` had both escapers, and
+    // `check-comment-terminators` had both again — found when the module was
+    // written, not by the entry that predicted only the env check. `%3A` is
+    // the character that tells the property escaper from the message one, so
+    // it is the one that says a fourth copy has appeared.
+    const copies = everyoneElse().filter((file) => sourceCode(file).includes('"%3A"'));
+    assert.deepEqual(
+      copies,
+      [],
+      "a workflow-command escape table has been written again — the property and message rules differ by two replacements and two copies stop agreeing",
+    );
+  });
+
+  it("is the only place the Actions check is written", () => {
+    // Three scripts decided when to annotate and each wrote the comparison.
+    // Read from code with comments stripped, because this module's own doc
+    // comment quotes the variable and so do two of the guards'.
+    const copies = everyoneElse().filter((file) => /GITHUB_ACTIONS\s*===/.test(sourceCode(file)));
+    assert.deepEqual(
+      copies,
+      [],
+      "a script is deciding whether to annotate on its own again, so `runningUnderActions` is one reader of three",
+    );
+  });
+
+  it("still formats a comment-terminator finding as it did privately", () => {
+    // The migration compared byte for byte against the template it replaced,
+    // including the two characters only the property escaper touches. Pinned
+    // here so the equivalence outlives the run that measured it.
+    assert.equal(
+      annotation("error", "100% of it: a, b", { file: "lib/we:ird,name.ts", line: 1, col: 1 }),
+      "::error file=lib/we%3Aird%2Cname.ts,line=1,col=1::100%25 of it: a, b",
     );
   });
 });
