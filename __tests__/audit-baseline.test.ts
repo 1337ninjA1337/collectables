@@ -11,6 +11,7 @@ import {
   fixKind,
   fixPackage,
   formatAuditVerdict,
+  AUDIT_SKIP_CAUSES,
   AUDIT_TIMEOUT_MS,
   auditInvocationSkip,
   auditSkipHeadline,
@@ -1466,7 +1467,10 @@ describe("the skip's cause — who gave up, which the sentence does not say", ()
   });
 
   it("gives each cause a headline a reader can tell apart at a glance", () => {
-    const headlines = (["abandoned", "refused", "unreadable"] as const).map(auditSkipHeadline);
+    // The population comes from the module, not from a second copy of the same
+    // three literals: a fourth cause used to be a compile error in the headline
+    // switch and an untested headline here.
+    const headlines = AUDIT_SKIP_CAUSES.map(auditSkipHeadline);
     assert.deepEqual(new Set(headlines).size, headlines.length, "two causes read the same");
     for (const headline of headlines) {
       assert.ok(headline.length > 0 && headline.length < 40, `"${headline}" is not a headline`);
@@ -1488,6 +1492,42 @@ describe("the skip's cause — who gave up, which the sentence does not say", ()
       script,
       /title: `\$\{CHECK_NAME\} skipped: \$\{headline\}`/,
       "the annotation title no longer distinguishes the causes, and the title is what a run summary shows",
+    );
+  });
+});
+
+describe("the declared causes and the produced ones are the same set", () => {
+  it("declares each cause once", () => {
+    assert.equal(
+      new Set(AUDIT_SKIP_CAUSES).size,
+      AUDIT_SKIP_CAUSES.length,
+      "a cause is listed twice, so the headline record has fewer keys than the array has entries",
+    );
+  });
+
+  it("produces every cause it declares, and declares every cause it produces", () => {
+    // The array is the one door onto the population, and a door onto nothing is
+    // what the derivation would otherwise buy: a cause could be declared, given
+    // a headline, looped over by every case here, and never returned by any
+    // reader for any input.
+    //
+    // The inputs are real ones — a killed call, npm's error object, and output
+    // that is not a report — so what this compares is the declaration against
+    // the behaviour rather than against another list.
+    const produced = new Set(
+      [
+        auditInvocationSkip({ signal: "SIGKILL" }, 180_000)?.cause,
+        auditInvocationSkip({ code: "ETIMEDOUT" }, 180_000)?.cause,
+        readAuditPayload('{"error":{"code":"ENOTFOUND"}}').cause,
+        readAuditPayload("").cause,
+        readAuditPayload("npm ERR!").cause,
+        readAuditPayload("{}").cause,
+      ].filter((cause) => cause !== undefined),
+    );
+    assert.deepEqual(
+      [...produced].sort(),
+      [...AUDIT_SKIP_CAUSES].sort(),
+      "the causes the readers actually return and the causes the module declares have drifted apart",
     );
   });
 });

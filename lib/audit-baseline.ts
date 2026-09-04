@@ -280,24 +280,39 @@ export type AuditRead =
  * and the bound is irrelevant; if the output was unreadable, neither of them
  * said anything and something has changed about npm itself.
  */
-export type AuditSkipCause =
+export const AUDIT_SKIP_CAUSES = [
   /** The gate stopped waiting. Nobody said the registry was down. */
-  | "abandoned"
+  "abandoned",
   /** npm named a failure — the registry was reached and refused. */
-  | "refused"
+  "refused",
   /** npm produced something that is not a report, and did not say why. */
-  | "unreadable";
+  "unreadable",
+] as const;
 
-/** A few words naming who gave up, for the front of a log line. */
+export type AuditSkipCause = (typeof AUDIT_SKIP_CAUSES)[number];
+
+/**
+ * A few words naming who gave up, for the front of a log line.
+ *
+ * A record rather than a `switch`, and the causes are a `const` array rather
+ * than a bare union, because there was no way to ASK what the causes are. The
+ * suite wrote the same three literals a second time to loop over them, so a
+ * fourth cause would have been a compile error here and an untested headline
+ * there — the two-lists arrangement half this week's entries are about, in the
+ * one place a type could supply the list instead.
+ *
+ * The record's key type is the union, so a cause added to the array without a
+ * headline does not compile; and the suite derives its population from the same
+ * array, so it does not silently keep testing three of four.
+ */
+const SKIP_HEADLINES: Record<AuditSkipCause, string> = {
+  abandoned: "we stopped waiting",
+  refused: "npm reported a failure",
+  unreadable: "npm's output was not a report",
+};
+
 export function auditSkipHeadline(cause: AuditSkipCause): string {
-  switch (cause) {
-    case "abandoned":
-      return "we stopped waiting";
-    case "refused":
-      return "npm reported a failure";
-    case "unreadable":
-      return "npm's output was not a report";
-  }
+  return SKIP_HEADLINES[cause];
 }
 
 /** As much of npm's own account of a failure as it gave. */
