@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import path from "node:path";
 
 import { measuredFloor } from "./helpers/coverage-floor";
 import { classifyProseName, moduleDoc, proseNames } from "./helpers/module-doc";
@@ -87,6 +88,20 @@ const EXPECTED_FOREIGN = [
 ];
 
 /**
+ * This file's own name in the suite walk, asked of the runtime.
+ *
+ * Written first as the literal `"header-prose-names.test.ts"`, which is a
+ * filename typed into the file it names: a rename leaves the constant pointing
+ * at a suite that is not there, the exclusion below stops excluding anything,
+ * and every entry in {@link FOREIGN} quietly resolves itself again. The case
+ * that catches that is one assertion away from the walk it protects, and
+ * `import.meta.url` answers the same question with nothing to keep in step —
+ * the spelling `suite-files-helper.test.ts` and `repo-file-helper.test.ts`
+ * already use to ask where they are.
+ */
+const SELF = path.basename(new URL(import.meta.url).pathname);
+
+/**
  * Every identifier that occurs in the tree's code, comments stripped.
  *
  * Suites and helpers are in it as well as source, and both halves earn their
@@ -107,7 +122,6 @@ const EXPECTED_FOREIGN = [
  * header is a comment, so an index built from raw text would find every name in
  * the sentence that names it and agree with itself forever.
  */
-const SELF = "header-prose-names.test.ts";
 const inCode = new Set<string>();
 for (const file of sourceFiles()) {
   for (const match of sourceCode(file).matchAll(/[A-Za-z_$][\w$]*/g)) inCode.add(match[0]);
@@ -116,29 +130,51 @@ for (const file of suiteFiles().filter((file) => file !== SELF)) {
   for (const match of suiteCode(file).matchAll(/[A-Za-z_$][\w$]*/g)) inCode.add(match[0]);
 }
 
-/** One header's unresolved names, both kinds, with the kind said in the text. */
-function unresolved(relative: string): readonly string[] {
-  const source = readSource(relative);
-  if (!source.includes("/**")) return [];
-  const named = proseNames(moduleDoc(source));
-  return [
-    ...named.identifiers.filter((name) => !inCode.has(name) && FOREIGN[name] === undefined),
-    ...named.paths.filter((rel) => !existsSync(repoPath(rel))).map((rel) => `${rel} (no such file)`),
-  ];
-}
+/**
+ * Every header in the source tree, extracted once.
+ *
+ * Three cases below want the same 257 headers, and the first version walked
+ * and re-extracted for each of them: `unresolved()` read a file and built its
+ * `proseNames`, the floors case read the same file and built the same result
+ * again, and the honesty case did it a third time. `readSource` is cached and
+ * the extraction is not, so what was being paid three times was the half that
+ * costs something.
+ */
+const HEADERS: readonly { readonly file: string; readonly names: ReturnType<typeof proseNames> }[] =
+  sourceFiles()
+    .filter((file) => readSource(file).includes("/**"))
+    .map((file) => ({ file, names: proseNames(moduleDoc(readSource(file))) }));
 
 describe("what the source headers point at", () => {
-  it("names nothing that is nowhere in the tree", () => {
+  it("names no identifier that is nowhere in the tree", () => {
     // Reported as one list rather than one case per file: a rename touches a
     // header in `lib/` and the two in `components/` that describe it, and three
     // separate red cases read as three problems.
-    const offenders = sourceFiles()
-      .flatMap((file) => unresolved(file).map((name) => `${file}: ${name}`))
-      .sort();
+    //
+    // Separate from the path case below because they are separate findings.
+    // One sentence covering both said "does not exist anywhere in this tree"
+    // for a file somebody MOVED and for a function somebody RENAMED, and the
+    // only thing telling them apart was a marker on half the rows.
+    const offenders = HEADERS.flatMap(({ file, names }) =>
+      names.identifiers
+        .filter((name) => !inCode.has(name) && FOREIGN[name] === undefined)
+        .map((name) => `${file}: ${name}`),
+    ).sort();
     assert.deepEqual(
       offenders,
       [],
-      `these module headers name code that does not exist anywhere in this tree:\n  ${offenders.join("\n  ")}\nA rename moves the import and leaves the paragraph — which is the first thing the next contributor reads, and the only thing telling them where to go`,
+      `these module headers name code that is nowhere in this tree:\n  ${offenders.join("\n  ")}\nA rename moves the import and leaves the paragraph — which is the first thing the next contributor reads, and the only thing telling them where to go`,
+    );
+  });
+
+  it("names no path that is not on disk", () => {
+    const offenders = HEADERS.flatMap(({ file, names }) =>
+      names.paths.filter((rel) => !existsSync(repoPath(rel))).map((rel) => `${file}: ${rel}`),
+    ).sort();
+    assert.deepEqual(
+      offenders,
+      [],
+      `these module headers point at files that are not there:\n  ${offenders.join("\n  ")}\nA moved file leaves every paragraph that named it as directions to nowhere`,
     );
   });
 
@@ -147,18 +183,22 @@ describe("what the source headers point at", () => {
     // the second says the classifier still claims names in it — a shape rule
     // tightened until it claims nothing passes this suite in silence, and the
     // green run would look exactly like the green run a correct tree gets.
-    const withHeaders = sourceFiles().filter((file) => readSource(file).includes("/**"));
+    //
+    // The floors are set at roughly half of what the tree carries (257 headers,
+    // 311 names) rather than just under it. A floor eleven names below the
+    // measurement is a tripwire on somebody rewriting one paragraph in plain
+    // words, and a red run about prose style is a red run nobody keeps.
     assert.ok(
-      withHeaders.length >= 200,
-      measuredFloor(withHeaders.length, 200, "source file(s) carrying a module header"),
+      HEADERS.length >= 130,
+      measuredFloor(HEADERS.length, 130, "source file(s) carrying a module header"),
     );
-    const claimed = withHeaders.reduce((total, file) => {
-      const named = proseNames(moduleDoc(readSource(file)));
-      return total + named.identifiers.length + named.paths.length;
-    }, 0);
+    const claimed = HEADERS.reduce(
+      (total, { names }) => total + names.identifiers.length + names.paths.length,
+      0,
+    );
     assert.ok(
-      claimed >= 300,
-      measuredFloor(claimed, 300, "name(s) the headers point at and this rule resolves"),
+      claimed >= 150,
+      measuredFloor(claimed, 150, "name(s) the headers point at and this rule resolves"),
     );
   });
 });
@@ -200,12 +240,7 @@ describe("the foreign vocabulary these headers are allowed to quote", () => {
     // The half worth having: an entry that stopped doing the thing exempts
     // nothing, and a name that arrived in the code since is a hole standing
     // open over a name the rule would now resolve on its own.
-    const quoted = new Set(
-      sourceFiles().flatMap((file) => {
-        const source = readSource(file);
-        return source.includes("/**") ? proseNames(moduleDoc(source)).identifiers : [];
-      }),
-    );
+    const quoted = new Set(HEADERS.flatMap(({ names }) => names.identifiers));
     for (const name of Object.keys(FOREIGN)) {
       assert.ok(
         quoted.has(name),
