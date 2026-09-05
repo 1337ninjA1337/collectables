@@ -270,24 +270,36 @@ export function isAuditReport(parsed: unknown): parsed is AuditReport {
  * Pure, and it owns the parse: the decision and the sentence explaining it come
  * out of one place, so a caller cannot skip for one reason and report another.
  */
-export type AuditRead =
-  | {
-      readonly kind: "answered";
-      readonly report: AuditReport;
-      readonly skip?: undefined;
-      readonly cause?: undefined;
-    }
-  | AuditSkip;
+export type AuditRead = AuditAnswer | AuditSkip;
 
 /**
- * The half of {@link AuditRead} where npm did not answer, named.
+ * The half of {@link AuditRead} where npm answered.
+ *
+ * Named for the same reason {@link AuditSkip} is, and at the same time: one
+ * side of a two-sided union carrying a name and the other spelled inline makes
+ * the sides look different in a way they are not, and a reader who has met
+ * `AuditSkip` goes looking for this.
+ */
+export interface AuditAnswer {
+  readonly kind: "answered";
+  readonly report: AuditReport;
+  readonly skip?: undefined;
+  readonly cause?: undefined;
+}
+
+/**
+ * The half where it did not.
  *
  * Named because two things return exactly it and could not say so:
  * {@link auditInvocationSkip} and {@link skipRead} both produce a skip and both
  * had to be typed as the whole union, so a caller holding one still had to
- * narrow before it could ask which cause it was. The `report?: undefined` and
- * the answered member's mirror of it stay: they are what let a caller ask
- * either question of an un-narrowed read, which forty-five assertions do.
+ * narrow before it could ask which cause it was.
+ *
+ * The `report?: undefined` here and its mirror on {@link AuditAnswer} stay, and
+ * they are not left over from before `kind` existed. They are what lets a
+ * caller ask either question of an un-narrowed read — forty-five assertions in
+ * the suite do exactly that — so removing them buys nothing and costs every one
+ * of them a narrowing it does not need.
  */
 export interface AuditSkip {
   readonly kind: "skipped";

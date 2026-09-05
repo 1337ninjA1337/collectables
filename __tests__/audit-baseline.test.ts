@@ -138,16 +138,20 @@ const A2 = "GHSA-bbbb-bbbb-bbb2";
 const A3 = "GHSA-cccc-cccc-ccc3";
 
 /**
- * The two halves of an {@link AuditRead}, built rather than spelled.
+ * An answered {@link AuditRead}, built rather than spelled.
  *
  * `AuditRead` gained a `kind` so it says which half it is the way
  * `AuditGateRun` does, instead of by whether `report` happened to be present.
  * Sixteen literals in this file would have had to grow the field, which is
- * sixteen chances to write the wrong one — so the two shapes are built here and
- * a case that wants "npm answered with this" says so.
+ * sixteen chances to write the wrong one.
+ *
+ * There is no local partner for the skipped half. There was — a `skippedWith`
+ * that took `(skip, cause)` and called `skipRead(cause, skip)`, flipping the
+ * order in the wrapping, so one pair had two orders in two files that are read
+ * together. `skipRead` is exported and is what the module itself builds skips
+ * with, which makes it the right thing for a case to build one with too.
  */
 const answeredWith = (payload: AuditReport): AuditRead => ({ kind: "answered", report: payload });
-const skippedWith = (skip: string, cause: AuditSkipCause): AuditRead => skipRead(cause, skip);
 
 const FIXTURE: readonly AcceptedAdvisory[] = [
   { package: "nanoid", advisories: [A1], shipsToClient: true, why: "vulnerable path unreachable" },
@@ -1834,7 +1838,7 @@ describe("answerWithSecondRead — the gate's second read, run rather than read 
     // same withholding it always had.
     const answered = answerWithSecondRead({
       first: staleOnly,
-      readAgain: () => skippedWith("registry unreachable", "refused"),
+      readAgain: () => skipRead("refused", "registry unreachable"),
       checkName: "check",
       underActions: true,
       accepted: FIXTURE,
@@ -1987,7 +1991,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     // A skip exits 0, so a week of registry outages is a week of green runs
     // with the reason in a log nobody opens on a green run. The annotation is
     // the only thing between that and a run that looks checked.
-    const run = gateRun([skippedWith("npm reported an error", "refused")], { underActions: true });
+    const run = gateRun([skipRead("refused", "npm reported an error")], { underActions: true });
     assert.equal(run.clean, true, "a skip failed the run");
     assert.equal(run.kind, "skipped", "a run that read nothing was reported as a checked one");
     assert.equal(run.lines.length, 2);
@@ -2002,7 +2006,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
   });
 
   it("leaves a local skip unannotated and still exits 0", () => {
-    const run = gateRun([skippedWith("we stopped waiting", "abandoned")]);
+    const run = gateRun([skipRead("abandoned", "we stopped waiting")]);
     assert.equal(run.clean, true);
     assert.deepEqual(run.lines, [
       `check: skipping (${auditSkipHeadline("abandoned")}) — we stopped waiting.`,
@@ -2090,7 +2094,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     // Every declared cause, because the mapping is one branch and a cause added
     // without one is exactly the shape that branch would miss.
     for (const cause of AUDIT_SKIP_CAUSES) {
-      assert.equal(gateRun([skippedWith("npm said nothing usable", cause)]).kind, "skipped");
+      assert.equal(gateRun([skipRead(cause, "npm said nothing usable")]).kind, "skipped");
     }
     assert.equal(gateRun([answeredWith(report(live))]).kind, "checked");
   });
@@ -2740,10 +2744,17 @@ describe("skipRead — the one construction every skipped read goes through", ()
     // The point of the constructor is that nothing bypasses it. Both readers
     // are driven here — a killed invocation and npm's error object — and both
     // answers have to be indistinguishable from a built one.
+    // The sentence is asserted independently rather than read off the answer
+    // and fed back in: `skipRead(cause, read.skip)` compares a value against
+    // itself on the one field that carries what happened, so a reader
+    // returning the wrong text under the right cause would pass.
     const killed = auditInvocationSkip({ signal: "SIGKILL" }, AUDIT_TIMEOUT_MS);
-    assert.deepEqual(killed, skipRead("abandoned", killed?.skip ?? "never"));
+    assert.deepEqual(
+      killed,
+      skipRead("abandoned", `npm audit was killed with SIGKILL after ${String(AUDIT_TIMEOUT_MS / 1000)}s — the registry was not answering, and a partial read is not an answer`),
+    );
     const refused = readAuditPayload('{"error":{"code":"ENOTFOUND"}}');
-    assert.deepEqual(refused, skipRead("refused", refused.skip ?? "never"));
+    assert.deepEqual(refused, skipRead("refused", "npm reported an error: ENOTFOUND"));
   });
 });
 
@@ -2803,7 +2814,7 @@ describe("the skip's cause — who gave up, which the sentence does not say", ()
     // annotation title, which is what a run summary shows.
     for (const cause of AUDIT_SKIP_CAUSES) {
       const run = runAuditGate({
-        read: () => skippedWith("npm said nothing usable", cause),
+        read: () => skipRead(cause, "npm said nothing usable"),
         checkName: "check",
         underActions: true,
         accepted: FIXTURE,
