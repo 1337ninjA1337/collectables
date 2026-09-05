@@ -273,6 +273,43 @@ describe("the one-versus-many rule lives in one module", () => {
     }
   });
 
+  /**
+   * The `if` half of the rule, which the single-line pattern cannot read.
+   *
+   * `if (n === 1) { return one; } return many;` says exactly what the ternary
+   * says, over two lines, and the disclaim list above pins that as a hole. This
+   * is the measurement of how big it is: three modules in the swept tree write
+   * an `if` whose condition compares a count against 1 or 2, and not one of
+   * them is an inflection.
+   *
+   *   `list.length < 2`     — a group needs two rows to be a duplicate
+   *   `value.length <= 1`   — a trailing separator cannot be trimmed off ""
+   *   `starts.length > 1`   — a marker that no longer identifies one section
+   *
+   * So the hole is empty today, and closing it by widening the rule to
+   * conditions would fail three bounds checks and put their names in an
+   * exemption list — the arrangement the rule's own comment refuses. Pinning
+   * the lookalikes instead means a real two-line inflection arrives as an
+   * unsanctioned module with a path, and whoever adds one has to decide what
+   * the sweep should do rather than never hearing about it.
+   */
+  const TWO_LINE_RULE = /if\s*\([^)]*(?:===\s*1|!==\s*1|>\s*1|<=\s*1|<\s*2|>=\s*2)\s*\)/;
+
+  it("has an if-shaped hole, and these three are what is in it", () => {
+    assertOnlyTheseMatch({
+      rule: TWO_LINE_RULE,
+      files: sourceFiles("lib", "scripts", "__tests__/helpers"),
+      read: sourceCode,
+      expected: [
+        "lib/db-duplicates.ts",
+        "lib/guard-root.ts",
+        "lib/privacy-translated-section.ts",
+      ],
+      subject: "modules",
+      what: "compare a count against 1 or 2 in an `if`",
+    });
+  });
+
   it("is not written out again anywhere else in the tree", () => {
     assertOnlyTheseMatch({
       rule: INLINE_RULE,
