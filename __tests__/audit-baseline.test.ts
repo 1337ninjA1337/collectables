@@ -14,6 +14,7 @@ import {
   formatSecondRead,
   secondReadAgreed,
   secondReadDifference,
+  secondReadDisagreements,
   AUDIT_SKIP_CAUSES,
   AUDIT_TIMEOUT_MS,
   auditInvocationSkip,
@@ -1996,10 +1997,6 @@ describe("secondReadAgreed — whether the run gets a mark for a registry that c
       );
     const live = { nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } };
     const surprise = { browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } };
-    // "Neither read carried its tally" is a shortfall both reads share, not a
-    // disagreement: two reads that answered nothing answered it the same way.
-    const namesADifference =
-      /short of its own totals|the reads disagree about|the second read reported \d+ finding|the second read did not repeat/;
     for (const [label, first, second] of [
       ["two clean reads", complete({}), complete({})],
       ["a staleness list that moved", complete({}), complete(live)],
@@ -2011,12 +2008,32 @@ describe("secondReadAgreed — whether the run gets a mark for a registry that c
       ["the same live advisory twice", complete(live), complete(live)],
     ] as const) {
       const line = formatSecondRead(first, second, "check");
+      // The clauses come from the formatter, not from a pattern typed here: a
+      // reworded clause has to keep this honest rather than quietly stop
+      // matching, which is a check that turns off instead of going red.
+      const disagreements = secondReadDisagreements(first, second);
       assert.equal(
         secondReadAgreed(first, second),
-        !namesADifference.test(line),
-        `${label}: the annotation and the log line describe different runs — ${line}`,
+        disagreements.length === 0,
+        `${label}: the annotation and the account describe different runs — ${line}`,
       );
+      for (const clause of disagreements) {
+        assert.ok(line.includes(clause), `${label}: "${clause}" is measured and never printed`);
+      }
     }
+  });
+
+  it("says nothing about a shortfall both reads share", () => {
+    // Two reads that answered nothing answered it the same way. The account
+    // still names the shortfall — that is what the run cost — and the run is
+    // not annotated for a disagreement it did not have.
+    const degraded = (claimed: number) =>
+      evaluateAudit(
+        { vulnerabilities: {}, metadata: { vulnerabilities: { high: claimed } } },
+        FIXTURE,
+      );
+    assert.deepEqual(secondReadDisagreements(degraded(9), degraded(2)), []);
+    assert.match(formatSecondRead(degraded(9), degraded(2), "check"), /neither read carried/);
   });
 
   it("names the disputed entries and the one-sided findings once, for both readers", () => {

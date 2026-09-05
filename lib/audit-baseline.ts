@@ -1395,6 +1395,84 @@ export function secondReadAgreed(first: AuditVerdict, second: AuditVerdict): boo
   );
 }
 
+/** `carried of claimed`, the two numbers the completeness clauses are built on. */
+function tallyCounts(verdict: AuditVerdict): string {
+  return `${String(verdict.completeness.carried)} of ${String(verdict.completeness.claimed)}`;
+}
+
+/**
+ * `N of M high/critical roots reported` — the noun governed by the count beside
+ * it, so a clause carrying two shortfalls says it once.
+ */
+function tallyShortfall(verdict: AuditVerdict): string {
+  return `${tallyCounts(verdict)} ${plural(verdict.completeness.claimed, "high/critical root", "high/critical roots")} reported`;
+}
+
+/** One read carried npm's tally and one did not, so one of them decided. */
+function deciderClause(first: AuditVerdict, second: AuditVerdict): string {
+  return first.completeness.complete
+    ? `the second read was short of its own totals (${tallyShortfall(second)}), so the first read decided staleness`
+    : `the first read was short of its own totals (${tallyShortfall(first)}) and the second was not, so the second read decided staleness`;
+}
+
+/** Both reads carried npm's tally, or neither did — which is not a difference. */
+function sharedTallyClause(first: AuditVerdict, second: AuditVerdict): string {
+  return first.completeness.complete
+    ? "both reads carried npm's own tally"
+    : `neither read carried npm's own tally (${tallyCounts(first)}, then ${tallyShortfall(second)}), so staleness is still unchecked`;
+}
+
+/** Baseline entries one voting read reported and the other did not mention. */
+function disputedClause(disputed: readonly string[]): string {
+  return `the reads disagree about ${counted(disputed.length, "baseline entry", "baseline entries")} (${disputed.join(", ")}), so ${plural(disputed.length, "it stays", "they stay")} on the baseline`;
+}
+
+/** The staleness answer the reads that voted agreed on — a difference in nothing. */
+function settledStaleClause(stale: readonly string[], voters: number): string {
+  if (stale.length === 0) return "every baseline entry was reported, so nothing reads as stale";
+  return `${counted(stale.length, "baseline entry", "baseline entries")} went unreported ${plural(voters, "in the read that decided", "in both reads")}: ${stale.join(", ")}`;
+}
+
+/** A finding the second call reported and the first did not. */
+function lateFindingClause(late: readonly string[]): string {
+  return `the second read reported ${counted(late.length, "finding", "findings")} the first did not (${late.join(", ")})`;
+}
+
+/**
+ * A finding the second call did not repeat — kept, not dropped: a finding is
+ * something npm SAID, and one read failing to say it again is not a withdrawal.
+ * Said out loud because the verdict prints it with no sign that only one of the
+ * two calls saw it.
+ */
+function unrepeatedFindingClause(gone: readonly string[]): string {
+  return `${counted(gone.length, "finding", "findings")} the second read did not repeat (${gone.join(", ")}) ${plural(gone.length, "is", "are")} kept`;
+}
+
+/**
+ * The clauses of the account that exist ONLY because the two reads differed —
+ * empty exactly when {@link secondReadAgreed}.
+ *
+ * The account is prose and a case that wants to know whether it named a
+ * disagreement was reading it with a hand-written regex over four phrasings.
+ * That is a fact the formatter knows and the case was guessing at: rewording a
+ * clause turned the check OFF rather than red, because a pattern that stops
+ * matching and a run with nothing to report look identical from the assertion.
+ * The clauses come from here now, so the case compares strings the formatter
+ * built rather than patterns somebody typed.
+ */
+export function secondReadDisagreements(
+  first: AuditVerdict,
+  second: AuditVerdict,
+): readonly string[] {
+  const difference = secondReadDifference(first, second);
+  return [
+    ...(difference.completenessDiffers ? [deciderClause(first, second)] : []),
+    ...(difference.disputedStale.length > 0 ? [disputedClause(difference.disputedStale)] : []),
+    ...(difference.onlySecond.length > 0 ? [lateFindingClause(difference.onlySecond)] : []),
+    ...(difference.onlyFirst.length > 0 ? [unrepeatedFindingClause(difference.onlyFirst)] : []),
+  ];
+}
+
 /**
  * What the second read did, for a log that until now only said it had started.
  *
@@ -1409,9 +1487,10 @@ export function secondReadAgreed(first: AuditVerdict, second: AuditVerdict): boo
  * second read exists: the right answer, printed by a run that no longer mentions
  * having met a degraded registry. This is where that sentence survives.
  *
- * Three clauses at most, and each is a measurement rather than a judgement: who
- * could answer the staleness question, what happened to the staleness list, and
- * which findings only one of the two reads saw. The last two come from
+ * Three questions, each a measurement rather than a judgement: who could answer
+ * the staleness question, what happened to the staleness list, and which
+ * findings only one of the two reads saw — the last of which is two clauses
+ * when each call saw something the other did not. The last two come from
  * {@link secondReadDifference}, which is also what decides whether the run is
  * annotated — the sentence and the mark cannot describe different runs.
  */
@@ -1423,57 +1502,20 @@ export function formatSecondRead(
   const resolved = reconcileAudit(first, second);
   const votes = [first, second].filter((verdict) => verdict.completeness.complete);
   const difference = secondReadDifference(first, second);
-  const counts = (verdict: AuditVerdict): string =>
-    `${String(verdict.completeness.carried)} of ${String(verdict.completeness.claimed)}`;
-  // The noun once per clause, governed by the count nearest it: "0 of 9, then
-  // 0 of 2 high/critical roots reported" rather than the phrase twice.
-  const roots = (verdict: AuditVerdict): string =>
-    `${plural(verdict.completeness.claimed, "high/critical root", "high/critical roots")} reported`;
-  const shortfall = (verdict: AuditVerdict): string => `${counts(verdict)} ${roots(verdict)}`;
-  const clauses: string[] = [];
-  if (votes.length === 2) {
-    clauses.push("both reads carried npm's own tally");
-  } else if (first.completeness.complete) {
-    clauses.push(
-      `the second read was short of its own totals (${shortfall(second)}), so the first read decided staleness`,
-    );
-  } else if (second.completeness.complete) {
-    clauses.push(
-      `the first read was short of its own totals (${shortfall(first)}) and the second was not, so the second read decided staleness`,
-    );
-  } else {
-    clauses.push(
-      `neither read carried npm's own tally (${counts(first)}, then ${shortfall(second)}), so staleness is still unchecked`,
-    );
-  }
+  const clauses: string[] = [
+    // One clause either way, because who could answer is a question every run
+    // has an answer to. A difference makes it name the read that DECIDED; two
+    // reads that agree — both carrying their totals, or neither — say so.
+    difference.completenessDiffers ? deciderClause(first, second) : sharedTallyClause(first, second),
+  ];
   if (votes.length > 0) {
-    const disputed = difference.disputedStale;
-    if (disputed.length > 0) {
-      clauses.push(
-        `the reads disagree about ${counted(disputed.length, "baseline entry", "baseline entries")} (${disputed.join(", ")}), so ${plural(disputed.length, "it stays", "they stay")} on the baseline`,
-      );
-    } else if (resolved.stale.length > 0) {
-      clauses.push(
-        `${counted(resolved.stale.length, "baseline entry", "baseline entries")} went unreported ${plural(votes.length, "in the read that decided", "in both reads")}: ${resolved.stale.join(", ")}`,
-      );
-    } else {
-      clauses.push("every baseline entry was reported, so nothing reads as stale");
-    }
-  }
-  const late = difference.onlySecond;
-  const gone = difference.onlyFirst;
-  if (late.length > 0) {
     clauses.push(
-      `the second read reported ${counted(late.length, "finding", "findings")} the first did not (${late.join(", ")})`,
+      difference.disputedStale.length > 0
+        ? disputedClause(difference.disputedStale)
+        : settledStaleClause(resolved.stale, votes.length),
     );
   }
-  if (gone.length > 0) {
-    // Kept, not dropped: a finding is something npm SAID, and one read failing
-    // to repeat it is not a withdrawal. Said out loud because the verdict
-    // below prints it with no sign that only one of the two calls saw it.
-    clauses.push(
-      `${counted(gone.length, "finding", "findings")} the second read did not repeat (${gone.join(", ")}) ${plural(gone.length, "is", "are")} kept`,
-    );
-  }
+  if (difference.onlySecond.length > 0) clauses.push(lateFindingClause(difference.onlySecond));
+  if (difference.onlyFirst.length > 0) clauses.push(unrepeatedFindingClause(difference.onlyFirst));
   return `${checkName}: the second read landed — ${clauses.join("; ")}.`;
 }
