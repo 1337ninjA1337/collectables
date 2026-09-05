@@ -34,6 +34,7 @@ import {
   reportTally,
   runAuditGate,
   type AcceptedAdvisory,
+  type AuditGateRun,
   type AuditRead,
   type AuditReport,
   type AuditVerdict,
@@ -1893,25 +1894,62 @@ describe("runAuditGate — the gate minus the two things only a process can do",
   // reads are arguments now and the lines are a return value.
 
   /**
-   * A reader with the run's answers staged in it, refusing a call past them.
+   * The gate, run over a staged sequence of reads, with the reader accounted
+   * for in BOTH directions.
    *
-   * The gate takes ONE reader for both calls now, so how many calls a run makes
-   * is a property of the reader: a case that stages one answer FAILS on a
-   * second read, which is how "a healthy run does not pay for a second
-   * `npm audit`" is measured rather than inferred from an `if` somebody could
-   * rewrite around.
+   * The gate takes one reader for both its calls, so how many calls a run makes
+   * is a property of the reader — which is what makes "a healthy run does not
+   * pay for a second `npm audit`" measurable rather than inferred from an `if`
+   * somebody could rewrite around. The reader that did this was half of the
+   * measurement: it failed on a call PAST the staged answers and said nothing
+   * about answers left unused. A case staging two reads and getting one passed
+   * silently, which is precisely the direction the single-reader change was
+   * made to catch — a gate that stopped asking again is a gate that prunes the
+   * baseline over one read's silence, and that is the incident, not a
+   * regression in a message.
+   *
+   * Both halves are here because the count is only meaningful as an equality,
+   * and it is asserted by the runner rather than offered to the case: a
+   * `drained()` a case has to remember to call is the same bug one screen
+   * later. That is also why staging and running are one function instead of a
+   * reader handed to a `runAuditGate` call — eight cases were building the same
+   * options object by hand, four of its five fields identical in every one, and
+   * a case that reached for the raw call could still stage nothing.
+   *
+   * The two unbounded readers this replaced (`() => ({ report: short })`,
+   * answering forever) said "the registry is still degraded" and could not say
+   * how many times it was asked. Two staged copies of the same short report say
+   * both.
    */
-  const staged = (...reads: readonly AuditRead[]) => {
+  const gateRun = (
+    reads: readonly AuditRead[],
+    options: {
+      readonly underActions?: boolean;
+      readonly checkName?: string;
+      readonly accepted?: readonly AcceptedAdvisory[];
+    } = {},
+  ): AuditGateRun => {
     let call = 0;
-    return (): AuditRead => {
-      const read = reads[call];
-      assert.ok(
-        read !== undefined,
-        `the gate made ${String(call + 1)} reads and ${String(reads.length)} were staged`,
-      );
-      call += 1;
-      return read;
-    };
+    const run = runAuditGate({
+      read: (): AuditRead => {
+        const read = reads[call];
+        assert.ok(
+          read !== undefined,
+          `the gate made ${String(call + 1)} reads and ${String(reads.length)} were staged`,
+        );
+        call += 1;
+        return read;
+      },
+      checkName: options.checkName ?? "check",
+      underActions: options.underActions ?? false,
+      accepted: options.accepted ?? FIXTURE,
+    });
+    assert.equal(
+      call,
+      reads.length,
+      `${String(reads.length)} read(s) were staged and the gate made ${String(call)} — an answer nobody asked for is a run that stopped asking, and the case it was staged for is now proving something else`,
+    );
+    return run;
   };
   const live = {
     nanoid: { advisories: [{ ghsa: A1, severity: "high" }] },
@@ -1919,12 +1957,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
   };
 
   it("passes a clean run, printing the verdict and nothing else", () => {
-    const run = runAuditGate({
-      read: staged({ report: report(live) }),
-      checkName: "check",
-      underActions: true,
-      accepted: FIXTURE,
-    });
+    const run = gateRun([{ report: report(live) }], { underActions: true });
     assert.equal(run.clean, true);
     assert.equal(run.lines.length, 1);
     assert.match(run.lines[0] ?? "", /^check: OK — no new high\/critical advisories/);
@@ -1934,11 +1967,8 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     // A skip exits 0, so a week of registry outages is a week of green runs
     // with the reason in a log nobody opens on a green run. The annotation is
     // the only thing between that and a run that looks checked.
-    const run = runAuditGate({
-      read: staged({ skip: "npm reported an error", cause: "refused" }),
-      checkName: "check",
+    const run = gateRun([{ skip: "npm reported an error", cause: "refused" }], {
       underActions: true,
-      accepted: FIXTURE,
     });
     assert.equal(run.clean, true, "a skip failed the run");
     assert.equal(run.kind, "skipped", "a run that read nothing was reported as a checked one");
@@ -1954,12 +1984,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
   });
 
   it("leaves a local skip unannotated and still exits 0", () => {
-    const run = runAuditGate({
-      read: staged({ skip: "we stopped waiting", cause: "abandoned" }),
-      checkName: "check",
-      underActions: false,
-      accepted: FIXTURE,
-    });
+    const run = gateRun([{ skip: "we stopped waiting", cause: "abandoned" }]);
     assert.equal(run.clean, true);
     assert.deepEqual(run.lines, [
       `check: skipping (${auditSkipHeadline("abandoned")}) — we stopped waiting.`,
@@ -1967,12 +1992,9 @@ describe("runAuditGate — the gate minus the two things only a process can do",
   });
 
   it("fails a run with an advisory nobody triaged", () => {
-    const run = runAuditGate({
-      read: staged({ report: report({ ...live, browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } }) }),
-      checkName: "check",
-      underActions: false,
-      accepted: FIXTURE,
-    });
+    const run = gateRun([
+      { report: report({ ...live, browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } }) },
+    ]);
     assert.equal(run.clean, false);
     assert.deepEqual(run.verdict?.unexpected, [`browserslist#${A2}`]);
     assert.ok((run.lines[0] ?? "").includes(`NEW  browserslist#${A2}`));
@@ -1982,12 +2004,10 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     // The whole mechanism, end to end: a report that mentions nothing reads as
     // the whole baseline being withdrawn, the second read reports two of the
     // three, and the gate goes green on the one both reads agree is gone.
-    const run = runAuditGate({
-      read: staged({ report: report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }) }, { report: report(live) }),
-      checkName: "check",
-      underActions: false,
-      accepted: FIXTURE,
-    });
+    const run = gateRun([
+      { report: report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }) },
+      { report: report(live) },
+    ]);
     assert.deepEqual(run.verdict?.stale, []);
     assert.equal(run.clean, true, "a baseline entry was pruned over one read's silence");
     assert.match(run.lines[0] ?? "", /asking once more before acting on it\./);
@@ -2005,14 +2025,11 @@ describe("runAuditGate — the gate minus the two things only a process can do",
       },
       metadata: { vulnerabilities: { high: 9 } },
     } as unknown as AuditReport;
-    const run = runAuditGate({
-      // A short report is worth re-asking about, and the second read is short
-      // too: the registry is still degraded, and the run still says so.
-      read: (): AuditRead => ({ report: short }),
-      checkName: "check",
-      underActions: true,
-      accepted: FIXTURE,
-    });
+    // A short report is worth re-asking about, and the second read is short
+    // too: the registry is still degraded, and the run still says so. Staging
+    // it twice is what makes "it asked again" part of what this case proves —
+    // a reader answering forever passed whether the gate asked once or twice.
+    const run = gateRun([{ report: short }, { report: short }], { underActions: true });
     assert.equal(run.clean, true, "a withheld staleness check failed the run");
     assert.equal(run.verdict?.completeness.complete, false);
     const marks = run.lines.filter((line) => line.startsWith("::"));
@@ -2026,17 +2043,41 @@ describe("runAuditGate — the gate minus the two things only a process can do",
       vulnerabilities: {},
       metadata: { vulnerabilities: { high: 9 } },
     } as unknown as AuditReport;
-    const run = runAuditGate({
-      read: (): AuditRead => ({ report: short }),
-      checkName: "check",
-      underActions: false,
-      accepted: FIXTURE,
-    });
+    const run = gateRun([{ report: short }, { report: short }]);
     assert.ok(
       !run.lines.some((line) => line.startsWith("::")),
       "a local run printed workflow commands into a terminal",
     );
     assert.ok(run.lines.some((line) => /staleness was NOT checked on this run/.test(line)));
+  });
+
+  /**
+   * The runner counts in both directions, which is the only reason the counts
+   * above mean anything.
+   *
+   * Every case here states how many times the registry is asked, in the length
+   * of the array it stages. That statement is worth exactly what the accounting
+   * behind it is worth — and for as long as the reader only refused an EXTRA
+   * call, half of every one of those statements was decoration. These two run
+   * the runner against the one gate whose read count is known either way.
+   */
+  it("refuses a run that asks past the answers staged for it", () => {
+    // A stale-only red asks twice. Stage one and the second call has nothing.
+    assert.throws(
+      () => gateRun([{ report: report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }) }]),
+      /the gate made 2 reads and 1 were staged/,
+    );
+  });
+
+  it("refuses a run that leaves an answer unasked for", () => {
+    // The half that was missing. A clean report is not worth asking about, so
+    // the gate reads once — and a case staging a second answer is describing a
+    // run that did not happen. Silently, until now: the extra answer was simply
+    // never returned, and the case went green having proved a different gate.
+    assert.throws(
+      () => gateRun([{ report: report(live) }, { report: report(live) }]),
+      /2 read\(s\) were staged and the gate made 1/,
+    );
   });
 });
 
