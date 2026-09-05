@@ -35,6 +35,7 @@ import {
   reportCompleteness,
   reportTally,
   runAuditGate,
+  skipRead,
   type AcceptedAdvisory,
   type AuditGateRun,
   type AuditSpawnOptions,
@@ -146,11 +147,7 @@ const A3 = "GHSA-cccc-cccc-ccc3";
  * a case that wants "npm answered with this" says so.
  */
 const answeredWith = (payload: AuditReport): AuditRead => ({ kind: "answered", report: payload });
-const skippedWith = (skip: string, cause: AuditSkipCause): AuditRead => ({
-  kind: "skipped",
-  skip,
-  cause,
-});
+const skippedWith = (skip: string, cause: AuditSkipCause): AuditRead => skipRead(cause, skip);
 
 const FIXTURE: readonly AcceptedAdvisory[] = [
   { package: "nanoid", advisories: [A1], shipsToClient: true, why: "vulnerable path unreachable" },
@@ -2709,6 +2706,44 @@ describe("auditInvocationSkip — a registry that never answers held the whole r
       new RegExp(`after ${String(AUDIT_TIMEOUT_MS / 1000)}s`),
       "a killed audit's partial output is being parsed as though it were an answer",
     );
+  });
+});
+
+describe("skipRead — the one construction every skipped read goes through", () => {
+  // Nine of these were built by hand in `lib/audit-baseline.ts`, each spelling
+  // `kind: "skipped"` for itself. The compiler catches a branch that writes
+  // `"answered"` only because the other two fields contradict it, which is a
+  // guarantee resting on a shape somebody could reasonably tidy away.
+
+  it("builds a read that is a skip, whatever cause it is given", () => {
+    // Over every declared cause, so a fourth is covered by arriving rather
+    // than by somebody adding a row here.
+    for (const cause of AUDIT_SKIP_CAUSES) {
+      const read = skipRead(cause, "something went wrong");
+      assert.equal(read.kind, "skipped");
+      assert.equal(read.cause, cause);
+      assert.equal(read.skip, "something went wrong");
+      assert.equal(read.report, undefined, "a skip carries a report");
+    }
+  });
+
+  it("takes the cause first, in the order the headline reads it", () => {
+    // The argument for the parameter order, made runnable: the sentence is
+    // printed under a headline the cause chooses, so a call site with the two
+    // swapped is a pair a reader can see is wrong. This is what would fail if
+    // the signature were flipped without the call sites following.
+    const read = skipRead("abandoned", "npm audit did not answer");
+    assert.equal(auditSkipHeadline(read.cause), "we stopped waiting");
+  });
+
+  it("is what the readers in this module return, not a shape beside them", () => {
+    // The point of the constructor is that nothing bypasses it. Both readers
+    // are driven here — a killed invocation and npm's error object — and both
+    // answers have to be indistinguishable from a built one.
+    const killed = auditInvocationSkip({ signal: "SIGKILL" }, AUDIT_TIMEOUT_MS);
+    assert.deepEqual(killed, skipRead("abandoned", killed?.skip ?? "never"));
+    const refused = readAuditPayload('{"error":{"code":"ENOTFOUND"}}');
+    assert.deepEqual(refused, skipRead("refused", refused.skip ?? "never"));
   });
 });
 

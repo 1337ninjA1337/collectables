@@ -277,12 +277,24 @@ export type AuditRead =
       readonly skip?: undefined;
       readonly cause?: undefined;
     }
-  | {
-      readonly kind: "skipped";
-      readonly report?: undefined;
-      readonly skip: string;
-      readonly cause: AuditSkipCause;
-    };
+  | AuditSkip;
+
+/**
+ * The half of {@link AuditRead} where npm did not answer, named.
+ *
+ * Named because two things return exactly it and could not say so:
+ * {@link auditInvocationSkip} and {@link skipRead} both produce a skip and both
+ * had to be typed as the whole union, so a caller holding one still had to
+ * narrow before it could ask which cause it was. The `report?: undefined` and
+ * the answered member's mirror of it stay: they are what let a caller ask
+ * either question of an un-narrowed read, which forty-five assertions do.
+ */
+export interface AuditSkip {
+  readonly kind: "skipped";
+  readonly report?: undefined;
+  readonly skip: string;
+  readonly cause: AuditSkipCause;
+}
 
 /**
  * WHO gave up, which is the half the sentence alone does not carry.
@@ -328,6 +340,27 @@ export function auditSkipHeadline(cause: AuditSkipCause): string {
   return SKIP_HEADLINES[cause];
 }
 
+/**
+ * A skipped read: who gave up, and the sentence saying what happened.
+ *
+ * Nine of these are constructed in this module and each spelled `kind:
+ * "skipped"` for itself — the field that arrived when {@link AuditRead} stopped
+ * announcing its half by whether `report` happened to be present. Writing it
+ * nine times is nine chances to write `"answered"` in a branch that is not one,
+ * and the compiler catches that only because the other two fields are there to
+ * contradict it.
+ *
+ * The cause comes first, matching {@link auditSkipHeadline} beside it: every
+ * one of these sentences is read under a headline that cause chooses, and
+ * putting them in the same order at the call site is what makes a mismatched
+ * pair look wrong. The two halves were already assumed to travel together —
+ * {@link SKIP_HEADLINES} is keyed on exactly this — and nothing put them in one
+ * call.
+ */
+export function skipRead(cause: AuditSkipCause, skip: string): AuditSkip {
+  return { kind: "skipped", cause, skip };
+}
+
 /** As much of npm's own account of a failure as it gave. */
 function npmErrorSentence(error: unknown): string {
   if (typeof error !== "object" || error === null) return `npm reported an error (${typeof error})`;
@@ -364,7 +397,7 @@ export const AUDIT_TIMEOUT_MS = 180_000;
  * whatever had been flushed when the signal arrived: not an answer, and not
  * npm's account of why there is none either.
  */
-export function auditInvocationSkip(failure: unknown, timeoutMs: number): AuditRead | undefined {
+export function auditInvocationSkip(failure: unknown, timeoutMs: number): AuditSkip | undefined {
   if (typeof failure !== "object" || failure === null) return undefined;
   const { signal, code } = failure as { signal?: unknown; code?: unknown };
   const waited = `${String(Math.round(timeoutMs / 1000))}s`;
@@ -377,29 +410,23 @@ export function auditInvocationSkip(failure: unknown, timeoutMs: number): AuditR
   // is node's own name for it and is checked because a future node could set
   // one without the other.
   if (typeof signal === "string" && signal !== "") {
-    return {
-      kind: "skipped",
-      cause: "abandoned",
-      skip: `npm audit was killed with ${signal} after ${waited} — the registry was not answering, and a partial read is not an answer`,
-    };
+    return skipRead(
+      "abandoned",
+      `npm audit was killed with ${signal} after ${waited} — the registry was not answering, and a partial read is not an answer`,
+    );
   }
   if (code === "ETIMEDOUT") {
-    return {
-      kind: "skipped",
-      cause: "abandoned",
-      skip: `npm audit did not answer within ${waited} — the registry was not answering, and a partial read is not an answer`,
-    };
+    return skipRead(
+      "abandoned",
+      `npm audit did not answer within ${waited} — the registry was not answering, and a partial read is not an answer`,
+    );
   }
   return undefined;
 }
 
 export function readAuditPayload(raw: string): AuditRead {
   if (raw.trim() === "") {
-    return {
-      kind: "skipped",
-      cause: "unreadable",
-      skip: "npm printed nothing, so it did not get as far as an answer",
-    };
+    return skipRead("unreadable", "npm printed nothing, so it did not get as far as an answer");
   }
   let parsed: unknown;
   try {
@@ -407,29 +434,26 @@ export function readAuditPayload(raw: string): AuditRead {
   } catch {
     // Bounded on purpose: this goes to a CI log, and npm's non-JSON output on a
     // bad day is a stack trace.
-    return {
-      kind: "skipped",
-      cause: "unreadable",
-      skip: `npm's output is not JSON: ${JSON.stringify(raw.trim().slice(0, 120))}`,
-    };
+    return skipRead(
+      "unreadable",
+      `npm's output is not JSON: ${JSON.stringify(raw.trim().slice(0, 120))}`,
+    );
   }
   if (typeof parsed !== "object" || parsed === null) {
-    return {
-      kind: "skipped",
-      cause: "unreadable",
-      skip: `npm's output is a ${parsed === null ? "null" : typeof parsed}, not a report`,
-    };
+    return skipRead(
+      "unreadable",
+      `npm's output is a ${parsed === null ? "null" : typeof parsed}, not a report`,
+    );
   }
   const payload = parsed as { error?: unknown };
   if (payload.error !== undefined) {
-    return { kind: "skipped", cause: "refused", skip: npmErrorSentence(payload.error) };
+    return skipRead("refused", npmErrorSentence(payload.error));
   }
   if (!isAuditReport(parsed)) {
-    return {
-      kind: "skipped",
-      cause: "unreadable",
-      skip: "npm's output carries no `vulnerabilities`, so it does not say which advisories are open",
-    };
+    return skipRead(
+      "unreadable",
+      "npm's output carries no `vulnerabilities`, so it does not say which advisories are open",
+    );
   }
   return { kind: "answered", report: parsed };
 }
