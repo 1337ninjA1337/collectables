@@ -490,32 +490,50 @@ describe("the one-versus-many rule lives in one module", () => {
    * goes red when a fourth arrives — with `lint:all`'s own registry cases as
    * the precedent for counting the readers rather than trusting them.
    *
-   * The seventh spelling is `\bunity\b`, which no comparison operator can spell
-   * and no source file in this tree contains. A widened fragment must be read
-   * by all three wrappers in the shape each of them wraps it in — a ternary, an
-   * `if` head, and a ternary with its operand — and the REAL readers must
-   * refuse the same three, which is the half that says the widening is what did
-   * it rather than something already in the pattern.
+   * TWO SEVENTH SPELLINGS, and the second is the one that matters. `\bunity\b`
+   * is a word: it proves the plumbing carries an ALTERNATIVE, and every real
+   * alternative is a comparison built out of `!`, `=`, `<`, `>` and `\s*` —
+   * metacharacters, an escape, and a quantifier, none of which a bare word
+   * exercises. `!==\s*0` is the shape a seventh spelling would actually be
+   * written in, and it is not one of the six, so both halves stay honest.
+   *
+   * A widened fragment must be read by all three wrappers in the shape each of
+   * them wraps it in — a ternary, an `if` head, and a ternary with its operand —
+   * and the REAL readers must refuse the same offenders, which is the half that
+   * says the widening did it rather than something already in the pattern.
    */
   it("hands a seventh spelling to all three readers from one edit", () => {
-    const WIDER = `(?:${COUNT_COMPARISON}|\\bunity\\b)`;
+    // A word and a comparison. The word says an alternative propagates at all;
+    // the comparison says one written like the six does, escapes included.
+    const SEVENTH = [
+      { alternative: "\\bunity\\b", token: "unity" },
+      { alternative: "!==\\s*0", token: "!== 0" },
+    ];
     const readers = [
-      { name: "ternary", build: ternaryReader, offender: "n unity ? one : many" },
-      { name: "if", build: ifReader, offender: "if (n unity) { return one; }" },
-      { name: "census", build: censusReader, offender: "photoCount unity ? one : many" },
+      { name: "ternary", build: ternaryReader, offender: (t: string) => `n ${t} ? one : many` },
+      { name: "if", build: ifReader, offender: (t: string) => `if (n ${t}) { return one; }` },
+      {
+        name: "census",
+        build: censusReader,
+        offender: (t: string) => `photoCount ${t} ? one : many`,
+      },
     ];
 
-    for (const { name, build, offender } of readers) {
-      assert.match(
-        offender,
-        build(WIDER),
-        `the ${name} reader was built from a widened COUNT_COMPARISON and does not read the alternative that was added to it, so a seventh spelling is one edit in the fragment and a silent hole here`,
-      );
-      assert.doesNotMatch(
-        offender,
-        build(COUNT_COMPARISON),
-        `the ${name} reader matches \`${offender}\` without the widening, so the case above proves nothing about the fragment`,
-      );
+    for (const { alternative, token } of SEVENTH) {
+      const WIDER = `(?:${COUNT_COMPARISON}|${alternative})`;
+      for (const { name, build, offender } of readers) {
+        const written = offender(token);
+        assert.match(
+          written,
+          build(WIDER),
+          `the ${name} reader was built from a COUNT_COMPARISON widened with \`${alternative}\` and does not read \`${written}\`, so a seventh spelling is one edit in the fragment and a silent hole here`,
+        );
+        assert.doesNotMatch(
+          written,
+          build(COUNT_COMPARISON),
+          `the ${name} reader matches \`${written}\` without the widening, so the case above proves nothing about the fragment`,
+        );
+      }
     }
 
     // The population, because a fourth reader with the six comparisons inlined
