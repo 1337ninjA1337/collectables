@@ -519,11 +519,21 @@ describe("the one-versus-many rule lives in one module", () => {
     }
 
     // The population, because a fourth reader with the six comparisons inlined
-    // passes every case in this file — every case in this file is about three.
+    // passes every case above — every case above is about the three in the
+    // array. Counted out of the FILE rather than compared against a literal:
+    // `readers.length === 3` beside a three-entry array is a tautology that
+    // only stops being one because a human remembers to edit the number, which
+    // is the same "a list in prose is a list that goes stale" this suite
+    // already refuses one describe up. A builder declared and left out of the
+    // array is the shape that matters, and this is what sees it.
+    //
+    // The pattern cannot match its own source: after `const ` the file has a
+    // backslash, and `\w` does not read one.
+    const declared = suiteCode("plural.test.ts").match(/const \w+Reader = /g) ?? [];
     assert.equal(
+      declared.length,
       readers.length,
-      3,
-      "a reader was added to or removed from the fragment's callers and this case still asks about three — the count is what stops a fourth being written with the alternation inlined",
+      `${declared.length} reader(s) of COUNT_COMPARISON are declared in this file and ${readers.length} are handed the widened alternation — a builder that no case asks about is a hole in exactly the direction this one is here to close`,
     );
     for (const rule of [INLINE_RULE, TWO_LINE_RULE, COUNTED_OPERAND]) {
       assert.ok(
