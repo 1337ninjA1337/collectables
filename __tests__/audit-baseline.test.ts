@@ -42,6 +42,7 @@ import {
   type AuditReport,
   type AuditVerdict,
 } from "@/lib/audit-baseline";
+import { isAnnotationLine } from "@/lib/github-annotations";
 import { LINT_ALL_EXEMPT, LINT_GUARDS } from "@/lib/lint-guards";
 
 import { measuredFloor } from "./helpers/coverage-floor";
@@ -1642,7 +1643,7 @@ describe("evaluateAudit on a report short of its own totals", () => {
       underActions: true,
       accepted: FIXTURE,
     });
-    const mark = run.lines.find((line) => line.startsWith("::"));
+    const mark = run.lines.find(isAnnotationLine);
     assert.ok(
       mark !== undefined,
       "a withheld staleness check no longer leaves a mark on the run summary, so it is only visible in a log nobody opens on a green run",
@@ -1836,7 +1837,7 @@ describe("answerWithSecondRead — the gate's second read, run rather than read 
       `check: the second read did not land (${auditSkipHeadline("refused")}) — registry unreachable; reporting the first.`,
     );
     assert.ok(
-      !answered.lines.some((line) => line.startsWith("::")),
+      !answered.lines.some(isAnnotationLine),
       "a run that got one answer was annotated as a run that got two",
     );
   });
@@ -2039,7 +2040,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     const run = gateRun([{ report: short }, { report: short }], { underActions: true });
     assert.equal(run.clean, true, "a withheld staleness check failed the run");
     assert.equal(run.verdict?.completeness.complete, false);
-    const marks = run.lines.filter((line) => line.startsWith("::"));
+    const marks = run.lines.filter(isAnnotationLine);
     assert.equal(marks.length, 1, "the under-report warning is missing, or doubled");
     assert.match(marks[0] ?? "", /^::warning title=check%3A npm's report was short of its own totals::/);
     assert.match(marks[0] ?? "", /Baseline staleness was NOT checked: 9 high\/critical roots counted, 1 reported\./);
@@ -2052,7 +2053,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     } as unknown as AuditReport;
     const run = gateRun([{ report: short }, { report: short }]);
     assert.ok(
-      !run.lines.some((line) => line.startsWith("::")),
+      !run.lines.some(isAnnotationLine),
       "a local run printed workflow commands into a terminal",
     );
     assert.ok(run.lines.some((line) => /staleness was NOT checked on this run/.test(line)));

@@ -2,9 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  ANNOTATION_LEVELS,
   annotation,
   escapeAnnotationMessage,
   escapeAnnotationProperty,
+  isAnnotationLine,
   runningUnderActions,
 } from "@/lib/github-annotations";
 import { runAuditGate, type AuditRead } from "@/lib/audit-baseline";
@@ -220,5 +222,79 @@ describe("one copy of the rule, which is what the module is for", () => {
       annotation("error", "100% of it: a, b", { file: "lib/we:ird,name.ts", line: 1, col: 1 }),
       "::error file=lib/we%3Aird%2Cname.ts,line=1,col=1::100%25 of it: a, b",
     );
+  });
+});
+
+/**
+ * The other end of {@link annotation}, and the reason it is here rather than at
+ * the five call sites that used to spell it.
+ *
+ * A gate returns its whole output as one list — log lines and workflow commands
+ * together, because the caller prints them all — so something has to tell them
+ * apart. Five cases in `audit-baseline.test.ts` did it with
+ * `startsWith("::")`, which is a copy of half of `annotation`'s decision: where
+ * the level goes, and whether a property list follows it before the closing
+ * `::`. Two spellings of one format, kept in step by nobody.
+ */
+describe("isAnnotationLine", () => {
+  it("recognises every level annotation can emit, with and without properties", () => {
+    // Driven off ANNOTATION_LEVELS rather than the three written out, which is
+    // why that array is the declaration and the type is derived from it: a
+    // fourth level spelled only in a union is one `annotation` can emit and
+    // this classifier cannot see.
+    for (const level of ANNOTATION_LEVELS) {
+      assert.ok(isAnnotationLine(annotation(level, "something happened")), `bare ${level}`);
+      assert.ok(
+        isAnnotationLine(annotation(level, "something happened", { title: "a check" })),
+        `${level} with a title`,
+      );
+      assert.ok(
+        isAnnotationLine(annotation(level, "x", { file: "lib/a.ts", line: 3, col: 9 })),
+        `${level} with a location`,
+      );
+    }
+  });
+
+  it("leaves the sentence every check prints beside its annotation alone", () => {
+    for (const line of [
+      "check-audit-baseline: OK — no new high/critical advisories",
+      "check: skipping (we stopped waiting) — npm printed nothing.",
+      "",
+    ]) {
+      assert.ok(!isAnnotationLine(line), `treated a log line as a workflow command: ${line}`);
+    }
+  });
+
+  it("does not read a quoted type annotation as a workflow command", () => {
+    // Why it anchors on the levels and not on `::` alone. These guards quote
+    // source back at people constantly, and a bare-`::` rule would classify a
+    // reported offender as a mark and suppress it on a terminal run.
+    for (const line of [
+      "  lib/a.ts:3  const x: Record<string, string> = {};",
+      "::not-a-level:: something",
+      ":: warning:: spaced",
+    ]) {
+      assert.ok(!isAnnotationLine(line), `treated source as a workflow command: ${line}`);
+    }
+  });
+
+  it("agrees with the gate about which of its own lines are marks", () => {
+    // The pairing that makes this more than a regex test: the gate emits a log
+    // line and a mark for the same skip, and the classifier has to split them
+    // the way `underActions: false` already does. A run with no marks and a run
+    // whose marks this cannot see look identical from outside.
+    const skip = (underActions: boolean) =>
+      runAuditGate({
+        read: (): AuditRead => ({ skip: "npm reported an error", cause: "refused" }),
+        checkName: "check",
+        underActions,
+      });
+    assert.deepEqual(
+      skip(true).lines.filter((line) => !isAnnotationLine(line)),
+      skip(false).lines,
+      "the lines this classifier calls prose are not the lines the gate prints when nothing is watching",
+    );
+    assert.equal(skip(true).lines.filter(isAnnotationLine).length, 1);
+    assert.equal(skip(false).lines.filter(isAnnotationLine).length, 0);
   });
 });

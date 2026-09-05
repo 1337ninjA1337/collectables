@@ -21,8 +21,36 @@
  * of a rule with five replacements in it is how the two stop agreeing.
  */
 
-/** What a workflow command says about severity. `notice` is the quietest. */
-export type AnnotationLevel = "error" | "warning" | "notice";
+/**
+ * What a workflow command says about severity. `notice` is the quietest.
+ *
+ * The array is the declaration and the type is derived from it, rather than the
+ * other way round: {@link isAnnotationLine} has to match every level, and a
+ * fourth spelled only in a union is a level `annotation` can emit and the
+ * classifier cannot recognise.
+ */
+export const ANNOTATION_LEVELS = ["error", "warning", "notice"] as const;
+
+export type AnnotationLevel = (typeof ANNOTATION_LEVELS)[number];
+
+/**
+ * Whether a printed line is a workflow command rather than a sentence.
+ *
+ * The gate scripts return their whole output as one list — log lines and
+ * annotations together, because the caller prints them all — and the only thing
+ * telling the two apart was a `::` prefix that five cases in
+ * `audit-baseline.test.ts` matched for themselves. The prefix is this module's
+ * to know: {@link annotation} decides where the level goes and whether a
+ * property list follows it, and a check reading `startsWith("::")` is a copy of
+ * half that decision, kept in step by nobody.
+ *
+ * Anchored on the levels rather than on `::` alone, because `::` alone is also
+ * how a TypeScript type annotation looks in a line of source a guard is quoting
+ * back — and these checks quote source at people constantly.
+ */
+export function isAnnotationLine(line: string): boolean {
+  return new RegExp(`^::(?:${ANNOTATION_LEVELS.join("|")})(?: |::)`).test(line);
+}
 
 /** The optional `key=value` pairs an annotation can carry. */
 export interface AnnotationProperties {
