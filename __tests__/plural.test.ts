@@ -223,6 +223,14 @@ describe("the one-versus-many rule lives in one module", () => {
    * `=== 2` and `> 2` are absent because they are not this rule. Widening to
    * "any comparison against a small number" would sweep in bounds checks and
    * make the exemption list the thing that carries the meaning.
+   *
+   * A COMPARISON AGAINST ZERO is absent for a different reason, and it is the
+   * one worth writing down because it reads like a seventh spelling. `n !== 0 ?
+   * many : none` picks a sentence for an EMPTY collection, and the form on the
+   * other side of that branch is still the plural — "0 items" is the number
+   * this whole module is `=== 1` rather than `< 2` for. Nothing is agreed, so
+   * there is nothing for `plural` to own; a screen that wants "no items" asks
+   * `t()` for a second key. Both spellings are in the disclaim list.
    */
   /**
    * The six comparisons, as a fragment all three readers are built from.
@@ -289,6 +297,16 @@ describe("the one-versus-many rule lives in one module", () => {
       "n > 2 ? crowd : few",
       "items.length >= 2 && items[1]",
       "for (let i = 1; i < 2; i += 1)",
+      // Zero against not-zero, which reads like a seventh spelling and is a
+      // different question. "No items" against "1 item" is an EMPTY STATE, and
+      // the form on the other side of it is still the plural — "0 items", the
+      // number `plural` exists to get right and the reason it is `=== 1` and
+      // not `< 2`. A copy written this way agrees nothing: it picks a sentence
+      // for an empty collection, which every screen in this app does through
+      // `t()` with two keys. Absent from the six by decision, and stated here
+      // rather than left as a gap a reader would read as an oversight.
+      "n !== 0 ? many : none",
+      "count === 0 ? empty : some",
       // The known hole, pinned rather than implied: a two-line `if` says the
       // same thing and no single-line pattern reads it. `.tasks/` says so and
       // this is where a reader meets it.
