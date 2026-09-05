@@ -224,8 +224,17 @@ describe("the one-versus-many rule lives in one module", () => {
    * "any comparison against a small number" would sweep in bounds checks and
    * make the exemption list the thing that carries the meaning.
    */
-  const INLINE_RULE =
-    /(?:===\s*1|!==\s*1|>\s*1|<=\s*1|<\s*2|>=\s*2)\s*\?/;
+  /**
+   * The six comparisons, as a fragment both rules are built from.
+   *
+   * They were written out twice — once inside the ternary pattern and once
+   * inside the `if` pattern — which is two places to add a seventh spelling and
+   * one of them to forget. The alternation is the rule; what differs between
+   * the two readers is only what wraps it.
+   */
+  const COUNT_COMPARISON = "(?:===\\s*1|!==\\s*1|>\\s*1|<=\\s*1|<\\s*2|>=\\s*2)";
+
+  const INLINE_RULE = new RegExp(`${COUNT_COMPARISON}\\s*\\?`);
 
   it("matches every spelling it claims, and the near misses it disclaims", () => {
     // The widened rule was proved on four broken trees, planted by hand in a
@@ -293,7 +302,7 @@ describe("the one-versus-many rule lives in one module", () => {
    * unsanctioned module with a path, and whoever adds one has to decide what
    * the sweep should do rather than never hearing about it.
    */
-  const TWO_LINE_RULE = /if\s*\([^)]*(?:===\s*1|!==\s*1|>\s*1|<=\s*1|<\s*2|>=\s*2)\s*\)/;
+  const TWO_LINE_RULE = new RegExp(`if\\s*\\([^)]*${COUNT_COMPARISON}\\s*\\)`);
 
   it("has an if-shaped hole, and these three are what is in it", () => {
     assertOnlyTheseMatch({
@@ -387,14 +396,20 @@ describe("the one-versus-many rule lives in one module", () => {
   const APP_TREE = ["app", "components", "data"] as const;
 
   /**
-   * The same six comparisons, with whatever is being compared kept.
+   * The ternary rule again, keeping whatever is being compared.
    *
-   * Built `g` per file rather than shared: a global pattern advances
-   * `lastIndex` between calls and would skip every other file, which is the
-   * hazard `offence-sweep` refuses on the caller's behalf and this census has
+   * The THIRD reader built from `COUNT_COMPARISON`, and the reason that
+   * fragment earned its keep an entry after it was extracted: a seventh
+   * spelling reaches the two sweeps and this census from one edit. What is
+   * added here is the operand, because the census has to name what it is
+   * vouching for and `> 1 ?` on its own names nothing.
+   *
+   * Built `g` per file rather than once: a global pattern advances `lastIndex`
+   * between calls and would skip every other file, which is the hazard
+   * `offence-sweep` refuses on its callers' behalf and a hand-rolled scan has
    * to refuse for itself.
    */
-  const COUNTED_OPERAND = /([\w.$[\]"']*)\s*(?:===\s*1|!==\s*1|>\s*1|<=\s*1|<\s*2|>=\s*2)\s*\?/;
+  const COUNTED_OPERAND = new RegExp(`(?:[\\w.$[\\]"']*)\\s*${COUNT_COMPARISON}\\s*\\?`);
 
   it("finds no inflection in the app tree, and these four expressions are why", () => {
     const census = new Set<string>();
