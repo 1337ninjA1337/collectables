@@ -1889,26 +1889,22 @@ describe("runAuditGate — the gate minus the two things only a process can do",
   // reads are arguments now and the lines are a return value.
 
   /**
-   * A reader with one answer in it — a second call is the failure.
+   * A reader with the run's answers staged in it, refusing a call past them.
    *
-   * The gate takes ONE reader for both calls now, so "this run did not pay for
-   * a second `npm audit`" is a property of the reader rather than of an `if`
-   * somebody could rewrite around.
+   * The gate takes ONE reader for both calls now, so how many calls a run makes
+   * is a property of the reader: a case that stages one answer FAILS on a
+   * second read, which is how "a healthy run does not pay for a second
+   * `npm audit`" is measured rather than inferred from an `if` somebody could
+   * rewrite around.
    */
-  const once = (read: AuditRead) => {
-    let spent = false;
-    return (): AuditRead => {
-      assert.equal(spent, false, "the gate asked npm again on a run that had nothing to re-ask about");
-      spent = true;
-      return read;
-    };
-  };
-  /** A reader that answers each call in turn, and refuses a call past the list. */
-  const inTurn = (...reads: readonly AuditRead[]) => {
+  const staged = (...reads: readonly AuditRead[]) => {
     let call = 0;
     return (): AuditRead => {
       const read = reads[call];
-      assert.ok(read !== undefined, `the gate made ${String(call + 1)} reads and ${String(reads.length)} were staged`);
+      assert.ok(
+        read !== undefined,
+        `the gate made ${String(call + 1)} reads and ${String(reads.length)} were staged`,
+      );
       call += 1;
       return read;
     };
@@ -1920,7 +1916,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
 
   it("passes a clean run, printing the verdict and nothing else", () => {
     const run = runAuditGate({
-      read: once({ report: report(live) }),
+      read: staged({ report: report(live) }),
       checkName: "check",
       underActions: true,
       accepted: FIXTURE,
@@ -1935,7 +1931,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     // with the reason in a log nobody opens on a green run. The annotation is
     // the only thing between that and a run that looks checked.
     const run = runAuditGate({
-      read: once({ skip: "npm reported an error", cause: "refused" }),
+      read: staged({ skip: "npm reported an error", cause: "refused" }),
       checkName: "check",
       underActions: true,
       accepted: FIXTURE,
@@ -1955,7 +1951,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
 
   it("leaves a local skip unannotated and still exits 0", () => {
     const run = runAuditGate({
-      read: once({ skip: "we stopped waiting", cause: "abandoned" }),
+      read: staged({ skip: "we stopped waiting", cause: "abandoned" }),
       checkName: "check",
       underActions: false,
       accepted: FIXTURE,
@@ -1968,7 +1964,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
 
   it("fails a run with an advisory nobody triaged", () => {
     const run = runAuditGate({
-      read: once({ report: report({ ...live, browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } }) }),
+      read: staged({ report: report({ ...live, browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } }) }),
       checkName: "check",
       underActions: false,
       accepted: FIXTURE,
@@ -1983,7 +1979,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     // the whole baseline being withdrawn, the second read reports two of the
     // three, and the gate goes green on the one both reads agree is gone.
     const run = runAuditGate({
-      read: inTurn({ report: report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }) }, { report: report(live) }),
+      read: staged({ report: report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }) }, { report: report(live) }),
       checkName: "check",
       underActions: false,
       accepted: FIXTURE,

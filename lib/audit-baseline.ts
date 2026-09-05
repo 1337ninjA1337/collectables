@@ -1437,6 +1437,23 @@ export type AuditGateRun =
  * this way, and none of it was before: those facts were established by reading
  * the file for an exact expression, which is a check on the spelling of the code
  * rather than on what it does.
+ *
+ * ## The three lines between a degraded registry and a wrong answer
+ *
+ * They are in order of how loudly the registry fails. {@link isAuditReport} is
+ * the first: npm answers a registry failure with a JSON error object, which
+ * parses and carries no findings, and no findings is exactly what "every
+ * accepted advisory has been withdrawn" looks like from in here. That catches a
+ * registry failing LOUDLY. {@link reportCompleteness} is the second, for one
+ * failing QUIETLY — a well-formed report whose entries are simply missing, which
+ * is what happened on 2026-09-04 — and it withholds the staleness half of the
+ * verdict rather than pruning the baseline over advisories npm did not mention.
+ *
+ * Both turn a wrong answer into a withheld one, which is better and is still not
+ * an answer. {@link answerWithSecondRead} is the third: this is the only leg of
+ * `verify` whose answer can change while the tree does not, so it asks again
+ * rather than leaving that to whoever re-runs the step by hand — and only where
+ * a second answer could change the outcome, so a healthy run costs what it did.
  */
 export function runAuditGate(options: {
   readonly read: () => AuditRead;

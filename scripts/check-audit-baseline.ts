@@ -1,49 +1,27 @@
 #!/usr/bin/env tsx
 /**
- * Dependency-advisory drift gate: fails when `npm audit` reports a
- * high/critical advisory root that SECURITY.md has not triaged, when npm can
- * clear an advisory AT ANY SEVERITY without a major version change, or when
- * the accepted list names an advisory the audit no longer reports.
+ * Dependency-advisory drift gate: the CLI half.
  *
- * The two severity scopes are deliberate and different. Needing a triage
- * sentence is expensive, so it is asked at high/critical; needing a lockfile
- * bump costs one command, so it is asked at all five.
+ * This file is the two things only a process can do — run `npm audit --json`
+ * and exit — plus the reader that turns one invocation into an `AuditRead`.
+ * Every decision is `runAuditGate` in `lib/audit-baseline.ts`: what the gate
+ * fails on, the two severity scopes, the soft skip and its annotation, whether
+ * npm is asked a second time and what is said about the answer. That module's
+ * doc comment is where those are argued, and it is the one that has to be right
+ * — five paragraphs restating them here is five paragraphs to keep in step with
+ * a file this one no longer contains.
  *
- * Replaces a bare `npm audit --audit-level=high` that was
- * `continue-on-error: true` and therefore reported the same red for an
- * advisory somebody had read and one nobody had ever seen. Pure logic lives
- * in `lib/audit-baseline.ts`.
+ * The reader is here rather than there because it is the process boundary: it
+ * spawns, and it carries the bound that spawn needs. `npm audit` exits non-zero
+ * WHENEVER it finds anything at or above the default level, so its exit code
+ * says nothing — only its JSON does, and only after `readAuditPayload` has told
+ * a report from a registry failure that parses like one.
  *
- * Needs the npm registry, so it is its own CI step rather than a `LINT_GUARDS`
- * entry (that registry is documented as network-free). A run that cannot reach
- * the registry is a SOFT SKIP, the same call `check-expo-install` makes:
+ * Needs the registry, so it is its own CI step rather than a `LINT_GUARDS`
+ * entry (that registry is documented as network-free), and a run that cannot
+ * reach it is a SOFT SKIP, the same call `check-expo-install` makes:
  * availability of a third party must not decide whether this repo's tests can
- * run. `npm audit` exits non-zero WHENEVER it finds anything at or above the
- * default level, so its exit code says nothing here — only its JSON does.
- *
- * And not merely whether that JSON PARSES. npm reports a registry failure as a
- * JSON error object, which parses and carries no findings, and no findings is
- * what "every accepted advisory has been withdrawn" looks like from in here.
- * `isAuditReport` is the line between the two; see its doc comment for the run
- * that made the case for it.
- *
- * That line catches a registry that fails LOUDLY. One that fails quietly — a
- * well-formed report whose findings are simply missing — gets through it, and
- * did, on 2026-09-04. `reportCompleteness` is the second line: it checks the
- * report's entries against the report's own totals and withholds the staleness
- * half of the verdict when they disagree, rather than failing the run over
- * advisories npm did not mention.
- *
- * And the third line is asking again. Both of the above turn a wrong answer
- * into a withheld one, which is better and is still not an answer; this is the
- * only leg of `verify` whose answer can change while the tree does not, and
- * `answerWithSecondRead` is what lets it check rather than leaving that to
- * whoever re-runs the step by hand. Spent only where it can change the outcome —
- * see `worthAsking` — so a healthy run costs exactly what it did.
- *
- * What is left in this file is the two things only a process can do: run
- * `npm audit` and exit. The decisions are `runAuditGate`, which takes this
- * file's reader and returns the lines to print, so a test can run them.
+ * run.
  */
 
 import { execFileSync } from "node:child_process";
