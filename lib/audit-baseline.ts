@@ -1310,31 +1310,88 @@ function findingKeys(verdict: AuditVerdict): readonly string[] {
   return [...verdict.unexpected, ...verdict.fixableInRange.map((found) => found.key)];
 }
 
-/** Set equality over two key lists, which arrive sorted but not deduped. */
-function sameKeys(left: readonly string[], right: readonly string[]): boolean {
-  const one = new Set(left);
-  const other = new Set(right);
-  return one.size === other.size && [...one].every((key) => other.has(key));
+/** Everything two reads of one tree can disagree about. */
+export interface SecondReadDifference {
+  /**
+   * Whether one read carried npm's own tally and the other did not.
+   *
+   * A difference in the one field that decides whether either read's `stale` was
+   * an answer at all — and one the two lists cannot show, because an incomplete
+   * read's `stale` is empty for a reason that is not "nothing was withdrawn".
+   */
+  readonly completenessDiffers: boolean;
+  /**
+   * Baseline entries exactly one VOTING read failed to mention, which is why
+   * they stay on the baseline.
+   *
+   * Only the reads that voted, because an incomplete read abstained rather than
+   * answering empty: counting its silence as disagreement would put the whole
+   * baseline in this list on every degraded run.
+   */
+  readonly disputedStale: readonly string[];
+  /** Findings the second read reported and the first did not. */
+  readonly onlySecond: readonly string[];
+  /** Findings the first read reported and the second did not — kept anyway. */
+  readonly onlyFirst: readonly string[];
+}
+
+/**
+ * What the two reads disagreed about, as the one measurement both readers use.
+ *
+ * {@link secondReadAgreed} decides whether the run gets a mark on its summary and
+ * {@link formatSecondRead} writes the sentence beside it. Those are two different
+ * jobs asking one question, and asked twice they can answer differently: a log
+ * line reading "both reads carried npm's own tally; every baseline entry was
+ * reported" printed beside an annotation saying the reads disagreed is one
+ * comparison's drift away, which is the arrangement half this file's history is
+ * about. Both read this.
+ *
+ * Three fields because three things can differ between two calls a minute apart:
+ * whether the report carried its own totals, which baseline entries went
+ * unmentioned, and what npm positively reported. `stillPresent` and `majorOnly`
+ * are derived from those, so a difference in either is already here.
+ */
+export function secondReadDifference(
+  first: AuditVerdict,
+  second: AuditVerdict,
+): SecondReadDifference {
+  const votes = [first, second].filter((verdict) => verdict.completeness.complete);
+  const staleVotes = votes.map((verdict) => new Set(verdict.stale));
+  const agreedStale =
+    staleVotes.length === 0
+      ? new Set<string>()
+      : staleVotes.reduce((both, next) => new Set([...both].filter((key) => next.has(key))));
+  const onlyIn = (mine: AuditVerdict, theirs: AuditVerdict): readonly string[] => {
+    const seen = new Set(findingKeys(theirs));
+    return [...new Set(findingKeys(mine))].filter((key) => !seen.has(key)).sort();
+  };
+  return {
+    completenessDiffers: first.completeness.complete !== second.completeness.complete,
+    disputedStale: [...new Set(votes.flatMap((verdict) => verdict.stale))]
+      .filter((key) => !agreedStale.has(key))
+      .sort(),
+    onlySecond: onlyIn(second, first),
+    onlyFirst: onlyIn(first, second),
+  };
 }
 
 /**
  * Whether the two reads said the same thing about the same tree.
  *
- * Three questions, because three things can differ between two calls a minute
- * apart: whether the report carried its own totals, which baseline entries went
- * unmentioned, and what npm positively reported. `stillPresent` and `majorOnly`
- * are derived from those, so a difference in either shows up here already.
+ * Every field of {@link SecondReadDifference} empty, and nothing else: the
+ * predicate IS the absence of the differences the printed account names, so a
+ * run cannot be annotated for a disagreement its own log does not describe.
  *
- * Separate from {@link formatSecondRead} because the two answers go to different
- * places: the sentence goes to the log, and this decides whether the run gets a
- * mark on its summary. A reconciled verdict cannot be asked — its whole job is
- * to look like one answer.
+ * A reconciled verdict cannot be asked this — its whole job is to look like one
+ * answer — so both callers take the two reads.
  */
 export function secondReadAgreed(first: AuditVerdict, second: AuditVerdict): boolean {
+  const difference = secondReadDifference(first, second);
   return (
-    first.completeness.complete === second.completeness.complete &&
-    sameKeys(first.stale, second.stale) &&
-    sameKeys(findingKeys(first), findingKeys(second))
+    !difference.completenessDiffers &&
+    difference.disputedStale.length === 0 &&
+    difference.onlySecond.length === 0 &&
+    difference.onlyFirst.length === 0
   );
 }
 
@@ -1354,7 +1411,9 @@ export function secondReadAgreed(first: AuditVerdict, second: AuditVerdict): boo
  *
  * Three clauses at most, and each is a measurement rather than a judgement: who
  * could answer the staleness question, what happened to the staleness list, and
- * which findings only one of the two reads saw.
+ * which findings only one of the two reads saw. The last two come from
+ * {@link secondReadDifference}, which is also what decides whether the run is
+ * annotated — the sentence and the mark cannot describe different runs.
  */
 export function formatSecondRead(
   first: AuditVerdict,
@@ -1363,6 +1422,7 @@ export function formatSecondRead(
 ): string {
   const resolved = reconcileAudit(first, second);
   const votes = [first, second].filter((verdict) => verdict.completeness.complete);
+  const difference = secondReadDifference(first, second);
   const counts = (verdict: AuditVerdict): string =>
     `${String(verdict.completeness.carried)} of ${String(verdict.completeness.claimed)}`;
   // The noun once per clause, governed by the count nearest it: "0 of 9, then
@@ -1387,12 +1447,7 @@ export function formatSecondRead(
     );
   }
   if (votes.length > 0) {
-    // Only the reads that voted, because an incomplete read abstained rather
-    // than answering empty: counting its silence as disagreement would print
-    // the whole baseline as disputed on every degraded run.
-    const disputed = [...new Set(votes.flatMap((verdict) => verdict.stale))]
-      .filter((key) => !resolved.stale.includes(key))
-      .sort();
+    const disputed = difference.disputedStale;
     if (disputed.length > 0) {
       clauses.push(
         `the reads disagree about ${counted(disputed.length, "baseline entry", "baseline entries")} (${disputed.join(", ")}), so ${plural(disputed.length, "it stays", "they stay")} on the baseline`,
@@ -1405,12 +1460,8 @@ export function formatSecondRead(
       clauses.push("every baseline entry was reported, so nothing reads as stale");
     }
   }
-  const onlyIn = (mine: AuditVerdict, theirs: AuditVerdict): readonly string[] => {
-    const seen = new Set(findingKeys(theirs));
-    return [...new Set(findingKeys(mine))].filter((key) => !seen.has(key)).sort();
-  };
-  const late = onlyIn(second, first);
-  const gone = onlyIn(first, second);
+  const late = difference.onlySecond;
+  const gone = difference.onlyFirst;
   if (late.length > 0) {
     clauses.push(
       `the second read reported ${counted(late.length, "finding", "findings")} the first did not (${late.join(", ")})`,

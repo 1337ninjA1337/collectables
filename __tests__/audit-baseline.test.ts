@@ -13,6 +13,7 @@ import {
   formatAuditVerdict,
   formatSecondRead,
   secondReadAgreed,
+  secondReadDifference,
   AUDIT_SKIP_CAUSES,
   AUDIT_TIMEOUT_MS,
   auditInvocationSkip,
@@ -1981,6 +1982,65 @@ describe("secondReadAgreed — whether the run gets a mark for a registry that c
       false,
       "an advisory npm could fix on one call and not the other reads as agreement",
     );
+  });
+
+  it("is the absence of the differences the printed account names", () => {
+    // The predicate decides an annotation and the account writes the sentence
+    // beside it. Asked separately they could answer differently — a log line
+    // saying the reads agreed under a summary mark saying they did not — so
+    // both read one `secondReadDifference`, and this is what holds them to it.
+    const degraded = (claimed: number) =>
+      evaluateAudit(
+        { vulnerabilities: {}, metadata: { vulnerabilities: { high: claimed } } },
+        FIXTURE,
+      );
+    const live = { nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } };
+    const surprise = { browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } };
+    // "Neither read carried its tally" is a shortfall both reads share, not a
+    // disagreement: two reads that answered nothing answered it the same way.
+    const namesADifference =
+      /short of its own totals|the reads disagree about|the second read reported \d+ finding|the second read did not repeat/;
+    for (const [label, first, second] of [
+      ["two clean reads", complete({}), complete({})],
+      ["a staleness list that moved", complete({}), complete(live)],
+      ["a first read that could not answer", degraded(9), complete({})],
+      ["a second read that could not answer", complete({}), degraded(9)],
+      ["two reads that could not answer", degraded(9), degraded(2)],
+      ["a finding only the second saw", complete({}), complete(surprise)],
+      ["a finding only the first saw", complete(surprise), complete({})],
+      ["the same live advisory twice", complete(live), complete(live)],
+    ] as const) {
+      const line = formatSecondRead(first, second, "check");
+      assert.equal(
+        secondReadAgreed(first, second),
+        !namesADifference.test(line),
+        `${label}: the annotation and the log line describe different runs — ${line}`,
+      );
+    }
+  });
+
+  it("names the disputed entries and the one-sided findings once, for both readers", () => {
+    const difference = secondReadDifference(
+      complete({ browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } }),
+      complete({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }),
+    );
+    assert.deepEqual(difference.disputedStale, [`nanoid#${A1}`]);
+    assert.deepEqual(difference.onlyFirst, [`browserslist#${A2}`]);
+    assert.deepEqual(difference.onlySecond, []);
+    assert.equal(difference.completenessDiffers, false);
+  });
+
+  it("leaves an abstaining read out of the disputed list", () => {
+    // The whole baseline would be "disputed" on every degraded run otherwise:
+    // an incomplete read's `stale` is empty because it could not ask, and the
+    // complete read's is the answer.
+    const degraded = evaluateAudit(
+      { vulnerabilities: {}, metadata: { vulnerabilities: { high: 9 } } },
+      FIXTURE,
+    );
+    const difference = secondReadDifference(degraded, complete({}));
+    assert.deepEqual(difference.disputedStale, []);
+    assert.equal(difference.completenessDiffers, true);
   });
 
   it("catches one call that carried its totals and one that did not", () => {
