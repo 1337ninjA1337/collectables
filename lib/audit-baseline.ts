@@ -373,6 +373,49 @@ export function skipRead(cause: AuditSkipCause, skip: string): AuditSkip {
   return { kind: "skipped", cause, skip };
 }
 
+/**
+ * The other half: npm answered, and this is what it said.
+ *
+ * One construction in this module, against {@link skipRead}'s nine, and the
+ * asymmetry was defensible for exactly as long as nobody wrote it down. The
+ * argument that produced `skipRead` — a discriminator written by hand is a
+ * discriminator that can be written wrong — does not count call sites, which is
+ * the same reason {@link checkedGate} exists for two constructions one type up.
+ * What it buys at one caller is that the module has no hand-written `kind`
+ * left: every {@link AuditRead} in the tree comes out of one of these two.
+ *
+ * The suite builds sixteen, which is where the count actually is. `report` is
+ * the only field an answer carries, so there is nothing here to put in the
+ * wrong order — the pairing argument `skipRead`'s signature rests on has no
+ * counterpart on this side.
+ */
+export function answerRead(report: AuditReport): AuditAnswer {
+  return { kind: "answered", report };
+}
+
+/**
+ * Whether npm answered, narrowing the read to the half that has a report.
+ *
+ * {@link AuditGateRun} got `isCheckedRun`/`isSkippedRun` first, and this is the
+ * union that taught it how to discriminate — so it is the one that looked
+ * strange without them. Same shape, same reason: the narrowing was a `kind`
+ * comparison written out at each caller, and a predicate in the module that
+ * declares `kind` is where a reader looks for the vocabulary.
+ *
+ * Against `kind`, never against `report !== undefined`: testing the payload for
+ * absence is the discrimination `kind` replaced here, and the optional-undefined
+ * mirrors that make it *possible* are kept for a different reason entirely —
+ * letting an un-narrowed read be asked either question.
+ */
+export function isAnsweredRead(read: AuditRead): read is AuditAnswer {
+  return read.kind === "answered";
+}
+
+/** The half where it did not answer, for the callers that want the cause. */
+export function isSkippedRead(read: AuditRead): read is AuditSkip {
+  return read.kind === "skipped";
+}
+
 /** As much of npm's own account of a failure as it gave. */
 function npmErrorSentence(error: unknown): string {
   if (typeof error !== "object" || error === null) return `npm reported an error (${typeof error})`;
@@ -467,7 +510,7 @@ export function readAuditPayload(raw: string): AuditRead {
       "npm's output carries no `vulnerabilities`, so it does not say which advisories are open",
     );
   }
-  return { kind: "answered", report: parsed };
+  return answerRead(parsed);
 }
 
 /**
@@ -1704,7 +1747,7 @@ export function runAuditGate(options: {
 }): AuditGateRun {
   const { read: reader, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES } = options;
   const read = reader();
-  if (read.kind === "skipped") {
+  if (isSkippedRead(read)) {
     // The headline is who gave up, which the sentence alone does not carry: a
     // run of "we stopped waiting" says the bound may be too tight, a run of
     // "npm reported a failure" says the registry answered and the bound is
@@ -1805,7 +1848,7 @@ export function answerWithSecondRead(options: {
     `${checkName}: this answer rests on what npm did NOT report, so asking once more before acting on it.`,
   ];
   const again = readAgain();
-  if (again.kind === "skipped") {
+  if (isSkippedRead(again)) {
     // The registry stopped answering between the two calls. That says nothing
     // about the first answer either way, so the first answer stands — and it is
     // printed with the same withholding it always had.

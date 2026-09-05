@@ -9,7 +9,7 @@ import {
   isAnnotationLine,
   runningUnderActions,
 } from "@/lib/github-annotations";
-import { runAuditGate, type AuditRead } from "@/lib/audit-baseline";
+import { runAuditGate, skipRead, type AuditRead } from "@/lib/audit-baseline";
 import { formatGitHubAnnotations } from "@/lib/check-inline-hex";
 
 import { readRepoFile } from "./helpers/repo-file";
@@ -137,7 +137,7 @@ describe("the two producers, related by the module rather than by a copy", () =>
       "the audit gate no longer decides when to annotate through the shared reader",
     );
     const skipped = runAuditGate({
-      read: (): AuditRead => ({ kind: "skipped", skip: "registry unreachable", cause: "refused" }),
+      read: (): AuditRead => skipRead("refused", "registry unreachable"),
       checkName: "check-audit-baseline",
       underActions: true,
     });
@@ -285,7 +285,7 @@ describe("isAnnotationLine", () => {
     // whose marks this cannot see look identical from outside.
     const skip = (underActions: boolean) =>
       runAuditGate({
-        read: (): AuditRead => ({ kind: "skipped", skip: "npm reported an error", cause: "refused" }),
+        read: (): AuditRead => skipRead("refused", "npm reported an error"),
         checkName: "check",
         underActions,
       });

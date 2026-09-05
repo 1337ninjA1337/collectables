@@ -22,11 +22,14 @@ import {
   AUDIT_TIMEOUT_MS,
   auditInvocationSkip,
   auditReader,
+  answerRead,
   auditSkipHeadline,
   checkedGate,
+  isAnsweredRead,
   isAuditReport,
   isCheckedRun,
   isClean,
+  isSkippedRead,
   isSkippedRun,
   readAuditPayload,
   skippedGate,
@@ -41,16 +44,19 @@ import {
   runAuditGate,
   skipRead,
   type AcceptedAdvisory,
+  type AuditAnswer,
   type AuditGateChecked,
   type AuditGateRun,
   type AuditGateSkipped,
   type AuditSpawnOptions,
   type AuditRead,
+  type AuditSkip,
   type AuditSkipCause,
   type AuditReport,
   type AuditVerdict,
 } from "@/lib/audit-baseline";
 import { isAnnotationLine } from "@/lib/github-annotations";
+import { stripComments } from "@/lib/strip-comments";
 import { LINT_ALL_EXEMPT, LINT_GUARDS } from "@/lib/lint-guards";
 
 import { measuredFloor } from "./helpers/coverage-floor";
@@ -157,7 +163,7 @@ const A3 = "GHSA-cccc-cccc-ccc3";
  * together. `skipRead` is exported and is what the module itself builds skips
  * with, which makes it the right thing for a case to build one with too.
  */
-const answeredWith = (payload: AuditReport): AuditRead => ({ kind: "answered", report: payload });
+const answeredWith = (payload: AuditReport): AuditRead => answerRead(payload);
 
 const FIXTURE: readonly AcceptedAdvisory[] = [
   { package: "nanoid", advisories: [A1], shipsToClient: true, why: "vulnerable path unreachable" },
@@ -2858,6 +2864,105 @@ describe("skipRead — the one construction every skipped read goes through", ()
     );
     const refused = readAuditPayload('{"error":{"code":"ENOTFOUND"}}');
     assert.deepEqual(refused, skipRead("refused", "npm reported an error: ENOTFOUND"));
+  });
+});
+
+describe("answerRead — the other half, so no `kind` is written by hand", () => {
+  /**
+   * One construction against `skipRead`'s nine, which is why this was argued
+   * for a day before it was written.
+   *
+   * What a constructor buys at one caller is not fewer copies: it is that
+   * `lib/audit-baseline.ts` now spells `kind` in exactly two places, both of
+   * them a `return`, so a branch that produces an answer where it meant a skip
+   * has to go out of its way. `checkedGate` exists one type up for two
+   * constructions on the same argument.
+   */
+  it("builds the answered half around the report it is given", () => {
+    const payload = report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } });
+    const read = answerRead(payload);
+    assert.equal(read.kind, "answered");
+    assert.equal(read.report, payload, "the report was copied rather than carried");
+    assert.equal(read.skip, undefined, "an answer carries a skip sentence");
+    assert.equal(read.cause, undefined, "an answer carries a cause");
+  });
+
+  it("is what the payload reader returns for a well-formed report", () => {
+    // The same "nothing bypasses it" property `skipRead` has, on the one path
+    // that produces an answer. Built from JSON rather than compared against
+    // the reader's own output, so the shape is asserted and not echoed.
+    const raw = '{"vulnerabilities":{},"metadata":{"vulnerabilities":{}}}';
+    assert.deepEqual(readAuditPayload(raw), answerRead(JSON.parse(raw) as AuditReport));
+  });
+
+  it("leaves the module with no `kind` written outside a constructor", () => {
+    // The claim the four constructors are FOR, measured instead of argued. A
+    // `deepEqual` against a reader's output proves that one path goes through
+    // one of them; nothing said the next branch would.
+    //
+    // Comment-stripped, because this module's doc comments quote the shapes
+    // they replaced — `{ kind: "checked", lines, clean: true }` is written out
+    // in `skippedGate`'s header as the mistake it prevents, and a scan that
+    // read prose as code would report it.
+    const source = stripComments(readRepoFile("lib/audit-baseline.ts"));
+    const constructions = source.match(/\{\s*kind:/g) ?? [];
+    assert.equal(
+      constructions.length,
+      4,
+      `a discriminated read or run is built somewhere other than skipRead/answerRead/skippedGate/checkedGate — ${String(constructions.length)} object literals in lib/audit-baseline.ts open with \`kind:\` and there are four constructors`,
+    );
+    // And the four are the four: each constructor returns one, so a fifth
+    // construction that displaced one of these would keep the count and change
+    // the answer.
+    for (const built of [
+      "return { kind: \"skipped\", cause, skip };",
+      "return { kind: \"answered\", report };",
+      "return { kind: \"skipped\", lines, clean: true };",
+      "return { kind: \"checked\", lines, clean: isClean(verdict), verdict };",
+    ]) {
+      assert.ok(source.includes(built), `no constructor in the module returns \`${built}\``);
+    }
+  });
+});
+
+describe("the read's guards — the vocabulary its sibling union already had", () => {
+  /**
+   * `AuditGateRun` got `isCheckedRun`/`isSkippedRun` first and this is the
+   * union that taught it how to discriminate, so it was the one that looked
+   * strange without them.
+   *
+   * Driven over both halves, and over every declared skip cause on the skipped
+   * side: a guard is a second spelling of `kind` by construction, and what
+   * keeps it from drifting is that this compares the two answers directly
+   * rather than restating what each should be.
+   */
+  it("answers exactly as the discriminator does, over both halves", () => {
+    const reads: readonly AuditRead[] = [
+      answerRead(report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } })),
+      ...AUDIT_SKIP_CAUSES.map((cause) => skipRead(cause, "npm said nothing usable")),
+    ];
+    for (const read of reads) {
+      assert.equal(isAnsweredRead(read), read.kind === "answered", read.kind);
+      assert.equal(isSkippedRead(read), read.kind === "skipped", read.kind);
+      // A third kind added without a guard would answer `false` to both and
+      // satisfy every assertion above.
+      assert.notEqual(isAnsweredRead(read), isSkippedRead(read), "a read was both halves, or neither");
+    }
+  });
+
+  it("narrows, which is the half an assertion cannot reach", () => {
+    // Assigned to the named halves rather than asserted about: these two lines
+    // stop compiling the day a guard stops narrowing, and `npm test`
+    // typechecks before it runs.
+    const read: AuditRead = readAuditPayload('{"vulnerabilities":{},"metadata":{"vulnerabilities":{}}}');
+    assert.ok(isAnsweredRead(read));
+    const answer: AuditAnswer = read;
+    assert.notEqual(answer.report, undefined);
+
+    const failed: AuditRead = readAuditPayload("not json at all");
+    assert.ok(isSkippedRead(failed));
+    const skip: AuditSkip = failed;
+    assert.equal(skip.cause, "unreadable");
   });
 });
 
