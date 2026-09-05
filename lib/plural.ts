@@ -79,6 +79,19 @@
  * for itself rather than importing this is reported by path, with two sanctioned
  * — this module, and `lib/oldest-record.ts`, a documented LEAF that may not
  * import anything because any evaluator has to be able to reach for it.
+ *
+ * THE SWEEP READS THE SCREENS TOO, which for a long time it did not. Both
+ * directions were walked over `lib/`, `scripts/` and `__tests__/helpers/`,
+ * because that is where the six copies were found — and the paragraphs at the
+ * top of this file are about `app/` and `components/`, the half of the tree
+ * where a count meets a word in six languages. Nothing read it. It is clean,
+ * and for a structural reason: a screen holds a KEY, not a word, so the
+ * agreement happens behind `t()` in `lib/i18n-context.tsx` and cannot be
+ * written into a component without going around the map. Four expressions there
+ * compare a count against one and none of them inflects anything — a pager, a
+ * disabled button, an owner filter, and one that picks which `t()` key to ask
+ * for. They are pinned by the EXPRESSION rather than by the file, so a screen
+ * that already compares a count cannot quietly grow an inflection beside it.
  */
 
 /**

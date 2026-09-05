@@ -5,7 +5,7 @@ import { plural, slavicPlural } from "@/lib/plural";
 
 import { measuredFloor } from "./helpers/coverage-floor";
 import { moduleDoc } from "./helpers/module-doc";
-import { assertOnlyTheseMatch } from "./helpers/offence-sweep";
+import { assertNoOffenders, assertOnlyTheseMatch } from "./helpers/offence-sweep";
 import { readRepoFile } from "./helpers/repo-file";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 import { suiteCode, suiteFiles } from "./helpers/suite-files";
@@ -330,6 +330,108 @@ describe("the one-versus-many rule lives in one module", () => {
       expected: ["lib/plural.ts", "lib/oldest-record.ts"],
       subject: "modules",
       what: "spell out the one-versus-many rule",
+    });
+  });
+
+  /**
+   * The other three quarters of the tree, swept for the first time.
+   *
+   * Both sweeps above walk `lib/`, `scripts/` and `__tests__/helpers/` — the
+   * tooling — because that is where the six copies were found and a rule read
+   * off the offenders in front of it is the shape three `.tasks/` entries are
+   * about. The rule they protect was written for `app/` and `components/`,
+   * where a count meets a word in six languages at once, and neither shape had
+   * ever been read there. Sixty-nine files, and the half of the tree the
+   * grammar actually ships from.
+   *
+   * It is clean, and structurally rather than by luck: a screen has no word to
+   * agree, it has a KEY. Every count-bearing string comes out of `t()`, and the
+   * sixteen keys that interpolate a count reach `plural` or `slavicPlural`
+   * inside `lib/i18n-context.tsx`. That is the arrangement the header's first
+   * fifty lines describe, and this is the first thing that checks the app tree
+   * still holds to it.
+   *
+   * FOUR EXPRESSIONS read the count-against-one shape — eight occurrences of
+   * them — and not one picks a word:
+   *
+   *   `app/listing/[id].tsx`          `photos.length > 1` — draw a pager at all
+   *   `app/people.tsx`                `page <= 1` — is "previous" disabled
+   *   `components/item-card.tsx`      `photoCount > 1` — which `t()` KEY to ask
+   *   `components/search-overlay.tsx` `owners.length > 1` — draw an owner filter
+   *
+   * The third is the near miss worth naming, because it does choose between two
+   * strings by a count. Both of them come out of the translation map, so the
+   * agreement still happens in the one module; what the ternary picks is which
+   * SENTENCE to say ("Open photo gallery" against "Open N photos"), not which
+   * form of a word. That is the distinction the pattern cannot make and a
+   * reader can, which is why the answer is a sanctioned list rather than a
+   * widened rule.
+   *
+   * PINNED BY EXPRESSION, NOT BY PATH, which is the one place this sweep is
+   * sharper than the two above it. `components/item-card.tsx` is the likeliest
+   * file in the tree to grow a real inflection — it already compares a photo
+   * count against one, four times — and a sanctioned PATH would swallow the
+   * next one silently. The census keys on the operand and the operator, so
+   * `photoCount > 1 ?` is vouched for and `n === 1 ?` in the same file is an
+   * offender.
+   *
+   * WHAT IT STILL CANNOT SEE, stated rather than implied: a fifth ternary on an
+   * operand already in the list. `photoCount > 1 ? "photo" : "photos"` written
+   * into `item-card` reads as a sanctioned entry, because the census collapses
+   * repeats — deliberately, since the same render condition written twice is
+   * not a second copy of the rule and going red on it would make the list churn
+   * for nothing. The branches would say which it is and the sweep may not read
+   * them: a copy that picks between two VARIABLES is the one worth catching
+   * most, which is the argument the rule's own comment makes one screen up.
+   */
+  const APP_TREE = ["app", "components", "data"] as const;
+
+  /**
+   * The same six comparisons, with whatever is being compared kept.
+   *
+   * Built `g` per file rather than shared: a global pattern advances
+   * `lastIndex` between calls and would skip every other file, which is the
+   * hazard `offence-sweep` refuses on the caller's behalf and this census has
+   * to refuse for itself.
+   */
+  const COUNTED_OPERAND = /([\w.$[\]"']*)\s*(?:===\s*1|!==\s*1|>\s*1|<=\s*1|<\s*2|>=\s*2)\s*\?/;
+
+  it("finds no inflection in the app tree, and these four expressions are why", () => {
+    const census = new Set<string>();
+    for (const file of sourceFiles(...APP_TREE)) {
+      for (const match of sourceCode(file).matchAll(new RegExp(COUNTED_OPERAND, "g"))) {
+        census.add(`${file}: ${match[0].replace(/\s+/g, " ").trim()}`);
+      }
+    }
+    assert.deepEqual(
+      [...census].sort(),
+      [
+        // A pager is drawn at all — not a word.
+        "app/listing/[id].tsx: item.photos.length > 1 ?",
+        // "Previous page" is disabled on the first page — not a word.
+        "app/people.tsx: page <= 1 ?",
+        // Which `t()` key to ask for. The agreement is still in the map.
+        "components/item-card.tsx: photoCount > 1 ?",
+        // An owner filter is worth showing — not a word.
+        "components/search-overlay.tsx: owners.length > 1 ?",
+      ],
+      "a screen compares a count against one in a shape this list does not vouch for — if it picks a WORD, the form belongs in `t()` and the rule in lib/plural.ts; if it picks a pager, a style or a key, add it here with what it decides",
+    );
+  });
+
+  it("has no if-shaped inflection in the app tree either", () => {
+    // The hole measured over `lib/` is empty there and empty here too, and the
+    // two are worth asking separately: the three modules pinned above are
+    // bounds checks in tooling, where a screen that grew one would be a
+    // rendering branch. `assertNoOffenders` rather than an empty `expected`,
+    // because "nobody does this" is the claim, and a sanctioned list of none
+    // says it in a shape that reads as an oversight.
+    assertNoOffenders({
+      rule: TWO_LINE_RULE,
+      files: sourceFiles(...APP_TREE),
+      read: sourceCode,
+      subject: "screens",
+      what: "compare a count against 1 or 2 in an `if`",
     });
   });
 });
