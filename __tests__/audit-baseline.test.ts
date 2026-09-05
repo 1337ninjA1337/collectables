@@ -18,8 +18,10 @@ import {
   secondReadDifference,
   secondReadDisagreements,
   AUDIT_SKIP_CAUSES,
+  AUDIT_SPAWN_OPTIONS,
   AUDIT_TIMEOUT_MS,
   auditInvocationSkip,
+  auditReader,
   auditSkipHeadline,
   isAuditReport,
   isClean,
@@ -35,6 +37,7 @@ import {
   runAuditGate,
   type AcceptedAdvisory,
   type AuditGateRun,
+  type AuditSpawnOptions,
   type AuditRead,
   type AuditReport,
   type AuditVerdict,
@@ -1769,7 +1772,11 @@ describe("worthAsking — the one leg that can answer differently, and could not
     // is `runAuditGate`, executed below.
     const script = readRepoFile("scripts/check-audit-baseline.ts");
     assert.match(script, /runAuditGate\(\{/);
-    assert.match(script, /read: readAudit,/);
+    assert.match(
+      script,
+      /read: auditReader\(/,
+      "the gate builds its own reader again, so the bound is back on the far side of the boundary from the argument for it",
+    );
     assert.match(script, /underActions: runningUnderActions\(\),/);
     assert.match(
       script,
@@ -2473,15 +2480,20 @@ describe("readAuditPayload — a skip that says which failure it was", () => {
   });
 
   it("is the reader the gate uses, and its sentence is what the run prints", () => {
-    const script = readRepoFile("scripts/check-audit-baseline.ts");
-    assert.match(
-      script,
-      /readAuditPayload\(raw\)/,
-      "check-audit-baseline no longer decides through readAuditPayload, so its skip and its reason are two statements again",
+    // Run, not read for. `auditReader` is what the gate is handed, so the
+    // question "does the gate still decide through `readAuditPayload`?" is
+    // answered by giving it npm's error object and comparing — where it used
+    // to be answered by matching `readAuditPayload(raw)` in the script's text,
+    // which a rename satisfies and a rewrite does not disturb.
+    const payload = '{"error":{"code":"ENOTFOUND"}}';
+    assert.deepEqual(
+      auditReader(() => payload)(),
+      readAuditPayload(payload),
+      "the gate's reader no longer decides through readAuditPayload, so its skip and its reason are two statements again",
     );
-    // The printing is executed, not read for: the reason this reader produced
-    // is the reason the run's first line carries.
-    const skipped = readAuditPayload('{"error":{"code":"ENOTFOUND"}}');
+    // The printing is executed too: the reason this reader produced is the
+    // reason the run's first line carries.
+    const skipped = readAuditPayload(payload);
     const run = runAuditGate({
       read: (): AuditRead => skipped,
       checkName: "check",
@@ -2493,6 +2505,99 @@ describe("readAuditPayload — a skip that says which failure it was", () => {
       (run.lines[0] ?? "").includes(skipped.skip ?? "never"),
       "the gate skips without printing the reason it was handed, which is the whole of this",
     );
+  });
+});
+
+describe("auditReader — the bounded read, which used to be unreachable", () => {
+  /**
+   * Thirty lines in `scripts/check-audit-baseline.ts` with four arguments
+   * inside it and no doc comment of its own, none of it runnable.
+   *
+   * Everything below was previously either untested or established by matching
+   * an expression in the script's text. The spawn is an argument now, so the
+   * three ways a read can end — an answer, a throw carrying a report, a throw
+   * carrying nothing — are each driven here.
+   */
+  const throwing = (failure: unknown) =>
+    auditReader(() => {
+      throw failure;
+    });
+
+  it("passes the bound to the spawn rather than trusting it to have one", () => {
+    let seen: AuditSpawnOptions | undefined;
+    auditReader((options) => {
+      seen = options;
+      return "{}";
+    })();
+    assert.deepEqual(seen, AUDIT_SPAWN_OPTIONS);
+    assert.equal(seen?.timeout, AUDIT_TIMEOUT_MS, "the bound and the argument for it disagree");
+  });
+
+  it("keeps stderr out of the payload it is about to parse", () => {
+    // npm writes progress to stderr, and the reader parses stdout. A spawn
+    // configured to merge them turns every healthy run into "npm's output is
+    // not JSON", which is the skip for a registry that answered badly.
+    assert.deepEqual(AUDIT_SPAWN_OPTIONS.stdio, ["ignore", "pipe", "ignore"]);
+    assert.equal(AUDIT_SPAWN_OPTIONS.encoding, "utf8");
+  });
+
+  it("gives the report room, because a truncated one parses as garbage", () => {
+    // The default 1 MiB cuts a whole-graph advisory report mid-JSON, and the
+    // failure arrives looking like npm answering badly rather than like a
+    // buffer this repo chose.
+    assert.ok(
+      AUDIT_SPAWN_OPTIONS.maxBuffer >= 8 * 1024 * 1024,
+      `maxBuffer is ${String(AUDIT_SPAWN_OPTIONS.maxBuffer)} bytes, which truncates a full report into unparseable JSON`,
+    );
+  });
+
+  it("reads the answer npm printed when npm exits 0", () => {
+    const read = auditReader(() => '{"vulnerabilities":{"nanoid":{"severity":"high"}}}')();
+    assert.equal(read.skip, undefined);
+    assert.deepEqual(Object.keys(read.report?.vulnerabilities ?? {}), ["nanoid"]);
+  });
+
+  it("salvages the report from a findings-present exit, which is every real run", () => {
+    // `npm audit` exits non-zero WHENEVER it finds anything at or above the
+    // default level, so for this tree the throw is the normal path and the
+    // report is on `stdout` of the error. A reader that trusted the status
+    // would skip every run and the gate would be green for a year.
+    const read = throwing({ status: 1, stdout: '{"vulnerabilities":{"postcss":{"severity":"high"}}}' })();
+    assert.equal(read.skip, undefined);
+    assert.deepEqual(Object.keys(read.report?.vulnerabilities ?? {}), ["postcss"]);
+  });
+
+  it("asks whether it was killed BEFORE it looks at what was flushed", () => {
+    // The order is the whole of it. A killed process's stdout is whatever had
+    // been written when the signal arrived — here, valid JSON with no findings,
+    // which is exactly what "every accepted advisory has been withdrawn" looks
+    // like. Salvaging first would prune the baseline over a timeout.
+    const read = throwing({ signal: "SIGKILL", stdout: '{"vulnerabilities":{}}' })();
+    assert.equal(read.report, undefined, "a killed read was parsed as an answer");
+    assert.equal(read.cause, "abandoned");
+    assert.match(String(read.skip), new RegExp(`after ${String(AUDIT_TIMEOUT_MS / 1000)}s`));
+  });
+
+  it("skips rather than throwing when the failure carries nothing at all", () => {
+    // `execFileSync` throws for reasons that are not npm's — ENOENT on the
+    // binary, a spawn that never started — and the error has no `stdout`. That
+    // is an empty payload, which `readAuditPayload` names.
+    const read = throwing(new Error("spawn npm ENOENT"))();
+    assert.equal(read.report, undefined);
+    assert.equal(read.cause, "unreadable");
+    assert.match(String(read.skip), /npm printed nothing/);
+  });
+
+  it("calls the spawn once per read, and reads only when asked", () => {
+    let calls = 0;
+    const read = auditReader(() => {
+      calls += 1;
+      return "{}";
+    });
+    assert.equal(calls, 0, "building the reader already spent a registry call");
+    read();
+    read();
+    assert.equal(calls, 2, "the reader is caching, so the gate's second read is the first one again");
   });
 });
 
@@ -2550,15 +2655,28 @@ describe("auditInvocationSkip — a registry that never answers held the whole r
     // having no bound cost the run and, twice, the answer.
     assert.ok(AUDIT_TIMEOUT_MS >= 120_000, "the bound is tighter than a slow but healthy answer");
     assert.ok(AUDIT_TIMEOUT_MS <= 300_000, "the bound is longer than the failures it exists to cut");
-    const script = readRepoFile("scripts/check-audit-baseline.ts");
-    assert.match(
-      script,
-      /timeout: AUDIT_TIMEOUT_MS/,
-      "the gate no longer bounds the audit call, so a registry that never answers holds the run again",
+    // Applied, not spelled. Both facts were established by matching
+    // `timeout: AUDIT_TIMEOUT_MS` and `auditInvocationSkip(error,
+    // AUDIT_TIMEOUT_MS)` in the script, which is a check on two expressions
+    // that a reader with no bound at all could be rewritten to keep.
+    let applied: AuditSpawnOptions | undefined;
+    auditReader((options) => {
+      applied = options;
+      return "{}";
+    })();
+    assert.equal(
+      applied?.timeout,
+      AUDIT_TIMEOUT_MS,
+      "the reader no longer bounds the audit call, so a registry that never answers holds the run again",
     );
+    assert.equal(applied?.killSignal, "SIGKILL", "the bound waits on a process waiting on a socket");
     assert.match(
-      script,
-      /auditInvocationSkip\(error, AUDIT_TIMEOUT_MS\)/,
+      String(
+        auditReader(() => {
+          throw { signal: "SIGKILL", stdout: '{"vulnerabilities":{}}' };
+        })().skip,
+      ),
+      new RegExp(`after ${String(AUDIT_TIMEOUT_MS / 1000)}s`),
       "a killed audit's partial output is being parsed as though it were an answer",
     );
   });
@@ -2771,10 +2889,21 @@ describe("the gate script's header names things that exist", () => {
       }
     }
   }
+  // Plus what the gate itself declares or imports. Both are findable from the
+  // file the reader already has open, which is the whole of what "go and find
+  // `runAuditGate`" asks — and `execFileSync` is neither ours to export nor
+  // ours to declare. A rename still fails: `tsc` rewrites the import to the
+  // NEW name, so the one in the paragraph is left resolving to nothing.
   for (const match of sourceCode(GATE).matchAll(
     /(?:function|const|let|var|class|type|interface|enum)\s+([A-Za-z_$][\w$]*)/g,
   )) {
     findable.add(match[1]);
+  }
+  for (const match of sourceCode(GATE).matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from/g)) {
+    for (const part of match[1].split(",")) {
+      const name = part.trim().split(/\s+as\s+/).pop()?.trim();
+      if (name !== undefined && /^[A-Za-z_$][\w$]*$/.test(name)) findable.add(name);
+    }
   }
 
   it("names an identifier a reader can go and find, for every one it names", () => {

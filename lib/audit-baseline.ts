@@ -418,6 +418,87 @@ export function readAuditPayload(raw: string): AuditRead {
   return { report: parsed };
 }
 
+/**
+ * What one `npm audit --json` invocation is allowed to cost.
+ *
+ * The bound was argued at length from three measured runs and then lived in
+ * `scripts/`, four literals typed beside the spawn — which put it on the far
+ * side of an argument boundary from the decision that needs it. {@link
+ * runAuditGate} takes a reader, so a caller handing it one without a timeout
+ * got a gate with no bound and no complaint: the whole case for three minutes
+ * is in {@link AUDIT_TIMEOUT_MS} a few lines up, and nothing connected the two.
+ *
+ * `maxBuffer` is 32 MiB because the report is the whole dependency graph's
+ * advisories and the default 1 MiB truncates it into unparseable JSON — a
+ * failure that arrives looking like "npm's output is not JSON", which is the
+ * skip for a registry that answered badly rather than one this repo caused.
+ *
+ * `stdio` drops stderr: npm writes progress there, and the gate reads stdout.
+ */
+export interface AuditSpawnOptions {
+  readonly encoding: "utf8";
+  readonly maxBuffer: number;
+  readonly stdio: ["ignore", "pipe", "ignore"];
+  readonly timeout: number;
+  readonly killSignal: "SIGKILL";
+}
+
+export const AUDIT_SPAWN_OPTIONS: AuditSpawnOptions = {
+  encoding: "utf8",
+  maxBuffer: 32 * 1024 * 1024,
+  stdio: ["ignore", "pipe", "ignore"],
+  timeout: AUDIT_TIMEOUT_MS,
+  // SIGKILL rather than SIGTERM because what is being given up on is a process
+  // waiting on a socket, and a polite signal is one more thing to wait for.
+  killSignal: "SIGKILL",
+};
+
+/** Running `npm audit --json` under {@link AUDIT_SPAWN_OPTIONS}, and nothing else. */
+export type AuditSpawn = (options: AuditSpawnOptions) => string;
+
+/**
+ * A bounded reader, built around the one thing only a process can do.
+ *
+ * The caller supplies the spawn — `execFileSync("npm", ["audit", "--json"],
+ * options)` — and gets back a `read` {@link runAuditGate} can take. Everything
+ * between the two was thirty lines in `scripts/check-audit-baseline.ts` with no
+ * doc comment of its own and four inline arguments inside it, none of it
+ * reachable by a test: the bound, the kill signal, telling a findings-present
+ * exit from a registry failure, and salvaging stdout from the throw.
+ *
+ * ## Why npm's exit code is not the answer
+ *
+ * `npm audit` exits non-zero WHENEVER it finds anything at or above the default
+ * level, which for this tree is every run. So the status says nothing and the
+ * payload says everything: a findings-present exit still carries the report on
+ * stdout, and a registry failure carries nothing parseable. The difference is
+ * what came out, not how it ended — EXCEPT when the process was killed, where
+ * the payload is whatever had been flushed and means nothing either way. That
+ * is why {@link auditInvocationSkip} is asked FIRST and the stdout salvage
+ * second.
+ *
+ * ## And why parsing is not the line either
+ *
+ * npm answers a registry failure with a JSON error object, which parses and
+ * carries no findings — and an empty findings set is exactly what "every
+ * accepted advisory has been withdrawn" looks like from here.
+ * {@link readAuditPayload} decides that and says why in one place.
+ */
+export function auditReader(spawn: AuditSpawn): () => AuditRead {
+  return (): AuditRead => {
+    let raw: string;
+    try {
+      raw = spawn(AUDIT_SPAWN_OPTIONS);
+    } catch (error: unknown) {
+      const killed = auditInvocationSkip(error, AUDIT_TIMEOUT_MS);
+      if (killed !== undefined) return killed;
+      const stdout = (error as { stdout?: unknown }).stdout;
+      raw = typeof stdout === "string" ? stdout : "";
+    }
+    return readAuditPayload(raw);
+  };
+}
+
 /** Shape of the slice of `npm audit --json` this reads. */
 export interface AuditReport {
   readonly vulnerabilities?: Readonly<
