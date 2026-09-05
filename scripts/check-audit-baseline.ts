@@ -45,17 +45,14 @@
 import { execFileSync } from "node:child_process";
 
 import {
+  answerWithSecondRead,
   AUDIT_TIMEOUT_MS,
   auditInvocationSkip,
   auditSkipHeadline,
   evaluateAudit,
   formatAuditVerdict,
-  formatSecondRead,
   isClean,
   readAuditPayload,
-  reconcileAudit,
-  secondReadAgreed,
-  worthAsking,
   type AuditRead,
   type AuditVerdict,
 } from "../lib/audit-baseline";
@@ -98,6 +95,12 @@ function readAudit(): AuditRead {
  * The verdict to act on, asking npm a second time when the first answer was
  * about what it did NOT say.
  *
+ * The decision itself is {@link answerWithSecondRead}, which takes this file's
+ * reader and hands back the lines to print: everything about it — whether a
+ * second call is spent, what a skip between the calls does, what the account
+ * says and when the run is annotated — is then reachable by a test with a stub
+ * reader instead of by reading this function's source for an exact expression.
+ *
  * This is the only leg of `verify` that can answer differently for one commit,
  * and until now it was also the only one that could not check. On 2026-09-04 a
  * degraded registry produced two red runs claiming the whole baseline had been
@@ -105,12 +108,12 @@ function readAudit(): AuditRead {
  * otherwise — twice, nine minutes apart, for the cost of one call each time.
  *
  * The second call is spent only where it can change the answer: see
- * {@link worthAsking}, which is a stale-only red or a report short of its own
- * totals. A healthy run never reaches it, so the gate's cost on the runs that
- * pass is unchanged; a degraded one pays about 49 seconds for the difference
- * between a red CI and a green one.
+ * `worthAsking`, which is a stale-only red or a report short of its own totals.
+ * A healthy run never reaches it, so the gate's cost on the runs that pass is
+ * unchanged; a degraded one pays about 49 seconds for the difference between a
+ * red CI and a green one.
  *
- * What the second read DID is printed, by {@link formatSecondRead}. Announcing
+ * What the second read DID is printed, by `formatSecondRead`. Announcing
  * the call and then printing a verdict leaves a reader unable to tell whether
  * the second read landed, agreed, or was the one that changed the answer — and
  * the reconciled verdict carries the completeness of whichever read decided, so
@@ -118,39 +121,14 @@ function readAudit(): AuditRead {
  * degraded registry and said so nowhere.
  */
 function answer(first: AuditVerdict): AuditVerdict {
-  if (!worthAsking(first)) return first;
-  console.log(
-    `${CHECK_NAME}: this answer rests on what npm did NOT report, so asking once more before acting on it.`,
-  );
-  const again = readAudit();
-  if (again.report === undefined) {
-    // The registry stopped answering between the two calls. That says nothing
-    // about the first answer either way, so the first answer stands — and it
-    // is printed with the same withholding it always had.
-    console.log(`${CHECK_NAME}: the second read did not land (${again.skip}); reporting the first.`);
-    return first;
-  }
-  const second = evaluateAudit(again.report);
-  // The one line the log was missing: it announced a second call and then
-  // printed a verdict, so a reader could not tell whether the second read
-  // landed, agreed, or was the one that changed the answer.
-  const account = formatSecondRead(first, second, CHECK_NAME);
-  console.log(account);
-  // And a mark on the run summary when they DISAGREED. npm answering one commit
-  // two ways inside one run is the fact the reconciliation is built to hide —
-  // it prints one answer, correctly — and it is also the only evidence a
-  // contributor gets that the registry was degraded while their branch was
-  // being judged. A notice, not a warning: the run's answer is sound.
-  if (!secondReadAgreed(first, second) && runningUnderActions()) {
-    console.log(
-      annotation(
-        "notice",
-        `npm answered this tree two different ways in one run. ${account} Findings from either read are kept; a baseline entry is pruned only where both reads agree it is gone.`,
-        { title: `${CHECK_NAME}: the two reads of the registry disagreed` },
-      ),
-    );
-  }
-  return reconcileAudit(first, second);
+  const answered = answerWithSecondRead({
+    first,
+    readAgain: readAudit,
+    checkName: CHECK_NAME,
+    underActions: runningUnderActions(),
+  });
+  for (const line of answered.lines) console.log(line);
+  return answered.verdict;
 }
 
 function main(): void {

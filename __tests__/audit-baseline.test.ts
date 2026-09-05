@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   ACCEPTED_HIGH_ADVISORIES,
+  answerWithSecondRead,
   advisoryIdentity,
   advisoryKey,
   advisoryPackage,
@@ -1707,37 +1708,138 @@ describe("worthAsking — the one leg that can answer differently, and could not
   });
 
   it("is the predicate the gate spends its second call on", () => {
-    const script = readRepoFile("scripts/check-audit-baseline.ts");
-    assert.match(
-      script,
-      /if \(!worthAsking\(first\)\) return first;/,
-      "the gate no longer decides through worthAsking, so which runs pay for a second read is a second statement of the same rule",
-    );
-    assert.match(script, /const second = evaluateAudit\(again\.report\);/);
-    assert.match(script, /reconcileAudit\(first, second\)/);
+    // Executed rather than read for: the reader counts its own calls, so "a
+    // clean run does not pay for a second `npm audit`" is measured here instead
+    // of inferred from an `if` somebody could rewrite around.
+    let calls = 0;
+    const never = (): AuditRead => {
+      calls += 1;
+      return { report: report({}) };
+    };
+    const clean = evaluateAudit(report({}), []);
+    const answered = answerWithSecondRead({
+      first: clean,
+      readAgain: never,
+      checkName: "check",
+      underActions: false,
+    });
+    assert.equal(calls, 0, "a run with nothing to re-ask about paid for a second registry call");
+    assert.deepEqual(answered.lines, []);
+    assert.equal(answered.verdict, clean, "the first verdict was rebuilt rather than returned");
   });
 
-  it("prints what the second read did before it prints the reconciled verdict", () => {
-    // The account is only worth writing if the log carries it, and the order is
-    // the whole point: a reader meets "asking once more", then what the second
-    // call said, then the answer built out of both.
+  it("delegates the gate's second read to the decision the tests can run", () => {
+    // The one source read left: that this file is what the gate calls. Every
+    // fact ABOUT the decision is executed below.
     const script = readRepoFile("scripts/check-audit-baseline.ts");
-    const announced = script.indexOf("asking once more before acting on it.");
-    const accounted = script.indexOf("const account = formatSecondRead(first, second, CHECK_NAME);");
-    const reconciled = script.indexOf("return reconcileAudit(first, second);");
-    assert.ok(announced > 0, "the gate no longer announces the second call");
-    assert.ok(accounted > announced, "the second read's account is not printed by the gate");
-    assert.ok(reconciled > accounted, "the verdict is printed before the account of how it was reached");
+    assert.match(script, /answerWithSecondRead\(\{/);
+    assert.match(script, /readAgain: readAudit,/);
+    assert.match(script, /underActions: runningUnderActions\(\),/);
     assert.match(
       script,
-      /if \(!secondReadAgreed\(first, second\) && runningUnderActions\(\)\)/,
-      "two reads that disagreed leave no mark on the run summary, which is where a green run is read",
+      /for \(const line of answered\.lines\) console\.log\(line\);/,
+      "the gate drops the lines the decision produced, so nothing it says reaches the log",
     );
-    assert.equal(
-      script.match(/formatSecondRead\(first, second, CHECK_NAME\)/g)?.length,
-      1,
-      "the log line and the annotation format the account separately, so the two accounts of one run can drift",
+  });
+});
+
+describe("answerWithSecondRead — the gate's second read, run rather than read for", () => {
+  // Six facts about this decision used to be established by matching exact
+  // expressions in `scripts/check-audit-baseline.ts`, which is the shape a
+  // dozen entries in this file are about: a check that reads for a spelling is
+  // checking the spelling. The reader is an argument now, so all three paths
+  // run here.
+
+  const staleOnly = evaluateAudit(report({}), FIXTURE);
+  const landing = (entries: Parameters<typeof report>[0]) => (): AuditRead => ({
+    report: report(entries),
+  });
+
+  it("announces the second call before it makes it", () => {
+    const answered = answerWithSecondRead({
+      first: staleOnly,
+      readAgain: landing({}),
+      checkName: "check",
+      underActions: false,
+      accepted: FIXTURE,
+    });
+    assert.match(answered.lines[0] ?? "", /^check: this answer rests on what npm did NOT report/);
+    assert.match(answered.lines[1] ?? "", /^check: the second read landed/);
+  });
+
+  it("keeps the first answer, and says so, when the second read does not land", () => {
+    // The registry stopped answering between the two calls. That says nothing
+    // about the first answer either way, so the first answer stands — with the
+    // same withholding it always had.
+    const answered = answerWithSecondRead({
+      first: staleOnly,
+      readAgain: (): AuditRead => ({ skip: "registry unreachable", cause: "refused" }),
+      checkName: "check",
+      underActions: true,
+      accepted: FIXTURE,
+    });
+    assert.equal(answered.verdict, staleOnly);
+    assert.equal(answered.lines.length, 2);
+    assert.match(
+      answered.lines[1] ?? "",
+      /the second read did not land \(registry unreachable\); reporting the first\./,
     );
+    assert.ok(
+      !answered.lines.some((line) => line.startsWith("::")),
+      "a run that got one answer was annotated as a run that got two",
+    );
+  });
+
+  it("reconciles the two reads and prints the account of them", () => {
+    const answered = answerWithSecondRead({
+      first: staleOnly,
+      readAgain: landing({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }),
+      checkName: "check",
+      underActions: false,
+      accepted: FIXTURE,
+    });
+    assert.deepEqual(
+      answered.verdict.stale,
+      [`postcss#${A2}`, `postcss#${A3}`],
+      "an entry one read reported was pruned on the other read's silence",
+    );
+    assert.equal(answered.lines.length, 2, "the account is missing, or a second one appeared");
+    assert.ok((answered.lines[1] ?? "").includes(`nanoid#${A1}`));
+  });
+
+  it("annotates a disagreement under Actions, and prints the same account either way", () => {
+    const options = {
+      first: staleOnly,
+      readAgain: landing({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }),
+      checkName: "check",
+      accepted: FIXTURE,
+    };
+    const local = answerWithSecondRead({ ...options, underActions: false });
+    const actions = answerWithSecondRead({ ...options, underActions: true });
+    assert.deepEqual(local.lines, actions.lines.slice(0, 2), "the log differs by where it runs");
+    assert.equal(actions.lines.length, 3);
+    const mark = actions.lines[2] ?? "";
+    assert.match(mark, /^::notice title=check%3A the two reads of the registry disagreed::/);
+    assert.ok(
+      mark.includes("npm answered this tree two different ways in one run."),
+      "the annotation does not say what it is marking",
+    );
+    assert.ok(
+      mark.includes((local.lines[1] ?? "").replace(/%/g, "%25")),
+      "the summary mark and the log line are two separate accounts of one run",
+    );
+  });
+
+  it("leaves a run where the reads agreed unmarked", () => {
+    const answered = answerWithSecondRead({
+      first: staleOnly,
+      readAgain: landing({}),
+      checkName: "check",
+      underActions: true,
+      accepted: FIXTURE,
+    });
+    assert.equal(answered.lines.length, 2, "a run whose two reads agreed was annotated");
+    assert.deepEqual(answered.verdict.stale, staleOnly.stale);
   });
 });
 

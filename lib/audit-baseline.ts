@@ -113,6 +113,7 @@
  * why it was the right one.
  */
 
+import { annotation } from "./github-annotations";
 import { plural } from "./plural";
 
 /** One triaged advisory root. Transitive dependents are not listed. */
@@ -1393,6 +1394,79 @@ export function secondReadAgreed(first: AuditVerdict, second: AuditVerdict): boo
     difference.onlySecond.length === 0 &&
     difference.onlyFirst.length === 0
   );
+}
+
+/** A verdict to act on, and everything the gate says about how it got there. */
+export interface AnsweredAudit {
+  /** The verdict the gate prints and exits on. */
+  readonly verdict: AuditVerdict;
+  /**
+   * The lines about the second read, in the order they are printed — the
+   * announcement, the account, and the annotation when there is one.
+   *
+   * Returned rather than printed so this decision can be RUN by a test. Every
+   * fact about it used to be established by reading the gate's source for an
+   * exact expression, in a repository whose recurring bug is a check that reads
+   * for a spelling and therefore checks the spelling.
+   */
+  readonly lines: readonly string[];
+}
+
+/**
+ * The whole second-read decision: whether to ask again, what came back, what to
+ * say about it, and the verdict to act on.
+ *
+ * `readAgain` is the caller's reader — the gate's `npm audit --json` — so the
+ * three paths through here (never asked, asked and the registry stopped
+ * answering, asked and answered) are reachable from a test without a registry
+ * or a child process. `underActions` decides only whether the disagreement
+ * earns a workflow annotation; the log lines are the same either way.
+ *
+ * The second call is spent only where it can change the answer: see
+ * {@link worthAsking}. A healthy run never reaches it, so the gate costs on
+ * passing runs exactly what it did.
+ */
+export function answerWithSecondRead(options: {
+  readonly first: AuditVerdict;
+  readonly readAgain: () => AuditRead;
+  readonly checkName: string;
+  readonly underActions: boolean;
+  readonly accepted?: readonly AcceptedAdvisory[];
+}): AnsweredAudit {
+  const { first, readAgain, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES } = options;
+  if (!worthAsking(first)) return { verdict: first, lines: [] };
+  const lines = [
+    `${checkName}: this answer rests on what npm did NOT report, so asking once more before acting on it.`,
+  ];
+  const again = readAgain();
+  if (again.report === undefined) {
+    // The registry stopped answering between the two calls. That says nothing
+    // about the first answer either way, so the first answer stands — and it is
+    // printed with the same withholding it always had.
+    lines.push(`${checkName}: the second read did not land (${again.skip}); reporting the first.`);
+    return { verdict: first, lines };
+  }
+  const second = evaluateAudit(again.report, accepted);
+  // The line the log was missing: it announced a second call and then printed a
+  // verdict, so a reader could not tell whether the second read landed, agreed,
+  // or was the one that changed the answer.
+  const account = formatSecondRead(first, second, checkName);
+  lines.push(account);
+  // And a mark on the run summary when they DISAGREED. npm answering one commit
+  // two ways inside one run is the fact the reconciliation is built to hide — it
+  // prints one answer, correctly — and it is the only evidence a contributor
+  // gets that the registry was degraded while their branch was judged. A notice,
+  // not a warning: the run's answer is sound.
+  if (!secondReadAgreed(first, second) && underActions) {
+    lines.push(
+      annotation(
+        "notice",
+        `npm answered this tree two different ways in one run. ${account} Findings from either read are kept; a baseline entry is pruned only where both reads agree it is gone.`,
+        { title: `${checkName}: the two reads of the registry disagreed` },
+      ),
+    );
+  }
+  return { verdict: reconcileAudit(first, second), lines };
 }
 
 /** `carried of claimed`, the two numbers the completeness clauses are built on. */
