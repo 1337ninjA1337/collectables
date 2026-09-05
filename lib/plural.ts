@@ -56,7 +56,11 @@
  * `lib/audit-baseline.ts` prints "1 advisory" / "18 advisories" for a human
  * reading a failing gate, and `__tests__/helpers/coverage-floor.ts` prints "only
  * 1 probe" / "only 0 probes" for a human reading a failing assertion. Both used
- * to carry their own `count === 1`.
+ * to carry their own `count === 1`. So did two more that the sweep below found
+ * afterwards: `lib/ships-to-client.ts` agrees "claim"/"claims" with a count of
+ * build-time claims, and `lib/provenance-tables.ts` agrees a VERB with one —
+ * `declare`/`declares`, twice in one sentence — which is the copy that shows
+ * the rule is about agreement rather than about nouns.
  *
  * Nothing about `plural` is specific to a translation map — it knows no
  * vocabulary at all, which is exactly what makes it the two-form rule for a
@@ -64,11 +68,17 @@
  * caller outside `lib/i18n-context.tsx` and wants none: this tree produces no
  * Russian failure messages.
  *
- * The three of them — `lib/i18n-context.tsx`, `lib/audit-baseline.ts`,
+ * The five of them — `lib/i18n-context.tsx`, `lib/audit-baseline.ts`,
+ * `lib/ships-to-client.ts`, `lib/provenance-tables.ts`,
  * `__tests__/helpers/coverage-floor.ts` — are named here rather than counted,
  * and `__tests__/plural.test.ts` walks the tree for importers and fails on one
  * this paragraph does not mention. A list in prose is a list that goes stale;
  * this one goes red instead.
+ *
+ * The same suite sweeps the other direction: a module that writes `=== 1 ?` out
+ * for itself rather than importing this is reported by path, with two sanctioned
+ * — this module, and `lib/oldest-record.ts`, a documented LEAF that may not
+ * import anything because any evaluator has to be able to reach for it.
  */
 
 /**

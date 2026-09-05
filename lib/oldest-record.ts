@@ -119,6 +119,11 @@ export function unknownKeysRefusal(
 ): string | null {
   if (unknownKeys.length === 0) return null;
   const quoted = unknownKeys.map((key) => JSON.stringify(key)).join(", ");
+  // The one-versus-many rule written out, where every other module in the tree
+  // takes it from `lib/plural.ts`. This module is a LEAF on purpose — the doc
+  // comment above says so and `oldest-record.test.ts` asserts it — and an
+  // import for two words is not worth being the module that closes a cycle.
+  // `plural.test.ts` sanctions this site by name for that reason.
   const entries =
     unknownKeys.length === 1 ? "1 entry" : `${unknownKeys.length} entries`;
   return `${tableName} carries ${entries} that ${orderName} does not know (${quoted}), so the age this run would have printed was measured over the rest of the table and reads as a fact about all of it. Nothing should reach this line: the shape half fails an unknown key before any pass line is built, so seeing it means that half did not run or no longer checks the keys.`;

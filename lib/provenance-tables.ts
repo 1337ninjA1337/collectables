@@ -43,6 +43,7 @@ import {
   formatBaselineRevisionUnparseable,
 } from "./privacy-baseline-provenance";
 import { PRIVACY_BODY_BASELINES } from "./privacy-body-baselines";
+import { plural } from "./plural";
 import {
   PRIVACY_TRANSLATION_SOURCES,
   parsePrivacyTranslationSources,
@@ -541,10 +542,10 @@ export function provenanceRegistryRefusal(
   if (unagreed.length > 0 || unclaimed.length > 0) {
     const halves = [
       unagreed.length > 0
-        ? `${unagreed.map((id) => `"${id}"`).join(", ")} declare${unagreed.length === 1 ? "s" : ""} an unparseable sentence without being listed`
+        ? `${unagreed.map((id) => `"${id}"`).join(", ")} declare${plural(unagreed.length, "s", "")} an unparseable sentence without being listed`
         : null,
       unclaimed.length > 0
-        ? `${unclaimed.map((id) => `"${id}"`).join(", ")} ${unclaimed.length === 1 ? "is" : "are"} listed and no longer stop${unclaimed.length === 1 ? "s" : ""} the run`
+        ? `${unclaimed.map((id) => `"${id}"`).join(", ")} ${plural(unclaimed.length, "is", "are")} listed and no longer stop${plural(unclaimed.length, "s", "")} the run`
         : null,
     ].filter((half): half is string => half !== null);
     return checkError(
