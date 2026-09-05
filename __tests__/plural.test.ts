@@ -528,8 +528,24 @@ describe("the one-versus-many rule lives in one module", () => {
     // array is the shape that matters, and this is what sees it.
     //
     // The pattern cannot match its own source: after `const ` the file has a
-    // backslash, and `\w` does not read one.
-    const declared = suiteCode("plural.test.ts").match(/const \w+Reader = /g) ?? [];
+    // backslash, and `\w` does not read one. Same for the parameter shape,
+    // whose parentheses are escaped in the pattern and bare in a declaration.
+    const source = suiteCode("plural.test.ts");
+    const declared = source.match(/const \w+Reader = /g) ?? [];
+    const takingFragment = source.match(/\(comparison: string\)/g) ?? [];
+    // TWO counts of one population, because the first reads a NAMING
+    // CONVENTION. A fourth builder called `switchPattern` takes the fragment,
+    // is a reader, and is invisible to a scan for `\w+Reader` — the convention
+    // holds today because the three were written together, which is not a
+    // reason. The parameter is the thing that makes a function a reader of the
+    // alternation, so the two counts have to agree: a builder named off the
+    // convention shows up on one side, a `*Reader` that is not built from the
+    // fragment on the other.
+    assert.equal(
+      takingFragment.length,
+      declared.length,
+      `${takingFragment.length} function(s) in this file take the alternation as a parameter and ${declared.length} are named \`…Reader\` — the array below is found by NAME, so a builder named off the convention is a reader no case asks about`,
+    );
     assert.equal(
       declared.length,
       readers.length,
