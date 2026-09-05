@@ -227,6 +227,52 @@ describe("the one-versus-many rule lives in one module", () => {
   const INLINE_RULE =
     /(?:===\s*1|!==\s*1|>\s*1|<=\s*1|<\s*2|>=\s*2)\s*\?/;
 
+  it("matches every spelling it claims, and the near misses it disclaims", () => {
+    // The widened rule was proved on four broken trees, planted by hand in a
+    // module that had just had the rule taken out of it, and the proof is a
+    // paragraph in `.tasks/`. A rule nobody has watched refuse anything is one
+    // that reads as passing whether it works or not — the argument this
+    // repository has spent four entries applying to `network-refusal.test.ts`,
+    // owed here too, and cheaper: the offenders are strings.
+    //
+    // Both halves. A rule that matched everything would pass the first loop
+    // and is what the second is for: `=== 2` and `> 2` are a different
+    // question, and a bounds check is not this rule at all.
+    for (const spelling of [
+      "n === 1 ? one : many",
+      "n !== 1 ? many : one",
+      "n > 1 ? many : one",
+      "n <= 1 ? one : many",
+      "n < 2 ? one : many",
+      "n >= 2 ? many : one",
+      // Spacing is a style question and the sweep reads whatever prettier left.
+      "count===1?one:many",
+    ]) {
+      assert.match(
+        spelling,
+        INLINE_RULE,
+        `\`${spelling}\` picks a form by count and the sweep does not read it as one, so a copy written that way is invisible`,
+      );
+    }
+
+    for (const notThisRule of [
+      "n === 2 ? pair : rest",
+      "n > 2 ? crowd : few",
+      "items.length >= 2 && items[1]",
+      "for (let i = 1; i < 2; i += 1)",
+      // The known hole, pinned rather than implied: a two-line `if` says the
+      // same thing and no single-line pattern reads it. `.tasks/` says so and
+      // this is where a reader meets it.
+      "if (n === 1) { return one; } return many;",
+    ]) {
+      assert.doesNotMatch(
+        notThisRule,
+        INLINE_RULE,
+        `\`${notThisRule}\` is not the one-versus-many rule and the sweep reads it as one, so the exemption list would carry the meaning`,
+      );
+    }
+  });
+
   it("is not written out again anywhere else in the tree", () => {
     assertOnlyTheseMatch({
       rule: INLINE_RULE,
