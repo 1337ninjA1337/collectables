@@ -47,12 +47,15 @@ import {
   EARLY_TERMINATOR_ADVICE,
   ORPHAN_TERMINATOR_ADVICE,
   TRAILING_LIMIT,
+  earlyTerminatorAnnotations,
   findEarlyTerminators,
   findOrphanTerminators,
   formatEarlyTerminatorReport,
   formatOrphanTerminatorReport,
+  orphanTerminatorAnnotations,
   orphansWithoutCause,
 } from "../lib/check-comment-terminators";
+import { isAnnotationLine } from "../lib/github-annotations";
 import { LINT_GUARDS } from "../lib/lint-guards";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
 import { installedBin } from "./helpers/installed-packages";
@@ -332,6 +335,80 @@ describe("formatEarlyTerminatorReport", () => {
     ]);
     assert.equal(report.split("\n").filter((line) => line.trim() === "lib/a.ts").length, 1);
     assert.ok(report.includes("lib/b.ts"));
+  });
+});
+
+/**
+ * The half of this guard's output that had never been run.
+ *
+ * Both builders were private functions in `scripts/check-comment-terminators.ts`
+ * until they moved here, which meant the only thing a suite could do about them
+ * was read the script for an exact expression — a check on the spelling of the
+ * code rather than on what it produces. This was the third module in the tree
+ * emitting workflow commands and the only one whose output had never been past
+ * `isAnnotationLine`, so nothing said its marks would reach a run summary at all.
+ *
+ * It is the output that matters most here, too: the compiler's own errors land
+ * on the lines BELOW the comment that caused them, so without the annotation a
+ * reviewer reading the diff sees complaints about code and nothing on the prose.
+ */
+describe("the annotations CI reads", () => {
+  const EARLY = { file: "lib/a.ts", line: 4, column: 12, trailing: ".ts`, so this way" };
+  const ORPHAN = { file: "lib/b.ts", line: 9, column: 1, text: "*/ and then some" };
+
+  it("says nothing when there is nothing to say", () => {
+    assert.deepEqual(earlyTerminatorAnnotations([]), []);
+    assert.deepEqual(orphanTerminatorAnnotations([]), []);
+  });
+
+  it("emits one workflow command per finding, on the finding's own line", () => {
+    // The location is the whole point of annotating this guard, so it is
+    // asserted rather than the message: an annotation without `file`/`line`
+    // lands on the summary and not on the diff, which is where the compiler
+    // already failed to point.
+    const [early] = earlyTerminatorAnnotations([EARLY, { ...EARLY, line: 7 }]);
+    assert.equal(earlyTerminatorAnnotations([EARLY, { ...EARLY, line: 7 }]).length, 2);
+    assert.match(early ?? "", /^::error file=lib\/a\.ts,line=4,col=12::/);
+    assert.ok((early ?? "").includes(EARLY_TERMINATOR_ADVICE), "the mark drops the advice the report carries");
+
+    const [orphan] = orphanTerminatorAnnotations([ORPHAN]);
+    assert.match(orphan ?? "", /^::error file=lib\/b\.ts,line=9,col=1::/);
+    assert.ok((orphan ?? "").includes(ORPHAN_TERMINATOR_ADVICE));
+  });
+
+  it("emits lines the shared classifier reads as workflow commands", () => {
+    const lines = [...earlyTerminatorAnnotations([EARLY]), ...orphanTerminatorAnnotations([ORPHAN])];
+    assert.equal(lines.filter(isAnnotationLine).length, 2);
+    // Anti-vacuous: the human-readable reports this check prints alongside are
+    // the lines a mark has to be distinguishable from, and they are prose.
+    assert.ok(
+      ![
+        ...formatEarlyTerminatorReport([EARLY]).split("\n"),
+        ...formatOrphanTerminatorReport([ORPHAN]).split("\n"),
+      ].some(isAnnotationLine),
+      "a human-readable report line is being classified as a workflow command",
+    );
+  });
+
+  it("keeps the two messages apart, which is why there are two builders", () => {
+    // Sharing one message would put a sentence about globs on a line whose
+    // problem is a comment that ended above it. The advice sentences are the
+    // half that must not cross over.
+    const [early] = earlyTerminatorAnnotations([EARLY]);
+    const [orphan] = orphanTerminatorAnnotations([ORPHAN]);
+    assert.ok(!(early ?? "").includes(ORPHAN_TERMINATOR_ADVICE));
+    assert.ok(!(orphan ?? "").includes(EARLY_TERMINATOR_ADVICE));
+  });
+
+  it("escapes a path that carries a property metacharacter", () => {
+    // `:` and `,` separate one property from the next and the properties from
+    // the message, so an unescaped one truncates the annotation rather than
+    // failing. No repo file is named this way; the escaping still has to hold,
+    // because a mark that silently loses its message is this module's own
+    // failure mode.
+    const [line] = earlyTerminatorAnnotations([{ ...EARLY, file: "lib/we:ird,name.ts" }]);
+    assert.match(line ?? "", /^::error file=lib\/we%3Aird%2Cname\.ts,line=4,col=12::/);
+    assert.ok(isAnnotationLine(line ?? ""));
   });
 });
 

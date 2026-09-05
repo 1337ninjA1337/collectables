@@ -13,23 +13,31 @@
  * It walks every source root, not the three or four most guards take: the
  * hazard is a property of doc comments, this repository writes them everywhere,
  * and the file that tripped it was in `scripts/`.
+ *
+ * The two annotation builders used to be here, private, and are
+ * `earlyTerminatorAnnotations` and `orphanTerminatorAnnotations` in that module
+ * now. Same reason the audit gate's decisions moved: a function only a script
+ * can reach is checkable by reading the file for an exact expression and no
+ * other way, and these two had never been run — this was the third producer of
+ * workflow commands in the tree and the only one whose output had never been
+ * past the classifier that tells them from log lines.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
-  EARLY_TERMINATOR_ADVICE,
-  ORPHAN_TERMINATOR_ADVICE,
+  earlyTerminatorAnnotations,
   findEarlyTerminators,
   findOrphanTerminators,
   formatEarlyTerminatorReport,
   formatOrphanTerminatorReport,
+  orphanTerminatorAnnotations,
   orphansWithoutCause,
   type EarlyTerminator,
   type OrphanTerminator,
 } from "../lib/check-comment-terminators";
-import { annotation, runningUnderActions } from "../lib/github-annotations";
+import { runningUnderActions } from "../lib/github-annotations";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedWalk } from "../lib/scanned-floor";
 import { guardScanRoot, listSourceFiles } from "./guard-io";
@@ -46,38 +54,6 @@ const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
  * demonstrated the failure lives in `scripts/`.
  */
 const SCANNED_DIRS = ["app", "components", "data", "lib", "scripts", "__tests__"] as const;
-
-/**
- * One `::error` per finding, so CI puts it on the line of the PR diff.
- *
- * This guard wants the annotation more than most: the compiler's own errors
- * land on the lines BELOW the real one, so a reviewer reading the diff sees
- * complaints about code and nothing at all on the comment that caused them.
- */
-function annotations(found: readonly EarlyTerminator[]): string[] {
-  return found.map((entry) =>
-    annotation(
-      "error",
-      `This block comment ends here; "${entry.trailing}" after it is parsed as code — ${EARLY_TERMINATOR_ADVICE}`,
-      { file: entry.file, line: entry.line, col: entry.column },
-    ),
-  );
-}
-
-/**
- * The same, for an orphan — a separate function because the message is a
- * different one and sharing it would put a sentence about globs on a line
- * whose problem is a comment that ended above it.
- */
-function orphanAnnotations(found: readonly OrphanTerminator[]): string[] {
-  return found.map((entry) =>
-    annotation(
-      "error",
-      `This comment terminator stands in code and closes nothing — ${ORPHAN_TERMINATOR_ADVICE}`,
-      { file: entry.file, line: entry.line, col: entry.column },
-    ),
-  );
-}
 
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
@@ -108,7 +84,8 @@ function main(): void {
   if (found.length > 0) console.error(formatEarlyTerminatorReport(found));
   if (orphans.length > 0) console.error(formatOrphanTerminatorReport(orphans));
   if (runningUnderActions()) {
-    for (const line of [...annotations(found), ...orphanAnnotations(orphans)]) console.log(line);
+    for (const line of [...earlyTerminatorAnnotations(found), ...orphanTerminatorAnnotations(orphans)])
+      console.log(line);
   }
   process.exit(1);
 }

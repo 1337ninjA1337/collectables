@@ -80,6 +80,7 @@
  * first customer, and the paragraphs above escape the one they quote.
  */
 
+import { annotation } from "./github-annotations";
 import { scanComments, scanSpans, codeOffsets } from "./strip-comments";
 
 /** One line whose block comment ended before its author meant it to. */
@@ -289,6 +290,48 @@ export function formatOrphanTerminatorReport(found: readonly OrphanTerminator[])
     }
   }
   return lines.join("\n");
+}
+
+/**
+ * One `::error` per finding, so CI puts it on the line of the PR diff.
+ *
+ * This guard wants the annotation more than most: the compiler's own errors
+ * land on the lines BELOW the real one, so a reviewer reading the diff sees
+ * complaints about code and nothing at all on the comment that caused them.
+ *
+ * Here rather than in `scripts/check-comment-terminators.ts`, where it was
+ * written, for the reason every other gate's decisions moved into `lib/`: a
+ * private function in a script is checkable only by reading the file for an
+ * exact expression, which is a check on the spelling of the code rather than
+ * on what it does. This one had never been run at all — it was the third
+ * producer of annotations in the tree and the only one whose output had never
+ * been through {@link isAnnotationLine}.
+ */
+export function earlyTerminatorAnnotations(found: readonly EarlyTerminator[]): string[] {
+  return found.map((entry) =>
+    annotation(
+      "error",
+      `This block comment ends here; "${entry.trailing}" after it is parsed as code — ${EARLY_TERMINATOR_ADVICE}`,
+      { file: entry.file, line: entry.line, col: entry.column },
+    ),
+  );
+}
+
+/**
+ * The same, for an orphan.
+ *
+ * A separate function because the message is a different one, and sharing it
+ * would put a sentence about globs on a line whose problem is a comment that
+ * ended above it.
+ */
+export function orphanTerminatorAnnotations(found: readonly OrphanTerminator[]): string[] {
+  return found.map((entry) =>
+    annotation(
+      "error",
+      `This comment terminator stands in code and closes nothing — ${ORPHAN_TERMINATOR_ADVICE}`,
+      { file: entry.file, line: entry.line, col: entry.column },
+    ),
+  );
 }
 
 /** Human-readable report, or `""` when there is nothing to say. */
