@@ -234,7 +234,61 @@ describe("the one-versus-many rule lives in one module", () => {
    */
   const COUNT_COMPARISON = "(?:===\\s*1|!==\\s*1|>\\s*1|<=\\s*1|<\\s*2|>=\\s*2)";
 
-  const INLINE_RULE = new RegExp(`${COUNT_COMPARISON}\\s*\\?`);
+  /**
+   * The three readers, as the splice each one performs.
+   *
+   * They were three template literals holding `COUNT_COMPARISON`, and the only
+   * evidence that an edit to the fragment reached any of them was a probe run
+   * by hand and written into a `.tasks/` entry — the arrangement two entries
+   * here have already closed one level down. A builder is the same splice with
+   * a name, and a name is a thing a case can hand a different fragment to.
+   */
+  function ternaryRule(comparison: string): RegExp {
+    return new RegExp(`${comparison}\\s*\\?`);
+  }
+
+  function ifRule(comparison: string): RegExp {
+    return new RegExp(`if\\s*\\([^)]*${comparison}\\s*\\)`);
+  }
+
+  function countedOperandRule(comparison: string): RegExp {
+    return new RegExp(`(?:[\\w.$[\\]"']*)\\s*${comparison}\\s*\\?`);
+  }
+
+  const INLINE_RULE = ternaryRule(COUNT_COMPARISON);
+
+  it("hands a seventh spelling to all three of its readers", () => {
+    // What `COUNT_COMPARISON` is FOR: one edit reaching the ternary sweep, the
+    // `if` census and the app census. The evidence for that was a probe run by
+    // hand and written into a `.tasks/` entry, which is the arrangement the two
+    // entries below this one closed for the rule's own spellings and for the
+    // hole's lookalikes. Here it costs a case, because the readers are
+    // functions now and a case can hand them a fragment of its own.
+    //
+    // `SEVENTH` is a stand-in for a spelling nobody has needed yet — an `&&`
+    // chain, a `!== 0`. What is proved is the splice, not the alternation: each
+    // builder puts what it is given where its own wrapper expects it.
+    const spliced = [
+      [ternaryRule, "n SEVENTH ? one : many"],
+      [ifRule, "if (n SEVENTH) { return one; }"],
+      [countedOperandRule, "items.length SEVENTH ? one : many"],
+    ] as const;
+    for (const [build, source] of spliced) {
+      assert.match(
+        source,
+        build("SEVENTH"),
+        `${build.name} does not put the comparison it is given where its wrapper reads it, so an edit to \`COUNT_COMPARISON\` does not reach this reader`,
+      );
+      // And the same builder, given the fragment it actually holds, must not
+      // match a source with no comparison in it at all: a builder that ignored
+      // its argument and matched everything would pass the loop above.
+      assert.doesNotMatch(
+        source,
+        build(COUNT_COMPARISON),
+        `${build.name} matches a source whose comparison is \`SEVENTH\` while built from the real fragment, so it is not reading the fragment at all`,
+      );
+    }
+  });
 
   it("matches every spelling it claims, and the near misses it disclaims", () => {
     // The widened rule was proved on four broken trees, planted by hand in a
@@ -302,7 +356,7 @@ describe("the one-versus-many rule lives in one module", () => {
    * unsanctioned module with a path, and whoever adds one has to decide what
    * the sweep should do rather than never hearing about it.
    */
-  const TWO_LINE_RULE = new RegExp(`if\\s*\\([^)]*${COUNT_COMPARISON}\\s*\\)`);
+  const TWO_LINE_RULE = ifRule(COUNT_COMPARISON);
 
   it("has an if-shaped hole, and these three are what is in it", () => {
     assertOnlyTheseMatch({
@@ -409,7 +463,7 @@ describe("the one-versus-many rule lives in one module", () => {
    * `offence-sweep` refuses on its callers' behalf and a hand-rolled scan has
    * to refuse for itself.
    */
-  const COUNTED_OPERAND = new RegExp(`(?:[\\w.$[\\]"']*)\\s*${COUNT_COMPARISON}\\s*\\?`);
+  const COUNTED_OPERAND = countedOperandRule(COUNT_COMPARISON);
 
   it("finds no inflection in the app tree, and these four expressions are why", () => {
     const census = new Set<string>();
