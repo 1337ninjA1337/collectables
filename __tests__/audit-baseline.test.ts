@@ -39,6 +39,7 @@ import {
   type AuditGateRun,
   type AuditSpawnOptions,
   type AuditRead,
+  type AuditSkipCause,
   type AuditReport,
   type AuditVerdict,
 } from "@/lib/audit-baseline";
@@ -134,6 +135,22 @@ const majorFix = (name: string): unknown => ({ name, version: "1.0.0", isSemVerM
 const A1 = "GHSA-aaaa-aaaa-aaa1";
 const A2 = "GHSA-bbbb-bbbb-bbb2";
 const A3 = "GHSA-cccc-cccc-ccc3";
+
+/**
+ * The two halves of an {@link AuditRead}, built rather than spelled.
+ *
+ * `AuditRead` gained a `kind` so it says which half it is the way
+ * `AuditGateRun` does, instead of by whether `report` happened to be present.
+ * Sixteen literals in this file would have had to grow the field, which is
+ * sixteen chances to write the wrong one — so the two shapes are built here and
+ * a case that wants "npm answered with this" says so.
+ */
+const answeredWith = (payload: AuditReport): AuditRead => ({ kind: "answered", report: payload });
+const skippedWith = (skip: string, cause: AuditSkipCause): AuditRead => ({
+  kind: "skipped",
+  skip,
+  cause,
+});
 
 const FIXTURE: readonly AcceptedAdvisory[] = [
   { package: "nanoid", advisories: [A1], shipsToClient: true, why: "vulnerable path unreachable" },
@@ -1130,7 +1147,7 @@ describe("isClean — the one place that decides the exit code", () => {
     ];
     for (const [label, entries] of red) {
       const run = runAuditGate({
-        read: (): AuditRead => ({ report: report(entries) }),
+        read: () => answeredWith(report(entries)),
         checkName: "check",
         underActions: false,
         accepted,
@@ -1638,7 +1655,7 @@ describe("evaluateAudit on a report short of its own totals", () => {
       metadata: { vulnerabilities: { high: 9 } },
     } as unknown as AuditReport;
     const run = runAuditGate({
-      read: (): AuditRead => ({ report: short }),
+      read: () => answeredWith(short),
       checkName: "check",
       underActions: true,
       accepted: FIXTURE,
@@ -1753,7 +1770,7 @@ describe("worthAsking — the one leg that can answer differently, and could not
     let calls = 0;
     const never = (): AuditRead => {
       calls += 1;
-      return { report: report({}) };
+      return answeredWith(report({}));
     };
     const clean = evaluateAudit(report({}), []);
     const answered = answerWithSecondRead({
@@ -1800,9 +1817,7 @@ describe("answerWithSecondRead — the gate's second read, run rather than read 
   // run here.
 
   const staleOnly = evaluateAudit(report({}), FIXTURE);
-  const landing = (entries: Parameters<typeof report>[0]) => (): AuditRead => ({
-    report: report(entries),
-  });
+  const landing = (entries: Parameters<typeof report>[0]) => () => answeredWith(report(entries));
 
   it("announces the second call before it makes it", () => {
     const answered = answerWithSecondRead({
@@ -1822,7 +1837,7 @@ describe("answerWithSecondRead — the gate's second read, run rather than read 
     // same withholding it always had.
     const answered = answerWithSecondRead({
       first: staleOnly,
-      readAgain: (): AuditRead => ({ skip: "registry unreachable", cause: "refused" }),
+      readAgain: () => skippedWith("registry unreachable", "refused"),
       checkName: "check",
       underActions: true,
       accepted: FIXTURE,
@@ -1965,7 +1980,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
   };
 
   it("passes a clean run, printing the verdict and nothing else", () => {
-    const run = gateRun([{ report: report(live) }], { underActions: true });
+    const run = gateRun([answeredWith(report(live))], { underActions: true });
     assert.equal(run.clean, true);
     assert.equal(run.lines.length, 1);
     assert.match(run.lines[0] ?? "", /^check: OK — no new high\/critical advisories/);
@@ -1975,9 +1990,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     // A skip exits 0, so a week of registry outages is a week of green runs
     // with the reason in a log nobody opens on a green run. The annotation is
     // the only thing between that and a run that looks checked.
-    const run = gateRun([{ skip: "npm reported an error", cause: "refused" }], {
-      underActions: true,
-    });
+    const run = gateRun([skippedWith("npm reported an error", "refused")], { underActions: true });
     assert.equal(run.clean, true, "a skip failed the run");
     assert.equal(run.kind, "skipped", "a run that read nothing was reported as a checked one");
     assert.equal(run.lines.length, 2);
@@ -1992,7 +2005,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
   });
 
   it("leaves a local skip unannotated and still exits 0", () => {
-    const run = gateRun([{ skip: "we stopped waiting", cause: "abandoned" }]);
+    const run = gateRun([skippedWith("we stopped waiting", "abandoned")]);
     assert.equal(run.clean, true);
     assert.deepEqual(run.lines, [
       `check: skipping (${auditSkipHeadline("abandoned")}) — we stopped waiting.`,
@@ -2001,7 +2014,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
 
   it("fails a run with an advisory nobody triaged", () => {
     const run = gateRun([
-      { report: report({ ...live, browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } }) },
+      answeredWith(report({ ...live, browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } })),
     ]);
     assert.equal(run.clean, false);
     assert.deepEqual(run.verdict?.unexpected, [`browserslist#${A2}`]);
@@ -2013,8 +2026,8 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     // the whole baseline being withdrawn, the second read reports two of the
     // three, and the gate goes green on the one both reads agree is gone.
     const run = gateRun([
-      { report: report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }) },
-      { report: report(live) },
+      answeredWith(report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } })),
+      answeredWith(report(live)),
     ]);
     assert.deepEqual(run.verdict?.stale, []);
     assert.equal(run.clean, true, "a baseline entry was pruned over one read's silence");
@@ -2037,7 +2050,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     // too: the registry is still degraded, and the run still says so. Staging
     // it twice is what makes "it asked again" part of what this case proves —
     // a reader answering forever passed whether the gate asked once or twice.
-    const run = gateRun([{ report: short }, { report: short }], { underActions: true });
+    const run = gateRun([answeredWith(short), answeredWith(short)], { underActions: true });
     assert.equal(run.clean, true, "a withheld staleness check failed the run");
     assert.equal(run.verdict?.completeness.complete, false);
     const marks = run.lines.filter(isAnnotationLine);
@@ -2051,7 +2064,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
       vulnerabilities: {},
       metadata: { vulnerabilities: { high: 9 } },
     } as unknown as AuditReport;
-    const run = gateRun([{ report: short }, { report: short }]);
+    const run = gateRun([answeredWith(short), answeredWith(short)]);
     assert.ok(
       !run.lines.some(isAnnotationLine),
       "a local run printed workflow commands into a terminal",
@@ -2069,10 +2082,26 @@ describe("runAuditGate — the gate minus the two things only a process can do",
    * call, half of every one of those statements was decoration. These two run
    * the runner against the one gate whose read count is known either way.
    */
+  it("takes its kind from the read's, which is why they spell `skipped` the same", () => {
+    // Two unions in one module for one fact — npm answered, or it did not —
+    // and they used to be discriminated two different ways: `AuditGateRun` by
+    // `kind`, `AuditRead` by whether `report` happened to be present. They say
+    // it the same way now, and this is what keeps the shared word honest: a
+    // gate that returned `kind: "checked"` for a read that skipped would be a
+    // run reported as having checked the baseline when nothing was read.
+    //
+    // Every declared cause, because the mapping is one branch and a cause added
+    // without one is exactly the shape that branch would miss.
+    for (const cause of AUDIT_SKIP_CAUSES) {
+      assert.equal(gateRun([skippedWith("npm said nothing usable", cause)]).kind, "skipped");
+    }
+    assert.equal(gateRun([answeredWith(report(live))]).kind, "checked");
+  });
+
   it("refuses a run that asks past the answers staged for it", () => {
     // A stale-only red asks twice. Stage one and the second call has nothing.
     assert.throws(
-      () => gateRun([{ report: report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }) }]),
+      () => gateRun([answeredWith(report({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }))]),
       /the gate made 2 reads and 1 were staged/,
     );
   });
@@ -2083,7 +2112,7 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     // run that did not happen. Silently, until now: the extra answer was simply
     // never returned, and the case went green having proved a different gate.
     assert.throws(
-      () => gateRun([{ report: report(live) }, { report: report(live) }]),
+      () => gateRun([answeredWith(report(live)), answeredWith(report(live))]),
       /2 read\(s\) were staged and the gate made 1/,
     );
   });
@@ -2739,7 +2768,7 @@ describe("the skip's cause — who gave up, which the sentence does not say", ()
     // annotation title, which is what a run summary shows.
     for (const cause of AUDIT_SKIP_CAUSES) {
       const run = runAuditGate({
-        read: (): AuditRead => ({ skip: "npm said nothing usable", cause }),
+        read: () => skippedWith("npm said nothing usable", cause),
         checkName: "check",
         underActions: true,
         accepted: FIXTURE,

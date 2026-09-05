@@ -271,8 +271,18 @@ export function isAuditReport(parsed: unknown): parsed is AuditReport {
  * out of one place, so a caller cannot skip for one reason and report another.
  */
 export type AuditRead =
-  | { readonly report: AuditReport; readonly skip?: undefined; readonly cause?: undefined }
-  | { readonly report?: undefined; readonly skip: string; readonly cause: AuditSkipCause };
+  | {
+      readonly kind: "answered";
+      readonly report: AuditReport;
+      readonly skip?: undefined;
+      readonly cause?: undefined;
+    }
+  | {
+      readonly kind: "skipped";
+      readonly report?: undefined;
+      readonly skip: string;
+      readonly cause: AuditSkipCause;
+    };
 
 /**
  * WHO gave up, which is the half the sentence alone does not carry.
@@ -368,12 +378,14 @@ export function auditInvocationSkip(failure: unknown, timeoutMs: number): AuditR
   // one without the other.
   if (typeof signal === "string" && signal !== "") {
     return {
+      kind: "skipped",
       cause: "abandoned",
       skip: `npm audit was killed with ${signal} after ${waited} — the registry was not answering, and a partial read is not an answer`,
     };
   }
   if (code === "ETIMEDOUT") {
     return {
+      kind: "skipped",
       cause: "abandoned",
       skip: `npm audit did not answer within ${waited} — the registry was not answering, and a partial read is not an answer`,
     };
@@ -384,6 +396,7 @@ export function auditInvocationSkip(failure: unknown, timeoutMs: number): AuditR
 export function readAuditPayload(raw: string): AuditRead {
   if (raw.trim() === "") {
     return {
+      kind: "skipped",
       cause: "unreadable",
       skip: "npm printed nothing, so it did not get as far as an answer",
     };
@@ -395,27 +408,30 @@ export function readAuditPayload(raw: string): AuditRead {
     // Bounded on purpose: this goes to a CI log, and npm's non-JSON output on a
     // bad day is a stack trace.
     return {
+      kind: "skipped",
       cause: "unreadable",
       skip: `npm's output is not JSON: ${JSON.stringify(raw.trim().slice(0, 120))}`,
     };
   }
   if (typeof parsed !== "object" || parsed === null) {
     return {
+      kind: "skipped",
       cause: "unreadable",
       skip: `npm's output is a ${parsed === null ? "null" : typeof parsed}, not a report`,
     };
   }
   const payload = parsed as { error?: unknown };
   if (payload.error !== undefined) {
-    return { cause: "refused", skip: npmErrorSentence(payload.error) };
+    return { kind: "skipped", cause: "refused", skip: npmErrorSentence(payload.error) };
   }
   if (!isAuditReport(parsed)) {
     return {
+      kind: "skipped",
       cause: "unreadable",
       skip: "npm's output carries no `vulnerabilities`, so it does not say which advisories are open",
     };
   }
-  return { report: parsed };
+  return { kind: "answered", report: parsed };
 }
 
 /**
@@ -1499,7 +1515,13 @@ export function secondReadAgreed(first: AuditVerdict, second: AuditVerdict): boo
  * One whole run of the gate: what it prints, and whether it passes.
  *
  * A union rather than an optional verdict, for the reason {@link AuditRead} is
- * one: a run that PASSED and a run that was never asked both exit 0, and a
+ * one, and discriminated the same way it is — `kind`, with `"skipped"` spelled
+ * identically in both because it is one fact travelling: npm did not answer, so
+ * the baseline was not checked. The positive halves differ (`"answered"` there,
+ * `"checked"` here) because they are different claims, and a case asserts the
+ * gate's kind follows the read's rather than leaving that to the prose. Before
+ * this, one union said which half it was by `kind` and the other by whether
+ * `report` happened to be present: a run that PASSED and a run that was never asked both exit 0, and a
  * caller holding `clean: true` beside a `verdict` that might be undefined has
  * the same ambiguity `stale: []` had before `completeness` travelled with it.
  * `kind` is the field that says which, and the skip's `clean` is a literal
@@ -1562,7 +1584,7 @@ export function runAuditGate(options: {
 }): AuditGateRun {
   const { read: reader, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES } = options;
   const read = reader();
-  if (read.report === undefined) {
+  if (read.kind === "skipped") {
     // The headline is who gave up, which the sentence alone does not carry: a
     // run of "we stopped waiting" says the bound may be too tight, a run of
     // "npm reported a failure" says the registry answered and the bound is
@@ -1661,7 +1683,7 @@ export function answerWithSecondRead(options: {
     `${checkName}: this answer rests on what npm did NOT report, so asking once more before acting on it.`,
   ];
   const again = readAgain();
-  if (again.report === undefined) {
+  if (again.kind === "skipped") {
     // The registry stopped answering between the two calls. That says nothing
     // about the first answer either way, so the first answer stands — and it is
     // printed with the same withholding it always had.
