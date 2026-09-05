@@ -37,26 +37,25 @@
  * And the third line is asking again. Both of the above turn a wrong answer
  * into a withheld one, which is better and is still not an answer; this is the
  * only leg of `verify` whose answer can change while the tree does not, and
- * `answer()` is what lets it check rather than leaving that to whoever re-runs
- * the step by hand. Spent only where it can change the outcome — see
- * `worthAsking` — so a healthy run costs exactly what it did.
+ * `answerWithSecondRead` is what lets it check rather than leaving that to
+ * whoever re-runs the step by hand. Spent only where it can change the outcome —
+ * see `worthAsking` — so a healthy run costs exactly what it did.
+ *
+ * What is left in this file is the two things only a process can do: run
+ * `npm audit` and exit. The decisions are `runAuditGate`, which takes this
+ * file's reader and returns the lines to print, so a test can run them.
  */
 
 import { execFileSync } from "node:child_process";
 
 import {
-  answerWithSecondRead,
   AUDIT_TIMEOUT_MS,
   auditInvocationSkip,
-  auditSkipHeadline,
-  evaluateAudit,
-  formatAuditVerdict,
-  isClean,
   readAuditPayload,
+  runAuditGate,
   type AuditRead,
-  type AuditVerdict,
 } from "../lib/audit-baseline";
-import { annotation, runningUnderActions } from "../lib/github-annotations";
+import { runningUnderActions } from "../lib/github-annotations";
 
 const CHECK_NAME = "check-audit-baseline";
 
@@ -92,94 +91,22 @@ function readAudit(): AuditRead {
 }
 
 /**
- * The verdict to act on, asking npm a second time when the first answer was
- * about what it did NOT say.
+ * The two things only a process can do: read the registry, and exit.
  *
- * The decision itself is {@link answerWithSecondRead}, which takes this file's
- * reader and hands back the lines to print: everything about it — whether a
- * second call is spent, what a skip between the calls does, what the account
- * says and when the run is annotated — is then reachable by a test with a stub
- * reader instead of by reading this function's source for an exact expression.
- *
- * This is the only leg of `verify` that can answer differently for one commit,
- * and until now it was also the only one that could not check. On 2026-09-04 a
- * degraded registry produced two red runs claiming the whole baseline had been
- * withdrawn, and a human re-running the step by hand is what established
- * otherwise — twice, nine minutes apart, for the cost of one call each time.
- *
- * The second call is spent only where it can change the answer: see
- * `worthAsking`, which is a stale-only red or a report short of its own totals.
- * A healthy run never reaches it, so the gate's cost on the runs that pass is
- * unchanged; a degraded one pays about 49 seconds for the difference between a
- * red CI and a green one.
- *
- * What the second read DID is printed, by `formatSecondRead`. Announcing
- * the call and then printing a verdict leaves a reader unable to tell whether
- * the second read landed, agreed, or was the one that changed the answer — and
- * the reconciled verdict carries the completeness of whichever read decided, so
- * a first read short of its own totals otherwise vanishes from a run that met a
- * degraded registry and said so nowhere.
+ * Everything between them — which failure a skip was, the annotation that keeps
+ * a skip from reading as a checked run, whether to ask npm again, the account of
+ * the second read, the under-report warning and the three ways to be red — is
+ * {@link runAuditGate}, so it can be run by a test rather than read for.
  */
-function answer(first: AuditVerdict): AuditVerdict {
-  const answered = answerWithSecondRead({
-    first,
+function main(): void {
+  const run = runAuditGate({
+    read: readAudit(),
     readAgain: readAudit,
     checkName: CHECK_NAME,
     underActions: runningUnderActions(),
   });
-  for (const line of answered.lines) console.log(line);
-  return answered.verdict;
-}
-
-function main(): void {
-  const read = readAudit();
-  if (read.report === undefined) {
-    // The headline is who gave up, which the sentence alone does not carry: a
-    // run of "we stopped waiting" says the bound may be too tight, a run of
-    // "npm reported a failure" says the registry answered and the bound is
-    // beside the point. Three skips in a row used to read identically.
-    const headline = auditSkipHeadline(read.cause);
-    console.log(`${CHECK_NAME}: skipping (${headline}) — ${read.skip}.`);
-    // A skip exits 0, so without this a week of registry outages is a week of
-    // green runs with the reason in a log nobody opens on a green run. The
-    // annotation puts it on the run summary, where the one leg allowed a live
-    // feed cannot decline to answer without leaving a mark.
-    if (runningUnderActions()) {
-      console.log(
-        annotation("warning", `${read.skip}. The advisory baseline was NOT checked on this run.`, {
-          title: `${CHECK_NAME} skipped: ${headline}`,
-        }),
-      );
-    }
-    return;
-  }
-  const verdict = answer(evaluateAudit(read.report));
-  console.log(formatAuditVerdict(verdict, CHECK_NAME));
-  // A withheld staleness check is a half-answered run, and the half it did not
-  // answer exits 0. The same argument the skip's annotation makes: without a
-  // mark on the run summary, "we could not ask" is only ever visible in a log
-  // nobody opens on a green run.
-  if (verdict.completeness.underReported.length > 0 && runningUnderActions()) {
-    const withheld = verdict.completeness.complete
-      ? "Baseline staleness was still checked — the shortfall is below the severities it reads."
-      : `Baseline staleness was NOT checked: ${String(verdict.completeness.claimed)} high/critical roots counted, ${String(verdict.completeness.carried)} reported.`;
-    console.log(
-      annotation(
-        "warning",
-        `npm counted more roots than it reported, at ${verdict.completeness.underReported
-          .map((row) => `${row.severity} (${String(row.carried)} of ${String(row.claimed)})`)
-          .join(", ")}. ${withheld}`,
-        { title: `${CHECK_NAME}: npm's report was short of its own totals` },
-      ),
-    );
-  }
-  // Three ways to be red and `isClean` is the one place that says which, so a
-  // finding cannot be printed by a step that exits 0. `stale` joined the
-  // failing side with `fixableInRange`, and because of it: fixing an in-range
-  // advisory is what MAKES its baseline entry stale, so leaving that half
-  // advisory-only would mean every fix this gate now demands leaves the
-  // accepted list describing a tree that no longer exists — and green.
-  if (!isClean(verdict)) process.exit(1);
+  for (const line of run.lines) console.log(line);
+  if (!run.clean) process.exit(1);
 }
 
 main();

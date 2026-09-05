@@ -7,6 +7,7 @@ import {
   escapeAnnotationProperty,
   runningUnderActions,
 } from "@/lib/github-annotations";
+import { runAuditGate, type AuditRead } from "@/lib/audit-baseline";
 import { formatGitHubAnnotations } from "@/lib/check-inline-hex";
 
 import { readRepoFile } from "./helpers/repo-file";
@@ -123,15 +124,24 @@ describe("the two producers, related by the module rather than by a copy", () =>
     // The gate's skip is the reason this module exists, and the annotation is
     // the half that survives a green run. A revert to a bare `console.log`
     // would leave every case above green.
+    //
+    // The gate's decisions moved into `lib/audit-baseline.ts`, so the skip is
+    // RUN here: the script keeps the `runningUnderActions()` reading, and the
+    // decision it hands that answer to is what produces the mark.
     const script = readRepoFile("scripts/check-audit-baseline.ts");
     assert.match(
       script,
-      /runningUnderActions\(\)/,
+      /underActions: runningUnderActions\(\),/,
       "the audit gate no longer decides when to annotate through the shared reader",
     );
-    assert.match(
-      script,
-      /annotation\("warning",/,
+    const skipped = runAuditGate({
+      read: { skip: "registry unreachable", cause: "refused" },
+      readAgain: (): AuditRead => ({ skip: "registry unreachable", cause: "refused" }),
+      checkName: "check-audit-baseline",
+      underActions: true,
+    });
+    assert.ok(
+      skipped.lines.some((line) => line.startsWith("::warning ")),
       "the audit gate's skip is a plain log line again, so a run that did not check advisories looks like one that did",
     );
   });

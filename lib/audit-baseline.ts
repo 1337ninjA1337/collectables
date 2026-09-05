@@ -1396,6 +1396,98 @@ export function secondReadAgreed(first: AuditVerdict, second: AuditVerdict): boo
   );
 }
 
+/** One whole run of the gate: what it prints, and whether it passes. */
+export interface AuditGateRun {
+  /** Every line to print, in order — log lines and workflow annotations alike. */
+  readonly lines: readonly string[];
+  /**
+   * Whether the step exits 0.
+   *
+   * True for a SKIP as well as a pass: availability of a third party must not
+   * decide whether this repo's tests can run, and the skip's annotation is what
+   * keeps that from reading as a checked run.
+   */
+  readonly clean: boolean;
+  /** The verdict acted on, absent when the first read never produced one. */
+  readonly verdict?: AuditVerdict;
+}
+
+/**
+ * The gate, minus the two things only a process can do: run `npm audit` and
+ * exit.
+ *
+ * The caller supplies the first read and a reader for the second, and gets back
+ * the lines and the exit decision. Everything that used to live in the script's
+ * `main` — which failure a skip was, the annotation that keeps a skip from
+ * looking like a pass, the under-report warning, and the three ways to be red —
+ * is reachable from a test this way, and none of it was before: those facts were
+ * established by reading the file for an exact expression, which is a check on
+ * the spelling of the code rather than on what it does.
+ */
+export function runAuditGate(options: {
+  readonly read: AuditRead;
+  readonly readAgain: () => AuditRead;
+  readonly checkName: string;
+  readonly underActions: boolean;
+  readonly accepted?: readonly AcceptedAdvisory[];
+}): AuditGateRun {
+  const { read, readAgain, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES } = options;
+  if (read.report === undefined) {
+    // The headline is who gave up, which the sentence alone does not carry: a
+    // run of "we stopped waiting" says the bound may be too tight, a run of
+    // "npm reported a failure" says the registry answered and the bound is
+    // beside the point. Three skips in a row used to read identically.
+    const headline = auditSkipHeadline(read.cause);
+    const lines = [`${checkName}: skipping (${headline}) — ${read.skip}.`];
+    // A skip exits 0, so without this a week of registry outages is a week of
+    // green runs with the reason in a log nobody opens on a green run. The
+    // annotation puts it on the run summary, where the one leg allowed a live
+    // feed cannot decline to answer without leaving a mark.
+    if (underActions) {
+      lines.push(
+        annotation("warning", `${read.skip}. The advisory baseline was NOT checked on this run.`, {
+          title: `${checkName} skipped: ${headline}`,
+        }),
+      );
+    }
+    return { lines, clean: true };
+  }
+  const answered = answerWithSecondRead({
+    first: evaluateAudit(read.report, accepted),
+    readAgain,
+    checkName,
+    underActions,
+    accepted,
+  });
+  const verdict = answered.verdict;
+  const lines = [...answered.lines, formatAuditVerdict(verdict, checkName)];
+  // A withheld staleness check is a half-answered run, and the half it did not
+  // answer exits 0. The same argument the skip's annotation makes: without a
+  // mark on the run summary, "we could not ask" is only ever visible in a log
+  // nobody opens on a green run.
+  if (verdict.completeness.underReported.length > 0 && underActions) {
+    const withheld = verdict.completeness.complete
+      ? "Baseline staleness was still checked — the shortfall is below the severities it reads."
+      : `Baseline staleness was NOT checked: ${String(verdict.completeness.claimed)} high/critical roots counted, ${String(verdict.completeness.carried)} reported.`;
+    lines.push(
+      annotation(
+        "warning",
+        `npm counted more roots than it reported, at ${verdict.completeness.underReported
+          .map((row) => `${row.severity} (${String(row.carried)} of ${String(row.claimed)})`)
+          .join(", ")}. ${withheld}`,
+        { title: `${checkName}: npm's report was short of its own totals` },
+      ),
+    );
+  }
+  // Three ways to be red and `isClean` is the one place that says which, so a
+  // finding cannot be printed by a step that exits 0. `stale` joined the failing
+  // side with `fixableInRange`, and because of it: fixing an in-range advisory
+  // is what MAKES its baseline entry stale, so leaving that half advisory-only
+  // would mean every fix this gate demands leaves the accepted list describing a
+  // tree that no longer exists — and green.
+  return { lines, clean: isClean(verdict), verdict };
+}
+
 /** A verdict to act on, and everything the gate says about how it got there. */
 export interface AnsweredAudit {
   /** The verdict the gate prints and exits on. */
@@ -1443,7 +1535,14 @@ export function answerWithSecondRead(options: {
     // The registry stopped answering between the two calls. That says nothing
     // about the first answer either way, so the first answer stands — and it is
     // printed with the same withholding it always had.
-    lines.push(`${checkName}: the second read did not land (${again.skip}); reporting the first.`);
+    //
+    // With the headline the first read's skip carries, and for the same reason:
+    // a second read abandoned after three minutes says the bound may be too
+    // tight, and one the registry refused says the bound is beside the point.
+    // Two failures that read alike is what the incident cost.
+    lines.push(
+      `${checkName}: the second read did not land (${auditSkipHeadline(again.cause)}) — ${again.skip}; reporting the first.`,
+    );
     return { verdict: first, lines };
   }
   const second = evaluateAudit(again.report, accepted);
