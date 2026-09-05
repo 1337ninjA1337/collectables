@@ -62,8 +62,9 @@
  *    index here is a match index in the original and a reported `file:line` is
  *    the real one. Reach for this whenever the finding is printed with a
  *    location.
- * 2. **Stripped then flattened** (`suiteCode` in `helpers/suite-files.ts`,
- *    `sourceCodeFlat` in `helpers/source-files.ts`). For a rule that matches a
+ * 2. **Stripped then flattened** (`suiteCode` in
+ *    `__tests__/helpers/suite-files.ts`, `sourceCodeFlat` in
+ *    `__tests__/helpers/source-files.ts`). For a rule that matches a
  *    SHAPE rather than reporting a place — a shape spanning lines otherwise
  *    hides behind a prettier rewrap, which is how three suites once read clean
  *    while still doing the thing. Offsets do not survive, so a caller that

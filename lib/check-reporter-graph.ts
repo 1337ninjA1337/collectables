@@ -17,8 +17,9 @@
  *     again before any suite runs.
  *
  * WHY A GUARD AND NOT A TEST. Both failures kill the whole run, so the suite
- * that would have caught them never executes: `__tests__/test-failure-report.ts`
- * spawns the real command, which is the strongest check available and is also
+ * that would have caught them never executes:
+ * `__tests__/test-failure-report.test.ts` spawns the real command, which is
+ * the strongest check available and is also
  * unreachable in exactly the case it is for. `lint:all` runs BEFORE `npm test`
  * in `lint:ci` and in ci.yml, so this guard gets to say what happened while
  * there is still a run to say it in.
