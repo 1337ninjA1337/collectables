@@ -208,8 +208,24 @@ describe("the one-versus-many rule lives in one module", () => {
    *
    * A CI message is not a different rule from a UI string: exactly one takes
    * the singular, and zero does not.
+   *
+   * SIX SPELLINGS, not one. The first version of this read `=== 1 ?` — the
+   * spelling the six modules it was written from happened to use — so a
+   * seventh copy written `!== 1 ? many : one`, `> 1 ?`, `<= 1 ?`, `< 2 ?` or
+   * `>= 2 ?` said the same thing and passed. That is the shape three entries
+   * in `.tasks/` are about: a rule read off the offenders in front of it.
+   *
+   * The condition is what is matched, not the branches. A copy that picks
+   * between two VARIABLES — `count === 1 ? one : many`, which is exactly what
+   * `audit-baseline` had — is the one worth catching most, and a rule keyed on
+   * a string literal after the `?` would miss it.
+   *
+   * `=== 2` and `> 2` are absent because they are not this rule. Widening to
+   * "any comparison against a small number" would sweep in bounds checks and
+   * make the exemption list the thing that carries the meaning.
    */
-  const INLINE_RULE = /=== 1 \?/;
+  const INLINE_RULE =
+    /(?:===\s*1|!==\s*1|>\s*1|<=\s*1|<\s*2|>=\s*2)\s*\?/;
 
   it("is not written out again anywhere else in the tree", () => {
     assertOnlyTheseMatch({
