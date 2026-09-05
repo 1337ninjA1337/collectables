@@ -44,8 +44,10 @@ export const INLINE_HEX_SHORT_PATTERN = /(["'`])#[0-9a-fA-F]{3,4}\1/g;
  *   from an item id; the 12-entry PALETTE is the feature.
  * - `lib/privacy-page.ts` — renders the standalone /privacy HTML page whose
  *   inline CSS cannot import design tokens (CSP `default-src 'none'`).
- * - `lib/export-pdf.ts` — builds the print-HTML template for PDF export;
- *   same standalone-document reasoning as the privacy page.
+ * - `lib/export-pdf-html.ts` — builds the print-HTML template for PDF export;
+ *   same standalone-document reasoning as the privacy page. The exemption moved
+ *   here with the CSS when the pure half was split out of `lib/export-pdf.ts`
+ *   so a suite could reach it; the wrapper that remains has no hex in it.
  *
  * `lib/toast-context.tsx` was exempt here until 2026-08-09 for its 13-hex toast
  * palette; that file is now fully tokenised, so the exemption is gone and the
@@ -55,7 +57,7 @@ export const HEX_ALLOWLIST: ReadonlySet<string> = new Set([
   "lib/design-tokens.ts",
   "lib/placeholder-color.ts",
   "lib/privacy-page.ts",
-  "lib/export-pdf.ts",
+  "lib/export-pdf-html.ts",
 ]);
 
 /** True when the repo-relative path is exempt from the inline-hex scan. */
