@@ -19,6 +19,12 @@
  * gate handed a reader with no bound is now a shape that has to be written on
  * purpose rather than one a caller can reach by accident.
  *
+ * The command stays spelled out HERE rather than joining the options in `lib/`,
+ * and that is a decision rather than an oversight: `verify-gate-script.test.ts`
+ * reads each gate leg's own wrapper for a remote call, and moving this one out
+ * of sight made the scan report a hermetic `verify` while `npm audit` ran on
+ * every leg-run. `AuditSpawn`'s doc comment argues it.
+ *
  * Needs the registry, so it is its own CI step rather than a `LINT_GUARDS`
  * entry (that registry is documented as network-free), and a run that cannot
  * reach it is a SOFT SKIP, the same call `check-expo-install` makes:

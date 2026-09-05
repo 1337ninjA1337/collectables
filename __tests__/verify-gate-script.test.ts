@@ -332,15 +332,29 @@ describe("only one leg of the gate reads anything outside the tree", () => {
     );
   });
 
+  it("still SEES the audit gate, which is the direction this scan can fail silently in", () => {
+    // Split out of the case below, which asserted the whole list at once and
+    // therefore reported "a second leg reads outside the tree" for a run where
+    // the audit gate had stopped being seen at all — the opposite finding,
+    // wearing the wrong sentence.
+    //
+    // It is not hypothetical. Moving `["npm", ["audit", "--json"]]` out of the
+    // gate's wrapper and into `lib/audit-baseline.ts` beside the bound is a
+    // tidy that reads as obviously correct, and it turns this scan off: the
+    // marker matches text in the leg's own file, so a remote read one import
+    // away is invisible here. `AuditSpawn`'s doc comment carries the argument
+    // for why the command stays where it is; this is what notices if it moves.
+    assert.deepEqual(
+      reachOut(["scripts/check-audit-baseline.ts"]),
+      [{ file: "scripts/check-audit-baseline.ts", why: "an `npm audit` of the registry" }],
+      "the audit gate no longer LOOKS like it reads the registry, and it certainly still does — the call moved somewhere this scan cannot see, so `verify` now reports as hermetic while `npm audit` runs on every leg-run",
+    );
+  });
+
   it("names the audit gate as the only leg that reads a live feed", () => {
     assert.deepEqual(
-      reachOut(GATE_SCRIPTS),
-      [
-        {
-          file: "scripts/check-audit-baseline.ts",
-          why: "an `npm audit` of the registry",
-        },
-      ],
+      reachOut(GATE_SCRIPTS).map((found) => found.file),
+      ["scripts/check-audit-baseline.ts"],
       "a second leg of `verify` now reads something outside the tree, which makes PUBLISHED_ELSEWHERE_NOTE's \"the one check here\" false — either keep the new leg hermetic, or rewrite that sentence and this case together",
     );
   });

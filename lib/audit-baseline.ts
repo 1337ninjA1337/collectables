@@ -453,7 +453,25 @@ export const AUDIT_SPAWN_OPTIONS: AuditSpawnOptions = {
   killSignal: "SIGKILL",
 };
 
-/** Running `npm audit --json` under {@link AUDIT_SPAWN_OPTIONS}, and nothing else. */
+/**
+ * `npm audit --json`, already spawned, bounded by {@link AUDIT_SPAWN_OPTIONS}.
+ *
+ * The OPTIONS moved here and the command deliberately did not, which is worth
+ * the paragraph because the obvious next tidy is to move it. `verify-gate-
+ * script.test.ts` scans each gate leg's own wrapper for a remote read, and the
+ * whole claim it measures — "the audit gate is the only leg of `verify` that
+ * reads anything outside the tree" — rests on that read being legible in the
+ * leg's text. Moving `["npm", ["audit", "--json"]]` in here was tried: the
+ * marker stopped matching, and the scan reported a hermetic `verify` while
+ * `npm audit` ran on every leg-run. Following the script's `lib/` closure
+ * instead does not rescue it — three more legs import modules that CONTAIN a
+ * `fetch` (a service worker's source text, the app's uploader) and never call
+ * one, so the scan gains three false findings and loses the property that made
+ * it worth having.
+ *
+ * So the bound lives where it is argued and the command stays where it is
+ * visible, and the two answer to different readers.
+ */
 export type AuditSpawn = (options: AuditSpawnOptions) => string;
 
 /**
