@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 
 import {
   ACCEPTED_HIGH_ADVISORIES,
@@ -39,7 +40,10 @@ import {
 } from "@/lib/audit-baseline";
 import { LINT_ALL_EXEMPT, LINT_GUARDS } from "@/lib/lint-guards";
 
-import { readRepoFile } from "./helpers/repo-file";
+import { measuredFloor } from "./helpers/coverage-floor";
+import { moduleDoc, proseNames } from "./helpers/module-doc";
+import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { sourceCode, sourceFiles } from "./helpers/source-files";
 
 /**
  * The dependency-advisory baseline — SEC-8's drift gate.
@@ -2660,6 +2664,126 @@ describe("the declared causes and the produced ones are the same set", () => {
       [...produced].sort(),
       [...AUDIT_SKIP_CAUSES].sort(),
       "the causes the readers actually return and the causes the module declares have drifted apart",
+    );
+  });
+});
+
+/**
+ * The header points at code, and nothing checked that the code was still there.
+ *
+ * `scripts/check-audit-baseline.ts` is now four statements and a reader, and
+ * the reason it can be that short is its header: five sentences saying every
+ * decision is `runAuditGate` in `lib/audit-baseline.ts`, that the reader is
+ * here because it is the process boundary, and that `readAuditPayload` tells a
+ * report from a registry failure that parses like one. That paragraph is the
+ * first thing a contributor reads and the only thing telling them where to go.
+ *
+ * It is also prose. The week this file's decisions moved into `lib/`, the
+ * header moved with them by hand — and a rename does not move prose. `tsc`
+ * would rewrite the import and leave the sentence pointing at a function that
+ * no longer exists, which is the exact failure `plural.ts` grew a case for
+ * when its "who else asks" paragraph fell a caller behind.
+ *
+ * ## What is checked, and the much larger half that is not
+ *
+ * `classifyProseName` claims a backticked span only on shape: a camel, Pascal
+ * or SCREAMING_SNAKE identifier, or a slashed path with an extension.
+ * Everything else in this header — `npm audit --json`, `check-expo-install`,
+ * `SIGKILL` — is left alone, because a rule that demanded npm's lifecycle
+ * hooks and the kernel's signals resolve to something in this tree would be
+ * red on correct prose. The floors below are what keep that honesty from
+ * turning into a check of nothing: a header reworded until it names no code is
+ * a header that stopped pointing anywhere, and that is a finding, not a pass.
+ *
+ * Resolution is EXPORTS rather than "appears somewhere in the tree". The claim
+ * the sentence makes is that a reader can go and find `runAuditGate`, so a
+ * dead name surviving as somebody's local variable is not the sentence being
+ * true. The script's own declarations count for the same reason — `readAudit`
+ * and `main` are findable in the file the reader already has open.
+ */
+describe("the gate script's header names things that exist", () => {
+  const GATE = "scripts/check-audit-baseline.ts";
+  const header = moduleDoc(readRepoFile(GATE));
+  const named = proseNames(header);
+
+  /**
+   * Every name `lib/` and `scripts/` export, plus what the gate declares.
+   *
+   * Both forms of export are read: the declaration (`export function x`) and
+   * the list (`export { x, y }`). Reading only the first would have reported
+   * every re-exported name as missing, which is a red run about the regex
+   * wearing a message about the paragraph — the same failure mode the
+   * extraction itself was rewritten to avoid.
+   */
+  const findable = new Set<string>();
+  for (const file of sourceFiles("lib", "scripts")) {
+    const code = sourceCode(file);
+    for (const match of code.matchAll(
+      /export\s+(?:default\s+)?(?:declare\s+)?(?:async\s+)?(?:function|const|let|var|class|type|interface|enum)\s+([A-Za-z_$][\w$]*)/g,
+    )) {
+      findable.add(match[1]);
+    }
+    for (const match of code.matchAll(/export\s*(?:type\s*)?\{([^}]*)\}/g)) {
+      for (const part of match[1].split(",")) {
+        const name = part.trim().split(/\s+as\s+/).pop()?.trim();
+        if (name !== undefined && /^[A-Za-z_$][\w$]*$/.test(name)) findable.add(name);
+      }
+    }
+  }
+  for (const match of sourceCode(GATE).matchAll(
+    /(?:function|const|let|var|class|type|interface|enum)\s+([A-Za-z_$][\w$]*)/g,
+  )) {
+    findable.add(match[1]);
+  }
+
+  it("names an identifier a reader can go and find, for every one it names", () => {
+    const missing = named.identifiers.filter((name) => !findable.has(name));
+    assert.deepEqual(
+      missing,
+      [],
+      `the header of ${GATE} names ${missing.join(", ")} and nothing under lib/ or scripts/ exports it — the sentence is the only thing telling a contributor where the gate's decisions live, and it is now pointing somewhere they are not`,
+    );
+  });
+
+  it("names a file that is on disk, for every path it names", () => {
+    const missing = named.paths.filter((rel) => !existsSync(repoPath(rel)));
+    assert.deepEqual(
+      missing,
+      [],
+      `the header of ${GATE} names ${missing.join(", ")} and no such file exists — a path in prose is a rename away from being directions to nowhere`,
+    );
+  });
+
+  it("still names the entry point the script actually calls", () => {
+    // The floors below say the header names SOME code. This says it names the
+    // one thing the file exists to reach: `main` calls exactly one function
+    // out of `lib/audit-baseline.ts`, and a header that stopped mentioning it
+    // could satisfy every count here while describing a different gate.
+    const called = [...sourceCode(GATE).matchAll(/\b([a-z][\w$]*)\(\{/g)].map((m) => m[1]);
+    assert.ok(
+      called.length > 0,
+      "the gate's main no longer calls anything with an options object, so this case is reading for a shape the script does not have",
+    );
+    const unnamed = called.filter((name) => !header.includes(name));
+    assert.deepEqual(
+      unnamed,
+      [],
+      `the gate calls ${unnamed.join(", ")} and its header does not name it — "every decision is X" is the header's whole claim, and X is now something else`,
+    );
+  });
+
+  it("names enough code that a reworded header cannot pass by naming none", () => {
+    // Measured, not chosen: four identifiers and one path today. A floor of
+    // zero is what an honesty-first classifier degrades to when somebody
+    // rewrites the paragraph in plain words, and the pass would look identical
+    // to the pass a correct header gets.
+    assert.ok(
+      named.identifiers.length >= 3,
+      measuredFloor(named.identifiers.length, 3, `identifier(s) named in the header of ${GATE}`),
+    );
+    assert.ok(
+      named.paths.length >= 1,
+      measuredFloor(named.paths.length, 1, `repo path(s) named in the header of ${GATE}`),
     );
   });
 });

@@ -12,7 +12,7 @@ import { stripComments } from "@/lib/strip-comments";
  * into `""`, so a sparse cloud row arrived with the address as its only
  * non-empty name and came out as `ada-lovelace-example-com`. `publicId` is the
  * identifier the app invites people to share so others can find them, and
- * `toProfileRow` writes it back to the cloud, so the address stuck. The term
+ * `upsertProfileBody` writes it back to the cloud, so the address stuck. The term
  * was removed; this stops the next one.
  *
  * WHICH FIELDS, and why not all of them.

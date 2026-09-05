@@ -2,7 +2,8 @@
  * Shared deployment-environment parser.
  *
  * `lib/sentry-config.ts` and `lib/analytics-config.ts` each carried an
- * identical `normaliseEnvironment` that collapses an `EXPO_PUBLIC_*_ENV` string
+ * identical copy of what is now `normaliseDeploymentEnv`, collapsing an
+ * `EXPO_PUBLIC_*_ENV` string
  * into one of three canonical buckets. Duplicating it meant a future "preview"
  * bucket added to one config would silently fall back to "production" in the
  * other. This is the single source of truth.

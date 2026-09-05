@@ -52,7 +52,7 @@ describe("finding an email in a public identifier", () => {
   });
 
   it("covers the snake_case column name as well as the camelCase field", () => {
-    // `toProfileRow` writes `public_id`, so a leak could be introduced on
+    // `upsertProfileBody` writes `public_id`, so a leak could be introduced on
     // either side of the row/profile boundary.
     assert.equal(scan(`const row = { public_id: user.email };`).length, 1);
     assert.equal(scan(`const row = { publicId: user.email };`).length, 1);

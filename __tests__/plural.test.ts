@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { plural, slavicPlural } from "@/lib/plural";
 
 import { measuredFloor } from "./helpers/coverage-floor";
+import { moduleDoc } from "./helpers/module-doc";
 import { readRepoFile } from "./helpers/repo-file";
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 import { suiteCode, suiteFiles } from "./helpers/suite-files";
@@ -161,28 +162,6 @@ describe("slavicPlural", () => {
 /** The module the rule lives in. It is not a caller of itself. */
 const NOT_CALLERS = ["lib/plural.ts"];
 
-/**
- * A module's own doc comment: the first `/**` block, from its opener to the
- * `*\/` that closes THAT block.
- *
- * Written first as `slice(0, indexOf("*\/"))` — the leading text up to the
- * first close, which is the doc comment only while the doc comment is the
- * first thing in the file. A `/* eslint … *\/` line above it, or a licence
- * header, would cut the search text down to that line and report every caller
- * as unnamed: a red run about the extraction, wearing a message about the
- * paragraph. Anchoring on `/**` and closing from there answers the question
- * asked, and an unparseable file is refused rather than read as empty.
- */
-function moduleDoc(source: string): string {
-  const open = source.indexOf("/**");
-  const close = open === -1 ? -1 : source.indexOf("*/", open);
-  assert.ok(
-    open !== -1 && close !== -1,
-    "the module has no doc comment to read, so a caller list cannot be looked for in it",
-  );
-  return source.slice(open, close);
-}
-
 describe("who the rule says asks it", () => {
   it("names every module that imports it, so a new caller cannot arrive unlisted", () => {
     // Suites are excluded: a case importing `plural` to test it is not a
@@ -213,49 +192,3 @@ describe("who the rule says asks it", () => {
   });
 });
 
-describe("the doc comment this case reads", () => {
-  it("is the first /** block, not the text before the first close", () => {
-    // The shape that broke it: a comment above the doc comment. The old
-    // extraction returned the eslint line and nothing else.
-    const source = ["/* eslint-disable no-bitwise */", "/**", " * lib/caller.ts asks.", " */", "export const x = 1;"].join("\n");
-    assert.match(moduleDoc(source), /lib\/caller\.ts asks\./);
-    assert.doesNotMatch(moduleDoc(source), /eslint-disable/);
-  });
-
-  it("stops at its own close, so the whole file is not the doc comment", () => {
-    const source = ["/**", " * lib/caller.ts asks.", " */", "// lib/impostor.ts does not.", ""].join("\n");
-    assert.doesNotMatch(moduleDoc(source), /impostor/);
-  });
-
-  it("returns the real header of the real file, which the fixtures cannot show", () => {
-    // The three cases above prove the extraction on shapes this tree does not
-    // have. What they cannot say is that it still returns the BLOCK when run on
-    // the file the case above reads — an extraction that quietly returned the
-    // whole file would pass every one of them, and the caller list would keep
-    // agreeing because the names are in there somewhere.
-    const source = readRepoFile("lib/plural.ts");
-    const doc = moduleDoc(source);
-    assert.ok(doc.startsWith("/**"), "the extracted text does not begin at a doc comment opener");
-    // Longer than every FUNCTION doc in the same file, derived rather than
-    // written: an anchor on `/**` can land on either, and a number typed here
-    // would be a third thing to keep in step with the prose above it.
-    const others = [...source.matchAll(/\/\*\*[\s\S]*?\*\//g)]
-      .slice(1)
-      .map((match) => match[0].length);
-    const longest = Math.max(...others);
-    assert.ok(
-      others.length > 0 && doc.length > longest,
-      `the extracted block is ${String(doc.length)} characters and the longest function doc in the file is ${String(longest)} — the header is the one the caller list lives in, and this is not it`,
-    );
-    // The half a length floor cannot state: the block ends before the code. Any
-    // export, not `plural` by name — the property is "stops at the source", and
-    // pinning one identifier makes a rename the thing that would notice.
-    assert.doesNotMatch(doc, /^export /m);
-  });
-
-  it("refuses a file with no doc comment rather than reading one as empty", () => {
-    // An empty search text agrees that nothing is named, which is the wrong
-    // answer given confidently: every caller would read as unnamed.
-    assert.throws(() => moduleDoc("export const x = 1;\n"), /no doc comment/);
-  });
-});
