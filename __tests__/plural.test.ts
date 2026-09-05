@@ -225,16 +225,36 @@ describe("the one-versus-many rule lives in one module", () => {
    * make the exemption list the thing that carries the meaning.
    */
   /**
-   * The six comparisons, as a fragment both rules are built from.
+   * The six comparisons, as a fragment all three readers are built from.
    *
    * They were written out twice — once inside the ternary pattern and once
    * inside the `if` pattern — which is two places to add a seventh spelling and
    * one of them to forget. The alternation is the rule; what differs between
-   * the two readers is only what wraps it.
+   * the readers is only what wraps it. There are three of them now: the app
+   * census arrived after the fragment did, and cost one wrapper rather than a
+   * third copy.
    */
   const COUNT_COMPARISON = "(?:===\\s*1|!==\\s*1|>\\s*1|<=\\s*1|<\\s*2|>=\\s*2)";
 
-  const INLINE_RULE = new RegExp(`${COUNT_COMPARISON}\\s*\\?`);
+  /**
+   * The three wrappers, as functions of the alternation rather than of the
+   * constant — which is the whole of what makes "one edit reaches all three"
+   * checkable instead of stated.
+   *
+   * A seventh spelling added to `COUNT_COMPARISON` reaches every reader, and
+   * the way that claim goes wrong is a fourth reader written with the six
+   * comparisons inlined: it passes every case in this file, because every case
+   * in this file is about the three that exist. Taking the fragment as a
+   * PARAMETER lets one case hand all three a widened alternation and watch
+   * each of them read it — the property the constant alone cannot offer, since
+   * a `RegExp` built from it keeps no link back.
+   */
+  const ternaryReader = (comparison: string) => new RegExp(`${comparison}\\s*\\?`);
+  const ifReader = (comparison: string) => new RegExp(`if\\s*\\([^)]*${comparison}\\s*\\)`);
+  const censusReader = (comparison: string) =>
+    new RegExp(`(?:[\\w.$[\\]"']*)\\s*${comparison}\\s*\\?`);
+
+  const INLINE_RULE = ternaryReader(COUNT_COMPARISON);
 
   it("matches every spelling it claims, and the near misses it disclaims", () => {
     // The widened rule was proved on four broken trees, planted by hand in a
@@ -302,7 +322,7 @@ describe("the one-versus-many rule lives in one module", () => {
    * unsanctioned module with a path, and whoever adds one has to decide what
    * the sweep should do rather than never hearing about it.
    */
-  const TWO_LINE_RULE = new RegExp(`if\\s*\\([^)]*${COUNT_COMPARISON}\\s*\\)`);
+  const TWO_LINE_RULE = ifReader(COUNT_COMPARISON);
 
   it("has an if-shaped hole, and these three are what is in it", () => {
     assertOnlyTheseMatch({
@@ -409,7 +429,7 @@ describe("the one-versus-many rule lives in one module", () => {
    * `offence-sweep` refuses on its callers' behalf and a hand-rolled scan has
    * to refuse for itself.
    */
-  const COUNTED_OPERAND = new RegExp(`(?:[\\w.$[\\]"']*)\\s*${COUNT_COMPARISON}\\s*\\?`);
+  const COUNTED_OPERAND = censusReader(COUNT_COMPARISON);
 
   it("finds no inflection in the app tree, and these four expressions are why", () => {
     const census = new Set<string>();
@@ -448,5 +468,68 @@ describe("the one-versus-many rule lives in one module", () => {
       subject: "screens",
       what: "compare a count against 1 or 2 in an `if`",
     });
+  });
+
+  /**
+   * The claim the fragment exists to make, asked instead of asserted.
+   *
+   * `COUNT_COMPARISON` was extracted so a seventh spelling would cost one edit
+   * rather than two, and the proof was a probe run by hand and written into
+   * `.tasks/`: a `SEVENTH` alternative dropped into the fragment, both readers
+   * asked, the result described in prose. That is the arrangement four entries
+   * closed for `network-refusal.test.ts` and one closed for the rule's own six
+   * alternatives — a property nobody has watched hold reads as holding whether
+   * it does or not — and it is cheaper here than in any of them, because the
+   * readers are three lines and the offender is a string.
+   *
+   * THE WAY THE CLAIM GOES WRONG is not that a wrapper drops the fragment: that
+   * fails every case in this file the moment it does. It is a FOURTH reader
+   * written with the six comparisons inlined, which passes everything here
+   * because everything here is about the three that exist. So the case asserts
+   * the population as well: three builders, and the count is the thing that
+   * goes red when a fourth arrives — with `lint:all`'s own registry cases as
+   * the precedent for counting the readers rather than trusting them.
+   *
+   * The seventh spelling is `\bunity\b`, which no comparison operator can spell
+   * and no source file in this tree contains. A widened fragment must be read
+   * by all three wrappers in the shape each of them wraps it in — a ternary, an
+   * `if` head, and a ternary with its operand — and the REAL readers must
+   * refuse the same three, which is the half that says the widening is what did
+   * it rather than something already in the pattern.
+   */
+  it("hands a seventh spelling to all three readers from one edit", () => {
+    const WIDER = `(?:${COUNT_COMPARISON}|\\bunity\\b)`;
+    const readers = [
+      { name: "ternary", build: ternaryReader, offender: "n unity ? one : many" },
+      { name: "if", build: ifReader, offender: "if (n unity) { return one; }" },
+      { name: "census", build: censusReader, offender: "photoCount unity ? one : many" },
+    ];
+
+    for (const { name, build, offender } of readers) {
+      assert.match(
+        offender,
+        build(WIDER),
+        `the ${name} reader was built from a widened COUNT_COMPARISON and does not read the alternative that was added to it, so a seventh spelling is one edit in the fragment and a silent hole here`,
+      );
+      assert.doesNotMatch(
+        offender,
+        build(COUNT_COMPARISON),
+        `the ${name} reader matches \`${offender}\` without the widening, so the case above proves nothing about the fragment`,
+      );
+    }
+
+    // The population, because a fourth reader with the six comparisons inlined
+    // passes every case in this file — every case in this file is about three.
+    assert.equal(
+      readers.length,
+      3,
+      "a reader was added to or removed from the fragment's callers and this case still asks about three — the count is what stops a fourth being written with the alternation inlined",
+    );
+    for (const rule of [INLINE_RULE, TWO_LINE_RULE, COUNTED_OPERAND]) {
+      assert.ok(
+        rule.source.includes(COUNT_COMPARISON),
+        `\`${rule.source}\` does not carry COUNT_COMPARISON verbatim, so an edit to the fragment does not reach it`,
+      );
+    }
   });
 });
