@@ -1396,42 +1396,56 @@ export function secondReadAgreed(first: AuditVerdict, second: AuditVerdict): boo
   );
 }
 
-/** One whole run of the gate: what it prints, and whether it passes. */
-export interface AuditGateRun {
-  /** Every line to print, in order — log lines and workflow annotations alike. */
-  readonly lines: readonly string[];
-  /**
-   * Whether the step exits 0.
-   *
-   * True for a SKIP as well as a pass: availability of a third party must not
-   * decide whether this repo's tests can run, and the skip's annotation is what
-   * keeps that from reading as a checked run.
-   */
-  readonly clean: boolean;
-  /** The verdict acted on, absent when the first read never produced one. */
-  readonly verdict?: AuditVerdict;
-}
+/**
+ * One whole run of the gate: what it prints, and whether it passes.
+ *
+ * A union rather than an optional verdict, for the reason {@link AuditRead} is
+ * one: a run that PASSED and a run that was never asked both exit 0, and a
+ * caller holding `clean: true` beside a `verdict` that might be undefined has
+ * the same ambiguity `stale: []` had before `completeness` travelled with it.
+ * `kind` is the field that says which, and the skip's `clean` is a literal
+ * `true` because a skip has no other outcome available to it: availability of a
+ * third party must not decide whether this repo's tests can run.
+ */
+export type AuditGateRun =
+  | {
+      readonly kind: "skipped";
+      /** Every line to print, in order — log lines and workflow annotations alike. */
+      readonly lines: readonly string[];
+      readonly clean: true;
+      readonly verdict?: undefined;
+    }
+  | {
+      readonly kind: "checked";
+      readonly lines: readonly string[];
+      readonly clean: boolean;
+      readonly verdict: AuditVerdict;
+    };
 
 /**
  * The gate, minus the two things only a process can do: run `npm audit` and
  * exit.
  *
- * The caller supplies the first read and a reader for the second, and gets back
- * the lines and the exit decision. Everything that used to live in the script's
- * `main` — which failure a skip was, the annotation that keeps a skip from
- * looking like a pass, the under-report warning, and the three ways to be red —
- * is reachable from a test this way, and none of it was before: those facts were
- * established by reading the file for an exact expression, which is a check on
- * the spelling of the code rather than on what it does.
+ * The caller supplies ONE reader and gets back the lines and the exit decision.
+ * One, because both calls ask the same registry about the same tree: taking a
+ * first read already made and a reader for the second let those be two
+ * different trees, which is a state no caller wants and the signature allowed.
+ *
+ * Everything that used to live in the script's `main` — which failure a skip
+ * was, the annotation that keeps a skip from looking like a pass, the
+ * under-report warning, and the three ways to be red — is reachable from a test
+ * this way, and none of it was before: those facts were established by reading
+ * the file for an exact expression, which is a check on the spelling of the code
+ * rather than on what it does.
  */
 export function runAuditGate(options: {
-  readonly read: AuditRead;
-  readonly readAgain: () => AuditRead;
+  readonly read: () => AuditRead;
   readonly checkName: string;
   readonly underActions: boolean;
   readonly accepted?: readonly AcceptedAdvisory[];
 }): AuditGateRun {
-  const { read, readAgain, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES } = options;
+  const { read: reader, checkName, underActions, accepted = ACCEPTED_HIGH_ADVISORIES } = options;
+  const read = reader();
   if (read.report === undefined) {
     // The headline is who gave up, which the sentence alone does not carry: a
     // run of "we stopped waiting" says the bound may be too tight, a run of
@@ -1450,11 +1464,11 @@ export function runAuditGate(options: {
         }),
       );
     }
-    return { lines, clean: true };
+    return { kind: "skipped", lines, clean: true };
   }
   const answered = answerWithSecondRead({
     first: evaluateAudit(read.report, accepted),
-    readAgain,
+    readAgain: reader,
     checkName,
     underActions,
     accepted,
@@ -1485,7 +1499,7 @@ export function runAuditGate(options: {
   // is what MAKES its baseline entry stale, so leaving that half advisory-only
   // would mean every fix this gate demands leaves the accepted list describing a
   // tree that no longer exists — and green.
-  return { lines, clean: isClean(verdict), verdict };
+  return { kind: "checked", lines, clean: isClean(verdict), verdict };
 }
 
 /** A verdict to act on, and everything the gate says about how it got there. */

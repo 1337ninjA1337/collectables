@@ -100,8 +100,7 @@ function readAudit(): AuditRead {
  */
 function main(): void {
   const run = runAuditGate({
-    read: readAudit(),
-    readAgain: readAudit,
+    read: readAudit,
     checkName: CHECK_NAME,
     underActions: runningUnderActions(),
   });

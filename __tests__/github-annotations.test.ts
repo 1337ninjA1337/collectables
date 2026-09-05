@@ -135,8 +135,7 @@ describe("the two producers, related by the module rather than by a copy", () =>
       "the audit gate no longer decides when to annotate through the shared reader",
     );
     const skipped = runAuditGate({
-      read: { skip: "registry unreachable", cause: "refused" },
-      readAgain: (): AuditRead => ({ skip: "registry unreachable", cause: "refused" }),
+      read: (): AuditRead => ({ skip: "registry unreachable", cause: "refused" }),
       checkName: "check-audit-baseline",
       underActions: true,
     });
