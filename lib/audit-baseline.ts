@@ -1304,3 +1304,125 @@ export function reconcileAudit(first: AuditVerdict, second: AuditVerdict): Audit
     majorOnly: byKey(first.majorOnly, second.majorOnly),
   };
 }
+
+/** Every advisory key a read POSITIVELY reported, in the two lists that fail. */
+function findingKeys(verdict: AuditVerdict): readonly string[] {
+  return [...verdict.unexpected, ...verdict.fixableInRange.map((found) => found.key)];
+}
+
+/** Set equality over two key lists, which arrive sorted but not deduped. */
+function sameKeys(left: readonly string[], right: readonly string[]): boolean {
+  const one = new Set(left);
+  const other = new Set(right);
+  return one.size === other.size && [...one].every((key) => other.has(key));
+}
+
+/**
+ * Whether the two reads said the same thing about the same tree.
+ *
+ * Three questions, because three things can differ between two calls a minute
+ * apart: whether the report carried its own totals, which baseline entries went
+ * unmentioned, and what npm positively reported. `stillPresent` and `majorOnly`
+ * are derived from those, so a difference in either shows up here already.
+ *
+ * Separate from {@link formatSecondRead} because the two answers go to different
+ * places: the sentence goes to the log, and this decides whether the run gets a
+ * mark on its summary. A reconciled verdict cannot be asked — its whole job is
+ * to look like one answer.
+ */
+export function secondReadAgreed(first: AuditVerdict, second: AuditVerdict): boolean {
+  return (
+    first.completeness.complete === second.completeness.complete &&
+    sameKeys(first.stale, second.stale) &&
+    sameKeys(findingKeys(first), findingKeys(second))
+  );
+}
+
+/**
+ * What the second read did, for a log that until now only said it had started.
+ *
+ * The gate announces "asking once more", calls npm again, and then prints the
+ * verdict — with nothing in between. A reader of that log cannot tell whether
+ * the second read landed, agreed with the first, or was the one that changed the
+ * answer, which is most of what the second read was added to establish.
+ *
+ * It also carries the fact that {@link reconcileAudit} deliberately drops. The
+ * reconciled verdict holds the completeness of the read that DECIDED staleness,
+ * so a first read short of its own totals disappears entirely once a sound
+ * second read exists: the right answer, printed by a run that no longer mentions
+ * having met a degraded registry. This is where that sentence survives.
+ *
+ * Three clauses at most, and each is a measurement rather than a judgement: who
+ * could answer the staleness question, what happened to the staleness list, and
+ * which findings only one of the two reads saw.
+ */
+export function formatSecondRead(
+  first: AuditVerdict,
+  second: AuditVerdict,
+  checkName: string,
+): string {
+  const resolved = reconcileAudit(first, second);
+  const votes = [first, second].filter((verdict) => verdict.completeness.complete);
+  const counts = (verdict: AuditVerdict): string =>
+    `${String(verdict.completeness.carried)} of ${String(verdict.completeness.claimed)}`;
+  // The noun once per clause, governed by the count nearest it: "0 of 9, then
+  // 0 of 2 high/critical roots reported" rather than the phrase twice.
+  const roots = (verdict: AuditVerdict): string =>
+    `${plural(verdict.completeness.claimed, "high/critical root", "high/critical roots")} reported`;
+  const shortfall = (verdict: AuditVerdict): string => `${counts(verdict)} ${roots(verdict)}`;
+  const clauses: string[] = [];
+  if (votes.length === 2) {
+    clauses.push("both reads carried npm's own tally");
+  } else if (first.completeness.complete) {
+    clauses.push(
+      `the second read was short of its own totals (${shortfall(second)}), so the first read decided staleness`,
+    );
+  } else if (second.completeness.complete) {
+    clauses.push(
+      `the first read was short of its own totals (${shortfall(first)}) and the second was not, so the second read decided staleness`,
+    );
+  } else {
+    clauses.push(
+      `neither read carried npm's own tally (${counts(first)}, then ${shortfall(second)}), so staleness is still unchecked`,
+    );
+  }
+  if (votes.length > 0) {
+    // Only the reads that voted, because an incomplete read abstained rather
+    // than answering empty: counting its silence as disagreement would print
+    // the whole baseline as disputed on every degraded run.
+    const disputed = [...new Set(votes.flatMap((verdict) => verdict.stale))]
+      .filter((key) => !resolved.stale.includes(key))
+      .sort();
+    if (disputed.length > 0) {
+      clauses.push(
+        `the reads disagree about ${counted(disputed.length, "baseline entry", "baseline entries")} (${disputed.join(", ")}), so ${plural(disputed.length, "it stays", "they stay")} on the baseline`,
+      );
+    } else if (resolved.stale.length > 0) {
+      clauses.push(
+        `${counted(resolved.stale.length, "baseline entry", "baseline entries")} went unreported ${plural(votes.length, "in the read that decided", "in both reads")}: ${resolved.stale.join(", ")}`,
+      );
+    } else {
+      clauses.push("every baseline entry was reported, so nothing reads as stale");
+    }
+  }
+  const onlyIn = (mine: AuditVerdict, theirs: AuditVerdict): readonly string[] => {
+    const seen = new Set(findingKeys(theirs));
+    return [...new Set(findingKeys(mine))].filter((key) => !seen.has(key)).sort();
+  };
+  const late = onlyIn(second, first);
+  const gone = onlyIn(first, second);
+  if (late.length > 0) {
+    clauses.push(
+      `the second read reported ${counted(late.length, "finding", "findings")} the first did not (${late.join(", ")})`,
+    );
+  }
+  if (gone.length > 0) {
+    // Kept, not dropped: a finding is something npm SAID, and one read failing
+    // to repeat it is not a withdrawal. Said out loud because the verdict
+    // below prints it with no sign that only one of the two calls saw it.
+    clauses.push(
+      `${counted(gone.length, "finding", "findings")} the second read did not repeat (${gone.join(", ")}) ${plural(gone.length, "is", "are")} kept`,
+    );
+  }
+  return `${checkName}: the second read landed — ${clauses.join("; ")}.`;
+}

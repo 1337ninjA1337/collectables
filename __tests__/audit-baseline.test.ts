@@ -11,6 +11,8 @@ import {
   fixKind,
   fixPackage,
   formatAuditVerdict,
+  formatSecondRead,
+  secondReadAgreed,
   AUDIT_SKIP_CAUSES,
   AUDIT_TIMEOUT_MS,
   auditInvocationSkip,
@@ -1709,7 +1711,31 @@ describe("worthAsking — the one leg that can answer differently, and could not
       /if \(!worthAsking\(first\)\) return first;/,
       "the gate no longer decides through worthAsking, so which runs pay for a second read is a second statement of the same rule",
     );
-    assert.match(script, /reconcileAudit\(first, evaluateAudit\(again\.report\)\)/);
+    assert.match(script, /const second = evaluateAudit\(again\.report\);/);
+    assert.match(script, /reconcileAudit\(first, second\)/);
+  });
+
+  it("prints what the second read did before it prints the reconciled verdict", () => {
+    // The account is only worth writing if the log carries it, and the order is
+    // the whole point: a reader meets "asking once more", then what the second
+    // call said, then the answer built out of both.
+    const script = readRepoFile("scripts/check-audit-baseline.ts");
+    const announced = script.indexOf("asking once more before acting on it.");
+    const accounted = script.indexOf("const account = formatSecondRead(first, second, CHECK_NAME);");
+    const reconciled = script.indexOf("return reconcileAudit(first, second);");
+    assert.ok(announced > 0, "the gate no longer announces the second call");
+    assert.ok(accounted > announced, "the second read's account is not printed by the gate");
+    assert.ok(reconciled > accounted, "the verdict is printed before the account of how it was reached");
+    assert.match(
+      script,
+      /if \(!secondReadAgreed\(first, second\) && runningUnderActions\(\)\)/,
+      "two reads that disagreed leave no mark on the run summary, which is where a green run is read",
+    );
+    assert.equal(
+      script.match(/formatSecondRead\(first, second, CHECK_NAME\)/g)?.length,
+      1,
+      "the log line and the annotation format the account separately, so the two accounts of one run can drift",
+    );
   });
 });
 
@@ -1807,6 +1833,169 @@ describe("reconcileAudit — findings unioned, staleness intersected", () => {
       [`nanoid#${A2}`, `undici#${A1}`],
       "the merged list is not in severity-then-key order, so two runs of the same pair print differently",
     );
+  });
+});
+
+describe("the second read says what it did, to a log that only said it started", () => {
+  // The gate announced "asking once more", called npm again, and printed a
+  // verdict — nothing in between. Whether the second read landed, agreed, or
+  // was the one that changed the answer is most of what the second call exists
+  // to establish, and none of it reached the log.
+
+  const complete = (entries: Parameters<typeof report>[0]) => evaluateAudit(report(entries), FIXTURE);
+  /** A well-formed report whose high/critical entries are simply missing. */
+  const degraded = (claimed: number) =>
+    evaluateAudit({ vulnerabilities: {}, metadata: { vulnerabilities: { high: claimed } } }, FIXTURE);
+
+  it("opens with the check's name and the fact that the call landed", () => {
+    // Every other line this gate prints is `check: …`, and this one is read in
+    // the same log beside them.
+    const line = formatSecondRead(complete({}), complete({}), "check");
+    assert.match(line, /^check: the second read landed — /);
+    assert.match(line, /\.$/);
+  });
+
+  it("says both reads carried npm's tally, and what they agreed was unreported", () => {
+    const line = formatSecondRead(complete({}), complete({}), "check");
+    assert.match(line, /both reads carried npm's own tally/);
+    assert.match(line, /3 baseline entries went unreported in both reads/);
+    for (const key of [`nanoid#${A1}`, `postcss#${A2}`, `postcss#${A3}`]) {
+      assert.ok(line.includes(key), `${key} is pruned by this run and unnamed in its account`);
+    }
+  });
+
+  it("names the entry the reads disagree about, and says it stays", () => {
+    // The failure the second call was added for: one read said `nanoid` was
+    // gone, the other reported it. The verdict keeps it, and the line is the
+    // only place saying the two calls differed at all.
+    const line = formatSecondRead(
+      complete({}),
+      complete({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }),
+      "check",
+    );
+    assert.match(line, /the reads disagree about 1 baseline entry/);
+    assert.ok(line.includes(`nanoid#${A1}`), "the disputed entry is not named");
+    assert.match(line, /so it stays on the baseline/);
+  });
+
+  it("carries the shortfall of a first read the reconciled verdict drops", () => {
+    // `reconcileAudit` keeps the completeness of the read that DECIDED, which
+    // is right and means a degraded first read vanishes from the run's output
+    // once a sound second read exists. This is where that survives.
+    const first = degraded(9);
+    const second = complete({});
+    const line = formatSecondRead(first, second, "check");
+    assert.match(line, /the first read was short of its own totals \(0 of 9 high\/critical roots reported\)/);
+    assert.match(line, /so the second read decided staleness/);
+    assert.doesNotMatch(
+      formatAuditVerdict(reconcileAudit(first, second), "check"),
+      /short of its own totals/,
+      "the verdict already says the registry was degraded, so this case is measuring nothing",
+    );
+  });
+
+  it("says which read decided when the SECOND is the degraded one", () => {
+    const line = formatSecondRead(complete({}), degraded(4), "check");
+    assert.match(line, /the second read was short of its own totals \(0 of 4 high\/critical roots reported\)/);
+    assert.match(line, /so the first read decided staleness/);
+    // One vote, so its own list is the answer — not a disagreement with a read
+    // that abstained.
+    assert.doesNotMatch(line, /disagree/);
+    assert.match(line, /went unreported in the read that decided/);
+  });
+
+  it("says staleness is still unchecked when neither read carried its tally", () => {
+    const line = formatSecondRead(degraded(9), degraded(2), "check");
+    // The noun once, governed by the count beside it — the phrase written twice
+    // is how "0 of 9 high/critical roots reported, then 0 of 2 high/critical
+    // roots reported" reads, and both halves are the same failure.
+    assert.match(line, /neither read carried npm's own tally \(0 of 9, then 0 of 2 high\/critical roots reported\)/);
+    assert.match(line, /so staleness is still unchecked/);
+    assert.doesNotMatch(line, /baseline entr/, "a run that answered nothing printed a staleness answer");
+  });
+
+  it("names a finding only the second read reported", () => {
+    const line = formatSecondRead(
+      complete({}),
+      complete({ browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } }),
+      "check",
+    );
+    assert.match(line, /the second read reported 1 finding the first did not/);
+    assert.ok(line.includes(`browserslist#${A2}`), "the late finding is not named");
+  });
+
+  it("says a finding the second read did not repeat is kept", () => {
+    // A finding is something npm SAID, so the union keeps it. The verdict
+    // prints it with no sign that only one of the two calls saw it.
+    const line = formatSecondRead(
+      complete({ browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } }),
+      complete({}),
+      "check",
+    );
+    assert.match(line, /1 finding the second read did not repeat/);
+    assert.match(line, /is kept/);
+    assert.ok(line.includes(`browserslist#${A2}`), "the dropped finding is not named");
+  });
+
+  it("says nothing reads as stale when the baseline is fully reported", () => {
+    const live = {
+      nanoid: { advisories: [{ ghsa: A1, severity: "high" }] },
+      postcss: { advisories: [{ ghsa: A2, severity: "high" }, { ghsa: A3, severity: "high" }] },
+    };
+    const line = formatSecondRead(complete(live), complete(live), "check");
+    assert.match(line, /every baseline entry was reported, so nothing reads as stale/);
+  });
+});
+
+describe("secondReadAgreed — whether the run gets a mark for a registry that changed its mind", () => {
+  // The reconciled verdict cannot be asked this: its whole job is to look like
+  // one answer. So the disagreement is measured before it, and it decides an
+  // annotation rather than the exit code — the answer printed IS sound.
+
+  const complete = (entries: Parameters<typeof report>[0]) => evaluateAudit(report(entries), FIXTURE);
+
+  it("agrees with itself", () => {
+    assert.equal(secondReadAgreed(complete({}), complete({})), true);
+  });
+
+  it("catches a staleness list that changed between the calls", () => {
+    assert.equal(
+      secondReadAgreed(complete({}), complete({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } })),
+      false,
+    );
+  });
+
+  it("catches a finding only one call reported", () => {
+    assert.equal(
+      secondReadAgreed(
+        complete({}),
+        complete({ browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } }),
+      ),
+      false,
+    );
+    assert.equal(
+      secondReadAgreed(
+        complete({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }], fixAvailable: true } }),
+        complete({ nanoid: { advisories: [{ ghsa: A1, severity: "high" }] } }),
+      ),
+      false,
+      "an advisory npm could fix on one call and not the other reads as agreement",
+    );
+  });
+
+  it("catches one call that carried its totals and one that did not", () => {
+    // The two reads can agree on every list and still differ in the one field
+    // that decides whether either list was an answer.
+    const degraded = evaluateAudit(
+      { vulnerabilities: {}, metadata: { vulnerabilities: { high: 9 } } },
+      FIXTURE,
+    );
+    const sound = evaluateAudit(
+      { vulnerabilities: {}, metadata: { vulnerabilities: { high: 0 } } },
+      FIXTURE,
+    );
+    assert.deepEqual(degraded.unexpected, sound.unexpected);
+    assert.equal(secondReadAgreed(degraded, sound), false);
   });
 });
 
