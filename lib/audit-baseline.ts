@@ -1594,6 +1594,76 @@ export interface AuditGateChecked {
 }
 
 /**
+ * A run that read nothing, and so checked nothing.
+ *
+ * {@link skipRead} exists one type up for the same reason and against nine
+ * constructions; there are two of these, and the argument that produced it does
+ * not count call sites: a discriminator written by hand is a discriminator that
+ * can be written wrong, and `{ kind: "checked", lines, clean: true }` is a run
+ * claiming the baseline was compared against a report nobody read. The two
+ * fields a skip does not get to choose — `clean: true`, and no verdict — are
+ * written once here rather than restated at each construction.
+ *
+ * `clean` is `true` because availability of a third party must not decide
+ * whether this repo's tests can run; {@link AuditGateSkipped} carries that as a
+ * literal type, and this is the only place the value is typed at all.
+ */
+export function skippedGate(lines: readonly string[]): AuditGateSkipped {
+  return { kind: "skipped", lines, clean: true };
+}
+
+/**
+ * A run that read a report, compared it, and printed the result.
+ *
+ * The verdict decides `clean` here rather than at the call site, which is the
+ * half {@link skippedGate} has no equivalent of: `clean` was `isClean(verdict)`
+ * spelled in `runAuditGate`, one expression away from the verdict it is about,
+ * and a run whose `clean` disagreed with its own printed verdict was a shape
+ * the type allowed. Three failure lists decide the exit code and {@link isClean}
+ * is the one place that says which; putting the call in the constructor is what
+ * makes that true of every checked run rather than of the one construction that
+ * happens to exist.
+ */
+export function checkedGate(lines: readonly string[], verdict: AuditVerdict): AuditGateChecked {
+  return { kind: "checked", lines, clean: isClean(verdict), verdict };
+}
+
+/**
+ * Whether a run checked the baseline, narrowing it to the half that has a
+ * verdict.
+ *
+ * Four unions in this module discriminate on `kind` and none of them shipped a
+ * guard, so every caller that wanted the narrow half wrote the literal
+ * comparison itself — eleven times, and in the suite as an inline arrow
+ * (`((run: AuditGateRun) => run.kind === "checked" ? run : undefined)(…)`),
+ * which is a type guard written as an expression because there was nowhere to
+ * put one. This is that statement, in the module that owns the union and beside
+ * {@link isClean}, which is the other predicate a caller holding a run asks.
+ *
+ * Written against `kind` rather than against `verdict !== undefined`: testing
+ * the payload for absence is exactly the discrimination `kind` was added to
+ * replace, and a guard spelled the old way would quietly reintroduce it for
+ * every caller that used the guard instead of the field.
+ */
+export function isCheckedRun(run: AuditGateRun): run is AuditGateChecked {
+  return run.kind === "checked";
+}
+
+/**
+ * The other half, for the callers that want the skip rather than the verdict.
+ *
+ * Both halves get a guard for the reason both halves got a name: one side of a
+ * two-sided union carrying one and the other not makes the sides look different
+ * in a way they are not. Narrowing this way is also how a caller reaches
+ * {@link AuditGateSkipped.clean}'s literal `true` — the guarantee that a
+ * degraded registry cannot fail this repo's tests, which is stated in the type
+ * and unreachable from the union.
+ */
+export function isSkippedRun(run: AuditGateRun): run is AuditGateSkipped {
+  return run.kind === "skipped";
+}
+
+/**
  * The gate, minus the two things only a process can do: run `npm audit` and
  * exit.
  *
@@ -1652,7 +1722,7 @@ export function runAuditGate(options: {
         }),
       );
     }
-    return { kind: "skipped", lines, clean: true };
+    return skippedGate(lines);
   }
   const answered = answerWithSecondRead({
     first: evaluateAudit(read.report, accepted),
@@ -1682,12 +1752,14 @@ export function runAuditGate(options: {
     );
   }
   // Three ways to be red and `isClean` is the one place that says which, so a
-  // finding cannot be printed by a step that exits 0. `stale` joined the failing
-  // side with `fixableInRange`, and because of it: fixing an in-range advisory
-  // is what MAKES its baseline entry stale, so leaving that half advisory-only
-  // would mean every fix this gate demands leaves the accepted list describing a
-  // tree that no longer exists — and green.
-  return { kind: "checked", lines, clean: isClean(verdict), verdict };
+  // finding cannot be printed by a step that exits 0 — `checkedGate` is where
+  // that call lives now, so the verdict this run printed is the verdict its
+  // `clean` was read off. `stale` joined the failing side with `fixableInRange`,
+  // and because of it: fixing an in-range advisory is what MAKES its baseline
+  // entry stale, so leaving that half advisory-only would mean every fix this
+  // gate demands leaves the accepted list describing a tree that no longer
+  // exists — and green.
+  return checkedGate(lines, verdict);
 }
 
 /** A verdict to act on, and everything the gate says about how it got there. */

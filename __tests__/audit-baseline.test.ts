@@ -23,9 +23,13 @@ import {
   auditInvocationSkip,
   auditReader,
   auditSkipHeadline,
+  checkedGate,
   isAuditReport,
+  isCheckedRun,
   isClean,
+  isSkippedRun,
   readAuditPayload,
+  skippedGate,
   observedAdvisories,
   observedAdvisoryDetails,
   observedAdvisoryFixes,
@@ -1156,7 +1160,7 @@ describe("isClean — the one place that decides the exit code", () => {
         accepted,
       });
       assert.equal(run.kind, "checked", label);
-      assert.equal(run.clean, run.kind === "checked" && isClean(run.verdict), label);
+      assert.equal(run.clean, isCheckedRun(run) && isClean(run.verdict), label);
       assert.equal(run.clean, false, `${label}: a finding was printed by a step that exits 0`);
     }
   });
@@ -2090,20 +2094,96 @@ describe("runAuditGate — the gate minus the two things only a process can do",
     // was two anonymous members, so a caller holding a checked run could not
     // name what it was holding — and the skip's `clean: true` was a guarantee
     // the only caller could not reach, because it read `run.clean` for both
-    // kinds without narrowing. Narrowing on `kind` gets both halves.
-    const checked: AuditGateChecked | undefined = ((run: AuditGateRun) =>
-      run.kind === "checked" ? run : undefined)(gateRun([answeredWith(report(live))]));
-    assert.notEqual(checked, undefined, "an answered read produced a run with no verdict on it");
-    assert.notEqual(checked?.verdict, undefined, "the checked half no longer carries its verdict");
+    // kinds without narrowing. Narrowing gets both halves.
+    //
+    // Through the module's own guards, which is the other half of what this
+    // proves: the narrowing used to be an inline arrow written here twice
+    // (`((run: AuditGateRun) => run.kind === "checked" ? run : undefined)(…)`),
+    // a type guard spelled as an expression because the module that owns the
+    // union did not ship one.
+    const answeredRun = gateRun([answeredWith(report(live))]);
+    assert.ok(isCheckedRun(answeredRun), "an answered read produced a run with no verdict on it");
+    // `checked` is typed as the narrow half, so this line stops compiling the
+    // day the guard stops narrowing — which is the half of a type guard an
+    // assertion cannot reach.
+    const checked: AuditGateChecked = answeredRun;
+    assert.notEqual(checked.verdict, undefined, "the checked half no longer carries its verdict");
 
-    const skipped: AuditGateSkipped | undefined = ((run: AuditGateRun) =>
-      run.kind === "skipped" ? run : undefined)(
-      gateRun([skipRead("refused", "npm reported an error")]),
-    );
+    const skippedRun = gateRun([skipRead("refused", "npm reported an error")]);
+    assert.ok(isSkippedRun(skippedRun), "a run that read nothing was reported as a checked one");
+    const skipped: AuditGateSkipped = skippedRun;
     // `true` by type as well as by value: a skip has no other outcome, and the
     // narrowed half is where a caller can see that without checking.
-    assert.equal(skipped?.clean, true);
-    assert.equal(skipped?.verdict, undefined, "a run that read nothing produced a verdict");
+    assert.equal(skipped.clean, true);
+    assert.equal(skipped.verdict, undefined, "a run that read nothing produced a verdict");
+  });
+
+  /**
+   * The guards and the field they read, held together.
+   *
+   * Two spellings of one question is the arrangement half of this module's
+   * history is about, and a guard is a second spelling by construction. What
+   * keeps it from being a divergence is that it is the ONLY other one: the
+   * predicates are `kind` comparisons in the module that declares `kind`, and
+   * this drives both over both halves so a guard that started answering by
+   * testing `verdict` for absence — the discrimination `kind` replaced — is a
+   * red run rather than a quiet reintroduction.
+   */
+  it("answers its guards exactly as the discriminator does, both ways", () => {
+    const runs: readonly AuditGateRun[] = [
+      gateRun([answeredWith(report(live))]),
+      ...AUDIT_SKIP_CAUSES.map((cause) => gateRun([skipRead(cause, "npm said nothing usable")])),
+    ];
+    for (const run of runs) {
+      assert.equal(isCheckedRun(run), run.kind === "checked", run.kind);
+      assert.equal(isSkippedRun(run), run.kind === "skipped", run.kind);
+      // Exhaustive as well as agreeing: a third kind added without a guard
+      // would answer `false` to both and pass every assertion above.
+      assert.notEqual(isCheckedRun(run), isSkippedRun(run), "a run was both halves, or neither");
+    }
+  });
+
+  /**
+   * Nothing bypasses the constructors, which is what makes them the place the
+   * two invariants live.
+   *
+   * A skip's `clean` is `true` because a third party's availability must not
+   * decide whether this repo's tests can run, and a checked run's is
+   * `isClean(verdict)` — the one predicate that says which of three lists made
+   * a run red. Both used to be spelled at the construction inside
+   * `runAuditGate`, where a `clean` disagreeing with the printed verdict was a
+   * shape the type allowed. These compare what the gate returns against what
+   * the constructors build from the same parts.
+   */
+  it("builds both halves through the constructors the module exports", () => {
+    const skipped = gateRun([skipRead("refused", "npm reported an error")], { underActions: true });
+    assert.deepEqual(skipped, skippedGate(skipped.lines));
+
+    const checked = gateRun([
+      answeredWith(report({ ...live, browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } })),
+    ]);
+    assert.ok(isCheckedRun(checked));
+    assert.deepEqual(checked, checkedGate(checked.lines, checked.verdict));
+    assert.equal(checked.clean, false, "an untriaged advisory did not fail the run");
+  });
+
+  it("reads `clean` off the verdict rather than taking it from the caller", () => {
+    // The constructor's whole job: `checkedGate` has no `clean` parameter, so
+    // there is no call that can claim a red verdict passed. Driven over a
+    // verdict of each colour, from the gate itself so the verdicts are real.
+    // An untriaged advisory rather than a stale-only red: this gate asks twice
+    // when the only finding is staleness, and the colour is what the case is
+    // about, not the read count.
+    const red = gateRun([
+      answeredWith(report({ ...live, browserslist: { advisories: [{ ghsa: A2, severity: "high" }] } })),
+    ]);
+    const green = gateRun([answeredWith(report(live))]);
+    for (const run of [red, green]) {
+      assert.ok(isCheckedRun(run));
+      assert.equal(checkedGate([], run.verdict).clean, isClean(run.verdict));
+    }
+    assert.equal(red.clean, false);
+    assert.equal(green.clean, true);
   });
 
   it("takes its kind from the read's, which is why they spell `skipped` the same", () => {
