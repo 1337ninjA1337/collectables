@@ -12,6 +12,7 @@ import {
   formatHexReport,
   isHexAllowlisted,
 } from "../lib/check-inline-hex";
+import { isAnnotationLine } from "../lib/github-annotations";
 import { LINT_GUARDS } from "../lib/lint-guards";
 import { SOURCE_EXTENSIONS } from "../lib/source-dirs";
 import { readRepoFile as read, repoPath, repoRelative } from "./helpers/repo-file";
@@ -273,9 +274,46 @@ describe("formatHexReport", () => {
   });
 });
 
+/**
+ * Two questions about the same output, and this suite only ever asked one.
+ *
+ * The cases below match `/^::error file=…,line=…,col=…::/` by hand, and that is
+ * deliberate: this is the FORMAT contract — where the level goes, which
+ * properties are carried and in what order, how they are escaped — and it is
+ * the reason a title with a raw colon in it cannot cut a command in half. A
+ * classifier cannot check any of that; it answers whether a line is a workflow
+ * command at all.
+ *
+ * What was missing is the other half. `lib/github-annotations.ts` owns the
+ * prefix and `isAnnotationLine` is where it is known, and until now one suite
+ * asked through the classifier and this one only by hand — so a change to the
+ * prefix would have been a red run over there and a red run here for a
+ * different reason, with nothing saying the two answers are about one format.
+ * Each case now asserts both: the exact line, and that the module which
+ * classifies these agrees this is one.
+ */
 describe("formatGitHubAnnotations", () => {
   it("returns empty array for no matches", () => {
     assert.deepEqual(formatGitHubAnnotations([]), []);
+  });
+
+  it("emits lines the shared classifier reads as workflow commands", () => {
+    // The gate suppresses marks itself when it runs locally, so a line this
+    // classifier cannot see is a finding printed into a terminal as noise and
+    // onto a run summary as nothing.
+    const out = formatGitHubAnnotations([
+      { file: "app/foo.tsx", line: 12, column: 5, value: "#aabbcc" },
+      { file: "app/a:b,c%.tsx", line: 1, column: 1, value: "#abcdef" },
+    ]);
+    assert.equal(out.filter(isAnnotationLine).length, out.length);
+    // Anti-vacuous: the classifier says no to the report this check also
+    // prints, which is the line these have to be told apart from.
+    assert.ok(
+      !formatHexReport([{ file: "app/foo.tsx", line: 12, column: 5, value: "#aabbcc" }])
+        .split("\n")
+        .some(isAnnotationLine),
+      "the human-readable report is being classified as a workflow command",
+    );
   });
 
   it("emits one ::error workflow command per finding with file/line/col", () => {

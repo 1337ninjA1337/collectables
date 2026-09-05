@@ -255,6 +255,28 @@ describe("isAnnotationLine", () => {
     }
   });
 
+  it("holds the levels to a shape both halves of the format can carry", () => {
+    // The round trip above is driven off the array, so a fourth level is
+    // covered the moment it is declared — and what that does NOT check is
+    // whether `annotation` could emit it in the first place.
+    //
+    // The level goes straight into the prefix with no escaping: it is the one
+    // part of a workflow command that is never a property value and never the
+    // message, so `escapeAnnotationProperty` never sees it. A level with a
+    // space in it produces `::a level::…`, which this classifier reads as
+    // prose; one with a colon closes the command early; one with `%` is
+    // ambiguous with an escape. All three are a mark that vanishes from the
+    // run summary rather than a red run, which is the failure mode this whole
+    // module exists to prevent.
+    for (const level of ANNOTATION_LEVELS) {
+      assert.match(
+        level,
+        /^[a-z]+$/,
+        `"${level}" goes into the annotation prefix unescaped, so a level that is not a bare lowercase word emits a command the classifier cannot see`,
+      );
+    }
+  });
+
   it("leaves the sentence every check prints beside its annotation alone", () => {
     for (const line of [
       "check-audit-baseline: OK — no new high/critical advisories",
