@@ -1560,24 +1560,38 @@ export function secondReadAgreed(first: AuditVerdict, second: AuditVerdict): boo
  * `report` happened to be present: a run that PASSED and a run that was never asked both exit 0, and a
  * caller holding `clean: true` beside a `verdict` that might be undefined has
  * the same ambiguity `stale: []` had before `completeness` travelled with it.
- * `kind` is the field that says which, and the skip's `clean` is a literal
- * `true` because a skip has no other outcome available to it: availability of a
- * third party must not decide whether this repo's tests can run.
+ * `kind` is the field that says which. Both halves are named for the reason
+ * {@link AuditAnswer} and {@link AuditSkip} are: one side of a two-sided union
+ * carrying a name and the other spelled inline makes the sides look different
+ * in a way they are not, and a caller holding a checked run could not say what
+ * it was holding.
  */
-export type AuditGateRun =
-  | {
-      readonly kind: "skipped";
-      /** Every line to print, in order — log lines and workflow annotations alike. */
-      readonly lines: readonly string[];
-      readonly clean: true;
-      readonly verdict?: undefined;
-    }
-  | {
-      readonly kind: "checked";
-      readonly lines: readonly string[];
-      readonly clean: boolean;
-      readonly verdict: AuditVerdict;
-    };
+export type AuditGateRun = AuditGateSkipped | AuditGateChecked;
+
+/**
+ * A run where the registry was never read, so the baseline was not checked.
+ *
+ * `clean` is the literal `true` rather than `boolean`: a skip has no other
+ * outcome available to it, because availability of a third party must not
+ * decide whether this repo's tests can run. The type says that; the caller
+ * reads `run.clean` for both kinds and cannot benefit from it, which is the
+ * shape of a guarantee that is documentation with a compiler behind it.
+ */
+export interface AuditGateSkipped {
+  readonly kind: "skipped";
+  /** Every line to print, in order — log lines and workflow annotations alike. */
+  readonly lines: readonly string[];
+  readonly clean: true;
+  readonly verdict?: undefined;
+}
+
+/** A run where npm answered and the baseline was compared against it. */
+export interface AuditGateChecked {
+  readonly kind: "checked";
+  readonly lines: readonly string[];
+  readonly clean: boolean;
+  readonly verdict: AuditVerdict;
+}
 
 /**
  * The gate, minus the two things only a process can do: run `npm audit` and

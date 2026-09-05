@@ -37,7 +37,9 @@ import {
   runAuditGate,
   skipRead,
   type AcceptedAdvisory,
+  type AuditGateChecked,
   type AuditGateRun,
+  type AuditGateSkipped,
   type AuditSpawnOptions,
   type AuditRead,
   type AuditSkipCause,
@@ -2083,6 +2085,27 @@ describe("runAuditGate — the gate minus the two things only a process can do",
    * call, half of every one of those statements was decoration. These two run
    * the runner against the one gate whose read count is known either way.
    */
+  it("hands a caller a run it can narrow, on the field that says which it is", () => {
+    // What naming the two halves buys, run rather than argued. `AuditGateRun`
+    // was two anonymous members, so a caller holding a checked run could not
+    // name what it was holding — and the skip's `clean: true` was a guarantee
+    // the only caller could not reach, because it read `run.clean` for both
+    // kinds without narrowing. Narrowing on `kind` gets both halves.
+    const checked: AuditGateChecked | undefined = ((run: AuditGateRun) =>
+      run.kind === "checked" ? run : undefined)(gateRun([answeredWith(report(live))]));
+    assert.notEqual(checked, undefined, "an answered read produced a run with no verdict on it");
+    assert.notEqual(checked?.verdict, undefined, "the checked half no longer carries its verdict");
+
+    const skipped: AuditGateSkipped | undefined = ((run: AuditGateRun) =>
+      run.kind === "skipped" ? run : undefined)(
+      gateRun([skipRead("refused", "npm reported an error")]),
+    );
+    // `true` by type as well as by value: a skip has no other outcome, and the
+    // narrowed half is where a caller can see that without checking.
+    assert.equal(skipped?.clean, true);
+    assert.equal(skipped?.verdict, undefined, "a run that read nothing produced a verdict");
+  });
+
   it("takes its kind from the read's, which is why they spell `skipped` the same", () => {
     // Two unions in one module for one fact — npm answered, or it did not —
     // and they used to be discriminated two different ways: `AuditGateRun` by
