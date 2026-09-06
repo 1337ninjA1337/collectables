@@ -97,9 +97,9 @@ const APP_TREE = ["app", "components", "data", "lib"] as const;
  * `lib/nav-animation-context.tsx` said "needs the mount harness" and took
  * `providerHarness` and no mocks at all. The third, `lib/use-visibility-refresh
  * .ts`, was the first entry that was hiding something: its no-`document`
- * branch returned an empty cleanup over a running interval. What is left is
- * one re-export with no behaviour of its own, and two modules wanting a
- * harness.
+ * branch returned an empty cleanup over a running interval, and the fourth,
+ * `lib/use-reactions.ts`, kept a reaction the server had refused. What is left
+ * is one re-export with no behaviour of its own, and the web list adapter.
  */
 const UNNAMED: Readonly<Record<string, string>> = {
   // Seven lines, all of them `export … from "react-native-draggable-flatlist"`.
@@ -108,15 +108,12 @@ const UNNAMED: Readonly<Record<string, string>> = {
   // The web twin is real code — it adapts the library's `renderItem` params and
   // stubs `drag` — and wants `helpers/render.ts`.
   "components/DraggableList.web.tsx": "a component; needs a render harness",
-  // A hook over `supabase-profiles`, so both a harness and mocked reads.
-  "lib/use-reactions.ts": "a hook over the cloud reads; needs both",
 };
 
 /** The same list again, as the tripwire `assertExemptionsHonest` argues for. */
 const EXPECTED_UNNAMED = [
   "components/DraggableList.tsx",
   "components/DraggableList.web.tsx",
-  "lib/use-reactions.ts",
 ];
 
 /**
