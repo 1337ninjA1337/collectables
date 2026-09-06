@@ -1,5 +1,4 @@
 import * as Linking from "expo-linking";
-import { Platform } from "react-native";
 
 import { getAppBaseUrl } from "@/lib/env";
 

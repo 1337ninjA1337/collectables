@@ -17,10 +17,11 @@ import { assertExemptionsHonest, suiteCode, suiteFiles } from "./helpers/suite-f
  * said the honest thing about its own provenance — nothing in the tree
  * measures that list, so a sixth is a DISCOVERY somebody happens to make
  * rather than a red run. It was already stale when it was written: the census
- * below finds six, and `lib/deep-link.ts` — `buildDeepLink`, imported by
- * `app/item/[id].tsx` and `components/collection-share-sheet.tsx` — is the one
- * the script missed, because it matched on a bare word that other suites use
- * in prose about links.
+ * below found six, and `lib/deep-link.ts` — `buildDeepLink`, imported by
+ * `app/item/[id].tsx` and `components/collection-share-sheet.tsx` — was the
+ * one the script missed, because it matched on a bare word that other suites
+ * use in prose about links. It has `deep-link.test.ts` now, which is what an
+ * entry in {@link UNNAMED} is for: a hole with the work written next to it.
  *
  * That is the whole argument for keeping the walk: the population only moves
  * when somebody adds a module or writes a suite, both of which are deliberate,
@@ -89,10 +90,11 @@ const APP_TREE = ["app", "components", "data", "lib"] as const;
 /**
  * The modules no suite names, and what each would need before one could.
  *
- * The comment beside an entry is the half that lets the next reader judge it.
- * Two of these are shaped like `lib/export-pdf.ts` was before it was split —
- * product code a node suite cannot load — and the rest are hooks and
- * components that want a render harness rather than a split.
+ * The comment beside an entry is the half that lets the next reader judge it,
+ * and the census's own first finding is the evidence that it works: the sixth
+ * entry was `lib/deep-link.ts`, its comment said "needs a module mock", and
+ * that is exactly what closing it took. What is left is one re-export with no
+ * behaviour of its own and four hooks and components wanting a harness.
  */
 const UNNAMED: Readonly<Record<string, string>> = {
   // Seven lines, all of them `export … from "react-native-draggable-flatlist"`.
@@ -101,9 +103,6 @@ const UNNAMED: Readonly<Record<string, string>> = {
   // The web twin is real code — it adapts the library's `renderItem` params and
   // stubs `drag` — and wants `helpers/render.ts`.
   "components/DraggableList.web.tsx": "a component; needs a render harness",
-  // `buildDeepLink` imports `expo-linking` and branches on `getAppBaseUrl()`.
-  // Loadable under a module mock, which is the smallest of the six.
-  "lib/deep-link.ts": "imports expo-linking; needs a module mock",
   // A provider and its hook. `helpers/mount-provider.ts` is the shape.
   "lib/nav-animation-context.tsx": "a provider; needs the mount harness",
   // A hook over `supabase-profiles`, so both a harness and mocked reads.
@@ -117,7 +116,6 @@ const UNNAMED: Readonly<Record<string, string>> = {
 const EXPECTED_UNNAMED = [
   "components/DraggableList.tsx",
   "components/DraggableList.web.tsx",
-  "lib/deep-link.ts",
   "lib/nav-animation-context.tsx",
   "lib/use-reactions.ts",
   "lib/use-visibility-refresh.ts",
