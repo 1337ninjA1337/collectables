@@ -98,6 +98,91 @@ describe("__tests__/helpers/fake-dom", () => {
     }
   });
 
+  it("records document listeners by type and drops them on removeEventListener", () => {
+    const fake = setupFakeDom();
+    try {
+      const doc = g.document as {
+        addEventListener: (type: string, listener: () => void) => void;
+        removeEventListener: (type: string, listener: () => void) => void;
+      };
+      const first = () => {};
+      const second = () => {};
+      doc.addEventListener("visibilitychange", first);
+      doc.addEventListener("visibilitychange", second);
+      assert.deepEqual(fake.listeners.visibilitychange, [first, second]);
+
+      doc.removeEventListener("visibilitychange", first);
+      assert.deepEqual(fake.listeners.visibilitychange, [second]);
+      // A listener nobody registered is not an error — the real DOM ignores it,
+      // and a cleanup that runs twice is the shape that would hit this.
+      doc.removeEventListener("visibilitychange", first);
+      doc.removeEventListener("nothing-registered", first);
+      assert.deepEqual(fake.listeners.visibilitychange, [second]);
+    } finally {
+      fake.restore();
+    }
+  });
+
+  it("setHidden flips document.hidden BEFORE the handlers read it", () => {
+    // The ordering is the contract: a real browser has already changed the
+    // flag by the time it dispatches, and a handler branching on
+    // `document.hidden` is the only kind this event has.
+    const fake = setupFakeDom();
+    try {
+      const doc = g.document as {
+        hidden: boolean;
+        addEventListener: (type: string, listener: () => void) => void;
+      };
+      const seen: boolean[] = [];
+      doc.addEventListener("visibilitychange", () => seen.push(doc.hidden));
+
+      fake.setHidden(true);
+      fake.setHidden(false);
+
+      assert.deepEqual(seen, [true, false]);
+      assert.equal(doc.hidden, false);
+    } finally {
+      fake.restore();
+    }
+  });
+
+  it("survives a handler that removes itself while the event is dispatching", () => {
+    // Which is what an effect cleanup running inside a handler does. Walking
+    // the live array here skips the next listener instead.
+    const fake = setupFakeDom();
+    try {
+      const doc = g.document as {
+        addEventListener: (type: string, listener: () => void) => void;
+        removeEventListener: (type: string, listener: () => void) => void;
+      };
+      const calls: string[] = [];
+      const first = () => {
+        calls.push("first");
+        doc.removeEventListener("visibilitychange", first);
+      };
+      const second = () => calls.push("second");
+      doc.addEventListener("visibilitychange", first);
+      doc.addEventListener("visibilitychange", second);
+
+      fake.setHidden(true);
+
+      assert.deepEqual(calls, ["first", "second"]);
+      assert.deepEqual(fake.listeners.visibilitychange, [second]);
+    } finally {
+      fake.restore();
+    }
+  });
+
+  it("starts visible, which is the state a mounted tab is in", () => {
+    const fake = setupFakeDom();
+    try {
+      assert.equal((g.document as { hidden: boolean }).hidden, false);
+      assert.deepEqual(fake.listeners, {});
+    } finally {
+      fake.restore();
+    }
+  });
+
   it("clarity.test.ts consumes the shared helper instead of a local re-roll", () => {
     const source = readRepoFile("__tests__/clarity.test.ts");
     assert.match(source, /from "\.\/helpers\/fake-dom"/);

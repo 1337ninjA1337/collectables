@@ -34,7 +34,12 @@ export function useVisibilityRefresh(refreshFn: () => void, intervalMs: number):
     }
 
     if (Platform.OS === "web") {
-      if (typeof document === "undefined") return () => {};
+      // A web bundle evaluated outside a browser — the static export, a
+      // prerender pass — has no `visibilitychange` to listen for, but the
+      // interval above is already running. Returning an empty cleanup here
+      // left it polling for the life of the process, holding every closure
+      // `refreshFn` captured, after the tree that started it was gone.
+      if (typeof document === "undefined") return pause;
       function onVisibilityChange() {
         if (document.hidden) {
           pause();

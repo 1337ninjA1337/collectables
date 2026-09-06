@@ -95,8 +95,11 @@ const APP_TREE = ["app", "components", "data", "lib"] as const;
  * entry was `lib/deep-link.ts`, its comment said "needs a module mock", and
  * that is exactly what closing it took, an hour later. So did the fifth:
  * `lib/nav-animation-context.tsx` said "needs the mount harness" and took
- * `providerHarness` and no mocks at all. What is left is one re-export with no
- * behaviour of its own and three hooks and components wanting a harness.
+ * `providerHarness` and no mocks at all. The third, `lib/use-visibility-refresh
+ * .ts`, was the first entry that was hiding something: its no-`document`
+ * branch returned an empty cleanup over a running interval. What is left is
+ * one re-export with no behaviour of its own, and two modules wanting a
+ * harness.
  */
 const UNNAMED: Readonly<Record<string, string>> = {
   // Seven lines, all of them `export … from "react-native-draggable-flatlist"`.
@@ -107,9 +110,6 @@ const UNNAMED: Readonly<Record<string, string>> = {
   "components/DraggableList.web.tsx": "a component; needs a render harness",
   // A hook over `supabase-profiles`, so both a harness and mocked reads.
   "lib/use-reactions.ts": "a hook over the cloud reads; needs both",
-  // A hook over `AppState` and `document.visibilityState`; `helpers/fake-dom.ts`
-  // exists for the second half.
-  "lib/use-visibility-refresh.ts": "a hook over AppState; needs a render harness",
 };
 
 /** The same list again, as the tripwire `assertExemptionsHonest` argues for. */
@@ -117,7 +117,6 @@ const EXPECTED_UNNAMED = [
   "components/DraggableList.tsx",
   "components/DraggableList.web.tsx",
   "lib/use-reactions.ts",
-  "lib/use-visibility-refresh.ts",
 ];
 
 /**

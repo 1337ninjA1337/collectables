@@ -12,6 +12,15 @@
  * inspection handles plus a `restore()` that reinstates the previous globals —
  * ALWAYS call it (use try/finally or afterEach) or later tests inherit the
  * fake DOM.
+ *
+ * The second surface is visibility: `document.hidden`, the listener registry
+ * behind `addEventListener`/`removeEventListener`, and {@link FakeDom.setHidden}
+ * which flips the flag and dispatches. It arrived with
+ * `use-visibility-refresh.test.ts`, whose subject is a hook that pauses a poll
+ * while the tab is away — a module that cannot be tested by inspecting what it
+ * appended to `head`, only by being sent an event and asked what it did. The
+ * registry is also the assertion for the OTHER half of that hook: a listener
+ * still in `listeners.visibilitychange` after an unmount is a leak.
  */
 
 export type FakeNode = {
@@ -34,6 +43,17 @@ export type FakeDom = {
   created: FakeNode[];
   byId: Record<string, FakeNode | null>;
   fakeWindow: Record<string, unknown>;
+  /** Listeners registered on the document, by event type, in registration order. */
+  listeners: Record<string, ((event: { type: string }) => void)[]>;
+  /**
+   * Flips `document.hidden` and fires `visibilitychange` at every listener.
+   *
+   * The pair is one call because they are one event: a hook reading
+   * `document.hidden` inside its handler sees the value the browser had
+   * already changed before it dispatched, and a test that set the flag after
+   * dispatching would exercise a sequence no browser produces.
+   */
+  setHidden: (hidden: boolean) => void;
   restore: () => void;
 };
 
@@ -64,8 +84,27 @@ export function setupFakeDom(opts?: {
   const created: FakeNode[] = [];
   const byId: Record<string, FakeNode | null> = {};
 
+  const listeners: Record<string, ((event: { type: string }) => void)[]> = {};
+
   const fakeDocument = {
     head,
+    /**
+     * `document.hidden`, the flag a visibility handler branches on.
+     *
+     * Mutable rather than a constructor option because the interesting cases
+     * are transitions: a tab that goes away and comes back, which is one
+     * mount and two events.
+     */
+    hidden: false,
+    addEventListener(type: string, listener: (event: { type: string }) => void) {
+      (listeners[type] ??= []).push(listener);
+    },
+    removeEventListener(type: string, listener: (event: { type: string }) => void) {
+      const forType = listeners[type];
+      if (!forType) return;
+      const at = forType.indexOf(listener);
+      if (at >= 0) forType.splice(at, 1);
+    },
     getElementById(id: string) {
       return byId[id] ?? null;
     },
@@ -112,6 +151,16 @@ export function setupFakeDom(opts?: {
     created,
     byId,
     fakeWindow,
+    listeners,
+    setHidden(hidden: boolean) {
+      fakeDocument.hidden = hidden;
+      // A copy, because a handler that removes itself while the event is
+      // dispatching would otherwise shorten the array being walked — which is
+      // exactly what an effect cleanup running inside a handler does.
+      for (const listener of [...(listeners.visibilitychange ?? [])]) {
+        listener({ type: "visibilitychange" });
+      }
+    },
     restore() {
       if (prevWindow === undefined) delete g.window;
       else g.window = prevWindow;
