@@ -27,6 +27,18 @@ export type FakeNode = {
   id?: string;
   parentNode?: FakeParent | null;
   tagName?: string;
+  /**
+   * What a live region is read from, and what `setAttribute` recorded.
+   *
+   * Both arrived with `reorder-announcement.web.ts`, whose whole subject is a
+   * node's text and its `aria-live` attributes — a fake element without them
+   * can be appended and inspected but says nothing about what a screen reader
+   * would do with it.
+   */
+  textContent?: string;
+  attributes?: Record<string, string>;
+  style?: Record<string, string>;
+  setAttribute?: (name: string, value: string) => void;
 };
 
 export type FakeParent = {
@@ -40,6 +52,14 @@ export type FakeParent = {
 
 export type FakeDom = {
   head: FakeParent;
+  /**
+   * `document.body`, which a live region is appended to.
+   *
+   * Optional on the fake for the same reason it is optional in the shim: a
+   * renderer that is not a browser may have a `document` and no `body`, and
+   * `setupFakeDom({ hasBody: false })` is how a case asks for that one.
+   */
+  body: FakeParent | null;
   created: FakeNode[];
   byId: Record<string, FakeNode | null>;
   fakeWindow: Record<string, unknown>;
@@ -59,9 +79,10 @@ export type FakeDom = {
 
 export function setupFakeDom(opts?: {
   hasFirstScript?: boolean;
+  hasBody?: boolean;
   doNotTrack?: unknown;
 }): FakeDom {
-  const head: FakeParent = {
+  const parent = (): FakeParent => ({
     removed: [],
     inserted: [],
     appended: [],
@@ -77,7 +98,9 @@ export function setupFakeDom(opts?: {
       this.appended.push(node);
       node.parentNode = this;
     },
-  };
+  });
+  const head = parent();
+  const body: FakeParent | null = opts?.hasBody === false ? null : parent();
   const firstScript: FakeNode | null = opts?.hasFirstScript === false
     ? null
     : { tagName: "SCRIPT", parentNode: head };
@@ -88,6 +111,7 @@ export function setupFakeDom(opts?: {
 
   const fakeDocument = {
     head,
+    body,
     /**
      * `document.hidden`, the flag a visibility handler branches on.
      *
@@ -111,12 +135,21 @@ export function setupFakeDom(opts?: {
     getElementsByTagName(_: string) {
       return firstScript ? [firstScript] : [];
     },
-    createElement(_: string) {
+    createElement(tagName: string) {
+      const attributes: Record<string, string> = {};
       const node: FakeNode & {
         id?: string;
         async?: boolean;
         src?: string;
-      } = {};
+      } = {
+        tagName: tagName.toUpperCase(),
+        textContent: "",
+        attributes,
+        style: {},
+        setAttribute(name: string, value: string) {
+          attributes[name] = value;
+        },
+      };
       created.push(node);
       // Simulate the side-effect of setting id: register it in the byId map.
       Object.defineProperty(node, "id", {
@@ -148,6 +181,7 @@ export function setupFakeDom(opts?: {
 
   return {
     head,
+    body,
     created,
     byId,
     fakeWindow,
