@@ -78,11 +78,12 @@ describe("owned-collection reorder actions — the actions themselves", () => {
   });
 
   it("keeps the long press, so a pointer user loses nothing", () => {
-    // Wrapped since the pick-up announcement landed, but `drag()` is still what
-    // it ends in — a wrapper that forgot to call it would leave the pointer
-    // user with a card that dims and never moves.
+    // The wrapper that announces the pick-up and then calls `drag()` is
+    // `reorderActionProps`'s now — it comes back as `onLongPress` in the same
+    // spread. What this screen still owns is handing the gesture over
+    // unconditionally: every owned collection is the user's own to reorder.
     const body = renderer();
-    assert.match(body, /onLongPress=\{\(\) => \{[\s\S]*?drag\(\);\n\s*\}\}/);
+    assert.match(body, /drag,/);
     assert.match(body, /disabled=\{isActive\}/);
   });
 });
@@ -98,13 +99,14 @@ describe("owned-collection reorder actions — what they write", () => {
     );
   });
 
-  it("announces where the row landed, from the position the move resolved to", () => {
-    // Not a re-derivation: `to` is what the move actually produced, and
-    // computing it a second time here is how the spoken position and the
-    // visible one drift.
+  it("passes the announcement straight through, choosing neither moment nor position", () => {
+    // Both are the module's: it knows which moment just happened (a pick-up
+    // before `drag()`, a landing after a move) and the position the move
+    // actually resolved to. A screen that re-derived either is how the spoken
+    // position and the visible one drift.
     assert.match(
       renderer(),
-      /announce: \(to, total\) => announceReorder\(t, "reorderMoved", to, total\),/,
+      /announce: \(key, at, total\) => announceReorder\(t, key, at, total\),/,
     );
   });
 

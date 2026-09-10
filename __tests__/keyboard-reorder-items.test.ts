@@ -124,11 +124,11 @@ describe("the collection screen's reorder actions", () => {
   });
 
   it("keeps the long press for owners, and only for owners", () => {
-    // Wrapped since the pick-up announcement landed. Both halves still matter:
-    // it ends in `drag()`, and a viewer still gets `undefined` rather than a
-    // handler that announces a pick-up they cannot perform.
-    const body = renderer();
-    assert.match(body, /onLongPress=\{\n\s*isOwner\n\s*\? \(\) => \{[\s\S]*?drag\(\);\n\s*\}\n\s*: undefined\n\s*\}/);
+    // The wrapper that announces the pick-up and then calls `drag()` moved
+    // into `reorderActionProps`. What stays here is the ownership decision:
+    // withholding `drag` is what leaves a viewer's row with no long press at
+    // all, rather than one that announces a pick-up they cannot perform.
+    assert.match(renderer(), /drag: isOwner \? drag : undefined,/);
   });
 });
 

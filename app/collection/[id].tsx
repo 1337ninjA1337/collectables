@@ -1025,20 +1025,15 @@ export default function CollectionDetailsScreen() {
       enabled: isDragBranch,
       label: t,
       commit: commitItemOrder,
-      announce: (to, total) => announceReorder(t, "reorderMoved", to, total),
+      announce: (key, at, total) => announceReorder(t, key, at, total),
+      // A viewer gets no long press at all — not one that announces a pick-up
+      // they cannot perform.
+      drag: isOwner ? drag : undefined,
     });
 
     return (
       <ScaleDecorator>
         <Pressable
-          onLongPress={
-            isOwner
-              ? () => {
-                  announceReorder(t, "reorderPickedUp", index, visibleItems.length);
-                  drag();
-                }
-              : undefined
-          }
           disabled={isActive}
           accessibilityState={{ disabled: isActive }}
           delayLongPress={150}

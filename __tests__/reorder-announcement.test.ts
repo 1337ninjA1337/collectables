@@ -102,20 +102,21 @@ describe("both screens announce both moments", () => {
     describe(screen, () => {
       const src = () => readRepoFile(screen);
 
-      it("announces the pick-up on the long press", () => {
-        assert.match(
-          src(),
-          new RegExp(`announceReorder\\(t, "reorderPickedUp", index, ${rows}\\.length\\);\\n\\s*drag\\(\\);`),
-        );
+      it("hands the drag over, which is what earns the row a pick-up announcement", () => {
+        // The announce-then-`drag()` ordering is `reorderActionProps`'s now
+        // and is asserted by running it in reorder-actions.test.ts. What can
+        // still go wrong here is a screen that never passes `drag` — a row
+        // with no long press at all.
+        assert.match(src(), /\bdrag(,|: isOwner \? drag : undefined,)/);
       });
 
-      it("announces the landing after a keyboard move", () => {
-        // The wiring moved into `reorderActionProps`, which hands the landing
-        // position back rather than letting each screen recompute it — so what
-        // the screen still owns is the call, and `to` is the module's answer.
+      it("announces both moments through one pass-through callback", () => {
+        // Which moment and which position are the module's answers; the screen
+        // owns only `t`. A screen that named the key itself would be back to
+        // choosing when to speak in two places.
         assert.match(
           src(),
-          /announce: \(to, total\) => announceReorder\(t, "reorderMoved", to, total\),/,
+          /announce: \(key, at, total\) => announceReorder\(t, key, at, total\),/,
         );
       });
 
@@ -135,7 +136,7 @@ describe("both screens announce both moments", () => {
         // that never happened.
         const code = src();
         const commit = code.indexOf("commit:");
-        const announce = code.indexOf("announce: (to, total) =>");
+        const announce = code.indexOf("announce: (key, at, total) =>");
         assert.ok(commit > 0, `expected a \`commit:\` callback in ${screen}`);
         assert.ok(announce > commit, `expected an \`announce:\` callback after it in ${screen}`);
         assert.match(code, new RegExp(`rows: ${rows},`));

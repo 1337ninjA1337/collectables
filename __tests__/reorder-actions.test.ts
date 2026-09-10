@@ -19,10 +19,12 @@ import { describe, it } from "node:test";
 
 import {
   REORDER_ACTIONS,
+  REORDER_ROW_ROLE,
   availableReorderActions,
   reorderActionProps,
   type ReorderActionName,
 } from "@/lib/reorder-actions";
+import type { ReorderAnnouncement } from "@/lib/reorder-announcement";
 
 const ROWS = ["a", "b", "c", "d"] as const;
 
@@ -30,12 +32,14 @@ const ROWS = ["a", "b", "c", "d"] as const;
 const label = (key: ReorderActionName) => `label:${key}`;
 
 /** Fires one action and reports what the row committed and announced. */
+type Announced = [ReorderAnnouncement, number | undefined, number];
+
 function perform(
   actionName: string,
   options: { index: number | undefined; rows?: readonly string[]; enabled?: boolean },
-): { committed: string[] | null; announced: [number, number] | null } {
+): { committed: string[] | null; announced: Announced | null } {
   let committed: string[] | null = null;
-  let announced: [number, number] | null = null;
+  let announced: Announced | null = null;
   const props = reorderActionProps({
     rows: options.rows ?? ROWS,
     index: options.index,
@@ -44,8 +48,8 @@ function perform(
     commit: (next) => {
       committed = next;
     },
-    announce: (to, total) => {
-      announced = [to, total];
+    announce: (key, at, total) => {
+      announced = [key, at, total];
     },
   });
   props.onAccessibilityAction({ nativeEvent: { actionName } });
@@ -104,6 +108,7 @@ describe("reorderActionProps — the props a row spreads", () => {
       label,
       commit: () => {},
       announce: () => {},
+      drag: () => {},
     });
 
   it("names each action and labels it through the caller's translations", () => {
@@ -136,13 +141,13 @@ describe("reorderActionProps — what an action does", () => {
   it("moves the row one place up and says where it landed", () => {
     const { committed, announced } = perform("moveUp", { index: 2 });
     assert.deepEqual(committed, ["a", "c", "b", "d"]);
-    assert.deepEqual(announced, [1, 4]);
+    assert.deepEqual(announced, ["reorderMoved", 1, 4]);
   });
 
   it("moves the row one place down and says where it landed", () => {
     const { committed, announced } = perform("moveDown", { index: 1 });
     assert.deepEqual(committed, ["a", "c", "b", "d"]);
-    assert.deepEqual(announced, [2, 4]);
+    assert.deepEqual(announced, ["reorderMoved", 2, 4]);
   });
 
   it("puts the row back when the two moves are undone", () => {
@@ -162,8 +167,8 @@ describe("reorderActionProps — what an action does", () => {
   it("announces the position the move resolved to, not a re-derivation", () => {
     // The announced index is the one `moveItem` was given, so the spoken
     // position and the visible one cannot drift.
-    assert.deepEqual(perform("moveDown", { index: 0 }).announced, [1, 4]);
-    assert.deepEqual(perform("moveUp", { index: 3 }).announced, [2, 4]);
+    assert.deepEqual(perform("moveDown", { index: 0 }).announced, ["reorderMoved", 1, 4]);
+    assert.deepEqual(perform("moveUp", { index: 3 }).announced, ["reorderMoved", 2, 4]);
   });
 
   it("does nothing for an action this row does not offer", () => {
@@ -205,5 +210,91 @@ describe("reorderActionProps — what an action does", () => {
     const { committed } = perform("moveDown", { index: 0, rows });
     assert.notEqual(committed, rows);
     assert.deepEqual(rows, ["a", "b", "c"]);
+  });
+});
+
+describe("reorderActionProps — the pointer route", () => {
+  /** Builds the props with recording callbacks, and reports what happened. */
+  function withLongPress(options: { index: number | undefined; drag?: (() => void) | undefined }) {
+    const order: string[] = [];
+    let announced: Announced | null = null;
+    const props = reorderActionProps({
+      rows: ROWS,
+      index: options.index,
+      label,
+      commit: () => {},
+      announce: (key, at, total) => {
+        order.push("announce");
+        announced = [key, at, total];
+      },
+      drag:
+        options.drag === undefined
+          ? undefined
+          : () => {
+              order.push("drag");
+              options.drag?.();
+            },
+    });
+    return { props, order, announced: () => announced };
+  }
+
+  it("announces the pick-up and then starts the drag, in that order", () => {
+    // After `drag()` the row is being held rather than sitting at a position,
+    // so a pick-up read aloud from mid-gesture names wherever the finger has
+    // reached instead of where the row was.
+    const run = withLongPress({ index: 2, drag: () => {} });
+    run.props.onLongPress?.();
+    assert.deepEqual(run.order, ["announce", "drag"]);
+    assert.deepEqual(run.announced(), ["reorderPickedUp", 2, 4]);
+  });
+
+  it("announces the pick-up at the row's CURRENT place, not a destination", () => {
+    const run = withLongPress({ index: 0, drag: () => {} });
+    run.props.onLongPress?.();
+    assert.deepEqual(run.announced(), ["reorderPickedUp", 0, 4]);
+  });
+
+  it("still starts the drag on a row whose index the list has not placed", () => {
+    // The pick-up is the one moment an unknown index must not block: the
+    // gesture is the user's and it has already begun. `announcedPosition`
+    // refuses the number downstream, so the drag runs and nothing is said.
+    const run = withLongPress({ index: undefined, drag: () => {} });
+    run.props.onLongPress?.();
+    assert.deepEqual(run.order, ["announce", "drag"]);
+    assert.deepEqual(run.announced(), ["reorderPickedUp", undefined, 4]);
+  });
+
+  it("hands back no long press at all when the row may not be dragged", () => {
+    // A viewer's row on the collection screen. `undefined` rather than a
+    // handler that announces a pick-up they cannot perform.
+    assert.equal(withLongPress({ index: 1, drag: undefined }).props.onLongPress, undefined);
+  });
+
+  it("offers the keyboard actions on a row with no drag, and the drag on a row with no actions", () => {
+    // The two routes are independent: a viewer keeps neither, but a row at the
+    // end of the list keeps its long press while offering one action, and a
+    // disabled gate removes the actions without removing the gesture.
+    const noDrag = reorderActionProps({
+      rows: ROWS,
+      index: 1,
+      label,
+      commit: () => {},
+      announce: () => {},
+    });
+    assert.equal(noDrag.onLongPress, undefined);
+    assert.deepEqual(
+      noDrag.accessibilityActions.map((a) => a.name),
+      ["moveUp", "moveDown"],
+    );
+    const gated = withLongPress({ index: 1, drag: () => {} });
+    assert.equal(typeof gated.props.onLongPress, "function");
+  });
+
+  it("claims a role, so the actions are offered consistently across readers", () => {
+    // `accessibilityActions` on a node with no role is announced
+    // inconsistently: TalkBack reads them off anything focusable, VoiceOver
+    // often does not offer the rotor until the element claims one.
+    assert.equal(withLongPress({ index: 1, drag: () => {} }).props.accessibilityRole, "button");
+    assert.equal(REORDER_ROW_ROLE, "button");
   });
 });

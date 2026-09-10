@@ -140,16 +140,13 @@ export default function HomeScreen() {
       index,
       label: t,
       commit: (next) => reorderOwnedCollections(next.map((c) => c.id)),
-      announce: (to, total) => announceReorder(t, "reorderMoved", to, total),
+      announce: (key, at, total) => announceReorder(t, key, at, total),
+      drag,
     });
 
     return (
       <ScaleDecorator>
         <Pressable
-        onLongPress={() => {
-          announceReorder(t, "reorderPickedUp", index, ownedCollections.length);
-          drag();
-        }}
         disabled={isActive}
         accessibilityState={{ disabled: isActive }} delayLongPress={150}
         {...reorderActions}>

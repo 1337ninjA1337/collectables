@@ -8,8 +8,10 @@
  * character for character apart from which array and which writer they named:
  * a can-move-up / can-move-down pair, a conditional spread so an action that
  * would do nothing is never offered, an undefined-index guard, the `moveItem`
- * call, the announcement, and a switch on the action name. Two copies of six
- * decisions, in two files nobody diffs against each other.
+ * call, the announcement, a switch on the action name, and — the last piece to
+ * move here — the long press that announces the pick-up and then starts the
+ * drag. Two copies of seven decisions, in two files nobody diffs against each
+ * other.
  *
  * ## Why it is a function and not a hook
  *
@@ -28,6 +30,17 @@
  */
 
 import { moveItem } from "@/lib/drag-reorder";
+import type { ReorderAnnouncement } from "@/lib/reorder-announcement";
+
+/**
+ * The role a row carrying custom actions announces itself as.
+ *
+ * `accessibilityActions` on a node with no role is announced inconsistently:
+ * TalkBack reads the actions off anything focusable, VoiceOver frequently does
+ * not offer the rotor at all until the element claims a role. Both rows are
+ * `Pressable`s that open something, so `button` is what they are.
+ */
+export const REORDER_ROW_ROLE = "button" as const;
 
 /** The two actions, and the i18n keys they are labelled with. */
 export const REORDER_ACTIONS = ["moveUp", "moveDown"] as const;
@@ -45,10 +58,17 @@ export type ReorderAccessibilityAction = {
   readonly label: string;
 };
 
-/** The two props a row spreads to become reorderable without a pointer. */
+/** Everything a row spreads to become reorderable, with a pointer or without. */
 export type ReorderActionProps = {
   readonly accessibilityActions: readonly ReorderAccessibilityAction[];
   readonly onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => void;
+  readonly accessibilityRole: typeof REORDER_ROW_ROLE;
+  /**
+   * The pointer route, announced and then started — `undefined` when the
+   * caller passed no `drag`, which is how a viewer's row gets no long press at
+   * all rather than one that announces a pick-up they cannot perform.
+   */
+  readonly onLongPress: (() => void) | undefined;
 };
 
 export type ReorderActionOptions<T> = {
@@ -73,8 +93,20 @@ export type ReorderActionOptions<T> = {
   readonly label: (key: ReorderActionName) => string;
   /** Persist the new order. Receives the whole of `rows`, reordered. */
   readonly commit: (next: T[]) => void;
-  /** Say where the row landed: 0-based position, and the list's length. */
-  readonly announce: (to: number, total: number) => void;
+  /**
+   * Say what just happened: which moment, the 0-based position it is about,
+   * and the list's length.
+   *
+   * `at` is `number | undefined` because the pick-up can fire on a row the
+   * list has not placed. `announcedPosition` refuses that rather than reading
+   * a guess aloud, so the caller passes it straight through.
+   */
+  readonly announce: (key: ReorderAnnouncement, at: number | undefined, total: number) => void;
+  /**
+   * Start the pointer drag. Omitted for a row that may not be dragged — a
+   * viewer's — which is what leaves `onLongPress` undefined.
+   */
+  readonly drag?: () => void;
 };
 
 /**
@@ -106,7 +138,7 @@ export function availableReorderActions<T>(
  * entry the screen adds later — cannot move anything.
  */
 export function reorderActionProps<T>(options: ReorderActionOptions<T>): ReorderActionProps {
-  const { rows, index, enabled, label, commit, announce } = options;
+  const { rows, index, enabled, label, commit, announce, drag } = options;
   const available = availableReorderActions(rows, index, enabled);
 
   return {
@@ -116,7 +148,18 @@ export function reorderActionProps<T>(options: ReorderActionOptions<T>): Reorder
       if (index === undefined || !available.includes(name)) return;
       const to = index + DELTA[name];
       commit(moveItem(rows, index, to));
-      announce(to, rows.length);
+      announce("reorderMoved", to, rows.length);
     },
+    accessibilityRole: REORDER_ROW_ROLE,
+    onLongPress:
+      drag === undefined
+        ? undefined
+        : () => {
+            // Before `drag()`, not after: once the gesture starts the row is
+            // being held rather than sitting at a position, and a pick-up read
+            // aloud from mid-drag names wherever the finger has reached.
+            announce("reorderPickedUp", index, rows.length);
+            drag();
+          },
   };
 }
