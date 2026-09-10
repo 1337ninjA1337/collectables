@@ -552,6 +552,8 @@ const en = {
   reorderResetSort: "Reset sort",
   moveUp: "Move up",
   moveDown: "Move down",
+  reorderPickedUp: (params?: TranslationParams) => `Picked up. Position ${params?.position ?? 1} of ${params?.total ?? 1}`,
+  reorderMoved: (params?: TranslationParams) => `Moved to position ${params?.position ?? 1} of ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Profile cache TTL too low",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS is set below 30 seconds. Aggressive overrides can hammer Supabase rate limits.",
@@ -1103,6 +1105,8 @@ const ru: TranslationMap = {
   reorderResetSort: "Сбросить сортировку",
   moveUp: "Переместить выше",
   moveDown: "Переместить ниже",
+  reorderPickedUp: (params?: TranslationParams) => `Взято. Позиция ${params?.position ?? 1} из ${params?.total ?? 1}`,
+  reorderMoved: (params?: TranslationParams) => `Перемещено на позицию ${params?.position ?? 1} из ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Слишком короткий TTL кэша профилей",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS установлен ниже 30 секунд. Слишком агрессивные значения нагружают лимиты Supabase.",
@@ -1457,6 +1461,8 @@ const be: TranslationMap = {
   reorderResetSort: "Скінуць сартаванне",
   moveUp: "Перамясціць вышэй",
   moveDown: "Перамясціць ніжэй",
+  reorderPickedUp: (params?: TranslationParams) => `Узята. Пазіцыя ${params?.position ?? 1} з ${params?.total ?? 1}`,
+  reorderMoved: (params?: TranslationParams) => `Перамешчана на пазіцыю ${params?.position ?? 1} з ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Занадта малы TTL кэша профіляў",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS усталяваны ніжэй за 30 секунд. Занадта агрэсіўныя значэнні нагружаюць ліміты Supabase.",
@@ -2021,6 +2027,8 @@ const pl: TranslationMap = {
   reorderResetSort: "Resetuj sortowanie",
   moveUp: "Przenieś wyżej",
   moveDown: "Przenieś niżej",
+  reorderPickedUp: (params?: TranslationParams) => `Podniesiono. Pozycja ${params?.position ?? 1} z ${params?.total ?? 1}`,
+  reorderMoved: (params?: TranslationParams) => `Przeniesiono na pozycję ${params?.position ?? 1} z ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Za niski TTL pamięci podręcznej profili",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS jest ustawiony poniżej 30 sekund. Zbyt agresywne wartości obciążają limity Supabase.",
@@ -2593,6 +2601,8 @@ const de: TranslationMap = {
   reorderResetSort: "Sortierung zurücksetzen",
   moveUp: "Nach oben verschieben",
   moveDown: "Nach unten verschieben",
+  reorderPickedUp: (params?: TranslationParams) => `Aufgenommen. Position ${params?.position ?? 1} von ${params?.total ?? 1}`,
+  reorderMoved: (params?: TranslationParams) => `Auf Position ${params?.position ?? 1} von ${params?.total ?? 1} verschoben`,
   profileCacheTtlLowTitle: "Profil-Cache-TTL zu niedrig",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS ist auf unter 30 Sekunden gesetzt. Zu aggressive Werte belasten die Supabase-Limits.",
@@ -3177,6 +3187,8 @@ const es: TranslationMap = {
   reorderResetSort: "Restablecer orden",
   moveUp: "Mover arriba",
   moveDown: "Mover abajo",
+  reorderPickedUp: (params?: TranslationParams) => `Seleccionado. Posición ${params?.position ?? 1} de ${params?.total ?? 1}`,
+  reorderMoved: (params?: TranslationParams) => `Movido a la posición ${params?.position ?? 1} de ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "TTL de caché de perfiles demasiado bajo",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS está por debajo de 30 segundos. Valores demasiado agresivos saturan los límites de Supabase.",

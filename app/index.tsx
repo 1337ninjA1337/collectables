@@ -46,6 +46,7 @@ import {
   TEXT_ON_DARK_8,
 } from "@/lib/design-tokens";
 import { moveItem } from "@/lib/drag-reorder";
+import { announceReorder } from "@/lib/reorder-announcement";
 import { selectRecentItems } from "@/lib/home-helpers";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
@@ -125,6 +126,11 @@ export default function HomeScreen() {
    * Only the moves that would do something are offered: "move up" on the first
    * card clamps back onto itself, and an action a screen reader announces but
    * that changes nothing is worse than one it never mentions.
+   *
+   * Both routes speak. The pick-up and the landing were feedback a sighted user
+   * got for free — a dimmed card, a card in a new place — and nothing else, so
+   * the mode was silent to exactly the user the actions were added for. See
+   * `lib/reorder-announcement.ts`, which also decides when NOT to speak.
    */
   const renderOwnedCollection = ({ item: collection, drag, isActive, getIndex }: RenderItemParams<Collection>) => {
     const index = getIndex();
@@ -133,11 +139,17 @@ export default function HomeScreen() {
     const moveBy = (delta: number) => {
       if (index === undefined) return;
       reorderOwnedCollections(moveItem(ownedCollections, index, index + delta).map((c) => c.id));
+      announceReorder(t, "reorderMoved", index + delta, ownedCollections.length);
     };
 
     return (
       <ScaleDecorator>
-        <Pressable onLongPress={drag} disabled={isActive}
+        <Pressable
+        onLongPress={() => {
+          announceReorder(t, "reorderPickedUp", index, ownedCollections.length);
+          drag();
+        }}
+        disabled={isActive}
         accessibilityState={{ disabled: isActive }} delayLongPress={150}
         accessibilityActions={[
           ...(canMoveUp ? [{ name: "moveUp", label: t("moveUp") }] : []),
@@ -343,7 +355,10 @@ export default function HomeScreen() {
                       data={ownedCollections}
                       keyExtractor={(c) => c.id}
                       renderItem={renderOwnedCollection}
-                      onDragEnd={({ data }) => reorderOwnedCollections(data.map((c) => c.id))}
+                      onDragEnd={({ data, to }) => {
+                        reorderOwnedCollections(data.map((c) => c.id));
+                        announceReorder(t, "reorderMoved", to, data.length);
+                      }}
                       contentContainerStyle={styles.draggableList}
                     />
                   ) : (

@@ -153,16 +153,16 @@ const FAMILIES: readonly Family[] = [
   {
     name: "home screen",
     screen: "app/index.tsx",
-    size: 27,
+    size: 29,
     because:
-      "the screen behind the app icon, and the one every session starts and returns to — measured on 2026-08-22 as reading 37 base keys, 12 owned by prefix families and one (`appName`) exempt, leaving 25 of which 19 were not declared in all six locales. The most MIXED screen listed so far: `createCollection` was missing only in `de`, `myCollections` in three, `friends` in all four, so a German reader met a section header in German above two English tiles — which is the seam a screen family closes and a per-key gap count never showed. 27 since 2026-09-10, when `moveUp` and `moveDown` arrived together as the screen-reader route into reordering owned collections — both translated in all six locales in the same commit, which is what this number is here to force",
+      "the screen behind the app icon, and the one every session starts and returns to — measured on 2026-08-22 as reading 37 base keys, 12 owned by prefix families and one (`appName`) exempt, leaving 25 of which 19 were not declared in all six locales. The most MIXED screen listed so far: `createCollection` was missing only in `de`, `myCollections` in three, `friends` in all four, so a German reader met a section header in German above two English tiles — which is the seam a screen family closes and a per-key gap count never showed. 27 since 2026-09-10, when `moveUp` and `moveDown` arrived together as the screen-reader route into reordering owned collections — both translated in all six locales in the same commit, which is what this number is here to force. 29 the same day, when `reorderPickedUp` and `reorderMoved` gave the mode a voice — the two announcements are the only keys on this screen a user never reads",
   },
   {
     name: "collection-detail screen",
     screen: "app/collection/[id].tsx",
-    size: 48,
+    size: 50,
     because:
-      "the screen a collector actually lives in — the one the 'this screen is half-translated' complaint was originally about — and the largest single holder left on 2026-08-22 at 27 of its 46 keys English in all four partial locales. It is also the first listed screen whose keys are not all its own: it renders through `<ItemCard>`, `<BulkBar>`, `<EditCollectionModal>`, the share sheet and more, so this entry finishes the FILE while a user reads the union, and the components are listed separately in their own suites. 48 since 2026-09-10, when `moveUp` and `moveDown` reached the item rows — the same two labels the home screen took two commits earlier, which is what a screen family counts and a per-key gap never would",
+      "the screen a collector actually lives in — the one the 'this screen is half-translated' complaint was originally about — and the largest single holder left on 2026-08-22 at 27 of its 46 keys English in all four partial locales. It is also the first listed screen whose keys are not all its own: it renders through `<ItemCard>`, `<BulkBar>`, `<EditCollectionModal>`, the share sheet and more, so this entry finishes the FILE while a user reads the union, and the components are listed separately in their own suites. 48 since 2026-09-10, when `moveUp` and `moveDown` reached the item rows — the same two labels the home screen took two commits earlier, which is what a screen family counts and a per-key gap never would. 50 the same day, with the two reorder announcements",
   },
   {
     name: "item-detail screen",

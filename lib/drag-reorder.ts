@@ -73,6 +73,30 @@ export function orderWithUnrenderedTail<T extends { id: string }>(
 }
 
 /**
+ * A row's place in its list as a screen reader should hear it, or nothing.
+ *
+ * Reordering is announced twice — at the pick-up and at the landing — and both
+ * announcements are the same sentence with different numbers. `position` is
+ * 1-based because "position 0 of 7" is not a thing anybody says.
+ *
+ * Nothing rather than a fallback when the numbers cannot be trusted: an index
+ * that is `undefined` (a windowed row not yet placed), out of range, or
+ * fractional, or an empty list. A wrong position read aloud is worse than
+ * silence, because the user cannot see the list to check it — and every one of
+ * these is reachable, which is why this returns null instead of clamping.
+ */
+export function announcedPosition(
+  index: number | undefined,
+  total: number,
+): { position: number; total: number } | null {
+  if (!Number.isInteger(index as number)) return null;
+  if (!Number.isInteger(total) || total <= 0) return null;
+  const at = index as number;
+  if (at < 0 || at >= total) return null;
+  return { position: at + 1, total };
+}
+
+/**
  * Which row index a pointer at `pointerY` is over, given the rows' extents.
  *
  * The comparison is against each row's MIDPOINT rather than its box, so the

@@ -471,7 +471,11 @@ describe("translation floors", () => {
     // as a pair because a list you can move a row up in but not down is not a
     // reorder, and in all six locales because the action is announced in the
     // user's language or not at all.
-    assert.match(report, /en: 504\/504 keys \(100\.0%\)/);
+    // 506 the same day: `reorderPickedUp` and `reorderMoved`, the two things a
+    // screen reader now says during a reorder. They are the first keys in the
+    // tree written to be HEARD rather than read, which is why they are
+    // sentences with the numbers inside rather than a "3 / 7" counter.
+    assert.match(report, /en: 506\/506 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

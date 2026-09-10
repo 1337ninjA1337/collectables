@@ -26,6 +26,7 @@ import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
 import { moveItem, orderWithUnrenderedTail } from "@/lib/drag-reorder";
+import { announceReorder } from "@/lib/reorder-announcement";
 import { flatListStyles } from "@/lib/flat-list-styles";
 import { useChunkedList } from "@/lib/use-chunked-list";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
@@ -1007,6 +1008,11 @@ export default function CollectionDetailsScreen() {
    * keyboard just as much as from a drag — corrupts what the owner arranged.
    * The screen already says so in the reorder-blocked notice; these actions
    * disappear for the same reason.
+   *
+   * Both routes speak. The pick-up and the landing were feedback a sighted user
+   * got for free — a dimmed row, a row in a new place — and nothing else, so
+   * reorder mode was silent to exactly the user the actions were added for.
+   * See `lib/reorder-announcement.ts`, which also decides when NOT to speak.
    */
   const renderItemRow = ({ item, drag, isActive, getIndex }: RenderItemParams<CollectableItem>) => {
     const index = getIndex();
@@ -1015,12 +1021,20 @@ export default function CollectionDetailsScreen() {
     const moveBy = (delta: number) => {
       if (index === undefined) return;
       commitItemOrder(moveItem(visibleItems, index, index + delta));
+      announceReorder(t, "reorderMoved", index + delta, visibleItems.length);
     };
 
     return (
       <ScaleDecorator>
         <Pressable
-          onLongPress={isOwner ? drag : undefined}
+          onLongPress={
+            isOwner
+              ? () => {
+                  announceReorder(t, "reorderPickedUp", index, visibleItems.length);
+                  drag();
+                }
+              : undefined
+          }
           disabled={isActive}
           accessibilityState={{ disabled: isActive }}
           delayLongPress={150}
@@ -1241,7 +1255,10 @@ export default function CollectionDetailsScreen() {
             // The tail-append rule lives in `commitItemOrder` now, because the
             // keyboard actions on each row need the same one. See
             // `orderWithUnrenderedTail`.
-            onDragEnd={({ data }) => commitItemOrder(data)}
+            onDragEnd={({ data, to }) => {
+              commitItemOrder(data);
+              announceReorder(t, "reorderMoved", to, data.length);
+            }}
             contentContainerStyle={styles.draggableList}
           />
         ) : null}

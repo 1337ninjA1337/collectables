@@ -117,8 +117,12 @@ describe("the collection screen's reorder actions", () => {
     assert.match(body, /if \(index === undefined\) return;/);
   });
 
-  it("keeps the long press for owners", () => {
-    assert.match(renderer(), /onLongPress=\{isOwner \? drag : undefined\}/);
+  it("keeps the long press for owners, and only for owners", () => {
+    // Wrapped since the pick-up announcement landed. Both halves still matter:
+    // it ends in `drag()`, and a viewer still gets `undefined` rather than a
+    // handler that announces a pick-up they cannot perform.
+    const body = renderer();
+    assert.match(body, /onLongPress=\{\n\s*isOwner\n\s*\? \(\) => \{[\s\S]*?drag\(\);\n\s*\}\n\s*: undefined\n\s*\}/);
   });
 });
 
@@ -131,7 +135,7 @@ describe("the collection screen's two reorder routes", () => {
       src,
       /const commitItemOrder = \(page: CollectableItem\[\]\) => \{\n\s*reorderItemsInCollection\(activeCollection\.id, orderWithUnrenderedTail\(page, items\)\);\n\s*\};/,
     );
-    assert.match(src, /onDragEnd=\{\(\{ data \}\) => commitItemOrder\(data\)\}/);
+    assert.match(src, /onDragEnd=\{\(\{ data, to \}\) => \{\n\s*commitItemOrder\(data\);/);
   });
 
   it("leaves no second copy of the tail rule in the screen", () => {
