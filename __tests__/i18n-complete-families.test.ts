@@ -153,9 +153,9 @@ const FAMILIES: readonly Family[] = [
   {
     name: "home screen",
     screen: "app/index.tsx",
-    size: 25,
+    size: 27,
     because:
-      "the screen behind the app icon, and the one every session starts and returns to — measured on 2026-08-22 as reading 37 base keys, 12 owned by prefix families and one (`appName`) exempt, leaving 25 of which 19 were not declared in all six locales. The most MIXED screen listed so far: `createCollection` was missing only in `de`, `myCollections` in three, `friends` in all four, so a German reader met a section header in German above two English tiles — which is the seam a screen family closes and a per-key gap count never showed",
+      "the screen behind the app icon, and the one every session starts and returns to — measured on 2026-08-22 as reading 37 base keys, 12 owned by prefix families and one (`appName`) exempt, leaving 25 of which 19 were not declared in all six locales. The most MIXED screen listed so far: `createCollection` was missing only in `de`, `myCollections` in three, `friends` in all four, so a German reader met a section header in German above two English tiles — which is the seam a screen family closes and a per-key gap count never showed. 27 since 2026-09-10, when `moveUp` and `moveDown` arrived together as the screen-reader route into reordering owned collections — both translated in all six locales in the same commit, which is what this number is here to force",
   },
   {
     name: "collection-detail screen",

@@ -550,6 +550,8 @@ const en = {
   reorderItemsDone: "Done reordering",
   reorderBlockedBySort: "Reordering is off while items are sorted — reset the sort to drag them.",
   reorderResetSort: "Reset sort",
+  moveUp: "Move up",
+  moveDown: "Move down",
   profileCacheTtlLowTitle: "Profile cache TTL too low",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS is set below 30 seconds. Aggressive overrides can hammer Supabase rate limits.",
@@ -1099,6 +1101,8 @@ const ru: TranslationMap = {
   reorderItemsDone: "Готово",
   reorderBlockedBySort: "Порядок нельзя менять при активной сортировке — сбросьте её, чтобы перетаскивать.",
   reorderResetSort: "Сбросить сортировку",
+  moveUp: "Переместить выше",
+  moveDown: "Переместить ниже",
   profileCacheTtlLowTitle: "Слишком короткий TTL кэша профилей",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS установлен ниже 30 секунд. Слишком агрессивные значения нагружают лимиты Supabase.",
@@ -1451,6 +1455,8 @@ const be: TranslationMap = {
   reorderItemsDone: "Гатова",
   reorderBlockedBySort: "Парадак нельга змяняць пры актыўным сартаванні — скіньце яго, каб перацягваць.",
   reorderResetSort: "Скінуць сартаванне",
+  moveUp: "Перамясціць вышэй",
+  moveDown: "Перамясціць ніжэй",
   profileCacheTtlLowTitle: "Занадта малы TTL кэша профіляў",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS усталяваны ніжэй за 30 секунд. Занадта агрэсіўныя значэнні нагружаюць ліміты Supabase.",
@@ -2013,6 +2019,8 @@ const pl: TranslationMap = {
   reorderItemsDone: "Gotowe",
   reorderBlockedBySort: "Nie zmienisz kolejności przy aktywnym sortowaniu — zresetuj je, aby przeciągać.",
   reorderResetSort: "Resetuj sortowanie",
+  moveUp: "Przenieś wyżej",
+  moveDown: "Przenieś niżej",
   profileCacheTtlLowTitle: "Za niski TTL pamięci podręcznej profili",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS jest ustawiony poniżej 30 sekund. Zbyt agresywne wartości obciążają limity Supabase.",
@@ -2583,6 +2591,8 @@ const de: TranslationMap = {
   reorderItemsDone: "Fertig",
   reorderBlockedBySort: "Neu anordnen ist bei aktiver Sortierung aus — setze die Sortierung zurück, um zu ziehen.",
   reorderResetSort: "Sortierung zurücksetzen",
+  moveUp: "Nach oben verschieben",
+  moveDown: "Nach unten verschieben",
   profileCacheTtlLowTitle: "Profil-Cache-TTL zu niedrig",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS ist auf unter 30 Sekunden gesetzt. Zu aggressive Werte belasten die Supabase-Limits.",
@@ -3165,6 +3175,8 @@ const es: TranslationMap = {
   reorderItemsDone: "Listo",
   reorderBlockedBySort: "No puedes reordenar con un orden activo — restablécelo para arrastrar.",
   reorderResetSort: "Restablecer orden",
+  moveUp: "Mover arriba",
+  moveDown: "Mover abajo",
   profileCacheTtlLowTitle: "TTL de caché de perfiles demasiado bajo",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS está por debajo de 30 segundos. Valores demasiado agresivos saturan los límites de Supabase.",
