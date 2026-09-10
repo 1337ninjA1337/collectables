@@ -13,7 +13,8 @@
  *
  *  - Each chip only carried `accessibilityRole="button"`, so VoiceOver
  *    announced all three identically and the active sort was conveyed by
- *    colour alone. `accessibilityState={{ selected: active }}` is the standard
+ *    colour alone. `accessibilityState={{ selected, checked }}` on a `radio`
+ *    inside a `radiogroup` (2026-09-10) is the standard
  *    React Native fix.
  *
  * `lib/item-filters.ts` is React-Native-free and IS imported here; the
@@ -158,13 +159,23 @@ describe("<ItemFilterBar> sort chips", () => {
 
   it("marks the active chip selected for screen readers", () => {
     const src = readComponentSrc();
-    assert.match(src, /accessibilityState=\{\{ selected: active \}\}/);
-    // The selected state must ride on the same Pressable that carries the
-    // button role, not on the label Text.
+    // The state must ride on the same Pressable that carries the role, not on
+    // the label Text. Both spellings: RN maps `selected` on native and
+    // react-native-web renders `aria-checked` from `checked`, which is the
+    // state a radio actually carries.
     const chip = src.match(/<Pressable\n\s*key=\{opt\.mode\}[\s\S]*?<\/Pressable>/)?.[0] ?? "";
     assert.ok(chip.length > 0, "expected to extract the sort chip Pressable");
-    assert.match(chip, /accessibilityRole="button"/);
-    assert.match(chip, /accessibilityState=\{\{ selected: active \}\}/);
+    assert.match(chip, /accessibilityRole="radio"/);
+    assert.match(chip, /accessibilityState=\{\{ selected: active, checked: active \}\}/);
+  });
+
+  it("groups the chips as the one mutually exclusive choice they are", () => {
+    // `selected` says which chip is on; nothing said the seven were
+    // alternatives, so a screen-reader user heard seven unrelated buttons with
+    // no reason to expect that picking one turns another off.
+    const src = readComponentSrc();
+    assert.match(src, /<View style=\{styles\.sortRow\} accessibilityRole="radiogroup"/);
+    assert.match(src, /aria-label=\{t\("sortLabel"\)\}/);
   });
 
   it("derives `active` from the draft, so the sheet reflects unapplied edits", () => {

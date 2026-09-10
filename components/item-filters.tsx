@@ -453,17 +453,27 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               {/* Sort mode */}
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>{t("sortLabel")}</Text>
-                <View style={styles.sortRow}>
+                {/*
+                  A radiogroup, because that is what it is: seven chips, one of
+                  which is on, and choosing another turns the previous one off.
+                  Announced as seven independent buttons, `selected` says which
+                  one is active but nothing says they are alternatives — so a
+                  screen-reader user hears no reason to expect that picking one
+                  changes the others, and no count of how many there are.
+                */}
+                <View style={styles.sortRow} accessibilityRole="radiogroup" aria-label={t("sortLabel")}>
                   {SORT_OPTIONS.map((opt) => {
                     const active = draft.sort === opt.mode;
                     return (
                       <Pressable
                         key={opt.mode}
-                        accessibilityRole="button"
+                        accessibilityRole="radio"
                         // Without `selected`, VoiceOver announces every chip
-                        // identically ("button") and the active sort is
-                        // conveyed by colour alone.
-                        accessibilityState={{ selected: active }}
+                        // identically and the active sort is conveyed by
+                        // colour alone. `checked` is the ARIA state a radio
+                        // carries on web; RN maps `selected` on native, and
+                        // react-native-web renders both from these two.
+                        accessibilityState={{ selected: active, checked: active }}
                         style={[styles.sortChip, active && styles.sortChipActive]}
                         onPress={() => setDraft({ ...draft, sort: opt.mode })}
                       >

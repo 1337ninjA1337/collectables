@@ -91,8 +91,11 @@ describe("components/item-filters.tsx — sort chip UI", () => {
     // divergent copy, and each chip carries its a11y role + selected state.
     assert.match(src, /\{SORT_OPTIONS\.map\(\(opt\) => \{/);
     assert.match(src, /SORT_OPTIONS,[\s\S]*?\} from "@\/lib\/item-filters";/);
-    assert.match(src, /accessibilityRole=\{?\s*"button"\s*\}?/);
-    assert.match(src, /accessibilityState=\{\{ selected: active \}\}/);
+    // A radio inside a radiogroup since 2026-09-10 — the row is one mutually
+    // exclusive choice, and `selected` alone never said so.
+    assert.match(src, /accessibilityRole=\{?\s*"radio"\s*\}?/);
+    assert.match(src, /accessibilityState=\{\{ selected: active, checked: active \}\}/);
+    assert.match(src, /accessibilityRole="radiogroup"/);
   });
 
   it("writes back to draft.sort via setDraft with spread (preserves other fields)", () => {
