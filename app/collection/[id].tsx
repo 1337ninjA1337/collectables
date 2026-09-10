@@ -25,7 +25,8 @@ import { useAuth } from "@/lib/auth-context";
 import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
-import { moveItem, orderWithUnrenderedTail } from "@/lib/drag-reorder";
+import { orderWithUnrenderedTail } from "@/lib/drag-reorder";
+import { reorderActionProps } from "@/lib/reorder-actions";
 import { announceReorder } from "@/lib/reorder-announcement";
 import { flatListStyles } from "@/lib/flat-list-styles";
 import { useChunkedList } from "@/lib/use-chunked-list";
@@ -1007,7 +1008,9 @@ export default function CollectionDetailsScreen() {
    * sort the visible order is not the manual one, so committing it — from a
    * keyboard just as much as from a drag — corrupts what the owner arranged.
    * The screen already says so in the reorder-blocked notice; these actions
-   * disappear for the same reason.
+   * disappear for the same reason, and `enabled` is how that reaches
+   * `reorderActionProps` in `lib/reorder-actions.ts`, which owns the rest of
+   * the wiring for both screens.
    *
    * Both routes speak. The pick-up and the landing were feedback a sighted user
    * got for free — a dimmed row, a row in a new place — and nothing else, so
@@ -1016,13 +1019,14 @@ export default function CollectionDetailsScreen() {
    */
   const renderItemRow = ({ item, drag, isActive, getIndex }: RenderItemParams<CollectableItem>) => {
     const index = getIndex();
-    const canMoveUp = isDragBranch && index !== undefined && index > 0;
-    const canMoveDown = isDragBranch && index !== undefined && index < visibleItems.length - 1;
-    const moveBy = (delta: number) => {
-      if (index === undefined) return;
-      commitItemOrder(moveItem(visibleItems, index, index + delta));
-      announceReorder(t, "reorderMoved", index + delta, visibleItems.length);
-    };
+    const reorderActions = reorderActionProps({
+      rows: visibleItems,
+      index,
+      enabled: isDragBranch,
+      label: t,
+      commit: commitItemOrder,
+      announce: (to, total) => announceReorder(t, "reorderMoved", to, total),
+    });
 
     return (
       <ScaleDecorator>
@@ -1038,14 +1042,7 @@ export default function CollectionDetailsScreen() {
           disabled={isActive}
           accessibilityState={{ disabled: isActive }}
           delayLongPress={150}
-          accessibilityActions={[
-            ...(canMoveUp ? [{ name: "moveUp", label: t("moveUp") }] : []),
-            ...(canMoveDown ? [{ name: "moveDown", label: t("moveDown") }] : []),
-          ]}
-          onAccessibilityAction={(event) => {
-            if (event.nativeEvent.actionName === "moveUp") moveBy(-1);
-            if (event.nativeEvent.actionName === "moveDown") moveBy(1);
-          }}
+          {...reorderActions}
         >
           <ItemCard item={item} />
         </Pressable>

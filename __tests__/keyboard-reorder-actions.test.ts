@@ -45,29 +45,36 @@ function renderer(): string {
 }
 
 describe("owned-collection reorder actions — the actions themselves", () => {
-  it("offers both moves as named accessibility actions with translated labels", () => {
+  it("delegates the whole action pair to lib/reorder-actions.ts", () => {
+    // The twelve lines this used to pin — a canMoveUp/canMoveDown pair, the
+    // conditional spread, the actionName switch, the undefined guard — were
+    // duplicated character for character in `app/collection/[id].tsx`. They
+    // are `reorderActionProps` now, and what this suite pins is the wiring;
+    // the decisions themselves are run as functions in reorder-actions.test.ts.
+    assert.match(readHomeSrc(), /import \{ reorderActionProps \} from "@\/lib\/reorder-actions";/);
     const body = renderer();
-    assert.match(body, /accessibilityActions=\{\[/);
-    assert.match(body, /\{ name: "moveUp", label: t\("moveUp"\) \}/);
-    assert.match(body, /\{ name: "moveDown", label: t\("moveDown"\) \}/);
+    assert.match(body, /const reorderActions = reorderActionProps\(\{/);
+    assert.match(body, /rows: ownedCollections,/);
+    assert.match(body, /index,/);
+    assert.match(body, /label: t,/);
   });
 
-  it("routes each action name to a move in that direction", () => {
-    const body = renderer();
-    assert.match(body, /onAccessibilityAction=\{\(event\) => \{/);
-    assert.match(body, /actionName === "moveUp"\) moveBy\(-1\)/);
-    assert.match(body, /actionName === "moveDown"\) moveBy\(1\)/);
+  it("spreads both props onto the row, so neither is quietly dropped", () => {
+    // `accessibilityActions` without `onAccessibilityAction` is a list of
+    // actions a screen reader offers and nothing answers.
+    assert.match(renderer(), /\{\.\.\.reorderActions\}/);
   });
 
-  it("offers only the move that would do something", () => {
-    // `moveItem` clamps, so "move up" on the first card is a no-op that a
-    // screen reader would still announce as an available action. Offering it
-    // and doing nothing is worse than never mentioning it.
-    const body = renderer();
-    assert.match(body, /const canMoveUp = index !== undefined && index > 0;/);
-    assert.match(body, /const canMoveDown = index !== undefined && index < ownedCollections\.length - 1;/);
-    assert.match(body, /\.\.\.\(canMoveUp \? \[\{ name: "moveUp"/);
-    assert.match(body, /\.\.\.\(canMoveDown \? \[\{ name: "moveDown"/);
+  it("reads the row's own index rather than assuming one", () => {
+    // `getIndex()` is `number | undefined`; the guard for that lives in
+    // `reorderActionProps` now, which is why this only pins the read.
+    assert.match(renderer(), /const index = getIndex\(\);/);
+  });
+
+  it("offers every owned collection as the list a move happens within", () => {
+    // `rows` is what the move is computed against and what gets committed —
+    // handing over a filtered or sliced array would renumber the rest.
+    assert.match(renderer(), /rows: ownedCollections,/);
   });
 
   it("keeps the long press, so a pointer user loses nothing", () => {
@@ -81,30 +88,31 @@ describe("owned-collection reorder actions — the actions themselves", () => {
 });
 
 describe("owned-collection reorder actions — what they write", () => {
-  it("commits through the same moveItem the drag commits through", () => {
-    // A hand-rolled splice here would be a second answer to "where does the
-    // row land", and the two would drift the first time either is fixed.
-    const body = renderer();
-    assert.match(
-      body,
-      /reorderOwnedCollections\(moveItem\(ownedCollections, index, index \+ delta\)\.map\(\(c\) => c\.id\)\)/,
-    );
-    assert.match(readHomeSrc(), /import \{ moveItem \} from "@\/lib\/drag-reorder";/);
-  });
-
-  it("writes the ids of the whole list, not just the pair that swapped", () => {
+  it("commits the whole list's ids, not just the pair that swapped", () => {
     // `reorderOwnedCollections` takes the full order; sending two ids would
-    // drop every collection the user did not touch.
-    assert.match(renderer(), /moveItem\([^)]*\)\.map\(\(c\) => c\.id\)/);
+    // drop every collection the user did not touch. `next` is the whole of
+    // `rows`, reordered — which is the contract reorderActionProps states.
+    assert.match(
+      renderer(),
+      /commit: \(next\) => reorderOwnedCollections\(next\.map\(\(c\) => c\.id\)\),/,
+    );
   });
 
-  it("does nothing when the row has no index", () => {
-    // `getIndex()` is `number | undefined` — a windowed row that has not been
-    // placed yet returns undefined, and `undefined + 1` would reach moveItem
-    // as NaN.
-    const body = renderer();
-    assert.match(body, /const index = getIndex\(\);/);
-    assert.match(body, /if \(index === undefined\) return;/);
+  it("announces where the row landed, from the position the move resolved to", () => {
+    // Not a re-derivation: `to` is what the move actually produced, and
+    // computing it a second time here is how the spoken position and the
+    // visible one drift.
+    assert.match(
+      renderer(),
+      /announce: \(to, total\) => announceReorder\(t, "reorderMoved", to, total\),/,
+    );
+  });
+
+  it("no longer reaches for moveItem itself", () => {
+    // A second call site for "where does the row land" is exactly what the
+    // extraction removed; the drag's own commit and the keyboard's now share
+    // one.
+    assert.doesNotMatch(readHomeSrc(), /import \{ moveItem \}/);
   });
 });
 

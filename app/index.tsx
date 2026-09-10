@@ -45,7 +45,7 @@ import {
   TEXT_ON_DARK_7,
   TEXT_ON_DARK_8,
 } from "@/lib/design-tokens";
-import { moveItem } from "@/lib/drag-reorder";
+import { reorderActionProps } from "@/lib/reorder-actions";
 import { announceReorder } from "@/lib/reorder-announcement";
 import { selectRecentItems } from "@/lib/home-helpers";
 import { useI18n } from "@/lib/i18n-context";
@@ -123,9 +123,10 @@ export default function HomeScreen() {
    * actions write through `moveItem` — the same function the drag commits
    * with — so both routes produce the same array from the same rules.
    *
-   * Only the moves that would do something are offered: "move up" on the first
-   * card clamps back onto itself, and an action a screen reader announces but
-   * that changes nothing is worse than one it never mentions.
+   * Which actions exist, which index they land on and when to offer none at
+   * all are `reorderActionProps` in `lib/reorder-actions.ts`, shared with
+   * `app/collection/[id].tsx`: the same twelve lines used to sit in both
+   * screens, and what stays here is the writer and the translations.
    *
    * Both routes speak. The pick-up and the landing were feedback a sighted user
    * got for free — a dimmed card, a card in a new place — and nothing else, so
@@ -134,13 +135,13 @@ export default function HomeScreen() {
    */
   const renderOwnedCollection = ({ item: collection, drag, isActive, getIndex }: RenderItemParams<Collection>) => {
     const index = getIndex();
-    const canMoveUp = index !== undefined && index > 0;
-    const canMoveDown = index !== undefined && index < ownedCollections.length - 1;
-    const moveBy = (delta: number) => {
-      if (index === undefined) return;
-      reorderOwnedCollections(moveItem(ownedCollections, index, index + delta).map((c) => c.id));
-      announceReorder(t, "reorderMoved", index + delta, ownedCollections.length);
-    };
+    const reorderActions = reorderActionProps({
+      rows: ownedCollections,
+      index,
+      label: t,
+      commit: (next) => reorderOwnedCollections(next.map((c) => c.id)),
+      announce: (to, total) => announceReorder(t, "reorderMoved", to, total),
+    });
 
     return (
       <ScaleDecorator>
@@ -151,14 +152,7 @@ export default function HomeScreen() {
         }}
         disabled={isActive}
         accessibilityState={{ disabled: isActive }} delayLongPress={150}
-        accessibilityActions={[
-          ...(canMoveUp ? [{ name: "moveUp", label: t("moveUp") }] : []),
-          ...(canMoveDown ? [{ name: "moveDown", label: t("moveDown") }] : []),
-        ]}
-        onAccessibilityAction={(event) => {
-          if (event.nativeEvent.actionName === "moveUp") moveBy(-1);
-          if (event.nativeEvent.actionName === "moveDown") moveBy(1);
-        }}>
+        {...reorderActions}>
           <CollectionCard
             collection={collection}
             count={getItemsForCollection(collection.id).length}

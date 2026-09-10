@@ -94,11 +94,11 @@ describe("the announcement helper", () => {
 
 describe("both screens announce both moments", () => {
   const screens = [
-    { screen: "app/index.tsx", rows: "ownedCollections", commit: "reorderOwnedCollections(moveItem" },
-    { screen: "app/collection/[id].tsx", rows: "visibleItems", commit: "commitItemOrder(moveItem" },
+    { screen: "app/index.tsx", rows: "ownedCollections" },
+    { screen: "app/collection/[id].tsx", rows: "visibleItems" },
   ] as const;
 
-  for (const { screen, rows, commit: commitCall } of screens) {
+  for (const { screen, rows } of screens) {
     describe(screen, () => {
       const src = () => readRepoFile(screen);
 
@@ -110,9 +110,12 @@ describe("both screens announce both moments", () => {
       });
 
       it("announces the landing after a keyboard move", () => {
+        // The wiring moved into `reorderActionProps`, which hands the landing
+        // position back rather than letting each screen recompute it — so what
+        // the screen still owns is the call, and `to` is the module's answer.
         assert.match(
           src(),
-          new RegExp(`announceReorder\\(t, "reorderMoved", index \\+ delta, ${rows}\\.length\\);`),
+          /announce: \(to, total\) => announceReorder\(t, "reorderMoved", to, total\),/,
         );
       });
 
@@ -124,14 +127,18 @@ describe("both screens announce both moments", () => {
         assert.match(src(), /announceReorder\(t, "reorderMoved", to, data\.length\);/);
       });
 
-      it("announces after committing, never instead of committing", () => {
-        // The announcement must not be able to swallow the write — an ordering
-        // this pins because both live in the same two-line handler.
+      it("hands the announcement to the same call that hands over the writer", () => {
+        // The ordering — write, then speak — is `reorderActionProps`'s now and
+        // is asserted by running it in reorder-actions.test.ts. What can still
+        // go wrong here is a screen that passes one callback and not the
+        // other, leaving a move that is silent or an announcement of a move
+        // that never happened.
         const code = src();
-        const commit = code.indexOf(commitCall);
-        const speak = code.indexOf('announceReorder(t, "reorderMoved", index + delta');
-        assert.ok(commit > 0, `expected \`${commitCall}\` in ${screen}`);
-        assert.ok(speak > commit, "the keyboard route must write before it speaks");
+        const commit = code.indexOf("commit:");
+        const announce = code.indexOf("announce: (to, total) =>");
+        assert.ok(commit > 0, `expected a \`commit:\` callback in ${screen}`);
+        assert.ok(announce > commit, `expected an \`announce:\` callback after it in ${screen}`);
+        assert.match(code, new RegExp(`rows: ${rows},`));
       });
     });
   }

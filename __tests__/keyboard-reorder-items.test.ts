@@ -75,12 +75,18 @@ describe("the unrendered tail — what it does", () => {
 });
 
 describe("the collection screen's reorder actions", () => {
-  it("offers both moves as named actions with translated labels", () => {
+  it("delegates the action pair to lib/reorder-actions.ts, and spreads both props", () => {
+    // The twelve lines this used to pin were duplicated character for
+    // character in `app/index.tsx`. `reorderActionProps` owns them now; which
+    // actions exist and where they land is run as a function in
+    // reorder-actions.test.ts rather than matched here.
+    assert.match(readScreenSrc(), /import \{ reorderActionProps \} from "@\/lib\/reorder-actions";/);
     const body = renderer();
-    assert.match(body, /\{ name: "moveUp", label: t\("moveUp"\) \}/);
-    assert.match(body, /\{ name: "moveDown", label: t\("moveDown"\) \}/);
-    assert.match(body, /actionName === "moveUp"\) moveBy\(-1\)/);
-    assert.match(body, /actionName === "moveDown"\) moveBy\(1\)/);
+    assert.match(body, /const reorderActions = reorderActionProps\(\{/);
+    assert.match(body, /label: t,/);
+    // `accessibilityActions` without its handler is a list of actions a screen
+    // reader offers and nothing answers.
+    assert.match(body, /\{\.\.\.reorderActions\}/);
   });
 
   it("gates them on isDragBranch, not merely on ownership", () => {
@@ -88,12 +94,9 @@ describe("the collection screen's reorder actions", () => {
     // committing it from a keyboard corrupts exactly what dragging is blocked
     // from corrupting. The screen already says so in the reorder-blocked
     // notice; these actions disappear for the same reason.
-    const body = renderer();
-    assert.match(body, /const canMoveUp = isDragBranch && index !== undefined && index > 0;/);
-    assert.match(
-      body,
-      /const canMoveDown = isDragBranch && index !== undefined && index < visibleItems\.length - 1;/,
-    );
+    // `enabled` is the whole gate: reorderActionProps offers nothing at all
+    // when it is false, so a sorted list cannot be committed from a keyboard.
+    assert.match(renderer(), /enabled: isDragBranch,/);
   });
 
   it("is declared after isDragBranch so the gate is not read before it exists", () => {
@@ -106,15 +109,18 @@ describe("the collection screen's reorder actions", () => {
 
   it("moves within the visible page, which is what the row's index counts", () => {
     // `getIndex()` is the index into `data`, and `data` is `visibleItems`.
-    // Moving within `items` would be off by every row the filter dropped.
+    // Moving within `items` would be off by every row the filter dropped —
+    // `rows` is what reorderActionProps computes the move against.
     const body = renderer();
-    assert.match(body, /commitItemOrder\(moveItem\(visibleItems, index, index \+ delta\)\)/);
+    assert.match(body, /rows: visibleItems,/);
+    assert.match(body, /commit: commitItemOrder,/);
   });
 
-  it("does nothing when the row has no index", () => {
-    const body = renderer();
-    assert.match(body, /const index = getIndex\(\);/);
-    assert.match(body, /if \(index === undefined\) return;/);
+  it("reads the row's own index rather than assuming one", () => {
+    // `getIndex()` is `number | undefined` for a windowed row the list has not
+    // placed; the guard for that moved into `reorderActionProps` with the rest
+    // of the wiring, so what stays here is the read.
+    assert.match(renderer(), /const index = getIndex\(\);/);
   });
 
   it("keeps the long press for owners, and only for owners", () => {
@@ -156,10 +162,12 @@ describe("the collection screen's two reorder routes", () => {
     );
   });
 
-  it("imports both helpers from the module that owns them", () => {
-    assert.match(
-      readScreenSrc(),
-      /import \{ moveItem, orderWithUnrenderedTail \} from "@\/lib\/drag-reorder";/,
-    );
+  it("imports the tail rule from the module that owns it, and no longer moveItem", () => {
+    // `moveItem` reaches this screen through `reorderActionProps` now — a
+    // second call site for "where does the row land" is what the extraction
+    // removed.
+    const src = readScreenSrc();
+    assert.match(src, /import \{ orderWithUnrenderedTail \} from "@\/lib\/drag-reorder";/);
+    assert.doesNotMatch(src, /import \{ moveItem/);
   });
 });
