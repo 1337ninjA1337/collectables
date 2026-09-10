@@ -45,6 +45,7 @@ import {
   TEXT_ON_DARK_7,
   TEXT_ON_DARK_8,
 } from "@/lib/design-tokens";
+import { moveItem } from "@/lib/drag-reorder";
 import { selectRecentItems } from "@/lib/home-helpers";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
@@ -113,19 +114,49 @@ export default function HomeScreen() {
   const myProfile = getMyProfile();
   const isPhone = isMobile;
 
-  const renderOwnedCollection = ({ item: collection, drag, isActive }: RenderItemParams<Collection>) => (
-    <ScaleDecorator>
-      <Pressable onLongPress={drag} disabled={isActive}
-      accessibilityState={{ disabled: isActive }} delayLongPress={150}>
-        <CollectionCard
-          collection={collection}
-          count={getItemsForCollection(collection.id).length}
-          totalCost={getCollectionTotalCost(collection.id).amount}
-          totalCostCurrency={getCollectionTotalCost(collection.id).currency}
-        />
-      </Pressable>
-    </ScaleDecorator>
-  );
+  /**
+   * The reorder a long press cannot do.
+   *
+   * Dragging is the only way into `reorderOwnedCollections` otherwise, and a
+   * keyboard, switch or screen-reader user has no long press. The two custom
+   * actions write through `moveItem` — the same function the drag commits
+   * with — so both routes produce the same array from the same rules.
+   *
+   * Only the moves that would do something are offered: "move up" on the first
+   * card clamps back onto itself, and an action a screen reader announces but
+   * that changes nothing is worse than one it never mentions.
+   */
+  const renderOwnedCollection = ({ item: collection, drag, isActive, getIndex }: RenderItemParams<Collection>) => {
+    const index = getIndex();
+    const canMoveUp = index !== undefined && index > 0;
+    const canMoveDown = index !== undefined && index < ownedCollections.length - 1;
+    const moveBy = (delta: number) => {
+      if (index === undefined) return;
+      reorderOwnedCollections(moveItem(ownedCollections, index, index + delta).map((c) => c.id));
+    };
+
+    return (
+      <ScaleDecorator>
+        <Pressable onLongPress={drag} disabled={isActive}
+        accessibilityState={{ disabled: isActive }} delayLongPress={150}
+        accessibilityActions={[
+          ...(canMoveUp ? [{ name: "moveUp", label: t("moveUp") }] : []),
+          ...(canMoveDown ? [{ name: "moveDown", label: t("moveDown") }] : []),
+        ]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === "moveUp") moveBy(-1);
+          if (event.nativeEvent.actionName === "moveDown") moveBy(1);
+        }}>
+          <CollectionCard
+            collection={collection}
+            count={getItemsForCollection(collection.id).length}
+            totalCost={getCollectionTotalCost(collection.id).amount}
+            totalCostCurrency={getCollectionTotalCost(collection.id).currency}
+          />
+        </Pressable>
+      </ScaleDecorator>
+    );
+  };
 
   return (
     <Screen nestable refreshing={showRefreshing} onRefresh={handleRefresh}>

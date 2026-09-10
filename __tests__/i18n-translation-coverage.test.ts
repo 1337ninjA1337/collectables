@@ -466,7 +466,12 @@ describe("translation floors", () => {
     // per-origin, the phone's storage screen does not list this app, and web is
     // the build this repo deploys. Written in all six, so every row rose by one
     // and none of them started inheriting.
-    assert.match(report, /en: 502\/502 keys \(100\.0%\)/);
+    // 504 on 2026-09-10: `moveUp` and `moveDown`, the two labels a screen
+    // reader offers as custom actions on an owned collection card. They land
+    // as a pair because a list you can move a row up in but not down is not a
+    // reorder, and in all six locales because the action is announced in the
+    // user's language or not at all.
+    assert.match(report, /en: 504\/504 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
