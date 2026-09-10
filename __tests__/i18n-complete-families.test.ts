@@ -160,9 +160,9 @@ const FAMILIES: readonly Family[] = [
   {
     name: "collection-detail screen",
     screen: "app/collection/[id].tsx",
-    size: 46,
+    size: 48,
     because:
-      "the screen a collector actually lives in — the one the 'this screen is half-translated' complaint was originally about — and the largest single holder left on 2026-08-22 at 27 of its 46 keys English in all four partial locales. It is also the first listed screen whose keys are not all its own: it renders through `<ItemCard>`, `<BulkBar>`, `<EditCollectionModal>`, the share sheet and more, so this entry finishes the FILE while a user reads the union, and the components are listed separately in their own suites",
+      "the screen a collector actually lives in — the one the 'this screen is half-translated' complaint was originally about — and the largest single holder left on 2026-08-22 at 27 of its 46 keys English in all four partial locales. It is also the first listed screen whose keys are not all its own: it renders through `<ItemCard>`, `<BulkBar>`, `<EditCollectionModal>`, the share sheet and more, so this entry finishes the FILE while a user reads the union, and the components are listed separately in their own suites. 48 since 2026-09-10, when `moveUp` and `moveDown` reached the item rows — the same two labels the home screen took two commits earlier, which is what a screen family counts and a per-key gap never would",
   },
   {
     name: "item-detail screen",

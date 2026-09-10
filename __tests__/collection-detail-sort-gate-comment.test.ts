@@ -98,21 +98,28 @@ describe("app/collection/[id].tsx — the drag-corruption gate is explained, not
     assertExplainsCorruption(inlineComment, "isDragBranch render branch");
   });
 
-  it("the onDragEnd handler explains why the unrendered tail is appended", () => {
-    // Second corruption class, same handler: the drag operates on the paginated
-    // WINDOW, so writing back only `data` would renumber the visible slice to
+  it("the order-committing helper explains why the unrendered tail is appended", () => {
+    // Second corruption class, same rule: the reorder operates on the paginated
+    // WINDOW, so writing back only the visible slice would renumber it to
     // 0..N-1 and shuffle it past everything below the page boundary.
-    const block = commentBlockAbove(SRC, /const\s+visibleIds\s*=\s*new\s+Set\(/);
-    assert.ok(block.length > 0, "onDragEnd tail-append has no explanatory comment");
+    //
+    // The anchor was `onDragEnd`'s inline `visibleIds` until 2026-09-10, when
+    // the row's keyboard actions needed the same rule and it became
+    // `commitItemOrder` calling `orderWithUnrenderedTail`. Moving the code did
+    // not move the reason a contributor needs it in front of them: this is the
+    // one place in the screen that writes the order, and both routes go
+    // through it.
+    const block = commentBlockAbove(SRC, /const\s+commitItemOrder\s*=/);
+    assert.ok(block.length > 0, "commitItemOrder has no explanatory comment");
     assert.match(
       block,
       /tail|unrendered|below the page|boundary/i,
-      "onDragEnd comment never explains the unrendered tail",
+      "commitItemOrder comment never explains the unrendered tail",
     );
     assert.match(
       block,
       MENTIONS_SORT_ORDER,
-      "onDragEnd comment never names the `sortOrder` renumbering",
+      "commitItemOrder comment never names the `sortOrder` renumbering",
     );
   });
 
