@@ -178,7 +178,8 @@ describe("the hook and the screen wire it up", () => {
     // keeps the functional updater (it must not clobber an active query) and
     // remembers the mode on the same line.
     assert.match(source, /const resetSort = useCallback\(\(\) => applySort\("default"\), \[applySort\]\);/);
-    assert.match(source, /action: \{ label: t\("undo"\), onPress: \(\) => applySort\(previous\) \}/);
+    assert.match(source, /label: t\("undo"\),/);
+    assert.match(source, /applySort\(previous\);/);
     const direct = source.match(/setItemFilters\(/g) ?? [];
     assert.equal(
       direct.length,

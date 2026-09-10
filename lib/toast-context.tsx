@@ -75,10 +75,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         action: input.action,
       };
       setToasts((current) => [...current, item]);
-      // An actionable toast outlives a reporting one — see lib/toast-timing.ts.
-      setTimeout(() => dismiss(id), toastDisplayMs(!!input.action));
+      // The dismissal timer lives in <ToastView>, not here: a toast the user is
+      // reading (hovering, or with the action focused) has to be able to HOLD
+      // its window, and a timer owned by the provider cannot be paused by the
+      // toast it is counting down. See lib/toast-timing.ts for the window.
     },
-    [dismiss],
+    [],
   );
 
   const api = useMemo<ToastApi>(
@@ -114,6 +116,12 @@ function ToastHost({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id:
 
 function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
   const anim = useRef(new Animated.Value(0)).current;
+  // The handler changes identity on every render of the host (it closes over
+  // the id), and the timer must not restart because of that — so the effect
+  // depends on the ref, and the ref is what the timeout reads.
+  const dismissRef = useRef(onDismiss);
+  dismissRef.current = onDismiss;
+  const [held, setHeld] = useState(false);
 
   useEffect(() => {
     Animated.timing(anim, {
@@ -123,6 +131,24 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
   }, [anim]);
+
+  /**
+   * The dismissal window, held open while the user is engaged with the toast.
+   *
+   * A pointer over it or focus inside it both mean "I am still reading this",
+   * and an undo that expires under the cursor reaching for it is the failure
+   * this prevents. Leaving restarts the FULL window rather than resuming the
+   * remainder: the user has just looked away from something they were reading,
+   * and a 300ms stub would be indistinguishable from a toast that ignored them.
+   */
+  useEffect(() => {
+    if (held) return;
+    const timer = setTimeout(() => dismissRef.current(), toastDisplayMs(!!toast.action));
+    return () => clearTimeout(timer);
+  }, [held, toast.action]);
+
+  const hold = () => setHeld(true);
+  const release = () => setHeld(false);
 
   const palette = PALETTES[toast.type];
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] });
@@ -135,13 +161,23 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
       ]}
     >
       <View style={[styles.accent, { backgroundColor: palette.accent }]} />
-      <Pressable style={styles.body} onPress={onDismiss} accessibilityRole="button">
+      <Pressable
+        style={styles.body}
+        onPress={onDismiss}
+        onHoverIn={hold}
+        onHoverOut={release}
+        accessibilityRole="button"
+      >
         {toast.title ? <Text style={[styles.title, { color: palette.text }]}>{toast.title}</Text> : null}
         <Text style={[styles.message, { color: palette.text }]}>{toast.message}</Text>
       </Pressable>
       {toast.action ? (
         <Pressable
           style={styles.action}
+          onHoverIn={hold}
+          onHoverOut={release}
+          onFocus={hold}
+          onBlur={release}
           onPress={() => {
             // The action first, then the dismissal: a handler that threw would
             // otherwise leave the toast up with its button already spent.

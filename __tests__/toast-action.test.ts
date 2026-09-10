@@ -41,8 +41,32 @@ describe("toastDisplayMs", () => {
 
 describe("the toast renders and times its action", () => {
   it("takes the window from the shared rule rather than a literal", () => {
-    assert.match(toastSrc, /setTimeout\(\(\) => dismiss\(id\), toastDisplayMs\(!!input\.action\)\)/);
+    assert.match(
+      toastSrc,
+      /setTimeout\(\(\) => dismissRef\.current\(\), toastDisplayMs\(!!toast\.action\)\)/,
+    );
     assert.doesNotMatch(toastSrc, /const DISPLAY_MS = \d+/, "the timing literal came back");
+  });
+
+  it("holds the window open while the user is engaged with the toast", () => {
+    // An undo that expires under the cursor reaching for it is the failure
+    // this prevents; focus counts as engagement for the same reason.
+    assert.match(toastSrc, /if \(held\) return;/);
+    assert.match(toastSrc, /const hold = \(\) => setHeld\(true\);/);
+    assert.match(toastSrc, /const release = \(\) => setHeld\(false\);/);
+    const action = toastSrc.match(/\{toast\.action \? \([\s\S]*?\) : null\}/)?.[0] ?? "";
+    for (const prop of ["onHoverIn={hold}", "onHoverOut={release}", "onFocus={hold}", "onBlur={release}"]) {
+      assert.ok(action.includes(prop), `the action must wire ${prop}`);
+    }
+  });
+
+  it("times each toast from the view, not from the provider", () => {
+    // A timer owned by `show()` cannot be paused by the toast it is counting
+    // down, and the identity of the per-toast dismiss handler must not restart
+    // it either — hence the ref.
+    assert.doesNotMatch(toastSrc, /setTimeout\([^)]*dismiss\(id\)/);
+    assert.match(toastSrc, /const dismissRef = useRef\(onDismiss\);/);
+    assert.match(toastSrc, /\}, \[held, toast\.action\]\);/);
   });
 
   it("renders the action only when there is one", () => {
@@ -87,7 +111,16 @@ describe("entering reorder mode clears the sort", () => {
     const decl = screenSrc.match(/const toggleReorderMode = useCallback\([\s\S]*?\n  \}, \[[^\]]*\]\);/)?.[0] ?? "";
     assert.match(decl, /const previous = itemFilters\.sort;/);
     assert.match(decl, /applySort\("default"\);/);
-    assert.match(decl, /action: \{ label: t\("undo"\), onPress: \(\) => applySort\(previous\) \}/);
+    assert.match(decl, /label: t\("undo"\),/);
+    assert.match(decl, /applySort\(previous\);/);
+  });
+
+  it("says both halves out loud, not only in the overlay", () => {
+    // A toast is an overlay a screen reader reaches only if it happens to walk
+    // into it, and this one discards a choice and offers it back.
+    const decl = screenSrc.match(/const toggleReorderMode = useCallback\([\s\S]*?\n  \}, \[[^\]]*\]\);/)?.[0] ?? "";
+    assert.match(decl, /announceMessage\(t\("sortClearedForReorder"\)\);/);
+    assert.match(decl, /announceMessage\(t\("sortRestored"\)\);/);
   });
 
   it("keeps the notice for the case it was written for", () => {
@@ -99,7 +132,7 @@ describe("entering reorder mode clears the sort", () => {
 });
 
 describe("the handoff's strings", () => {
-  const KEYS = ["sortClearedForReorder", "undo"] as const;
+  const KEYS = ["sortClearedForReorder", "undo", "sortRestored"] as const;
 
   it("declares both keys in every locale", () => {
     const src = readI18nSource();

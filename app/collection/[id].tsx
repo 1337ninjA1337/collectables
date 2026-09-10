@@ -766,10 +766,21 @@ export default function CollectionDetailsScreen() {
     if (!entering || itemFilters.sort === "default") return;
     const previous = itemFilters.sort;
     applySort("default");
+    // Said as well as shown. The toast is an overlay a screen reader reaches
+    // only if it happens to walk into it, and this one is not merely a report:
+    // it discards a choice and offers it back, which is the last thing that
+    // should be visual-only.
+    announceMessage(t("sortClearedForReorder"));
     toast.show({
       type: "info",
       message: t("sortClearedForReorder"),
-      action: { label: t("undo"), onPress: () => applySort(previous) },
+      action: {
+        label: t("undo"),
+        onPress: () => {
+          applySort(previous);
+          announceMessage(t("sortRestored"));
+        },
+      },
     });
   }, [applySort, itemFilters.sort, reorderMode, t, toast]);
 

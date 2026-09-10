@@ -479,7 +479,11 @@ describe("translation floors", () => {
     // entering reorder mode discards an active sort. `undo` is the first key
     // in the tree that belongs to no screen — it is the label of a toast
     // action, and the second consumer will not add a seventh string for it.
-    assert.match(report, /en: 508\/508 keys \(100\.0%\)/);
+    // 509 later still: `sortRestored`, said when the undo puts the sort back.
+    // The clear reuses its toast's own sentence; the restore had none, and a
+    // screen-reader user who presses Undo and hears nothing cannot tell
+    // whether it worked — the list they cannot see is the only other evidence.
+    assert.match(report, /en: 509\/509 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
