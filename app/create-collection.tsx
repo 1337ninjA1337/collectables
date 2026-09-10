@@ -196,6 +196,9 @@ export default function CreateCollectionScreen() {
               style={{...styles.templateCard, ...(selectedTemplateId === tpl.id ? styles.templateCardActive : {})}}
               onPress={() => applyTemplate(tpl.id)}
               accessibilityRole="button"
+              // The amber card is the only thing saying which template is
+              // applied; without this the row is a list of identical buttons.
+              accessibilityState={{ selected: selectedTemplateId === tpl.id }}
             >
               <Text style={styles.templateIcon}>{tpl.icon}</Text>
               <Text

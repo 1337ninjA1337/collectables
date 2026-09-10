@@ -219,6 +219,11 @@ export function ItemFilterBar({ filters, onChange }: Props) {
           style={[styles.filterButton, activeCount > 0 && styles.filterButtonActive]}
           onPress={openModal}
           accessibilityRole="button"
+          // `expanded`, not `selected`: this button OPENS the sheet, and the
+          // dark treatment means "filters are on", which the label already
+          // says as a count. A screen reader otherwise hears the same "Filters"
+          // whether the sheet is up or not.
+          accessibilityState={{ expanded: modalOpen }}
         >
           <Ionicons
             name="options-outline"

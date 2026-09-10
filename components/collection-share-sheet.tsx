@@ -85,6 +85,10 @@ export const CollectionShareSheet = memo(function CollectionShareSheet({
                   </View>
                   <Pressable
                     accessibilityRole="button"
+                    // The button toggles this friend's access and its label
+                    // changes with it, but the state is what a reader announces
+                    // on focus rather than only on press.
+                    accessibilityState={{ selected: isShared }}
                     style={{...styles.shareFriendButton, ...(isShared ? styles.shareFriendButtonActive : {})}}
                     onPress={() => {
                       if (isShared) {
