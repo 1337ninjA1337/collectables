@@ -146,9 +146,9 @@ const FAMILIES: readonly Family[] = [
   {
     name: "add-item screen",
     screen: "app/create.tsx",
-    size: 41,
+    size: 42,
     because:
-      "the first thing the app asks a new account to DO, and the screen the sign-in screen hands them to — measured on 2026-08-22 as reading 46 base keys of which 38 were English in all four partial locales. It is also the first screen family to overlap the prefix families (`collection*` twice, `search*` twice), which is why the ownership rule above had to be written down rather than left to luck",
+      "the first thing the app asks a new account to DO, and the screen the sign-in screen hands them to — measured on 2026-08-22 as reading 46 base keys of which 38 were English in all four partial locales. It is also the first screen family to overlap the prefix families (`collection*` twice, `search*` twice), which is why the ownership rule above had to be written down rather than left to luck. 42 on 2026-09-10: `tagsDuplicate`, said when Add refuses a label the item already carries — the case that used to be a bare `return`",
   },
   {
     name: "home screen",
@@ -167,9 +167,9 @@ const FAMILIES: readonly Family[] = [
   {
     name: "item-detail screen",
     screen: "app/item/[id].tsx",
-    size: 38,
+    size: 39,
     because:
-      "the screen a collector opens most often once they own anything, and the one where the app finally shows a person their own stuff — measured on 2026-08-22 as reading 59 base keys, 21 of them already owned by prefix families, leaving 38 of which 12 were English in all four partial locales. Five of those twelve (`delete`, `acquiredHow`, `acquiredDate`, `variants`, `share`) are also rendered by `app/collection/[id].tsx`, which is the next screen and the largest remaining holder",
+      "the screen a collector opens most often once they own anything, and the one where the app finally shows a person their own stuff — measured on 2026-08-22 as reading 59 base keys, 21 of them already owned by prefix families, leaving 38 of which 12 were English in all four partial locales. Five of those twelve (`delete`, `acquiredHow`, `acquiredDate`, `variants`, `share`) are also rendered by `app/collection/[id].tsx`, which is the next screen and the largest remaining holder. 39 on 2026-09-10, with `tagsDuplicate` — its edit mode IS the add-item form, so the two families took the key together",
   },
   {
     name: "sign-in screen",

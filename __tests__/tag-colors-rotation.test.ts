@@ -89,9 +89,13 @@ describe("TAG_COLORS shared rotation", () => {
   });
 
   for (const file of TAG_CONSUMERS) {
-    it(`${file} reaches the palette through nextTagColor, not the 9 hues`, () => {
+    it(`${file} reaches the palette through lib/tag-input, not the 9 hues`, () => {
+      // One step further out since 2026-09-10: the screens no longer name a
+      // colour helper at all — `addTagToList` decides the label's hue, so the
+      // rule about which colour a tag gets has exactly one caller.
       const src = read(file);
-      assert.match(src, /\bnextTagColor\b/);
+      assert.match(src, /addTagToList/);
+      assert.doesNotMatch(src, /\bnextTagColor\b/);
       for (const hue of [
         "TAG_RUST",
         "TAG_SAGE",
@@ -111,13 +115,11 @@ describe("TAG_COLORS shared rotation", () => {
       }
     });
 
-    it(`${file} feeds nextTagColor the colours already in use`, () => {
-      // Passing the used colours (rather than a count) is what makes the
-      // delete-then-add case pick an unused hue.
-      assert.match(
-        read(file),
-        /nextTagColor\((?:edit)?[Tt]ags\.map\(\(tag\) => tag\.color\)\)/,
-      );
+    it(`${file} hands the whole tag list to the shared rule`, () => {
+      // The used colours are what make the delete-then-add case pick an unused
+      // hue, and the labels are what make the duplicate check work; the screen
+      // passes the list and lets `lib/tag-input.ts` read both out of it.
+      assert.match(read(file), /addTagToList\((?:edit)?[Tt]ags, (?:edit)?[Tt]agInput\)/);
     });
 
     it(`${file} adds a tag through a single shared handler`, () => {
@@ -130,9 +132,14 @@ describe("TAG_COLORS shared rotation", () => {
         "expected exactly one addTag() definition per screen",
       );
       assert.equal(
-        (src.match(/\bsetTags\(\[|\bsetEditTags\(\[/g) ?? []).length,
+        (src.match(/\bsetTags\(result\.tags\)|\bsetEditTags\(result\.tags\)/g) ?? []).length,
         1,
         "a second inline tag-append path re-opens the drift this consolidated",
+      );
+      assert.doesNotMatch(
+        src,
+        /\bsetTags\(\[\.\.\.|\bsetEditTags\(\[\.\.\./,
+        "the hand-rolled append is back",
       );
     });
   }

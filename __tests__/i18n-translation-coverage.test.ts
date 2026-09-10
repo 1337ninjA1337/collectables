@@ -483,7 +483,10 @@ describe("translation floors", () => {
     // The clear reuses its toast's own sentence; the restore had none, and a
     // screen-reader user who presses Undo and hears nothing cannot tell
     // whether it worked — the list they cannot see is the only other evidence.
-    assert.match(report, /en: 509\/509 keys \(100\.0%\)/);
+    // 510 later that day: `tagsDuplicate`, the hint that replaced a bare
+    // `return` on both tag forms. Pressing Add on a tag the item already has
+    // looked exactly like a broken button, in six languages equally.
+    assert.match(report, /en: 510\/510 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

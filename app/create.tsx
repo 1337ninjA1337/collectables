@@ -28,6 +28,7 @@ import {
   pinCurrency,
   setUserPreferredCurrency,
 } from "@/lib/locale-helpers";
+import { addTagToList } from "@/lib/tag-input";
 import { useToast } from "@/lib/toast-context";
 import { ItemCondition, ItemTag } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -63,7 +64,6 @@ import {
   TEXT_DARK_4,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
-  nextTagColor,
 } from "@/lib/design-tokens";
 
 export default function CreateItemScreen() {
@@ -182,10 +182,17 @@ export default function CreateItemScreen() {
   // Shared by the keyboard "submit" path and the Add button so the two can't
   // drift; mirrors `addTag()` in app/item/[id].tsx.
   function addTag() {
-    const label = tagInput.trim();
-    if (!label) return;
-    if (tags.some((tag) => tag.label.toLowerCase() === label.toLowerCase())) return;
-    setTags([...tags, { label, color: nextTagColor(tags.map((tag) => tag.color)) }]);
+    // Rules in lib/tag-input.ts, shared with app/item/[id].tsx — the two
+    // hand-written copies could disagree about what a duplicate is or hand the
+    // same label two colours, and nothing would have noticed.
+    const result = addTagToList(tags, tagInput);
+    if (result.status === "duplicate") {
+      // Was a bare `return`, which looks exactly like a broken Add button.
+      toast.info(t("tagsDuplicate"));
+      return;
+    }
+    if (result.status === "empty") return;
+    setTags(result.tags);
     setTagInput("");
   }
 

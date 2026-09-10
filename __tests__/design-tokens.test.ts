@@ -1212,8 +1212,11 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bSUCCESS_GREEN_2\b/);
     // The 9 individual TAG_* hues are no longer imported here: the rotation
     // moved into the shared `TAG_COLORS` export + `nextTagColor()` helper
-    // (2026-08-07) so the new-item form and the item-edit form can't drift.
-    assert.match(src, /\bnextTagColor\b/);
+    // (2026-08-07) so the new-item form and the item-edit form can't drift —
+    // and on 2026-09-10 the whole add-a-tag rule moved one step further out,
+    // into `lib/tag-input.ts`, which is where the palette is read now.
+    assert.match(src, /addTagToList/);
+    assert.doesNotMatch(src, /\bnextTagColor\b/);
     assert.match(src, /\bTEXT_DARK\b/);
     assert.match(src, /\bTEXT_DARK_2\b/);
     assert.match(src, /\bTEXT_DARK_3\b/);
@@ -1260,9 +1263,10 @@ describe("design-tokens adoption", () => {
     // moved into <SheetSearchRow> — see that file's block below.
     assert.match(src, /PAGE_BG_2/);
     assert.match(src, /PLACEHOLDER/);
-    // Same as app/item/[id].tsx: the hues arrive via the shared TAG_COLORS
-    // rotation rather than 9 individual imports.
-    assert.match(src, /\bnextTagColor\b/);
+    // Same as app/item/[id].tsx: the hues arrive through `lib/tag-input.ts`,
+    // which reads TAG_COLORS, rather than through imports on this screen.
+    assert.match(src, /addTagToList/);
+    assert.doesNotMatch(src, /\bnextTagColor\b/);
     assert.match(src, /TEXT_DARK\b/);
     assert.match(src, /TEXT_DARK_2\b/);
     assert.match(src, /TEXT_DARK_3\b/);

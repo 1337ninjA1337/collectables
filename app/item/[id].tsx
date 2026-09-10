@@ -44,6 +44,7 @@ import { useMarketplace } from "@/lib/marketplace-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { usePremium } from "@/lib/premium-context";
 import { fetchItemById } from "@/lib/supabase-profiles";
+import { addTagToList } from "@/lib/tag-input";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
 import { FONT_DISPLAY, FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -84,7 +85,6 @@ import {
   TEXT_DARK_4,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
-  nextTagColor,
 } from "@/lib/design-tokens";
 
 export default function ItemDetailsScreen() {
@@ -298,10 +298,14 @@ export default function ItemDetailsScreen() {
   }
 
   function addTag() {
-    const label = editTagInput.trim();
-    if (!label) return;
-    if (editTags.some((tag) => tag.label.toLowerCase() === label.toLowerCase())) return;
-    setEditTags([...editTags, { label, color: nextTagColor(editTags.map((tag) => tag.color)) }]);
+    // Rules in lib/tag-input.ts, shared with app/create.tsx.
+    const result = addTagToList(editTags, editTagInput);
+    if (result.status === "duplicate") {
+      toast.info(t("tagsDuplicate"));
+      return;
+    }
+    if (result.status === "empty") return;
+    setEditTags(result.tags);
     setEditTagInput("");
   }
 
