@@ -766,11 +766,10 @@ export default function CollectionDetailsScreen() {
     if (!entering || itemFilters.sort === "default") return;
     const previous = itemFilters.sort;
     applySort("default");
-    // Said as well as shown. The toast is an overlay a screen reader reaches
-    // only if it happens to walk into it, and this one is not merely a report:
-    // it discards a choice and offers it back, which is the last thing that
-    // should be visual-only.
-    announceMessage(t("sortClearedForReorder"));
+    // The clear is announced by `toast.show` itself now — every toast is —
+    // so there is no hand-written call here. The UNDO still needs one: it
+    // shows no toast of its own, and a user who presses it and hears nothing
+    // has only the list they cannot see as evidence that it worked.
     toast.show({
       type: "info",
       message: t("sortClearedForReorder"),

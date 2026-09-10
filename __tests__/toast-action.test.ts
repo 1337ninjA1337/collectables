@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { toastAnnouncement } from "@/lib/toast-announcement";
 import {
   TOAST_ACTION_DISPLAY_MS,
   TOAST_DISPLAY_MS,
@@ -97,6 +98,55 @@ describe("the toast renders and times its action", () => {
   });
 });
 
+describe("toastAnnouncement", () => {
+  it("joins a title and a message into one sentence", () => {
+    assert.equal(
+      toastAnnouncement({ title: "Saved", message: "Your changes are synced." }),
+      "Saved. Your changes are synced.",
+    );
+  });
+
+  it("does not give a title that punctuates itself a second period", () => {
+    for (const title of ["Saved.", "Saved!", "Really?", "Note:", "Wait;"]) {
+      const spoken = toastAnnouncement({ title, message: "Done." }) ?? "";
+      assert.equal(spoken, `${title} Done.`, `double-punctuated after ${title}`);
+    }
+  });
+
+  it("speaks either half alone", () => {
+    assert.equal(toastAnnouncement({ message: "Done." }), "Done.");
+    assert.equal(toastAnnouncement({ title: "Saved", message: "" }), "Saved");
+    assert.equal(toastAnnouncement({ title: "  ", message: " Done. " }), "Done.");
+  });
+
+  it("says nothing rather than an empty sentence", () => {
+    // A live region written with "" is a change a reader may still announce as
+    // silence-with-a-pause; there is nothing here to say.
+    assert.equal(toastAnnouncement({ message: "" }), null);
+    assert.equal(toastAnnouncement({ title: "   ", message: "  " }), null);
+  });
+
+  it("leaves the action label out of the sentence", () => {
+    // "Undo" read aloud with no way to say how to reach the button is a worse
+    // sentence than the message alone.
+    assert.equal(toastAnnouncement({ message: "Sort cleared." }), "Sort cleared.");
+  });
+});
+
+describe("every toast announces itself", () => {
+  it("derives the sentence from the toast and speaks it once, in the provider", () => {
+    assert.match(toastSrc, /const spoken = toastAnnouncement\(item\);/);
+    assert.match(toastSrc, /if \(spoken\) announceMessage\(spoken\);/);
+  });
+
+  it("speaks through the app's one live region", () => {
+    // A second region would interrupt the reorder announcements and the user
+    // would hear half of each — see lib/announce.web.ts.
+    assert.match(toastSrc, /import \{ announceMessage \} from "@\/lib\/announce";/);
+    assert.doesNotMatch(toastSrc, /aria-live/);
+  });
+});
+
 describe("entering reorder mode clears the sort", () => {
   it("clears only when entering, and only when a sort is on", () => {
     // Leaving the mode must not touch the sort, and entering it with no sort
@@ -115,12 +165,17 @@ describe("entering reorder mode clears the sort", () => {
     assert.match(decl, /applySort\(previous\);/);
   });
 
-  it("says both halves out loud, not only in the overlay", () => {
-    // A toast is an overlay a screen reader reaches only if it happens to walk
-    // into it, and this one discards a choice and offers it back.
+  it("says the undo out loud, and leaves the clear to the toast", () => {
+    // The clear rides in a toast, and every toast announces itself now — a
+    // hand-written call beside it would say the same sentence twice. The undo
+    // shows no toast at all, so it keeps its own.
     const decl = screenSrc.match(/const toggleReorderMode = useCallback\([\s\S]*?\n  \}, \[[^\]]*\]\);/)?.[0] ?? "";
-    assert.match(decl, /announceMessage\(t\("sortClearedForReorder"\)\);/);
     assert.match(decl, /announceMessage\(t\("sortRestored"\)\);/);
+    assert.doesNotMatch(
+      decl,
+      /announceMessage\(t\("sortClearedForReorder"\)\)/,
+      "the toast already announces its own message",
+    );
   });
 
   it("keeps the notice for the case it was written for", () => {

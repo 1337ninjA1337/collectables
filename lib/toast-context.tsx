@@ -17,6 +17,8 @@ import {
   SUCCESS_SOFT_2,
 } from "@/lib/design-tokens";
 import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
+import { announceMessage } from "@/lib/announce";
+import { toastAnnouncement } from "@/lib/toast-announcement";
 import { toastDisplayMs } from "@/lib/toast-timing";
 
 export type ToastType = "success" | "error" | "info";
@@ -75,6 +77,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         action: input.action,
       };
       setToasts((current) => [...current, item]);
+      // Said as well as shown, from here rather than from each caller: the host
+      // is an overlay a screen reader reaches only if it walks into it, and by
+      // then the toast may be gone. `announceMessage` writes the app's one
+      // live region, so this does not compete with the reorder announcements.
+      const spoken = toastAnnouncement(item);
+      if (spoken) announceMessage(spoken);
       // The dismissal timer lives in <ToastView>, not here: a toast the user is
       // reading (hovering, or with the action focused) has to be able to HOLD
       // its window, and a timer owned by the provider cannot be paused by the
@@ -160,7 +168,12 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
         { backgroundColor: palette.bg, borderColor: palette.border, opacity: anim, transform: [{ translateY }] },
       ]}
     >
-      <View style={[styles.accent, { backgroundColor: palette.accent }]} />
+      {/*
+        The accent bar rides INSIDE the dismiss target rather than beside it:
+        the hold below is wired to this Pressable, and a five-pixel stripe that
+        released the timer when the pointer crossed it would be a hover gap
+        nobody could see or explain.
+      */}
       <Pressable
         style={styles.body}
         onPress={onDismiss}
@@ -168,12 +181,20 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
         onHoverOut={release}
         accessibilityRole="button"
       >
-        {toast.title ? <Text style={[styles.title, { color: palette.text }]}>{toast.title}</Text> : null}
-        <Text style={[styles.message, { color: palette.text }]}>{toast.message}</Text>
+        <View style={[styles.accent, { backgroundColor: palette.accent }]} />
+        <View style={styles.bodyText}>
+          {toast.title ? <Text style={[styles.title, { color: palette.text }]}>{toast.title}</Text> : null}
+          <Text style={[styles.message, { color: palette.text }]}>{toast.message}</Text>
+        </View>
       </Pressable>
       {toast.action ? (
         <Pressable
           style={styles.action}
+          // Focusable so a keyboard can reach it at all — and so the focus
+          // hold above has something to hold ON. react-native-web maps this to
+          // a tab stop; on native the toast is not in the focus order and the
+          // prop is inert.
+          focusable
           onHoverIn={hold}
           onHoverOut={release}
           onFocus={hold}
@@ -259,6 +280,10 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   body: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  bodyText: {
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 14,
