@@ -32,6 +32,24 @@ type Translate = (
 ) => string;
 
 /**
+ * Nothing to mount here — the counterpart of the web spelling's live region.
+ *
+ * `AccessibilityInfo.announceForAccessibility` speaks through the platform's
+ * own screen-reader channel, which is always there; the web half has to build
+ * the thing it speaks through, and a node created at the moment of the first
+ * announcement can be missed by a reader that has not scanned that subtree yet.
+ * So `app/_layout.tsx` mounts it at startup, and on native that call has to
+ * resolve to something — this.
+ *
+ * A no-op rather than an absent export: Metro resolves the import per platform,
+ * so a name the web half has and this one does not is a native crash at
+ * startup. `lint:platform-pairs` is the rule that says so.
+ */
+export function ensureReorderLiveRegion(): void {
+  // Deliberately empty. See above.
+}
+
+/**
  * Announce a row's new place, or stay quiet.
  *
  * `index` is 0-based and may be `undefined` — `getIndex()` returns that for a

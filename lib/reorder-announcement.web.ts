@@ -93,6 +93,25 @@ function liveRegion(): Region | null {
 }
 
 /**
+ * Put the region in the document now, before anything has to be announced.
+ *
+ * The clear-then-write below covers the common case, and it cannot cover the
+ * FIRST announcement of a session: a screen reader that has not yet scanned the
+ * subtree a brand-new node sits in can miss the change entirely, however the
+ * write is staged. The only reliable fix is for the region to have been there
+ * before the reorder started, which means mounting it from somewhere that runs
+ * once at startup rather than from the first pick-up.
+ *
+ * Idempotent, because that is what makes it safe to call from an effect: the
+ * lookup by id is the same one `liveRegion` does, so a second call finds the
+ * node instead of appending a second one. Called by `app/_layout.tsx`, whose
+ * native build gets the no-op spelling in `lib/reorder-announcement.ts`.
+ */
+export function ensureReorderLiveRegion(): void {
+  liveRegion();
+}
+
+/**
  * Announce a row's new place, or stay quiet.
  *
  * The same signature and the same silences as the native spelling — only the

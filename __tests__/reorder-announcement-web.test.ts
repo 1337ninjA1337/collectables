@@ -18,7 +18,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { announceReorder } from "@/lib/reorder-announcement.web";
+import { announceReorder, ensureReorderLiveRegion } from "@/lib/reorder-announcement.web";
 import { setupFakeDom, type FakeDom, type FakeNode } from "./helpers/fake-dom";
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -172,6 +172,76 @@ describe("the web live region — when it stays quiet", () => {
     delete g.document;
     try {
       assert.doesNotThrow(() => announceReorder(t, "reorderMoved", 2, 7));
+    } finally {
+      if (previous === undefined) delete g.document;
+      else g.document = previous;
+    }
+  });
+});
+
+describe("the region is mounted before anything has to be announced", () => {
+  /**
+   * The one silence the clear-then-write cannot cover.
+   *
+   * Staging the text in a later task makes the region's own content a
+   * MUTATION, which is what a live region announces. It does not help a reader
+   * that has not yet scanned the subtree the region was just appended to —
+   * there is nothing to mutate from its point of view. The only fix is for the
+   * node to have been there first, which is a startup concern rather than a
+   * reorder one.
+   */
+  it("appends an empty region with no announcement at all", async () => {
+    await withDom(async (_announce, dom) => {
+      ensureReorderLiveRegion();
+      assert.equal(dom.body?.appended.length, 1);
+      assert.equal(region(dom)?.textContent, "");
+      assert.equal(region(dom)?.attributes?.["aria-live"], "assertive");
+      assert.equal(region(dom)?.attributes?.["aria-atomic"], "true");
+      // Nothing queued: a mount that scheduled a write would announce an empty
+      // string at startup, which some readers speak as a pause.
+      await settle();
+      assert.equal(region(dom)?.textContent, "");
+    });
+  });
+
+  it("is idempotent, which is what makes it safe to call from an effect", async () => {
+    // React runs an effect twice in StrictMode, and a remount runs it again.
+    await withDom(async (_announce, dom) => {
+      ensureReorderLiveRegion();
+      ensureReorderLiveRegion();
+      ensureReorderLiveRegion();
+      assert.equal(dom.body?.appended.length, 1, "each call appended its own region");
+    });
+  });
+
+  it("hands the mounted region to the first announcement rather than replacing it", async () => {
+    // The point of mounting early: the FIRST announcement writes into a node
+    // the reader has already seen, instead of into one that arrives with it.
+    await withDom(async (announce, dom) => {
+      ensureReorderLiveRegion();
+      const mounted = region(dom);
+      announce(t, "reorderPickedUp", 0, 4);
+      await settle();
+      assert.equal(dom.body?.appended.length, 1, "the announcement built a second region");
+      assert.equal(mounted?.textContent, "reorderPickedUp:1/4");
+    });
+  });
+
+  it("does nothing where there is no body, and nothing where there is no document", async () => {
+    // It runs from a root-layout effect, so every renderer that mounts the
+    // tree reaches it — including a prerender pass with no DOM. A throw there
+    // is a blank app, not a missing announcement.
+    await withDom(
+      async () => {
+        assert.doesNotThrow(() => ensureReorderLiveRegion());
+      },
+      { hasBody: false },
+    );
+    const g = globalThis as { document?: unknown };
+    const previous = g.document;
+    delete g.document;
+    try {
+      assert.doesNotThrow(() => ensureReorderLiveRegion());
     } finally {
       if (previous === undefined) delete g.document;
       else g.document = previous;

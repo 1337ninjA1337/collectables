@@ -171,3 +171,49 @@ describe("the announcement copy", () => {
     }
   });
 });
+
+describe("the live region is mounted at startup, not at the first announcement", () => {
+  /**
+   * A region created at the moment of the first announcement can be missed by
+   * a screen reader that has not scanned that subtree yet — the one silence
+   * the web spelling's clear-then-write cannot stage around. `app/_layout.tsx`
+   * mounts it empty instead, which puts a platform call in the root layout and
+   * makes the native no-op load-bearing.
+   */
+  it("is called from the root layout in an effect that runs once", () => {
+    const layout = readRepoFile("app/_layout.tsx");
+    assert.match(layout, /import \{ ensureReorderLiveRegion \} from "@\/lib\/reorder-announcement";/);
+    // In an effect rather than in render: appending to `document.body` during
+    // render is a side effect React may run twice or discard.
+    assert.match(layout, /useEffect\(\(\) => \{[^}]*ensureReorderLiveRegion\(\);\n\s*\}, \[\]\);/s);
+  });
+
+  it("resolves to something on native, where there is no region to mount", () => {
+    // Metro serves one spelling per platform, so a name only the web half
+    // exports is a crash at startup on iOS and Android — the exact failure
+    // `lint:platform-pairs` exists to refuse. The native answer is a no-op,
+    // and it has to be an EXPORTED one.
+    const native = readRepoFile("lib/reorder-announcement.ts");
+    assert.match(native, /export function ensureReorderLiveRegion\(\): void \{/);
+    // Empty on purpose: the platform's own announcement channel is always
+    // there. A body here would be a second mechanism nobody asked for.
+    const body = /export function ensureReorderLiveRegion\(\): void \{([\s\S]*?)\n\}/.exec(native)?.[1] ?? "";
+    assert.equal(
+      body.replace(/\/\/[^\n]*/g, "").trim(),
+      "",
+      "the native spelling grew a body — it is meant to do nothing",
+    );
+  });
+
+  it("mounts through the layout rather than from the screens that reorder", () => {
+    // Two screens announce; if either mounted the region itself, a user who
+    // reordered on the other one would still hit the race.
+    for (const screen of ["app/index.tsx", "app/collection/[id].tsx"]) {
+      assert.doesNotMatch(
+        readRepoFile(screen),
+        /ensureReorderLiveRegion/,
+        `${screen} mounts the region itself — startup is the only place that removes the race`,
+      );
+    }
+  });
+});
