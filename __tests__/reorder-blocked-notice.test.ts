@@ -96,15 +96,15 @@ describe("reorder-blocked-by-sort notice — rendering", () => {
     // `setItemFilters(EMPTY_FILTERS)` would silently drop an active query or
     // condition filter alongside the sort — a destructive surprise.
     const src = readScreenSrc();
-    assert.match(
-      src,
-      /setItemFilters\(\(current\) => \(\{ \.\.\.current, sort: "default" \}\)\);/,
-    );
+    // Both go through `applySort`, whose functional updater carries the rest
+    // of the filter state forward untouched.
+    assert.match(src, /setItemFilters\(\(current\) => \(\{ \.\.\.current, sort \}\)\);/);
+    assert.match(src, /const resetSort = useCallback\(\(\) => applySort\("default"\), \[applySort\]\);/);
     // And the reset is remembered, or the sort the user just turned off comes
     // back the next time they open the collection.
-    assert.match(src, /rememberSort\("default"\);/);
-    const decl = src.match(/const resetSort = useCallback\(\(\) => \{[\s\S]*?\}, \[[^\]]*\]\);/)?.[0] ?? "";
-    assert.ok(decl.length > 0, "expected to extract the resetSort declaration");
+    assert.match(src, /rememberSort\(sort\);/);
+    const decl = src.match(/const applySort = useCallback\([\s\S]*?\[rememberSort\],\s*\n\s*\);/)?.[0] ?? "";
+    assert.ok(decl.length > 0, "expected to extract the applySort declaration");
     assert.doesNotMatch(decl, /EMPTY_FILTERS/);
   });
 
@@ -115,11 +115,15 @@ describe("reorder-blocked-by-sort notice — rendering", () => {
     // id, so the dep is stable for as long as the screen is showing one
     // collection; building the next filters from `itemFilters` instead would
     // NOT be, which is why the reset uses the functional updater.
-    const decl =
-      readScreenSrc().match(/const resetSort = useCallback\(\(\) => \{[\s\S]*?\}, \[[^\]]*\]\);/)?.[0] ?? "";
-    assert.ok(decl.length > 0, "expected to extract the resetSort declaration");
-    assert.match(decl, /\}, \[rememberSort\]\);$/, "resetSort must depend only on rememberSort");
-    assert.doesNotMatch(decl, /itemFilters/, "resetSort must not close over the filter state");
+    const src = readScreenSrc();
+    const decl = src.match(/const applySort = useCallback\([\s\S]*?\[rememberSort\],\s*\n\s*\);/)?.[0] ?? "";
+    assert.ok(decl.length > 0, "expected to extract the applySort declaration");
+    assert.doesNotMatch(decl, /itemFilters/, "applySort must not close over the filter state");
+    assert.match(
+      src,
+      /const resetSort = useCallback\(\(\) => applySort\("default"\), \[applySort\]\);/,
+      "resetSort must be a thin wrapper whose only dep is applySort",
+    );
   });
 
   it("styles the notice with design tokens, no inline hex", () => {

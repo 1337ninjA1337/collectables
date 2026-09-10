@@ -225,7 +225,10 @@ describe("app/collection/[id].tsx — grid by default, reorder on demand", () =>
   });
 
   it("exposes the toggle in the owner actions row with a selected a11y state", () => {
-    assert.match(collectionSrc, /onPress=\{\(\) => setReorderMode\(\(on\) => !on\)\}/);
+    // The toggle is a named callback now, because entering the mode also
+    // clears an active sort (with an undo) — see reorder-blocked-notice.
+    assert.match(collectionSrc, /onPress=\{toggleReorderMode\}/);
+    assert.match(collectionSrc, /const toggleReorderMode = useCallback\(\(\) => \{/);
     assert.match(collectionSrc, /accessibilityState=\{\{ selected: reorderMode \}\}/);
     assert.match(collectionSrc, /\{reorderMode \? t\("reorderItemsDone"\) : t\("reorderItems"\)\}/);
   });

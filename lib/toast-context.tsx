@@ -17,17 +17,29 @@ import {
   SUCCESS_SOFT_2,
 } from "@/lib/design-tokens";
 import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
+import { toastDisplayMs } from "@/lib/toast-timing";
 
 export type ToastType = "success" | "error" | "info";
+
+/**
+ * A second thing the toast can do, beyond being read and dismissed.
+ *
+ * `onPress` runs and the toast closes — an action that left it standing would
+ * invite a second press on an undo that has already happened. The label is
+ * a translated string, not a key: this module is below the i18n context and
+ * every other string it renders arrives the same way.
+ */
+export type ToastAction = { label: string; onPress: () => void };
 
 type ToastItem = {
   id: number;
   type: ToastType;
   title?: string;
   message: string;
+  action?: ToastAction;
 };
 
-type ToastInput = { type?: ToastType; title?: string; message: string };
+type ToastInput = { type?: ToastType; title?: string; message: string; action?: ToastAction };
 
 type ToastApi = {
   show: (input: ToastInput) => void;
@@ -37,8 +49,6 @@ type ToastApi = {
 };
 
 const ToastContext = createContext<ToastApi | null>(null);
-
-const DISPLAY_MS = 3200;
 
 export function useToast() {
   const ctx = useContext(ToastContext);
@@ -62,9 +72,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         type: input.type ?? "info",
         title: input.title,
         message: input.message,
+        action: input.action,
       };
       setToasts((current) => [...current, item]);
-      setTimeout(() => dismiss(id), DISPLAY_MS);
+      // An actionable toast outlives a reporting one — see lib/toast-timing.ts.
+      setTimeout(() => dismiss(id), toastDisplayMs(!!input.action));
     },
     [dismiss],
   );
@@ -127,6 +139,21 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
         {toast.title ? <Text style={[styles.title, { color: palette.text }]}>{toast.title}</Text> : null}
         <Text style={[styles.message, { color: palette.text }]}>{toast.message}</Text>
       </Pressable>
+      {toast.action ? (
+        <Pressable
+          style={styles.action}
+          onPress={() => {
+            // The action first, then the dismissal: a handler that threw would
+            // otherwise leave the toast up with its button already spent.
+            toast.action?.onPress();
+            onDismiss();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={toast.action.label}
+        >
+          <Text style={[styles.actionText, { color: palette.text }]}>{toast.action.label}</Text>
+        </Pressable>
+      ) : null}
     </Animated.View>
   );
 }
@@ -184,6 +211,16 @@ const styles = StyleSheet.create({
   },
   accent: {
     width: 5,
+  },
+  action: {
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: "700",
+    textDecorationLine: "underline",
   },
   body: {
     flex: 1,

@@ -475,7 +475,11 @@ describe("translation floors", () => {
     // screen reader now says during a reorder. They are the first keys in the
     // tree written to be HEARD rather than read, which is why they are
     // sentences with the numbers inside rather than a "3 / 7" counter.
-    assert.match(report, /en: 506\/506 keys \(100\.0%\)/);
+    // 508 later that day: `sortClearedForReorder` and `undo`, said when
+    // entering reorder mode discards an active sort. `undo` is the first key
+    // in the tree that belongs to no screen — it is the label of a toast
+    // action, and the second consumer will not add a seventh string for it.
+    assert.match(report, /en: 508\/508 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

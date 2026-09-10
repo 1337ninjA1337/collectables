@@ -174,9 +174,11 @@ describe("the hook and the screen wire it up", () => {
     const source = readRepoFile("app/collection/[id].tsx");
     assert.match(source, /<ItemFilterBar filters=\{itemFilters\} onChange=\{applyFilters\} \/>/);
     assert.match(source, /onAction=\{\(\) => applyFilters\(EMPTY_FILTERS\)\}/);
-    // The notice's reset keeps the functional updater (it must not clobber an
-    // active query), so it remembers on its own line rather than via applyFilters.
-    assert.match(source, /rememberSort\("default"\);/);
+    // The notice's reset and the reorder handoff go through `applySort`, which
+    // keeps the functional updater (it must not clobber an active query) and
+    // remembers the mode on the same line.
+    assert.match(source, /const resetSort = useCallback\(\(\) => applySort\("default"\), \[applySort\]\);/);
+    assert.match(source, /action: \{ label: t\("undo"\), onPress: \(\) => applySort\(previous\) \}/);
     const direct = source.match(/setItemFilters\(/g) ?? [];
     assert.equal(
       direct.length,

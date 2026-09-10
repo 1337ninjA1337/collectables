@@ -4,7 +4,7 @@ import { Profiler, useCallback, useEffect, useMemo, useRef, useState, type Profi
 import { Alert, FlatList, Image, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
-import { applyItemFilters, applySortMode, EMPTY_FILTERS, ItemFilterBar, type ItemFilters } from "@/components/item-filters";
+import { applyItemFilters, applySortMode, EMPTY_FILTERS, ItemFilterBar, type ItemFilters, type ItemSortMode } from "@/components/item-filters";
 import { VisibilityBadge } from "@/components/visibility-badge";
 import { SkeletonCollectionDetail } from "@/components/skeleton";
 import { NestableDraggableFlatList, RenderItemParams, ScaleDecorator } from "../../components/DraggableList";
@@ -733,14 +733,45 @@ export default function CollectionDetailsScreen() {
   }, [reorderBlockedBySort, t]);
 
   // Not routed through `applyFilters`: the functional updater is what keeps
-  // this resetting ONLY the sort, and taking `itemFilters` as a dep to build
+  // this changing ONLY the sort, and taking `itemFilters` as a dep to build
   // the object instead would give the callback a new identity on every
   // keystroke in the search box — the identity HM-A's memo depends on.
-  const resetSort = useCallback(() => {
-    sortRestoredRef.current = true;
-    rememberSort("default");
-    setItemFilters((current) => ({ ...current, sort: "default" }));
-  }, [rememberSort]);
+  const applySort = useCallback(
+    (sort: ItemSortMode) => {
+      sortRestoredRef.current = true;
+      rememberSort(sort);
+      setItemFilters((current) => ({ ...current, sort }));
+    },
+    [rememberSort],
+  );
+  const resetSort = useCallback(() => applySort("default"), [applySort]);
+
+  /**
+   * Reorder mode does the thing the owner asked for.
+   *
+   * The notice below explains why dragging is off while a sort is on, which
+   * fixed the broken-button feel and left the owner two taps from the state
+   * they requested: tap Reorder, read, tap Reset. Clearing the sort on the way
+   * IN is the direct path — and now that the sort persists across visits, the
+   * notice would otherwise be arguing about a choice made weeks ago.
+   *
+   * With an undo, because this discards something the owner chose: the toast
+   * carries the mode back, and an actionable toast gets a longer window than a
+   * reporting one (lib/toast-timing.ts). The notice keeps its job for the case
+   * it was written for — a sort applied WHILE reorder mode is already on.
+   */
+  const toggleReorderMode = useCallback(() => {
+    const entering = !reorderMode;
+    setReorderMode(entering);
+    if (!entering || itemFilters.sort === "default") return;
+    const previous = itemFilters.sort;
+    applySort("default");
+    toast.show({
+      type: "info",
+      message: t("sortClearedForReorder"),
+      action: { label: t("undo"), onPress: () => applySort(previous) },
+    });
+  }, [applySort, itemFilters.sort, reorderMode, t, toast]);
 
   const listTitleAndFilters = useMemo(
     () => (
@@ -901,7 +932,7 @@ export default function CollectionDetailsScreen() {
             {allItems.length > 0 && !selectionMode ? (
               <Pressable
                 style={reorderMode ? styles.reorderButtonActive : styles.reorderButton}
-                onPress={() => setReorderMode((on) => !on)}
+                onPress={toggleReorderMode}
                 accessibilityRole="button"
                 accessibilityState={{ selected: reorderMode }}
               >
