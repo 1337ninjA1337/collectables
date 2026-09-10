@@ -61,15 +61,18 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     // Without this remap, dragging within the first 20 items would
     // re-sortOrder items 21..N to 0..N-1 alongside the visible slice
     // and shuffle them relative to each other.
-    assert.match(src, /const\s+visibleIds\s*=\s*new\s+Set\(\s*visibleItems\.map/);
+    //
+    // The rule was three inline lines in `onDragEnd` until 2026-09-10, when the
+    // row's keyboard actions needed the same one and it moved to
+    // `orderWithUnrenderedTail` in `lib/drag-reorder.ts`. What this case pins
+    // is unchanged — that the drag commits the page AND the tail — but the
+    // rule itself is now behaviour a suite can run, in
+    // `keyboard-reorder-items.test.ts`, rather than a regex over a literal.
     assert.match(
       src,
-      /const\s+tail\s*=\s*items\.filter\(\s*\(\s*i\s*\)\s*=>\s*!\s*visibleIds\.has\(\s*i\.id\s*\)\s*\)/,
+      /const commitItemOrder = \(page: CollectableItem\[\]\) => \{\s*\n\s*reorderItemsInCollection\(\s*activeCollection\.id\s*,\s*orderWithUnrenderedTail\(\s*page\s*,\s*items\s*\)\s*\);/,
     );
-    assert.match(
-      src,
-      /reorderItemsInCollection\(\s*activeCollection\.id\s*,\s*\[\s*\.\.\.data\s*,\s*\.\.\.tail\s*\]\.map\(\s*\(\s*i\s*\)\s*=>\s*i\.id\s*\)\s*\)/,
-    );
+    assert.match(src, /onDragEnd=\{\s*\(\{\s*data\s*\}\)\s*=>\s*commitItemOrder\(\s*data\s*\)\s*\}/);
   });
 
   it("selection-mode branch feeds visibleItems into a FlatList (VM-E — not items, not a .map)", () => {

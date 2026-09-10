@@ -25,6 +25,7 @@ import { useAuth } from "@/lib/auth-context";
 import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
+import { moveItem, orderWithUnrenderedTail } from "@/lib/drag-reorder";
 import { flatListStyles } from "@/lib/flat-list-styles";
 import { useChunkedList } from "@/lib/use-chunked-list";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
@@ -977,24 +978,66 @@ export default function CollectionDetailsScreen() {
     }
   };
 
-  const renderItemRow = ({ item, drag, isActive }: RenderItemParams<CollectableItem>) => (
-    <ScaleDecorator>
-      <Pressable
-        onLongPress={isOwner ? drag : undefined}
-        disabled={isActive}
-        accessibilityState={{ disabled: isActive }}
-        delayLongPress={150}
-      >
-        <ItemCard item={item} />
-      </Pressable>
-    </ScaleDecorator>
-  );
-
   // Drag-to-reorder is reachable only when the owner opts into reorder mode AND
   // the list is unsorted: onDragEnd re-writes `sortOrder` from the VISIBLE order,
   // so dragging under ANY non-default sort (title, cost or acquisition date)
   // would silently corrupt the manual order. Either gate failing hands the owner back to the read-only card grid.
   const isDragBranch = isOwner && !selectionMode && reorderMode && itemFilters.sort === "default";
+
+  // The whole order to persist after one row moves — from the drag, and from
+  // the keyboard actions on each row, which is why this is a function and no
+  // longer three lines inside `onDragEnd`.
+  //
+  // `reorderItemsInCollection` renumbers `sortOrder` from the list it is
+  // handed, and the list on screen is a paginated WINDOW. Writing back only
+  // the visible slice would renumber it 0..N-1 and shuffle it past everything
+  // below the page boundary — corrupting the manual order of rows the user
+  // never saw. `orderWithUnrenderedTail` appends that unrendered tail in the
+  // order it already had; see `lib/drag-reorder.ts`.
+  const commitItemOrder = (page: CollectableItem[]) => {
+    reorderItemsInCollection(activeCollection.id, orderWithUnrenderedTail(page, items));
+  };
+
+  /**
+   * The reorder a long press cannot do, on the rows a collector actually
+   * reorders.
+   *
+   * Gated on `isDragBranch` rather than on `isOwner` alone: under a non-default
+   * sort the visible order is not the manual one, so committing it — from a
+   * keyboard just as much as from a drag — corrupts what the owner arranged.
+   * The screen already says so in the reorder-blocked notice; these actions
+   * disappear for the same reason.
+   */
+  const renderItemRow = ({ item, drag, isActive, getIndex }: RenderItemParams<CollectableItem>) => {
+    const index = getIndex();
+    const canMoveUp = isDragBranch && index !== undefined && index > 0;
+    const canMoveDown = isDragBranch && index !== undefined && index < visibleItems.length - 1;
+    const moveBy = (delta: number) => {
+      if (index === undefined) return;
+      commitItemOrder(moveItem(visibleItems, index, index + delta));
+    };
+
+    return (
+      <ScaleDecorator>
+        <Pressable
+          onLongPress={isOwner ? drag : undefined}
+          disabled={isActive}
+          accessibilityState={{ disabled: isActive }}
+          delayLongPress={150}
+          accessibilityActions={[
+            ...(canMoveUp ? [{ name: "moveUp", label: t("moveUp") }] : []),
+            ...(canMoveDown ? [{ name: "moveDown", label: t("moveDown") }] : []),
+          ]}
+          onAccessibilityAction={(event) => {
+            if (event.nativeEvent.actionName === "moveUp") moveBy(-1);
+            if (event.nativeEvent.actionName === "moveDown") moveBy(1);
+          }}
+        >
+          <ItemCard item={item} />
+        </Pressable>
+      </ScaleDecorator>
+    );
+  };
 
   // VM-D: When the viewer/read-only branch (the multi-column FlatList case)
   // is active, hoist the outer scroll INTO the FlatList itself so iOS can
@@ -1195,16 +1238,10 @@ export default function CollectionDetailsScreen() {
             data={visibleItems}
             keyExtractor={(item) => item.id}
             renderItem={renderItemRow}
-            onDragEnd={({ data }) => {
-              // Drag-reorder must operate on the full filtered list, not just
-              // the visible window — otherwise items below the page boundary
-              // would be re-sortOrdered to 0..N-1 alongside the visible slice
-              // and shuffle relative to each other. Append the unrendered
-              // tail in its existing order so only the visible slice moves.
-              const visibleIds = new Set(visibleItems.map((i) => i.id));
-              const tail = items.filter((i) => !visibleIds.has(i.id));
-              reorderItemsInCollection(activeCollection.id, [...data, ...tail].map((i) => i.id));
-            }}
+            // The tail-append rule lives in `commitItemOrder` now, because the
+            // keyboard actions on each row need the same one. See
+            // `orderWithUnrenderedTail`.
+            onDragEnd={({ data }) => commitItemOrder(data)}
             contentContainerStyle={styles.draggableList}
           />
         ) : null}

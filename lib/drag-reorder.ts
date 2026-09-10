@@ -47,6 +47,32 @@ export function moveItem<T>(rows: readonly T[], from: number, to: number): T[] {
 }
 
 /**
+ * The id order to persist after reordering a PAGE of a longer list.
+ *
+ * `app/collection/[id].tsx` renders a chunked slice of its items, and both
+ * routes into `reorderItemsInCollection` — the drag and the keyboard actions —
+ * hand it a whole-collection id list. Sending only the visible slice would
+ * re-`sortOrder` it to 0..N-1 and leave every item below the page boundary to
+ * be renumbered against it, shuffling rows the user never saw and cannot see.
+ *
+ * So the unrendered remainder is appended in the order it already had. That is
+ * the rule, and it is here rather than inside an `onDragEnd` literal because
+ * two callers now depend on it and a third would otherwise write it a third
+ * time — the failure it prevents is invisible on screen, which is exactly the
+ * kind that survives being re-derived slightly differently.
+ *
+ * `page` is not required to be a subset of `all`: an id in both appears once,
+ * from the page, and `all` contributes only what the page left out.
+ */
+export function orderWithUnrenderedTail<T extends { id: string }>(
+  page: readonly T[],
+  all: readonly T[],
+): string[] {
+  const shown = new Set(page.map((row) => row.id));
+  return [...page.map((row) => row.id), ...all.filter((row) => !shown.has(row.id)).map((row) => row.id)];
+}
+
+/**
  * Which row index a pointer at `pointerY` is over, given the rows' extents.
  *
  * The comparison is against each row's MIDPOINT rather than its box, so the
