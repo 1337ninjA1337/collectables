@@ -264,8 +264,9 @@ type Gesture = {
  */
 async function mountGesture(
   name: (typeof SHIM_EXPORTS)[number],
+  domOpts?: { hasBody?: boolean },
 ): Promise<Gesture & { restore: () => void }> {
-  const dom = setupFakeDom();
+  const dom = setupFakeDom(domOpts);
   const drops: DragEnd[] = [];
   const dragHandles = new Map<number, () => void>();
   const active = new Map<number, boolean>();
@@ -552,16 +553,20 @@ describe("the web DraggableList shim runs the drag gesture itself", () => {
   });
 
   it("survives a document with no body to unselect", async () => {
-    // `suppressTextSelection` reaches for `document.body.style`, and the fake
-    // document has no body — as does any renderer that is not a browser. The
-    // guard is the difference between a drag that works and a TypeError
-    // thrown from inside a pointer handler, where nothing catches it.
-    const gesture = await mountGesture("DraggableFlatList");
+    // `suppressTextSelection` reaches for `document.body.style`, and some
+    // renderers that are not browsers have a document and no body. The guard is
+    // the difference between a drag that works and a TypeError thrown from
+    // inside a pointer handler, where nothing catches it.
+    //
+    // Asked for explicitly since `setupFakeDom` grew a body by default — the
+    // live region in `reorder-announcement.web.ts` needs one, and a fake that
+    // silently lacked the node under test was how this case used to pass.
+    const gesture = await mountGesture("DraggableFlatList", { hasBody: false });
     try {
       gesture.layOutRows();
       const installed = (globalThis as { document?: { body?: unknown } }).document;
       assert.ok(installed, "the fake document was not installed");
-      assert.equal(installed.body, undefined);
+      assert.equal(installed.body, null);
       assert.doesNotThrow(() => gesture.dragRow(0));
       gesture.pointerMove(160);
       gesture.pointerUp();
