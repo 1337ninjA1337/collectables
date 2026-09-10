@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createElement, type ReactElement } from "react";
 
+import { AMBER_ACCENT } from "@/lib/design-tokens";
 import { stripComments } from "@/lib/strip-comments";
 
 import { setupFakeDom, type FakeDom } from "./helpers/fake-dom";
@@ -200,6 +201,31 @@ describe("the web DraggableList shim renders a FlatList", () => {
     assert.notEqual(mod.DraggableFlatList, mod.NestableDraggableFlatList);
   });
 });
+
+/**
+ * The drop marker's style minus the edge it is pinned to.
+ *
+ * Spread into each expectation rather than asserted as a whole, because WHICH
+ * edge is the thing the two directions disagree about and the rest is shared —
+ * a case that asserted the whole object twice would state the shared half
+ * twice and the interesting half once each.
+ */
+const MARKER_BASE = {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  height: 2,
+  backgroundColor: AMBER_ACCENT,
+  zIndex: 1,
+} as const;
+
+/** The marker a row is carrying, or null when it has none. */
+function markerStyle(row: RowElement): Record<string, unknown> | null {
+  const children = row.props.children;
+  if (!Array.isArray(children)) return null;
+  const [marker] = children as ReactElement<{ style?: Record<string, unknown> }>[];
+  return marker?.props?.style ?? null;
+}
 
 /** Row extents a case hands the shim in place of a laid-out `div`. */
 const ROW_HEIGHT = 100;
@@ -420,6 +446,75 @@ describe("the web DraggableList shim runs the drag gesture itself", () => {
       assert.deepEqual(gesture.drops, [
         { data: [ROWS[1], ROWS[0]], from: 1, to: 0 },
       ]);
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("draws the drop marker below the target when dragging down", async () => {
+    const gesture = await mountGesture("NestableDraggableFlatList");
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(0);
+      gesture.pointerMove(160);
+      const node = gesture.tree.rerender().findByType("FlatList");
+      assert.deepEqual(markerStyle(adaptedRow(node, ROWS[1], 1)), {
+        ...MARKER_BASE,
+        bottom: -1,
+      });
+      // Never on the row being held: "it will land where it already is" is not
+      // information, and the row is already dimmed.
+      assert.equal(markerStyle(adaptedRow(node, ROWS[0], 0)), null);
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("draws it above the target when dragging up", async () => {
+    const gesture = await mountGesture("NestableDraggableFlatList");
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(1);
+      gesture.pointerMove(10);
+      const node = gesture.tree.rerender().findByType("FlatList");
+      assert.deepEqual(markerStyle(adaptedRow(node, ROWS[0], 0)), {
+        ...MARKER_BASE,
+        top: -1,
+      });
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("takes the marker away on the drop", async () => {
+    const gesture = await mountGesture("NestableDraggableFlatList");
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(0);
+      gesture.pointerMove(160);
+      gesture.pointerUp();
+      const node = gesture.tree.rerender().findByType("FlatList");
+      assert.equal(markerStyle(adaptedRow(node, ROWS[1], 1)), null);
+      assert.equal(markerStyle(adaptedRow(node, ROWS[0], 0)), null);
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("costs no layout, so the list does not twitch as the marker moves", async () => {
+    // The reason it is an absolutely positioned child and not a border: a
+    // 2pt border grows the row and pushes every row below it down, on every
+    // pointer move, which is a visible flicker and — worse — changes the very
+    // measurements the next move is resolved against.
+    const gesture = await mountGesture("NestableDraggableFlatList");
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(0);
+      gesture.pointerMove(160);
+      const node = gesture.tree.rerender().findByType("FlatList");
+      const marker = markerStyle(adaptedRow(node, ROWS[1], 1));
+      assert.equal(marker?.position, "absolute");
+      assert.equal(adaptedRow(node, ROWS[1], 1).props.style, undefined);
     } finally {
       gesture.restore();
     }
