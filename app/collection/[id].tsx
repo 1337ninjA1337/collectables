@@ -25,6 +25,7 @@ import { useAuth } from "@/lib/auth-context";
 import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
+import { announceMessage } from "@/lib/announce";
 import { orderWithUnrenderedTail } from "@/lib/drag-reorder";
 import { reorderActionProps } from "@/lib/reorder-actions";
 import { announceReorder } from "@/lib/reorder-announcement";
@@ -680,6 +681,23 @@ export default function CollectionDetailsScreen() {
     !selectionMode &&
     reorderMode &&
     itemFilters.sort !== "default";
+
+  // The notice above is `accessibilityRole="alert"`, which announces itself on
+  // Android and on web and does NOT on iOS, where VoiceOver reads an alert only
+  // when it happens to reach it. It also lives in the list header, which a user
+  // deep in a long collection has scrolled past. So the moment the gate closes
+  // is said out loud as well: without it a screen-reader owner taps "Reorder",
+  // the two move actions are simply absent from every row, and nothing anywhere
+  // explains why — the same "indistinguishable from a broken button" the notice
+  // was added for, in the one place the notice cannot reach.
+  //
+  // On the transition only. `reorderBlockedBySort` is recomputed every render,
+  // and announcing on each would interrupt the reader mid-sentence for as long
+  // as the sort is on.
+  useEffect(() => {
+    if (!reorderBlockedBySort) return;
+    announceMessage(t("reorderBlockedBySort"));
+  }, [reorderBlockedBySort, t]);
 
   const resetSort = useCallback(
     () => setItemFilters((current) => ({ ...current, sort: "default" })),

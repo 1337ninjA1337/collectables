@@ -30,7 +30,7 @@ export type FakeNode = {
   /**
    * What a live region is read from, and what `setAttribute` recorded.
    *
-   * Both arrived with `reorder-announcement.web.ts`, whose whole subject is a
+   * Both arrived with the live region in `announce.web.ts`, whose whole subject is a
    * node's text and its `aria-live` attributes — a fake element without them
    * can be appended and inspected but says nothing about what a screen reader
    * would do with it.

@@ -190,10 +190,10 @@ describe("the live region is mounted at startup, not at the first announcement",
    */
   it("is called from the root layout in an effect that runs once", () => {
     const layout = readRepoFile("app/_layout.tsx");
-    assert.match(layout, /import \{ ensureReorderLiveRegion \} from "@\/lib\/reorder-announcement";/);
+    assert.match(layout, /import \{ ensureLiveRegion \} from "@\/lib\/announce";/);
     // In an effect rather than in render: appending to `document.body` during
     // render is a side effect React may run twice or discard.
-    assert.match(layout, /useEffect\(\(\) => \{[^}]*ensureReorderLiveRegion\(\);\n\s*\}, \[\]\);/s);
+    assert.match(layout, /useEffect\(\(\) => \{[^}]*ensureLiveRegion\(\);\n\s*\}, \[\]\);/s);
   });
 
   it("resolves to something on native, where there is no region to mount", () => {
@@ -201,11 +201,11 @@ describe("the live region is mounted at startup, not at the first announcement",
     // exports is a crash at startup on iOS and Android — the exact failure
     // `lint:platform-pairs` exists to refuse. The native answer is a no-op,
     // and it has to be an EXPORTED one.
-    const native = readRepoFile("lib/reorder-announcement.ts");
-    assert.match(native, /export function ensureReorderLiveRegion\(\): void \{/);
+    const native = readRepoFile("lib/announce.ts");
+    assert.match(native, /export function ensureLiveRegion\(\): void \{/);
     // Empty on purpose: the platform's own announcement channel is always
     // there. A body here would be a second mechanism nobody asked for.
-    const body = /export function ensureReorderLiveRegion\(\): void \{([\s\S]*?)\n\}/.exec(native)?.[1] ?? "";
+    const body = /export function ensureLiveRegion\(\): void \{([\s\S]*?)\n\}/.exec(native)?.[1] ?? "";
     assert.equal(
       body.replace(/\/\/[^\n]*/g, "").trim(),
       "",
@@ -219,9 +219,62 @@ describe("the live region is mounted at startup, not at the first announcement",
     for (const screen of ["app/index.tsx", "app/collection/[id].tsx"]) {
       assert.doesNotMatch(
         readRepoFile(screen),
-        /ensureReorderLiveRegion/,
+        /ensureLiveRegion/,
         `${screen} mounts the region itself — startup is the only place that removes the race`,
       );
     }
+  });
+});
+
+describe("the reorder gate says why it closed", () => {
+  /**
+   * The actions vanish and a sighted owner sees the notice; a screen-reader
+   * owner sees nothing at all.
+   *
+   * `reorderBlockedBySort` renders a `accessibilityRole="alert"` notice, which
+   * announces itself on Android and on web and does NOT on iOS. It also lives
+   * in the list header, which a user deep in a long collection has scrolled
+   * past. So the transition is spoken as well — the same "indistinguishable
+   * from a broken button" the notice exists for, in the one place the notice
+   * cannot reach.
+   */
+  const screen = () => readRepoFile("app/collection/[id].tsx");
+
+  it("announces the notice's own words, not a second sentence about it", () => {
+    // Two phrasings for one state is two things to translate and one of them
+    // to forget; the notice's key is already in all six locales.
+    assert.match(screen(), /announceMessage\(t\("reorderBlockedBySort"\)\)/);
+    assert.match(screen(), /import \{ announceMessage \} from "@\/lib\/announce";/);
+  });
+
+  it("speaks through the same door the reorder announcements use", () => {
+    // Not `AccessibilityInfo` directly: on web that call is an empty function,
+    // which is the whole reason `lib/announce.web.ts` exists.
+    assert.doesNotMatch(screen(), /AccessibilityInfo/);
+  });
+
+  it("fires on the transition, not on every render", () => {
+    // `reorderBlockedBySort` is recomputed each pass; announcing on each would
+    // interrupt the reader mid-sentence for as long as the sort is on.
+    assert.match(
+      screen(),
+      /useEffect\(\(\) => \{\n\s*if \(!reorderBlockedBySort\) return;\n\s*announceMessage\(t\("reorderBlockedBySort"\)\);\n\s*\}, \[reorderBlockedBySort, t\]\);/,
+    );
+  });
+
+  it("keeps the visible notice too — the announcement is the second route, not a replacement", () => {
+    const src = screen();
+    assert.match(src, /accessibilityRole="alert"/);
+    assert.match(src, /\{t\("reorderBlockedBySort"\)\}/);
+  });
+
+  it("is declared where the gate is, above the early returns that narrow the collection", () => {
+    // Hooks may not sit below a conditional return, and this one reads a value
+    // derived above them for exactly that reason.
+    const src = screen();
+    assert.ok(
+      src.indexOf("const reorderBlockedBySort =") < src.indexOf("announceMessage(t(\"reorderBlockedBySort\"))"),
+      "the effect must come after the value it watches",
+    );
   });
 });

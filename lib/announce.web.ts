@@ -1,11 +1,10 @@
 /**
- * The same announcement, on the platform where React Native's version is a
- * no-op.
+ * The same door, on the platform where React Native's version is a no-op.
  *
  * `AccessibilityInfo.announceForAccessibility` in react-native-web is an empty
  * function — `announceForAccessibility: function (announcement) {}`, verbatim.
- * So the reorder announcements worked on iOS and Android and did nothing at all
- * on GitHub Pages, which is the build this repository actually deploys. Metro
+ * So an announcement worked on iOS and Android and did nothing at all on
+ * GitHub Pages, which is the build this repository actually deploys. Metro
  * serves this spelling to the web bundle, the same way it serves
  * `components/DraggableList.web.tsx` in place of the native list.
  *
@@ -15,7 +14,9 @@
  *
  *  - The region must be in the document BEFORE its text changes, or the change
  *    is not observed and nothing is read. It is created once and written to
- *    afterwards, never created-and-filled in one go.
+ *    afterwards, never created-and-filled in one go — and `ensureLiveRegion`
+ *    puts it there at startup, because even that staging cannot help a reader
+ *    that has not yet scanned the subtree a brand-new node sits in.
  *  - It must be hidden the way `clip` hides things, not with `display: none` or
  *    `visibility: hidden` — both remove the node from the accessibility tree,
  *    and a region outside that tree announces nothing.
@@ -23,22 +24,12 @@
  *    silent. The write clears the region first, which is also what makes two
  *    announcements in quick succession both land.
  *
- * The decision about WHETHER to speak is not repeated here: it is
- * `announcedPosition` in `lib/drag-reorder.ts`, shared with the native spelling.
+ * ONE region for the whole app, not one per caller: two assertive regions
+ * interrupt each other, and the user hears half of each.
  */
 
-import { announcedPosition } from "@/lib/drag-reorder";
-
-export type { ReorderAnnouncement } from "@/lib/reorder-announcement";
-import type { ReorderAnnouncement } from "@/lib/reorder-announcement";
-
-type Translate = (
-  key: ReorderAnnouncement,
-  params?: Record<string, string | number>,
-) => string;
-
 /** One region for the app, found by id rather than held in a module variable. */
-const REGION_ID = "collectables-reorder-live-region";
+const REGION_ID = "collectables-live-region";
 
 /**
  * Off-screen without leaving the accessibility tree.
@@ -99,35 +90,24 @@ function liveRegion(): Region | null {
  * FIRST announcement of a session: a screen reader that has not yet scanned the
  * subtree a brand-new node sits in can miss the change entirely, however the
  * write is staged. The only reliable fix is for the region to have been there
- * before the reorder started, which means mounting it from somewhere that runs
- * once at startup rather than from the first pick-up.
+ * first, which means mounting it from somewhere that runs once at startup.
  *
  * Idempotent, because that is what makes it safe to call from an effect: the
  * lookup by id is the same one `liveRegion` does, so a second call finds the
  * node instead of appending a second one. Called by `app/_layout.tsx`, whose
- * native build gets the no-op spelling in `lib/reorder-announcement.ts`.
+ * native build gets the no-op spelling in `lib/announce.ts`.
  */
-export function ensureReorderLiveRegion(): void {
+export function ensureLiveRegion(): void {
   liveRegion();
 }
 
 /**
- * Announce a row's new place, or stay quiet.
- *
- * The same signature and the same silences as the native spelling — only the
- * mechanism differs. See `lib/reorder-announcement.ts`.
+ * Read one sentence aloud, now — or do nothing, where there is no page to read
+ * it from.
  */
-export function announceReorder(
-  t: Translate,
-  key: ReorderAnnouncement,
-  index: number | undefined,
-  total: number,
-): void {
-  const at = announcedPosition(index, total);
-  if (!at) return;
+export function announceMessage(message: string): void {
   const region = liveRegion();
   if (!region) return;
-  const message = t(key, at);
   // Cleared first, then written in a later task. Both halves earn their place:
   // a region created in this same task has not been observed yet, and an
   // unchanged string is not a change at all — either one is a silent

@@ -1,32 +1,39 @@
 /**
  * The announcement that was silent on the only platform this app deploys to.
  *
- * `lib/reorder-announcement.ts` calls `AccessibilityInfo.announceForAccessibility`,
- * which iOS and Android implement and react-native-web does not: its version is
+ * `lib/announce.ts` calls `AccessibilityInfo.announceForAccessibility`, which
+ * iOS and Android implement and react-native-web does not: its version is
  * `announceForAccessibility: function (announcement) {}`, an empty function.
  * So the reorder announcements shipped, passed their suite, and did nothing on
  * GitHub Pages.
  *
- * `lib/reorder-announcement.web.ts` is the spelling Metro serves the web bundle
- * — same signature, same silences, an ARIA live region instead of a no-op. What
- * these cases are about is the three ways a live region is silently wrong: it
- * was not in the document before the text changed, it was hidden in a way that
- * removes it from the accessibility tree, or the text did not actually change.
- * None of those is visible by reading the code, and none of them errors.
+ * `lib/announce.web.ts` is the spelling Metro serves the web bundle — same
+ * signature, an ARIA live region instead of a no-op. What these cases are about
+ * is the three ways a live region is silently wrong: it was not in the document
+ * before the text changed, it was hidden in a way that removes it from the
+ * accessibility tree, or the text did not actually change. None of those is
+ * visible by reading the code, and none of them errors.
+ *
+ * WHAT MOVED OUT OF HERE. These used to be reorder cases, calling
+ * `announceReorder` with an index and a total and asserting a position was or
+ * was not read aloud. The mechanism is a general one now — one region, one
+ * `announceMessage`, with reordering as its first caller — so the silences that
+ * belong to `announcedPosition` are asserted where that function lives
+ * (`reorder-announcement.test.ts`, which runs it directly) and what is left
+ * here is the region: the part only a DOM can answer.
  */
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { announceReorder, ensureReorderLiveRegion } from "@/lib/reorder-announcement.web";
+import { announceMessage, ensureLiveRegion } from "@/lib/announce.web";
 import { setupFakeDom, type FakeDom, type FakeNode } from "./helpers/fake-dom";
 import { readRepoFile } from "./helpers/repo-file";
 
-const REGION_ID = "collectables-reorder-live-region";
+const REGION_ID = "collectables-live-region";
 
-/** A `t` that shows what it was given, so a case can assert both halves. */
-const t = (key: string, params?: Record<string, string | number>) =>
-  `${key}:${params?.position}/${params?.total}`;
+/** A sentence of the shape the app actually announces. */
+const MESSAGE = "Moved to position 3 of 7";
 
 /** Lets the queued write land — the module writes the text in a later task. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -36,15 +43,17 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
  *
  * The module under test holds no state between calls — it finds its region
  * through `document.getElementById` every time — so one import serves every
- * case, and swapping the document out from under it is the whole setup.
+ * case, and swapping the document out from under it is the whole setup. Both
+ * of its exports reach the same node, which is why a case that mounts and a
+ * case that announces can be read side by side.
  */
 async function withDom(
-  run: (announce: typeof announceReorder, dom: FakeDom) => Promise<void>,
+  run: (dom: FakeDom) => Promise<void>,
   opts?: { hasBody?: boolean },
 ): Promise<void> {
   const dom = setupFakeDom(opts);
   try {
-    await run(announceReorder, dom);
+    await run(dom);
   } finally {
     dom.restore();
   }
@@ -57,9 +66,9 @@ function region(dom: FakeDom): FakeNode | null {
 
 describe("the web live region — how it is built", () => {
   it("appends one region to the body and finds it again", async () => {
-    await withDom(async (announce, dom) => {
-      announce(t, "reorderMoved", 2, 7);
-      announce(t, "reorderPickedUp", 0, 7);
+    await withDom(async (dom) => {
+      announceMessage(MESSAGE);
+      announceMessage("Picked up");
       assert.equal(dom.body?.appended.length, 1, "a second announcement built a second region");
       assert.equal(region(dom)?.id, REGION_ID);
     });
@@ -69,8 +78,8 @@ describe("the web live region — how it is built", () => {
     // Polite would queue: three quick keyboard moves and the user hears the
     // position they were at three presses ago. Non-atomic would let a reader
     // announce only the digit that changed.
-    await withDom(async (announce, dom) => {
-      announce(t, "reorderMoved", 2, 7);
+    await withDom(async (dom) => {
+      announceMessage(MESSAGE);
       assert.equal(region(dom)?.attributes?.["aria-live"], "assertive");
       assert.equal(region(dom)?.attributes?.["aria-atomic"], "true");
     });
@@ -80,8 +89,8 @@ describe("the web live region — how it is built", () => {
     // The failure this is here for: `display: none` and `visibility: hidden`
     // both hide it from a screen reader too, which is a region that announces
     // nothing and looks correct.
-    await withDom(async (announce, dom) => {
-      announce(t, "reorderMoved", 2, 7);
+    await withDom(async (dom) => {
+      announceMessage(MESSAGE);
       const style = region(dom)?.style ?? {};
       assert.equal(style.display, undefined, "the region was display:none — it would be unreadable");
       assert.equal(style.visibility, undefined, "the region was visibility:hidden — it would be unreadable");
@@ -95,21 +104,21 @@ describe("the web live region — how it is built", () => {
     // A region whose text is set in the same task it was appended in has not
     // been observed yet, so the change is not announced. This is the ordering
     // that makes the FIRST announcement work.
-    await withDom(async (announce, dom) => {
-      announce(t, "reorderMoved", 2, 7);
+    await withDom(async (dom) => {
+      announceMessage(MESSAGE);
       assert.equal(region(dom)?.textContent, "", "the region carried its text before it was in the document");
       await settle();
-      assert.equal(region(dom)?.textContent, "reorderMoved:3/7");
+      assert.equal(region(dom)?.textContent, MESSAGE);
     });
   });
 });
 
 describe("the web live region — what it says", () => {
-  it("says the 1-based position and the total, through `t`", async () => {
-    await withDom(async (announce, dom) => {
-      announce(t, "reorderPickedUp", 0, 4);
+  it("reads the sentence it was handed, whole", async () => {
+    await withDom(async (dom) => {
+      announceMessage("Picked up Alpha");
       await settle();
-      assert.equal(region(dom)?.textContent, "reorderPickedUp:1/4");
+      assert.equal(region(dom)?.textContent, "Picked up Alpha");
     });
   });
 
@@ -117,48 +126,34 @@ describe("the web live region — what it says", () => {
     // An unchanged string is not a mutation and is not announced. Clearing is
     // what makes a repeat land — reachable when a drag ends where it started
     // and the user then presses the same key.
-    await withDom(async (announce, dom) => {
-      announce(t, "reorderMoved", 2, 7);
+    await withDom(async (dom) => {
+      announceMessage(MESSAGE);
       await settle();
-      assert.equal(region(dom)?.textContent, "reorderMoved:3/7");
-      announce(t, "reorderMoved", 2, 7);
+      assert.equal(region(dom)?.textContent, MESSAGE);
+      announceMessage(MESSAGE);
       assert.equal(region(dom)?.textContent, "", "the second announcement did not clear the region first");
       await settle();
-      assert.equal(region(dom)?.textContent, "reorderMoved:3/7");
+      assert.equal(region(dom)?.textContent, MESSAGE);
     });
   });
 
   it("keeps the last message when two announcements race", async () => {
-    await withDom(async (announce, dom) => {
-      announce(t, "reorderPickedUp", 0, 7);
-      announce(t, "reorderMoved", 3, 7);
+    await withDom(async (dom) => {
+      announceMessage("Picked up");
+      announceMessage(MESSAGE);
       await settle();
-      assert.equal(region(dom)?.textContent, "reorderMoved:4/7");
+      assert.equal(region(dom)?.textContent, MESSAGE);
     });
   });
 });
 
 describe("the web live region — when it stays quiet", () => {
-  it("says nothing, and builds nothing, when the position is untrustworthy", async () => {
-    // Same silences as the native spelling: it shares `announcedPosition`
-    // rather than re-deciding. A region built for an announcement that never
-    // comes is a stray node in everybody's DOM.
-    await withDom(async (announce, dom) => {
-      announce(t, "reorderMoved", undefined, 7);
-      announce(t, "reorderMoved", 7, 7);
-      announce(t, "reorderMoved", -1, 7);
-      announce(t, "reorderMoved", 0, 0);
-      await settle();
-      assert.equal(dom.body?.appended.length, 0);
-    });
-  });
-
   it("does nothing where the document has no body", async () => {
     // A prerender pass, or any renderer that is not a browser. An announcement
     // is not worth a TypeError inside an event handler.
     await withDom(
-      async (announce, dom) => {
-        announce(t, "reorderMoved", 2, 7);
+      async (dom) => {
+        announceMessage(MESSAGE);
         await settle();
         assert.equal(dom.body, null);
       },
@@ -171,7 +166,7 @@ describe("the web live region — when it stays quiet", () => {
     const previous = g.document;
     delete g.document;
     try {
-      assert.doesNotThrow(() => announceReorder(t, "reorderMoved", 2, 7));
+      assert.doesNotThrow(() => announceMessage(MESSAGE));
     } finally {
       if (previous === undefined) delete g.document;
       else g.document = previous;
@@ -187,12 +182,11 @@ describe("the region is mounted before anything has to be announced", () => {
    * MUTATION, which is what a live region announces. It does not help a reader
    * that has not yet scanned the subtree the region was just appended to —
    * there is nothing to mutate from its point of view. The only fix is for the
-   * node to have been there first, which is a startup concern rather than a
-   * reorder one.
+   * node to have been there first, which is a startup concern.
    */
   it("appends an empty region with no announcement at all", async () => {
-    await withDom(async (_announce, dom) => {
-      ensureReorderLiveRegion();
+    await withDom(async (dom) => {
+      ensureLiveRegion();
       assert.equal(dom.body?.appended.length, 1);
       assert.equal(region(dom)?.textContent, "");
       assert.equal(region(dom)?.attributes?.["aria-live"], "assertive");
@@ -206,10 +200,10 @@ describe("the region is mounted before anything has to be announced", () => {
 
   it("is idempotent, which is what makes it safe to call from an effect", async () => {
     // React runs an effect twice in StrictMode, and a remount runs it again.
-    await withDom(async (_announce, dom) => {
-      ensureReorderLiveRegion();
-      ensureReorderLiveRegion();
-      ensureReorderLiveRegion();
+    await withDom(async (dom) => {
+      ensureLiveRegion();
+      ensureLiveRegion();
+      ensureLiveRegion();
       assert.equal(dom.body?.appended.length, 1, "each call appended its own region");
     });
   });
@@ -217,13 +211,13 @@ describe("the region is mounted before anything has to be announced", () => {
   it("hands the mounted region to the first announcement rather than replacing it", async () => {
     // The point of mounting early: the FIRST announcement writes into a node
     // the reader has already seen, instead of into one that arrives with it.
-    await withDom(async (announce, dom) => {
-      ensureReorderLiveRegion();
+    await withDom(async (dom) => {
+      ensureLiveRegion();
       const mounted = region(dom);
-      announce(t, "reorderPickedUp", 0, 4);
+      announceMessage(MESSAGE);
       await settle();
       assert.equal(dom.body?.appended.length, 1, "the announcement built a second region");
-      assert.equal(mounted?.textContent, "reorderPickedUp:1/4");
+      assert.equal(mounted?.textContent, MESSAGE);
     });
   });
 
@@ -233,7 +227,7 @@ describe("the region is mounted before anything has to be announced", () => {
     // is a blank app, not a missing announcement.
     await withDom(
       async () => {
-        assert.doesNotThrow(() => ensureReorderLiveRegion());
+        assert.doesNotThrow(() => ensureLiveRegion());
       },
       { hasBody: false },
     );
@@ -241,7 +235,7 @@ describe("the region is mounted before anything has to be announced", () => {
     const previous = g.document;
     delete g.document;
     try {
-      assert.doesNotThrow(() => ensureReorderLiveRegion());
+      assert.doesNotThrow(() => ensureLiveRegion());
     } finally {
       if (previous === undefined) delete g.document;
       else g.document = previous;
@@ -249,37 +243,32 @@ describe("the region is mounted before anything has to be announced", () => {
   });
 });
 
-describe("the two spellings agree", () => {
-  it("export the same function name and the same key type", () => {
-    const web = readRepoFile("lib/reorder-announcement.web.ts");
-    const native = readRepoFile("lib/reorder-announcement.ts");
-    for (const src of [web, native]) {
-      assert.match(src, /export function announceReorder\(/);
-    }
-    // One definition of the two keys, re-exported rather than restated: a web
-    // spelling that grew a third key its translations do not have would be a
-    // sentence nobody hears.
-    assert.match(native, /export type ReorderAnnouncement = "reorderPickedUp" \| "reorderMoved";/);
-    assert.match(web, /export type \{ ReorderAnnouncement \} from "@\/lib\/reorder-announcement";/);
-  });
-
-  it("share the decision about whether to speak", () => {
-    // `announcedPosition` is imported by both. Two copies of "is this position
-    // sayable" is how one platform starts announcing a position the other
-    // suppresses.
-    for (const file of ["lib/reorder-announcement.ts", "lib/reorder-announcement.web.ts"]) {
-      const src = readRepoFile(file);
-      assert.match(src, /import \{ announcedPosition \} from "@\/lib\/drag-reorder";/, file);
-      assert.match(src, /const at = announcedPosition\(index, total\);\n\s*if \(!at\) return;/, file);
-    }
-  });
-
+describe("the two spellings", () => {
   it("names the react-native-web no-op that made the web spelling necessary", () => {
     // Without this, the file reads as gratuitous: react-native ALREADY has an
     // announcement API, and the reason it cannot be used here is one line in
     // somebody else's node_modules.
-    const web = readRepoFile("lib/reorder-announcement.web.ts");
+    const web = readRepoFile("lib/announce.web.ts");
     assert.match(web, /announceForAccessibility/);
     assert.match(web, /react-native-web/);
+  });
+
+  it("keeps the platform split in the door and not in its callers", () => {
+    // `lib/reorder-announcement.ts` used to have a `.web` spelling of its own,
+    // and the only thing that differed between the two was the mechanism. It
+    // has none now: it imports the door and holds the decision.
+    const caller = readRepoFile("lib/reorder-announcement.ts");
+    assert.match(caller, /import \{ announceMessage \} from "@\/lib\/announce";/);
+    assert.doesNotMatch(caller, /AccessibilityInfo/);
+    assert.doesNotMatch(caller, /document/);
+  });
+
+  it("is one region for the app, not one per caller", () => {
+    // Two assertive regions interrupt each other and the user hears half of
+    // each — which is what a second caller adding its own would produce.
+    const web = readRepoFile("lib/announce.web.ts");
+    const ids = [...web.matchAll(/aria-live/g)];
+    assert.equal(ids.length, 1, "more than one live region is declared here");
+    assert.match(web, /const REGION_ID = "collectables-live-region";/);
   });
 });

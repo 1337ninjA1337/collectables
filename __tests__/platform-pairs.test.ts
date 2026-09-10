@@ -3,11 +3,11 @@
  * platform-split module still export the same names.
  *
  * Most of these run the reader over source strings rather than matching its
- * source, because the thing worth pinning is what it NAMES: the pair this repo
- * ships spells one shared type two different ways (`export type T` on the
- * native side, `export type { T } from` on the web side), and a reader that
- * missed either form would report a difference that is not there and would go
- * on doing so until somebody deleted the guard.
+ * source, because the thing worth pinning is what it NAMES. A pair can spell
+ * one shared name two different ways — `export type T` on one side and
+ * `export type { T } from` on the other — and a reader that missed either form
+ * would report a difference that is not there and would go on doing so until
+ * somebody deleted the guard.
  *
  * The last block runs the real tree through the same functions the wrapper
  * does, so the two pairs in this repository are asserted to agree rather than
@@ -45,9 +45,9 @@ function pairOf(file = "lib/thing.web.ts"): PlatformPair {
 
 describe("platformSpelling — which files are one half of a pair", () => {
   it("splits a web spelling into its base and platform", () => {
-    assert.deepEqual(platformSpelling("lib/reorder-announcement.web.ts"), {
-      file: "lib/reorder-announcement.web.ts",
-      base: "lib/reorder-announcement",
+    assert.deepEqual(platformSpelling("lib/announce.web.ts"), {
+      file: "lib/announce.web.ts",
+      base: "lib/announce",
       platform: "web",
     });
   });
@@ -153,8 +153,11 @@ describe("exportedNames — the forms this tree actually writes", () => {
   });
 
   it("reads `export type { T } from` as the same name `export type T` declares", () => {
-    // The exact pair this repository ships: reorder-announcement declares the
-    // type natively and re-exports it on web. Two statement forms, one name.
+    // The shape `lib/reorder-announcement.web.ts` used before the announcement
+    // door was generalised: one half declared the type and the other
+    // re-exported it. Kept as a case because it is the form a reader most
+    // easily misses — two statement forms, one name — and the next pair to
+    // share a type will be written exactly like this.
     assert.deepEqual(names('export type { ReorderAnnouncement } from "@/lib/reorder-announcement";'), [
       "ReorderAnnouncement",
     ]);
@@ -344,7 +347,7 @@ describe("formatPlatformPairReport", () => {
 describe("this repository's own pairs", () => {
   const PAIRS: readonly (readonly [string, string])[] = [
     ["components/DraggableList.web.tsx", "components/DraggableList.tsx"],
-    ["lib/reorder-announcement.web.ts", "lib/reorder-announcement.ts"],
+    ["lib/announce.web.ts", "lib/announce.ts"],
   ];
 
   for (const [web, native] of PAIRS) {

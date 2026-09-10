@@ -559,7 +559,7 @@ describe("the web DraggableList shim runs the drag gesture itself", () => {
     // inside a pointer handler, where nothing catches it.
     //
     // Asked for explicitly since `setupFakeDom` grew a body by default — the
-    // live region in `reorder-announcement.web.ts` needs one, and a fake that
+    // live region in `announce.web.ts` needs one, and a fake that
     // silently lacked the node under test was how this case used to pass.
     const gesture = await mountGesture("DraggableFlatList", { hasBody: false });
     try {

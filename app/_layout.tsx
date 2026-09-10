@@ -48,7 +48,7 @@ import { MarketplaceProvider } from "@/lib/marketplace-context";
 import { PremiumProvider } from "@/lib/premium-context";
 import { NavAnimationProvider, useNavAnimation } from "@/lib/nav-animation-context";
 import { RealtimeStatusProvider } from "@/lib/realtime-status-context";
-import { ensureReorderLiveRegion } from "@/lib/reorder-announcement";
+import { ensureLiveRegion } from "@/lib/announce";
 import { getSentryStatus, triggerSentryTestError } from "@/lib/sentry";
 import { SocialProvider } from "@/lib/social-context";
 import { clearAllCollectablesStorage } from "@/lib/storage-keys";
@@ -70,11 +70,11 @@ export default Sentry.wrap(function RootLayout() {
   }, []);
 
   useEffect(() => {
-    // The reorder announcements speak through an ARIA live region on web, and
-    // a region created at the moment of the first announcement can be missed
-    // by a reader that has not scanned that subtree yet. Mounting it empty at
-    // startup removes the race; on native this is a no-op.
-    ensureReorderLiveRegion();
+    // Screen-reader announcements speak through an ARIA live region on web,
+    // and a region created at the moment of the first announcement can be
+    // missed by a reader that has not scanned that subtree yet. Mounting it
+    // empty at startup removes the race; on native this is a no-op.
+    ensureLiveRegion();
   }, []);
 
   useEffect(() => {
