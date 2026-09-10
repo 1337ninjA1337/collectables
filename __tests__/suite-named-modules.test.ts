@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { measuredFloor } from "./helpers/coverage-floor";
 import { sourceFiles } from "./helpers/source-files";
-import { assertExemptionsHonest, suiteCode, suiteFiles } from "./helpers/suite-files";
+import { suiteCode, suiteFiles } from "./helpers/suite-files";
 
 /**
  * Which modules of the app tree no suite so much as names.
@@ -21,7 +21,9 @@ import { assertExemptionsHonest, suiteCode, suiteFiles } from "./helpers/suite-f
  * `app/item/[id].tsx` and `components/collection-share-sheet.tsx` — was the
  * one the script missed, because it matched on a bare word that other suites
  * use in prose about links. It has `deep-link.test.ts` now, which is what an
- * entry in {@link UNNAMED} is for: a hole with the work written next to it.
+ * exemption entry was for: a hole with the work written next to it. The list
+ * is gone because all six closed; the paragraph below it says why it is prose
+ * now and what re-adding it would mean.
  *
  * That is the whole argument for keeping the walk: the population only moves
  * when somebody adds a module or writes a suite, both of which are deliberate,
@@ -67,10 +69,11 @@ import { assertExemptionsHonest, suiteCode, suiteFiles } from "./helpers/suite-f
  * mention in a paragraph is exactly the mention this rule should not accept.
  *
  * Excluded for the reason `header-prose-names.test.ts` excludes itself from
- * its own index: {@link UNNAMED} is an inventory of modules nothing names,
- * written as string keys, which are code. Index this file and every exemption
- * resolves itself, the allow-list cancels the allow-list, and the sweep is
- * green because it is broken.
+ * its own index: an exemption list here is an inventory of modules nothing
+ * names, written as string keys, which are code. Index this file and every
+ * exemption resolves itself, the allow-list cancels the allow-list, and the
+ * sweep is green because it is broken. The list is empty today and the
+ * exclusion still holds — it is what makes re-adding one safe.
  */
 
 /**
@@ -88,33 +91,33 @@ import { assertExemptionsHonest, suiteCode, suiteFiles } from "./helpers/suite-f
 const APP_TREE = ["app", "components", "data", "lib"] as const;
 
 /**
- * The modules no suite names, and what each would need before one could.
+ * There is no exemption list here any more, and that is the finding.
  *
- * The comment beside an entry is the half that lets the next reader judge it,
- * and the census's own first finding is the evidence that it works: the sixth
- * entry was `lib/deep-link.ts`, its comment said "needs a module mock", and
- * that is exactly what closing it took, an hour later. So did the fifth:
- * `lib/nav-animation-context.tsx` said "needs the mount harness" and took
- * `providerHarness` and no mocks at all. The third, `lib/use-visibility-refresh
- * .ts`, was the first entry that was hiding something: its no-`document`
- * branch returned an empty cleanup over a running interval, and the fourth,
- * `lib/use-reactions.ts`, kept a reaction the server had refused. What is left
- * is one re-export with no behaviour of its own, and the web list adapter.
+ * There was one, of six entries, each carrying the sentence that said what
+ * closing it would take — and every sentence turned out to be right. The sixth
+ * was `lib/deep-link.ts`, "needs a module mock", closed an hour later by
+ * exactly that. The fifth said "needs the mount harness" and
+ * `lib/nav-animation-context.tsx` took `providerHarness` and no mocks at all.
+ * The third and fourth were hiding bugs rather than gaps:
+ * `lib/use-visibility-refresh.ts` returned an empty cleanup over a running
+ * interval, and `lib/use-reactions.ts` kept a reaction the server had refused.
+ *
+ * The last two went together, and not by choice. `components/DraggableList.web
+ * .tsx` is the shim the deployed web bundle serves and wanted a render
+ * harness; `components/DraggableList.tsx` is seven lines of re-export with no
+ * behaviour to assert. But {@link namedBySomeSuite} counts a module as named
+ * when a suite contains its path without the extension, and the web spelling
+ * CONTAINS the native one — so `draggable-list-web.test.ts` could not name the
+ * half it tests without naming the half it does not. It answers for both
+ * deliberately: the parity cases there hold the native file to still being
+ * nothing but re-exports, which is the claim its exemption comment made and
+ * nothing checked.
+ *
+ * `assertExemptionsHonest` refuses an empty list ("delete it instead"), which
+ * is why this is prose rather than a `{}`. Re-adding the list is the right
+ * move for a module that genuinely cannot be reached yet — with the sentence
+ * saying what it would take, because that sentence is what closed six of six.
  */
-const UNNAMED: Readonly<Record<string, string>> = {
-  // Seven lines, all of them `export … from "react-native-draggable-flatlist"`.
-  // There is no behaviour here to assert that is not the library's.
-  "components/DraggableList.tsx": "a re-export of the native list library",
-  // The web twin is real code — it adapts the library's `renderItem` params and
-  // stubs `drag` — and wants `helpers/render.ts`.
-  "components/DraggableList.web.tsx": "a component; needs a render harness",
-};
-
-/** The same list again, as the tripwire `assertExemptionsHonest` argues for. */
-const EXPECTED_UNNAMED = [
-  "components/DraggableList.tsx",
-  "components/DraggableList.web.tsx",
-];
 
 /**
  * This file's own name in the suite walk, asked of the runtime.
@@ -153,25 +156,13 @@ function namedBySomeSuite(relative: string): boolean {
 }
 
 describe("every module in the app tree is named by a suite", () => {
-  it("names no module that only the exemption list knows about", () => {
-    const offenders = MODULES.filter(
-      (relative) => UNNAMED[relative] === undefined && !namedBySomeSuite(relative),
-    );
+  it("leaves no module that nothing has ever named", () => {
+    const offenders = MODULES.filter((relative) => !namedBySomeSuite(relative));
     assert.deepEqual(
       offenders,
       [],
-      `no suite names these modules:\n  ${offenders.join("\n  ")}\nA module nothing has ever imported, read or swept is one nobody has decided about — add a suite, or add it to UNNAMED with what it would take`,
+      `no suite names these modules:\n  ${offenders.join("\n  ")}\nA module nothing has ever imported, read or swept is one nobody has decided about — write the suite, or re-add the exemption list this file describes with the sentence that says what closing the entry would take`,
     );
-  });
-
-  it("holds the exemptions to being still unnamed and still on disk", () => {
-    assertExemptionsHonest({
-      exemptions: Object.keys(UNNAMED),
-      expected: EXPECTED_UNNAMED,
-      rule: "the suite-names-every-module census",
-      stillNeeded: (relative) => !namedBySomeSuite(relative),
-      walk: MODULES,
-    });
   });
 
   it("reaches no module only through a file name another module shares", () => {
