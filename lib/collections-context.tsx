@@ -27,7 +27,7 @@ import {
   subscribeToOwnCollections,
   subscribeToOwnItems,
 } from "@/lib/supabase-realtime-sync";
-import { byCollectionOrder, userScopedCollectionId } from "@/lib/collections-helpers";
+import { byCollectionOrder, planItemReorder, userScopedCollectionId } from "@/lib/collections-helpers";
 import { byCreatedAtDescThenId } from "@/lib/sort-helpers";
 import {
   appendTransferLogEntry,
@@ -1434,22 +1434,24 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         removedItemIds.forEach((id) => softDeleteRemoteItem(id).catch(() => undefined));
       },
       reorderOwnedCollections: (orderedIds) => {
+        // Same shape as `reorderItemsInCollection`: the rows to sync are
+        // decided HERE, from the collections this render is holding, not inside
+        // an updater React runs at a time of its own choosing.
+        const byId = new Map(localCollections.map((c) => [c.id, c]));
+        const reordered: Collection[] = [];
         const updated: Collection[] = [];
-        setLocalCollections((current) => {
-          const byId = new Map(current.map((c) => [c.id, c]));
-          const reordered: Collection[] = [];
-          orderedIds.forEach((id, index) => {
-            const c = byId.get(id);
-            if (c) {
-              const next = { ...c, sortOrder: index };
-              reordered.push(next);
-              updated.push(next);
-              byId.delete(id);
-            }
-          });
-          byId.forEach((c) => reordered.push(c));
-          return reordered;
+        orderedIds.forEach((id, index) => {
+          const c = byId.get(id);
+          if (c) {
+            const next = { ...c, sortOrder: index };
+            reordered.push(next);
+            updated.push(next);
+            byId.delete(id);
+          }
         });
+        if (updated.length === 0) return;
+        byId.forEach((c) => reordered.push(c));
+        setLocalCollections(reordered);
         updated.forEach((c) => syncCollection(c, () => updateRemoteCollection(c.id, { sortOrder: c.sortOrder })));
       },
       transferItemToBuyer: async (snapshot, options) => {
@@ -1487,20 +1489,14 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         setRefreshTick((n) => n + 1);
       },
       reorderItemsInCollection: (collectionId, orderedIds) => {
-        const indexById = new Map(orderedIds.map((id, idx) => [id, idx]));
-        const reordered: CollectableItem[] = [];
-        setLocalItems((current) =>
-          current.map((item) => {
-            if (item.collectionId === collectionId && indexById.has(item.id)) {
-              const order = indexById.get(item.id)!;
-              const next = { ...item, sortOrder: order };
-              reordered.push(next);
-              return next;
-            }
-            return item;
-          }),
-        );
-        reordered.forEach((item) => syncItem(item, () => updateRemoteItem(item.id, { sortOrder: item.sortOrder })));
+        // The plan is computed from `localItems` rather than inside the
+        // `setLocalItems` updater: the rows to sync have to be known HERE, and
+        // an updater that pushes into a closure array only fills it when React
+        // decides to run it — which is a render, not this call.
+        const plan = planItemReorder(localItems, collectionId, orderedIds);
+        if (plan.changed.length === 0) return;
+        setLocalItems(plan.items);
+        plan.changed.forEach((item) => syncItem(item, () => updateRemoteItem(item.id, { sortOrder: item.sortOrder })));
       },
       deleteUserContent: async (userId) => {
         const ownedCollectionIds = new Set(
