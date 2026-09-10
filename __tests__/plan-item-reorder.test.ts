@@ -212,6 +212,7 @@ describe("the provider delegates the reorder rather than re-inlining it", () => 
       /setLocalCollections\(\(current\) => \{[^}]*updated\.push/s,
       "reorderOwnedCollections collects its sync list inside the state updater",
     );
-    assert.match(source, /const byId = new Map\(localCollections\.map/);
+    // It plans from the state this render holds — see owned-collection-order.
+    assert.match(source, /planCollectionReorder\(localCollections, orderedIds\)/);
   });
 });

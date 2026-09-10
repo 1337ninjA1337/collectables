@@ -27,7 +27,14 @@ import {
   subscribeToOwnCollections,
   subscribeToOwnItems,
 } from "@/lib/supabase-realtime-sync";
-import { byCollectionOrder, planItemReorder, userScopedCollectionId } from "@/lib/collections-helpers";
+import {
+  byCollectionOrder,
+  byOwnedCollectionOrder,
+  nextCollectionSortOrder,
+  planCollectionReorder,
+  planItemReorder,
+  userScopedCollectionId,
+} from "@/lib/collections-helpers";
 import { byCreatedAtDescThenId } from "@/lib/sort-helpers";
 import {
   appendTransferLogEntry,
@@ -1048,7 +1055,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
 
   const collections = useMemo(() => {
     const seen = new Set(localCollections.map((c) => c.id));
-    const merged: Collection[] = [...localCollections];
+    // The user's drag order comes from `sortOrder`, not from where the row
+    // happens to sit in the array — the array is whatever the id-keyed cloud
+    // merge produced, which on a second device is not the order they chose.
+    // Rules in collections-helpers so they are unit-tested; the sort is stable,
+    // which is what keeps the never-dragged collections newest-first.
+    const merged: Collection[] = [...localCollections].sort(byOwnedCollectionOrder);
     getVisibleCollections().forEach((c) => {
       if (!seen.has(c.id)) { merged.push(c); seen.add(c.id); }
     });
@@ -1333,6 +1345,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           sharedWithUserIds: [],
           role: "owner",
           visibility: input.visibility ?? "private",
+          // Once the user has dragged anything, rule 1 of
+          // `byOwnedCollectionOrder` puts every numbered collection ahead of
+          // every unnumbered one — so a new collection with no number lands at
+          // the bottom of the home screen. `undefined` while no manual order
+          // exists; one below the lowest index once it does.
+          sortOrder: nextCollectionSortOrder(localCollections),
         };
 
         setLocalCollections((current) => [nextCollection, ...current]);
@@ -1434,25 +1452,16 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         removedItemIds.forEach((id) => softDeleteRemoteItem(id).catch(() => undefined));
       },
       reorderOwnedCollections: (orderedIds) => {
-        // Same shape as `reorderItemsInCollection`: the rows to sync are
-        // decided HERE, from the collections this render is holding, not inside
-        // an updater React runs at a time of its own choosing.
-        const byId = new Map(localCollections.map((c) => [c.id, c]));
-        const reordered: Collection[] = [];
-        const updated: Collection[] = [];
-        orderedIds.forEach((id, index) => {
-          const c = byId.get(id);
-          if (c) {
-            const next = { ...c, sortOrder: index };
-            reordered.push(next);
-            updated.push(next);
-            byId.delete(id);
-          }
-        });
-        if (updated.length === 0) return;
-        byId.forEach((c) => reordered.push(c));
-        setLocalCollections(reordered);
-        updated.forEach((c) => syncCollection(c, () => updateRemoteCollection(c.id, { sortOrder: c.sortOrder })));
+        // Same shape as `reorderItemsInCollection`: a dense run written from
+        // the collections this render is holding, and the rows to sync decided
+        // HERE rather than inside an updater React runs when it renders.
+        // The array is no longer the order — the `collections` memo sorts
+        // through `byOwnedCollectionOrder`, so the number is what the home
+        // screen reads back, on this device and on the next one.
+        const plan = planCollectionReorder(localCollections, orderedIds);
+        if (plan.changed.length === 0) return;
+        setLocalCollections(plan.collections);
+        plan.changed.forEach((c) => syncCollection(c, () => updateRemoteCollection(c.id, { sortOrder: c.sortOrder })));
       },
       transferItemToBuyer: async (snapshot, options) => {
         if (!user) return null;

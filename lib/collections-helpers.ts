@@ -184,3 +184,116 @@ export function planItemReorder(
 
   return { items: items.map((item) => renumbered.get(item.id) ?? item), changed };
 }
+
+/**
+ * The home screen's owned-collection ordering: the user's manual drag order
+ * first, then the collections they never dragged, in the order they came in.
+ *
+ * `reorderOwnedCollections` has always written `sortOrder` — to the cloud
+ * column and to the local row — while the home list rendered the ARRAY it also
+ * reordered. So the number was written, synced, and never read: a second
+ * device pulls the rows, `mergeCollectionsFromCloud` rebuilds the array by id,
+ * and the manual order is gone even though it is sitting in `sort_order` the
+ * whole time.
+ *
+ * Two of the three rules `byCollectionOrder` states, for the same reasons: a
+ * dragged collection outranks an undragged one, and two dragged ones sort by
+ * `sortOrder` with `id` breaking a cross-device tie.
+ *
+ * The third is deliberately missing. `Collection` carries no `createdAt`, so
+ * there is nothing to rank two undragged collections BY — this returns 0 for
+ * that pair and leans on `Array.prototype.sort` being stable (specified since
+ * ES2019), which keeps them in the order the caller already had. That order is
+ * newest-first, because `addCollection` prepends; it is a local fact rather
+ * than a total one, and it is the best available until the row gains a
+ * timestamp.
+ */
+export function byOwnedCollectionOrder(a: Collection, b: Collection): number {
+  const aHas = typeof a.sortOrder === "number";
+  const bHas = typeof b.sortOrder === "number";
+  if (aHas && bHas) {
+    return (a.sortOrder as number) - (b.sortOrder as number) || compareKeysAsc(a.id, b.id);
+  }
+  if (aHas) return -1;
+  if (bHas) return 1;
+  return 0;
+}
+
+/** What a collection reorder would write: the new array, and only the rows that moved. */
+export type CollectionReorderPlan = {
+  /** Every collection, the owned ones renumbered in place. `collections` by reference when nothing moved. */
+  readonly collections: Collection[];
+  /** The renumbered owned collections whose `sortOrder` actually changed. */
+  readonly changed: Collection[];
+};
+
+/**
+ * The `sortOrder` run a home-screen reorder should persist.
+ *
+ * `planItemReorder`'s rules, over the collections the user owns: every owned
+ * collection is renumbered (not just the named ones, or the unnamed tail keeps
+ * indices that collide with the fresh head), `orderedIds` decides the head with
+ * unknown and repeated ids skipped, and the rest follow in
+ * `byOwnedCollectionOrder`. Collections the user does not own carry no manual
+ * order — they are somebody else's rows — and are left untouched at their place
+ * in the array.
+ */
+export function planCollectionReorder(
+  collections: readonly Collection[],
+  orderedIds: readonly string[],
+): CollectionReorderPlan {
+  const owned = new Map<string, Collection>();
+  for (const collection of collections) {
+    if (collection.role === "owner") owned.set(collection.id, collection);
+  }
+  if (owned.size === 0) return { collections: collections as Collection[], changed: [] };
+
+  const ranked: Collection[] = [];
+  const placed = new Set<string>();
+  for (const id of orderedIds) {
+    const collection = owned.get(id);
+    if (!collection || placed.has(id)) continue;
+    placed.add(id);
+    ranked.push(collection);
+  }
+  const tail = [...owned.values()].filter((c) => !placed.has(c.id)).sort(byOwnedCollectionOrder);
+
+  const changed: Collection[] = [];
+  const renumbered = new Map<string, Collection>();
+  [...ranked, ...tail].forEach((collection, index) => {
+    if (collection.sortOrder === index) return;
+    const next = { ...collection, sortOrder: index };
+    renumbered.set(collection.id, next);
+    changed.push(next);
+  });
+  if (changed.length === 0) return { collections: collections as Collection[], changed: [] };
+
+  return { collections: collections.map((c) => renumbered.get(c.id) ?? c), changed };
+}
+
+/**
+ * The `sortOrder` a collection created right now should carry, or nothing.
+ *
+ * Nothing while the user has never dragged: an undragged list is rendered in
+ * array order and `addCollection` prepends, so the new collection is already on
+ * top and stamping it would only invent a manual order the user never asked
+ * for.
+ *
+ * Once ANY owned collection carries a number, though, rule 1 says every dragged
+ * collection outranks every undragged one — so an unstamped newcomer would land
+ * at the BOTTOM of the home screen, which is the one place a user does not look
+ * for the collection they just made. One below the lowest index puts it back on
+ * top for the price of a single row write; the run stops being dense until the
+ * next reorder, which is exactly what `planCollectionReorder` renumbers.
+ */
+export function nextCollectionSortOrder(
+  collections: readonly Collection[],
+): number | undefined {
+  let lowest: number | undefined;
+  for (const collection of collections) {
+    if (collection.role !== "owner") continue;
+    if (typeof collection.sortOrder !== "number") continue;
+    if (lowest === undefined || collection.sortOrder < lowest) lowest = collection.sortOrder;
+  }
+  return lowest === undefined ? undefined : lowest - 1;
+}
