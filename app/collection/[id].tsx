@@ -1053,6 +1053,9 @@ export default function CollectionDetailsScreen() {
       // A viewer gets no long press at all — not one that announces a pick-up
       // they cannot perform.
       drag: isOwner ? drag : undefined,
+      // By id, not by reference: a cloud merge rebuilds the objects, so the
+      // same item comes back as a new one and only the id survives.
+      identify: { row: item, keyOf: (i) => i.id },
     });
 
     return (

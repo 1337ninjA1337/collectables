@@ -132,6 +132,29 @@ export type ReorderActionOptions<T> = {
    * viewer's — which is what leaves `onLongPress` undefined.
    */
   readonly drag?: () => void;
+  /**
+   * How to find THIS row again in a list that may have changed since it was
+   * drawn.
+   *
+   * `index` is the render's answer and `rows` is now the action's, and that is
+   * only half a fix: re-checking whether a move exists at the old index says
+   * nothing about whether the row is still sitting there. A cloud merge that
+   * reorders the list leaves the index pointing at a different card, and the
+   * move goes to whatever now occupies it — the user asked to move Alpha and
+   * Beta moves.
+   *
+   * Matched by KEY rather than by reference, because a merge rebuilds the
+   * objects: the same collection comes back as a new object with the same id,
+   * and `indexOf` would not find it. A row the key cannot find is a row that
+   * left the list, and the action does nothing.
+   *
+   * Optional: a caller whose list cannot be reordered underneath it passes
+   * nothing and keeps the render's index.
+   */
+  readonly identify?: {
+    readonly row: T;
+    readonly keyOf: (row: T) => string;
+  };
 };
 
 /**
@@ -156,6 +179,27 @@ export function availableReorderActions<T>(
 }
 
 /**
+ * Where this row sits in the list AS IT IS NOW, or null when it has left it.
+ *
+ * Without an `identify` this is the render's index, unchanged — the behaviour
+ * a caller with a stable list wants and the only thing available before
+ * `identify` existed. With one, the row is found by key, and "not found" is a
+ * row the list no longer holds: deleted, filtered out, moved to another
+ * collection. Doing nothing is the only correct answer there; falling back to
+ * the render's index would move whichever card inherited the slot.
+ */
+function currentIndexOf<T>(
+  rows: readonly T[],
+  index: number,
+  identify: ReorderActionOptions<T>["identify"],
+): number | null {
+  if (!identify) return index;
+  const key = identify.keyOf(identify.row);
+  const found = rows.findIndex((row) => identify.keyOf(row) === key);
+  return found === -1 ? null : found;
+}
+
+/**
  * The `accessibilityActions` / `onAccessibilityAction` pair for one row.
  *
  * The handler answers only to the actions this row actually offers, so an
@@ -164,7 +208,7 @@ export function availableReorderActions<T>(
  * entry the screen adds later — cannot move anything.
  */
 export function reorderActionProps<T>(options: ReorderActionOptions<T>): ReorderActionProps {
-  const { rows, index, enabled, label, commit, announce, drag } = options;
+  const { rows, index, enabled, label, commit, announce, drag, identify } = options;
   const available = availableReorderActions(rows, index, enabled);
 
   return {
@@ -177,9 +221,11 @@ export function reorderActionProps<T>(options: ReorderActionOptions<T>): Reorder
       // and `availableReorderActions` re-run against the fresh list is what
       // decides whether the move still exists at all.
       const current = resolveRows(rows);
-      if (!availableReorderActions(current, index, enabled).includes(name)) return;
-      const to = index + DELTA[name];
-      commit(moveItem(current, index, to));
+      const from = currentIndexOf(current, index, identify);
+      if (from === null) return;
+      if (!availableReorderActions(current, from, enabled).includes(name)) return;
+      const to = from + DELTA[name];
+      commit(moveItem(current, from, to));
       announce("reorderMoved", to, current.length);
     },
     accessibilityRole: REORDER_ROW_ROLE,

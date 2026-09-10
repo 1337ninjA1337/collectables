@@ -155,6 +155,9 @@ export default function HomeScreen() {
       commit: (next) => reorderOwnedCollections(next.map((c) => c.id)),
       announce: (key, at, total) => announceReorder(t, key, at, total),
       drag,
+      // By id, not by reference: a cloud merge rebuilds the objects, so the
+      // same collection comes back as a new one and only the id survives.
+      identify: { row: collection, keyOf: (c) => c.id },
     });
 
     return (

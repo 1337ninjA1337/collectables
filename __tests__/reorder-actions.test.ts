@@ -390,3 +390,102 @@ describe("reorderActionProps — rows read at action time", () => {
     assert.deepEqual(availableReorderActions(() => ["a", "b"], 0), ["moveDown"]);
   });
 });
+
+describe("reorderActionProps — which row, in a list that reordered underneath it", () => {
+  /**
+   * The other half of reading the rows fresh.
+   *
+   * Re-checking whether a move exists at the old index says nothing about
+   * whether the ROW is still sitting there. A cloud merge that reorders the
+   * list leaves the index pointing at a different card: the user asked to move
+   * Alpha and Beta moves, silently and correctly as far as every other check
+   * is concerned.
+   */
+  const keyOf = (row: string) => row;
+
+  function movable(initial: readonly string[], row: string, index: number) {
+    let current = initial;
+    let committed: string[] | null = null;
+    const props = reorderActionProps({
+      rows: () => current,
+      index,
+      label,
+      commit: (next) => {
+        committed = next;
+      },
+      announce: () => {},
+      identify: { row, keyOf },
+    });
+    return {
+      props,
+      change: (next: readonly string[]) => {
+        current = next;
+      },
+      committed: () => committed,
+    };
+  }
+
+  it("moves the row the user picked, not whatever inherited its index", () => {
+    const run = movable(["a", "b", "c"], "b", 1);
+    run.change(["c", "b", "a"]);
+    run.props.onAccessibilityAction({ nativeEvent: { actionName: "moveUp" } });
+    // "b" is still at index 1, so this one would have worked either way…
+    assert.deepEqual(run.committed(), ["b", "c", "a"]);
+  });
+
+  it("follows the row when the list reordered around it", () => {
+    const run = movable(["a", "b", "c"], "b", 1);
+    run.change(["b", "a", "c"]);
+    run.props.onAccessibilityAction({ nativeEvent: { actionName: "moveDown" } });
+    // Without `identify` this would have moved "a" — the card now at index 1.
+    assert.deepEqual(run.committed(), ["a", "b", "c"]);
+  });
+
+  it("does nothing when the row has left the list", () => {
+    // Deleted, filtered out, moved to another collection. Falling back to the
+    // render's index would move whichever card inherited the slot.
+    const run = movable(["a", "b", "c"], "b", 1);
+    run.change(["a", "c"]);
+    run.props.onAccessibilityAction({ nativeEvent: { actionName: "moveUp" } });
+    assert.equal(run.committed(), null);
+  });
+
+  it("keeps the render's index when the caller identifies nothing", () => {
+    // The behaviour before `identify` existed, and what a caller with a stable
+    // list still gets.
+    let current: readonly string[] = ["a", "b", "c"];
+    const seen: string[][] = [];
+    const props = reorderActionProps({
+      rows: () => current,
+      index: 1,
+      label,
+      commit: (next) => {
+        seen.push(next);
+      },
+      announce: () => {},
+    });
+    current = ["b", "a", "c"];
+    props.onAccessibilityAction({ nativeEvent: { actionName: "moveDown" } });
+    assert.deepEqual(seen, [["b", "c", "a"]]);
+  });
+
+  it("matches by key rather than by reference, since a merge rebuilds the objects", () => {
+    let current: readonly { id: string }[] = [{ id: "a" }, { id: "b" }];
+    const seen: string[][] = [];
+    const row = current[1]!;
+    const props = reorderActionProps({
+      rows: () => current,
+      index: 1,
+      label,
+      commit: (next) => {
+        seen.push(next.map((r) => r.id));
+      },
+      announce: () => {},
+      identify: { row, keyOf: (r) => r.id },
+    });
+    // The same two rows, as new objects — what a cloud merge hands back.
+    current = [{ id: "a" }, { id: "b" }];
+    props.onAccessibilityAction({ nativeEvent: { actionName: "moveUp" } });
+    assert.deepEqual(seen, [["b", "a"]]);
+  });
+});
