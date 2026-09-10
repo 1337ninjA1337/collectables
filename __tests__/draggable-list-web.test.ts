@@ -224,6 +224,7 @@ type Gesture = {
   dragRow: (index: number) => void;
   pointerMove: (clientY: number) => void;
   pointerUp: () => void;
+  fire: (type: string, event: Record<string, unknown>) => void;
   isActive: (index: number) => boolean;
   drops: DragEnd[];
 };
@@ -287,6 +288,7 @@ async function mountGesture(
     },
     pointerMove: (clientY) => fire("pointermove", { clientY }),
     pointerUp: () => fire("pointerup", {}),
+    fire,
     isActive: (index) => active.get(index) === true,
     drops,
     restore: dom.restore,
@@ -418,6 +420,57 @@ describe("the web DraggableList shim runs the drag gesture itself", () => {
       assert.deepEqual(gesture.drops, [
         { data: [ROWS[1], ROWS[0]], from: 1, to: 0 },
       ]);
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("keeps the page from scrolling out from under a finger", async () => {
+    // The gesture that made this necessary: a long press is a finger held
+    // still, so the browser has not yet chosen between scrolling and giving
+    // the page the gesture when `drag()` runs. The first `touchmove` is where
+    // it chooses, and a `preventDefault` on a non-passive listener is the
+    // whole vote. Without it every phone drag ends as a `pointercancel`.
+    const gesture = await mountGesture("NestableDraggableFlatList");
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(0);
+      assert.equal(gesture.dom.listeners.touchmove?.length, 1);
+
+      let prevented = 0;
+      gesture.fire("touchmove", { cancelable: true, preventDefault: () => { prevented += 1; } });
+      assert.equal(prevented, 1);
+
+      // An uncancelable move is one the browser has already committed to
+      // scrolling; calling preventDefault there is a console warning and
+      // nothing else.
+      gesture.fire("touchmove", {
+        cancelable: false,
+        preventDefault: () => assert.fail("prevented an uncancelable touchmove"),
+      });
+
+      gesture.pointerUp();
+      assert.equal(gesture.dom.listeners.touchmove?.length, 0);
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("survives a document with no body to unselect", async () => {
+    // `suppressTextSelection` reaches for `document.body.style`, and the fake
+    // document has no body — as does any renderer that is not a browser. The
+    // guard is the difference between a drag that works and a TypeError
+    // thrown from inside a pointer handler, where nothing catches it.
+    const gesture = await mountGesture("DraggableFlatList");
+    try {
+      gesture.layOutRows();
+      const installed = (globalThis as { document?: { body?: unknown } }).document;
+      assert.ok(installed, "the fake document was not installed");
+      assert.equal(installed.body, undefined);
+      assert.doesNotThrow(() => gesture.dragRow(0));
+      gesture.pointerMove(160);
+      gesture.pointerUp();
+      assert.deepEqual(gesture.drops, [{ data: [ROWS[1], ROWS[0]], from: 0, to: 1 }]);
     } finally {
       gesture.restore();
     }

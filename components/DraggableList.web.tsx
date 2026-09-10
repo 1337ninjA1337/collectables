@@ -79,6 +79,46 @@ function draggableDocument(): Document | null {
   return document;
 }
 
+/**
+ * Stops the browser from scrolling the page instead of dragging the row.
+ *
+ * A long press is a finger held STILL, so at the moment `drag()` runs the
+ * browser has not decided anything yet — the first `touchmove` is where it
+ * chooses between scrolling and letting the page have the gesture, and a
+ * non-passive listener that calls `preventDefault` is how the page wins. Once
+ * a scroll has started the choice is made and `pointercancel` ends the drag,
+ * which is what happened on every phone before this existed.
+ *
+ * Registered per gesture rather than as `touch-action: none` on the rows: the
+ * list IS the page on both screens that use it, so a permanent `touch-action`
+ * would cost the user the ability to scroll past the collection they are
+ * looking at.
+ */
+function suppressTouchScrolling(doc: Document): () => void {
+  const block = (event: Event) => {
+    if (event.cancelable) event.preventDefault();
+  };
+  doc.addEventListener("touchmove", block, { passive: false });
+  return () => doc.removeEventListener("touchmove", block);
+}
+
+/**
+ * Stops a mouse drag from selecting the text it passes over.
+ *
+ * `document.body` is optional here because the node-run suites install a fake
+ * document that has none — the guard is the difference between a drag that
+ * works and a `TypeError` inside a pointer handler.
+ */
+function suppressTextSelection(doc: Document): () => void {
+  const style = doc.body?.style;
+  if (!style) return () => {};
+  const previous = style.userSelect;
+  style.userSelect = "none";
+  return () => {
+    style.userSelect = previous;
+  };
+}
+
 function makeDraggableShim() {
   return function DraggableShim<T>(props: any) {
     const {
@@ -119,6 +159,9 @@ function makeDraggableShim() {
       // a second set of listeners on the document.
       detach.current?.();
 
+      const restoreTouch = suppressTouchScrolling(doc);
+      const restoreSelection = suppressTextSelection(doc);
+
       let to = from;
       const onMove = (event: PointerLike) => {
         if (typeof event?.clientY !== "number") return;
@@ -130,6 +173,8 @@ function makeDraggableShim() {
         doc.removeEventListener("pointermove", onMove as EventListener);
         doc.removeEventListener("pointerup", onUp as EventListener);
         doc.removeEventListener("pointercancel", onUp as EventListener);
+        restoreTouch();
+        restoreSelection();
         detach.current = null;
       };
       const onUp = () => {
