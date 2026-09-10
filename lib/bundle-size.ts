@@ -13,7 +13,7 @@
  */
 
 /**
- * 4.53 MiB — today's bundle (~4.501 MiB) plus just under 30 KiB.
+ * 4.55 MiB — today's bundle (4634.4 KiB) plus 24.8 KiB.
  *
  * THE HEADROOM IS THE GUARD, and it is chosen against the smallest thing this
  * budget has to catch rather than against how much room feels comfortable.
@@ -28,11 +28,20 @@
  * 190 KiB of headroom could never have caught either SDK anyway. Both halves
  * of that comment were wrong in opposite directions.
  *
+ * 4.55 MiB on 2026-09-10, re-measured for the same reason and argued the same
+ * way. Three features (the dense-run reorder writer, the per-collection sort
+ * preference, and the toast action) took the bundle from 4619.4 to 4634.4 KiB
+ * and the headroom from 19.3 to 4.3 — a fourth diff of ordinary size would
+ * have gone red on nothing an SDK did. The raise buys 24.8 KiB, which is still
+ * below Clarity, so a statically-imported SDK still trips on its own commit.
+ * The number moves by re-measuring and re-arguing, never by rounding up until
+ * the build passes.
+ *
  * Raising this is a decision to be argued, not a step in fixing a red build:
  * `bundle-size.test.ts` asserts the headroom stays under the smaller SDK, so a
  * raise that gives up the guard fails there instead of passing quietly.
  */
-export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.53 * 1024 * 1024;
+export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.55 * 1024 * 1024;
 
 /**
  * The smallest SDK the budget must still catch as a static import, in bytes.
