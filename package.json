@@ -23,6 +23,7 @@
     "verify:bundle-inlining": "tsx scripts/verify-bundle-inlining.ts",
     "lint:profile-id-pii": "tsx scripts/check-profile-id-pii.ts",
     "lint:orphan-i18n": "tsx scripts/check-orphan-i18n-keys.ts",
+    "lint:platform-pairs": "tsx scripts/check-platform-pairs.ts",
     "lint:problem-phrasing": "tsx scripts/check-problem-phrasing-imports.ts",
     "lint:clarity-mask": "tsx scripts/check-clarity-input-mask.ts",
     "lint:migration-docs": "tsx scripts/check-migration-docs.ts",

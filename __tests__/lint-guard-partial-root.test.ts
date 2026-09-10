@@ -117,6 +117,10 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // `app` at 19 files is nowhere near it.
   "check-profile-id-pii": () => ["app"],
   "check-console-swap": () => sliceOfEveryRoot("check-console-swap"),
+  // Walks app + components + data + lib. `data` holds exactly three .ts files,
+  // which is the default slice — so this is the one spec where the slice is a
+  // whole root, and it is still a slice of the other three.
+  "check-platform-pairs": () => sliceOfEveryRoot("check-platform-pairs"),
   // The widest walk in the registry — six roots, 810 files, a floor of 600.
   // Same slice-of-every-root shape as the others: `__tests__` alone is 511
   // files, so handing over whole roots would either copy most of the tree or

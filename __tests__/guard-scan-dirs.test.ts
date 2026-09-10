@@ -72,6 +72,13 @@ const GUARD_SCANS: Readonly<
       scripts: "build and guard code renders nothing",
     },
   },
+  "check-platform-pairs": {
+    dirs: ["app", "components", "data", "lib"],
+    excludes: {
+      scripts:
+        "node tooling, never in a Metro bundle — a `.web.ts` there would be a file no platform resolves, so there is no pair to disagree",
+    },
+  },
   "check-a11y-jsx": {
     // The same walk as check-clarity-input-mask, down to the extensions, and
     // it was the guard this table did NOT have — for two months, because the

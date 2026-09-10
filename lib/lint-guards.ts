@@ -80,6 +80,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "No base translation key that nothing in the source tree reads — an orphan still resolves through every locale's ...en spread, so nothing at runtime shows it",
   },
   {
+    npmScript: "lint:platform-pairs",
+    scriptPath: "scripts/check-platform-pairs.ts",
+    args: [],
+    description:
+      "Every *.web.ts(x) has a native sibling and both halves export the same names — Metro serves one per platform, tsc checks each alone and the node suites only ever import the native one",
+  },
+  {
     npmScript: "lint:problem-phrasing",
     scriptPath: "scripts/check-problem-phrasing-imports.ts",
     args: [],

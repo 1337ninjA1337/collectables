@@ -825,6 +825,10 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     count: { label: "source file", minimum: 200 },
     note: "app/ + components/ + data/ + lib/ + scripts/ held 262 .ts/.tsx files on 2026-08-21, minus lib/i18n-context.tsx itself (which declares every key, so counting it would make every key read) = 261. 200 rides above the 163 that lib/ alone contributes, so no single root clears this floor on its own — the property matters more here than for most, because a key's only reader is often a TABLE in lib/ rather than a `t()` call in a screen, and a walk that had quietly lost app/ would report those keys live while missing every orphan a screen used to render.",
   },
+  "check-platform-pairs": {
+    count: { label: "source file", minimum: 200, roots: ["app", "components", "data", "lib"] },
+    note: "app/ + components/ + data/ + lib/ held 267 .ts/.tsx files on 2026-09-10 (app 19, components 47, data 3, lib 198); 200 leaves 25% of them deletable. `roots` carries the no-lost-root property — data/ is three files and no count could ever ride above it — so this number's only job is the walk that came back implausibly small with every root present. scripts/ is deliberately absent: Metro never resolves it, so a platform spelling there would be a file nothing imports.",
+  },
   "check-problem-phrasing-imports": {
     count: { label: "source file", minimum: 535, roots: ["app", "components", "lib", "scripts", "__tests__"] },
     note: "app/ + components/ + lib/ + scripts/ + __tests__/ held 716 .ts/.tsx files on 2026-08-21 (app 19, components 46, lib 168, scripts 32, tests 451); 535 leaves 25% deletable. It used to have to ride above the 451 that __tests__/ alone contributes, which made it the entry likeliest to need re-measuring next — 96% of the way there at one point. `roots` holds that property now, asserted by the guard rather than by this number, and what is left is a plausibility check on the total.",

@@ -83,6 +83,15 @@ const PLANTED: Readonly<
     // is planting. That is the rule working on its own test.
     source: `/${"*"}*\n * A glob written out: \`**${"*"}${"/"}.ts\`, and this became code.\n ${"*"}${"/"}\nexport const x = 1;\n`,
   },
+  "check-platform-pairs": {
+    entries: ["app", "components", "data", "lib"],
+    // A web spelling with no native sibling — the one finding of this guard
+    // that a SINGLE planted file can produce. The name-set comparison needs
+    // two files to disagree, and this table plants one; the mismatch cases are
+    // run against sources rather than a tree in platform-pairs.test.ts.
+    file: "lib/planted-offender.web.ts",
+    source: "export const shim = 1;\n",
+  },
   "check-a11y-jsx": {
     entries: ["app", "components"],
     file: "app/planted-offender.tsx",
