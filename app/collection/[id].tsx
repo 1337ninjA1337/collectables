@@ -31,6 +31,7 @@ import { reorderActionProps } from "@/lib/reorder-actions";
 import { announceReorder } from "@/lib/reorder-announcement";
 import { flatListStyles } from "@/lib/flat-list-styles";
 import { useChunkedList } from "@/lib/use-chunked-list";
+import { useItemSortPref } from "@/lib/use-item-sort-pref";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { useI18n } from "@/lib/i18n-context";
 import { getDefaultLocaleForLanguage } from "@/lib/locale-helpers";
@@ -116,6 +117,32 @@ export default function CollectionDetailsScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [itemFilters, setItemFilters] = useState<ItemFilters>(EMPTY_FILTERS);
+  // The sort — and ONLY the sort — survives leaving the screen. A query or a
+  // tag filter is the question the user is asking right now; the sort is how
+  // they like to read this collection, and re-picking it on every visit is two
+  // taps behind a sheet. See lib/item-sort-prefs.ts.
+  const [restoredSort, rememberSort] = useItemSortPref(params.id);
+  // Applied once, and never over a choice the user has already made: the read
+  // is async, so a user who opens the sheet and picks a sort in the meantime
+  // must not have it replaced by the one the store was still fetching.
+  const sortRestoredRef = useRef(false);
+  const applyFilters = useCallback(
+    (next: ItemFilters) => {
+      sortRestoredRef.current = true;
+      setItemFilters(next);
+      rememberSort(next.sort);
+    },
+    [rememberSort],
+  );
+  useEffect(() => {
+    sortRestoredRef.current = false;
+  }, [params.id]);
+  useEffect(() => {
+    if (restoredSort === null || sortRestoredRef.current) return;
+    sortRestoredRef.current = true;
+    if (restoredSort === "default") return;
+    setItemFilters((current) => ({ ...current, sort: restoredSort }));
+  }, [restoredSort]);
   const [exporting, setExporting] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -705,17 +732,22 @@ export default function CollectionDetailsScreen() {
     announceMessage(t("reorderBlockedBySort"));
   }, [reorderBlockedBySort, t]);
 
-  const resetSort = useCallback(
-    () => setItemFilters((current) => ({ ...current, sort: "default" })),
-    [],
-  );
+  // Not routed through `applyFilters`: the functional updater is what keeps
+  // this resetting ONLY the sort, and taking `itemFilters` as a dep to build
+  // the object instead would give the callback a new identity on every
+  // keystroke in the search box — the identity HM-A's memo depends on.
+  const resetSort = useCallback(() => {
+    sortRestoredRef.current = true;
+    rememberSort("default");
+    setItemFilters((current) => ({ ...current, sort: "default" }));
+  }, [rememberSort]);
 
   const listTitleAndFilters = useMemo(
     () => (
       <>
         <Text style={styles.listTitle}>{t("collectionItems")}</Text>
         {allItems.length > 0 ? (
-          <ItemFilterBar filters={itemFilters} onChange={setItemFilters} />
+          <ItemFilterBar filters={itemFilters} onChange={applyFilters} />
         ) : null}
         {reorderBlockedBySort ? (
           <View style={styles.reorderNotice} accessibilityRole="alert">
@@ -732,7 +764,7 @@ export default function CollectionDetailsScreen() {
         ) : null}
       </>
     ),
-    [allItems.length, itemFilters, reorderBlockedBySort, resetSort, t],
+    [allItems.length, applyFilters, itemFilters, reorderBlockedBySort, resetSort, t],
   );
 
   // Manual Load-more CTA — only for the nestable drag-mode fallback, where
@@ -1258,7 +1290,7 @@ export default function CollectionDetailsScreen() {
             title={t("emptySearchTitle")}
             hint={t("emptySearchHint")}
             actionLabel={t("filterReset")}
-            onAction={() => setItemFilters(EMPTY_FILTERS)}
+            onAction={() => applyFilters(EMPTY_FILTERS)}
             compact
           />
         ) : isDragBranch ? (

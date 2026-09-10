@@ -7,6 +7,12 @@ export const DIAGNOSTICS_KEY = "collectables-diagnostics-v1";
 export const CURRENCY_KEY = "collectables-currency-v1";
 export const PINNED_CURRENCIES_KEY = "collectables-pinned-currencies-v1";
 export const CURRENCY_RATES_KEY = "collectables-currency-rates-v1";
+/**
+ * Sort mode per collection id, as one blob. Not user-scoped: collection ids
+ * are uuids, so two accounts on one device cannot collide, and the value is a
+ * view preference rather than anything a signed-out user should not see.
+ */
+export const ITEM_SORT_KEY = "collectables-item-sort-v1";
 
 export function collectionsKey(userId: string): string {
   return `collectables-collections-v1-${userId}`;

@@ -49,6 +49,8 @@ export const STORAGE_FAILURE_SITES = [
   "locale-helpers.setItem",
   "marketplace-transfer-log.getItem",
   "marketplace-transfer-log.setItem",
+  "use-item-sort-pref.getItem",
+  "use-item-sort-pref.setItem",
 ] as const;
 
 /** One of {@link STORAGE_FAILURE_SITES}. */

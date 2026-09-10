@@ -98,18 +98,28 @@ describe("reorder-blocked-by-sort notice — rendering", () => {
     const src = readScreenSrc();
     assert.match(
       src,
-      /const resetSort = useCallback\(\s*\n\s*\(\) => setItemFilters\(\(current\) => \(\{ \.\.\.current, sort: "default" \}\)\),\s*\n\s*\[\],\s*\n\s*\);/,
+      /setItemFilters\(\(current\) => \(\{ \.\.\.current, sort: "default" \}\)\);/,
     );
-    const decl = src.match(/const resetSort = useCallback\([\s\S]*?\);\n/)?.[0] ?? "";
+    // And the reset is remembered, or the sort the user just turned off comes
+    // back the next time they open the collection.
+    assert.match(src, /rememberSort\("default"\);/);
+    const decl = src.match(/const resetSort = useCallback\(\(\) => \{[\s\S]*?\}, \[[^\]]*\]\);/)?.[0] ?? "";
+    assert.ok(decl.length > 0, "expected to extract the resetSort declaration");
     assert.doesNotMatch(decl, /EMPTY_FILTERS/);
   });
 
   it("keeps resetSort referentially stable so the memo is not defeated", () => {
     // An inline arrow would change identity every render and re-run the
     // listTitleAndFilters memo on every parent pass — the exact cost HM-A
-    // exists to avoid.
-    const decl = readScreenSrc().match(/const resetSort = useCallback\([\s\S]*?\);\n/)?.[0] ?? "";
-    assert.match(decl, /\[\],\s*\n\s*\);/, "resetSort must have an empty dep array");
+    // exists to avoid. `rememberSort` is a useCallback keyed on the collection
+    // id, so the dep is stable for as long as the screen is showing one
+    // collection; building the next filters from `itemFilters` instead would
+    // NOT be, which is why the reset uses the functional updater.
+    const decl =
+      readScreenSrc().match(/const resetSort = useCallback\(\(\) => \{[\s\S]*?\}, \[[^\]]*\]\);/)?.[0] ?? "";
+    assert.ok(decl.length > 0, "expected to extract the resetSort declaration");
+    assert.match(decl, /\}, \[rememberSort\]\);$/, "resetSort must depend only on rememberSort");
+    assert.doesNotMatch(decl, /itemFilters/, "resetSort must not close over the filter state");
   });
 
   it("styles the notice with design tokens, no inline hex", () => {
