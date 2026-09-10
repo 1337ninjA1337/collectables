@@ -298,3 +298,95 @@ describe("reorderActionProps — the pointer route", () => {
     assert.equal(REORDER_ROW_ROLE, "button");
   });
 });
+
+describe("reorderActionProps — rows read at action time", () => {
+  /**
+   * The gap a plain array leaves open.
+   *
+   * The props are built during the render that drew the row. The action fires
+   * later — a screen reader focuses a card, the user thinks, then presses. A
+   * cloud merge or a `loadMore` in between changes the list, and a handler
+   * closing over the old array commits an order nobody is looking at. Passing
+   * a function backed by a ref is what closes it, and both screens do.
+   */
+  function movable(initial: readonly string[]) {
+    let current = initial;
+    let committed: string[] | null = null;
+    let announced: Announced | null = null;
+    const props = reorderActionProps({
+      rows: () => current,
+      index: 1,
+      label,
+      commit: (next) => {
+        committed = next;
+      },
+      announce: (key, at, total) => {
+        announced = [key, at, total];
+      },
+    });
+    return {
+      props,
+      change: (next: readonly string[]) => {
+        current = next;
+      },
+      committed: () => committed,
+      announced: () => announced,
+    };
+  }
+
+  it("commits the list as it is when the action fires, not as it was", () => {
+    const run = movable(["a", "b", "c"]);
+    run.change(["a", "b", "c", "d", "e"]);
+    run.props.onAccessibilityAction({ nativeEvent: { actionName: "moveDown" } });
+    assert.deepEqual(run.committed(), ["a", "c", "b", "d", "e"]);
+    // …and the total said aloud is the new one, not the length the row was
+    // drawn against.
+    assert.deepEqual(run.announced(), ["reorderMoved", 2, 5]);
+  });
+
+  it("refuses a move the list has grown out of", () => {
+    // The row was drawn in the middle of a five-item list and offered both
+    // moves; by the time the action fires the list is two items and this row
+    // is last. Committing "move down" would clamp — a write that changes
+    // nothing, announced as a move.
+    const run = movable(["a", "b", "c", "d", "e"]);
+    run.change(["a", "b"]);
+    run.props.onAccessibilityAction({ nativeEvent: { actionName: "moveDown" } });
+    assert.equal(run.committed(), null);
+    assert.equal(run.announced(), null);
+  });
+
+  it("still offers what the render-time list supported, so the row is not empty", () => {
+    // Availability is a render-time question: the platform needs the action
+    // list when it draws the row, and re-deciding it at action time is what
+    // the case above is for.
+    const run = movable(["a", "b", "c"]);
+    assert.deepEqual(
+      run.props.accessibilityActions.map((action) => action.name),
+      ["moveUp", "moveDown"],
+    );
+  });
+
+  it("reads the length fresh for the pick-up announcement too", () => {
+    const run = movable(["a", "b", "c"]);
+    run.change(["a", "b", "c", "d"]);
+    const withDrag = reorderActionProps({
+      rows: () => ["a", "b", "c", "d"],
+      index: 1,
+      label,
+      commit: () => {},
+      announce: (key, at, total) => {
+        assert.deepEqual([key, at, total], ["reorderPickedUp", 1, 4]);
+      },
+      drag: () => {},
+    });
+    withDrag.onLongPress?.();
+  });
+
+  it("takes a plain array too, for a caller with nothing to go stale", () => {
+    // Building a ref to say "this list cannot change" would be ceremony; the
+    // suites above pass arrays throughout.
+    assert.deepEqual(availableReorderActions(["a", "b"], 0), ["moveDown"]);
+    assert.deepEqual(availableReorderActions(() => ["a", "b"], 0), ["moveDown"]);
+  });
+});

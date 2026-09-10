@@ -94,8 +94,8 @@ describe("the announcement helper", () => {
 
 describe("both screens announce both moments", () => {
   const screens = [
-    { screen: "app/index.tsx", rows: "ownedCollections" },
-    { screen: "app/collection/[id].tsx", rows: "visibleItems" },
+    { screen: "app/index.tsx", rows: "ownedCollectionsRef" },
+    { screen: "app/collection/[id].tsx", rows: "visibleItemsRef" },
   ] as const;
 
   for (const { screen, rows } of screens) {
@@ -139,7 +139,7 @@ describe("both screens announce both moments", () => {
         const announce = code.indexOf("announce: (key, at, total) =>");
         assert.ok(commit > 0, `expected a \`commit:\` callback in ${screen}`);
         assert.ok(announce > commit, `expected an \`announce:\` callback after it in ${screen}`);
-        assert.match(code, new RegExp(`rows: ${rows},`));
+        assert.match(code, new RegExp(`rows: \\(\\) => ${rows}\\.current,`));
       });
     });
   }

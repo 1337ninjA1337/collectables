@@ -213,6 +213,12 @@ export default function CollectionDetailsScreen() {
   // sort swap) because `items` is memoized on `[filteredItems, itemFilters.sort]`
   // above and `filteredItems` is memoized on `[allItems, itemFilters]`.
   const { visibleItems, hasMore, loadMore } = useChunkedList(items);
+  // The page as it is NOW, for a keyboard move that fires after the render
+  // that drew the row — a `loadMore` or a cloud merge between a screen reader
+  // focusing a row and the action firing would otherwise commit the order the
+  // user is no longer looking at. See ReorderRows in lib/reorder-actions.ts.
+  const visibleItemsRef = useRef(visibleItems);
+  visibleItemsRef.current = visibleItems;
 
   // Resolve profile details for every viewer listed on the collection so the
   // share sheet can show non-friends (link-granted viewers) alongside friends.
@@ -1038,7 +1044,7 @@ export default function CollectionDetailsScreen() {
   const renderItemRow = ({ item, drag, isActive, getIndex }: RenderItemParams<CollectableItem>) => {
     const index = getIndex();
     const reorderActions = reorderActionProps({
-      rows: visibleItems,
+      rows: () => visibleItemsRef.current,
       index,
       enabled: isDragBranch,
       label: t,

@@ -1,6 +1,6 @@
 import { Link, router } from "expo-router";
 import { Stack } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NestableDraggableFlatList, ScaleDecorator, RenderItemParams } from "../components/DraggableList";
 
@@ -95,6 +95,20 @@ export default function HomeScreen() {
   // hold and not a leading debounce.
   const showRefreshing = useMinimumVisible(refreshing);
 
+  // Hoisted above the `!ready` early return so the ref below can be a hook,
+  // and memoised so the list is one array per `collections` rather than a new
+  // one per render.
+  const ownedCollections = useMemo(
+    () => collections.filter((collection) => collection.role === "owner"),
+    [collections],
+  );
+  // The list as it is NOW, for a keyboard move that fires after the render
+  // that drew the row — a cloud merge between a screen reader focusing a card
+  // and the action firing would otherwise commit the order the user is no
+  // longer looking at. See ReorderRows in lib/reorder-actions.ts.
+  const ownedCollectionsRef = useRef(ownedCollections);
+  ownedCollectionsRef.current = ownedCollections;
+
   if (!ready) {
     return (
       <Screen>
@@ -107,7 +121,6 @@ export default function HomeScreen() {
     );
   }
 
-  const ownedCollections = collections.filter((collection) => collection.role === "owner");
   const sharedWithMeIds = new Set(sharedWithMeCollections.map((c) => c.id));
   const friendCollections = collections.filter((collection) =>
     collection.role === "viewer" && (friends.includes(collection.ownerUserId) || sharedWithMeIds.has(collection.id))
@@ -136,7 +149,7 @@ export default function HomeScreen() {
   const renderOwnedCollection = ({ item: collection, drag, isActive, getIndex }: RenderItemParams<Collection>) => {
     const index = getIndex();
     const reorderActions = reorderActionProps({
-      rows: ownedCollections,
+      rows: () => ownedCollectionsRef.current,
       index,
       label: t,
       commit: (next) => reorderOwnedCollections(next.map((c) => c.id)),

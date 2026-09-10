@@ -71,9 +71,34 @@ export type ReorderActionProps = {
   readonly onLongPress: (() => void) | undefined;
 };
 
+/**
+ * The rows a move happens within, either as they are or as a way of asking.
+ *
+ * A plain array is the array from the RENDER THAT DREW THE ROW, and there is a
+ * gap between that render and the action firing: a screen reader focuses a
+ * card, a cloud merge or a `loadMore` lands, and the handler still closes over
+ * the old list. Committing it renumbers an order the user is not looking at.
+ * A function is read at action time instead — back it with a ref that each
+ * render updates and the gap closes. The web drag shim solved the same problem
+ * the same way.
+ *
+ * Both are accepted because the availability question ("is this row last?") is
+ * a render-time one either way, and a caller with no staleness to worry about
+ * should not have to build a ref to say so.
+ */
+export type ReorderRows<T> = readonly T[] | (() => readonly T[]);
+
+/** Whichever form the caller used, as an array. */
+function resolveRows<T>(rows: ReorderRows<T>): readonly T[] {
+  return typeof rows === "function" ? rows() : rows;
+}
+
 export type ReorderActionOptions<T> = {
-  /** The rows as they are rendered — the list the move happens WITHIN. */
-  readonly rows: readonly T[];
+  /**
+   * The list the move happens WITHIN — see {@link ReorderRows} for why this
+   * may be a function, and what a plain array costs.
+   */
+  readonly rows: ReorderRows<T>;
   /**
    * This row's place in `rows`, straight from `getIndex()`.
    *
@@ -118,14 +143,15 @@ export type ReorderActionOptions<T> = {
  * first row is a silent no-op; this is what keeps it from being offered.
  */
 export function availableReorderActions<T>(
-  rows: readonly T[],
+  rows: ReorderRows<T>,
   index: number | undefined,
   enabled = true,
 ): ReorderActionName[] {
   if (!enabled || index === undefined) return [];
+  const length = resolveRows(rows).length;
   return REORDER_ACTIONS.filter((name) => {
     const to = index + DELTA[name];
-    return to >= 0 && to < rows.length;
+    return to >= 0 && to < length;
   });
 }
 
@@ -146,9 +172,15 @@ export function reorderActionProps<T>(options: ReorderActionOptions<T>): Reorder
     onAccessibilityAction: (event) => {
       const name = event.nativeEvent.actionName as ReorderActionName;
       if (index === undefined || !available.includes(name)) return;
+      // Read NOW, not at render: see ReorderRows. `moveItem` is total, so a
+      // list that shrank between the two reads clamps rather than throwing —
+      // and `availableReorderActions` re-run against the fresh list is what
+      // decides whether the move still exists at all.
+      const current = resolveRows(rows);
+      if (!availableReorderActions(current, index, enabled).includes(name)) return;
       const to = index + DELTA[name];
-      commit(moveItem(rows, index, to));
-      announce("reorderMoved", to, rows.length);
+      commit(moveItem(current, index, to));
+      announce("reorderMoved", to, current.length);
     },
     accessibilityRole: REORDER_ROW_ROLE,
     onLongPress:
@@ -158,7 +190,7 @@ export function reorderActionProps<T>(options: ReorderActionOptions<T>): Reorder
             // Before `drag()`, not after: once the gesture starts the row is
             // being held rather than sitting at a position, and a pick-up read
             // aloud from mid-drag names wherever the finger has reached.
-            announce("reorderPickedUp", index, rows.length);
+            announce("reorderPickedUp", index, resolveRows(rows).length);
             drag();
           },
   };

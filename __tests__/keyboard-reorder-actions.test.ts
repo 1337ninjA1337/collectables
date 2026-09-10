@@ -54,7 +54,7 @@ describe("owned-collection reorder actions — the actions themselves", () => {
     assert.match(readHomeSrc(), /import \{ reorderActionProps \} from "@\/lib\/reorder-actions";/);
     const body = renderer();
     assert.match(body, /const reorderActions = reorderActionProps\(\{/);
-    assert.match(body, /rows: ownedCollections,/);
+    assert.match(body, /rows: \(\) => ownedCollectionsRef\.current,/);
     assert.match(body, /index,/);
     assert.match(body, /label: t,/);
   });
@@ -71,10 +71,21 @@ describe("owned-collection reorder actions — the actions themselves", () => {
     assert.match(renderer(), /const index = getIndex\(\);/);
   });
 
-  it("offers every owned collection as the list a move happens within", () => {
+  it("offers every owned collection as the list a move happens within, read fresh", () => {
     // `rows` is what the move is computed against and what gets committed —
-    // handing over a filtered or sliced array would renumber the rest.
-    assert.match(renderer(), /rows: ownedCollections,/);
+    // handing over a filtered or sliced array would renumber the rest. A
+    // FUNCTION rather than the array, so an action that fires after a cloud
+    // merge commits the list the user is actually looking at; the ref is
+    // updated on every render, above the `!ready` early return so it can be a
+    // hook at all.
+    assert.match(renderer(), /rows: \(\) => ownedCollectionsRef\.current,/);
+    const src = readHomeSrc();
+    assert.match(src, /const ownedCollectionsRef = useRef\(ownedCollections\);/);
+    assert.match(src, /ownedCollectionsRef\.current = ownedCollections;/);
+    assert.ok(
+      src.indexOf("const ownedCollectionsRef =") < src.indexOf("if (!ready)"),
+      "the ref must be declared above the early return, or it is a conditional hook",
+    );
   });
 
   it("keeps the long press, so a pointer user loses nothing", () => {

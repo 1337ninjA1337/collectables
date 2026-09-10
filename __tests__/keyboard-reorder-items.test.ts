@@ -112,8 +112,14 @@ describe("the collection screen's reorder actions", () => {
     // Moving within `items` would be off by every row the filter dropped —
     // `rows` is what reorderActionProps computes the move against.
     const body = renderer();
-    assert.match(body, /rows: visibleItems,/);
+    // A function rather than the array: a `loadMore` between a screen reader
+    // focusing a row and the action firing would otherwise commit the page as
+    // it was drawn. The ref is updated beside the chunked list it mirrors.
+    assert.match(body, /rows: \(\) => visibleItemsRef\.current,/);
     assert.match(body, /commit: commitItemOrder,/);
+    const src = readScreenSrc();
+    assert.match(src, /const visibleItemsRef = useRef\(visibleItems\);/);
+    assert.match(src, /visibleItemsRef\.current = visibleItems;/);
   });
 
   it("reads the row's own index rather than assuming one", () => {
