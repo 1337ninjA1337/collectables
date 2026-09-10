@@ -72,7 +72,7 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
       src,
       /const commitItemOrder = \(page: CollectableItem\[\]\) => \{\s*\n\s*reorderItemsInCollection\(\s*activeCollection\.id\s*,\s*orderWithUnrenderedTail\(\s*page\s*,\s*items\s*\)\s*\);/,
     );
-    assert.match(src, /onDragEnd=\{\s*\(\{\s*data\s*\}\)\s*=>\s*commitItemOrder\(\s*data\s*\)\s*\}/);
+    assert.match(src, /onDragEnd=\{\(\{ data, to \}\) => \{\s*\n\s*commitItemOrder\(data\);/);
   });
 
   it("selection-mode branch feeds visibleItems into a FlatList (VM-E — not items, not a .map)", () => {

@@ -71,8 +71,11 @@ describe("owned-collection reorder actions — the actions themselves", () => {
   });
 
   it("keeps the long press, so a pointer user loses nothing", () => {
+    // Wrapped since the pick-up announcement landed, but `drag()` is still what
+    // it ends in — a wrapper that forgot to call it would leave the pointer
+    // user with a card that dims and never moves.
     const body = renderer();
-    assert.match(body, /onLongPress=\{drag\}/);
+    assert.match(body, /onLongPress=\{\(\) => \{[\s\S]*?drag\(\);\n\s*\}\}/);
     assert.match(body, /disabled=\{isActive\}/);
   });
 });
