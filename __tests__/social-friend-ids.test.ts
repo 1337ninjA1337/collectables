@@ -270,6 +270,36 @@ describe("the request list is walked twice, not once per asker", () => {
   });
 });
 
+describe("a request naming one person on both sides is not a relationship", () => {
+  it("does not make the viewer their own friend", async () => {
+    // Such a row lands in both directions, so the intersection holds the
+    // viewer's own id: their name in `friends`, a profile fetch for somebody
+    // this provider already holds, and a count one too high. `getRelationship`
+    // answers "self" first, so nothing on screen would ever have said so.
+    remoteRequests = [{ from_user_id: "user-a", to_user_id: "user-a" }];
+    await mount();
+
+    assert.deepEqual(value().friends, []);
+    assert.equal(value().friendIds.has("user-a"), false);
+    assert.equal(value().getRelationship("user-a"), "self");
+  });
+
+  it("does not put the viewer in their own inbox", async () => {
+    remoteRequests = [{ from_user_id: "user-a", to_user_id: "user-a" }];
+    await mount();
+
+    assert.deepEqual(value().incomingRequestUserIds, []);
+  });
+
+  it("leaves a real handshake in the same list alone", async () => {
+    // The guard drops one row, not the pass it sits in.
+    remoteRequests = [{ from_user_id: "user-a", to_user_id: "user-a" }, ...mutualWith(LEV)];
+    await mount();
+
+    assert.deepEqual(value().friends, [LEV]);
+  });
+});
+
 describe("the inbox excludes people who are already friends", () => {
   it("drops the incoming half of a mutual handshake", async () => {
     // `incomingRequestUserIds` filtered with `friends.includes` — friends ×
@@ -280,6 +310,33 @@ describe("the inbox excludes people who are already friends", () => {
 
     assert.deepEqual(value().incomingRequestUserIds, [MILA]);
     assert.equal(value().getRelationship(MILA), "request_received");
+  });
+
+  it("keeps the order the requests arrived in", async () => {
+    // It reads `incoming` rather than re-filtering the list; a Set iterates in
+    // insertion order and `incoming` was filled by walking that list, so the
+    // inbox is still oldest-first.
+    remoteRequests = [
+      { from_user_id: SOFIA, to_user_id: "user-a" },
+      { from_user_id: MILA, to_user_id: "user-a" },
+      { from_user_id: LEV, to_user_id: "user-a" },
+    ];
+    await mount();
+
+    assert.deepEqual(value().incomingRequestUserIds, [SOFIA, MILA, LEV]);
+  });
+
+  it("lists a duplicated pair once", async () => {
+    // The one place the set difference differs from the filter it replaced: a
+    // request list carrying the same pair twice used to put that person in the
+    // inbox twice, which renders as two identical rows.
+    remoteRequests = [
+      { from_user_id: MILA, to_user_id: "user-a" },
+      { from_user_id: MILA, to_user_id: "user-a" },
+    ];
+    await mount();
+
+    assert.deepEqual(value().incomingRequestUserIds, [MILA]);
   });
 });
 

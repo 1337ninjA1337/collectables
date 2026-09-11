@@ -604,6 +604,16 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
    * the order the requests arrived in, and it is what the profile fetch and the
    * home screen's count render from. Intersecting would reorder it by whichever
    * direction happened to be recorded first.
+   *
+   * A row naming one person on both sides is dropped before any of that. It
+   * would land in `outgoing` AND `incoming`, which makes the viewer their own
+   * friend: their id in `friends`, a `fetchProfileById` for a profile this
+   * provider already holds, and a count one too high. `getRelationship` answers
+   * `"self"` before it looks at either set, so nothing on screen would say so,
+   * and the DB's own constraint rejects the row — which makes this the kind of
+   * hole that is unreachable right up until a locally-created request skips
+   * that path. It is one comparison, and a directed pair between one person is
+   * not a relationship in either direction.
    */
   const requestDirections = useMemo(() => {
     const outgoing = new Set<string>();
@@ -613,11 +623,12 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       return { outgoing, incoming, mutual };
     }
 
-    for (const request of friendRequests) {
+    const pairs = friendRequests.filter((request) => request.fromUserId !== request.toUserId);
+    for (const request of pairs) {
       if (request.fromUserId === user.id) outgoing.add(request.toUserId);
       if (request.toUserId === user.id) incoming.add(request.fromUserId);
     }
-    for (const request of friendRequests) {
+    for (const request of pairs) {
       if (request.fromUserId === user.id && incoming.has(request.toUserId)) {
         mutual.add(request.toUserId);
       }
@@ -629,10 +640,10 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   }, [friendRequests, user]);
 
   /**
-   * The mutual half of the request list, as the membership test every consumer
-   * was writing for itself; `friends` below is the array every renderer wants.
-   * Producing both from one pass is free, and it is what stops the next caller
-   * from rebuilding the Set at its own call site.
+   * An alias, not a derivation — which is why it is a `const` among memos. The
+   * stability consumers depend on comes from `requestDirections` above; a
+   * `useMemo` here would recompute on exactly the renders that one already
+   * does, and would read as though it were doing work.
    */
   const friendIds: ReadonlySet<string> = requestDirections.mutual;
 
@@ -682,12 +693,22 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     return () => { active = false; };
   }, [friends]);
 
-  const incomingRequestUserIds = useMemo(() => {
-    if (!user) return [];
-    return friendRequests
-      .filter((r) => r.toUserId === user.id && !friendIds.has(r.fromUserId))
-      .map((r) => r.fromUserId);
-  }, [friendIds, friendRequests, user]);
+  /**
+   * The inbox: requests waiting on an answer, which is `incoming` minus the
+   * ones already answered.
+   *
+   * It filtered the raw list — a fourth pass over something three sets are
+   * already derived from — for the same answer in the same order, since a Set
+   * iterates in insertion order and `incoming` was filled by walking that list.
+   * Same order, one difference: two rows from the same person are one entry
+   * rather than two, so a duplicated pair can no longer put somebody in the
+   * inbox twice. `requestDirections` is now the only reader of
+   * `friendRequests`.
+   */
+  const incomingRequestUserIds = useMemo(
+    () => [...requestDirections.incoming].filter((id) => !friendIds.has(id)),
+    [friendIds, requestDirections],
+  );
 
   const profileById = useMemo(() => {
     const map = new Map<string, UserProfile>();
