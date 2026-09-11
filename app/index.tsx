@@ -188,8 +188,8 @@ export default function HomeScreen() {
    * render" decision; this is the one line of arithmetic that is about THIS
    * screen's two lists.
    */
-  const renderLoadMore = (window: ChunkedList<Collection>, total: number) => (
-    <LoadMoreButton remaining={total - window.visibleItems.length} onPress={window.loadMore} />
+  const renderLoadMore = (window: ChunkedList<Collection>) => (
+    <LoadMoreButton remaining={window.remaining} onPress={window.loadMore} />
   );
 
   /**
@@ -467,7 +467,7 @@ export default function HomeScreen() {
                           <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={total.amount} totalCostCurrency={total.currency} />
                         );
                       })}
-                      {renderLoadMore(friendsWindow, friendCollections.length)}
+                      {renderLoadMore(friendsWindow)}
                     </>
                   ) : (
                     <EmptyState
@@ -492,7 +492,7 @@ export default function HomeScreen() {
                         <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={total.amount} totalCostCurrency={total.currency} />
                       );
                     })}
-                    {renderLoadMore(subscribedWindow, subscribedCollections.length)}
+                    {renderLoadMore(subscribedWindow)}
                   </>
                 ) : (
                   <EmptyState

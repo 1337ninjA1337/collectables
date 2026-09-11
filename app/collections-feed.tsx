@@ -140,7 +140,7 @@ export default function CollectionsFeedScreen() {
                   />
                 );
               })}
-              <LoadMoreButton remaining={total - cols.length} onPress={window.loadMore} />
+              <LoadMoreButton remaining={window.remaining} onPress={window.loadMore} />
             </View>
           );
         }}

@@ -27,6 +27,17 @@ export const DEFAULT_CHUNK_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 export type ChunkedList<T> = {
   visibleItems: T[];
   hasMore: boolean;
+  /**
+   * Rows the window is not currently mounting.
+   *
+   * The three screens with a window each computed `total - visibleItems.length`
+   * at their call site to label the Load-more button, and each of them got
+   * `total` from a different expression — one of which was a ternary picking
+   * between two lists. The hook already knows both numbers, so the subtraction
+   * belongs here; `hasMore` is `remaining > 0`, stated once rather than
+   * asked separately beside it.
+   */
+  remaining: number;
   loadMore: () => void;
   reset: () => void;
 };
@@ -47,7 +58,8 @@ export function useChunkedList<T>(
     [items, count, safePageSize],
   );
 
-  const hasMore = items.length > visibleItems.length;
+  const remaining = items.length - visibleItems.length;
+  const hasMore = remaining > 0;
 
   // Both callbacks are referentially stable while the `items` identity is
   // unchanged, so callers can safely list them in `useMemo`/`useCallback`
@@ -62,7 +74,7 @@ export function useChunkedList<T>(
     setCount(safePageSize);
   }, [safePageSize]);
 
-  return { visibleItems, hasMore, loadMore, reset };
+  return { visibleItems, hasMore, remaining, loadMore, reset };
 }
 
 /**

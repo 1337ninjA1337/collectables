@@ -66,8 +66,8 @@ describe("app/collection/[id].tsx — HM-A header-fragment memoization", () => {
     );
     assert.match(
       src,
-      /loadMoreCta\s*=\s*useMemo\([\s\S]*?\[loadMore,\s*items\.length,\s*visibleItems\.length\],?\s*\n\s*\)/,
-      "loadMoreCta deps must be [loadMore, items.length, visibleItems.length]",
+      /loadMoreCta\s*=\s*useMemo\([\s\S]*?\[loadMore,\s*remaining\],?\s*\n\s*\)/,
+      "loadMoreCta deps must be [loadMore, remaining]",
     );
   });
 
@@ -88,7 +88,7 @@ describe("app/collection/[id].tsx — HM-A header-fragment memoization", () => {
     // crash at runtime. Pin the invariant so a future edit that folds
     // collection chrome into these memos fails loudly.
     const titleBlock = src.match(/const\s+listTitleAndFilters\s*=\s*useMemo\([\s\S]*?\[allItems\.length,\s*applyFilters,\s*itemFilters,\s*reorderBlockedBySort,\s*resetSort,\s*t\],?\s*\n\s*\);/)?.[0] ?? "";
-    const ctaBlock = src.match(/const\s+loadMoreCta\s*=\s*useMemo\([\s\S]*?\[loadMore,\s*items\.length,\s*visibleItems\.length\],?\s*\n\s*\);/)?.[0] ?? "";
+    const ctaBlock = src.match(/const\s+loadMoreCta\s*=\s*useMemo\([\s\S]*?\[loadMore,\s*remaining\],?\s*\n\s*\);/)?.[0] ?? "";
     assert.ok(titleBlock.length > 0 && ctaBlock.length > 0, "expected to extract both memo blocks");
     assert.doesNotMatch(titleBlock, /activeCollection/);
     assert.doesNotMatch(ctaBlock, /activeCollection/);

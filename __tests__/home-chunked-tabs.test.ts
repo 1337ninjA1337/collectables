@@ -50,8 +50,8 @@ describe("the home screen's borrowed-list tabs", () => {
   });
 
   it("offers a way to grow each window", () => {
-    assert.match(CODE, /renderLoadMore\(friendsWindow, friendCollections\.length\)/);
-    assert.match(CODE, /renderLoadMore\(subscribedWindow, subscribedCollections\.length\)/);
+    assert.match(CODE, /renderLoadMore\(friendsWindow\)/);
+    assert.match(CODE, /renderLoadMore\(subscribedWindow\)/);
   });
 
   it("declares both hooks above the early return, or they are conditional hooks", () => {
@@ -80,11 +80,11 @@ describe("the home screen's Load-more CTA", () => {
     // The component renders nothing at zero, so the arithmetic IS the
     // "should this button exist" decision — there is no second gate here to
     // disagree with it.
-    assert.match(CODE, /remaining=\{total - window\.visibleItems\.length\}/);
+    assert.match(CODE, /remaining=\{window\.remaining\}/);
   });
 
   it("is written once for the two tabs that have one", () => {
-    assert.match(CODE, /const renderLoadMore = \(window: ChunkedList<Collection>, total: number\) =>/);
+    assert.match(CODE, /const renderLoadMore = \(window: ChunkedList<Collection>\) =>/);
     assert.equal(
       (CODE.match(/renderLoadMore\(/g) ?? []).length,
       2,

@@ -1,9 +1,26 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { createElement, type ReactElement } from "react";
 
 import { stripComments } from "@/lib/strip-comments";
 
+import { autoUnmount, installNativeModuleStubs, mockModule, render } from "./helpers/render";
 import { readRepoFile } from "./helpers/repo-file";
+
+mockModule("@/lib/i18n-context", {
+  useI18n: () => ({
+    t: (key: string, params?: { count?: number }) =>
+      params?.count === undefined ? key : `${key}:${params.count}`,
+  }),
+});
+
+installNativeModuleStubs();
+autoUnmount();
+
+async function mount(remaining: number, onPress: () => void = () => undefined) {
+  const { LoadMoreButton } = await import("@/components/load-more-button");
+  return render(createElement(LoadMoreButton, { remaining, onPress }) as ReactElement);
+}
 
 /**
  * One Load-more button, for the three screens that grow a window.
@@ -63,6 +80,59 @@ describe("LoadMoreButton", () => {
   it("owns the styles too", () => {
     assert.match(COMPONENT, /loadMore: \{/);
     assert.match(COMPONENT, /loadMoreText: \{/);
+  });
+});
+
+describe("LoadMoreButton, rendered", () => {
+  it("puts no node in the tree when nothing remains", async () => {
+    // The claim the regexes cannot check. `return null` and a node styled to
+    // nothing look identical in source and are not identical in a layout: an
+    // empty pressable still takes its 14pt of vertical padding, which on the
+    // home screen would be a gap under the last card that nobody can explain.
+    const tree = await mount(0);
+
+    assert.deepEqual(tree.all(), [], "a spent window renders nothing at all");
+    assert.deepEqual(tree.texts(), []);
+  });
+
+  it("renders nothing for a negative remaining either", async () => {
+    const tree = await mount(-3);
+
+    assert.deepEqual(tree.all(), []);
+  });
+
+  it("renders a button carrying the count when rows are left", async () => {
+    const tree = await mount(7);
+
+    assert.deepEqual(tree.texts(), ["loadMoreItems:7"]);
+    const buttons = tree.all().filter((node) => node.props?.accessibilityRole === "button");
+    assert.equal(buttons.length, 1);
+  });
+
+  it("labels and hints the button for a reader that cannot see the count", async () => {
+    const tree = await mount(7);
+
+    const [button] = tree.all().filter((node) => node.props?.accessibilityRole === "button");
+    assert.equal(button.props?.accessibilityLabel, "loadMoreItemsA11y:7");
+    assert.equal(button.props?.accessibilityHint, "loadMoreItemsHint");
+  });
+
+  it("grows the window when pressed", async () => {
+    let presses = 0;
+    const tree = await mount(7, () => { presses += 1; });
+
+    const [button] = tree.all().filter((node) => node.props?.accessibilityRole === "button");
+    (button.props.onPress as () => void)();
+    assert.equal(presses, 1);
+  });
+
+  it("renders one row remaining without special-casing it", async () => {
+    // The boundary between "a button" and "no button" is 1 / 0, and the label
+    // is a count rather than a plural form — so one is not a different
+    // sentence, it is the same one with a 1 in it.
+    const tree = await mount(1);
+
+    assert.deepEqual(tree.texts(), ["loadMoreItems:1"]);
   });
 });
 

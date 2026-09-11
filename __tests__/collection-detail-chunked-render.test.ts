@@ -49,7 +49,7 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
   it("destructures visibleItems + hasMore + loadMore from the hook", () => {
     assert.match(
       src,
-      /const\s*\{\s*visibleItems\s*,\s*hasMore\s*,\s*loadMore\s*\}\s*=\s*useChunkedList/,
+      /const\s*\{\s*visibleItems\s*,\s*hasMore\s*,\s*remaining\s*,\s*loadMore\s*\}\s*=\s*useChunkedList/,
     );
   });
 
@@ -163,7 +163,7 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     // only this screen knows which list the window is over.
     assert.match(
       src,
-      /remaining=\{items\.length - visibleItems\.length\}/,
+      /remaining=\{remaining\}/,
     );
   });
 

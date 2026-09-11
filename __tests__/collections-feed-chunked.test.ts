@@ -41,7 +41,7 @@ describe("app/collections-feed.tsx — WLF-C chunked tab mounts", () => {
     // window is over.
     const src = readSrc();
     assert.match(src, /import \{ LoadMoreButton \} from "@\/components\/load-more-button";/);
-    assert.match(src, /<LoadMoreButton remaining=\{total - cols\.length\} onPress=\{window\.loadMore\} \/>/);
+    assert.match(src, /<LoadMoreButton remaining=\{window\.remaining\} onPress=\{window\.loadMore\} \/>/);
     assert.doesNotMatch(src, /loadMoreItemsA11y/);
     assert.doesNotMatch(src, /styles\.loadMoreText/);
   });

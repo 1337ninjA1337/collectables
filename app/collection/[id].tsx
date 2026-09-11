@@ -240,7 +240,7 @@ export default function CollectionDetailsScreen() {
   // its window automatically when the `items` reference changes (filter or
   // sort swap) because `items` is memoized on `[filteredItems, itemFilters.sort]`
   // above and `filteredItems` is memoized on `[allItems, itemFilters]`.
-  const { visibleItems, hasMore, loadMore } = useChunkedList(items);
+  const { visibleItems, hasMore, remaining, loadMore } = useChunkedList(items);
   // The page as it is NOW, for a keyboard move that fires after the render
   // that drew the row — a `loadMore` or a cloud merge between a screen reader
   // focusing a row and the action firing would otherwise commit the order the
@@ -822,9 +822,9 @@ export default function CollectionDetailsScreen() {
   // `items.length > visibleItems.length`, and both numbers are already here.
   const loadMoreCta = useMemo(
     () => (
-      <LoadMoreButton remaining={items.length - visibleItems.length} onPress={loadMore} />
+      <LoadMoreButton remaining={remaining} onPress={loadMore} />
     ),
-    [loadMore, items.length, visibleItems.length],
+    [loadMore, remaining],
   );
 
   // HM-B: hero + summary + total + reactions + owner-actions — the JSX that

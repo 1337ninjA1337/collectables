@@ -140,11 +140,39 @@ describe("useChunkedList hook contract (structural)", () => {
     assert.match(src, /const\s+safePageSize\s*=\s*resolvePageSize\(pageSize\)/);
   });
 
-  it("hasMore compares items.length against the slice length, not the raw count", () => {
+  it("remaining compares items.length against the slice length, not the raw count", () => {
     // Comparing against `count` would be wrong once clampCount pins
-    // count to total — hasMore would falsely stay true for a moment.
-    // Comparing against the slice length is the safe shape.
-    assert.match(src, /hasMore\s*=\s*items\.length\s*>\s*visibleItems\.length/);
+    // count to total — the window would falsely report rows left for a
+    // moment. Comparing against the slice length is the safe shape, and
+    // since 2026-09-11 it is computed once: `remaining` is the subtraction
+    // the three screens with a window were each doing at their call site.
+    assert.match(src, /const remaining = items\.length - visibleItems\.length;/);
+  });
+
+  it("hasMore is remaining > 0, said once rather than asked twice", () => {
+    // The two were separate facts about the same pair of numbers, which is
+    // how a screen came to gate on one and label with the other. Deriving
+    // the boolean from the count makes them impossible to disagree.
+    assert.match(src, /const hasMore = remaining > 0;/);
+    assert.doesNotMatch(src, /hasMore\s*=\s*items\.length\s*>\s*visibleItems\.length/);
+  });
+
+  it("returns remaining alongside the rest of the window", () => {
+    assert.match(src, /return \{ visibleItems, hasMore, remaining, loadMore, reset \};/);
+    assert.match(src, /^\s*remaining: number;$/m);
+  });
+
+  it("no screen computes the subtraction itself any more", () => {
+    // Each of the three had its own spelling of `total - visibleItems.length`,
+    // and one of them took `total` from a ternary picking between two lists.
+    for (const screen of ["app/index.tsx", "app/collections-feed.tsx", "app/collection/[id].tsx"]) {
+      const code = read(screen);
+      assert.doesNotMatch(
+        code,
+        /remaining=\{[^}]*\.length\s*-\s*[^}]*\.length\}/,
+        `${screen} still computes its own remaining`,
+      );
+    }
   });
 
   it("exports the ChunkedList<T> result type so callers can annotate the hook return", () => {
