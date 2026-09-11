@@ -110,6 +110,32 @@ export default function HomeScreen() {
   const ownedCollectionsRef = useRef(ownedCollections);
   ownedCollectionsRef.current = ownedCollections;
 
+  /**
+   * The collections a friend shared, or that somebody shared with me directly.
+   *
+   * Hoisted above the `!ready` early return for the same reason
+   * `ownedCollections` was — a hook cannot sit below a conditional return —
+   * and memoised because it rebuilt a Set AND an array on every render of this
+   * screen, both of which a list then renders from. It was flagged alongside
+   * `ownedCollections` and left behind when only the one blocking the ref was
+   * done.
+   *
+   * `friends` becomes a Set too. It was scanned with `.includes` once per
+   * collection, so the cost was friends × collections: a user with forty
+   * friends and two hundred visible collections paid eight thousand string
+   * comparisons per render, for a list that changes when somebody accepts a
+   * friend request.
+   */
+  const friendCollections = useMemo(() => {
+    const sharedWithMeIds = new Set(sharedWithMeCollections.map((c) => c.id));
+    const friendIds = new Set(friends);
+    return collections.filter(
+      (collection) =>
+        collection.role === "viewer" &&
+        (friendIds.has(collection.ownerUserId) || sharedWithMeIds.has(collection.id)),
+    );
+  }, [collections, sharedWithMeCollections, friends]);
+
   if (!ready) {
     return (
       <Screen>
@@ -122,10 +148,10 @@ export default function HomeScreen() {
     );
   }
 
-  const sharedWithMeIds = new Set(sharedWithMeCollections.map((c) => c.id));
-  const friendCollections = collections.filter((collection) =>
-    collection.role === "viewer" && (friends.includes(collection.ownerUserId) || sharedWithMeIds.has(collection.id))
-  );
+  // Not memoised, deliberately: `getMyProfile` is built inside the context
+  // value object, so its identity changes whenever that value does — a memo
+  // keyed on it would recompute on exactly the renders it already does. What
+  // it costs is one `Map.get`.
   const myProfile = getMyProfile();
   const isPhone = isMobile;
 
