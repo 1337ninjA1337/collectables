@@ -186,7 +186,27 @@ function makeDraggableShim() {
     } & Record<string, unknown>;
 
     const rows: readonly T[] = Array.isArray(data) ? (data as T[]) : [];
-    const [activeIndex, setActiveIndex] = useState<number | null>(null);
+    /**
+     * WHICH row is being dragged, held as the row rather than as its index.
+     *
+     * The index was what this held, and it was the long press's index: a merge
+     * landing mid-gesture left the dim on whatever row had since taken that
+     * slot while the drop marker was measured against the new list. The commit
+     * re-resolves the row at the drop, so a display that does not is the same
+     * bug with the user watching — they see the wrong card fade.
+     */
+    const [active, setActive] = useState<{ row: T; key: string | undefined } | null>(null);
+    /**
+     * Where that row is in the list as it is being rendered, or -1.
+     *
+     * Derived rather than stored, because it is a fact about `data` and `data`
+     * changes without the gesture doing anything. -1 is a row that has left
+     * the list mid-drag, which dims nothing and marks nothing — the same
+     * answer `onUp` gives it.
+     */
+    const activeIndex = active
+      ? indexOfDraggedRow(rows, active.row, active.key, keyExtractor)
+      : -1;
     /**
      * Where the drop marker is drawn — display only.
      *
@@ -273,7 +293,7 @@ function makeDraggableShim() {
       };
       const onUp = () => {
         stop();
-        setActiveIndex(null);
+        setActive(null);
         setDropIndex(null);
         if (!moved) return;
         const { rows: current, onDragEnd: commit, keyExtractor: keyOf } = latest.current;
@@ -292,7 +312,7 @@ function makeDraggableShim() {
       doc.addEventListener("pointerup", onUp as EventListener);
       doc.addEventListener("pointercancel", onUp as EventListener);
       detach.current = stop;
-      setActiveIndex(from);
+      setActive({ row: draggedRow, key: draggedKey });
     }, []);
 
     // A screen that navigates away mid-drag leaves the listeners on the
@@ -308,7 +328,7 @@ function makeDraggableShim() {
      * "it will go back where it was", which is true and is not information.
      */
     function dropMarkerStyle(index: number) {
-      if (activeIndex === null || dropIndex === null) return null;
+      if (activeIndex < 0 || dropIndex === null) return null;
       if (index !== dropIndex || dropIndex === activeIndex) return null;
       return dropIndex > activeIndex ? DROP_MARKER_BELOW : DROP_MARKER_ABOVE;
     }

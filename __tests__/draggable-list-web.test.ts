@@ -676,6 +676,11 @@ describe("the web DraggableList shim resolves the dragged row at the drop", () =
         assert.ok(drag, `row ${index} was never rendered`);
         drag();
       },
+      /** The wrapper style one row is carrying on the current pass. */
+      styleOf: (row: Row, index: number) => {
+        tree = tree.dirty ? tree.rerender() : tree;
+        return adaptedRow(tree.findByType("FlatList"), row, index).props.style;
+      },
       pointerMove: (clientY: number) => {
         for (const listener of [...(dom.listeners.pointermove ?? [])]) {
           listener({ type: "pointermove", clientY } as never);
@@ -777,6 +782,39 @@ describe("the web DraggableList shim resolves the dragged row at the drop", () =
       assert.deepEqual(gesture.drops, [
         { data: [A, C, D, B], from: 1, to: 3 },
       ]);
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("keeps the dim on the row the user grabbed when the list shifts under it", async () => {
+    // The commit re-resolves the row and the DISPLAY has to as well, or the
+    // user watches the wrong card fade while the drop marker is measured
+    // against the new list. `activeIndex` held the long press's index.
+    const gesture = await mountMerging([A, B, C]);
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(0);
+      assert.deepEqual(gesture.styleOf(A, 0), { opacity: 0.6 });
+
+      gesture.merge([Z, A, B, C]);
+
+      assert.equal(gesture.styleOf(Z, 0), undefined, "the newcomer is not being dragged");
+      assert.deepEqual(gesture.styleOf(A, 1), { opacity: 0.6 });
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("dims nothing once the dragged row has left the list", async () => {
+    const gesture = await mountMerging([A, B, C]);
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(1);
+      gesture.merge([A, C]);
+
+      assert.equal(gesture.styleOf(A, 0), undefined);
+      assert.equal(gesture.styleOf(C, 1), undefined, "not the row standing where it was");
     } finally {
       gesture.restore();
     }
