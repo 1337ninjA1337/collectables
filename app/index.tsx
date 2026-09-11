@@ -48,7 +48,7 @@ import {
 } from "@/lib/design-tokens";
 import { reorderActionProps } from "@/lib/reorder-actions";
 import { announceReorder } from "@/lib/reorder-announcement";
-import { selectRecentItems } from "@/lib/home-helpers";
+import { selectFriendCollections, selectRecentItems } from "@/lib/home-helpers";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
@@ -124,15 +124,15 @@ export default function HomeScreen() {
    * own from `friends` and so did everyone else who noticed the scan, which is
    * one Set per consumer of a list that changes when somebody accepts a friend
    * request. `friendIds` is built once, in the memo that derives the ids.
+   *
+   * The RULE moved to `selectFriendCollections`, because
+   * `app/collections-feed.tsx` renders a tab with this screen's label and had
+   * its own, narrower answer. One function, two screens.
    */
-  const friendCollections = useMemo(() => {
-    const sharedWithMeIds = new Set(sharedWithMeCollections.map((c) => c.id));
-    return collections.filter(
-      (collection) =>
-        collection.role === "viewer" &&
-        (friendIds.has(collection.ownerUserId) || sharedWithMeIds.has(collection.id)),
-    );
-  }, [collections, sharedWithMeCollections, friendIds]);
+  const friendCollections = useMemo(
+    () => selectFriendCollections(collections, friendIds, sharedWithMeCollections),
+    [collections, sharedWithMeCollections, friendIds],
+  );
 
   if (!ready) {
     return (

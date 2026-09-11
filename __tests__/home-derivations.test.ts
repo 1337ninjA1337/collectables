@@ -45,13 +45,29 @@ const CODE = stripComments(SRC);
  * that is what this reads.
  */
 function depsOf(name: string): Set<string> {
-  const start = CODE.indexOf(`const ${name} = useMemo(`);
-  assert.ok(start > 0, `${name} must be a useMemo in app/index.tsx`);
-  const close = CODE.indexOf("}, [", start);
-  assert.ok(close > start, `${name}'s dep array must follow its body`);
-  const end = CODE.indexOf("]", close);
+  const open = CODE.indexOf(`const ${name} = useMemo(`);
+  assert.ok(open > 0, `${name} must be a useMemo in app/index.tsx`);
+  // Walk to the `useMemo(` call's own closing paren, so this reads a memo whose
+  // body is a block (`}, [deps])`) and one whose body is a single expression
+  // (`() => select(...), [deps])`) the same way.
+  let depth = 0;
+  let close = -1;
+  for (let i = CODE.indexOf("(", open); i < CODE.length; i += 1) {
+    if (CODE[i] === "(") depth += 1;
+    else if (CODE[i] === ")") {
+      depth -= 1;
+      if (depth === 0) {
+        close = i;
+        break;
+      }
+    }
+  }
+  assert.ok(close > open, `${name}'s useMemo call must be closed`);
+  const call = CODE.slice(open, close);
+  const deps = call.slice(call.lastIndexOf("["), call.lastIndexOf("]"));
   return new Set(
-    CODE.slice(close + "}, [".length, end)
+    deps
+      .slice(1)
       .split(",")
       .map((dep) => dep.trim())
       .filter(Boolean),
@@ -79,32 +95,24 @@ describe("the home screen's friend-collection list", () => {
     assert.ok(memo < early, "the memo must be declared above the early return");
   });
 
-  it("asks a Set whether somebody is a friend, not an array", () => {
-    // `friends.includes(collection.ownerUserId)` ran once per collection. A
-    // user with forty friends and two hundred visible collections paid eight
-    // thousand string comparisons for one render of a list that changes when
-    // somebody accepts a friend request.
-    assert.match(CODE, /friendIds\.has\(collection\.ownerUserId\)/);
-    assert.doesNotMatch(CODE, /friends\.includes\(/);
-  });
-
-  it("takes the Set from the context rather than building its own", () => {
+  it("hands the Set to the selector rather than building its own", () => {
     // The screen used to do `new Set(friends)` inside the memo, and so did
     // every other consumer that noticed the scan. One Set per caller of a list
     // that changes when somebody accepts a friend request is the thing
     // `friendIds` retires; a local rebuild here would quietly bring it back.
     assert.match(CODE, /const \{[^}]*\bfriendIds\b[^}]*\} = useSocial\(\);/);
     assert.doesNotMatch(CODE, /new Set\(friends\)/);
+    assert.doesNotMatch(CODE, /friends\.includes\(/);
   });
 
-  it("keeps the shared-with-me ids inside the memo that is its only reader", () => {
-    // It was a screen-level `const` with one consumer, rebuilt every render
-    // beside the filter that used it.
-    const memo = CODE.slice(CODE.indexOf("const friendCollections = useMemo("));
-    assert.match(
-      memo.slice(0, memo.indexOf("}, [")),
-      /const sharedWithMeIds = new Set\(/,
-    );
+  it("states the rule nowhere, because the feed screen states it too", () => {
+    // The filter body and the shared-with-me Set moved into
+    // `selectFriendCollections` once `app/collections-feed.tsx` turned out to
+    // answer the same question with a narrower list. What is left here is the
+    // call; `friend-collections-selector.test.ts` owns the rule.
+    assert.match(CODE, /selectFriendCollections\(collections, friendIds, sharedWithMeCollections\)/);
+    assert.doesNotMatch(CODE, /const sharedWithMeIds = new Set\(/);
+    assert.doesNotMatch(CODE, /friendIds\.has\(collection\.ownerUserId\)/);
   });
 });
 

@@ -41,3 +41,42 @@ export function selectRecentItems(
     .sort(byCreatedAtDescThenId)
     .slice(0, Math.max(0, limit));
 }
+
+/**
+ * The collections shown under "Friends' collections" — on BOTH screens that
+ * carry that label.
+ *
+ * There were two lists with one name. `app/index.tsx` filtered the merged
+ * `collections` by "a viewer copy whose owner is a friend, or a collection
+ * somebody shared with me"; `app/collections-feed.tsx` rendered the context's
+ * `friendCollections`, which is only what `fetchPublicCollectionsByUserId`
+ * returned for each friend. So the feed's tab was a strict subset: no seeded
+ * friend collections (the whole list, on a device with no Supabase, or before
+ * the fetch lands) and nothing shared directly with the viewer. A user moving
+ * between two screens saw two different answers to one question, and nothing
+ * said which was meant.
+ *
+ * The merged rule wins because it is the one that can see every source: the
+ * context's `collections` already holds the cloud fetch, the seeds and the
+ * shares, and reading the merged list is what makes this one answer rather
+ * than one per fetch that happens to have landed.
+ *
+ * **The shared-with-me arm is deliberate and it is not obviously right.** A
+ * collection a stranger shared with the viewer appears here, under a label
+ * that says "friends". It is here because there is nowhere else: no screen in
+ * the app renders `sharedWithMeCollections` on its own, so dropping the arm
+ * would not move those collections, it would hide them. The arm goes when that
+ * surface exists.
+ */
+export function selectFriendCollections(
+  collections: readonly Collection[],
+  friendIds: ReadonlySet<string>,
+  sharedWithMeCollections: readonly Collection[],
+): Collection[] {
+  const sharedWithMeIds = new Set(sharedWithMeCollections.map((c) => c.id));
+  return collections.filter(
+    (collection) =>
+      collection.role === "viewer" &&
+      (friendIds.has(collection.ownerUserId) || sharedWithMeIds.has(collection.id)),
+  );
+}

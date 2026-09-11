@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CollectionCard } from "@/components/collection-card";
@@ -15,8 +15,10 @@ import {
   RADIUS_CARD,
 } from "@/lib/design-tokens";
 import { FONT_BODY_BOLD } from "@/lib/fonts";
+import { selectFriendCollections } from "@/lib/home-helpers";
 import { useChunkedList } from "@/lib/use-chunked-list";
 import { useI18n } from "@/lib/i18n-context";
+import { useSocial } from "@/lib/social-context";
 import { fetchItemsByCollectionId } from "@/lib/supabase-profiles";
 import { Collection } from "@/lib/types";
 
@@ -24,7 +26,24 @@ type MainTab = "friends" | "subscribed";
 
 export default function CollectionsFeedScreen() {
   const { t } = useI18n();
-  const { friendCollections, subscribedCollections, getItemsForCollection, getCollectionTotalCost } = useCollections();
+  const { collections, sharedWithMeCollections, subscribedCollections, getItemsForCollection, getCollectionTotalCost } = useCollections();
+  const { friendIds } = useSocial();
+
+  /**
+   * The same list the home screen's "Friends' collections" tab shows.
+   *
+   * This tab rendered the context's `friendCollections` — only what
+   * `fetchPublicCollectionsByUserId` returned for each friend — so it was a
+   * strict subset of the home screen's answer to the same question: no seeded
+   * friend collections, nothing shared directly with the viewer, and nothing
+   * at all before the fetch landed. Two lists with one name, on two screens a
+   * user moves between. `selectFriendCollections` is now the only place the
+   * rule is written.
+   */
+  const friendCollections = useMemo(
+    () => selectFriendCollections(collections, friendIds, sharedWithMeCollections),
+    [collections, friendIds, sharedWithMeCollections],
+  );
 
   const [mainTab, setMainTab] = useState<MainTab>("friends");
   const [itemCounts, setItemCounts] = useState<Record<string, number>>({});

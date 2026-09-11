@@ -244,7 +244,10 @@ describe("app/index.tsx wiring", () => {
   const source = read("app/index.tsx");
 
   it("imports the selector rather than re-implementing the memo body", () => {
-    assert.match(source, /import \{ selectRecentItems \} from "@\/lib\/home-helpers";/);
+    // Two selectors come from that module now — `selectFriendCollections`
+    // joined it when the feed screen turned out to answer the same question
+    // differently — so this asks for the name, not for the whole import line.
+    assert.match(source, /import \{[^}]*\bselectRecentItems\b[^}]*\} from "@\/lib\/home-helpers";/);
   });
 
   it("builds recentItems from the selector", () => {
