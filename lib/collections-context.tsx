@@ -30,6 +30,7 @@ import {
 import {
   byCollectionOrder,
   byOwnedCollectionOrder,
+  groupItemsByCollection,
   nextCollectionSortOrder,
   planCollectionReorder,
   planItemReorder,
@@ -181,6 +182,16 @@ type CollectionsContextValue = {
   saveSharedCollection: (collection: Collection) => Promise<Collection | null>;
   getCollectionById: (id: string) => Collection | undefined;
   getItemsForCollection: (collectionId: string) => CollectableItem[];
+  /**
+   * How many live items a collection holds — the same question
+   * `getItemsForCollection(id).length` answers, without building the array or
+   * sorting it into an order the caller is about to discard.
+   *
+   * Every card that shows a count reads this. `getItemsForCollection` is for
+   * callers that render the items themselves (collection detail), and taking
+   * `.length` of its result is the shape this exists to retire.
+   */
+  countItemsForCollection: (collectionId: string) => number;
   getCollectionTotalCost: (collectionId: string) => CollectionTotalCost;
   /**
    * Convert a single item's cost into `targetCurrency` (defaults to the
@@ -1099,6 +1110,23 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     return dedupeItems(merged);
   }, [getVisibleItems, localItems, friendItems, subscribedItems, sharedWithMeItems]);
 
+  /**
+   * The merged item list indexed by collection, built once per change of
+   * `items` rather than re-walked per accessor call.
+   *
+   * `getItemsForCollection`, `countItemsForCollection` and
+   * `getCollectionTotalCost` all answer questions about ONE collection, and
+   * all three used to answer them by filtering the whole array with the same
+   * predicate. A `<CollectionCard>` asks two of them, so a home screen showing
+   * twenty cards walked every visible item forty times per render and sorted
+   * twenty lists whose order was thrown away by the `.length` that followed.
+   *
+   * Inside the provider rather than in the value memo below: the value object
+   * is rebuilt on any of its twenty-odd deps, and this should be rebuilt when
+   * the items change and not before. See `groupItemsByCollection`.
+   */
+  const itemsByCollection = useMemo(() => groupItemsByCollection(items), [items]);
+
   // Memoized separately from the big `value` memo below so the array keeps a
   // stable identity while `localItems` is unchanged — `useChunkedList` on the
   // wishlist screen resets its visible window whenever the reference changes,
@@ -1196,17 +1224,16 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       },
       getCollectionById: (id) => collections.find((collection) => collection.id === id),
       getItemsForCollection: (collectionId) =>
-        items
-          .filter(
-            (item) =>
-              item.collectionId === collectionId &&
-              !item.isWishlist &&
-              !item.archivedAt,
-          )
+        // A copy, because the array is the map's and `sort` is in place —
+        // sorting the entry would reorder what every other reader of that
+        // collection sees, from a getter that looks like it only reads.
+        [...(itemsByCollection.get(collectionId) ?? [])]
           // Drag order first, then undragged items newest-first; both tiers tie
           // on `id`. Lives in collections-helpers so the rules are unit-tested
           // rather than pinned by a source regex — see `byCollectionOrder`.
           .sort(byCollectionOrder),
+      countItemsForCollection: (collectionId) =>
+        itemsByCollection.get(collectionId)?.length ?? 0,
       getCollectionTotalCost: (collectionId) => {
         // A per-collection `currency` override (set via the edit modal or the
         // tap-to-swap chip on the summary card) wins over the user's app-wide
@@ -1214,13 +1241,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         // collections without the column keep working unchanged.
         const collection = collections.find((c) => c.id === collectionId);
         const target = collection?.currency ?? displayCurrency;
-        const entries = items
-          .filter(
-            (item) =>
-              item.collectionId === collectionId &&
-              !item.isWishlist &&
-              !item.archivedAt,
-          )
+        const entries = (itemsByCollection.get(collectionId) ?? [])
           .filter((item): item is typeof item & { cost: number } => typeof item.cost === "number")
           .map((item) => ({
             amount: item.cost,
@@ -1520,7 +1541,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     }),
     // syncCollection/syncItem are stable useCallback([]) refs, so they're
     // intentionally omitted here (ratesUpdatedAt stays last in the deps list).
-    [collections, items, wishlistItems, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
+    [collections, items, itemsByCollection, wishlistItems, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;

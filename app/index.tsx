@@ -66,7 +66,7 @@ export default function HomeScreen() {
   const {
     collections,
     items,
-    getItemsForCollection,
+    countItemsForCollection,
     getCollectionTotalCost,
     getCollectionById,
     ready,
@@ -227,6 +227,11 @@ export default function HomeScreen() {
       identify: { row: collection, keyOf: byId },
     });
 
+    // One call, two fields. This row asked twice — once for the amount and
+    // once for the currency — which is a whole second conversion of every
+    // priced item in the collection to read one string off the result.
+    const totalCost = getCollectionTotalCost(collection.id);
+
     return (
       <ScaleDecorator>
         <Pressable
@@ -235,9 +240,9 @@ export default function HomeScreen() {
         {...reorderActions}>
           <CollectionCard
             collection={collection}
-            count={getItemsForCollection(collection.id).length}
-            totalCost={getCollectionTotalCost(collection.id).amount}
-            totalCostCurrency={getCollectionTotalCost(collection.id).currency}
+            count={countItemsForCollection(collection.id)}
+            totalCost={totalCost.amount}
+            totalCostCurrency={totalCost.currency}
           />
         </Pressable>
       </ScaleDecorator>
@@ -467,7 +472,7 @@ export default function HomeScreen() {
                       {friendsWindow.visibleItems.map((collection) => {
                         const total = getCollectionTotalCost(collection.id);
                         return (
-                          <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={total.amount} totalCostCurrency={total.currency} />
+                          <CollectionCard key={collection.id} collection={collection} count={countItemsForCollection(collection.id)} totalCost={total.amount} totalCostCurrency={total.currency} />
                         );
                       })}
                       {renderLoadMore(friendsWindow)}
@@ -492,7 +497,7 @@ export default function HomeScreen() {
                     {subscribedWindow.visibleItems.map((collection) => {
                       const total = getCollectionTotalCost(collection.id);
                       return (
-                        <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={total.amount} totalCostCurrency={total.currency} />
+                        <CollectionCard key={collection.id} collection={collection} count={countItemsForCollection(collection.id)} totalCost={total.amount} totalCostCurrency={total.currency} />
                       );
                     })}
                     {renderLoadMore(subscribedWindow)}

@@ -87,11 +87,20 @@ describe("CollectionsContext — archiveItem method", () => {
     );
   });
 
+  // The two cases below used to read `!item.archivedAt` out of each accessor's
+  // own body. The predicate is `groupItemsByCollection` now — one statement of
+  // "a live item of this collection", shared by the three accessors that used
+  // to write it out — so what is checked here is that each accessor reads that
+  // index rather than the raw array. The rule itself is asserted on values
+  // rather than on source text in `items-by-collection.test.ts`, which is a
+  // stronger pin than either of these ever was: it archives an item and looks
+  // at what comes back.
+
   it("getItemsForCollection skips archived items", () => {
     assert.match(
       src,
-      /getItemsForCollection:[\s\S]{0,400}!item\.archivedAt/,
-      "getItemsForCollection must filter archived rows",
+      /getItemsForCollection:[\s\S]{0,400}itemsByCollection\.get\(collectionId\)/,
+      "getItemsForCollection must read the live-item index, which is where archived rows are dropped",
     );
   });
 
@@ -102,8 +111,18 @@ describe("CollectionsContext — archiveItem method", () => {
     assert.ok(block, "could not locate getCollectionTotalCost implementation");
     assert.match(
       block![0],
-      /!item\.archivedAt/,
-      "getCollectionTotalCost must filter archived rows so totals reflect the live collection",
+      /itemsByCollection\.get\(collectionId\)/,
+      "getCollectionTotalCost must read the live-item index so totals reflect the live collection",
+    );
+  });
+
+  it("the index they both read is the one that drops archived rows", () => {
+    // The hop the two cases above now take on trust, spelled out: the accessors
+    // read `itemsByCollection`, and `itemsByCollection` is built by the helper
+    // whose archived rule has its own behavioural cases.
+    assert.match(
+      src,
+      /const itemsByCollection = useMemo\(\(\) => groupItemsByCollection\(items\), \[items\]\);/,
     );
   });
 });

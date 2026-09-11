@@ -71,7 +71,7 @@ export default function ProfileScreen() {
     isAdmin,
     friendIds,
   } = useSocial();
-  const { collections, getItemsForCollection, getCollectionTotalCost, deleteUserContent, wishlistItems, getItemById } = useCollections();
+  const { collections, countItemsForCollection, getCollectionTotalCost, deleteUserContent, wishlistItems, getItemById } = useCollections();
   const { listings } = useMarketplace();
   const cachedProfile = getProfileById(params.id);
   const myProfile = getMyProfile();
@@ -449,7 +449,7 @@ export default function ProfileScreen() {
               <CollectionCard
                 key={collection.id}
                 collection={collection}
-                count={getItemsForCollection(collection.id).length || remoteItemCounts[collection.id] || 0}
+                count={countItemsForCollection(collection.id) || remoteItemCounts[collection.id] || 0}
                 totalCost={total.amount}
                 totalCostCurrency={total.currency}
               />

@@ -75,6 +75,48 @@ export function selectOwnedActiveItems(
 }
 
 /**
+ * Every collection's live items, in one pass over the merged item list.
+ *
+ * Three context accessors asked the same question by re-walking the whole
+ * array: `getItemsForCollection` filtered it, `getCollectionTotalCost`
+ * filtered it again with the identical predicate, and a screen that wanted a
+ * COUNT got it by taking `.length` of the first one's sorted result. The home
+ * screen renders a `<CollectionCard>` per collection and each card asks for
+ * both, so twenty cards cost forty full passes over every item the viewer can
+ * see — their own, their friends', their subscriptions' and their shares' —
+ * plus twenty sorts of lists nobody ordered anything by, because the caller
+ * wanted a number.
+ *
+ * The predicate is the one all three shared: an item belongs to its collection
+ * here unless it is a wishlist entry (a want, not a holding) or archived (in
+ * the trash). Stated once, so the three accessors cannot drift on what counts
+ * — which is the failure mode worth more than the passes: a count that
+ * includes archived items above a total cost that excludes them is two numbers
+ * on one card disagreeing about the same collection.
+ *
+ * Order is whatever `items` was in; a caller that needs the drag order sorts
+ * its own copy through {@link byCollectionOrder}. Entries are the map's, so
+ * a caller must not sort them in place — `getItemsForCollection` copies.
+ *
+ * A collection with nothing in it is ABSENT from the map rather than present
+ * with an empty array: `get` answering `undefined` and `?? []` at the call
+ * site is the same answer, and building an entry per collection would mean
+ * passing the collection list in to learn nothing.
+ */
+export function groupItemsByCollection(
+  items: readonly CollectableItem[],
+): Map<string, CollectableItem[]> {
+  const byCollection = new Map<string, CollectableItem[]>();
+  for (const item of items) {
+    if (item.isWishlist || item.archivedAt) continue;
+    const existing = byCollection.get(item.collectionId);
+    if (existing) existing.push(item);
+    else byCollection.set(item.collectionId, [item]);
+  }
+  return byCollection;
+}
+
+/**
  * The collection-detail ordering: the user's manual drag order first, then the
  * items they never dragged, newest-first.
  *
