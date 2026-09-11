@@ -214,6 +214,62 @@ describe("the visibility filters read the sets", () => {
   });
 });
 
+describe("the request list is walked twice, not once per asker", () => {
+  it("answers all five relationships off the same two passes", async () => {
+    // `getRelationship` called `hasRequest` twice — a `.some` over the whole
+    // list per direction — and `app/people.tsx` calls it once per row of a
+    // twenty-five-profile page. The directions are sets now; these are the
+    // answers they have to keep giving.
+    store.set(PERSONAL_A, JSON.stringify({ following: [MILA], myProfile: null }));
+    remoteRequests = [
+      ...mutualWith(LEV),
+      { from_user_id: "user-a", to_user_id: "u-sent" },
+      { from_user_id: "u-received", to_user_id: "user-a" },
+    ];
+    await mount();
+
+    assert.equal(value().getRelationship("user-a"), "self");
+    assert.equal(value().getRelationship(LEV), "friend");
+    assert.equal(value().getRelationship("u-sent"), "request_sent");
+    assert.equal(value().getRelationship("u-received"), "request_received");
+    assert.equal(value().getRelationship(MILA), "following");
+    assert.equal(value().getRelationship("u-stranger"), "none");
+  });
+
+  it("ignores a pair between two other people", async () => {
+    // The directions are built from rows naming the VIEWER; a handshake
+    // between two strangers must not put either of them in any of the three
+    // sets. A `.some` asked the same question one pair at a time and could not
+    // get this wrong; a set built in one pass can.
+    remoteRequests = [
+      { from_user_id: LEV, to_user_id: SOFIA },
+      { from_user_id: SOFIA, to_user_id: LEV },
+    ];
+    await mount();
+
+    assert.deepEqual(value().friends, []);
+    assert.equal(value().getRelationship(LEV), "none");
+    assert.equal(value().getRelationship(SOFIA), "none");
+    assert.deepEqual(value().incomingRequestUserIds, []);
+  });
+
+  it("keeps the friends in the order the requests arrived", async () => {
+    // The reason `friends` walks the list rather than intersecting the two
+    // sets. The array is what the profile fetch and the home screen's count
+    // render from, and intersecting would order it by whichever direction was
+    // recorded first — here, the reverse.
+    remoteRequests = [
+      { from_user_id: SOFIA, to_user_id: "user-a" },
+      { from_user_id: "user-a", to_user_id: LEV },
+      { from_user_id: "user-a", to_user_id: SOFIA },
+      { from_user_id: LEV, to_user_id: "user-a" },
+    ];
+    await mount();
+
+    assert.deepEqual(value().friends, [SOFIA, LEV]);
+  });
+});
+
 describe("the inbox excludes people who are already friends", () => {
   it("drops the incoming half of a mutual handshake", async () => {
     // `incomingRequestUserIds` filtered with `friends.includes` — friends ×
@@ -235,6 +291,24 @@ describe("no consumer scans an array for membership any more", () => {
     assert.doesNotMatch(SOCIAL, /friends\.includes\(/);
     assert.doesNotMatch(SOCIAL, /following\.includes\(/);
     assert.doesNotMatch(SOCIAL, /deletedProfileIds\.includes\(/);
+  });
+
+  it("the provider asks the request list per direction, not per caller", () => {
+    // `hasRequest` survives for exactly one call site: the guard inside the
+    // `setFriendRequests` updater, which is about `current` — the live state,
+    // which a concurrent update may have moved past the render the directions
+    // were derived from.
+    const calls = SOCIAL.match(/hasRequest\(/g) ?? [];
+    assert.equal(
+      calls.length,
+      2,
+      "one declaration and one call: the updater's duplicate-pair guard",
+    );
+    assert.match(SOCIAL, /if \(hasRequest\(current, user\.id, profileId\)\)/);
+    // A comma, not a colon: `hasRequest(friendRequests: FriendRequest[]` is
+    // the declaration's own parameter list, which is one of the two matches
+    // counted above.
+    assert.doesNotMatch(SOCIAL, /hasRequest\(friendRequests,/);
   });
 
   it("the Set is built in the derivation rather than beside each caller", () => {

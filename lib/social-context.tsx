@@ -587,30 +587,54 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   }, [deliverSocial, ready, user]);
 
   /**
-   * The mutual half of the request list, as a Set — which is the shape the
-   * derivation already built and then threw away.
+   * Every question this provider asks about the request list, answered in two
+   * linear passes instead of a scan per asker.
    *
-   * The `[...uniqueIds]` spread below is the array every renderer wants and the
-   * Set is the membership test every filter wants; producing both from one pass
-   * is free, and it is what stops the next caller from rebuilding the Set at
-   * its own call site.
+   * `friendRequests` is a flat list of directed pairs, and three of them matter:
+   * did I send one to this person, did they send one to me, and are both true
+   * (which is what a friendship IS here). `hasRequest` is a `.some` over the
+   * whole list, and it was called from inside a `forEach` over that same list
+   * to derive the friends — quadratic — and twice more per call of
+   * `getRelationship`, which `app/people.tsx` calls once per row of a
+   * twenty-five-profile page. So a viewer with a busy inbox paid the request
+   * list fifty times over to render one page.
+   *
+   * `friends` is built by walking `friendRequests` rather than by intersecting
+   * the two sets, which looks redundant and is not: the ORDER of that array is
+   * the order the requests arrived in, and it is what the profile fetch and the
+   * home screen's count render from. Intersecting would reorder it by whichever
+   * direction happened to be recorded first.
    */
-  const friendIds = useMemo<ReadonlySet<string>>(() => {
+  const requestDirections = useMemo(() => {
+    const outgoing = new Set<string>();
+    const incoming = new Set<string>();
+    const mutual = new Set<string>();
     if (!user) {
-      return new Set<string>();
+      return { outgoing, incoming, mutual };
     }
 
-    const uniqueIds = new Set<string>();
-    friendRequests.forEach((request) => {
-      if (request.fromUserId === user.id && hasRequest(friendRequests, request.toUserId, user.id)) {
-        uniqueIds.add(request.toUserId);
+    for (const request of friendRequests) {
+      if (request.fromUserId === user.id) outgoing.add(request.toUserId);
+      if (request.toUserId === user.id) incoming.add(request.fromUserId);
+    }
+    for (const request of friendRequests) {
+      if (request.fromUserId === user.id && incoming.has(request.toUserId)) {
+        mutual.add(request.toUserId);
       }
-      if (request.toUserId === user.id && hasRequest(friendRequests, user.id, request.fromUserId)) {
-        uniqueIds.add(request.fromUserId);
+      if (request.toUserId === user.id && outgoing.has(request.fromUserId)) {
+        mutual.add(request.fromUserId);
       }
-    });
-    return uniqueIds;
+    }
+    return { outgoing, incoming, mutual };
   }, [friendRequests, user]);
+
+  /**
+   * The mutual half of the request list, as the membership test every consumer
+   * was writing for itself; `friends` below is the array every renderer wants.
+   * Producing both from one pass is free, and it is what stops the next caller
+   * from rebuilding the Set at its own call site.
+   */
+  const friendIds: ReadonlySet<string> = requestDirections.mutual;
 
   const friends = useMemo(() => [...friendIds], [friendIds]);
 
@@ -756,8 +780,8 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
           return "none";
         }
 
-        const outgoing = hasRequest(friendRequests, user.id, profileId);
-        const incoming = hasRequest(friendRequests, profileId, user.id);
+        const outgoing = requestDirections.outgoing.has(profileId);
+        const incoming = requestDirections.incoming.has(profileId);
 
         if (outgoing && incoming) {
           return "friend";
@@ -804,11 +828,15 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
           return;
         }
 
-        const alreadyRequested = hasRequest(friendRequests, user.id, profileId);
+        const alreadyRequested = requestDirections.outgoing.has(profileId);
         // An inbound request (them → me) makes this an *accept*: it flips both
         // directions to friends. Otherwise it is a fresh outgoing request.
-        const isAccept = hasRequest(friendRequests, profileId, user.id);
+        const isAccept = requestDirections.incoming.has(profileId);
 
+        // Still a scan, and deliberately: `current` is the live state, which
+        // a concurrent update may have moved past the render `requestDirections`
+        // was derived from. The guard is against writing a duplicate pair, so
+        // it has to ask the list it is about to write to.
         setFriendRequests((current) => {
           if (hasRequest(current, user.id, profileId)) {
             return current;
@@ -842,8 +870,8 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         // pending request, declining theirs, and unfriending — only the first
         // is the funnel's churn arm.
         const removal = classifyRequestRemoval(
-          hasRequest(friendRequests, user.id, profileId),
-          hasRequest(friendRequests, profileId, user.id),
+          requestDirections.outgoing.has(profileId),
+          requestDirections.incoming.has(profileId),
         );
 
         setFriendRequests((current) =>
@@ -889,7 +917,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       getVisibleItems: () => visibleSocialItems,
       pendingSyncCount: countPendingSocial(pendingSocial),
     }),
-    [ensureProfilesLoaded, friendIds, friendRequests, following, followingIds, friends, incomingRequestUserIds, isAdmin, pendingSocial, profileById, profiles, ready, syncSocial, user, viewerProfiles, visibleSocialCollections, visibleSocialItems],
+    [ensureProfilesLoaded, friendIds, following, followingIds, friends, incomingRequestUserIds, isAdmin, pendingSocial, profileById, profiles, ready, requestDirections, syncSocial, user, viewerProfiles, visibleSocialCollections, visibleSocialItems],
   );
 
   return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>;

@@ -65,8 +65,10 @@ describe("BE-21 — addFriend routes an accept through the Edge Function", () =>
   });
 
   it("detects an inbound request and dispatches accept-request instead of send-request", () => {
-    // The accept branch is keyed off an existing them→me request.
-    assert.match(SOURCE, /hasRequest\(friendRequests,\s*profileId,\s*user\.id\)/);
+    // The accept branch is keyed off an existing them→me request — which is
+    // the `incoming` direction of `requestDirections` since 2026-09-11, when
+    // the two per-call scans of `friendRequests` became two set lookups.
+    assert.match(SOURCE, /isAccept\s*=\s*requestDirections\.incoming\.has\(profileId\)/);
     assert.match(
       SOURCE,
       /kind:\s*"accept-request",\s*acceptorUserId:\s*user\.id,\s*fromUserId:\s*profileId/,

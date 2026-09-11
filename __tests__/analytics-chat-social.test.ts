@@ -95,10 +95,19 @@ describe("lib/social-context.tsx — friend_requested wiring", () => {
     assert.ok(addFriendIdx >= 0);
     const sliceEnd = src.indexOf("removeFriend: async", addFriendIdx);
     const body = src.slice(addFriendIdx, sliceEnd);
+    // Read off `requestDirections` rather than `hasRequest` since 2026-09-11 —
+    // the same question, asked of the sets derived from `friendRequests`
+    // instead of scanning the list twice per tap. What the case is actually
+    // about is unchanged: the snapshot is taken BEFORE `setFriendRequests`, or
+    // the re-tap it exists to suppress looks new.
     assert.match(
       body,
-      /alreadyRequested\s*=\s*hasRequest\(/,
-      "addFriend must capture alreadyRequested via hasRequest before mutating state",
+      /alreadyRequested\s*=\s*requestDirections\.outgoing\.has\(profileId\)/,
+      "addFriend must capture alreadyRequested from the render's request directions",
+    );
+    assert.ok(
+      body.indexOf("alreadyRequested") < body.indexOf("setFriendRequests"),
+      "alreadyRequested must be captured before the state mutation it describes",
     );
     assert.match(
       body,

@@ -78,10 +78,14 @@ describe("lib/social-context.tsx — friend_request_cancelled wiring", () => {
     );
   });
 
-  it("classifies from both hasRequest directions (mine, theirs)", () => {
+  it("classifies from both request directions (mine, theirs)", () => {
+    // Two `hasRequest` scans of the whole list until 2026-09-11, two lookups
+    // in the sets derived from it since. The argument ORDER is what this case
+    // is about and it is what a swap would break silently: a decline would be
+    // reported as a cancellation.
     assert.match(
       body,
-      /classifyRequestRemoval\(\s*hasRequest\(friendRequests,\s*user\.id,\s*profileId\)\s*,\s*hasRequest\(friendRequests,\s*profileId,\s*user\.id\)\s*,?\s*\)/,
+      /classifyRequestRemoval\(\s*requestDirections\.outgoing\.has\(profileId\)\s*,\s*requestDirections\.incoming\.has\(profileId\)\s*,?\s*\)/,
       "the classifier's args must be (hadOutgoing, hadIncoming) in that order",
     );
   });
