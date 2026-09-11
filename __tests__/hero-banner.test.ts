@@ -32,7 +32,6 @@ const GRADIENT_CONSUMERS = ["app/index.tsx", "app/settings.tsx", "components/log
 /** Every screen that renders the flat `HERO_DARK` banner. */
 const SOLID_CONSUMERS = [
   "app/chats.tsx",
-  "app/collections-feed.tsx",
   "app/friends.tsx",
   "app/marketplace.tsx",
   "app/people.tsx",

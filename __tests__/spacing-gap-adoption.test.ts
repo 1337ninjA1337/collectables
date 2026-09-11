@@ -42,8 +42,6 @@ const MIGRATED_FILES: ReadonlyArray<{
   // list: false since 2026-08-21 — the action-row gap left with <RelationshipActionRow>
   { rel: "app/friends.tsx", list: false, card: false, inline: false },
   { rel: "app/stats.tsx", list: true, card: false, inline: true },
-  // list: false since 2026-08-08 — the hero gap left with <HeroBanner>
-  { rel: "app/collections-feed.tsx", list: false, card: false, inline: false },
   { rel: "app/auth/callback.tsx", list: false, card: true, inline: false },
   { rel: "app/_layout.tsx", list: false, card: true, inline: true },
   // batch 5/6

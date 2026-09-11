@@ -105,11 +105,12 @@ describe("the home screen's friend-collection list", () => {
     assert.doesNotMatch(CODE, /friends\.includes\(/);
   });
 
-  it("states the rule nowhere, because the feed screen states it too", () => {
+  it("states the rule nowhere, because a tested helper states it", () => {
     // The filter body and the shared-with-me Set moved into
     // `selectFriendCollections` once `app/collections-feed.tsx` turned out to
-    // answer the same question with a narrower list. What is left here is the
-    // call; `friend-collections-selector.test.ts` owns the rule.
+    // answer the same question with a narrower list. That screen is gone and
+    // the helper stayed: what is left here is the call, and
+    // `friend-collections-selector.test.ts` owns the rule.
     assert.match(CODE, /selectFriendCollections\(collections, friendIds, sharedWithMeCollections\)/);
     assert.doesNotMatch(CODE, /const sharedWithMeIds = new Set\(/);
     assert.doesNotMatch(CODE, /friendIds\.has\(collection\.ownerUserId\)/);

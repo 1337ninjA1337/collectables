@@ -13,9 +13,9 @@ import { readRepoFile } from "./helpers/repo-file";
  * every friend collection and every subscription mounted a `CollectionCard` —
  * and its remote cover image — as soon as the home screen rendered, whether or
  * not the tab was the visible one. `useChunkedList` exists for exactly that
- * iOS memory hot-path, and `app/collections-feed.tsx` has used it for these
- * two lists since it was written. The home screen is where every user lands
- * and it was the one still unbounded.
+ * iOS memory hot-path, and the (since retired) `app/collections-feed.tsx` had
+ * used it over these two lists since it was written. The home screen is where
+ * every user lands and it was the one still unbounded.
  *
  * "Mine" stays unwindowed on purpose: it is a drag-to-reorder list, and a
  * window would let the owner drag a row toward a position that is not mounted.

@@ -165,7 +165,7 @@ describe("useChunkedList hook contract (structural)", () => {
   it("no screen computes the subtraction itself any more", () => {
     // Each of the three had its own spelling of `total - visibleItems.length`,
     // and one of them took `total` from a ternary picking between two lists.
-    for (const screen of ["app/index.tsx", "app/collections-feed.tsx", "app/collection/[id].tsx"]) {
+    for (const screen of ["app/index.tsx", "app/collection/[id].tsx"]) {
       const code = read(screen);
       assert.doesNotMatch(
         code,

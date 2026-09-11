@@ -43,18 +43,23 @@ export function selectRecentItems(
 }
 
 /**
- * The collections shown under "Friends' collections" — on BOTH screens that
- * carry that label.
+ * The collections shown under "Friends' collections".
  *
  * There were two lists with one name. `app/index.tsx` filtered the merged
  * `collections` by "a viewer copy whose owner is a friend, or a collection
- * somebody shared with me"; `app/collections-feed.tsx` rendered the context's
+ * somebody shared with me"; the collections-feed screen rendered the context's
  * `friendCollections`, which is only what `fetchPublicCollectionsByUserId`
  * returned for each friend. So the feed's tab was a strict subset: no seeded
  * friend collections (the whole list, on a device with no Supabase, or before
  * the fetch lands) and nothing shared directly with the viewer. A user moving
  * between two screens saw two different answers to one question, and nothing
  * said which was meant.
+ *
+ * The feed screen was retired on 2026-09-11 — no route in the app could open
+ * it, and its two tabs were the home screen's two tabs — so the label has one
+ * screen again. The rule stayed a function: it is the answer to a question
+ * with three sources, and a unit-testable one is worth more than a filter
+ * chain inlined in JSX.
  *
  * The merged rule wins because it is the one that can see every source: the
  * context's `collections` already holds the cloud fetch, the seeds and the

@@ -129,9 +129,12 @@ export default function HomeScreen() {
    * one Set per consumer of a list that changes when somebody accepts a friend
    * request. `friendIds` is built once, in the memo that derives the ids.
    *
-   * The RULE moved to `selectFriendCollections`, because
-   * `app/collections-feed.tsx` renders a tab with this screen's label and had
-   * its own, narrower answer. One function, two screens.
+   * The RULE moved to `selectFriendCollections`, because the collections-feed
+   * screen rendered a tab with this screen's label and had its own, narrower
+   * answer. That screen was deleted on 2026-09-11 — nothing in the app could
+   * open it — so this is the only screen asking, and the question is still
+   * worth a unit-tested function rather than a filter chain in the middle of
+   * the JSX. See `collections-feed-retired.test.ts`.
    */
   const friendCollections = useMemo(
     () => selectFriendCollections(collections, friendIds, sharedWithMeCollections),
@@ -145,9 +148,9 @@ export default function HomeScreen() {
    * subscription mounted a `CollectionCard` — and its remote cover image —
    * the moment the home screen rendered, whether or not the tab was the
    * visible one. That is the iOS memory hot-path `useChunkedList` was written
-   * for, and `app/collections-feed.tsx` has used it for these exact two lists
-   * since it was written; the home screen is where every user lands and it was
-   * the one still unbounded.
+   * for, and the since-deleted collections-feed screen had used it over these
+   * exact two lists since it was written; the home screen is where every user
+   * lands and it was the one still unbounded.
    *
    * "Mine" is deliberately NOT windowed: it is a drag-to-reorder list, and a
    * window would let the owner drag a row toward a position that is not

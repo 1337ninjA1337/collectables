@@ -8,7 +8,7 @@ import { Collection } from "@/lib/types";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
- * One rule for "Friends' collections", on the two screens that carry the label.
+ * One rule for "Friends' collections", on the one screen that carries the label.
  *
  * `app/index.tsx` filtered the merged `collections`; `app/collections-feed.tsx`
  * rendered the context's `friendCollections`, which holds only what
@@ -18,9 +18,12 @@ import { readRepoFile } from "./helpers/repo-file";
  * fetch landed. Two screens a user moves between, one label, two answers, and
  * nothing anywhere saying which was meant.
  *
- * The cases below are about which sources the surviving rule can see, since
- * that is the whole disagreement. The two structural ones are what stops the
- * feed quietly going back to its own list.
+ * The feed screen was retired on 2026-09-11 — nothing in the app could open it
+ * — so the label has one screen again, and the rule it was extracted for is
+ * the rule that screen reads. The extraction still earns its place: the answer
+ * is a unit-testable function rather than a filter chain inlined in JSX, which
+ * is what the cases below are about. See `collections-feed-retired.test.ts`
+ * for what stops a second copy of the screen coming back.
  */
 
 const collection = (over: Partial<Collection>): Collection => ({
@@ -112,21 +115,21 @@ describe("selectFriendCollections", () => {
   });
 });
 
-describe("both screens that say \"friends' collections\" read the one rule", () => {
+describe("the screen that says \"friends' collections\" reads the rule", () => {
   const HOME = stripComments(readRepoFile("app/index.tsx"));
-  const FEED = stripComments(readRepoFile("app/collections-feed.tsx"));
 
   it("the home screen calls the selector rather than filtering inline", () => {
     assert.match(HOME, /selectFriendCollections\(collections, friendIds, sharedWithMeCollections\)/);
     assert.doesNotMatch(HOME, /collection\.role === "viewer" &&/);
   });
 
-  it("the feed derives its tab instead of rendering the context's fetch result", () => {
+  it("the home screen does not render the context's fetch result instead", () => {
     // `friendCollections` on the context is what the cloud returned for each
     // friend. It is still the right thing for the MERGE to consume; it was the
     // wrong thing for a tab to render, because it can only ever be one of the
-    // three sources the merged list holds.
-    assert.match(FEED, /selectFriendCollections\(collections, friendIds, sharedWithMeCollections\)/);
-    assert.doesNotMatch(FEED, /\{[^}]*\bfriendCollections\b[^}]*\} = useCollections\(\)/);
+    // three sources the merged list holds. The retired feed screen is where
+    // that went wrong, and this is the assertion that kept the home screen
+    // from being rewritten into it.
+    assert.doesNotMatch(HOME, /\{[^}]*\bfriendCollections\b[^}]*\} = useCollections\(\)/);
   });
 });

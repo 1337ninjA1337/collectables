@@ -23,14 +23,16 @@ async function mount(remaining: number, onPress: () => void = () => undefined) {
 }
 
 /**
- * One Load-more button, for the three screens that grow a window.
+ * One Load-more button, for the screens that grow a window.
  *
  * It was written out three times — collection detail's drag-mode fallback,
  * `app/collections-feed.tsx`, and the home screen's two borrowed-list tabs —
  * each copy arriving when that screen got its window, each carrying the same
  * three i18n keys, the same two style rules and the same accessibility props.
  * The third copy was added on 2026-09-11 and retired the same day, which is
- * the only reason this is a component and not a fourth.
+ * the only reason this is a component and not a fourth. The feed screen was
+ * itself retired later that day (nothing in the app could open it, and its two
+ * tabs were the home screen's two tabs), so the list below is two.
  *
  * Structural: the component pulls react-native, so what is asserted is that
  * every screen reaches it and none of them kept a copy. The behavioural claim
@@ -42,7 +44,6 @@ const COMPONENT = stripComments(readRepoFile("components/load-more-button.tsx"))
 
 const SCREENS = [
   "app/index.tsx",
-  "app/collections-feed.tsx",
   "app/collection/[id].tsx",
 ] as const;
 

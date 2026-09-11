@@ -491,7 +491,15 @@ describe("translation floors", () => {
     // back, which reads as "fixed" to somebody who can see it and is announced
     // by nothing to somebody who cannot — text becoming empty is not a
     // sentence.
-    assert.match(report, /en: 511\/511 keys \(100\.0%\)/);
+    // 508 later that day, and the first fall in this list: the collections-feed
+    // screen was deleted, and `collectionsFeed`, `collectionsFeedTitle` and
+    // `tabFriendCollections` had no other reader. A route no user could open
+    // had six locales' worth of copy translated for it — which is the cost
+    // this number makes visible, and the reason a removal belongs here beside
+    // the additions rather than passing silently as "fewer keys is fine".
+    // `collectionsFeedSubtitle` stayed: the home screen's subscribed tab
+    // renders it.
+    assert.match(report, /en: 508\/508 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
