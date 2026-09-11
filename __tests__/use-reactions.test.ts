@@ -2,6 +2,7 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement, type ReactElement } from "react";
 
+import { REACTION_WRITE_DEBOUNCE_MS } from "@/lib/reaction-write-queue";
 import type { Reaction, ReactionEmoji, ReactionTargetType } from "@/lib/types";
 
 import { settle } from "./helpers/mount-provider";
@@ -43,6 +44,16 @@ import { autoUnmount, installNativeModuleStubs, mockModule, render } from "./hel
  * The calls are read off the mocks, because "optimistic" is a claim about
  * ORDER — the state has to change before the promise settles — and only the
  * mock can hold the promise open long enough to look.
+ *
+ * ## Why the cases wait
+ *
+ * The writes go through `lib/reaction-write-queue.ts`, a trailing debounce:
+ * the row moves on the tap and the cloud is told once the direction has
+ * settled. `toggle` resolves when that has happened, so awaiting it is still
+ * the way to ask what the cloud was told — it just takes a window to answer,
+ * which is what {@link untilWritten} waits out. The window's own boundaries
+ * are `reaction-write-queue.test.ts`'s, under mock timers; what is here is the
+ * gesture end to end.
  */
 
 /** The signed-in user, or `null`; reassigned per case. */
@@ -131,6 +142,21 @@ function countOf(emoji: ReactionEmoji): number {
 
 function mineOn(emoji: ReactionEmoji): boolean {
   return value().counts.find((entry) => entry.key === emoji)!.mine;
+}
+
+/**
+ * Waits until the queue's window has elapsed and the write has been made.
+ *
+ * Polled rather than slept-for: a case that held the write open needs the
+ * point where the CALL happened and the promise has not settled, which one
+ * `setTimeout` past the window cannot name.
+ */
+async function untilWritten(made: () => boolean): Promise<void> {
+  const deadline = Date.now() + REACTION_WRITE_DEBOUNCE_MS * 4;
+  while (!made()) {
+    if (Date.now() > deadline) throw new Error("the queue never sent the write");
+    await settle();
+  }
 }
 
 beforeEach(() => {
@@ -227,6 +253,9 @@ describe("useReactions — toggling", () => {
 
     assert.equal(countOf("star"), 1, "the tap must show immediately");
     assert.equal(mineOn("star"), true);
+    assert.deepEqual(addCalls, [], "and before the cloud has been told anything");
+
+    await untilWritten(() => addCalls.length === 1);
     releaseWrite?.();
     await pending;
     tree.rerender();
@@ -314,11 +343,22 @@ describe("useReactions — two taps before a re-render", () => {
     // table that allows one per (user, target, emoji).
     assert.equal(countOf("star"), 0, "the second tap must undo the first");
     assert.equal(mineOn("star"), false);
-    assert.deepEqual(addCalls, [{ userId: "me", targetId: "c1", emoji: "star" }]);
-    assert.deepEqual(removeCalls, [{ userId: "me", targetId: "c1", emoji: "star" }]);
   });
 
-  it("takes three taps back to one reaction, not to three", async () => {
+  it("tells the cloud nothing when the two taps net to nothing", async () => {
+    const tree = await mount();
+
+    await Promise.all([value().toggle("star"), value().toggle("star")]);
+    tree.rerender();
+
+    // The pair used to be an INSERT and a DELETE for a row the server created
+    // and dropped microseconds apart: two round trips to reach the state it
+    // was already in.
+    assert.deepEqual(addCalls, []);
+    assert.deepEqual(removeCalls, []);
+  });
+
+  it("takes three taps back to one reaction, and sends one write", async () => {
     const tree = await mount();
 
     await Promise.all([
@@ -329,8 +369,8 @@ describe("useReactions — two taps before a re-render", () => {
     tree.rerender();
 
     assert.equal(countOf("fire"), 1);
-    assert.equal(addCalls.length, 2);
-    assert.equal(removeCalls.length, 1);
+    assert.deepEqual(addCalls, [{ userId: "me", targetId: "c1", emoji: "fire" }]);
+    assert.deepEqual(removeCalls, [], "only the settled direction is sent");
   });
 
   it("keeps two different emoji apart when both are tapped in one pass", async () => {
@@ -377,5 +417,73 @@ describe("useReactions — two taps before a re-render", () => {
     tree.rerender();
 
     assert.equal(value().toggle, first);
+  });
+});
+
+describe("useReactions — when the cloud is told", () => {
+  it("moves the row now and writes later", async () => {
+    // The whole point of the window: the screen is never waiting for it, and
+    // nothing has left the device while the user can still change their mind.
+    const tree = await mount();
+
+    const pending = value().toggle("heart");
+    tree.rerender();
+
+    assert.equal(countOf("heart"), 1);
+    assert.deepEqual(addCalls, []);
+
+    await pending;
+    assert.deepEqual(addCalls, [{ userId: "me", targetId: "c1", emoji: "heart" }]);
+  });
+
+  it("collapses a pair on one emoji without touching another", async () => {
+    // One emoji's settled direction says nothing about the next one's, and a
+    // queue that shared a slot would have the star cancel the heart.
+    const tree = await mount();
+
+    await Promise.all([
+      value().toggle("heart"),
+      value().toggle("heart"),
+      value().toggle("star"),
+    ]);
+    tree.rerender();
+
+    assert.equal(countOf("heart"), 0);
+    assert.equal(countOf("star"), 1);
+    assert.deepEqual(addCalls, [{ userId: "me", targetId: "c1", emoji: "star" }]);
+    assert.deepEqual(removeCalls, []);
+  });
+
+  it("still sends a removal that settles that way", async () => {
+    // The collapse must not swallow the direction a sequence actually ends on.
+    stored = [reaction("r1", "me", "heart")];
+    const tree = await mount();
+
+    await Promise.all([
+      value().toggle("heart"),
+      value().toggle("heart"),
+      value().toggle("heart"),
+    ]);
+    tree.rerender();
+
+    assert.equal(countOf("heart"), 0);
+    assert.deepEqual(removeCalls, [{ userId: "me", targetId: "c1", emoji: "heart" }]);
+    assert.deepEqual(addCalls, []);
+  });
+
+  it("sends a tap the user walked away from", async () => {
+    // A tap and then a back-swipe inside the window. The queue is flushed by
+    // the unmount, or the window would be a way to lose a reaction rather than
+    // a way to batch one.
+    const tree = await mount();
+
+    void value().toggle("clap");
+    tree.rerender();
+    assert.deepEqual(addCalls, [], "nothing has gone yet");
+
+    tree.unmount();
+    await untilWritten(() => addCalls.length === 1);
+
+    assert.deepEqual(addCalls, [{ userId: "me", targetId: "c1", emoji: "clap" }]);
   });
 });

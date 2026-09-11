@@ -410,6 +410,56 @@ describe("supabase-profiles.ts wiring", () => {
   }
 });
 
+// --- The two optimistic writers, and the refusal they have to report ---
+describe("reaction writes reject a refused response", () => {
+  /**
+   * `fetch` resolves for every status the server manages to answer with, so a
+   * 401 from RLS read exactly like a successful insert. Both reaction writers
+   * are awaited by an optimistic caller — `lib/use-reactions.ts` shows the row
+   * first and takes it back if the write rejects — and a refusal that resolved
+   * left the screen stating a fact the server had refused, with nothing to
+   * correct it until a remount. That is the bug the hook's suite was written
+   * to close, and it was asserted against a mocked rejection: the only failure
+   * that could actually reach the rollback was a dropped connection.
+   *
+   * Read off the source, because reaching these two through a real `fetch`
+   * means a configured Supabase and a signed-in token. What a suite can ask
+   * without either is that the status is looked at at all — which is exactly
+   * the line that was missing.
+   */
+  const SOURCE = readRepoFile("lib/supabase-profiles.ts");
+
+  it("has one place that turns a non-OK reaction response into a throw", () => {
+    assert.match(SOURCE, /function assertReactionWriteAccepted\(/);
+    assert.match(SOURCE, /if \(res\.ok\) return;\n\s*throw new Error\(/);
+  });
+
+  for (const writer of ["addReaction", "removeReaction"]) {
+    it(`holds ${writer}'s response and asserts it`, () => {
+      const body = SOURCE.slice(SOURCE.indexOf(`export async function ${writer}(`));
+      const fn = body.slice(0, body.indexOf("\n}\n"));
+
+      assert.match(fn, /const res = await supabaseRest\(/, "the response must be kept");
+      assert.match(
+        fn,
+        new RegExp(`assertReactionWriteAccepted\\(res, "${writer}"\\)`),
+        "and handed to the assertion",
+      );
+    });
+  }
+
+  it("percent-encodes every caller-supplied segment of the delete filter", () => {
+    // `target_id` was encoded and `user_id` beside it was not. Both are ids
+    // this app mints rather than a user types, which is an argument for the
+    // encoding being cheap rather than for leaving it out.
+    const body = SOURCE.slice(SOURCE.indexOf("export async function removeReaction("));
+    const fn = body.slice(0, body.indexOf("\n}\n"));
+
+    assert.match(fn, /user_id=eq\.\$\{encodeURIComponent\(userId\)\}/);
+    assert.match(fn, /target_id=eq\.\$\{encodeURIComponent\(targetId\)\}/);
+  });
+});
+
 // --- BE-28c explicit column projections (no more select=*) ---
 describe("BE-28c column projections", () => {
   const SOURCE = readRepoFile("lib/supabase-profiles.ts");

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
 import { planReactionToggle, rollbackReactionToggle } from "@/lib/reaction-toggle";
+import { createReactionWriteQueue, reactionWriteKey } from "@/lib/reaction-write-queue";
 import { addReaction, fetchReactions, removeReaction } from "@/lib/supabase-profiles";
 import { Reaction, ReactionEmoji, ReactionTargetType } from "@/lib/types";
 import { generateUuidV4 } from "@/lib/uuid";
@@ -39,6 +40,35 @@ export function useReactions(targetType: ReactionTargetType, targetId: string) {
     latest.current = next(latest.current);
     setReactions(latest.current);
   }, []);
+
+  /**
+   * The writes, collapsed: on-then-off in one gesture leaves the device alone.
+   *
+   * Everything the write needs is on `plan.row`, so the queue does not depend
+   * on `user` or the target and is built once for the life of the mount —
+   * which is also what keeps `toggle`'s identity stable for the memoized bar.
+   */
+  const queue = useMemo(
+    () =>
+      createReactionWriteQueue({
+        write: async (plan) => {
+          const { userId, targetType: type, targetId: id, emoji } = plan.row;
+          if (plan.kind === "add") await addReaction(userId, type, id, emoji);
+          else await removeReaction(userId, type, id, emoji);
+        },
+        // Both directions are optimistic and both put the row back if the
+        // cloud refuses: a screen that keeps a reaction the server rejected is
+        // stating a fact nothing agrees with, and nothing corrects it until a
+        // remount.
+        onFailure: (plan) => apply((rows) => rollbackReactionToggle(rows, plan)),
+      }),
+    [apply],
+  );
+
+  // A tap inside the window followed by a back-swipe would otherwise sit in a
+  // timer nothing is left to fire it. The flush sends it; the window is a
+  // batching delay, never a way to lose a reaction.
+  useEffect(() => () => void queue.flush(), [queue]);
 
   useEffect(() => {
     // No target yet — the first pass of a detail screen, before the route
@@ -82,24 +112,17 @@ export function useReactions(targetType: ReactionTargetType, targetId: string) {
         createdAt: new Date().toISOString(),
       });
 
-      // Both writes are optimistic and both put the row back if the cloud
-      // refuses: a screen that keeps a reaction the server rejected is stating
-      // a fact nothing agrees with, and nothing corrects it until a remount.
+      // The list moves now; the cloud is told once the direction has settled.
+      // Two taps on one emoji are one gesture and net to nothing, so the queue
+      // drops the pair instead of sending an INSERT and a DELETE for a row the
+      // server would create and drop microseconds apart.
       apply(() => plan.rows);
-      try {
-        if (plan.kind === "add") {
-          await addReaction(user.id, targetType, targetId, emoji);
-        } else {
-          await removeReaction(user.id, targetType, targetId, emoji);
-        }
-      } catch {
-        apply((rows) => rollbackReactionToggle(rows, plan));
-      }
+      await queue.submit(reactionWriteKey(targetType, targetId, emoji), plan);
     },
     // Not `reactions`: the rows are read through `latest` now, so the handler
     // keeps one identity for the life of the target instead of a new one per
     // tap — which is what let two taps close over the same list.
-    [user, targetType, targetId, apply],
+    [user, targetType, targetId, apply, queue],
   );
 
   return { counts, toggle, loading, totalCount: reactions.length };

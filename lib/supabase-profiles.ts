@@ -746,6 +746,23 @@ export async function fetchReactions(targetType: ReactionTargetType, targetId: s
   return rows.map(toReaction);
 }
 
+/**
+ * A refused reaction write, as a rejection.
+ *
+ * `fetch` resolves for every status the server manages to answer with, so an
+ * RLS denial arrives as a 401 that reads exactly like a success. Both reaction
+ * writers are optimistic — `lib/use-reactions.ts` puts the row on screen and
+ * takes it back if the write rejects — and a refusal that resolves leaves the
+ * screen stating a fact the server refused, which is the one thing the
+ * rollback exists to prevent. The suites mocked these two functions, so the
+ * rollback was asserted against an error that only a dropped connection could
+ * actually produce.
+ */
+function assertReactionWriteAccepted(res: Response, what: string): void {
+  if (res.ok) return;
+  throw new Error(`[${what}] refused by the server: ${res.status}`);
+}
+
 export async function addReaction(
   userId: string,
   targetType: ReactionTargetType,
@@ -754,7 +771,7 @@ export async function addReaction(
 ): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  await supabaseRest("/reactions", {
+  const res = await supabaseRest("/reactions", {
     method: "POST",
     body: JSON.stringify({
       user_id: userId,
@@ -763,6 +780,7 @@ export async function addReaction(
       emoji,
     }),
   });
+  assertReactionWriteAccepted(res, "addReaction");
 }
 
 export async function removeReaction(
@@ -773,10 +791,11 @@ export async function removeReaction(
 ): Promise<void> {
   if (!isSupabaseConfigured) return;
 
-  await supabaseRest(
-    `/reactions?user_id=eq.${userId}&target_type=eq.${targetType}&target_id=eq.${encodeURIComponent(targetId)}&emoji=eq.${emoji}`,
+  const res = await supabaseRest(
+    `/reactions?user_id=eq.${encodeURIComponent(userId)}&target_type=eq.${targetType}&target_id=eq.${encodeURIComponent(targetId)}&emoji=eq.${emoji}`,
     { method: "DELETE" },
   );
+  assertReactionWriteAccepted(res, "removeReaction");
 }
 
 export async function fetchAllUserImageUrls(userId: string): Promise<string[]> {
