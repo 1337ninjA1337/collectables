@@ -62,6 +62,24 @@ export type AcceptedFriendship = {
   direction: "accepted_by_me" | "accepted_by_them";
 };
 
+/**
+ * A pair naming one person on both sides — which is not a relationship, in
+ * either direction.
+ *
+ * The rule was written three times before it was named: `collectHandshakes`
+ * below carries it as a `&&` on each arm, `addFriend` returns early rather than
+ * sending one, and the provider's direction sets dropped it so a self-pair
+ * could not make the viewer their own friend. Three spellings of one sentence
+ * is how the fourth author writes a fourth, so this is the sentence.
+ *
+ * The DB rejects the row and nothing in the app composes one deliberately; what
+ * this guards is the path where a row arrives anyway — a hand-edited cache, a
+ * migration, a server that stops enforcing its constraint.
+ */
+export function isSelfPair(request: FriendRequestEdge): boolean {
+  return request.fromUserId === request.toUserId;
+}
+
 type HandshakeState = { outgoing: boolean; incoming: boolean };
 
 function collectHandshakes(
@@ -78,9 +96,10 @@ function collectHandshakes(
     return state;
   };
   for (const request of requests) {
-    if (request.fromUserId === userId && request.toUserId !== userId) {
+    if (isSelfPair(request)) continue;
+    if (request.fromUserId === userId) {
       stateFor(request.toUserId).outgoing = true;
-    } else if (request.toUserId === userId && request.fromUserId !== userId) {
+    } else if (request.toUserId === userId) {
       stateFor(request.fromUserId).incoming = true;
     }
   }

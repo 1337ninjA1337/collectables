@@ -50,6 +50,7 @@ import {
   diffAcceptedFriendships,
   ensureUniquePublicId,
   ensureUniqueUsername,
+  isSelfPair,
   normalizeProfile,
   resolveFallbackIdentity,
   slugifyProfileId,
@@ -191,6 +192,23 @@ function buildFallbackProfile(
 
 function hasRequest(friendRequests: FriendRequest[], fromUserId: string, toUserId: string) {
   return friendRequests.some((request) => request.fromUserId === fromUserId && request.toUserId === toUserId);
+}
+
+/**
+ * The cloud's rows as this provider's shape — the ONE door `friendRequests`
+ * comes in through, and where a pair naming one person on both sides stops.
+ *
+ * Both entry points (the hydrate and the realtime refetch) had their own copy
+ * of this `map`, and the self-pair rule was enforced two layers downstream, in
+ * the derivation that would otherwise make the viewer their own friend. That is
+ * the wrong place for it: the bad row still entered state, was still persisted
+ * by the sync queue, and every future reader had to know to skip it. Dropped
+ * here, it never exists, and the readers get to trust what they are handed.
+ */
+function toFriendRequests(rows: readonly RemoteFriendRequest[]): FriendRequest[] {
+  return rows
+    .map((row) => ({ fromUserId: row.from_user_id, toUserId: row.to_user_id }))
+    .filter((request) => !isSelfPair(request));
 }
 
 /**
@@ -384,11 +402,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         // Friend requests come from Supabase, and stay as they were when the
         // fetch could not answer.
         if (remoteRequests !== null) {
-          const mapped: FriendRequest[] = remoteRequests.map((r: RemoteFriendRequest) => ({
-            fromUserId: r.from_user_id,
-            toUserId: r.to_user_id,
-          }));
-          setFriendRequests(mapped);
+          setFriendRequests(toFriendRequests(remoteRequests));
         }
       } catch (error: unknown) {
         // What reaches here is a cached blob that is not JSON, since the reads
@@ -428,12 +442,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       fetchFriendRequests(activeUser.id)
         .then((remoteRequests) => {
           if (!active) return;
-          setFriendRequests(
-            remoteRequests.map((r: RemoteFriendRequest) => ({
-              fromUserId: r.from_user_id,
-              toUserId: r.to_user_id,
-            })),
-          );
+          setFriendRequests(toFriendRequests(remoteRequests));
         })
         .catch(() => undefined);
     };
@@ -605,15 +614,11 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
    * home screen's count render from. Intersecting would reorder it by whichever
    * direction happened to be recorded first.
    *
-   * A row naming one person on both sides is dropped before any of that. It
-   * would land in `outgoing` AND `incoming`, which makes the viewer their own
-   * friend: their id in `friends`, a `fetchProfileById` for a profile this
-   * provider already holds, and a count one too high. `getRelationship` answers
-   * `"self"` before it looks at either set, so nothing on screen would say so,
-   * and the DB's own constraint rejects the row — which makes this the kind of
-   * hole that is unreachable right up until a locally-created request skips
-   * that path. It is one comparison, and a directed pair between one person is
-   * not a relationship in either direction.
+   * A row naming one person on both sides would land in `outgoing` AND
+   * `incoming` — making the viewer their own friend — and this is NOT where
+   * that is stopped. `toFriendRequests` drops it at the door, so the sets are
+   * derived from a list that cannot contain one; the filtered copy this memo
+   * used to allocate on every change is gone with it.
    */
   const requestDirections = useMemo(() => {
     const outgoing = new Set<string>();
@@ -623,12 +628,11 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       return { outgoing, incoming, mutual };
     }
 
-    const pairs = friendRequests.filter((request) => request.fromUserId !== request.toUserId);
-    for (const request of pairs) {
+    for (const request of friendRequests) {
       if (request.fromUserId === user.id) outgoing.add(request.toUserId);
       if (request.toUserId === user.id) incoming.add(request.fromUserId);
     }
-    for (const request of pairs) {
+    for (const request of friendRequests) {
       if (request.fromUserId === user.id && incoming.has(request.toUserId)) {
         mutual.add(request.toUserId);
       }

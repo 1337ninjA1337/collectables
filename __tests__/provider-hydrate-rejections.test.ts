@@ -92,9 +92,14 @@ describe("the hydrate chains that used to end at a finally", () => {
       /fetchFriendRequests\(activeUser\.id\)\.catch\(\(\) => null\)/,
       "a failed fetch must not read as an empty list",
     );
+    // The intermediate `mapped` const became a call to `toFriendRequests`,
+    // which is where the two entry points' duplicated `map` and the self-pair
+    // rule now live. What this case is about is the GATE around it: a null
+    // means the fetch could not answer, and a list that was never fetched must
+    // not overwrite the one on screen.
     assert.match(
       source,
-      /if \(remoteRequests !== null\) \{[\s\S]*?setFriendRequests\(mapped\);/,
+      /if \(remoteRequests !== null\) \{[\s\S]*?setFriendRequests\(toFriendRequests\(remoteRequests\)\);/,
       "setFriendRequests must be gated on the fetch having answered",
     );
   });
