@@ -28,6 +28,8 @@
  * interrupt each other, and the user hears half of each.
  */
 
+import { createAnnouncementQueue } from "@/lib/announce-queue";
+
 /** One region for the app, found by id rather than held in a module variable. */
 const REGION_ID = "collectables-live-region";
 
@@ -102,18 +104,46 @@ export function ensureLiveRegion(): void {
 }
 
 /**
- * Read one sentence aloud, now — or do nothing, where there is no page to read
- * it from.
+ * One channel, so two callers speaking at once are heard one after the other.
+ *
+ * Both writes used to land on one node inside one task, so a reader observed a
+ * single mutation and read a single sentence — the first caller was silently
+ * lost. See `lib/announce-queue.ts` for why the rule is one held message and
+ * one pending slot rather than a queue of everything.
+ */
+const channel = createAnnouncementQueue({
+  speak: (message) => {
+    const region = liveRegion();
+    if (!region) return;
+    // Cleared first, then written in a later task. Both halves earn their
+    // place: a region created in this same task has not been observed yet, and
+    // an unchanged string is not a change at all — either one is a silent
+    // announcement.
+    region.textContent = "";
+    setTimeout(() => {
+      region.textContent = message;
+    }, 0);
+  },
+});
+
+/**
+ * Read one sentence aloud, now — or next, if something else just was, or not
+ * at all where there is no page to read it from.
  */
 export function announceMessage(message: string): void {
-  const region = liveRegion();
-  if (!region) return;
-  // Cleared first, then written in a later task. Both halves earn their place:
-  // a region created in this same task has not been observed yet, and an
-  // unchanged string is not a change at all — either one is a silent
-  // announcement.
-  region.textContent = "";
-  setTimeout(() => {
-    region.textContent = message;
-  }, 0);
+  channel.push(message);
+}
+
+/**
+ * Forget a pending sentence and release the hold.
+ *
+ * The channel is module state, so a suite that announces leaves a timer armed
+ * for the one that runs next — and on this half it would write into whatever
+ * fake document that suite has installed since. Exported from both spellings
+ * of the pair because Metro resolves the import per platform and
+ * `lint:platform-pairs` is the rule that says a name on one half and not the
+ * other is a crash on the other.
+ */
+export function __resetAnnouncementsForTests(): void {
+  channel.reset();
 }

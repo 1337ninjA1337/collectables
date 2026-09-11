@@ -26,7 +26,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { announceMessage, ensureLiveRegion } from "@/lib/announce.web";
+import {
+  __resetAnnouncementsForTests,
+  announceMessage,
+  ensureLiveRegion,
+} from "@/lib/announce.web";
+import { ANNOUNCEMENT_HOLD_MS } from "@/lib/announce-queue";
 import { setupFakeDom, type FakeDom, type FakeNode } from "./helpers/fake-dom";
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -38,23 +43,31 @@ const MESSAGE = "Moved to position 3 of 7";
 /** Lets the queued write land — the module writes the text in a later task. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+/** Long enough for a held sentence to hand the channel to the next one. */
+const afterHold = () => new Promise((resolve) => setTimeout(resolve, ANNOUNCEMENT_HOLD_MS + 10));
+
 /**
  * Runs a case against a fresh fake DOM, and puts the real globals back.
  *
- * The module under test holds no state between calls — it finds its region
- * through `document.getElementById` every time — so one import serves every
- * case, and swapping the document out from under it is the whole setup. Both
- * of its exports reach the same node, which is why a case that mounts and a
- * case that announces can be read side by side.
+ * The module finds its region through `document.getElementById` every time, so
+ * swapping the document out is most of the setup. What it does hold between
+ * calls is the announcement channel — one sentence at a time, the rest in a
+ * pending slot — and that survives the document it was speaking into: without
+ * the reset a case that announces arms a timer which fires into the NEXT
+ * case's fake DOM, writing a sentence nobody asked for into a region that
+ * should be empty. Reset on both sides, because a case can leave one pending
+ * as easily as it can inherit one.
  */
 async function withDom(
   run: (dom: FakeDom) => Promise<void>,
   opts?: { hasBody?: boolean },
 ): Promise<void> {
+  __resetAnnouncementsForTests();
   const dom = setupFakeDom(opts);
   try {
     await run(dom);
   } finally {
+    __resetAnnouncementsForTests();
     dom.restore();
   }
 }
@@ -130,6 +143,7 @@ describe("the web live region — what it says", () => {
       announceMessage(MESSAGE);
       await settle();
       assert.equal(region(dom)?.textContent, MESSAGE);
+      await afterHold();
       announceMessage(MESSAGE);
       assert.equal(region(dom)?.textContent, "", "the second announcement did not clear the region first");
       await settle();
@@ -137,12 +151,42 @@ describe("the web live region — what it says", () => {
     });
   });
 
-  it("keeps the last message when two announcements race", async () => {
+  it("says both sentences when two callers announce in one tick", async () => {
+    // This used to keep only the last: both writes landed on one node inside
+    // one task, so a reader observed a single mutation and read a single
+    // sentence. A toast arriving in the same tick as a keyboard move silenced
+    // the move, and nothing said so.
     await withDom(async (dom) => {
       announceMessage("Picked up");
       announceMessage(MESSAGE);
+
       await settle();
-      assert.equal(region(dom)?.textContent, MESSAGE);
+      assert.equal(region(dom)?.textContent, "Picked up", "the first caller is heard first");
+
+      await afterHold();
+      assert.equal(region(dom)?.textContent, MESSAGE, "and the second is heard after it");
+    });
+  });
+
+  it("keeps the newest of several sentences waiting on the channel", async () => {
+    // Five keyboard moves in a second: the user hears where they started and
+    // where they are. The three in the middle were stale before they could be
+    // read aloud, and reading them all would put the user a second behind
+    // their own hands.
+    await withDom(async (dom) => {
+      announceMessage("position 1 of 5");
+      announceMessage("position 2 of 5");
+      announceMessage("position 3 of 5");
+      announceMessage("position 4 of 5");
+
+      await settle();
+      assert.equal(region(dom)?.textContent, "position 1 of 5");
+
+      await afterHold();
+      assert.equal(region(dom)?.textContent, "position 4 of 5");
+
+      await afterHold();
+      assert.equal(region(dom)?.textContent, "position 4 of 5", "and nothing is left over");
     });
   });
 });
