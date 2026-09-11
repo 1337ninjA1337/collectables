@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
+import { planReactionToggle, rollbackReactionToggle } from "@/lib/reaction-toggle";
 import { addReaction, fetchReactions, removeReaction } from "@/lib/supabase-profiles";
 import { Reaction, ReactionEmoji, ReactionTargetType } from "@/lib/types";
+import { generateUuidV4 } from "@/lib/uuid";
 
 export const REACTION_EMOJIS: { key: ReactionEmoji; icon: string }[] = [
   { key: "heart", icon: "\u2764\uFE0F" },
@@ -17,6 +19,27 @@ export function useReactions(targetType: ReactionTargetType, targetId: string) {
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [loading, setLoading] = useState(true);
 
+  /**
+   * The rows as they are NOW, which React state cannot answer between renders.
+   *
+   * Two taps in one pass — the emoji are 44 points apart and a double tap is
+   * one gesture — both used to read `reactions` from the same closure, both
+   * find no row of their own, and both insert: two optimistic hearts and two
+   * inserts sent to a table that allows one. A `setReactions` updater sees the
+   * real previous list, but the DIRECTION of the tap has to be decided
+   * synchronously (it picks which network call to make), and the updater's
+   * argument is not available then.
+   *
+   * So the writer keeps its own copy and updates it before React re-renders.
+   * Every mutation goes through `apply` — the fetch included — or the two
+   * answers drift and the ref becomes the stale one.
+   */
+  const latest = useRef<Reaction[]>(reactions);
+  const apply = useCallback((next: (rows: readonly Reaction[]) => Reaction[]) => {
+    latest.current = next(latest.current);
+    setReactions(latest.current);
+  }, []);
+
   useEffect(() => {
     // No target yet — the first pass of a detail screen, before the route
     // param resolves. There is nothing to read, but the bar renders only its
@@ -29,11 +52,11 @@ export function useReactions(targetType: ReactionTargetType, targetId: string) {
     let active = true;
     setLoading(true);
     fetchReactions(targetType, targetId)
-      .then((r) => { if (active) setReactions(r); })
+      .then((r) => { if (active) apply(() => r); })
       .catch(() => {})
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [targetType, targetId]);
+  }, [targetType, targetId, apply]);
 
   const counts = REACTION_EMOJIS.map(({ key, icon }) => ({
     key,
@@ -45,37 +68,38 @@ export function useReactions(targetType: ReactionTargetType, targetId: string) {
   const toggle = useCallback(
     async (emoji: ReactionEmoji) => {
       if (!user) return;
-      const existing = reactions.find((r) => r.emoji === emoji && r.userId === user.id);
+      // A uuid, not `tmp-${Date.now()}`: two taps in the same millisecond minted
+      // the same id, and the rollback of either one then removed both. It is
+      // also the id class every other locally-minted row in this app uses — see
+      // `lib/item-id.ts` for what the legacy scheme cost there.
+      const plan = planReactionToggle({
+        rows: latest.current,
+        userId: user.id,
+        targetType,
+        targetId,
+        emoji,
+        id: generateUuidV4(),
+        createdAt: new Date().toISOString(),
+      });
+
       // Both writes are optimistic and both put the row back if the cloud
       // refuses: a screen that keeps a reaction the server rejected is stating
       // a fact nothing agrees with, and nothing corrects it until a remount.
-      if (existing) {
-        setReactions((prev) => prev.filter((r) => r.id !== existing.id));
-        try {
-          await removeReaction(user.id, targetType, targetId, emoji);
-        } catch {
-          setReactions((prev) =>
-            prev.some((r) => r.id === existing.id) ? prev : [...prev, existing],
-          );
-        }
-      } else {
-        const optimistic: Reaction = {
-          id: `tmp-${Date.now()}`,
-          userId: user.id,
-          targetType,
-          targetId,
-          emoji,
-          createdAt: new Date().toISOString(),
-        };
-        setReactions((prev) => [...prev, optimistic]);
-        try {
+      apply(() => plan.rows);
+      try {
+        if (plan.kind === "add") {
           await addReaction(user.id, targetType, targetId, emoji);
-        } catch {
-          setReactions((prev) => prev.filter((r) => r.id !== optimistic.id));
+        } else {
+          await removeReaction(user.id, targetType, targetId, emoji);
         }
+      } catch {
+        apply((rows) => rollbackReactionToggle(rows, plan));
       }
     },
-    [user, reactions, targetType, targetId],
+    // Not `reactions`: the rows are read through `latest` now, so the handler
+    // keeps one identity for the life of the target instead of a new one per
+    // tap — which is what let two taps close over the same list.
+    [user, targetType, targetId, apply],
   );
 
   return { counts, toggle, loading, totalCount: reactions.length };

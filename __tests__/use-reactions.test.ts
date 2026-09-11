@@ -295,3 +295,87 @@ describe("useReactions — toggling", () => {
     assert.equal(countOf("clap"), 0);
   });
 });
+
+describe("useReactions — two taps before a re-render", () => {
+  /**
+   * The gesture, not a contrived one: the five emoji are 44 points apart and a
+   * double tap on one of them is a single thing a finger does. Both handlers
+   * run against whatever the hook knew at the last render, and there is no
+   * render between them.
+   */
+  it("reads the second tap against the first, rather than adding twice", async () => {
+    const tree = await mount();
+
+    await Promise.all([value().toggle("star"), value().toggle("star")]);
+    tree.rerender();
+
+    // On then off. Before the rows moved into a ref, both taps found no row of
+    // their own and both inserted: two hearts on screen, two INSERTs sent to a
+    // table that allows one per (user, target, emoji).
+    assert.equal(countOf("star"), 0, "the second tap must undo the first");
+    assert.equal(mineOn("star"), false);
+    assert.deepEqual(addCalls, [{ userId: "me", targetId: "c1", emoji: "star" }]);
+    assert.deepEqual(removeCalls, [{ userId: "me", targetId: "c1", emoji: "star" }]);
+  });
+
+  it("takes three taps back to one reaction, not to three", async () => {
+    const tree = await mount();
+
+    await Promise.all([
+      value().toggle("fire"),
+      value().toggle("fire"),
+      value().toggle("fire"),
+    ]);
+    tree.rerender();
+
+    assert.equal(countOf("fire"), 1);
+    assert.equal(addCalls.length, 2);
+    assert.equal(removeCalls.length, 1);
+  });
+
+  it("keeps two different emoji apart when both are tapped in one pass", async () => {
+    const tree = await mount();
+
+    await Promise.all([value().toggle("heart"), value().toggle("clap")]);
+    tree.rerender();
+
+    // The second tap reading the first's list must not mean it overwrites it:
+    // a ref that replaced the list rather than extending it would leave one.
+    assert.equal(countOf("heart"), 1);
+    assert.equal(countOf("clap"), 1);
+    assert.equal(value().totalCount, 2);
+  });
+
+  it("gives each optimistic row its own id", async () => {
+    // `tmp-${Date.now()}` gave two taps in one millisecond the same id, and a
+    // rollback of either then removed both. Two rows added in one pass is the
+    // cheapest way to ask whether the ids can collide.
+    const tree = await mount();
+
+    await Promise.all([value().toggle("heart"), value().toggle("clap")]);
+    tree.rerender();
+
+    assert.equal(value().totalCount, 2, "two rows with one id would count as one removal later");
+
+    writeError = new Error("rls");
+    await value().toggle("eyes");
+    tree.rerender();
+
+    assert.equal(countOf("heart"), 1, "a refused third tap must not take the first two down");
+    assert.equal(countOf("clap"), 1);
+    assert.equal(countOf("eyes"), 0);
+  });
+
+  it("keeps one handler identity across taps, so a memoized bar does not re-render per reaction", async () => {
+    // The handler closed over `reactions` before this, so every tap minted a
+    // new `toggle` — which is both the staleness above and a new prop for
+    // `components/reaction-bar.tsx` on every count change.
+    const tree = await mount();
+    const first = value().toggle;
+
+    await value().toggle("star");
+    tree.rerender();
+
+    assert.equal(value().toggle, first);
+  });
+});
