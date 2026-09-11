@@ -69,7 +69,7 @@ export default function ProfileScreen() {
     updateMyProfile,
     deleteProfile,
     isAdmin,
-    friends,
+    friendIds,
   } = useSocial();
   const { collections, getItemsForCollection, getCollectionTotalCost, deleteUserContent, wishlistItems, getItemById } = useCollections();
   const { listings } = useMarketplace();
@@ -85,7 +85,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const isSelf = myProfile?.id === params.id;
-  const isFriend = friends.includes(params.id);
+  const isFriend = friendIds.has(params.id);
 
   useFocusEffect(
     useCallback(() => {

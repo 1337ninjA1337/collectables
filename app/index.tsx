@@ -81,7 +81,7 @@ export default function HomeScreen() {
     }
   };
   const { t } = useI18n();
-  const { friends, following, getMyProfile } = useSocial();
+  const { friends, friendIds, following, getMyProfile } = useSocial();
   const [collectionsTab, setCollectionsTab] = useState<CollectionsTab>("mine");
   const { isMobile } = useResponsive();
   const theme = useAppTheme();
@@ -120,21 +120,19 @@ export default function HomeScreen() {
    * `ownedCollections` and left behind when only the one blocking the ref was
    * done.
    *
-   * `friends` becomes a Set too. It was scanned with `.includes` once per
-   * collection, so the cost was friends × collections: a user with forty
-   * friends and two hundred visible collections paid eight thousand string
-   * comparisons per render, for a list that changes when somebody accepts a
-   * friend request.
+   * The friend lookup is a Set, and it is the context's — this screen built its
+   * own from `friends` and so did everyone else who noticed the scan, which is
+   * one Set per consumer of a list that changes when somebody accepts a friend
+   * request. `friendIds` is built once, in the memo that derives the ids.
    */
   const friendCollections = useMemo(() => {
     const sharedWithMeIds = new Set(sharedWithMeCollections.map((c) => c.id));
-    const friendIds = new Set(friends);
     return collections.filter(
       (collection) =>
         collection.role === "viewer" &&
         (friendIds.has(collection.ownerUserId) || sharedWithMeIds.has(collection.id)),
     );
-  }, [collections, sharedWithMeCollections, friends]);
+  }, [collections, sharedWithMeCollections, friendIds]);
 
   if (!ready) {
     return (

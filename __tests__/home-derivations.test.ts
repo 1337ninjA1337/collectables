@@ -34,13 +34,40 @@ import { readRepoFile } from "./helpers/repo-file";
 const SRC = readRepoFile("app/index.tsx");
 const CODE = stripComments(SRC);
 
+/**
+ * The dep array of a named `useMemo`, as a SET of names.
+ *
+ * The first version of this file matched `}, [collections,
+ * sharedWithMeCollections, friends]);` as a literal, which asks a question
+ * about formatting: reordering the deps is a no-op for React and turned the
+ * suite red, while adding a fourth dep passed silently if it happened to land
+ * elsewhere in the file. What matters is WHICH names the memo re-runs on, so
+ * that is what this reads.
+ */
+function depsOf(name: string): Set<string> {
+  const start = CODE.indexOf(`const ${name} = useMemo(`);
+  assert.ok(start > 0, `${name} must be a useMemo in app/index.tsx`);
+  const close = CODE.indexOf("}, [", start);
+  assert.ok(close > start, `${name}'s dep array must follow its body`);
+  const end = CODE.indexOf("]", close);
+  return new Set(
+    CODE.slice(close + "}, [".length, end)
+      .split(",")
+      .map((dep) => dep.trim())
+      .filter(Boolean),
+  );
+}
+
 describe("the home screen's friend-collection list", () => {
   it("is derived once per input rather than once per render", () => {
     assert.match(CODE, /const friendCollections = useMemo\(/);
   });
 
   it("depends on exactly the three lists it reads", () => {
-    assert.match(CODE, /\}, \[collections, sharedWithMeCollections, friends\]\);/);
+    assert.deepEqual(
+      depsOf("friendCollections"),
+      new Set(["collections", "sharedWithMeCollections", "friendIds"]),
+    );
   });
 
   it("is declared above the early return, or it is a conditional hook", () => {
@@ -57,9 +84,17 @@ describe("the home screen's friend-collection list", () => {
     // user with forty friends and two hundred visible collections paid eight
     // thousand string comparisons for one render of a list that changes when
     // somebody accepts a friend request.
-    assert.match(CODE, /const friendIds = new Set\(friends\);/);
     assert.match(CODE, /friendIds\.has\(collection\.ownerUserId\)/);
     assert.doesNotMatch(CODE, /friends\.includes\(/);
+  });
+
+  it("takes the Set from the context rather than building its own", () => {
+    // The screen used to do `new Set(friends)` inside the memo, and so did
+    // every other consumer that noticed the scan. One Set per caller of a list
+    // that changes when somebody accepts a friend request is the thing
+    // `friendIds` retires; a local rebuild here would quietly bring it back.
+    assert.match(CODE, /const \{[^}]*\bfriendIds\b[^}]*\} = useSocial\(\);/);
+    assert.doesNotMatch(CODE, /new Set\(friends\)/);
   });
 
   it("keeps the shared-with-me ids inside the memo that is its only reader", () => {

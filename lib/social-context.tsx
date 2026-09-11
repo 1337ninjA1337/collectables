@@ -91,6 +91,18 @@ type SocialContextValue = {
   isAdmin: boolean;
   profiles: UserProfile[];
   friends: string[];
+  /**
+   * The same ids as `friends`, as the membership test every consumer was
+   * writing for itself.
+   *
+   * `friends` is the list you render (a count on the home screen, a row per
+   * friend); `friendIds` is the question "is this person a friend", which was
+   * `friends.includes(id)` in four places and inside two filters — so the cost
+   * was friends × collections on a screen that re-renders on every tab swipe.
+   * The Set is built where the array is, from the same pass, rather than once
+   * per caller who happened to notice.
+   */
+  friendIds: ReadonlySet<string>;
   incomingRequestUserIds: string[];
   following: string[];
   getMyProfile: () => UserProfile | undefined;
@@ -432,8 +444,15 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     };
   }, [user]);
 
+  // Both of these are persisted as arrays (the blobs are JSON) and asked
+  // membership questions everywhere they are read — the tombstone list against
+  // every profile the app knows, `following` against every social collection.
+  // Internal to the provider: nothing outside it scans either one.
+  const deletedProfileIdSet = useMemo(() => new Set(deletedProfileIds), [deletedProfileIds]);
+  const followingIds = useMemo(() => new Set(following), [following]);
+
   const profiles = useMemo<UserProfile[]>(() => {
-    const isDeleted = (profileId: string) => deletedProfileIds.includes(profileId);
+    const isDeleted = (profileId: string) => deletedProfileIdSet.has(profileId);
     const seen = new Set<string>();
 
     const result: UserProfile[] = [];
@@ -460,7 +479,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     }
 
     return result;
-  }, [deletedProfileIds, myProfileOverride, remoteProfiles, t, user]);
+  }, [deletedProfileIdSet, myProfileOverride, remoteProfiles, t, user]);
 
   const isAdmin = useMemo(() => {
     if (!user) {
@@ -567,9 +586,18 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     };
   }, [deliverSocial, ready, user]);
 
-  const friends = useMemo(() => {
+  /**
+   * The mutual half of the request list, as a Set — which is the shape the
+   * derivation already built and then threw away.
+   *
+   * The `[...uniqueIds]` spread below is the array every renderer wants and the
+   * Set is the membership test every filter wants; producing both from one pass
+   * is free, and it is what stops the next caller from rebuilding the Set at
+   * its own call site.
+   */
+  const friendIds = useMemo<ReadonlySet<string>>(() => {
     if (!user) {
-      return [];
+      return new Set<string>();
     }
 
     const uniqueIds = new Set<string>();
@@ -581,8 +609,10 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         uniqueIds.add(request.fromUserId);
       }
     });
-    return [...uniqueIds];
+    return uniqueIds;
   }, [friendRequests, user]);
+
+  const friends = useMemo(() => [...friendIds], [friendIds]);
 
   // Analytics: the accepted arm of the friend-request funnel. A friendship can
   // turn mutual on either side — this device taps accept (addFriend's isAccept
@@ -631,9 +661,9 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
   const incomingRequestUserIds = useMemo(() => {
     if (!user) return [];
     return friendRequests
-      .filter((r) => r.toUserId === user.id && !friends.includes(r.fromUserId))
+      .filter((r) => r.toUserId === user.id && !friendIds.has(r.fromUserId))
       .map((r) => r.fromUserId);
-  }, [friendRequests, friends, user]);
+  }, [friendIds, friendRequests, user]);
 
   const profileById = useMemo(() => {
     const map = new Map<string, UserProfile>();
@@ -676,12 +706,43 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
     [profileById, viewerProfiles],
   );
 
+  /**
+   * Who the viewer can see, decided once per change of the graph rather than
+   * once per call.
+   *
+   * Both getters were filters written out in full inside the context value, and
+   * `getVisibleItems` re-ran `getVisibleCollections`'s filter to get the ids —
+   * so the walk over `seedSocialCollections` happened twice per evaluation of
+   * `collections`/`items` in the collections provider, each pass scanning three
+   * arrays per row. It is a memo now and the getters hand back the result.
+   *
+   * The returned arrays are stable between graph changes, which is a change in
+   * kind: callers used to get a fresh array every call. Both consumers only
+   * read (a `forEach` and a push-into-merged), and a stable reference is what
+   * the memos above them want anyway.
+   */
+  const visibleSocialCollections = useMemo(
+    () =>
+      seedSocialCollections.filter(
+        (collection) =>
+          !deletedProfileIdSet.has(collection.ownerUserId) &&
+          (followingIds.has(collection.ownerUserId) || friendIds.has(collection.ownerUserId)),
+      ),
+    [deletedProfileIdSet, friendIds, followingIds],
+  );
+
+  const visibleSocialItems = useMemo(() => {
+    const visibleCollectionIds = new Set(visibleSocialCollections.map((collection) => collection.id));
+    return seedSocialItems.filter((item) => visibleCollectionIds.has(item.collectionId));
+  }, [visibleSocialCollections]);
+
   const value = useMemo<SocialContextValue>(
     () => ({
       ready,
       isAdmin,
       profiles,
       friends,
+      friendIds,
       incomingRequestUserIds,
       following,
       getMyProfile: () => (user ? profileById.get(user.id) : undefined),
@@ -707,7 +768,7 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
         if (incoming) {
           return "request_received";
         }
-        if (following.includes(profileId)) {
+        if (followingIds.has(profileId)) {
           return "following";
         }
         return "none";
@@ -824,27 +885,11 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
           return rest;
         });
       },
-      getVisibleCollections: () =>
-        seedSocialCollections.filter(
-          (collection) =>
-            !deletedProfileIds.includes(collection.ownerUserId) &&
-            (following.includes(collection.ownerUserId) || friends.includes(collection.ownerUserId)),
-        ),
-      getVisibleItems: () => {
-        const visibleCollectionIds = new Set(
-          seedSocialCollections
-            .filter(
-              (collection) =>
-                !deletedProfileIds.includes(collection.ownerUserId) &&
-                (following.includes(collection.ownerUserId) || friends.includes(collection.ownerUserId)),
-            )
-            .map((collection) => collection.id),
-        );
-        return seedSocialItems.filter((item) => visibleCollectionIds.has(item.collectionId));
-      },
+      getVisibleCollections: () => visibleSocialCollections,
+      getVisibleItems: () => visibleSocialItems,
       pendingSyncCount: countPendingSocial(pendingSocial),
     }),
-    [deletedProfileIds, ensureProfilesLoaded, friendRequests, following, friends, incomingRequestUserIds, isAdmin, pendingSocial, profileById, profiles, ready, syncSocial, user, viewerProfiles],
+    [ensureProfilesLoaded, friendIds, friendRequests, following, followingIds, friends, incomingRequestUserIds, isAdmin, pendingSocial, profileById, profiles, ready, syncSocial, user, viewerProfiles, visibleSocialCollections, visibleSocialItems],
   );
 
   return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>;
