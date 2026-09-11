@@ -42,6 +42,9 @@ import {
 
 let pending = { collections: 0, social: 0, chat: 0 };
 let connectionState: string | null = "online";
+let notice: "offline" | "reconnected" | null = null;
+/** Every `online` the pill has asked the notice hook about. */
+const noticeAskedAbout: boolean[] = [];
 
 mockModule("@/lib/collections-context", {
   useCollections: () => ({ pendingSyncCount: pending.collections }),
@@ -61,6 +64,22 @@ mockModule("@/lib/i18n-context", {
 mockModule("@/lib/realtime-status-context", {
   useOptionalRealtimeStatus: () => (connectionState === null ? null : { connectionState }),
 });
+/**
+ * The notice is handed to the pill rather than timed out of it.
+ *
+ * WHEN each notice appears — the grace before a drop is reported, the window a
+ * reconnection stays up, and the blip that is neither — is
+ * `connection-notice.test.ts`'s, under its own short windows. What is here is
+ * the pill: which sentence each notice renders, and that the region carrying
+ * it was in the tree first. Driving the real hook would mean waiting out a
+ * 1.5s grace per case to assert a string.
+ */
+mockModule("@/lib/use-connection-notice", {
+  useConnectionNotice: (online: boolean) => {
+    noticeAskedAbout.push(online);
+    return notice;
+  },
+});
 
 installNativeModuleStubs();
 autoUnmount();
@@ -68,6 +87,8 @@ autoUnmount();
 beforeEach(() => {
   pending = { collections: 0, social: 0, chat: 0 };
   connectionState = "online";
+  notice = null;
+  noticeAskedAbout.length = 0;
 });
 
 /** Every node in the tree that declares itself a polite live region. */
@@ -160,11 +181,21 @@ describe("the realtime pill's live region", () => {
   });
 
   it("puts the offline pill inside the region it already had", async () => {
-    connectionState = "connecting";
+    notice = "offline";
     const tree = await mountRealtime();
 
     assert.equal(politeRegions(tree.all()).length, 1);
     assert.deepEqual(tree.texts(), ["chatOfflinePill"]);
+  });
+
+  it("says the connection came back, in the same region", async () => {
+    // The pill used to vanish, which reads as "fixed" to a sighted user and is
+    // announced by nothing: text becoming empty is not a sentence.
+    notice = "reconnected";
+    const tree = await mountRealtime();
+
+    assert.equal(politeRegions(tree.all()).length, 1, "the same region, not a second one");
+    assert.deepEqual(tree.texts(), ["chatBackOnlinePill"]);
   });
 
   it("renders nothing at all where there is no subscription to have a state", async () => {
@@ -172,34 +203,37 @@ describe("the realtime pill's live region", () => {
     // has no opinion, and a region that announced one would be announcing a
     // status nobody is subscribed to.
     connectionState = null;
+    notice = "offline";
     const tree = await mountRealtime();
 
     assert.deepEqual(politeRegions(tree.all()), []);
     assert.deepEqual(tree.texts(), []);
   });
 
-  it("says the connection came back, in the region it already had", async () => {
-    // The pill used to vanish, which reads as "fixed" to a sighted user and is
-    // announced by nothing: text becoming empty is not a sentence.
+  it("calls connecting the only state that is offline", async () => {
     connectionState = "connecting";
-    const tree = await mountRealtime();
-    assert.deepEqual(tree.texts(), ["chatOfflinePill"]);
+    await mountRealtime();
 
-    connectionState = "online";
-    tree.rerender();
-    const back = tree.rerender();
-
-    assert.equal(politeRegions(back.all()).length, 1, "the same region, not a second one");
-    assert.deepEqual(back.texts(), ["chatBackOnlinePill"]);
+    assert.deepEqual(noticeAskedAbout, [false]);
   });
 
-  it("says nothing on a screen whose socket was up the whole time", async () => {
-    // Every mount would otherwise greet the user with news about a connection
-    // that was never broken.
-    connectionState = "online";
-    const tree = await mountRealtime();
-    tree.rerender();
+  it("calls online and idle both up", async () => {
+    // `idle` is a screen with no subscription running. Passing `false` there
+    // would claim a connection is down when there is no connection at all.
+    for (const state of ["online", "idle"]) {
+      noticeAskedAbout.length = 0;
+      connectionState = state;
+      await mountRealtime();
+      assert.deepEqual(noticeAskedAbout, [true], state);
+    }
+  });
 
-    assert.deepEqual(tree.rerender().texts(), []);
+  it("asks even on a screen with no subscription, before the early return", async () => {
+    // Hooks cannot be skipped, and `status?.connectionState !== "connecting"`
+    // is `true` for `undefined` — which is the right answer for "not offline".
+    connectionState = null;
+    await mountRealtime();
+
+    assert.deepEqual(noticeAskedAbout, [true]);
   });
 });

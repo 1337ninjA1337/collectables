@@ -22,6 +22,14 @@
  * user with news about a connection that was never broken. So the notice only
  * becomes `"reconnected"` from `"offline"`, and a mount at `online` goes
  * straight to nothing.
+ *
+ * ## And a blip is not an outage
+ *
+ * The same rule carries the grace period: a drop is only applied once it has
+ * lasted {@link OFFLINE_GRACE_MS}, so a connection that recovers inside the
+ * window never reaches `"offline"` and therefore never reaches
+ * `"reconnected"` either. Both halves of a blip are silent, which is what
+ * makes a flapping socket bearable in a live region that queues.
  */
 
 export type ConnectionNotice = "offline" | "reconnected" | null;
@@ -50,6 +58,25 @@ export const CONNECTION_NOTICE_KEYS = {
  * badge about something that happened ten seconds ago.
  */
 export const RECONNECTED_NOTICE_MS = 4000;
+
+/**
+ * How long the socket has to stay down before the user is told about it.
+ *
+ * A polite live region QUEUES rather than replaces, so a flapping connection —
+ * a phone on a train, a laptop walking between access points — writes two
+ * sentences per cycle into a queue that reads them all, and the user is read a
+ * paragraph about something they can do nothing about. The pill flashing on
+ * and off is the same fact for somebody who can see it.
+ *
+ * So a drop is not news until it has lasted. Nothing is announced for a blip,
+ * including the recovery from one: a connection the user was never told had
+ * broken has nothing to come back from.
+ *
+ * Short enough that a real outage is still reported about as fast as a user
+ * notices it themselves — the first message that fails to send is slower than
+ * this.
+ */
+export const OFFLINE_GRACE_MS = 1500;
 
 /**
  * The notice after one change of connection state.

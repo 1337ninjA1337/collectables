@@ -6,6 +6,7 @@ import {
   clearedReconnectedNotice,
   CONNECTION_NOTICE_KEYS,
   nextConnectionNotice,
+  OFFLINE_GRACE_MS,
   RECONNECTED_NOTICE_MS,
   type ConnectionNotice,
 } from "@/lib/connection-notice";
@@ -116,8 +117,9 @@ describe("clearedReconnectedNotice", () => {
 });
 
 describe("useConnectionNotice", () => {
-  /** Short enough that a case can wait the window out. */
-  const HOLD = 20;
+  /** Short enough that a case can wait either window out. */
+  const HOLD = 30;
+  const GRACE = 20;
 
   let seen: ConnectionNotice = null;
 
@@ -127,22 +129,32 @@ describe("useConnectionNotice", () => {
 
   async function mount(online: boolean) {
     const { useConnectionNotice } = await import("@/lib/use-connection-notice");
-    function Probe({ up }: { up: boolean }) {
-      seen = useConnectionNotice(up, HOLD);
+    let up = online;
+    function Probe(props: { up: boolean }) {
+      seen = useConnectionNotice(props.up, HOLD, GRACE);
       return null;
     }
-    const tree = render(createElement(Probe, { up: online }) as ReactElement);
+    const tree = render(createElement(Probe, { up }) as ReactElement);
     await settle();
-    return {
-      tree,
-      set: async (up: boolean) => {
-        tree.rerender(createElement(Probe, { up }) as ReactElement);
+
+    /** Re-renders until the effects have stopped changing anything. */
+    const drain = async (passes = 3) => {
+      for (let pass = 0; pass < passes; pass += 1) {
         await settle();
         tree.rerender(createElement(Probe, { up }) as ReactElement);
+      }
+    };
+
+    return {
+      tree,
+      set: async (next: boolean) => {
+        up = next;
+        await drain();
       },
-      wait: async () => {
-        await new Promise((resolve) => setTimeout(resolve, HOLD + 10));
-        tree.rerender(createElement(Probe, { up: online }) as ReactElement);
+      /** Waits out a window, without changing the connection. */
+      wait: async (ms: number) => {
+        await new Promise((resolve) => setTimeout(resolve, ms));
+        await drain();
       },
     };
   }
@@ -150,20 +162,50 @@ describe("useConnectionNotice", () => {
   it("says nothing on a session that starts online", async () => {
     // The first render is not a transition, and greeting every user with news
     // about a connection that was never broken is worse than saying nothing.
-    await mount(true);
+    const probe = await mount(true);
+    await probe.wait(GRACE + HOLD + 10);
 
     assert.equal(seen, null);
   });
 
-  it("says offline on a session that starts disconnected", async () => {
-    await mount(false);
+  it("says offline on a session that starts disconnected, once the drop has lasted", async () => {
+    const probe = await mount(false);
+    assert.equal(seen, null, "a mount during a blip must flash nothing");
+
+    await probe.wait(GRACE + 10);
 
     assert.equal(seen, "offline");
   });
 
-  it("says reconnected when the socket comes back", async () => {
+  it("says nothing at all for a blip, in either direction", async () => {
+    // The failure this is here for: a polite live region QUEUES, so a phone on
+    // a train writes two sentences per drop/recover cycle into something that
+    // reads all of them.
+    const probe = await mount(true);
+
+    await probe.set(false);
+    assert.equal(seen, null);
+
+    await probe.set(true);
+    await probe.wait(GRACE + HOLD + 10);
+
+    assert.equal(seen, null, "a connection nobody was told about has nothing to come back from");
+  });
+
+  it("says reconnected when a reported outage comes back", async () => {
     const probe = await mount(false);
+    await probe.wait(GRACE + 10);
     assert.equal(seen, "offline");
+
+    await probe.set(true);
+
+    assert.equal(seen, "reconnected");
+  });
+
+  it("says it immediately, without waiting out a grace of its own", async () => {
+    // Coming back is the one the user is already waiting to hear.
+    const probe = await mount(false);
+    await probe.wait(GRACE + 10);
 
     await probe.set(true);
 
@@ -172,29 +214,37 @@ describe("useConnectionNotice", () => {
 
   it("goes quiet again once the window has passed", async () => {
     const probe = await mount(false);
+    await probe.wait(GRACE + 10);
     await probe.set(true);
     assert.equal(seen, "reconnected");
 
-    await probe.wait();
+    await probe.wait(HOLD + 10);
 
     assert.equal(seen, null);
   });
 
-  it("goes back to offline if the socket drops inside the window", async () => {
+  it("goes back to offline if the socket drops again and stays down", async () => {
     const probe = await mount(false);
+    await probe.wait(GRACE + 10);
     await probe.set(true);
     assert.equal(seen, "reconnected");
 
     await probe.set(false);
+    await probe.wait(GRACE + 10);
     assert.equal(seen, "offline");
 
     // The timer from the reconnection is still armed, and what it would write
     // is a fact that has been replaced.
-    await probe.wait();
+    await probe.wait(HOLD + 10);
     assert.equal(seen, "offline", "a stale clear must not erase the live notice");
   });
 
-  it("holds for the documented window by default", () => {
+  it("holds and waits for the documented windows by default", () => {
     assert.equal(RECONNECTED_NOTICE_MS, 4000);
+    assert.equal(OFFLINE_GRACE_MS, 1500);
+    assert.ok(
+      OFFLINE_GRACE_MS < RECONNECTED_NOTICE_MS,
+      "a drop that is worth reporting is worth leaving up longer than it took to report",
+    );
   });
 });
