@@ -27,6 +27,7 @@ import {
   mergeItemsFromCloud,
 } from "@/lib/collections-cloud-merge";
 import { dedupeItems } from "@/lib/dedupe-items";
+import { fetchSettled, fetchSettledRows } from "@/lib/fan-out";
 import {
   subscribeToOwnCollections,
   subscribeToOwnItems,
@@ -695,17 +696,16 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         // home page's "Recent items" + per-collection counts aren't empty.
         if (visibleItems.length === 0 && visibleCollections.length > 0) {
           try {
-            const itemResults = await Promise.all(
-              visibleCollections.map((c) => fetchItemsByCollectionId(c.id)),
+            const fetchedItems = await fetchSettledRows(
+              visibleCollections,
+              (c) => fetchItemsByCollectionId(c.id),
             );
             if (active) {
               const seen = new Set(visibleItems.map((i) => i.id));
-              for (const items of itemResults) {
-                for (const item of items) {
-                  if (!seen.has(item.id)) {
-                    visibleItems.push(item);
-                    seen.add(item.id);
-                  }
+              for (const item of fetchedItems) {
+                if (!seen.has(item.id)) {
+                  visibleItems.push(item);
+                  seen.add(item.id);
                 }
               }
             }
@@ -958,7 +958,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
 
     // refreshTick triggers re-fetch
     void refreshTick;
-    Promise.all(followedCollectionIds.map((id) => fetchCollectionById(id)))
+    fetchSettled(followedCollectionIds, (id) => fetchCollectionById(id))
       .then((results) => {
         if (active) {
           setSubscribedCollections(
@@ -980,13 +980,9 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
 
     let active = true;
 
-    Promise.all(subscribedCollections.map((c) => fetchItemsByCollectionId(c.id)))
-      .then((results) => {
-        if (active) {
-          const allItems: CollectableItem[] = [];
-          results.forEach((items) => items.forEach((item) => allItems.push(item)));
-          setSubscribedItems(allItems);
-        }
+    fetchSettledRows(subscribedCollections, (c) => fetchItemsByCollectionId(c.id))
+      .then((allItems) => {
+        if (active) setSubscribedItems(allItems);
       })
       .catch(() => {});
 
@@ -1005,18 +1001,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
 
     async function loadFriendData() {
       try {
-        const allCols: Collection[] = [];
-        const allItems: CollectableItem[] = [];
+        const friendCols = await fetchSettledRows(friends, (id) =>
+          fetchPublicCollectionsByUserId(id),
+        );
+        const allCols: Collection[] = friendCols.map((c) => ({ ...c, role: "viewer" }));
 
-        const colResults = await Promise.all(friends.map((id) => fetchPublicCollectionsByUserId(id)));
-        colResults.forEach((cols) => {
-          cols.forEach((c) => allCols.push({ ...c, role: "viewer" }));
-        });
-
-        const itemResults = await Promise.all(allCols.map((c) => fetchItemsByCollectionId(c.id)));
-        itemResults.forEach((items) => {
-          items.forEach((item) => allItems.push(item));
-        });
+        const allItems = await fetchSettledRows(allCols, (c) => fetchItemsByCollectionId(c.id));
 
         if (active) {
           setFriendCollections(allCols);
@@ -1048,10 +1038,8 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         if (!active) return;
         setSharedWithMeCollections(cols);
 
-        const itemResults = await Promise.all(cols.map((c) => fetchItemsByCollectionId(c.id)));
+        const allItems = await fetchSettledRows(cols, (c) => fetchItemsByCollectionId(c.id));
         if (!active) return;
-        const allItems: CollectableItem[] = [];
-        itemResults.forEach((items) => items.forEach((item) => allItems.push(item)));
         setSharedWithMeItems(allItems);
       } catch {
         // ignore

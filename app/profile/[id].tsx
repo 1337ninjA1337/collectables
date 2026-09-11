@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
@@ -15,6 +15,7 @@ import { useAppTheme } from "@/components/use-app-theme";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { uploadImage } from "@/lib/cloudinary";
 import { useCollections } from "@/lib/collections-context";
+import { fetchSettled } from "@/lib/fan-out";
 import { useMarketplace } from "@/lib/marketplace-context";
 import { purchasesForUser, salesForUser } from "@/lib/marketplace-helpers";
 import {
@@ -84,6 +85,17 @@ export default function ProfileScreen() {
   const [remoteWishlist, setRemoteWishlist] = useState<CollectableItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
+  // The focus effect below has an `active` flag for its own async work; a
+  // pull-to-refresh has nothing to hang one on, so it took `loadItemCounts`'
+  // `() => true` default and wrote state on a screen the user had already left.
+  // Slow connections are exactly when a refresh resolves late, which is also
+  // exactly when somebody navigates away rather than waiting.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
   const isSelf = myProfile?.id === params.id;
   const isFriend = friendIds.has(params.id);
 
@@ -125,12 +137,16 @@ export default function ProfileScreen() {
     }, [cachedProfile, params.id, isSelf, isFriend, ensureProfilesLoaded]),
   );
 
+  // `fetchSettled`, not `Promise.all`: one collection whose fetch rejects used
+  // to discard the counts for every collection that resolved, and the catch at
+  // the call site made that silent — the card list then showed zeros it had
+  // the real numbers for. See lib/fan-out.ts.
   async function loadItemCounts(cols: Collection[], isActive: () => boolean = () => true) {
-    const counts: Record<string, number> = {};
-    const results = await Promise.all(
-      cols.map((c) => fetchItemsByCollectionId(c.id).then((items) => ({ id: c.id, count: items.length })))
+    const results = await fetchSettled(cols, (c) =>
+      fetchItemsByCollectionId(c.id).then((items) => ({ id: c.id, count: items.length })),
     );
     if (!isActive()) return;
+    const counts: Record<string, number> = {};
     results.forEach((r) => { counts[r.id] = r.count; });
     setRemoteItemCounts(counts);
   }
@@ -146,7 +162,7 @@ export default function ProfileScreen() {
       ]);
       setRemoteCollections(cols);
       setRemoteWishlist(wish);
-      await loadItemCounts(cols);
+      await loadItemCounts(cols, () => mountedRef.current);
     } catch {} finally { setRefreshing(false); }
   }, [params.id, isSelf, isFriend, ensureProfilesLoaded]);
 
