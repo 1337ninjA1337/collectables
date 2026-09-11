@@ -60,6 +60,7 @@ import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
+import { hasFiniteCost } from "@/lib/item-cost";
 
 export default function WishlistScreen() {
   const { t } = useI18n();
@@ -240,7 +241,7 @@ export default function WishlistScreen() {
               </Text>
             ) : null}
             <View style={styles.metaRow}>
-              {typeof item.cost === "number" ? (
+              {hasFiniteCost(item) ? (
                 <View style={styles.metaChip}>
                   <Text style={styles.metaChipText}>{item.cost}</Text>
                 </View>

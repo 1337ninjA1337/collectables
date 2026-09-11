@@ -19,6 +19,7 @@ import type {
   TransferSource,
 } from "@/lib/transfer-item-types";
 import type { CollectableItem, Collection } from "@/lib/types";
+import { hasFiniteCost } from "@/lib/item-cost";
 
 export const ACQUIRED_COLLECTION_ID_SUFFIX = "acquired-marketplace";
 
@@ -154,7 +155,7 @@ export function planTransferItem(input: TransferItemInput): TransferItemPlan {
     createdBy: ownerName,
     createdByUserId: ownerUserId,
     createdAt: now.toISOString(),
-    cost: typeof snapshot.cost === "number" ? snapshot.cost : null,
+    cost: hasFiniteCost(snapshot) ? snapshot.cost : null,
     isWishlist: false,
     condition: snapshot.condition,
     tags: snapshot.tags,

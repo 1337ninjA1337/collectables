@@ -210,7 +210,7 @@ export default function ItemDetailsScreen() {
     setEditAcquiredFrom(activeItem.acquiredFrom);
     setEditAcquiredAt(activeItem.acquiredAt);
     setEditVariants(activeItem.variants);
-    setEditCost(typeof activeItem.cost === "number" ? String(activeItem.cost) : "");
+    setEditCost(hasFiniteCost(activeItem) ? String(activeItem.cost) : "");
     setEditCostError(null);
     setEditCurrencyState(activeItem.costCurrency ?? getDefaultCurrencyForLanguage(language));
     void getUserPreferredCurrency().then((stored) => {

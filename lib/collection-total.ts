@@ -66,7 +66,7 @@ export function collectionTotalCost(
   rates: UsdRates | null,
 ): CollectionTotalCost {
   const entries = items.filter(hasFiniteCost).map((item) => ({
-    amount: item.cost as number,
+    amount: item.cost,
     currency: item.costCurrency ?? target,
   }));
 

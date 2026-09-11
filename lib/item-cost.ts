@@ -24,8 +24,24 @@ import { convertAmount, type UsdRates } from "@/lib/currency-rates";
  */
 export { formatCostAmount } from "@/lib/format-cost";
 
-/** Shared gate for "this item has a renderable cost" (excludes null/NaN/±Infinity). */
-export function hasFiniteCost(item: { cost?: number | null }): boolean {
+/**
+ * Shared gate for "this item has a renderable cost" (excludes
+ * null/NaN/±Infinity).
+ *
+ * A type guard, so a caller that passes it narrows to a `cost: number` and can
+ * sum or print the field without a cast. Six places asked this question and
+ * four asked it as `typeof item.cost === "number"` — which is true of `NaN`
+ * and of `Infinity`, so one such item made a total read `NaN` and a cost cell
+ * print it. No entry path can produce one today (the forms go through
+ * `parseCurrencyValueDetailed`, which rejects a non-finite number, and cloud
+ * rows go through `coerceNumberOrNull`, which does the same), and this is
+ * exactly the moment to make that a property of the code rather than a
+ * coincidence of the paths: the weak check gives the wrong answer the day one
+ * more importer, one more paste handler or one more migration disagrees.
+ */
+export function hasFiniteCost<T extends { cost?: number | null }>(
+  item: T,
+): item is T & { cost: number } {
   return typeof item.cost === "number" && Number.isFinite(item.cost);
 }
 

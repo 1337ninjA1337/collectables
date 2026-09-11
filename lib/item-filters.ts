@@ -1,5 +1,6 @@
 import type { CollectableItem } from "@/lib/types";
 import { compareKeysAsc } from "@/lib/sort-helpers";
+import { hasFiniteCost } from "@/lib/item-cost";
 
 /**
  * Pure filter state + matchers shared by the collection-detail screen and the
@@ -240,7 +241,7 @@ export function getTitleCollator(locale?: string): Intl.Collator {
  * all three into one "missing" bucket that `compareByKey` parks at the end.
  */
 function costKey(item: CollectableItem): number | null {
-  return typeof item.cost === "number" && Number.isFinite(item.cost) ? item.cost : null;
+  return hasFiniteCost(item) ? item.cost : null;
 }
 
 /**

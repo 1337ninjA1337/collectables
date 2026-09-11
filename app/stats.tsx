@@ -25,6 +25,7 @@ import {
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { hasFiniteCost } from "@/lib/item-cost";
 
 type MonthBucket = { label: string; count: number };
 
@@ -55,7 +56,10 @@ export default function StatsScreen() {
   );
 
   const totalValue = useMemo(
-    () => ownedItems.reduce((sum, i) => sum + (typeof i.cost === "number" ? i.cost : 0), 0),
+    // `hasFiniteCost`, not `typeof i.cost === "number"`: NaN and Infinity are
+    // both numbers, and one of either would make the headline figure on the
+    // stats screen read NaN. See lib/item-cost.ts.
+    () => ownedItems.filter(hasFiniteCost).reduce((sum, i) => sum + i.cost, 0),
     [ownedItems],
   );
 

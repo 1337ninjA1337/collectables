@@ -19,6 +19,7 @@
  */
 
 import { CollectableItem, Collection } from "@/lib/types";
+import { hasFiniteCost } from "@/lib/item-cost";
 
 /** The translated words the document prints, resolved by the caller's `t()`. */
 export type ExportLabels = {
@@ -61,10 +62,11 @@ export function buildCollectionExportHtml(
   labels: ExportLabels,
   printedOn: Date = new Date(),
 ): string {
-  const totalCost = items.reduce(
-    (sum, item) => sum + (typeof item.cost === "number" ? item.cost : 0),
-    0,
-  );
+  // The same gate the in-app totals use: a NaN cost would otherwise be
+  // summed into the printed total and land in a PDF somebody keeps.
+  const totalCost = items
+    .filter(hasFiniteCost)
+    .reduce((sum, item) => sum + item.cost, 0);
   const totalPhotos = items.reduce((sum, item) => sum + item.photos.length, 0);
 
   const itemsHtml = items
@@ -89,7 +91,7 @@ export function buildCollectionExportHtml(
       if (item.variants) {
         fields.push(`<div class="field"><span class="field-label">${escapeHtml(labels.variants)}</span><span>${escapeHtml(item.variants)}</span></div>`);
       }
-      if (typeof item.cost === "number") {
+      if (hasFiniteCost(item)) {
         fields.push(`<div class="field"><span class="field-label">${escapeHtml(labels.costLabel)}</span><span>${item.cost}</span></div>`);
       }
 
