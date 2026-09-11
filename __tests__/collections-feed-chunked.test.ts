@@ -32,13 +32,18 @@ describe("app/collections-feed.tsx — WLF-C chunked tab mounts", () => {
     assert.doesNotMatch(src, /subscribedCollections\.map\(/);
   });
 
-  it("shows a Load-more CTA gated on hasMore with the shared i18n strings", () => {
+  it("shows a Load-more CTA, and it is the shared button", () => {
+    // The `{window.hasMore ? (<Pressable …/>) : null}` here was one of three
+    // copies of one button; `<LoadMoreButton>` owns the markup, the three
+    // strings and the two style rules since 2026-09-11, and renders nothing
+    // at a `remaining` of zero — which is what `hasMore` was saying. The
+    // arithmetic stays here because only this screen knows which list the
+    // window is over.
     const src = readSrc();
-    assert.match(src, /\{window\.hasMore \? \(/);
-    assert.match(src, /onPress=\{\s*window\.loadMore\s*\}/);
-    assert.match(src, /accessibilityLabel=\{\s*t\("loadMoreItemsA11y",\s*\{\s*count:\s*total - cols\.length\s*\}\)\s*\}/);
-    assert.match(src, /accessibilityHint=\{\s*t\("loadMoreItemsHint"\)\s*\}/);
-    assert.match(src, /t\("loadMoreItems",\s*\{\s*count:\s*total - cols\.length\s*\}\)/);
+    assert.match(src, /import \{ LoadMoreButton \} from "@\/components\/load-more-button";/);
+    assert.match(src, /<LoadMoreButton remaining=\{total - cols\.length\} onPress=\{window\.loadMore\} \/>/);
+    assert.doesNotMatch(src, /loadMoreItemsA11y/);
+    assert.doesNotMatch(src, /styles\.loadMoreText/);
   });
 
   it("empty-state check reads the FULL list length (a chunked window is never empty when the source isn't)", () => {

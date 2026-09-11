@@ -156,7 +156,7 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // for the ListHeaderComponent children); the declaration shape moved
     // from a plain const to a useMemo factory.
     assert.match(src, /const\s+listTitleAndFilters\s*=\s*useMemo\(\s*\(\)\s*=>\s*\(/);
-    assert.match(src, /const\s+loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\n?\s*hasMore\s*\?/);
+    assert.match(src, /const\s+loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\(\s*\n\s*<LoadMoreButton/);
     assert.match(src, /const\s+modalsBlock\s*=\s*\(/);
   });
 

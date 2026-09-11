@@ -4,6 +4,7 @@ import { Profiler, useCallback, useEffect, useMemo, useRef, useState, type Profi
 import { Alert, FlatList, Image, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
+import { LoadMoreButton } from "@/components/load-more-button";
 import { applyItemFilters, applySortMode, EMPTY_FILTERS, ItemFilterBar, type ItemFilters, type ItemSortMode } from "@/components/item-filters";
 import { VisibilityBadge } from "@/components/visibility-badge";
 import { SkeletonCollectionDetail } from "@/components/skeleton";
@@ -816,22 +817,14 @@ export default function CollectionDetailsScreen() {
   // `loadMore` is referentially stable while the `items` identity is
   // unchanged (useCallback inside useChunkedList), so this memo only
   // re-fires when pagination state actually moves.
+  // `hasMore` left the deps with the button: `<LoadMoreButton>` renders
+  // nothing at a `remaining` of zero, which is the same fact — `hasMore` IS
+  // `items.length > visibleItems.length`, and both numbers are already here.
   const loadMoreCta = useMemo(
-    () =>
-      hasMore ? (
-        <Pressable
-          style={styles.loadMore}
-          onPress={loadMore}
-          accessibilityRole="button"
-          accessibilityLabel={t("loadMoreItemsA11y", { count: items.length - visibleItems.length })}
-          accessibilityHint={t("loadMoreItemsHint")}
-        >
-          <Text style={styles.loadMoreText}>
-            {t("loadMoreItems", { count: items.length - visibleItems.length })}
-          </Text>
-        </Pressable>
-      ) : null,
-    [hasMore, loadMore, items.length, visibleItems.length, t],
+    () => (
+      <LoadMoreButton remaining={items.length - visibleItems.length} onPress={loadMore} />
+    ),
+    [loadMore, items.length, visibleItems.length],
   );
 
   // HM-B: hero + summary + total + reactions + owner-actions — the JSX that
@@ -1439,22 +1432,6 @@ const styles = StyleSheet.create({
   },
   draggableList: {
     gap: SPACING_CARD,
-  },
-  loadMore: {
-    borderRadius: RADIUS_CARD,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-    backgroundColor: CARD_BG_3,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  loadMoreText: {
-    color: MUTED_3,
-    fontSize: 15,
-    fontWeight: "700",
-    fontFamily: FONT_BODY_BOLD,
   },
   ownerActions: {
     gap: SPACING_CARD,

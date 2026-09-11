@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { CollectionCard } from "@/components/collection-card";
 import { EmptyState } from "@/components/empty-state";
 import { HeroBanner } from "@/components/hero-banner";
+import { LoadMoreButton } from "@/components/load-more-button";
 import { Screen } from "@/components/screen";
 import { SwipeTabs } from "@/components/swipe-tabs";
 import { useCollections } from "@/lib/collections-context";
@@ -139,19 +140,7 @@ export default function CollectionsFeedScreen() {
                   />
                 );
               })}
-              {window.hasMore ? (
-                <Pressable
-                  style={styles.loadMore}
-                  onPress={window.loadMore}
-                  accessibilityRole="button"
-                  accessibilityLabel={t("loadMoreItemsA11y", { count: total - cols.length })}
-                  accessibilityHint={t("loadMoreItemsHint")}
-                >
-                  <Text style={styles.loadMoreText}>
-                    {t("loadMoreItems", { count: total - cols.length })}
-                  </Text>
-                </Pressable>
-              ) : null}
+              <LoadMoreButton remaining={total - cols.length} onPress={window.loadMore} />
             </View>
           );
         }}
@@ -163,22 +152,5 @@ export default function CollectionsFeedScreen() {
 const styles = StyleSheet.create({
   tabPanel: {
     gap: 14,
-  },
-  // Mirrors collection detail's drag-fallback Load-more CTA styles.
-  loadMore: {
-    borderRadius: RADIUS_CARD,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-    backgroundColor: CARD_BG_3,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  loadMoreText: {
-    color: MUTED_3,
-    fontSize: 15,
-    fontWeight: "700",
-    fontFamily: FONT_BODY_BOLD,
   },
 });

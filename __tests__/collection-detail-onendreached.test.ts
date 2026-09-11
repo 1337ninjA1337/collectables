@@ -45,7 +45,7 @@ describe("app/collection/[id].tsx — onEndReached pagination", () => {
     // The const declaration + exactly one render site ({loadMoreCta} in the
     // fallback return). The viewer/selection early-returns must not render
     // it — their pagination is scroll-driven.
-    assert.match(src, /const\s+loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\n?\s*hasMore\s*\?/);
+    assert.match(src, /const\s+loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\(\s*\n\s*<LoadMoreButton/);
     const renders = src.match(/\{\s*loadMoreCta\s*\}/g) ?? [];
     assert.equal(renders.length, 1, `expected exactly 1 {loadMoreCta} render (drag fallback), got ${renders.length}`);
     // And that one render site lives in the nestable fallback return, after
@@ -65,10 +65,13 @@ describe("app/collection/[id].tsx — onEndReached pagination", () => {
 
   it("drag-mode CTA still routes through the hook's loadMore with the a11y strings", () => {
     const src = readSrc();
-    // The surviving CTA keeps its press target + i18n a11y contract so the
-    // drag-mode path (no onEndReached) still paginates accessibly.
-    assert.match(src, /loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\n?\s*hasMore\s*\?\s*\(\s*\n\s*<Pressable[\s\S]*?onPress=\{\s*loadMore\s*\}/);
-    assert.match(src, /accessibilityLabel=\{t\("loadMoreItemsA11y"/);
-    assert.match(src, /accessibilityHint=\{t\("loadMoreItemsHint"\)\}/);
+    // The surviving CTA keeps its press target so the drag-mode path (no
+    // onEndReached) still paginates. The a11y contract moved WITH the button
+    // on 2026-09-11 — `<LoadMoreButton>` carries both strings for all three
+    // screens, and `load-more-button.test.ts` is where they are pinned now.
+    assert.match(src, /loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\(\s*\n\s*<LoadMoreButton[\s\S]*?onPress=\{loadMore\}/);
+    const button = readRepoFile("components/load-more-button.tsx");
+    assert.match(button, /accessibilityLabel=\{t\("loadMoreItemsA11y"/);
+    assert.match(button, /accessibilityHint=\{t\("loadMoreItemsHint"\)\}/);
   });
 });

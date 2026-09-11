@@ -67,21 +67,20 @@ describe("the home screen's borrowed-list tabs", () => {
 });
 
 describe("the home screen's Load-more CTA", () => {
-  it("is decided by hasMore rather than by a length comparison", () => {
-    // The label says how many rows remain, so a CTA shown when none do reads
-    // "Load more (0 remaining)".
-    assert.match(CODE, /if \(!window\.hasMore\) return null;/);
+  it("is the shared component, not a third copy of the button", () => {
+    // This screen's copy was the third — collection detail's drag fallback and
+    // the feed screen had the other two, with the same three i18n keys and the
+    // same two style rules each. It was added and retired the same day.
+    assert.match(CODE, /import \{ LoadMoreButton \} from "@\/components\/load-more-button";/);
+    assert.doesNotMatch(CODE, /loadMoreItemsA11y/);
+    assert.doesNotMatch(CODE, /styles\.loadMore\b/);
   });
 
   it("counts what is left, not what is shown", () => {
-    assert.match(CODE, /const remaining = total - window\.visibleItems\.length;/);
-    assert.match(CODE, /t\("loadMoreItems", \{ count: remaining \}\)/);
-  });
-
-  it("is announced, with both the label and the hint the feed screen uses", () => {
-    assert.match(CODE, /accessibilityRole="button"/);
-    assert.match(CODE, /t\("loadMoreItemsA11y", \{ count: remaining \}\)/);
-    assert.match(CODE, /t\("loadMoreItemsHint"\)/);
+    // The component renders nothing at zero, so the arithmetic IS the
+    // "should this button exist" decision — there is no second gate here to
+    // disagree with it.
+    assert.match(CODE, /remaining=\{total - window\.visibleItems\.length\}/);
   });
 
   it("is written once for the two tabs that have one", () => {

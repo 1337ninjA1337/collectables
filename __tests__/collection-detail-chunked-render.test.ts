@@ -141,37 +141,39 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     assert.match(src, /:\s*items\.length\s*===\s*0\s*\?\s*\(\s*<EmptyState[\s\S]*?icon="🔎"/);
   });
 
-  it("renders the Load more CTA gated on hasMore", () => {
+  it("renders the Load more CTA, and it is the shared button", () => {
     // VM-D extracted the inline `{hasMore ? <Pressable .../> : null}` JSX
-    // into a `const loadMoreCta = hasMore ? (<Pressable .../>) : null` so
-    // both the viewer-FlatList ListFooterComponent path and the nestable
-    // path can reuse the same node. The gating condition is still on
-    // `hasMore`, the click target is still `loadMore`, and the renderer is
-    // still a `<Pressable>` — the `{` JSX-expression brace is gone because
-    // the conditional now lives in a `const` declaration, not in JSX.
-    // HM-A wrapped the declaration in a useMemo factory (stable element
-    // identity), so the conditional now sits inside `useMemo(() => ...)`.
+    // into a `const loadMoreCta` so both the viewer-FlatList
+    // ListFooterComponent path and the nestable path could reuse one node.
+    // On 2026-09-11 the `<Pressable>` itself left: it was the third screen
+    // carrying a copy of the same button, so `<LoadMoreButton>` owns the
+    // markup, the three strings and the two style rules. The memo stays —
+    // stable element identity is a claim about THIS screen's two render
+    // paths, not about the button.
     assert.match(
       src,
-      /loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\n?\s*hasMore\s*\?\s*\(\s*\n\s*<Pressable[\s\S]*?onPress=\{\s*loadMore\s*\}/,
+      /loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\(\s*\n\s*<LoadMoreButton[\s\S]*?onPress=\{loadMore\}/,
+    );
+    assert.match(src, /import \{ LoadMoreButton \} from "@\/components\/load-more-button";/);
+  });
+
+  it("Load more CTA passes the remaining count (items.length - visibleItems.length) to the button", () => {
+    // The count used to reach `t("loadMoreItems", …)` here and reaches
+    // `remaining` now. Same arithmetic, and it is still this screen's, because
+    // only this screen knows which list the window is over.
+    assert.match(
+      src,
+      /remaining=\{items\.length - visibleItems\.length\}/,
     );
   });
 
-  it("Load more CTA passes the remaining count (items.length - visibleItems.length) to the t() formatter", () => {
-    assert.match(
-      src,
-      /t\(\s*"loadMoreItems"\s*,\s*\{\s*count:\s*items\.length\s*-\s*visibleItems\.length\s*\}\s*\)/,
-    );
-  });
-
-  it("Load more CTA wires accessibilityLabel + accessibilityHint for VoiceOver", () => {
-    assert.match(src, /accessibilityLabel=\{\s*t\(\s*"loadMoreItemsA11y"/);
-    assert.match(src, /accessibilityHint=\{\s*t\(\s*"loadMoreItemsHint"\s*\)\s*\}/);
-  });
-
-  it("declares loadMore / loadMoreText styles for the CTA", () => {
-    assert.match(src, /loadMore:\s*\{[\s\S]*?borderRadius:[\s\S]*?\}/);
-    assert.match(src, /loadMoreText:\s*\{[\s\S]*?fontFamily:\s*FONT_BODY_BOLD/);
+  it("no longer carries its own copy of the button", () => {
+    // The three i18n keys and the two style rules were the whole duplicated
+    // surface; naming either again means an inline copy came back.
+    assert.doesNotMatch(src, /loadMoreItemsA11y/);
+    assert.doesNotMatch(src, /loadMoreItemsHint/);
+    assert.doesNotMatch(src, /styles\.loadMoreText/);
+    assert.doesNotMatch(src, /^\s*loadMore:\s*\{/m);
   });
 });
 

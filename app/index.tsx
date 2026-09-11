@@ -8,6 +8,7 @@ import { CollectionCard } from "@/components/collection-card";
 import { DashboardBanner } from "@/components/dashboard-banner";
 import { EmptyState } from "@/components/empty-state";
 import { HeroBanner } from "@/components/hero-banner";
+import { LoadMoreButton } from "@/components/load-more-button";
 import { Screen, useResponsive } from "@/components/screen";
 import { Skeleton } from "@/components/skeleton";
 import { SwipeTabs } from "@/components/swipe-tabs";
@@ -182,28 +183,14 @@ export default function HomeScreen() {
   const isPhone = isMobile;
 
   /**
-   * The CTA that grows a window, written once for the two tabs that have one.
-   *
-   * Same shape and same strings as `app/collections-feed.tsx` — the remaining
-   * count is what the label says, so a button reading "Load more (0
-   * remaining)" is a button that should not be there, which is why `hasMore`
-   * decides rather than a length comparison done here.
+   * The CTA that grows a window. `<LoadMoreButton>` owns the button — the
+   * three keys, the two style rules and the "nothing left means nothing to
+   * render" decision; this is the one line of arithmetic that is about THIS
+   * screen's two lists.
    */
-  const renderLoadMore = (window: ChunkedList<Collection>, total: number) => {
-    if (!window.hasMore) return null;
-    const remaining = total - window.visibleItems.length;
-    return (
-      <Pressable
-        style={styles.loadMore}
-        onPress={window.loadMore}
-        accessibilityRole="button"
-        accessibilityLabel={t("loadMoreItemsA11y", { count: remaining })}
-        accessibilityHint={t("loadMoreItemsHint")}
-      >
-        <Text style={styles.loadMoreText}>{t("loadMoreItems", { count: remaining })}</Text>
-      </Pressable>
-    );
-  };
+  const renderLoadMore = (window: ChunkedList<Collection>, total: number) => (
+    <LoadMoreButton remaining={total - window.visibleItems.length} onPress={window.loadMore} />
+  );
 
   /**
    * The reorder a long press cannot do.
@@ -781,24 +768,5 @@ const styles = StyleSheet.create({
   recentMeta: {
     fontSize: 12,
     fontFamily: FONT_BODY,
-  },
-  // Mirrors the Load-more CTA in app/collections-feed.tsx, which mirrors
-  // collection detail's drag fallback. Three copies of one button; the styles
-  // are the only part still written out per screen.
-  loadMore: {
-    borderRadius: RADIUS_CARD,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderWidth: 1,
-    borderColor: AMBER_SOFT,
-    backgroundColor: CARD_BG_3,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  loadMoreText: {
-    color: MUTED_3,
-    fontSize: 15,
-    fontWeight: "700",
-    fontFamily: FONT_BODY_BOLD,
   },
 });

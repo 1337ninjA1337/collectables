@@ -55,15 +55,19 @@ describe("app/collection/[id].tsx — HM-A header-fragment memoization", () => {
 
   it("loadMoreCta is a useMemo with honest deps", () => {
     const src = readScreenSrc();
+    // `hasMore` and `t` left the deps with the button on 2026-09-11:
+    // `<LoadMoreButton>` renders nothing at a `remaining` of zero, which is
+    // the same fact `hasMore` carried, and it takes `t` from the context
+    // itself. What is left is the two numbers this screen owns.
     assert.match(
       src,
-      /const\s+loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\n?\s*hasMore\s*\?/,
-      "loadMoreCta must be declared via useMemo, gated on hasMore inside the factory",
+      /const\s+loadMoreCta\s*=\s*useMemo\(\s*\(\)\s*=>\s*\(\s*\n\s*<LoadMoreButton/,
+      "loadMoreCta must be declared via useMemo around the shared button",
     );
     assert.match(
       src,
-      /loadMoreCta\s*=\s*useMemo\([\s\S]*?\[hasMore,\s*loadMore,\s*items\.length,\s*visibleItems\.length,\s*t\],?\s*\n\s*\)/,
-      "loadMoreCta deps must be [hasMore, loadMore, items.length, visibleItems.length, t]",
+      /loadMoreCta\s*=\s*useMemo\([\s\S]*?\[loadMore,\s*items\.length,\s*visibleItems\.length\],?\s*\n\s*\)/,
+      "loadMoreCta deps must be [loadMore, items.length, visibleItems.length]",
     );
   });
 
@@ -84,7 +88,7 @@ describe("app/collection/[id].tsx — HM-A header-fragment memoization", () => {
     // crash at runtime. Pin the invariant so a future edit that folds
     // collection chrome into these memos fails loudly.
     const titleBlock = src.match(/const\s+listTitleAndFilters\s*=\s*useMemo\([\s\S]*?\[allItems\.length,\s*applyFilters,\s*itemFilters,\s*reorderBlockedBySort,\s*resetSort,\s*t\],?\s*\n\s*\);/)?.[0] ?? "";
-    const ctaBlock = src.match(/const\s+loadMoreCta\s*=\s*useMemo\([\s\S]*?\[hasMore,\s*loadMore,\s*items\.length,\s*visibleItems\.length,\s*t\],?\s*\n\s*\);/)?.[0] ?? "";
+    const ctaBlock = src.match(/const\s+loadMoreCta\s*=\s*useMemo\([\s\S]*?\[loadMore,\s*items\.length,\s*visibleItems\.length\],?\s*\n\s*\);/)?.[0] ?? "";
     assert.ok(titleBlock.length > 0 && ctaBlock.length > 0, "expected to extract both memo blocks");
     assert.doesNotMatch(titleBlock, /activeCollection/);
     assert.doesNotMatch(ctaBlock, /activeCollection/);
