@@ -60,6 +60,46 @@ export function byId(row: { readonly id: string }): string {
   return row.id;
 }
 
+/**
+ * Where the dragged row belongs in the current list, read off its neighbours.
+ *
+ * The drop was expressed against rows the user could SEE, so the rows either
+ * side of it in `data` are what carries the intent — not `to`, which is an
+ * index into a snapshot. The nearest surviving row above the drop wins and the
+ * row lands after it; if the whole run above is gone, the nearest surviving
+ * row BELOW wins and the row lands before it.
+ *
+ * Looking both ways matters for exactly one case and it is not a rare one: a
+ * drop near the top whose two or three predecessors were deleted on another
+ * device. Looking up only, that resolves to the top of the list — which is a
+ * real position the user did not ask for, and the row below it, the one they
+ * dropped ONTO, was sitting there the whole time.
+ *
+ * Zero when the list holds nothing the snapshot had. There is nothing left to
+ * be relative to, and the top is the only answer that does not invent one.
+ */
+function anchoredTarget<T>(
+  data: readonly T[],
+  to: number,
+  movedKey: string,
+  keyOf: (row: T) => string,
+  placeOf: ReadonlyMap<string, number>,
+): number {
+  for (let above = to - 1; above >= 0; above -= 1) {
+    const key = keyOf(data[above]);
+    if (key === movedKey) continue;
+    const place = placeOf.get(key);
+    if (place !== undefined) return place + 1;
+  }
+  for (let below = to + 1; below < data.length; below += 1) {
+    const key = keyOf(data[below]);
+    if (key === movedKey) continue;
+    const place = placeOf.get(key);
+    if (place !== undefined) return place;
+  }
+  return 0;
+}
+
 /** Where a finished drag actually lands, once the list is read again. */
 export type DragEndPlan<T> = {
   /** The whole of the CURRENT list, with the dragged row moved into place. */
@@ -79,14 +119,14 @@ export type DragEndPlan<T> = {
  * the render's answer when `identify` was added; this is the same fix for the
  * route that produced the argument in the first place.
  *
- * ## The drop is read as "after this row", not as an index
+ * ## The drop is read as "next to this row", not as an index
  *
  * `to` is an index into `data`, and an index into a list that has changed
  * means nothing — row 3 of the old list may be row 5 or may be gone. What the
  * user expressed is a position RELATIVE TO THE ROWS THEY COULD SEE, so the
- * nearest predecessor in `data` that still exists is the anchor, and the row
- * lands immediately after it. A drop at the top has no predecessor and lands
- * at the top.
+ * nearest surviving neighbour is the anchor: after the one above the drop, or
+ * — when that whole run is gone — before the one below it. `anchoredTarget`
+ * owns that rule and says why it looks both ways.
  *
  * When nothing changed underneath — every ordinary drag — this reproduces
  * `data` exactly: the two lists hold the same rows, so "after the same
@@ -121,18 +161,20 @@ export function planDragCommit<T>(params: {
   // the list `moveItem` splices into: it lifts the row out first, so a target
   // computed against the full array would be one place late for every drop
   // below the row's old position.
+  //
+  // Built once as a map rather than scanned per candidate: the walk below can
+  // visit every row in `data` before it finds one that survived, and a drop at
+  // the bottom of a long collection after a merge that removed the rows above
+  // it would otherwise be a full scan per step, at the end of a gesture the
+  // user has already finished.
   const remaining = rows.filter((_, index) => index !== from);
-  let target = 0;
-  for (let above = to - 1; above >= 0; above -= 1) {
-    const key = keyOf(data[above]);
-    if (key === movedKey) continue;
-    const anchor = remaining.findIndex((row) => keyOf(row) === key);
-    if (anchor !== -1) {
-      target = anchor + 1;
-      break;
-    }
-  }
+  const placeOf = new Map<string, number>();
+  remaining.forEach((row, index) => {
+    const key = keyOf(row);
+    if (!placeOf.has(key)) placeOf.set(key, index);
+  });
 
+  const target = anchoredTarget(data, to, movedKey, keyOf, placeOf);
   if (target === from) return null;
   return { rows: moveItem(rows, from, target), to: target };
 }

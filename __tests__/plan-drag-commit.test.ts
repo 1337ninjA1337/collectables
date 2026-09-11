@@ -128,14 +128,47 @@ describe("planDragCommit on a list that changed mid-gesture", () => {
     assert.equal(plan!.to, 1);
   });
 
-  it("goes to the top when every row above the drop is gone", () => {
-    // Dropped under "a", and "a" and "b" both went away. Nothing is left to
-    // anchor on above the drop, so the top is where the user aimed.
+  it("lands above the row it was dropped ONTO when the run above is gone", () => {
+    // Dropped under "a", and "a" went away. Looking only upwards this is the
+    // top of the list — a position the user did not ask for. "b" is the row
+    // they dropped onto and it never moved, so above "b" is where the row
+    // goes. The list has other rows below, which is what makes the top and
+    // "above b" two different answers.
     const { data, to } = dragged(RENDERED, 3, 1);
-    const plan = planDragCommit({ data, to, rows: [row("c"), row("d")], keyOf: byId });
+    const withoutA = [row("z"), ...RENDERED.filter((r) => r.id !== "a")];
+    const plan = planDragCommit({ data, to, rows: withoutA, keyOf: byId });
 
-    assert.deepEqual(ids(plan!.rows), ["d", "c"]);
+    assert.deepEqual(ids(plan!.rows), ["z", "d", "b", "c"]);
+    assert.equal(plan!.to, 1);
+  });
+
+  it("skips a dead row below too, down to the first neighbour that survived", () => {
+    const { data, to } = dragged(RENDERED, 3, 1);
+    const left = [row("z"), row("c")];
+    const plan = planDragCommit({ data, to, rows: [...left, row("d")], keyOf: byId });
+
+    assert.deepEqual(ids(plan!.rows), ["z", "d", "c"]);
+    assert.equal(plan!.to, 1);
+  });
+
+  it("goes to the top when nothing the snapshot held is left to be relative to", () => {
+    // Neither direction has a surviving neighbour: there is no position to be
+    // relative to, and the top is the only answer that does not invent one.
+    const { data, to } = dragged(RENDERED, 3, 1);
+    const plan = planDragCommit({ data, to, rows: [row("z"), row("d")], keyOf: byId });
+
+    assert.deepEqual(ids(plan!.rows), ["d", "z"]);
     assert.equal(plan!.to, 0);
+  });
+
+  it("never consults the row below when the row above survived", () => {
+    // The downward walk is a fallback, not a tiebreak. A drop with both
+    // neighbours intact must still land after the one above it, or every
+    // ordinary drag moves one place.
+    const { data, to } = dragged(RENDERED, 0, 2);
+    const plan = planDragCommit({ data, to, rows: RENDERED, keyOf: byId });
+
+    assert.deepEqual(ids(plan!.rows), ["b", "c", "a", "d"]);
   });
 
   it("commits nothing when the drop resolves to where the row already sits", () => {
