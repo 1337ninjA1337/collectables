@@ -84,8 +84,8 @@ describe("SyncStatusPill component (components/sync-status-pill.tsx)", () => {
     assert.match(src, /collectionsPending\s*\+\s*socialPending\s*\+\s*chatPending/);
   });
 
-  it("renders nothing when there is no pending work", () => {
-    assert.match(src, /if\s*\(total\s*<=\s*0\)\s*return\s+null/);
+  it("renders no pill when there is no pending work", () => {
+    assert.match(src, /total\s*<=\s*0\s*\?\s*null/);
   });
 
   it("renders the localised syncing copy with the live count", () => {

@@ -17,6 +17,26 @@ import { useSocial } from "@/lib/social-context";
  * dismissible affordance that disappears the moment the queues drain, so a
  * fully-synced app isn't decorated with a misleading badge. Must be rendered
  * inside the Social/Collections/Chat providers (i.e. within `AppShell`).
+ *
+ * ## The pill announces itself, and the wrapper is why it can
+ *
+ * A user who cannot see it had no way to learn that a write was parked: the
+ * pill appeared, sat there, and vanished, all silently. It is a STATUS rather
+ * than an interruption — nobody needs to be cut off mid-sentence to hear that
+ * three changes are queued — so it is a polite live region rather than a call
+ * to `announceMessage`, which writes the app's one assertive channel.
+ *
+ * The always-rendered wrapper is the whole mechanism. A live region announces
+ * a CHANGE to text it already had; a node carrying `aria-live` that is
+ * inserted with its text already in it is usually not announced at all, which
+ * is the same lesson `lib/announce.web.ts` opens with. So the region is in the
+ * tree from the first render and the pill moves in and out of it. Empty, it
+ * carries no style and costs no layout.
+ *
+ * Both spellings, because the platforms disagree on the name:
+ * react-native-web forwards `aria-live` to the DOM node and Android reads
+ * `accessibilityLiveRegion`. iOS has no live regions at all, and nothing here
+ * can give it one.
  */
 export function SyncStatusPill() {
   const { pendingSyncCount: collectionsPending } = useCollections();
@@ -25,15 +45,18 @@ export function SyncStatusPill() {
   const { t } = useI18n();
 
   const total = collectionsPending + socialPending + chatPending;
-  if (total <= 0) return null;
 
   return (
-    <View
-      style={styles.pill}
-      accessibilityRole="text"
-      accessibilityLabel={t("syncingPillA11y", { count: total })}
-    >
-      <Text style={styles.pillText}>{t("syncingPill", { count: total })}</Text>
+    <View aria-live="polite" accessibilityLiveRegion="polite">
+      {total <= 0 ? null : (
+        <View
+          style={styles.pill}
+          accessibilityRole="text"
+          accessibilityLabel={t("syncingPillA11y", { count: total })}
+        >
+          <Text style={styles.pillText}>{t("syncingPill", { count: total })}</Text>
+        </View>
+      )}
     </View>
   );
 }

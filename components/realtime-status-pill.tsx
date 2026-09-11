@@ -14,15 +14,31 @@ import { useOptionalRealtimeStatus } from "@/lib/realtime-status-context";
  * that don't own their own realtime subscription (marketplace, future
  * profile-presence) can render the same affordance without re-wiring a
  * status listener.
+ *
+ * ## Going offline is said out loud, politely
+ *
+ * A user who cannot see the pill had no way to learn the socket had dropped —
+ * their messages simply stopped arriving. It is a status rather than an
+ * interruption, so it is a polite live region rather than the app's one
+ * assertive channel; see `components/sync-status-pill.tsx` for why the region
+ * has to be in the tree BEFORE the pill appears in it, and for why both
+ * spellings of the prop are given.
+ *
+ * The outer `null` stays outside the region: a screen with no realtime
+ * subscription has no connection to have an opinion about, which is not the
+ * same fact as a connection that is up.
  */
 export function RealtimeStatusPill() {
   const status = useOptionalRealtimeStatus();
   const { t } = useI18n();
   if (!status) return null;
-  if (status.connectionState !== "connecting") return null;
   return (
-    <View style={styles.pill}>
-      <Text style={styles.pillText}>{t("chatOfflinePill")}</Text>
+    <View aria-live="polite" accessibilityLiveRegion="polite">
+      {status.connectionState !== "connecting" ? null : (
+        <View style={styles.pill} accessibilityRole="text">
+          <Text style={styles.pillText}>{t("chatOfflinePill")}</Text>
+        </View>
+      )}
     </View>
   );
 }
