@@ -23,10 +23,12 @@ import {
   AMBER_SOFT,
   BORDER,
   CARD_BG,
+  CARD_BG_3,
   CARD_BG_9,
   HERO_DARK_2,
   MUTED,
   MUTED_2,
+  MUTED_3,
   MUTED_18,
   RADIUS_AVATAR,
   RADIUS_CARD,
@@ -49,6 +51,7 @@ import {
 import { reorderActionProps } from "@/lib/reorder-actions";
 import { announceReorder } from "@/lib/reorder-announcement";
 import { selectFriendCollections, selectRecentItems } from "@/lib/home-helpers";
+import { ChunkedList, useChunkedList } from "@/lib/use-chunked-list";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
@@ -134,6 +137,31 @@ export default function HomeScreen() {
     [collections, sharedWithMeCollections, friendIds],
   );
 
+  /**
+   * Bounded card mounts on the two tabs that render somebody else's list.
+   *
+   * Both `.map`ped the whole array, so every friend collection and every
+   * subscription mounted a `CollectionCard` — and its remote cover image —
+   * the moment the home screen rendered, whether or not the tab was the
+   * visible one. That is the iOS memory hot-path `useChunkedList` was written
+   * for, and `app/collections-feed.tsx` has used it for these exact two lists
+   * since it was written; the home screen is where every user lands and it was
+   * the one still unbounded.
+   *
+   * "Mine" is deliberately NOT windowed: it is a drag-to-reorder list, and a
+   * window would let the owner drag a row toward a position that is not
+   * mounted. Its length is also self-limiting in a way the other two are not —
+   * it is collections the user made.
+   *
+   * Both hooks sit above the `!ready` early return, like every other hook on
+   * this screen, and both are fed a stable reference (a memo, and a
+   * context-held array) — the identity reset in the hook's header means a list
+   * rebuilt per render would snap the window back to the first page and make
+   * "load more" do nothing.
+   */
+  const friendsWindow = useChunkedList(friendCollections);
+  const subscribedWindow = useChunkedList(subscribedCollections);
+
   if (!ready) {
     return (
       <Screen>
@@ -152,6 +180,30 @@ export default function HomeScreen() {
   // it costs is one `Map.get`.
   const myProfile = getMyProfile();
   const isPhone = isMobile;
+
+  /**
+   * The CTA that grows a window, written once for the two tabs that have one.
+   *
+   * Same shape and same strings as `app/collections-feed.tsx` — the remaining
+   * count is what the label says, so a button reading "Load more (0
+   * remaining)" is a button that should not be there, which is why `hasMore`
+   * decides rather than a length comparison done here.
+   */
+  const renderLoadMore = (window: ChunkedList<Collection>, total: number) => {
+    if (!window.hasMore) return null;
+    const remaining = total - window.visibleItems.length;
+    return (
+      <Pressable
+        style={styles.loadMore}
+        onPress={window.loadMore}
+        accessibilityRole="button"
+        accessibilityLabel={t("loadMoreItemsA11y", { count: remaining })}
+        accessibilityHint={t("loadMoreItemsHint")}
+      >
+        <Text style={styles.loadMoreText}>{t("loadMoreItems", { count: remaining })}</Text>
+      </Pressable>
+    );
+  };
 
   /**
    * The reorder a long press cannot do.
@@ -421,12 +473,15 @@ export default function HomeScreen() {
                 <View style={styles.tabPanel}>
                   <Text style={{ ...styles.sectionDescription, color: theme.muted }}>{t("friendCollectionsSubtitle")}</Text>
                   {friendCollections.length > 0 ? (
-                    friendCollections.map((collection) => {
-                      const total = getCollectionTotalCost(collection.id);
-                      return (
-                        <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={total.amount} totalCostCurrency={total.currency} />
-                      );
-                    })
+                    <>
+                      {friendsWindow.visibleItems.map((collection) => {
+                        const total = getCollectionTotalCost(collection.id);
+                        return (
+                          <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={total.amount} totalCostCurrency={total.currency} />
+                        );
+                      })}
+                      {renderLoadMore(friendsWindow, friendCollections.length)}
+                    </>
                   ) : (
                     <EmptyState
                       icon="🤝"
@@ -443,12 +498,15 @@ export default function HomeScreen() {
               <View style={styles.tabPanel}>
                 <Text style={{ ...styles.sectionDescription, color: theme.muted }}>{t("collectionsFeedSubtitle")}</Text>
                 {subscribedCollections.length > 0 ? (
-                  subscribedCollections.map((collection) => {
-                    const total = getCollectionTotalCost(collection.id);
-                    return (
-                      <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={total.amount} totalCostCurrency={total.currency} />
-                    );
-                  })
+                  <>
+                    {subscribedWindow.visibleItems.map((collection) => {
+                      const total = getCollectionTotalCost(collection.id);
+                      return (
+                        <CollectionCard key={collection.id} collection={collection} count={getItemsForCollection(collection.id).length} totalCost={total.amount} totalCostCurrency={total.currency} />
+                      );
+                    })}
+                    {renderLoadMore(subscribedWindow, subscribedCollections.length)}
+                  </>
                 ) : (
                   <EmptyState
                     icon="🔖"
@@ -723,5 +781,24 @@ const styles = StyleSheet.create({
   recentMeta: {
     fontSize: 12,
     fontFamily: FONT_BODY,
+  },
+  // Mirrors the Load-more CTA in app/collections-feed.tsx, which mirrors
+  // collection detail's drag fallback. Three copies of one button; the styles
+  // are the only part still written out per screen.
+  loadMore: {
+    borderRadius: RADIUS_CARD,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: AMBER_SOFT,
+    backgroundColor: CARD_BG_3,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  loadMoreText: {
+    color: MUTED_3,
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
   },
 });
