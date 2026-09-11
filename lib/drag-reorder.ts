@@ -133,6 +133,20 @@ export type DragEndPlan<T> = {
  * neighbour" is the same place. The rule only starts deciding anything when
  * the snapshot and the list have actually diverged.
  *
+ * ## `from` is not a parameter, and that is the whole answer to it
+ *
+ * `onDragEnd` sends `{ data, from, to }` and this reads the dragged row out of
+ * `data[to]` instead — which was flagged three rounds running as a second
+ * source of truth. It is not one: `from` indexes the list as it was BEFORE the
+ * move and `to` indexes `data`, which is that list with the row moved, so the
+ * two are answers about different arrays and only `data[to]`'s is in the same
+ * frame as the rest of this function. The disagreement the flag was about was
+ * real and it was one layer down — `components/DraggableList.web.tsx` captured
+ * `from` at the long press and spliced it out of the list as it was at the
+ * DROP, so a merge landing mid-gesture made it name a different row. It
+ * re-resolves the row at the drop now, which is where a stale index had to be
+ * fixed; taking it here would only have re-derived what `data` already says.
+ *
  * Null for a drag there is nothing to commit for: a `to` that is not a
  * position in `data`, a dragged row that has left the list (committing it
  * would resurrect a row somebody else deleted), or a drop that resolves to

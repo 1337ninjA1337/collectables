@@ -143,6 +143,28 @@ function suppressTextSelection(doc: Document): () => void {
   };
 }
 
+/**
+ * Where the dragged row is in the list as it is NOW, or -1 if it has left.
+ *
+ * By key rather than by reference, for the reason `identify` in
+ * `lib/drag-reorder.ts` gives: a cloud merge rebuilds the objects, so the same
+ * row comes back as a new object with the same id and `indexOf` would find
+ * nothing. Reference identity is the fallback for a list rendered without a
+ * `keyExtractor`, which neither screen does and the shim cannot require.
+ */
+function indexOfDraggedRow<T>(
+  rows: readonly T[],
+  row: T,
+  key: string | undefined,
+  keyExtractor?: (item: T, index: number) => string,
+): number {
+  if (key === undefined || !keyExtractor) return rows.indexOf(row);
+  for (let index = 0; index < rows.length; index += 1) {
+    if (keyExtractor(rows[index], index) === key) return index;
+  }
+  return -1;
+}
+
 function makeDraggableShim() {
   return function DraggableShim<T>(props: any) {
     const {
@@ -150,12 +172,17 @@ function makeDraggableShim() {
       onDragEnd,
       activationDistance: _activationDistance,
       data,
+      keyExtractor,
       ...rest
     } = props as {
       renderItem?: (params: RenderItemParams<T>) => ReactNode;
       onDragEnd?: (params: DragEndParams<T>) => void;
       activationDistance?: number;
       data?: readonly T[];
+      // Destructured because the gesture needs it — a row has to be
+      // recognisable across a merge that rebuilt it — and handed straight back
+      // to the `FlatList`, which needs it for the same reason React does.
+      keyExtractor?: (item: T, index: number) => string;
     } & Record<string, unknown>;
 
     const rows: readonly T[] = Array.isArray(data) ? (data as T[]) : [];
@@ -177,8 +204,8 @@ function makeDraggableShim() {
      * before a cloud merge lands and ends after it must reorder the list as it
      * is at the drop, not as it was at the long press.
      */
-    const latest = useRef({ rows, onDragEnd });
-    latest.current = { rows, onDragEnd };
+    const latest = useRef({ rows, onDragEnd, keyExtractor });
+    latest.current = { rows, onDragEnd, keyExtractor };
 
     /** index → the row's element, written by the ref callback below. */
     const nodes = useRef(new Map<number, Measurable>());
@@ -196,12 +223,43 @@ function makeDraggableShim() {
       const restoreTouch = suppressTouchScrolling(doc);
       const restoreSelection = suppressTextSelection(doc);
 
+      /**
+       * WHICH row this gesture is about, captured once, as a row and a key.
+       *
+       * `from` is an index into the list as it was at the long press, and the
+       * drop reads the list as it is at the pointerup — the two are not the
+       * same array whenever a cloud merge or a `loadMore` lands in between.
+       * Committing `moveItem(current, from, to)` then moves whatever row has
+       * since taken that index: the user drags Alpha and Beta moves, silently,
+       * with a well-formed whole-list order to persist afterwards. This is the
+       * `identify` fix the keyboard route got, arriving at the route that
+       * produced the argument for it.
+       */
+      const draggedRow = latest.current.rows[from];
+      const draggedKey = latest.current.keyExtractor?.(draggedRow, from);
+
       let to = from;
+      /**
+       * Whether the pointer ever resolved to a row at all.
+       *
+       * `to === from` used to stand in for this, and it stops being the same
+       * question once `from` is re-resolved at the drop: a list that shrank
+       * above the dragged row can make a genuine landing index collide with
+       * the index the gesture started from, and reading that as "the finger
+       * never moved" drops a drag the user made.
+       *
+       * Set before the `next === to` dedup below rather than after it, because
+       * that check asks whether the MARKER needs redrawing — a pointer resting
+       * on the index it was already over is still a pointer that resolved.
+       */
+      let moved = false;
       const onMove = (event: PointerLike) => {
         if (typeof event?.clientY !== "number") return;
         const rects = measureRows(nodes.current, latest.current.rows.length);
         const next = targetIndexForPointer(rects, event.clientY);
-        if (next < 0 || next === to) return;
+        if (next < 0) return;
+        moved = true;
+        if (next === to) return;
         to = next;
         setDropIndex(next);
       };
@@ -217,9 +275,17 @@ function makeDraggableShim() {
         stop();
         setActiveIndex(null);
         setDropIndex(null);
-        if (to === from) return;
-        const { rows: current, onDragEnd: commit } = latest.current;
-        commit?.({ data: moveItem(current, from, to), from, to });
+        if (!moved) return;
+        const { rows: current, onDragEnd: commit, keyExtractor: keyOf } = latest.current;
+        const at = indexOfDraggedRow(current, draggedRow, draggedKey, keyOf);
+        // The row left the list mid-gesture — deleted on another device, moved
+        // to another collection, filtered out. There is no move to commit, and
+        // committing one would move whatever is standing where it was.
+        if (at === -1) return;
+        // Including the drag that moved away and came back: `to` is where the
+        // row is going and `at` is where it already is.
+        if (to === at) return;
+        commit?.({ data: moveItem(current, at, to), from: at, to });
       };
 
       doc.addEventListener("pointermove", onMove as EventListener);
@@ -284,7 +350,7 @@ function makeDraggableShim() {
         }
       : undefined;
 
-    return <FlatList {...rest} data={data} renderItem={adaptedRenderItem} />;
+    return <FlatList {...rest} data={data} keyExtractor={keyExtractor} renderItem={adaptedRenderItem} />;
   };
 }
 

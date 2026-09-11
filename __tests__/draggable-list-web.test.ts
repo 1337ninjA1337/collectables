@@ -592,6 +592,216 @@ describe("the web DraggableList shim runs the drag gesture itself", () => {
   });
 });
 
+/**
+ * Which row the drop is about, when the list changed while the finger was down.
+ *
+ * The ref above this comment exists because "a drag that starts before a cloud
+ * merge lands and ends after it must reorder the list as it is at the drop" —
+ * and only half of that shipped. `rows` was re-read at the drop and `from`,
+ * the index the long press captured, was not, so `moveItem(current, from, to)`
+ * spliced out whatever row had SINCE taken that index. The user drags Alpha
+ * and Beta moves, the commit is a well-formed whole-list order, and
+ * `planDragCommit` downstream re-plans the wrong row faithfully: it reads
+ * `data[to]`, and `data` is the snapshot this line built.
+ *
+ * Which is the same half-fix the keyboard route had before `identify`, on the
+ * route that produced the argument for it.
+ *
+ * ## The harness is separate because these cases re-render
+ *
+ * `mountGesture` mounts one fixed `ROWS` and every case above drags it
+ * unchanged. What is needed here is a list that CHANGES between the long press
+ * and the pointerup, which means re-rendering the shim with new `data` and
+ * re-attaching the row refs at the new indices — the two things the real
+ * `FlatList` does when a merge lands under it.
+ */
+describe("the web DraggableList shim resolves the dragged row at the drop", () => {
+  const A = { id: "a", title: "Alpha" };
+  const B = { id: "b", title: "Beta" };
+  const C = { id: "c", title: "Gamma" };
+  const D = { id: "d", title: "Delta" };
+  const Z = { id: "z", title: "Zeta" };
+
+  /**
+   * The y a pointer needs to resolve to `index` — just ABOVE its midpoint.
+   *
+   * `targetIndexForPointer` answers with the first row whose midpoint the
+   * pointer has not passed, so a y ten points BELOW a midpoint is already the
+   * next row down.
+   */
+  const overRow = (index: number) => index * ROW_HEIGHT + ROW_HEIGHT / 2 - 10;
+
+  async function mountMerging(initial: readonly Row[], options: { keyed?: boolean } = {}) {
+    const dom = setupFakeDom();
+    const drops: DragEnd[] = [];
+    const dragHandles = new Map<number, () => void>();
+    let rows: readonly Row[] = initial;
+
+    const propsFor = (data: readonly Row[]) => ({
+      data,
+      ...(options.keyed === false ? {} : { keyExtractor: (row: Row) => row.id }),
+      onDragEnd: (params: DragEnd) => drops.push(params),
+      renderItem: ({ drag, getIndex }: { drag: () => void; getIndex: () => number | undefined }) => {
+        const index = getIndex();
+        if (index !== undefined) dragHandles.set(index, drag);
+        return null;
+      },
+    });
+
+    const shim = (await webModule()).NestableDraggableFlatList as (props: unknown) => ReactElement;
+    const element = (data: readonly Row[]) =>
+      createElement(shim as never, propsFor(data) as never) as ReactElement;
+    let tree = render(element(initial));
+
+    /** Rebuilds every row of the CURRENT list and attaches its measurement. */
+    const layOutRows = () => {
+      tree = tree.dirty ? tree.rerender() : tree;
+      const node = tree.findByType("FlatList");
+      rows.forEach((row, index) => {
+        adaptedRow(node, row, index).props.ref?.(measurable(index));
+      });
+    };
+
+    return {
+      drops,
+      layOutRows,
+      /** The merge: new rows, re-rendered and re-measured, mid-gesture. */
+      merge: (next: readonly Row[]) => {
+        rows = next;
+        tree = tree.rerender(element(next));
+        layOutRows();
+      },
+      dragRow: (index: number) => {
+        const drag = dragHandles.get(index);
+        assert.ok(drag, `row ${index} was never rendered`);
+        drag();
+      },
+      pointerMove: (clientY: number) => {
+        for (const listener of [...(dom.listeners.pointermove ?? [])]) {
+          listener({ type: "pointermove", clientY } as never);
+        }
+      },
+      pointerUp: () => {
+        for (const listener of [...(dom.listeners.pointerup ?? [])]) {
+          listener({ type: "pointerup" } as never);
+        }
+      },
+      restore: dom.restore,
+    };
+  }
+
+  it("moves the row the user grabbed, not the one now at its old index", async () => {
+    const gesture = await mountMerging([A, B, C, D]);
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(0);
+      // Another device created a collection; the merge puts it at the top.
+      gesture.merge([Z, A, B, C, D]);
+      gesture.pointerMove(overRow(2));
+      gesture.pointerUp();
+
+      // Alpha is now at index 1, and it is Alpha that lands at 2. Reading the
+      // long press's index instead spliced out Zeta — a row that had existed
+      // for a hundred milliseconds and that the user has never seen move.
+      assert.deepEqual(gesture.drops, [
+        { data: [Z, B, A, C, D], from: 1, to: 2 },
+      ]);
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("commits nothing when the dragged row left the list", async () => {
+    const gesture = await mountMerging([A, B, C]);
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(1);
+      // Beta was deleted on another device while the finger was down.
+      gesture.merge([A, C]);
+      gesture.pointerMove(overRow(0));
+      gesture.pointerUp();
+
+      // Committing would have moved Gamma, which is standing where Beta was.
+      assert.deepEqual(gesture.drops, []);
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("commits a move whose landing index collides with the one it started from", async () => {
+    const gesture = await mountMerging([A, B, C, D]);
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(2);
+      // Alpha is gone, so Gamma — the dragged row — is index 1 now.
+      gesture.merge([B, C, D]);
+      gesture.pointerMove(overRow(2));
+      gesture.pointerUp();
+
+      // `to === from` stood in for "the pointer never moved" and is a
+      // different question once `from` is re-resolved: this drag really does
+      // land on 2 and really did start from what was index 2.
+      assert.deepEqual(gesture.drops, [
+        { data: [B, D, C], from: 1, to: 2 },
+      ]);
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("commits nothing for a drag that moved away and came back", async () => {
+    const gesture = await mountMerging([A, B, C]);
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(0);
+      gesture.pointerMove(overRow(2));
+      gesture.pointerMove(overRow(0));
+      gesture.pointerUp();
+
+      assert.deepEqual(gesture.drops, []);
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("reproduces the old answer exactly when nothing changed underneath", async () => {
+    // The 99% must not pay for the 1%: re-resolving a row in a list that did
+    // not move has to find it exactly where the long press left it.
+    const gesture = await mountMerging([A, B, C, D]);
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(1);
+      gesture.pointerMove(overRow(3));
+      gesture.pointerUp();
+
+      assert.deepEqual(gesture.drops, [
+        { data: [A, C, D, B], from: 1, to: 3 },
+      ]);
+    } finally {
+      gesture.restore();
+    }
+  });
+
+  it("falls back to the row itself when the list has no keyExtractor", async () => {
+    // Neither screen renders without one, and the shim cannot require it: a
+    // list with no keys still drags, by reference, which is right for every
+    // list whose rows are not being rebuilt underneath it.
+    const gesture = await mountMerging([A, B, C], { keyed: false });
+    try {
+      gesture.layOutRows();
+      gesture.dragRow(0);
+      gesture.pointerMove(overRow(2));
+      gesture.pointerUp();
+
+      assert.deepEqual(gesture.drops, [
+        { data: [B, C, A], from: 0, to: 2 },
+      ]);
+    } finally {
+      gesture.restore();
+    }
+  });
+});
+
 describe("the web DraggableList shim's non-list exports", () => {
   it("is react-native's ScrollView under the nestable container's name", async () => {
     const [mod, rn] = await Promise.all([webModule(), import("react-native")]);
