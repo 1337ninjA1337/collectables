@@ -178,15 +178,28 @@ describe("the realtime pill's live region", () => {
     assert.deepEqual(tree.texts(), []);
   });
 
-  it("keeps the region across a reconnect", async () => {
+  it("says the connection came back, in the region it already had", async () => {
+    // The pill used to vanish, which reads as "fixed" to a sighted user and is
+    // announced by nothing: text becoming empty is not a sentence.
     connectionState = "connecting";
     const tree = await mountRealtime();
     assert.deepEqual(tree.texts(), ["chatOfflinePill"]);
 
     connectionState = "online";
+    tree.rerender();
     const back = tree.rerender();
 
-    assert.equal(politeRegions(back.all()).length, 1);
-    assert.deepEqual(back.texts(), []);
+    assert.equal(politeRegions(back.all()).length, 1, "the same region, not a second one");
+    assert.deepEqual(back.texts(), ["chatBackOnlinePill"]);
+  });
+
+  it("says nothing on a screen whose socket was up the whole time", async () => {
+    // Every mount would otherwise greet the user with news about a connection
+    // that was never broken.
+    connectionState = "online";
+    const tree = await mountRealtime();
+    tree.rerender();
+
+    assert.deepEqual(tree.rerender().texts(), []);
   });
 });

@@ -1,8 +1,10 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { CONNECTION_NOTICE_KEYS } from "@/lib/connection-notice";
 import { AMBER_SOFT, AMBER_SOFT_4, MUTED_25, RADIUS_PILL } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { useOptionalRealtimeStatus } from "@/lib/realtime-status-context";
+import { useConnectionNotice } from "@/lib/use-connection-notice";
 
 /**
  * Localised "Offline · reconnecting" pill driven by the shared realtime
@@ -27,16 +29,30 @@ import { useOptionalRealtimeStatus } from "@/lib/realtime-status-context";
  * The outer `null` stays outside the region: a screen with no realtime
  * subscription has no connection to have an opinion about, which is not the
  * same fact as a connection that is up.
+ *
+ * ## And it says when the connection comes back
+ *
+ * The pill used to simply vanish, which a sighted user correctly reads as
+ * "fixed" and which is announced by nothing at all — text becoming empty is
+ * not a sentence. So the user who most needed telling was told the connection
+ * broke and never told it worked again. `lib/connection-notice.ts` owns the
+ * transition and why a session that starts online has not reconnected.
  */
 export function RealtimeStatusPill() {
   const status = useOptionalRealtimeStatus();
   const { t } = useI18n();
+  // Hooks run before the early return can be reached, so the notice is asked
+  // for even on a screen with no subscription — `false` there would claim the
+  // connection is down. `idle` and `online` are both "not offline".
+  const notice = useConnectionNotice(status?.connectionState !== "connecting");
   if (!status) return null;
   return (
     <View aria-live="polite" accessibilityLiveRegion="polite">
-      {status.connectionState !== "connecting" ? null : (
+      {notice === null ? null : (
         <View style={styles.pill} accessibilityRole="text">
-          <Text style={styles.pillText}>{t("chatOfflinePill")}</Text>
+          <Text style={styles.pillText}>
+            {t(CONNECTION_NOTICE_KEYS[notice])}
+          </Text>
         </View>
       )}
     </View>

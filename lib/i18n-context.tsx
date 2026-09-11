@@ -518,6 +518,7 @@ const en = {
   premiumConfirmCancelText:
     "You'll lose unlimited listings and your premium badge. The free cap returns immediately.",
   chatOfflinePill: "Offline · reconnecting",
+  chatBackOnlinePill: "Back online",
   syncingPill: (params?: TranslationParams) =>
     `Syncing ${params?.count ?? 0} ${plural(params?.count, "change", "changes")}…`,
   syncingPillA11y: (params?: TranslationParams) =>
@@ -1087,6 +1088,7 @@ const ru: TranslationMap = {
   premiumConfirmCancelText:
     "Вы потеряете неограниченные объявления и премиум-значок. Бесплатный лимит вернётся сразу.",
   chatOfflinePill: "Нет соединения · переподключение",
+  chatBackOnlinePill: "Соединение восстановлено",
   syncingPill: (params?: TranslationParams) =>
     `Синхронизация: ${params?.count ?? 0}…`,
   syncingPillA11y: (params?: TranslationParams) =>
@@ -1700,6 +1702,7 @@ const be: TranslationMap = {
     "Усе ў гэтым спісе — уключаючы тых, хто адкрыў калекцыю па спасылцы — могуць яе праглядаць. Выдаліце доступ, каб закрыць прагляд.",
   removeAccess: "Прыбраць",
   chatOfflinePill: "Няма злучэння · перападключэнне",
+  chatBackOnlinePill: "Злучэнне адноўлена",
   syncingPill: (params?: TranslationParams) => `Сінхранізацыя: ${params?.count ?? 0}…`,
   syncingPillA11y: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${slavicPlural(params?.count, "змяненне сінхранізуецца", "змяненні сінхранізуюцца", "змяненняў сінхранізуецца")} з воблакам`,
@@ -2280,6 +2283,7 @@ const pl: TranslationMap = {
     "Każdy z tej listy — łącznie z osobami, które otworzyły udostępniony link — może oglądać tę kolekcję. Usuń dostęp, aby to cofnąć.",
   removeAccess: "Usuń",
   chatOfflinePill: "Brak połączenia · łączymy ponownie",
+  chatBackOnlinePill: "Połączenie przywrócone",
   syncingPill: (params?: TranslationParams) => `Synchronizacja: ${params?.count ?? 0}…`,
   syncingPillA11y: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${slavicPlural(params?.count, "zmiana synchronizuje się", "zmiany synchronizują się", "zmian synchronizuje się")} z chmurą`,
@@ -2868,6 +2872,7 @@ const de: TranslationMap = {
     "Alle in dieser Liste — auch wer den geteilten Link geöffnet hat — können diese Sammlung sehen. Entzieh den Zugriff, um das zu beenden.",
   removeAccess: "Entfernen",
   chatOfflinePill: "Offline · verbindet neu",
+  chatBackOnlinePill: "Wieder online",
   syncingPill: (params?: TranslationParams) =>
     `Synchronisiere ${params?.count ?? 0} ${plural(params?.count, "Änderung", "Änderungen")}…`,
   syncingPillA11y: (params?: TranslationParams) =>
@@ -3455,6 +3460,7 @@ const es: TranslationMap = {
     "Cualquiera de esta lista — incluidas las personas que abrieron el enlace compartido — puede ver esta colección. Quita el acceso para revocarlo.",
   removeAccess: "Quitar",
   chatOfflinePill: "Sin conexión · reconectando",
+  chatBackOnlinePill: "De nuevo en línea",
   syncingPill: (params?: TranslationParams) =>
     `Sincronizando ${params?.count ?? 0} ${plural(params?.count, "cambio", "cambios")}…`,
   syncingPillA11y: (params?: TranslationParams) =>

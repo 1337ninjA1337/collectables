@@ -44,9 +44,11 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { useChat } from "@/lib/chat-context";
 import { buildChatId } from "@/lib/chat-helpers";
+import { CONNECTION_NOTICE_KEYS } from "@/lib/connection-notice";
 import { useI18n } from "@/lib/i18n-context";
 import { useSocial } from "@/lib/social-context";
 import { subscribeToTyping } from "@/lib/supabase-chat";
+import { useConnectionNotice } from "@/lib/use-connection-notice";
 import { DWELL_TIME_DEFAULT_MS, useDwellTimeEffect } from "@/lib/use-dwell-time";
 import { useVisibilityRefresh } from "@/lib/use-visibility-refresh";
 
@@ -70,6 +72,10 @@ export default function ChatDetailScreen() {
   const { t, language } = useI18n();
   const { getProfileById, ensureProfilesLoaded, getRelationship } = useSocial();
   const { getMessages, sendMessage, canMessage, markRead, clearChat, refreshFromCloud, realtimeOnline } = useChat();
+
+  // The pill used to vanish on reconnect, which is announced by nothing:
+  // text becoming empty is not a sentence. See lib/connection-notice.ts.
+  const connectionNotice = useConnectionNotice(realtimeOnline);
 
   const [text, setText] = useState("");
   const otherProfile = getProfileById(otherUserId) ?? null;
@@ -294,11 +300,19 @@ export default function ChatDetailScreen() {
           ) : null}
         </View>
 
-        {allowed && !realtimeOnline ? (
-          <View style={styles.offlinePill}>
-            <Text style={styles.offlinePillText}>{t("chatOfflinePill")}</Text>
-          </View>
-        ) : null}
+        {/* The region is mounted before the pill it will carry: a node that
+            arrives with its text already inside it is a new node, not a
+            changed one, and a new node is announced by nothing. See
+            components/sync-status-pill.tsx. */}
+        <View aria-live="polite" accessibilityLiveRegion="polite">
+          {allowed && connectionNotice !== null ? (
+            <View style={styles.offlinePill} accessibilityRole="text">
+              <Text style={styles.offlinePillText}>
+                {t(CONNECTION_NOTICE_KEYS[connectionNotice])}
+              </Text>
+            </View>
+          ) : null}
+        </View>
 
         <ScrollView
           ref={scrollRef}

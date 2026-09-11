@@ -486,7 +486,12 @@ describe("translation floors", () => {
     // 510 later that day: `tagsDuplicate`, the hint that replaced a bare
     // `return` on both tag forms. Pressing Add on a tag the item already has
     // looked exactly like a broken button, in six languages equally.
-    assert.match(report, /en: 510\/510 keys \(100\.0%\)/);
+    // 511 on 2026-09-11: `chatBackOnlinePill`, the half of the connection
+    // story that was missing. The offline pill vanished when the socket came
+    // back, which reads as "fixed" to somebody who can see it and is announced
+    // by nothing to somebody who cannot — text becoming empty is not a
+    // sentence.
+    assert.match(report, /en: 511\/511 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
