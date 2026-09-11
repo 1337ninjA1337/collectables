@@ -120,12 +120,25 @@ describe("both screens announce both moments", () => {
         );
       });
 
-      it("announces the landing after a drag, from the index the list reports", () => {
-        // `to` rather than a re-derivation: the list already resolved which
-        // slot the row fell into, and computing it twice is how the spoken
-        // position and the visible one drift.
+      it("announces the landing after a drag, from the index it actually committed", () => {
+        // It was `to` and `data.length` — the list's own answers — until
+        // 2026-09-11, when the drag stopped committing the snapshot it was
+        // handed. `plan.to` and `plan.rows.length` are the only numbers that
+        // describe the order that was written: they equal the list's whenever
+        // nothing changed underneath, and differ exactly when a merge landed
+        // mid-gesture, which is the case the user cannot see to check.
         assert.match(src(), /onDragEnd=\{\(\{ data, to \}\) => \{/);
-        assert.match(src(), /announceReorder\(t, "reorderMoved", to, data\.length\);/);
+        assert.match(
+          src(),
+          /announceReorder\(t, "reorderMoved", plan\.to, plan\.rows\.length\);/,
+        );
+      });
+
+      it("says nothing at all for a drag that resolved to no move", () => {
+        // `planDragCommit` returns null for a row that left the list, a `to`
+        // that is not a position, and a drop that lands where the row already
+        // is. Announcing any of those reads out a move that did not happen.
+        assert.match(src(), /if \(!plan\) return;/);
       });
 
       it("hands the announcement to the same call that hands over the writer", () => {

@@ -68,11 +68,16 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     // is unchanged — that the drag commits the page AND the tail — but the
     // rule itself is now behaviour a suite can run, in
     // `keyboard-reorder-items.test.ts`, rather than a regex over a literal.
+    //
+    // What the drag hands `commitItemOrder` changed again on 2026-09-11: not
+    // `data` (the list's snapshot of what it drew) but `planDragCommit`'s
+    // rows, resolved against the visible list as it is NOW. The tail rule is
+    // untouched by that — it still runs on whatever page it is given.
     assert.match(
       src,
       /const commitItemOrder = \(page: CollectableItem\[\]\) => \{\s*\n\s*reorderItemsInCollection\(\s*activeCollection\.id\s*,\s*orderWithUnrenderedTail\(\s*page\s*,\s*items\s*\)\s*\);/,
     );
-    assert.match(src, /onDragEnd=\{\(\{ data, to \}\) => \{\s*\n\s*commitItemOrder\(data\);/);
+    assert.match(src, /onDragEnd=\{\(\{ data, to \}\) => \{[\s\S]*?commitItemOrder\(plan\.rows\);/);
   });
 
   it("selection-mode branch feeds visibleItems into a FlatList (VM-E — not items, not a .map)", () => {

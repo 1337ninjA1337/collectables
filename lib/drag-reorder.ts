@@ -47,6 +47,97 @@ export function moveItem<T>(rows: readonly T[], from: number, to: number): T[] {
 }
 
 /**
+ * The key every list in this app is ordered and reconciled by.
+ *
+ * `Collection` and `CollectableItem` both carry `id`, both `keyExtractor`s
+ * read it, and every `identify` in the two screens spelled it again as its own
+ * arrow. Four copies of the same function is four chances for one of them to
+ * be written as something that is not stable — an index, a title, a composite
+ * — and the failure that produces (a drag committing against a row it matched
+ * by name) is invisible until two rows share the value.
+ */
+export function byId(row: { readonly id: string }): string {
+  return row.id;
+}
+
+/** Where a finished drag actually lands, once the list is read again. */
+export type DragEndPlan<T> = {
+  /** The whole of the CURRENT list, with the dragged row moved into place. */
+  readonly rows: T[];
+  /** The row's 0-based index in `rows` — the position to announce. */
+  readonly to: number;
+};
+
+/**
+ * What a finished drag means, expressed against the list as it is NOW.
+ *
+ * `onDragEnd` hands back `data`: the list's own reordered copy of what it
+ * DREW. Between the frame the gesture started on and the finger coming up, a
+ * cloud merge or a `loadMore` can land — and committing `data` then persists a
+ * snapshot taken before it, silently reverting rows the user never touched and
+ * dropping ones that arrived mid-gesture. The keyboard route stopped trusting
+ * the render's answer when `identify` was added; this is the same fix for the
+ * route that produced the argument in the first place.
+ *
+ * ## The drop is read as "after this row", not as an index
+ *
+ * `to` is an index into `data`, and an index into a list that has changed
+ * means nothing — row 3 of the old list may be row 5 or may be gone. What the
+ * user expressed is a position RELATIVE TO THE ROWS THEY COULD SEE, so the
+ * nearest predecessor in `data` that still exists is the anchor, and the row
+ * lands immediately after it. A drop at the top has no predecessor and lands
+ * at the top.
+ *
+ * When nothing changed underneath — every ordinary drag — this reproduces
+ * `data` exactly: the two lists hold the same rows, so "after the same
+ * neighbour" is the same place. The rule only starts deciding anything when
+ * the snapshot and the list have actually diverged.
+ *
+ * Null for a drag there is nothing to commit for: a `to` that is not a
+ * position in `data`, a dragged row that has left the list (committing it
+ * would resurrect a row somebody else deleted), or a drop that resolves to
+ * where the row already is — which is not a move, and announcing one as
+ * "moved to position 3 of 7" is indistinguishable from a move that did
+ * nothing.
+ */
+export function planDragCommit<T>(params: {
+  /** The reordered snapshot `onDragEnd` handed back. */
+  readonly data: readonly T[];
+  /** The index within `data` the row was dropped on. */
+  readonly to: number;
+  /** The list as it is now — a ref the render writes, not the render's array. */
+  readonly rows: readonly T[];
+  /** How a row is recognised across a merge that rebuilt the objects. */
+  readonly keyOf: (row: T) => string;
+}): DragEndPlan<T> | null {
+  const { data, to, rows, keyOf } = params;
+  if (!Number.isInteger(to) || to < 0 || to >= data.length) return null;
+
+  const movedKey = keyOf(data[to]);
+  const from = rows.findIndex((row) => keyOf(row) === movedKey);
+  if (from === -1) return null;
+
+  // Indices are read against the list WITHOUT the dragged row, because that is
+  // the list `moveItem` splices into: it lifts the row out first, so a target
+  // computed against the full array would be one place late for every drop
+  // below the row's old position.
+  const remaining = rows.filter((_, index) => index !== from);
+  let target = 0;
+  for (let above = to - 1; above >= 0; above -= 1) {
+    const key = keyOf(data[above]);
+    if (key === movedKey) continue;
+    const anchor = remaining.findIndex((row) => keyOf(row) === key);
+    if (anchor !== -1) {
+      target = anchor + 1;
+      break;
+    }
+  }
+
+  if (target === from) return null;
+  return { rows: moveItem(rows, from, target), to: target };
+}
+
+/**
  * The id order to persist after reordering a PAGE of a longer list.
  *
  * `app/collection/[id].tsx` renders a chunked slice of its items, and both

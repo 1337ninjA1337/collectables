@@ -26,7 +26,7 @@ import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
 import { announceMessage } from "@/lib/announce";
-import { orderWithUnrenderedTail } from "@/lib/drag-reorder";
+import { byId, orderWithUnrenderedTail, planDragCommit } from "@/lib/drag-reorder";
 import { reorderActionProps } from "@/lib/reorder-actions";
 import { announceReorder } from "@/lib/reorder-announcement";
 import { flatListStyles } from "@/lib/flat-list-styles";
@@ -1128,7 +1128,7 @@ export default function CollectionDetailsScreen() {
       drag: isOwner ? drag : undefined,
       // By id, not by reference: a cloud merge rebuilds the objects, so the
       // same item comes back as a new one and only the id survives.
-      identify: { row: item, keyOf: (i) => i.id },
+      identify: { row: item, keyOf: byId },
     });
 
     return (
@@ -1347,9 +1347,19 @@ export default function CollectionDetailsScreen() {
             // The tail-append rule lives in `commitItemOrder` now, because the
             // keyboard actions on each row need the same one. See
             // `orderWithUnrenderedTail`.
+            // `data` is the list's copy of what it DREW. `planDragCommit`
+            // re-reads the visible rows so a merge that landed mid-gesture is
+            // not reverted by the commit; see lib/drag-reorder.ts.
             onDragEnd={({ data, to }) => {
-              commitItemOrder(data);
-              announceReorder(t, "reorderMoved", to, data.length);
+              const plan = planDragCommit({
+                data,
+                to,
+                rows: visibleItemsRef.current,
+                keyOf: byId,
+              });
+              if (!plan) return;
+              commitItemOrder(plan.rows);
+              announceReorder(t, "reorderMoved", plan.to, plan.rows.length);
             }}
             contentContainerStyle={styles.draggableList}
           />

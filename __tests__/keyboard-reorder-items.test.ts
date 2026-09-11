@@ -147,7 +147,12 @@ describe("the collection screen's two reorder routes", () => {
       src,
       /const commitItemOrder = \(page: CollectableItem\[\]\) => \{\n\s*reorderItemsInCollection\(activeCollection\.id, orderWithUnrenderedTail\(page, items\)\);\n\s*\};/,
     );
-    assert.match(src, /onDragEnd=\{\(\{ data, to \}\) => \{\n\s*commitItemOrder\(data\);/);
+    // Both routes now also agree on WHICH list the move happens within: the
+    // actions read `visibleItemsRef` at action time, and since 2026-09-11 the
+    // drag resolves its snapshot against the same ref through
+    // `planDragCommit` rather than committing the array the list drew.
+    assert.match(src, /onDragEnd=\{\(\{ data, to \}\) => \{[\s\S]*?commitItemOrder\(plan\.rows\);/);
+    assert.match(src, /rows: visibleItemsRef\.current,/);
   });
 
   it("leaves no second copy of the tail rule in the screen", () => {
@@ -173,7 +178,10 @@ describe("the collection screen's two reorder routes", () => {
     // second call site for "where does the row land" is what the extraction
     // removed.
     const src = readScreenSrc();
-    assert.match(src, /import \{ orderWithUnrenderedTail \} from "@\/lib\/drag-reorder";/);
+    assert.match(
+      src,
+      /import \{ byId, orderWithUnrenderedTail, planDragCommit \} from "@\/lib\/drag-reorder";/,
+    );
     assert.doesNotMatch(src, /import \{ moveItem/);
   });
 });

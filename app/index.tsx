@@ -15,6 +15,7 @@ import { useAppTheme } from "@/components/use-app-theme";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { useAuth } from "@/lib/auth-context";
 import { useCollections } from "@/lib/collections-context";
+import { byId, planDragCommit } from "@/lib/drag-reorder";
 import {
   AMBER_ACCENT,
   AMBER_LIGHT,
@@ -157,7 +158,7 @@ export default function HomeScreen() {
       drag,
       // By id, not by reference: a cloud merge rebuilds the objects, so the
       // same collection comes back as a new one and only the id survives.
-      identify: { row: collection, keyOf: (c) => c.id },
+      identify: { row: collection, keyOf: byId },
     });
 
     return (
@@ -362,9 +363,20 @@ export default function HomeScreen() {
                       data={ownedCollections}
                       keyExtractor={(c) => c.id}
                       renderItem={renderOwnedCollection}
+                      // `data` is the list's copy of what it DREW, and a cloud
+                      // merge can land mid-gesture. `planDragCommit` re-reads
+                      // the rows and keeps the drop where the user put it —
+                      // after the same neighbour. See lib/drag-reorder.ts.
                       onDragEnd={({ data, to }) => {
-                        reorderOwnedCollections(data.map((c) => c.id));
-                        announceReorder(t, "reorderMoved", to, data.length);
+                        const plan = planDragCommit({
+                          data,
+                          to,
+                          rows: ownedCollectionsRef.current,
+                          keyOf: byId,
+                        });
+                        if (!plan) return;
+                        reorderOwnedCollections(plan.rows.map(byId));
+                        announceReorder(t, "reorderMoved", plan.to, plan.rows.length);
                       }}
                       contentContainerStyle={styles.draggableList}
                     />
