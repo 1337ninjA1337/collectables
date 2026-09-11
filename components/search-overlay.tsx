@@ -13,6 +13,7 @@ import {
 import { MaskedTextInput } from "@/components/masked-text-input";
 //
 import { EmptyState } from "@/components/empty-state";
+import { isLiveItem } from "@/lib/collections-helpers";
 import { useCollections } from "@/lib/collections-context";
 import {
   AMBER_ACCENT,
@@ -102,8 +103,11 @@ export function SearchOverlay({ visible, onClose }: Props) {
     if (!q || filter === "collections" || filter === "people") return [];
     return items
       .filter((item) => {
-        if (item.isWishlist) return false;
-        if (item.archivedAt) return false;
+        // A want and a sold item are both things the collector does not have;
+        // search answers "where is my …", so neither belongs in the results.
+        // The rule is `isLiveItem` rather than two early returns because it is
+        // the same rule the card counts and the collection totals use.
+        if (!isLiveItem(item)) return false;
         const matchesQuery =
           item.title.toLowerCase().includes(q) ||
           item.description.toLowerCase().includes(q) ||

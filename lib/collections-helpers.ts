@@ -46,19 +46,64 @@ export function ownedCollectionIds(collections: Collection[]): Set<string> {
 }
 
 /**
+ * In the trash: sold, or manually retired.
+ *
+ * Per the `archivedAt` contract in `lib/types.ts` an archived item stays in
+ * storage for stats and audit history and is excluded from listings, totals,
+ * counts, recent items and search. The field is nullable and legacy rows carry
+ * `null` rather than being absent, so the question is truthiness of a
+ * timestamp and not `"archivedAt" in item`.
+ *
+ * The one fact the two predicates below share, named so that they can be read
+ * as "and not in the trash" rather than each spelling out what the trash is.
+ */
+export function isArchived(item: CollectableItem): boolean {
+  return Boolean(item.archivedAt);
+}
+
+/**
+ * A thing the collector HAS: not in the trash, not a wishlist entry.
+ *
+ * Four places stated this rule and no two stated it the same way — a
+ * three-clause filter here, a `continue` guard built out of its De Morgan
+ * negation forty lines down, and two early returns in the search overlay.
+ * They agreed, and checking that they agreed meant negating one of them in
+ * your head. It is one function now, so the next reader checks a name.
+ *
+ * The wishlist exclusion is the load-bearing half: a wishlist entry is
+ * something the user does NOT own yet, so counting one inflates a total and
+ * reads as an acquisition that never happened. {@link isLiveWishlistItem} is
+ * the other side of the same split.
+ */
+export function isLiveItem(item: CollectableItem): boolean {
+  return !isArchived(item) && !item.isWishlist;
+}
+
+/**
+ * A thing the collector WANTS: not in the trash, on the wishlist.
+ *
+ * The mirror of {@link isLiveItem}, and the reason both are here rather than
+ * one: the wishlist memo in the collections provider asked only
+ * `item.isWishlist`, so an archived wishlist entry was in the trash on every
+ * screen in the app except the one it was added on. Written as a pair, "and
+ * not archived" is the half neither can quietly drop.
+ */
+export function isLiveWishlistItem(item: CollectableItem): boolean {
+  return !isArchived(item) && Boolean(item.isWishlist);
+}
+
+/**
  * The user's own, currently-held items: owned collection, not a wishlist
  * entry, not archived.
  *
  * This is the "what do I have" predicate that the home rail, the stats screen
  * and search all need, and each exclusion is load-bearing:
  *
- *   - **wishlist items** (`isWishlist`) are things the user does NOT own yet,
- *     so counting them inflates totals and reads as a false acquisition.
- *   - **archived items** (`archivedAt`) were sold or manually retired; per the
- *     field's contract in `lib/types.ts` they stay in storage for audit
- *     history but are excluded from listings, totals, recent items and search.
+ *   - **wishlist items** and **archived items** are {@link isLiveItem}'s
+ *     business, and the two exclusions are explained there.
  *   - **items in non-owned collections** belong to somebody else; without the
- *     ownership gate their items are counted as the user's own.
+ *     ownership gate their items are counted as the user's own. That is this
+ *     function's own clause and the reason it takes `collections`.
  *
  * Order is preserved from `items` — callers that need a different order sort
  * their own copy.
@@ -69,8 +114,7 @@ export function selectOwnedActiveItems(
 ): CollectableItem[] {
   const ownedIds = ownedCollectionIds(collections);
   return items.filter(
-    (item) =>
-      !item.isWishlist && !item.archivedAt && ownedIds.has(item.collectionId),
+    (item) => isLiveItem(item) && ownedIds.has(item.collectionId),
   );
 }
 
@@ -87,12 +131,11 @@ export function selectOwnedActiveItems(
  * plus twenty sorts of lists nobody ordered anything by, because the caller
  * wanted a number.
  *
- * The predicate is the one all three shared: an item belongs to its collection
- * here unless it is a wishlist entry (a want, not a holding) or archived (in
- * the trash). Stated once, so the three accessors cannot drift on what counts
- * — which is the failure mode worth more than the passes: a count that
- * includes archived items above a total cost that excludes them is two numbers
- * on one card disagreeing about the same collection.
+ * The predicate is the one all three shared, and it is {@link isLiveItem}:
+ * stated once, so the three accessors cannot drift on what counts — which is
+ * the failure mode worth more than the passes, since a count that includes
+ * archived items above a total cost that excludes them is two numbers on one
+ * card disagreeing about the same collection.
  *
  * Order is whatever `items` was in; a caller that needs the drag order sorts
  * its own copy through {@link byCollectionOrder}. Entries are the map's, so
@@ -108,7 +151,7 @@ export function groupItemsByCollection(
 ): Map<string, CollectableItem[]> {
   const byCollection = new Map<string, CollectableItem[]>();
   for (const item of items) {
-    if (item.isWishlist || item.archivedAt) continue;
+    if (!isLiveItem(item)) continue;
     const existing = byCollection.get(item.collectionId);
     if (existing) existing.push(item);
     else byCollection.set(item.collectionId, [item]);

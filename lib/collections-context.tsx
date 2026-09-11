@@ -31,6 +31,7 @@ import {
   byCollectionOrder,
   byOwnedCollectionOrder,
   groupItemsByCollection,
+  isLiveWishlistItem,
   nextCollectionSortOrder,
   planCollectionReorder,
   planItemReorder,
@@ -1132,11 +1133,13 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
   // wishlist screen resets its visible window whenever the reference changes,
   // so recomputing this inline in the value factory would snap the window
   // back to one page on every unrelated context update.
+  // `isLiveWishlistItem`, not `item.isWishlist`: archived means the trash, and
+  // every other list in the app drops archived rows — collection listings,
+  // counts, totals, recent items, stats and search. This one did not, so an
+  // archived want was in the trash everywhere except the screen it was added
+  // on. See the predicate pair in lib/collections-helpers.ts.
   const wishlistItems = useMemo(
-    () =>
-      localItems
-        .filter((item) => item.isWishlist)
-        .sort(byCreatedAtDescThenId),
+    () => localItems.filter(isLiveWishlistItem).sort(byCreatedAtDescThenId),
     [localItems],
   );
 

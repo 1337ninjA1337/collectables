@@ -78,7 +78,14 @@ describe("app/wishlist.tsx — WLF-B FlatList migration", () => {
     // useChunkedList resets its window whenever the array identity changes;
     // computing the filter inline in the big value-memo factory handed the
     // screen a fresh array on every context update.
-    assert.match(src, /const wishlistItems = useMemo\(\s*\(\)\s*=>\s*\n?\s*localItems\s*\n?\s*\.filter\(\(item\) => item\.isWishlist\)/);
+    //
+    // The predicate moved out on 2026-09-11 and changed while it did: the
+    // inline `(item) => item.isWishlist` let an ARCHIVED want stay on this
+    // screen while it was in the trash everywhere else. What this case is
+    // about is the separate memo, so it asks for that and for the dep — see
+    // `live-item-predicate.test.ts` for the rule itself.
+    assert.match(src, /const wishlistItems = useMemo\(\s*\(\)\s*=>\s*\n?\s*localItems\.filter\(isLiveWishlistItem\)/);
+    assert.match(src, /\[localItems\],\s*\);/);
     assert.match(src, /^\s*wishlistItems,$/m);
     assert.doesNotMatch(src, /wishlistItems:\s*localItems/);
   });
