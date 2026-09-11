@@ -165,7 +165,11 @@ describe("the provider asks the index rather than the array", () => {
   });
 
   it("sums the cost from the index too", () => {
-    assert.match(SRC, /const entries = \(itemsByCollection\.get\(collectionId\) \?\? \[\]\)/);
+    // Via the totals map, which walks the index rather than the array: the
+    // total is the one accessor whose work is worth more than its lookup, so
+    // it is computed per collection once per change instead of per call.
+    assert.match(SRC, /for \(const \[collectionId, collectionItems\] of itemsByCollection\)/);
+    assert.match(SRC, /collectionTotalCost\(collectionItems, target, currencyRates\)/);
   });
 
   it("declares the count accessor on the context shape", () => {

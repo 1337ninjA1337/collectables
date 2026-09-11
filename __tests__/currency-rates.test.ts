@@ -249,10 +249,18 @@ describe("currency-rates module — structural", () => {
 describe("CollectionsContext currency wiring", () => {
   const src = read("lib/collections-context.tsx");
 
+  // The summation itself left this file on 2026-09-11 for
+  // `lib/collection-total.ts`, where it is asserted on numbers rather than on
+  // the characters of a `sumConverted(` call — see `collection-total.test.ts`
+  // for the conversion, the no-rates fallback and the returned shape. What
+  // these cases keep is the WIRING, which is what they are in this suite for:
+  // the provider loads the rate table, holds it in state, and hands it to the
+  // sum along with the target currency it resolved.
+
   it("imports the currency-rates helpers", () => {
     assert.match(src, /from\s+"@\/lib\/currency-rates"/);
     assert.match(src, /loadCurrencyRates/);
-    assert.match(src, /sumConverted/);
+    assert.match(src, /from\s+"@\/lib\/collection-total"/);
   });
 
   it("loads rates on mount and stores them in state", () => {
@@ -261,23 +269,32 @@ describe("CollectionsContext currency wiring", () => {
   });
 
   it("getCollectionTotalCost returns a { amount, currency, converted, skipped } shape", () => {
+    // The type is `lib/collection-total.ts`'s and the context re-exports it,
+    // so a consumer's `import { CollectionTotalCost } from "@/lib/collections-context"`
+    // keeps working.
+    assert.match(src, /export type \{ CollectionTotalCost \};/);
     assert.match(
       src,
-      /getCollectionTotalCost:\s*\(collectionId\)\s*=>\s*\{[\s\S]*sumConverted\(/,
+      /getCollectionTotalCost: \(collectionId\) =>\s*collectionTotals\.get\(collectionId\)/,
     );
     // `target` resolves to `collection.currency ?? displayCurrency` — the
     // per-collection override added on 2026-05-23 lets the user pick a
     // display currency just for one collection without changing the
     // app-wide default. Pre-override, this assertion checked for
     // `displayCurrency` directly.
-    assert.match(src, /amount:\s*total,\s*currency:\s*target/);
-    assert.match(src, /const\s+target\s*=\s*collection\?\.currency\s*\?\?\s*displayCurrency/);
+    assert.match(
+      src,
+      /const target = collectionsById\.get\(collectionId\)\?\.currency \?\? displayCurrency;/,
+    );
   });
 
-  it("falls back to a raw sum when rates are not yet loaded (no crash on first paint)", () => {
-    assert.match(src, /if\s*\(currencyRates\)/);
-    // Fallback summation block.
-    assert.match(src, /reduce\(\(sum,\s*e\)\s*=>\s*sum\s*\+\s*e\.amount/);
+  it("hands the rate table to the sum, loaded or not", () => {
+    // `currencyRates` is `UsdRates | null` and the null case is the first
+    // paint, before the table lands. Passing it through rather than guarding
+    // here is what keeps the two states one code path — the fallback is the
+    // sum's business, and `collection-total.test.ts` pins it.
+    assert.match(src, /collectionTotalCost\(collectionItems, target, currencyRates\)/);
+    assert.match(src, /\[itemsByCollection, collectionsById, displayCurrency, currencyRates\]/);
   });
 
   it("exposes displayCurrency + refreshCurrencyRates on the context value", () => {

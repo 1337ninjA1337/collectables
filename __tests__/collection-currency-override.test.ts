@@ -46,30 +46,52 @@ describe("DB shape — DbCollection + toCollection map the currency column", () 
 describe("getCollectionTotalCost — per-collection currency override", () => {
   const src = read("lib/collections-context.tsx");
 
-  it("looks up the collection and reads its currency override before falling back", () => {
+  // These three cases used to match the accessor's body — a `collections.find`
+  // line, the shape of a `sumConverted` call, two returned object literals.
+  // What they claim is about NUMBERS ("a collection with an override totals in
+  // that currency, and an item with no currency of its own is assumed to be in
+  // it"), and the arithmetic moved to `lib/collection-total.ts` on 2026-09-11
+  // where it is asserted on values — see `collection-total.test.ts`. What is
+  // left for this file to say is where the target comes from, which is the one
+  // part that is genuinely about the provider: the collection's own column,
+  // and the viewer's preference only when the column is empty.
+
+  it("reads the collection's currency override before falling back", () => {
     // The override is a property of the collection, not the user. Without
     // this lookup, every collection would share the app-wide displayCurrency
     // and the override couldn't surface.
     assert.match(
       src,
-      /const\s+collection\s*=\s*collections\.find\(\s*\(\s*c\s*\)\s*=>\s*c\.id\s*===\s*collectionId\s*\);/,
+      /const target = collectionsById\.get\(collectionId\)\?\.currency \?\? displayCurrency;/,
     );
-    assert.match(src, /const\s+target\s*=\s*collection\?\.currency\s*\?\?\s*displayCurrency;/);
   });
 
-  it("threads the resolved `target` currency through sumConverted + the no-rates fallback", () => {
+  it("threads the resolved `target` currency into the sum, for both rate states", () => {
     // Both code paths (rates-available and rates-not-loaded-yet) must use
     // `target`. If only one path uses it, the totals would flicker between
-    // currencies during initial app load.
-    assert.match(src, /sumConverted\(\s*entries\s*,\s*target\s*,\s*currencyRates\s*\)/);
-    assert.match(src, /return\s*\{\s*amount:\s*total,\s*currency:\s*target,\s*converted,\s*skipped\s*\};/);
-    assert.match(src, /return\s*\{\s*amount,\s*currency:\s*target,\s*converted:\s*entries\.length,\s*skipped:\s*0\s*\};/);
+    // currencies during initial app load. One call site now, so there is one
+    // target; `collection-total.test.ts` asserts both paths answer in it.
+    assert.match(src, /collectionTotalCost\(collectionItems, target, currencyRates\)/);
+  });
+
+  it("keeps the override for a collection holding nothing priced", () => {
+    // The empty-total fallback is a second place the target is resolved, and
+    // the realistic slip is for it to reach for `displayCurrency` alone — so
+    // an empty collection would read "0 USD" under a card labelled in EUR.
+    assert.match(
+      src,
+      /emptyCollectionTotal\(collectionsById\.get\(collectionId\)\?\.currency \?\? displayCurrency\)/,
+    );
   });
 
   it("falls back to `target` (not displayCurrency) for items missing their own costCurrency", () => {
     // Otherwise an item with cost=10 and no costCurrency would be treated
     // as displayCurrency even when the collection has overridden the target.
-    assert.match(src, /currency:\s*item\.costCurrency\s*\?\?\s*target,/);
+    // The rule lives with the arithmetic now.
+    assert.match(
+      read("lib/collection-total.ts"),
+      /currency: item\.costCurrency \?\? target,/,
+    );
   });
 });
 

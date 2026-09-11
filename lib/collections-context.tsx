@@ -6,9 +6,13 @@ import { useAuth } from "@/lib/auth-context";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import {
   loadCurrencyRates,
-  sumConverted,
   type UsdRates,
 } from "@/lib/currency-rates";
+import {
+  collectionTotalCost,
+  emptyCollectionTotal,
+  type CollectionTotalCost,
+} from "@/lib/collection-total";
 import { convertItemCost, type ConvertedItemCost } from "@/lib/item-cost";
 import { useI18n } from "@/lib/i18n-context";
 import { useStorageNotice } from "@/lib/storage-notice";
@@ -155,16 +159,10 @@ export type { ConvertedItemCost };
 
 export { ACQUIRED_COLLECTION_ID_SUFFIX };
 
-export type CollectionTotalCost = {
-  /** Sum of all item costs, converted to `currency`. */
-  amount: number;
-  /** Currency the amount is expressed in (the user's preferred display currency). */
-  currency: string;
-  /** Number of items whose cost was successfully converted. */
-  converted: number;
-  /** Number of items whose cost couldn't be converted (missing rate). */
-  skipped: number;
-};
+// The shape and the arithmetic live in lib/collection-total.ts, where they can
+// be tested on values rather than pinned by a regex over this file. Re-exported
+// because every consumer imports it from the context.
+export type { CollectionTotalCost };
 
 type CollectionsContextValue = {
   collections: Collection[];
@@ -1128,6 +1126,44 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
    */
   const itemsByCollection = useMemo(() => groupItemsByCollection(items), [items]);
 
+  /**
+   * The collection list indexed by id — the same move as `itemsByCollection`,
+   * one type up.
+   *
+   * `getCollectionById` was a `collections.find` and `getCollectionTotalCost`
+   * opened with a second one to read the collection's `currency` override, so
+   * every card that shows a total scanned the whole collection list and every
+   * screen resolving a collection by id scanned it again.
+   */
+  const collectionsById = useMemo(
+    () => new Map(collections.map((collection) => [collection.id, collection])),
+    [collections],
+  );
+
+  /**
+   * Every collection's total, computed once per change of the things a total
+   * depends on rather than once per call.
+   *
+   * The accessor is called by each `<CollectionCard>` on each render, and what
+   * it does is a currency conversion per priced item — the expensive half, and
+   * the half the per-collection index did nothing about. The inputs are the
+   * items, the rate table, the viewer's display currency and the collections
+   * (for their `currency` overrides); none of those change on a render, and
+   * all four are deps here.
+   *
+   * Keyed off `itemsByCollection`, so a collection holding nothing live has no
+   * entry — the accessor answers those from `emptyCollectionTotal`, which is
+   * also the honest answer for an id nothing knows about.
+   */
+  const collectionTotals = useMemo(() => {
+    const totals = new Map<string, CollectionTotalCost>();
+    for (const [collectionId, collectionItems] of itemsByCollection) {
+      const target = collectionsById.get(collectionId)?.currency ?? displayCurrency;
+      totals.set(collectionId, collectionTotalCost(collectionItems, target, currencyRates));
+    }
+    return totals;
+  }, [itemsByCollection, collectionsById, displayCurrency, currencyRates]);
+
   // Memoized separately from the big `value` memo below so the array keeps a
   // stable identity while `localItems` is unchanged — `useChunkedList` on the
   // wishlist screen resets its visible window whenever the reference changes,
@@ -1225,7 +1261,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         }
         return asViewer;
       },
-      getCollectionById: (id) => collections.find((collection) => collection.id === id),
+      getCollectionById: (id) => collectionsById.get(id),
       getItemsForCollection: (collectionId) =>
         // A copy, because the array is the map's and `sort` is in place —
         // sorting the entry would reorder what every other reader of that
@@ -1237,29 +1273,14 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           .sort(byCollectionOrder),
       countItemsForCollection: (collectionId) =>
         itemsByCollection.get(collectionId)?.length ?? 0,
-      getCollectionTotalCost: (collectionId) => {
-        // A per-collection `currency` override (set via the edit modal or the
-        // tap-to-swap chip on the summary card) wins over the user's app-wide
-        // `displayCurrency`. Falls back when null/undefined so legacy
-        // collections without the column keep working unchanged.
-        const collection = collections.find((c) => c.id === collectionId);
-        const target = collection?.currency ?? displayCurrency;
-        const entries = (itemsByCollection.get(collectionId) ?? [])
-          .filter((item): item is typeof item & { cost: number } => typeof item.cost === "number")
-          .map((item) => ({
-            amount: item.cost,
-            currency: item.costCurrency ?? target,
-          }));
-        if (currencyRates) {
-          const { total, converted, skipped } = sumConverted(entries, target, currencyRates);
-          return { amount: total, currency: target, converted, skipped };
-        }
-        // No rates yet: sum raw amounts (assume each item is already in the
-        // target currency). Better than crashing the UI; once rates load the
-        // totals re-render with real conversion.
-        const amount = entries.reduce((sum, e) => sum + e.amount, 0);
-        return { amount, currency: target, converted: entries.length, skipped: 0 };
-      },
+      getCollectionTotalCost: (collectionId) =>
+        collectionTotals.get(collectionId) ??
+        // Nothing live in it, or no such collection. A per-collection
+        // `currency` override (set via the edit modal or the tap-to-swap chip
+        // on the summary card) still wins over the viewer's app-wide
+        // `displayCurrency`, so an empty collection reads zero in the currency
+        // its owner chose for it.
+        emptyCollectionTotal(collectionsById.get(collectionId)?.currency ?? displayCurrency),
       convertItemCost: (item, targetCurrency) =>
         convertItemCost(item, targetCurrency ?? displayCurrency, currencyRates),
       displayCurrency,
@@ -1544,7 +1565,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     }),
     // syncCollection/syncItem are stable useCallback([]) refs, so they're
     // intentionally omitted here (ratesUpdatedAt stays last in the deps list).
-    [collections, items, itemsByCollection, wishlistItems, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
+    [collections, collectionsById, collectionTotals, items, itemsByCollection, wishlistItems, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;

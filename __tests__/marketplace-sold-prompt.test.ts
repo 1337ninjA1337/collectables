@@ -105,14 +105,18 @@ describe("CollectionsContext — archiveItem method", () => {
   });
 
   it("getCollectionTotalCost skips archived items", () => {
-    const block = src.match(
-      /getCollectionTotalCost:\s*\(collectionId\)\s*=>\s*\{[\s\S]*?^\s{6}\}/m,
-    );
-    assert.ok(block, "could not locate getCollectionTotalCost implementation");
+    // The accessor is a lookup into `collectionTotals` now, and that map is
+    // built by walking the live-item index — so the archived rows are dropped
+    // one step earlier, in the thing the totals are computed FROM.
     assert.match(
-      block![0],
-      /itemsByCollection\.get\(collectionId\)/,
-      "getCollectionTotalCost must read the live-item index so totals reflect the live collection",
+      src,
+      /for \(const \[collectionId, collectionItems\] of itemsByCollection\)[\s\S]{0,300}collectionTotalCost\(collectionItems,/,
+      "the totals map must be built from the live-item index so totals reflect the live collection",
+    );
+    assert.match(
+      src,
+      /getCollectionTotalCost: \(collectionId\) =>\s*collectionTotals\.get\(collectionId\)/,
+      "getCollectionTotalCost must read that map rather than summing a list of its own",
     );
   });
 
