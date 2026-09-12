@@ -592,7 +592,11 @@ describe("translation floors", () => {
     // that the listings it counted came from a live-item-filtered list, so a
     // listed wishlist item was warned about by neither the confirm nor the
     // removal.
-    assert.match(report, /en: 540\/540 keys \(100\.0%\)/);
+    // 541 later the same day: `marketplaceWishlistHint`. The archived round
+    // stopped an item the collector used to have being put up for sale and
+    // said nothing about one they have never had — and `MarketplaceMode` is
+    // "trade" | "sell", both of which promise to hand the item over.
+    assert.match(report, /en: 541\/541 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

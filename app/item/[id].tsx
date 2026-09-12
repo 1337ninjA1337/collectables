@@ -781,6 +781,24 @@ export default function ItemDetailsScreen() {
           <View style={styles.listingStatusGroup}>
             <Text style={styles.listingHint}>{t("marketplaceArchivedHint")}</Text>
           </View>
+        ) : activeItem.isWishlist ? (
+          // The same door, on the other side of owning the thing. Both listing
+          // modes are `"trade" | "sell"` — an offer to hand the item over — and
+          // a wishlist item is one the collector does not have. So the CTA was
+          // inviting somebody to promise a stranger a thing they were still
+          // looking for, which is the archived mistake told forwards in time.
+          //
+          // It sits BELOW the `existingListing` branch for the reason the
+          // archived one does: taking a listing down still works on a want,
+          // and that is the direction that reduces the obligation rather than
+          // creating one.
+          //
+          // The hint points at the wishlist screen, because that is where the
+          // promote lives ("Got it" → "Move to collection"); there is no
+          // promote on this screen to point at.
+          <View style={styles.listingStatusGroup}>
+            <Text style={styles.listingHint}>{t("marketplaceWishlistHint")}</Text>
+          </View>
         ) : (
           <View style={styles.listingStatusGroup}>
             <Pressable
