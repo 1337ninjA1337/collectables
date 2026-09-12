@@ -115,16 +115,20 @@ describe("what the save writes", () => {
     // convenience without paying for it — the collector who switches to JPY
     // here is asked again on the next screen. `currency-input-consistency`
     // is the sweep that would have caught it.
-    assert.ok(BODY.includes("getUserPreferredCurrency"), "the preference is not read");
-    assert.ok(BODY.includes("setUserPreferredCurrency"), "the preference is not written");
-    assert.match(BODY, /function setCurrency\(next: string\) \{\s*setCurrencyState\(next\);\s*void setUserPreferredCurrency\(next\);\s*\}/);
+    //
+    // The helper it names changed the round after: one slot held both "what a
+    // form opens with" and "what totals are displayed in", so all three forms
+    // write `setEntryCurrency` now. See `entry-currency-key.test.ts`.
+    assert.ok(BODY.includes("getEntryCurrency"), "the entry currency is not read");
+    assert.ok(BODY.includes("setEntryCurrency"), "the entry currency is not written");
+    assert.match(BODY, /function setCurrency\(next: string\) \{\s*setCurrencyState\(next\);\s*void setEntryCurrency\(next\);\s*\}/);
   });
 
   it("hydrates through the raw setter, not the writing one", () => {
     // Writing back what was just read is a round-trip that can only ever
     // re-persist the value it came from.
     const effect = BODY.slice(
-      BODY.indexOf("void getUserPreferredCurrency()"),
+      BODY.indexOf("void getEntryCurrency()"),
       BODY.indexOf("const [promoteFor"),
     );
     assert.ok(effect.length > 0, "could not parse the hydration effect");

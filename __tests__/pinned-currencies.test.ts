@@ -107,12 +107,22 @@ describe("CurrencyInput — pinned chips wiring", () => {
 });
 
 describe("create form — raw currency selector pins too", () => {
-  it("setCurrency writes the MRU pin alongside the preferred currency", () => {
+  it("setCurrency writes the MRU pin alongside the entry currency", () => {
+    // Two writes on one pick, and they are genuinely different facts — which
+    // is why this case asserts both rather than either. The pin ORDERS the
+    // chip strip; the entry currency decides what the next cost form OPENS
+    // with. A third fact used to ride along: `setUserPreferredCurrency` also
+    // moved the currency every total is displayed in, because one slot held
+    // both until 2026-09-12.
     const src = read("app/create.tsx");
     const idx = src.indexOf("function setCurrency");
     assert.ok(idx >= 0, "setCurrency not found");
     const block = src.slice(idx, idx + 400);
-    assert.match(block, /void setUserPreferredCurrency\(next\)/);
+    assert.match(block, /void setEntryCurrency\(next\)/);
     assert.match(block, /void pinCurrency\(next\)/);
+    assert.ok(
+      !/\bsetUserPreferredCurrency\b/.test(src),
+      "adding an item moves the app-wide display currency again",
+    );
   });
 });

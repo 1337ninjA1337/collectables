@@ -24,9 +24,9 @@ import {
 import { useI18n } from "@/lib/i18n-context";
 import {
   getDefaultCurrencyForLanguage,
-  getUserPreferredCurrency,
+  getEntryCurrency,
   pinCurrency,
-  setUserPreferredCurrency,
+  setEntryCurrency,
 } from "@/lib/locale-helpers";
 import { addTagToList } from "@/lib/tag-input";
 import { useToast } from "@/lib/toast-context";
@@ -93,7 +93,7 @@ export default function CreateItemScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    void getUserPreferredCurrency().then((stored) => {
+    void getEntryCurrency().then((stored) => {
       if (cancelled || !stored) return;
       setCurrencyState(stored);
     });
@@ -104,7 +104,7 @@ export default function CreateItemScreen() {
 
   function setCurrency(next: string) {
     setCurrencyState(next);
-    void setUserPreferredCurrency(next);
+    void setEntryCurrency(next);
     // The create form's cost row uses a raw CurrencySheet (no <CurrencyInput>),
     // so it records the MRU pin itself.
     void pinCurrency(next);

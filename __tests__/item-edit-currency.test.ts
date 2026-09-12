@@ -42,10 +42,20 @@ describe("item edit form — value currency", () => {
     );
   });
 
-  it("persists the picked currency as the user's preferred currency", () => {
+  it("persists the picked currency as the ENTRY currency", () => {
+    // It said "preferred currency" and wrote `setUserPreferredCurrency` until
+    // 2026-09-12, when that slot turned out to be two facts: what a cost form
+    // opens with, and what totals are DISPLAYED in. Editing an item's cost
+    // moved both, so changing this field to yen re-denominated every
+    // collection total. What this case was claiming is that the form
+    // remembers what you typed — which is the entry half.
     assert.match(
       src,
-      /function\s+setEditCurrency\(next:\s*string\)\s*\{[\s\S]*?setUserPreferredCurrency\(next\)/,
+      /function\s+setEditCurrency\(next:\s*string\)\s*\{[\s\S]*?setEntryCurrency\(next\)/,
+    );
+    assert.ok(
+      !/\bsetUserPreferredCurrency\b/.test(src),
+      "the edit form moves the app-wide display currency again",
     );
   });
 });

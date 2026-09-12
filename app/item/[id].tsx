@@ -16,7 +16,7 @@ import {
   type CurrencyValueError,
 } from "@/lib/format-currency-input";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
-import { getUserPreferredCurrency, setUserPreferredCurrency } from "@/lib/locale-helpers";
+import { getEntryCurrency, setEntryCurrency } from "@/lib/locale-helpers";
 import { SkeletonItemDetail } from "@/components/skeleton";
 
 import { PhotoLightbox } from "@/components/photo-lightbox";
@@ -157,15 +157,15 @@ export default function ItemDetailsScreen() {
   const [listingCurrency, setListingCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
   function setListingCurrency(next: string) {
     setListingCurrencyState(next);
-    void setUserPreferredCurrency(next);
+    void setEntryCurrency(next);
   }
   function setEditCurrency(next: string) {
     setEditCurrencyState(next);
-    void setUserPreferredCurrency(next);
+    void setEntryCurrency(next);
   }
   useEffect(() => {
     let cancelled = false;
-    void getUserPreferredCurrency().then((stored) => {
+    void getEntryCurrency().then((stored) => {
       if (cancelled || !stored) return;
       setListingCurrencyState(stored);
     });
@@ -218,7 +218,7 @@ export default function ItemDetailsScreen() {
     setEditCost(hasFiniteCost(activeItem) ? String(activeItem.cost) : "");
     setEditCostError(null);
     setEditCurrencyState(activeItem.costCurrency ?? getDefaultCurrencyForLanguage(language));
-    void getUserPreferredCurrency().then((stored) => {
+    void getEntryCurrency().then((stored) => {
       if (!activeItem.costCurrency && stored) setEditCurrencyState(stored);
     });
     setEditCondition(activeItem.condition ?? "");

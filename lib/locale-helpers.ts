@@ -1,7 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { reportStorageFailure } from "@/lib/report-storage-failure";
-import { CURRENCY_KEY, PINNED_CURRENCIES_KEY } from "@/lib/storage-keys";
+import {
+  CURRENCY_KEY,
+  ENTRY_CURRENCY_KEY,
+  PINNED_CURRENCIES_KEY,
+} from "@/lib/storage-keys";
 
 /**
  * Locale-derived helpers shared across UI forms (currency pickers, future
@@ -192,10 +196,15 @@ export function parseStoredCurrency(raw: string | null | undefined): string | nu
 }
 
 /**
- * Read the user's last-picked currency from AsyncStorage. Returns null
- * when nothing is stored, when storage throws, or when the stored value
+ * Read the user's DISPLAY currency from AsyncStorage — the unit collection
+ * totals, the stats screen and every `<CostBadge>` are rendered in. Returns
+ * null when nothing is stored, when storage throws, or when the stored value
  * fails ISO 4217 validation — the caller should then fall back to the
  * language default via `getDefaultCurrencyForLanguage`.
+ *
+ * NOT what a cost form opens with: that is {@link getEntryCurrency}, which
+ * this function was doing double duty for until 2026-09-12. See
+ * `ENTRY_CURRENCY_KEY` for the collision.
  */
 export async function getUserPreferredCurrency(): Promise<string | null> {
   try {
@@ -211,10 +220,14 @@ export async function getUserPreferredCurrency(): Promise<string | null> {
 }
 
 /**
- * Persist the user's currency choice so a power user who picked JPY once
- * doesn't have to re-pick on the next listing form. Silently no-ops on
- * malformed input (avoids polluting storage with junk) and on storage
- * failure (best-effort; matches how `marketplace-context` writes through).
+ * Persist the user's DISPLAY currency. Written by the settings screen through
+ * the provider's `setDisplayCurrency`, and by the profile sync when a
+ * signed-in account carries one — not by the cost forms, which write
+ * {@link setEntryCurrency}.
+ *
+ * Silently no-ops on malformed input (avoids polluting storage with junk) and
+ * on storage failure (best-effort; matches how `marketplace-context` writes
+ * through).
  */
 export async function setUserPreferredCurrency(currency: string): Promise<void> {
   const validated = parseStoredCurrency(currency);
@@ -226,6 +239,57 @@ export async function setUserPreferredCurrency(currency: string): Promise<void> 
     // user's choice is applied and silently forgotten by the next launch,
     // which is the kind of thing nobody reports as a bug.
     reportStorageFailure("locale-helpers.setItem", CURRENCY_KEY, error);
+  }
+}
+
+/**
+ * Read the currency a cost form should OPEN with — the last unit the user
+ * typed an amount in.
+ *
+ * FALLS BACK TO THE DISPLAY CURRENCY, and that fallback IS the migration.
+ * The two facts lived in one slot until 2026-09-12, so every existing
+ * installation has a display currency and no entry currency; reading through
+ * means a returning user's forms open exactly where they did before, and the
+ * two only diverge once one is deliberately changed. Doing it on READ rather
+ * than by copying the value across at startup keeps the app from writing a
+ * key nobody has chosen a value for — which would make "never picked one"
+ * indistinguishable from "picked the same one" forever after.
+ *
+ * Returns null only when neither slot holds a valid code.
+ */
+export async function getEntryCurrency(): Promise<string | null> {
+  try {
+    const raw = await AsyncStorage.getItem(ENTRY_CURRENCY_KEY);
+    const parsed = parseStoredCurrency(raw);
+    if (parsed) return parsed;
+  } catch (error: unknown) {
+    // Reported and then fallen through, not returned early: the display slot
+    // is a different key and may well be readable. A store that is failing
+    // wholesale answers null from the call below too.
+    reportStorageFailure("locale-helpers.getItem", ENTRY_CURRENCY_KEY, error);
+  }
+  return getUserPreferredCurrency();
+}
+
+/**
+ * Persist the currency a cost form should open with next time.
+ *
+ * Writes ONLY this slot. It used to write the display currency, which meant
+ * noting a want priced in yen re-denominated every collection total on the
+ * home screen — a global moved as a side effect of filling in one field, with
+ * nothing on either screen connecting the two.
+ *
+ * Same best-effort contract as {@link setUserPreferredCurrency}: malformed
+ * input is dropped rather than stored, and a failed write is reported rather
+ * than thrown, because a form submit must not die over a preference.
+ */
+export async function setEntryCurrency(currency: string): Promise<void> {
+  const validated = parseStoredCurrency(currency);
+  if (!validated) return;
+  try {
+    await AsyncStorage.setItem(ENTRY_CURRENCY_KEY, validated);
+  } catch (error: unknown) {
+    reportStorageFailure("locale-helpers.setItem", ENTRY_CURRENCY_KEY, error);
   }
 }
 

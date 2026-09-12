@@ -66,7 +66,7 @@ import {
   type CurrencyValueError,
 } from "@/lib/format-currency-input";
 import { useI18n } from "@/lib/i18n-context";
-import { getUserPreferredCurrency, setUserPreferredCurrency } from "@/lib/locale-helpers";
+import { getEntryCurrency, setEntryCurrency } from "@/lib/locale-helpers";
 import { useMarketplace } from "@/lib/marketplace-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
@@ -120,27 +120,31 @@ export default function WishlistScreen() {
   // stored preference once it hydrates — the shape all four currency inputs
   // in the app share.
   const [currency, setCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
-  // Read AND written, like the other three. `setUserPreferredCurrency` is
-  // documented as "so a power user who picked JPY once doesn't have to
-  // re-pick on the next form", and every input seeds itself from it — so an
-  // input that reads without writing takes the convenience and does not pay
-  // for it, and the collector who switches to JPY here is asked again on the
-  // next screen. `currency-input-consistency.test.ts` is the sweep that says
-  // a fifth input cannot quietly differ either.
+  // Read AND written, like the other three cost inputs. The entry currency
+  // exists so somebody pricing a run of imports does not re-pick JPY on every
+  // row, and every input seeds itself from it — so an input that reads
+  // without writing takes the convenience and does not pay for it.
+  // `currency-input-consistency.test.ts` is the sweep that says a fifth input
+  // cannot quietly differ either.
   //
-  // <CurrencyInput> records the MRU pin itself, which is a different fact:
-  // the pin orders the chip strip, the preference decides what a form opens
-  // with.
+  // `setEntryCurrency` and NOT `setUserPreferredCurrency`: the second is the
+  // currency totals are DISPLAYED in, and one key did both jobs until the two
+  // were split — so noting a want priced in yen used to re-denominate every
+  // collection total on the home screen.
+  //
+  // <CurrencyInput> records the MRU pin itself, which is a third fact: the
+  // pin orders the chip strip, the entry currency decides what a form opens
+  // with, the display currency decides what a total is shown in.
   function setCurrency(next: string) {
     setCurrencyState(next);
-    void setUserPreferredCurrency(next);
+    void setEntryCurrency(next);
   }
   const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    void getUserPreferredCurrency().then((stored) => {
+    void getEntryCurrency().then((stored) => {
       if (cancelled || !stored) return;
       // The RAW setter: hydration is not a choice, and writing back what was
       // just read is a round-trip through storage that can only ever

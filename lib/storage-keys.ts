@@ -4,7 +4,33 @@ export const LANGUAGE_KEY = "collectables-language-v1";
 export const SOCIAL_GRAPH_KEY = "collectables-social-graph-v1";
 export const MARKETPLACE_KEY = "collectables-marketplace-v1";
 export const DIAGNOSTICS_KEY = "collectables-diagnostics-v1";
+/**
+ * The currency figures are DISPLAYED in — collection totals, the stats screen,
+ * every `<CostBadge>`. Written by `app/settings.tsx` through the provider's
+ * `setDisplayCurrency`, and by the profile sync when a signed-in account
+ * carries one.
+ *
+ * It used to be written by the cost FORMS as well, which is why
+ * {@link ENTRY_CURRENCY_KEY} exists.
+ */
 export const CURRENCY_KEY = "collectables-currency-v1";
+/**
+ * The currency a cost form OPENS with — the last unit the user typed an amount
+ * in, so somebody pricing a run of imports does not re-pick JPY on every row.
+ *
+ * One key did both jobs until 2026-09-12, and the collision was not
+ * theoretical: noting a single want priced in yen re-denominated every
+ * collection total on the home screen, because the form wrote the display
+ * currency on its way past. Two facts that agree most of the time and are not
+ * the same fact — what a number is quoted in, and what you want your net worth
+ * shown in.
+ *
+ * There is no migration and there does not need to be one:
+ * `getEntryCurrency` falls back to {@link CURRENCY_KEY} when this slot is
+ * empty, so a returning user's forms open exactly where they did before and
+ * the two only diverge once one is deliberately changed.
+ */
+export const ENTRY_CURRENCY_KEY = "collectables-entry-currency-v1";
 export const PINNED_CURRENCIES_KEY = "collectables-pinned-currencies-v1";
 export const CURRENCY_RATES_KEY = "collectables-currency-rates-v1";
 /**
@@ -172,6 +198,11 @@ export async function clearAllUserData(userId: string): Promise<void> {
     LANGUAGE_KEY,
     MARKETPLACE_KEY,
     CURRENCY_KEY,
+    // Both halves of the split, for the reason the display half was already
+    // here: a currency is a fact about the person who picked it, and leaving
+    // one behind means the next account on this device opens its first cost
+    // form on a stranger's unit.
+    ENTRY_CURRENCY_KEY,
     PINNED_CURRENCIES_KEY,
     CURRENCY_RATES_KEY,
   ];

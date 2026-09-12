@@ -89,30 +89,39 @@ describe("locale-helpers persistence wiring", () => {
   });
 });
 
-describe("forms hydrate from + persist to the preferred-currency slot", () => {
+/**
+ * These two cases said "the preferred-currency slot" and named
+ * `getUserPreferredCurrency` / `setUserPreferredCurrency`. What they were
+ * CLAIMING is that a cost form opens with the unit you last typed in and
+ * remembers a new pick — and on 2026-09-12 that stopped being the same helper,
+ * because the slot turned out to hold two facts: what a form opens with, and
+ * what totals are DISPLAYED in. The forms write the entry half now; the
+ * display half is the provider's. See `entry-currency-key.test.ts`.
+ */
+describe("forms hydrate from + persist to the entry-currency slot", () => {
   it("app/create.tsx imports the read/write pair and wires both", () => {
     const src = read("app/create.tsx");
     assert.match(
       src,
-      /import\s*\{[^}]*\bgetUserPreferredCurrency\b[^}]*\}\s*from\s*"@\/lib\/locale-helpers"/,
+      /import\s*\{[^}]*\bgetEntryCurrency\b[^}]*\}\s*from\s*"@\/lib\/locale-helpers"/,
     );
     assert.match(
       src,
-      /import\s*\{[^}]*\bsetUserPreferredCurrency\b[^}]*\}\s*from\s*"@\/lib\/locale-helpers"/,
+      /import\s*\{[^}]*\bsetEntryCurrency\b[^}]*\}\s*from\s*"@\/lib\/locale-helpers"/,
     );
     // Hydration effect on mount.
-    assert.match(src, /getUserPreferredCurrency\(\)/);
+    assert.match(src, /getEntryCurrency\(\)/);
     // Persist on every currency selection.
-    assert.match(src, /setUserPreferredCurrency\(/);
+    assert.match(src, /setEntryCurrency\(/);
   });
 
   it("app/item/[id].tsx (listing sheet) hydrates and persists too", () => {
     const src = read("app/item/[id].tsx");
     assert.match(
       src,
-      /import\s*\{[^}]*\bgetUserPreferredCurrency\b[^}]*\}\s*from\s*"@\/lib\/locale-helpers"/,
+      /import\s*\{[^}]*\bgetEntryCurrency\b[^}]*\}\s*from\s*"@\/lib\/locale-helpers"/,
     );
-    assert.match(src, /getUserPreferredCurrency\(\)/);
-    assert.match(src, /setUserPreferredCurrency\(/);
+    assert.match(src, /getEntryCurrency\(\)/);
+    assert.match(src, /setEntryCurrency\(/);
   });
 });

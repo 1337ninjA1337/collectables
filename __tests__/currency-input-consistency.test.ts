@@ -20,27 +20,28 @@ import { sourceCode, tsxFiles } from "./helpers/source-files";
  *
  * 1. Does the form OPEN with the currency the user last picked? Every input
  *    seeds `getDefaultCurrencyForLanguage(language)` and then replaces it from
- *    `getUserPreferredCurrency()` once storage answers. A form that skipped
- *    this would open on the language default for a collector who has been
- *    typing JPY all week.
+ *    `getEntryCurrency()` once storage answers. A form that skipped this would
+ *    open on the language default for a collector who has been typing JPY all
+ *    week.
  *
- * 2. Does picking one REMEMBER it? `setUserPreferredCurrency` is documented as
- *    "so a power user who picked JPY once doesn't have to re-pick on the next
- *    form", which is a promise only kept if every form both reads and writes.
- *    An input that reads without writing takes the convenience and does not
- *    pay for it.
+ * 2. Does picking one REMEMBER it? The entry currency exists so a power user
+ *    who picked JPY once doesn't have to re-pick on the next form, which is a
+ *    promise only kept if every form both reads and writes. An input that
+ *    reads without writing takes the convenience and does not pay for it.
  *
  * The pairing is the claim, not either half: a reader without a writer is the
  * bug this file was written after, and a writer without a reader would persist
  * a preference it then ignores.
  *
- * WHAT THIS DOES NOT ASSERT is that the preference SHOULD be one value. It is
- * one AsyncStorage key doing two jobs — the currency a form opens with, and
- * the currency totals are displayed in, which `app/settings.tsx` also writes
- * through `setDisplayCurrency`. So picking a currency for one item does move
- * the whole app's display currency, which is a real design question and a
- * separate one. This file says the four inputs agree; whether what they agree
- * on is right is recorded in `.tasks/.suggestions.md`.
+ * THE HELPER THESE RULES NAME CHANGED THE ROUND AFTER THIS FILE SHIPPED, and
+ * that is the sweep working rather than the sweep being wrong. It first asked
+ * about `getUserPreferredCurrency` / `setUserPreferredCurrency`, because one
+ * AsyncStorage key was doing two jobs: what a cost form opens with, and what
+ * totals are DISPLAYED in — which `app/settings.tsx` writes through
+ * `setDisplayCurrency`. So noting a want priced in yen re-denominated every
+ * collection total on the home screen. The keys are split now and these rules
+ * ask about the entry one; the display half is asserted at the bottom of this
+ * file, where the two must NOT be confused again.
  */
 
 /**
@@ -51,11 +52,10 @@ import { sourceCode, tsxFiles } from "./helpers/source-files";
  * Offering a currency choice is not enough: `app/settings.tsx` and
  * `app/collection/[id].tsx` both drive a `<CurrencySheet>` and neither takes
  * an amount — they pick the currency a figure is DISPLAYED in, which is the
- * opposite direction and has no preference to remember. Asking them to write
- * `setUserPreferredCurrency` would make choosing a display currency change
- * what the next cost form opens with, which is the confusion this repository
- * already has once (see the note at the bottom of this file) and does not
- * need twice.
+ * opposite direction and has no entry currency to remember. Asking them to
+ * write `setEntryCurrency` would make choosing a display currency change what
+ * the next cost form opens with — which is the collision the key split just
+ * removed, re-introduced from the other end.
  *
  * So the second half is `parseCurrencyValueDetailed` — the shared parser for
  * a typed amount. A screen that both picks a currency and parses an amount is
@@ -97,7 +97,7 @@ describe("every screen with a cost input", () => {
         `${file} has no language-derived default to fall back to`,
       );
       assert.ok(
-        code.includes("getUserPreferredCurrency("),
+        code.includes("getEntryCurrency("),
         `${file} ignores the stored preference and opens on the language default`,
       );
     });
@@ -105,7 +105,7 @@ describe("every screen with a cost input", () => {
     it(`${file} remembers a currency the user picks`, () => {
       const code = sourceCode(file);
       assert.ok(
-        code.includes("setUserPreferredCurrency("),
+        code.includes("setEntryCurrency("),
         `${file} reads the preference without writing it — the next form asks again`,
       );
     });
@@ -148,13 +148,13 @@ describe("the screens that pick a currency and take no amount", () => {
   it("writes the display currency through the provider, not the storage helper", () => {
     // Deliberate, and the distinction this sweep's scope rests on: settings is
     // where a user states a DISPLAY preference outright, so it goes through
-    // `setDisplayCurrency`, which updates the provider's state and persists.
-    // A form remembering what you typed is not the same act, even though the
-    // two currently land on the same key.
+    // `setDisplayCurrency`, which updates the provider's state and persists to
+    // CURRENCY_KEY. A form remembering what you typed is a different act on a
+    // different key, which is what the split made true.
     const code = sourceCode("app/settings.tsx");
     assert.ok(code.includes("setDisplayCurrency("), "settings no longer sets the display currency");
     assert.ok(
-      !code.includes("setUserPreferredCurrency("),
+      !code.includes("setEntryCurrency("),
       "settings writes storage behind the provider's back",
     );
   });
