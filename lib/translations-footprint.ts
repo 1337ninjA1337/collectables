@@ -21,6 +21,7 @@
  * `lib/i18n-coverage.ts` has from `lib/i18n-source.ts`.
  */
 
+import { BUDGET_SNAPSHOT } from "@/lib/budget-snapshot";
 import { languageOptionCodes, localeKeys } from "@/lib/i18n-source";
 
 export type TranslationsFootprint = {
@@ -68,9 +69,12 @@ export function translationsFootprint(source: string): TranslationsFootprint {
  * half of `LAST_MEASURED_BUNDLE_BYTES`, measured in the same breath and moving
  * only when it moves.
  *
- * Recorded on 2026-09-12 against the 4673.4 KiB bundle.
+ * Re-exported from `lib/budget-snapshot.ts`, which holds both halves: a raise
+ * that updated the bundle figure and left this one behind reported a copy
+ * delta measured against the wrong baseline, silently and plausibly, on the
+ * output somebody reads when deciding whether to raise again.
  */
-export const LAST_MEASURED_TRANSLATIONS_BYTES = 238_763;
+export const LAST_MEASURED_TRANSLATIONS_BYTES = BUDGET_SNAPSHOT.translationsBytes;
 
 /** Signed KiB, one decimal — the report's own spelling. */
 function formatKiB(bytes: number): string {

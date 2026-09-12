@@ -64,26 +64,29 @@
  * `bundle-size.test.ts` asserts the headroom stays under the smaller SDK, so a
  * raise that gives up the guard fails there instead of passing quietly.
  */
+
+import { BUDGET_SNAPSHOT } from "@/lib/budget-snapshot";
+
 export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.59 * 1024 * 1024;
 
 /**
- * The bundle as it stood when the budget last moved: 4673.4 KiB, measured on
- * 2026-09-12 by `npm run lint:bundle-size` against a fresh `dist/`.
+ * The bundle as it stood when the budget last moved.
  *
- * Beside the budget rather than inside a test, which is where it lived: the
- * doc block above argues from it in every paragraph, `bundle-size.test.ts`
- * holds the two bounds against it, and the report prints the drift from it —
- * three readers and, until now, one of them owning it. A number a test owns
- * is a number the tool cannot say out loud.
+ * Re-exported rather than declared: it is half of a PAIR — the other half is
+ * the translations module's size at that same commit — and the two are taken
+ * in the same breath and argued from together. A raise that updated one and
+ * left the other behind reported a copy delta measured against the wrong
+ * baseline, silently, on the one output somebody reads when deciding whether
+ * to raise again. `lib/budget-snapshot.ts` holds both so that forgetting half
+ * is not expressible.
  *
- * A MEASUREMENT, never a re-measurement: reading `dist/` for it would make
- * every claim depend on whether somebody had built, and would turn a real
- * regression into a number that quietly re-derives its own expectation. It
- * moves when the budget moves, and only then — so the drift the report prints
- * is "since the last time somebody argued about this", which is the question
- * a raise has to answer.
+ * It reached that module from here, having reached here from inside
+ * `bundle-size.test.ts`: the doc block above argues from it in every
+ * paragraph, the suite holds two bounds against it, and the report prints the
+ * drift from it — three readers, and originally the one that cannot print it
+ * owned the number.
  */
-export const LAST_MEASURED_BUNDLE_BYTES = Math.round(4673.4 * 1024);
+export const LAST_MEASURED_BUNDLE_BYTES = BUDGET_SNAPSHOT.bundleBytes;
 
 /**
  * The point at which the report stops saying "OK" and starts asking for an

@@ -149,9 +149,16 @@ describe("the near-floor warning", () => {
 });
 
 describe("the measurement has one home", () => {
-  it("lives beside the budget it is argued against", () => {
+  it("is re-exported from the snapshot, not declared here", () => {
+    // This case shipped asserting the number was DECLARED in
+    // `lib/bundle-size.ts`, which was right for an hour: the round after it
+    // found that the bundle figure and the copy figure are one measurement
+    // taken in two places, and moved both into `lib/budget-snapshot.ts`. What
+    // it was claiming is that the number has one home and that this module
+    // reads it rather than keeping a copy — which is what it asks now.
     const SRC = stripComments(readRepoFile("lib/bundle-size.ts"));
-    assert.match(SRC, /export const LAST_MEASURED_BUNDLE_BYTES = Math\.round\(/);
+    assert.match(SRC, /export const LAST_MEASURED_BUNDLE_BYTES = BUDGET_SNAPSHOT\.bundleBytes;/);
+    assert.match(SRC, /import \{ BUDGET_SNAPSHOT \} from "@\/lib\/budget-snapshot";/);
   });
 
   it("is not re-declared by the suite that used to own it", () => {
@@ -166,11 +173,14 @@ describe("the measurement has one home", () => {
   it("is a measurement, never a re-measurement", () => {
     // Reading `dist/` for it would make every claim depend on whether somebody
     // had built, and turn a real regression into a number that re-derives its
-    // own expectation.
+    // own expectation. The declaration itself moved to
+    // `lib/budget-snapshot.ts`, where `budget-snapshot.test.ts` holds the same
+    // rule; what stays here is that the module doing the arithmetic never
+    // reaches for the filesystem either.
     const SRC = readRepoFile("lib/bundle-size.ts");
     assert.ok(!SRC.includes("readdirSync"));
     assert.ok(!SRC.includes("statSync"));
-    assert.match(stripComments(SRC), /export const LAST_MEASURED_BUNDLE_BYTES = Math\.round\([\d.]+ \* 1024\);/);
+    assert.ok(!SRC.includes("node:fs"));
   });
 
   it("keeps the two bounds the raise has to satisfy", () => {
