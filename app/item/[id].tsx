@@ -37,6 +37,8 @@ import { isRisingEdge } from "@/lib/use-transition-event";
 import { buildDeepLink } from "@/lib/deep-link";
 import { useAuth } from "@/lib/auth-context";
 import { uploadImages } from "@/lib/cloudinary";
+import { announceMessage } from "@/lib/announce";
+import { isArchived } from "@/lib/collections-helpers";
 import { useCollections } from "@/lib/collections-context";
 import { hasFiniteCost } from "@/lib/item-cost";
 import { useI18n } from "@/lib/i18n-context";
@@ -90,7 +92,7 @@ import {
 export default function ItemDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const { getItemById, getCollectionById, deleteItem, updateItem, refresh } = useCollections();
+  const { getItemById, getCollectionById, deleteItem, updateItem, archiveItem, unarchiveItem, refresh } = useCollections();
   const { t, language } = useI18n();
   const theme = useAppTheme();
   const { width, contentMaxWidth } = useResponsive();
@@ -387,6 +389,44 @@ export default function ItemDetailsScreen() {
     toast.success(t("marketplaceListingRemoved"));
   }
 
+  /**
+   * Archiving from the screen the item is on.
+   *
+   * It had exactly one entry point until now — the sold-listing prompt — so
+   * the only way to retire an item you still own (broken, loaned, lent out)
+   * was to delete it. No confirm: archiving is reversible in two places now
+   * (this screen's own banner and `app/archive.tsx`), and the toast carries
+   * the undo for the tap that was a mistake, which is the same shape the sold
+   * prompt uses.
+   */
+  function handleArchive() {
+    const archivedId = activeItem.id;
+    void archiveItem(archivedId).then(() => {
+      toast.show({
+        type: "success",
+        message: t("archiveActionDone"),
+        action: {
+          label: t("undo"),
+          onPress: () => {
+            void unarchiveItem(archivedId);
+            announceMessage(t("archiveRestored"));
+          },
+        },
+      });
+    });
+  }
+
+  function handleRestore() {
+    const restoredId = activeItem.id;
+    void unarchiveItem(restoredId).then(() => {
+      toast.success(t("archiveRestored"));
+      // The banner disappears when the item is restored, and a banner going
+      // away is not a sentence — same argument as the archive screen's row
+      // leaving its list.
+      announceMessage(t("archiveRestored"));
+    });
+  }
+
   function handleDelete() {
     const message = `${t("deleteItemTitle")} ${t("deleteItemText")}`;
 
@@ -571,6 +611,29 @@ export default function ItemDetailsScreen() {
         <Text style={{ ...styles.itemMeta, color: theme.meta }}>{t("addedBy", { name: activeItem.createdBy })}</Text>
       </View>
 
+      {/*
+        An archived item used to render exactly like a live one: no banner, no
+        restore, nothing saying why it had vanished from every list. The deep
+        link and the marketplace transfer log both reach this screen, so it is
+        where somebody most often meets an archived row without having gone
+        looking for it.
+      */}
+      {isArchived(activeItem) ? (
+        <View style={styles.archivedBanner}>
+          <Text style={styles.archivedTitle}>{t("archiveBannerTitle")}</Text>
+          <Text style={styles.archivedHint}>{t("archiveBannerHint")}</Text>
+          {isOwner ? (
+            <Pressable
+              style={styles.archivedRestore}
+              onPress={handleRestore}
+              accessibilityRole="button"
+            >
+              <Text style={styles.archivedRestoreText}>{t("archiveRestore")}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
       {activeItem.description ? (
         <Text style={{ ...styles.description, color: theme.muted }}>{activeItem.description}</Text>
       ) : null}
@@ -592,6 +655,15 @@ export default function ItemDetailsScreen() {
         >
           <Text style={{ ...styles.ghostButtonText, color: theme.text }}>{t("share")}</Text>
         </Pressable>
+        {isOwner && !isArchived(activeItem) ? (
+          <Pressable
+            style={{ ...styles.ghostButton, borderColor: theme.border }}
+            onPress={handleArchive}
+            accessibilityRole="button"
+          >
+            <Text style={{ ...styles.ghostButtonText, color: theme.text }}>{t("archiveAction")}</Text>
+          </Pressable>
+        ) : null}
         {isOwner ? (
           <Pressable
             style={styles.ghostDangerButton}
@@ -861,6 +933,39 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     gap: SPACING_LIST,
+  },
+  archivedBanner: {
+    borderRadius: RADIUS_CARD_LG,
+    borderWidth: 1,
+    borderColor: AMBER_SOFT,
+    backgroundColor: CARD_BG_3,
+    padding: SPACING_CARD,
+    gap: SPACING_INLINE,
+    alignItems: "flex-start",
+  },
+  archivedTitle: {
+    color: TEXT_DARK,
+    fontSize: 15,
+    fontWeight: "800",
+    fontFamily: FONT_BODY_EXTRABOLD,
+  },
+  archivedHint: {
+    color: MUTED_2,
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: FONT_BODY,
+  },
+  archivedRestore: {
+    borderRadius: RADIUS_PILL,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: AMBER_ACCENT,
+  },
+  archivedRestoreText: {
+    color: TEXT_ON_DARK_2,
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
   },
   editButton: {
     flex: 1,

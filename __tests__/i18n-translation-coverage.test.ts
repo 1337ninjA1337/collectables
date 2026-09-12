@@ -522,7 +522,14 @@ describe("translation floors", () => {
     // the home screen links to that a user reaches only after a mistake, and
     // a recovery path served in English under somebody else's flag is where
     // the silent fallback costs the most.
-    assert.match(report, /en: 521\/521 keys \(100\.0%\)/);
+    // 525 later that day: `archiveAction`, `archiveActionDone`,
+    // `archiveBannerTitle` and `archiveBannerHint`, which close the archive
+    // family's two remaining holes. `archiveItem` had exactly one caller — a
+    // marketplace prompt — so the only route into the archive was selling
+    // something, and an archived item rendered on its own detail screen
+    // exactly like a live one, with nothing saying why it had vanished from
+    // every list. Translated in all six locales.
+    assert.match(report, /en: 525\/525 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

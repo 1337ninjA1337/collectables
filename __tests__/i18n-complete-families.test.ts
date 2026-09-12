@@ -167,9 +167,9 @@ const FAMILIES: readonly Family[] = [
   {
     name: "item-detail screen",
     screen: "app/item/[id].tsx",
-    size: 39,
+    size: 46,
     because:
-      "the screen a collector opens most often once they own anything, and the one where the app finally shows a person their own stuff — measured on 2026-08-22 as reading 59 base keys, 21 of them already owned by prefix families, leaving 38 of which 12 were English in all four partial locales. Five of those twelve (`delete`, `acquiredHow`, `acquiredDate`, `variants`, `share`) are also rendered by `app/collection/[id].tsx`, which is the next screen and the largest remaining holder. 39 on 2026-09-10, with `tagsDuplicate` — its edit mode IS the add-item form, so the two families took the key together",
+      "the screen a collector opens most often once they own anything, and the one where the app finally shows a person their own stuff — measured on 2026-08-22 as reading 59 base keys, 21 of them already owned by prefix families, leaving 38 of which 12 were English in all four partial locales. Five of those twelve (`delete`, `acquiredHow`, `acquiredDate`, `variants`, `share`) are also rendered by `app/collection/[id].tsx`, which is the next screen and the largest remaining holder. 39 on 2026-09-10, with `tagsDuplicate` — its edit mode IS the add-item form, so the two families took the key together. 46 on 2026-09-12, when archiving finally reached the screen the item is on: four new keys (`archiveAction`, `archiveActionDone`, `archiveBannerTitle`, `archiveBannerHint`) plus three the archive screen had already paid for (`archiveRestore`, `archiveRestored`, `undo`). Seven for a four-key round is what a screen family counts and a per-key diff would not show — and it is the right number, because a reader of this screen meets all seven",
   },
   {
     name: "sign-in screen",
