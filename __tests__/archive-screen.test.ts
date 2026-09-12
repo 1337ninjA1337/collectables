@@ -112,9 +112,12 @@ describe("the archive screen", () => {
   const SRC = stripComments(readRepoFile("app/archive.tsx"));
 
   it("reads the list and both resolutions from the context", () => {
+    // `refresh` joined the destructure when the screen gained pull-to-refresh,
+    // which is not what this case is about: it claims the screen reads the
+    // list and the two resolutions off the context rather than deriving them.
     assert.match(
       SRC,
-      /const \{ archivedItems, unarchiveItem, deleteItem, getCollectionById \} = useCollections\(\);/,
+      /const \{ archivedItems, unarchiveItem, deleteItem, getCollectionById[^}]*\} = useCollections\(\);/,
     );
   });
 
@@ -212,6 +215,33 @@ describe("the archive screen", () => {
     const PROVIDER = stripComments(readRepoFile("lib/collections-context.tsx"));
     assert.match(PROVIDER, /const archivedItems = useMemo\(/);
     assert.ok(!SRC.includes(".filter(isArchived)"), "the screen must not re-derive the list");
+  });
+
+  it("declares its row height once, for the style and the layout both", () => {
+    // A `getItemLayout` whose number and the stylesheet's disagree makes the
+    // list place rows where they are not, which looks like a scroll bug and
+    // is a constant.
+    assert.match(SRC, /const ROW_HEIGHT = 56 \+ SPACING_CARD \* 2;/);
+    assert.match(SRC, /height: ROW_HEIGHT,/);
+    assert.match(SRC, /length: ROW_HEIGHT \+ SPACING_LIST,/);
+    assert.match(SRC, /offset: \(ROW_HEIGHT \+ SPACING_LIST\) \* index,/);
+  });
+
+  it("keeps every row to one line of each text, which is what makes the height honest", () => {
+    // A fixed layout on a row whose text could wrap would place rows where
+    // they are not. The title and the collection name are capped and the date
+    // is a ten-character ISO prefix.
+    const caps = SRC.match(/numberOfLines=\{1\}/g) ?? [];
+    assert.equal(caps.length, 2, "a text in the row is no longer capped to one line");
+  });
+
+  it("pulls to refresh like every other list screen", () => {
+    // It was the only one without. An archive syncs like everything else, so
+    // two devices reconcile it the same way — and the only way to see that
+    // was to leave the screen and come back.
+    assert.match(SRC, /refreshControl=\{\s*<RefreshControl/);
+    assert.match(SRC, /refreshing=\{showRefreshing\}/);
+    assert.match(SRC, /const showRefreshing = useMinimumVisible\(refreshing\);/);
   });
 
   it("prints the archive date as its ISO prefix", () => {

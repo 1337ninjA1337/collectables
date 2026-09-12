@@ -1,6 +1,6 @@
 import { Stack, router } from "expo-router";
 import { useCallback, useState } from "react";
-import { FlatList, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 
 import { DangerIconButton } from "@/components/danger-icon-button";
 import { EmptyState } from "@/components/empty-state";
@@ -11,6 +11,7 @@ import { announceMessage } from "@/lib/announce";
 import { useCollections } from "@/lib/collections-context";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import {
+  ACCENT_DEEP,
   AMBER_ACCENT,
   BORDER,
   CARD_BG,
@@ -23,6 +24,7 @@ import {
   SHADOW_SOFT,
   SPACING_CARD,
   SPACING_INLINE,
+  SPACING_LIST,
   TEXT_DARK,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
@@ -55,11 +57,21 @@ import { useMinimumVisible } from "@/lib/use-minimum-visible";
  * the worst possible place to put a one-tap way to make a bigger one.
  */
 export default function ArchiveScreen() {
-  const { archivedItems, unarchiveItem, deleteItem, getCollectionById } = useCollections();
+  const { archivedItems, unarchiveItem, deleteItem, getCollectionById, refresh } = useCollections();
   const { t } = useI18n();
   const theme = useAppTheme();
   const toast = useToast();
   const [working, setWorking] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try { await refresh(); } finally { setRefreshing(false); }
+  }, [refresh]);
+
+  // The trailing hold every other list screen uses: a refresh that resolves
+  // from cache is instant, and a spinner that flashes reads as a glitch.
+  const showRefreshing = useMinimumVisible(refreshing);
 
   // Same trailing hold the other screens use: a restore that resolves from
   // local state is instant, and a control that flickers disabled reads as a
@@ -215,16 +227,50 @@ export default function ArchiveScreen() {
         }
         ListFooterComponent={<LoadMoreButton remaining={remaining} onPress={loadMore} />}
         renderItem={renderRow}
+        // Every row is exactly ROW_HEIGHT plus the list's row gap, so the list
+        // can place one without measuring it — which is what lets it skip to
+        // an offset instead of mounting everything above it. Collection detail
+        // passes one for the same reason; this list did not, so FlatList
+        // measured every row as it mounted.
+        getItemLayout={(_, index) => ({
+          length: ROW_HEIGHT + SPACING_LIST,
+          offset: (ROW_HEIGHT + SPACING_LIST) * index,
+          index,
+        })}
         onEndReached={remaining > 0 ? loadMore : undefined}
         onEndReachedThreshold={0.5}
         initialNumToRender={10}
         maxToRenderPerBatch={8}
         windowSize={5}
         removeClippedSubviews={Platform.OS === "ios"}
+        // The one list screen with no pull-to-refresh. An archive is synced
+        // like everything else, so two devices reconcile it the same way — and
+        // without this the only way to see that was to leave the screen and
+        // come back.
+        refreshControl={
+          <RefreshControl
+            refreshing={showRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={ACCENT_DEEP}
+            colors={[ACCENT_DEEP]}
+          />
+        }
       />
     </Screen>
   );
 }
+
+/**
+ * The height of one row, declared rather than implied — so `getItemLayout` and
+ * the stylesheet cannot drift apart.
+ *
+ * A 56px thumbnail in 12px of padding, and the text column is shorter than the
+ * thumb: a 15px title and two 12px meta lines, each `numberOfLines={1}`, come
+ * to roughly 50. So the thumb sets the height and nothing in the row can grow
+ * past it — which is the property that makes a fixed layout honest here and
+ * would not hold on a row whose text wraps.
+ */
+const ROW_HEIGHT = 56 + SPACING_CARD * 2;
 
 const styles = StyleSheet.create({
   hero: {
@@ -247,6 +293,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
+    height: ROW_HEIGHT,
     gap: SPACING_CARD,
     padding: SPACING_CARD,
     borderRadius: RADIUS_CARD_LG,
