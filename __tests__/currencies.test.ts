@@ -85,12 +85,17 @@ describe("currency selector is wired into the create-item flow", () => {
   it("create.tsx renders a currency selector next to cost and sends costCurrency", () => {
     const src = read("app/create.tsx");
     // The CURRENCIES list was hoisted into `components/currency-sheet.tsx`
-    // when the picker was extracted for reuse on the collection-edit page;
-    // create.tsx now imports the shared <CurrencySheet/> instead.
-    assert.match(src, /from\s+"@\/components\/currency-sheet"/);
+    // when the picker was extracted for reuse on the collection-edit page, and
+    // create.tsx drove that sheet directly — its own open/query state and all.
+    // On 2026-09-12 it adopted <CurrencyInput>, which owns the sheet, so the
+    // selector is still here and the screen no longer mounts it: the sheet is
+    // one level down, which is why this asserts the component rather than the
+    // sheet it contains.
+    assert.match(src, /from\s+"@\/components\/currency-input"/);
     assert.match(src, /getDefaultCurrencyForLanguage/);
-    assert.match(src, /currencySheetOpen/);
-    assert.match(src, /<CurrencySheet/);
+    assert.match(src, /<CurrencyInput/);
+    assert.doesNotMatch(src, /currencySheetOpen/, "the screen drives a sheet the component owns");
+    assert.match(read("components/currency-input.tsx"), /<CurrencySheet/);
     assert.match(src, /costCurrency:/);
   });
 

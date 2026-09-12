@@ -106,23 +106,30 @@ describe("CurrencyInput — pinned chips wiring", () => {
   });
 });
 
-describe("create form — raw currency selector pins too", () => {
-  it("setCurrency writes the MRU pin alongside the entry currency", () => {
-    // Two writes on one pick, and they are genuinely different facts — which
-    // is why this case asserts both rather than either. The pin ORDERS the
-    // chip strip; the entry currency decides what the next cost form OPENS
-    // with. A third fact used to ride along: `setUserPreferredCurrency` also
-    // moved the currency every total is displayed in, because one slot held
-    // both until 2026-09-12.
+describe("create form — the pin moved into the component", () => {
+  it("setCurrency writes the entry currency and leaves the MRU pin to <CurrencyInput>", () => {
+    // Three facts rode on one pick and they are genuinely different. The PIN
+    // orders the chip strip; the ENTRY currency decides what the next cost
+    // form opens with; the DISPLAY currency decides what a total is shown in.
+    // This form wrote all three: the display one until the storage key was
+    // split, and the pin until the cost row adopted <CurrencyInput> — it
+    // drove a raw CurrencySheet and so had to record the pin itself.
+    // Writing it in both places would double-pin one choice, which is
+    // harmless and is exactly the duplication the adoption removed.
     const src = read("app/create.tsx");
     const idx = src.indexOf("function setCurrency");
     assert.ok(idx >= 0, "setCurrency not found");
-    const block = src.slice(idx, idx + 400);
+    const block = src.slice(idx, idx + 600);
     assert.match(block, /void setEntryCurrency\(next\)/);
-    assert.match(block, /void pinCurrency\(next\)/);
+    assert.ok(!/void pinCurrency\(next\)/.test(block), "the screen pins a second time");
     assert.ok(
       !/\bsetUserPreferredCurrency\b/.test(src),
       "adding an item moves the app-wide display currency again",
+    );
+    // The pin still happens — one level down, where every adopter gets it.
+    assert.match(
+      read("components/currency-input.tsx"),
+      /function selectCurrency\(code: string\) \{\s*onChangeCurrency\(code\);\s*void pinCurrency\(code\);/,
     );
   });
 });

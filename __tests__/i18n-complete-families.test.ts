@@ -146,9 +146,9 @@ const FAMILIES: readonly Family[] = [
   {
     name: "add-item screen",
     screen: "app/create.tsx",
-    size: 42,
+    size: 41,
     because:
-      "the first thing the app asks a new account to DO, and the screen the sign-in screen hands them to — measured on 2026-08-22 as reading 46 base keys of which 38 were English in all four partial locales. It is also the first screen family to overlap the prefix families (`collection*` twice, `search*` twice), which is why the ownership rule above had to be written down rather than left to luck. 42 on 2026-09-10: `tagsDuplicate`, said when Add refuses a label the item already carries — the case that used to be a bare `return`",
+      "the first thing the app asks a new account to DO, and the screen the sign-in screen hands them to — measured on 2026-08-22 as reading 46 base keys of which 38 were English in all four partial locales. It is also the first screen family to overlap the prefix families (`collection*` twice, `search*` twice), which is why the ownership rule above had to be written down rather than left to luck. 42 on 2026-09-10: `tagsDuplicate`, said when Add refuses a label the item already carries — the case that used to be a bare `return`. 41 later on 2026-09-12, DOWN, which is the second time a family has shrunk: the cost row adopted `<CurrencyInput>`, and the screen stopped reading `currencyLabel` because the component labels its own control. No key left the vocabulary — `components/edit-collection-modal.tsx` still reads it — so this is a screen reading one fewer, which is what a screen family counts and a coverage total would not show",
   },
   {
     name: "home screen",

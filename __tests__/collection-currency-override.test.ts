@@ -6,6 +6,7 @@ import {
   assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
 import { readRepoFile as read } from "./helpers/repo-file";
+import { sourceCode } from "./helpers/source-files";
 
 /**
  * Structural pins for the per-collection currency override shipped in
@@ -105,10 +106,20 @@ describe("CurrencySheet — extracted to a shared component", () => {
     assert.match(sheet, /export\s+const\s+CurrencySheet\s*=\s*memo\(\s*function\s+CurrencySheet\s*\(/);
   });
 
-  it("app/create.tsx imports the shared CurrencySheet and no longer declares a local copy", () => {
-    assert.match(create, /import\s*\{\s*CurrencySheet\s*\}\s*from\s*"@\/components\/currency-sheet"/);
-    // The function-form local declaration is gone — only the JSX usage <CurrencySheet ... /> remains.
+  it("app/create.tsx reaches the shared CurrencySheet and declares no local copy", () => {
+    // It imported the sheet directly until 2026-09-12 — that was the point of
+    // this case, written when a local copy of the picker was deleted from
+    // this file. The screen reaches it through <CurrencyInput> now, which
+    // owns the sheet along with the MRU chips and the error pill, so the
+    // claim is one level down and the "no second copy" half is unchanged.
+    assert.match(create, /import\s*\{\s*CurrencyInput\s*\}\s*from\s*"@\/components\/currency-input"/);
     assert.doesNotMatch(create, /function\s+CurrencySheet\s*\(/);
+    // Comment-stripped, because the cost row's own comment explains the
+    // adoption by naming the thing it stopped mounting — a rule read off raw
+    // source fails on its own rationale, which is the third time this
+    // repository has written that case and the second time today.
+    assert.doesNotMatch(sourceCode("app/create.tsx"), /<CurrencySheet/, "the screen mounts a second sheet");
+    assert.match(read("components/currency-input.tsx"), /import\s*\{\s*CurrencySheet\s*\}\s*from\s*"@\/components\/currency-sheet"/);
   });
 
   it("app/collection/[id].tsx imports the shared CurrencySheet and mounts it in JSX", () => {

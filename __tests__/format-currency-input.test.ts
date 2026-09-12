@@ -49,9 +49,16 @@ describe("CurrencyInput adoption", () => {
     assert.doesNotMatch(src, /function sanitize\(/);
   });
 
-  it("create form's raw cost input sanitizes keystrokes too (no unsanitized setCost)", () => {
+  it("create form's cost input sanitizes keystrokes — inside the component now", () => {
+    // It had a RAW cost input until 2026-09-12 and so had to sanitize for
+    // itself; the case asserted the screen's own call. What it was claiming
+    // is that no keystroke reaches `setCost` unsanitized, and that is now
+    // true because <CurrencyInput> sanitizes before it calls back — which is
+    // the stronger form, since a fourth form adopting the component cannot
+    // forget.
     const src = read("app/create.tsx");
-    assert.match(src, /setCost\(sanitizeCurrencyInput\(v\)\)/);
-    assert.doesNotMatch(src, /setCost\(v\)/);
+    assert.match(src, /<CurrencyInput/);
+    assert.doesNotMatch(src, /sanitizeCurrencyInput/, "the screen sanitizes a second time");
+    assert.match(read("components/currency-input.tsx"), /onChangeValue\(sanitizeCurrencyInput\(raw\)\)/);
   });
 });

@@ -310,7 +310,7 @@ describe("the header and the friends row, which had the nav bar's bug again", ()
 
 describe("the last four screens, which close the sweep", () => {
   /**
-   * `app/create.tsx` (5), `app/wishlist.tsx` (5), `app/chat/[id].tsx` (2) and
+   * `app/create.tsx` (4), `app/wishlist.tsx` (5), `app/chat/[id].tsx` (2) and
    * `app/profile/[id].tsx` (1) — the twelve icons left after the two chat entry
    * points came out of the screen-level group. All twelve are decorative on the
    * usual evidence, which is why this is a table again rather than twelve
@@ -321,7 +321,11 @@ describe("the last four screens, which close the sweep", () => {
    * label it was the only carrier of.
    */
   const SCREENS: readonly (readonly [string, number, string])[] = [
-    ["app/create.tsx", 5, "each sits beside naming <Text> or in a labelled Pressable"],
+    [
+      "app/create.tsx",
+      4,
+      "each sits beside naming <Text> or in a labelled Pressable; the fifth left with the hand-rolled currency selector when the cost row adopted <CurrencyInput>, whose own chevron is decided about in that file",
+    ],
     [
       "app/wishlist.tsx",
       5,

@@ -5,9 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 
-import { CurrencySheet } from "@/components/currency-sheet";
+import { CurrencyInput } from "@/components/currency-input";
 import { SheetSearchRow } from "@/components/sheet-search-row";
-import { ErrorPill } from "@/components/error-pill";
 import { PhotoPreview } from "@/components/photo-preview";
 import { Screen } from "@/components/screen";
 import { analyzeItemPhoto, isAiVisionConfigured } from "@/lib/ai-vision";
@@ -18,14 +17,12 @@ import { useCollections } from "@/lib/collections-context";
 import {
   CURRENCY_ERROR_I18N_KEY,
   parseCurrencyValueDetailed,
-  sanitizeCurrencyInput,
   type CurrencyValueError,
 } from "@/lib/format-currency-input";
 import { useI18n } from "@/lib/i18n-context";
 import {
   getDefaultCurrencyForLanguage,
   getEntryCurrency,
-  pinCurrency,
   setEntryCurrency,
 } from "@/lib/locale-helpers";
 import { addTagToList } from "@/lib/tag-input";
@@ -88,8 +85,6 @@ export default function CreateItemScreen() {
   const [cost, setCost] = useState("");
   const [costError, setCostError] = useState<CurrencyValueError | null>(null);
   const [currency, setCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
-  const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
-  const [currencyQuery, setCurrencyQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -105,9 +100,11 @@ export default function CreateItemScreen() {
   function setCurrency(next: string) {
     setCurrencyState(next);
     void setEntryCurrency(next);
-    // The create form's cost row uses a raw CurrencySheet (no <CurrencyInput>),
-    // so it records the MRU pin itself.
-    void pinCurrency(next);
+    // The MRU pin is <CurrencyInput>'s own `selectCurrency`, which is why it
+    // is no longer written here: this form drove a raw CurrencySheet until
+    // 2026-09-12 and had to record the pin itself. Writing it in both places
+    // would double-pin one choice, which is harmless and is exactly the kind
+    // of duplication the adoption was for.
   }
   const [condition, setCondition] = useState<ItemCondition | "">("");
   const [tags, setTags] = useState<ItemTag[]>([]);
@@ -332,36 +329,28 @@ export default function CreateItemScreen() {
       />
       <View style={styles.fieldGroup}>
         <Text style={styles.label}>{t("costLabel")}</Text>
-        <View style={styles.costRow}>
-          <MaskedTextInput
-            value={cost}
-            onChangeText={(v) => {
-              setCost(sanitizeCurrencyInput(v));
-              setCostError(null);
-            }}
-            placeholder={t("costPlaceholder")}
-            placeholderTextColor={PLACEHOLDER}
-            keyboardType="numeric"
-            style={{ ...styles.input, ...styles.costInput }}
-          />
-          <Pressable
-            style={styles.currencySelector}
-            onPress={() => { setCurrencyQuery(""); setCurrencySheetOpen(true); }}
-            accessibilityRole="button"
-            accessibilityLabel={t("currencyLabel")}
-          >
-            <Text style={styles.currencySelectorText}>{currency}</Text>
-            <Ionicons
-              name="chevron-down"
-              size={16}
-              color={PLACEHOLDER}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-              aria-hidden
-            />
-          </Pressable>
-        </View>
-        <ErrorPill label={costError ? t(CURRENCY_ERROR_I18N_KEY[costError]) : ""} />
+        {/*
+          The last cost input in the app driving a raw <CurrencySheet>. It
+          predates <CurrencyInput> and re-implemented three things the
+          component already had — the sheet's open/query state, the MRU pin
+          and the error pill — and got a fourth wrong by omission: a
+          currency CODE behind a chevron where the other two forms show a
+          strip of chips, so picking a second currency here was two taps and
+          a search field rather than one tap on a code you used yesterday.
+          The `keyboardType` differed too ("numeric" against the component's
+          "decimal-pad", which is the one with a separator key on iOS).
+        */}
+        <CurrencyInput
+          value={cost}
+          currency={currency}
+          onChangeValue={(v: string) => {
+            setCost(v);
+            setCostError(null);
+          }}
+          onChangeCurrency={setCurrency}
+          placeholder={t("costPlaceholder")}
+          error={costError ? t(CURRENCY_ERROR_I18N_KEY[costError]) : null}
+        />
       </View>
 
       <View style={styles.fieldGroup}>
@@ -460,14 +449,7 @@ export default function CreateItemScreen() {
         onClose={() => setSheetOpen(false)}
       />
 
-      <CurrencySheet
-        visible={currencySheetOpen}
-        selectedCode={currency}
-        query={currencyQuery}
-        onQueryChange={setCurrencyQuery}
-        onSelect={(code) => { setCurrency(code); setCurrencySheetOpen(false); }}
-        onClose={() => setCurrencySheetOpen(false)}
-      />
+
     </Screen>
   );
 }
@@ -639,11 +621,12 @@ function CollectionSheet({
   );
 }
 
-// CurrencySheet was extracted to `components/currency-sheet.tsx` so the
-// collection-page edit modal can reuse the same picker; this screen now
-// imports `CurrencySheet` from there. The local copy was identical to the
-// shared one — keeping a copy would mean every styling tweak has to be
-// done in two places.
+// The currency picker was a local copy in this file, then an import of the
+// extracted `components/currency-sheet.tsx`, and is now reached one level
+// further down: the cost row renders `<CurrencyInput>`, which owns the sheet
+// along with the MRU chip strip and the error pill. Each step deleted a copy
+// of something this screen had no reason to know about — the argument has not
+// changed, only how much of it the screen was still holding.
 
 const styles = StyleSheet.create({
   hero: {
@@ -691,32 +674,6 @@ const styles = StyleSheet.create({
   inputInvalid: {
     borderColor: DANGER,
     borderWidth: 2,
-  },
-  costRow: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: SPACING_LIST,
-  },
-  costInput: {
-    flex: 1,
-  },
-  currencySelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    borderRadius: RADIUS_CARD,
-    backgroundColor: CARD_BG,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 16,
-    minWidth: 96,
-  },
-  currencySelectorText: {
-    color: TEXT_DARK_4,
-    fontSize: 16,
-    fontWeight: "700",
-    fontFamily: FONT_BODY_BOLD,
   },
   currencyRowText: {
     flexDirection: "row",

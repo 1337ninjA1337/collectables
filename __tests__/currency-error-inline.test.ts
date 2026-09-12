@@ -118,15 +118,28 @@ describe("create cost (app/create.tsx) — optional-field semantics", () => {
     assert.match(src, /costCurrency: parsedCost\.value !== null \? currency : null/);
   });
 
-  it("renders <ErrorPill> under the cost row (raw input, no CurrencyInput here)", () => {
-    assert.match(src, /import \{ ErrorPill \} from "@\/components\/error-pill"/);
+  it("hands the error to <CurrencyInput>, which owns the pill now", () => {
+    // "(raw input, no CurrencyInput here)" was the title until 2026-09-12.
+    // This screen predated the component and re-implemented three of its
+    // parts — the sheet state, the MRU pin and the pill — so the pill it
+    // mounted itself was the duplication rather than a decision. The claim
+    // survives the adoption: an invalid cost still shows an inline message
+    // built from the shared error vocabulary.
+    assert.match(src, /import \{ CurrencyInput \} from "@\/components\/currency-input"/);
     assert.match(
       src,
-      /<ErrorPill label=\{costError \? t\(CURRENCY_ERROR_I18N_KEY\[costError\]\) : ""\} \/>/,
+      /error=\{costError \? t\(CURRENCY_ERROR_I18N_KEY\[costError\]\) : null\}/,
     );
+    assert.doesNotMatch(src, /import \{ ErrorPill \}/, "the screen mounts a second pill");
   });
 
-  it("clears the error on typing (keystrokes sanitized through the shared helper)", () => {
-    assert.match(src, /setCost\(sanitizeCurrencyInput\(v\)\);\s*setCostError\(null\);/);
+  it("clears the error on typing (keystrokes sanitized inside the component)", () => {
+    // `sanitizeCurrencyInput` moved rather than vanished: <CurrencyInput>'s
+    // own onChangeText runs it before calling back, which is asserted at the
+    // top of this file. The screen's job is only to drop the stale error.
+    assert.match(src, /onChangeValue=\{\(v: string\) => \{\s*setCost\(v\);\s*setCostError\(null\);/);
+    assert.doesNotMatch(src, /sanitizeCurrencyInput/, "the screen sanitizes a second time");
+    const component = read("components/currency-input.tsx");
+    assert.match(component, /onChangeText=\{\(raw\) => onChangeValue\(sanitizeCurrencyInput\(raw\)\)\}/);
   });
 });
