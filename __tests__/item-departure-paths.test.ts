@@ -17,28 +17,51 @@ import { readRepoFile } from "./helpers/repo-file";
  * the paths that follow it cannot name the one that does not.
  *
  * So this is a list, checked against the provider's own mutations. The
- * expensive half is not the eight entries: it is the case below that finds a
- * NINTH, which is what turns "somebody has to remember" into "the build says
- * so". `moveItems` is the entry that proves the list is worth having — four
- * rounds carried it as an open question and the answer turned out to be
- * "exempt, and here is why", which no amount of copying the archive path
- * would have produced.
+ * expensive half is not the entries: it is the case that finds the NEXT one,
+ * which is what turns "somebody has to remember" into "the build says so".
+ *
+ * Both halves have now proved themselves. `moveItems` is the entry that
+ * proves the list is worth having — four rounds carried it as an open
+ * question and the answer turned out to be "exempt, and here is why", which
+ * no amount of copying the archive path would have produced. And the
+ * DERIVATION proved it by being wrong: its first version read mutations whose
+ * parameter was an item id, which is the shape of the paths that were already
+ * known, and missed `deleteCollection` — a path that removes a collection and
+ * every item in it, leaving a standing offer per item, and the largest
+ * departure path in the app. The sweep had the same blind spot as the rounds
+ * it was written to catch, one level up.
  */
 
 const PROVIDER = stripComments(readRepoFile("lib/collections-context.tsx"));
 
 /**
- * The provider's item mutations, read off the context type.
+ * Every provider mutation that WRITES the item list.
  *
- * Derived rather than listed twice: a mutation added to the type and not to
- * the record is exactly the shape this suite exists to catch, and a
- * hand-written copy of the type here would be one more place to forget.
+ * Derived rather than listed twice: a mutation added to the provider and not
+ * to the record is exactly the shape this suite exists to catch, and a
+ * hand-written copy here would be one more place to forget.
+ *
+ * **The first version of this asked the wrong question** and is worth keeping
+ * in view, because it failed in the way the record exists to catch. It read
+ * mutations whose PARAMETER was an item id — the shape of the paths that were
+ * already known — and so it found eight and missed six, among them
+ * `deleteCollection`, which removes a collection and every item in it and is
+ * the largest departure path in the app. A sweep written to the shape of the
+ * known cases is the same blind spot one level up.
+ *
+ * `setLocalItems` is the question that cannot be dodged by a parameter: a
+ * mutation that changes items writes it, whatever it is called and whatever
+ * it takes.
  */
 const declaredItemPaths = (): readonly string[] => {
-  const matches = PROVIDER.matchAll(
-    /^ {2}([a-zA-Z]+): \((?:itemId: string|itemIds: string\[\])[^)]*\) => Promise</gm,
-  );
-  return [...matches].map((m) => m[1]).sort();
+  const heads = [...PROVIDER.matchAll(/^ {6}([a-zA-Z]+): (?:async )?\([^)]*\) => \{/gm)];
+  const names: string[] = [];
+  for (let i = 0; i < heads.length; i += 1) {
+    const start = heads[i].index ?? 0;
+    const end = i + 1 < heads.length ? (heads[i + 1].index ?? PROVIDER.length) : PROVIDER.length;
+    if (PROVIDER.slice(start, end).includes("setLocalItems(")) names.push(heads[i][1]);
+  }
+  return names.sort();
 };
 
 const verdict = (path: string): string => LISTING_RULE_BY_ITEM_PATH[path] ?? "";
@@ -48,7 +71,28 @@ describe("the record covers the provider", () => {
   it("found the provider's mutations at all", () => {
     // Without this the two comparisons below pass on an empty list, which is
     // the way a sweep like this dies quietly.
-    assert.ok(declaredItemPaths().length >= 6, "the type scan found almost nothing — the regex has drifted");
+    // Fourteen today. The floor is deliberately well under that and well over
+    // the eight the first, narrower sweep found, so this case fails on a
+    // broken scan rather than on an ordinary commit.
+    assert.ok(
+      declaredItemPaths().length >= 10,
+      `the provider scan found only ${String(declaredItemPaths().length)} mutation(s) — the regex has drifted`,
+    );
+  });
+
+  it("sees the paths a parameter-shaped sweep missed", () => {
+    // The six the first version could not find, and the reason the derivation
+    // asks what a mutation DOES rather than what it takes.
+    for (const path of [
+      "deleteCollection",
+      "deleteUserContent",
+      "addItem",
+      "addWishlistItem",
+      "reorderItemsInCollection",
+      "transferItemToBuyer",
+    ]) {
+      assert.ok(declaredItemPaths().includes(path), `the scan no longer finds '${path}'`);
+    }
   });
 
   it("names every item mutation the provider declares", () => {
@@ -112,6 +156,35 @@ describe("the verdicts match what the code does", () => {
     );
     assert.match(del, /retireSelectedListings\(\);/);
     assert.match(arc, /retireSelectedListings\(\);/);
+  });
+
+  it("deleteCollection retires, on the screen that calls it", () => {
+    // The bug this round found: it removes the collection AND every item in
+    // it, so deleting a collection of thirty left thirty standing offers
+    // pointing at items that no longer exist anywhere.
+    assert.ok(retires("deleteCollection"));
+    assert.match(
+      COLLECTION_SCREEN,
+      /const collectionOpenListings = useMemo\(\s*\(\) => openListingsForItems\(myListings, allItems\.map\(\(item\) => item\.id\)\),/,
+    );
+    const commit = COLLECTION_SCREEN.slice(
+      COLLECTION_SCREEN.indexOf("const confirmAndDeleteCollection"),
+      COLLECTION_SCREEN.indexOf("const handleDeleteCollection"),
+    );
+    assert.ok(
+      commit.indexOf("removeListing(listing.id)") < commit.indexOf("await deleteCollection(collection.id)"),
+      "the items are gone after the delete, and so is the list to read",
+    );
+  });
+
+  it("its confirm reuses the counted sentence rather than writing a second one", () => {
+    // Deleting a collection IS the bulk delete with the selection implied, so
+    // a separate string would be the same warning translated twice.
+    assert.match(
+      COLLECTION_SCREEN,
+      /collectionOpenListings\.length > 0\s*\?\s*`\$\{t\("deleteCollectionText"\)\} \$\{t\("bulkListedWarning", \{ count: collectionOpenListings\.length \}\)\}`/,
+    );
+    assert.match(COLLECTION_SCREEN, /Alert\.alert\(t\("deleteCollectionTitle"\), body, \[/);
   });
 
   it("moveItems is exempt, and the code it calls agrees", () => {

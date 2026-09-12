@@ -708,14 +708,39 @@ export default function CollectionDetailsScreen() {
   // above the early returns as useCallbacks (hook-order invariant), which
   // means none may touch the post-narrow `activeCollection` — each guards on
   // the still-nullable `collection` instead, mirroring `handleOpenMove`.
+  /**
+   * The open listings for everything in this collection.
+   *
+   * `deleteCollection` removes the collection AND every item in it, which
+   * makes it the largest departure path in the app — and it was the one the
+   * listing rule never reached, because the sweep that found the others read
+   * mutations taking an item id and this one takes a collection id. Deleting a
+   * collection of thirty left thirty standing offers on every buyer's device,
+   * each pointing at an item that no longer exists anywhere.
+   */
+  const collectionOpenListings = useMemo(
+    () => openListingsForItems(myListings, allItems.map((item) => item.id)),
+    [myListings, allItems],
+  );
+
   const confirmAndDeleteCollection = useCallback(async () => {
     if (!collection) return;
+    // Before the delete, for the same reason every other departure path does
+    // it first: the items are gone afterwards and so is the list to read.
+    for (const listing of collectionOpenListings) removeListing(listing.id);
     await deleteCollection(collection.id);
     router.replace("/");
-  }, [collection, deleteCollection]);
+  }, [collection, collectionOpenListings, removeListing, deleteCollection]);
 
   const handleDeleteCollection = useCallback(() => {
-    const message = `${t("deleteCollectionTitle")} ${t("deleteCollectionText")}`;
+    // The same counted sentence the bulk confirms use: this is the bulk delete
+    // with the selection implied, so a separate string would be the same
+    // warning written twice.
+    const body =
+      collectionOpenListings.length > 0
+        ? `${t("deleteCollectionText")} ${t("bulkListedWarning", { count: collectionOpenListings.length })}`
+        : t("deleteCollectionText");
+    const message = `${t("deleteCollectionTitle")} ${body}`;
 
     if (Platform.OS === "web") {
       if (globalThis.confirm(message)) {
@@ -724,7 +749,7 @@ export default function CollectionDetailsScreen() {
       return;
     }
 
-    Alert.alert(t("deleteCollectionTitle"), t("deleteCollectionText"), [
+    Alert.alert(t("deleteCollectionTitle"), body, [
       { text: t("cancel"), style: "cancel" },
       {
         text: t("delete"),
@@ -734,7 +759,7 @@ export default function CollectionDetailsScreen() {
         },
       },
     ]);
-  }, [t, confirmAndDeleteCollection]);
+  }, [t, collectionOpenListings, confirmAndDeleteCollection]);
 
   const handleExportPdf = useCallback(async () => {
     if (!collection) return;

@@ -233,25 +233,46 @@ export function isOpenListing(
  * is always a path nobody remembered, and a rule stated only in the paths that
  * follow it cannot name the one that does not.
  *
- * `item-departure-paths.test.ts` reads this record against the provider's own
- * mutation list, so an eighth mutation is red until somebody decides which
- * kind it is. The reasons are here rather than there because they are about
- * the marketplace, and a reader asking "why does moving not retire a listing?"
- * arrives at this file.
+ * `item-departure-paths.test.ts` reads this record against every provider
+ * mutation that WRITES the item list, so a fifteenth is red until somebody
+ * decides which kind it is. The reasons are here rather than there because
+ * they are about the marketplace, and a reader asking "why does moving not
+ * retire a listing?" arrives at this file.
+ *
+ * **The derivation is the load-bearing part, and its first version was wrong
+ * in the way this record exists to catch.** It read mutations whose PARAMETER
+ * was an item id, which is the shape of the paths that were already known, and
+ * so it found eight and missed six — among them `deleteCollection`, which
+ * removes a collection and every item in it and is the largest departure path
+ * in the app. A sweep written to the shape of the known cases is the same
+ * blind spot one level up. It asks "does this write `setLocalItems`?" now,
+ * which is a question about what a mutation DOES.
  */
 export const LISTING_RULE_BY_ITEM_PATH: Readonly<Record<string, string>> = {
+  addItem:
+    "EXEMPT — an arrival. A brand-new item has no listing by construction, and the add form offers no way to create one",
+  addWishlistItem:
+    "EXEMPT — an arrival, and a want rather than a holding: you cannot list a thing you do not own",
   archiveItem:
     "retires — an open listing outlives the archive otherwise and stays in activeListings for every buyer, under an item its owner has said they no longer have. The sold-listing prompt is the exception INSIDE this path: it archives as the last step of a sale that already happened, and the listing is that sale's record",
   archiveItems:
     "retires — the same act done to a selection, and the scale at which nobody would have noticed: thirty rows leave storage and thirty standing offers stay",
   deleteItem:
     "retires — the worse half. The item leaves storage entirely, so the buyer who claims the surviving listing gets a purchase pointing at nothing the seller can even open",
+  deleteCollection:
+    "retires — the largest departure path in the app, and the one the first version of this record could not see: it removes the collection AND every item in it, so deleting a collection of thirty left thirty standing offers pointing at items that no longer exist anywhere",
+  deleteUserContent:
+    "EXEMPT — an admin dropping another user's collections and items from THIS device. The listings belong to that user's account and are not the viewer's to withdraw; removing them here would be one device deciding what another person is selling",
   deleteItems:
     "retires — the bulk version of the above, and the one the confirm has to count, because a seller deleting thirty is told about the thirty and not the four listings",
   moveItems:
     "EXEMPT — a listing carries `itemId` and nothing about the collection, and `app/listing/[id].tsx` resolves its item with `getItemById(listing.itemId)` alone. Moving an item between collections is invisible to the marketplace, so retiring a listing here would withdraw a live offer for no reason. This is a decision and not an omission: four rounds carried it as an open question, and the answer is that the data shape makes it a non-event",
   unarchiveItem:
     "EXEMPT — the item is coming BACK, which is the one direction that cannot orphan an offer. Its listing was either retired on the way in or is sold, and re-creating one would put a thing up for sale that nobody asked to sell",
+  reorderItemsInCollection:
+    "EXEMPT — it writes `sortOrder` and nothing else. The item stays where it is and stays for sale; a listing has no notion of position",
+  transferItemToBuyer:
+    "EXEMPT — the only entry here that is an ARRIVAL on the buyer's device: it creates their copy of a thing they just bought. The seller's side of that sale is the sold-listing prompt, which archives and deliberately keeps the listing as the sale's record",
   updateItem:
     "EXEMPT — the item stays where it is and stays for sale; editing a title is not a departure. A listing shows the item's current title by design, which is the point of resolving it by id",
   promoteWishlistItem:
