@@ -103,6 +103,7 @@ const en = {
   deleteItem: "Delete item",
   deleteItemTitle: "Delete item?",
   deleteItemText: "It will disappear from this collection permanently.",
+  deleteItemListedText: "It is on the marketplace, so the listing goes with it. Neither comes back.",
   acquiredHow: "How it was acquired",
   acquiredDate: "Acquired date",
   description: "Description",
@@ -701,6 +702,7 @@ const ru: TranslationMap = {
   deleteItem: "Удалить предмет",
   deleteItemTitle: "Удалить предмет?",
   deleteItemText: "Он исчезнет из этой коллекции без возможности восстановления.",
+  deleteItemListedText: "Он выставлен на маркетплейсе, поэтому объявление тоже будет снято. Вернуть нельзя ни то, ни другое.",
   selectItems: "Выбрать",
   selectedCount: (params?: TranslationParams) =>
     `${slavicPlural(params?.count, "Выбран", "Выбрано", "Выбрано")} ${params?.count ?? 0}`,
@@ -1344,6 +1346,7 @@ const be: TranslationMap = {
   deleteItem: "Выдаліць прадмет",
   deleteItemTitle: "Выдаліць прадмет?",
   deleteItemText: "Ён знікне з гэтай калекцыі назаўсёды.",
+  deleteItemListedText: "Ён выстаўлены на маркетплейсе, таму аб'ява знікне разам з ім. Вярнуць нельга ні тое, ні другое.",
   settings: "Налады",
   settingsTitle: "Налады праграмы",
   language: "Мова",
@@ -1840,6 +1843,7 @@ const pl: TranslationMap = {
   deleteItem: "Usuń przedmiot",
   deleteItemTitle: "Usunąć przedmiot?",
   deleteItemText: "Zniknie z tej kolekcji na zawsze.",
+  deleteItemListedText: "Jest wystawiony na rynku, więc ogłoszenie zniknie razem z nim. Żadnego z nich nie da się przywrócić.",
   diagnosticsTitle: "Diagnostyka i raporty o awariach",
   diagnosticsHint:
     "Gdy włączone, anonimowe raporty o awariach pomagają nam szybciej naprawiać błędy. Wyłącz, aby nie wysyłać diagnostyki.",
@@ -2443,6 +2447,7 @@ const de: TranslationMap = {
   deleteItem: "Objekt löschen",
   deleteItemTitle: "Objekt löschen?",
   deleteItemText: "Es verschwindet dauerhaft aus dieser Sammlung.",
+  deleteItemListedText: "Es steht auf dem Marktplatz, die Anzeige verschwindet also mit. Beides kommt nicht zurück.",
   diagnosticsTitle: "Diagnose & Absturzberichte",
   diagnosticsHint:
     "Wenn aktiviert, helfen uns anonyme Absturzberichte, Fehler schneller zu beheben. Deaktivieren, um keine Diagnosedaten zu senden.",
@@ -3051,6 +3056,7 @@ const es: TranslationMap = {
   deleteItem: "Eliminar objeto",
   deleteItemTitle: "¿Eliminar objeto?",
   deleteItemText: "Desaparecerá de esta colección de forma permanente.",
+  deleteItemListedText: "Está en el mercado, así que la publicación desaparece con él. Ninguno de los dos vuelve.",
   diagnosticsTitle: "Diagnóstico e informes de fallos",
   diagnosticsHint:
     "Si está activado, los informes anónimos de fallos nos ayudan a corregir errores más rápido. Desactívalo para no enviar diagnósticos.",

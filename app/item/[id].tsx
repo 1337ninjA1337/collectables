@@ -40,7 +40,7 @@ import { uploadImages } from "@/lib/cloudinary";
 import { announceMessage } from "@/lib/announce";
 import { isArchived } from "@/lib/collections-helpers";
 import { confirmDialog } from "@/lib/confirm-dialog";
-import { shouldRetireListingOnArchive } from "@/lib/marketplace-helpers";
+import { isOpenListing } from "@/lib/marketplace-helpers";
 import { useCollections } from "@/lib/collections-context";
 import { hasFiniteCost } from "@/lib/item-cost";
 import { useI18n } from "@/lib/i18n-context";
@@ -314,6 +314,15 @@ export default function ItemDetailsScreen() {
   }
 
   async function confirmAndDeleteItem() {
+    // The listing first, and for the same reason archiving takes it down: an
+    // open listing is a standing offer to strangers, and a delete is the
+    // version where the buyer who claims it gets a row pointing at nothing
+    // the seller can even open. A SOLD listing stays — a delete does not
+    // un-sell a thing that was sold, and the buyer's purchase list, the
+    // transfer log and "recently sold" all read that record.
+    if (isOpenListing(existingListing) && existingListing) {
+      removeListing(existingListing.id);
+    }
     await deleteItem(activeItem.id);
     router.replace(collection ? `/collection/${collection.id}` : "/");
   }
@@ -415,7 +424,7 @@ export default function ItemDetailsScreen() {
    */
   function handleArchive() {
     const archivedId = activeItem.id;
-    const retiring = shouldRetireListingOnArchive(existingListing);
+    const retiring = isOpenListing(existingListing);
 
     // An item with an OPEN listing is the case where archiving is not a
     // private act: the listing stays in the browse feed for every buyer
@@ -468,7 +477,13 @@ export default function ItemDetailsScreen() {
   }
 
   function handleDelete() {
-    const message = `${t("deleteItemTitle")} ${t("deleteItemText")}`;
+    // The body says the listing goes too when there is one to lose. A confirm
+    // that named only the item would be describing half of what the button
+    // does, on the one action in this family that nothing can undo.
+    const body = isOpenListing(existingListing)
+      ? `${t("deleteItemText")} ${t("deleteItemListedText")}`
+      : t("deleteItemText");
+    const message = `${t("deleteItemTitle")} ${body}`;
 
     if (Platform.OS === "web") {
       if (globalThis.confirm(message)) {
@@ -477,7 +492,7 @@ export default function ItemDetailsScreen() {
       return;
     }
 
-    Alert.alert(t("deleteItemTitle"), t("deleteItemText"), [
+    Alert.alert(t("deleteItemTitle"), body, [
       { text: t("cancel"), style: "cancel" },
       {
         text: t("delete"),

@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { shouldRetireListingOnArchive } from "@/lib/marketplace-helpers";
+import { isOpenListing } from "@/lib/marketplace-helpers";
 import { stripComments } from "@/lib/strip-comments";
 import type { MarketplaceListing } from "@/lib/types";
 
@@ -40,14 +40,14 @@ const listing = (over: Partial<MarketplaceListing> = {}): MarketplaceListing =>
     ...over,
   }) as MarketplaceListing;
 
-describe("shouldRetireListingOnArchive", () => {
-  it("takes down an open listing", () => {
-    assert.equal(shouldRetireListingOnArchive(listing()), true);
+describe("isOpenListing", () => {
+  it("is true for a listing still on the browse feed", () => {
+    assert.equal(isOpenListing(listing()), true);
   });
 
-  it("leaves a sold listing standing, because it is the record of the sale", () => {
+  it("is false for a sold one, which is the record of the sale", () => {
     assert.equal(
-      shouldRetireListingOnArchive(listing({ soldAt: "2026-02-01T00:00:00.000Z" })),
+      isOpenListing(listing({ soldAt: "2026-02-01T00:00:00.000Z" })),
       false,
     );
   });
@@ -55,8 +55,8 @@ describe("shouldRetireListingOnArchive", () => {
   it("is false for an item that was never listed", () => {
     // Both spellings of absence: `findListingByItemId` answers `undefined`,
     // and a caller threading a nullable through gets `null`.
-    assert.equal(shouldRetireListingOnArchive(undefined), false);
-    assert.equal(shouldRetireListingOnArchive(null), false);
+    assert.equal(isOpenListing(undefined), false);
+    assert.equal(isOpenListing(null), false);
   });
 
   it("asks about soldAt and not about a buyer", () => {
@@ -64,9 +64,9 @@ describe("shouldRetireListingOnArchive", () => {
     // the record becomes history is `soldAt` — the same field `activeListings`
     // filters the browse feed on. Asking a different question here would let
     // the two disagree about what "still open" means.
-    assert.equal(shouldRetireListingOnArchive(listing({ buyerUserId: "u-2" })), true);
+    assert.equal(isOpenListing(listing({ buyerUserId: "u-2" })), true);
     assert.equal(
-      shouldRetireListingOnArchive(listing({ soldAt: "2026-02-01T00:00:00.000Z", buyerUserId: "u-2" })),
+      isOpenListing(listing({ soldAt: "2026-02-01T00:00:00.000Z", buyerUserId: "u-2" })),
       false,
     );
   });
@@ -80,10 +80,20 @@ describe("shouldRetireListingOnArchive", () => {
   });
 
   it("is a function rather than an if on a screen", () => {
-    // The previous round put its rule in a component, and the next caller — a
-    // bulk archive — would not inherit one that lives there.
+    // The round before this put its rule in a component, and the next caller
+    // — a bulk archive — would not inherit one that lives there. It now has
+    // two callers, which is the argument made good.
     const SRC = stripComments(readRepoFile("lib/marketplace-helpers.ts"));
-    assert.match(SRC, /export function shouldRetireListingOnArchive\(/);
+    assert.match(SRC, /export function isOpenListing\(/);
+  });
+
+  it("is named for the listing's state, not for one of the two acts", () => {
+    // It shipped an hour earlier as `shouldRetireListingOnArchive`, and the
+    // delete path is what made the narrower name wrong: the two callers
+    // differ in what they do NEXT (an archive is reversible and a delete is
+    // not, so they warn differently), never in what they need to know.
+    const SRC = stripComments(readRepoFile("lib/marketplace-helpers.ts"));
+    assert.doesNotMatch(SRC, /shouldRetireListingOnArchive/);
   });
 });
 
@@ -99,7 +109,7 @@ describe("the item screen's archive action", () => {
   });
 
   it("asks the shared rule rather than reading soldAt itself", () => {
-    assert.match(handler, /const retiring = shouldRetireListingOnArchive\(existingListing\);/);
+    assert.match(handler, /const retiring = isOpenListing\(existingListing\);/);
     assert.ok(!handler.includes("soldAt"));
   });
 

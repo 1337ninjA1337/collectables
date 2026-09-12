@@ -79,9 +79,15 @@ describe("the archive action", () => {
     assert.match(SRC, /const restoredId = activeItem\.id;/);
   });
 
-  it("leaves delete exactly as it was, behind its confirm", () => {
+  it("leaves delete behind its confirm, which archive is not", () => {
+    // This case shipped asserting the confirm's exact arguments, which was a
+    // pin on the wrong thing: the delete round afterwards gave that dialog a
+    // second sentence for a listed item, and the claim here was only ever
+    // that delete still ASKS while archive does not. The body's composition
+    // belongs to `delete-retires-listing.test.ts`.
     assert.match(SRC, /function handleDelete\(\) \{/);
-    assert.match(SRC, /Alert\.alert\(t\("deleteItemTitle"\), t\("deleteItemText"\)/);
+    assert.match(SRC, /Alert\.alert\(t\("deleteItemTitle"\), body, \[/);
+    assert.match(SRC, /style: "destructive",/);
   });
 });
 

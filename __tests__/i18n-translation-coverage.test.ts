@@ -543,7 +543,12 @@ describe("translation floors", () => {
     // sale off-platform, and the listing stayed in the browse feed for every
     // buyer. The item comes back and the listing does not, so the confirm has
     // to say so; that sentence is why this is three keys and not one.
-    assert.match(report, /en: 530\/530 keys \(100\.0%\)/);
+    // 531 later that day: `deleteItemListedText`, the sentence the delete
+    // confirm gains when the item is on the marketplace. The archive round
+    // fixed one half of this and left the worse half standing — a deleted
+    // item leaves storage entirely, so the buyer who claims its surviving
+    // listing gets a purchase pointing at nothing the seller can open.
+    assert.match(report, /en: 531\/531 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

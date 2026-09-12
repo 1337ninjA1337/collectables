@@ -184,27 +184,37 @@ export function removeListingById(
 }
 
 /**
- * Should archiving this item take its listing down with it?
+ * Is there a listing for this item, and is it still open?
  *
- * Archiving an item said nothing to the marketplace, so a live listing
- * outlived its item's archive and stayed in {@link activeListings} for every
- * buyer — while the item screen, under a banner reading "this item is
- * archived", still showed it as listed. The lock that stops a listing being
- * CREATED for an archived item says nothing about this order, and this is the
- * likelier one: a seller archives AFTER agreeing a sale off-platform.
+ * The question every "the item is going away" path has to ask before it lets
+ * the item go. An open listing is a standing offer to strangers: it sits in
+ * {@link activeListings} on every buyer's device, and nothing about archiving
+ * or deleting the item on the seller's device reaches it. So an item could be
+ * archived — its own screen saying, under a banner, that the owner no longer
+ * has it — while still being offered for sale; and it could be DELETED, which
+ * is worse, because the buyer who claims it then gets a row pointing at
+ * nothing the seller can even open.
  *
- * **A sold listing stays.** The sold-listing prompt archives the item as the
- * final step of a sale that already happened, and the listing is that sale's
- * record — the buyer's purchase list, the transfer log and "recently sold" all
- * read it. Removing it there would delete the history the archive exists to
- * keep, which is the same argument `archivedAt` itself is built on.
+ * **A sold listing is not open, and must survive both.** The sold-listing
+ * prompt archives an item as the final step of a sale that already happened,
+ * and the listing is that sale's record — the buyer's purchase list, the
+ * transfer log and "recently sold" all read it. Removing it would delete the
+ * history the archive exists to keep, which is the argument `archivedAt`
+ * itself is built on; and a delete does not un-sell a thing that was sold.
  *
- * So the question is exactly "is there a listing, and is it still open?", and
- * it is a function rather than an `if` on a screen because the previous round
- * put its rule in a component and the next caller — a bulk archive — will not
- * inherit one that lives there.
+ * The same answer serves both callers, which is why this is named for the
+ * LISTING's state rather than for one of the two acts. It shipped an hour
+ * earlier as `shouldRetireListingOnArchive`, and the delete path is what made
+ * the narrower name wrong: the two callers differ in what they do next (an
+ * archive is reversible and a delete is not, so they warn differently), not in
+ * what they need to know.
+ *
+ * `soldAt` and not `buyerUserId`: a listing can be claimed before the transfer
+ * completes, and `soldAt` is the field {@link activeListings} filters the
+ * browse feed on. Asking anything else here would let the two disagree about
+ * what "still open" means.
  */
-export function shouldRetireListingOnArchive(
+export function isOpenListing(
   listing: MarketplaceListing | undefined | null,
 ): boolean {
   if (!listing) return false;
