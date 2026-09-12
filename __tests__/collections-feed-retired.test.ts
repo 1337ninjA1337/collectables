@@ -70,8 +70,8 @@ describe("the collections-feed screen is retired", () => {
     // The two lists it rendered are the two the home screen windows. If this
     // ever fails it is because the tabs moved, and the deletion above needs
     // re-reading rather than the assertion relaxing.
-    assert.match(HOME, /useChunkedList\(friendCollections\)/);
-    assert.match(HOME, /useChunkedList\(subscribedCollections\)/);
+    assert.match(HOME, /useChunkedList\(friendCollections, CHUNK_PAGE_SIZE_CARDS\)/);
+    assert.match(HOME, /useChunkedList\(subscribedCollections, CHUNK_PAGE_SIZE_CARDS\)/);
     assert.match(HOME, /key: "subscribed", label: t\("tabSubscribedCollections"\)/);
   });
 });

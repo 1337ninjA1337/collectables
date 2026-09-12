@@ -52,7 +52,7 @@ import {
 import { reorderActionProps } from "@/lib/reorder-actions";
 import { announceReorder } from "@/lib/reorder-announcement";
 import { selectFriendCollections, selectRecentItems } from "@/lib/home-helpers";
-import { ChunkedList, useChunkedList } from "@/lib/use-chunked-list";
+import { CHUNK_PAGE_SIZE_CARDS, ChunkedList, useChunkedList } from "@/lib/use-chunked-list";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
@@ -164,8 +164,8 @@ export default function HomeScreen() {
    * rebuilt per render would snap the window back to the first page and make
    * "load more" do nothing.
    */
-  const friendsWindow = useChunkedList(friendCollections);
-  const subscribedWindow = useChunkedList(subscribedCollections);
+  const friendsWindow = useChunkedList(friendCollections, CHUNK_PAGE_SIZE_CARDS);
+  const subscribedWindow = useChunkedList(subscribedCollections, CHUNK_PAGE_SIZE_CARDS);
 
   if (!ready) {
     return (

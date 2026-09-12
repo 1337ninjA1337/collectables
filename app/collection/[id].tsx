@@ -33,7 +33,7 @@ import { byId, orderWithUnrenderedTail, planDragCommit } from "@/lib/drag-reorde
 import { reorderActionProps } from "@/lib/reorder-actions";
 import { announceReorder } from "@/lib/reorder-announcement";
 import { flatListStyles } from "@/lib/flat-list-styles";
-import { useChunkedList } from "@/lib/use-chunked-list";
+import { CHUNK_PAGE_SIZE_CARDS, useChunkedList } from "@/lib/use-chunked-list";
 import { useItemSortPref } from "@/lib/use-item-sort-pref";
 import { exportCollectionToPdf } from "@/lib/export-pdf";
 import { useI18n } from "@/lib/i18n-context";
@@ -245,7 +245,7 @@ export default function CollectionDetailsScreen() {
   // its window automatically when the `items` reference changes (filter or
   // sort swap) because `items` is memoized on `[filteredItems, itemFilters.sort]`
   // above and `filteredItems` is memoized on `[allItems, itemFilters]`.
-  const { visibleItems, hasMore, remaining, loadMore } = useChunkedList(items);
+  const { visibleItems, hasMore, remaining, loadMore } = useChunkedList(items, CHUNK_PAGE_SIZE_CARDS);
   // The page as it is NOW, for a keyboard move that fires after the render
   // that drew the row — a `loadMore` or a cloud merge between a screen reader
   // focusing a row and the action firing would otherwise commit the order the

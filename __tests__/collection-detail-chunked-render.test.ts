@@ -18,7 +18,7 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
   const src = read("app/collection/[id].tsx");
 
   it("imports useChunkedList from the shared hook module", () => {
-    assert.match(src, /import\s*\{\s*useChunkedList\s*\}\s*from\s*"@\/lib\/use-chunked-list"/);
+    assert.match(src, /import\s*\{[^}]*\buseChunkedList\b[^}]*\}\s*from\s*"@\/lib\/use-chunked-list"/);
   });
 
   it("instantiates exactly one useChunkedList(items) hook (single shared window across the 3 render branches)", () => {
@@ -27,7 +27,7 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     // sync — confusing behaviour and double the auto-reset cost.
     const calls = src.match(/useChunkedList\s*\(/g) ?? [];
     assert.equal(calls.length, 1, `expected exactly one useChunkedList call, got ${calls.length}`);
-    assert.match(src, /useChunkedList\(\s*items\s*\)/);
+    assert.match(src, /useChunkedList\(\s*items\s*,\s*CHUNK_PAGE_SIZE_CARDS\s*\)/);
   });
 
   it("memoizes getItemsForCollection so localItems reference is stable across renders", () => {

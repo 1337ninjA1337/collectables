@@ -30,8 +30,8 @@ const CODE = stripComments(SRC);
 
 describe("the home screen's borrowed-list tabs", () => {
   it("windows both of them", () => {
-    assert.match(CODE, /const friendsWindow = useChunkedList\(friendCollections\)/);
-    assert.match(CODE, /const subscribedWindow = useChunkedList\(subscribedCollections\)/);
+    assert.match(CODE, /const friendsWindow = useChunkedList\(friendCollections, CHUNK_PAGE_SIZE_CARDS\)/);
+    assert.match(CODE, /const subscribedWindow = useChunkedList\(subscribedCollections, CHUNK_PAGE_SIZE_CARDS\)/);
   });
 
   it("renders the window, not the whole array", () => {

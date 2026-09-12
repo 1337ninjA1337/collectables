@@ -52,7 +52,7 @@ describe("app/collection/[id].tsx — drag-mode sort gate (corruption fix)", () 
     // the visible window reflects the chosen sort.
     const filterIdx = src.search(/applyItemFilters\(allItems\s*,\s*itemFilters\)/);
     const sortIdx = src.search(/applySortMode\(filteredItems\s*,\s*itemFilters\.sort\s*,\s*sortLocale\)/);
-    const chunkIdx = src.search(/useChunkedList\(\s*items\s*\)/);
+    const chunkIdx = src.search(/useChunkedList\(\s*items\s*,/);
     assert.ok(filterIdx > 0, "applyItemFilters call missing");
     assert.ok(sortIdx > 0, "applySortMode call missing");
     assert.ok(chunkIdx > 0, "useChunkedList call missing");

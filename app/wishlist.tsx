@@ -30,7 +30,7 @@ import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useCollections } from "@/lib/collections-context";
 import { flatListStyles } from "@/lib/flat-list-styles";
-import { useChunkedList } from "@/lib/use-chunked-list";
+import { CHUNK_PAGE_SIZE_ROWS, useChunkedList } from "@/lib/use-chunked-list";
 import {
   ACCENT_DEEP,
   AMBER_ACCENT,
@@ -89,7 +89,7 @@ export default function WishlistScreen() {
   );
   // WLF-B: chunked window bounds the mount count (a 500-entry wishlist mounts
   // 20 cards + their images up-front); onEndReached grows it while scrolling.
-  const { visibleItems, hasMore, loadMore } = useChunkedList(wishlistItems);
+  const { visibleItems, hasMore, loadMore } = useChunkedList(wishlistItems, CHUNK_PAGE_SIZE_ROWS);
 
   const [addOpen, setAddOpen] = useState(false);
   const [title, setTitle] = useState("");

@@ -173,7 +173,7 @@ describe("the archive screen", () => {
     // Six rounds carried this as a suggestion and the bulk archive is what
     // made it real: one gesture can now put thirty rows on a screen that
     // mounts a remote cover photo per row, on a list nothing prunes.
-    assert.match(SRC, /const \{ visibleItems, remaining, loadMore \} = useChunkedList\(archivedItems\);/);
+    assert.match(SRC, /const \{ visibleItems, remaining, loadMore \} = useChunkedList\(archivedItems, CHUNK_PAGE_SIZE_ROWS\);/);
     assert.match(SRC, /data=\{visibleItems\}/);
     assert.ok(!SRC.includes("archivedItems.map("), "the unwindowed map is back");
     assert.ok(!SRC.includes("visibleItems.map("), "the rows are mapped rather than rendered by the list");

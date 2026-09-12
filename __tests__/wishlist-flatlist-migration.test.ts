@@ -35,7 +35,7 @@ describe("app/wishlist.tsx — WLF-B FlatList migration", () => {
 
   it("feeds the FlatList from the chunked window, never the raw array", () => {
     const src = readSrc();
-    assert.match(src, /useChunkedList\(\s*wishlistItems\s*\)/);
+    assert.match(src, /useChunkedList\(\s*wishlistItems\s*,\s*CHUNK_PAGE_SIZE_ROWS\s*\)/);
     assert.match(src, /<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}/);
     assert.doesNotMatch(src, /data=\{\s*wishlistItems\s*\}/);
   });

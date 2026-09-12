@@ -34,7 +34,7 @@ import { placeholderColor } from "@/lib/placeholder-color";
 import { useToast } from "@/lib/toast-context";
 import { flatListStyles } from "@/lib/flat-list-styles";
 import { CollectableItem } from "@/lib/types";
-import { useChunkedList } from "@/lib/use-chunked-list";
+import { CHUNK_PAGE_SIZE_ROWS, useChunkedList } from "@/lib/use-chunked-list";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
 
 /**
@@ -79,7 +79,7 @@ export default function ArchiveScreen() {
    * the reset is right there — the row left the list, so the window the user
    * had grown is describing a list that no longer exists.
    */
-  const { visibleItems, remaining, loadMore } = useChunkedList(archivedItems);
+  const { visibleItems, remaining, loadMore } = useChunkedList(archivedItems, CHUNK_PAGE_SIZE_ROWS);
 
   const handleRestore = useCallback(
     async (itemId: string) => {
