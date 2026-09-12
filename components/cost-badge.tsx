@@ -19,6 +19,15 @@ type CostBadgeProps = {
   amount?: number;
   /** Raw mode: currency code rendered after the amount. */
   currency?: string;
+  /**
+   * Raw mode: prefix "≈" because the amount is a sum of RAW values across
+   * currencies — no rate table was available when it was computed.
+   *
+   * The same marker the item mode already prints for a real conversion, and
+   * for the same reason: a figure that is not exactly what it claims should
+   * say so where it is read. See `CollectionTotalCost.approximate`.
+   */
+  approximate?: boolean;
   /** Item mode: prefix the translated cost label ("Cost: 12 USD"). */
   withLabel?: boolean;
   /** Style for the rendered <Text> — the caller owns typography/color. */
@@ -33,6 +42,7 @@ export const CostBadge = memo(function CostBadge({
   item,
   amount,
   currency,
+  approximate,
   withLabel,
   style,
   onLongPressOriginal,
@@ -44,7 +54,7 @@ export const CostBadge = memo(function CostBadge({
     if (typeof amount !== "number" || !Number.isFinite(amount)) return null;
     return (
       <Text style={style}>
-        {formatCostAmount(amount)}{currency ? ` ${currency}` : ""}
+        {approximate ? "≈ " : ""}{formatCostAmount(amount)}{currency ? ` ${currency}` : ""}
       </Text>
     );
   }

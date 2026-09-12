@@ -8,19 +8,29 @@ import { PHOTO_SCRIM_GRADIENT } from "@/lib/gradients";
 import { formatCostAmount } from "@/lib/format-cost";
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
+import type { CollectionTotalCost } from "@/lib/collection-total";
 import { Collection } from "@/lib/types";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD } from "@/lib/fonts";
 
 export function CollectionCard({
   collection,
   count,
-  totalCost,
-  totalCostCurrency,
+  total,
 }: {
   collection: Collection;
   count: number;
-  totalCost?: number;
-  totalCostCurrency?: string;
+  /**
+   * The whole total, not an amount beside a currency beside a flag.
+   *
+   * It was a pair of optional props that four call sites spread by hand from
+   * the one object the provider hands them, and the third field — whether the
+   * figure converted at all — would have made it three. A card that shows a
+   * raw sum of three currencies as though it were one number is the same
+   * claim the PDF export had to be taught to qualify; the difference is that
+   * a card re-renders when the rates land, which is an argument for a quieter
+   * marker rather than for silence.
+   */
+  total?: CollectionTotalCost;
 }) {
   const { t } = useI18n();
   const hasCover = Boolean(collection.coverPhoto);
@@ -46,10 +56,11 @@ export function CollectionCard({
               {t("ownerLabel", { name: collection.ownerName })}
             </Text>
           ) : null}
-          {typeof totalCost === "number" && totalCost > 0 ? (
+          {total && total.amount > 0 ? (
             <Text style={styles.meta}>
-              {t("totalCost")}: {formatCostAmount(totalCost)}
-              {totalCostCurrency ? ` ${totalCostCurrency}` : ""}
+              {t("totalCost")}: {total.approximate ? "≈ " : ""}
+              {formatCostAmount(total.amount)}
+              {total.currency ? ` ${total.currency}` : ""}
             </Text>
           ) : null}
         </View>

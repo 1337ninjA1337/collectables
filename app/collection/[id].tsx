@@ -1018,12 +1018,12 @@ export default function CollectionDetailsScreen() {
               accessibilityRole="button"
               accessibilityLabel={t("collectionCurrencyA11y", { currency: total.currency })}
             >
-              <CostBadge amount={total.amount} currency={total.currency} style={styles.summaryNumber} />
+              <CostBadge amount={total.amount} currency={total.currency} approximate={total.approximate} style={styles.summaryNumber} />
               <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
             </Pressable>
           ) : (
             <View style={styles.summaryCard}>
-              <CostBadge amount={total.amount} currency={total.currency} style={styles.summaryNumber} />
+              <CostBadge amount={total.amount} currency={total.currency} approximate={total.approximate} style={styles.summaryNumber} />
               <Text style={styles.summaryLabel}>{t("totalCost")}</Text>
             </View>
           );

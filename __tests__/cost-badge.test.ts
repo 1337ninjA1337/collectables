@@ -64,10 +64,15 @@ describe("<CostBadge> — the single cost renderer", () => {
 });
 
 describe("CostBadge adoption — no cost-rendering re-rolls left", () => {
-  it("collection summary renders totals through <CostBadge amount currency>", () => {
+  it("collection summary renders totals through <CostBadge amount currency approximate>", () => {
+    // The `approximate` prop joined the pair when the totals learned to say
+    // they had been summed without a rate table. This case shipped matching
+    // the two props exactly, which made it a pin on the argument LIST rather
+    // than on the adoption it is about — so it names the three it needs and
+    // lets the element carry more.
     const src = read("app/collection/[id].tsx");
     const matches = src.match(
-      /<CostBadge amount=\{total\.amount\} currency=\{total\.currency\} style=\{styles\.summaryNumber\} \/>/g,
+      /<CostBadge amount=\{total\.amount\} currency=\{total\.currency\} approximate=\{total\.approximate\} style=\{styles\.summaryNumber\} \/>/g,
     ) ?? [];
     assert.equal(matches.length, 2, `expected owner + viewer summary adoptions, got ${matches.length}`);
     assert.doesNotMatch(src, /formatCostAmount/);

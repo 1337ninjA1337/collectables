@@ -466,8 +466,7 @@ export default function ProfileScreen() {
                 key={collection.id}
                 collection={collection}
                 count={countItemsForCollection(collection.id) || remoteItemCounts[collection.id] || 0}
-                totalCost={total.amount}
-                totalCostCurrency={total.currency}
+                total={total}
               />
             );
           })

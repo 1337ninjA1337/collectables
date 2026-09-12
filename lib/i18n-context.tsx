@@ -173,6 +173,7 @@ const en = {
   statsSubtitle: "Overview of your collection.",
   statsTotalItems: "Total items",
   statsTotalValue: "Total value",
+  statsTotalValueApprox: "Summed without exchange rates — the figure mixes currencies.",
   statsTotalValuePartial: (params?: TranslationParams) =>
     `Excludes ${params?.count ?? 0} ${plural(params?.count, "item", "items")} we could not convert`,
   statsTotalCollections: "Collections",
@@ -829,6 +830,7 @@ const ru: TranslationMap = {
   statsSubtitle: "Обзор вашей коллекции.",
   statsTotalItems: "Всего предметов",
   statsTotalValue: "Общая стоимость",
+  statsTotalValueApprox: "Посчитано без курсов валют — в сумме смешаны валюты.",
   statsTotalValuePartial: (params?: TranslationParams) =>
     `Не удалось пересчитать ${params?.count ?? 0} ${slavicPlural(params?.count, "предмет", "предмета", "предметов")}`,
   statsTotalCollections: "Коллекции",
@@ -1750,6 +1752,7 @@ const be: TranslationMap = {
   subTabRequests: "Запыты ў сябры",
   statsTotalItems: "Усяго прадметаў",
   statsTotalValue: "Агульны кошт",
+  statsTotalValueApprox: "Палічана без курсаў валют — у суме змяшаныя валюты.",
   statsTotalValuePartial: (params?: TranslationParams) =>
     `Не ўдалося пералічыць ${params?.count ?? 0} ${slavicPlural(params?.count, "прадмет", "прадметы", "прадметаў")}`,
   statsTotalCollections: "Калекцыі",
@@ -2359,6 +2362,7 @@ const pl: TranslationMap = {
   subTabRequests: "Zaproszenia do znajomych",
   statsTotalItems: "Wszystkich przedmiotów",
   statsTotalValue: "Łączna wartość",
+  statsTotalValueApprox: "Zsumowano bez kursów walut — kwota miesza waluty.",
   statsTotalValuePartial: (params?: TranslationParams) =>
     `Nie przeliczono ${params?.count ?? 0} ${slavicPlural(params?.count, "przedmiotu", "przedmiotów", "przedmiotów")}`,
   statsTotalCollections: "Kolekcje",
@@ -2975,6 +2979,7 @@ const de: TranslationMap = {
   subTabRequests: "Freundschaftsanfragen",
   statsTotalItems: "Objekte insgesamt",
   statsTotalValue: "Gesamtwert",
+  statsTotalValueApprox: "Ohne Wechselkurse summiert — die Zahl mischt Währungen.",
   statsTotalValuePartial: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${plural(params?.count, "Objekt", "Objekte")} ohne Umrechnung`,
   statsTotalCollections: "Sammlungen",
@@ -3596,6 +3601,7 @@ const es: TranslationMap = {
   subTabRequests: "Solicitudes de amistad",
   statsTotalItems: "Objetos en total",
   statsTotalValue: "Valor total",
+  statsTotalValueApprox: "Sumado sin tipos de cambio — la cifra mezcla monedas.",
   statsTotalValuePartial: (params?: TranslationParams) =>
     `Sin convertir: ${params?.count ?? 0} ${plural(params?.count, "objeto", "objetos")}`,
   statsTotalCollections: "Colecciones",

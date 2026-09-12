@@ -242,8 +242,7 @@ export default function HomeScreen() {
           <CollectionCard
             collection={collection}
             count={countItemsForCollection(collection.id)}
-            totalCost={totalCost.amount}
-            totalCostCurrency={totalCost.currency}
+            total={totalCost}
           />
         </Pressable>
       </ScaleDecorator>
@@ -489,7 +488,7 @@ export default function HomeScreen() {
                       {friendsWindow.visibleItems.map((collection) => {
                         const total = getCollectionTotalCost(collection.id);
                         return (
-                          <CollectionCard key={collection.id} collection={collection} count={countItemsForCollection(collection.id)} totalCost={total.amount} totalCostCurrency={total.currency} />
+                          <CollectionCard key={collection.id} collection={collection} count={countItemsForCollection(collection.id)} total={total} />
                         );
                       })}
                       {renderLoadMore(friendsWindow)}
@@ -514,7 +513,7 @@ export default function HomeScreen() {
                     {subscribedWindow.visibleItems.map((collection) => {
                       const total = getCollectionTotalCost(collection.id);
                       return (
-                        <CollectionCard key={collection.id} collection={collection} count={countItemsForCollection(collection.id)} totalCost={total.amount} totalCostCurrency={total.currency} />
+                        <CollectionCard key={collection.id} collection={collection} count={countItemsForCollection(collection.id)} total={total} />
                       );
                     })}
                     {renderLoadMore(subscribedWindow)}

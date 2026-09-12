@@ -97,6 +97,7 @@ export default function StatsScreen() {
             <CostBadge
               amount={ownedTotalCost.amount}
               currency={ownedTotalCost.currency}
+              approximate={ownedTotalCost.approximate}
               style={styles.summaryNumber}
             />
           ) : (
@@ -104,13 +105,24 @@ export default function StatsScreen() {
           )}
           <Text style={styles.summaryLabel}>{t("statsTotalValue")}</Text>
           {/*
-            A portfolio spans currencies, so a rate table missing one of them
-            is the ordinary case rather than the pathological one — and a total
-            that silently drops those items is a wrong headline figure. The
-            collection cards can stay quiet about `skipped`; the screen whose
-            whole job is the total cannot.
+            Two ways the headline figure can be less than it looks, said in
+            the order of how wrong it is.
+
+            `approximate` is the worse claim and wins: a total summed with no
+            rate table at all is in no single currency, not merely short of a
+            few items — and this screen said nothing about it while saying
+            "excludes N items" about the other. The same gap the PDF export
+            had, on the surface where the number IS the point.
+
+            `skipped` is the ordinary case: a portfolio spans currencies, so a
+            rate table missing one of them is expected rather than
+            pathological, and a total that silently drops those items is a
+            wrong headline. The collection cards can stay quiet about it; the
+            screen whose whole job is the total cannot.
           */}
-          {ownedTotalCost.skipped > 0 ? (
+          {ownedTotalCost.approximate ? (
+            <Text style={styles.summaryHint}>{t("statsTotalValueApprox")}</Text>
+          ) : ownedTotalCost.skipped > 0 ? (
             <Text style={styles.summaryHint}>
               {t("statsTotalValuePartial", { count: ownedTotalCost.skipped })}
             </Text>

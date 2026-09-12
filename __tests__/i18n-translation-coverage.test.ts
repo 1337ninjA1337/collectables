@@ -560,7 +560,13 @@ describe("translation floors", () => {
     // did not hold, or be a sum of raw amounts across currencies labelled
     // with one of them, and the document said neither — permanently, in the
     // one output a user keeps, mails and files.
-    assert.match(report, /en: 537\/537 keys \(100\.0%\)/);
+    // 538 later that day: `statsTotalValueApprox`. The export learned to say
+    // when its total had been summed without a rate table and the three
+    // in-app surfaces showing the same figure said nothing — on the argument
+    // that they re-render, which is an argument for a quieter marker than a
+    // sentence rather than for silence. The cards took the `≈` they already
+    // print; the screen whose whole job is one total took the words.
+    assert.match(report, /en: 538\/538 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
