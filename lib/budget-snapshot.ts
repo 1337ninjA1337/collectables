@@ -77,6 +77,14 @@ export type BudgetSnapshot = {
  */
 export const BUDGET_HISTORY: readonly BudgetSnapshot[] = [
   {
+    budgetBytes: 4.60 * 1024 * 1024,
+    bundleBytes: 4_802_272,
+    translationsBytes: 243_824,
+    takenOn: "2026-09-12",
+    because:
+      "seven rounds of ordinary work — a typed bulk-bar contract, two composed outcome toasts, a shared separator, a search-row cost fix and two marketplace locks — 16.3 KiB, of which 4.9 KiB is copy",
+  },
+  {
     budgetBytes: 4.59 * 1024 * 1024,
     bundleBytes: Math.round(4673.4 * 1024),
     translationsBytes: 238_763,

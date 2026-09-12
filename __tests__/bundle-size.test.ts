@@ -52,8 +52,8 @@ describe("the budget is a headroom, not a round number", () => {
 });
 
 describe("resolveBundleSizeBudget", () => {
-  it("defaults to 4.59 MiB when the env var is unset or empty", () => {
-    assert.equal(DEFAULT_BUNDLE_SIZE_BUDGET_BYTES, 4.59 * 1024 * 1024);
+  it("defaults to 4.60 MiB when the env var is unset or empty", () => {
+    assert.equal(DEFAULT_BUNDLE_SIZE_BUDGET_BYTES, 4.60 * 1024 * 1024);
     assert.equal(resolveBundleSizeBudget({}), DEFAULT_BUNDLE_SIZE_BUDGET_BYTES);
     assert.equal(
       resolveBundleSizeBudget({ BUNDLE_SIZE_BUDGET_BYTES: "" }),

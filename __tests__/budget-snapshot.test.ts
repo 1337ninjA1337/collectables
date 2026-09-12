@@ -99,6 +99,41 @@ describe("the snapshot still supports the argument it exists for", () => {
     );
   });
 
+  it("no raise in the record ever bought more than the smallest SDK", () => {
+    // The ceiling the fifth raise found, applied backwards over the whole
+    // history rather than only to the live head. A raise buys
+    // `budget - bundle` at the commit that took the measurement, and a raise
+    // that bought 30 KiB or more would have handed a statically-imported
+    // Clarity a place to land — which is the entire thing this budget is for.
+    // It is also why "raise it by the usual 0.02 MiB" is not a step that can
+    // be taken without measuring: what the ladder can afford depends on where
+    // the bundle already is.
+    for (const row of BUDGET_HISTORY) {
+      const bought = row.budgetBytes - row.bundleBytes;
+      assert.ok(
+        bought > 0,
+        `the ${row.takenOn} raise recorded a budget under its own measurement`,
+      );
+      assert.ok(
+        bought < SMALLEST_GUARDED_SDK_BYTES,
+        `the ${row.takenOn} raise bought ${String(Math.round(bought / 1024))} KiB, at or above the smallest SDK the gate has to catch`,
+      );
+    }
+  });
+
+  it("every raise also cleared the floor it was taken to clear", () => {
+    // The other bound, and the reason a raise happens at all: a budget that
+    // buys less than the re-argue floor is one the next ordinary diff turns
+    // red, which puts the wrong cause on the failure.
+    for (const row of BUDGET_HISTORY) {
+      const bought = row.budgetBytes - row.bundleBytes;
+      assert.ok(
+        bought > BUDGET_REARGUE_FLOOR_BYTES,
+        `the ${row.takenOn} raise bought ${String(Math.round(bought / 1024))} KiB, under the floor it was taken to clear`,
+      );
+    }
+  });
+
   it("records a copy figure that still describes the translations module", () => {
     // A drift of zero on a commit that did not touch the translations is what
     // says the pair is in step; a large one means somebody moved the budget
