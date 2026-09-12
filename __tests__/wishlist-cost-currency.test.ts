@@ -107,12 +107,28 @@ describe("what the save writes", () => {
     assert.match(SAVE, /costCurrency: parsedCost\.value !== null \? currency : null,/);
   });
 
-  it("does not move the app-wide display currency", () => {
-    // app/create.tsx writes the preference back; app/item/[id].tsx's edit form
-    // does not. A want is the wrong act to reset a global on — it is a thing
-    // you do not own, often priced in a currency you are passing through.
-    assert.ok(!BODY.includes("setUserPreferredCurrency"), "adding a want moves a global");
-    assert.ok(BODY.includes("getUserPreferredCurrency"), "the preference is not even read");
+  it("remembers the picked currency the way every other input does", () => {
+    // The first draft of this screen read the preference without writing it,
+    // on a reading of the other two forms that was simply wrong: BOTH of
+    // `app/item/[id].tsx`'s inputs write it, as does `app/create.tsx`. An
+    // input that seeds itself from the preference and never writes takes the
+    // convenience without paying for it — the collector who switches to JPY
+    // here is asked again on the next screen. `currency-input-consistency`
+    // is the sweep that would have caught it.
+    assert.ok(BODY.includes("getUserPreferredCurrency"), "the preference is not read");
+    assert.ok(BODY.includes("setUserPreferredCurrency"), "the preference is not written");
+    assert.match(BODY, /function setCurrency\(next: string\) \{\s*setCurrencyState\(next\);\s*void setUserPreferredCurrency\(next\);\s*\}/);
+  });
+
+  it("hydrates through the raw setter, not the writing one", () => {
+    // Writing back what was just read is a round-trip that can only ever
+    // re-persist the value it came from.
+    const effect = BODY.slice(
+      BODY.indexOf("void getUserPreferredCurrency()"),
+      BODY.indexOf("const [promoteFor"),
+    );
+    assert.ok(effect.length > 0, "could not parse the hydration effect");
+    assert.ok(effect.includes("setCurrencyState(stored)"), "hydration re-persists what it read");
   });
 
   it("keeps the currency across a reset and clears everything else", () => {

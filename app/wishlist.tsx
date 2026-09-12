@@ -66,7 +66,7 @@ import {
   type CurrencyValueError,
 } from "@/lib/format-currency-input";
 import { useI18n } from "@/lib/i18n-context";
-import { getUserPreferredCurrency } from "@/lib/locale-helpers";
+import { getUserPreferredCurrency, setUserPreferredCurrency } from "@/lib/locale-helpers";
 import { useMarketplace } from "@/lib/marketplace-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
@@ -117,14 +117,24 @@ export default function WishlistScreen() {
   const [cost, setCost] = useState("");
   const [costError, setCostError] = useState<CurrencyValueError | null>(null);
   // Seeded from the language so the field is never blank, then replaced by the
-  // stored preference once it hydrates. The preference is READ and not
-  // written: `app/create.tsx` writes it back (picking a currency for one item
-  // moves the whole app's display currency), and `app/item/[id].tsx`'s edit
-  // form does not. A want is the wrong act to reset a global on — it is a
-  // thing you do not own, often priced in a currency you are only passing
-  // through. <CurrencyInput> still records the MRU pin itself, so the code
-  // leads the strip next time either way.
-  const [currency, setCurrency] = useState(() => getDefaultCurrencyForLanguage(language));
+  // stored preference once it hydrates — the shape all four currency inputs
+  // in the app share.
+  const [currency, setCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
+  // Read AND written, like the other three. `setUserPreferredCurrency` is
+  // documented as "so a power user who picked JPY once doesn't have to
+  // re-pick on the next form", and every input seeds itself from it — so an
+  // input that reads without writing takes the convenience and does not pay
+  // for it, and the collector who switches to JPY here is asked again on the
+  // next screen. `currency-input-consistency.test.ts` is the sweep that says
+  // a fifth input cannot quietly differ either.
+  //
+  // <CurrencyInput> records the MRU pin itself, which is a different fact:
+  // the pin orders the chip strip, the preference decides what a form opens
+  // with.
+  function setCurrency(next: string) {
+    setCurrencyState(next);
+    void setUserPreferredCurrency(next);
+  }
   const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -132,7 +142,11 @@ export default function WishlistScreen() {
     let cancelled = false;
     void getUserPreferredCurrency().then((stored) => {
       if (cancelled || !stored) return;
-      setCurrency(stored);
+      // The RAW setter: hydration is not a choice, and writing back what was
+      // just read is a round-trip through storage that can only ever
+      // re-persist the value it came from. `app/item/[id].tsx`'s hydration
+      // effect reaches for its raw setter for the same reason.
+      setCurrencyState(stored);
     });
     return () => {
       cancelled = true;
