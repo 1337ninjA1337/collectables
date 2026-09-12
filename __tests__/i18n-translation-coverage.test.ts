@@ -536,7 +536,14 @@ describe("translation floors", () => {
     // describing two inches higher as one they no longer have — and the
     // archived items likeliest to be re-listed are the ones that got there
     // through the sold prompt. Translated in all six locales.
-    assert.match(report, /en: 527\/527 keys \(100\.0%\)/);
+    // 530 later that day: `archiveListedTitle`, `archiveListedBody` and
+    // `archiveActionDoneListingRemoved`. The previous round stopped a listing
+    // being CREATED for an archived item and said nothing about the reverse
+    // order, which is the likelier one — a seller archives after agreeing a
+    // sale off-platform, and the listing stayed in the browse feed for every
+    // buyer. The item comes back and the listing does not, so the confirm has
+    // to say so; that sentence is why this is three keys and not one.
+    assert.match(report, /en: 530\/530 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

@@ -50,16 +50,25 @@ describe("the archive action", () => {
     assert.match(SRC, /!isArchived\(activeItem\)/);
   });
 
-  it("takes no confirm, and carries an undo instead", () => {
-    // Archiving is reversible in two places now (this screen's banner and the
+  it("takes no confirm on an unlisted item, and carries an undo instead", () => {
+    // Archiving is reversible in two places (this screen's banner and the
     // archive screen), so a confirm would be an obstacle in front of a
     // reversible action. The undo covers the tap that was a mistake — the
     // same shape the sold-listing prompt uses.
+    //
+    // The LISTED branch is the exception and came later: archiving an item
+    // that is on the marketplace withdraws something other people can see,
+    // and `addListing` mints a new id so it cannot be put back. That branch
+    // asks first and offers no undo — see `archive-retires-listing.test.ts`.
+    // This case is about the ordinary one, so it reads the ordinary branch
+    // rather than the whole handler.
     const handler = SRC.slice(SRC.indexOf("function handleArchive"), SRC.indexOf("function handleRestore"));
-    assert.ok(!handler.includes("confirmDialog"));
-    assert.ok(!handler.includes("Alert.alert"));
-    assert.match(handler, /label: t\("undo"\)/);
-    assert.match(handler, /void unarchiveItem\(archivedId\)/);
+    const plain = handler.slice(handler.indexOf("void archiveItem(archivedId).then"));
+    assert.ok(plain.length > 0, "could not parse the unlisted branch");
+    assert.ok(!plain.includes("confirmDialog"));
+    assert.ok(!plain.includes("Alert.alert"));
+    assert.match(plain, /label: t\("undo"\)/);
+    assert.match(plain, /void unarchiveItem\(archivedId\)/);
   });
 
   it("captures the id before the await", () => {

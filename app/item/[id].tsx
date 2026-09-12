@@ -39,6 +39,8 @@ import { useAuth } from "@/lib/auth-context";
 import { uploadImages } from "@/lib/cloudinary";
 import { announceMessage } from "@/lib/announce";
 import { isArchived } from "@/lib/collections-helpers";
+import { confirmDialog } from "@/lib/confirm-dialog";
+import { shouldRetireListingOnArchive } from "@/lib/marketplace-helpers";
 import { useCollections } from "@/lib/collections-context";
 import { hasFiniteCost } from "@/lib/item-cost";
 import { useI18n } from "@/lib/i18n-context";
@@ -413,6 +415,32 @@ export default function ItemDetailsScreen() {
    */
   function handleArchive() {
     const archivedId = activeItem.id;
+    const retiring = shouldRetireListingOnArchive(existingListing);
+
+    // An item with an OPEN listing is the case where archiving is not a
+    // private act: the listing stays in the browse feed for every buyer
+    // otherwise, under an item its owner has said they no longer have. Taking
+    // it down is the right answer and it is not undoable — `addListing` mints
+    // a new id and a new `createdAt` — so this branch asks first and then
+    // offers no undo, rather than an undo that quietly restores half of what
+    // it took.
+    if (retiring && existingListing) {
+      const listingId = existingListing.id;
+      void (async () => {
+        const ok = await confirmDialog({
+          title: t("archiveListedTitle"),
+          body: t("archiveListedBody"),
+          confirmLabel: t("archiveAction"),
+          cancelLabel: t("cancel"),
+        });
+        if (!ok) return;
+        removeListing(listingId);
+        await archiveItem(archivedId);
+        toast.success(t("archiveActionDoneListingRemoved"));
+      })();
+      return;
+    }
+
     void archiveItem(archivedId).then(() => {
       toast.show({
         type: "success",

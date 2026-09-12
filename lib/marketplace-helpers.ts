@@ -184,6 +184,34 @@ export function removeListingById(
 }
 
 /**
+ * Should archiving this item take its listing down with it?
+ *
+ * Archiving an item said nothing to the marketplace, so a live listing
+ * outlived its item's archive and stayed in {@link activeListings} for every
+ * buyer — while the item screen, under a banner reading "this item is
+ * archived", still showed it as listed. The lock that stops a listing being
+ * CREATED for an archived item says nothing about this order, and this is the
+ * likelier one: a seller archives AFTER agreeing a sale off-platform.
+ *
+ * **A sold listing stays.** The sold-listing prompt archives the item as the
+ * final step of a sale that already happened, and the listing is that sale's
+ * record — the buyer's purchase list, the transfer log and "recently sold" all
+ * read it. Removing it there would delete the history the archive exists to
+ * keep, which is the same argument `archivedAt` itself is built on.
+ *
+ * So the question is exactly "is there a listing, and is it still open?", and
+ * it is a function rather than an `if` on a screen because the previous round
+ * put its rule in a component and the next caller — a bulk archive — will not
+ * inherit one that lives there.
+ */
+export function shouldRetireListingOnArchive(
+  listing: MarketplaceListing | undefined | null,
+): boolean {
+  if (!listing) return false;
+  return !listing.soldAt;
+}
+
+/**
  * Listings that should appear on the marketplace browse page: not sold,
  * sorted newest-first.
  */
