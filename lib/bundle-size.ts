@@ -67,6 +67,38 @@
 export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.59 * 1024 * 1024;
 
 /**
+ * The bundle as it stood when the budget last moved: 4673.4 KiB, measured on
+ * 2026-09-12 by `npm run lint:bundle-size` against a fresh `dist/`.
+ *
+ * Beside the budget rather than inside a test, which is where it lived: the
+ * doc block above argues from it in every paragraph, `bundle-size.test.ts`
+ * holds the two bounds against it, and the report prints the drift from it —
+ * three readers and, until now, one of them owning it. A number a test owns
+ * is a number the tool cannot say out loud.
+ *
+ * A MEASUREMENT, never a re-measurement: reading `dist/` for it would make
+ * every claim depend on whether somebody had built, and would turn a real
+ * regression into a number that quietly re-derives its own expectation. It
+ * moves when the budget moves, and only then — so the drift the report prints
+ * is "since the last time somebody argued about this", which is the question
+ * a raise has to answer.
+ */
+export const LAST_MEASURED_BUNDLE_BYTES = Math.round(4673.4 * 1024);
+
+/**
+ * The point at which the report stops saying "OK" and starts asking for an
+ * argument.
+ *
+ * `bundle-size.test.ts` has held this bound since the second raise: below it,
+ * the gate fails on ordinary feature work rather than on an accidental SDK,
+ * which is not what it is for. It was a rule only the suite knew, so a build
+ * sat at 3.7 KiB of headroom and reported "OK" — green, and one ordinary diff
+ * from a red CI that would have named the wrong cause. The report says it now,
+ * on the build that is actually close.
+ */
+export const BUDGET_REARGUE_FLOOR_BYTES = 8 * 1024;
+
+/**
  * The smallest SDK the budget must still catch as a static import, in bytes.
  *
  * Clarity's browser bundle, the smaller of the two the doc block names. The
@@ -86,6 +118,22 @@ export type BundleSizeResult = {
   readonly overBudget: boolean;
   /** Positive when under budget, negative when over. */
   readonly headroomBytes: number;
+  /**
+   * Growth since {@link LAST_MEASURED_BUNDLE_BYTES} — how much this build has
+   * spent of what the last raise bought.
+   *
+   * The budget has moved four times in three days and nothing recorded what
+   * was buying the space, so each raise was argued against the one before it
+   * rather than against a trend. This is the missing number, printed on every
+   * build rather than reconstructed from git when somebody wonders.
+   */
+  readonly driftBytes: number;
+  /**
+   * True when the headroom has fallen below {@link BUDGET_REARGUE_FLOOR_BYTES}
+   * while still being under budget: the build passes, and the NEXT ordinary
+   * diff will not.
+   */
+  readonly nearFloor: boolean;
 };
 
 /**
@@ -110,11 +158,17 @@ export function evaluateBundleSize(
   budgetBytes: number,
 ): BundleSizeResult {
   const totalBytes = files.reduce((sum, f) => sum + f.bytes, 0);
+  const headroomBytes = budgetBytes - totalBytes;
   return {
     totalBytes,
     budgetBytes,
     overBudget: totalBytes > budgetBytes,
-    headroomBytes: budgetBytes - totalBytes,
+    headroomBytes,
+    driftBytes: totalBytes - LAST_MEASURED_BUNDLE_BYTES,
+    // Only while still under budget: over budget the report has a louder
+    // thing to say, and "you are near the floor" under "you are through it"
+    // reads as a smaller problem than the one on screen.
+    nearFloor: headroomBytes >= 0 && headroomBytes < BUDGET_REARGUE_FLOOR_BYTES,
   };
 }
 
@@ -145,5 +199,32 @@ export function formatBundleSizeReport(
       `check-bundle-size: OK — ${formatKiB(result.headroomBytes)} of headroom left.`,
     );
   }
+  lines.push(formatDriftLine(result));
+  if (result.nearFloor) {
+    lines.push(
+      `check-bundle-size: headroom is under ${formatKiB(BUDGET_REARGUE_FLOOR_BYTES)} — this build passes and the next ordinary diff will not.`,
+      "Re-measure and re-argue the budget in lib/bundle-size.ts rather than",
+      "rounding it up until the build goes green; the headroom is chosen against",
+      "the smallest SDK the gate has to catch, not against comfort.",
+    );
+  }
   return lines.join("\n");
+}
+
+/**
+ * "Spent 17.9 KiB of the 26.8 KiB the last raise bought" — the sentence the
+ * budget's doc block asks for and nothing was producing.
+ *
+ * Signed, and the zero case says so explicitly rather than printing "+0.0
+ * KiB": a build at the recorded measurement is the one that just moved the
+ * budget, and reading it as growth is how a raise gets argued twice.
+ */
+export function formatDriftLine(result: BundleSizeResult): string {
+  const bought = result.budgetBytes - LAST_MEASURED_BUNDLE_BYTES;
+  if (result.driftBytes === 0) {
+    return `check-bundle-size: at the recorded measurement — ${formatKiB(bought)} bought by the last raise, none of it spent.`;
+  }
+  const sign = result.driftBytes > 0 ? "+" : "-";
+  const spent = `${sign}${formatKiB(Math.abs(result.driftBytes))}`;
+  return `check-bundle-size: ${spent} since the last budget move, of the ${formatKiB(bought)} it bought.`;
 }

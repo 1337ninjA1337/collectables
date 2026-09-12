@@ -3,9 +3,12 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  BUDGET_REARGUE_FLOOR_BYTES,
   DEFAULT_BUNDLE_SIZE_BUDGET_BYTES,
   evaluateBundleSize,
   formatBundleSizeReport,
+  formatDriftLine,
+  LAST_MEASURED_BUNDLE_BYTES,
   resolveBundleSizeBudget,
   SMALLEST_GUARDED_SDK_BYTES,
 } from "../lib/bundle-size";
@@ -13,16 +16,14 @@ import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("the budget is a headroom, not a round number", () => {
   /**
-   * The bundle at the commit that last moved the budget: 4673.4 KiB, measured
-   * on 2026-09-12 by `npm run lint:bundle-size` against a fresh `dist/`.
+   * The bundle at the commit that last moved the budget.
    *
-   * A measured number rather than a re-measurement, because this case is about
-   * the RELATIONSHIP and not about today's size — reading `dist/` here would
-   * make the claim depend on whether somebody had built, and would turn a real
-   * regression into a case that quietly re-derives its own expectation. It
-   * moves when the budget moves, and only then.
+   * This suite declared its own copy of the number, which is how a measurement
+   * three readers argue from ended up owned by the one that cannot print it.
+   * It lives beside the budget now, with the reasoning for why it is a
+   * measurement rather than a re-measurement, and this case reads it.
    */
-  const MEASURED_BUNDLE_BYTES = Math.round(4673.4 * 1024);
+  const MEASURED_BUNDLE_BYTES = LAST_MEASURED_BUNDLE_BYTES;
 
   it("keeps less headroom than the smallest SDK it has to catch", () => {
     // The whole point of the gate. With MORE headroom than Clarity (~30 KiB), a
@@ -42,8 +43,9 @@ describe("the budget is a headroom, not a round number", () => {
     // of headroom the gate failed on a commit that added five provider guards
     // and one small module, which is not what it was written to catch.
     const headroom = DEFAULT_BUNDLE_SIZE_BUDGET_BYTES - MEASURED_BUNDLE_BYTES;
+    assert.equal(BUDGET_REARGUE_FLOOR_BYTES, 8 * 1024);
     assert.ok(
-      headroom > 8 * 1024,
+      headroom > BUDGET_REARGUE_FLOOR_BYTES,
       `headroom is ${String(Math.round(headroom / 1024))} KiB — a budget this tight fails on ordinary work rather than on an accidental SDK`,
     );
   });
