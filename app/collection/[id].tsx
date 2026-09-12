@@ -453,16 +453,36 @@ export default function CollectionDetailsScreen() {
     for (const listing of selectedOpenListings) removeListing(listing.id);
   }, [selectedOpenListings, removeListing]);
 
+  /**
+   * What the outcome toast adds when listings went with the items.
+   *
+   * The confirms counted listings and the toasts counted only rows, so a
+   * seller who archived thirty and withdrew four was told about the thirty —
+   * the half they most need to have seen, because it is the half other people
+   * can see. Composed onto the existing counted message rather than a second
+   * pair of keys, which is the same shape the confirms use.
+   */
+  const listedOutcome = useCallback(
+    () =>
+      selectedOpenListings.length > 0
+        ? ` ${t("bulkListingsRemoved", { count: selectedOpenListings.length })}`
+        : "",
+    [selectedOpenListings, t],
+  );
+
   const performBulkDelete = useCallback(async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     // The listings first, for the same reason the single-item paths do it:
     // an item removed first is one whose listing removal can be lost.
     retireSelectedListings();
+    // Read before the delete: `selectedOpenListings` is derived from the
+    // selection, and `exitSelectionMode` empties it two lines down.
+    const outcome = listedOutcome();
     await deleteItems(ids);
-    toast.success(t("itemsDeleted", { count: ids.length }));
+    toast.success(`${t("itemsDeleted", { count: ids.length })}${outcome}`);
     exitSelectionMode();
-  }, [selectedIds, retireSelectedListings, deleteItems, toast, t, exitSelectionMode]);
+  }, [selectedIds, retireSelectedListings, listedOutcome, deleteItems, toast, t, exitSelectionMode]);
 
   const handleBulkDelete = useCallback(() => {
     const count = selectedIds.size;
@@ -487,10 +507,11 @@ export default function CollectionDetailsScreen() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     retireSelectedListings();
+    const outcome = listedOutcome();
     await archiveItems(ids);
-    toast.success(t("itemsArchived", { count: ids.length }));
+    toast.success(`${t("itemsArchived", { count: ids.length })}${outcome}`);
     exitSelectionMode();
-  }, [selectedIds, retireSelectedListings, archiveItems, toast, t, exitSelectionMode]);
+  }, [selectedIds, retireSelectedListings, listedOutcome, archiveItems, toast, t, exitSelectionMode]);
 
   /**
    * Archiving a selection asks only when it would withdraw a listing.

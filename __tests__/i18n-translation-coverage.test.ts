@@ -566,7 +566,12 @@ describe("translation floors", () => {
     // that they re-render, which is an argument for a quieter marker than a
     // sentence rather than for silence. The cards took the `≈` they already
     // print; the screen whose whole job is one total took the words.
-    assert.match(report, /en: 538\/538 keys \(100\.0%\)/);
+    // 539 later that day: `bulkListingsRemoved`. Both bulk confirms counted
+    // the listings a selection would withdraw and both outcome toasts counted
+    // only the rows, so a seller who archived thirty items and took four
+    // listings down was told about the thirty — the half they least need,
+    // since the other half is the one other people can see.
+    assert.match(report, /en: 539\/539 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

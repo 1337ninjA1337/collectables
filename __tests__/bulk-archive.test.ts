@@ -199,6 +199,33 @@ describe("the collection screen's bulk resolutions", () => {
     assert.match(archiveHandler, /if \(selectedOpenListings\.length === 0\) \{\s*void performBulkArchive\(\);\s*return;\s*\}/);
   });
 
+  it("tells the user how many listings went, not just how many rows", () => {
+    // The confirms counted listings and the toasts counted only rows, so a
+    // seller who archived thirty and withdrew four was told about the thirty
+    // — the half they most need to have seen, because it is the half other
+    // people can see.
+    assert.match(
+      SRC,
+      /selectedOpenListings\.length > 0\s*\?\s*` \$\{t\("bulkListingsRemoved", \{ count: selectedOpenListings\.length \}\)\}`\s*:\s*""/,
+    );
+    assert.match(SRC, /toast\.success\(`\$\{t\("itemsArchived", \{ count: ids\.length \}\)\}\$\{outcome\}`\)/);
+    assert.match(SRC, /toast\.success\(`\$\{t\("itemsDeleted", \{ count: ids\.length \}\)\}\$\{outcome\}`\)/);
+  });
+
+  it("reads the listing count before the selection is cleared", () => {
+    // `selectedOpenListings` is derived from `selectedIds`, and
+    // `exitSelectionMode` empties it two lines below the toast. Composing the
+    // string after the await but before the exit is the whole reason this is
+    // a local rather than a second call.
+    for (const perform of ["const performBulkDelete", "const performBulkArchive"] as const) {
+      const body = SRC.slice(SRC.indexOf(perform), SRC.indexOf(perform.replace("perform", "handle")));
+      assert.ok(
+        body.indexOf("const outcome = listedOutcome();") < body.indexOf("exitSelectionMode();"),
+        `${perform} composes its outcome after the selection is cleared`,
+      );
+    }
+  });
+
   it("does not style the archive confirm as destructive", () => {
     // Bounded by the handler's own dep array rather than by the next JSX
     // tag: a slice that ran to `<BulkBar>` swept up the DELETE confirm, whose
@@ -214,7 +241,13 @@ describe("the collection screen's bulk resolutions", () => {
 
 describe("the four bulk strings are translated everywhere", () => {
   const I18N = readI18nSource();
-  const KEYS = ["itemsArchived", "archiveItemsTitle", "archiveItemsText", "bulkListedWarning"] as const;
+  const KEYS = [
+    "itemsArchived",
+    "archiveItemsTitle",
+    "archiveItemsText",
+    "bulkListedWarning",
+    "bulkListingsRemoved",
+  ] as const;
 
   for (const key of KEYS) {
     it(`${key} is declared by every locale`, () => {
@@ -223,7 +256,12 @@ describe("the four bulk strings are translated everywhere", () => {
   }
 
   it("the three counted ones actually read the count", () => {
-    for (const key of ["itemsArchived", "archiveItemsTitle", "bulkListedWarning"] as const) {
+    for (const key of [
+      "itemsArchived",
+      "archiveItemsTitle",
+      "bulkListedWarning",
+      "bulkListingsRemoved",
+    ] as const) {
       for (const [code, value] of localeValuesOf(I18N, key)) {
         assert.ok(value.includes("params?.count"), `${code}'s '${key}' drops the count`);
       }
@@ -236,6 +274,19 @@ describe("the four bulk strings are translated everywhere", () => {
     for (const code of ["ru", "be", "pl"]) {
       const value = localeValuesOf(I18N, "archiveItemsTitle").get(code) ?? "";
       assert.match(value, /slavicPlural\(/, `${code} pins one noun form in a counted title`);
+    }
+  });
+
+  it("the warning and the outcome are different sentences", () => {
+    // One is a confirm asking about something that has not happened; the
+    // other reports what did. A locale that reused the warning would tell a
+    // seller their listings "will be taken down" after they already were.
+    for (const [code, warning] of localeValuesOf(I18N, "bulkListedWarning")) {
+      assert.notEqual(
+        warning,
+        localeValuesOf(I18N, "bulkListingsRemoved").get(code),
+        `${code} uses one sentence for the question and the answer`,
+      );
     }
   });
 
