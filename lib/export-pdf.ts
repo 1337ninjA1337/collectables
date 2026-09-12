@@ -10,17 +10,22 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { Platform } from "react-native";
 
-import { buildCollectionExportHtml, type ExportLabels } from "@/lib/export-pdf-html";
+import {
+  buildCollectionExportHtml,
+  type ExportLabels,
+  type ExportMoney,
+} from "@/lib/export-pdf-html";
 import { CollectableItem, Collection } from "@/lib/types";
 
-export type { ExportLabels };
+export type { ExportLabels, ExportMoney };
 
 export async function exportCollectionToPdf(
   collection: Collection,
   items: CollectableItem[],
   labels: ExportLabels,
+  money: ExportMoney,
 ): Promise<void> {
-  const html = buildCollectionExportHtml(collection, items, labels);
+  const html = buildCollectionExportHtml(collection, items, labels, money);
 
   if (Platform.OS === "web") {
     const w = window.open("", "_blank");

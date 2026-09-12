@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { buildCollectionExportHtml, type ExportLabels } from "@/lib/export-pdf-html";
+import { collectionTotalCost } from "@/lib/collection-total";
+import type { UsdRates } from "@/lib/currency-rates";
+import {
+  buildCollectionExportHtml,
+  type ExportLabels,
+  type ExportMoney,
+} from "@/lib/export-pdf-html";
+import { convertItemCost } from "@/lib/item-cost";
 import type { CollectableItem, Collection } from "@/lib/types";
 
 /**
@@ -32,6 +39,28 @@ const LABELS: ExportLabels = {
 };
 
 const PRINTED_ON = new Date("2026-01-02T03:04:05Z");
+
+const RATES: UsdRates = { USD: 1, EUR: 0.5 };
+
+/**
+ * The money the collection screen hands the builder, computed the way the
+ * screen computes it.
+ *
+ * The document does not convert — it prints answers the caller resolved
+ * against the live rate table, which is how the PDF ends up showing the same
+ * figures the screen showed rather than a second implementation's.
+ */
+function money(
+  items: CollectableItem[],
+  col: Collection = collection(),
+  rates: UsdRates | null = RATES,
+): ExportMoney {
+  const target = col.currency ?? "USD";
+  return {
+    total: collectionTotalCost(items, target, rates),
+    itemCost: (item) => convertItemCost(item, target, rates),
+  };
+}
 
 function collection(overrides: Partial<Collection> = {}): Collection {
   return {
@@ -72,6 +101,7 @@ describe("the collection export document", () => {
       collection({ name: "<script>alert(1)</script>", description: "a & b" }),
       [item({ title: "<img onerror=x>" })],
       LABELS,
+      money([]),
       PRINTED_ON,
     );
     // The only tags in the document are the ones the template wrote. A `<` that
@@ -89,6 +119,7 @@ describe("the collection export document", () => {
       collection(),
       [item({ photos: ['x.png" onerror="alert(1)'] })],
       LABELS,
+      money([]),
       PRINTED_ON,
     );
     assert.ok(!html.includes('onerror="alert(1)"'), "a photo URL escaped its attribute");
@@ -100,6 +131,7 @@ describe("the collection export document", () => {
       collection(),
       [item({ photos: ["a.png", "b.png"] }), item({ id: "i2", photos: ["c.png"] })],
       LABELS,
+      money([]),
       PRINTED_ON,
     );
     assert.match(html, /<div class="stat-value">2<\/div>\s*<div class="stat-label">Items<\/div>/);
@@ -109,25 +141,30 @@ describe("the collection export document", () => {
   it("adds the cost stat only when something cost something", () => {
     // `cost` is `number | null | undefined`, so the sum has to skip two kinds of
     // absence — and a collection of free items must not print a "Total cost 0".
+    const freeItems = [item({ cost: null }), item({ id: "i2" })];
     const free = buildCollectionExportHtml(
       collection(),
-      [item({ cost: null }), item({ id: "i2" })],
+      freeItems,
       LABELS,
+      money(freeItems),
       PRINTED_ON,
     );
     assert.ok(!free.includes("Total cost"), "a collection with no costs printed a total");
 
+    const paidItems = [item({ cost: 12 }), item({ id: "i2", cost: null }), item({ id: "i3", cost: 30 })];
     const paid = buildCollectionExportHtml(
       collection(),
-      [item({ cost: 12 }), item({ id: "i2", cost: null }), item({ id: "i3", cost: 30 })],
+      paidItems,
       LABELS,
+      money(paidItems),
       PRINTED_ON,
     );
-    assert.match(paid, /<div class="stat-value">42<\/div>\s*<div class="stat-label">Total cost<\/div>/);
+    // "42" before this round, in no currency at all.
+    assert.match(paid, /<div class="stat-value">42 USD<\/div>\s*<div class="stat-label">Total cost<\/div>/);
   });
 
   it("prints a field only when the item has one", () => {
-    const bare = buildCollectionExportHtml(collection(), [item()], LABELS, PRINTED_ON);
+    const bare = buildCollectionExportHtml(collection(), [item()], LABELS, money([]), PRINTED_ON);
     for (const label of ["Acquired how", "Acquired date", "Description", "Variants", "Cost"]) {
       assert.ok(!bare.includes(label), `an empty item printed the \`${label}\` field`);
     }
@@ -144,6 +181,7 @@ describe("the collection export document", () => {
         }),
       ],
       LABELS,
+      money([item({ cost: 0 })]),
       PRINTED_ON,
     );
     for (const label of ["Acquired how", "Acquired date", "Description", "Variants", "Cost"]) {
@@ -158,7 +196,12 @@ describe("the collection export document", () => {
   it("does not read the clock, so the same collection prints the same document", () => {
     // The footer used to call `new Date()` inside the builder, which made the
     // output different on every call and unassertable. The date is a parameter.
-    const args: [Collection, CollectableItem[], ExportLabels] = [collection(), [item()], LABELS];
+    const args: [Collection, CollectableItem[], ExportLabels, ExportMoney] = [
+      collection(),
+      [item()],
+      LABELS,
+      money([]),
+    ];
     assert.equal(
       buildCollectionExportHtml(...args, PRINTED_ON),
       buildCollectionExportHtml(...args, PRINTED_ON),
@@ -170,7 +213,7 @@ describe("the collection export document", () => {
   });
 
   it("renders an empty collection without an items section", () => {
-    const html = buildCollectionExportHtml(collection(), [], LABELS, PRINTED_ON);
+    const html = buildCollectionExportHtml(collection(), [], LABELS, money([]), PRINTED_ON);
     assert.ok(!html.includes('class="item"'), "an empty collection rendered an item card");
     assert.match(html, /<div class="stat-value">0<\/div>\s*<div class="stat-label">Items<\/div>/);
   });

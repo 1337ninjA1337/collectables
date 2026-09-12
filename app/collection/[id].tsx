@@ -88,6 +88,7 @@ export default function CollectionDetailsScreen() {
     getCollectionById,
     getItemsForCollection,
     getCollectionTotalCost,
+    convertItemCost,
     deleteCollection,
     deleteItems,
     moveItems,
@@ -673,6 +674,14 @@ export default function CollectionDetailsScreen() {
         totalCost: t("totalCost"),
         exportPdfItemCount: t("exportPdfItemCount", { count: allItems.length }),
         photosSaved: t("photosSaved"),
+      }, {
+        // The same two answers the summary card and every `<CostBadge>` on
+        // this screen are already showing. The export used to sum the raw
+        // `cost` fields itself, so the one artifact a user keeps was the one
+        // place that converted nothing, printed no currency and ignored the
+        // collection's own `currency` override.
+        total: getCollectionTotalCost(collection.id),
+        itemCost: (item) => convertItemCost(item, collection.currency ?? undefined),
       });
       toast.success(t("exportPdfDone"));
     } catch {
@@ -680,7 +689,7 @@ export default function CollectionDetailsScreen() {
     } finally {
       setExporting(false);
     }
-  }, [collection, allItems, t, toast]);
+  }, [collection, allItems, getCollectionTotalCost, convertItemCost, t, toast]);
 
   const openEditModal = useCallback(() => {
     if (!collection) return;

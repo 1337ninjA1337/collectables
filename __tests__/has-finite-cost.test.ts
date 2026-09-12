@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { hasFiniteCost } from "@/lib/item-cost";
+import { collectionTotalCost } from "@/lib/collection-total";
+import { convertItemCost, hasFiniteCost } from "@/lib/item-cost";
 import { buildCollectionExportHtml } from "@/lib/export-pdf-html";
 import { stripComments } from "@/lib/strip-comments";
 import { CollectableItem, Collection } from "@/lib/types";
@@ -107,10 +108,15 @@ describe("the PDF export prices what it can and drops what it cannot", () => {
   it("does not put NaN in the printed total", () => {
     // A PDF is the one output a user keeps, mails and files. A `NaN` in it
     // outlives every re-render that would have fixed the screen.
+    const items = [item({ id: "a", cost: 10 }), item({ id: "b", cost: NaN })];
     const html = buildCollectionExportHtml(
       collection,
-      [item({ id: "a", cost: 10 }), item({ id: "b", cost: NaN })],
+      items,
       labels,
+      {
+        total: collectionTotalCost(items, "USD", null),
+        itemCost: (i) => convertItemCost(i, "USD", null),
+      },
       new Date("2026-01-01T00:00:00.000Z"),
     );
 
@@ -119,10 +125,15 @@ describe("the PDF export prices what it can and drops what it cannot", () => {
   });
 
   it("omits the cost row for an item whose price is not a number", () => {
+    const items = [item({ id: "b", cost: Infinity })];
     const html = buildCollectionExportHtml(
       collection,
-      [item({ id: "b", cost: Infinity })],
+      items,
       labels,
+      {
+        total: collectionTotalCost(items, "USD", null),
+        itemCost: (i) => convertItemCost(i, "USD", null),
+      },
       new Date("2026-01-01T00:00:00.000Z"),
     );
 

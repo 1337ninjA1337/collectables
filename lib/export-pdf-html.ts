@@ -18,8 +18,40 @@
  * so; the exemption moved here with the CSS.
  */
 
+import type { CollectionTotalCost } from "@/lib/collection-total";
 import { CollectableItem, Collection } from "@/lib/types";
-import { hasFiniteCost } from "@/lib/item-cost";
+import { formatCostAmount, hasFiniteCost, type ConvertedItemCost } from "@/lib/item-cost";
+
+/**
+ * The money in the document, resolved by the caller against the live rate
+ * table — the same two answers the collection screen is already rendering.
+ *
+ * **Why the caller resolves it and not this module.** The conversion needs the
+ * USD rate table, which lives in the collections provider behind a fetch and a
+ * cache; taking it as an argument would make this module's signature about
+ * where rates come from instead of about the document. Taking the ANSWERS
+ * keeps the document pure and gets something better than consistency-by-luck:
+ * the PDF prints the figures the screen printed, because they are the same
+ * values.
+ *
+ * The export used to do its own arithmetic — `items.reduce((sum, item) => sum
+ * + item.cost)` — which converted nothing and labelled nothing, so a
+ * collection holding items in EUR and USD filed one figure in no unit at all,
+ * and a per-collection `currency` override reached every screen in the app and
+ * not the one artifact a user keeps.
+ */
+export type ExportMoney = {
+  /**
+   * The collection's total, already converted into the currency the collection
+   * is labelled in — `getCollectionTotalCost(collection.id)`.
+   */
+  total: CollectionTotalCost;
+  /**
+   * One item's cost in that same currency — `convertItemCost(item,
+   * collection.currency)`, which is what `<CostBadge>` renders on the card.
+   */
+  itemCost: (item: CollectableItem) => ConvertedItemCost;
+};
 
 /** The translated words the document prints, resolved by the caller's `t()`. */
 export type ExportLabels = {
@@ -50,6 +82,35 @@ function escapeHtml(str: string): string {
 }
 
 /**
+ * One item's cost cell: the converted amount, its currency, and an `≈` when a
+ * real conversion happened.
+ *
+ * The `≈` is emitted here rather than taken as a label because every one of
+ * the six locales spells `itemValueApprox` as exactly `≈ ${amount}
+ * ${currency}` — the marker is a symbol, not a word — and
+ * `export-pdf-money.test.ts` pins that equivalence rather than trusting this
+ * sentence. What it marks is worth marking in a document somebody files: a
+ * figure derived from a rate table on the day it was printed is not the price
+ * that was paid.
+ *
+ * A `null` amount cannot reach here (the caller gates on `hasFiniteCost`), and
+ * the `?? item.cost` fallback is what makes that a property of the code rather
+ * than of the call order.
+ */
+function formatItemCost(
+  item: CollectableItem & { cost: number },
+  money: ExportMoney,
+): string {
+  const converted = money.itemCost(item);
+  const amount = converted.amount ?? item.cost;
+  const approx =
+    converted.converted &&
+    item.costCurrency != null &&
+    item.costCurrency !== converted.currency;
+  return `${approx ? "≈ " : ""}${formatCostAmount(amount)} ${converted.currency}`;
+}
+
+/**
  * The whole document for one collection.
  *
  * `printedOn` is a parameter rather than a `new Date()` inside, because a
@@ -60,13 +121,9 @@ export function buildCollectionExportHtml(
   collection: Collection,
   items: CollectableItem[],
   labels: ExportLabels,
+  money: ExportMoney,
   printedOn: Date = new Date(),
 ): string {
-  // The same gate the in-app totals use: a NaN cost would otherwise be
-  // summed into the printed total and land in a PDF somebody keeps.
-  const totalCost = items
-    .filter(hasFiniteCost)
-    .reduce((sum, item) => sum + item.cost, 0);
   const totalPhotos = items.reduce((sum, item) => sum + item.photos.length, 0);
 
   const itemsHtml = items
@@ -92,7 +149,10 @@ export function buildCollectionExportHtml(
         fields.push(`<div class="field"><span class="field-label">${escapeHtml(labels.variants)}</span><span>${escapeHtml(item.variants)}</span></div>`);
       }
       if (hasFiniteCost(item)) {
-        fields.push(`<div class="field"><span class="field-label">${escapeHtml(labels.costLabel)}</span><span>${item.cost}</span></div>`);
+        // `${item.cost}` before this: a bare number, in no currency, and
+        // unformatted — so a 1500-euro item printed "1500" beside a
+        // 1500-dollar one and the document could not tell them apart.
+        fields.push(`<div class="field"><span class="field-label">${escapeHtml(labels.costLabel)}</span><span>${escapeHtml(formatItemCost(item, money))}</span></div>`);
       }
 
       return `
@@ -140,9 +200,9 @@ export function buildCollectionExportHtml(
         <div class="stat-value">${totalPhotos}</div>
         <div class="stat-label">${escapeHtml(labels.photosSaved)}</div>
       </div>
-      ${totalCost > 0 ? `
+      ${money.total.amount > 0 ? `
       <div class="stat">
-        <div class="stat-value">${totalCost}</div>
+        <div class="stat-value">${escapeHtml(`${formatCostAmount(money.total.amount)} ${money.total.currency}`)}</div>
         <div class="stat-label">${escapeHtml(labels.totalCost)}</div>
       </div>` : ""}
     </div>
