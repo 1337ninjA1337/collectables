@@ -13,7 +13,7 @@
  */
 
 /**
- * 4.55 MiB — today's bundle (4634.4 KiB) plus 24.8 KiB.
+ * 4.57 MiB — today's bundle (4655.5 KiB) plus 24.2 KiB.
  *
  * THE HEADROOM IS THE GUARD, and it is chosen against the smallest thing this
  * budget has to catch rather than against how much room feels comfortable.
@@ -37,11 +37,20 @@
  * The number moves by re-measuring and re-arguing, never by rounding up until
  * the build passes.
  *
+ * 4.57 MiB on 2026-09-12, the third time and the same argument. Four rounds
+ * (the converted stats total, the export's money, the reversible archive, and
+ * the archive screen with its eleven keys in six languages) took the bundle
+ * from 4634.4 to 4655.5 KiB and the headroom from 24.8 to 3.7. Screens and
+ * translated copy are the ordinary growth this budget is supposed to let
+ * through; 3.7 KiB is below the 8 KiB floor `bundle-size.test.ts` holds for
+ * exactly that reason, so the next round would have gone red on nothing an SDK
+ * did. The raise buys 24.2 KiB — still below Clarity, so the guard is intact.
+ *
  * Raising this is a decision to be argued, not a step in fixing a red build:
  * `bundle-size.test.ts` asserts the headroom stays under the smaller SDK, so a
  * raise that gives up the guard fails there instead of passing quietly.
  */
-export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.55 * 1024 * 1024;
+export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.57 * 1024 * 1024;
 
 /**
  * The smallest SDK the budget must still catch as a static import, in bytes.

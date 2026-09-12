@@ -2,7 +2,7 @@
 /**
  * Bundle-size budget gate. Fails when the exported web JS bundle
  * (`dist/_expo/static/js/web/*.js`, sourcemaps excluded) exceeds the budget
- * (default 4.55 MiB, override via BUNDLE_SIZE_BUDGET_BYTES).
+ * (default 4.57 MiB, override via BUNDLE_SIZE_BUDGET_BYTES).
  *
  * Runs as its own CI step right after `npm run build` (the bundle must exist
  * first). Pure logic lives in `lib/bundle-size.ts`.

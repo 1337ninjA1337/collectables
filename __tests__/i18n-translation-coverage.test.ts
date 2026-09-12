@@ -513,7 +513,16 @@ describe("translation floors", () => {
     // and an item that took it left every listing, total, count and search in
     // the app with nothing anywhere able to bring it back. Translated in all
     // six locales, beside the archived string it undoes.
-    assert.match(report, /en: 510\/510 keys \(100\.0%\)/);
+    // 521 later that day: the eleven `archive*` keys, the screen that makes
+    // the archive a place rather than a hole. `unarchiveItem` had shipped with
+    // one caller — an Undo on a toast — so eight seconds after archiving
+    // something there was still no way to see it or get it back. All eleven
+    // are translated in all six locales in the commit that adds them, which is
+    // the rule this screen has the strongest claim on: it is the first thing
+    // the home screen links to that a user reaches only after a mistake, and
+    // a recovery path served in English under somebody else's flag is where
+    // the silent fallback costs the most.
+    assert.match(report, /en: 521\/521 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

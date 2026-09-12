@@ -68,6 +68,7 @@ export default function HomeScreen() {
     items,
     countItemsForCollection,
     getCollectionTotalCost,
+    archivedItems,
     getCollectionById,
     ready,
     subscribedCollections,
@@ -366,6 +367,22 @@ export default function HomeScreen() {
         title={t("statsTitle")}
         hint={t("statsSubtitle")}
       />
+
+      {/*
+        Only when there is something in it. An archive is a recovery path, not
+        a feature to advertise: a permanent row pointing at an empty screen is
+        noise on the surface every session starts on, and a row that appears
+        the moment something lands in the trash is how somebody learns the
+        trash exists at the one moment they need to.
+      */}
+      {archivedItems.length > 0 ? (
+        <DashboardBanner
+          href="/archive"
+          icon="🗄"
+          title={t("archiveTitle")}
+          hint={t("archiveHint")}
+        />
+      ) : null}
 
       {recentItems.length > 0 ? (
         <View style={styles.section}>

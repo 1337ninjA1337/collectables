@@ -37,6 +37,7 @@ import {
   byCollectionOrder,
   byOwnedCollectionOrder,
   groupItemsByCollection,
+  isArchived,
   isLiveWishlistItem,
   nextCollectionSortOrder,
   resolveLocalItem,
@@ -230,6 +231,15 @@ type CollectionsContextValue = {
   refreshCurrencyRates: () => Promise<void>;
   getItemById: (itemId: string) => CollectableItem | undefined;
   wishlistItems: CollectableItem[];
+  /**
+   * The viewer's own archived items, newest archive first — the list
+   * `app/archive.tsx` renders and the only way back from `archiveItem`.
+   *
+   * Their own, not the merged list: an archive is a thing you did to your own
+   * rows, and a friend's archived item is neither yours to restore nor yours
+   * to be shown.
+   */
+  archivedItems: CollectableItem[];
   addWishlistItem: (input: DraftWishlistInput) => Promise<string>;
   promoteWishlistItem: (itemId: string, targetCollectionId: string) => Promise<void>;
   addItem: (input: DraftItemInput) => Promise<string>;
@@ -1221,6 +1231,27 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     [localItems],
   );
 
+  /**
+   * The trash, in the order things went into it.
+   *
+   * `localItems` rather than the merged `items`: an archive is a thing you did
+   * to your OWN rows, and a friend's archived item is not yours to restore or
+   * to be told about. Nothing else in the app can produce a visible archived
+   * row, which is the point — this list is the only way back.
+   *
+   * Newest first, by `archivedAt` rather than by `createdAt`: what a user is
+   * looking for here is the thing they archived a minute ago, not the oldest
+   * item they own. A legacy row carrying `null` cannot be in this list at all
+   * (`isArchived` is what put it here), so the comparison has no absent side.
+   */
+  const archivedItems = useMemo(
+    () =>
+      localItems
+        .filter(isArchived)
+        .sort((a, b) => (b.archivedAt ?? "").localeCompare(a.archivedAt ?? "")),
+    [localItems],
+  );
+
   const value = useMemo<CollectionsContextValue>(
     () => ({
       collections,
@@ -1340,6 +1371,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       refreshCurrencyRates,
       getItemById: (itemId) => items.find((item) => item.id === itemId),
       wishlistItems,
+      archivedItems,
       addWishlistItem: async (input) => {
         const nextItem: CollectableItem = {
           // Server-keyed uuid (BE-5) so the row matches `items.id uuid` and
@@ -1591,7 +1623,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     }),
     // syncCollection/syncItem are stable useCallback([]) refs, so they're
     // intentionally omitted here (ratesUpdatedAt stays last in the deps list).
-    [collections, collectionsById, collectionTotals, ownedTotalCost, items, itemsByCollection, wishlistItems, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
+    [collections, collectionsById, collectionTotals, ownedTotalCost, items, itemsByCollection, wishlistItems, archivedItems, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;

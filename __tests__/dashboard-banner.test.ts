@@ -114,7 +114,13 @@ describe("dashboard-banner — adoption across the UI", () => {
     assert.match(src, /import \{ DashboardBanner \} from "@\/components\/dashboard-banner";/);
     assert.match(src, /<DashboardBanner\s*\n\s*href="\/wishlist"\s*\n\s*tone="amber"/);
     assert.match(src, /<DashboardBanner\s*\n\s*href="\/stats"\s*\n\s*icon="⊞"/);
-    assert.equal(src.match(/<DashboardBanner\b/g)?.length, 2);
+    // Three since the archive shipped, and the third is the one that is not
+    // always there: an archive is a recovery path rather than a feature, so
+    // the row appears only when `archivedItems` has something in it. That is
+    // the reason this count is not just bumped — a fourth unconditional row
+    // would be a different claim about the dashboard than a conditional one.
+    assert.match(src, /\{archivedItems\.length > 0 \? \(\s*<DashboardBanner\s*\n\s*href="\/archive"/);
+    assert.equal(src.match(/<DashboardBanner\b/g)?.length, 3);
   });
 
   it("the stats row passes no tone, so the default stays exercised", () => {
