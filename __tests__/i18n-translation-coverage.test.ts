@@ -548,7 +548,14 @@ describe("translation floors", () => {
     // fixed one half of this and left the worse half standing — a deleted
     // item leaves storage entirely, so the buyer who claims its surviving
     // listing gets a purchase pointing at nothing the seller can open.
-    assert.match(report, /en: 531\/531 keys \(100\.0%\)/);
+    // 535 later that day: `itemsArchived`, `archiveItemsTitle`,
+    // `archiveItemsText` and `bulkListedWarning`. `deleteItems` was the bulk
+    // bar's only way to make a selection go away — the permanent one — and it
+    // asked nothing about listings, so thirty rows could leave storage while
+    // thirty standing offers stayed on every buyer's device. The counted ones
+    // decline their nouns in the three Slavic locales, which is what a bulk
+    // confirm most needs and where a pinned form is read most carefully.
+    assert.match(report, /en: 535\/535 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

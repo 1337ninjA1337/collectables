@@ -260,6 +260,13 @@ const en = {
     `Moved ${params?.count ?? 0} ${plural(params?.count, "item", "items")}`,
   itemsDeleted: (params?: TranslationParams) =>
     `Deleted ${params?.count ?? 0} ${plural(params?.count, "item", "items")}`,
+  itemsArchived: (params?: TranslationParams) =>
+    `Archived ${params?.count ?? 0} ${plural(params?.count, "item", "items")}`,
+  archiveItemsTitle: (params?: TranslationParams) =>
+    `Archive ${params?.count ?? 0} ${plural(params?.count, "item", "items")}?`,
+  archiveItemsText: "They leave your collections, totals and search, and you can restore them from the archive.",
+  bulkListedWarning: (params?: TranslationParams) =>
+    `${params?.count ?? 0} of ${plural(params?.count, "them is", "them are")} on the marketplace, and ${plural(params?.count, "that listing", "those listings")} will be taken down.`,
   emptyOwnedTitle: "Start your first collection",
   emptyOwnedHint: "Group items by theme — cards, coins, vinyl, toys — and share them with friends.",
   emptyOwnedCta: "Create collection",
@@ -713,6 +720,12 @@ const ru: TranslationMap = {
   deleteItemsText: "Выбранные предметы будут удалены из этой коллекции без возможности восстановления.",
   itemsMoved: (params?: TranslationParams) => `Перемещено: ${params?.count ?? 0}`,
   itemsDeleted: (params?: TranslationParams) => `Удалено: ${params?.count ?? 0}`,
+  itemsArchived: (params?: TranslationParams) => `Архивировано: ${params?.count ?? 0}`,
+  archiveItemsTitle: (params?: TranslationParams) =>
+    `Архивировать ${params?.count ?? 0} ${slavicPlural(params?.count, "предмет", "предмета", "предметов")}?`,
+  archiveItemsText: "Они исчезнут из коллекций, сумм и поиска, но их можно восстановить из архива.",
+  bulkListedWarning: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "объявление будет снято", "объявления будут сняты", "объявлений будет снято")}: эти предметы выставлены на маркетплейсе.`,
   emptyOwnedTitle: "Начните свою первую коллекцию",
   emptyOwnedHint: "Сгруппируйте предметы по теме — карточки, монеты, винил, игрушки — и делитесь с друзьями.",
   emptyOwnedCta: "Создать коллекцию",
@@ -1673,6 +1686,12 @@ const be: TranslationMap = {
     "Выбраныя прадметы будуць выдалены з гэтай калекцыі без магчымасці аднаўлення.",
   itemsMoved: (params?: TranslationParams) => `Перамешчана: ${params?.count ?? 0}`,
   itemsDeleted: (params?: TranslationParams) => `Выдалена: ${params?.count ?? 0}`,
+  itemsArchived: (params?: TranslationParams) => `Заархівавана: ${params?.count ?? 0}`,
+  archiveItemsTitle: (params?: TranslationParams) =>
+    `Заархіваваць ${params?.count ?? 0} ${slavicPlural(params?.count, "прадмет", "прадметы", "прадметаў")}?`,
+  archiveItemsText: "Яны знікнуць з калекцый, сум і пошуку, але іх можна аднавіць з архіва.",
+  bulkListedWarning: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "аб'ява будзе знятая", "аб'явы будуць знятыя", "аб'яў будзе знята")}: гэтыя прадметы выстаўлены на маркетплейсе.`,
   exportPdf: "Экспарт у PDF",
   exportPdfGenerating: "Ствараем PDF...",
   exportPdfDone: "PDF гатовы",
@@ -2267,6 +2286,12 @@ const pl: TranslationMap = {
     "Zaznaczone przedmioty zostaną bezpowrotnie usunięte z tej kolekcji.",
   itemsMoved: (params?: TranslationParams) => `Przeniesiono: ${params?.count ?? 0}`,
   itemsDeleted: (params?: TranslationParams) => `Usunięto: ${params?.count ?? 0}`,
+  itemsArchived: (params?: TranslationParams) => `Zarchiwizowano: ${params?.count ?? 0}`,
+  archiveItemsTitle: (params?: TranslationParams) =>
+    `Zarchiwizować ${params?.count ?? 0} ${slavicPlural(params?.count, "przedmiot", "przedmioty", "przedmiotów")}?`,
+  archiveItemsText: "Znikną z kolekcji, sum i wyszukiwania, ale możesz je przywrócić z archiwum.",
+  bulkListedWarning: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "ogłoszenie zostanie zdjęte", "ogłoszenia zostaną zdjęte", "ogłoszeń zostanie zdjętych")}: te przedmioty są wystawione na rynku.`,
   exportPdf: "Eksportuj do PDF",
   exportPdfGenerating: "Tworzenie PDF...",
   exportPdfDone: "PDF gotowy",
@@ -2870,6 +2895,12 @@ const de: TranslationMap = {
     "Die ausgewählten Objekte werden endgültig aus dieser Sammlung entfernt.",
   itemsMoved: (params?: TranslationParams) => `Verschoben: ${params?.count ?? 0}`,
   itemsDeleted: (params?: TranslationParams) => `Gelöscht: ${params?.count ?? 0}`,
+  itemsArchived: (params?: TranslationParams) => `Archiviert: ${params?.count ?? 0}`,
+  archiveItemsTitle: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "Objekt", "Objekte")} archivieren?`,
+  archiveItemsText: "Sie verschwinden aus Sammlungen, Summen und der Suche und lassen sich aus dem Archiv wiederherstellen.",
+  bulkListedWarning: (params?: TranslationParams) =>
+    `${params?.count ?? 0} davon ${plural(params?.count, "steht", "stehen")} auf dem Marktplatz — ${plural(params?.count, "die Anzeige wird", "die Anzeigen werden")} entfernt.`,
   exportPdf: "Als PDF exportieren",
   exportPdfGenerating: "PDF wird erstellt...",
   exportPdfDone: "PDF fertig",
@@ -3483,6 +3514,12 @@ const es: TranslationMap = {
     "Los objetos seleccionados se eliminarán de esta colección de forma permanente.",
   itemsMoved: (params?: TranslationParams) => `Movidos: ${params?.count ?? 0}`,
   itemsDeleted: (params?: TranslationParams) => `Eliminados: ${params?.count ?? 0}`,
+  itemsArchived: (params?: TranslationParams) => `Archivados: ${params?.count ?? 0}`,
+  archiveItemsTitle: (params?: TranslationParams) =>
+    `¿Archivar ${params?.count ?? 0} ${plural(params?.count, "objeto", "objetos")}?`,
+  archiveItemsText: "Saldrán de tus colecciones, totales y búsquedas, y podrás restaurarlos desde el archivo.",
+  bulkListedWarning: (params?: TranslationParams) =>
+    `${params?.count ?? 0} de ellos ${plural(params?.count, "está publicado", "están publicados")} en el mercado, y ${plural(params?.count, "esa publicación se retirará", "esas publicaciones se retirarán")}.`,
   exportPdf: "Exportar a PDF",
   exportPdfGenerating: "Generando PDF...",
   exportPdfDone: "PDF listo",

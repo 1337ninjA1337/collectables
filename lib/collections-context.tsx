@@ -266,6 +266,18 @@ type CollectionsContextValue = {
    * worst of both: not gone, not reachable.
    */
   unarchiveItem: (itemId: string) => Promise<void>;
+  /**
+   * Archive a selection in one stamp — the reversible answer the bulk bar
+   * did not have.
+   *
+   * `deleteItems` was the only bulk resolution, so somebody retiring thirty
+   * sold items either deleted them (irreversible) or opened thirty screens.
+   * One `archivedAt` for the whole selection rather than one per item: the
+   * archive screen sorts on that field, and thirty timestamps a millisecond
+   * apart would scatter a single act across the top of the list in an order
+   * nobody chose.
+   */
+  archiveItems: (itemIds: string[]) => Promise<void>;
   moveItems: (itemIds: string[], targetCollectionId: string) => Promise<void>;
   deleteCollection: (collectionId: string) => Promise<void>;
   deleteUserContent: (userId: string) => Promise<void>;
@@ -1515,6 +1527,23 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         const restored: CollectableItem = { ...current, archivedAt: null };
         setLocalItems((items) => items.map((item) => (item.id === itemId ? restored : item)));
         syncItem(restored, () => updateRemoteItem(itemId, { archivedAt: null }));
+      },
+      archiveItems: async (itemIds) => {
+        if (itemIds.length === 0) return;
+        const archivedAt = new Date().toISOString();
+        const idSet = new Set(itemIds);
+        // Resolved from `localItems` before the write, like every other
+        // mutation here — see `resolveLocalItem`. An id the list does not
+        // hold is skipped rather than synced.
+        const archived = localItems
+          .filter((item) => idSet.has(item.id) && !item.archivedAt)
+          .map((item) => ({ ...item, archivedAt }));
+        if (archived.length === 0) return;
+        const archivedById = new Map(archived.map((item) => [item.id, item]));
+        setLocalItems((items) => items.map((item) => archivedById.get(item.id) ?? item));
+        archived.forEach((item) =>
+          syncItem(item, () => updateRemoteItem(item.id, { archivedAt })),
+        );
       },
       deleteItems: async (itemIds) => {
         if (itemIds.length === 0) return;

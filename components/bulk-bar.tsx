@@ -20,6 +20,13 @@ import { useI18n } from "@/lib/i18n-context";
 type Props = {
   count: number;
   onMove: () => void;
+  /**
+   * The reversible resolution, and the reason it sits between Move and
+   * Delete: the bar offered exactly one way to make a selection go away and
+   * it was the permanent one, so retiring thirty sold items meant deleting
+   * them or opening thirty screens.
+   */
+  onArchive: () => void;
   onDelete: () => void;
   onCancel: () => void;
 };
@@ -30,7 +37,7 @@ type Props = {
 // re-renders on parent commits where neither the count nor a handler
 // changed. Absolute positioning stays with the component; the page keeps
 // the spacer that reserves scroll room underneath it.
-export const BulkBar = memo(function BulkBar({ count, onMove, onDelete, onCancel }: Props) {
+export const BulkBar = memo(function BulkBar({ count, onMove, onArchive, onDelete, onCancel }: Props) {
   const { t } = useI18n();
   const empty = count === 0;
   return (
@@ -46,6 +53,15 @@ export const BulkBar = memo(function BulkBar({ count, onMove, onDelete, onCancel
             onPress={onMove}
           >
             <Text style={styles.bulkBarButtonText}>{t("moveToCollection")}</Text>
+          </Pressable>
+          <Pressable
+            style={{ ...styles.bulkBarButton, ...(empty ? styles.bulkBarButtonDisabled : {}) }}
+            disabled={empty}
+            accessibilityState={{ disabled: empty }}
+            accessibilityRole="button"
+            onPress={onArchive}
+          >
+            <Text style={styles.bulkBarButtonText}>{t("archiveAction")}</Text>
           </Pressable>
           <Pressable
             style={{ ...styles.bulkBarButton, ...styles.bulkBarButtonDanger, ...(empty ? styles.bulkBarButtonDisabled : {}) }}

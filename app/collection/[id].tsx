@@ -26,6 +26,8 @@ import { useAuth } from "@/lib/auth-context";
 import { uploadImage } from "@/lib/cloudinary";
 import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
+import { useMarketplace } from "@/lib/marketplace-context";
+import { openListingsForItems } from "@/lib/marketplace-helpers";
 import { announceMessage } from "@/lib/announce";
 import { byId, orderWithUnrenderedTail, planDragCommit } from "@/lib/drag-reorder";
 import { reorderActionProps } from "@/lib/reorder-actions";
@@ -91,6 +93,7 @@ export default function CollectionDetailsScreen() {
     convertItemCost,
     deleteCollection,
     deleteItems,
+    archiveItems,
     moveItems,
     isCollectionFollowed,
     followCollection,
@@ -116,6 +119,7 @@ export default function CollectionDetailsScreen() {
   // the owner opts into from the actions row, mirroring how selection mode
   // already takes over the list.
   const [reorderMode, setReorderMode] = useState(false);
+  const { myListings, removeListing } = useMarketplace();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [moveModalOpen, setMoveModalOpen] = useState(false);
   const [itemFilters, setItemFilters] = useState<ItemFilters>(EMPTY_FILTERS);
@@ -422,19 +426,49 @@ export default function CollectionDetailsScreen() {
     setSelectedIds(new Set());
   }, []);
 
+  /**
+   * The open listings inside the current selection.
+   *
+   * The single-item archive and the single-item delete each retire one before
+   * letting the item go; the bulk delete asked nothing, so thirty rows left
+   * storage and thirty standing offers stayed on every buyer's device. Both
+   * bulk resolutions read this: it says how many to warn about, which ids to
+   * remove, and whether to bother.
+   */
+  const selectedOpenListings = useMemo(
+    () => openListingsForItems(myListings, Array.from(selectedIds)),
+    [myListings, selectedIds],
+  );
+
+  /** The sentence the confirms gain when the selection includes a listing. */
+  const listedWarning = useCallback(
+    () =>
+      selectedOpenListings.length > 0
+        ? ` ${t("bulkListedWarning", { count: selectedOpenListings.length })}`
+        : "",
+    [selectedOpenListings, t],
+  );
+
+  const retireSelectedListings = useCallback(() => {
+    for (const listing of selectedOpenListings) removeListing(listing.id);
+  }, [selectedOpenListings, removeListing]);
+
   const performBulkDelete = useCallback(async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
+    // The listings first, for the same reason the single-item paths do it:
+    // an item removed first is one whose listing removal can be lost.
+    retireSelectedListings();
     await deleteItems(ids);
     toast.success(t("itemsDeleted", { count: ids.length }));
     exitSelectionMode();
-  }, [selectedIds, deleteItems, toast, t, exitSelectionMode]);
+  }, [selectedIds, retireSelectedListings, deleteItems, toast, t, exitSelectionMode]);
 
   const handleBulkDelete = useCallback(() => {
     const count = selectedIds.size;
     if (count === 0) return;
     const title = t("deleteItemsTitle", { count });
-    const message = t("deleteItemsText");
+    const message = `${t("deleteItemsText")}${listedWarning()}`;
 
     if (Platform.OS === "web") {
       if (globalThis.confirm(`${title}\n\n${message}`)) {
@@ -447,7 +481,48 @@ export default function CollectionDetailsScreen() {
       { text: t("cancel"), style: "cancel" },
       { text: t("delete"), style: "destructive", onPress: () => void performBulkDelete() },
     ]);
-  }, [selectedIds, t, performBulkDelete]);
+  }, [selectedIds, t, listedWarning, performBulkDelete]);
+
+  const performBulkArchive = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    retireSelectedListings();
+    await archiveItems(ids);
+    toast.success(t("itemsArchived", { count: ids.length }));
+    exitSelectionMode();
+  }, [selectedIds, retireSelectedListings, archiveItems, toast, t, exitSelectionMode]);
+
+  /**
+   * Archiving a selection asks only when it would withdraw a listing.
+   *
+   * The single-item action takes no confirm for an unlisted item — archiving
+   * is reversible from the item's own banner and from `app/archive.tsx` — and
+   * the bulk version keeps that rule rather than inventing a stricter one for
+   * the same act done thirty times. What is NOT reversible is the listing
+   * removal, which is exactly when this asks.
+   */
+  const handleBulkArchive = useCallback(() => {
+    const count = selectedIds.size;
+    if (count === 0) return;
+    if (selectedOpenListings.length === 0) {
+      void performBulkArchive();
+      return;
+    }
+    const title = t("archiveItemsTitle", { count });
+    const message = `${t("archiveItemsText")}${listedWarning()}`;
+
+    if (Platform.OS === "web") {
+      if (globalThis.confirm(`${title}\n\n${message}`)) {
+        void performBulkArchive();
+      }
+      return;
+    }
+
+    Alert.alert(title, message, [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("archiveAction"), onPress: () => void performBulkArchive() },
+    ]);
+  }, [selectedIds, selectedOpenListings, t, listedWarning, performBulkArchive]);
 
   // Hoisted alongside the handlers that close over it; `collection` is still
   // nullable up here so the self-exclusion uses optional chaining instead of
@@ -1304,6 +1379,7 @@ export default function CollectionDetailsScreen() {
         <BulkBar
           count={selectedIds.size}
           onMove={handleOpenMove}
+          onArchive={handleBulkArchive}
           onDelete={handleBulkDelete}
           onCancel={exitSelectionMode}
         />

@@ -13,7 +13,7 @@ import { readRepoFile as read } from "./helpers/repo-file";
 
 describe("the budget is a headroom, not a round number", () => {
   /**
-   * The bundle at the commit that last moved the budget: 4655.5 KiB, measured
+   * The bundle at the commit that last moved the budget: 4673.4 KiB, measured
    * on 2026-09-12 by `npm run lint:bundle-size` against a fresh `dist/`.
    *
    * A measured number rather than a re-measurement, because this case is about
@@ -22,7 +22,7 @@ describe("the budget is a headroom, not a round number", () => {
    * regression into a case that quietly re-derives its own expectation. It
    * moves when the budget moves, and only then.
    */
-  const MEASURED_BUNDLE_BYTES = Math.round(4655.5 * 1024);
+  const MEASURED_BUNDLE_BYTES = Math.round(4673.4 * 1024);
 
   it("keeps less headroom than the smallest SDK it has to catch", () => {
     // The whole point of the gate. With MORE headroom than Clarity (~30 KiB), a
@@ -50,8 +50,8 @@ describe("the budget is a headroom, not a round number", () => {
 });
 
 describe("resolveBundleSizeBudget", () => {
-  it("defaults to 4.57 MiB when the env var is unset or empty", () => {
-    assert.equal(DEFAULT_BUNDLE_SIZE_BUDGET_BYTES, 4.57 * 1024 * 1024);
+  it("defaults to 4.59 MiB when the env var is unset or empty", () => {
+    assert.equal(DEFAULT_BUNDLE_SIZE_BUDGET_BYTES, 4.59 * 1024 * 1024);
     assert.equal(resolveBundleSizeBudget({}), DEFAULT_BUNDLE_SIZE_BUDGET_BYTES);
     assert.equal(
       resolveBundleSizeBudget({ BUNDLE_SIZE_BUDGET_BYTES: "" }),

@@ -13,7 +13,7 @@
  */
 
 /**
- * 4.57 MiB — today's bundle (4655.5 KiB) plus 24.2 KiB.
+ * 4.59 MiB — today's bundle (4673.4 KiB) plus 26.8 KiB.
  *
  * THE HEADROOM IS THE GUARD, and it is chosen against the smallest thing this
  * budget has to catch rather than against how much room feels comfortable.
@@ -46,11 +46,25 @@
  * exactly that reason, so the next round would have gone red on nothing an SDK
  * did. The raise buys 24.2 KiB — still below Clarity, so the guard is intact.
  *
+ * 4.59 MiB the same day, the FOURTH raise in three days, and the trend is now
+ * the finding rather than a footnote on it. 4.53 → 4.55 → 4.57 → 4.59: each
+ * raise buys about 25 KiB and four rounds of ordinary feature work spends it,
+ * so this number is a ratchet that records how fast the app grows and has
+ * never once said stop. It is still the right shape — the headroom is chosen
+ * against Clarity and not against comfort, so a statically-imported SDK trips
+ * on its own commit either way — and what it does NOT do is any kind of
+ * budgeting. This round (a bulk archive, its listing pass, and four counted
+ * strings in six languages) cost 17.9 KiB, of which the copy is a real share:
+ * a counted string with three Slavic forms is not free. Somebody should
+ * measure KiB per round and split code from copy before the fifth raise; this
+ * paragraph is here so that the fifth is argued against a trend rather than
+ * against the fourth.
+ *
  * Raising this is a decision to be argued, not a step in fixing a red build:
  * `bundle-size.test.ts` asserts the headroom stays under the smaller SDK, so a
  * raise that gives up the guard fails there instead of passing quietly.
  */
-export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.57 * 1024 * 1024;
+export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.59 * 1024 * 1024;
 
 /**
  * The smallest SDK the budget must still catch as a static import, in bytes.

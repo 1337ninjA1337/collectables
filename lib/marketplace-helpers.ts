@@ -222,6 +222,42 @@ export function isOpenListing(
 }
 
 /**
+ * The open listings among `itemIds` — {@link isOpenListing} asked of a
+ * selection instead of of one row.
+ *
+ * The single-item archive and the single-item delete both retire an open
+ * listing before letting the item go. The BULK delete did not ask once: a
+ * thirty-row selection took thirty items out of storage and left thirty
+ * standing offers on every buyer's device, and the confirm said nothing about
+ * it. That is the same bug at the scale where nobody would notice.
+ *
+ * Returns the listings rather than a count or a boolean, because both callers
+ * need all three answers: how many to warn about, which ids to remove, and
+ * whether to bother. A caller that only wants the number takes `.length`.
+ *
+ * Order follows `itemIds`, not the listing store, so the warning a user reads
+ * and the removals that follow walk the selection in the order it was made.
+ */
+export function openListingsForItems(
+  listings: readonly MarketplaceListing[],
+  itemIds: readonly string[],
+): MarketplaceListing[] {
+  const byItemId = new Map<string, MarketplaceListing>();
+  for (const listing of listings) {
+    if (!isOpenListing(listing)) continue;
+    // First wins: `findListingByItemId` answers the first match too, so a
+    // duplicate pair resolves the same way here as it does on the item screen.
+    if (!byItemId.has(listing.itemId)) byItemId.set(listing.itemId, listing);
+  }
+  const found: MarketplaceListing[] = [];
+  for (const itemId of itemIds) {
+    const listing = byItemId.get(itemId);
+    if (listing) found.push(listing);
+  }
+  return found;
+}
+
+/**
  * Listings that should appear on the marketplace browse page: not sold,
  * sorted newest-first.
  */
