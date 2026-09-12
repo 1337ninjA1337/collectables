@@ -1,7 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { sourceCode, tsxFiles } from "./helpers/source-files";
+import {
+  CURRENCY_IMPLEMENTATION_FILES,
+  costInputFiles,
+  displayPickerFiles,
+} from "./helpers/currency-surfaces";
+import { sourceCode } from "./helpers/source-files";
 
 /**
  * Every currency input in the app answers the same two questions the same way.
@@ -45,40 +50,24 @@ import { sourceCode, tsxFiles } from "./helpers/source-files";
  */
 
 /**
- * A COST input is a screen where the user types an amount AND says what
- * currency it is in. Both halves are the definition, and the first draft of
- * this sweep had only one of them.
+ * The derivation moved to `helpers/currency-surfaces.ts` on 2026-09-12, and
+ * the move is the finding rather than a tidy-up.
  *
- * Offering a currency choice is not enough: `app/settings.tsx` and
- * `app/collection/[id].tsx` both drive a `<CurrencySheet>` and neither takes
- * an amount — they pick the currency a figure is DISPLAYED in, which is the
- * opposite direction and has no entry currency to remember. Asking them to
- * write `setEntryCurrency` would make choosing a display currency change what
- * the next cost form opens with — which is the collision the key split just
- * removed, re-introduced from the other end.
+ * It lived here and a near-copy lived in
+ * `create-currency-input-adoption.test.ts`, and both walked `app/` only —
+ * because every currency surface anybody had thought about was a route. The
+ * one control in `components/` was outside both rules by the WALK rather than
+ * by either rule, and it took a THIRD signal to see at all: the
+ * collection-edit modal renders the button and asks its parent to open the
+ * sheet, so neither `<CurrencyInput>` nor `<CurrencySheet>` appears in it.
  *
- * So the second half is `parseCurrencyValueDetailed` — the shared parser for
- * a typed amount. A screen that both picks a currency and parses an amount is
- * saying "this number is in this unit", and that is the claim these rules are
- * about.
- *
- * Derived rather than listed because `app/create.tsx` predates
- * `<CurrencyInput>` and keeps a raw sheet, so a list of component call sites
- * would have found two of the three and called it complete.
+ * It belongs on the excluded side, which is precisely why nobody noticed — a
+ * gap that is currently harmless is still a gap, and it is the kind these
+ * sweeps exist to close.
  */
-function costInputScreens(): readonly string[] {
-  const found: string[] = [];
-  for (const file of tsxFiles("app")) {
-    const code = sourceCode(file);
-    const picksCurrency = code.includes("<CurrencyInput") || code.includes("<CurrencySheet");
-    const parsesAmount = code.includes("parseCurrencyValueDetailed(");
-    if (picksCurrency && parsesAmount) found.push(file);
-  }
-  return found;
-}
 
 describe("every screen with a cost input", () => {
-  const SCREENS = costInputScreens();
+  const SCREENS = costInputFiles();
 
   it("finds the known screens (guards the rules below from passing vacuously)", () => {
     // A sweep that found nothing would pass every rule under it.
@@ -87,6 +76,38 @@ describe("every screen with a cost input", () => {
       "app/item/[id].tsx",
       "app/wishlist.tsx",
     ]);
+  });
+
+  it("every currency surface is on exactly one of the two lists", () => {
+    // The two lists are complements over one walk, so a file cannot fall out
+    // of both — which is how the collection-edit modal spent its life
+    // unruled. Adding a typed amount to a display picker moves it across and
+    // turns a case red rather than leaving it silently exempt.
+    const overlap = costInputFiles().filter((f) => displayPickerFiles().includes(f));
+    assert.deepEqual(overlap, [], "a file is both a cost input and a display picker");
+    const all = [...costInputFiles(), ...displayPickerFiles()].sort();
+    assert.deepEqual(all, [
+      "app/collection/[id].tsx",
+      "app/create.tsx",
+      "app/item/[id].tsx",
+      "app/settings.tsx",
+      "app/wishlist.tsx",
+      "components/edit-collection-modal.tsx",
+    ]);
+  });
+
+  it("exempts the two files that IMPLEMENT the controls, and only those", () => {
+    // Named rather than pattern-matched: "anything under components/ with
+    // `currency` in the name" would also exempt the next screen-level
+    // component somebody puts there.
+    assert.deepEqual([...CURRENCY_IMPLEMENTATION_FILES], [
+      "components/currency-input.tsx",
+      "components/currency-sheet.tsx",
+    ]);
+    for (const file of CURRENCY_IMPLEMENTATION_FILES) {
+      assert.ok(!costInputFiles().includes(file), `${file} is held to the cost-input rules`);
+      assert.ok(!displayPickerFiles().includes(file), `${file} is held to the display rules`);
+    }
   });
 
   for (const file of SCREENS) {
@@ -128,18 +149,34 @@ describe("the screens that pick a currency and take no amount", () => {
       "app/collection/[id].tsx",
       "the per-collection display override, which re-denominates a total somebody else's items contributed to",
     ],
+    [
+      "components/edit-collection-modal.tsx",
+      "the button that opens that override's picker — the surface neither sweep could see until the walk reached components/, because it mounts no sheet of its own and names one through a prop",
+    ],
   ];
+
+  it("is the whole of the other list", () => {
+    // Written out above AND derived, so a new display picker is a red case
+    // rather than a silent omission — the failure mode the modal was in.
+    assert.deepEqual(
+      DISPLAY_PICKERS.map(([file]) => file).sort(),
+      [...displayPickerFiles()].sort(),
+    );
+  });
 
   for (const [file, why] of DISPLAY_PICKERS) {
     it(`${file} picks a display currency — ${why}`, () => {
       const code = sourceCode(file);
-      assert.ok(code.includes("<CurrencySheet"), `${file} no longer offers a currency choice`);
+      assert.ok(
+        code.includes("<CurrencySheet") || code.includes("onOpenCurrencySheet"),
+        `${file} no longer offers a currency choice`,
+      );
       assert.ok(
         !code.includes("parseCurrencyValueDetailed("),
         `${file} now takes a typed amount — decide whether it is a cost input`,
       );
       assert.ok(
-        !costInputScreens().includes(file),
+        !costInputFiles().includes(file),
         `${file} is being held to the cost-input rules`,
       );
     });

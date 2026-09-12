@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { sourceCode, tsxFiles } from "./helpers/source-files";
+import { costInputFiles, displayPickerFiles } from "./helpers/currency-surfaces";
+import { sourceCode } from "./helpers/source-files";
 
 /**
  * The last cost input driving a raw `<CurrencySheet>`.
@@ -113,10 +114,12 @@ describe("the sweep — nothing drives a currency sheet by hand for a cost", () 
    * codes.
    */
   it("every screen that parses an amount renders the component, not the sheet", () => {
+    // The walk is `helpers/currency-surfaces.ts` now — shared with
+    // `currency-input-consistency.test.ts`, which had a near-copy of the same
+    // derivation with the same hole in it: both stopped at `app/`.
     const offenders: string[] = [];
-    for (const file of tsxFiles("app")) {
+    for (const file of costInputFiles()) {
       const code = sourceCode(file);
-      if (!code.includes("parseCurrencyValueDetailed(")) continue;
       if (!code.includes("<CurrencyInput")) offenders.push(`${file} (no <CurrencyInput>)`);
       if (code.includes("<CurrencySheet")) offenders.push(`${file} (mounts <CurrencySheet>)`);
     }
@@ -124,23 +127,28 @@ describe("the sweep — nothing drives a currency sheet by hand for a cost", () 
   });
 
   it("finds the cost screens (guards the rule from passing vacuously)", () => {
-    const costScreens = tsxFiles("app").filter((f) =>
-      sourceCode(f).includes("parseCurrencyValueDetailed("),
-    );
-    assert.deepEqual([...costScreens].sort(), [
+    assert.deepEqual([...costInputFiles()].sort(), [
       "app/create.tsx",
       "app/item/[id].tsx",
       "app/wishlist.tsx",
     ]);
   });
 
-  it("the display pickers still mount the sheet directly, which is correct", () => {
+  it("the display pickers do not take the cost-input control", () => {
     // The other side of the rule. They take no amount, so they have no entry
     // currency to remember and no use for a strip of recently-typed codes.
-    for (const file of ["app/settings.tsx", "app/collection/[id].tsx"]) {
-      const code = sourceCode(file);
-      assert.ok(code.includes("<CurrencySheet"), `${file} stopped offering a currency choice`);
-      assert.ok(!code.includes("<CurrencyInput"), `${file} took the cost-input control`);
+    //
+    // `components/edit-collection-modal.tsx` is on this list and mounts no
+    // sheet at all — it renders the button and names the opener through a
+    // prop, which is why neither sweep could see it until the walk reached
+    // `components/`. So the shared half is "not <CurrencyInput>", and the
+    // sheet is asserted per file below.
+    for (const file of displayPickerFiles()) {
+      assert.ok(
+        !sourceCode(file).includes("<CurrencyInput"),
+        `${file} took the cost-input control`,
+      );
     }
+    assert.ok(displayPickerFiles().length >= 3, "the display side of the walk found nothing");
   });
 });
