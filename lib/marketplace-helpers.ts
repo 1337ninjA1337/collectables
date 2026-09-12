@@ -222,6 +222,43 @@ export function isOpenListing(
 }
 
 /**
+ * Every provider mutation that acts on an item, and whether it has to ask
+ * {@link isOpenListing} first.
+ *
+ * Two bugs this week were the same bug: a path that touches an item and does
+ * not ask the question the others ask. The archive round did not think about
+ * listings; the round that fixed listings did not think about delete. Both
+ * were found by writing a suggestion afterwards rather than by anything in the
+ * tree, and the thing that catches that class is a list — because the failure
+ * is always a path nobody remembered, and a rule stated only in the paths that
+ * follow it cannot name the one that does not.
+ *
+ * `item-departure-paths.test.ts` reads this record against the provider's own
+ * mutation list, so an eighth mutation is red until somebody decides which
+ * kind it is. The reasons are here rather than there because they are about
+ * the marketplace, and a reader asking "why does moving not retire a listing?"
+ * arrives at this file.
+ */
+export const LISTING_RULE_BY_ITEM_PATH: Readonly<Record<string, string>> = {
+  archiveItem:
+    "retires — an open listing outlives the archive otherwise and stays in activeListings for every buyer, under an item its owner has said they no longer have. The sold-listing prompt is the exception INSIDE this path: it archives as the last step of a sale that already happened, and the listing is that sale's record",
+  archiveItems:
+    "retires — the same act done to a selection, and the scale at which nobody would have noticed: thirty rows leave storage and thirty standing offers stay",
+  deleteItem:
+    "retires — the worse half. The item leaves storage entirely, so the buyer who claims the surviving listing gets a purchase pointing at nothing the seller can even open",
+  deleteItems:
+    "retires — the bulk version of the above, and the one the confirm has to count, because a seller deleting thirty is told about the thirty and not the four listings",
+  moveItems:
+    "EXEMPT — a listing carries `itemId` and nothing about the collection, and `app/listing/[id].tsx` resolves its item with `getItemById(listing.itemId)` alone. Moving an item between collections is invisible to the marketplace, so retiring a listing here would withdraw a live offer for no reason. This is a decision and not an omission: four rounds carried it as an open question, and the answer is that the data shape makes it a non-event",
+  unarchiveItem:
+    "EXEMPT — the item is coming BACK, which is the one direction that cannot orphan an offer. Its listing was either retired on the way in or is sold, and re-creating one would put a thing up for sale that nobody asked to sell",
+  updateItem:
+    "EXEMPT — the item stays where it is and stays for sale; editing a title is not a departure. A listing shows the item's current title by design, which is the point of resolving it by id",
+  promoteWishlistItem:
+    "EXEMPT — a want becoming a holding is an arrival. It could not have had a listing: you cannot sell a thing you do not own, and the wishlist screen offers no way to list one",
+};
+
+/**
  * The open listings among `itemIds` — {@link isOpenListing} asked of a
  * selection instead of of one row.
  *
