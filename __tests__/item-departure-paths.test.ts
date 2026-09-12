@@ -169,9 +169,13 @@ describe("the verdicts match what the code does", () => {
     // it, so deleting a collection of thirty left thirty standing offers
     // pointing at items that no longer exist anywhere.
     assert.ok(retires("deleteCollection"));
+    // Over the provider's UNFILTERED list, not the screen's `allItems`:
+    // `getItemsForCollection` is live-item filtered and the delete removes
+    // every row carrying the id, so a listed wishlist item was warned about
+    // and retired by neither.
     assert.match(
       COLLECTION_SCREEN,
-      /const collectionOpenListings = useMemo\(\s*\(\) => openListingsForItems\(myListings, allItems\.map\(\(item\) => item\.id\)\),/,
+      /openListingsForItems\(\s*myListings,\s*unfilteredItems\.filter\(\(item\) => item\.collectionId === params\.id\)\.map\(\(item\) => item\.id\),/,
     );
     const commit = COLLECTION_SCREEN.slice(
       COLLECTION_SCREEN.indexOf("const confirmAndDeleteCollection"),

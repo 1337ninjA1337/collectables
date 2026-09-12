@@ -585,7 +585,14 @@ describe("translation floors", () => {
     // — `archiveActionDone` plus `bulkListingsRemoved` at a count of one — so
     // the distinction survives with one fewer sentence per locale, and the
     // shape scales to a third thing the act also did.
-    assert.match(report, /en: 539\/539 keys \(100\.0%\)/);
+    // 540 later the same day: `collectionDeleted`. Deleting a collection
+    // removes it and every item in it, took every open listing down with it,
+    // and said nothing at all — the last resolution in this family with no
+    // outcome, at the largest scale any of them runs at. The same round found
+    // that the listings it counted came from a live-item-filtered list, so a
+    // listed wishlist item was warned about by neither the confirm nor the
+    // removal.
+    assert.match(report, /en: 540\/540 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

@@ -93,6 +93,7 @@ const en = {
   deleteCollection: "Delete collection",
   collectionItems: "Items in collection",
   deleteCollectionTitle: "Delete collection?",
+  collectionDeleted: "Collection deleted",
   deleteCollectionText: "The collection and all items inside it will be deleted permanently.",
   cancel: "Cancel",
   delete: "Delete",
@@ -706,6 +707,7 @@ const ru: TranslationMap = {
   deleteCollection: "Удалить коллекцию",
   collectionItems: "Предметы в коллекции",
   deleteCollectionTitle: "Удалить коллекцию?",
+  collectionDeleted: "Коллекция удалена",
   deleteCollectionText: "Коллекция и все предметы внутри будут удалены без возможности восстановления.",
   cancel: "Отмена",
   delete: "Удалить",
@@ -1686,6 +1688,7 @@ const be: TranslationMap = {
   photosSaved: "Захавана фота",
   addItemToCollection: "Дадаць прадмет у гэтую калекцыю",
   deleteCollectionTitle: "Выдаліць калекцыю?",
+  collectionDeleted: "Калекцыя выдалена",
   deleteCollectionText:
     "Калекцыя і ўсе прадметы ўнутры будуць выдалены без магчымасці аднаўлення.",
   description: "Апісанне",
@@ -2292,6 +2295,7 @@ const pl: TranslationMap = {
   addItemToCollection: "Dodaj przedmiot do tej kolekcji",
   deleteCollection: "Usuń kolekcję",
   deleteCollectionTitle: "Usunąć kolekcję?",
+  collectionDeleted: "Kolekcja usunięta",
   deleteCollectionText:
     "Kolekcja i wszystkie przedmioty w środku zostaną usunięte bezpowrotnie.",
   description: "Opis",
@@ -2907,6 +2911,7 @@ const de: TranslationMap = {
   addItemToCollection: "Objekt zu dieser Sammlung hinzufügen",
   deleteCollection: "Sammlung löschen",
   deleteCollectionTitle: "Sammlung löschen?",
+  collectionDeleted: "Sammlung gelöscht",
   deleteCollectionText:
     "Die Sammlung und alle Objekte darin werden endgültig gelöscht.",
   description: "Beschreibung",
@@ -3532,6 +3537,7 @@ const es: TranslationMap = {
   addItemToCollection: "Añadir objeto a esta colección",
   deleteCollection: "Eliminar colección",
   deleteCollectionTitle: "¿Eliminar la colección?",
+  collectionDeleted: "Colección eliminada",
   deleteCollectionText:
     "La colección y todos los objetos que contiene se eliminarán de forma permanente.",
   description: "Descripción",

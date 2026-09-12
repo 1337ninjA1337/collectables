@@ -139,9 +139,9 @@ const FAMILIES: readonly Family[] = [
   {
     name: "collection",
     pattern: /^collection[A-Z]/,
-    size: 14,
+    size: 15,
     because:
-      "the last prefix family of any size, and the labels on the form a user meets before they own anything — naming a collection is the first thing the app asks anybody to do, so an English form here is the first English a new speaker of any of these four sees",
+      "the last prefix family of any size, and the labels on the form a user meets before they own anything — naming a collection is the first thing the app asks anybody to do, so an English form here is the first English a new speaker of any of these four sees. 15 on 2026-09-12, with `collectionDeleted`: deleting a collection removes it and every item in it and said nothing at all, which made it the last resolution in the family with no outcome — at the largest scale any of them runs at. The prefix rule is what puts it here rather than on the collection-detail screen's count",
   },
   {
     name: "add-item screen",

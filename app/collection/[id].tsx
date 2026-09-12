@@ -88,6 +88,10 @@ export default function CollectionDetailsScreen() {
   const { user } = useAuth();
   const {
     collections,
+    // Aliased: this screen's own `items` is the sorted, filtered render list.
+    // This one is the provider's, unfiltered — archived and wishlist rows
+    // included — which is what the delete path needs.
+    items: unfilteredItems,
     getCollectionById,
     getItemsForCollection,
     getCollectionTotalCost,
@@ -744,19 +748,44 @@ export default function CollectionDetailsScreen() {
    * collection of thirty left thirty standing offers on every buyer's device,
    * each pointing at an item that no longer exists anywhere.
    */
+  //
+  // Over EVERY item in the collection, not `allItems`. `allItems` is
+  // `getItemsForCollection`, which is live-item filtered — and the delete does
+  // not ask whether a row is live, it removes every item carrying this
+  // `collectionId`. Nothing stops a wishlist item being listed (the item
+  // screen's marketplace block gates on archived, never on `isWishlist`), so a
+  // collection holding a listed want warned about one listing too few and left
+  // that offer standing after the rows were gone — the same class of bug the
+  // departure-path record was built to catch, one filter down.
   const collectionOpenListings = useMemo(
-    () => openListingsForItems(myListings, allItems.map((item) => item.id)),
-    [myListings, allItems],
+    () =>
+      openListingsForItems(
+        myListings,
+        unfilteredItems.filter((item) => item.collectionId === params.id).map((item) => item.id),
+      ),
+    [myListings, unfilteredItems, params.id],
   );
 
   const confirmAndDeleteCollection = useCallback(async () => {
     if (!collection) return;
     // Before the delete, for the same reason every other departure path does
     // it first: the items are gone afterwards and so is the list to read.
+    // Composed before the removals, for the reason every path in this family
+    // composes first: `collectionOpenListings` derives from items that stop
+    // existing on the next line.
+    const outcome = composeOutcome(
+      t("collectionDeleted"),
+      collectionOpenListings.length > 0
+        ? t("bulkListingsRemoved", { count: collectionOpenListings.length })
+        : null,
+    );
     for (const listing of collectionOpenListings) removeListing(listing.id);
     await deleteCollection(collection.id);
+    // After the delete, so a failure does not claim it happened; before the
+    // navigation, so the message is queued while this screen is still mounted.
+    toast.success(outcome);
     router.replace("/");
-  }, [collection, collectionOpenListings, removeListing, deleteCollection]);
+  }, [collection, collectionOpenListings, removeListing, deleteCollection, toast, t]);
 
   const handleDeleteCollection = useCallback(() => {
     // The same counted sentence the bulk confirms use: this is the bulk delete
