@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
+  AMBER_ACCENT,
   AMBER_LIGHT_2,
   DANGER_DEEP_4,
   DANGER_SOFT_5,
@@ -12,22 +13,37 @@ import {
   RADIUS_CARD,
   SPACING_CARD,
   SPACING_INLINE,
+  TEXT_ON_DARK_2,
   TEXT_ON_DARK_4,
 } from "@/lib/design-tokens";
 import { FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
 
+/**
+ * Every action is optional and Cancel is not — the bar renders the ones it is
+ * handed, in this order.
+ *
+ * They were all required while one screen mounted it. The archive screen is
+ * the second, and the actions it offers are not a subset of the first's by
+ * accident: a screen whose whole purpose is recovering from a mistake gets
+ * Restore and nothing else, and deliberately no "delete all", which is the
+ * argument `app/archive.tsx` has made since it was written. Optional props
+ * are what let that screen state its answer by omission rather than by
+ * passing four handlers and disabling three of them.
+ */
 type Props = {
   count: number;
-  onMove: () => void;
+  /** The way back out of the archive, and the only action that screen offers. */
+  onRestore?: () => void;
+  onMove?: () => void;
   /**
    * The reversible resolution, and the reason it sits between Move and
    * Delete: the bar offered exactly one way to make a selection go away and
    * it was the permanent one, so retiring thirty sold items meant deleting
    * them or opening thirty screens.
    */
-  onArchive: () => void;
-  onDelete: () => void;
+  onArchive?: () => void;
+  onDelete?: () => void;
   onCancel: () => void;
 };
 
@@ -37,7 +53,14 @@ type Props = {
 // re-renders on parent commits where neither the count nor a handler
 // changed. Absolute positioning stays with the component; the page keeps
 // the spacer that reserves scroll room underneath it.
-export const BulkBar = memo(function BulkBar({ count, onMove, onArchive, onDelete, onCancel }: Props) {
+export const BulkBar = memo(function BulkBar({
+  count,
+  onRestore,
+  onMove,
+  onArchive,
+  onDelete,
+  onCancel,
+}: Props) {
   const { t } = useI18n();
   const empty = count === 0;
   return (
@@ -45,33 +68,52 @@ export const BulkBar = memo(function BulkBar({ count, onMove, onArchive, onDelet
       <View style={styles.bulkBarInner}>
         <Text style={styles.bulkBarCount}>{t("selectedCount", { count })}</Text>
         <View style={styles.bulkBarButtons}>
-          <Pressable
-            style={{ ...styles.bulkBarButton, ...(empty ? styles.bulkBarButtonDisabled : {}) }}
-            disabled={empty}
-            accessibilityState={{ disabled: empty }}
-            accessibilityRole="button"
-            onPress={onMove}
-          >
-            <Text style={styles.bulkBarButtonText}>{t("moveToCollection")}</Text>
-          </Pressable>
-          <Pressable
-            style={{ ...styles.bulkBarButton, ...(empty ? styles.bulkBarButtonDisabled : {}) }}
-            disabled={empty}
-            accessibilityState={{ disabled: empty }}
-            accessibilityRole="button"
-            onPress={onArchive}
-          >
-            <Text style={styles.bulkBarButtonText}>{t("archiveAction")}</Text>
-          </Pressable>
-          <Pressable
-            style={{ ...styles.bulkBarButton, ...styles.bulkBarButtonDanger, ...(empty ? styles.bulkBarButtonDisabled : {}) }}
-            disabled={empty}
-            accessibilityState={{ disabled: empty }}
-            accessibilityRole="button"
-            onPress={onDelete}
-          >
-            <Text style={{ ...styles.bulkBarButtonText, ...styles.bulkBarButtonDangerText }}>{t("delete")}</Text>
-          </Pressable>
+          {onRestore ? (
+            <Pressable
+              style={{ ...styles.bulkBarButton, ...styles.bulkBarButtonPrimary, ...(empty ? styles.bulkBarButtonDisabled : {}) }}
+              disabled={empty}
+              accessibilityState={{ disabled: empty }}
+              accessibilityRole="button"
+              onPress={onRestore}
+            >
+              <Text style={{ ...styles.bulkBarButtonText, ...styles.bulkBarButtonPrimaryText }}>
+                {t("archiveRestore")}
+              </Text>
+            </Pressable>
+          ) : null}
+          {onMove ? (
+            <Pressable
+              style={{ ...styles.bulkBarButton, ...(empty ? styles.bulkBarButtonDisabled : {}) }}
+              disabled={empty}
+              accessibilityState={{ disabled: empty }}
+              accessibilityRole="button"
+              onPress={onMove}
+            >
+              <Text style={styles.bulkBarButtonText}>{t("moveToCollection")}</Text>
+            </Pressable>
+          ) : null}
+          {onArchive ? (
+            <Pressable
+              style={{ ...styles.bulkBarButton, ...(empty ? styles.bulkBarButtonDisabled : {}) }}
+              disabled={empty}
+              accessibilityState={{ disabled: empty }}
+              accessibilityRole="button"
+              onPress={onArchive}
+            >
+              <Text style={styles.bulkBarButtonText}>{t("archiveAction")}</Text>
+            </Pressable>
+          ) : null}
+          {onDelete ? (
+            <Pressable
+              style={{ ...styles.bulkBarButton, ...styles.bulkBarButtonDanger, ...(empty ? styles.bulkBarButtonDisabled : {}) }}
+              disabled={empty}
+              accessibilityState={{ disabled: empty }}
+              accessibilityRole="button"
+              onPress={onDelete}
+            >
+              <Text style={{ ...styles.bulkBarButtonText, ...styles.bulkBarButtonDangerText }}>{t("delete")}</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             style={{ ...styles.bulkBarButton, ...styles.bulkBarButtonGhost }}
             onPress={onCancel}
@@ -133,6 +175,13 @@ const styles = StyleSheet.create({
   bulkBarButtonDanger: {
     backgroundColor: DANGER_DEEP_4,
   },
+  // The same amber the per-row Restore pill on `app/archive.tsx` uses: the bar
+  // is doing that row's action to thirty rows at once, and a screen where the
+  // one bulk action looked like the neutral ones would read as if the primary
+  // was missing.
+  bulkBarButtonPrimary: {
+    backgroundColor: AMBER_ACCENT,
+  },
   bulkBarButtonGhost: {
     backgroundColor: "transparent",
     borderWidth: 1,
@@ -146,5 +195,8 @@ const styles = StyleSheet.create({
   },
   bulkBarButtonDangerText: {
     color: DANGER_SOFT_5,
+  },
+  bulkBarButtonPrimaryText: {
+    color: TEXT_ON_DARK_2,
   },
 });

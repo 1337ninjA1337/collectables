@@ -113,12 +113,15 @@ describe("the archive screen", () => {
 
   it("reads the list and both resolutions from the context", () => {
     // `refresh` joined the destructure when the screen gained pull-to-refresh,
-    // which is not what this case is about: it claims the screen reads the
-    // list and the two resolutions off the context rather than deriving them.
-    assert.match(
-      SRC,
-      /const \{ archivedItems, unarchiveItem, deleteItem, getCollectionById[^}]*\} = useCollections\(\);/,
-    );
+    // and `unarchiveItems` when it gained a bulk restore — neither is what
+    // this case is about: it claims the screen reads the list and the
+    // resolutions off the context rather than deriving them. Spelled as a
+    // membership check rather than one regex over a destructure that now
+    // wraps across two lines, which is a formatting fact and not a claim.
+    const destructure = SRC.slice(SRC.indexOf("const {"), SRC.indexOf("= useCollections();"));
+    for (const name of ["archivedItems", "unarchiveItem", "unarchiveItems", "deleteItem", "getCollectionById"]) {
+      assert.ok(destructure.includes(name), `'${name}' is no longer read from the context`);
+    }
   });
 
   it("offers Restore as the primary action on every row", () => {
@@ -195,8 +198,11 @@ describe("the archive screen", () => {
     // `onEndReached` for a scroll that reaches the end, and the footer button
     // for the platforms and gestures where it never fires — the same pairing
     // collection detail uses, and `remaining > 0` is the one gate for both.
+    // The footer became a fragment when selection mode arrived — the button
+    // still renders unconditionally, with the bulk bar's scroll spacer beside
+    // it — so this reads the button rather than the whole prop.
     assert.match(SRC, /onEndReached=\{remaining > 0 \? loadMore : undefined\}/);
-    assert.match(SRC, /ListFooterComponent=\{<LoadMoreButton remaining=\{remaining\} onPress=\{loadMore\} \/>\}/);
+    assert.match(SRC, /<LoadMoreButton remaining=\{remaining\} onPress=\{loadMore\} \/>/);
   });
 
   it("grows the window through the shared button", () => {

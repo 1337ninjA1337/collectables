@@ -91,6 +91,21 @@ describe("openListingsForItems", () => {
 describe("archiveItems on the provider", () => {
   const SRC = stripComments(readRepoFile("lib/collections-context.tsx"));
 
+  /**
+   * One handler's body, bounded by the next handler's head.
+   *
+   * It was `slice(indexOf("archiveItems: async"), indexOf("deleteItems: async"))`
+   * until `unarchiveItems` landed between the two — a name that CONTAINS
+   * "archiveItems: async", so the old slice silently grew to cover both
+   * bodies and every case below went on passing while claiming to read one.
+   */
+  const bodyOf = (name: string): string => {
+    const start = SRC.indexOf(`\n      ${name}: async`);
+    assert.ok(start >= 0, `could not find '${name}' on the provider`);
+    const next = SRC.slice(start + 1).search(/\n {6}[a-zA-Z]+: (?:async )?\(/);
+    return SRC.slice(start, next >= 0 ? start + 1 + next : SRC.length);
+  };
+
   it("exists alongside deleteItems", () => {
     assert.match(SRC, /archiveItems: async \(itemIds\) => \{/);
     assert.match(SRC, /archiveItems: \(itemIds: string\[\]\) => Promise<void>;/);
@@ -100,14 +115,14 @@ describe("archiveItems on the provider", () => {
     // The archive screen sorts on `archivedAt`, and thirty timestamps a
     // millisecond apart would scatter a single act across the top of that
     // list in an order nobody chose.
-    const body = SRC.slice(SRC.indexOf("archiveItems: async"), SRC.indexOf("deleteItems: async"));
+    const body = bodyOf("archiveItems");
     assert.ok(body.length > 0, "could not parse archiveItems");
     const stamps = body.match(/new Date\(\)\.toISOString\(\)/g) ?? [];
     assert.equal(stamps.length, 1);
   });
 
   it("resolves from localItems before the state write, like every other mutation", () => {
-    const body = SRC.slice(SRC.indexOf("archiveItems: async"), SRC.indexOf("deleteItems: async"));
+    const body = bodyOf("archiveItems");
     assert.match(body, /const archived = localItems\s*\.filter\(/);
     assert.doesNotMatch(body, /let \w+ = null;/);
   });
@@ -115,18 +130,18 @@ describe("archiveItems on the provider", () => {
   it("skips rows that are already archived", () => {
     // Re-stamping one would move it to the top of the archive list for an act
     // that changed nothing.
-    const body = SRC.slice(SRC.indexOf("archiveItems: async"), SRC.indexOf("deleteItems: async"));
+    const body = bodyOf("archiveItems");
     assert.match(body, /idSet\.has\(item\.id\) && !item\.archivedAt/);
   });
 
   it("returns early on an empty selection and on a selection that resolves to nothing", () => {
-    const body = SRC.slice(SRC.indexOf("archiveItems: async"), SRC.indexOf("deleteItems: async"));
+    const body = bodyOf("archiveItems");
     assert.match(body, /if \(itemIds\.length === 0\) return;/);
     assert.match(body, /if \(archived\.length === 0\) return;/);
   });
 
   it("syncs each archived row", () => {
-    const body = SRC.slice(SRC.indexOf("archiveItems: async"), SRC.indexOf("deleteItems: async"));
+    const body = bodyOf("archiveItems");
     assert.match(body, /syncItem\(item, \(\) => updateRemoteItem\(item\.id, \{ archivedAt \}\)\)/);
   });
 });

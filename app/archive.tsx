@@ -1,7 +1,8 @@
 import { Stack, router } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { FlatList, Image, Platform, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 
+import { BulkBar } from "@/components/bulk-bar";
 import { DangerIconButton } from "@/components/danger-icon-button";
 import { EmptyState } from "@/components/empty-state";
 import { LoadMoreButton } from "@/components/load-more-button";
@@ -15,9 +16,11 @@ import {
   AMBER_ACCENT,
   BORDER,
   CARD_BG,
+  CARD_BG_3,
   HERO_DARK,
   MUTED,
   MUTED_2,
+  MUTED_22,
   RADIUS_CARD_LG,
   RADIUS_ITEM_AIRY,
   RADIUS_PILL,
@@ -28,6 +31,7 @@ import {
   TEXT_DARK,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
+  TEXT_ON_DARK_5,
   TEXT_ON_DARK_MUTED,
 } from "@/lib/design-tokens";
 import { FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD, FONT_DISPLAY } from "@/lib/fonts";
@@ -55,14 +59,25 @@ import { useMinimumVisible } from "@/lib/use-minimum-visible";
  * one behind a confirm. What this screen deliberately does NOT offer is a
  * "delete all" — a screen whose whole purpose is recovering from a mistake is
  * the worst possible place to put a one-tap way to make a bigger one.
+ *
+ * Selection mode is the answer to the asymmetry that opened up when the bulk
+ * bar learned to archive: one gesture on the collection screen can put thirty
+ * rows in here, and this screen took them out one at a time. The whole case
+ * for archiving over deleting is that the way back is cheap, which stops
+ * being true at thirty taps. So the bar comes here too — with Restore, and
+ * with the "delete all" it still does not offer, which is the same answer as
+ * before and now has to be stated by what is NOT passed to `<BulkBar>`.
  */
 export default function ArchiveScreen() {
-  const { archivedItems, unarchiveItem, deleteItem, getCollectionById, refresh } = useCollections();
+  const { archivedItems, unarchiveItem, unarchiveItems, deleteItem, getCollectionById, refresh } =
+    useCollections();
   const { t } = useI18n();
   const theme = useAppTheme();
   const toast = useToast();
   const [working, setWorking] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -131,14 +146,77 @@ export default function ArchiveScreen() {
     [deleteItem, toast, t],
   );
 
+  const enterSelectionMode = useCallback(() => {
+    setSelectionMode(true);
+    setSelectedIds(new Set());
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // A lookup rather than `selectedIds.has()` inside renderItem, for the reason
+  // the collection screen's selection list gives: the row reads a boolean off
+  // an object rebuilt once per toggle instead of the parent's Set reference
+  // reaching every row.
+  const selectedById = useMemo(
+    () => Object.fromEntries(Array.from(selectedIds, (id) => [id, true])) as Record<string, boolean>,
+    [selectedIds],
+  );
+
+  /**
+   * Restore a selection, and take no confirm for it.
+   *
+   * Nothing here is destructive — every row it touches goes back where it was,
+   * and the way to undo it is the archive action that put it here. The
+   * destructive resolution on this screen stays one row at a time, behind the
+   * confirm it has always had.
+   *
+   * `ids` is read BEFORE the await for the same reason the collection screen
+   * reads its listing count before one: `exitSelectionMode` empties the
+   * selection three lines below, and a count composed after it would be zero.
+   */
+  const performBulkRestore = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setWorking(true);
+    try {
+      await unarchiveItems(ids);
+      const message = t("itemsRestored", { count: ids.length });
+      toast.success(message);
+      // Said as well as shown, like the single-row restore: the rows leave
+      // this list, and a list that got thirty shorter is what a bulk delete
+      // would look like too.
+      announceMessage(message);
+      exitSelectionMode();
+    } finally {
+      setWorking(false);
+    }
+  }, [selectedIds, unarchiveItems, toast, t, exitSelectionMode]);
+
+  // The sync wrapper `<BulkBar>` is handed, so its memo sees one stable
+  // reference instead of a fresh arrow per parent render.
+  const handleBulkRestore = useCallback(() => {
+    void performBulkRestore();
+  }, [performBulkRestore]);
+
   const renderRow = useCallback(
     ({ item }: { item: CollectableItem }) => {
       const collection = getCollectionById(item.collectionId);
       const photo = item.photos[0];
-      return (
-        <View
-          style={{ ...styles.row, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}
-        >
+      const selected = !!selectedById[item.id];
+      const body = (
+        <>
           {photo ? (
             <Image source={{ uri: photo }} style={styles.thumb} />
           ) : (
@@ -164,6 +242,34 @@ export default function ArchiveScreen() {
               {t("archiveArchivedOn", { date: (item.archivedAt ?? "").slice(0, 10) })}
             </Text>
           </View>
+        </>
+      );
+      const surface = { ...styles.row, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT };
+
+      // A row in a multi-select list is a checkbox and not a button — the same
+      // call `<SelectableItemRow>` makes and for the same reason: "button"
+      // announces the tap and says nothing about whether the row is in the
+      // selection, which is the only state this mode has.
+      if (selectionMode) {
+        return (
+          <Pressable
+            style={{ ...surface, ...(selected ? styles.rowSelected : {}) }}
+            onPress={() => toggleSelect(item.id)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: selected }}
+            accessibilityLabel={item.title}
+          >
+            {body}
+            <View style={{ ...styles.checkbox, ...(selected ? styles.checkboxOn : {}) }}>
+              {selected ? <Text style={styles.check}>✓</Text> : null}
+            </View>
+          </Pressable>
+        );
+      }
+
+      return (
+        <View style={surface}>
+          {body}
           <View style={styles.rowActions}>
             <Pressable
               style={styles.restore}
@@ -184,7 +290,7 @@ export default function ArchiveScreen() {
         </View>
       );
     },
-    [getCollectionById, theme, t, busy, handleRestore, handleDelete],
+    [getCollectionById, theme, t, busy, handleRestore, handleDelete, selectionMode, selectedById, toggleSelect],
   );
 
   /*
@@ -210,10 +316,21 @@ export default function ArchiveScreen() {
         keyExtractor={(item) => item.id}
         style={flatListStyles.viewerFlatList}
         contentContainerStyle={flatListStyles.viewerFlatListContent}
+        extraData={selectedIds}
         ListHeaderComponent={
           <View style={styles.hero}>
             <Text style={styles.heroTitle}>{t("archiveTitle")}</Text>
             <Text style={styles.heroText}>{t("archiveSubtitle")}</Text>
+            {archivedItems.length > 0 && !selectionMode ? (
+              <Pressable
+                style={styles.selectChip}
+                onPress={enterSelectionMode}
+                accessibilityRole="button"
+                accessibilityLabel={t("selectItems")}
+              >
+                <Text style={styles.selectChipText}>{t("selectItems")}</Text>
+              </Pressable>
+            ) : null}
           </View>
         }
         ListEmptyComponent={
@@ -225,7 +342,15 @@ export default function ArchiveScreen() {
             onAction={() => router.replace("/")}
           />
         }
-        ListFooterComponent={<LoadMoreButton remaining={remaining} onPress={loadMore} />}
+        ListFooterComponent={
+          <>
+            <LoadMoreButton remaining={remaining} onPress={loadMore} />
+            {/* The bar floats over the list, so the last row needs somewhere
+                to scroll to — the same spacer the collection screen keeps as
+                a page concern rather than folding into the component. */}
+            {selectionMode ? <View style={styles.bulkBarSpacer} /> : null}
+          </>
+        }
         renderItem={renderRow}
         // Every row is exactly ROW_HEIGHT plus the list's row gap, so the list
         // can place one without measuring it — which is what lets it skip to
@@ -256,6 +381,13 @@ export default function ArchiveScreen() {
           />
         }
       />
+      {selectionMode ? (
+        // Restore and Cancel, and nothing else. The omission is the screen's
+        // oldest argument: a place you come to after a mistake is the worst
+        // possible place for a one-tap way to make a bigger one, so there is
+        // no bulk delete here even though `<BulkBar>` can render one.
+        <BulkBar count={selectedIds.size} onRestore={handleBulkRestore} onCancel={exitSelectionMode} />
+      ) : null}
     </Screen>
   );
 }
@@ -337,5 +469,49 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
+  },
+  selectChip: {
+    alignSelf: "flex-start",
+    borderRadius: RADIUS_PILL,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: MUTED_22,
+  },
+  selectChipText: {
+    color: TEXT_ON_DARK,
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
+  },
+  // The selected row keeps its height: an amber border replaces the neutral
+  // one rather than sitting outside it, because `getItemLayout` promises
+  // every row is exactly ROW_HEIGHT and a 2px wrapper would make that a lie
+  // for the rows a user has touched.
+  rowSelected: {
+    borderColor: AMBER_ACCENT,
+    backgroundColor: CARD_BG_3,
+  },
+  checkbox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: AMBER_ACCENT,
+    backgroundColor: CARD_BG,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxOn: {
+    backgroundColor: AMBER_ACCENT,
+  },
+  check: {
+    color: TEXT_ON_DARK_5,
+    fontSize: 16,
+    fontWeight: "900",
+    fontFamily: FONT_BODY_EXTRABOLD,
+  },
+  bulkBarSpacer: {
+    height: 120,
   },
 });

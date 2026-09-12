@@ -267,6 +267,8 @@ export const LISTING_RULE_BY_ITEM_PATH: Readonly<Record<string, string>> = {
     "retires — the bulk version of the above, and the one the confirm has to count, because a seller deleting thirty is told about the thirty and not the four listings",
   moveItems:
     "EXEMPT — a listing carries `itemId` and nothing about the collection, and `app/listing/[id].tsx` resolves its item with `getItemById(listing.itemId)` alone. Moving an item between collections is invisible to the marketplace, so retiring a listing here would withdraw a live offer for no reason. This is a decision and not an omission: four rounds carried it as an open question, and the answer is that the data shape makes it a non-event",
+  unarchiveItems:
+    "EXEMPT — the same arrival done to a selection, and exempt for the same reason one at a time is: thirty items coming back cannot orphan an offer, and re-creating thirty listings would put thirty things up for sale that nobody asked to sell",
   unarchiveItem:
     "EXEMPT — the item is coming BACK, which is the one direction that cannot orphan an offer. Its listing was either retired on the way in or is sold, and re-creating one would put a thing up for sale that nobody asked to sell",
   reorderItemsInCollection:

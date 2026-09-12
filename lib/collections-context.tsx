@@ -278,6 +278,20 @@ type CollectionsContextValue = {
    * nobody chose.
    */
   archiveItems: (itemIds: string[]) => Promise<void>;
+  /**
+   * Put a selection back — the other direction of `archiveItems`, and the one
+   * the archive screen had no way to do.
+   *
+   * One gesture on the bulk bar can put thirty rows into the trash and the
+   * archive screen took them out one at a time, which is the asymmetry a
+   * reversible action cannot afford: the whole argument for archiving over
+   * deleting is that the way back is cheap.
+   *
+   * No timestamp to stamp, so unlike `archiveItems` this needs no single
+   * clock: it clears a field rather than setting one, and every row it
+   * touches leaves the archive list entirely.
+   */
+  unarchiveItems: (itemIds: string[]) => Promise<void>;
   moveItems: (itemIds: string[], targetCollectionId: string) => Promise<void>;
   deleteCollection: (collectionId: string) => Promise<void>;
   deleteUserContent: (userId: string) => Promise<void>;
@@ -1543,6 +1557,29 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         setLocalItems((items) => items.map((item) => archivedById.get(item.id) ?? item));
         archived.forEach((item) =>
           syncItem(item, () => updateRemoteItem(item.id, { archivedAt })),
+        );
+      },
+      unarchiveItems: async (itemIds) => {
+        if (itemIds.length === 0) return;
+        const idSet = new Set(itemIds);
+        // Resolved from `localItems` before the write, like `archiveItems`
+        // above. The filter also asks `item.archivedAt`: an id that is not in
+        // the trash has nothing to come back from, and syncing it would write
+        // a field that already reads `null`.
+        //
+        // `null` and not `undefined`, for the reason `unarchiveItem` spells
+        // out at length: `updateRemoteItem` only writes the field when the key
+        // is PRESENT in `updates`, so an `undefined` here would clear thirty
+        // local flags and leave thirty cloud rows archived — and the next sync
+        // would put the whole selection back in the trash.
+        const restored = localItems
+          .filter((item) => idSet.has(item.id) && item.archivedAt)
+          .map((item): CollectableItem => ({ ...item, archivedAt: null }));
+        if (restored.length === 0) return;
+        const restoredById = new Map(restored.map((item) => [item.id, item]));
+        setLocalItems((items) => items.map((item) => restoredById.get(item.id) ?? item));
+        restored.forEach((item) =>
+          syncItem(item, () => updateRemoteItem(item.id, { archivedAt: null })),
         );
       },
       deleteItems: async (itemIds) => {

@@ -571,7 +571,13 @@ describe("translation floors", () => {
     // only the rows, so a seller who archived thirty items and took four
     // listings down was told about the thirty — the half they least need,
     // since the other half is the one other people can see.
-    assert.match(report, /en: 539\/539 keys \(100\.0%\)/);
+    // 540 later that day: `itemsRestored`. Archiving reached the bulk bar and
+    // restoring did not, so one gesture could put thirty rows in the archive
+    // and taking them out was thirty taps — the asymmetry that makes "archive
+    // instead of delete" a worse deal the more of it you do. The counted
+    // outcome is the same shape `itemsArchived` already had, and it is the
+    // whole i18n cost of the round.
+    assert.match(report, /en: 540\/540 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

@@ -266,6 +266,8 @@ const en = {
     `Deleted ${params?.count ?? 0} ${plural(params?.count, "item", "items")}`,
   itemsArchived: (params?: TranslationParams) =>
     `Archived ${params?.count ?? 0} ${plural(params?.count, "item", "items")}`,
+  itemsRestored: (params?: TranslationParams) =>
+    `Restored ${params?.count ?? 0} ${plural(params?.count, "item", "items")}`,
   archiveItemsTitle: (params?: TranslationParams) =>
     `Archive ${params?.count ?? 0} ${plural(params?.count, "item", "items")}?`,
   archiveItemsText: "They leave your collections, totals and search, and you can restore them from the archive.",
@@ -727,6 +729,7 @@ const ru: TranslationMap = {
   itemsMoved: (params?: TranslationParams) => `Перемещено: ${params?.count ?? 0}`,
   itemsDeleted: (params?: TranslationParams) => `Удалено: ${params?.count ?? 0}`,
   itemsArchived: (params?: TranslationParams) => `Архивировано: ${params?.count ?? 0}`,
+  itemsRestored: (params?: TranslationParams) => `Восстановлено: ${params?.count ?? 0}`,
   archiveItemsTitle: (params?: TranslationParams) =>
     `Архивировать ${params?.count ?? 0} ${slavicPlural(params?.count, "предмет", "предмета", "предметов")}?`,
   archiveItemsText: "Они исчезнут из коллекций, сумм и поиска, но их можно восстановить из архива.",
@@ -1702,6 +1705,7 @@ const be: TranslationMap = {
   itemsMoved: (params?: TranslationParams) => `Перамешчана: ${params?.count ?? 0}`,
   itemsDeleted: (params?: TranslationParams) => `Выдалена: ${params?.count ?? 0}`,
   itemsArchived: (params?: TranslationParams) => `Заархівавана: ${params?.count ?? 0}`,
+  itemsRestored: (params?: TranslationParams) => `Адноўлена: ${params?.count ?? 0}`,
   archiveItemsTitle: (params?: TranslationParams) =>
     `Заархіваваць ${params?.count ?? 0} ${slavicPlural(params?.count, "прадмет", "прадметы", "прадметаў")}?`,
   archiveItemsText: "Яны знікнуць з калекцый, сум і пошуку, але іх можна аднавіць з архіва.",
@@ -2308,6 +2312,7 @@ const pl: TranslationMap = {
   itemsMoved: (params?: TranslationParams) => `Przeniesiono: ${params?.count ?? 0}`,
   itemsDeleted: (params?: TranslationParams) => `Usunięto: ${params?.count ?? 0}`,
   itemsArchived: (params?: TranslationParams) => `Zarchiwizowano: ${params?.count ?? 0}`,
+  itemsRestored: (params?: TranslationParams) => `Przywrócono: ${params?.count ?? 0}`,
   archiveItemsTitle: (params?: TranslationParams) =>
     `Zarchiwizować ${params?.count ?? 0} ${slavicPlural(params?.count, "przedmiot", "przedmioty", "przedmiotów")}?`,
   archiveItemsText: "Znikną z kolekcji, sum i wyszukiwania, ale możesz je przywrócić z archiwum.",
@@ -2923,6 +2928,7 @@ const de: TranslationMap = {
   itemsMoved: (params?: TranslationParams) => `Verschoben: ${params?.count ?? 0}`,
   itemsDeleted: (params?: TranslationParams) => `Gelöscht: ${params?.count ?? 0}`,
   itemsArchived: (params?: TranslationParams) => `Archiviert: ${params?.count ?? 0}`,
+  itemsRestored: (params?: TranslationParams) => `Wiederhergestellt: ${params?.count ?? 0}`,
   archiveItemsTitle: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${plural(params?.count, "Objekt", "Objekte")} archivieren?`,
   archiveItemsText: "Sie verschwinden aus Sammlungen, Summen und der Suche und lassen sich aus dem Archiv wiederherstellen.",
@@ -3548,6 +3554,7 @@ const es: TranslationMap = {
   itemsMoved: (params?: TranslationParams) => `Movidos: ${params?.count ?? 0}`,
   itemsDeleted: (params?: TranslationParams) => `Eliminados: ${params?.count ?? 0}`,
   itemsArchived: (params?: TranslationParams) => `Archivados: ${params?.count ?? 0}`,
+  itemsRestored: (params?: TranslationParams) => `Restaurados: ${params?.count ?? 0}`,
   archiveItemsTitle: (params?: TranslationParams) =>
     `¿Archivar ${params?.count ?? 0} ${plural(params?.count, "objeto", "objetos")}?`,
   archiveItemsText: "Saldrán de tus colecciones, totales y búsquedas, y podrás restaurarlos desde el archivo.",
