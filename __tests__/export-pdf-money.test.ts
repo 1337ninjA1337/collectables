@@ -44,6 +44,7 @@ const LABELS: ExportLabels = {
   totalCost: "Total cost",
   exportPdfItemCount: "Items",
   photosSaved: "Photos",
+  totalCostCaveat: "",
 };
 
 const PRINTED_ON = new Date("2026-01-02T03:04:05Z");
@@ -261,7 +262,12 @@ describe("the screen hands over what it is already showing", () => {
   const SRC = stripComments(readRepoFile("app/collection/[id].tsx"));
 
   it("passes the memoised total rather than recomputing one", () => {
-    assert.match(SRC, /total: getCollectionTotalCost\(collection\.id\),/);
+    // Read into a local first since the round that added the total's caveat:
+    // the labels need to know whether the figure is exact and the document
+    // needs the figure, and two accessor calls could straddle a rate table
+    // landing — printing a caveat about a total that is no longer on the page.
+    assert.match(SRC, /const exportTotal = getCollectionTotalCost\(collection\.id\);/);
+    assert.match(SRC, /total: exportTotal,/);
   });
 
   it("passes the same per-item conversion CostBadge renders", () => {

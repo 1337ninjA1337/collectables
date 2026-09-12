@@ -49,14 +49,14 @@ describe("collectionTotalCost — with rates", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: 15, currency: "USD", converted: 2, skipped: 0 });
+    assert.deepEqual(total, { amount: 15, currency: "USD", converted: 2, skipped: 0, approximate: false });
   });
 
   it("converts an item stored in another currency", () => {
     // EUR is 0.5 USD-rate here, so 10 EUR is 20 USD.
     const total = collectionTotalCost([item({ cost: 10, costCurrency: "EUR" })], "USD", RATES);
 
-    assert.deepEqual(total, { amount: 20, currency: "USD", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 20, currency: "USD", converted: 1, skipped: 0, approximate: false });
   });
 
   it("answers in the target currency, not the items'", () => {
@@ -75,7 +75,7 @@ describe("collectionTotalCost — with rates", () => {
     // currency it was never in.
     const total = collectionTotalCost([item({ cost: 10 })], "EUR", RATES);
 
-    assert.deepEqual(total, { amount: 10, currency: "EUR", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 10, currency: "EUR", converted: 1, skipped: 0, approximate: false });
   });
 
   it("counts an unconvertible item as skipped rather than as zero", () => {
@@ -87,12 +87,17 @@ describe("collectionTotalCost — with rates", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 1 });
+    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 1, approximate: false });
   });
 });
 
 describe("collectionTotalCost — before the rates land", () => {
-  it("sums raw amounts and reports them as converted", () => {
+  it("sums raw amounts and marks the total approximate", () => {
+    // The case shipped as "reports them as converted", which was true and was
+    // the bug: a raw sum was indistinguishable from one that really converted
+    // every item. Fine for a card that re-renders two seconds later, and not
+    // for the PDF export, which is the one output a user keeps. `approximate`
+    // is what a consumer that cannot re-render reads.
     // A deliberate lie of convenience: better than blanking the card while the
     // rate table loads, and the totals re-render for real once it arrives.
     const total = collectionTotalCost(
@@ -101,7 +106,7 @@ describe("collectionTotalCost — before the rates land", () => {
       null,
     );
 
-    assert.deepEqual(total, { amount: 15, currency: "USD", converted: 2, skipped: 0 });
+    assert.deepEqual(total, { amount: 15, currency: "USD", converted: 2, skipped: 0, approximate: true });
   });
 
   it("still answers in the target currency", () => {
@@ -117,7 +122,7 @@ describe("collectionTotalCost — what counts as a cost", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0, approximate: false });
   });
 
   it("ignores a NaN cost instead of poisoning the whole total", () => {
@@ -129,7 +134,7 @@ describe("collectionTotalCost — what counts as a cost", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0, approximate: false });
   });
 
   it("ignores an infinite cost", () => {
@@ -139,13 +144,13 @@ describe("collectionTotalCost — what counts as a cost", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0, approximate: false });
   });
 
   it("keeps a zero cost, which is a price and not a missing one", () => {
     const total = collectionTotalCost([item({ cost: 0 })], "USD", RATES);
 
-    assert.deepEqual(total, { amount: 0, currency: "USD", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 0, currency: "USD", converted: 1, skipped: 0, approximate: false });
   });
 
   it("keeps a negative cost", () => {
@@ -161,6 +166,7 @@ describe("collectionTotalCost — what counts as a cost", () => {
       currency: "EUR",
       converted: 0,
       skipped: 0,
+      approximate: false,
     });
   });
 

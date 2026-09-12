@@ -763,6 +763,10 @@ export default function CollectionDetailsScreen() {
 
   const handleExportPdf = useCallback(async () => {
     if (!collection) return;
+    // Read once: the labels need to know whether it is exact and the document
+    // needs the figure, and two calls could straddle a rate table landing —
+    // printing a caveat about a total that is no longer the one on the page.
+    const exportTotal = getCollectionTotalCost(collection.id);
     setExporting(true);
     try {
       await exportCollectionToPdf(collection, allItems, {
@@ -774,13 +778,22 @@ export default function CollectionDetailsScreen() {
         totalCost: t("totalCost"),
         exportPdfItemCount: t("exportPdfItemCount", { count: allItems.length }),
         photosSaved: t("photosSaved"),
+        // Resolved here because this module takes strings and the counted
+        // sentence needs a number. The order is deliberate: a total summed
+        // with NO rate table at all is a worse claim than one missing a few
+        // currencies, so it wins when somehow both could apply.
+        totalCostCaveat: exportTotal.approximate
+          ? t("exportTotalUnconverted")
+          : exportTotal.skipped > 0
+            ? t("exportTotalPartial", { count: exportTotal.skipped })
+            : "",
       }, {
         // The same two answers the summary card and every `<CostBadge>` on
         // this screen are already showing. The export used to sum the raw
         // `cost` fields itself, so the one artifact a user keeps was the one
         // place that converted nothing, printed no currency and ignored the
         // collection's own `currency` override.
-        total: getCollectionTotalCost(collection.id),
+        total: exportTotal,
         itemCost: (item) => convertItemCost(item, collection.currency ?? undefined),
       });
       toast.success(t("exportPdfDone"));

@@ -103,6 +103,7 @@ describe("the PDF export prices what it can and drops what it cannot", () => {
     totalCost: "Total",
     exportPdfItemCount: "Items",
     photosSaved: "Photos",
+    totalCostCaveat: "",
   };
 
   it("does not put NaN in the printed total", () => {

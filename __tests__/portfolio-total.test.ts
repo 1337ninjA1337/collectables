@@ -66,7 +66,7 @@ describe("portfolioTotalCost — across currencies", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: 70, currency: "USD", converted: 3, skipped: 0 });
+    assert.deepEqual(total, { amount: 70, currency: "USD", converted: 3, skipped: 0, approximate: false });
   });
 
   it("is not the raw sum the stats screen used to print", () => {
@@ -92,7 +92,7 @@ describe("portfolioTotalCost — across currencies", () => {
     );
 
     // 10 GBP is 40 USD is 20 EUR.
-    assert.deepEqual(total, { amount: 20, currency: "EUR", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 20, currency: "EUR", converted: 1, skipped: 0, approximate: false });
   });
 
   it("counts an unconvertible currency as skipped rather than as zero", () => {
@@ -106,7 +106,7 @@ describe("portfolioTotalCost — across currencies", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 1 });
+    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 1, approximate: false });
   });
 
   it("drops NaN, Infinity, null and absent costs without poisoning the sum", () => {
@@ -124,7 +124,7 @@ describe("portfolioTotalCost — across currencies", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0, approximate: false });
   });
 
   it("keeps zero and negative costs, which are prices", () => {
@@ -138,7 +138,7 @@ describe("portfolioTotalCost — across currencies", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: -5, currency: "USD", converted: 2, skipped: 0 });
+    assert.deepEqual(total, { amount: -5, currency: "USD", converted: 2, skipped: 0, approximate: false });
   });
 
   it("totals nothing to zero in the target currency", () => {
@@ -147,6 +147,7 @@ describe("portfolioTotalCost — across currencies", () => {
       currency: "EUR",
       converted: 0,
       skipped: 0,
+      approximate: false,
     });
   });
 });
@@ -163,7 +164,7 @@ describe("portfolioTotalCost — the collection's currency override", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: 20, currency: "USD", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 20, currency: "USD", converted: 1, skipped: 0, approximate: false });
   });
 
   it("lets the item's own stored currency win over its collection's label", () => {
@@ -174,7 +175,7 @@ describe("portfolioTotalCost — the collection's currency override", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0, approximate: false });
   });
 
   it("falls back to the viewer's currency for a collection with no override", () => {
@@ -185,7 +186,7 @@ describe("portfolioTotalCost — the collection's currency override", () => {
       RATES,
     );
 
-    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0, approximate: false });
   });
 
   it("adds up to what the collection cards show — the property a user checks by hand", () => {
@@ -197,8 +198,8 @@ describe("portfolioTotalCost — the collection's currency override", () => {
 
     const eurCard = collectionTotalCost(eurItems, "EUR", RATES);
     const usdCard = collectionTotalCost(usdItems, "USD", RATES);
-    assert.deepEqual(eurCard, { amount: 10, currency: "EUR", converted: 1, skipped: 0 });
-    assert.deepEqual(usdCard, { amount: 30, currency: "USD", converted: 1, skipped: 0 });
+    assert.deepEqual(eurCard, { amount: 10, currency: "EUR", converted: 1, skipped: 0, approximate: false });
+    assert.deepEqual(usdCard, { amount: 30, currency: "USD", converted: 1, skipped: 0, approximate: false });
 
     const portfolio = portfolioTotalCost([...eurItems, ...usdItems], overrides, "USD", RATES);
     // 10 EUR is 20 USD; plus the 30 USD card.
@@ -220,7 +221,7 @@ describe("portfolioTotalCost — the collection's currency override", () => {
 });
 
 describe("portfolioTotalCost — before the rates land", () => {
-  it("sums raw amounts and reports them as converted", () => {
+  it("sums raw amounts and marks the total approximate", () => {
     // The same deliberate lie of convenience collectionTotalCost documents:
     // better than blanking the headline while the rate table loads.
     const total = portfolioTotalCost(
@@ -233,7 +234,7 @@ describe("portfolioTotalCost — before the rates land", () => {
       null,
     );
 
-    assert.deepEqual(total, { amount: 15, currency: "USD", converted: 2, skipped: 0 });
+    assert.deepEqual(total, { amount: 15, currency: "USD", converted: 2, skipped: 0, approximate: true });
   });
 
   it("still drops non-finite costs with no rates", () => {
@@ -244,7 +245,7 @@ describe("portfolioTotalCost — before the rates land", () => {
       null,
     );
 
-    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0 });
+    assert.deepEqual(total, { amount: 10, currency: "USD", converted: 1, skipped: 0, approximate: true });
   });
 });
 

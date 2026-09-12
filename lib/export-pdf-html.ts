@@ -63,6 +63,15 @@ export type ExportLabels = {
   totalCost: string;
   exportPdfItemCount: string;
   photosSaved: string;
+  /**
+   * Printed under the total when it does not mean what it appears to mean —
+   * some items had no rate, or there was no rate table at all.
+   *
+   * The caller resolves which sentence it is, because the counted one needs a
+   * number and this module takes strings. Empty when the total is exact,
+   * which is the ordinary case and prints nothing.
+   */
+  totalCostCaveat: string;
 };
 
 /**
@@ -179,6 +188,7 @@ export function buildCollectionExportHtml(
   .stat { background: #fffaf3; border: 1px solid #eadbc8; border-radius: 12px; padding: 12px 16px; }
   .stat-value { font-size: 22px; font-weight: 800; color: #261b14; }
   .stat-label { font-size: 12px; color: #8f6947; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-caveat { font-size: 11px; color: #8f6947; margin-top: 4px; max-width: 240px; line-height: 1.4; }
   .item { page-break-inside: avoid; border: 1px solid #eadbc8; border-radius: 16px; padding: 20px; margin-bottom: 20px; background: #fffaf3; }
   .item h2 { font-size: 20px; color: #261b14; margin-bottom: 12px; }
   .photos { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -204,6 +214,7 @@ export function buildCollectionExportHtml(
       <div class="stat">
         <div class="stat-value">${escapeHtml(`${formatCostAmount(money.total.amount)} ${money.total.currency}`)}</div>
         <div class="stat-label">${escapeHtml(labels.totalCost)}</div>
+        ${labels.totalCostCaveat ? `<div class="stat-caveat">${escapeHtml(labels.totalCostCaveat)}</div>` : ""}
       </div>` : ""}
     </div>
   </div>

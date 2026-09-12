@@ -555,7 +555,12 @@ describe("translation floors", () => {
     // thirty standing offers stayed on every buyer's device. The counted ones
     // decline their nouns in the three Slavic locales, which is what a bulk
     // confirm most needs and where a pinned form is read most carefully.
-    assert.match(report, /en: 535\/535 keys \(100\.0%\)/);
+    // 537 later that day: `exportTotalUnconverted` and `exportTotalPartial`.
+    // A PDF total could be short by the items in a currency the rate table
+    // did not hold, or be a sum of raw amounts across currencies labelled
+    // with one of them, and the document said neither — permanently, in the
+    // one output a user keeps, mails and files.
+    assert.match(report, /en: 537\/537 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

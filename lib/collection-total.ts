@@ -15,12 +15,18 @@
  * An item without its own `costCurrency` is assumed to already be in that
  * target — the same fallback `convertItemCost` documents.
  *
- * **Without rates, raw amounts are summed** and reported as converted. That is
- * a deliberate lie of convenience: it is better than blanking the card while
- * the rate table loads, and once the rates land the totals re-render with real
- * conversion. It is also only ever right when the items share a currency,
- * which is why `converted`/`skipped` come back at all — a caller that wants to
- * say "approximate" has the counts to decide with.
+ * **Without rates, raw amounts are summed.** That is a deliberate lie of
+ * convenience: it is better than blanking the card while the rate table loads,
+ * and once the rates land the totals re-render with real conversion. It is
+ * also only ever right when the items share a currency.
+ *
+ * It used to report that sum as fully `converted`, which made it
+ * indistinguishable from a total that really had converted everything — fine
+ * for a card that re-renders two seconds later, and not fine for the PDF
+ * export, which is the one output a user keeps, mails and files. `approximate`
+ * is how a consumer that cannot re-render tells the two apart; `skipped`
+ * answers the other half, where the table existed and did not hold every
+ * currency in it.
  */
 
 import { sumConverted, type UsdRates } from "@/lib/currency-rates";
@@ -36,6 +42,24 @@ export type CollectionTotalCost = {
   converted: number;
   /** Number of items whose cost couldn't be converted (missing rate). */
   skipped: number;
+  /**
+   * True when the amount is a sum of RAW values because no rate table was
+   * available — a figure in no single currency, labelled with one.
+   *
+   * The no-rates branch reported `converted: entries.length, skipped: 0`,
+   * which is indistinguishable from a total that really did convert every
+   * item. That is a fine lie for a card which re-renders two seconds later
+   * with real conversion, and it is not fine for the PDF export, which is the
+   * one output a user keeps, mails and files: a document filed during a cold
+   * start states a sum of three currencies as a figure in one, permanently,
+   * with nothing on it saying so.
+   *
+   * So the field exists for the consumers that cannot re-render. `skipped`
+   * answers the other half — some items had no rate — and the two are
+   * genuinely different: `approximate` is about the table, `skipped` about
+   * the currencies in it.
+   */
+  approximate: boolean;
 };
 
 /**
@@ -47,7 +71,9 @@ export type CollectionTotalCost = {
  * could drift from it.
  */
 export function emptyCollectionTotal(currency: string): CollectionTotalCost {
-  return { amount: 0, currency, converted: 0, skipped: 0 };
+  // `approximate: false` and not "unknown": zero of zero items is exact in
+  // every currency, so there is nothing here a rate table would have changed.
+  return { amount: 0, currency, converted: 0, skipped: 0, approximate: false };
 }
 
 /**
@@ -129,12 +155,20 @@ function sumEntries(
 ): CollectionTotalCost {
   if (rates) {
     const { total, converted, skipped } = sumConverted(entries, target, rates);
-    return { amount: total, currency: target, converted, skipped };
+    return { amount: total, currency: target, converted, skipped, approximate: false };
   }
 
   // No rates yet: sum raw amounts (assume each item is already in the target
   // currency). Better than blanking the UI; once rates load the totals
-  // re-render with real conversion.
+  // re-render with real conversion — and `approximate` is how a consumer that
+  // will NOT re-render (the PDF export) can tell this apart from a total that
+  // really converted. An empty list is exact either way.
   const amount = entries.reduce((sum, entry) => sum + entry.amount, 0);
-  return { amount, currency: target, converted: entries.length, skipped: 0 };
+  return {
+    amount,
+    currency: target,
+    converted: entries.length,
+    skipped: 0,
+    approximate: entries.length > 0,
+  };
 }

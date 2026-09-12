@@ -36,6 +36,11 @@ const LABELS: ExportLabels = {
   totalCost: "Total cost",
   exportPdfItemCount: "Items",
   photosSaved: "Photos",
+  // Empty: these cases are about escaping, counts and field presence, and a
+  // caveat printed under every total would make each of them assert one more
+  // thing than it is claiming. The caveat's own cases are in
+  // `export-pdf-money.test.ts`.
+  totalCostCaveat: "",
 };
 
 const PRINTED_ON = new Date("2026-01-02T03:04:05Z");
