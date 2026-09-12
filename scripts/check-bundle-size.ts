@@ -17,9 +17,16 @@ import {
   resolveBundleSizeBudget,
   type BundleFile,
 } from "../lib/bundle-size";
+import {
+  formatCopyDriftLine,
+  translationsFootprint,
+} from "../lib/translations-footprint";
 import { REPO_ROOT, assertBundlePremise } from "./bundle-premise";
 
 const CHECK_NAME = "check-bundle-size";
+
+/** The one file the copy measure reads, relative to the repo root. */
+const I18N_SOURCE = "lib/i18n-context.tsx";
 
 function main(): void {
   // Shared premise (dist/ present, at least one chunk, newer than the source
@@ -35,6 +42,17 @@ function main(): void {
   const budget = resolveBundleSizeBudget(process.env);
   const result = evaluateBundleSize(files, budget);
   console.log(formatBundleSizeReport(files, result));
+
+  // The copy half of the drift. Read from SOURCE rather than from `dist/`,
+  // which is the honest thing and also the only possible one: the bundle is
+  // one minified blob and no chunk boundary separates the string table from
+  // the screens that read it. See `lib/translations-footprint.ts` for why the
+  // delta is a fair proxy even though the absolute number is not a share.
+  const copyLine = formatCopyDriftLine(
+    translationsFootprint(fs.readFileSync(path.join(REPO_ROOT, I18N_SOURCE), "utf8")),
+  );
+  if (copyLine) console.log(copyLine);
+
   if (result.overBudget) process.exit(1);
 }
 

@@ -278,6 +278,8 @@ describe("the parser stays out of the bundle", () => {
       "the arithmetic over what the parser found — Node-pure, read by the suites and by nothing the app imports",
     "lib/check-orphan-i18n-keys.ts":
       "the orphan-key lint guard's module, run by tsx from scripts/check-orphan-i18n-keys.ts",
+    "lib/translations-footprint.ts":
+      "the copy half of the bundle-size report — how many keys, how many declarations, how many source bytes — run by tsx from scripts/check-bundle-size.ts after the build, and imported by no screen. It is the module most likely to be reached for by mistake, because what it measures (the app's sentences) is a thing a screen could plausibly want to show",
   };
 
   it("is imported only by modules the app never loads", () => {
