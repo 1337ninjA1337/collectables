@@ -6,7 +6,11 @@ import { stripComments } from "@/lib/strip-comments";
 import type { MarketplaceListing } from "@/lib/types";
 
 import { readI18nSource } from "./helpers/i18n-source-file";
-import { assertDeclaredInEveryLocale, localeValuesOf } from "./helpers/i18n-locales";
+import {
+  assertDeclaredInEveryLocale,
+  assertNoLocaleDeclares,
+  localeValuesOf,
+} from "./helpers/i18n-locales";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -136,7 +140,15 @@ describe("the item screen's archive action", () => {
     const retiring = handler.slice(handler.indexOf("if (retiring"), handler.indexOf("void archiveItem(archivedId).then"));
     assert.ok(retiring.length > 0, "could not parse the retiring branch");
     assert.ok(!retiring.includes('t("undo")'), "the non-undoable branch offers an undo");
-    assert.match(retiring, /toast\.success\(t\("archiveActionDoneListingRemoved"\)\)/);
+    // Composed from the two counted halves the bulk path uses rather than a
+    // purpose-written sentence — what it CLAIMS is unchanged: the item went,
+    // and so did the listing.
+    assert.match(retiring, /toast\.success\(\s*`\$\{t\("archiveActionDone"\)\} \$\{t\("bulkListingsRemoved", \{ count: 1 \}\)\}`\s*\)/);
+    assert.doesNotMatch(
+      retiring,
+      /archiveActionDoneListingRemoved/,
+      "the dedicated key is retired: one sentence per thing the act did, composed",
+    );
   });
 
   it("keeps the undo on the ordinary branch", () => {
@@ -153,13 +165,12 @@ describe("the item screen's archive action", () => {
   });
 });
 
-describe("the three new strings are translated everywhere", () => {
+describe("the two new strings are translated everywhere", () => {
   const I18N = readI18nSource();
-  const KEYS = [
-    "archiveActionDoneListingRemoved",
-    "archiveListedTitle",
-    "archiveListedBody",
-  ] as const;
+  // Three, until the outcome toast stopped needing a sentence of its own: the
+  // branch composes `archiveActionDone` with `bulkListingsRemoved`, both of
+  // which are translated everywhere and pinned by their own suites.
+  const KEYS = ["archiveListedTitle", "archiveListedBody"] as const;
 
   for (const key of KEYS) {
     it(`${key} is declared by every locale`, () => {
@@ -184,13 +195,29 @@ describe("the three new strings are translated everywhere", () => {
     }
   });
 
-  it("the two archive toasts are different sentences", () => {
-    // One says an item was archived; the other says an item was archived AND
-    // something was withdrawn from a public feed. Collapsing them would hide
-    // the half a seller most needs to have read.
-    for (const [code, withListing] of localeValuesOf(I18N, "archiveActionDoneListingRemoved")) {
-      const plain = localeValuesOf(I18N, "archiveActionDone").get(code) ?? "";
-      assert.notEqual(withListing, plain, `${code} uses one toast for both outcomes`);
+  it("the retired key is gone from every locale", () => {
+    // `lint:orphan-i18n` catches a key nothing reads; this catches the other
+    // half — a removal that reaches `en` and misses `ru` is invisible at
+    // runtime, because the inheriting locales serve English either way.
+    assertNoLocaleDeclares(
+      I18N,
+      (key) => key === "archiveActionDoneListingRemoved",
+      "the dedicated archive-outcome toast is composed now",
+    );
+  });
+
+  it("the listed outcome still says more than the plain one, in every locale", () => {
+    // What the dedicated key was for: one sentence says an item was archived,
+    // the other says an item was archived AND something was withdrawn from a
+    // public feed. Composed, the difference is the suffix — so the claim is
+    // that the suffix is a sentence rather than decoration.
+    for (const [code, plain] of localeValuesOf(I18N, "archiveActionDone")) {
+      const suffix = localeValuesOf(I18N, "bulkListingsRemoved").get(code) ?? "";
+      assert.ok(suffix.length > 0, `${code} declares no listing outcome`);
+      assert.ok(
+        `${plain} ${suffix}`.length > plain.length + 6,
+        `${code}'s composed toast says no more than the plain one`,
+      );
     }
   });
 });

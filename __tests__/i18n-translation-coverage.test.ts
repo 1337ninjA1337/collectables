@@ -577,7 +577,15 @@ describe("translation floors", () => {
     // instead of delete" a worse deal the more of it you do. The counted
     // outcome is the same shape `itemsArchived` already had, and it is the
     // whole i18n cost of the round.
-    assert.match(report, /en: 540\/540 keys \(100\.0%\)/);
+    // 539 later that day, going DOWN for the first time in this log:
+    // `archiveActionDoneListingRemoved` is retired. It was a purpose-written
+    // sentence for "item archived AND listing removed", and the bulk path had
+    // since learned to compose the same outcome out of what the act did to
+    // items and what it did to listings. The single-item branch composes now
+    // — `archiveActionDone` plus `bulkListingsRemoved` at a count of one — so
+    // the distinction survives with one fewer sentence per locale, and the
+    // shape scales to a third thing the act also did.
+    assert.match(report, /en: 539\/539 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

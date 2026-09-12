@@ -235,7 +235,6 @@ const en = {
   exportTotalUnconverted: "Summed without exchange rates — items priced in different currencies were added together as written.",
   exportTotalPartial: (params?: TranslationParams) =>
     `Excludes ${params?.count ?? 0} ${plural(params?.count, "item", "items")} in a currency we had no rate for.`,
-  archiveActionDoneListingRemoved: "Item archived and listing removed",
   archiveListedTitle: "Archive and take the listing down?",
   archiveListedBody: "This item is on the marketplace. Archiving it removes the listing, and restoring the item later will not put the listing back.",
   archiveActionDone: "Item archived",
@@ -899,7 +898,6 @@ const ru: TranslationMap = {
   exportTotalUnconverted: "Посчитано без курсов валют — суммы в разных валютах сложены как есть.",
   exportTotalPartial: (params?: TranslationParams) =>
     `Не учтено ${params?.count ?? 0} ${slavicPlural(params?.count, "предмет", "предмета", "предметов")} в валюте без курса.`,
-  archiveActionDoneListingRemoved: "Предмет архивирован, объявление снято",
   archiveListedTitle: "Архивировать и снять объявление?",
   archiveListedBody: "Предмет выставлен на маркетплейсе. Архивация снимет объявление, и восстановление предмета его не вернёт.",
   archiveActionDone: "Предмет архивирован",
@@ -1392,7 +1390,6 @@ const be: TranslationMap = {
   exportTotalUnconverted: "Палічана без курсаў валют — сумы ў розных валютах складзены як ёсць.",
   exportTotalPartial: (params?: TranslationParams) =>
     `Не ўлічана ${params?.count ?? 0} ${slavicPlural(params?.count, "прадмет", "прадметы", "прадметаў")} у валюце без курсу.`,
-  archiveActionDoneListingRemoved: "Прадмет заархіваваны, аб'ява знятая",
   archiveListedTitle: "Заархіваваць і зняць аб'яву?",
   archiveListedBody: "Прадмет выстаўлены на маркетплейсе. Архівацыя здыме аб'яву, і аднаўленне прадмета яе не верне.",
   archiveActionDone: "Прадмет заархіваваны",
@@ -1997,7 +1994,6 @@ const pl: TranslationMap = {
   exportTotalUnconverted: "Zsumowano bez kursów walut — kwoty w różnych walutach dodano tak, jak zapisano.",
   exportTotalPartial: (params?: TranslationParams) =>
     `Pominięto ${params?.count ?? 0} ${slavicPlural(params?.count, "przedmiot", "przedmioty", "przedmiotów")} w walucie bez kursu.`,
-  archiveActionDoneListingRemoved: "Przedmiot zarchiwizowany, ogłoszenie zdjęte",
   archiveListedTitle: "Zarchiwizować i zdjąć ogłoszenie?",
   archiveListedBody: "Przedmiot jest wystawiony na rynku. Archiwizacja zdejmie ogłoszenie, a późniejsze przywrócenie przedmiotu go nie odtworzy.",
   archiveActionDone: "Przedmiot zarchiwizowany",
@@ -2610,7 +2606,6 @@ const de: TranslationMap = {
   exportTotalUnconverted: "Ohne Wechselkurse summiert — Beträge in verschiedenen Währungen wurden unverändert addiert.",
   exportTotalPartial: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${plural(params?.count, "Objekt", "Objekte")} in einer Währung ohne Kurs sind nicht enthalten.`,
-  archiveActionDoneListingRemoved: "Objekt archiviert, Anzeige entfernt",
   archiveListedTitle: "Archivieren und Anzeige entfernen?",
   archiveListedBody: "Dieses Objekt steht auf dem Marktplatz. Beim Archivieren wird die Anzeige entfernt, und ein späteres Wiederherstellen bringt sie nicht zurück.",
   archiveActionDone: "Objekt archiviert",
@@ -3235,7 +3230,6 @@ const es: TranslationMap = {
   exportTotalUnconverted: "Sumado sin tipos de cambio — los importes en distintas monedas se sumaron tal cual.",
   exportTotalPartial: (params?: TranslationParams) =>
     `No incluye ${params?.count ?? 0} ${plural(params?.count, "objeto", "objetos")} en una moneda sin tipo de cambio.`,
-  archiveActionDoneListingRemoved: "Objeto archivado y publicación retirada",
   archiveListedTitle: "¿Archivar y retirar la publicación?",
   archiveListedBody: "Este objeto está en el mercado. Al archivarlo se retira la publicación, y restaurar el objeto más tarde no la devolverá.",
   archiveActionDone: "Objeto archivado",

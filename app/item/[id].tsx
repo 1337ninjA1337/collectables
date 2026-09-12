@@ -445,7 +445,12 @@ export default function ItemDetailsScreen() {
         if (!ok) return;
         removeListing(listingId);
         await archiveItem(archivedId);
-        toast.success(t("archiveActionDoneListingRemoved"));
+        // Composed rather than a purpose-written sentence: the bulk path
+        // already says what an act did to items and then what it did to
+        // listings, and the shape is what scales to a third thing the act
+        // also did. This branch needs no `count > 0` gate around it — it only
+        // runs when there IS a listing, and there is exactly one.
+        toast.success(`${t("archiveActionDone")} ${t("bulkListingsRemoved", { count: 1 })}`);
       })();
       return;
     }
