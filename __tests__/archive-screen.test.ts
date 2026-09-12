@@ -110,6 +110,11 @@ describe("the provider exposes it", () => {
 
 describe("the archive screen", () => {
   const SRC = stripComments(readRepoFile("app/archive.tsx"));
+  // The row's markup moved to `<ArchiveRow>` when selection mode needed it
+  // memoized, so the cases about what a row RENDERS read the component and
+  // the ones about what the screen DOES read the screen. Same claims, split
+  // where the code is.
+  const ROW = stripComments(readRepoFile("components/archive-row.tsx"));
 
   it("reads the list and both resolutions from the context", () => {
     // `refresh` joined the destructure when the screen gained pull-to-refresh,
@@ -125,7 +130,11 @@ describe("the archive screen", () => {
   });
 
   it("offers Restore as the primary action on every row", () => {
-    assert.match(SRC, /void handleRestore\(item\.id\)/);
+    // The row presses it, the screen performs it. `onRestore` is handed down
+    // as one stable reference rather than a fresh arrow per row, which is
+    // what the row's memo needs to skip anything at all.
+    assert.match(ROW, /onPress=\{\(\) => onRestore\(item\.id\)\}/);
+    assert.match(SRC, /onRestore=\{handleRestore\}/);
     assert.match(SRC, /await unarchiveItem\(itemId\)/);
   });
 
@@ -158,12 +167,12 @@ describe("the archive screen", () => {
   it("names both row controls with the item's title", () => {
     // Ten identical "Restore" buttons in a column are ten identical
     // announcements without this.
-    assert.match(SRC, /t\("archiveRestoreA11y", \{ title: item\.title \}\)/);
-    assert.match(SRC, /t\("archiveDeleteA11y", \{ title: item\.title \}\)/);
+    assert.match(ROW, /t\("archiveRestoreA11y", \{ title: item\.title \}\)/);
+    assert.match(ROW, /t\("archiveDeleteA11y", \{ title: item\.title \}\)/);
   });
 
   it("says a disabled control is disabled rather than only looking it", () => {
-    assert.match(SRC, /accessibilityState=\{\{ disabled: busy \}\}/);
+    assert.match(ROW, /accessibilityState=\{\{ disabled: busy \}\}/);
   });
 
   it("renders an empty state rather than a blank screen", () => {
@@ -227,17 +236,21 @@ describe("the archive screen", () => {
     // A `getItemLayout` whose number and the stylesheet's disagree makes the
     // list place rows where they are not, which looks like a scroll bug and
     // is a constant.
-    assert.match(SRC, /const ROW_HEIGHT = 56 \+ SPACING_CARD \* 2;/);
-    assert.match(SRC, /height: ROW_HEIGHT,/);
-    assert.match(SRC, /length: ROW_HEIGHT \+ SPACING_LIST,/);
-    assert.match(SRC, /offset: \(ROW_HEIGHT \+ SPACING_LIST\) \* index,/);
+    // The constant lives with the markup it describes and the list imports
+    // it, which is the version of "once" that survived the row moving into
+    // its own file — a copy in the screen would be the drift this guards.
+    assert.match(ROW, /export const ARCHIVE_ROW_HEIGHT = 56 \+ SPACING_CARD \* 2;/);
+    assert.match(ROW, /height: ARCHIVE_ROW_HEIGHT,/);
+    assert.match(SRC, /import \{ ARCHIVE_ROW_HEIGHT, ArchiveRow \} from "@\/components\/archive-row";/);
+    assert.match(SRC, /length: ARCHIVE_ROW_HEIGHT \+ SPACING_LIST,/);
+    assert.match(SRC, /offset: \(ARCHIVE_ROW_HEIGHT \+ SPACING_LIST\) \* index,/);
   });
 
   it("keeps every row to one line of each text, which is what makes the height honest", () => {
     // A fixed layout on a row whose text could wrap would place rows where
     // they are not. The title and the collection name are capped and the date
     // is a ten-character ISO prefix.
-    const caps = SRC.match(/numberOfLines=\{1\}/g) ?? [];
+    const caps = ROW.match(/numberOfLines=\{1\}/g) ?? [];
     assert.equal(caps.length, 2, "a text in the row is no longer capped to one line");
   });
 
@@ -254,8 +267,8 @@ describe("the archive screen", () => {
     // `acquiredAt` is stored and rendered as YYYY-MM-DD everywhere else; a
     // date that reads one way here and another on the item it came from is
     // worse than one that is unambiguous in every locale.
-    assert.match(SRC, /\(item\.archivedAt \?\? ""\)\.slice\(0, 10\)/);
-    assert.ok(!SRC.includes("toLocaleDateString"));
+    assert.match(ROW, /\(item\.archivedAt \?\? ""\)\.slice\(0, 10\)/);
+    assert.ok(!ROW.includes("toLocaleDateString"));
   });
 });
 

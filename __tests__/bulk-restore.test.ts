@@ -29,6 +29,7 @@ import { readRepoFile } from "./helpers/repo-file";
 const PROVIDER = stripComments(readRepoFile("lib/collections-context.tsx"));
 const SCREEN = stripComments(readRepoFile("app/archive.tsx"));
 const BAR = stripComments(readRepoFile("components/bulk-bar.tsx"));
+const ROW = stripComments(readRepoFile("components/archive-row.tsx"));
 
 /** One handler's body, bounded by the next handler's head. */
 const bodyOf = (name: string): string => {
@@ -167,16 +168,16 @@ describe("the archive screen's selection mode", () => {
     // "button" announces the tap and says nothing about whether the row is in
     // the selection, which is the only state this mode has. Same call
     // `<SelectableItemRow>` makes on the collection screen.
-    assert.match(SCREEN, /accessibilityRole="checkbox"/);
-    assert.match(SCREEN, /accessibilityState=\{\{ checked: selected \}\}/);
+    assert.match(ROW, /accessibilityRole="checkbox"/);
+    assert.match(ROW, /accessibilityState=\{\{ checked: selected \}\}/);
   });
 
   it("keeps the selected row exactly as tall as the unselected one", () => {
-    // `getItemLayout` promises every row is ROW_HEIGHT. A selection style
+    // `getItemLayout` promises every row is ARCHIVE_ROW_HEIGHT. A selection style
     // that added a border or padding would make that promise false for the
     // rows a user has touched — which reads as a scroll bug, and only for
     // them.
-    const style = SCREEN.slice(SCREEN.indexOf("rowSelected: {"), SCREEN.indexOf("checkbox: {"));
+    const style = ROW.slice(ROW.indexOf("rowSelected: {"), ROW.indexOf("checkbox: {"));
     assert.ok(style.length > 0, "could not parse the rowSelected style");
     for (const growth of ["borderWidth", "padding", "height", "margin"]) {
       assert.ok(!style.includes(growth), `rowSelected changes '${growth}', so the fixed layout is a lie`);
