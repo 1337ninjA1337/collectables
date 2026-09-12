@@ -21,6 +21,7 @@ import {
 import { MaskedTextInput } from "@/components/masked-text-input";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { CostBadge } from "@/components/cost-badge";
 import { DangerIconButton } from "@/components/danger-icon-button";
 import { EmptyState } from "@/components/empty-state";
 import { PhotoPreview } from "@/components/photo-preview";
@@ -291,8 +292,26 @@ export default function WishlistScreen() {
                 </Pressable>
               ) : null}
               {hasFiniteCost(item) ? (
+                // The last surface in the app that interpolated the raw
+                // field. A want priced in euros and one priced in dollars
+                // both read "1500" with nothing in the row able to tell them
+                // apart — the same defect the search row carried, and this is
+                // the screen where a collector compares prices they have not
+                // paid yet.
+                //
+                // `<CostBadge item>` converts into the display currency and
+                // carries the stored original in its accessibility label. A
+                // want's `collectionId` is `""` by construction, so
+                // `getCollectionById` finds nothing and there is no
+                // collection override to apply — which is right: a thing you
+                // do not own is not in a collection yet.
+                //
+                // The gate stays, even though the badge renders nothing
+                // without a finite cost: it is the CHIP's pill background
+                // that must not appear around an empty string, which is the
+                // same branch-sharing the search row settled.
                 <View style={styles.metaChip}>
-                  <Text style={styles.metaChipText}>{item.cost}</Text>
+                  <CostBadge item={item} style={styles.metaChipText} />
                 </View>
               ) : null}
               {item.acquiredFrom ? (
