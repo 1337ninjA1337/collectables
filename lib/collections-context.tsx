@@ -11,6 +11,7 @@ import {
 import {
   collectionTotalCost,
   emptyCollectionTotal,
+  portfolioTotalCost,
   type CollectionTotalCost,
 } from "@/lib/collection-total";
 import { convertItemCost, type ConvertedItemCost } from "@/lib/item-cost";
@@ -193,6 +194,17 @@ type CollectionsContextValue = {
    */
   countItemsForCollection: (collectionId: string) => number;
   getCollectionTotalCost: (collectionId: string) => CollectionTotalCost;
+  /**
+   * Every owned collection's live items, totalled together and converted into
+   * the viewer's `displayCurrency` — the stats screen's headline figure.
+   *
+   * A value rather than an accessor because there is exactly one of it and it
+   * has no argument to key a cache on. `skipped` is worth reading here in a
+   * way it is not on a single collection: a portfolio spans currencies, so a
+   * missing rate for one of them is the realistic case rather than the
+   * pathological one.
+   */
+  ownedTotalCost: CollectionTotalCost;
   /**
    * Convert a single item's cost into `targetCurrency` (defaults to the
    * viewer's `displayCurrency`). Pass a collection's `currency` override as
@@ -1152,6 +1164,36 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     return totals;
   }, [itemsByCollection, collectionsById, displayCurrency, currencyRates]);
 
+  /**
+   * What the viewer's OWN collections are worth, converted, in one figure.
+   *
+   * The stats screen used to answer this itself with a raw
+   * `reduce((sum, i) => sum + i.cost, 0)` over every owned item — the one
+   * total in the app that never converted and never said which currency it
+   * was in. Three items priced in EUR, GBP and USD added up to a number that
+   * was in none of them.
+   *
+   * Built from `itemsByCollection` rather than by re-filtering `items`: the
+   * index is already live-item filtered, which is the predicate the old screen
+   * got via `selectOwnedActiveItems`, and walking owned collections skips
+   * every friend's, subscription's and share's items instead of testing them.
+   */
+  const ownedTotalCost = useMemo(() => {
+    const owned: CollectableItem[] = [];
+    for (const collection of collections) {
+      if (collection.role !== "owner") continue;
+      const collectionItems = itemsByCollection.get(collection.id);
+      if (!collectionItems) continue;
+      for (const item of collectionItems) owned.push(item);
+    }
+    return portfolioTotalCost(
+      owned,
+      (collectionId) => collectionsById.get(collectionId)?.currency,
+      displayCurrency,
+      currencyRates,
+    );
+  }, [collections, collectionsById, itemsByCollection, displayCurrency, currencyRates]);
+
   // Memoized separately from the big `value` memo below so the array keeps a
   // stable identity while `localItems` is unchanged — `useChunkedList` on the
   // wishlist screen resets its visible window whenever the reference changes,
@@ -1269,6 +1311,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         // `displayCurrency`, so an empty collection reads zero in the currency
         // its owner chose for it.
         emptyCollectionTotal(collectionsById.get(collectionId)?.currency ?? displayCurrency),
+      ownedTotalCost,
       convertItemCost: (item, targetCurrency) =>
         convertItemCost(item, targetCurrency ?? displayCurrency, currencyRates),
       displayCurrency,
@@ -1553,7 +1596,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     }),
     // syncCollection/syncItem are stable useCallback([]) refs, so they're
     // intentionally omitted here (ratesUpdatedAt stays last in the deps list).
-    [collections, collectionsById, collectionTotals, items, itemsByCollection, wishlistItems, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
+    [collections, collectionsById, collectionTotals, ownedTotalCost, items, itemsByCollection, wishlistItems, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
   );
 
   return <CollectionsContext.Provider value={value}>{children}</CollectionsContext.Provider>;

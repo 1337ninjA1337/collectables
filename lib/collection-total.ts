@@ -65,11 +65,68 @@ export function collectionTotalCost(
   target: string,
   rates: UsdRates | null,
 ): CollectionTotalCost {
-  const entries = items.filter(hasFiniteCost).map((item) => ({
-    amount: item.cost,
-    currency: item.costCurrency ?? target,
-  }));
+  return sumEntries(
+    items.filter(hasFiniteCost).map((item) => ({
+      amount: item.cost,
+      currency: item.costCurrency ?? target,
+    })),
+    target,
+    rates,
+  );
+}
 
+/**
+ * What EVERYTHING is worth — the same sum across items drawn from many
+ * collections, each of which may label itself in a different currency.
+ *
+ * The stats screen was the one place in the app that totalled money without
+ * converting it: it reduced raw `cost` fields into a bare number and labelled
+ * the result "total value", so a collector holding items priced in EUR, GBP
+ * and USD read the sum of three different units, printed with no currency at
+ * all, beside collection cards that had converted the same figures correctly.
+ *
+ * **Why the collection's override is consulted per item and not just the
+ * viewer's currency.** `collectionTotalCost` resolves a costless-currency item
+ * as `item.costCurrency ?? target`, and for a collection card `target` IS that
+ * collection's override. Reading the override here keeps the two answers
+ * consistent: the portfolio total is the sum of the collection totals, which
+ * is the property a user checks by adding the cards up, and the one a
+ * per-item `?? displayCurrency` fallback would quietly break for exactly the
+ * collections that set an override.
+ *
+ * `collectionCurrency` is a lookup rather than a map so the caller can hand
+ * over the index it already has (`collectionsById.get(id)?.currency`) without
+ * building a second one.
+ */
+export function portfolioTotalCost(
+  items: readonly CollectableItem[],
+  collectionCurrency: (collectionId: string) => string | null | undefined,
+  target: string,
+  rates: UsdRates | null,
+): CollectionTotalCost {
+  return sumEntries(
+    items.filter(hasFiniteCost).map((item) => ({
+      amount: item.cost,
+      currency: item.costCurrency ?? collectionCurrency(item.collectionId) ?? target,
+    })),
+    target,
+    rates,
+  );
+}
+
+/**
+ * The arithmetic both totals share: convert every entry into `target`, or sum
+ * raw amounts when there is no rate table yet.
+ *
+ * Written once because the no-rates branch is a judgement call (see the module
+ * header) and a second copy of a judgement call is how two screens end up
+ * disagreeing about what an unconvertible item is worth.
+ */
+function sumEntries(
+  entries: ReadonlyArray<{ amount: number; currency: string }>,
+  target: string,
+  rates: UsdRates | null,
+): CollectionTotalCost {
   if (rates) {
     const { total, converted, skipped } = sumConverted(entries, target, rates);
     return { amount: total, currency: target, converted, skipped };

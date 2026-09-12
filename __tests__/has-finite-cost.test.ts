@@ -132,7 +132,6 @@ describe("the PDF export prices what it can and drops what it cannot", () => {
 
 describe("no caller asks the weak question", () => {
   const FILES = [
-    "app/stats.tsx",
     "app/wishlist.tsx",
     "app/item/[id].tsx",
     "lib/item-filters.ts",
@@ -152,6 +151,19 @@ describe("no caller asks the weak question", () => {
       );
     });
   }
+
+  it("app/stats.tsx does not sum costs at all any more", () => {
+    // It was the seventh caller and read the gate directly, because it kept
+    // its own `reduce` over `cost` — the one total in the app that never
+    // converted. That sum is `portfolioTotalCost` now and the screen reads a
+    // value off the context, so the right pin is that no arithmetic came
+    // back rather than that the gate is still imported.
+    const CODE = stripComments(readRepoFile("app/stats.tsx"));
+    assert.doesNotMatch(CODE, /typeof \w+\.cost === "number"/);
+    assert.doesNotMatch(CODE, /Number\.isFinite\(\w+\.cost\)/);
+    assert.doesNotMatch(CODE, /\.cost/, "the screen must not touch item costs directly");
+    assert.match(CODE, /ownedTotalCost/);
+  });
 
   it("the gate itself is the only place the check is spelled out", () => {
     // Including the `Number.isFinite` half: `item-filters.ts` had a verbatim

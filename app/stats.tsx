@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+import { CostBadge } from "@/components/cost-badge";
 import { Screen } from "@/components/screen";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { selectOwnedActiveItems } from "@/lib/collections-helpers";
@@ -25,12 +26,11 @@ import {
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
-import { hasFiniteCost } from "@/lib/item-cost";
 
 type MonthBucket = { label: string; count: number };
 
 export default function StatsScreen() {
-  const { collections, items, refresh } = useCollections();
+  const { collections, items, ownedTotalCost, refresh } = useCollections();
   const { t } = useI18n();
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = useCallback(async () => {
@@ -53,14 +53,6 @@ export default function StatsScreen() {
   const ownedItems = useMemo(
     () => selectOwnedActiveItems(items, collections),
     [items, collections],
-  );
-
-  const totalValue = useMemo(
-    // `hasFiniteCost`, not `typeof i.cost === "number"`: NaN and Infinity are
-    // both numbers, and one of either would make the headline figure on the
-    // stats screen read NaN. See lib/item-cost.ts.
-    () => ownedItems.filter(hasFiniteCost).reduce((sum, i) => sum + i.cost, 0),
-    [ownedItems],
   );
 
   const growth = useMemo<MonthBucket[]>(() => {
@@ -94,8 +86,35 @@ export default function StatsScreen() {
           <Text style={styles.summaryLabel}>{t("statsTotalItems")}</Text>
         </View>
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryNumber}>{totalValue > 0 ? totalValue.toLocaleString() : "—"}</Text>
+          {/*
+            Converted and labelled, from the provider — this card used to be a
+            raw `reduce` over `cost` rendered with `toLocaleString()`, so a
+            collector holding items in three currencies read the sum of three
+            different units with no currency beside it. `ownedTotalCost` is the
+            same arithmetic every collection card already does.
+          */}
+          {ownedTotalCost.amount > 0 ? (
+            <CostBadge
+              amount={ownedTotalCost.amount}
+              currency={ownedTotalCost.currency}
+              style={styles.summaryNumber}
+            />
+          ) : (
+            <Text style={styles.summaryNumber}>—</Text>
+          )}
           <Text style={styles.summaryLabel}>{t("statsTotalValue")}</Text>
+          {/*
+            A portfolio spans currencies, so a rate table missing one of them
+            is the ordinary case rather than the pathological one — and a total
+            that silently drops those items is a wrong headline figure. The
+            collection cards can stay quiet about `skipped`; the screen whose
+            whole job is the total cannot.
+          */}
+          {ownedTotalCost.skipped > 0 ? (
+            <Text style={styles.summaryHint}>
+              {t("statsTotalValuePartial", { count: ownedTotalCost.skipped })}
+            </Text>
+          ) : null}
         </View>
         <View style={styles.summaryCard}>
           <Text style={styles.summaryNumber}>{ownedCollections.length}</Text>
@@ -174,6 +193,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "600",
     fontFamily: FONT_BODY_SEMIBOLD,
+  },
+  summaryHint: {
+    color: MUTED,
+    fontSize: 11,
+    textAlign: "center",
+    fontFamily: FONT_BODY,
   },
   section: {
     gap: 14,

@@ -172,6 +172,8 @@ const en = {
   statsSubtitle: "Overview of your collection.",
   statsTotalItems: "Total items",
   statsTotalValue: "Total value",
+  statsTotalValuePartial: (params?: TranslationParams) =>
+    `Excludes ${params?.count ?? 0} ${plural(params?.count, "item", "items")} we could not convert`,
   statsTotalCollections: "Collections",
   statsGrowthTitle: "Growth by month",
   statsNoData: "No data yet. Add items to see statistics.",
@@ -788,6 +790,8 @@ const ru: TranslationMap = {
   statsSubtitle: "Обзор вашей коллекции.",
   statsTotalItems: "Всего предметов",
   statsTotalValue: "Общая стоимость",
+  statsTotalValuePartial: (params?: TranslationParams) =>
+    `Не удалось пересчитать ${params?.count ?? 0} ${slavicPlural(params?.count, "предмет", "предмета", "предметов")}`,
   statsTotalCollections: "Коллекции",
   statsGrowthTitle: "Рост по месяцам",
   statsNoData: "Пока нет данных. Добавьте предметы, чтобы увидеть статистику.",
@@ -1652,6 +1656,8 @@ const be: TranslationMap = {
   subTabRequests: "Запыты ў сябры",
   statsTotalItems: "Усяго прадметаў",
   statsTotalValue: "Агульны кошт",
+  statsTotalValuePartial: (params?: TranslationParams) =>
+    `Не ўдалося пералічыць ${params?.count ?? 0} ${slavicPlural(params?.count, "прадмет", "прадметы", "прадметаў")}`,
   statsTotalCollections: "Калекцыі",
   statsGrowthTitle: "Рост па месяцах",
   statsNoData: "Пакуль няма даных. Дадайце прадметы, каб убачыць статыстыку.",
@@ -2228,6 +2234,8 @@ const pl: TranslationMap = {
   subTabRequests: "Zaproszenia do znajomych",
   statsTotalItems: "Wszystkich przedmiotów",
   statsTotalValue: "Łączna wartość",
+  statsTotalValuePartial: (params?: TranslationParams) =>
+    `Nie przeliczono ${params?.count ?? 0} ${slavicPlural(params?.count, "przedmiotu", "przedmiotów", "przedmiotów")}`,
   statsTotalCollections: "Kolekcje",
   statsGrowthTitle: "Wzrost w miesiącach",
   statsNoData: "Nie ma jeszcze danych. Dodaj przedmioty, aby zobaczyć statystyki.",
@@ -2811,6 +2819,8 @@ const de: TranslationMap = {
   subTabRequests: "Freundschaftsanfragen",
   statsTotalItems: "Objekte insgesamt",
   statsTotalValue: "Gesamtwert",
+  statsTotalValuePartial: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "Objekt", "Objekte")} ohne Umrechnung`,
   statsTotalCollections: "Sammlungen",
   statsGrowthTitle: "Wachstum nach Monat",
   statsNoData: "Noch keine Daten. Füge Objekte hinzu, um Statistiken zu sehen.",
@@ -3399,6 +3409,8 @@ const es: TranslationMap = {
   subTabRequests: "Solicitudes de amistad",
   statsTotalItems: "Objetos en total",
   statsTotalValue: "Valor total",
+  statsTotalValuePartial: (params?: TranslationParams) =>
+    `Sin convertir: ${params?.count ?? 0} ${plural(params?.count, "objeto", "objetos")}`,
   statsTotalCollections: "Colecciones",
   statsGrowthTitle: "Crecimiento por mes",
   statsNoData: "Aún no hay datos. Añade objetos para ver las estadísticas.",

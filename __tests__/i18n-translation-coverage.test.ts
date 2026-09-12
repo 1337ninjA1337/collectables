@@ -499,7 +499,15 @@ describe("translation floors", () => {
     // the additions rather than passing silently as "fewer keys is fine".
     // `collectionsFeedSubtitle` stayed: the home screen's subscribed tab
     // renders it.
-    assert.match(report, /en: 508\/508 keys \(100\.0%\)/);
+    // 509 on 2026-09-12: `statsTotalValuePartial`, the line under the stats
+    // screen's headline figure saying how many items the rate table could not
+    // convert. It arrived with the round that made that figure a real total —
+    // a portfolio spans currencies, so a missing rate is the ordinary case,
+    // and a total that silently drops those items is a wrong headline number
+    // rather than a rounding one. Translated in all six locales, so every row
+    // rises by one: a hint about an incomplete sum, served in English under
+    // somebody else's flag, is the same defect one layer up.
+    assert.match(report, /en: 509\/509 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
