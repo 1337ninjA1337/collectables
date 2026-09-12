@@ -29,6 +29,14 @@
 
 export type BudgetSnapshot = {
   /**
+   * The budget this measurement was taken to justify, in bytes.
+   *
+   * On the record rather than only in `lib/bundle-size.ts`, because the
+   * argument for a raise is about a RATE — how much each one bought and how
+   * fast it was spent — and a rate needs both numbers per row.
+   */
+  readonly budgetBytes: number;
+  /**
    * The exported web JS bundle, in bytes, at the commit that last moved the
    * budget — a MEASUREMENT, never a re-measurement. Reading `dist/` for it
    * would make every claim depend on whether somebody had built, and turn a
@@ -41,19 +49,73 @@ export type BudgetSnapshot = {
    * `lib/translations-footprint.ts` for why the delta is fair even though the
    * absolute number is not.
    */
-  readonly translationsBytes: number;
+  readonly translationsBytes: number | null;
   /** ISO date the pair was measured, for arguing about a rate. */
   readonly takenOn: string;
+  /** One line on what spent the previous raise. */
+  readonly because: string;
 };
 
 /**
- * Measured on 2026-09-12 by `npm run lint:bundle-size` against a fresh
- * `dist/`, at the commit that raised the budget to 4.59 MiB.
+ * Every budget move, newest first.
  *
- * Re-measure BOTH fields together, or neither.
+ * The doc block in `lib/bundle-size.ts` is four paragraphs of prose doing a
+ * table's job: each raise was argued against the one before it, in sentences,
+ * and a reader wanting the TREND had to reconstruct it by reading all four.
+ * Eight rounds carried "nothing keeps a budget history" as a suggestion, and
+ * it was the oldest unactioned item in that file and the one every raise
+ * would have used.
+ *
+ * **Newest first, and the head is the live snapshot.** A raise adds a row
+ * rather than editing one, which is what makes the trend accumulate instead
+ * of being overwritten by the thing it is supposed to measure.
+ *
+ * `translationsBytes` is `null` for the three rows that predate the copy
+ * measure: the honest answer for a number nobody took, and better than
+ * back-filling one from today's file, which would describe a translations
+ * module that has grown by nine keys since.
  */
-export const BUDGET_SNAPSHOT: BudgetSnapshot = {
-  bundleBytes: Math.round(4673.4 * 1024),
-  translationsBytes: 238_763,
-  takenOn: "2026-09-12",
-};
+export const BUDGET_HISTORY: readonly BudgetSnapshot[] = [
+  {
+    budgetBytes: 4.59 * 1024 * 1024,
+    bundleBytes: Math.round(4673.4 * 1024),
+    translationsBytes: 238_763,
+    takenOn: "2026-09-12",
+    because:
+      "a bulk archive with its listing pass and four counted strings in six languages — 17.9 KiB, of which the copy is a real share",
+  },
+  {
+    budgetBytes: 4.57 * 1024 * 1024,
+    bundleBytes: Math.round(4655.5 * 1024),
+    translationsBytes: null,
+    takenOn: "2026-09-12",
+    because:
+      "four rounds — the converted stats total, the export's money, the reversible archive, and the archive screen with its eleven keys in six languages",
+  },
+  {
+    budgetBytes: 4.55 * 1024 * 1024,
+    bundleBytes: Math.round(4634.4 * 1024),
+    translationsBytes: null,
+    takenOn: "2026-09-10",
+    because:
+      "three features — the dense-run reorder writer, the per-collection sort preference, and the toast action",
+  },
+  {
+    budgetBytes: 4.53 * 1024 * 1024,
+    bundleBytes: Math.round(4619.4 * 1024),
+    translationsBytes: null,
+    takenOn: "2026-09-10",
+    because:
+      "the first raise: the budget had reached 1.1 KiB of headroom under a comment claiming 190 KiB, and failed on five provider guards and one small module",
+  },
+];
+
+/**
+ * The live pair — the head of the history, named for the two readers that
+ * only ever want the latest.
+ *
+ * Re-measure BOTH fields together, or neither; and add a ROW rather than
+ * editing this one, or the trend is overwritten by the measurement that was
+ * supposed to extend it.
+ */
+export const BUDGET_SNAPSHOT: BudgetSnapshot = BUDGET_HISTORY[0];

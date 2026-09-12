@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { BUDGET_SNAPSHOT } from "@/lib/budget-snapshot";
+import { BUDGET_HISTORY, BUDGET_SNAPSHOT } from "@/lib/budget-snapshot";
 import {
   DEFAULT_BUNDLE_SIZE_BUDGET_BYTES,
+  formatBudgetTrendLine,
   LAST_MEASURED_BUNDLE_BYTES,
   SMALLEST_GUARDED_SDK_BYTES,
   BUDGET_REARGUE_FLOOR_BYTES,
@@ -53,7 +54,10 @@ describe("BUDGET_SNAPSHOT", () => {
     const COPY = stripComments(readRepoFile("lib/translations-footprint.ts"));
 
     assert.match(BUNDLE, /export const LAST_MEASURED_BUNDLE_BYTES = BUDGET_SNAPSHOT\.bundleBytes;/);
-    assert.match(COPY, /export const LAST_MEASURED_TRANSLATIONS_BYTES = BUDGET_SNAPSHOT\.translationsBytes;/);
+    assert.match(
+      COPY,
+      /export const LAST_MEASURED_TRANSLATIONS_BYTES: number \| null =\s*BUDGET_SNAPSHOT\.translationsBytes;/,
+    );
     assert.ok(!/Math\.round\(\d{4}\.\d \* 1024\)/.test(BUNDLE), "the bundle figure is declared here again");
     assert.ok(!/= \d{3}_\d{3};/.test(COPY), "the copy figure is declared here again");
   });
@@ -101,8 +105,9 @@ describe("the snapshot still supports the argument it exists for", () => {
     // and left this half behind, which is the bug this module exists to make
     // unexpressible and this case exists to catch if it becomes expressible
     // again.
+    assert.notEqual(BUDGET_SNAPSHOT.translationsBytes, null, "the head of the history carries no copy figure");
     const drift = Math.abs(
-      translationsFootprint(readI18nSource()).sourceBytes - BUDGET_SNAPSHOT.translationsBytes,
+      translationsFootprint(readI18nSource()).sourceBytes - (BUDGET_SNAPSHOT.translationsBytes ?? 0),
     );
 
     assert.ok(
@@ -114,5 +119,82 @@ describe("the snapshot still supports the argument it exists for", () => {
   it("the date is not in the future", () => {
     // A snapshot dated tomorrow is one somebody typed rather than measured.
     assert.ok(BUDGET_SNAPSHOT.takenOn <= new Date().toISOString().slice(0, 10));
+  });
+});
+
+describe("BUDGET_HISTORY", () => {
+  it("has the live snapshot at its head", () => {
+    // A raise adds a ROW rather than editing one, which is what makes the
+    // trend accumulate instead of being overwritten by the measurement that
+    // was supposed to extend it.
+    assert.equal(BUDGET_SNAPSHOT, BUDGET_HISTORY[0]);
+  });
+
+  it("is newest first, by date and by budget", () => {
+    for (let i = 1; i < BUDGET_HISTORY.length; i += 1) {
+      const newer = BUDGET_HISTORY[i - 1];
+      const older = BUDGET_HISTORY[i];
+      assert.ok(newer.takenOn >= older.takenOn, `row ${String(i)} is dated before the one after it`);
+      assert.ok(
+        newer.budgetBytes > older.budgetBytes,
+        `row ${String(i)} does not record a RAISE — every move so far has been upward, and a fall needs its own reasoning here`,
+      );
+    }
+  });
+
+  it("records the budget each measurement justified", () => {
+    // Without it a row is half an argument: how much was spent is only
+    // meaningful against how much was bought.
+    assert.equal(BUDGET_HISTORY[0].budgetBytes, DEFAULT_BUNDLE_SIZE_BUDGET_BYTES);
+  });
+
+  it("says what spent each raise, in more than a word", () => {
+    const thin = BUDGET_HISTORY.filter((row) => row.because.length < 40).map((row) => row.takenOn);
+    assert.deepEqual(thin, [], `these rows record a raise with no account of it: ${thin.join(", ")}`);
+  });
+
+  it("carries a copy figure only where one was taken", () => {
+    // Three rows predate the copy measure and honestly say so. Back-filling
+    // them from today's file would describe a translations module that has
+    // grown since.
+    const withCopy = BUDGET_HISTORY.filter((row) => row.translationsBytes !== null);
+    assert.ok(withCopy.length >= 1, "not one row records the copy half");
+    assert.equal(withCopy[0], BUDGET_HISTORY[0], "the newest row is the one that must have it");
+  });
+});
+
+describe("formatBudgetTrendLine", () => {
+  it("names the number of raises and the total growth", () => {
+    const line = formatBudgetTrendLine([
+      { budgetBytes: 3 * 1024, takenOn: "2026-09-12" },
+      { budgetBytes: 2 * 1024, takenOn: "2026-09-11" },
+      { budgetBytes: 1 * 1024, takenOn: "2026-09-10" },
+    ]);
+
+    assert.match(line ?? "", /budget raised 2 times since 2026-09-10 \(\+2\.0 KiB in total\)/);
+  });
+
+  it("counts the moves between the ends, not the rows", () => {
+    // The oldest row is the baseline, not a raise measured against anything
+    // in the list.
+    const line = formatBudgetTrendLine([
+      { budgetBytes: 2 * 1024, takenOn: "2026-09-12" },
+      { budgetBytes: 1 * 1024, takenOn: "2026-09-10" },
+    ]);
+
+    assert.match(line ?? "", /raised 1 time since/);
+  });
+
+  it("says nothing about a history with one entry", () => {
+    // "Raised once" is not a trend, and a line saying so on every build is
+    // noise.
+    assert.equal(formatBudgetTrendLine([{ budgetBytes: 1024, takenOn: "2026-09-12" }]), null);
+    assert.equal(formatBudgetTrendLine([]), null);
+  });
+
+  it("points at the rows rather than restating them", () => {
+    // Four `because` lines in a build log would be the prose the history
+    // replaced, printed on every commit.
+    assert.match(formatBudgetTrendLine() ?? "", /see BUDGET_HISTORY for what spent each one/);
   });
 });

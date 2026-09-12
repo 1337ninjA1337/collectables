@@ -130,12 +130,30 @@ describe("formatCopyDriftLine", () => {
   it("defaults to the recorded measurement", () => {
     // The one-argument form is what the script calls, so the default has to be
     // the same number the doc block records.
-    const footprint = { sourceBytes: LAST_MEASURED_TRANSLATIONS_BYTES, locales: 6, baseKeys: 1, declarations: 1 };
+    const recorded = LAST_MEASURED_TRANSLATIONS_BYTES;
+    assert.notEqual(recorded, null, "the head of the history carries no copy figure");
+    const footprint = { sourceBytes: recorded ?? 0, locales: 6, baseKeys: 1, declarations: 1 };
     assert.equal(formatCopyDriftLine(footprint), null);
   });
 });
 
 describe("the measurement and the bundle's move together", () => {
+  it("the head of the history carries a copy figure at all", () => {
+    // The three rows that predate this measure carry `null`, which is honest;
+    // the HEAD must not, or every build prints no copy line and the measure
+    // is silently off.
+    assert.notEqual(LAST_MEASURED_TRANSLATIONS_BYTES, null);
+  });
+
+  it("says nothing when the baseline is unknown", () => {
+    // Subtracting from zero would report the whole translations module as
+    // this round's growth.
+    assert.equal(
+      formatCopyDriftLine({ sourceBytes: 1, locales: 6, baseKeys: 1, declarations: 1 }, null),
+      null,
+    );
+  });
+
   it("the recorded copy figure matches the module as it stands", () => {
     // The two measurements are taken in the same breath and move only when
     // the budget moves. A drift of zero here on a commit that did not touch
@@ -144,7 +162,7 @@ describe("the measurement and the bundle's move together", () => {
     // point — so this case asserts the CONSTANT is a plausible measurement of
     // this file rather than that it is exact.
     const footprint = translationsFootprint(readI18nSource());
-    const drift = Math.abs(footprint.sourceBytes - LAST_MEASURED_TRANSLATIONS_BYTES);
+    const drift = Math.abs(footprint.sourceBytes - (LAST_MEASURED_TRANSLATIONS_BYTES ?? 0));
 
     assert.ok(
       drift < 30 * 1024,

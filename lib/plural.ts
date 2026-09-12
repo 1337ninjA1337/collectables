@@ -68,12 +68,21 @@
  * caller outside `lib/i18n-context.tsx` and wants none: this tree produces no
  * Russian failure messages.
  *
- * The five of them — `lib/i18n-context.tsx`, `lib/audit-baseline.ts`,
+ * The six of them — `lib/i18n-context.tsx`, `lib/audit-baseline.ts`,
  * `lib/ships-to-client.ts`, `lib/provenance-tables.ts`,
- * `__tests__/helpers/coverage-floor.ts` — are named here rather than counted,
+ * `lib/bundle-size.ts`, `__tests__/helpers/coverage-floor.ts` — are named here
+ * rather than counted,
  * and `__tests__/plural.test.ts` walks the tree for importers and fails on one
  * this paragraph does not mention. A list in prose is a list that goes stale;
  * this one goes red instead.
+ *
+ * `lib/bundle-size.ts` is the newest and the one that says most about the
+ * rule's reach: it agrees "time"/"times" with a count of budget raises in a
+ * BUILD LOG line, which nobody translates and nobody but a maintainer reads.
+ * It is here because the sweep does not have a UI half and a tooling half —
+ * a sentence with a count in it is the same sentence wherever it prints, and
+ * the alternative is a second rule for the places the first one was judged not
+ * to matter.
  *
  * The same suite sweeps the other direction: a module that writes `=== 1 ?` out
  * for itself rather than importing this is reported by path, with two sanctioned

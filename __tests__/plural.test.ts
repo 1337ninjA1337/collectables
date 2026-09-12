@@ -325,13 +325,20 @@ describe("the one-versus-many rule lives in one module", () => {
    *
    * `if (n === 1) { return one; } return many;` says exactly what the ternary
    * says, over two lines, and the disclaim list above pins that as a hole. This
-   * is the measurement of how big it is: three modules in the swept tree write
+   * is the measurement of how big it is: four modules in the swept tree write
    * an `if` whose condition compares a count against 1 or 2, and not one of
    * them is an inflection.
    *
    *   `list.length < 2`     — a group needs two rows to be a duplicate
    *   `value.length <= 1`   — a trailing separator cannot be trimmed off ""
    *   `starts.length > 1`   — a marker that no longer identifies one section
+   *   `history.length < 2`  — a budget trend needs two moves to be a trend
+   *
+   * The fourth arrived with the budget history and is the same kind: a bounds
+   * check on how many rows a claim needs, not a word being inflected. The
+   * module it is in DOES import `plural`, for the "time"/"times" in the
+   * sentence that bound guards — which is exactly the pair this hole is about:
+   * the inflection goes through the rule and the bounds check cannot.
    *
    * So the hole is empty today, and closing it by widening the rule to
    * conditions would fail three bounds checks and put their names in an
@@ -342,12 +349,13 @@ describe("the one-versus-many rule lives in one module", () => {
    */
   const TWO_LINE_RULE = ifReader(COUNT_COMPARISON);
 
-  it("has an if-shaped hole, and these three are what is in it", () => {
+  it("has an if-shaped hole, and these four are what is in it", () => {
     assertOnlyTheseMatch({
       rule: TWO_LINE_RULE,
       files: sourceFiles("lib", "scripts", "__tests__/helpers"),
       read: sourceCode,
       expected: [
+        "lib/bundle-size.ts",
         "lib/db-duplicates.ts",
         "lib/guard-root.ts",
         "lib/privacy-translated-section.ts",

@@ -158,7 +158,7 @@ describe("the measurement has one home", () => {
     // reads it rather than keeping a copy — which is what it asks now.
     const SRC = stripComments(readRepoFile("lib/bundle-size.ts"));
     assert.match(SRC, /export const LAST_MEASURED_BUNDLE_BYTES = BUDGET_SNAPSHOT\.bundleBytes;/);
-    assert.match(SRC, /import \{ BUDGET_SNAPSHOT \} from "@\/lib\/budget-snapshot";/);
+    assert.match(SRC, /import \{[^}]*\bBUDGET_SNAPSHOT\b[^}]*\} from "@\/lib\/budget-snapshot";/);
   });
 
   it("is not re-declared by the suite that used to own it", () => {

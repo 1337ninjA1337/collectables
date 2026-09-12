@@ -74,7 +74,8 @@ export function translationsFootprint(source: string): TranslationsFootprint {
  * delta measured against the wrong baseline, silently and plausibly, on the
  * output somebody reads when deciding whether to raise again.
  */
-export const LAST_MEASURED_TRANSLATIONS_BYTES = BUDGET_SNAPSHOT.translationsBytes;
+export const LAST_MEASURED_TRANSLATIONS_BYTES: number | null =
+  BUDGET_SNAPSHOT.translationsBytes;
 
 /** Signed KiB, one decimal — the report's own spelling. */
 function formatKiB(bytes: number): string {
@@ -92,8 +93,13 @@ function formatKiB(bytes: number): string {
  */
 export function formatCopyDriftLine(
   footprint: TranslationsFootprint,
-  lastMeasuredBytes: number = LAST_MEASURED_TRANSLATIONS_BYTES,
+  lastMeasuredBytes: number | null = LAST_MEASURED_TRANSLATIONS_BYTES,
 ): string | null {
+  // `null` is the honest answer for a baseline nobody took — the three budget
+  // moves that predate this measure carry it, and a row without one cannot
+  // support a delta. Saying nothing beats subtracting from zero, which would
+  // report the whole translations module as this round's growth.
+  if (lastMeasuredBytes === null) return null;
   const drift = footprint.sourceBytes - lastMeasuredBytes;
   if (drift === 0) return null;
   return (

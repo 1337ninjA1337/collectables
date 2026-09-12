@@ -65,7 +65,10 @@
  * raise that gives up the guard fails there instead of passing quietly.
  */
 
-import { BUDGET_SNAPSHOT } from "@/lib/budget-snapshot";
+import { BUDGET_HISTORY, BUDGET_SNAPSHOT } from "@/lib/budget-snapshot";
+// A build-log line is still a sentence with a count in it, and `plural.test.ts`
+// holds the rule for the whole tree rather than for the UI half of it.
+import { plural } from "@/lib/plural";
 
 export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.59 * 1024 * 1024;
 
@@ -203,6 +206,8 @@ export function formatBundleSizeReport(
     );
   }
   lines.push(formatDriftLine(result));
+  const trend = formatBudgetTrendLine();
+  if (trend) lines.push(trend);
   if (result.nearFloor) {
     lines.push(
       `check-bundle-size: headroom is under ${formatKiB(BUDGET_REARGUE_FLOOR_BYTES)} — this build passes and the next ordinary diff will not.`,
@@ -212,6 +217,36 @@ export function formatBundleSizeReport(
     );
   }
   return lines.join("\n");
+}
+
+/**
+ * "Raised 4 times since 2026-09-10, +61.4 KiB in total" — the trend every
+ * raise was argued without.
+ *
+ * The budget's doc block is four paragraphs of prose doing a table's job:
+ * each move was argued against the one before it, and a reader wanting the
+ * RATE had to reconstruct it by reading all four. Eight rounds carried
+ * "nothing keeps a budget history" as a suggestion.
+ *
+ * Returns `null` for a single-entry history, because "raised once" is not a
+ * trend and a line saying so on every build is noise.
+ */
+export function formatBudgetTrendLine(
+  history: readonly { budgetBytes: number; takenOn: string }[] = BUDGET_HISTORY,
+): string | null {
+  if (history.length < 2) return null;
+  const newest = history[0];
+  const oldest = history[history.length - 1];
+  // The moves BETWEEN the ends: the oldest row is the baseline, not a raise
+  // measured against anything in this list.
+  const raises = history.length - 1;
+  const grew = newest.budgetBytes - oldest.budgetBytes;
+  return (
+    `check-bundle-size: budget raised ${String(raises)} ${plural(raises, "time", "times")} ` +
+    // Signed, because every move in the history is a raise and an unsigned
+    // "2.0 KiB in total" reads as a size rather than as growth.
+    `since ${oldest.takenOn} (+${formatKiB(grew)} in total) — see BUDGET_HISTORY for what spent each one.`
+  );
 }
 
 /**
