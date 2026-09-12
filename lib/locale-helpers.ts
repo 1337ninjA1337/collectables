@@ -294,6 +294,33 @@ export async function setEntryCurrency(currency: string): Promise<void> {
 }
 
 /**
+ * Forget the entry currency, so cost forms fall back to the display currency
+ * again.
+ *
+ * THIS IS WHAT MAKES THE READ-THROUGH A DECISION RATHER THAN A LEFTOVER.
+ * {@link getEntryCurrency} falling back to the display slot shipped as the
+ * migration for installations that predate the split — and because the
+ * fallback never expires, "no entry currency" already meant "follow the
+ * display one" for everybody. That was an accident of how the migration was
+ * written, and it is a perfectly good rule: a collector who has never chosen
+ * a separate one is best served by the currency they read totals in. So the
+ * settings screen offers the empty state as a CHOICE, and removing the key is
+ * how it is expressed — not by writing the display currency into it, which
+ * would pin the forms to today's display currency and silently stop following
+ * a later change.
+ *
+ * Best-effort like its neighbours: a failed remove leaves the old value in
+ * place, which is the same state the user was already in.
+ */
+export async function clearEntryCurrency(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(ENTRY_CURRENCY_KEY);
+  } catch (error: unknown) {
+    reportStorageFailure("locale-helpers.removeItem", ENTRY_CURRENCY_KEY, error);
+  }
+}
+
+/**
  * How many recently-used currencies the chip strip surfaces ahead of the
  * static `CURRENCY_CHIPS` shortlist. Four keeps the strip's above-the-fold
  * width on an iPhone SE while covering the multi-currency power user.

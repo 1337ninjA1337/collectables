@@ -1,5 +1,5 @@
 import { Stack, router } from "expo-router";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CurrencySheet } from "@/components/currency-sheet";
@@ -39,6 +39,7 @@ import {
 } from "@/lib/design-tokens";
 import { getAnalyticsEventCatalog } from "@/lib/analytics";
 import { isDevEnvironment } from "@/lib/dev-menu";
+import { clearEntryCurrency, getEntryCurrency } from "@/lib/locale-helpers";
 import { useDiagnostics } from "@/lib/diagnostics-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
 import { getSentryStatus } from "@/lib/sentry";
@@ -83,6 +84,27 @@ export default function SettingsScreen() {
   const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [currencyQuery, setCurrencyQuery] = useState("");
   const [refreshingRates, setRefreshingRates] = useState(false);
+  // The OTHER currency preference. Splitting the storage key stopped a cost
+  // form moving the display currency as a side effect, and left a second
+  // preference no screen mentioned: a collector who displays in USD and types
+  // in JPY saw "USD" here and a JPY chip on every add form, with nothing
+  // connecting the two.
+  //
+  // Read as its own state rather than through the provider, because the
+  // provider owns the DISPLAY currency and adding the entry one to it would
+  // re-render every total on a change that cannot affect any of them.
+  const [entryCurrency, setEntryCurrencyState] = useState<string | null>(null);
+  const loadEntryCurrency = useCallback(() => {
+    void getEntryCurrency().then(setEntryCurrencyState);
+  }, []);
+  useEffect(loadEntryCurrency, [loadEntryCurrency]);
+
+  const handleUseDisplayCurrency = useCallback(() => {
+    // Clearing, not writing `displayCurrency` into the slot: the empty state
+    // means "follow the display currency", so writing today's value would pin
+    // the forms to it and silently stop following a later change.
+    void clearEntryCurrency().then(loadEntryCurrency);
+  }, [loadEntryCurrency]);
 
   async function handleRefreshRates() {
     if (refreshingRates) return;
@@ -224,6 +246,23 @@ export default function SettingsScreen() {
           <Text style={styles.currencyValue}>{displayCurrency}</Text>
           <Text style={styles.currencyChevron}>›</Text>
         </Pressable>
+        {entryCurrency != null && entryCurrency !== displayCurrency ? (
+          // Only when the two DIFFER. A line saying "new costs are entered in
+          // USD" under a display currency of USD is a sentence about nothing,
+          // and this card's job is the display currency — the entry one earns
+          // its space here exactly when it is a surprise.
+          <Pressable
+            onPress={handleUseDisplayCurrency}
+            accessibilityRole="button"
+            accessibilityLabel={t("entryCurrencyReset")}
+          >
+            <Text style={styles.entryCurrencyHint}>
+              {t("entryCurrencyNotice", { currency: entryCurrency })}
+              {" · "}
+              {t("entryCurrencyReset")}
+            </Text>
+          </Pressable>
+        ) : null}
         {currencyRatesUpdatedAt != null ? (
           <Pressable onPress={handleRefreshRates} disabled={refreshingRates}
           accessibilityState={{ disabled: refreshingRates }}
@@ -471,6 +510,17 @@ const styles = StyleSheet.create({
   ratesHint: {
     fontSize: 13,
     color: AMBER_ACCENT,
+    fontWeight: "700",
+    fontFamily: FONT_BODY_BOLD,
+  },
+  // The rates hint's shape — a sentence whose tail is the action — because it
+  // is the same kind of line: a fact about the currency setup with one thing
+  // you can do about it. MUTED_2 rather than the accent, because the rates
+  // line is the one this card wants pressed and two amber lines under one row
+  // would compete.
+  entryCurrencyHint: {
+    fontSize: 13,
+    color: MUTED_2,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
   },

@@ -47,6 +47,11 @@ export const STORAGE_FAILURE_SITES = [
   "currency-rates.setItem",
   "locale-helpers.getItem",
   "locale-helpers.setItem",
+  // The first `removeItem` in this list, and it reports for the same reason
+  // the writes do: `clearEntryCurrency` is how a user says "enter new costs
+  // in my display currency", so a silent failure leaves them typing in a
+  // currency they just asked the app to forget.
+  "locale-helpers.removeItem",
   "marketplace-transfer-log.getItem",
   "marketplace-transfer-log.setItem",
   "use-item-sort-pref.getItem",

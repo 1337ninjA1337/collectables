@@ -604,7 +604,17 @@ describe("translation floors", () => {
     // "Listed for …" keys were already in six locales); this is the hint that
     // says a press opens the screen where the listing can come down, which is
     // also the only route from the wishlist to that screen.
-    assert.match(report, /en: 542\/542 keys \(100\.0%\)/);
+    // 544 later the same day: `entryCurrencyNotice` and `entryCurrencyReset`.
+    // Splitting the currency storage key stopped a cost form moving the
+    // app-wide display currency as a side effect, and left a SECOND
+    // preference no screen mentioned — so a collector displaying in USD and
+    // typing in JPY saw "USD" in settings and a JPY chip on every add form,
+    // with nothing connecting them. The notice renders only when the two
+    // differ, because the same sentence under a matching pair is about
+    // nothing; the label says the outcome ("use display currency") rather
+    // than the mechanism, since the slot it clears is one the user has never
+    // been shown.
+    assert.match(report, /en: 544\/544 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
