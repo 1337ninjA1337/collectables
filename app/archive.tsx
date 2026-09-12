@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DangerIconButton } from "@/components/danger-icon-button";
 import { EmptyState } from "@/components/empty-state";
+import { LoadMoreButton } from "@/components/load-more-button";
 import { Screen } from "@/components/screen";
 import { useAppTheme } from "@/components/use-app-theme";
 import { announceMessage } from "@/lib/announce";
@@ -32,6 +33,7 @@ import { FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD, FONT_DISPLAY } from "@/
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useToast } from "@/lib/toast-context";
+import { useChunkedList } from "@/lib/use-chunked-list";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
 
 /**
@@ -62,6 +64,21 @@ export default function ArchiveScreen() {
   // local state is instant, and a control that flickers disabled reads as a
   // glitch rather than as progress. See lib/minimum-visible-helpers.ts.
   const busy = useMinimumVisible(working);
+
+  /**
+   * The window, for the same reason every other list in the app has one: each
+   * row mounts a remote cover photo, and this list has no ceiling — nothing
+   * prunes it, every sale adds to it, and the bulk bar can now put thirty rows
+   * in it with one gesture.
+   *
+   * `archivedItems` is memoised in the provider on `localItems` alone, which
+   * is the stable reference `useChunkedList` requires: a fresh array per
+   * render would snap the window back to one page every time and make
+   * `loadMore` a no-op. A restore genuinely does change that reference, and
+   * the reset is right there — the row left the list, so the window the user
+   * had grown is describing a list that no longer exists.
+   */
+  const { visibleItems, remaining, loadMore } = useChunkedList(archivedItems);
 
   const handleRestore = useCallback(
     async (itemId: string) => {
@@ -120,7 +137,7 @@ export default function ArchiveScreen() {
         />
       ) : (
         <View style={styles.list}>
-          {archivedItems.map((item) => {
+          {visibleItems.map((item) => {
             const collection = getCollectionById(item.collectionId);
             const photo = item.photos[0];
             return (
@@ -173,6 +190,7 @@ export default function ArchiveScreen() {
               </View>
             );
           })}
+          <LoadMoreButton remaining={remaining} onPress={loadMore} />
         </View>
       )}
     </Screen>

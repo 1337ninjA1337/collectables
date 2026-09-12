@@ -168,6 +168,33 @@ describe("the archive screen", () => {
     assert.match(SRC, /<EmptyState/);
   });
 
+  it("mounts a window rather than every row it is handed", () => {
+    // Six rounds carried this as a suggestion and the bulk archive is what
+    // made it real: one gesture can now put thirty rows on a screen that
+    // mounts a remote cover photo per row, on a list nothing prunes.
+    assert.match(SRC, /const \{ visibleItems, remaining, loadMore \} = useChunkedList\(archivedItems\);/);
+    assert.match(SRC, /\{visibleItems\.map\(\(item\) => \{/);
+    assert.ok(!SRC.includes("archivedItems.map("), "the unwindowed map is back");
+  });
+
+  it("grows the window through the shared button", () => {
+    // `<LoadMoreButton>` renders nothing at `remaining <= 0`, so the gate and
+    // the label are one number rather than a `hasMore` asked beside a
+    // subtraction — see the component's own header.
+    assert.match(SRC, /<LoadMoreButton remaining=\{remaining\} onPress=\{loadMore\} \/>/);
+    assert.ok(!SRC.includes("hasMore"), "a second spelling of remaining > 0");
+  });
+
+  it("takes the window off the provider's memoised array", () => {
+    // `useChunkedList` resets its window when the array's REFERENCE changes,
+    // so a caller that filtered inline would snap back to one page on every
+    // render and make loadMore a no-op. `archivedItems` is memoised on
+    // `localItems` alone, which is what makes this safe.
+    const PROVIDER = stripComments(readRepoFile("lib/collections-context.tsx"));
+    assert.match(PROVIDER, /const archivedItems = useMemo\(/);
+    assert.ok(!SRC.includes(".filter(isArchived)"), "the screen must not re-derive the list");
+  });
+
   it("prints the archive date as its ISO prefix", () => {
     // `acquiredAt` is stored and rendered as YYYY-MM-DD everywhere else; a
     // date that reads one way here and another on the item it came from is
