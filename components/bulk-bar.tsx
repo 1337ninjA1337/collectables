@@ -20,8 +20,9 @@ import { FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { useI18n } from "@/lib/i18n-context";
 
 /**
- * Every action is optional and Cancel is not — the bar renders the ones it is
- * handed, in this order.
+ * Every action is individually optional and at least one is not — the bar
+ * renders the ones it is handed, in this order, and refuses to be handed
+ * none.
  *
  * They were all required while one screen mounted it. The archive screen is
  * the second, and the actions it offers are not a subset of the first's by
@@ -31,8 +32,7 @@ import { useI18n } from "@/lib/i18n-context";
  * are what let that screen state its answer by omission rather than by
  * passing four handlers and disabling three of them.
  */
-type Props = {
-  count: number;
+type BulkBarActions = {
   /** The way back out of the archive, and the only action that screen offers. */
   onRestore?: () => void;
   onMove?: () => void;
@@ -44,8 +44,33 @@ type Props = {
    */
   onArchive?: () => void;
   onDelete?: () => void;
-  onCancel: () => void;
 };
+
+/**
+ * A union with one member per action, each requiring its own — so "at least
+ * one" is a thing the compiler checks rather than a sentence in the block
+ * above.
+ *
+ * Making all four optional is what let the archive screen state its answer by
+ * omission, and it also made `<BulkBar count={n} onCancel={f} />` a legal
+ * call: a selection count floating over nothing but Cancel, which is a
+ * selection mode a user can enter and cannot resolve. That is the one
+ * combination no screen could mean, and the realistic way to reach it is a
+ * screen mounting the bar before its actions are wired rather than anybody
+ * choosing it.
+ *
+ * A discriminated union would be the heavier answer and would have to name a
+ * variant per screen; this names none, so a third screen offering Move and
+ * Archive and no Delete needs nothing added here.
+ */
+type AtLeastOneAction = {
+  [K in keyof BulkBarActions]-?: Required<Pick<BulkBarActions, K>> & Omit<BulkBarActions, K>;
+}[keyof BulkBarActions];
+
+export type BulkBarProps = {
+  count: number;
+  onCancel: () => void;
+} & AtLeastOneAction;
 
 // BB-A: extracted from app/collection/[id].tsx so the bar is a memoized
 // sibling of the selection FlatList rather than inline JSX — the four
@@ -60,7 +85,7 @@ export const BulkBar = memo(function BulkBar({
   onArchive,
   onDelete,
   onCancel,
-}: Props) {
+}: BulkBarProps) {
   const { t } = useI18n();
   const empty = count === 0;
   return (
