@@ -132,9 +132,9 @@ const FAMILIES: readonly Family[] = [
   {
     name: "marketplace",
     pattern: /^marketplace[A-Z]/,
-    size: 73,
+    size: 74,
     because:
-      "the largest family in the map, and the only one that was 61/73 done in four locales — the twelve missing keys were the whole `marketplaceSoldPrompt*` sub-family, which is the dialog a seller meets the moment somebody claims their listing and has to choose between archiving, deleting and keeping the original",
+      "the largest family in the map, and the only one that was 61/73 done in four locales — the twelve missing keys were the whole `marketplaceSoldPrompt*` sub-family, which is the dialog a seller meets the moment somebody claims their listing and has to choose between archiving, deleting and keeping the original. 74 since 2026-09-12: `marketplaceSoldPromptItemRestored`, the announcement for the Undo that made that dialog's Archive reversible — the sub-family's whole argument is that this is the one dialog whose wording a seller cannot afford to misread, and a restore nobody hears is the same problem",
   },
   {
     name: "collection",

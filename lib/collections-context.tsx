@@ -39,6 +39,7 @@ import {
   groupItemsByCollection,
   isLiveWishlistItem,
   nextCollectionSortOrder,
+  resolveLocalItem,
   planCollectionReorder,
   planItemReorder,
   userScopedCollectionId,
@@ -244,6 +245,17 @@ type CollectionsContextValue = {
    * seller-side prompt after a marketplace sale.
    */
   archiveItem: (itemId: string) => Promise<void>;
+  /**
+   * Put an archived item back: clears `archivedAt`, so it returns to every
+   * listing, total, count and search it was dropped from.
+   *
+   * Archiving was one-way. `archiveItem` is offered by the sold-listing prompt
+   * as the SAFE answer next to Delete — "keep it for stats" — and an item that
+   * took it vanished from every screen in the app with nothing anywhere able
+   * to bring it back. The row stayed in storage and kept syncing, which is the
+   * worst of both: not gone, not reachable.
+   */
+  unarchiveItem: (itemId: string) => Promise<void>;
   moveItems: (itemIds: string[], targetCollectionId: string) => Promise<void>;
   deleteCollection: (collectionId: string) => Promise<void>;
   deleteUserContent: (userId: string) => Promise<void>;
@@ -1353,30 +1365,25 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       },
       promoteWishlistItem: async (itemId, targetCollectionId) => {
         const acquiredAt = new Date().toISOString().slice(0, 10);
-        let promoted: CollectableItem | null = null;
-        setLocalItems((current) =>
-          current.map((item) => {
-            if (item.id !== itemId) return item;
-            const next = {
-              ...item,
-              collectionId: targetCollectionId,
-              isWishlist: false,
-              acquiredAt: item.acquiredAt || acquiredAt,
-            };
-            promoted = next;
-            return next;
+        // Resolved from `localItems` BEFORE the state write, not assigned from
+        // inside the updater — see `resolveLocalItem` for why reading a
+        // variable an updater wrote is a coin flip.
+        const current = resolveLocalItem(localItems, itemId);
+        if (!current) return;
+        const promoted: CollectableItem = {
+          ...current,
+          collectionId: targetCollectionId,
+          isWishlist: false,
+          acquiredAt: current.acquiredAt || acquiredAt,
+        };
+        setLocalItems((items) => items.map((item) => (item.id === itemId ? promoted : item)));
+        syncItem(promoted, () =>
+          updateRemoteItem(itemId, {
+            collectionId: targetCollectionId,
+            isWishlist: false,
+            acquiredAt: acquiredAt,
           }),
         );
-        if (promoted) {
-          const updated = promoted;
-          syncItem(updated, () =>
-            updateRemoteItem(itemId, {
-              collectionId: targetCollectionId,
-              isWishlist: false,
-              acquiredAt: acquiredAt,
-            }),
-          );
-        }
       },
       addItem: async (input) => {
         const nextItem: CollectableItem = {
@@ -1434,34 +1441,20 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         return nextCollection.id;
       },
       updateItem: async (itemId, updates) => {
-        let updated: CollectableItem | null = null;
-        setLocalItems((current) =>
-          current.map((item) => {
-            if (item.id !== itemId) return item;
-            const next = { ...item, ...updates, id: item.id };
-            updated = next;
-            return next;
-          }),
-        );
-        if (updated) {
-          const entity = updated;
-          syncItem(entity, () => updateRemoteItem(itemId, updates));
-        }
+        const current = resolveLocalItem(localItems, itemId);
+        if (!current) return;
+        const updated: CollectableItem = { ...current, ...updates, id: current.id };
+        setLocalItems((items) => items.map((item) => (item.id === itemId ? updated : item)));
+        syncItem(updated, () => updateRemoteItem(itemId, updates));
       },
       updateCollection: async (collectionId, updates) => {
-        let updated: Collection | null = null;
-        setLocalCollections((current) =>
-          current.map((col) => {
-            if (col.id !== collectionId) return col;
-            const next = { ...col, ...updates, id: col.id };
-            updated = next;
-            return next;
-          }),
+        const current = localCollections.find((col) => col.id === collectionId);
+        if (!current) return;
+        const updated: Collection = { ...current, ...updates, id: current.id };
+        setLocalCollections((cols) =>
+          cols.map((col) => (col.id === collectionId ? updated : col)),
         );
-        if (updated) {
-          const entity = updated;
-          syncCollection(entity, () => updateRemoteCollection(collectionId, updates));
-        }
+        syncCollection(updated, () => updateRemoteCollection(collectionId, updates));
       },
       deleteItem: async (itemId) => {
         setLocalItems((current) => current.filter((item) => item.id !== itemId));
@@ -1472,19 +1465,24 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       },
       archiveItem: async (itemId) => {
         const archivedAt = new Date().toISOString();
-        let archived: CollectableItem | null = null;
-        setLocalItems((current) =>
-          current.map((item) => {
-            if (item.id !== itemId) return item;
-            const next = { ...item, archivedAt };
-            archived = next;
-            return next;
-          }),
-        );
-        if (archived) {
-          const entity = archived;
-          syncItem(entity, () => updateRemoteItem(itemId, { archivedAt }));
-        }
+        const current = resolveLocalItem(localItems, itemId);
+        if (!current) return;
+        const archived: CollectableItem = { ...current, archivedAt };
+        setLocalItems((items) => items.map((item) => (item.id === itemId ? archived : item)));
+        syncItem(archived, () => updateRemoteItem(itemId, { archivedAt }));
+      },
+      unarchiveItem: async (itemId) => {
+        const current = resolveLocalItem(localItems, itemId);
+        if (!current) return;
+        // `null`, not `undefined`: `archivedAt` is a nullable column, the row
+        // coercer reads `null` for "not archived", and `updateRemoteItem`
+        // only writes the field when the key is PRESENT in `updates`
+        // (`"archivedAt" in updates`). An `undefined` here would clear the
+        // local flag and leave the cloud row archived, so the next sync would
+        // put the item straight back in the trash.
+        const restored: CollectableItem = { ...current, archivedAt: null };
+        setLocalItems((items) => items.map((item) => (item.id === itemId ? restored : item)));
+        syncItem(restored, () => updateRemoteItem(itemId, { archivedAt: null }));
       },
       deleteItems: async (itemIds) => {
         if (itemIds.length === 0) return;
@@ -1497,15 +1495,12 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
       moveItems: async (itemIds, targetCollectionId) => {
         if (itemIds.length === 0) return;
         const idSet = new Set(itemIds);
-        const moved: CollectableItem[] = [];
-        setLocalItems((current) =>
-          current.map((item) => {
-            if (!idSet.has(item.id) || item.collectionId === targetCollectionId) return item;
-            const next = { ...item, collectionId: targetCollectionId, sortOrder: undefined };
-            moved.push(next);
-            return next;
-          }),
-        );
+        const moved = localItems
+          .filter((item) => idSet.has(item.id) && item.collectionId !== targetCollectionId)
+          .map((item) => ({ ...item, collectionId: targetCollectionId, sortOrder: undefined }));
+        if (moved.length === 0) return;
+        const movedById = new Map(moved.map((item) => [item.id, item]));
+        setLocalItems((items) => items.map((item) => movedById.get(item.id) ?? item));
         moved.forEach((item) =>
           syncItem(item, () => updateRemoteItem(item.id, { collectionId: item.collectionId, sortOrder: undefined })),
         );

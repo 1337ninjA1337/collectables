@@ -1,5 +1,6 @@
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { announceMessage } from "@/lib/announce";
 import { useAuth } from "@/lib/auth-context";
 import { useCollections } from "@/lib/collections-context";
 import { confirmDialog } from "@/lib/confirm-dialog";
@@ -37,7 +38,7 @@ import { useToast } from "@/lib/toast-context";
 export function SoldListingPrompt() {
   const { sellerNotifications, dismissSellerNotification, getListingById } =
     useMarketplace();
-  const { getItemById, archiveItem, deleteItem } = useCollections();
+  const { getItemById, archiveItem, unarchiveItem, deleteItem } = useCollections();
   const { getProfileById } = useSocial();
   const { user } = useAuth();
   const { t } = useI18n();
@@ -64,8 +65,28 @@ export function SoldListingPrompt() {
 
   async function handleArchive() {
     if (item) {
-      await archiveItem(item.id);
-      toast.success(t("marketplaceSoldPromptItemArchived"));
+      const archivedId = item.id;
+      await archiveItem(archivedId);
+      // Archiving is offered here as the SAFE answer next to Delete, and it
+      // used to be the irreversible one: an archived item leaves every
+      // listing, total, count and search in the app, and nothing anywhere
+      // could bring it back. `toast.show` rather than `toast.success` because
+      // the undo is the point — a success toast has no action slot.
+      toast.show({
+        type: "success",
+        message: t("marketplaceSoldPromptItemArchived"),
+        action: {
+          label: t("undo"),
+          onPress: () => {
+            void unarchiveItem(archivedId);
+            // The restore shows no toast of its own, so a screen-reader user
+            // who presses Undo would otherwise hear nothing — and the lists
+            // they cannot see are the only other evidence it worked. Same
+            // argument as the reorder undo in app/collection/[id].tsx.
+            announceMessage(t("marketplaceSoldPromptItemRestored"));
+          },
+        },
+      });
     }
     dismissSellerNotification(listingId);
   }

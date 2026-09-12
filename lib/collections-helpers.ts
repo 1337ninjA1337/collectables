@@ -146,6 +146,32 @@ export function selectOwnedActiveItems(
  * site is the same answer, and building an entry per collection would mean
  * passing the collection list in to learn nothing.
  */
+/**
+ * The item a mutation is about to change, read BEFORE the state write.
+ *
+ * Five mutations on the collections provider used to learn what they had
+ * changed by assigning to a `let` from inside a `setLocalItems` updater and
+ * reading it on the next line. React does not promise to run an updater
+ * synchronously: `useState`'s dispatch computes the next state eagerly only
+ * when the hook has no work already queued, so the pattern holds right up to
+ * the moment something else has queued an update on the same hook — a landing
+ * realtime row, a second archive on a fast double-tap, a sync flush — and then
+ * the variable is still `null`, the `if` is skipped, and the cloud write never
+ * happens. The local state changes and the remote row does not, so the next
+ * sync hands the old value straight back: an edit that silently reverts, and
+ * only under load.
+ *
+ * `deleteCollection` in that same file had always read `localItems` directly.
+ * This is that shape, named, so the five can say what they are doing in one
+ * word — and so the next mutation reaches for the reliable read first.
+ */
+export function resolveLocalItem(
+  items: readonly CollectableItem[],
+  itemId: string,
+): CollectableItem | undefined {
+  return items.find((item) => item.id === itemId);
+}
+
 export function groupItemsByCollection(
   items: readonly CollectableItem[],
 ): Map<string, CollectableItem[]> {

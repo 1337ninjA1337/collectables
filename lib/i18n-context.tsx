@@ -482,6 +482,7 @@ const en = {
   marketplaceSoldPromptConfirmDeleteBody:
     "This permanently removes the item from your collection. You can keep it archived instead.",
   marketplaceSoldPromptItemArchived: "Item archived",
+  marketplaceSoldPromptItemRestored: "Item restored",
   marketplaceSoldPromptItemDeleted: "Item deleted",
   marketplaceAcquiredCollection: "Acquired via marketplace",
   marketplaceAcquiredCollectionDescription: "Items you bought or traded for through the marketplace.",
@@ -1051,6 +1052,7 @@ const ru: TranslationMap = {
   marketplaceSoldPromptConfirmDeleteBody:
     "Это безвозвратно удалит предмет из коллекции. Можно вместо этого его архивировать.",
   marketplaceSoldPromptItemArchived: "Предмет архивирован",
+  marketplaceSoldPromptItemRestored: "Предмет восстановлен",
   marketplaceSoldPromptItemDeleted: "Предмет удалён",
   marketplaceAcquiredCollection: "Получено через маркетплейс",
   marketplaceAcquiredCollectionDescription: "Предметы, которые вы купили или обменяли через маркетплейс.",
@@ -1399,6 +1401,7 @@ const be: TranslationMap = {
   marketplaceSoldPromptConfirmDeleteBody:
     "Гэта незваротна выдаліць прадмет з вашай калекцыі. Замест гэтага яго можна архіваваць.",
   marketplaceSoldPromptItemArchived: "Прадмет архіваваны",
+  marketplaceSoldPromptItemRestored: "Прадмет адноўлены",
   marketplaceSoldPromptItemDeleted: "Прадмет выдалены",
   marketplaceBoughtFrom: (params?: TranslationParams) => `Ад ${params?.name ?? ""}`,
   itemValueApprox: (params?: TranslationParams) => `≈ ${params?.amount ?? ""} ${params?.currency ?? ""}`,
@@ -1969,6 +1972,7 @@ const pl: TranslationMap = {
   marketplaceSoldPromptConfirmDeleteBody:
     "To trwale usunie przedmiot z twojej kolekcji. Zamiast tego możesz go zarchiwizować.",
   marketplaceSoldPromptItemArchived: "Przedmiot zarchiwizowany",
+  marketplaceSoldPromptItemRestored: "Przedmiot przywrócony",
   marketplaceSoldPromptItemDeleted: "Przedmiot usunięty",
   marketplaceBoughtFrom: (params?: TranslationParams) => `Od ${params?.name ?? ""}`,
   itemValueApprox: (params?: TranslationParams) => `≈ ${params?.amount ?? ""} ${params?.currency ?? ""}`,
@@ -2547,6 +2551,7 @@ const de: TranslationMap = {
   marketplaceSoldPromptConfirmDeleteBody:
     "Damit wird das Objekt dauerhaft aus deiner Sammlung entfernt. Du kannst es stattdessen archivieren.",
   marketplaceSoldPromptItemArchived: "Objekt archiviert",
+  marketplaceSoldPromptItemRestored: "Objekt wiederhergestellt",
   marketplaceSoldPromptItemDeleted: "Objekt gelöscht",
   marketplaceBoughtFrom: (params?: TranslationParams) => `Von ${params?.name ?? ""}`,
   itemValueApprox: (params?: TranslationParams) => `≈ ${params?.amount ?? ""} ${params?.currency ?? ""}`,
@@ -3137,6 +3142,7 @@ const es: TranslationMap = {
   marketplaceSoldPromptConfirmDeleteBody:
     "Esto elimina el objeto de tu colección de forma permanente. En su lugar puedes archivarlo.",
   marketplaceSoldPromptItemArchived: "Objeto archivado",
+  marketplaceSoldPromptItemRestored: "Objeto restaurado",
   marketplaceSoldPromptItemDeleted: "Objeto eliminado",
   marketplaceBoughtFrom: (params?: TranslationParams) => `De ${params?.name ?? ""}`,
   itemValueApprox: (params?: TranslationParams) => `≈ ${params?.amount ?? ""} ${params?.currency ?? ""}`,

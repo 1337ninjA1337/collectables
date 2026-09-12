@@ -507,7 +507,13 @@ describe("translation floors", () => {
     // rather than a rounding one. Translated in all six locales, so every row
     // rises by one: a hint about an incomplete sum, served in English under
     // somebody else's flag, is the same defect one layer up.
-    assert.match(report, /en: 509\/509 keys \(100\.0%\)/);
+    // 510 later that day: `marketplaceSoldPromptItemRestored`, said when the
+    // Undo on the sold-listing prompt puts an archived item back. Archiving
+    // was one-way — the dialog offers it as the SAFE answer next to Delete,
+    // and an item that took it left every listing, total, count and search in
+    // the app with nothing anywhere able to bring it back. Translated in all
+    // six locales, beside the archived string it undoes.
+    assert.match(report, /en: 510\/510 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
