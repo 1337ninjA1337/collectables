@@ -132,9 +132,9 @@ const FAMILIES: readonly Family[] = [
   {
     name: "marketplace",
     pattern: /^marketplace[A-Z]/,
-    size: 74,
+    size: 76,
     because:
-      "the largest family in the map, and the only one that was 61/73 done in four locales — the twelve missing keys were the whole `marketplaceSoldPrompt*` sub-family, which is the dialog a seller meets the moment somebody claims their listing and has to choose between archiving, deleting and keeping the original. 74 since 2026-09-12: `marketplaceSoldPromptItemRestored`, the announcement for the Undo that made that dialog's Archive reversible — the sub-family's whole argument is that this is the one dialog whose wording a seller cannot afford to misread, and a restore nobody hears is the same problem",
+      "the largest family in the map, and the only one that was 61/73 done in four locales — the twelve missing keys were the whole `marketplaceSoldPrompt*` sub-family, which is the dialog a seller meets the moment somebody claims their listing and has to choose between archiving, deleting and keeping the original. 74 since 2026-09-12: `marketplaceSoldPromptItemRestored`, the announcement for the Undo that made that dialog's Archive reversible — the sub-family's whole argument is that this is the one dialog whose wording a seller cannot afford to misread, and a restore nobody hears is the same problem. 76 on 2026-09-12: `marketplaceArchivedHint` and `marketplaceArchivedBlocked`, the two halves of refusing to list an item the app is simultaneously describing as one the seller no longer has — a standing sentence where the CTA used to be, and a toast for the sheet that was already open. They are marketplace keys rather than archive ones because the prefix family owns the surface, which is the rule that put them here and not on the item-detail screen's count",
   },
   {
     name: "collection",

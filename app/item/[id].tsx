@@ -349,6 +349,18 @@ export default function ItemDetailsScreen() {
 
   function handleSubmitListing() {
     if (overFreeCap) return;
+    // The button that opens this sheet is already hidden for an archived
+    // item, so this is the second lock on the same door — and it is the one
+    // that holds if the sheet is left open while the item is archived from
+    // somewhere else (the sold-listing prompt fires on a realtime update, on
+    // whatever screen the seller happens to be looking at). Listing a thing
+    // you have already parted with is the one mistake in this family that
+    // creates an obligation to somebody else.
+    if (isArchived(activeItem)) {
+      toast.error(t("marketplaceArchivedBlocked"));
+      setListingSheetOpen(false);
+      return;
+    }
     let finalPrice: number | null = null;
     if (listingMode === "sell") {
       const parsed = parseCurrencyValueDetailed(listingPrice);
@@ -692,6 +704,15 @@ export default function ItemDetailsScreen() {
             >
               <Text style={styles.listingRemoveText}>{t("marketplaceRemoveListing")}</Text>
             </Pressable>
+          </View>
+        ) : isArchived(activeItem) ? (
+          // No CTA at all, rather than a disabled one: an archived item is
+          // usually one that has already been sold, and "List on marketplace"
+          // greyed out invites a press that explains nothing. The sentence
+          // says what to do instead, and Restore is the button directly above
+          // it.
+          <View style={styles.listingStatusGroup}>
+            <Text style={styles.listingHint}>{t("marketplaceArchivedHint")}</Text>
           </View>
         ) : (
           <View style={styles.listingStatusGroup}>

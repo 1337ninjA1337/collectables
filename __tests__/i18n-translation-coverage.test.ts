@@ -529,7 +529,14 @@ describe("translation floors", () => {
     // something, and an archived item rendered on its own detail screen
     // exactly like a live one, with nothing saying why it had vanished from
     // every list. Translated in all six locales.
-    assert.match(report, /en: 525\/525 keys \(100\.0%\)/);
+    // 527 later that day: `marketplaceArchivedHint` and
+    // `marketplaceArchivedBlocked`. The archive rounds gave the state a
+    // screen, a restore and a banner and left the marketplace block under
+    // that banner untouched, so a seller could offer an item the app was
+    // describing two inches higher as one they no longer have — and the
+    // archived items likeliest to be re-listed are the ones that got there
+    // through the sold prompt. Translated in all six locales.
+    assert.match(report, /en: 527\/527 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
