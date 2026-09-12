@@ -161,11 +161,12 @@ describe("the archive screen", () => {
   });
 
   it("renders an empty state rather than a blank screen", () => {
-    // The route is reachable directly, and a banner that disappears when the
-    // archive empties would otherwise leave a page with a heading and nothing
-    // under it.
-    assert.match(SRC, /archivedItems\.length === 0 \? \(/);
-    assert.match(SRC, /<EmptyState/);
+    // The route is reachable directly, and the home banner disappears when the
+    // archive empties, so without this the page is a heading over nothing.
+    // It shipped as a `length === 0` ternary and is the list's own
+    // `ListEmptyComponent` since the screen became a FlatList — which is the
+    // same claim, made by the thing that knows whether the list is empty.
+    assert.match(SRC, /ListEmptyComponent=\{\s*<EmptyState/);
   });
 
   it("mounts a window rather than every row it is handed", () => {
@@ -173,8 +174,26 @@ describe("the archive screen", () => {
     // made it real: one gesture can now put thirty rows on a screen that
     // mounts a remote cover photo per row, on a list nothing prunes.
     assert.match(SRC, /const \{ visibleItems, remaining, loadMore \} = useChunkedList\(archivedItems\);/);
-    assert.match(SRC, /\{visibleItems\.map\(\(item\) => \{/);
+    assert.match(SRC, /data=\{visibleItems\}/);
     assert.ok(!SRC.includes("archivedItems.map("), "the unwindowed map is back");
+    assert.ok(!SRC.includes("visibleItems.map("), "the rows are mapped rather than rendered by the list");
+  });
+
+  it("recycles them too, which the window alone did not", () => {
+    // The window bounded how many rows START mounted and nothing recycled
+    // them, so five presses of Load more held a hundred rows and a hundred
+    // remote images. Virtualization bounds the ceiling.
+    assert.match(SRC, /<Screen scroll=\{false\}>/);
+    assert.match(SRC, /style=\{flatListStyles\.viewerFlatList\}/);
+    assert.match(SRC, /removeClippedSubviews=\{Platform\.OS === "ios"\}/);
+  });
+
+  it("keeps both ways of growing the window", () => {
+    // `onEndReached` for a scroll that reaches the end, and the footer button
+    // for the platforms and gestures where it never fires — the same pairing
+    // collection detail uses, and `remaining > 0` is the one gate for both.
+    assert.match(SRC, /onEndReached=\{remaining > 0 \? loadMore : undefined\}/);
+    assert.match(SRC, /ListFooterComponent=\{<LoadMoreButton remaining=\{remaining\} onPress=\{loadMore\} \/>\}/);
   });
 
   it("grows the window through the shared button", () => {

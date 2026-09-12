@@ -1,6 +1,6 @@
 import { Stack, router } from "expo-router";
 import { useCallback, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DangerIconButton } from "@/components/danger-icon-button";
 import { EmptyState } from "@/components/empty-state";
@@ -23,7 +23,6 @@ import {
   SHADOW_SOFT,
   SPACING_CARD,
   SPACING_INLINE,
-  SPACING_LIST,
   TEXT_DARK,
   TEXT_ON_DARK,
   TEXT_ON_DARK_2,
@@ -33,6 +32,8 @@ import { FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD, FONT_DISPLAY } from "@/
 import { useI18n } from "@/lib/i18n-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { useToast } from "@/lib/toast-context";
+import { flatListStyles } from "@/lib/flat-list-styles";
+import { CollectableItem } from "@/lib/types";
 import { useChunkedList } from "@/lib/use-chunked-list";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
 
@@ -118,81 +119,109 @@ export default function ArchiveScreen() {
     [deleteItem, toast, t],
   );
 
-  return (
-    <Screen>
-      <Stack.Screen options={{ title: t("archiveTitle") }} />
-
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>{t("archiveTitle")}</Text>
-        <Text style={styles.heroText}>{t("archiveSubtitle")}</Text>
-      </View>
-
-      {archivedItems.length === 0 ? (
-        <EmptyState
-          icon="🗄"
-          title={t("archiveEmptyTitle")}
-          hint={t("archiveEmptyHint")}
-          actionLabel={t("goHome")}
-          onAction={() => router.replace("/")}
-        />
-      ) : (
-        <View style={styles.list}>
-          {visibleItems.map((item) => {
-            const collection = getCollectionById(item.collectionId);
-            const photo = item.photos[0];
-            return (
-              <View
-                key={item.id}
-                style={{ ...styles.row, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}
-              >
-                {photo ? (
-                  <Image source={{ uri: photo }} style={styles.thumb} />
-                ) : (
-                  <View style={{ ...styles.thumb, backgroundColor: placeholderColor(item.id) }} />
-                )}
-                <View style={styles.rowText}>
-                  <Text style={{ ...styles.rowTitle, color: theme.text }} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  {collection ? (
-                    <Text style={{ ...styles.rowMeta, color: theme.meta }} numberOfLines={1}>
-                      {collection.name}
-                    </Text>
-                  ) : null}
-                  {/*
-                    The ISO prefix, not `toLocaleDateString()`: `acquiredAt` is
-                    stored and rendered as `YYYY-MM-DD` everywhere else in the
-                    app, and a date that reads one way on this screen and
-                    another on the item it came from is worse than a date that
-                    is unambiguous in every locale.
-                  */}
-                  <Text style={{ ...styles.rowMeta, color: theme.meta }}>
-                    {t("archiveArchivedOn", { date: (item.archivedAt ?? "").slice(0, 10) })}
-                  </Text>
-                </View>
-                <View style={styles.rowActions}>
-                  <Pressable
-                    style={styles.restore}
-                    onPress={() => void handleRestore(item.id)}
-                    disabled={busy}
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: busy }}
-                    accessibilityLabel={t("archiveRestoreA11y", { title: item.title })}
-                  >
-                    <Text style={styles.restoreText}>{t("archiveRestore")}</Text>
-                  </Pressable>
-                  <DangerIconButton
-                    onPress={() => void handleDelete(item.id)}
-                    disabled={busy}
-                    accessibilityLabel={t("archiveDeleteA11y", { title: item.title })}
-                  />
-                </View>
-              </View>
-            );
-          })}
-          <LoadMoreButton remaining={remaining} onPress={loadMore} />
+  const renderRow = useCallback(
+    ({ item }: { item: CollectableItem }) => {
+      const collection = getCollectionById(item.collectionId);
+      const photo = item.photos[0];
+      return (
+        <View
+          style={{ ...styles.row, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}
+        >
+          {photo ? (
+            <Image source={{ uri: photo }} style={styles.thumb} />
+          ) : (
+            <View style={{ ...styles.thumb, backgroundColor: placeholderColor(item.id) }} />
+          )}
+          <View style={styles.rowText}>
+            <Text style={{ ...styles.rowTitle, color: theme.text }} numberOfLines={1}>
+              {item.title}
+            </Text>
+            {collection ? (
+              <Text style={{ ...styles.rowMeta, color: theme.meta }} numberOfLines={1}>
+                {collection.name}
+              </Text>
+            ) : null}
+            {/*
+              The ISO prefix, not `toLocaleDateString()`: `acquiredAt` is
+              stored and rendered as `YYYY-MM-DD` everywhere else in the app,
+              and a date that reads one way on this screen and another on the
+              item it came from is worse than a date that is unambiguous in
+              every locale.
+            */}
+            <Text style={{ ...styles.rowMeta, color: theme.meta }}>
+              {t("archiveArchivedOn", { date: (item.archivedAt ?? "").slice(0, 10) })}
+            </Text>
+          </View>
+          <View style={styles.rowActions}>
+            <Pressable
+              style={styles.restore}
+              onPress={() => void handleRestore(item.id)}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: busy }}
+              accessibilityLabel={t("archiveRestoreA11y", { title: item.title })}
+            >
+              <Text style={styles.restoreText}>{t("archiveRestore")}</Text>
+            </Pressable>
+            <DangerIconButton
+              onPress={() => void handleDelete(item.id)}
+              disabled={busy}
+              accessibilityLabel={t("archiveDeleteA11y", { title: item.title })}
+            />
+          </View>
         </View>
-      )}
+      );
+    },
+    [getCollectionById, theme, t, busy, handleRestore, handleDelete],
+  );
+
+  /*
+   * `<Screen scroll={false}>` with the list owning the scroll — the pattern
+   * `lib/flat-list-styles.ts` describes, established on collection detail.
+   *
+   * The window shipped first and bounded how many rows START mounted; nothing
+   * recycled them, so five presses of Load more held a hundred rows and a
+   * hundred remote cover photos. Virtualization is what bounds the CEILING,
+   * and this is the list with no ceiling of its own: nothing prunes an
+   * archive, every sale adds to it, and one gesture on the bulk bar can put
+   * thirty rows in it.
+   *
+   * The window stays. `onEndReached` grows it as the user scrolls and
+   * `<LoadMoreButton>` is the footer for the platforms and gestures where a
+   * scroll-to-end never fires — the same pairing collection detail uses.
+   */
+  return (
+    <Screen scroll={false}>
+      <Stack.Screen options={{ title: t("archiveTitle") }} />
+      <FlatList
+        data={visibleItems}
+        keyExtractor={(item) => item.id}
+        style={flatListStyles.viewerFlatList}
+        contentContainerStyle={flatListStyles.viewerFlatListContent}
+        ListHeaderComponent={
+          <View style={styles.hero}>
+            <Text style={styles.heroTitle}>{t("archiveTitle")}</Text>
+            <Text style={styles.heroText}>{t("archiveSubtitle")}</Text>
+          </View>
+        }
+        ListEmptyComponent={
+          <EmptyState
+            icon="🗄"
+            title={t("archiveEmptyTitle")}
+            hint={t("archiveEmptyHint")}
+            actionLabel={t("goHome")}
+            onAction={() => router.replace("/")}
+          />
+        }
+        ListFooterComponent={<LoadMoreButton remaining={remaining} onPress={loadMore} />}
+        renderItem={renderRow}
+        onEndReached={remaining > 0 ? loadMore : undefined}
+        onEndReachedThreshold={0.5}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === "ios"}
+      />
     </Screen>
   );
 }
@@ -214,9 +243,6 @@ const styles = StyleSheet.create({
     color: TEXT_ON_DARK_MUTED,
     lineHeight: 22,
     fontFamily: FONT_BODY,
-  },
-  list: {
-    gap: SPACING_LIST,
   },
   row: {
     flexDirection: "row",
