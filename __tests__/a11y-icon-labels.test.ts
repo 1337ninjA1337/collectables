@@ -310,7 +310,7 @@ describe("the header and the friends row, which had the nav bar's bug again", ()
 
 describe("the last four screens, which close the sweep", () => {
   /**
-   * `app/create.tsx` (5), `app/wishlist.tsx` (4), `app/chat/[id].tsx` (2) and
+   * `app/create.tsx` (5), `app/wishlist.tsx` (5), `app/chat/[id].tsx` (2) and
    * `app/profile/[id].tsx` (1) — the twelve icons left after the two chat entry
    * points came out of the screen-level group. All twelve are decorative on the
    * usual evidence, which is why this is a table again rather than twelve
@@ -322,7 +322,11 @@ describe("the last four screens, which close the sweep", () => {
    */
   const SCREENS: readonly (readonly [string, number, string])[] = [
     ["app/create.tsx", 5, "each sits beside naming <Text> or in a labelled Pressable"],
-    ["app/wishlist.tsx", 4, "add / promote / pick each carry their own <Text>"],
+    [
+      "app/wishlist.tsx",
+      5,
+      "add / promote / pick / collection-row each carry their own <Text>, and the listed chip's chevron sits beside the mode it opens",
+    ],
     ["app/chat/[id].tsx", 2, 'clear and send carry t("chatClear") and t("chatSend")'],
     ["app/profile/[id].tsx", 1, 'the settings button carries t("settings")'],
   ];

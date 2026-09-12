@@ -278,7 +278,7 @@ export const LISTING_RULE_BY_ITEM_PATH: Readonly<Record<string, string>> = {
   updateItem:
     "EXEMPT — the item stays where it is and stays for sale; editing a title is not a departure. A listing shows the item's current title by design, which is the point of resolving it by id",
   promoteWishlistItem:
-    "EXEMPT — a want becoming a holding is an arrival. It could not have had a listing: you cannot sell a thing you do not own, and the wishlist screen offers no way to list one",
+    "EXEMPT — a want becoming a holding is an arrival, and the one transition that makes a listing MORE honest rather than less: the seller now owns the thing they were offering. The first version of this reason argued that a want has no listing to retire, which was never true — the wishlist lock shipped after the marketplace, so rows listed before it still exist, which is why `app/wishlist.tsx` renders their state. Retiring one here would withdraw an offer at the exact moment it became keepable",
 };
 
 /**

@@ -111,9 +111,9 @@ const FAMILIES: readonly Family[] = [
   {
     name: "wishlist",
     pattern: /^wishlist([A-Z]|$)/,
-    size: 14,
+    size: 15,
     because:
-      "the wishlist empty states were translated on 2026-08-21 while `wishlist` itself was not, so the screen read a translated body under an English heading — the seam this family closes",
+      "the wishlist empty states were translated on 2026-08-21 while `wishlist` itself was not, so the screen read a translated body under an English heading — the seam this family closes. 15 on 2026-09-12: `wishlistListedHint`, the accessibility hint on the chip that finally shows a want is on the marketplace. It is a wishlist key and not a marketplace one because the prefix family owns the surface, which is the same rule that put `marketplaceWishlistHint` on the other side of it — that sentence is the marketplace refusing a want, this one is a wishlist row saying where to press. The chip's VISIBLE text costs this family nothing: it reuses the item screen's `marketplaceListedForSale` / `marketplaceListedForTrade`, which are already in all six locales",
   },
   {
     name: "item filters",

@@ -56,6 +56,7 @@ import {
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
+import { useMarketplace } from "@/lib/marketplace-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -73,6 +74,13 @@ export default function WishlistScreen() {
   // home-indicator area on iOS doesn't occlude the action row.
   const sheetMaxHeight = Math.max(320, windowHeight * 0.9 - insets.bottom);
   const { wishlistItems, collections, addWishlistItem, deleteItem, promoteWishlistItem, refresh } = useCollections();
+  // A want cannot be listed any more — `app/item/[id].tsx` refuses the CTA on
+  // `isWishlist` — but the lock shipped after the marketplace did, so rows
+  // listed before it still exist and nothing sweeps them. Reading the store
+  // here is what makes that state visible on the one screen where a collector
+  // manages wants; `findListingByItemId` already skips sold listings, so this
+  // is `isOpenListing` asked by id.
+  const { findListingByItemId } = useMarketplace();
   const [refreshing, setRefreshing] = useState(false);
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -226,6 +234,7 @@ export default function WishlistScreen() {
   const renderWishlistCard = useCallback(
     ({ item }: { item: CollectableItem }) => {
       const hasPhoto = item.photos.length > 0 && Boolean(item.photos[0]);
+      const listing = findListingByItemId(item.id);
       return (
         <View style={{ ...styles.card, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
           {hasPhoto ? (
@@ -241,6 +250,46 @@ export default function WishlistScreen() {
               </Text>
             ) : null}
             <View style={styles.metaRow}>
+              {listing ? (
+                // First in the row, because it is the only chip here that is
+                // about somebody ELSE: a standing offer on every buyer's
+                // device for a thing this collector is still looking for. The
+                // cost and the source are notes to self.
+                //
+                // Amber and not the item screen's `SUCCESS_GREEN` pill. Green
+                // says the listing is working as intended, which is true of a
+                // holding and is exactly the claim this row cannot make — the
+                // app now refuses to create this state, so the honest tone is
+                // the one it uses for attention.
+                //
+                // It is a Pressable and the destination is the ITEM screen,
+                // not `/listing/[id]`: the take-it-down button lives on the
+                // item screen's `existingListing` branch, which renders above
+                // the wishlist refusal and so is still reachable for a want.
+                // Without this there is no route from the wishlist to the item
+                // screen at all — the promote is the only other one, and it
+                // resolves the want rather than the listing.
+                <Pressable
+                  style={styles.listedChip}
+                  onPress={() => router.push(`/item/${item.id}`)}
+                  accessibilityRole="button"
+                  accessibilityHint={t("wishlistListedHint")}
+                >
+                  <Text style={styles.listedChipText}>
+                    {listing.mode === "sell"
+                      ? t("marketplaceListedForSale")
+                      : t("marketplaceListedForTrade")}
+                  </Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={12}
+                    color={TEXT_DARK_2}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    aria-hidden
+                  />
+                </Pressable>
+              ) : null}
               {hasFiniteCost(item) ? (
                 <View style={styles.metaChip}>
                   <Text style={styles.metaChipText}>{item.cost}</Text>
@@ -281,7 +330,16 @@ export default function WishlistScreen() {
         </View>
       );
     },
-    [theme.card, theme.border, theme.text, theme.muted, ownedCollections.length, confirmDelete, t],
+    [
+      theme.card,
+      theme.border,
+      theme.text,
+      theme.muted,
+      ownedCollections.length,
+      confirmDelete,
+      findListingByItemId,
+      t,
+    ],
   );
 
   const SWIPE_THRESHOLD = 80;
@@ -603,6 +661,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     fontFamily: FONT_BODY_BOLD,
+  },
+  // Same pill geometry as `metaChip` so the row keeps one rhythm; only the
+  // colour and the weight separate it, which is what makes it read as the one
+  // chip in the row that does something.
+  listedChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: RADIUS_PILL,
+    backgroundColor: AMBER_ACCENT,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  listedChipText: {
+    color: TEXT_DARK_2,
+    fontSize: 12,
+    fontWeight: "800",
+    fontFamily: FONT_BODY_EXTRABOLD,
   },
   actionsRow: {
     flexDirection: "row",

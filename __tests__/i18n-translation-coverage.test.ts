@@ -596,7 +596,15 @@ describe("translation floors", () => {
     // stopped an item the collector used to have being put up for sale and
     // said nothing about one they have never had — and `MarketplaceMode` is
     // "trade" | "sell", both of which promise to hand the item over.
-    assert.match(report, /en: 541\/541 keys \(100\.0%\)/);
+    // 542 later the same day: `wishlistListedHint`. The round above closed the
+    // door and deliberately left the take-it-down path open, because wants
+    // listed BEFORE the lock still exist and nothing sweeps them — so the
+    // state is reachable and the one screen that manages wants showed no sign
+    // of it. The chip's visible text cost nothing (the item screen's two
+    // "Listed for …" keys were already in six locales); this is the hint that
+    // says a press opens the screen where the listing can come down, which is
+    // also the only route from the wishlist to that screen.
+    assert.match(report, /en: 542\/542 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
