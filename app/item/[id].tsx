@@ -321,10 +321,28 @@ export default function ItemDetailsScreen() {
     // the seller can even open. A SOLD listing stays — a delete does not
     // un-sell a thing that was sold, and the buyer's purchase list, the
     // transfer log and "recently sold" all read that record.
-    if (isOpenListing(existingListing) && existingListing) {
+    //
+    // `retiring` is the same local `handleArchive` uses, for the same reason:
+    // `existingListing` is recomputed from the marketplace store on every
+    // render, and the outcome has to be read while the row still exists.
+    const retiring = isOpenListing(existingListing);
+    // Composed before anything is removed. The delete had no toast at all, so
+    // a seller who deleted a listed item withdrew a standing offer from every
+    // buyer's device and was told nothing — the same gap the bulk paths closed
+    // this morning, on the one action nothing can undo. `archiveDeleted` is
+    // the sentence the archive screen already says for this exact act.
+    const outcome = composeOutcome(
+      t("archiveDeleted"),
+      retiring ? t("bulkListingsRemoved", { count: 1 }) : null,
+    );
+    if (retiring && existingListing) {
       removeListing(existingListing.id);
     }
     await deleteItem(activeItem.id);
+    // Before the navigation: the toast provider sits above the router, so the
+    // message survives either way, and queueing it while this screen is still
+    // mounted is the ordering that does not depend on that.
+    toast.success(outcome);
     router.replace(collection ? `/collection/${collection.id}` : "/");
   }
 

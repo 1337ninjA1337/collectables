@@ -139,8 +139,14 @@ describe("the verdicts match what the code does", () => {
 
   it("archiveItem and deleteItem retire, on the screen that calls them", () => {
     assert.ok(retires("archiveItem") && retires("deleteItem"));
-    assert.match(ITEM_SCREEN, /const retiring = isOpenListing\(existingListing\);/);
-    assert.match(ITEM_SCREEN, /if \(isOpenListing\(existingListing\) && existingListing\) \{/);
+    // Both paths now ask the shared rule the same way — a `retiring` local,
+    // then a guarded removal — so this counts them rather than matching one
+    // spelling twice. The delete path grew the local when its outcome toast
+    // needed the same answer the removal does.
+    const asks = [...ITEM_SCREEN.matchAll(/const retiring = isOpenListing\(existingListing\);/g)];
+    const removes = [...ITEM_SCREEN.matchAll(/if \(retiring && existingListing\) \{/g)];
+    assert.equal(asks.length, 2, "each of the two departure paths asks the rule once");
+    assert.equal(removes.length, 2, "each of the two departure paths removes under that answer");
   });
 
   it("archiveItems and deleteItems retire, on the screen that calls them", () => {

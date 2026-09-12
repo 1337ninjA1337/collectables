@@ -37,7 +37,11 @@ describe("the delete path", () => {
   });
 
   it("asks the shared rule rather than reading soldAt itself", () => {
-    assert.match(commit, /if \(isOpenListing\(existingListing\) && existingListing\) \{/);
+    // One `retiring` local, the same shape `handleArchive` uses: the answer is
+    // needed twice now — once to compose the outcome and once to remove — and
+    // `existingListing` is recomputed on every render between them.
+    assert.match(commit, /const retiring = isOpenListing\(existingListing\);/);
+    assert.match(commit, /if \(retiring && existingListing\) \{/);
     assert.ok(!commit.includes("soldAt"));
   });
 
