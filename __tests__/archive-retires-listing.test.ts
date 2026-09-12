@@ -143,7 +143,10 @@ describe("the item screen's archive action", () => {
     // Composed from the two counted halves the bulk path uses rather than a
     // purpose-written sentence — what it CLAIMS is unchanged: the item went,
     // and so did the listing.
-    assert.match(retiring, /toast\.success\(\s*`\$\{t\("archiveActionDone"\)\} \$\{t\("bulkListingsRemoved", \{ count: 1 \}\)\}`\s*\)/);
+    assert.match(
+      retiring,
+      /toast\.success\(composeOutcome\(t\("archiveActionDone"\), t\("bulkListingsRemoved", \{ count: 1 \}\)\)\)/,
+    );
     assert.doesNotMatch(
       retiring,
       /archiveActionDoneListingRemoved/,

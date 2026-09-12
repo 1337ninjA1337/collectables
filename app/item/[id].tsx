@@ -41,6 +41,7 @@ import { announceMessage } from "@/lib/announce";
 import { isArchived } from "@/lib/collections-helpers";
 import { confirmDialog } from "@/lib/confirm-dialog";
 import { isOpenListing } from "@/lib/marketplace-helpers";
+import { composeOutcome } from "@/lib/outcome-message";
 import { useCollections } from "@/lib/collections-context";
 import { hasFiniteCost } from "@/lib/item-cost";
 import { useI18n } from "@/lib/i18n-context";
@@ -450,7 +451,7 @@ export default function ItemDetailsScreen() {
         // listings, and the shape is what scales to a third thing the act
         // also did. This branch needs no `count > 0` gate around it — it only
         // runs when there IS a listing, and there is exactly one.
-        toast.success(`${t("archiveActionDone")} ${t("bulkListingsRemoved", { count: 1 })}`);
+        toast.success(composeOutcome(t("archiveActionDone"), t("bulkListingsRemoved", { count: 1 })));
       })();
       return;
     }

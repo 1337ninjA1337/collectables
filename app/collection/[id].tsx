@@ -28,6 +28,7 @@ import { withCloudinaryThumbUrl } from "@/lib/cloudinary-url";
 import { useCollections } from "@/lib/collections-context";
 import { useMarketplace } from "@/lib/marketplace-context";
 import { openListingsForItems } from "@/lib/marketplace-helpers";
+import { composeOutcome } from "@/lib/outcome-message";
 import { announceMessage } from "@/lib/announce";
 import { byId, orderWithUnrenderedTail, planDragCommit } from "@/lib/drag-reorder";
 import { reorderActionProps } from "@/lib/reorder-actions";
@@ -462,11 +463,15 @@ export default function CollectionDetailsScreen() {
    * can see. Composed onto the existing counted message rather than a second
    * pair of keys, which is the same shape the confirms use.
    */
+  // `null` and not an empty string with a leading space: `composeOutcome`
+  // drops a clause that did not happen, so the punctuation between the two
+  // belongs to the join rather than to a prefix this callback has to
+  // remember.
   const listedOutcome = useCallback(
     () =>
       selectedOpenListings.length > 0
-        ? ` ${t("bulkListingsRemoved", { count: selectedOpenListings.length })}`
-        : "",
+        ? t("bulkListingsRemoved", { count: selectedOpenListings.length })
+        : null,
     [selectedOpenListings, t],
   );
 
@@ -480,7 +485,7 @@ export default function CollectionDetailsScreen() {
     // selection, and `exitSelectionMode` empties it two lines down.
     const outcome = listedOutcome();
     await deleteItems(ids);
-    toast.success(`${t("itemsDeleted", { count: ids.length })}${outcome}`);
+    toast.success(composeOutcome(t("itemsDeleted", { count: ids.length }), outcome));
     exitSelectionMode();
   }, [selectedIds, retireSelectedListings, listedOutcome, deleteItems, toast, t, exitSelectionMode]);
 
@@ -509,7 +514,7 @@ export default function CollectionDetailsScreen() {
     retireSelectedListings();
     const outcome = listedOutcome();
     await archiveItems(ids);
-    toast.success(`${t("itemsArchived", { count: ids.length })}${outcome}`);
+    toast.success(composeOutcome(t("itemsArchived", { count: ids.length }), outcome));
     exitSelectionMode();
   }, [selectedIds, retireSelectedListings, listedOutcome, archiveItems, toast, t, exitSelectionMode]);
 

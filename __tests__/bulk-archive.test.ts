@@ -219,12 +219,15 @@ describe("the collection screen's bulk resolutions", () => {
     // seller who archived thirty and withdrew four was told about the thirty
     // — the half they most need to have seen, because it is the half other
     // people can see.
+    // The clause is a `null` when nothing was withdrawn, not an empty string
+    // with a leading space: `composeOutcome` owns the punctuation between the
+    // two halves, so this callback says only whether the second half happened.
     assert.match(
       SRC,
-      /selectedOpenListings\.length > 0\s*\?\s*` \$\{t\("bulkListingsRemoved", \{ count: selectedOpenListings\.length \}\)\}`\s*:\s*""/,
+      /selectedOpenListings\.length > 0\s*\?\s*t\("bulkListingsRemoved", \{ count: selectedOpenListings\.length \}\)\s*:\s*null/,
     );
-    assert.match(SRC, /toast\.success\(`\$\{t\("itemsArchived", \{ count: ids\.length \}\)\}\$\{outcome\}`\)/);
-    assert.match(SRC, /toast\.success\(`\$\{t\("itemsDeleted", \{ count: ids\.length \}\)\}\$\{outcome\}`\)/);
+    assert.match(SRC, /toast\.success\(composeOutcome\(t\("itemsArchived", \{ count: ids\.length \}\), outcome\)\)/);
+    assert.match(SRC, /toast\.success\(composeOutcome\(t\("itemsDeleted", \{ count: ids\.length \}\), outcome\)\)/);
   });
 
   it("reads the listing count before the selection is cleared", () => {

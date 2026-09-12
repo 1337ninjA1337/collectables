@@ -273,7 +273,7 @@ const en = {
   bulkListedWarning: (params?: TranslationParams) =>
     `${params?.count ?? 0} of ${plural(params?.count, "them is", "them are")} on the marketplace, and ${plural(params?.count, "that listing", "those listings")} will be taken down.`,
   bulkListingsRemoved: (params?: TranslationParams) =>
-    `· ${params?.count ?? 0} ${plural(params?.count, "listing", "listings")} taken down`,
+    `${params?.count ?? 0} ${plural(params?.count, "listing", "listings")} taken down`,
   emptyOwnedTitle: "Start your first collection",
   emptyOwnedHint: "Group items by theme — cards, coins, vinyl, toys — and share them with friends.",
   emptyOwnedCta: "Create collection",
@@ -735,7 +735,7 @@ const ru: TranslationMap = {
   bulkListedWarning: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${slavicPlural(params?.count, "объявление будет снято", "объявления будут сняты", "объявлений будет снято")}: эти предметы выставлены на маркетплейсе.`,
   bulkListingsRemoved: (params?: TranslationParams) =>
-    `· ${params?.count ?? 0} ${slavicPlural(params?.count, "объявление снято", "объявления сняты", "объявлений снято")}`,
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "объявление снято", "объявления сняты", "объявлений снято")}`,
   emptyOwnedTitle: "Начните свою первую коллекцию",
   emptyOwnedHint: "Сгруппируйте предметы по теме — карточки, монеты, винил, игрушки — и делитесь с друзьями.",
   emptyOwnedCta: "Создать коллекцию",
@@ -1709,7 +1709,7 @@ const be: TranslationMap = {
   bulkListedWarning: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${slavicPlural(params?.count, "аб'ява будзе знятая", "аб'явы будуць знятыя", "аб'яў будзе знята")}: гэтыя прадметы выстаўлены на маркетплейсе.`,
   bulkListingsRemoved: (params?: TranslationParams) =>
-    `· ${params?.count ?? 0} ${slavicPlural(params?.count, "аб'ява знятая", "аб'явы знятыя", "аб'яў знята")}`,
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "аб'ява знятая", "аб'явы знятыя", "аб'яў знята")}`,
   exportPdf: "Экспарт у PDF",
   exportPdfGenerating: "Ствараем PDF...",
   exportPdfDone: "PDF гатовы",
@@ -2315,7 +2315,7 @@ const pl: TranslationMap = {
   bulkListedWarning: (params?: TranslationParams) =>
     `${params?.count ?? 0} ${slavicPlural(params?.count, "ogłoszenie zostanie zdjęte", "ogłoszenia zostaną zdjęte", "ogłoszeń zostanie zdjętych")}: te przedmioty są wystawione na rynku.`,
   bulkListingsRemoved: (params?: TranslationParams) =>
-    `· ${params?.count ?? 0} ${slavicPlural(params?.count, "ogłoszenie zdjęte", "ogłoszenia zdjęte", "ogłoszeń zdjętych")}`,
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "ogłoszenie zdjęte", "ogłoszenia zdjęte", "ogłoszeń zdjętych")}`,
   exportPdf: "Eksportuj do PDF",
   exportPdfGenerating: "Tworzenie PDF...",
   exportPdfDone: "PDF gotowy",
@@ -2930,7 +2930,7 @@ const de: TranslationMap = {
   bulkListedWarning: (params?: TranslationParams) =>
     `${params?.count ?? 0} davon ${plural(params?.count, "steht", "stehen")} auf dem Marktplatz — ${plural(params?.count, "die Anzeige wird", "die Anzeigen werden")} entfernt.`,
   bulkListingsRemoved: (params?: TranslationParams) =>
-    `· ${params?.count ?? 0} ${plural(params?.count, "Anzeige entfernt", "Anzeigen entfernt")}`,
+    `${params?.count ?? 0} ${plural(params?.count, "Anzeige entfernt", "Anzeigen entfernt")}`,
   exportPdf: "Als PDF exportieren",
   exportPdfGenerating: "PDF wird erstellt...",
   exportPdfDone: "PDF fertig",
@@ -3555,7 +3555,7 @@ const es: TranslationMap = {
   bulkListedWarning: (params?: TranslationParams) =>
     `${params?.count ?? 0} de ellos ${plural(params?.count, "está publicado", "están publicados")} en el mercado, y ${plural(params?.count, "esa publicación se retirará", "esas publicaciones se retirarán")}.`,
   bulkListingsRemoved: (params?: TranslationParams) =>
-    `· ${params?.count ?? 0} ${plural(params?.count, "publicación retirada", "publicaciones retiradas")}`,
+    `${params?.count ?? 0} ${plural(params?.count, "publicación retirada", "publicaciones retiradas")}`,
   exportPdf: "Exportar a PDF",
   exportPdfGenerating: "Generando PDF...",
   exportPdfDone: "PDF listo",
