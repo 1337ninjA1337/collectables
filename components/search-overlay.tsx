@@ -12,8 +12,10 @@ import {
 } from "react-native";
 import { MaskedTextInput } from "@/components/masked-text-input";
 //
+import { CostBadge } from "@/components/cost-badge";
 import { EmptyState } from "@/components/empty-state";
 import { isLiveItem } from "@/lib/collections-helpers";
+import { hasFiniteCost } from "@/lib/item-cost";
 import { useCollections } from "@/lib/collections-context";
 import {
   AMBER_ACCENT,
@@ -385,7 +387,24 @@ export function SearchOverlay({ visible, onClose }: Props) {
                           </Text>
                           <Text style={styles.rowMeta} numberOfLines={1}>
                             {getCollectionName(item.collectionId)}
-                            {item.cost ? ` · ${item.cost}` : ""}
+                            {/*
+                              `<CostBadge>` rather than `${item.cost}`, and
+                              `hasFiniteCost` rather than a truthiness check.
+                              The raw render printed a bare number with no
+                              currency beside it — the same defect the export
+                              round fixed in the PDF — hid a cost of zero,
+                              which the shared gate holds is a price, and
+                              printed `Infinity` for a non-finite one. The
+                              badge converts, marks a conversion with `≈` and
+                              renders nothing when there is no cost, so the
+                              separator is the only thing left to decide here.
+                            */}
+                            {hasFiniteCost(item) ? (
+                              <>
+                                {" · "}
+                                <CostBadge item={item} style={styles.rowMeta} />
+                              </>
+                            ) : null}
                           </Text>
                         </View>
                       </View>
