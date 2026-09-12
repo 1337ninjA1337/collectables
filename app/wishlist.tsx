@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -22,6 +22,10 @@ import { MaskedTextInput } from "@/components/masked-text-input";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CostBadge } from "@/components/cost-badge";
+import {
+  CurrencyInput,
+  getDefaultCurrencyForLanguage,
+} from "@/components/currency-input";
 import { DangerIconButton } from "@/components/danger-icon-button";
 import { EmptyState } from "@/components/empty-state";
 import { PhotoPreview } from "@/components/photo-preview";
@@ -56,7 +60,13 @@ import {
   TEXT_DARK_2,
   TEXT_ON_DARK_5,
 } from "@/lib/design-tokens";
+import {
+  CURRENCY_ERROR_I18N_KEY,
+  parseCurrencyValueDetailed,
+  type CurrencyValueError,
+} from "@/lib/format-currency-input";
 import { useI18n } from "@/lib/i18n-context";
+import { getUserPreferredCurrency } from "@/lib/locale-helpers";
 import { useMarketplace } from "@/lib/marketplace-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
@@ -65,7 +75,7 @@ import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
 import { hasFiniteCost } from "@/lib/item-cost";
 
 export default function WishlistScreen() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const theme = useAppTheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
@@ -105,8 +115,29 @@ export default function WishlistScreen() {
   const [description, setDescription] = useState("");
   const [acquiredFrom, setAcquiredFrom] = useState("");
   const [cost, setCost] = useState("");
+  const [costError, setCostError] = useState<CurrencyValueError | null>(null);
+  // Seeded from the language so the field is never blank, then replaced by the
+  // stored preference once it hydrates. The preference is READ and not
+  // written: `app/create.tsx` writes it back (picking a currency for one item
+  // moves the whole app's display currency), and `app/item/[id].tsx`'s edit
+  // form does not. A want is the wrong act to reset a global on — it is a
+  // thing you do not own, often priced in a currency you are only passing
+  // through. <CurrencyInput> still records the MRU pin itself, so the code
+  // leads the strip next time either way.
+  const [currency, setCurrency] = useState(() => getDefaultCurrencyForLanguage(language));
   const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getUserPreferredCurrency().then((stored) => {
+      if (cancelled || !stored) return;
+      setCurrency(stored);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [promoteFor, setPromoteFor] = useState<CollectableItem | null>(null);
 
@@ -134,12 +165,33 @@ export default function WishlistScreen() {
     setDescription("");
     setAcquiredFrom("");
     setCost("");
+    setCostError(null);
     setPhotos([]);
+    // `currency` deliberately survives a reset: somebody adding wants is
+    // usually adding several, and re-picking the same code per row is the
+    // friction the MRU strip exists to remove.
   }
 
   async function handleSave() {
     if (!title.trim()) {
       toast.error(t("requiredFieldsMissing"), t("needMoreData"));
+      return;
+    }
+    // `cost ? Number(cost) : null` shipped here for as long as the sheet has
+    // existed and had two failure modes the other forms had already closed.
+    // `Number("12,50")` is NaN, and a comma decimal is what four of this
+    // app's six locales type — so the price vanished on save, silently, since
+    // `hasFiniteCost` reads NaN as no price at all. `Number("abc")` did the
+    // same. `parseCurrencyValueDetailed` is the shared gate: the sanitizer
+    // inside <CurrencyInput> folds the comma before it ever gets here, and
+    // this catches what the sanitizer cannot.
+    const parsedCost = parseCurrencyValueDetailed(cost);
+    if (parsedCost.error && parsedCost.error !== "empty") {
+      // "empty" is not an error on this form — a want with no price is the
+      // common case, and the field is optional. The other two are a number
+      // the user meant and the app could not read, which is worth stopping
+      // for rather than storing as nothing.
+      setCostError(parsedCost.error);
       return;
     }
     setSaving(true);
@@ -149,7 +201,10 @@ export default function WishlistScreen() {
         description,
         acquiredFrom,
         photos,
-        cost: cost ? Number(cost) : null,
+        cost: parsedCost.value,
+        // Null when there is no price: a currency with no amount claims a
+        // quote nobody gave. The same pairing `app/create.tsx` writes.
+        costCurrency: parsedCost.value !== null ? currency : null,
       });
       toast.success(t("wishlistAdded"));
       resetForm();
@@ -495,13 +550,31 @@ export default function WishlistScreen() {
                 />
 
                 <Text style={styles.label}>{t("costLabel")}</Text>
-                <MaskedTextInput
-                  style={styles.input}
+                {/*
+                  The wishlist was the last cost input in the app with no
+                  currency beside it, so every want ever added was stored
+                  currency-less and only read correctly because
+                  `convertItemCost` assumes the display currency for a null.
+                  A want noted while shopping abroad read as that many of the
+                  wrong unit — the defect the chip above this list made
+                  visible by finally printing a currency at all.
+
+                  <CurrencyInput> and not a second hand-rolled row: it brings
+                  the sanitizer (a comma decimal is what four of six locales
+                  type), the MRU chip strip and the error pill, which are the
+                  three things this sheet was missing and each of which was
+                  already written.
+                */}
+                <CurrencyInput
                   value={cost}
-                  onChangeText={setCost}
-                  placeholder="0"
-                  placeholderTextColor={MUTED_21}
-                  keyboardType="numeric"
+                  currency={currency}
+                  onChangeValue={(v) => {
+                    setCost(v);
+                    setCostError(null);
+                  }}
+                  onChangeCurrency={setCurrency}
+                  placeholder={t("costPlaceholder")}
+                  error={costError ? t(CURRENCY_ERROR_I18N_KEY[costError]) : null}
                 />
 
                 <Text style={styles.label}>{t("photosLabel")}</Text>

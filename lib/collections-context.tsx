@@ -149,6 +149,21 @@ type DraftWishlistInput = {
   acquiredFrom: string;
   photos: string[];
   cost?: number | null;
+  /**
+   * The currency the want's price is quoted in.
+   *
+   * Absent until 2026-09-12, which made the wishlist the only cost input in
+   * the app that could not say what its number meant. Every reader falls back
+   * to the viewer's display currency for a null (`convertItemCost`'s
+   * `item.costCurrency ?? target`), so a want noted while shopping abroad read
+   * as that many of the WRONG unit — silently, and permanently once the
+   * collector forgot which it was.
+   *
+   * Optional and nullable for the same reason it is on `DraftItemInput`: a
+   * want with no price has no currency either, and writing one would claim a
+   * quote nobody gave.
+   */
+  costCurrency?: string | null;
 };
 
 type DraftCollectionInput = {
@@ -1414,6 +1429,7 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
           createdByUserId: user?.id ?? "unknown-user",
           createdAt: new Date().toISOString(),
           cost: input.cost ?? null,
+          costCurrency: input.costCurrency ?? null,
           isWishlist: true,
         };
 
