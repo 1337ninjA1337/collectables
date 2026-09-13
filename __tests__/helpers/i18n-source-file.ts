@@ -41,6 +41,7 @@ import path from "node:path";
 import {
   I18N_LOCALE_SOURCES,
   I18N_PROVIDER_SOURCE,
+  I18N_SOURCE_FILES,
   I18N_TYPES_SOURCE,
 } from "../../lib/i18n-source-files";
 
@@ -77,9 +78,7 @@ export function readI18nSource(): string {
   // `.map((rel) => …)` and not `.map(readRepoFile)`: the reader takes path
   // SEGMENTS, so a point-free map hands it the array index as a second
   // segment and every call throws on the number.
-  return [I18N_SOURCE_REL, I18N_TYPES_SOURCE_REL, ...I18N_LOCALE_SOURCE_RELS]
-    .map((rel) => readRepoFile(rel))
-    .join("\n");
+  return I18N_SOURCE_FILES.map((rel) => readRepoFile(rel)).join("\n");
 }
 
 /**

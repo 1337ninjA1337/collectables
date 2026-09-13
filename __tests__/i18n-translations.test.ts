@@ -47,22 +47,26 @@ describe("i18n translations", () => {
     }
   });
 
-  it("registers every offered language in the translations record", () => {
-    const record = findObjectLiteral(SOURCE, "translations");
-    assert.ok(record, "translations record not found");
+  it("registers every offered language in the loader record", () => {
+    // It was `const translations = { en, ru, be, pl, de, es }` in the provider
+    // until the four lazy locales arrived; the record that has to name every
+    // language is `loaders` in `lib/i18n/registry.ts` now, and a language
+    // missing from it is one nothing can ever fetch.
+    const record = findObjectLiteral(SOURCE, "loaders");
+    assert.ok(record, "loader record not found");
     for (const code of EXPECTED_LANGUAGES) {
       assert.ok(
-        record!.keys.includes(code),
-        `language '${code}' missing from translations record`,
+        record.keys.includes(code),
+        `language '${code}' missing from the loader record`,
       );
     }
   });
 
-  it("has a declared map behind every entry of the translations record", () => {
+  it("has a declared map behind every entry of the loader record", () => {
     // The other direction: an entry registered with no map behind it is a
-    // `ReferenceError` at import, and a shorthand entry naming the wrong
-    // identifier is what would produce one.
-    for (const code of findObjectLiteral(SOURCE, "translations")!.keys) {
+    // `ReferenceError` at import for the eager pair and a failed chunk for the
+    // rest, and a loader naming the wrong identifier is what would produce one.
+    for (const code of findObjectLiteral(SOURCE, "loaders")!.keys) {
       assert.ok(
         findLocaleBlock(SOURCE, code),
         `the record registers '${code}' and no \`const ${code}\` map declares it`,

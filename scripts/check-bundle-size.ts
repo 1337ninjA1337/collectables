@@ -23,7 +23,7 @@ import {
   resolveBundleSizeBudget,
   type BundleFile,
 } from "../lib/bundle-size";
-import { I18N_SOURCE_FILES } from "../lib/i18n-source-files";
+import { I18N_COPY_SOURCES } from "../lib/i18n-source-files";
 import {
   formatCopyDriftLine,
   translationsFootprint,
@@ -41,7 +41,7 @@ const CHECK_NAME = "check-bundle-size";
  * whether to raise the budget. `lib/i18n-source-files.ts` names the set for
  * every reader that cares.
  */
-const I18N_SOURCES = I18N_SOURCE_FILES;
+const I18N_SOURCES = I18N_COPY_SOURCES;
 
 function main(): void {
   // Shared premise (dist/ present, at least one chunk, newer than the source

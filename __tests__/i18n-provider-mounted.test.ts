@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 
-import { installSpyCapture } from "./helpers/mount-provider";
+import { drain, installSpyCapture } from "./helpers/mount-provider";
 import { autoUnmount, installNativeModuleStubs, mockModule, render } from "./helpers/render";
 
 /**
@@ -75,9 +75,13 @@ async function settle(): Promise<void> {
 async function mount() {
   i18n ??= await import("../lib/i18n-context");
   (await import("../lib/report-storage-failure")).__resetStorageFailureReportsForTests();
+  (await import("../lib/i18n/registry")).__resetLoadedLocalesForTests();
   const tree = render(createElement(i18n.I18nProvider, null, createElement(Probe)));
-  await settle();
-  tree.rerender();
+  // `drain` and not one settle/rerender pair: adopting a stored language can
+  // take a chunk fetch now — the four lazy locales arrive through `import()` —
+  // and a fixed count of passes is a claim about how many awaits a hydrate
+  // holds, written nowhere near the hydrate.
+  await drain(tree);
   return tree;
 }
 
@@ -96,7 +100,14 @@ describe("I18nProvider — hydrating the stored language", () => {
   it("reads the language key and adopts a stored language", async () => {
     const { LANGUAGE_KEY } = await import("../lib/storage-keys");
     stored = "pl";
-    await mount();
+    const tree = await mount();
+    // Polish is one of the four locales that arrive through `import()`, and
+    // the provider adopts it only once the chunk has landed. Asking the
+    // registry for the same locale hands back the promise already in flight
+    // rather than starting a second fetch — which is also the case for the
+    // dedup, one line up from where it would matter.
+    await (await import("../lib/i18n/registry")).loadLocale("pl");
+    await drain(tree);
 
     assert.deepEqual(reads, [LANGUAGE_KEY]);
     assert.equal(seen?.language, "pl");

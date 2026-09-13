@@ -3,8 +3,10 @@ import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
+  I18N_COPY_SOURCES,
   I18N_LOCALE_SOURCES,
   I18N_PROVIDER_SOURCE,
+  I18N_REGISTRY_SOURCE,
   I18N_SOURCE_FILES,
   I18N_TYPES_SOURCE,
 } from "../lib/i18n-source-files";
@@ -43,11 +45,12 @@ const CODES_FROM_PATHS = I18N_LOCALE_SOURCES.map(
 
 describe("lib/i18n-source-files.ts names files that exist", () => {
   it("lists the provider, the types and the six maps", () => {
-    assert.deepEqual(I18N_SOURCE_FILES, [
+    assert.deepEqual(I18N_COPY_SOURCES, [
       I18N_PROVIDER_SOURCE,
       I18N_TYPES_SOURCE,
       ...I18N_LOCALE_SOURCES,
     ]);
+    assert.deepEqual(I18N_SOURCE_FILES, [...I18N_COPY_SOURCES, I18N_REGISTRY_SOURCE]);
     // One module per language the picker offers, derived from the picker: a
     // seventh language with no module is copy nothing measures.
     assert.deepEqual([...CODES_FROM_PATHS].sort(), [...CODES].sort());
@@ -66,7 +69,7 @@ describe("lib/i18n-source-files.ts names files that exist", () => {
     assert.equal(new Set(I18N_SOURCE_FILES).size, I18N_SOURCE_FILES.length);
   });
 
-  it("is these eight files, spelled out", () => {
+  it("is these nine files, spelled out", () => {
     // Spelled rather than derived, in one case, because a path that appears
     // nowhere in any suite is a module nobody has decided about —
     // `suite-named-modules.test.ts` sweeps for exactly that, and the other
@@ -80,6 +83,7 @@ describe("lib/i18n-source-files.ts names files that exist", () => {
       "lib/i18n/pl.ts",
       "lib/i18n/de.ts",
       "lib/i18n/es.ts",
+      "lib/i18n/registry.ts",
     ]);
   });
 });
@@ -145,13 +149,11 @@ describe("the provider still answers for the names the app imports", () => {
     assert.match(PROVIDER, /export type \{ TranslationKey \} from "@\/lib\/i18n\/en";/);
   });
 
-  it("still builds `translations` from all six maps", () => {
-    const literal = findObjectLiteral(PROVIDER, "translations");
-    assert.ok(literal, "the translations map is gone from the provider");
-    assert.deepEqual(
-      [...literal.keys].sort(),
-      I18N_LOCALE_SOURCES.map((rel) => rel.split("/").pop()?.replace(".ts", "")).sort(),
-    );
+  it("reads its maps from the registry rather than holding them", () => {
+    // The provider had `const translations = { en, ru, be, pl, de, es }`,
+    // which is a static reference to all six and the reason all six shipped.
+    assert.equal(findObjectLiteral(PROVIDER, "translations"), null);
+    assert.match(PROVIDER, /from "@\/lib\/i18n\/registry"/);
   });
 
   it("carries none of the copy itself any more", () => {
@@ -187,11 +189,11 @@ describe("what the source readers see", () => {
     }
   });
 
-  it("the copy measure reads all seven files, not just the provider", () => {
+  it("the copy measure reads every file the copy is in, not just the provider", () => {
     // The failure this prevents is a silent one: the drift line would report
     // the copy as having shrunk by 300 KiB in a commit that only moved it.
     const gate = readRepoFile("scripts/check-bundle-size.ts");
-    assert.match(gate, /I18N_SOURCE_FILES/);
+    assert.match(gate, /I18N_COPY_SOURCES/);
     assert.ok(
       !gate.includes('"lib/i18n-context.tsx"'),
       "the gate must not spell one file's path again",

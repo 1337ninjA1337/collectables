@@ -2,18 +2,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { trackEvent } from "@/lib/analytics";
-// The six locale maps, one module each. They were 3696 of this file's 3929
-// lines and 314 KiB of the web bundle — the largest single thing every visitor
-// downloads, because Metro escapes the Cyrillic and the Polish diacritics as
-// `\uXXXX` and six locales cost six bytes a letter. Still statically imported,
-// so nothing about the bundle has changed yet; a dictionary can only be
-// fetched on demand once it is a module of its own.
-import { be } from "@/lib/i18n/be";
-import { de } from "@/lib/i18n/de";
-import { en, type TranslationKey, type TranslationMap } from "@/lib/i18n/en";
-import { es } from "@/lib/i18n/es";
-import { pl } from "@/lib/i18n/pl";
-import { ru } from "@/lib/i18n/ru";
+// The six locale maps live one per module, and only `en` and `ru` are in the
+// entry chunk: `ru` is what this provider starts in and `en` is what every
+// missing key falls back to, so both have to be in memory before the first
+// paint. The other four — 208 KiB of copy nobody in a Russian session ever
+// reads — arrive through `import()` when somebody picks them.
+// `lib/i18n/registry.ts` is the cache and the loader.
+import type { TranslationKey } from "@/lib/i18n/en";
+import {
+  baseLocale,
+  isLocaleLoaded,
+  loadLocale,
+  loadedLocale,
+} from "@/lib/i18n/registry";
 import type { AppLanguage, TranslationParams } from "@/lib/i18n/types";
 import { getDefaultLocaleForLanguage } from "@/lib/locale-helpers";
 import { reportStorageFailure } from "@/lib/report-storage-failure";
@@ -27,8 +28,6 @@ import { LANGUAGE_KEY } from "@/lib/storage-keys";
  */
 export type { AppLanguage } from "@/lib/i18n/types";
 export type { TranslationKey } from "@/lib/i18n/en";
-
-const translations: Record<AppLanguage, TranslationMap> = { en, ru, be, pl, de, es };
 
 const languageOptions: { code: AppLanguage; label: string }[] = [
   { code: "ru", label: "Русский" },
@@ -160,13 +159,24 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
     let active = true;
 
     AsyncStorage.getItem(LANGUAGE_KEY)
-      .then((value) => {
+      .then(async (value) => {
         if (!active) {
           return;
         }
-        if (value && languageOptions.some((option) => option.code === value)) {
-          setLanguageState(value as AppLanguage);
+        if (!value || !languageOptions.some((option) => option.code === value)) {
+          return;
         }
+        const stored = value as AppLanguage;
+        // The copy comes BEFORE `ready`, or the first paint is English under a
+        // Polish setting and swaps a frame later. The tree is already gated on
+        // `ready` for the storage read; for the two eager locales this adds
+        // nothing, and for the other four it is one chunk.
+        if (!isLocaleLoaded(stored) && (await loadLocale(stored)) === null) {
+          // Unreachable copy: stay in the default rather than render a
+          // language whose strings are not there.
+          return;
+        }
+        if (active) setLanguageState(stored);
       })
       // A `.finally` HANDLES NOTHING. This chain ended at one, so a rejected
       // read left the rejection with no handler anywhere — an unhandled
@@ -194,6 +204,12 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
       language,
       ready,
       setLanguage: async (nextLanguage: AppLanguage) => {
+        // The chunk first, and nothing happens if it does not arrive: a switch
+        // that renders English under a Polish setting is worse than a switch
+        // that visibly did not happen, and tapping again retries.
+        if (!isLocaleLoaded(nextLanguage) && (await loadLocale(nextLanguage)) === null) {
+          return;
+        }
         if (nextLanguage !== language) {
           trackEvent("language_switched", {
             language: nextLanguage,
@@ -214,7 +230,11 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
         }
       },
       t: (key: TranslationKey, params?: TranslationParams) => {
-        const entry = translations[language][key] ?? translations.en[key];
+        // `?? baseLocale` and not `translations[language]`: a language whose
+        // chunk has not landed has no map at all, and indexing one that is
+        // undefined is a crash on every string on the screen.
+        const map = loadedLocale(language) ?? baseLocale;
+        const entry = map[key] ?? baseLocale[key];
         return typeof entry === "function" ? entry(params) : entry;
       },
       formatRelativeDate: (iso: string) => formatRelativeDate(iso, language),

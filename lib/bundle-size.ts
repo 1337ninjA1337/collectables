@@ -367,51 +367,65 @@ export function formatDriftLine(result: BundleSizeResult): string {
  * marks `(lazy)` on everything outside the entry chunk and a human reads it;
  * this is the same fact with a floor under it, on the gate CI already runs.
  *
- * **The floor has to sit above the largest lazy chunk, not just under the
- * total.** With 1148.2 KiB lazy in two chunks — Sentry's 874.5 and PostHog's
- * 273.7 — a floor of 200 KiB would have caught Sentry going eager and slept
- * through PostHog doing the same, because 273.7 KiB of remaining lazy bytes is
- * still over it. Any single chunk going eager has to break it, which puts the
- * floor above 874.5 KiB; `bundle-size.test.ts` asserts exactly that from the
- * measurements rather than from this paragraph.
+ * **A byte floor alone stopped being enough at six chunks.** It was two —
+ * Sentry's 874.5 KiB and PostHog's 273.7 — and a floor between them catches
+ * either one going eager. Then the four lazy locale chunks landed (94.1, 33.5,
+ * 31.5 and 31.2 KiB), and catching the smallest of those through a TOTAL would
+ * mean a floor within 31 KiB of the measurement: a gate that goes red the
+ * first time a dependency bump makes an SDK smaller. So the count is the other
+ * half of the guard — {@link LAZY_CHUNK_COUNT_FLOOR} — and it is the half that
+ * scales, because a chunk that stops being lazy stops existing whatever it
+ * weighed.
  *
- * **The slack under the measurement is on purpose.** The regression is a cliff
- * — a whole chunk stops existing — not a drift, so a floor anywhere in that
- * band catches it on the commit that causes it. What a tight floor would add
- * is false reds on a dependency bump that makes an SDK smaller, each costing a
- * round to re-measure and re-argue for no extra guard. 1000 KiB leaves 148.2
- * KiB of room to shrink.
+ * **The slack under the byte floor is on purpose.** The regression is a cliff
+ * — a whole chunk stops existing — not a drift, so a floor anywhere in the
+ * band catches the big ones on the commit that causes it while the count
+ * catches the small ones. 1200 KiB leaves 138.5 KiB of room to shrink.
  *
  * Lowering it is the same kind of decision as raising the budget: a lazy chunk
  * that is genuinely gone (analytics deleted) is a saving to bank deliberately,
  * and the suite holds the floor inside the band above so it cannot be edited
  * into a number that passes quietly.
  */
-export const LAZY_CHUNK_FLOOR_BYTES = 1000 * 1024;
+export const LAZY_CHUNK_FLOOR_BYTES = 1200 * 1024;
 
 /**
- * The lazy chunks as they stood when the floor was set — 1148.2 KiB in two
- * chunks: Sentry's 874.5 (`index-<hash>.js`, fetched when diagnostics
- * initialise) and PostHog's 273.7.
+ * How many chunks a page load must NOT fetch.
+ *
+ * Six today: Sentry, PostHog, and one per lazy locale (be, pl, de, es). A
+ * package or a locale that stops being deferred takes its chunk with it, so
+ * the count falls whatever the bytes do — which is the half of this guard that
+ * still works when the smallest chunk is 31 KiB and the largest is 874.
+ *
+ * A MINIMUM, not an equality: splitting a feature into two chunks is not a
+ * regression, and a gate that failed on it would be a gate against lazy
+ * loading. Lowering it is the same deliberate decision as lowering the byte
+ * floor — a feature genuinely deleted.
+ */
+export const LAZY_CHUNK_COUNT_FLOOR = 6;
+
+/**
+ * The lazy chunks as they stood when the floor was set — 1338.5 KiB in six:
+ * Sentry's 874.5 (fetched when diagnostics initialise), PostHog's 273.7, and
+ * the four locales the page load stopped carrying (be 94.1, pl 33.5, de 31.5,
+ * es 31.2).
  *
  * A MEASUREMENT, like `LAST_MEASURED_BUNDLE_BYTES`, taken on 2026-09-13 from
- * the same export that measured 3822836 bytes in total. It is not a field of
+ * the same export that measured 3827531 bytes in total. It is not a field of
  * `BUDGET_SNAPSHOT` because it is not half of that pair: the budget and the
  * copy figure move together at a budget move, and this number moves when the
  * SPLIT changes, which is a different event.
  */
-export const LAST_MEASURED_LAZY_BYTES = 1_175_775;
+export const LAST_MEASURED_LAZY_BYTES = 1_370_594;
 
 /**
- * The smallest of those chunks — PostHog's, at 273.7 KiB.
+ * The smallest of those chunks — the Spanish locale, at 31.2 KiB.
  *
- * The floor's real bound: a chunk this size going eager has to fail the gate,
- * so the floor cannot be more than this far below
- * {@link LAST_MEASURED_LAZY_BYTES}. Recorded rather than derived because it is
- * a measurement of the SAME export, and a bound computed from a number nobody
- * took is a bound that moves when somebody guesses.
+ * Recorded because it is what the byte floor CANNOT catch: a chunk this size
+ * going eager moves the total by less than the slack any honest floor leaves,
+ * which is the whole argument for {@link LAZY_CHUNK_COUNT_FLOOR}.
  */
-export const SMALLEST_MEASURED_LAZY_CHUNK_BYTES = 280_243;
+export const SMALLEST_MEASURED_LAZY_CHUNK_BYTES = 31_976;
 
 export type LazySplitResult = {
   /** Bytes in the chunk(s) every page load fetches. */
@@ -425,6 +439,11 @@ export type LazySplitResult = {
   readonly marginBytes: number;
   /** True when the lazy chunks have fallen below {@link floorBytes}. */
   readonly belowFloor: boolean;
+  /**
+   * True when there are fewer lazy chunks than {@link LAZY_CHUNK_COUNT_FLOOR}
+   * — one stopped being lazy, whatever it weighed.
+   */
+  readonly tooFewLazyChunks: boolean;
   /**
    * True when no chunk is named like an entry chunk at all.
    *
@@ -465,13 +484,14 @@ export function evaluateLazySplit(
     floorBytes,
     marginBytes: lazyBytes - floorBytes,
     belowFloor: lazyBytes < floorBytes,
+    tooFewLazyChunks: lazyChunkCount < LAZY_CHUNK_COUNT_FLOOR,
     missingEntryChunk: entryChunkCount === 0,
   };
 }
 
 /** Whether {@link evaluateLazySplit} should fail the build. */
 export function lazySplitFailed(result: LazySplitResult): boolean {
-  return result.missingEntryChunk || result.belowFloor;
+  return result.missingEntryChunk || result.belowFloor || result.tooFewLazyChunks;
 }
 
 export function formatLazySplitReport(result: LazySplitResult): string {
@@ -495,8 +515,20 @@ export function formatLazySplitReport(result: LazySplitResult): string {
       "deliberately gone.",
     ].join("\n");
   }
+  if (result.tooFewLazyChunks) {
+    return [
+      `check-bundle-size: FAIL — ${String(result.lazyChunkCount)} lazy ${plural(result.lazyChunkCount, "chunk", "chunks")}, fewer than the ${String(LAZY_CHUNK_COUNT_FLOOR)} this export had when the floor was set.`,
+      "Something that was behind an `import()` is in the entry chunk now. The",
+      "byte floor above can miss this when the chunk was small — a locale is 31",
+      "KiB — which is why the count is checked too.",
+      "`npm run build:sourcemaps && npm run bundle:composition` names what moved.",
+      "Lower LAZY_CHUNK_COUNT_FLOOR only for a lazy chunk that is deliberately",
+      "gone.",
+    ].join("\n");
+  }
   return (
-    `check-bundle-size: ${formatKiB(result.lazyBytes)} of the bundle is lazy — ` +
+    `check-bundle-size: ${formatKiB(result.lazyBytes)} of the bundle is lazy in ` +
+    `${String(result.lazyChunkCount)} ${plural(result.lazyChunkCount, "chunk", "chunks")} — ` +
     `${formatKiB(result.marginBytes)} above the ${formatKiB(result.floorBytes)} floor, ` +
     `${formatKiB(result.entryBytes)} in the entry chunk.`
   );

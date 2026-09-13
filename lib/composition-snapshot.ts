@@ -36,8 +36,8 @@ import type { CompositionBaseline } from "@/lib/bundle-composition";
 // an arrival on the next run — one number, so the two halves cannot disagree.
 
 /**
- * Re-taken on 2026-09-13, after the crash shell became a platform pair, from a
- * `--source-maps` export of the tree `check-bundle-size` measured at 3733.2
+ * Re-taken on 2026-09-13, after the four lazy locale chunks landed, from a
+ * `--source-maps` export of the tree `check-bundle-size` measured at 3737.8
  * KiB.
  *
  * THE BUCKETS BARELY MOVED AND THE BUNDLE CHANGED COMPLETELY, which is the
@@ -63,19 +63,20 @@ import type { CompositionBaseline } from "@/lib/bundle-composition";
  * budget, which keeps its own figure in `lib/budget-snapshot.ts`. Compare
  * composition totals to composition totals.
  *
- * The headline facts as they stand now: 1148.5 KiB of the bundle — the five
- * Sentry packages and the two PostHog ones — is in chunks a page load does not
- * fetch, `lib/` is 552 KiB of this repository's own code, and
- * `lib/i18n-context.tsx` alone is 314 KiB, the heaviest single module in the
- * bundle and ahead of `react-dom`, because Metro escapes non-ASCII as
- * `\uXXXX` and six locales of Cyrillic cost six bytes a letter.
+ * The headline facts as they stand now: 1339.3 KiB of the bundle is in chunks
+ * a page load does not fetch — the five Sentry packages, the two PostHog ones,
+ * and four of the six locale maps — and `lib/` is 552 KiB of this repository's
+ * own code, of which the copy is the largest part. `lib/i18n/ru.ts` is the
+ * heaviest module a page load still fetches, at 92 KiB, because Metro escapes
+ * non-ASCII as `\uXXXX` and Cyrillic costs six bytes a letter; `lib/i18n/be.ts`
+ * is 94 KiB of the same and is fetched only by somebody who reads Belarusian.
  */
 export const COMPOSITION_BASELINE: CompositionBaseline = {
   takenOn: "2026-09-13",
-  totalBytes: 3823286,
+  totalBytes: 3828569,
   buckets: {
-    "(unattributed)": 621310,
-    "lib/": 552213,
+    "(unattributed)": 624468,
+    "lib/": 554338,
     "@sentry/core": 292950,
     "react-native-web": 282097,
     "app/": 198307,
@@ -142,3 +143,4 @@ export const COMPOSITION_BASELINE: CompositionBaseline = {
     "base64-js": 1401,
   },
 };
+

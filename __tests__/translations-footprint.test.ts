@@ -179,7 +179,7 @@ describe("the measurement and the bundle's move together", () => {
     // spelling a path of its own, which is what kept the measure honest
     // through the move.
     const SRC = stripComments(readRepoFile("scripts/check-bundle-size.ts"));
-    assert.match(SRC, /const I18N_SOURCES = I18N_SOURCE_FILES;/);
+    assert.match(SRC, /const I18N_SOURCES = I18N_COPY_SOURCES;/);
     assert.match(SRC, /I18N_SOURCES\.map\(\(rel\) => fs\.readFileSync\(path\.join\(REPO_ROOT, rel\), "utf8"\)\)/);
     assert.match(SRC, /formatCopyDriftLine\(/);
   });

@@ -36,9 +36,27 @@ export const I18N_LOCALE_SOURCES: readonly string[] = [
   "lib/i18n/es.ts",
 ];
 
-/** Every file the translations module is spread across, provider first. */
-export const I18N_SOURCE_FILES: readonly string[] = [
+/** Which locales ship with the page load, and how the other four arrive. */
+export const I18N_REGISTRY_SOURCE = "lib/i18n/registry.ts";
+
+/**
+ * What the copy measure reads — the provider, the types and the six maps.
+ *
+ * NOT the registry: that file is a cache and six `import()` calls, and counting
+ * it as copy would report a loader rewrite as the app having grown sentences.
+ */
+export const I18N_COPY_SOURCES: readonly string[] = [
   I18N_PROVIDER_SOURCE,
   I18N_TYPES_SOURCE,
   ...I18N_LOCALE_SOURCES,
+];
+
+/**
+ * Every file the translations module is spread across, provider first — what
+ * the suites concatenate when they ask a structural question of "the i18n
+ * source", which since the lazy split includes which locales are eager.
+ */
+export const I18N_SOURCE_FILES: readonly string[] = [
+  ...I18N_COPY_SOURCES,
+  I18N_REGISTRY_SOURCE,
 ];
