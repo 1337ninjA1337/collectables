@@ -118,7 +118,7 @@ export const EditCollectionModal = memo(function EditCollectionModal({
           onPress={(e) => e.stopPropagation()}
           accessibilityRole="none"
         >
-          <Text style={styles.modalTitle}>{t("editCollection")}</Text>
+          <Text style={styles.modalTitle} accessibilityRole="header">{t("editCollection")}</Text>
 
           <View style={styles.editFieldGroup}>
             <Text style={styles.editFieldLabel}>

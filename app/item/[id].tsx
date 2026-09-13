@@ -868,7 +868,7 @@ export default function ItemDetailsScreen() {
             accessibilityRole="none"
           >
             <View style={styles.shareHandle} />
-            <Text style={styles.shareTitle}>{t("marketplaceListingTitle")}</Text>
+            <Text style={styles.shareTitle} accessibilityRole="header">{t("marketplaceListingTitle")}</Text>
             <Text style={styles.shareHint}>{t("marketplaceListingHint")}</Text>
 
             <View style={styles.editFieldGroup}>

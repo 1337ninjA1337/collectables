@@ -528,7 +528,7 @@ export default function WishlistScreen() {
               accessibilityRole="none"
             >
               <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>{t("wishlistAdd")}</Text>
+              <Text style={styles.sheetTitle} accessibilityRole="header">{t("wishlistAdd")}</Text>
               <ScrollView
                 style={styles.sheetScrollView}
                 contentContainerStyle={styles.sheetScroll}
@@ -641,7 +641,7 @@ export default function WishlistScreen() {
       >
         <View style={styles.sheetBackdrop}>
           <View style={styles.promoteSheet}>
-            <Text style={styles.sheetTitle}>{t("wishlistPromoteTitle")}</Text>
+            <Text style={styles.sheetTitle} accessibilityRole="header">{t("wishlistPromoteTitle")}</Text>
             <Text style={styles.subtitle}>{t("wishlistPromoteHint")}</Text>
             <ScrollView style={{ maxHeight: 320 }}>
               {ownedCollections.map((c) => (

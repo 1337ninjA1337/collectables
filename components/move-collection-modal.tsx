@@ -51,7 +51,7 @@ export const MoveCollectionModal = memo(function MoveCollectionModal({
           onPress={(e) => e.stopPropagation()}
           accessibilityRole="none"
         >
-          <Text style={styles.modalTitle}>{t("moveToCollection")}</Text>
+          <Text style={styles.modalTitle} accessibilityRole="header">{t("moveToCollection")}</Text>
           <View style={styles.modalList}>
             {collections.map((c) => (
               <Pressable

@@ -80,7 +80,7 @@ export const ShareSheet = memo(function ShareSheet({
         >
           <ScrollView bounces={false} contentContainerStyle={styles.shareSheetContent}>
             <View style={styles.shareHandle} />
-            <Text style={styles.shareTitle}>{t("shareTitle")}</Text>
+            <Text style={styles.shareTitle} accessibilityRole="header">{t("shareTitle")}</Text>
             <Text style={styles.shareHint}>{hint}</Text>
             <View style={styles.shareLinkBox}>
               <Text style={styles.shareLinkText} numberOfLines={1}>{url}</Text>

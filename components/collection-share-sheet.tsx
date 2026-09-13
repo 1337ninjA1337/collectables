@@ -66,7 +66,7 @@ export const CollectionShareSheet = memo(function CollectionShareSheet({
     >
       {isOwner && friends.length > 0 ? (
         <View style={styles.shareFriendsSection}>
-          <Text style={styles.shareFriendsTitle}>{t("shareWithFriends")}</Text>
+          <Text style={styles.shareFriendsTitle} accessibilityRole="header">{t("shareWithFriends")}</Text>
           <Text style={styles.shareFriendsHint}>{t("shareWithFriendsHint")}</Text>
           <ScrollView style={styles.shareFriendsList} nestedScrollEnabled>
             {friends.map((friendId) => {
@@ -112,7 +112,7 @@ export const CollectionShareSheet = memo(function CollectionShareSheet({
       ) : null}
       {isOwner && sharedWithUserIds.length > 0 ? (
         <View style={styles.shareFriendsSection}>
-          <Text style={styles.shareFriendsTitle}>{t("peopleWithAccess")}</Text>
+          <Text style={styles.shareFriendsTitle} accessibilityRole="header">{t("peopleWithAccess")}</Text>
           <Text style={styles.shareFriendsHint}>{t("peopleWithAccessHint")}</Text>
           <ScrollView style={styles.shareFriendsList} nestedScrollEnabled>
             {sharedWithUserIds.map((viewerId) => {

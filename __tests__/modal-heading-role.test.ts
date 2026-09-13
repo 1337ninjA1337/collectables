@@ -1,0 +1,164 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+
+import { openTagEnd } from "@/lib/jsx-open-tag";
+import { stripComments } from "@/lib/strip-comments";
+
+import { sourceCode, tsxFiles } from "./helpers/source-files";
+
+/**
+ * Every heading inside a modal is announced as one.
+ *
+ * A sheet that slides up over a screen gives an assistive technology no
+ * landmark of its own: the title is the only thing that says where the user
+ * now is, and until it carries `accessibilityRole="header"` it is one more
+ * line of text above a list. VoiceOver and TalkBack both navigate by heading;
+ * without the role there is nothing to navigate to, and the way out of a
+ * 160-row currency list is to swipe through it.
+ *
+ * THE CLASSIFICATION IS THE RULE, not the count. A `Title`-styled `<Text>`
+ * inside a `<Modal>` is either a heading — and then it says so — or it is a
+ * row's label that happens to be named `…Title`, and then it is listed below
+ * with the reason. A new modal that ships an unclassified one turns this red,
+ * which is the only way a rule like this stays true: the previous eleven were
+ * all written by people who had no reason to think about it.
+ *
+ * Why a scan and not eleven hard-coded assertions: eleven assertions pass
+ * forever and say nothing about the twelfth sheet. The scan is over the same
+ * two roots `check-a11y-jsx` walks, and the same two primitives, because the
+ * thing that is hard here is finding where a JSX open tag ENDS — the obvious
+ * `/<Text([\s\S]*?)>/` stops at the first `>` in an arrow function.
+ */
+
+/**
+ * A style name this repository gives a heading.
+ *
+ * `styles.title` exactly, or anything ending in `Title` — `sheetTitle`,
+ * `modalTitle`, `shareTitle`, `rowTitle`. NOT `subtitle`, which is a second
+ * line under a heading and never a heading itself; matching it would be
+ * asking for two headers where the design has one.
+ */
+const TITLE_STYLE = /styles\.(?:title|[A-Za-z0-9_]*Title)\b/;
+
+type TitleText = {
+  readonly file: string;
+  readonly line: number;
+  readonly attrs: string;
+};
+
+/**
+ * Every `Title`-styled `<Text>` that sits inside a `<Modal>` subtree.
+ *
+ * The stack is what makes "inside a modal" answerable: a screen renders its
+ * page content and its sheets in one file, and `app/item/[id].tsx`'s item
+ * title is not a modal heading while its share sheet's title is.
+ */
+function modalTitleTexts(file: string): TitleText[] {
+  const code = stripComments(sourceCode(file));
+  const found: TitleText[] = [];
+  const stack: { name: string; inModal: boolean }[] = [];
+  let cursor = 0;
+  while (cursor < code.length) {
+    const start = code.indexOf("<", cursor);
+    if (start === -1) break;
+    const close = /^<\/([A-Za-z][A-Za-z0-9_.]*)\s*>/.exec(code.slice(start));
+    if (close) {
+      const depth = stack.map((frame) => frame.name).lastIndexOf(close[1]);
+      if (depth !== -1) stack.length = depth;
+      cursor = start + close[0].length;
+      continue;
+    }
+    const name = /^<([A-Za-z][A-Za-z0-9_.]*)/.exec(code.slice(start));
+    if (!name) {
+      cursor = start + 1;
+      continue;
+    }
+    const attrsAt = start + name[0].length;
+    const tagEnd = openTagEnd(code, attrsAt);
+    if (tagEnd === -1) break;
+    cursor = tagEnd + 1;
+    const attrs = code.slice(attrsAt, tagEnd);
+    const inModal = stack.length > 0 && stack[stack.length - 1].inModal;
+    if (name[1] === "Text" && inModal && TITLE_STYLE.test(attrs)) {
+      found.push({ file, line: code.slice(0, start).split("\n").length, attrs });
+    }
+    // A self-closing tag opens nothing, so it never becomes an ancestor.
+    const selfClosing = code[tagEnd - 1] === "/";
+    if (!selfClosing) {
+      stack.push({ name: name[1], inModal: inModal || name[1] === "Modal" });
+    }
+  }
+  return found;
+}
+
+/**
+ * The `…Title` styles inside a modal that are NOT headings.
+ *
+ * `components/search-overlay.tsx` is a full-screen `<Modal>` whose results are
+ * rows, and `rowTitle` is the name of the thing each row is about. Marking
+ * those as headings would put one heading per search result into the rotor
+ * and leave the overlay itself with none — the opposite of what the role is
+ * for.
+ */
+const NOT_A_HEADING: readonly string[] = ["styles.rowTitle"];
+
+function isExempt(attrs: string): boolean {
+  return NOT_A_HEADING.some((style) => attrs.includes(style));
+}
+
+describe("every modal heading is announced as a header", () => {
+  const FOUND = tsxFiles("app", "components").flatMap((file) => modalTitleTexts(file));
+
+  it("finds the modal titles at all", () => {
+    // The floor every scanner in this repository carries: a walk that silently
+    // matched nothing proves its negative over an empty set.
+    assert.ok(FOUND.length >= 10, `only ${String(FOUND.length)} modal title(s) found — the scan broke`);
+  });
+
+  it("classifies every one of them", () => {
+    const unclassified = FOUND.filter(
+      (text) => !text.attrs.includes('accessibilityRole="header"') && !isExempt(text.attrs),
+    ).map((text) => `${text.file}:${String(text.line)}`);
+    assert.deepEqual(
+      unclassified,
+      [],
+      'a <Text> styled as a title inside a <Modal> is either a heading — accessibilityRole="header" — or a row label listed in NOT_A_HEADING with the reason',
+    );
+  });
+
+  it("does not make a heading of a search result row", () => {
+    // The exemption is a claim about the tree too: if search-overlay's rows
+    // ever DO get the role, this list is stale and says the opposite of what
+    // the file does.
+    const rows = FOUND.filter((text) => isExempt(text.attrs));
+    assert.ok(rows.length > 0, "NOT_A_HEADING lists a style nothing renders any more");
+    for (const row of rows) {
+      assert.ok(
+        !row.attrs.includes('accessibilityRole="header"'),
+        `${row.file}:${String(row.line)} is listed as not a heading and carries the role`,
+      );
+    }
+  });
+
+  it("covers the sheets a user meets most", () => {
+    // Named so a deletion is visible: a scan over a tree is only as good as
+    // the tree, and a sheet that stopped rendering its title would pass the
+    // classification case by having nothing to classify.
+    const byFile = new Set(
+      FOUND.filter((text) => text.attrs.includes('accessibilityRole="header"')).map((t) => t.file),
+    );
+    for (const file of [
+      "components/currency-sheet.tsx",
+      "components/item-filters.tsx",
+      "components/move-collection-modal.tsx",
+      "components/edit-collection-modal.tsx",
+      "components/share-sheet.tsx",
+      "components/premium-upsell-sheet.tsx",
+      "components/sold-listing-prompt.tsx",
+      "app/wishlist.tsx",
+      "app/create.tsx",
+    ]) {
+      assert.ok(byFile.has(file), `${file} no longer announces its sheet title as a header`);
+    }
+  });
+});

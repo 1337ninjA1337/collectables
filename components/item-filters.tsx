@@ -339,7 +339,7 @@ export function ItemFilterBar({ filters, onChange }: Props) {
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
-              <Text style={styles.sheetTitle}>{t("filterTitle")}</Text>
+              <Text style={styles.sheetTitle} accessibilityRole="header">{t("filterTitle")}</Text>
 
               {/* Search by title. The row's chrome (decorative-icon hiding,
                   the named clear chip, the styles) lives in

@@ -533,7 +533,7 @@ function CollectionSheet({
           accessibilityRole="none"
         >
           <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>{t("collectionFieldLabel")}</Text>
+          <Text style={styles.sheetTitle} accessibilityRole="header">{t("collectionFieldLabel")}</Text>
 
           <SheetSearchRow
             value={query}

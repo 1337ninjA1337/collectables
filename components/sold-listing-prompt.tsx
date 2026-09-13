@@ -123,7 +123,7 @@ export function SoldListingPrompt() {
           onPress={(e) => e.stopPropagation()}
           accessibilityRole="none"
         >
-          <Text style={styles.title}>{t("marketplaceSoldPromptTitle")}</Text>
+          <Text style={styles.title} accessibilityRole="header">{t("marketplaceSoldPromptTitle")}</Text>
           <Text style={styles.body}>
             {t("marketplaceSoldPromptBody", {
               buyer: buyerName,

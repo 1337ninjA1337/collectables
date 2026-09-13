@@ -75,7 +75,7 @@ export function PremiumUpsellSheet({ visible, onClose, onActivated, title, body,
           accessibilityRole="none"
         >
           <Text style={styles.lock}>🔒</Text>
-          <Text style={styles.title}>{title ?? t("premiumTitle")}</Text>
+          <Text style={styles.title} accessibilityRole="header">{title ?? t("premiumTitle")}</Text>
           <Text style={styles.body}>{body ?? t("premiumSubtitle")}</Text>
 
           <View style={styles.benefits}>
