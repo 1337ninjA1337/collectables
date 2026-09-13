@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
   Modal,
@@ -47,6 +47,8 @@ import {
 import { PROFILE_SEARCH_DEBOUNCE_MS } from "@/lib/debounce-helpers";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useI18n } from "@/lib/i18n-context";
+import { announceMessage } from "@/lib/announce";
+import { searchAnnouncement, type SearchResultsState } from "@/lib/search-announcement";
 import { fetchProfiles, searchProfiles } from "@/lib/supabase-profiles";
 import { UserProfile } from "@/lib/types";
 
@@ -183,6 +185,28 @@ export function SearchOverlay({ visible, onClose }: Props) {
 
   const totalResults =
     matchedProfiles.length + matchedCollections.length + matchedItems.length;
+
+  // The count, out loud, when it changes.
+  //
+  // The three section headings are landmarks a screen-reader user can jump
+  // between; nothing told them the lists underneath had changed. The rule for
+  // what is worth saying lives in `lib/search-announcement.ts` — a repeat of
+  // the number already spoken is silence, and an empty field forgets — and
+  // what is SAID is the locale map's, because the noun agrees with the number
+  // differently in six languages.
+  //
+  // A ref, not state: the memory must not cause a render, and a re-render is
+  // what this effect is reacting to.
+  const spokenResults = useRef<SearchResultsState | null>(null);
+  useEffect(() => {
+    // `debouncedQuery` lags the field, so this waits for typing to settle —
+    // an announcement per keystroke interrupts the reader mid-word, which is
+    // the failure this is supposed to prevent rather than cause.
+    if (debouncedQuery !== q) return;
+    const decision = searchAnnouncement({ query: q, total: totalResults }, spokenResults.current);
+    spokenResults.current = decision.spoken;
+    if (decision.speak) announceMessage(t("searchResultsAnnouncement", { count: totalResults }));
+  }, [debouncedQuery, q, totalResults, t]);
 
   const filters: { key: FilterType; label: string }[] = [
     { key: "all", label: t("searchFilterAll") },

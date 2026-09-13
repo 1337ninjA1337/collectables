@@ -148,6 +148,8 @@ export const en = {
   searchResultsCollections: "Collections",
   searchResultsItems: "Items",
   searchNoResults: "Nothing found",
+  searchResultsAnnouncement: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "result", "results")}`,
   searchFilterAll: "All",
   searchFilterCollections: "Collections",
   searchFilterItems: "Items",

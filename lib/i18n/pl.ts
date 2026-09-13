@@ -476,6 +476,8 @@ export const pl: TranslationMap = {
   searchFilterItems: "Przedmioty",
   searchFilterPeople: "Osoby",
   searchNoResults: "Nic nie znaleziono",
+  searchResultsAnnouncement: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "wynik", "wyniki", "wyników")}`,
   searchPlaceholder: "Przedmioty, kolekcje, osoby...",
   searchResultsCollections: "Kolekcje",
   searchResultsItems: "Przedmioty",

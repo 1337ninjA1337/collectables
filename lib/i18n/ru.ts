@@ -202,6 +202,8 @@ export const ru: TranslationMap = {
   searchResultsCollections: "Коллекции",
   searchResultsItems: "Предметы",
   searchNoResults: "Ничего не найдено",
+  searchResultsAnnouncement: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "результат", "результата", "результатов")}`,
   searchFilterAll: "Все",
   searchFilterCollections: "Коллекции",
   searchFilterItems: "Предметы",

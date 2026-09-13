@@ -634,7 +634,12 @@ describe("translation floors", () => {
     // collector who types in three currencies scrolled past all three to reach
     // the fourth. Two section headings are what let the shortlist sit above
     // the 160 without the list looking like it lost its order.
-    assert.match(report, /en: 550\/550 keys \(100\.0%\)/);
+    // 551 the same day: `searchResultsAnnouncement`. The overlay's three
+    // section headings became headings that morning, which is what a screen
+    // reader finds AFTER going looking; nothing told a user typing into the
+    // field that the lists underneath had changed. The count is spoken when it
+    // moves, so the noun has to agree with it in all six languages.
+    assert.match(report, /en: 551\/551 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

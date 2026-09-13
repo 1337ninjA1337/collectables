@@ -483,6 +483,8 @@ export const be: TranslationMap = {
   searchFilterItems: "Прадметы",
   searchFilterPeople: "Людзі",
   searchNoResults: "Нічога не знойдзена",
+  searchResultsAnnouncement: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${slavicPlural(params?.count, "вынік", "вынікі", "вынікаў")}`,
   searchPlaceholder: "Прадметы, калекцыі, людзі...",
   searchResultsCollections: "Калекцыі",
   searchResultsItems: "Прадметы",

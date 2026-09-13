@@ -125,7 +125,7 @@ const FAMILIES: readonly Family[] = [
   {
     name: "search",
     pattern: /^search[A-Z]/,
-    size: 18,
+    size: 19,
     because:
       "the search overlay was already half-translated — four keys in every locale and fourteen in none, so the same overlay showed a translated placeholder above English result headings",
   },

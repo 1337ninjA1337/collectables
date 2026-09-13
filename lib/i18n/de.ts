@@ -476,6 +476,8 @@ export const de: TranslationMap = {
   searchFilterItems: "Objekte",
   searchFilterPeople: "Leute",
   searchNoResults: "Nichts gefunden",
+  searchResultsAnnouncement: (params?: TranslationParams) =>
+    `${params?.count ?? 0} ${plural(params?.count, "Ergebnis", "Ergebnisse")}`,
   searchPlaceholder: "Objekte, Sammlungen, Leute...",
   searchResultsCollections: "Sammlungen",
   searchResultsItems: "Objekte",
