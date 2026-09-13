@@ -7,6 +7,7 @@ import {
   openTagAt,
   openTagEnd,
   skipStringLiteral,
+  walkJsx,
 } from "@/lib/jsx-open-tag";
 
 /**
@@ -155,5 +156,96 @@ describe("reading a braced attribute value", () => {
 
   it("returns null when the value's brace never closes", () => {
     assert.equal(attributeValue(`<Pressable onPress={() => go(`, "onPress"), null);
+  });
+});
+
+describe("walkJsx", () => {
+  /**
+   * The tag-stack walk this module took over from its two callers.
+   *
+   * Both of them wrote it themselves, months apart, and both had the same hole
+   * in it — see the module header. The cases here are the walk's own
+   * behaviour; what each caller inherits is theirs to test.
+   */
+  const names = (code: string): string[] =>
+    [...walkJsx(code, { seed: false, inherit: () => false })].map((tag) => tag.name);
+
+  it("reports every tag, outermost first", () => {
+    assert.deepEqual(
+      names(`<View style={s.a}><Text>hi</Text><Ionicons name="x" /></View>`),
+      ["View", "Text", "Ionicons"],
+    );
+  });
+
+  it("reads the JSX inside a render prop, and the carrier before it", () => {
+    // The bug both copies shipped: `openTagEnd` correctly reports the carrier
+    // as ending after the closing brace, so a flat walk resumes past
+    // everything the prop renders.
+    assert.deepEqual(
+      names(`<Tabs renderTab={(k) => (<View><Text>hi</Text></View>)} />`),
+      ["Tabs", "View", "Text"],
+    );
+  });
+
+  it("passes what an ancestor hands down into a render prop's children", () => {
+    const marked = [
+      ...walkJsx<boolean>(`<Modal><Tabs renderTab={() => (<Text>hi</Text>)} /></Modal>`, {
+        seed: false,
+        inherit: (tag, inside) => inside || tag.name === "Modal",
+      }),
+    ];
+    assert.deepEqual(
+      marked.map((tag) => [tag.name, tag.inherited]),
+      [
+        ["Modal", false],
+        ["Tabs", true],
+        ["Text", true],
+      ],
+    );
+  });
+
+  it("inherits down a subtree and stops at its close tag", () => {
+    const marked = [
+      ...walkJsx<boolean>(`<Modal><Text>a</Text></Modal><Text>b</Text>`, {
+        seed: false,
+        inherit: (tag, inside) => inside || tag.name === "Modal",
+      }),
+    ];
+    assert.deepEqual(
+      marked.map((tag) => [tag.name, tag.inherited]),
+      [
+        ["Modal", false],
+        ["Text", true],
+        ["Text", false],
+      ],
+    );
+  });
+
+  it("does not let a self-closing tag become an ancestor", () => {
+    const marked = [
+      ...walkJsx<boolean>(`<Modal /><Text>b</Text>`, {
+        seed: false,
+        inherit: (tag, inside) => inside || tag.name === "Modal",
+      }),
+    ];
+    assert.deepEqual(marked.map((tag) => tag.inherited), [false, false]);
+  });
+
+  it("is not fooled by a comparison, and does not choke on an unmatched close", () => {
+    // `a < b` has a space after the `<`; an unmatched close tag is ignored
+    // rather than thrown on, because these scanners read files mid-edit.
+    assert.deepEqual(names(`<View>{count < max ? <Text>a</Text> : null}</Ionicons></View>`), [
+      "View",
+      "Text",
+    ]);
+  });
+
+  it("hands back offsets into the string it was given", () => {
+    const code = `  <Pressable onPress={() => go(">")}><Text>x</Text></Pressable>`;
+    const [first] = [...walkJsx(code, { seed: null, inherit: () => null })];
+    assert.equal(code.slice(first.start, first.tagEnd + 1).startsWith("<Pressable"), true);
+    assert.equal(code[first.tagEnd], ">");
+    assert.match(first.attrs, /onPress=\{\(\) => go\(">"\)\}/);
+    assert.equal(first.selfClosing, false);
   });
 });

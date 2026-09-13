@@ -27,9 +27,17 @@
  *
  * What this is NOT: a parser. It understands text, not components. Callers ask
  * about a tag they have already located and get back text they still have to
- * interpret. The a11y guard's own tag-stack walk (which tracks ancestors, so
- * it knows when a node is inside a hidden subtree) stays there — it is a rule
- * about that guard's domain rather than a primitive.
+ * interpret.
+ *
+ * The one thing that WAS ruled out of here and has since been ruled back in is
+ * the tag-stack walk. This header used to say the a11y guard's own walk "stays
+ * there — it is a rule about that guard's domain rather than a primitive",
+ * which was right while there was one of them. There were two by 2026-09-13,
+ * and they had the same bug: the JSX inside a render prop lives in the
+ * PARENT'S OPEN TAG, so both walks stepped over everything a component renders
+ * through a prop. Two copies, one bug, two fixes an hour apart. `walkJsx` at
+ * the foot of this file is the walk; what stays with each caller is the only
+ * part that differs — what a tag passes down to its descendants.
  *
  * Offsets are into whatever string the caller passes. Pass source with
  * comments blanked by `stripComments` if a commented-out tag should not count;
@@ -170,4 +178,121 @@ export function attributeValue(tag: string, name: string): string | null {
     i++;
   }
   return null;
+}
+
+/**
+ * One opening tag, as a walk reports it.
+ *
+ * Offsets are into the string the walk was given, so `start` is what a line
+ * number is computed from and `attrs` is the text every rule tests.
+ */
+export type JsxTag = {
+  /** The element name — `Pressable`, `Ionicons`, `Modal`. */
+  readonly name: string;
+  /** Everything between the name and the closing `>`, `/` included. */
+  readonly attrs: string;
+  /** Offset of the `<`. */
+  readonly start: number;
+  /** Offset just past the name, where `attrs` begins. */
+  readonly attrsAt: number;
+  /** Offset of the closing `>`. */
+  readonly tagEnd: number;
+  /** Whether the tag closes itself and so opens no subtree. */
+  readonly selfClosing: boolean;
+};
+
+/** A tag, plus whatever its ancestors passed down to it. */
+export type WalkedJsxTag<T> = JsxTag & { readonly inherited: T };
+
+/**
+ * What descendants inherit, and where the outermost element starts from.
+ *
+ * The two callers inherit different things — the a11y guard tracks whether an
+ * ancestor has hidden this subtree from screen readers, the heading sweeps
+ * track whether a `<Modal>` is above this node — and that one difference is
+ * the whole of what used to justify two copies of the walk.
+ */
+export type JsxWalk<T> = {
+  readonly seed: T;
+  readonly inherit: (tag: JsxTag, inherited: T) => T;
+};
+
+/**
+ * Every opening tag in `code`, outermost first, with an inherited value.
+ *
+ * WHY THIS IS HERE NOW, against what the header of this module used to say.
+ * It said the a11y guard's tag-stack walk "stays there — it is a rule about
+ * that guard's domain rather than a primitive", and that was right while there
+ * was one of them. There were two by this morning, written months apart, and
+ * they had the same bug: a render prop's JSX lives INSIDE the parent's open
+ * tag, `openTagEnd` correctly reports that tag as ending after the closing
+ * brace, and both walks resumed there — so everything drawn through a prop
+ * rather than through children was invisible to six lint rules and two sweeps.
+ * Two copies, one bug, two fixes an hour apart is the argument this module was
+ * written to make.
+ *
+ * The tag that CARRIES a render prop is yielded before the tags inside it, so
+ * a rule about the parent is not lost to the recursion, and the inherited
+ * value is passed down into the prop: a render prop's children are inside the
+ * element that hides them.
+ *
+ * An unmatched close tag pops down to its name if the name is open and is
+ * ignored otherwise — the forgiving choice, because these scanners read files
+ * mid-edit and a stack that threw would turn a lint run into a crash.
+ */
+export function* walkJsx<T>(code: string, walk: JsxWalk<T>): Generator<WalkedJsxTag<T>> {
+  yield* walkJsxRange(code, 0, code.length, walk.seed, walk);
+}
+
+function* walkJsxRange<T>(
+  code: string,
+  from: number,
+  to: number,
+  seed: T,
+  walk: JsxWalk<T>,
+): Generator<WalkedJsxTag<T>> {
+  /** Open ancestors, innermost last. */
+  const stack: { name: string; inherited: T }[] = [];
+  let cursor = from;
+  while (cursor < to) {
+    const start = code.indexOf("<", cursor);
+    if (start === -1 || start >= to) return;
+    const closeMatch = /^<\/([A-Za-z][A-Za-z0-9_.]*)\s*>/.exec(code.slice(start));
+    if (closeMatch) {
+      const depth = stack.map((frame) => frame.name).lastIndexOf(closeMatch[1]);
+      if (depth !== -1) stack.length = depth;
+      cursor = start + closeMatch[0].length;
+      continue;
+    }
+    // `<` followed by a letter is the whole tag test: a bare `<` in an
+    // expression (`a < b`) is followed by a space in every formatting this
+    // repository uses, and a fragment `<>` has no name.
+    const nameMatch = /^<([A-Za-z][A-Za-z0-9_.]*)/.exec(code.slice(start));
+    if (!nameMatch) {
+      cursor = start + 1;
+      continue;
+    }
+    const attrsAt = start + nameMatch[0].length;
+    const tagEnd = openTagEnd(code, attrsAt);
+    if (tagEnd === -1 || tagEnd > to) return;
+    cursor = tagEnd + 1;
+    const tag: JsxTag = {
+      name: nameMatch[1],
+      attrs: code.slice(attrsAt, tagEnd),
+      start,
+      attrsAt,
+      tagEnd,
+      selfClosing: code[tagEnd - 1] === "/",
+    };
+    const inherited = stack.length > 0 ? stack[stack.length - 1].inherited : seed;
+    yield { ...tag, inherited };
+    const passedDown = walk.inherit(tag, inherited);
+    // A render prop carries JSX inside the open tag. `<` in the attribute text
+    // is a cheap test that costs a fruitless walk of a string containing one.
+    if (tag.attrs.includes("<")) {
+      yield* walkJsxRange(code, attrsAt, tagEnd, passedDown, walk);
+    }
+    // A self-closing tag opens nothing, so it never becomes an ancestor.
+    if (!tag.selfClosing) stack.push({ name: tag.name, inherited: passedDown });
+  }
 }

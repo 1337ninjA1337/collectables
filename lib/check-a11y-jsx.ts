@@ -1,4 +1,4 @@
-import { closeTagIndex, openTagEnd } from "@/lib/jsx-open-tag";
+import { closeTagIndex, walkJsx, type WalkedJsxTag } from "@/lib/jsx-open-tag";
 import { stripComments } from "@/lib/strip-comments";
 
 /**
@@ -233,110 +233,24 @@ export function describeIconLabelFinding(
 
 const TAG = "Pressable";
 
-/** One JSX opening tag, as the scan sees it. */
-type OpenTag = {
-  readonly name: string;
-  /** Everything between the tag name and its closing `>`. */
-  readonly attrs: string;
-  /** Offset of the `<`, and of the attribute text, in the stripped source. */
-  readonly start: number;
-  readonly attrsAt: number;
-  /** Offset of the `>` that closed the open tag. */
-  readonly tagEnd: number;
-  readonly selfClosing: boolean;
-  /**
-   * True when some ANCESTOR of this tag hides its whole subtree on all three
-   * platforms. Such a node is already unreachable, so it needs no props of its
-   * own and asking for them would be asking for the redundant.
-   */
-  readonly coveredByAncestor: boolean;
-};
-
 /**
- * Every JSX opening tag in a stripped source, in order.
+ * Every JSX opening tag in a stripped source, in order, with the one thing
+ * these rules inherit: whether an ANCESTOR has hidden this whole subtree on
+ * all three platforms. Such a node is already unreachable, so it needs no
+ * props of its own and asking for them would be asking for the redundant.
  *
- * One walk for both rules: the label rules care only about `<Pressable>` and
- * the paired-hiding rule applies to every element, and running two scanners
- * over one file would be two chances to disagree about where a tag ends —
- * which is the thing that was hard to get right here.
- *
- * `<` followed by a letter is the whole tag test. A bare `<` in an expression
- * (`a < b`) is followed by a space in every formatting this repository uses,
- * and a fragment `<>` has no name. A `<` that turns out not to open a tag
- * costs a fruitless brace walk and no finding, because every rule below
- * requires a named attribute.
- *
- * Closing tags are read too, for one reason: hiding is INHERITED. A node
- * inside a subtree its parent hides is already unreachable, so the rules have
- * to know where that parent's subtree ends, and that means a stack rather
- * than a flat scan. `</>` closes a fragment and matches no name, so it is
- * skipped along with the `<>` that opened it — a fragment cannot carry props
- * and so can never be the ancestor that hides anything.
- *
- * An unmatched close tag pops down to its name if the name is open, and is
- * ignored otherwise. Both are the forgiving choice: this scanner reads files
- * mid-edit, and a stack that threw would turn a lint run into a crash.
+ * THE WALK ITSELF IS `lib/jsx-open-tag.ts`'s NOW, and that module's header
+ * says why the old sentence there ("the guard's tag-stack walk stays here, it
+ * is a rule about that guard's domain rather than a primitive") stopped being
+ * true: a second copy grew in the suites, and both had the same render-prop
+ * hole. What stays here is the only part that is about accessibility — what
+ * gets passed down.
  */
-function* openTags(
-  code: string,
-  from = 0,
-  to = code.length,
-  coveredSeed = false,
-): Generator<OpenTag> {
-  /** Open ancestors, innermost last; `covered` is inherited then widened. */
-  const stack: { name: string; covered: boolean }[] = [];
-  let cursor = from;
-  while (cursor < to) {
-    const start = code.indexOf("<", cursor);
-    if (start === -1 || start >= to) return;
-    const closeMatch = /^<\/([A-Za-z][A-Za-z0-9_.]*)\s*>/.exec(code.slice(start));
-    if (closeMatch) {
-      const depth = stack.map((f) => f.name).lastIndexOf(closeMatch[1]);
-      if (depth !== -1) stack.length = depth;
-      cursor = start + closeMatch[0].length;
-      continue;
-    }
-    const nameMatch = /^<([A-Za-z][A-Za-z0-9_.]*)/.exec(code.slice(start));
-    if (!nameMatch) {
-      cursor = start + 1;
-      continue;
-    }
-    const attrsAt = start + nameMatch[0].length;
-    const tagEnd = openTagEnd(code, attrsAt);
-    if (tagEnd === -1 || tagEnd > to) return;
-    cursor = tagEnd + 1;
-    const attrs = code.slice(attrsAt, tagEnd);
-    const selfClosing = code[tagEnd - 1] === "/";
-    const coveredByAncestor = stack.length > 0 ? stack[stack.length - 1].covered : coveredSeed;
-    yield {
-      name: nameMatch[1],
-      attrs,
-      start,
-      attrsAt,
-      tagEnd,
-      selfClosing,
-      coveredByAncestor,
-    };
-    // A RENDER PROP'S JSX LIVES INSIDE THE OPEN TAG, and the first version of
-    // this walk stepped over all of it: `openTagEnd` correctly reports the end
-    // of `<SwipeTabs … renderTab={(key) => (<View>…</View>)} />`, and the
-    // cursor resumed there — sixty lines and a screenful of `<Pressable>`s
-    // later. Every rule below was blind to them, in every file that renders
-    // through a prop rather than through children.
-    //
-    // The seed carries the hide down: a render prop's children are inside the
-    // element that hides them, so an ancestor that took the subtree takes
-    // these too.
-    if (attrs.includes("<")) {
-      yield* openTags(code, attrsAt, tagEnd, coveredByAncestor || hidesSubtree(attrs));
-    }
-    if (!selfClosing) {
-      stack.push({
-        name: nameMatch[1],
-        covered: coveredByAncestor || hidesSubtree(attrs),
-      });
-    }
-  }
+function* openTags(code: string): Generator<WalkedJsxTag<boolean>> {
+  yield* walkJsx(code, {
+    seed: false,
+    inherit: (tag, covered) => covered || hidesSubtree(tag.attrs),
+  });
 }
 
 /**
@@ -412,12 +326,14 @@ export function findUnlabeledIconButtons(file: string, source: string): IconLabe
   };
   for (const tag of openTags(code)) {
     const { attrs, attrsAt, start } = tag;
+    // What an ancestor hid, spelled at its one reader rather than at eight.
+    const coveredByAncestor = tag.inherited;
     const missing = HIDE_PLATFORMS.filter((platform) => !HIDDEN_BY[platform].test(attrs));
     // A node hidden everywhere is done; one hidden nowhere never asked to be.
     // Everything between is a hide that stops at a platform boundary — unless
     // an ancestor already took the whole subtree, in which case this node is
     // unreachable however many props it happens to carry.
-    if (!tag.coveredByAncestor && missing.length > 0 && missing.length < HIDE_PLATFORMS.length) {
+    if (!coveredByAncestor && missing.length > 0 && missing.length < HIDE_PLATFORMS.length) {
       findings.push({
         file,
         line: at(start),
@@ -431,7 +347,7 @@ export function findUnlabeledIconButtons(file: string, source: string): IconLabe
     // to until somebody does.
     if (
       `<${tag.name}` === ICON_ELEMENT &&
-      !tag.coveredByAncestor &&
+      !coveredByAncestor &&
       missing.length > 0 &&
       !attrs.includes("accessibilityLabel")
     ) {

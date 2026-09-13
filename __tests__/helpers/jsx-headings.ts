@@ -8,14 +8,18 @@
  * landmark of its own and a screen has its route, and the modal rule allows
  * exemptions where the screen one has nothing to exempt — but they are the
  * same question about the same JSX, and the hard part is shared: finding where
- * an open tag ENDS. The obvious `/<Text([\s\S]*?)>/` stops at the first `>`
- * inside an arrow function, and "inside a modal" is a question about
- * ANCESTORS, which needs a tag stack rather than a regex. `check-a11y-jsx`
- * reaches for `lib/jsx-open-tag` for exactly this reason, and a second copy of
- * a tag stack is the copy that drifts.
+ * an open tag ENDS, and answering "is this inside a `<Modal>`", which is a
+ * question about ANCESTORS and needs a tag stack rather than a regex.
+ *
+ * BOTH ARE `lib/jsx-open-tag.ts`'s `walkJsx` NOW. This file kept its own copy
+ * of that walk for an hour, which was long enough for the copy to be found
+ * carrying the same render-prop bug as the guard's — a copy of a tag stack is
+ * the copy that drifts, and this one drifted before it was a day old. What
+ * stays here is the only part that is about headings: a `<Modal>` is what
+ * descendants inherit.
  */
 
-import { openTagEnd } from "@/lib/jsx-open-tag";
+import { walkJsx } from "@/lib/jsx-open-tag";
 import { stripComments } from "@/lib/strip-comments";
 
 import { sourceCode } from "./source-files";
@@ -46,76 +50,20 @@ export function isHeader(text: HeadingText): boolean {
 export function headingTexts(file: string, styleMatcher: RegExp): HeadingText[] {
   const code = stripComments(sourceCode(file));
   const found: HeadingText[] = [];
-  scan(code, 0, code.length, false, { file, styleMatcher, found });
-  // Children of a render prop are collected while their parent tag is being
+  for (const tag of walkJsx(code, {
+    seed: false,
+    inherit: (candidate, inModal) => inModal || candidate.name === "Modal",
+  })) {
+    if (tag.name !== "Text" || !styleMatcher.test(tag.attrs)) continue;
+    found.push({
+      file,
+      line: code.slice(0, tag.start).split("\n").length,
+      attrs: tag.attrs,
+      inModal: tag.inherited,
+    });
+  }
+  // Children of a render prop are yielded while their parent tag is being
   // read, so the raw order is not the file's order — and an offender list is
   // read as one.
   return found.sort((a, b) => a.line - b.line);
-}
-
-type ScanContext = {
-  readonly file: string;
-  readonly styleMatcher: RegExp;
-  readonly found: HeadingText[];
-};
-
-/**
- * One JSX range, with a tag stack.
- *
- * `inModalSeed` is what the range's OUTERMOST element is already nested in,
- * which matters only for the recursive call below.
- */
-function scan(
-  code: string,
-  from: number,
-  to: number,
-  inModalSeed: boolean,
-  context: ScanContext,
-): void {
-  const stack: { name: string; inModal: boolean }[] = [];
-  let cursor = from;
-  while (cursor < to) {
-    const start = code.indexOf("<", cursor);
-    if (start === -1 || start >= to) break;
-    const close = /^<\/([A-Za-z][A-Za-z0-9_.]*)\s*>/.exec(code.slice(start));
-    if (close) {
-      const depth = stack.map((frame) => frame.name).lastIndexOf(close[1]);
-      if (depth !== -1) stack.length = depth;
-      cursor = start + close[0].length;
-      continue;
-    }
-    const name = /^<([A-Za-z][A-Za-z0-9_.]*)/.exec(code.slice(start));
-    if (!name) {
-      cursor = start + 1;
-      continue;
-    }
-    const attrsAt = start + name[0].length;
-    const tagEnd = openTagEnd(code, attrsAt);
-    if (tagEnd === -1 || tagEnd > to) break;
-    cursor = tagEnd + 1;
-    const attrs = code.slice(attrsAt, tagEnd);
-    const inModal = stack.length > 0 ? stack[stack.length - 1].inModal : inModalSeed;
-    if (name[1] === "Text" && context.styleMatcher.test(attrs)) {
-      context.found.push({
-        file: context.file,
-        line: code.slice(0, start).split("\n").length,
-        attrs,
-        inModal,
-      });
-    }
-    // A RENDER PROP CARRIES JSX INSIDE THE OPEN TAG, and the first version of
-    // this walk stepped straight over it: `openTagEnd` correctly reports the
-    // end of `<SwipeTabs … renderTab={(key) => (<View>…</View>)} />`, which is
-    // sixty lines and two section headings later. `app/friends.tsx` renders
-    // both of its tab panels that way, so the rule read the file as having
-    // nothing to say about — the quietest way a sweep can be wrong.
-    if (attrs.includes("<")) {
-      scan(code, attrsAt, tagEnd, inModal || name[1] === "Modal", context);
-    }
-    // A self-closing tag opens nothing, so it never becomes an ancestor.
-    const selfClosing = code[tagEnd - 1] === "/";
-    if (!selfClosing) {
-      stack.push({ name: name[1], inModal: inModal || name[1] === "Modal" });
-    }
-  }
 }
