@@ -135,6 +135,11 @@ describe("the near-floor warning", () => {
     assert.match(report, /the next ordinary diff will not/);
     assert.match(report, /Re-measure and re-argue/);
     assert.match(report, /not against comfort/);
+    // And it names the tool that answers the question the argument asks. Five
+    // raises were argued from a total and a date because nothing could say
+    // what was IN the bundle; leaving that in a doc block would mean only a
+    // reader who already knew ever runs it.
+    assert.match(report, /npm run bundle:composition/);
   });
 
   it("stays out of a healthy report except for the drift line", () => {

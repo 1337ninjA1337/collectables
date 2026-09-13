@@ -17,6 +17,19 @@
  * never a figure to subtract from the bundle total, and the report labels it
  * that way rather than leaving the reader to assume.
  *
+ * **The ratio has now been measured once, and the proxy UNDER-states.** This
+ * module has asked since it was written whether the delta it prints tracks the
+ * bundle's, and `npm run bundle:composition` can answer: at the 2026-09-12
+ * measurement `lib/i18n-context.tsx` is 314.0 KiB of the entry chunk against
+ * 238.1 KiB of source — the heaviest single module in the bundle, ahead of
+ * `react-dom`. The reason is that Metro escapes every non-ASCII character as
+ * `\uXXXX`, so a Cyrillic letter that is two bytes here is SIX there, while
+ * the types and comments this file counts are stripped. A new key in six
+ * languages therefore costs the bundle rather more than this measure reports,
+ * which is the safe direction for a number used to decide whether to raise a
+ * budget, and it is a ratio rather than a constant: an English-only key
+ * measures nearly one to one.
+ *
  * Pure and node-safe: it takes source text somebody else read, the same split
  * `lib/i18n-coverage.ts` has from `lib/i18n-source.ts`.
  */

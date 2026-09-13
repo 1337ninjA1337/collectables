@@ -80,6 +80,14 @@
  * indefinitely; what it cannot do is climb FASTER, so a round that needs more
  * than ~30 KiB of room has to make the bundle smaller instead.
  *
+ * The SIXTH raise has something the first five did not: `npm run
+ * bundle:composition` prints what the bundle is made of, per package and per
+ * module, from the export's own sourcemap. Every paragraph above argues from
+ * a total and a date because that is all anybody could measure; the next one
+ * can name what grew. `lib/bundle-composition.ts` is the arithmetic and says
+ * what a per-module number is not — a bucket's bytes are what it contributed,
+ * never what removing it would return.
+ *
  * Raising this is a decision to be argued, not a step in fixing a red build:
  * `bundle-size.test.ts` asserts the headroom stays under the smaller SDK, so a
  * raise that gives up the guard fails there instead of passing quietly.
@@ -234,6 +242,13 @@ export function formatBundleSizeReport(
       "Re-measure and re-argue the budget in lib/bundle-size.ts rather than",
       "rounding it up until the build goes green; the headroom is chosen against",
       "the smallest SDK the gate has to catch, not against comfort.",
+      // The argument wants to know what is IN the bundle, and for five raises
+      // nothing could say. This is the moment somebody needs it, so it is the
+      // moment the report names the tool rather than leaving it in a doc block
+      // they would have to already know to open.
+      "`npm run build:sourcemaps && npm run bundle:composition` says what the",
+      "bundle is made of, per package and per module — the input this argument",
+      "has never had.",
     );
   }
   return lines.join("\n");

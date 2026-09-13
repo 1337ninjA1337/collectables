@@ -55,6 +55,8 @@
     "verify": "npm run lint:ci && npm run lint:audit-baseline && npm run build && npm run verify:dist",
     "postinstall": "npx expo install --check || true",
     "build": "npx expo export --platform web && tsx scripts/build-spa-fallback.ts",
+    "build:sourcemaps": "npx expo export --platform web --source-maps --clear && tsx scripts/build-spa-fallback.ts",
+    "bundle:composition": "tsx scripts/report-bundle-composition.ts",
     "deploy": "cross-env-shell 'set -a && [ -f .env ] && . ./.env; set +a && EXPO_PUBLIC_APP_URL=https://1337ninja1337.github.io/collectables npx expo export --platform web --clear && tsx scripts/build-spa-fallback.ts && touch dist/.nojekyll && echo > dist/.gitignore && npx gh-pages -d dist --dotfiles'"
   },
   "dependencies": {

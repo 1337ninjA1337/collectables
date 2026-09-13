@@ -41,6 +41,13 @@ npm run verify:dist # the four guards that read dist/ (needs a build first)
 npm run verify     # lint:ci → build → verify:dist, the full gate — run THIS before committing
 ```
 
+Reports, which gate nothing and are run when a question comes up:
+
+```bash
+npm run build:sourcemaps   # the same web export WITH sourcemaps (the deploy strips them)
+npm run bundle:composition # what the bundle is made of, per package and per module
+```
+
 `npm run verify` is the single command to run before every commit. It chains
 the NINE steps CI runs (typecheck → lint:all → test → audit baseline → build
 → bundle secrets → bundle size → bundle smoke → ships-to-client) in the same order, fail-fast, so a green

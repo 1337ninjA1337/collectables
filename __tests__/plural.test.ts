@@ -325,7 +325,7 @@ describe("the one-versus-many rule lives in one module", () => {
    *
    * `if (n === 1) { return one; } return many;` says exactly what the ternary
    * says, over two lines, and the disclaim list above pins that as a hole. This
-   * is the measurement of how big it is: four modules in the swept tree write
+   * is the measurement of how big it is: six modules in the swept tree write
    * an `if` whose condition compares a count against 1 or 2, and not one of
    * them is an inflection.
    *
@@ -333,6 +333,8 @@ describe("the one-versus-many rule lives in one module", () => {
    *   `value.length <= 1`   — a trailing separator cannot be trimmed off ""
    *   `starts.length > 1`   — a marker that no longer identifies one section
    *   `history.length < 2`  — a budget trend needs two moves to be a trend
+   *   `values.length === 1` — a VLQ segment of one field names no source
+   *   `mapped.length > 1`   — a bundle of one chunk needs no combined total
    *
    * The fourth arrived with the budget history and is the same kind: a bounds
    * check on how many rows a claim needs, not a word being inflected. The
@@ -349,16 +351,22 @@ describe("the one-versus-many rule lives in one module", () => {
    */
   const TWO_LINE_RULE = ifReader(COUNT_COMPARISON);
 
-  it("has an if-shaped hole, and these four are what is in it", () => {
+  it("has an if-shaped hole, and these six are what is in it", () => {
     assertOnlyTheseMatch({
       rule: TWO_LINE_RULE,
       files: sourceFiles("lib", "scripts", "__tests__/helpers"),
       read: sourceCode,
       expected: [
+        // The last two arrived with the composition report and are the same
+        // kind again: a segment of one VLQ field claims no source, and a
+        // bundle of one chunk has no combined total worth printing above the
+        // per-chunk one. Neither picks a word.
+        "lib/bundle-composition.ts",
         "lib/bundle-size.ts",
         "lib/db-duplicates.ts",
         "lib/guard-root.ts",
         "lib/privacy-translated-section.ts",
+        "scripts/report-bundle-composition.ts",
       ],
       subject: "modules",
       what: "compare a count against 1 or 2 in an `if`",
