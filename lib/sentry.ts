@@ -78,6 +78,36 @@ let initErrorLogged = false;
 // this device right now", so it must not persist across restarts.
 let lastEventSentAt: string | null = null;
 
+/**
+ * Captures taken before the SDK finished loading, replayed once it has.
+ *
+ * **The window this closes got longer the day it was written.** `captureException`
+ * has always returned early while `sdk` is null, and until 2026-09-13 that was
+ * a few frames: the SDK was in the entry chunk, so `initSentry` only had to
+ * wait for the stored diagnostics flag. `components/crash-boundary.web.tsx`
+ * took the SDK off the page load — 874.4 KiB — and the wait is now a network
+ * fetch of a chunk. A crash during it is the crash most worth having: it
+ * happens while the app is still starting up.
+ *
+ * **Nothing here leaves the device before the gates it would have passed.**
+ * A buffered event is replayed only from the success path of `runInit`, which
+ * is reached only when the user has not opted out AND the config is enabled;
+ * every other path clears the queue instead. Flipping the opt-out on clears it
+ * too, so an error captured a second before the user says "no diagnostics" is
+ * dropped rather than sent.
+ *
+ * FIRST events rather than last: a runaway render loop throws the same error
+ * thousands of times, and the first few are the ones that say what broke. The
+ * cap is small for the same reason — this is a startup window, not a store.
+ */
+const PRE_INIT_BUFFER_LIMIT = 20;
+
+type BufferedCapture = { error: unknown; context?: CaptureContext };
+
+let preInitQueue: BufferedCapture[] = [];
+/** Captures the buffer refused, so the diagnostics screen can say so. */
+let preInitDropped = 0;
+
 // Rate-limit captureException to MAX_EVENTS_PER_WINDOW within RATE_LIMIT_WINDOW_MS
 // so a runaway useEffect loop or an exception in render cannot exhaust the
 // 5k/month free-tier quota in seconds.
@@ -111,6 +141,10 @@ let userOptedOut = false;
  */
 export function setSentryOptOut(optedOut: boolean): void {
   userOptedOut = optedOut;
+  // An event captured a second before the user said "no diagnostics" is not
+  // one they consented to send. The queue is memory, so dropping it here is
+  // the whole of the fix.
+  if (optedOut) clearPreInitQueue();
 }
 
 export function isSentryOptedOut(): boolean {
@@ -127,6 +161,14 @@ export function shutdownSentry(): void {
   initialised = false;
   activeConfig = null;
   pending = null;
+  // Whatever was waiting for an SDK that is now gone would otherwise be
+  // replayed into the NEXT init, which is a different session's decision.
+  clearPreInitQueue();
+}
+
+function clearPreInitQueue(): void {
+  preInitQueue = [];
+  preInitDropped = 0;
 }
 
 export async function initSentry(options: InitOptions = {}): Promise<void> {
@@ -145,6 +187,7 @@ export async function initSentry(options: InitOptions = {}): Promise<void> {
 async function runInit(options: InitOptions): Promise<void> {
   if (userOptedOut) {
     initialised = true;
+    clearPreInitQueue();
     return;
   }
   // Use the literal-access helper so Metro inlines EXPO_PUBLIC_* into the
@@ -155,6 +198,9 @@ async function runInit(options: InitOptions): Promise<void> {
   activeConfig = config;
   if (!config.enabled) {
     initialised = true;
+    // A disabled config is a decision, not a delay: nothing buffered is ever
+    // going to be sent, so it is dropped rather than held for a retry.
+    clearPreInitQueue();
     return;
   }
   try {
@@ -168,12 +214,17 @@ async function runInit(options: InitOptions): Promise<void> {
       beforeSend: makeBeforeSend(config.environment),
     });
     sdk = mod;
+    flushPreInitQueue();
   } catch (err) {
     // SDK failed to load (native bridge missing, network init, etc.) — stay
     // disabled so call sites keep no-oping instead of crashing the host app.
     // Store the cause for diagnostics and log it once (not on every retry) so
     // it isn't silently masked.
     lastInitError = err;
+    // There is no SDK to replay into and there will not be one: a failed load
+    // keeps the wrapper disabled, so holding the queue would only keep the
+    // errors reachable in memory.
+    clearPreInitQueue();
     if (!initErrorLogged) {
       initErrorLogged = true;
       console.error("[sentry] init failed", err);
@@ -217,8 +268,57 @@ export function captureException(
   context?: CaptureContext,
 ): void {
   if (userOptedOut) return;
-  if (!sdk || !activeConfig?.enabled) return;
+  if (!sdk) {
+    bufferPreInit(error, context);
+    return;
+  }
+  if (!activeConfig?.enabled) return;
   if (!rateLimitAllow()) return;
+  send(error, context);
+}
+
+/**
+ * Holds a capture taken before the SDK resolved. See
+ * {@link PRE_INIT_BUFFER_LIMIT} for why the queue exists at all, and why it
+ * keeps the first events rather than the newest.
+ *
+ * `activeConfig` is the test for "the gates have already answered": `runInit`
+ * sets it before it decides, so a config that exists and is disabled means the
+ * answer was no, and nothing is worth holding. A null one means init has not
+ * got that far — which is the window this is for.
+ */
+function bufferPreInit(error: unknown, context?: CaptureContext): void {
+  if (activeConfig && !activeConfig.enabled) return;
+  if (preInitQueue.length >= PRE_INIT_BUFFER_LIMIT) {
+    preInitDropped += 1;
+    return;
+  }
+  preInitQueue.push({ error, context });
+}
+
+/**
+ * Replays the queue into a freshly initialised SDK, oldest first.
+ *
+ * Through the same rate limiter as a live capture — the limit is about the
+ * monthly quota, and twenty events arriving in one millisecond spend it
+ * exactly as twenty arriving over a minute would. What is NOT replayed is the
+ * original timestamp: the SDK's simple capture API has nowhere to put one, so
+ * a buffered event is stamped when it is sent, and the `scope` tag is the only
+ * thing that says where it came from.
+ */
+function flushPreInitQueue(): void {
+  const queued = preInitQueue;
+  preInitQueue = [];
+  for (const item of queued) {
+    if (!rateLimitAllow()) break;
+    send(item.error, item.context);
+  }
+  preInitDropped = 0;
+}
+
+/** The one place an event is handed to the SDK. */
+function send(error: unknown, context?: CaptureContext): void {
+  if (!sdk) return;
   try {
     sdk.captureException(error, toSentryCaptureContext(context));
     lastEventSentAt = new Date().toISOString();
@@ -301,6 +401,13 @@ export type SentryStatus = {
    * token; see the invariant note on `SentryConfig` in lib/sentry-config.ts.
    */
   sourcemapsExpected: boolean;
+  /**
+   * Captures waiting for the SDK to finish loading, and captures the buffer
+   * refused because it was full. Both are zero on a session that never crashed
+   * during startup, which is nearly all of them.
+   */
+  bufferedEvents: number;
+  bufferOverflowed: number;
   reason:
     | "ready"
     | "not-initialised"
@@ -344,6 +451,8 @@ export function getSentryStatus(): SentryStatus {
     release,
     lastEventSentAt,
     sourcemapsExpected: activeConfig?.sourcemapsExpected ?? false,
+    bufferedEvents: preInitQueue.length,
+    bufferOverflowed: preInitDropped,
     reason,
   };
 }
@@ -394,6 +503,7 @@ export function __resetSentryForTests(): void {
   lastEventSentAt = null;
   rateLimiter.reset();
   userOptedOut = false;
+  clearPreInitQueue();
 }
 
 export function __resetSentryRateLimitForTests(): void {

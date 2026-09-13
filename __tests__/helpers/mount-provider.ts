@@ -219,6 +219,8 @@ const INERT_SENTRY_STATUS: SentryStatus = {
   release: null,
   lastEventSentAt: null,
   sourcemapsExpected: false,
+  bufferedEvents: 0,
+  bufferOverflowed: 0,
   reason: "not-initialised",
 };
 
