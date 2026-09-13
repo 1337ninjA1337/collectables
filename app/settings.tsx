@@ -352,6 +352,14 @@ export default function SettingsScreen() {
         selectedCode={
           currencySheetTarget === "entry" ? (entryCurrency ?? displayCurrency) : displayCurrency
         }
+        // One sheet, two questions — so it says which one it is asking. The
+        // checkmark was the only difference between them, and a row that is
+        // already selected reads as an answer rather than as a heading.
+        title={
+          currencySheetTarget === "entry"
+            ? t("currencySelectEntryTitle")
+            : t("currencySelectDisplayTitle")
+        }
         query={currencyQuery}
         onQueryChange={setCurrencyQuery}
         onSelect={handleSelectCurrency}

@@ -133,6 +133,8 @@ export const de: TranslationMap = {
   collectionCoverLabel: "Titelbild der Sammlung",
   currencyLabel: "Währung",
   currencySelectTitle: "Währung auswählen",
+  currencySelectDisplayTitle: "Anzeigewährung",
+  currencySelectEntryTitle: "Eingabewährung",
   currencyMore: "Weitere Währungen",
   photoMoveBack: "Foto zurück verschieben",
   photoMoveForward: "Foto nach vorne verschieben",

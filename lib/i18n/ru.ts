@@ -217,6 +217,8 @@ export const ru: TranslationMap = {
   costPlaceholder: "Необязательно",
   currencyLabel: "Валюта",
   currencySelectTitle: "Выберите валюту",
+  currencySelectDisplayTitle: "Валюта отображения",
+  currencySelectEntryTitle: "Валюта ввода",
   currencyMore: "Другие валюты",
   photoMoveBack: "Переместить фото назад",
   photoMoveForward: "Переместить фото вперёд",

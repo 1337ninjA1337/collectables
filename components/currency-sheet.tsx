@@ -30,12 +30,25 @@ type CurrencySheetProps = {
   onQueryChange: (q: string) => void;
   onSelect: (code: string) => void;
   onClose: () => void;
+  /**
+   * WHICH currency is being picked, for a screen that asks more than once.
+   *
+   * Settings opens this one sheet for two different questions — what totals
+   * are shown in, and what new costs are typed in — and both arrived under
+   * "Select currency". The only thing telling them apart was which row had a
+   * checkmark, which a screen-reader user reaches last and a sighted user
+   * reads as "I already picked this". Omitted, the generic title stands: a
+   * create form has already said what the field is.
+   */
+  title?: string;
 };
 
 /**
  * Bottom-sheet currency picker shared by every screen that needs a currency
- * selector (item create, collection edit). Search-as-you-type filter, single
- * selection, ISO 4217 list sourced from `lib/currencies.ts`.
+ * selector (item create, collection edit, both settings preferences).
+ * Search-as-you-type filter, single selection, ISO 4217 list sourced from
+ * `lib/currencies.ts`. `title` names the question when one screen asks it more
+ * than once.
  */
 // HM-C4: memoized so a scroll-driven re-render of a parent screen skips the
 // hidden <Modal visible={false}> subtree — pays off wherever the six props
@@ -48,6 +61,7 @@ export const CurrencySheet = memo(function CurrencySheet({
   onQueryChange,
   onSelect,
   onClose,
+  title,
 }: CurrencySheetProps) {
   const { t } = useI18n();
   const filtered = useMemo(() => {
@@ -71,7 +85,9 @@ export const CurrencySheet = memo(function CurrencySheet({
           accessibilityRole="none"
         >
           <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>{t("currencySelectTitle")}</Text>
+          <Text style={styles.sheetTitle} accessibilityRole="header">
+            {title ?? t("currencySelectTitle")}
+          </Text>
 
           <SheetSearchRow
             value={query}

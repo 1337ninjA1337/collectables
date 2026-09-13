@@ -163,6 +163,8 @@ export const en = {
   costPlaceholder: "Optional",
   currencyLabel: "Currency",
   currencySelectTitle: "Select currency",
+  currencySelectDisplayTitle: "Display currency",
+  currencySelectEntryTitle: "Entry currency",
   currencyMore: "More currencies",
   photoMoveBack: "Move photo back",
   photoMoveForward: "Move photo forward",

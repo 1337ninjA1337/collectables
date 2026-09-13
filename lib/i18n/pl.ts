@@ -131,6 +131,8 @@ export const pl: TranslationMap = {
   collectionCoverLabel: "Okładka kolekcji",
   currencyLabel: "Waluta",
   currencySelectTitle: "Wybierz walutę",
+  currencySelectDisplayTitle: "Waluta wyświetlania",
+  currencySelectEntryTitle: "Waluta wprowadzania",
   currencyMore: "Więcej walut",
   photoMoveBack: "Przesuń zdjęcie wstecz",
   photoMoveForward: "Przesuń zdjęcie do przodu",

@@ -620,7 +620,15 @@ describe("translation floors", () => {
     // accident only. The notice became a way in ("· change", opening the same
     // picker for the entry slot) and the quiet line takes its place when the
     // two agree, where the notice itself would be a sentence about nothing.
-    assert.match(report, /en: 546\/546 keys \(100\.0%\)/);
+    // 548 on 2026-09-13: `currencySelectDisplayTitle` and
+    // `currencySelectEntryTitle`. The settings card opens ONE `<CurrencySheet>`
+    // for two preferences — what totals are shown in, what new costs are typed
+    // in — and both arrived under the generic "Select currency". The only
+    // thing separating them was which row carried a checkmark, which is the
+    // last thing a screen-reader user reaches and reads as an answer rather
+    // than as the question. The generic key stays: the screens that open the
+    // picker from a labelled field are not asking twice.
+    assert.match(report, /en: 548\/548 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",
