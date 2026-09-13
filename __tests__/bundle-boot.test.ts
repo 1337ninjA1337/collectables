@@ -438,6 +438,39 @@ describe("formatBundleBootReport", () => {
     assert.match(report, /fetched 1 chunk\(s\): entry-abc123\.js/);
   });
 
+  it("says how long the boot took to settle, when it was measured", () => {
+    // The poll has always known this number and threw it away; it is the only
+    // thing anywhere here about how long the app takes to come up.
+    const report = formatBundleBootReport(
+      "check-bundle-boot",
+      evaluateBundleBoot(healthy(), ORIGIN),
+      "home",
+      163,
+    );
+    assert.match(report, /\[home\]: settled after 163 ms\./);
+  });
+
+  it("says it gave up, on a boot that spent the deadline", () => {
+    // The difference between a rule that was never satisfied and one that
+    // broke at once — which is the question a failing report leaves a reader
+    // with.
+    const report = formatBundleBootReport(
+      "check-bundle-boot",
+      evaluateBundleBoot(healthy({ rootHtmlLength: 0 }), ORIGIN),
+      "home",
+      10_012,
+    );
+    assert.match(report, /gave up after 10012 ms\./);
+  });
+
+  it("leaves the line out when nobody measured", () => {
+    // A caller with no clock says nothing rather than reporting a zero, which
+    // would read as an instant boot.
+    const report = formatBundleBootReport("check-bundle-boot", evaluateBundleBoot(healthy(), ORIGIN));
+    assert.doesNotMatch(report, /settled after/);
+    assert.doesNotMatch(report, /gave up after/);
+  });
+
   it("lists every failure and says a red here is a broken site", () => {
     const report = formatBundleBootReport(
       "check-bundle-boot",
@@ -678,6 +711,11 @@ describe("the script around it", () => {
     assert.match(SCRIPT, /evaluateBundleBoot\(await observe\(\), origin, basePath, scenario\)/);
   });
 
+  it("times the poll and passes the number to the report", () => {
+    assert.match(SCRIPT, /const settleMs = Date\.now\(\) - startedAt;/);
+    assert.match(SCRIPT, /formatBundleBootReport\(CHECK_NAME, result, scenario\.name, settleMs\)/);
+  });
+
   it("polls for a settled boot instead of waiting a fixed time", () => {
     // The flat settle is gone: it was a number picked on one machine, and the
     // failure it was one bad connection away from is "the chunk was slow, so
@@ -685,7 +723,7 @@ describe("the script around it", () => {
     assert.doesNotMatch(SCRIPT, /const SETTLE_MS/);
     assert.doesNotMatch(SCRIPT, /setTimeout\(resolve, SETTLE_MS\)/);
     assert.match(SCRIPT, /while \(!isBootPollFinished\(result\) && Date\.now\(\) < deadline\)/);
-    assert.match(SCRIPT, /Date\.now\(\) \+ BOOT_SETTLE_DEADLINE_MS/);
+    assert.match(SCRIPT, /const deadline = startedAt \+ BOOT_SETTLE_DEADLINE_MS;/);
     assert.match(SCRIPT, /setTimeout\(resolve, BOOT_SETTLE_POLL_MS\)/);
   });
 

@@ -163,7 +163,7 @@ async function boot(
   wsUrl: string,
   scenario: BootScenario,
   basePath: string,
-): Promise<BootResult> {
+): Promise<{ result: BootResult; settleMs: number }> {
   const socket = new WebSocket(wsUrl);
   await new Promise((resolve, reject) => {
     socket.addEventListener("open", resolve, { once: true });
@@ -344,18 +344,23 @@ async function boot(
   // is stop the moment a healthy boot is healthy (a few hundred milliseconds,
   // three times over) and give a slow locale chunk the whole deadline rather
   // than a number somebody picked on one machine.
-  const deadline = Date.now() + BOOT_SETTLE_DEADLINE_MS;
+  const startedAt = Date.now();
+  const deadline = startedAt + BOOT_SETTLE_DEADLINE_MS;
   let result = evaluateBundleBoot(await observe(), origin, basePath, scenario);
   while (!isBootPollFinished(result) && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, BOOT_SETTLE_POLL_MS));
     result = evaluateBundleBoot(await observe(), origin, basePath, scenario);
   }
+  // Reported rather than discarded: it is the only number anywhere here about
+  // how long the app takes to come up, and on a failure it says whether the
+  // rule was never satisfied or broke at once.
+  const settleMs = Date.now() - startedAt;
 
   // The target goes with the socket: three scenarios would otherwise leave
   // three pages open in one browser, each still running the app it loaded.
   await send("Target.closeTarget", { targetId: target.targetId });
   socket.close();
-  return result;
+  return { result, settleMs };
 }
 
 async function main(): Promise<void> {
@@ -382,9 +387,9 @@ async function main(): Promise<void> {
     // seeded language a boot rather than a reload, and starting three browsers
     // would pay the launch three times for nothing.
     for (const scenario of BOOT_SCENARIOS) {
-      const result = await boot(server.origin, started.ws, scenario, basePath);
+      const { result, settleMs } = await boot(server.origin, started.ws, scenario, basePath);
       console[result.ok ? "log" : "error"](
-        formatBundleBootReport(CHECK_NAME, result, scenario.name),
+        formatBundleBootReport(CHECK_NAME, result, scenario.name, settleMs),
       );
       // Every scenario runs even after one fails: a run that stopped at the
       // first would cost a second build to find out whether the other two are

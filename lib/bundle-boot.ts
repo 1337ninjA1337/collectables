@@ -406,10 +406,26 @@ function firstLine(text: string): string {
   return line.length > 120 ? `${line.slice(0, 117)}…` : line;
 }
 
+/**
+ * How long the page took to settle, phrased for the line it appears on.
+ *
+ * The poll has always known this number and threw it away. It is the closest
+ * thing this repository has to "how long is the startup window" — a question
+ * three suggestion groups have asked and nothing has ever answered — and on a
+ * FAILING boot it is the difference between a rule that was never satisfied
+ * (the whole deadline) and one that broke immediately.
+ */
+function settleLine(label: string, settleMs: number | undefined, ok: boolean): string[] {
+  if (settleMs === undefined) return [];
+  const verb = ok ? "settled" : "gave up";
+  return [`${label}: ${verb} after ${String(settleMs)} ms.`];
+}
+
 export function formatBundleBootReport(
   checkName: string,
   result: BootResult,
   scenario?: string,
+  settleMs?: number,
 ): string {
   const { observation } = result;
   // The scenario name, when there is more than one boot in a run: three reports
@@ -422,6 +438,7 @@ export function formatBundleBootReport(
   if (result.ok) {
     lines.push(
       `${label}: OK — the tree mounted (${String(observation.rootHtmlLength)} characters of markup).`,
+      ...settleLine(label, settleMs, true),
       // The first line of what a human would SEE, so a boot that mounts the
       // wrong thing — an error screen, an untranslated key — is visible rather
       // than merely counted.
@@ -429,7 +446,10 @@ export function formatBundleBootReport(
     );
     return lines.join("\n");
   }
-  lines.push(`${label}: FAIL — ${String(result.failures.length)} problem(s) loading the exported app:`);
+  lines.push(
+    `${label}: FAIL — ${String(result.failures.length)} problem(s) loading the exported app:`,
+    ...settleLine(label, settleMs, false),
+  );
   for (const failure of result.failures) {
     lines.push(`  ${failure.kind}: ${failure.detail}`);
   }
