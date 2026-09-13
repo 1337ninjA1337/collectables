@@ -4,8 +4,11 @@ import { describe, it } from "node:test";
 import {
   evaluateBundleBoot,
   formatBundleBootReport,
+  isBundleRequest,
   isSameOrigin,
+  isSpaRouteRequest,
   MIN_ROOT_HTML_LENGTH,
+  toBootRequestFailure,
   type BootObservation,
 } from "../lib/bundle-boot";
 import { readRepoFile as read } from "./helpers/repo-file";
@@ -72,6 +75,35 @@ describe("what counts as a failed boot", () => {
     assert.match(result.failures[0].detail, /HTTP 404/);
   });
 
+  it("fails on a same-origin request that never got a response at all", () => {
+    // The gap this closes: a chunk that dies without a status used to be
+    // dropped, so a locale that was never served read as an empty screen
+    // rather than as "the chunk did not arrive".
+    const result = evaluateBundleBoot(
+      healthy({
+        failedRequests: [
+          {
+            url: `${ORIGIN}/collectables/_expo/static/js/web/pl-1.js`,
+            status: null,
+            errorText: "net::ERR_CONNECTION_RESET",
+          },
+        ],
+      }),
+      ORIGIN,
+    );
+    assert.equal(result.ok, false);
+    // The reason is on the line: "no response" alone reads as a slow chunk.
+    assert.match(result.failures[0].detail, /no response \(net::ERR_CONNECTION_RESET\)/);
+  });
+
+  it("says no response without a reason when Chromium gave none", () => {
+    const result = evaluateBundleBoot(
+      healthy({ failedRequests: [{ url: `${ORIGIN}/collectables/`, status: null }] }),
+      ORIGIN,
+    );
+    assert.equal(result.failures[0].detail, `no response — ${ORIGIN}/collectables/`);
+  });
+
   it("ignores a request to another origin", () => {
     // Supabase, a font host and an analytics endpoint are all unreachable from
     // a sandbox with no internet. A check that reddened on that would be a
@@ -117,6 +149,120 @@ describe("what counts as a failed boot", () => {
       result.failures.map((f) => f.kind),
       ["page error", "console error", "empty root"],
     );
+  });
+});
+
+describe("toBootRequestFailure", () => {
+  it("turns a dead request into a failure with no status and the reason", () => {
+    assert.deepEqual(
+      toBootRequestFailure({
+        url: `${ORIGIN}/collectables/_expo/static/js/web/de-1.js`,
+        errorText: "net::ERR_CONNECTION_REFUSED",
+        canceled: false,
+      }),
+      {
+        url: `${ORIGIN}/collectables/_expo/static/js/web/de-1.js`,
+        status: null,
+        errorText: "net::ERR_CONNECTION_REFUSED",
+      },
+    );
+  });
+
+  it("drops a request the page itself called off", () => {
+    // An effect that unmounted or a fetch the app aborted is ordinary React
+    // behaviour, and a check that reddened on it would be a check about
+    // strict mode.
+    assert.equal(
+      toBootRequestFailure({ url: `${ORIGIN}/x.js`, errorText: "net::ERR_ABORTED", canceled: true }),
+      null,
+    );
+  });
+
+  it("drops an abort even when the flag is not set", () => {
+    // Chromium sets `canceled` for most of them and reports only the error
+    // text for the rest; both spellings mean the same thing.
+    assert.equal(
+      toBootRequestFailure({
+        url: `${ORIGIN}/x.js`,
+        errorText: "net::ERR_ABORTED",
+        canceled: false,
+      }),
+      null,
+    );
+  });
+
+  it("drops a failure it cannot attribute to a URL", () => {
+    // The event carries a request id and nothing else. Without the sending
+    // event there is no URL, so there is no way to ask whether it was this
+    // origin — and the requests that die in a sandbox are all the other ones.
+    assert.equal(
+      toBootRequestFailure({ url: null, errorText: "net::ERR_NAME_NOT_RESOLVED", canceled: false }),
+      null,
+    );
+  });
+});
+
+describe("what the artifact under test includes", () => {
+  const BASE = "/collectables";
+
+  it("ignores the browser's own favicon probe at the domain root", () => {
+    // Chromium asks every origin for /favicon.ico whether the page mentions
+    // one or not, and this export ships none. Counting it would fail every
+    // healthy boot for something the deploy does not publish.
+    const result = evaluateBundleBoot(
+      healthy({ failedRequests: [{ url: `${ORIGIN}/favicon.ico`, status: 404 }] }),
+      ORIGIN,
+      BASE,
+    );
+    assert.equal(result.ok, true);
+  });
+
+  it("still counts a file under the base path", () => {
+    const result = evaluateBundleBoot(
+      healthy({ failedRequests: [{ url: `${ORIGIN}${BASE}/_expo/x.js`, status: 404 }] }),
+      ORIGIN,
+      BASE,
+    );
+    assert.equal(result.ok, false);
+  });
+
+  it("counts everything same-origin when the app is the whole origin", () => {
+    // `experiments.baseUrl` is empty for a deploy at a domain root, and then
+    // there is nothing above the app to belong to somebody else.
+    const result = evaluateBundleBoot(
+      healthy({ failedRequests: [{ url: `${ORIGIN}/x.js`, status: 404 }] }),
+      ORIGIN,
+      "",
+    );
+    assert.equal(result.ok, false);
+  });
+
+  it("does not match a sibling path that merely starts the same way", () => {
+    assert.equal(isBundleRequest(`${ORIGIN}/collectables-old/x.js`, ORIGIN, BASE), false);
+    assert.equal(isBundleRequest(`${ORIGIN}/collectables`, ORIGIN, BASE), true);
+    assert.equal(isBundleRequest(`${ORIGIN}/collectables/x.js`, ORIGIN, BASE), true);
+    assert.equal(isBundleRequest("https://xyz.supabase.co/collectables/x", ORIGIN, BASE), false);
+  });
+});
+
+describe("isSpaRouteRequest", () => {
+  it("treats an extensionless path as a route the shell answers", () => {
+    assert.equal(isSpaRouteRequest("/collectables/item/abc"), true);
+    assert.equal(isSpaRouteRequest("/collectables/people"), true);
+    assert.equal(isSpaRouteRequest("/"), true);
+  });
+
+  it("treats a path that asked for a file as a file", () => {
+    // The bug it fixes: serving the SPA shell for a chunk missing from dist/
+    // hands the browser HTML with a `.js` content type, and the failure
+    // arrives as a syntax error one step removed from "the file is not there".
+    assert.equal(isSpaRouteRequest("/collectables/_expo/static/js/web/pl-1.js"), false);
+    assert.equal(isSpaRouteRequest("/collectables/favicon.ico"), false);
+  });
+
+  it("looks at the last segment only", () => {
+    // A version or a locale tag in a directory name is not an extension.
+    assert.equal(isSpaRouteRequest("/collectables/v1.2/settings"), true);
   });
 });
 
@@ -195,6 +341,28 @@ describe("the script around it", () => {
     // A boot check against a stale dist/ boots yesterday's app with today's
     // confidence — the same failure `assertBundlePremise` exists for.
     assert.match(SCRIPT, /assertBundlePremise\(CHECK_NAME\)/);
+  });
+
+  it("remembers where each request was going, so a dead one has a URL", () => {
+    // `Network.loadingFailed` has a request id and no URL. Without the map,
+    // the whole class of "the chunk never arrived" was invisible.
+    assert.match(SCRIPT, /requestUrls\.set\(params\.requestId, url\)/);
+    assert.match(SCRIPT, /requestUrls\.get\(requestId\)/);
+    assert.match(SCRIPT, /toBootRequestFailure\(/);
+  });
+
+  it("judges the boot against the base path it served the app on", () => {
+    assert.match(SCRIPT, /evaluateBundleBoot\(observation, server\.origin, readBaseUrl\(\)\)/);
+  });
+
+  it("404s a file that is missing from dist/ instead of handing back the shell", () => {
+    assert.match(SCRIPT, /if \(!isSpaRouteRequest\(requested\)\) \{/);
+    assert.match(SCRIPT, /res\.writeHead\(404/);
+  });
+
+  it("reports one broken request once", () => {
+    // A request can answer 4xx and then fail; both events carry the same id.
+    assert.match(SCRIPT, /reportedRequests\.has\(requestId\)/);
   });
 
   it("lets the OS choose the port", () => {

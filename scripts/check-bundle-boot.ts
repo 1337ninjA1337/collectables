@@ -35,6 +35,8 @@ import * as path from "node:path";
 import {
   evaluateBundleBoot,
   formatBundleBootReport,
+  isSpaRouteRequest,
+  toBootRequestFailure,
   type BootRequestFailure,
 } from "../lib/bundle-boot";
 import { REPO_ROOT, assertBundlePremise } from "./bundle-premise";
@@ -89,8 +91,16 @@ function serveDist(baseUrl: string): Promise<{ origin: string; close: () => void
     if (baseUrl && requested.startsWith(baseUrl)) requested = requested.slice(baseUrl.length);
     if (requested === "" || requested === "/") requested = "/index.html";
     let file = path.join(root, requested);
-    // The SPA fallback the deploy uses: an unknown path is a route, not a 404.
     if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+      // The SPA fallback the deploy uses — for a ROUTE. A file that is missing
+      // from dist/ gets the 404 it would get in production rather than a page
+      // of HTML with a `.js` content type, which is a syntax error one step
+      // removed from the thing that is actually wrong.
+      if (!isSpaRouteRequest(requested)) {
+        res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+        res.end(`not in dist/: ${requested}`);
+        return;
+      }
       file = path.join(root, "index.html");
     }
     res.writeHead(200, {
@@ -156,6 +166,12 @@ async function boot(origin: string, wsUrl: string) {
   const consoleErrors: string[] = [];
   const failedRequests: BootRequestFailure[] = [];
   const chunksFetched: string[] = [];
+  // `Network.loadingFailed` carries a request id and no URL, so the URL has to
+  // come from the event that sent the request out. A redirect reuses the id and
+  // overwrites the entry, which is what the report wants: the hop that failed.
+  const requestUrls = new Map<string, string>();
+  // A request can both answer 4xx and then fail; it is one broken request.
+  const reportedRequests = new Set<string>();
 
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(String(event.data)) as CdpMessage & {
@@ -184,19 +200,31 @@ async function boot(origin: string, wsUrl: string) {
       case "Network.requestWillBeSent": {
         const url = String((params.request as { url?: string }).url ?? "");
         if (url.includes("/_expo/")) chunksFetched.push(url.split("/").pop() ?? url);
+        if (typeof params.requestId === "string") requestUrls.set(params.requestId, url);
         break;
       }
       case "Network.responseReceived": {
         const response = params.response as { url?: string; status?: number };
         if ((response.status ?? 200) >= 400) {
+          if (typeof params.requestId === "string") reportedRequests.add(params.requestId);
           failedRequests.push({ url: String(response.url), status: response.status ?? null });
         }
         break;
       }
       case "Network.loadingFailed": {
-        // The URL is not on this event, so it is looked up by request id in
-        // the map the sender built — kept simple here: an unnamed failure is
-        // reported against the origin only when nothing else explains it.
+        // A request that DIED — DNS, refused, reset, a server that never
+        // answered. Everything but the id is on the event; the URL comes from
+        // the map above, and the rule about which of these is the bundle's
+        // problem lives in `lib/bundle-boot.ts` where it can be tested.
+        const requestId = typeof params.requestId === "string" ? params.requestId : null;
+        if (requestId !== null && reportedRequests.has(requestId)) break;
+        if (requestId !== null) reportedRequests.add(requestId);
+        const failure = toBootRequestFailure({
+          url: requestId === null ? null : (requestUrls.get(requestId) ?? null),
+          errorText: String(params.errorText ?? "unknown network error"),
+          canceled: params.canceled === true,
+        });
+        if (failure) failedRequests.push(failure);
         break;
       }
       default:
@@ -290,7 +318,7 @@ async function main(): Promise<void> {
     const started = await startBrowser(executable);
     browser = started.child;
     const observation = await boot(server.origin, started.ws);
-    const result = evaluateBundleBoot(observation, server.origin);
+    const result = evaluateBundleBoot(observation, server.origin, readBaseUrl());
     console[result.ok ? "log" : "error"](formatBundleBootReport(CHECK_NAME, result));
     if (!result.ok) process.exitCode = 1;
   } finally {
