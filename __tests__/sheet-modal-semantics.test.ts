@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { attributeValue, openTagAt } from "@/lib/jsx-open-tag";
+import { attributeValue, closeTagIndex, openTagAt, walkJsx } from "@/lib/jsx-open-tag";
 
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 
@@ -43,17 +43,25 @@ import { sourceCode, sourceFiles } from "./helpers/source-files";
  */
 const OPT_OUT = /accessibilityRole="none"/g;
 
-/** Byte ranges covered by a `<Modal …>…</Modal>` element, in one source. */
+/**
+ * Byte ranges covered by a `<Modal …>…</Modal>` element, in one source.
+ *
+ * The third hand-rolled JSX walk in this repository until this round, and the
+ * one with an assumption written into it: `code.indexOf("</Modal>")` after
+ * each `<Modal`, correct only because these sheets do not nest. `walkJsx`
+ * finds the tags and `closeTagIndex` counts depth, so nesting is handled
+ * rather than documented — and a `<Modal>` rendered through a render prop is
+ * found at all, which the `indexOf` version managed only by accident of the
+ * open tag being searched for separately.
+ */
 function modalSpans(code: string): { start: number; end: number }[] {
   const spans: { start: number; end: number }[] = [];
-  const opens = [...code.matchAll(/<Modal[\s>]/g)].map((m) => m.index!);
-  for (const start of opens) {
-    // These do not nest anywhere in this tree, so the next close is this
-    // element's close. A nested one would make the span too small, which fails
-    // closed rather than open — the assertion below would report a sandwich as
-    // outside a Modal, not wave one through.
-    const end = code.indexOf("</Modal>", start);
-    if (end !== -1) spans.push({ start, end });
+  for (const tag of walkJsx(code, { seed: null, inherit: () => null })) {
+    // A self-closing `<Modal />` covers nothing, and asking for its close tag
+    // would find the next sheet's.
+    if (tag.name !== "Modal" || tag.selfClosing) continue;
+    const end = closeTagIndex(code, tag.tagEnd + 1, "Modal");
+    if (end !== -1) spans.push({ start: tag.start, end });
   }
   return spans;
 }
@@ -173,5 +181,44 @@ describe("every sheet sandwich is inside a Modal", () => {
       [],
       "accessibilityViewIsModal on a sheet already inside <Modal> is redundant — iOS presents a separate view controller, Android a Dialog, and react-native-web sets aria-modal with a focus trap",
     );
+  });
+});
+
+describe("the span reader itself", () => {
+  /**
+   * What the `indexOf("</Modal>")` version got away with.
+   *
+   * Its own comment said so: "these do not nest anywhere in this tree, so the
+   * next close is this element's close", with the note that a nested one would
+   * make the span too small and so fail closed. Failing closed is the right
+   * choice for an assumption; not needing one is better, and the shared walk
+   * plus a depth-counted close is what removes it.
+   */
+  it("gives a nested pair two spans, the outer one covering both", () => {
+    const code = `<Modal a><View><Modal b><Text>x</Text></Modal></View></Modal>`;
+    const spans = modalSpans(code);
+    assert.equal(spans.length, 2);
+    const [outer, inner] = spans;
+    assert.equal(outer.start, 0);
+    assert.ok(inner.start > outer.start && inner.end < outer.end);
+    // The old reader ended the OUTER span at the inner's close tag, so
+    // anything between them read as outside a Modal.
+    assert.ok(code.indexOf("</Modal>") < outer.end);
+  });
+
+  it("counts a self-closing Modal as covering nothing", () => {
+    // Asking for its close tag would find the NEXT sheet's, which is a span
+    // that swallows the code between two unrelated modals.
+    assert.deepEqual(modalSpans(`<Modal /><Text>x</Text>`), []);
+  });
+
+  it("finds a Modal rendered through a prop", () => {
+    const spans = modalSpans(`<Host render={() => (<Modal><Text>x</Text></Modal>)} />`);
+    assert.equal(spans.length, 1);
+  });
+
+  it("says nothing about a Modal whose close tag is missing", () => {
+    // These files are read mid-edit; a half-typed sheet is not a finding.
+    assert.deepEqual(modalSpans(`<Modal><Text>x</Text>`), []);
   });
 });
