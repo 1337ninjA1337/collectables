@@ -39,11 +39,8 @@ import {
 } from "@/lib/design-tokens";
 import { getAnalyticsEventCatalog } from "@/lib/analytics";
 import { isDevEnvironment } from "@/lib/dev-menu";
-import {
-  clearEntryCurrency,
-  getEntryCurrency,
-  setEntryCurrency,
-} from "@/lib/locale-helpers";
+import { clearEntryCurrency, setEntryCurrency } from "@/lib/locale-helpers";
+import { useEntryCurrency } from "@/lib/use-entry-currency";
 import { useDiagnostics } from "@/lib/diagnostics-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
 import { getSentryStatus } from "@/lib/sentry";
@@ -104,11 +101,13 @@ export default function SettingsScreen() {
   // Read as its own state rather than through the provider, because the
   // provider owns the DISPLAY currency and adding the entry one to it would
   // re-render every total on a change that cannot affect any of them.
-  const [entryCurrency, setEntryCurrencyState] = useState<string | null>(null);
-  const loadEntryCurrency = useCallback(() => {
-    void getEntryCurrency().then(setEntryCurrencyState);
-  }, []);
-  useEffect(loadEntryCurrency, [loadEntryCurrency]);
+  //
+  // Through the hook rather than a read on mount: this screen and the two cost
+  // forms all read one slot, and a stack keeps the others mounted while this
+  // one is open. The hook re-reads on every write, so a currency picked here
+  // reaches the add sheet sitting underneath rather than waiting for it to
+  // remount.
+  const entryCurrency = useEntryCurrency();
 
   const openCurrencySheet = useCallback((target: "display" | "entry") => {
     // The query is cleared on the way IN rather than on close, so a sheet
@@ -122,24 +121,24 @@ export default function SettingsScreen() {
   const handleSelectCurrency = useCallback(
     (code: string) => {
       if (currencySheetTarget === "entry") {
-        // Re-read rather than assume: the slot is written and the state is
-        // whatever the read answers, which is the same reason the clear
-        // re-reads.
-        void setEntryCurrency(code).then(loadEntryCurrency);
+        // No `.then(reload)`: the write notifies every reader of the slot and
+        // this screen is one of them. Re-reading here as well would be a
+        // second answer to a question already being asked.
+        void setEntryCurrency(code);
       } else {
         setDisplayCurrency(code);
       }
       setCurrencySheetOpen(false);
     },
-    [currencySheetTarget, loadEntryCurrency, setDisplayCurrency],
+    [currencySheetTarget, setDisplayCurrency],
   );
 
   const handleUseDisplayCurrency = useCallback(() => {
     // Clearing, not writing `displayCurrency` into the slot: the empty state
     // means "follow the display currency", so writing today's value would pin
     // the forms to it and silently stop following a later change.
-    void clearEntryCurrency().then(loadEntryCurrency);
-  }, [loadEntryCurrency]);
+    void clearEntryCurrency();
+  }, []);
 
   async function handleRefreshRates() {
     if (refreshingRates) return;

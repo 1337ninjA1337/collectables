@@ -24,9 +24,9 @@ import { installNativeModuleStubs, mockModule } from "./render";
  *
  * It does not mount anything (`use-persisted-blob.test.ts` needs a React
  * render and a spy that RECORDS writes in order, which is a different
- * fixture), and it does not stub `removeItem`, `multiSet` or `getAllKeys` —
- * an unused branch is an untested one, and the module that needs the first of
- * those can add it with the case that reads it.
+ * fixture), and it does not stub `multiSet` or `getAllKeys` — an
+ * unused branch is an untested one, and the module that needs one of those can
+ * add it with the case that reads it. `removeItem` arrived that way.
  *
  * ## One per process
  *
@@ -50,6 +50,15 @@ export interface StorageSpy {
   readError: Error | null;
   /** Non-null makes every `setItem` reject with it. */
   writeError: Error | null;
+  /**
+   * Non-null makes every `removeItem` reject with it.
+   *
+   * Its own field rather than sharing {@link writeError}: a store that refuses
+   * writes and a store that refuses deletes are different failures, and the
+   * one case that needs this — `clearEntryCurrency`, the first `removeItem` in
+   * `STORAGE_FAILURE_SITES` — is specifically about the delete arm.
+   */
+  removeError: Error | null;
   /** Clears the store, both failures, the reports AND the session budget. */
   reset(): Promise<void>;
   /** The `scope` of each report, in order — a `deepEqual` subject. */
@@ -81,11 +90,13 @@ export function installStorageSpy(): StorageSpy {
     captured,
     readError: null,
     writeError: null,
+    removeError: null,
     async reset() {
       store.clear();
       captured.length = 0;
       spy.readError = null;
       spy.writeError = null;
+      spy.removeError = null;
       // The budget is module scope in `report-storage-failure` and survives
       // between cases in one process, so a suite that did not clear it would
       // see its second case report nothing and read that as a passing bound.
@@ -104,6 +115,13 @@ export function installStorageSpy(): StorageSpy {
       setItem: async (key: string, value: string) => {
         if (spy.writeError) throw spy.writeError;
         store.set(key, value);
+      },
+      // Added with `entry-currency-live.test.ts`, which is what the note below
+      // about "an unused branch is an untested one" asks for: the module that
+      // needs a verb adds it alongside the case that reads it.
+      removeItem: async (key: string) => {
+        if (spy.removeError) throw spy.removeError;
+        store.delete(key);
       },
     },
   });

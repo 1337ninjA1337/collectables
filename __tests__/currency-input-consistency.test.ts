@@ -117,8 +117,13 @@ describe("every screen with a cost input", () => {
         code.includes("getDefaultCurrencyForLanguage("),
         `${file} has no language-derived default to fall back to`,
       );
+      // Either spelling of the same read. `useEntryCurrencyEffect` IS
+      // `getEntryCurrency`, plus the subscription that keeps the answer
+      // current while the screen stays mounted — the three readers of this
+      // slot each had their own mount-time read, and a stack keeps two of
+      // them alive while the third is being used.
       assert.ok(
-        code.includes("getEntryCurrency("),
+        code.includes("getEntryCurrency(") || code.includes("useEntryCurrencyEffect("),
         `${file} ignores the stored preference and opens on the language default`,
       );
     });

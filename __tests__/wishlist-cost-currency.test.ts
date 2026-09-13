@@ -119,20 +119,29 @@ describe("what the save writes", () => {
     // The helper it names changed the round after: one slot held both "what a
     // form opens with" and "what totals are displayed in", so all three forms
     // write `setEntryCurrency` now. See `entry-currency-key.test.ts`.
-    assert.ok(BODY.includes("getEntryCurrency"), "the entry currency is not read");
+    //
+    // And the read is the hook as of 2026-09-13: four screens held their own
+    // mount-time `getEntryCurrency()` and a stack keeps three of them mounted
+    // while the fourth is in use, so a currency picked in settings did not
+    // reach this sheet until it remounted.
+    assert.ok(
+      BODY.includes("useEntryCurrencyEffect"),
+      "the entry currency is not read",
+    );
     assert.ok(BODY.includes("setEntryCurrency"), "the entry currency is not written");
     assert.match(BODY, /function setCurrency\(next: string\) \{\s*setCurrencyState\(next\);\s*void setEntryCurrency\(next\);\s*\}/);
   });
 
   it("hydrates through the raw setter, not the writing one", () => {
     // Writing back what was just read is a round-trip that can only ever
-    // re-persist the value it came from.
-    const effect = BODY.slice(
-      BODY.indexOf("void getEntryCurrency()"),
-      BODY.indexOf("const [promoteFor"),
+    // re-persist the value it came from — so the hook is handed
+    // `setCurrencyState` and not `setCurrency`, which would persist every
+    // value it was told about, including the one it was just told BY storage.
+    assert.match(BODY, /useEntryCurrencyEffect\(setCurrencyState\)/);
+    assert.ok(
+      !BODY.includes("useEntryCurrencyEffect(setCurrency)"),
+      "hydration re-persists what it read",
     );
-    assert.ok(effect.length > 0, "could not parse the hydration effect");
-    assert.ok(effect.includes("setCurrencyState(stored)"), "hydration re-persists what it read");
   });
 
   it("keeps the currency across a reset and clears everything else", () => {

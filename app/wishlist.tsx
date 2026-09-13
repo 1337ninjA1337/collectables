@@ -66,7 +66,8 @@ import {
   type CurrencyValueError,
 } from "@/lib/format-currency-input";
 import { useI18n } from "@/lib/i18n-context";
-import { getEntryCurrency, setEntryCurrency } from "@/lib/locale-helpers";
+import { setEntryCurrency } from "@/lib/locale-helpers";
+import { useEntryCurrencyEffect } from "@/lib/use-entry-currency";
 import { useMarketplace } from "@/lib/marketplace-context";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
@@ -142,20 +143,14 @@ export default function WishlistScreen() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    void getEntryCurrency().then((stored) => {
-      if (cancelled || !stored) return;
-      // The RAW setter: hydration is not a choice, and writing back what was
-      // just read is a round-trip through storage that can only ever
-      // re-persist the value it came from. `app/item/[id].tsx`'s hydration
-      // effect reaches for its raw setter for the same reason.
-      setCurrencyState(stored);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // The RAW setter, not `setCurrency`: hydration is not a choice, and writing
+  // back what was just read is a round-trip through storage that can only ever
+  // re-persist the value it came from. `app/item/[id].tsx`'s hydration effect
+  // reaches for its raw setter for the same reason.
+  //
+  // Through the hook, so the sheet also follows a currency chosen in settings
+  // while this screen sat mounted under it.
+  useEntryCurrencyEffect(setCurrencyState);
 
   const [promoteFor, setPromoteFor] = useState<CollectableItem | null>(null);
 

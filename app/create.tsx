@@ -22,10 +22,10 @@ import {
 import { useI18n } from "@/lib/i18n-context";
 import {
   getDefaultCurrencyForLanguage,
-  getEntryCurrency,
   setEntryCurrency,
 } from "@/lib/locale-helpers";
 import { addTagToList } from "@/lib/tag-input";
+import { useEntryCurrencyEffect } from "@/lib/use-entry-currency";
 import { useToast } from "@/lib/toast-context";
 import { ItemCondition, ItemTag } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -86,16 +86,11 @@ export default function CreateItemScreen() {
   const [costError, setCostError] = useState<CurrencyValueError | null>(null);
   const [currency, setCurrencyState] = useState(() => getDefaultCurrencyForLanguage(language));
 
-  useEffect(() => {
-    let cancelled = false;
-    void getEntryCurrency().then((stored) => {
-      if (cancelled || !stored) return;
-      setCurrencyState(stored);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Seeded from the stored preference, and kept in step with it: the slot is
+  // read on mount and re-read whenever anything writes it, so a currency
+  // chosen in settings reaches this form even though the stack left it
+  // mounted underneath.
+  useEntryCurrencyEffect(setCurrencyState);
 
   function setCurrency(next: string) {
     setCurrencyState(next);

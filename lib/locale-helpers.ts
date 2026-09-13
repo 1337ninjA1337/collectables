@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { notifyEntryCurrencyChanged } from "@/lib/entry-currency-store";
 import { reportStorageFailure } from "@/lib/report-storage-failure";
 import {
   CURRENCY_KEY,
@@ -239,7 +240,18 @@ export async function setUserPreferredCurrency(currency: string): Promise<void> 
     // user's choice is applied and silently forgotten by the next launch,
     // which is the kind of thing nobody reports as a bug.
     reportStorageFailure("locale-helpers.setItem", CURRENCY_KEY, error);
+    return;
   }
+  // The DISPLAY slot, and still an entry-currency change for most people:
+  // `getEntryCurrency` reads through to this key whenever the entry one is
+  // empty, which is every installation that has never chosen a separate one.
+  // A mounted cost form that missed this would open in the currency the user
+  // just stopped using.
+  //
+  // OUTSIDE the try, and only after a write that landed: inside it, a
+  // listener throwing would be caught by the arm above and reported as a
+  // storage failure it had nothing to do with.
+  notifyEntryCurrencyChanged();
 }
 
 /**
@@ -290,7 +302,12 @@ export async function setEntryCurrency(currency: string): Promise<void> {
     await AsyncStorage.setItem(ENTRY_CURRENCY_KEY, validated);
   } catch (error: unknown) {
     reportStorageFailure("locale-helpers.setItem", ENTRY_CURRENCY_KEY, error);
+    return;
   }
+  // AFTER the write, so a reader that re-reads on the notification sees the
+  // value that caused it rather than the one it replaced — and only for a
+  // write that landed, because a slot that did not move has nothing to say.
+  notifyEntryCurrencyChanged();
 }
 
 /**
@@ -317,7 +334,9 @@ export async function clearEntryCurrency(): Promise<void> {
     await AsyncStorage.removeItem(ENTRY_CURRENCY_KEY);
   } catch (error: unknown) {
     reportStorageFailure("locale-helpers.removeItem", ENTRY_CURRENCY_KEY, error);
+    return;
   }
+  notifyEntryCurrencyChanged();
 }
 
 /**

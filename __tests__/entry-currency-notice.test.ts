@@ -111,7 +111,7 @@ describe("what the button does", () => {
   it("clears the slot instead of writing the display currency into it", () => {
     // Writing today's value would pin the forms to it and stop following a
     // later change to the display currency — the opposite of what it says.
-    assert.match(SETTINGS, /void clearEntryCurrency\(\)\.then\(loadEntryCurrency\)/);
+    assert.match(SETTINGS, /void clearEntryCurrency\(\);/);
     // This case used to read "settings never calls setEntryCurrency — that is
     // what a cost form does", and the pin was right about the RESET and wrong
     // about the screen: a card that explains a preference and can only clear
@@ -132,7 +132,7 @@ describe("what the button does", () => {
     const handler = SETTINGS.slice(SETTINGS.indexOf("const handleSelectCurrency"));
     const body = handler.slice(0, handler.indexOf("\n  );"));
     assert.match(body, /currencySheetTarget === "entry"/);
-    assert.match(body, /void setEntryCurrency\(code\)\.then\(loadEntryCurrency\)/);
+    assert.match(body, /void setEntryCurrency\(code\);/);
     // The display branch is the `else`, so one pick cannot write both slots.
     assert.match(body, /\} else \{\s*setDisplayCurrency\(code\);/);
   });
@@ -158,8 +158,17 @@ describe("what the button does", () => {
     // The read falls through to the display currency, so the state after a
     // clear is not null — it is whatever the fallback answers. Assuming
     // either would put the notice one render out of date.
-    assert.match(SETTINGS, /const loadEntryCurrency = useCallback\(\(\) => \{\s*void getEntryCurrency\(\)\.then\(setEntryCurrencyState\);/);
-    assert.match(SETTINGS, /useEffect\(loadEntryCurrency, \[loadEntryCurrency\]\)/);
+    //
+    // The re-read is the SUBSCRIPTION now, and the screen no longer chains a
+    // reload onto its own writes: `clearEntryCurrency` and `setEntryCurrency`
+    // notify every reader of the slot, and this screen is one of them. That
+    // is what also fixes the case this screen could not see — a cost form
+    // mounted underneath, holding a currency the user has just changed here.
+    assert.match(SETTINGS, /const entryCurrency = useEntryCurrency\(\);/);
+    assert.ok(
+      !SETTINGS.includes("getEntryCurrency("),
+      "settings still takes its own one-off read of the slot",
+    );
   });
 
   it("keeps the entry currency out of the provider", () => {

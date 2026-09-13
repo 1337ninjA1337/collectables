@@ -17,6 +17,7 @@ import {
 } from "@/lib/format-currency-input";
 import { useMinimumVisible } from "@/lib/use-minimum-visible";
 import { getEntryCurrency, setEntryCurrency } from "@/lib/locale-helpers";
+import { useEntryCurrencyEffect } from "@/lib/use-entry-currency";
 import { SkeletonItemDetail } from "@/components/skeleton";
 
 import { PhotoLightbox } from "@/components/photo-lightbox";
@@ -163,16 +164,11 @@ export default function ItemDetailsScreen() {
     setEditCurrencyState(next);
     void setEntryCurrency(next);
   }
-  useEffect(() => {
-    let cancelled = false;
-    void getEntryCurrency().then((stored) => {
-      if (cancelled || !stored) return;
-      setListingCurrencyState(stored);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // The RAW setter, because hydration is not a choice — writing back what was
+  // just read would re-persist the value it came from. Through the hook, so
+  // the sheet follows a currency chosen in settings while this screen sat
+  // mounted underneath it.
+  useEntryCurrencyEffect(setListingCurrencyState);
   const [listingNotes, setListingNotes] = useState("");
 
   useEffect(() => {

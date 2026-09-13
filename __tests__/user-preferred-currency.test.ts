@@ -101,26 +101,33 @@ describe("locale-helpers persistence wiring", () => {
 describe("forms hydrate from + persist to the entry-currency slot", () => {
   it("app/create.tsx imports the read/write pair and wires both", () => {
     const src = read("app/create.tsx");
-    assert.match(
-      src,
-      /import\s*\{[^}]*\bgetEntryCurrency\b[^}]*\}\s*from\s*"@\/lib\/locale-helpers"/,
-    );
+    // The READ is `useEntryCurrencyEffect` as of 2026-09-13 — `getEntryCurrency`
+    // plus the subscription that keeps four mounted readers of one slot in
+    // step. The write is unchanged: a form that picks a currency records it.
     assert.match(
       src,
       /import\s*\{[^}]*\bsetEntryCurrency\b[^}]*\}\s*from\s*"@\/lib\/locale-helpers"/,
     );
-    // Hydration effect on mount.
-    assert.match(src, /getEntryCurrency\(\)/);
-    // Persist on every currency selection.
+    assert.match(
+      src,
+      /import\s*\{\s*useEntryCurrencyEffect\s*\}\s*from\s*"@\/lib\/use-entry-currency"/,
+    );
+    assert.match(src, /useEntryCurrencyEffect\(setCurrencyState\)/);
     assert.match(src, /setEntryCurrency\(/);
   });
 
   it("app/item/[id].tsx (listing sheet) hydrates and persists too", () => {
     const src = read("app/item/[id].tsx");
+    // Both spellings, and this screen is the one that needs both: the listing
+    // sheet is a mounted form and takes the hook, while `enterEditMode` reads
+    // the slot ONCE, inside an event handler, to seed an edit of an item that
+    // carries no currency of its own. A subscription there would re-seed a
+    // half-finished edit from a preference the user changed elsewhere.
     assert.match(
       src,
       /import\s*\{[^}]*\bgetEntryCurrency\b[^}]*\}\s*from\s*"@\/lib\/locale-helpers"/,
     );
+    assert.match(src, /useEntryCurrencyEffect\(setListingCurrencyState\)/);
     assert.match(src, /getEntryCurrency\(\)/);
     assert.match(src, /setEntryCurrency\(/);
   });
