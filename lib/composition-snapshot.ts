@@ -36,45 +36,55 @@ import type { CompositionBaseline } from "@/lib/bundle-composition";
 // an arrival on the next run — one number, so the two halves cannot disagree.
 
 /**
- * Re-taken on 2026-09-13, after the gesture-handler root became a platform
- * pair, from a `--source-maps` export of the tree `check-bundle-size` measured
- * at 3732.1 KiB.
+ * Re-taken on 2026-09-13, after the crash shell became a platform pair, from a
+ * `--source-maps` export of the tree `check-bundle-size` measured at 3733.2
+ * KiB.
  *
- * THE PREVIOUS BASELINE IS WHY THAT ROUND HAPPENED AT ALL. It recorded
- * `react-native-reanimated` at 632.9 KiB — the largest single bucket, 13.5% of
- * everything shipped — in a web build where `components/DraggableList.web.tsx`
- * exists specifically to avoid it. The drift section then confirmed the fix in
- * one line: -963.9 KiB, with reanimated, gesture-handler, worklets, hammerjs
- * and semver all marked `(gone)`.
+ * THE BUCKETS BARELY MOVED AND THE BUNDLE CHANGED COMPLETELY, which is the
+ * finding this baseline exists to make readable. The previous one recorded the
+ * five Sentry packages at 645 KiB and called them "statically imported"; they
+ * are the same 645 KiB today and every one of them is marked `(lazy)`.
+ * `app/_layout.tsx` had imported `@sentry/react-native` at module scope for
+ * `wrap()` and `<ErrorBoundary>`, so the SDK `lib/sentry.ts` loads through a
+ * lazy `import()` was in the entry chunk anyway. Splitting the boundary into
+ * `components/crash-boundary.{tsx,web.tsx}` took the entry chunk from 3458.4
+ * to 2585.0 KiB — 874.4 KiB off every page load — and moved it into a chunk
+ * fetched when diagnostics initialise.
  *
- * `totalBytes` here is 0.3 KiB above the gate's figure, because a sourcemapped
- * export appends a `sourceMappingURL` comment to each chunk and the deploy
- * strips them. It is the right number for THIS baseline — every bucket below
- * was measured in the same build — and the wrong one to compare against the
+ * **A drift report over the buckets alone would have called that round a
+ * no-op**: +1.1 KiB total, nothing meaningful in any row. What changed is
+ * WHICH CHUNK each bucket is in, which is why the report marks `(lazy)` and
+ * `lib/bundle-size.ts` holds a floor under the bytes outside the entry chunk.
+ *
+ * `totalBytes` here is above the gate's figure, because a sourcemapped export
+ * appends a `sourceMappingURL` comment to each chunk and the deploy strips
+ * them. It is the right number for THIS baseline — every bucket below was
+ * measured in the same build — and the wrong one to compare against the
  * budget, which keeps its own figure in `lib/budget-snapshot.ts`. Compare
  * composition totals to composition totals.
  *
- * The headline facts as they stand now: the five Sentry packages are 645 KiB
- * together and statically imported, `lib/` is 552 KiB of this repository's own
- * code, and `lib/i18n-context.tsx` alone is 314 KiB — the heaviest single
- * module in the bundle, ahead of `react-dom`, because Metro escapes non-ASCII
- * as `\uXXXX` and six locales of Cyrillic cost six bytes a letter.
+ * The headline facts as they stand now: 1148.5 KiB of the bundle — the five
+ * Sentry packages and the two PostHog ones — is in chunks a page load does not
+ * fetch, `lib/` is 552 KiB of this repository's own code, and
+ * `lib/i18n-context.tsx` alone is 314 KiB, the heaviest single module in the
+ * bundle and ahead of `react-dom`, because Metro escapes non-ASCII as
+ * `\uXXXX` and six locales of Cyrillic cost six bytes a letter.
  */
 export const COMPOSITION_BASELINE: CompositionBaseline = {
   takenOn: "2026-09-13",
-  totalBytes: 3821988,
+  totalBytes: 3823286,
   buckets: {
-    "(unattributed)": 620503,
+    "(unattributed)": 621310,
     "lib/": 552213,
     "@sentry/core": 292950,
     "react-native-web": 282097,
-    "app/": 198345,
+    "app/": 198307,
     "@sentry/react-native": 195253,
     "react-dom": 171778,
     "expo-router": 154974,
     "@posthog/core": 127400,
     "@sentry-internal/replay": 123677,
-    "components/": 122896,
+    "components/": 123425,
     "posthog-react-native": 110929,
     "@supabase/auth-js": 106013,
     "@sentry/browser": 89827,

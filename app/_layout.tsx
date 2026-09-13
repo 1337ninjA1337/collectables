@@ -12,8 +12,14 @@
 // of what the deployed site downloads. See `components/gesture-root.web.tsx`.
 import { GestureRoot } from "@/components/gesture-root";
 
-import { ErrorBoundary } from "@sentry/react-native";
-import * as Sentry from "@sentry/react-native";
+// The crash shell is a platform pair for the same reason the gesture root is:
+// the root imported `@sentry/react-native` at module scope for `wrap()` and
+// `<ErrorBoundary>`, and that import put 838 KiB of SDK — replay and feedback
+// included, which nothing here calls — into every web page load, while
+// `lib/sentry.ts` was carefully loading the same SDK lazily. Native keeps
+// Sentry's own boundary; web has one of its own that reports through
+// `@/lib/sentry`. See `components/crash-boundary.web.tsx`.
+import { CrashBoundary, withCrashReporting } from "@/components/crash-boundary";
 import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import { Stack, router, usePathname } from "expo-router";
@@ -69,7 +75,7 @@ import { Screen, useResponsive } from "@/components/screen";
 import { SyncStatusPill } from "@/components/sync-status-pill";
 import { FONT_DISPLAY, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
-export default Sentry.wrap(function RootLayout() {
+export default withCrashReporting(function RootLayout() {
   useEffect(() => {
     // SDK init now happens inside DiagnosticsProvider after hydrating the
     // stored opt-in/opt-out flag, so the user's choice is honoured before
@@ -128,7 +134,7 @@ export default Sentry.wrap(function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <ErrorBoundary
+    <CrashBoundary
       fallback={({ error, resetError }) => (
         <LocalizedCrashFallback error={error} resetError={resetError} />
       )}
@@ -161,7 +167,7 @@ export default Sentry.wrap(function RootLayout() {
           </ToastProvider>
         </DiagnosticsProvider>
       </I18nProvider>
-    </ErrorBoundary>
+    </CrashBoundary>
   );
 });
 

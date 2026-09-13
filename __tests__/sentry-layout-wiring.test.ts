@@ -26,24 +26,40 @@ describe("Crash #4 — Sentry provider wiring", () => {
     );
   });
 
-  it("imports Sentry's ErrorBoundary", () => {
+  it("imports the crash shell rather than the SDK", () => {
+    // It was `import { ErrorBoundary } from "@sentry/react-native"`, and that
+    // one line put 838 KiB of SDK into every web page load. The boundary is a
+    // platform pair now: Sentry's on native, an SDK-free one on web.
     assert.match(
       layoutSrc,
-      /import\s*\{\s*ErrorBoundary\s*\}\s*from\s*["']@sentry\/react-native["']/,
-      "_layout.tsx must import ErrorBoundary from @sentry/react-native",
+      /import\s*\{\s*CrashBoundary,\s*withCrashReporting\s*\}\s*from\s*["']@\/components\/crash-boundary["']/,
+      "_layout.tsx must import the crash shell from @/components/crash-boundary",
+    );
+    assert.ok(
+      !/from\s*["']@sentry\/react-native["']/.test(layoutSrc),
+      "_layout.tsx must not reach the SDK directly any more",
     );
   });
 
-  it("wraps the provider tree with <ErrorBoundary>", () => {
+  it("wraps the provider tree with <CrashBoundary>", () => {
     assert.match(
       layoutSrc,
-      /<ErrorBoundary[\s\S]*?<I18nProvider>/,
-      "ErrorBoundary must wrap the I18nProvider (and the rest of the tree)",
+      /<CrashBoundary[\s\S]*?<I18nProvider>/,
+      "CrashBoundary must wrap the I18nProvider (and the rest of the tree)",
     );
     assert.match(
       layoutSrc,
-      /<\/I18nProvider>[\s\S]*?<\/ErrorBoundary>/,
-      "ErrorBoundary closing tag must come after I18nProvider's",
+      /<\/I18nProvider>[\s\S]*?<\/CrashBoundary>/,
+      "CrashBoundary closing tag must come after I18nProvider's",
+    );
+  });
+
+  it("still wraps the root component for crash reporting", () => {
+    // `Sentry.wrap` on native, identity on web — the call site is the same.
+    assert.match(
+      layoutSrc,
+      /export default withCrashReporting\(function RootLayout\(\)/,
+      "the root component must stay wrapped",
     );
   });
 

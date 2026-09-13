@@ -348,44 +348,70 @@ export function formatDriftLine(result: BundleSizeResult): string {
  * THE TOTAL CANNOT SEE THE ONE REGRESSION THIS FILE EXISTS FOR. The budget
  * above is a sum over every chunk, so a package that stops being lazy — the
  * `import()` in `lib/analytics.ts` becoming a static import, or a screen
- * reaching for `posthog-react-native` directly — moves 273.7 KiB out of a
- * chunk nothing fetches until analytics initialises and into the one every
+ * reaching for `posthog-react-native` directly — moves its bytes out of a
+ * chunk nothing fetches until that feature initialises and into the one every
  * page load does, and changes the sum by approximately nothing. Every
- * paragraph of the doc block above argues about ~30 KiB of headroom against
- * an SDK arriving; an SDK that is already in the tree and merely stops being
+ * paragraph of the doc block above argues about ~30 KiB of headroom against an
+ * SDK arriving; an SDK that is already in the tree and merely stops being
  * deferred arrives at the browser for free, under budget, silently.
+ *
+ * **That is not hypothetical, and the day this floor landed it was already
+ * true.** `app/_layout.tsx` imported `@sentry/react-native` at module scope
+ * for `wrap()` and `<ErrorBoundary>` while `lib/sentry.ts` loaded the same SDK
+ * through a lazy `import()`, so 874.4 KiB sat in the entry chunk with nothing
+ * red. Splitting the crash shell into `components/crash-boundary.{tsx,web.tsx}`
+ * moved it out and cost the TOTAL +1.1 KiB — the whole saving is invisible to
+ * the budget, in both directions.
  *
  * So the guard is the SPLIT rather than a second size. The composition report
  * marks `(lazy)` on everything outside the entry chunk and a human reads it;
  * this is the same fact with a floor under it, on the gate CI already runs.
  *
- * **The floor is slack on purpose, and the reason is the shape of what it
- * catches.** The regression is a cliff — the lazy chunk collapses to nothing,
- * because the only thing in it is the SDK — not a drift of a few KiB, so a
- * floor anywhere below today's 273.7 KiB catches it on the commit that causes
- * it. What a tight floor would add is false reds on a dependency bump that
- * makes PostHog smaller, each costing a round to re-measure and re-argue for
- * no guard at all. 200 KiB leaves 73.7 KiB of room for the SDK to shrink and
- * still fails the moment its bytes move into the entry chunk.
+ * **The floor has to sit above the largest lazy chunk, not just under the
+ * total.** With 1148.2 KiB lazy in two chunks — Sentry's 874.5 and PostHog's
+ * 273.7 — a floor of 200 KiB would have caught Sentry going eager and slept
+ * through PostHog doing the same, because 273.7 KiB of remaining lazy bytes is
+ * still over it. Any single chunk going eager has to break it, which puts the
+ * floor above 874.5 KiB; `bundle-size.test.ts` asserts exactly that from the
+ * measurements rather than from this paragraph.
+ *
+ * **The slack under the measurement is on purpose.** The regression is a cliff
+ * — a whole chunk stops existing — not a drift, so a floor anywhere in that
+ * band catches it on the commit that causes it. What a tight floor would add
+ * is false reds on a dependency bump that makes an SDK smaller, each costing a
+ * round to re-measure and re-argue for no extra guard. 1000 KiB leaves 148.2
+ * KiB of room to shrink.
  *
  * Lowering it is the same kind of decision as raising the budget: a lazy chunk
  * that is genuinely gone (analytics deleted) is a saving to bank deliberately,
- * and `bundle-size.test.ts` holds the floor below the measurement and above
- * the cliff so it cannot be edited into a number that passes quietly.
+ * and the suite holds the floor inside the band above so it cannot be edited
+ * into a number that passes quietly.
  */
-export const LAZY_CHUNK_FLOOR_BYTES = 200 * 1024;
+export const LAZY_CHUNK_FLOOR_BYTES = 1000 * 1024;
 
 /**
- * The lazy chunks as they stood when the floor was set — 273.7 KiB, all of it
- * PostHog, in the `index-<hash>.js` chunk `lib/analytics.ts` pulls in.
+ * The lazy chunks as they stood when the floor was set — 1148.2 KiB in two
+ * chunks: Sentry's 874.5 (`index-<hash>.js`, fetched when diagnostics
+ * initialise) and PostHog's 273.7.
  *
- * A MEASUREMENT, like `LAST_MEASURED_BUNDLE_BYTES`, and taken on 2026-09-13
- * from the same export that measured 3821688 bytes in total. It is not a field
- * of `BUDGET_SNAPSHOT` because it is not half of that pair: the budget and the
+ * A MEASUREMENT, like `LAST_MEASURED_BUNDLE_BYTES`, taken on 2026-09-13 from
+ * the same export that measured 3822836 bytes in total. It is not a field of
+ * `BUDGET_SNAPSHOT` because it is not half of that pair: the budget and the
  * copy figure move together at a budget move, and this number moves when the
- * SPLIT changes, which is a different event and usually a much rarer one.
+ * SPLIT changes, which is a different event.
  */
-export const LAST_MEASURED_LAZY_BYTES = 280_244;
+export const LAST_MEASURED_LAZY_BYTES = 1_175_775;
+
+/**
+ * The smallest of those chunks — PostHog's, at 273.7 KiB.
+ *
+ * The floor's real bound: a chunk this size going eager has to fail the gate,
+ * so the floor cannot be more than this far below
+ * {@link LAST_MEASURED_LAZY_BYTES}. Recorded rather than derived because it is
+ * a measurement of the SAME export, and a bound computed from a number nobody
+ * took is a bound that moves when somebody guesses.
+ */
+export const SMALLEST_MEASURED_LAZY_CHUNK_BYTES = 280_243;
 
 export type LazySplitResult = {
   /** Bytes in the chunk(s) every page load fetches. */
