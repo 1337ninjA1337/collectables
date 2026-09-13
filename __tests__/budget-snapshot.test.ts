@@ -142,7 +142,7 @@ describe("the snapshot still supports the argument it exists for", () => {
     // again.
     assert.notEqual(BUDGET_SNAPSHOT.translationsBytes, null, "the head of the history carries no copy figure");
     const drift = Math.abs(
-      translationsFootprint(readI18nSource()).sourceBytes - (BUDGET_SNAPSHOT.translationsBytes ?? 0),
+      translationsFootprint(readI18nSource()).copyBytes - (BUDGET_SNAPSHOT.translationsBytes ?? 0),
     );
 
     assert.ok(

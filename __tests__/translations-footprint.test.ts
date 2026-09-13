@@ -20,8 +20,8 @@ import { readRepoFile } from "./helpers/repo-file";
  * and nobody could state it. One round cost 17.9 KiB with four counted strings
  * in six languages in it; the next cost 0.2 KiB with none.
  *
- * **The measure is a proxy and the report says so.** It reads the SOURCE bytes
- * of `lib/i18n-context.tsx`, which is not that module's share of the minified
+ * **The measure is a proxy and the report says so.** It reads the bytes of the
+ * locale maps' bodies, which is not their share of the minified
  * bundle — the bundler renames locals, strips types and drops comments. What
  * survives almost untouched is the string literals, so the DELTA between two
  * measurements tracks what the bundle sees far better than either absolute
@@ -75,9 +75,34 @@ describe("translationsFootprint", () => {
 
   it("measures UTF-8 bytes, not characters", () => {
     // Every locale but `en` is non-Latin or accented, so a character count
-    // would under-report the four languages that cost the most.
-    const cyrillic = translationsFootprint(TWO_LOCALES);
-    assert.ok(cyrillic.sourceBytes > TWO_LOCALES.length, "counted characters, not bytes");
+    // would under-report the languages that cost the most. Two fixtures of the
+    // same SHAPE and the same character count, one Latin and one Cyrillic: a
+    // measure counting characters calls them equal.
+    const latin = TWO_LOCALES.replace('"Привет"', '"Privet"').replace('"Пока"', '"Poka"');
+    const cyrillic = TWO_LOCALES.replace('"Привет"', '"Приветx"').replace('"Пока"', '"Покаx"');
+
+    assert.equal(
+      cyrillic.replace(/[^\x00-\x7F]/g, "x").length,
+      latin.length + 2,
+      "the fixtures must differ only in which alphabet the values use",
+    );
+    assert.ok(
+      translationsFootprint(cyrillic).copyBytes >
+        translationsFootprint(latin).copyBytes + 2,
+      "counted characters, not bytes",
+    );
+  });
+
+  it("counts the maps' bodies, not the files around them", () => {
+    // The bug this basis fixes: the six maps became six modules with six doc
+    // headers, and the measure reported +5.8 KiB of "translated copy" for a
+    // round that translated nothing. A header is the module's, not the copy's.
+    const withHeader = `/**\n * A doc block that is not translated copy.\n * ${"x".repeat(2000)}\n */\n${TWO_LOCALES}`;
+
+    assert.equal(
+      translationsFootprint(withHeader).copyBytes,
+      translationsFootprint(TWO_LOCALES).copyBytes,
+    );
   });
 
   it("reads the real translations module", () => {
@@ -88,14 +113,14 @@ describe("translationsFootprint", () => {
     // Six locales' worth: the declarations must exceed the vocabulary by a
     // wide margin or the parse has gone wrong rather than the file.
     assert.ok(footprint.declarations > footprint.baseKeys * 4);
-    assert.ok(footprint.sourceBytes > 100_000);
+    assert.ok(footprint.copyBytes > 100_000);
   });
 });
 
 describe("formatCopyDriftLine", () => {
   const lineFor = (bytes: number) =>
     formatCopyDriftLine(
-      { sourceBytes: bytes, locales: 6, baseKeys: 538, declarations: 3214 },
+      { copyBytes: bytes, locales: 6, baseKeys: 538, declarations: 3214 },
       238_763,
     );
 
@@ -132,7 +157,7 @@ describe("formatCopyDriftLine", () => {
     // the same number the doc block records.
     const recorded = LAST_MEASURED_TRANSLATIONS_BYTES;
     assert.notEqual(recorded, null, "the head of the history carries no copy figure");
-    const footprint = { sourceBytes: recorded ?? 0, locales: 6, baseKeys: 1, declarations: 1 };
+    const footprint = { copyBytes: recorded ?? 0, locales: 6, baseKeys: 1, declarations: 1 };
     assert.equal(formatCopyDriftLine(footprint), null);
   });
 });
@@ -149,7 +174,7 @@ describe("the measurement and the bundle's move together", () => {
     // Subtracting from zero would report the whole translations module as
     // this round's growth.
     assert.equal(
-      formatCopyDriftLine({ sourceBytes: 1, locales: 6, baseKeys: 1, declarations: 1 }, null),
+      formatCopyDriftLine({ copyBytes: 1, locales: 6, baseKeys: 1, declarations: 1 }, null),
       null,
     );
   });
@@ -162,7 +187,7 @@ describe("the measurement and the bundle's move together", () => {
     // point — so this case asserts the CONSTANT is a plausible measurement of
     // this file rather than that it is exact.
     const footprint = translationsFootprint(readI18nSource());
-    const drift = Math.abs(footprint.sourceBytes - (LAST_MEASURED_TRANSLATIONS_BYTES ?? 0));
+    const drift = Math.abs(footprint.copyBytes - (LAST_MEASURED_TRANSLATIONS_BYTES ?? 0));
 
     assert.ok(
       drift < 30 * 1024,

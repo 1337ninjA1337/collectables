@@ -44,10 +44,18 @@ export type BudgetSnapshot = {
    */
   readonly bundleBytes: number;
   /**
-   * `lib/i18n-context.tsx`'s source bytes at that same commit — the copy half.
-   * A proxy for growth rather than a share of the bundle; see
+   * The locale maps' bytes at that same commit — the copy half. A proxy for
+   * growth rather than a share of the bundle; see
    * `lib/translations-footprint.ts` for why the delta is fair even though the
    * absolute number is not.
+   *
+   * **The head row's figure was re-taken on a narrower basis on 2026-09-13**,
+   * when the maps moved out of `lib/i18n-context.tsx` into six files of their
+   * own and the measure started counting their headers. It is not a
+   * re-measurement for growth: the maps at the commit that moved the budget
+   * come to 236225 bytes and they come to 236225 bytes today, so the pair is
+   * still two numbers from one commit — the second one is now in the unit it
+   * always claimed to be in.
    */
   readonly translationsBytes: number | null;
   /** ISO date the pair was measured, for arguing about a rate. */
@@ -88,7 +96,7 @@ export const BUDGET_HISTORY: readonly BudgetSnapshot[] = [
   {
     budgetBytes: 3.67 * 1024 * 1024,
     bundleBytes: 3_821_688,
-    translationsBytes: 246_084,
+    translationsBytes: 236_225,
     takenOn: "2026-09-13",
     because:
       "the first move that has ever gone DOWN: the gesture-handler root became a platform pair, and reanimated, worklets, hammerjs and semver left the web bundle with it — 964.2 KiB, a fifth of what the deployed site downloads, found by the composition report and confirmed by its drift section",

@@ -35,11 +35,21 @@
  */
 
 import { BUDGET_SNAPSHOT } from "@/lib/budget-snapshot";
-import { languageOptionCodes, localeKeys } from "@/lib/i18n-source";
+import { findObjectLiteral, languageOptionCodes, localeKeys } from "@/lib/i18n-source";
 
 export type TranslationsFootprint = {
-  /** UTF-8 bytes of the translations module's source. */
-  readonly sourceBytes: number;
+  /**
+   * UTF-8 bytes of the locale maps' bodies — the copy itself.
+   *
+   * It was the whole module's source until 2026-09-13, which was the same
+   * thing while the maps WERE the module: 3696 of its 3929 lines. Then they
+   * became six files with six doc headers, and the measure reported +5.8 KiB
+   * of "translated copy" for a round that translated nothing. Measured at the
+   * commit that last moved the budget, the maps come to the same 236225 bytes
+   * they do today — so the drift that line had been printing all morning was
+   * entirely prose about the move.
+   */
+  readonly copyBytes: number;
   /** Locales the picker offers. */
   readonly locales: number;
   /**
@@ -65,12 +75,22 @@ export type TranslationsFootprint = {
 export function translationsFootprint(source: string): TranslationsFootprint {
   const codes = languageOptionCodes(source);
   let declarations = 0;
-  for (const code of codes) declarations += localeKeys(source, code).size;
+  let copyBytes = 0;
+  for (const code of codes) {
+    declarations += localeKeys(source, code).size;
+    // The map's BODY, not the file: a header, an import line and a type
+    // annotation are the module's, and counting them makes a refactor read as
+    // translation. A locale with no map found contributes nothing rather than
+    // throwing — `localeKeys` above is the reader that refuses that case, and
+    // one refusal per question is enough.
+    const block = findObjectLiteral(source, code);
+    if (block) copyBytes += new TextEncoder().encode(block.body).length;
+  }
   return {
     // `Buffer` is available in the node contexts that run this (the check
     // script and its suite) and `TextEncoder` is available everywhere, so the
     // encoder is the one that cannot be wrong about the environment.
-    sourceBytes: new TextEncoder().encode(source).length,
+    copyBytes,
     locales: codes.length,
     baseKeys: localeKeys(source, "en").size,
     declarations,
@@ -113,7 +133,7 @@ export function formatCopyDriftLine(
   // support a delta. Saying nothing beats subtracting from zero, which would
   // report the whole translations module as this round's growth.
   if (lastMeasuredBytes === null) return null;
-  const drift = footprint.sourceBytes - lastMeasuredBytes;
+  const drift = footprint.copyBytes - lastMeasuredBytes;
   if (drift === 0) return null;
   return (
     `check-bundle-size: ${formatKiB(drift)} of that is translated copy ` +
