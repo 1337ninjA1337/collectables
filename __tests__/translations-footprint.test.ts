@@ -185,7 +185,11 @@ describe("the measurement and the bundle's move together", () => {
     const SRC = stripComments(readRepoFile("scripts/check-bundle-size.ts"));
     const verdict = SRC.indexOf("formatBundleSizeReport(files, result)");
     const copy = SRC.indexOf("if (copyLine) console.log(copyLine);");
-    const exit = SRC.indexOf("if (result.overBudget) process.exit(1);");
+    // The exit condition grew a second half when the lazy-split guard landed,
+    // and this case is about ORDER rather than about what fails the build — so
+    // it looks for the exit itself, not for a spelling of the predicate that
+    // goes stale the next time the gate learns something.
+    const exit = SRC.indexOf("process.exit(1);");
     assert.ok(verdict > 0 && copy > verdict, "the copy line must follow the verdict");
     assert.ok(exit > copy, "the copy line must print before the process exits");
   });

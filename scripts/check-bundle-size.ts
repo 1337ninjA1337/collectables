@@ -2,7 +2,10 @@
 /**
  * Bundle-size budget gate. Fails when the exported web JS bundle
  * (`dist/_expo/static/js/web/*.js`, sourcemaps excluded) exceeds the budget
- * (default 4.59 MiB, override via BUNDLE_SIZE_BUDGET_BYTES).
+ * (default 3.67 MiB, override via BUNDLE_SIZE_BUDGET_BYTES) — or when the
+ * bytes OUTSIDE the entry chunk fall below `LAZY_CHUNK_FLOOR_BYTES`, which is
+ * what a package that stopped being lazy looks like to a sum that did not
+ * change.
  *
  * Runs as its own CI step right after `npm run build` (the bundle must exist
  * first). Pure logic lives in `lib/bundle-size.ts`.
@@ -13,7 +16,10 @@ import * as path from "node:path";
 
 import {
   evaluateBundleSize,
+  evaluateLazySplit,
   formatBundleSizeReport,
+  formatLazySplitReport,
+  lazySplitFailed,
   resolveBundleSizeBudget,
   type BundleFile,
 } from "../lib/bundle-size";
@@ -53,7 +59,16 @@ function main(): void {
   );
   if (copyLine) console.log(copyLine);
 
-  if (result.overBudget) process.exit(1);
+  // The half of the guard the total cannot see: a package that stops being
+  // lazy moves its bytes from a chunk nothing fetches into the one every page
+  // load does, and leaves the sum above where it was. Reported after the
+  // budget and before the exit, so a build that is both over budget and newly
+  // eager says both things rather than the first one it hits.
+  const split = evaluateLazySplit(files);
+  const splitFailed = lazySplitFailed(split);
+  console[splitFailed ? "error" : "log"](formatLazySplitReport(split));
+
+  if (result.overBudget || splitFailed) process.exit(1);
 }
 
 main();

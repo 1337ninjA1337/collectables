@@ -10,9 +10,21 @@
  * The budget applies to the sum of the exported JS chunks under
  * `dist/_expo/static/js/web/*.js` (sourcemaps excluded — they're stripped
  * before the Pages artifact is uploaded and never ship to browsers).
+ *
+ * A SUM CANNOT SEE AN SDK THAT WAS ALREADY HERE AND MERELY STOPPED BEING
+ * DEFERRED, which is the other half of the same regression: the bytes move
+ * from a chunk nothing fetches into the one every page load does, and the
+ * total stays where it was. {@link evaluateLazySplit} is that half, and it
+ * fails the same gate.
  */
 
 /**
+ * 3.67 MiB today. THE LIVE NUMBER IS THE LAST PARAGRAPH'S, not the next
+ * line's: that line was written as a header back when this block was one
+ * raise, and it kept saying "4.60 MiB" after the budget went DOWN to 3.67.
+ * Everything under it is the moves in order, each argued against the one
+ * before it, and the newest is at the bottom.
+ *
  * 4.60 MiB — today's bundle (4689.7 KiB) plus 20.7 KiB.
  *
  * THE HEADROOM IS THE GUARD, and it is chosen against the smallest thing this
@@ -108,6 +120,7 @@
  * raise that gives up the guard fails there instead of passing quietly.
  */
 
+import { isEntryChunk } from "@/lib/bundle-composition";
 import { BUDGET_HISTORY, BUDGET_SNAPSHOT } from "@/lib/budget-snapshot";
 // A build-log line is still a sentence with a count in it, and `plural.test.ts`
 // holds the rule for the whole tree rather than for the UI half of it.
@@ -327,4 +340,138 @@ export function formatDriftLine(result: BundleSizeResult): string {
   const sign = result.driftBytes > 0 ? "+" : "-";
   const spent = `${sign}${formatKiB(Math.abs(result.driftBytes))}`;
   return `check-bundle-size: ${spent} since the last budget move, of the ${formatKiB(bought)} it bought.`;
+}
+
+/**
+ * The bytes that must stay OUTSIDE the entry chunk, in bytes.
+ *
+ * THE TOTAL CANNOT SEE THE ONE REGRESSION THIS FILE EXISTS FOR. The budget
+ * above is a sum over every chunk, so a package that stops being lazy — the
+ * `import()` in `lib/analytics.ts` becoming a static import, or a screen
+ * reaching for `posthog-react-native` directly — moves 273.7 KiB out of a
+ * chunk nothing fetches until analytics initialises and into the one every
+ * page load does, and changes the sum by approximately nothing. Every
+ * paragraph of the doc block above argues about ~30 KiB of headroom against
+ * an SDK arriving; an SDK that is already in the tree and merely stops being
+ * deferred arrives at the browser for free, under budget, silently.
+ *
+ * So the guard is the SPLIT rather than a second size. The composition report
+ * marks `(lazy)` on everything outside the entry chunk and a human reads it;
+ * this is the same fact with a floor under it, on the gate CI already runs.
+ *
+ * **The floor is slack on purpose, and the reason is the shape of what it
+ * catches.** The regression is a cliff — the lazy chunk collapses to nothing,
+ * because the only thing in it is the SDK — not a drift of a few KiB, so a
+ * floor anywhere below today's 273.7 KiB catches it on the commit that causes
+ * it. What a tight floor would add is false reds on a dependency bump that
+ * makes PostHog smaller, each costing a round to re-measure and re-argue for
+ * no guard at all. 200 KiB leaves 73.7 KiB of room for the SDK to shrink and
+ * still fails the moment its bytes move into the entry chunk.
+ *
+ * Lowering it is the same kind of decision as raising the budget: a lazy chunk
+ * that is genuinely gone (analytics deleted) is a saving to bank deliberately,
+ * and `bundle-size.test.ts` holds the floor below the measurement and above
+ * the cliff so it cannot be edited into a number that passes quietly.
+ */
+export const LAZY_CHUNK_FLOOR_BYTES = 200 * 1024;
+
+/**
+ * The lazy chunks as they stood when the floor was set — 273.7 KiB, all of it
+ * PostHog, in the `index-<hash>.js` chunk `lib/analytics.ts` pulls in.
+ *
+ * A MEASUREMENT, like `LAST_MEASURED_BUNDLE_BYTES`, and taken on 2026-09-13
+ * from the same export that measured 3821688 bytes in total. It is not a field
+ * of `BUDGET_SNAPSHOT` because it is not half of that pair: the budget and the
+ * copy figure move together at a budget move, and this number moves when the
+ * SPLIT changes, which is a different event and usually a much rarer one.
+ */
+export const LAST_MEASURED_LAZY_BYTES = 280_244;
+
+export type LazySplitResult = {
+  /** Bytes in the chunk(s) every page load fetches. */
+  readonly entryBytes: number;
+  /** Bytes in every other chunk — reached through a dynamic `import()`. */
+  readonly lazyBytes: number;
+  readonly entryChunkCount: number;
+  readonly lazyChunkCount: number;
+  readonly floorBytes: number;
+  /** Positive while the lazy chunks are above the floor. */
+  readonly marginBytes: number;
+  /** True when the lazy chunks have fallen below {@link floorBytes}. */
+  readonly belowFloor: boolean;
+  /**
+   * True when no chunk is named like an entry chunk at all.
+   *
+   * Then every chunk counts as lazy, the floor passes on a bundle that is
+   * entirely eager, and the guard has stopped guarding without saying so —
+   * which is what happens the day Metro changes how it names the web entry.
+   * A premise this check cannot verify fails loudly instead.
+   */
+  readonly missingEntryChunk: boolean;
+};
+
+/**
+ * Splits the exported chunks into what a page load fetches and what it does
+ * not, and holds the second half above {@link LAZY_CHUNK_FLOOR_BYTES}.
+ */
+export function evaluateLazySplit(
+  files: readonly BundleFile[],
+  floorBytes: number = LAZY_CHUNK_FLOOR_BYTES,
+): LazySplitResult {
+  let entryBytes = 0;
+  let lazyBytes = 0;
+  let entryChunkCount = 0;
+  let lazyChunkCount = 0;
+  for (const file of files) {
+    if (isEntryChunk(file.path)) {
+      entryBytes += file.bytes;
+      entryChunkCount += 1;
+    } else {
+      lazyBytes += file.bytes;
+      lazyChunkCount += 1;
+    }
+  }
+  return {
+    entryBytes,
+    lazyBytes,
+    entryChunkCount,
+    lazyChunkCount,
+    floorBytes,
+    marginBytes: lazyBytes - floorBytes,
+    belowFloor: lazyBytes < floorBytes,
+    missingEntryChunk: entryChunkCount === 0,
+  };
+}
+
+/** Whether {@link evaluateLazySplit} should fail the build. */
+export function lazySplitFailed(result: LazySplitResult): boolean {
+  return result.missingEntryChunk || result.belowFloor;
+}
+
+export function formatLazySplitReport(result: LazySplitResult): string {
+  if (result.missingEntryChunk) {
+    return [
+      `check-bundle-size: FAIL — none of the ${String(result.lazyChunkCount)} exported ${plural(result.lazyChunkCount, "chunk", "chunks")} is named like the entry chunk.`,
+      "`isEntryChunk` in lib/bundle-composition.ts knows Metro's `entry-<hash>.js`",
+      "convention; if the export stopped following it, this check cannot tell a",
+      "lazily-loaded chunk from the one every page load fetches, and neither can",
+      "the composition report's `(lazy)` marks.",
+    ].join("\n");
+  }
+  if (result.belowFloor) {
+    return [
+      `check-bundle-size: FAIL — only ${formatKiB(result.lazyBytes)} sits outside the entry chunk, ${formatKiB(-result.marginBytes)} under the ${formatKiB(result.floorBytes)} floor.`,
+      "A package that used to be behind a lazy `import()` is probably in the entry",
+      "chunk now, where every page load fetches it. The BUDGET above cannot see",
+      "this: the bytes moved between chunks and the total barely changed.",
+      "`npm run build:sourcemaps && npm run bundle:composition` names which bucket",
+      "moved. Lower LAZY_CHUNK_FLOOR_BYTES only for a lazy chunk that is",
+      "deliberately gone.",
+    ].join("\n");
+  }
+  return (
+    `check-bundle-size: ${formatKiB(result.lazyBytes)} of the bundle is lazy — ` +
+    `${formatKiB(result.marginBytes)} above the ${formatKiB(result.floorBytes)} floor, ` +
+    `${formatKiB(result.entryBytes)} in the entry chunk.`
+  );
 }
