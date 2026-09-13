@@ -33,11 +33,13 @@ import * as http from "node:http";
 import * as path from "node:path";
 
 import {
+  BOOT_SCENARIOS,
   evaluateBundleBoot,
   formatBundleBootReport,
   isSpaRouteRequest,
   toBootRequestFailure,
   type BootRequestFailure,
+  type BootScenario,
 } from "../lib/bundle-boot";
 import { REPO_ROOT, assertBundlePremise } from "./bundle-premise";
 
@@ -153,7 +155,7 @@ function startBrowser(executable: string): Promise<{ ws: string; child: ChildPro
 
 type CdpMessage = { id?: number; method?: string; params?: Record<string, unknown> };
 
-async function boot(origin: string, wsUrl: string) {
+async function boot(origin: string, wsUrl: string, scenario: BootScenario) {
   const socket = new WebSocket(wsUrl);
   await new Promise((resolve, reject) => {
     socket.addEventListener("open", resolve, { once: true });
@@ -260,6 +262,27 @@ async function boot(origin: string, wsUrl: string) {
   await sendToPage("Runtime.enable");
   await sendToPage("Network.enable");
 
+  // Seeded BEFORE the page's first script, because the app reads the language
+  // once on mount: a write after the load would be testing a language CHANGE,
+  // which is a different thing from booting in that language. The origin is
+  // this run's own server, so nothing here outlives the process.
+  //
+  // CLEARED FIRST, AND FOR EVERY SCENARIO, including the ones that seed
+  // nothing. A new target is not a new origin: the first run of this loop left
+  // `pl` in storage and the scenario after it — which seeds nothing and is
+  // supposed to boot the default language — fetched the Polish chunk and
+  // rendered "KONTO COLLECTABLES". A scenario that inherits the previous one's
+  // state is not the scenario it says it is.
+  await sendToPage("Page.addScriptToEvaluateOnNewDocument", {
+    source: [
+      "localStorage.clear();",
+      ...Object.entries(scenario.storage).map(
+        ([key, value]) =>
+          `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(value)});`,
+      ),
+    ].join("\n"),
+  });
+
   const loaded = new Promise<void>((resolve) => {
     const onMessage = (event: MessageEvent) => {
       const message = JSON.parse(String(event.data)) as CdpMessage;
@@ -271,7 +294,7 @@ async function boot(origin: string, wsUrl: string) {
     socket.addEventListener("message", onMessage);
   });
 
-  await sendToPage("Page.navigate", { url: `${origin}${readBaseUrl()}/` });
+  await sendToPage("Page.navigate", { url: `${origin}${readBaseUrl()}${scenario.path}` });
   await Promise.race([
     loaded,
     new Promise<void>((resolve) => setTimeout(resolve, LOAD_TIMEOUT_MS)),
@@ -294,6 +317,9 @@ async function boot(origin: string, wsUrl: string) {
   );
   const bodyText = String((await evaluate("document.body.innerText.slice(0, 400)")) ?? "");
 
+  // The target goes with the socket: three scenarios would otherwise leave
+  // three pages open in one browser, each still running the app it loaded.
+  await send("Target.closeTarget", { targetId: target.targetId });
   socket.close();
   return { pageErrors, consoleErrors, failedRequests, rootHtmlLength, bodyText, chunksFetched };
 }
@@ -317,10 +343,25 @@ async function main(): Promise<void> {
   try {
     const started = await startBrowser(executable);
     browser = started.child;
-    const observation = await boot(server.origin, started.ws);
-    const result = evaluateBundleBoot(observation, server.origin, readBaseUrl());
-    console[result.ok ? "log" : "error"](formatBundleBootReport(CHECK_NAME, result));
-    if (!result.ok) process.exitCode = 1;
+    // One browser, one target per scenario: a fresh target is what makes the
+    // seeded language a boot rather than a reload, and starting three browsers
+    // would pay the launch three times for nothing.
+    for (const scenario of BOOT_SCENARIOS) {
+      const observation = await boot(server.origin, started.ws, scenario);
+      const result = evaluateBundleBoot(
+        observation,
+        server.origin,
+        readBaseUrl(),
+        scenario.expectChunk,
+      );
+      console[result.ok ? "log" : "error"](
+        formatBundleBootReport(CHECK_NAME, result, scenario.name),
+      );
+      // Every scenario runs even after one fails: a run that stopped at the
+      // first would cost a second build to find out whether the other two are
+      // broken too.
+      if (!result.ok) process.exitCode = 1;
+    }
   } finally {
     browser?.kill();
     server.close();

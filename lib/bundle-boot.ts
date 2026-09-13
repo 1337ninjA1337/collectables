@@ -42,6 +42,41 @@
  * cancelled or unattributable one, does not.
  */
 
+import { LANGUAGE_KEY } from "@/lib/storage-keys";
+
+/**
+ * One thing to load, and what loading it proves.
+ *
+ * The first version of this check booted ONE page — `/`, signed out, in the
+ * default language — because that is what an unconfigured install renders. It
+ * is also the one page whose copy is in the entry chunk and whose route is the
+ * one the server has a file for, so the two things that broke this year were
+ * both outside it: four locale maps moving behind `import()`, and the router
+ * answering a path that only exists as an SPA fallback.
+ *
+ * `storage` is seeded BEFORE the first script runs, because the language is
+ * read once on mount: writing it after the load would test a language change
+ * rather than a boot in that language. On the web AsyncStorage is
+ * `localStorage`, and it stores the language code as it is.
+ */
+export type BootScenario = {
+  /** What this run is called in the report. */
+  readonly name: string;
+  /** Appended to the deploy's base path — `/` is the home screen. */
+  readonly path: string;
+  /** `localStorage` entries to seed before the page's first script runs. */
+  readonly storage: Readonly<Record<string, string>>;
+  /**
+   * A chunk basename this scenario MUST cause the page to fetch.
+   *
+   * The Polish boot is the only thing in this repository that proves a lazy
+   * locale chunk is reachable at all: without it, a `pl` that silently fell
+   * back to the default copy would render a mounted, non-empty, error-free
+   * tree in the wrong language, and every check here would pass.
+   */
+  readonly expectChunk?: RegExp;
+};
+
 export type BootRequestFailure = {
   readonly url: string;
   /** HTTP status, or null when the request never got one (DNS, refused, …). */
@@ -99,6 +134,37 @@ export type BootObservation = {
   /** Basenames of the `_expo` chunks the page fetched, in request order. */
   readonly chunksFetched: readonly string[];
 };
+
+/**
+ * What `npm run check:boot` loads, in order.
+ *
+ * Three, and each one is a thing the others cannot see:
+ *
+ *  - `home` is the original: the entry chunk, the provider tree, the default
+ *    copy, on the path the server has a file for.
+ *  - `polish` is the lazy-locale half. It is the only check anywhere that a
+ *    locale chunk is REACHABLE — a `pl` that fell back to the Russian copy
+ *    would mount, fill the root and log nothing, and pass every other rule
+ *    here. `expectChunk` is what turns that into a failure.
+ *  - `deep link` is the SPA fallback. Every route but `/` exists only because
+ *    the server answers an unresolved path with the shell, and a router that
+ *    could not mount one would be invisible to a check that only ever asks for
+ *    the home screen. The id is deliberately one no seed contains: an unknown
+ *    item is a route the app is expected to handle, not an error.
+ *
+ * `LANGUAGE_KEY` is imported rather than spelled so a renamed key breaks the
+ * seed loudly instead of booting the default language under a Polish label.
+ */
+export const BOOT_SCENARIOS: readonly BootScenario[] = [
+  { name: "home", path: "/", storage: {} },
+  {
+    name: "polish",
+    path: "/",
+    storage: { [LANGUAGE_KEY]: "pl" },
+    expectChunk: /^pl-/,
+  },
+  { name: "deep link", path: "/item/not-a-real-item", storage: {} },
+];
 
 export type BootFailure = { readonly kind: string; readonly detail: string };
 
@@ -164,8 +230,19 @@ export function evaluateBundleBoot(
   observation: BootObservation,
   origin: string,
   basePath = "",
+  expectChunk?: RegExp,
 ): BootResult {
   const failures: BootFailure[] = [];
+
+  // A scenario that exists to prove a chunk is reachable has to say so: the
+  // Polish boot mounts, fills the root and logs nothing whether the locale
+  // arrived or silently fell back to the default copy.
+  if (expectChunk && !observation.chunksFetched.some((chunk) => expectChunk.test(chunk))) {
+    failures.push({
+      kind: "chunk not fetched",
+      detail: `nothing matching ${String(expectChunk)} was requested — fetched ${observation.chunksFetched.join(", ") || "nothing"}`,
+    });
+  }
 
   for (const message of observation.pageErrors) {
     failures.push({ kind: "page error", detail: message });
@@ -200,22 +277,30 @@ function firstLine(text: string): string {
   return line.length > 120 ? `${line.slice(0, 117)}…` : line;
 }
 
-export function formatBundleBootReport(checkName: string, result: BootResult): string {
+export function formatBundleBootReport(
+  checkName: string,
+  result: BootResult,
+  scenario?: string,
+): string {
   const { observation } = result;
+  // The scenario name, when there is more than one boot in a run: three reports
+  // that all begin "check-bundle-boot: OK" say nothing about which page each
+  // one loaded.
+  const label = scenario === undefined ? checkName : `${checkName} [${scenario}]`;
   const lines = [
-    `${checkName}: fetched ${String(observation.chunksFetched.length)} chunk(s): ${observation.chunksFetched.join(", ")}`,
+    `${label}: fetched ${String(observation.chunksFetched.length)} chunk(s): ${observation.chunksFetched.join(", ")}`,
   ];
   if (result.ok) {
     lines.push(
-      `${checkName}: OK — the tree mounted (${String(observation.rootHtmlLength)} characters of markup).`,
+      `${label}: OK — the tree mounted (${String(observation.rootHtmlLength)} characters of markup).`,
       // The first line of what a human would SEE, so a boot that mounts the
       // wrong thing — an error screen, an untranslated key — is visible rather
       // than merely counted.
-      `${checkName}: first line on screen: ${JSON.stringify(firstLine(observation.bodyText))}`,
+      `${label}: first line on screen: ${JSON.stringify(firstLine(observation.bodyText))}`,
     );
     return lines.join("\n");
   }
-  lines.push(`${checkName}: FAIL — ${String(result.failures.length)} problem(s) loading the exported app:`);
+  lines.push(`${label}: FAIL — ${String(result.failures.length)} problem(s) loading the exported app:`);
   for (const failure of result.failures) {
     lines.push(`  ${failure.kind}: ${failure.detail}`);
   }
