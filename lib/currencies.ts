@@ -182,3 +182,63 @@ export function isCurrencyCode(code: string): boolean {
 export function findCurrency(code: string): Currency | undefined {
   return CURRENCIES.find((c) => c.code === code);
 }
+
+/** One block of the picker's list: rows under a heading, or under none. */
+export type CurrencyGroup = {
+  /** `"recent"` for the pinned block, `"all"` for the rest, null for a flat list. */
+  readonly kind: "recent" | "all" | null;
+  readonly items: readonly Currency[];
+};
+
+/**
+ * How the picker's 160 rows are laid out for one user.
+ *
+ * The cost input's chip strip has led with recently-used codes since it was
+ * written; the sheet behind its "…" chip listed ISO order and nothing else, so
+ * a collector who types in three currencies scrolled past all three to reach
+ * the fourth. This is that same shortlist, one control over.
+ *
+ * A QUERY COLLAPSES IT. Somebody typing "PL" already knows what they want, and
+ * a match hidden under a second heading is worse than a match in one list — so
+ * a non-empty query returns a single unheaded group, which is also exactly
+ * what the picker did before this existed.
+ *
+ * NO DUPLICATES. A pinned code is REMOVED from the long list rather than
+ * repeated in it: two identical rows, one of them checked, is a picker that
+ * looks broken. That is also why the recent block keeps the order it was given
+ * — most recent first — while the rest stay in ISO order: the two blocks are
+ * answering different questions.
+ *
+ * Unknown codes in `pinned` are dropped. The list is the authority on what a
+ * currency is, and storage is a place a code can outlive one.
+ */
+export function currencyPickerGroups(
+  pinned: readonly string[],
+  query: string,
+): readonly CurrencyGroup[] {
+  const needle = query.trim().toLowerCase();
+  if (needle) {
+    return [
+      {
+        kind: null,
+        items: CURRENCIES.filter(
+          (c) => c.code.toLowerCase().includes(needle) || c.name.toLowerCase().includes(needle),
+        ),
+      },
+    ];
+  }
+  const recent: Currency[] = [];
+  const seen = new Set<string>();
+  for (const code of pinned) {
+    if (seen.has(code)) continue;
+    const currency = findCurrency(code);
+    if (!currency) continue;
+    seen.add(code);
+    recent.push(currency);
+  }
+  if (recent.length === 0) return [{ kind: null, items: CURRENCIES }];
+  return [
+    { kind: "recent", items: recent },
+    { kind: "all", items: CURRENCIES.filter((c) => !seen.has(c.code)) },
+  ];
+}

@@ -3,7 +3,7 @@ import { memo, useMemo } from "react";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SheetSearchRow } from "@/components/sheet-search-row";
 
-import { CURRENCIES } from "@/lib/currencies";
+import { currencyPickerGroups } from "@/lib/currencies";
 import {
   AMBER_ACCENT,
   AMBER_MUTED_6,
@@ -41,7 +41,19 @@ type CurrencySheetProps = {
    * create form has already said what the field is.
    */
   title?: string;
+  /**
+   * The codes this user has picked before, most recent first.
+   *
+   * The chip strip above the cost input has led with these since it was
+   * written, and the sheet behind the "…" chip ignored them: a collector who
+   * types in three currencies scrolled 160 ISO rows to reach the fourth, past
+   * the three they use. Only meaningful while the search box is empty — a
+   * query is somebody who already knows what they want, and splitting their
+   * results into two sections would hide a match under a heading.
+   */
+  pinned?: readonly string[];
 };
+
 
 /**
  * Bottom-sheet currency picker shared by every screen that needs a currency
@@ -54,6 +66,9 @@ type CurrencySheetProps = {
 // hidden <Modal visible={false}> subtree — pays off wherever the six props
 // are referentially stable (collection detail hoists its handlers; other
 // consumers still pass inline arrows and simply keep today's behaviour).
+/** One shared empty list, so a sheet with no shortlist re-memoizes. */
+const EMPTY_PINNED: readonly string[] = [];
+
 export const CurrencySheet = memo(function CurrencySheet({
   visible,
   selectedCode,
@@ -62,15 +77,14 @@ export const CurrencySheet = memo(function CurrencySheet({
   onSelect,
   onClose,
   title,
+  pinned,
 }: CurrencySheetProps) {
   const { t } = useI18n();
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return CURRENCIES;
-    return CURRENCIES.filter(
-      (c) => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q),
-    );
-  }, [query]);
+  // `pinned` defaults to nothing, which returns the one unheaded group of all
+  // 160 — the list this sheet showed before the shortlist existed, and what
+  // the screens that pass no shortlist still get.
+  const groups = useMemo(() => currencyPickerGroups(pinned ?? EMPTY_PINNED, query), [pinned, query]);
+  const empty = groups.every((group) => group.items.length === 0);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -104,45 +118,62 @@ export const CurrencySheet = memo(function CurrencySheet({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {filtered.length === 0 ? (
+            {empty ? (
               <Text style={styles.sheetEmpty}>{t("searchNoResults")}</Text>
             ) : (
-              filtered.map((c) => {
-                const isSelected = c.code === selectedCode;
-                return (
-                  <Pressable
-                    key={c.code}
-                    style={[styles.sheetRow, isSelected && styles.sheetRowSelected]}
-                    onPress={() => onSelect(c.code)}
-                    // The row announces its code and name from its own <Text>
-                    // children; which one is CHOSEN is drawn as a checkmark and
-                    // said nowhere. This is that, in words the platform speaks.
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isSelected }}
-                  >
-                    <View style={styles.currencyRowText}>
-                      <Text
-                        style={[styles.currencyRowCode, isSelected && styles.sheetRowNameSelected]}
+              groups.map((group) => (
+                <View key={group.kind ?? "all-currencies"}>
+                  {group.kind === null ? null : (
+                    // A section label, and a header: VoiceOver and TalkBack
+                    // both navigate by heading, so "the long list starts here"
+                    // is how somebody skips the shortlist without swiping
+                    // through it.
+                    <Text style={styles.sectionTitle} accessibilityRole="header">
+                      {group.kind === "recent" ? t("currencyRecent") : t("currencyAll")}
+                    </Text>
+                  )}
+                  {group.items.map((c) => {
+                    const isSelected = c.code === selectedCode;
+                    return (
+                      <Pressable
+                        key={c.code}
+                        style={[styles.sheetRow, isSelected && styles.sheetRowSelected]}
+                        onPress={() => onSelect(c.code)}
+                        // The row announces its code and name from its own
+                        // <Text> children; which one is CHOSEN is drawn as a
+                        // checkmark and said nowhere. This is that, in words
+                        // the platform speaks.
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isSelected }}
                       >
-                        {c.code}
-                      </Text>
-                      <Text style={styles.sheetRowDesc} numberOfLines={1}>
-                        {c.name}
-                      </Text>
-                    </View>
-                    {isSelected ? (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={22}
-                        color={AMBER_ACCENT}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                        aria-hidden
-                      />
-                    ) : null}
-                  </Pressable>
-                );
-              })
+                        <View style={styles.currencyRowText}>
+                          <Text
+                            style={[
+                              styles.currencyRowCode,
+                              isSelected && styles.sheetRowNameSelected,
+                            ]}
+                          >
+                            {c.code}
+                          </Text>
+                          <Text style={styles.sheetRowDesc} numberOfLines={1}>
+                            {c.name}
+                          </Text>
+                        </View>
+                        {isSelected ? (
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={22}
+                            color={AMBER_ACCENT}
+                            accessibilityElementsHidden
+                            importantForAccessibility="no"
+                            aria-hidden
+                          />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ))
             )}
           </ScrollView>
 
@@ -192,6 +223,17 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: TEXT_DARK_3,
     fontFamily: FONT_BODY_EXTRABOLD,
+  },
+  sectionTitle: {
+    color: MUTED_2,
+    fontSize: 12,
+    fontWeight: "800",
+    fontFamily: FONT_BODY_EXTRABOLD,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    paddingTop: SPACING_LIST,
+    paddingBottom: 6,
+    paddingHorizontal: 12,
   },
   sheetList: {
     maxHeight: 340,

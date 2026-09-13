@@ -141,6 +141,11 @@ export function CurrencyInput({
       <CurrencySheet
         visible={sheetOpen}
         selectedCode={currency}
+        // The same shortlist the chip strip leads with, one control over: the
+        // sheet behind the "…" chip listed ISO order and nothing else, so a
+        // collector who types in three currencies scrolled past all three to
+        // reach the fourth.
+        pinned={pinned}
         query={query}
         onQueryChange={setQuery}
         onSelect={(code) => {

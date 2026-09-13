@@ -628,7 +628,13 @@ describe("translation floors", () => {
     // last thing a screen-reader user reaches and reads as an answer rather
     // than as the question. The generic key stays: the screens that open the
     // picker from a labelled field are not asking twice.
-    assert.match(report, /en: 548\/548 keys \(100\.0%\)/);
+    // 550 the same day: `currencyRecent` and `currencyAll`. The cost input's
+    // chip strip has led with recently-used codes since it was written and the
+    // sheet behind its "…" chip listed ISO order and nothing else, so a
+    // collector who types in three currencies scrolled past all three to reach
+    // the fourth. Two section headings are what let the shortlist sit above
+    // the 160 without the list looking like it lost its order.
+    assert.match(report, /en: 550\/550 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

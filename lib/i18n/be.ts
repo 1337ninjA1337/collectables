@@ -126,6 +126,8 @@ export const be: TranslationMap = {
   collectionCoverLabel: "Вокладка калекцыі",
   currencyLabel: "Валюта",
   currencySelectTitle: "Выберыце валюту",
+  currencyRecent: "Нядаўнія",
+  currencyAll: "Усе валюты",
   currencySelectDisplayTitle: "Валюта адлюстравання",
   currencySelectEntryTitle: "Валюта ўводу",
   currencyMore: "Іншыя валюты",
