@@ -194,6 +194,43 @@ export const BOOT_SCENARIOS: readonly BootScenario[] = [
   },
 ];
 
+/**
+ * Every kind of failure this module reports, named once.
+ *
+ * They are named rather than spelled at each push site because the poll below
+ * SORTS them: three of the six are conditions more waiting could still clear,
+ * and three are events that never un-happen. A kind spelled in two places is a
+ * kind that can drift out of that classification silently — the poll would then
+ * sit out its whole deadline on a page error, or, worse, stop early on a tree
+ * that had simply not mounted yet.
+ */
+export const BOOT_FAILURE_KINDS = {
+  chunkNotFetched: "chunk not fetched",
+  copyNotOnScreen: "copy not on screen",
+  pageError: "page error",
+  consoleError: "console error",
+  requestFailed: "request failed",
+  emptyRoot: "empty root",
+} as const;
+
+export type BootFailureKind = (typeof BOOT_FAILURE_KINDS)[keyof typeof BOOT_FAILURE_KINDS];
+
+/**
+ * The failures that are a "not yet", rather than a "no".
+ *
+ * The tree mounts in an effect after the load event, the copy appears when it
+ * renders, and a lazy locale chunk is requested when the registry asks for it —
+ * all three are things that arrive LATE, and all three are the check's own
+ * subject. Everything else is an event the browser already reported: an
+ * exception was thrown, a console error was logged, a request came back 404.
+ * No amount of waiting takes one of those back.
+ */
+export const WAITABLE_BOOT_FAILURE_KINDS: readonly BootFailureKind[] = [
+  BOOT_FAILURE_KINDS.chunkNotFetched,
+  BOOT_FAILURE_KINDS.copyNotOnScreen,
+  BOOT_FAILURE_KINDS.emptyRoot,
+];
+
 export type BootFailure = { readonly kind: string; readonly detail: string };
 
 export type BootResult = {
@@ -271,7 +308,7 @@ export function evaluateBundleBoot(
   // arrived or silently fell back to the default copy.
   if (expectChunk && !observation.chunksFetched.some((chunk) => expectChunk.test(chunk))) {
     failures.push({
-      kind: "chunk not fetched",
+      kind: BOOT_FAILURE_KINDS.chunkNotFetched,
       detail: `nothing matching ${String(expectChunk)} was requested — fetched ${observation.chunksFetched.join(", ") || "nothing"}`,
     });
   }
@@ -289,16 +326,16 @@ export function evaluateBundleBoot(
     !observation.bodyText.toLowerCase().includes(expectText.toLowerCase())
   ) {
     failures.push({
-      kind: "copy not on screen",
+      kind: BOOT_FAILURE_KINDS.copyNotOnScreen,
       detail: `${JSON.stringify(expectText)} is not in what the page rendered — first line was ${JSON.stringify(firstLine(observation.bodyText))}`,
     });
   }
 
   for (const message of observation.pageErrors) {
-    failures.push({ kind: "page error", detail: message });
+    failures.push({ kind: BOOT_FAILURE_KINDS.pageError, detail: message });
   }
   for (const message of observation.consoleErrors) {
-    failures.push({ kind: "console error", detail: message });
+    failures.push({ kind: BOOT_FAILURE_KINDS.consoleError, detail: message });
   }
   for (const request of observation.failedRequests) {
     // Another origin is the network's problem, not the bundle's. The app talks
@@ -310,16 +347,58 @@ export function evaluateBundleBoot(
           // reads as a slow chunk, and `net::ERR_CONNECTION_REFUSED` does not.
           `no response${request.errorText ? ` (${request.errorText})` : ""}`
         : `HTTP ${String(request.status)}`;
-    failures.push({ kind: "request failed", detail: `${status} — ${request.url}` });
+    failures.push({ kind: BOOT_FAILURE_KINDS.requestFailed, detail: `${status} — ${request.url}` });
   }
   if (observation.rootHtmlLength < MIN_ROOT_HTML_LENGTH) {
     failures.push({
-      kind: "empty root",
+      kind: BOOT_FAILURE_KINDS.emptyRoot,
       detail: `${String(observation.rootHtmlLength)} characters of markup, under the ${String(MIN_ROOT_HTML_LENGTH)} a mounted tree produces`,
     });
   }
 
   return { ok: failures.length === 0, failures, observation };
+}
+
+/**
+ * How long a boot gets to settle, and how often it is asked, in milliseconds.
+ *
+ * The check waited a flat 1.5 seconds after the load event for its whole life,
+ * under a comment saying a fixed settle is "crude and honest" and that polling
+ * for markup "would make the check pass by waiting for the thing it is asking
+ * about". The first half was true and the second is the thing this pair is
+ * built around — see `isBootPollFinished`.
+ *
+ * The deadline is longer than the flat wait was, deliberately: what it costs is
+ * paid only by a boot that is already failing, and what it buys is a run that
+ * stops guessing. 1.5 seconds was a number somebody picked once, on one
+ * machine, before the check grew a lazy locale chunk and a third scenario — the
+ * shape of the failure it was one bad connection away from is "the chunk was
+ * slow, so the app is broken", which is a lie this check should never tell.
+ */
+export const BOOT_SETTLE_DEADLINE_MS = 10_000;
+export const BOOT_SETTLE_POLL_MS = 100;
+
+/**
+ * Whether waiting longer could still change this verdict.
+ *
+ * THE POLL IS NOT ALLOWED TO DECIDE ANYTHING, which is the whole answer to the
+ * objection the fixed wait was written under. Every condition it waits for is
+ * one the verdict FAILS on, so a boot that never satisfies them is failed by
+ * `evaluateBundleBoot` at the deadline exactly as it was failed at 1.5 seconds.
+ * Polling changes when the answer is read, never what it is: a healthy boot is
+ * read the moment it is healthy instead of at a fixed time after the load, and
+ * a broken one is read after it has had every chance the deadline allows.
+ *
+ * It also stops EARLY on a failure that is already final. An exception, a
+ * console error or a 404 on a chunk is an event the browser has reported and
+ * cannot un-report, so a run that has seen one has its answer — sitting out the
+ * remaining nine seconds would only make the report slower to say so.
+ */
+export function isBootPollFinished(result: BootResult): boolean {
+  if (result.ok) return true;
+  return result.failures.some(
+    (failure) => !WAITABLE_BOOT_FAILURE_KINDS.includes(failure.kind as BootFailureKind),
+  );
 }
 
 function firstLine(text: string): string {

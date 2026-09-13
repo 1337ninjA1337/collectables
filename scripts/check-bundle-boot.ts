@@ -34,20 +34,23 @@ import * as path from "node:path";
 
 import {
   BOOT_SCENARIOS,
+  BOOT_SETTLE_DEADLINE_MS,
+  BOOT_SETTLE_POLL_MS,
   evaluateBundleBoot,
   formatBundleBootReport,
+  isBootPollFinished,
   isSpaRouteRequest,
   toBootRequestFailure,
   type BootRequestFailure,
+  type BootResult,
   type BootScenario,
 } from "../lib/bundle-boot";
 import { REPO_ROOT, assertBundlePremise } from "./bundle-premise";
 
 const CHECK_NAME = "check-bundle-boot";
 
-/** How long the page gets to load and settle, in milliseconds. */
+/** How long the page gets to load, in milliseconds. */
 const LOAD_TIMEOUT_MS = 30_000;
-const SETTLE_MS = 1_500;
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -155,7 +158,12 @@ function startBrowser(executable: string): Promise<{ ws: string; child: ChildPro
 
 type CdpMessage = { id?: number; method?: string; params?: Record<string, unknown> };
 
-async function boot(origin: string, wsUrl: string, scenario: BootScenario) {
+async function boot(
+  origin: string,
+  wsUrl: string,
+  scenario: BootScenario,
+  basePath: string,
+): Promise<BootResult> {
   const socket = new WebSocket(wsUrl);
   await new Promise((resolve, reject) => {
     socket.addEventListener("open", resolve, { once: true });
@@ -294,15 +302,11 @@ async function boot(origin: string, wsUrl: string, scenario: BootScenario) {
     socket.addEventListener("message", onMessage);
   });
 
-  await sendToPage("Page.navigate", { url: `${origin}${readBaseUrl()}${scenario.path}` });
+  await sendToPage("Page.navigate", { url: `${origin}${basePath}${scenario.path}` });
   await Promise.race([
     loaded,
     new Promise<void>((resolve) => setTimeout(resolve, LOAD_TIMEOUT_MS)),
   ]);
-  // The tree mounts in an effect after the load event; a fixed settle is crude
-  // and honest, and the alternative — polling for markup — would make the
-  // check pass by waiting for the thing it is asking about.
-  await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
 
   const evaluate = async (expression: string) => {
     const result = (await sendToPage("Runtime.evaluate", {
@@ -312,16 +316,46 @@ async function boot(origin: string, wsUrl: string, scenario: BootScenario) {
     return result.result?.value;
   };
 
-  const rootHtmlLength = Number(
-    (await evaluate("document.getElementById('root')?.innerHTML.length ?? 0")) ?? 0,
-  );
-  const bodyText = String((await evaluate("document.body.innerText.slice(0, 400)")) ?? "");
+  const observe = async () => {
+    const rootHtmlLength = Number(
+      (await evaluate("document.getElementById('root')?.innerHTML.length ?? 0")) ?? 0,
+    );
+    const bodyText = String((await evaluate("document.body.innerText.slice(0, 400)")) ?? "");
+    // COPIED, because these four arrays are filled by the socket listener while
+    // the poll runs. Handing the live ones out was harmless when there was one
+    // observation per boot; with a round every 100 ms it would mean the result
+    // that ends the loop carries whatever arrived after it was judged — a
+    // report listing a failure the verdict it prints never saw.
+    return {
+      pageErrors: [...pageErrors],
+      consoleErrors: [...consoleErrors],
+      failedRequests: [...failedRequests],
+      rootHtmlLength,
+      bodyText,
+      chunksFetched: [...chunksFetched],
+    };
+  };
+
+  // The tree mounts in an effect AFTER the load event, so the page has to be
+  // asked more than once — and until this round it was asked once, 1.5 seconds
+  // later, whatever it had managed by then. The verdict is what decides when to
+  // stop: `isBootPollFinished` is true only when the answer can no longer
+  // change, so the loop cannot pass a boot the rules would fail. What it can do
+  // is stop the moment a healthy boot is healthy (a few hundred milliseconds,
+  // three times over) and give a slow locale chunk the whole deadline rather
+  // than a number somebody picked on one machine.
+  const deadline = Date.now() + BOOT_SETTLE_DEADLINE_MS;
+  let result = evaluateBundleBoot(await observe(), origin, basePath, scenario);
+  while (!isBootPollFinished(result) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, BOOT_SETTLE_POLL_MS));
+    result = evaluateBundleBoot(await observe(), origin, basePath, scenario);
+  }
 
   // The target goes with the socket: three scenarios would otherwise leave
   // three pages open in one browser, each still running the app it loaded.
   await send("Target.closeTarget", { targetId: target.targetId });
   socket.close();
-  return { pageErrors, consoleErrors, failedRequests, rootHtmlLength, bodyText, chunksFetched };
+  return result;
 }
 
 async function main(): Promise<void> {
@@ -338,7 +372,8 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const server = await serveDist(readBaseUrl());
+  const basePath = readBaseUrl();
+  const server = await serveDist(basePath);
   let browser: ChildProcess | null = null;
   try {
     const started = await startBrowser(executable);
@@ -347,13 +382,7 @@ async function main(): Promise<void> {
     // seeded language a boot rather than a reload, and starting three browsers
     // would pay the launch three times for nothing.
     for (const scenario of BOOT_SCENARIOS) {
-      const observation = await boot(server.origin, started.ws, scenario);
-      const result = evaluateBundleBoot(
-        observation,
-        server.origin,
-        readBaseUrl(),
-        scenario,
-      );
+      const result = await boot(server.origin, started.ws, scenario, basePath);
       console[result.ok ? "log" : "error"](
         formatBundleBootReport(CHECK_NAME, result, scenario.name),
       );

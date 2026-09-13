@@ -7,14 +7,19 @@ import { ru } from "@/lib/i18n/ru";
 import { LANGUAGE_KEY } from "@/lib/storage-keys";
 
 import {
+  BOOT_FAILURE_KINDS,
   BOOT_SCENARIOS,
+  BOOT_SETTLE_DEADLINE_MS,
+  BOOT_SETTLE_POLL_MS,
   evaluateBundleBoot,
   formatBundleBootReport,
+  isBootPollFinished,
   isBundleRequest,
   isSameOrigin,
   isSpaRouteRequest,
   MIN_ROOT_HTML_LENGTH,
   toBootRequestFailure,
+  WAITABLE_BOOT_FAILURE_KINDS,
   type BootObservation,
 } from "../lib/bundle-boot";
 import { readRepoFile as read } from "./helpers/repo-file";
@@ -444,6 +449,156 @@ describe("formatBundleBootReport", () => {
   });
 });
 
+describe("when the poll may stop asking", () => {
+  /**
+   * The rule that replaced a flat 1.5-second wait.
+   *
+   * The objection the fixed settle was written under — polling "would make the
+   * check pass by waiting for the thing it is asking about" — is answered by
+   * the shape of these cases rather than by prose: every condition the loop
+   * waits for is one `evaluateBundleBoot` FAILS on, so a boot that never
+   * satisfies it is failed at the deadline exactly as it was at 1.5 seconds.
+   */
+  const POLISH = BOOT_SCENARIOS.find((scenario) => scenario.name === "polish");
+
+  it("stops the moment the boot is healthy", () => {
+    assert.equal(isBootPollFinished(evaluateBundleBoot(healthy(), ORIGIN)), true);
+  });
+
+  it("keeps waiting for a root that has not filled yet", () => {
+    // The tree mounts in an effect after the load event: an empty root one
+    // poll after navigation is "not yet", not "no".
+    const result = evaluateBundleBoot(healthy({ rootHtmlLength: 0 }), ORIGIN);
+    assert.equal(result.ok, false);
+    assert.equal(isBootPollFinished(result), false);
+  });
+
+  it("keeps waiting for copy that has not rendered yet", () => {
+    const result = evaluateBundleBoot(healthy({ bodyText: "" }), ORIGIN, "", {
+      expectText: "Konto",
+    });
+    assert.equal(result.failures[0].kind, BOOT_FAILURE_KINDS.copyNotOnScreen);
+    assert.equal(isBootPollFinished(result), false);
+  });
+
+  it("keeps waiting for a lazy chunk that has not been requested yet", () => {
+    assert.ok(POLISH, "the Polish scenario is what makes a lazy chunk observable");
+    const result = evaluateBundleBoot(
+      healthy({ bodyText: "KONTO COLLECTABLES" }),
+      ORIGIN,
+      "",
+      POLISH,
+    );
+    assert.equal(result.failures[0].kind, BOOT_FAILURE_KINDS.chunkNotFetched);
+    assert.equal(isBootPollFinished(result), false);
+  });
+
+  it("stops early on an exception, which no amount of waiting takes back", () => {
+    // The whole point of stopping early: a run that has its answer should say
+    // so rather than sit out the remaining nine seconds.
+    const result = evaluateBundleBoot(
+      healthy({ pageErrors: ["TypeError: t is not a function"], rootHtmlLength: 0 }),
+      ORIGIN,
+    );
+    assert.equal(isBootPollFinished(result), true);
+  });
+
+  it("stops early on a console error and on a chunk that 404d", () => {
+    assert.equal(
+      isBootPollFinished(evaluateBundleBoot(healthy({ consoleErrors: ["boom"] }), ORIGIN)),
+      true,
+    );
+    assert.equal(
+      isBootPollFinished(
+        evaluateBundleBoot(
+          healthy({ failedRequests: [{ url: `${ORIGIN}/entry-abc123.js`, status: 404 }] }),
+          ORIGIN,
+        ),
+      ),
+      true,
+    );
+  });
+
+  it("keeps waiting when the only failed request was another origin's", () => {
+    // Supabase is unreachable from a sandbox and is not a boot failure at all,
+    // so it must not end the wait for a tree that is still mounting.
+    const result = evaluateBundleBoot(
+      healthy({
+        rootHtmlLength: 0,
+        failedRequests: [{ url: "https://example.supabase.co/auth/v1/user", status: null }],
+      }),
+      ORIGIN,
+    );
+    assert.deepEqual(
+      result.failures.map((failure) => failure.kind),
+      [BOOT_FAILURE_KINDS.emptyRoot],
+    );
+    assert.equal(isBootPollFinished(result), false);
+  });
+
+  it("waits only for things the verdict would fail on", () => {
+    // THE PROPERTY THAT MAKES POLLING HONEST. If a waitable kind could ever
+    // appear on a passing result, the loop would be deciding the answer rather
+    // than reading it.
+    const cases: Record<string, BootObservation> = {
+      [BOOT_FAILURE_KINDS.emptyRoot]: healthy({ rootHtmlLength: 0 }),
+      [BOOT_FAILURE_KINDS.copyNotOnScreen]: healthy({ bodyText: "" }),
+      [BOOT_FAILURE_KINDS.chunkNotFetched]: healthy({ chunksFetched: [] }),
+    };
+    for (const kind of WAITABLE_BOOT_FAILURE_KINDS) {
+      const result = evaluateBundleBoot(cases[kind], ORIGIN, "", {
+        expectText: "Аккаунт",
+        expectChunk: /^pl-/,
+      });
+      assert.equal(result.ok, false, `${kind} must be a failure, or waiting for it invents one`);
+      assert.ok(
+        result.failures.some((failure) => failure.kind === kind),
+        `${kind} is not what evaluateBundleBoot called it`,
+      );
+    }
+  });
+
+  it("classifies every kind the verdict can produce", () => {
+    // The lock-step case. A seventh kind pushed with a bare string would be
+    // treated as terminal by default — the poll would stop on a condition that
+    // had simply not happened yet — so every kind has to be in the constant.
+    const produced = new Set<string>();
+    const observations: BootObservation[] = [
+      healthy({ rootHtmlLength: 0 }),
+      healthy({ bodyText: "" }),
+      healthy({ chunksFetched: [] }),
+      healthy({ pageErrors: ["Error: boom"] }),
+      healthy({ consoleErrors: ["boom"] }),
+      healthy({ failedRequests: [{ url: `${ORIGIN}/x.js`, status: 404 }] }),
+    ];
+    for (const observation of observations) {
+      for (const failure of evaluateBundleBoot(observation, ORIGIN, "", {
+        expectText: "Аккаунт",
+        expectChunk: /^entry-/,
+      }).failures) {
+        produced.add(failure.kind);
+      }
+    }
+    assert.deepEqual(
+      [...produced].sort(),
+      Object.values(BOOT_FAILURE_KINDS).slice().sort(),
+      "a failure kind was spelled at the push site rather than named",
+    );
+    const kinds = new Set<string>(Object.values(BOOT_FAILURE_KINDS));
+    for (const kind of WAITABLE_BOOT_FAILURE_KINDS) {
+      assert.ok(kinds.has(kind), `${kind} is waited for and is not a kind anything reports`);
+    }
+  });
+
+  it("gives a boot more time than the flat wait did, and asks often", () => {
+    // The deadline is only ever paid by a boot that is already failing; a
+    // healthy one returns as soon as it is healthy. 1.5s was the old flat
+    // wait, and being under it would mean this round made slow boots worse.
+    assert.ok(BOOT_SETTLE_DEADLINE_MS > 1_500);
+    assert.ok(BOOT_SETTLE_POLL_MS > 0 && BOOT_SETTLE_POLL_MS < BOOT_SETTLE_DEADLINE_MS / 10);
+  });
+});
+
 describe("the script around it", () => {
   const SCRIPT = read("scripts/check-bundle-boot.ts");
 
@@ -497,7 +652,7 @@ describe("the script around it", () => {
 
   it("boots every scenario in one browser and closes each page after it", () => {
     assert.match(SCRIPT, /for \(const scenario of BOOT_SCENARIOS\)/);
-    assert.match(SCRIPT, /Page\.navigate", \{ url: `\$\{origin\}\$\{readBaseUrl\(\)\}\$\{scenario\.path\}`/);
+    assert.match(SCRIPT, /Page\.navigate", \{ url: `\$\{origin\}\$\{basePath\}\$\{scenario\.path\}`/);
     assert.match(SCRIPT, /Target\.closeTarget/);
   });
 
@@ -516,7 +671,36 @@ describe("the script around it", () => {
   });
 
   it("judges the boot against the base path it served the app on", () => {
-    assert.match(SCRIPT, /evaluateBundleBoot\(\s*observation,\s*server\.origin,\s*readBaseUrl\(\),/);
+    // One read, passed to both halves: the server strips this prefix and the
+    // verdict decides what is "part of the artifact" by it, so a second
+    // `readBaseUrl()` call is two chances to answer differently.
+    assert.match(SCRIPT, /const basePath = readBaseUrl\(\);\n\s*const server = await serveDist\(basePath\);/);
+    assert.match(SCRIPT, /evaluateBundleBoot\(await observe\(\), origin, basePath, scenario\)/);
+  });
+
+  it("polls for a settled boot instead of waiting a fixed time", () => {
+    // The flat settle is gone: it was a number picked on one machine, and the
+    // failure it was one bad connection away from is "the chunk was slow, so
+    // the app is broken".
+    assert.doesNotMatch(SCRIPT, /const SETTLE_MS/);
+    assert.doesNotMatch(SCRIPT, /setTimeout\(resolve, SETTLE_MS\)/);
+    assert.match(SCRIPT, /while \(!isBootPollFinished\(result\) && Date\.now\(\) < deadline\)/);
+    assert.match(SCRIPT, /Date\.now\(\) \+ BOOT_SETTLE_DEADLINE_MS/);
+    assert.match(SCRIPT, /setTimeout\(resolve, BOOT_SETTLE_POLL_MS\)/);
+  });
+
+  it("judges a snapshot, not the arrays the socket is still filling", () => {
+    // A poll round every 100ms against live arrays would print a report whose
+    // failure list the verdict above it never saw.
+    assert.match(SCRIPT, /pageErrors: \[\.\.\.pageErrors\]/);
+    assert.match(SCRIPT, /chunksFetched: \[\.\.\.chunksFetched\]/);
+  });
+
+  it("takes the deadline and the interval from the module that explains them", () => {
+    // Spelled in the script they would be two numbers nobody can test; the
+    // rule about what the loop may wait for lives beside them.
+    assert.doesNotMatch(SCRIPT, /BOOT_SETTLE_(?:DEADLINE|POLL)_MS\s*=/);
+    assert.match(SCRIPT, /BOOT_SETTLE_DEADLINE_MS,\n\s*BOOT_SETTLE_POLL_MS,/);
   });
 
   it("404s a file that is missing from dist/ instead of handing back the shell", () => {
