@@ -80,6 +80,21 @@
  * indefinitely; what it cannot do is climb FASTER, so a round that needs more
  * than ~30 KiB of room has to make the bundle smaller instead.
  *
+ * 3.67 MiB on 2026-09-13, and it is the first move in this block that is not
+ * a raise. `npm run bundle:composition` — the tool the paragraph below asks
+ * for — found that `app/_layout.tsx`'s `GestureHandlerRootView` was pulling
+ * `react-native-reanimated` (632.9 KiB), gesture-handler (202.3), worklets
+ * (57.8), hammerjs (25.6) and semver (16.7) into a bundle where no screen
+ * mounts a gesture-handler component. Splitting the root into a platform pair
+ * took the bundle from 4696.0 to 3732.1 KiB.
+ *
+ * A SAVING HAS TO BE BANKED IN THE SAME COMMIT. Left at 4.60 MiB the gate
+ * would have had 978 KiB of headroom — not a loose guard but no guard at all,
+ * and four rounds of ordinary work would have spent a fifth of it without
+ * anybody deciding anything. The new number keeps the rule the five raises
+ * were argued under: 26.0 KiB of headroom, under Clarity's ~30 KiB, so a
+ * statically-imported SDK still trips on its own commit.
+ *
  * The SIXTH raise has something the first five did not: `npm run
  * bundle:composition` prints what the bundle is made of, per package and per
  * module, from the export's own sourcemap. Every paragraph above argues from
@@ -98,7 +113,7 @@ import { BUDGET_HISTORY, BUDGET_SNAPSHOT } from "@/lib/budget-snapshot";
 // holds the rule for the whole tree rather than for the UI half of it.
 import { plural } from "@/lib/plural";
 
-export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 4.60 * 1024 * 1024;
+export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 3.67 * 1024 * 1024;
 
 /**
  * The bundle as it stood when the budget last moved.
@@ -255,15 +270,22 @@ export function formatBundleSizeReport(
 }
 
 /**
- * "Raised 4 times since 2026-09-10, +61.4 KiB in total" — the trend every
- * raise was argued without.
+ * "Budget moved 5 times since 2026-09-10, -798.7 KiB in total" — the trend
+ * every raise was argued without.
  *
- * The budget's doc block is four paragraphs of prose doing a table's job:
- * each move was argued against the one before it, and a reader wanting the
- * RATE had to reconstruct it by reading all four. Eight rounds carried
- * "nothing keeps a budget history" as a suggestion.
+ * The budget's doc block is paragraphs of prose doing a table's job: each move
+ * was argued against the one before it, and a reader wanting the RATE had to
+ * reconstruct it by reading all of them. Eight rounds carried "nothing keeps a
+ * budget history" as a suggestion.
  *
- * Returns `null` for a single-entry history, because "raised once" is not a
+ * MOVED, not RAISED, and the word had to change on the day the first lowering
+ * landed. Five raises in three days made "raised N times (+X KiB)" read as a
+ * fact about the list rather than an assumption, and the assumption was baked
+ * into the arithmetic too: the total was printed with a hard-coded `+`, so the
+ * 2026-09-13 row would have printed `+-798.7 KiB` — a sign bug that could only
+ * appear on the one build anybody would want to celebrate.
+ *
+ * Returns `null` for a single-entry history, because "moved once" is not a
  * trend and a line saying so on every build is noise.
  */
 export function formatBudgetTrendLine(
@@ -272,15 +294,16 @@ export function formatBudgetTrendLine(
   if (history.length < 2) return null;
   const newest = history[0];
   const oldest = history[history.length - 1];
-  // The moves BETWEEN the ends: the oldest row is the baseline, not a raise
+  // The moves BETWEEN the ends: the oldest row is the baseline, not a move
   // measured against anything in this list.
-  const raises = history.length - 1;
-  const grew = newest.budgetBytes - oldest.budgetBytes;
+  const moves = history.length - 1;
+  const net = newest.budgetBytes - oldest.budgetBytes;
+  // Signed, because an unsigned "2.0 KiB in total" reads as a size rather than
+  // as a change, and the sign is now the interesting half.
+  const sign = net < 0 ? "-" : "+";
   return (
-    `check-bundle-size: budget raised ${String(raises)} ${plural(raises, "time", "times")} ` +
-    // Signed, because every move in the history is a raise and an unsigned
-    // "2.0 KiB in total" reads as a size rather than as growth.
-    `since ${oldest.takenOn} (+${formatKiB(grew)} in total) — see BUDGET_HISTORY for what spent each one.`
+    `check-bundle-size: budget moved ${String(moves)} ${plural(moves, "time", "times")} ` +
+    `since ${oldest.takenOn} (${sign}${formatKiB(Math.abs(net))} net) — see BUDGET_HISTORY for what each one was for.`
   );
 }
 
@@ -291,11 +314,15 @@ export function formatBudgetTrendLine(
  * Signed, and the zero case says so explicitly rather than printing "+0.0
  * KiB": a build at the recorded measurement is the one that just moved the
  * budget, and reading it as growth is how a raise gets argued twice.
+ *
+ * "the last budget move" and not "the last raise": the 2026-09-13 move went
+ * DOWN, and a line calling that a raise describes the opposite of what
+ * happened on the build where somebody is reading it.
  */
 export function formatDriftLine(result: BundleSizeResult): string {
   const bought = result.budgetBytes - LAST_MEASURED_BUNDLE_BYTES;
   if (result.driftBytes === 0) {
-    return `check-bundle-size: at the recorded measurement — ${formatKiB(bought)} bought by the last raise, none of it spent.`;
+    return `check-bundle-size: at the recorded measurement — ${formatKiB(bought)} of room at the last budget move, none of it spent.`;
   }
   const sign = result.driftBytes > 0 ? "+" : "-";
   const spent = `${sign}${formatKiB(Math.abs(result.driftBytes))}`;

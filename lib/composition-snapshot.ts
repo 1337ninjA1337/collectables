@@ -36,51 +36,54 @@ import type { CompositionBaseline } from "@/lib/bundle-composition";
 // an arrival on the next run — one number, so the two halves cannot disagree.
 
 /**
- * Taken on 2026-09-13, from a `--source-maps` export of the tree
- * `check-bundle-size` measured at 4696.0 KiB.
+ * Re-taken on 2026-09-13, after the gesture-handler root became a platform
+ * pair, from a `--source-maps` export of the tree `check-bundle-size` measured
+ * at 3732.1 KiB.
  *
- * `totalBytes` here is 4696.3 KiB — 0.3 larger, because a sourcemapped export
- * appends a `sourceMappingURL` comment to each chunk and the deploy strips
- * those before publishing. It is the right number for THIS baseline (every
- * bucket below was measured in the same build) and the wrong one to compare
- * against the budget, which is why the gate keeps its own figure in
- * `lib/budget-snapshot.ts`. Compare composition totals to composition totals.
+ * THE PREVIOUS BASELINE IS WHY THAT ROUND HAPPENED AT ALL. It recorded
+ * `react-native-reanimated` at 632.9 KiB — the largest single bucket, 13.5% of
+ * everything shipped — in a web build where `components/DraggableList.web.tsx`
+ * exists specifically to avoid it. The drift section then confirmed the fix in
+ * one line: -963.9 KiB, with reanimated, gesture-handler, worklets, hammerjs
+ * and semver all marked `(gone)`.
  *
- * The three headline facts, so the next reader does not have to run anything
- * to know where to look: `react-native-reanimated` is the largest single
- * bucket at 632.9 KiB (13.5%), the five Sentry packages together are 645 KiB,
- * and `lib/i18n-context.tsx` alone is 314 KiB — the heaviest module in the
- * bundle, ahead of `react-dom`, because Metro escapes non-ASCII as `\uXXXX`
- * and six locales of Cyrillic cost six bytes a letter.
+ * `totalBytes` here is 0.3 KiB above the gate's figure, because a sourcemapped
+ * export appends a `sourceMappingURL` comment to each chunk and the deploy
+ * strips them. It is the right number for THIS baseline — every bucket below
+ * was measured in the same build — and the wrong one to compare against the
+ * budget, which keeps its own figure in `lib/budget-snapshot.ts`. Compare
+ * composition totals to composition totals.
+ *
+ * The headline facts as they stand now: the five Sentry packages are 645 KiB
+ * together and statically imported, `lib/` is 552 KiB of this repository's own
+ * code, and `lib/i18n-context.tsx` alone is 314 KiB — the heaviest single
+ * module in the bundle, ahead of `react-dom`, because Metro escapes non-ASCII
+ * as `\uXXXX` and six locales of Cyrillic cost six bytes a letter.
  */
 export const COMPOSITION_BASELINE: CompositionBaseline = {
   takenOn: "2026-09-13",
-  totalBytes: 4809013,
+  totalBytes: 3821988,
   buckets: {
-    "(unattributed)": 649923,
-    "react-native-reanimated": 648122,
+    "(unattributed)": 620503,
     "lib/": 552213,
     "@sentry/core": 292950,
     "react-native-web": 282097,
-    "react-native-gesture-handler": 207129,
-    "app/": 198356,
+    "app/": 198345,
     "@sentry/react-native": 195253,
     "react-dom": 171778,
     "expo-router": 154974,
     "@posthog/core": 127400,
     "@sentry-internal/replay": 123677,
-    "components/": 122768,
+    "components/": 122896,
     "posthog-react-native": 110929,
     "@supabase/auth-js": 106013,
     "@sentry/browser": 89827,
     "@react-navigation/core": 81554,
-    "react-native-worklets": 59141,
     "@sentry-internal/feedback": 48630,
     "@sentry-internal/browser-utils": 41416,
     "@react-navigation/elements": 34118,
     "@supabase/realtime-js": 33751,
     "@sentry/react": 30835,
-    "@egjs/hammerjs": 26196,
     "@supabase/phoenix": 25050,
     "expo-auth-session": 24327,
     "@react-navigation/native": 23308,
@@ -88,7 +91,6 @@ export const COMPOSITION_BASELINE: CompositionBaseline = {
     "expo-file-system": 20454,
     "@react-navigation/routers": 18093,
     "@expo/vector-icons": 17774,
-    "semver": 17134,
     "@babel/runtime": 15900,
     "@sentry-internal/replay-canvas": 14702,
     "expo-modules-core": 14272,

@@ -52,8 +52,14 @@ describe("the budget is a headroom, not a round number", () => {
 });
 
 describe("resolveBundleSizeBudget", () => {
-  it("defaults to 4.60 MiB when the env var is unset or empty", () => {
-    assert.equal(DEFAULT_BUNDLE_SIZE_BUDGET_BYTES, 4.60 * 1024 * 1024);
+  it("defaults to 3.67 MiB when the env var is unset or empty", () => {
+    // Down from 4.60 on 2026-09-13, which is the first move in either
+    // direction that was not a raise: the gesture-handler root became a
+    // platform pair and 964.2 KiB of reanimated, worklets and hammerjs left
+    // the web bundle. A saving is banked by lowering the budget in the same
+    // commit — left where it was, the gate would have had 978 KiB of headroom
+    // and caught nothing.
+    assert.equal(DEFAULT_BUNDLE_SIZE_BUDGET_BYTES, 3.67 * 1024 * 1024);
     assert.equal(resolveBundleSizeBudget({}), DEFAULT_BUNDLE_SIZE_BUDGET_BYTES);
     assert.equal(
       resolveBundleSizeBudget({ BUNDLE_SIZE_BUDGET_BYTES: "" }),

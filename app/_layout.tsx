@@ -1,5 +1,3 @@
-import "react-native-gesture-handler";
-
 import { ErrorBoundary } from "@sentry/react-native";
 import * as Sentry from "@sentry/react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,10 +6,15 @@ import { Stack, router, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { BottomNav } from "@/components/bottom-nav";
 import { CrashFallback } from "@/components/crash-fallback";
+// Platform-split: `GestureHandlerRootView` plus its side-effect import on
+// native, a plain `<View>` on web. Nothing on web mounts a gesture-handler
+// component — the reorder list has its own web shim — and the import alone was
+// carrying reanimated, worklets and hammerjs into the bundle: 964 KiB, a fifth
+// of what the deployed site downloads. See `components/gesture-root.web.tsx`.
+import { GestureRoot } from "@/components/gesture-root";
 import { LoginScreen } from "@/components/login-screen";
 import { NavigationBreadcrumbs } from "@/components/navigation-breadcrumbs";
 import { SearchOverlay } from "@/components/search-overlay";
@@ -210,7 +213,7 @@ function AppShell() {
   const showMobileNav = isMobile;
 
   return (
-    <GestureHandlerRootView style={styles.shell}>
+    <GestureRoot style={styles.shell}>
     <View style={styles.shell}>
       <StatusBar style="dark" />
       <NavigationBreadcrumbs />
@@ -332,7 +335,7 @@ function AppShell() {
       <SearchOverlay visible={searchOpen} onClose={() => setSearchOpen(false)} />
       <SoldListingPrompt />
     </View>
-    </GestureHandlerRootView>
+    </GestureRoot>
   );
 }
 

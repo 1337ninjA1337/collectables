@@ -165,16 +165,40 @@ describe("BUDGET_HISTORY", () => {
     assert.equal(BUDGET_SNAPSHOT, BUDGET_HISTORY[0]);
   });
 
-  it("is newest first, by date and by budget", () => {
+  it("is newest first by date, and every row is a MOVE", () => {
+    // The budget half of this case used to read "> older", with a message
+    // saying a fall would need its own reasoning here. It got one on
+    // 2026-09-13: the composition report found 964 KiB of gesture stack in the
+    // web bundle that no web screen uses, and the saving had to be banked by
+    // lowering the budget in the same commit — a budget 978 KiB above its
+    // bundle is not a loose guard, it is no guard.
+    //
+    // What survives is the rule that actually matters: a row RECORDS a change,
+    // so two rows with the same budget are a measurement somebody forgot to
+    // take or a row added for nothing.
     for (let i = 1; i < BUDGET_HISTORY.length; i += 1) {
       const newer = BUDGET_HISTORY[i - 1];
       const older = BUDGET_HISTORY[i];
       assert.ok(newer.takenOn >= older.takenOn, `row ${String(i)} is dated before the one after it`);
-      assert.ok(
-        newer.budgetBytes > older.budgetBytes,
-        `row ${String(i)} does not record a RAISE — every move so far has been upward, and a fall needs its own reasoning here`,
+      assert.notEqual(
+        newer.budgetBytes,
+        older.budgetBytes,
+        `row ${String(i)} records no change of budget — a row is a MOVE, up or down`,
       );
     }
+  });
+
+  it("has exactly one downward move, and it is the one that says so", () => {
+    // A lowering is not ordinary: it means somebody made the bundle smaller
+    // and banked it. If a second one appears, this case is where the next
+    // reader learns the first was not a fluke — and if one appears with a
+    // `because` that does not mention the saving, that is a budget quietly
+    // being tightened.
+    const falls = BUDGET_HISTORY.filter(
+      (row, i) => i + 1 < BUDGET_HISTORY.length && row.budgetBytes < BUDGET_HISTORY[i + 1].budgetBytes,
+    );
+    assert.equal(falls.length, 1);
+    assert.match(falls[0].because, /DOWN/);
   });
 
   it("records the budget each measurement justified", () => {
@@ -199,25 +223,37 @@ describe("BUDGET_HISTORY", () => {
 });
 
 describe("formatBudgetTrendLine", () => {
-  it("names the number of raises and the total growth", () => {
+  it("names the number of moves and the net change", () => {
     const line = formatBudgetTrendLine([
       { budgetBytes: 3 * 1024, takenOn: "2026-09-12" },
       { budgetBytes: 2 * 1024, takenOn: "2026-09-11" },
       { budgetBytes: 1 * 1024, takenOn: "2026-09-10" },
     ]);
 
-    assert.match(line ?? "", /budget raised 2 times since 2026-09-10 \(\+2\.0 KiB in total\)/);
+    assert.match(line ?? "", /budget moved 2 times since 2026-09-10 \(\+2\.0 KiB net\)/);
   });
 
   it("counts the moves between the ends, not the rows", () => {
-    // The oldest row is the baseline, not a raise measured against anything
+    // The oldest row is the baseline, not a move measured against anything
     // in the list.
     const line = formatBudgetTrendLine([
       { budgetBytes: 2 * 1024, takenOn: "2026-09-12" },
       { budgetBytes: 1 * 1024, takenOn: "2026-09-10" },
     ]);
 
-    assert.match(line ?? "", /raised 1 time since/);
+    assert.match(line ?? "", /moved 1 time since/);
+  });
+
+  it("signs a net FALL rather than printing a plus in front of a minus", () => {
+    // The bug this shape had until the first lowering: the total was printed
+    // with a hard-coded `+`, so a history ending below where it started read
+    // `+-798.7 KiB` — on the one build anybody would want to celebrate.
+    const line = formatBudgetTrendLine([
+      { budgetBytes: 1 * 1024, takenOn: "2026-09-13" },
+      { budgetBytes: 3 * 1024, takenOn: "2026-09-12" },
+    ]);
+    assert.match(line ?? "", /budget moved 1 time since 2026-09-12 \(-2\.0 KiB net\)/);
+    assert.ok(!(line ?? "").includes("+-"), "a plus in front of a minus");
   });
 
   it("says nothing about a history with one entry", () => {
@@ -228,8 +264,9 @@ describe("formatBudgetTrendLine", () => {
   });
 
   it("points at the rows rather than restating them", () => {
-    // Four `because` lines in a build log would be the prose the history
-    // replaced, printed on every commit.
-    assert.match(formatBudgetTrendLine() ?? "", /see BUDGET_HISTORY for what spent each one/);
+    // Five `because` lines in a build log would be the prose the history
+    // replaced, printed on every commit. "What each one was FOR", not "what
+    // spent each one": one of them was not spending.
+    assert.match(formatBudgetTrendLine() ?? "", /see BUDGET_HISTORY for what each one was for/);
   });
 });

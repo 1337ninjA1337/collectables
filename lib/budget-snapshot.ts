@@ -57,7 +57,16 @@ export type BudgetSnapshot = {
 };
 
 /**
- * Every budget move, newest first.
+ * Every budget move, newest first — RAISES AND ONE LOWERING.
+ *
+ * The list was five raises in three days and the doc block that reads it
+ * called that a ratchet "that has never once said stop". The 2026-09-13 row is
+ * the other direction: the composition report found 964 KiB of gesture stack
+ * in the web bundle that no web screen uses, and a budget left at 4.60 MiB
+ * over a 3732 KiB bundle is not a guard at all — 978 KiB of headroom catches
+ * nothing, least of all the ~30 KiB SDK the number exists for. A saving has to
+ * be banked by lowering the budget in the same commit, or it is spent by the
+ * next four rounds without anybody deciding to.
  *
  * The doc block in `lib/bundle-size.ts` is four paragraphs of prose doing a
  * table's job: each raise was argued against the one before it, in sentences,
@@ -76,6 +85,14 @@ export type BudgetSnapshot = {
  * module that has grown by nine keys since.
  */
 export const BUDGET_HISTORY: readonly BudgetSnapshot[] = [
+  {
+    budgetBytes: 3.67 * 1024 * 1024,
+    bundleBytes: 3_821_688,
+    translationsBytes: 246_084,
+    takenOn: "2026-09-13",
+    because:
+      "the first move that has ever gone DOWN: the gesture-handler root became a platform pair, and reanimated, worklets, hammerjs and semver left the web bundle with it — 964.2 KiB, a fifth of what the deployed site downloads, found by the composition report and confirmed by its drift section",
+  },
   {
     budgetBytes: 4.60 * 1024 * 1024,
     bundleBytes: 4_802_272,
