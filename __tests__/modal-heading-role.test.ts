@@ -37,8 +37,18 @@ import { sourceCode, tsxFiles } from "./helpers/source-files";
  * `modalTitle`, `shareTitle`, `rowTitle`. NOT `subtitle`, which is a second
  * line under a heading and never a heading itself; matching it would be
  * asking for two headers where the design has one.
+ *
+ * A SECTION LABEL IS THE OTHER SHAPE A HEADING TAKES HERE, and leaving it out
+ * is how the search overlay ended up with no landmark at all: the file's only
+ * `…Title` is `rowTitle`, which is correctly exempt, so the rule's verdict on
+ * the whole file was "nothing to classify" while three section labels sat
+ * above three lists of results. `styles.sectionLabel` and `styles.section`
+ * with a suffix are matched for the same reason `sheetTitle` is — what the
+ * style is CALLED is the only signal a scan has, and this repository names a
+ * heading above a list `section…`. `sectionText` is the body copy under one,
+ * excluded for exactly the reason `subtitle` is.
  */
-const TITLE_STYLE = /styles\.(?:title|[A-Za-z0-9_]*Title)\b/;
+const TITLE_STYLE = /styles\.(?:title|[A-Za-z0-9_]*Title|section(?:Label|Heading)?)\b/;
 
 type TitleText = {
   readonly file: string;
@@ -99,6 +109,12 @@ function modalTitleTexts(file: string): TitleText[] {
  * those as headings would put one heading per search result into the rotor
  * and leave the overlay itself with none — the opposite of what the role is
  * for.
+ *
+ * That sentence used to be the whole story about this file, and the second
+ * half of it was a description of the bug rather than of the design: the
+ * overlay HAD no heading. Its three `sectionLabel`s carry the role now, so the
+ * exemption is what it always claimed to be — a rule about rows, inside a file
+ * that has landmarks of its own.
  */
 const NOT_A_HEADING: readonly string[] = ["styles.rowTitle"];
 
@@ -138,6 +154,36 @@ describe("every modal heading is announced as a header", () => {
         `${row.file}:${String(row.line)} is listed as not a heading and carries the role`,
       );
     }
+  });
+
+  it("makes a heading of each section of search results", () => {
+    // The three lists — items, collections, people — are one scroll, and the
+    // rotor is how a screen-reader user skips twenty items to reach two
+    // people. Named rather than counted: a section that stopped rendering its
+    // label would pass the classification case by having nothing to classify.
+    const headers = FOUND.filter(
+      (text) =>
+        text.file === "components/search-overlay.tsx" &&
+        text.attrs.includes('accessibilityRole="header"'),
+    );
+    assert.equal(
+      headers.length,
+      3,
+      `search-overlay announces ${String(headers.length)} of its 3 result sections as headers`,
+    );
+    for (const header of headers) {
+      assert.match(header.attrs, /styles\.sectionLabel/);
+    }
+  });
+
+  it("reads a section label as a heading and a section's body as not one", () => {
+    // The matcher's two edges, held here rather than only in its doc block:
+    // `sectionLabel` is the heading above a list, `sectionText` is the copy
+    // under one — the same distinction `subtitle` is excluded for.
+    assert.match("styles.sectionLabel", TITLE_STYLE);
+    assert.match("styles.sectionTitle", TITLE_STYLE);
+    assert.doesNotMatch("styles.sectionText", TITLE_STYLE);
+    assert.doesNotMatch("styles.subtitle", TITLE_STYLE);
   });
 
   it("covers the sheets a user meets most", () => {

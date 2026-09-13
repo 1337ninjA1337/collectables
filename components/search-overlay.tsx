@@ -360,7 +360,10 @@ export function SearchOverlay({ visible, onClose }: Props) {
             >
               {matchedItems.length > 0 && (
                 <>
-                  <Text style={styles.sectionLabel}>
+                  {/* A header, not a label: three sections of results in one
+                      scroll, and the rotor is how a screen-reader user skips
+                      the twenty items to reach the two people. */}
+                  <Text style={styles.sectionLabel} accessibilityRole="header">
                     {t("searchResultsItems")} ({matchedItems.length})
                   </Text>
                   {matchedItems.map((item) => (
@@ -415,7 +418,10 @@ export function SearchOverlay({ visible, onClose }: Props) {
 
               {matchedCollections.length > 0 && (
                 <>
-                  <Text style={styles.sectionLabel}>
+                  {/* A header, not a label: three sections of results in one
+                      scroll, and the rotor is how a screen-reader user skips
+                      the twenty items to reach the two people. */}
+                  <Text style={styles.sectionLabel} accessibilityRole="header">
                     {t("searchResultsCollections")} ({matchedCollections.length})
                   </Text>
                   {matchedCollections.map((c) => (
@@ -452,7 +458,10 @@ export function SearchOverlay({ visible, onClose }: Props) {
 
               {matchedProfiles.length > 0 && (
                 <>
-                  <Text style={styles.sectionLabel}>
+                  {/* A header, not a label: three sections of results in one
+                      scroll, and the rotor is how a screen-reader user skips
+                      the twenty items to reach the two people. */}
+                  <Text style={styles.sectionLabel} accessibilityRole="header">
                     {t("searchResultsPeople")} ({matchedProfiles.length})
                   </Text>
                   {matchedProfiles.map((p) => (
