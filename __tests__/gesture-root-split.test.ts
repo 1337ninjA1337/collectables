@@ -91,6 +91,20 @@ describe("the native half", () => {
 });
 
 describe("the root layout", () => {
+  it("imports the split root before anything else", () => {
+    // `react-native-gesture-handler` asks to be imported at the top of the
+    // entry file, before any other import, and it WAS the first line here
+    // until the split moved it one module down. The native half still runs
+    // that side effect, so the import that pulls it has to keep the position
+    // the side effect had — a detail the web half cannot notice and the
+    // typecheck cannot either.
+    const firstImport = LAYOUT.slice(LAYOUT.indexOf("import "));
+    assert.match(
+      firstImport,
+      /^import \{ GestureRoot \} from "@\/components\/gesture-root";/,
+    );
+  });
+
   it("mounts the split root and imports neither package itself", () => {
     assert.match(LAYOUT, /import \{ GestureRoot \} from "@\/components\/gesture-root"/);
     assert.match(LAYOUT, /<GestureRoot style=\{styles\.shell\}>/);

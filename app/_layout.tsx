@@ -1,3 +1,17 @@
+// FIRST, and that is the gesture-handler rule rather than a style choice: on
+// native this module runs `import "react-native-gesture-handler"` for its side
+// effects, which the library asks for at the top of the entry file, before
+// anything else is imported. It was literally the first line of this file
+// until the platform split moved it one module down; keeping the import here
+// keeps the ordering the split was not meant to change.
+//
+// Platform-split: `GestureHandlerRootView` plus that side-effect import on
+// native, a plain `<View>` on web. Nothing on web mounts a gesture-handler
+// component — the reorder list has its own web shim — and the import alone was
+// carrying reanimated, worklets and hammerjs into the bundle: 964 KiB, a fifth
+// of what the deployed site downloads. See `components/gesture-root.web.tsx`.
+import { GestureRoot } from "@/components/gesture-root";
+
 import { ErrorBoundary } from "@sentry/react-native";
 import * as Sentry from "@sentry/react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,12 +23,6 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 
 import { BottomNav } from "@/components/bottom-nav";
 import { CrashFallback } from "@/components/crash-fallback";
-// Platform-split: `GestureHandlerRootView` plus its side-effect import on
-// native, a plain `<View>` on web. Nothing on web mounts a gesture-handler
-// component — the reorder list has its own web shim — and the import alone was
-// carrying reanimated, worklets and hammerjs into the bundle: 964 KiB, a fifth
-// of what the deployed site downloads. See `components/gesture-root.web.tsx`.
-import { GestureRoot } from "@/components/gesture-root";
 import { LoginScreen } from "@/components/login-screen";
 import { NavigationBreadcrumbs } from "@/components/navigation-breadcrumbs";
 import { SearchOverlay } from "@/components/search-overlay";
