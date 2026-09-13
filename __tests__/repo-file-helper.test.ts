@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import path from "node:path";
 
 import {
+  I18N_LOCALE_SOURCE_RELS,
   I18N_SOURCE_REL,
+  I18N_TYPES_SOURCE_REL,
   readI18nSource,
 } from "./helpers/i18n-source-file";
 import {
@@ -186,9 +188,14 @@ describe("reading a repo file, said once", () => {
     const helper = readRepoFile("__tests__/helpers/i18n-source-file.ts");
     assert.match(helper, /from "\.\/repo-file"/);
     assert.doesNotMatch(helper, /from "node:fs"/);
-    // Through the module's own constant, not a second literal — the path is
-    // said once and this case is about the layering, not about the name.
-    assert.equal(readI18nSource(), readRepoFile(I18N_SOURCE_REL));
+    // Through the module's own constants, not second literals — the paths are
+    // said once and this case is about the layering, not about the names. The
+    // reader concatenates seven files since the locale maps became modules, so
+    // what it proves is that each of them arrives through this helper.
+    const joined = readI18nSource();
+    for (const rel of [I18N_SOURCE_REL, I18N_TYPES_SOURCE_REL, ...I18N_LOCALE_SOURCE_RELS]) {
+      assert.ok(joined.includes(readRepoFile(rel)), `${rel} is not in what the reader returns`);
+    }
   });
 
   it("keeps the exemption list to the four files that have to name the shape", () => {

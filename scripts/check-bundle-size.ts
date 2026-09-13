@@ -23,6 +23,7 @@ import {
   resolveBundleSizeBudget,
   type BundleFile,
 } from "../lib/bundle-size";
+import { I18N_SOURCE_FILES } from "../lib/i18n-source-files";
 import {
   formatCopyDriftLine,
   translationsFootprint,
@@ -31,8 +32,16 @@ import { REPO_ROOT, assertBundlePremise } from "./bundle-premise";
 
 const CHECK_NAME = "check-bundle-size";
 
-/** The one file the copy measure reads, relative to the repo root. */
-const I18N_SOURCE = "lib/i18n-context.tsx";
+/**
+ * What the copy measure reads, relative to the repo root.
+ *
+ * It was one file until the locale maps became modules; reading only the
+ * provider afterwards would have reported the copy as having shrunk by 300 KiB
+ * in a commit that moved it, on the one line somebody consults when deciding
+ * whether to raise the budget. `lib/i18n-source-files.ts` names the set for
+ * every reader that cares.
+ */
+const I18N_SOURCES = I18N_SOURCE_FILES;
 
 function main(): void {
   // Shared premise (dist/ present, at least one chunk, newer than the source
@@ -55,7 +64,9 @@ function main(): void {
   // the screens that read it. See `lib/translations-footprint.ts` for why the
   // delta is a fair proxy even though the absolute number is not a share.
   const copyLine = formatCopyDriftLine(
-    translationsFootprint(fs.readFileSync(path.join(REPO_ROOT, I18N_SOURCE), "utf8")),
+    translationsFootprint(
+      I18N_SOURCES.map((rel) => fs.readFileSync(path.join(REPO_ROOT, rel), "utf8")).join("\n"),
+    ),
   );
   if (copyLine) console.log(copyLine);
 

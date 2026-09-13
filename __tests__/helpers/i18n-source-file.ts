@@ -38,13 +38,32 @@
 
 import path from "node:path";
 
+import {
+  I18N_LOCALE_SOURCES,
+  I18N_PROVIDER_SOURCE,
+  I18N_TYPES_SOURCE,
+} from "../../lib/i18n-source-files";
+
 import { REPO_ROOT, readRepoFile } from "./repo-file";
 
 /** The module's location, repo-relative — the one statement of it. */
-export const I18N_SOURCE_REL = "lib/i18n-context.tsx";
+export const I18N_SOURCE_REL = I18N_PROVIDER_SOURCE;
 
 /** The same location absolute, for the case that pins what it resolves to. */
 export const I18N_SOURCE_PATH = path.join(REPO_ROOT, I18N_SOURCE_REL);
+
+/** Where the three shared types live — `AppLanguage` among them. */
+export const I18N_TYPES_SOURCE_REL = I18N_TYPES_SOURCE;
+
+/**
+ * The six locale maps, which are modules of their own since 2026-09-13.
+ *
+ * They were 3696 of `i18n-context.tsx`'s 3929 lines, and they moved so that
+ * four of them can eventually be fetched on demand rather than shipped to
+ * every visitor. `en` first because it is the key set the other five are
+ * checked against, then the order `languageOptions` lists.
+ */
+export const I18N_LOCALE_SOURCE_RELS: readonly string[] = I18N_LOCALE_SOURCES;
 
 /**
  * The translations module's source text.
@@ -55,5 +74,27 @@ export const I18N_SOURCE_PATH = path.join(REPO_ROOT, I18N_SOURCE_REL);
  * parser already knows, which is the habit that parser exists to end.
  */
 export function readI18nSource(): string {
+  // `.map((rel) => …)` and not `.map(readRepoFile)`: the reader takes path
+  // SEGMENTS, so a point-free map hands it the array index as a second
+  // segment and every call throws on the number.
+  return [I18N_SOURCE_REL, I18N_TYPES_SOURCE_REL, ...I18N_LOCALE_SOURCE_RELS]
+    .map((rel) => readRepoFile(rel))
+    .join("\n");
+}
+
+/**
+ * Just the provider's own file — the questions that are about the MODULE
+ * rather than about the copy: what it imports, what it exports, what the
+ * provider does on mount.
+ *
+ * {@link readI18nSource} answers the other kind, and after the locale split it
+ * has to be a concatenation to do it: a hundred suites ask "does every locale
+ * declare this key", which was one file's text until the maps became six
+ * modules and is now seven files' text. Joining them keeps that question
+ * answerable in one call, and `lib/i18n-source.ts` reads top-level
+ * declarations rather than offsets, so a concatenation is the same subject
+ * the single file was.
+ */
+export function readI18nProviderSource(): string {
   return readRepoFile(I18N_SOURCE_REL);
 }

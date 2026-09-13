@@ -547,9 +547,16 @@ export function declaredKeysByFormatting(body: string): readonly string[] {
 }
 
 /**
- * Matches a top-level `const <name> = <open>`, with or without a type
- * annotation (`: TranslationMap`, `: Record<AppLanguage, TranslationMap>`,
- * `: { code: AppLanguage; label: string }[]`).
+ * Matches a top-level `const <name> = <open>` or `export const <name> =
+ * <open>`, with or without a type annotation (`: TranslationMap`, `:
+ * Record<AppLanguage, TranslationMap>`, `: { code: AppLanguage; label: string
+ * }[]`).
+ *
+ * **The `export` half arrived with the locale modules.** The six maps lived in
+ * `lib/i18n-context.tsx` as file-private `const`s; as `lib/i18n/<locale>.ts`
+ * they have to be exported, and without this every reader would report the
+ * maps as renamed or deleted — which is exactly what 265 cases said the hour
+ * before it was added.
  *
  * Line-anchored, so prose in a doc comment that happens to quote a declaration
  * is not one. The annotation may not cross a newline or contain `=`, which is
@@ -557,7 +564,7 @@ export function declaredKeysByFormatting(body: string): readonly string[] {
  */
 function declarationPattern(name: string, open: "{" | "["): RegExp {
   return new RegExp(
-    `^\\s*const\\s+${name}\\b[^=\\n]*=\\s*\\${open}`,
+    `^\\s*(?:export\\s+)?const\\s+${name}\\b[^=\\n]*=\\s*\\${open}`,
     "m",
   );
 }

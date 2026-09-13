@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Fails when a base translation key in `lib/i18n-context.tsx` is read by
+ * Fails when a base translation key in `lib/i18n/en.ts` is read by
  * nothing in the source tree. Run via `npm run lint:orphan-i18n` locally and
  * via `npm run lint:ci` in CI.
  *
@@ -18,6 +18,7 @@ import {
 import { GuardRootError } from "../lib/guard-root";
 import type { ScannedSource } from "../lib/i18n-key-usage";
 import { ScannedFloorError, assertScannedFloor } from "../lib/scanned-floor";
+import { I18N_LOCALE_SOURCES } from "../lib/i18n-source-files";
 import { SOURCE_DIRS } from "../lib/source-dirs";
 import { guardScanRoot, listSourceFiles } from "./guard-io";
 
@@ -36,12 +37,21 @@ const DEFAULT_REPO_ROOT = path.join(__dirname, "..");
  * of them after a comma and make this guard vacuous in a commit that reads as
  * formatting.
  */
-const TRANSLATIONS_FILE = "lib/i18n-context.tsx";
+const TRANSLATIONS_FILE = I18N_LOCALE_SOURCES[0];
+
+/**
+ * The six locale maps, excluded from the scan for the same defensive reason
+ * {@link TRANSLATIONS_FILE} is: they write the same identifiers as keys, and a
+ * commit that quoted them would make this guard vacuous while reading as
+ * formatting. They moved out of `lib/i18n-context.tsx` on 2026-09-13; the
+ * provider itself is ordinary source now and is scanned like any other file.
+ */
+const LOCALE_FILES = new Set(I18N_LOCALE_SOURCES);
 
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
   const files = listSourceFiles(repoRoot, SOURCE_DIRS).filter(
-    (file) => file !== TRANSLATIONS_FILE,
+    (file) => !LOCALE_FILES.has(file),
   );
 
   assertScannedFloor(CHECK_NAME, files.length);

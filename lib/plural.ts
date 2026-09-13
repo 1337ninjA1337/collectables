@@ -65,10 +65,12 @@
  * Nothing about `plural` is specific to a translation map — it knows no
  * vocabulary at all, which is exactly what makes it the two-form rule for a
  * gate's English as much as for `en`, `de` and `es`. `slavicPlural` has no
- * caller outside `lib/i18n-context.tsx` and wants none: this tree produces no
- * Russian failure messages.
+ * caller outside the three Slavic locale maps and wants none: this tree
+ * produces no Russian failure messages.
  *
- * The six of them — `lib/i18n-context.tsx`, `lib/audit-baseline.ts`,
+ * The eleven of them — `lib/i18n/en.ts`, `lib/i18n/ru.ts`, `lib/i18n/be.ts`,
+ * `lib/i18n/pl.ts`, `lib/i18n/de.ts`, `lib/i18n/es.ts` (the six locale maps,
+ * which were one file until 2026-09-13), `lib/audit-baseline.ts`,
  * `lib/ships-to-client.ts`, `lib/provenance-tables.ts`,
  * `lib/bundle-size.ts`, `__tests__/helpers/coverage-floor.ts` — are named here
  * rather than counted,

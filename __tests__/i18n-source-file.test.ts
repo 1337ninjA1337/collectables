@@ -68,7 +68,9 @@ describe("the translations module's path, said once", () => {
     // resolving from `import.meta.url` would answer a different question.
     assert.ok(path.isAbsolute(I18N_SOURCE_PATH));
     assert.equal(I18N_SOURCE_PATH, repoPath("lib", "i18n-context.tsx"));
-    assert.equal(readFileSync(I18N_SOURCE_PATH, "utf8"), readI18nSource());
+    // The provider's own text is the FIRST thing the reader returns, and since
+    // the locale maps became modules it is no longer the whole of it.
+    assert.ok(readI18nSource().startsWith(readFileSync(I18N_SOURCE_PATH, "utf8")));
   });
 
   it("is the only file under __tests__ that spells the path to READ it", () => {

@@ -174,9 +174,14 @@ describe("the measurement and the bundle's move together", () => {
     // Not a preference: the bundle is one minified blob and no chunk boundary
     // separates the string table from the screens that read it, so there is
     // no honest way to take this number out of `dist/`.
+    // Seven files since the locale maps became modules, named once in
+    // `lib/i18n-source-files.ts` — the gate reads that list rather than
+    // spelling a path of its own, which is what kept the measure honest
+    // through the move.
     const SRC = stripComments(readRepoFile("scripts/check-bundle-size.ts"));
-    assert.match(SRC, /const I18N_SOURCE = "lib\/i18n-context\.tsx";/);
-    assert.match(SRC, /formatCopyDriftLine\(\s*translationsFootprint\(fs\.readFileSync\(path\.join\(REPO_ROOT, I18N_SOURCE\), "utf8"\)\),\s*\)/);
+    assert.match(SRC, /const I18N_SOURCES = I18N_SOURCE_FILES;/);
+    assert.match(SRC, /I18N_SOURCES\.map\(\(rel\) => fs\.readFileSync\(path\.join\(REPO_ROOT, rel\), "utf8"\)\)/);
+    assert.match(SRC, /formatCopyDriftLine\(/);
   });
 
   it("the copy line prints after the budget verdict and before the exit", () => {
