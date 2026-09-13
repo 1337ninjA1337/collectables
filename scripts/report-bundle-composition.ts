@@ -24,6 +24,7 @@ import * as path from "node:path";
 import {
   attributeChunkBytes,
   BASELINE_BUCKET_FLOOR_BYTES,
+  isEntryChunk,
   formatCompositionDriftReport,
   formatCompositionReport,
   summarizeComposition,
@@ -58,6 +59,8 @@ function main(): void {
   }
 
   const wholeBundle = new Map<string, number>();
+  const entryBuckets = new Set<string>();
+  let lazyBytes = 0;
   const sections: string[] = [];
   for (const full of mapped) {
     const relative = path.relative(REPO_ROOT, full);
@@ -67,12 +70,27 @@ function main(): void {
     for (const [source, bytes] of perSource) {
       wholeBundle.set(source, (wholeBundle.get(source) ?? 0) + bytes);
     }
-    sections.push(
-      formatCompositionReport(relative, summarizeComposition(perSource, REPO_ROOT)),
-    );
+    const chunk = summarizeComposition(perSource, REPO_ROOT);
+    // Which buckets the ENTRY chunk contains, and how much weight sits outside
+    // it. The combined view below sums every chunk, and read without this a
+    // package behind a lazy `import()` is indistinguishable from one every
+    // page load fetches — which is the one distinction the bundle budget is
+    // about.
+    if (isEntryChunk(relative)) {
+      for (const bucket of chunk.buckets) entryBuckets.add(bucket.label);
+      for (const module of chunk.modules) entryBuckets.add(module.label);
+    } else {
+      lazyBytes += chunk.totalBytes;
+    }
+    sections.push(formatCompositionReport(relative, chunk));
   }
 
   const whole = summarizeComposition(wholeBundle, REPO_ROOT);
+  const lazyLabels = new Set(
+    [...whole.buckets, ...whole.modules]
+      .map((entry) => entry.label)
+      .filter((label) => !entryBuckets.has(label)),
+  );
 
   // `--snapshot` prints the literal to paste into `lib/composition-snapshot.ts`
   // and nothing else, so re-taking the baseline is a copy rather than a
@@ -86,7 +104,12 @@ function main(): void {
   // question "what spent the last raise" is asked of the sum before it is
   // asked of either half.
   if (mapped.length > 1) {
-    console.log(formatCompositionReport(`all ${String(mapped.length)} chunks`, whole));
+    console.log(
+      formatCompositionReport(`all ${String(mapped.length)} chunks`, whole, {
+        lazyLabels,
+        lazyBytes,
+      }),
+    );
     console.log("");
   }
   console.log(sections.join("\n\n"));

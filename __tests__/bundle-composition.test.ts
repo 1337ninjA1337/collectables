@@ -10,6 +10,7 @@ import {
   FIRST_PARTY_ROOTS,
   formatCompositionDriftReport,
   formatCompositionReport,
+  isEntryChunk,
   GENERATED,
   moduleBucket,
   NON_CODE_FIRST_PARTY_ROOTS,
@@ -584,5 +585,54 @@ describe("the recorded baseline", () => {
       Math.abs(COMPOSITION_BASELINE.totalBytes - LAST_MEASURED_BUNDLE_BYTES) < 20 * 1024,
       `the baseline (${String(COMPOSITION_BASELINE.totalBytes)}) and the budget's measurement (${String(LAST_MEASURED_BUNDLE_BYTES)}) are of different builds`,
     );
+  });
+});
+
+describe("isEntryChunk", () => {
+  it("knows Metro's entry chunk from a lazily-loaded one", () => {
+    // The distinction the bundle budget is entirely about. Metro names a web
+    // chunk after the module that asked for it, so the app's is `entry-…` and
+    // anything reached through a dynamic `import()` is named after its caller.
+    assert.equal(isEntryChunk("dist/_expo/static/js/web/entry-6d8dfb5d.js"), true);
+    assert.equal(isEntryChunk("dist/_expo/static/js/web/index-32b36168.js"), false);
+    assert.equal(isEntryChunk("dist\\_expo\\static\\js\\web\\entry-6d8dfb5d.js"), true);
+  });
+
+  it("is not fooled by a path that merely contains the word", () => {
+    assert.equal(isEntryChunk("dist/entry-chunks/index-1.js"), false);
+  });
+});
+
+describe("the lazy marker", () => {
+  const composition = summarizeComposition(
+    new Map([
+      ["/lib/screen.tsx", 4000],
+      ["/node_modules/posthog-react-native/dist/index.js", 3000],
+    ]),
+  );
+
+  it("marks a bucket that lives outside the entry chunk", () => {
+    // Read without it, a package behind a lazy `import()` is indistinguishable
+    // from one every page load fetches — and a suggestion was filed against
+    // this repository's own lazy analytics loader on exactly that misreading:
+    // the combined view sums both chunks, so PostHog looked like 238 KiB of
+    // entry-chunk weight when it is a chunk nothing fetches until analytics
+    // initialises.
+    const report = formatCompositionReport("all 2 chunks", composition, {
+      lazyLabels: new Set(["posthog-react-native"]),
+      lazyBytes: 3000,
+    });
+    assert.match(report, /posthog-react-native {2}\(lazy\)/);
+    assert.ok(!/lib\/ {2}\(lazy\)/.test(report), "an entry-chunk bucket was marked lazy");
+    assert.match(report, /2\.9 KiB of this is in chunks a page load does not fetch/);
+  });
+
+  it("says nothing about laziness when the caller knows of none", () => {
+    // The per-chunk sections pass no marks: inside one chunk every byte is as
+    // fetched as every other, and a "(lazy)" there would be a claim about a
+    // file the section is not about.
+    const report = formatCompositionReport("dist/entry.js", composition);
+    assert.ok(!report.includes("(lazy)"));
+    assert.ok(!report.includes("a page load does not fetch"));
   });
 });

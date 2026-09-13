@@ -491,10 +491,25 @@ function formatRow(entry: CompositionEntry): string {
 export function formatCompositionReport(
   chunkLabel: string,
   composition: Composition,
-  options: { readonly topBuckets?: number; readonly topModules?: number } = {},
+  options: {
+    readonly topBuckets?: number;
+    readonly topModules?: number;
+    /**
+     * Buckets that live entirely OUTSIDE the entry chunk — code a page load
+     * does not fetch. Marked rather than left out: they are in the bundle and
+     * they count against the budget, and the day one of them stops being lazy
+     * is the day this report has to be readable enough to notice.
+     */
+    readonly lazyLabels?: ReadonlySet<string>;
+    /** Total bytes of the non-entry chunks, for the summary line. */
+    readonly lazyBytes?: number;
+  } = {},
 ): string {
   const topBuckets = options.topBuckets ?? 20;
   const topModules = options.topModules ?? 15;
+  const lazyLabels = options.lazyLabels ?? new Set<string>();
+  const mark = (entry: CompositionEntry): string =>
+    lazyLabels.has(entry.label) ? `${formatRow(entry)}  (lazy)` : formatRow(entry);
   const lines = [
     `${chunkLabel} — ${formatKiB(composition.totalBytes)} across ${String(composition.modules.length)} sources`,
     `  ${formatKiB(composition.firstPartyBytes).padStart(10)}  ${formatShare(composition.totalBytes === 0 ? 0 : composition.firstPartyBytes / composition.totalBytes).padStart(6)}  this repository's own source`,
@@ -502,16 +517,39 @@ export function formatCompositionReport(
     `  ${formatKiB(composition.unattributedBytes).padStart(10)}  ${formatShare(composition.totalBytes === 0 ? 0 : composition.unattributedBytes / composition.totalBytes).padStart(6)}  ${UNATTRIBUTED} — runtime preamble, wrappers, newlines`,
     "",
     `  by bucket (top ${String(topBuckets)}):`,
-    ...composition.buckets.slice(0, topBuckets).map(formatRow),
+    ...composition.buckets.slice(0, topBuckets).map(mark),
     "",
     `  by module (top ${String(topModules)}):`,
-    ...composition.modules.slice(0, topModules).map(formatRow),
+    ...composition.modules.slice(0, topModules).map(mark),
     "",
+    ...(options.lazyBytes === undefined
+      ? []
+      : [
+          `  ${formatKiB(options.lazyBytes).padStart(10)} of this is in chunks a page load does not fetch — marked (lazy).`,
+          "",
+        ]),
     "  A bucket's bytes are what it contributed, not what removing it would return:",
     "  shared helpers, tree-shaken re-exports and code the minifier hoisted across",
     "  module boundaries all move bytes over this line.",
   ];
   return lines.join("\n");
+}
+
+/**
+ * Whether a chunk is the one every page load fetches.
+ *
+ * Metro names the web export's chunks after their entry point, so the app's is
+ * `entry-<hash>.js` and a chunk reached through a dynamic `import()` is named
+ * after the module that asked for it. The distinction is the whole subject of
+ * the bundle budget — `lib/bundle-size.ts` exists to catch an SDK that stops
+ * being lazy — and the composition report could not make it: the combined view
+ * sums both chunks, so `posthog-react-native` read as 111 KiB "in the bundle"
+ * when it is 111 KiB in a chunk nothing fetches until analytics initialises.
+ * A suggestion was filed against the lazy loader on exactly that misreading.
+ */
+export function isEntryChunk(chunkPath: string): boolean {
+  const name = chunkPath.replace(/\\/g, "/").split("/").pop() ?? "";
+  return name.startsWith("entry-") || name === "entry.js";
 }
 
 /** Signed KiB, the spelling the drift lines in `check-bundle-size` use. */
