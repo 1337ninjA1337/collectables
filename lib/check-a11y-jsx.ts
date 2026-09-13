@@ -277,13 +277,18 @@ type OpenTag = {
  * ignored otherwise. Both are the forgiving choice: this scanner reads files
  * mid-edit, and a stack that threw would turn a lint run into a crash.
  */
-function* openTags(code: string): Generator<OpenTag> {
+function* openTags(
+  code: string,
+  from = 0,
+  to = code.length,
+  coveredSeed = false,
+): Generator<OpenTag> {
   /** Open ancestors, innermost last; `covered` is inherited then widened. */
   const stack: { name: string; covered: boolean }[] = [];
-  let cursor = 0;
-  while (cursor < code.length) {
+  let cursor = from;
+  while (cursor < to) {
     const start = code.indexOf("<", cursor);
-    if (start === -1) return;
+    if (start === -1 || start >= to) return;
     const closeMatch = /^<\/([A-Za-z][A-Za-z0-9_.]*)\s*>/.exec(code.slice(start));
     if (closeMatch) {
       const depth = stack.map((f) => f.name).lastIndexOf(closeMatch[1]);
@@ -298,11 +303,11 @@ function* openTags(code: string): Generator<OpenTag> {
     }
     const attrsAt = start + nameMatch[0].length;
     const tagEnd = openTagEnd(code, attrsAt);
-    if (tagEnd === -1) return;
+    if (tagEnd === -1 || tagEnd > to) return;
     cursor = tagEnd + 1;
     const attrs = code.slice(attrsAt, tagEnd);
     const selfClosing = code[tagEnd - 1] === "/";
-    const coveredByAncestor = stack.length > 0 && stack[stack.length - 1].covered;
+    const coveredByAncestor = stack.length > 0 ? stack[stack.length - 1].covered : coveredSeed;
     yield {
       name: nameMatch[1],
       attrs,
@@ -312,6 +317,19 @@ function* openTags(code: string): Generator<OpenTag> {
       selfClosing,
       coveredByAncestor,
     };
+    // A RENDER PROP'S JSX LIVES INSIDE THE OPEN TAG, and the first version of
+    // this walk stepped over all of it: `openTagEnd` correctly reports the end
+    // of `<SwipeTabs … renderTab={(key) => (<View>…</View>)} />`, and the
+    // cursor resumed there — sixty lines and a screenful of `<Pressable>`s
+    // later. Every rule below was blind to them, in every file that renders
+    // through a prop rather than through children.
+    //
+    // The seed carries the hide down: a render prop's children are inside the
+    // element that hides them, so an ancestor that took the subtree takes
+    // these too.
+    if (attrs.includes("<")) {
+      yield* openTags(code, attrsAt, tagEnd, coveredByAncestor || hidesSubtree(attrs));
+    }
     if (!selfClosing) {
       stack.push({
         name: nameMatch[1],

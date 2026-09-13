@@ -549,3 +549,92 @@ describe("the tappable that never says it is a button", () => {
     );
   });
 });
+
+describe("the JSX inside a render prop", () => {
+  /**
+   * THE BLIND SPOT THIS SCANNER SHIPPED WITH, in every rule at once.
+   *
+   * A render prop's elements live inside the PARENT'S OPEN TAG:
+   * `<SwipeTabs renderTab={(key) => (<View>…</View>)} />` is one tag, and
+   * `openTagEnd` correctly reports it as ending after the closing brace —
+   * sixty lines and a screenful of `<Pressable>`s later. The walk resumed
+   * there, so nothing rendered that way was ever looked at. `app/friends.tsx`
+   * draws both of its tab panels through one, which is how the heading sweep
+   * next door came to read the file as having nothing in it.
+   */
+  it("flags an unlabeled icon button rendered through a prop", () => {
+    assert.deepEqual(
+      codes(`
+        <SwipeTabs
+          tabs={tabs}
+          renderTab={(key) => (
+            <View>
+              <Pressable onPress={remove} accessibilityRole="button">
+                <Ionicons name="trash" size={18} ${HIDDEN} />
+              </Pressable>
+            </View>
+          )}
+        />
+      `),
+      ["unlabeled"],
+    );
+  });
+
+  it("reports it at its own line, not at the tag that carries the prop", () => {
+    const found = findings(`
+      <SwipeTabs
+        renderTab={() => (
+          <Pressable onPress={remove} accessibilityRole="button">
+            <Ionicons name="trash" size={18} ${HIDDEN} />
+          </Pressable>
+        )}
+      />
+    `);
+    assert.equal(found.length, 1);
+    assert.equal(found[0].line, 4);
+    assert.match(found[0].snippet, /<Pressable onPress=\{remove\}/);
+  });
+
+  it("says nothing about a labeled one, so the reach is not a new false positive", () => {
+    assert.deepEqual(
+      codes(`
+        <SwipeTabs
+          renderTab={() => (
+            <Pressable onPress={remove} accessibilityLabel={t("remove")} accessibilityRole="button">
+              <Ionicons name="trash" size={18} ${HIDDEN} />
+            </Pressable>
+          )}
+        />
+      `),
+      [],
+    );
+  });
+
+  it("carries a hiding ancestor into the prop's children", () => {
+    // Hiding is inherited, and a render prop's children are inside the element
+    // that hides them — a decorative list drawn through a prop is as
+    // unreachable as one drawn through children, and flagging it would be the
+    // false positive the `covered` stack exists to prevent.
+    assert.deepEqual(
+      codes(`
+        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden
+          renderRow={() => (<Ionicons name="star" size={12} />)}
+        />
+      `),
+      [],
+    );
+  });
+
+  it("still reads the tag that carries the prop", () => {
+    // The parent is yielded before its prop's children, so a rule about the
+    // parent is not lost to the recursion.
+    assert.deepEqual(
+      codes(`
+        <Pressable onPress={x} accessibilityRole="button" renderIcon={() => (<Text>hi</Text>)}>
+          <Ionicons name="a" ${HIDDEN} />
+        </Pressable>
+      `).sort(),
+      ["unlabeled"],
+    );
+  });
+});
