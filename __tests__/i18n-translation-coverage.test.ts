@@ -614,7 +614,13 @@ describe("translation floors", () => {
     // nothing; the label says the outcome ("use display currency") rather
     // than the mechanism, since the slot it clears is one the user has never
     // been shown.
-    assert.match(report, /en: 544\/544 keys \(100\.0%\)/);
+    // 546 on 2026-09-13: `entryCurrencyChange` and `entryCurrencySet`. The two
+    // keys above explain the entry currency and can only clear it, so the
+    // preference could be CREATED nowhere but an add form — discoverable by
+    // accident only. The notice became a way in ("· change", opening the same
+    // picker for the entry slot) and the quiet line takes its place when the
+    // two agree, where the notice itself would be a sentence about nothing.
+    assert.match(report, /en: 546\/546 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

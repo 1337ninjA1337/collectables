@@ -31,6 +31,27 @@ import { sourceCode } from "./helpers/source-files";
  * following a later change, which is the opposite of what the button says.
  * So the read-through stops being an accident of the migration and becomes the
  * documented meaning of the empty state.
+ *
+ * AND THEN THE NOTICE COULD NOT CREATE WHAT IT DESCRIBED (2026-09-13). The
+ * round above shipped a card that explains the entry currency and can only
+ * clear it: the preference came into existence by opening an add form and
+ * picking a currency there, which is discoverable by accident only. So the
+ * line became a way in — tapping the notice opens the picker for the entry
+ * slot — and a quiet one-line affordance took its place when the two agree,
+ * where the notice itself would be a sentence about nothing.
+ *
+ * IT IS STILL NOT A SECOND PICKER, which is the argument above surviving
+ * intact. The card shows ONE value, the display currency, above ONE row; the
+ * entry preference is a line of text underneath that happens to open the same
+ * sheet. Two currency values side by side would read as two equal settings,
+ * and one of them is a convenience the other is not.
+ *
+ * ONE SHEET WITH A TARGET, not two mounted pickers: the list, the search box
+ * and the modal are identical either way, and a second `<CurrencySheet>` in
+ * this file would be the duplication `currency-input-consistency` exists to
+ * stop. The target decides `selectedCode` and what `onSelect` writes, and the
+ * entry side opens on the EFFECTIVE currency — `entryCurrency ?? displayCurrency`
+ * — because a null slot means "follow the display one" and not "none".
  */
 
 const SETTINGS = sourceCode("app/settings.tsx");
@@ -62,6 +83,28 @@ describe("the notice", () => {
     assert.match(SETTINGS, /accessibilityLabel=\{t\("entryCurrencyReset"\)\}/);
     assert.match(SETTINGS, /accessibilityRole="button"/);
   });
+
+  it("offers a way in when the two agree, with no second value on screen", () => {
+    // The half the previous round left out: the preference could only be
+    // CREATED from an add form, so the one screen that explains it could not
+    // change it in the direction that brings it into existence.
+    //
+    // The `else` branch of the same conditional, so it is not possible for
+    // both to render or for neither to: the card always carries exactly one
+    // line about the entry currency.
+    assert.match(
+      SETTINGS,
+      /entryCurrency !== displayCurrency \? \([\s\S]*?\) : \([\s\S]*?t\("entryCurrencySet"\)/,
+    );
+    // And it is a sentence, not a value: printing the effective entry currency
+    // here would put two currency codes in a card whose subject is one of them.
+    const quiet = SETTINGS.slice(SETTINGS.indexOf('t("entryCurrencySet")'));
+    const line = quiet.slice(0, quiet.indexOf("</Pressable>"));
+    assert.ok(
+      !line.includes("{entryCurrency}") && !line.includes("{displayCurrency}"),
+      "the quiet line shows a currency code beside the display one",
+    );
+  });
 });
 
 describe("what the button does", () => {
@@ -69,10 +112,46 @@ describe("what the button does", () => {
     // Writing today's value would pin the forms to it and stop following a
     // later change to the display currency — the opposite of what it says.
     assert.match(SETTINGS, /void clearEntryCurrency\(\)\.then\(loadEntryCurrency\)/);
+    // This case used to read "settings never calls setEntryCurrency — that is
+    // what a cost form does", and the pin was right about the RESET and wrong
+    // about the screen: a card that explains a preference and can only clear
+    // it leaves the user to create it by opening a form they did not want to
+    // fill in. What has to stay true is that the CLEAR is a clear, so the
+    // write is pinned to its own handler rather than banned from the file.
+    const reset = SETTINGS.slice(SETTINGS.indexOf("const handleUseDisplayCurrency"));
+    const body = reset.slice(0, reset.indexOf("\n  }"));
     assert.ok(
-      !/setEntryCurrency\(/.test(SETTINGS),
-      "settings sets an entry currency — that is what a cost form does",
+      !body.includes("setEntryCurrency("),
+      "the reset writes a currency into the slot instead of removing it",
     );
+  });
+
+  it("writes the entry slot and nothing else when the sheet was opened for it", () => {
+    // The whole point of the split: the display currency is what every total
+    // renders in, and picking an entry currency must not move it.
+    const handler = SETTINGS.slice(SETTINGS.indexOf("const handleSelectCurrency"));
+    const body = handler.slice(0, handler.indexOf("\n  );"));
+    assert.match(body, /currencySheetTarget === "entry"/);
+    assert.match(body, /void setEntryCurrency\(code\)\.then\(loadEntryCurrency\)/);
+    // The display branch is the `else`, so one pick cannot write both slots.
+    assert.match(body, /\} else \{\s*setDisplayCurrency\(code\);/);
+  });
+
+  it("opens the entry sheet on the effective currency, not on an empty slot", () => {
+    // `getEntryCurrency` reads through to the display currency, so a null slot
+    // means "follow the display one". A sheet opened with nothing selected
+    // would tell a user who has never chosen one that they have no entry
+    // currency, which is not what their forms do.
+    assert.match(
+      SETTINGS,
+      /currencySheetTarget === "entry" \? \(entryCurrency \?\? displayCurrency\) : displayCurrency/,
+    );
+  });
+
+  it("mounts one picker for both preferences", () => {
+    // Two <CurrencySheet> mounts here would be the same list, the same search
+    // box and the same modal twice, differing in one prop.
+    assert.equal(SETTINGS.split("<CurrencySheet").length - 1, 1);
   });
 
   it("re-reads afterwards rather than assuming what the read will say", () => {
@@ -122,10 +201,15 @@ describe("clearEntryCurrency", () => {
   });
 });
 
-describe("the two new keys", () => {
+describe("the four keys", () => {
   const I18N = readI18nSource();
 
-  for (const key of ["entryCurrencyNotice", "entryCurrencyReset"] as const) {
+  for (const key of [
+    "entryCurrencyNotice",
+    "entryCurrencyReset",
+    "entryCurrencyChange",
+    "entryCurrencySet",
+  ] as const) {
     it(`${key} is declared by every locale`, () => {
       assertDeclaredInEveryLocale(I18N, key);
     });
@@ -149,6 +233,34 @@ describe("the two new keys", () => {
   it("each locale writes its own words for the reset label", () => {
     const values = [...localeValuesOf(I18N, "entryCurrencyReset").values()];
     assert.equal(new Set(values).size, values.length, "two locales share a value");
+  });
+
+  it("the two actions on the notice line are different words", () => {
+    // "Change" opens the picker and "Use display currency" empties the slot;
+    // a locale that translated both to the same phrase would put two
+    // identically-labelled buttons one under the other, and a screen-reader
+    // user would hear the same sentence twice with different outcomes.
+    const reset = localeValuesOf(I18N, "entryCurrencyReset");
+    for (const [code, value] of localeValuesOf(I18N, "entryCurrencyChange")) {
+      assert.notEqual(value, reset.get(code), `${code} labels both actions the same`);
+    }
+  });
+
+  it("the quiet line is a sentence and the action is a word", () => {
+    // They sit in the same slot in the card, under opposite branches, and the
+    // difference is the point: the notice line already says what is happening
+    // and needs a verb, the line that replaces it when nothing is happening
+    // has to say what the tap would DO.
+    const change = localeValuesOf(I18N, "entryCurrencyChange");
+    for (const [code, value] of localeValuesOf(I18N, "entryCurrencySet")) {
+      const words = value.replace(/^["'`]|["'`]$/g, "").split(" ").length;
+      assert.ok(words >= 4, `${code}'s quiet line (${value}) is too short to explain itself`);
+      const action = (change.get(code) ?? "").replace(/^["'`]|["'`]$/g, "");
+      assert.ok(
+        action.split(" ").length <= 2,
+        `${code}'s change label (${action}) is a sentence where a word belongs`,
+      );
+    }
   });
 
   it("the reset label names the display currency, not the storage slot", () => {

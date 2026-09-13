@@ -50,7 +50,14 @@ describe("settings screen — display currency picker", () => {
 
   it("mounts a CurrencySheet whose onSelect persists via setDisplayCurrency", () => {
     assert.match(src, /<CurrencySheet\s*\n?\s*visible=\{currencySheetOpen\}/);
-    assert.match(src, /onSelect=\{\(code\)\s*=>\s*\{\s*setDisplayCurrency\(code\);/);
+    // The handler moved out of the JSX when the same sheet learned to pick the
+    // ENTRY currency too (2026-09-13): one mounted picker, a target, and a
+    // named callback the entry-currency suite reads the branches of. What this
+    // case still says is that a pick from this screen reaches the provider's
+    // setter rather than a storage helper.
+    assert.match(src, /onSelect=\{handleSelectCurrency\}/);
+    assert.match(src, /const handleSelectCurrency = useCallback\(/);
+    assert.match(src, /\} else \{\s*setDisplayCurrency\(code\);/);
   });
 
   it("shows the rates-updated + refresh affordance when rates exist, else the unavailable hint", () => {

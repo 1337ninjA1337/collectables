@@ -190,9 +190,17 @@ describe("the screens that pick a currency and take no amount", () => {
     // different key, which is what the split made true.
     const code = sourceCode("app/settings.tsx");
     assert.ok(code.includes("setDisplayCurrency("), "settings no longer sets the display currency");
+    // The DISPLAY half is what goes through the provider. Settings also writes
+    // the entry slot now — the card that explains that preference could only
+    // clear it, so it could not be created anywhere but an add form — and the
+    // entry currency is deliberately NOT in the provider: it re-renders no
+    // total, so putting it there would re-render every one of them on a change
+    // that cannot affect any. What this case protects is that the two writes
+    // stay separate, which is the whole of the key split.
+    const display = code.slice(code.indexOf("} else {"), code.indexOf("setCurrencySheetOpen(false);"));
     assert.ok(
-      !code.includes("setEntryCurrency("),
-      "settings writes storage behind the provider's back",
+      display.includes("setDisplayCurrency(code)") && !display.includes("setEntryCurrency("),
+      "one pick writes both currency slots",
     );
   });
 

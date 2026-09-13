@@ -39,7 +39,11 @@ import {
 } from "@/lib/design-tokens";
 import { getAnalyticsEventCatalog } from "@/lib/analytics";
 import { isDevEnvironment } from "@/lib/dev-menu";
-import { clearEntryCurrency, getEntryCurrency } from "@/lib/locale-helpers";
+import {
+  clearEntryCurrency,
+  getEntryCurrency,
+  setEntryCurrency,
+} from "@/lib/locale-helpers";
 import { useDiagnostics } from "@/lib/diagnostics-context";
 import { AppLanguage, useI18n } from "@/lib/i18n-context";
 import { getSentryStatus } from "@/lib/sentry";
@@ -83,6 +87,13 @@ export default function SettingsScreen() {
   const [eventsListOpen, setEventsListOpen] = useState(false);
   const [currencySheetOpen, setCurrencySheetOpen] = useState(false);
   const [currencyQuery, setCurrencyQuery] = useState("");
+  // WHICH preference the one sheet is picking for. One mounted picker and a
+  // target, rather than two sheets: the list, the search box and the modal are
+  // identical, and a second `<CurrencySheet>` here would be the same component
+  // twice with a different `onSelect` — the shape `currency-input-consistency`
+  // exists to stop.
+  const [currencySheetTarget, setCurrencySheetTarget] =
+    useState<"display" | "entry">("display");
   const [refreshingRates, setRefreshingRates] = useState(false);
   // The OTHER currency preference. Splitting the storage key stopped a cost
   // form moving the display currency as a side effect, and left a second
@@ -98,6 +109,30 @@ export default function SettingsScreen() {
     void getEntryCurrency().then(setEntryCurrencyState);
   }, []);
   useEffect(loadEntryCurrency, [loadEntryCurrency]);
+
+  const openCurrencySheet = useCallback((target: "display" | "entry") => {
+    // The query is cleared on the way IN rather than on close, so a sheet
+    // opened for the other preference does not arrive filtered by what
+    // somebody typed the last time they opened this card.
+    setCurrencyQuery("");
+    setCurrencySheetTarget(target);
+    setCurrencySheetOpen(true);
+  }, []);
+
+  const handleSelectCurrency = useCallback(
+    (code: string) => {
+      if (currencySheetTarget === "entry") {
+        // Re-read rather than assume: the slot is written and the state is
+        // whatever the read answers, which is the same reason the clear
+        // re-reads.
+        void setEntryCurrency(code).then(loadEntryCurrency);
+      } else {
+        setDisplayCurrency(code);
+      }
+      setCurrencySheetOpen(false);
+    },
+    [currencySheetTarget, loadEntryCurrency, setDisplayCurrency],
+  );
 
   const handleUseDisplayCurrency = useCallback(() => {
     // Clearing, not writing `displayCurrency` into the slot: the empty state
@@ -237,8 +272,7 @@ export default function SettingsScreen() {
         <Pressable
           style={styles.currencyRow}
           onPress={() => {
-            setCurrencyQuery("");
-            setCurrencySheetOpen(true);
+            openCurrencySheet("display");
           }}
           accessibilityLabel={t("displayCurrencyTitle")}
           accessibilityRole="button"
@@ -247,22 +281,51 @@ export default function SettingsScreen() {
           <Text style={styles.currencyChevron}>›</Text>
         </Pressable>
         {entryCurrency != null && entryCurrency !== displayCurrency ? (
-          // Only when the two DIFFER. A line saying "new costs are entered in
-          // USD" under a display currency of USD is a sentence about nothing,
-          // and this card's job is the display currency — the entry one earns
-          // its space here exactly when it is a surprise.
+          // The SURPRISE, still only when the two differ: a line saying "new
+          // costs are entered in USD" under a display currency of USD is a
+          // sentence about nothing. What changed is that the sentence is now a
+          // way IN — tapping it opens the picker for the entry currency, which
+          // the round that wrote this line left with no way to be set from
+          // here at all.
+          <>
+            <Pressable
+              onPress={() => {
+                openCurrencySheet("entry");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t("entryCurrencyNotice", { currency: entryCurrency })}
+            >
+              <Text style={styles.entryCurrencyHint}>
+                {t("entryCurrencyNotice", { currency: entryCurrency })}
+                {" · "}
+                {t("entryCurrencyChange")}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleUseDisplayCurrency}
+              accessibilityRole="button"
+              accessibilityLabel={t("entryCurrencyReset")}
+            >
+              <Text style={styles.entryCurrencyHint}>{t("entryCurrencyReset")}</Text>
+            </Pressable>
+          </>
+        ) : (
+          // And when they agree, the affordance without the claim. This is the
+          // half that was missing: the preference could only be CREATED by
+          // opening an add form and picking a currency there, so the one
+          // screen that explains it could not change it in the direction that
+          // brings it into existence. One quiet line, no second value shown —
+          // the card's subject is still the display currency.
           <Pressable
-            onPress={handleUseDisplayCurrency}
+            onPress={() => {
+              openCurrencySheet("entry");
+            }}
             accessibilityRole="button"
-            accessibilityLabel={t("entryCurrencyReset")}
+            accessibilityLabel={t("entryCurrencySet")}
           >
-            <Text style={styles.entryCurrencyHint}>
-              {t("entryCurrencyNotice", { currency: entryCurrency })}
-              {" · "}
-              {t("entryCurrencyReset")}
-            </Text>
+            <Text style={styles.entryCurrencyHint}>{t("entryCurrencySet")}</Text>
           </Pressable>
-        ) : null}
+        )}
         {currencyRatesUpdatedAt != null ? (
           <Pressable onPress={handleRefreshRates} disabled={refreshingRates}
           accessibilityState={{ disabled: refreshingRates }}
@@ -283,13 +346,16 @@ export default function SettingsScreen() {
 
       <CurrencySheet
         visible={currencySheetOpen}
-        selectedCode={displayCurrency}
+        // The entry sheet opens on the EFFECTIVE entry currency, which is the
+        // display one until somebody chooses otherwise — `getEntryCurrency`
+        // reads through, so a null slot is "follow the display currency" and
+        // not "no currency".
+        selectedCode={
+          currencySheetTarget === "entry" ? (entryCurrency ?? displayCurrency) : displayCurrency
+        }
         query={currencyQuery}
         onQueryChange={setCurrencyQuery}
-        onSelect={(code) => {
-          setDisplayCurrency(code);
-          setCurrencySheetOpen(false);
-        }}
+        onSelect={handleSelectCurrency}
         onClose={() => setCurrencySheetOpen(false)}
       />
 
