@@ -128,4 +128,26 @@ export function __resetLoadedLocalesForTests(): void {
   loaded.clear();
   for (const [code, map] of EAGER) loaded.set(code, map);
   inflight.clear();
+  for (const [code, loader] of realLoaders) loaders[code] = loader;
+}
+
+/** What each entry of {@link loaders} was before any case replaced it. */
+const realLoaders: ReadonlyMap<AppLanguage, LocaleLoader> = new Map(
+  Object.entries(loaders) as [AppLanguage, LocaleLoader][],
+);
+
+/**
+ * Test seam: swaps one locale's loader.
+ *
+ * The failure this module promises to survive — a chunk that will not load —
+ * has no other way in. `loaders` is module-private on purpose (a caller that
+ * could reach it could also bypass the cache), and a suite that only asserts
+ * the `.catch` is THERE is asserting the source rather than the behaviour.
+ * {@link __resetLoadedLocalesForTests} puts the real one back.
+ */
+export function __setLocaleLoaderForTests(
+  language: AppLanguage,
+  loader: LocaleLoader,
+): void {
+  loaders[language] = loader;
 }

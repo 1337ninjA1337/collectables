@@ -5,11 +5,13 @@ import { I18N_REGISTRY_SOURCE } from "../lib/i18n-source-files";
 import {
   EAGER_LOCALES,
   __resetLoadedLocalesForTests,
+  __setLocaleLoaderForTests,
   baseLocale,
   isLocaleLoaded,
   loadLocale,
   loadedLocale,
 } from "../lib/i18n/registry";
+import { __resetSentryForTests, getSentryStatus } from "../lib/sentry";
 import { locales } from "./helpers/i18n-locales";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { readRepoFile } from "./helpers/repo-file";
@@ -97,6 +99,50 @@ describe("fetching a lazy locale", () => {
     const pl = await loadLocale("pl");
     const missing = Object.keys(baseLocale).filter((key) => !(key in (pl ?? {})));
     assert.deepEqual(missing, []);
+  });
+});
+
+describe("a chunk that will not load", () => {
+  it("resolves null rather than rejecting, and reports it", async () => {
+    // The callers are a mount effect and a language picker; neither can do
+    // anything useful with a thrown chunk error, and an unhandled rejection in
+    // a render path is a redbox in dev and a silent drop in production.
+    // Through the real `@/lib/sentry` rather than a double: with no SDK
+    // initialised, a capture lands in the pre-init buffer, so `bufferedEvents`
+    // is proof the failure was reported and not swallowed — and it is the two
+    // halves of this morning's work meeting.
+    __resetSentryForTests();
+    __setLocaleLoaderForTests("de", () => Promise.reject(new Error("chunk 404")));
+
+    const map = await loadLocale("de");
+
+    assert.equal(map, null);
+    assert.equal(isLocaleLoaded("de"), false, "a failed fetch must not cache anything");
+    assert.equal(getSentryStatus().bufferedEvents, 1);
+  });
+
+  it("can be retried, because the usual cause is a network that comes back", async () => {
+    let attempts = 0;
+    __setLocaleLoaderForTests("de", async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("offline");
+      return (await import("../lib/i18n/de")).de;
+    });
+
+    assert.equal(await loadLocale("de"), null);
+    const second = await loadLocale("de");
+
+    assert.equal(attempts, 2, "the in-flight entry outlived the failure");
+    assert.ok(second, "the retry must be allowed to succeed");
+    assert.ok(isLocaleLoaded("de"));
+  });
+
+  it("leaves the app in the language it had, with a complete map", () => {
+    // What the provider does with the null: `t()` keeps reading the locale it
+    // has. The alternative — switching anyway — renders English under a Polish
+    // setting, which looks like the app losing the user's choice.
+    assert.ok(isLocaleLoaded("ru"), "the eager pair is what a failure falls back to");
+    assert.equal(typeof loadedLocale("ru")?.authTitle, "string");
   });
 });
 
