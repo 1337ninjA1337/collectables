@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { stripComments } from "@/lib/strip-comments";
-import { findListingByItemId, LISTING_RULE_BY_ITEM_PATH } from "@/lib/marketplace-helpers";
+import { LISTING_RULE_BY_ITEM_PATH, openListingsByItemId } from "@/lib/marketplace-helpers";
 import type { MarketplaceListing } from "@/lib/types";
 
 import { readI18nSource } from "./helpers/i18n-source-file";
@@ -72,6 +72,27 @@ describe("the screen reads the listing store", () => {
     );
     assert.ok(deps.length > 0, "could not parse the renderItem dep list");
     assert.ok(deps.includes("findListingByItemId"), "the store accessor is not a dep");
+  });
+
+  it("costs one pass over the store per change, not one per row", () => {
+    // Asking per row is the right shape for the SCREEN and was the wrong cost:
+    // the accessor scanned the whole listings array on every call, so a
+    // forty-row window over a two-hundred-listing store was eight thousand
+    // comparisons per render pass, growing with both the collection and the
+    // marketplace. Four suggestion rounds carried it.
+    //
+    // The fix is in the provider rather than here, which is why this case
+    // lives beside the screen that pays for it: every other by-id caller
+    // (`app/item/[id].tsx`) got it too, and no screen had to change.
+    const provider = stripComments(readRepoFile("lib/marketplace-context.tsx"));
+    assert.match(
+      provider,
+      /const listingByItemId = useMemo\(\(\) => openListingsByItemId\(listings\), \[listings\]\)/,
+    );
+    assert.match(
+      provider,
+      /\(itemId: string\) => listingByItemId\.get\(itemId\),\s*\[listingByItemId\]/,
+    );
   });
 });
 
@@ -148,22 +169,22 @@ describe("the chip", () => {
 
 describe("what counts as listed", () => {
   it("a sold listing leaves no chip", () => {
-    // `findListingByItemId` already filters `soldAt`, so this is
-    // `isOpenListing` asked by id — and a want that was somehow sold is
-    // history rather than a standing offer.
+    // The index the context's `findListingByItemId` reads already filters
+    // `soldAt`, so this is `isOpenListing` asked by id — and a want that was
+    // somehow sold is history rather than a standing offer.
     const open = listing();
     const sold = listing({ soldAt: "2026-09-12T01:00:00.000Z" });
-    assert.equal(findListingByItemId([open], "i1"), open);
-    assert.equal(findListingByItemId([sold], "i1"), undefined);
+    assert.equal(openListingsByItemId([open]).get("i1"), open);
+    assert.equal(openListingsByItemId([sold]).get("i1"), undefined);
   });
 
   it("a listing for another item leaves no chip", () => {
-    assert.equal(findListingByItemId([listing({ itemId: "other" })], "i1"), undefined);
+    assert.equal(openListingsByItemId([listing({ itemId: "other" })]).get("i1"), undefined);
   });
 
   it("either mode produces a chip, and they differ", () => {
-    const sell = findListingByItemId([listing({ mode: "sell" })], "i1");
-    const trade = findListingByItemId([listing({ mode: "trade" })], "i1");
+    const sell = openListingsByItemId([listing({ mode: "sell" })]).get("i1");
+    const trade = openListingsByItemId([listing({ mode: "trade" })]).get("i1");
     assert.equal(sell?.mode, "sell");
     assert.equal(trade?.mode, "trade");
   });

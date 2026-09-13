@@ -7,7 +7,7 @@ import {
   coerceListing,
   coerceListings,
   countActiveListingsForUser,
-  findListingByItemId,
+  openListingsByItemId,
   isListingClaimedFromOwner,
   listingsAcquiredByUser,
   listingsForUser,
@@ -80,15 +80,38 @@ describe("canCreateAnotherListing", () => {
   });
 });
 
-describe("findListingByItemId", () => {
+describe("openListingsByItemId", () => {
   it("returns the active listing for an item", () => {
     const target = listing({ id: "x", itemId: "item-7" });
-    assert.equal(findListingByItemId([target], "item-7"), target);
+    assert.equal(openListingsByItemId([target]).get("item-7"), target);
   });
 
   it("ignores sold listings", () => {
     const ls = [listing({ itemId: "item-7", soldAt: "2026-04-26T00:00:00.000Z" })];
-    assert.equal(findListingByItemId(ls, "item-7"), undefined);
+    assert.equal(openListingsByItemId(ls).get("item-7"), undefined);
+  });
+
+  it("answers the first of two open listings for one item", () => {
+    // The per-row scan this replaced returned the first match, and nothing
+    // enforces one listing per item — so a duplicate pair has to resolve the
+    // same way here, or the chip on the wishlist and the warning in a bulk
+    // confirm would name different listings for the same want.
+    const first = listing({ id: "a", itemId: "item-7" });
+    const second = listing({ id: "b", itemId: "item-7" });
+    assert.equal(openListingsByItemId([first, second]).get("item-7"), first);
+  });
+
+  it("walks the store once, whatever is asked of it afterwards", () => {
+    // The point of the change: one pass to build, `get` thereafter. A map of
+    // only the open listings, keyed by item.
+    const ls = [
+      listing({ id: "a", itemId: "i1" }),
+      listing({ id: "b", itemId: "i2", soldAt: "2026-04-26T00:00:00.000Z" }),
+      listing({ id: "c", itemId: "i3" }),
+    ];
+    const byItemId = openListingsByItemId(ls);
+    assert.deepEqual([...byItemId.keys()], ["i1", "i3"]);
+    assert.equal(byItemId.get("nobody"), undefined);
   });
 });
 

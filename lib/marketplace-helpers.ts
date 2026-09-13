@@ -124,14 +124,34 @@ export function canCreateAnotherListing(
   return countActiveListingsForUser(listings, userId) < FREE_LISTING_CAP;
 }
 
-export function findListingByItemId(
+/**
+ * The open listing for each item, as one pass over the store.
+ *
+ * This replaced `findListingByItemId`, which asked the same question with a
+ * linear scan and was called once per RENDERED ROW: the wishlist reads it for
+ * every card, so a forty-row window over a two-hundred-listing store was eight
+ * thousand comparisons per render pass, growing with both the collection and
+ * the marketplace. Four suggestion rounds carried it. The map is built once
+ * per change to the listings array and every lookup after that is a `get`.
+ *
+ * FIRST WINS, which is the scan's answer preserved: a store holding two open
+ * listings for one item (possible — nothing enforces uniqueness) resolves to
+ * the same one the per-row scan used to return, so the chip on the wishlist
+ * and the warning in a bulk confirm still agree about which listing they mean.
+ *
+ * {@link isOpenListing} rather than `!soldAt` spelled out again: what "still
+ * open" means is one decision, and the browse feed, the archive and this all
+ * have to read it the same way.
+ */
+export function openListingsByItemId(
   listings: readonly MarketplaceListing[],
-  itemId: string,
-): MarketplaceListing | undefined {
-  for (const l of listings) {
-    if (l.itemId === itemId && !l.soldAt) return l;
+): Map<string, MarketplaceListing> {
+  const byItemId = new Map<string, MarketplaceListing>();
+  for (const listing of listings) {
+    if (!isOpenListing(listing)) continue;
+    if (!byItemId.has(listing.itemId)) byItemId.set(listing.itemId, listing);
   }
-  return undefined;
+  return byItemId;
 }
 
 /**
@@ -302,13 +322,10 @@ export function openListingsForItems(
   listings: readonly MarketplaceListing[],
   itemIds: readonly string[],
 ): MarketplaceListing[] {
-  const byItemId = new Map<string, MarketplaceListing>();
-  for (const listing of listings) {
-    if (!isOpenListing(listing)) continue;
-    // First wins: `findListingByItemId` answers the first match too, so a
-    // duplicate pair resolves the same way here as it does on the item screen.
-    if (!byItemId.has(listing.itemId)) byItemId.set(listing.itemId, listing);
-  }
+  // The map this used to build inline is {@link openListingsByItemId} now —
+  // the same index, wanted by the provider for its per-item lookups. Two
+  // copies of a first-wins rule is exactly the pair that drifts.
+  const byItemId = openListingsByItemId(listings);
   const found: MarketplaceListing[] = [];
   for (const itemId of itemIds) {
     const listing = byItemId.get(itemId);

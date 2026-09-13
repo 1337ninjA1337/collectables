@@ -8,11 +8,11 @@ import {
   canCreateAnotherListing,
   coerceListings,
   countActiveListingsForUser,
-  findListingByItemId,
   isListingClaimedFromOwner,
   listingsForUser,
   markListingArrived,
   normalizeListing,
+  openListingsByItemId,
   purchasesForUser,
   removeListingById,
   salesForUser,
@@ -308,9 +308,21 @@ export function MarketplaceProvider({ children }: React.PropsWithChildren) {
     [user],
   );
 
+  /**
+   * One index over the store, rebuilt when the store changes.
+   *
+   * `findByItemId` scanned the whole listings array on every call and the
+   * wishlist calls it once per rendered card — a forty-row window over a
+   * two-hundred-listing store was eight thousand comparisons per render pass,
+   * and it grew with both the collection and the marketplace. Four suggestion
+   * rounds carried it. The accessor's contract is unchanged, so no screen had
+   * to move: what changed is what it costs to ask.
+   */
+  const listingByItemId = useMemo(() => openListingsByItemId(listings), [listings]);
+
   const findByItemId = useCallback(
-    (itemId: string) => findListingByItemId(listings, itemId),
-    [listings],
+    (itemId: string) => listingByItemId.get(itemId),
+    [listingByItemId],
   );
 
   const getListingById = useCallback(

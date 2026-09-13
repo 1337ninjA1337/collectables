@@ -10,7 +10,7 @@ import {
 import { ANALYTICS_EVENTS } from "../lib/analytics-events";
 import {
   canCreateAnotherListing,
-  findListingByItemId,
+  openListingsByItemId,
   normalizeListing,
   upsertListing,
 } from "../lib/marketplace-helpers";
@@ -108,7 +108,10 @@ function createStubMarketplace(sellerId: string) {
       return listings.find((l) => l.id === id);
     },
     findListingByItemId(itemId: string): MarketplaceListing | undefined {
-      return findListingByItemId(listings, itemId);
+      // The provider answers this from an index it rebuilds when the store
+      // changes; the stub builds one per call, which is the same answer at a
+      // scale where the cost is the point of neither.
+      return openListingsByItemId(listings).get(itemId);
     },
   };
 }
