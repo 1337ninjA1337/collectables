@@ -352,7 +352,7 @@ async function main(): Promise<void> {
         observation,
         server.origin,
         readBaseUrl(),
-        scenario.expectChunk,
+        scenario,
       );
       console[result.ok ? "log" : "error"](
         formatBundleBootReport(CHECK_NAME, result, scenario.name),

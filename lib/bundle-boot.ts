@@ -75,6 +75,18 @@ export type BootScenario = {
    * tree in the wrong language, and every check here would pass.
    */
   readonly expectChunk?: RegExp;
+  /**
+   * Copy that must appear on screen — the app's own words, in the language
+   * this scenario asked for.
+   *
+   * `expectChunk` proves a locale chunk ARRIVED; this proves it was RENDERED.
+   * They are different claims: a registry that fetched `pl` and kept the
+   * default map would satisfy the first one completely. The value is a short
+   * fragment of `authAccount`, the auth screen's heading, and
+   * `bundle-boot.test.ts` holds it against the locale maps so a re-worded
+   * heading is a red case rather than a red check.
+   */
+  readonly expectText?: string;
 };
 
 export type BootRequestFailure = {
@@ -129,7 +141,11 @@ export type BootObservation = {
   readonly failedRequests: readonly BootRequestFailure[];
   /** Characters of markup inside the root element after the load settled. */
   readonly rootHtmlLength: number;
-  /** The visible text, for the report — never a pass/fail input. */
+  /**
+   * The visible text: the report's "first line on screen", and — since
+   * scenarios began asking for a language — what `expectText` is checked
+   * against.
+   */
   readonly bodyText: string;
   /** Basenames of the `_expo` chunks the page fetched, in request order. */
   readonly chunksFetched: readonly string[];
@@ -156,14 +172,26 @@ export type BootObservation = {
  * seed loudly instead of booting the default language under a Polish label.
  */
 export const BOOT_SCENARIOS: readonly BootScenario[] = [
-  { name: "home", path: "/", storage: {} },
+  // "Аккаунт" — `authAccount` in the default language, which is in the entry
+  // chunk. It says the copy rendered rather than merely loaded.
+  { name: "home", path: "/", storage: {}, expectText: "Аккаунт" },
   {
     name: "polish",
     path: "/",
     storage: { [LANGUAGE_KEY]: "pl" },
     expectChunk: /^pl-/,
+    // "Konto" — the same heading in Polish. Without it a registry that
+    // fetched the chunk and kept the default map would pass every rule here.
+    expectText: "Konto",
   },
-  { name: "deep link", path: "/item/not-a-real-item", storage: {} },
+  {
+    name: "deep link",
+    path: "/item/not-a-real-item",
+    storage: {},
+    // Back to the default language: this scenario is about the SPA fallback,
+    // and the text is what proves storage was cleared after the Polish run.
+    expectText: "Аккаунт",
+  },
 ];
 
 export type BootFailure = { readonly kind: string; readonly detail: string };
@@ -226,13 +254,17 @@ export function isBundleRequest(url: string, origin: string, basePath: string): 
   return pathname === basePath || pathname.startsWith(`${basePath}/`);
 }
 
+/** What a scenario claims its boot will produce, beyond merely mounting. */
+export type BootExpectation = Pick<BootScenario, "expectChunk" | "expectText">;
+
 export function evaluateBundleBoot(
   observation: BootObservation,
   origin: string,
   basePath = "",
-  expectChunk?: RegExp,
+  expect: BootExpectation = {},
 ): BootResult {
   const failures: BootFailure[] = [];
+  const { expectChunk, expectText } = expect;
 
   // A scenario that exists to prove a chunk is reachable has to say so: the
   // Polish boot mounts, fills the root and logs nothing whether the locale
@@ -241,6 +273,24 @@ export function evaluateBundleBoot(
     failures.push({
       kind: "chunk not fetched",
       detail: `nothing matching ${String(expectChunk)} was requested — fetched ${observation.chunksFetched.join(", ") || "nothing"}`,
+    });
+  }
+
+  // ARRIVED is not RENDERED. A registry that fetched the Polish chunk and kept
+  // the default map satisfies the rule above completely, and the app it serves
+  // is in the wrong language.
+  //
+  // CASE-INSENSITIVE, because the auth heading is uppercased by a style and
+  // `innerText` reports what is on screen: the copy says "Аккаунт" and the page
+  // says "АККАУНТ". The expectation is written the way the locale map writes
+  // it, so the case that holds the two together compares like with like.
+  if (
+    expectText !== undefined &&
+    !observation.bodyText.toLowerCase().includes(expectText.toLowerCase())
+  ) {
+    failures.push({
+      kind: "copy not on screen",
+      detail: `${JSON.stringify(expectText)} is not in what the page rendered — first line was ${JSON.stringify(firstLine(observation.bodyText))}`,
     });
   }
 

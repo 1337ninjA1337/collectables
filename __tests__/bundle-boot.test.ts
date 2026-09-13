@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import type { TranslationValue } from "@/lib/i18n/types";
+import { pl } from "@/lib/i18n/pl";
+import { ru } from "@/lib/i18n/ru";
 import { LANGUAGE_KEY } from "@/lib/storage-keys";
 
 import {
@@ -160,7 +163,7 @@ describe("a scenario that exists to prove a chunk is reachable", () => {
     // The silent failure this catches: a `pl` that fell back to the default
     // copy mounts, fills the root and logs nothing. Every other rule here
     // passes it.
-    const result = evaluateBundleBoot(healthy(), ORIGIN, "", /^pl-/);
+    const result = evaluateBundleBoot(healthy(), ORIGIN, "", { expectChunk: /^pl-/ });
     assert.equal(result.ok, false);
     assert.equal(result.failures[0].kind, "chunk not fetched");
     assert.match(result.failures[0].detail, /fetched entry-abc123\.js/);
@@ -171,13 +174,13 @@ describe("a scenario that exists to prove a chunk is reachable", () => {
       healthy({ chunksFetched: ["entry-abc123.js", "pl-9f8e7d.js"] }),
       ORIGIN,
       "",
-      /^pl-/,
+      { expectChunk: /^pl-/ },
     );
     assert.equal(result.ok, true);
   });
 
   it("says so when the page fetched nothing at all", () => {
-    const result = evaluateBundleBoot(healthy({ chunksFetched: [] }), ORIGIN, "", /^pl-/);
+    const result = evaluateBundleBoot(healthy({ chunksFetched: [] }), ORIGIN, "", { expectChunk: /^pl-/ });
     assert.match(result.failures[0].detail, /fetched nothing/);
   });
 
@@ -185,6 +188,35 @@ describe("a scenario that exists to prove a chunk is reachable", () => {
     assert.equal(evaluateBundleBoot(healthy({ chunksFetched: [] }), ORIGIN).ok, true);
   });
 });
+
+describe("a scenario that names the copy it expects", () => {
+  it("fails when the page rendered another language", () => {
+    // The Polish boot's real failure mode: the chunk arrives, the registry
+    // keeps the default map, and the app is in the wrong language while every
+    // other rule here passes.
+    const result = evaluateBundleBoot(healthy(), ORIGIN, "", { expectText: "Konto" });
+    assert.equal(result.ok, false);
+    assert.equal(result.failures[0].kind, "copy not on screen");
+    assert.match(result.failures[0].detail, /first line was "АККАУНТ COLLECTABLES"/);
+  });
+
+  it("matches copy the page uppercased", () => {
+    // The heading is uppercased by a style and `innerText` reports what is on
+    // screen, so the expectation is written the way the locale map writes it.
+    assert.equal(evaluateBundleBoot(healthy(), ORIGIN, "", { expectText: "Аккаунт" }).ok, true);
+  });
+
+  it("looks at the whole page, not only the first line", () => {
+    const result = evaluateBundleBoot(healthy(), ORIGIN, "", { expectText: "хранить свои коллекции" });
+    assert.equal(result.ok, true);
+  });
+});
+
+/** A locale map's value as the screen renders it — every heading here is a literal. */
+function heading(value: TranslationValue): string {
+  assert.equal(typeof value, "string", "authAccount takes no params in any locale");
+  return value as string;
+}
 
 describe("what the check boots", () => {
   it("loads the home screen, a lazy locale and a deep link", () => {
@@ -201,6 +233,38 @@ describe("what the check boots", () => {
     assert.ok(polish);
     assert.equal(polish.storage[LANGUAGE_KEY], "pl");
     assert.ok(polish.expectChunk, "a seeded locale that proves nothing about its chunk is a boot of the default copy");
+  });
+
+  it("expects copy the locale maps actually write", () => {
+    // The lock-step half: the scenarios carry a short fragment of the auth
+    // screen's heading, and a re-worded heading has to be a red CASE here
+    // rather than a red check nobody can explain. Compared case-insensitively
+    // for the same reason the rule is — the heading is uppercased by a style,
+    // and `innerText` reports what is on screen.
+    const headingFor: Record<string, string> = {
+      home: heading(ru.authAccount),
+      "deep link": heading(ru.authAccount),
+      polish: heading(pl.authAccount),
+    };
+    for (const scenario of BOOT_SCENARIOS) {
+      assert.ok(scenario.expectText, `${scenario.name} asserts nothing about what rendered`);
+      const heading = headingFor[scenario.name];
+      assert.ok(
+        heading.toLowerCase().includes(scenario.expectText.toLowerCase()),
+        `${scenario.name} expects ${JSON.stringify(scenario.expectText)}, which is not in ${JSON.stringify(heading)}`,
+      );
+    }
+  });
+
+  it("expects DIFFERENT copy for the Polish boot", () => {
+    // A fragment that both languages happen to contain — "Collectables", say —
+    // would pass whichever map rendered, which is the failure the scenario
+    // exists to catch.
+    const polish = BOOT_SCENARIOS.find((scenario) => scenario.name === "polish");
+    const home = BOOT_SCENARIOS.find((scenario) => scenario.name === "home");
+    assert.ok(polish?.expectText && home?.expectText);
+    assert.notEqual(polish.expectText.toLowerCase(), home.expectText.toLowerCase());
+    assert.ok(!heading(ru.authAccount).toLowerCase().includes(polish.expectText.toLowerCase()));
   });
 
   it("asks for a route the export has no file for", () => {
