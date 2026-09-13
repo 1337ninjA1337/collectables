@@ -85,7 +85,7 @@ export function LoginScreen() {
       />
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>{t("emailLoginTitle")}</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">{t("emailLoginTitle")}</Text>
         <Text style={styles.sectionText}>{t("emailLoginSubtitle")}</Text>
         <MaskedTextInput
           value={email}
@@ -126,7 +126,7 @@ export function LoginScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>{t("quickLoginTitle")}</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">{t("quickLoginTitle")}</Text>
         <Text style={styles.sectionText}>{t("quickLoginSubtitle")}</Text>
         <Pressable style={{...styles.secondaryButton, ...(pending ? styles.disabledButton : {})}} onPress={() => handleProviderLogin("google")} disabled={pending}
         accessibilityState={{ disabled: pending }} accessibilityRole="button">

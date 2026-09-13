@@ -246,13 +246,13 @@ export default function FriendsScreen() {
                   <>
                     {requestProfiles.length > 0 && (
                       <>
-                        <Text style={styles.sectionLabel}>{t("subTabRequests")}</Text>
+                        <Text style={styles.sectionLabel} accessibilityRole="header">{t("subTabRequests")}</Text>
                         {requestProfiles.map((p) => renderProfileCard(p, "request"))}
                       </>
                     )}
                     {friendProfiles.length > 0 ? (
                       <>
-                        <Text style={styles.sectionLabel}>{t("subTabMyFriends")}</Text>
+                        <Text style={styles.sectionLabel} accessibilityRole="header">{t("subTabMyFriends")}</Text>
                         {friendProfiles.map((p) => renderProfileCard(p, "friend"))}
                       </>
                     ) : requestProfiles.length === 0 ? (

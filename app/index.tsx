@@ -320,7 +320,7 @@ export default function HomeScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderText}>
-            <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("myProfile")}</Text>
+            <Text style={{ ...styles.sectionTitle, color: theme.text }} accessibilityRole="header">{t("myProfile")}</Text>
             <Text style={{ ...styles.sectionDescription, color: theme.muted }}>{t("myProfileSubtitle")}</Text>
           </View>
           {myProfile ? (
@@ -387,7 +387,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderText}>
-              <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("recentlyAdded")}</Text>
+              <Text style={{ ...styles.sectionTitle, color: theme.text }} accessibilityRole="header">{t("recentlyAdded")}</Text>
               <Text style={{ ...styles.sectionDescription, color: theme.muted }}>{t("recentlyAddedHint")}</Text>
             </View>
           </View>

@@ -122,14 +122,14 @@ export default function MarketplaceScreen() {
 
       {purchases.length > 0 ? (
         <View style={styles.purchasesSection}>
-          <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("marketplaceMyPurchasesTitle")}</Text>
+          <Text style={{ ...styles.sectionTitle, color: theme.text }} accessibilityRole="header">{t("marketplaceMyPurchasesTitle")}</Text>
           <ListingGrid data={purchases} columns={columns} fromSeller onMarkReceived={handleMarkReceived} />
         </View>
       ) : null}
 
       {sales.length > 0 ? (
         <View style={styles.purchasesSection}>
-          <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("marketplaceMySalesTitle")}</Text>
+          <Text style={{ ...styles.sectionTitle, color: theme.text }} accessibilityRole="header">{t("marketplaceMySalesTitle")}</Text>
           <ListingGrid
             data={sales}
             columns={columns}
@@ -143,7 +143,7 @@ export default function MarketplaceScreen() {
 
       {recentlySold.length > 0 ? (
         <View style={styles.purchasesSection}>
-          <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("marketplaceRecentlySoldTitle")}</Text>
+          <Text style={{ ...styles.sectionTitle, color: theme.text }} accessibilityRole="header">{t("marketplaceRecentlySoldTitle")}</Text>
           <ListingGrid
             data={recentlySold}
             columns={columns}

@@ -1,10 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { openTagEnd } from "@/lib/jsx-open-tag";
-import { stripComments } from "@/lib/strip-comments";
-
-import { sourceCode, tsxFiles } from "./helpers/source-files";
+import { headingTexts, isHeader, type HeadingText } from "./helpers/jsx-headings";
+import { tsxFiles } from "./helpers/source-files";
 
 /**
  * Every heading inside a modal is announced as one.
@@ -50,55 +48,17 @@ import { sourceCode, tsxFiles } from "./helpers/source-files";
  */
 const TITLE_STYLE = /styles\.(?:title|[A-Za-z0-9_]*Title|section(?:Label|Heading)?)\b/;
 
-type TitleText = {
-  readonly file: string;
-  readonly line: number;
-  readonly attrs: string;
-};
-
 /**
- * Every `Title`-styled `<Text>` that sits inside a `<Modal>` subtree.
+ * Every heading-styled `<Text>` that sits inside a `<Modal>` subtree.
  *
- * The stack is what makes "inside a modal" answerable: a screen renders its
+ * The stack is what makes "inside a modal" answerable — a screen renders its
  * page content and its sheets in one file, and `app/item/[id].tsx`'s item
- * title is not a modal heading while its share sheet's title is.
+ * title is not a modal heading while its share sheet's title is — and it is
+ * `helpers/jsx-headings.ts` that keeps it, because `screen-heading-role` asks
+ * the same question of the same JSX outside a modal.
  */
-function modalTitleTexts(file: string): TitleText[] {
-  const code = stripComments(sourceCode(file));
-  const found: TitleText[] = [];
-  const stack: { name: string; inModal: boolean }[] = [];
-  let cursor = 0;
-  while (cursor < code.length) {
-    const start = code.indexOf("<", cursor);
-    if (start === -1) break;
-    const close = /^<\/([A-Za-z][A-Za-z0-9_.]*)\s*>/.exec(code.slice(start));
-    if (close) {
-      const depth = stack.map((frame) => frame.name).lastIndexOf(close[1]);
-      if (depth !== -1) stack.length = depth;
-      cursor = start + close[0].length;
-      continue;
-    }
-    const name = /^<([A-Za-z][A-Za-z0-9_.]*)/.exec(code.slice(start));
-    if (!name) {
-      cursor = start + 1;
-      continue;
-    }
-    const attrsAt = start + name[0].length;
-    const tagEnd = openTagEnd(code, attrsAt);
-    if (tagEnd === -1) break;
-    cursor = tagEnd + 1;
-    const attrs = code.slice(attrsAt, tagEnd);
-    const inModal = stack.length > 0 && stack[stack.length - 1].inModal;
-    if (name[1] === "Text" && inModal && TITLE_STYLE.test(attrs)) {
-      found.push({ file, line: code.slice(0, start).split("\n").length, attrs });
-    }
-    // A self-closing tag opens nothing, so it never becomes an ancestor.
-    const selfClosing = code[tagEnd - 1] === "/";
-    if (!selfClosing) {
-      stack.push({ name: name[1], inModal: inModal || name[1] === "Modal" });
-    }
-  }
-  return found;
+function modalTitleTexts(file: string): HeadingText[] {
+  return headingTexts(file, TITLE_STYLE).filter((text) => text.inModal);
 }
 
 /**
@@ -133,7 +93,7 @@ describe("every modal heading is announced as a header", () => {
 
   it("classifies every one of them", () => {
     const unclassified = FOUND.filter(
-      (text) => !text.attrs.includes('accessibilityRole="header"') && !isExempt(text.attrs),
+      (text) => !isHeader(text) && !isExempt(text.attrs),
     ).map((text) => `${text.file}:${String(text.line)}`);
     assert.deepEqual(
       unclassified,
@@ -150,7 +110,7 @@ describe("every modal heading is announced as a header", () => {
     assert.ok(rows.length > 0, "NOT_A_HEADING lists a style nothing renders any more");
     for (const row of rows) {
       assert.ok(
-        !row.attrs.includes('accessibilityRole="header"'),
+        !isHeader(row),
         `${row.file}:${String(row.line)} is listed as not a heading and carries the role`,
       );
     }
@@ -164,7 +124,7 @@ describe("every modal heading is announced as a header", () => {
     const headers = FOUND.filter(
       (text) =>
         text.file === "components/search-overlay.tsx" &&
-        text.attrs.includes('accessibilityRole="header"'),
+        isHeader(text),
     );
     assert.equal(
       headers.length,
@@ -191,7 +151,7 @@ describe("every modal heading is announced as a header", () => {
     // the tree, and a sheet that stopped rendering its title would pass the
     // classification case by having nothing to classify.
     const byFile = new Set(
-      FOUND.filter((text) => text.attrs.includes('accessibilityRole="header"')).map((t) => t.file),
+      FOUND.filter(isHeader).map((text) => text.file),
     );
     for (const file of [
       "components/currency-sheet.tsx",

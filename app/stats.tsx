@@ -135,7 +135,7 @@ export default function StatsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t("statsGrowthTitle")}</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">{t("statsGrowthTitle")}</Text>
         {growth.length === 0 ? (
           <Text style={styles.emptyText}>{t("statsNoData")}</Text>
         ) : (

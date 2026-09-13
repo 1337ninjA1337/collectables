@@ -173,7 +173,7 @@ export default function TokensPreviewScreen() {
 
       {colorGroups.map((group) => (
         <View key={group.id} style={styles.section}>
-          <Text style={styles.sectionTitle}>{group.id}</Text>
+          <Text style={styles.sectionTitle} accessibilityRole="header">{group.id}</Text>
           <View style={styles.swatchGrid}>
             {group.entries.map((token) => {
               const labelColor = isLightHex(token.value) ? TEXT_DARK : TEXT_ON_DARK;
@@ -196,7 +196,7 @@ export default function TokensPreviewScreen() {
       ))}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Radius</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Radius</Text>
         <View style={styles.radiusRow}>
           {RADIUS_TOKENS.map((token) => (
             <View key={token.name} style={styles.radiusItem}>
@@ -214,7 +214,7 @@ export default function TokensPreviewScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Spacing</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Spacing</Text>
         <View style={styles.spacingList}>
           {SPACING_TOKENS.map((token) => (
             <View key={token.name} style={styles.spacingItem}>
@@ -227,7 +227,7 @@ export default function TokensPreviewScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Icon-badge rings</Text>
+        <Text style={styles.sectionTitle} accessibilityRole="header">Icon-badge rings</Text>
         <View style={styles.ringRow}>
           <IconBadge icon="📦" />
           <View style={styles.spacingList}>

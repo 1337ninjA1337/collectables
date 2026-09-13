@@ -225,7 +225,7 @@ export default function SettingsScreen() {
       <HeroBanner eyebrow={t("settings")} title={t("settingsTitle")} />
 
       <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t("language")}</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{t("language")}</Text>
         <Text style={[styles.sectionText, { color: theme.meta }]}>{t("languageSubtitle")}</Text>
         <View style={styles.languageRow}>
           {languageOptions.map((option) => {
@@ -266,7 +266,7 @@ export default function SettingsScreen() {
       </View>
 
       <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t("displayCurrencyTitle")}</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]} accessibilityRole="header">{t("displayCurrencyTitle")}</Text>
         <Text style={[styles.sectionText, { color: theme.meta }]}>{t("displayCurrencySubtitle")}</Text>
         <Pressable
           style={styles.currencyRow}

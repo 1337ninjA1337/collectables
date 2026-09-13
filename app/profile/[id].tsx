@@ -417,7 +417,7 @@ export default function ProfileScreen() {
       {relationship === "self" ? (
         <View style={styles.selfTools}>
           <View style={{ ...styles.languageCard, backgroundColor: theme.card, borderColor: theme.border, ...SHADOW_SOFT }}>
-            <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("descriptionLabel")}</Text>
+            <Text style={{ ...styles.sectionTitle, color: theme.text }} accessibilityRole="header">{t("descriptionLabel")}</Text>
             <Text style={{ ...styles.sectionText, color: theme.meta }}>{t("descriptionPlaceholder")}</Text>
             <MaskedTextInput
               value={bioDraft}
@@ -457,7 +457,7 @@ export default function ProfileScreen() {
       )}
 
       <View style={styles.section}>
-        <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("profileCollections")}</Text>
+        <Text style={{ ...styles.sectionTitle, color: theme.text }} accessibilityRole="header">{t("profileCollections")}</Text>
         {profileCollections.length > 0 ? (
           profileCollections.map((collection) => {
             const total = getCollectionTotalCost(collection.id);
@@ -483,7 +483,7 @@ export default function ProfileScreen() {
 
       {isSelf ? (
         <View style={styles.section}>
-          <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("marketplaceHistoryTitle")}</Text>
+          <Text style={{ ...styles.sectionTitle, color: theme.text }} accessibilityRole="header">{t("marketplaceHistoryTitle")}</Text>
           {myPurchases.length === 0 && mySales.length === 0 ? (
             <EmptyState icon="🛍️" title={t("marketplaceHistoryEmpty")} />
           ) : (
@@ -521,7 +521,7 @@ export default function ProfileScreen() {
 
       {(isSelf || isFriend) && (
         <View style={styles.section}>
-          <Text style={{ ...styles.sectionTitle, color: theme.text }}>{t("profileWishlist")}</Text>
+          <Text style={{ ...styles.sectionTitle, color: theme.text }} accessibilityRole="header">{t("profileWishlist")}</Text>
           {visibleWishlist.length > 0 ? (
             visibleWishlist.map((item) => (
               <Link key={item.id} href={`/item/${item.id}`} asChild>
