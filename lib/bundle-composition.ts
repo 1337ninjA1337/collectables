@@ -386,6 +386,88 @@ export function summarizeComposition(
   };
 }
 
+/**
+ * What a bucket weighed at some earlier build — the baseline a drift is
+ * measured from.
+ *
+ * Bytes per bucket and nothing else: a snapshot of the per-MODULE numbers
+ * would be a thousand rows that churn on every dependency bump, and the
+ * question a raise asks is "what grew", which is a question about packages
+ * and directories.
+ */
+export type CompositionBaseline = {
+  /** ISO date the measurement was taken — a rate needs the date. */
+  readonly takenOn: string;
+  /** The whole bundle, in bytes, at that measurement. */
+  readonly totalBytes: number;
+  /** Bucket label → bytes. */
+  readonly buckets: Readonly<Record<string, number>>;
+};
+
+/**
+ * The smallest bucket a baseline records, in bytes.
+ *
+ * Below about a kibibyte the list is a long tail of one-file packages that
+ * churn on every dependency bump — thirty rows that say nothing, in a file
+ * somebody has to re-take by hand. So a baseline stops here, and
+ * {@link compositionDelta} ignores the same tail on both sides: without that,
+ * every omitted bucket would read as `(new)` on the next run, which is the
+ * first thing this reported and the fastest way to make a drift report
+ * worthless.
+ *
+ * The tail is still inside the baseline's `totalBytes`, so the drift's total
+ * line stays honest and the unlisted moves show up as the gap between it and
+ * the sum of the rows.
+ */
+export const BASELINE_BUCKET_FLOOR_BYTES = 1024;
+
+export type CompositionDelta = {
+  readonly label: string;
+  /** Bytes now, 0 for a bucket that has left the bundle. */
+  readonly bytes: number;
+  /** Bytes then, 0 for a bucket that is new. */
+  readonly baselineBytes: number;
+  readonly deltaBytes: number;
+};
+
+/**
+ * Every bucket that moved between `baseline` and `composition`, biggest move
+ * first.
+ *
+ * Both directions, and arrivals and departures too: a bucket that is new is a
+ * dependency somebody added, and one that is gone is the only evidence a
+ * removal ever worked. Reporting growth alone would make the one round that
+ * gave bytes back invisible, which is the failure the copy-drift line already
+ * had to fix once.
+ *
+ * Unmoved buckets are left out — on an ordinary build that is nearly all of
+ * them, and a list of two hundred zeroes hides the four rows worth reading.
+ */
+export function compositionDelta(
+  composition: Composition,
+  baseline: CompositionBaseline,
+  floorBytes: number = BASELINE_BUCKET_FLOOR_BYTES,
+): readonly CompositionDelta[] {
+  const now = new Map(composition.buckets.map((entry) => [entry.label, entry.bytes]));
+  const labels = new Set([...now.keys(), ...Object.keys(baseline.buckets)]);
+  const deltas: CompositionDelta[] = [];
+  for (const label of labels) {
+    const bytes = now.get(label) ?? 0;
+    const baselineBytes = baseline.buckets[label] ?? 0;
+    if (bytes === baselineBytes) continue;
+    // The tail the baseline does not record. A bucket under the floor on both
+    // sides is absent from the baseline for a reason, and reporting it as an
+    // arrival would fill the report with packages that have been there for
+    // months.
+    if (Math.max(bytes, baselineBytes) < floorBytes) continue;
+    deltas.push({ label, bytes, baselineBytes, deltaBytes: bytes - baselineBytes });
+  }
+  return deltas.sort(
+    (a, b) =>
+      Math.abs(b.deltaBytes) - Math.abs(a.deltaBytes) || a.label.localeCompare(b.label),
+  );
+}
+
 function formatKiB(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KiB`;
 }
@@ -429,5 +511,57 @@ export function formatCompositionReport(
     "  shared helpers, tree-shaken re-exports and code the minifier hoisted across",
     "  module boundaries all move bytes over this line.",
   ];
+  return lines.join("\n");
+}
+
+/** Signed KiB, the spelling the drift lines in `check-bundle-size` use. */
+function formatSignedKiB(bytes: number): string {
+  const sign = bytes < 0 ? "-" : "+";
+  return `${sign}${(Math.abs(bytes) / 1024).toFixed(1)} KiB`;
+}
+
+/**
+ * "since 2026-09-13: +6.3 KiB, of which lib/ is +4.1" — what a budget raise
+ * has wanted five times and never had.
+ *
+ * The budget's own report can say the bundle grew and by how much; only this
+ * can say what grew. Rows are the buckets that MOVED, biggest first, so an
+ * ordinary build prints three or four lines and a dependency bump prints the
+ * one row that explains itself.
+ *
+ * Returns `null` when nothing moved at all, because a build identical to the
+ * baseline has nothing to report and a heading over an empty list reads as a
+ * measurement that failed.
+ */
+export function formatCompositionDriftReport(
+  composition: Composition,
+  baseline: CompositionBaseline,
+  options: { readonly topRows?: number } = {},
+): string | null {
+  const deltas = compositionDelta(composition, baseline);
+  if (deltas.length === 0) return null;
+  const topRows = options.topRows ?? 12;
+  const total = composition.totalBytes - baseline.totalBytes;
+  const lines = [
+    `since the ${baseline.takenOn} measurement: ${formatSignedKiB(total)} (${formatKiB(baseline.totalBytes)} → ${formatKiB(composition.totalBytes)})`,
+    ...deltas.slice(0, topRows).map((delta) => {
+      // An arrival and a departure are the two rows a reader most wants
+      // named: one is a dependency somebody added, the other is the only
+      // evidence a removal worked.
+      const note =
+        delta.baselineBytes === 0
+          ? " (new)"
+          : delta.bytes === 0
+            ? " (gone)"
+            : "";
+      return `  ${formatSignedKiB(delta.deltaBytes).padStart(11)}  ${delta.label}${note}`;
+    }),
+  ];
+  if (deltas.length > topRows) {
+    const rest = deltas.slice(topRows).reduce((sum, d) => sum + d.deltaBytes, 0);
+    lines.push(
+      `  ${formatSignedKiB(rest).padStart(11)}  ${String(deltas.length - topRows)} smaller moves`,
+    );
+  }
   return lines.join("\n");
 }

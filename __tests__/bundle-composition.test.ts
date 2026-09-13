@@ -3,9 +3,12 @@ import { describe, it } from "node:test";
 
 import {
   attributeChunkBytes,
+  BASELINE_BUCKET_FLOOR_BYTES,
+  compositionDelta,
   decodeMappings,
   decodeVlq,
   FIRST_PARTY_ROOTS,
+  formatCompositionDriftReport,
   formatCompositionReport,
   GENERATED,
   moduleBucket,
@@ -14,6 +17,8 @@ import {
   UNATTRIBUTED,
   type SourceMapLike,
 } from "../lib/bundle-composition";
+import { LAST_MEASURED_BUNDLE_BYTES } from "../lib/bundle-size";
+import { COMPOSITION_BASELINE } from "../lib/composition-snapshot";
 import { SOURCE_DIRS } from "../lib/source-dirs";
 
 const BASE64 =
@@ -420,5 +425,164 @@ describe("formatCompositionReport", () => {
     // directions.
     const report = formatCompositionReport("dist/entry.js", composition);
     assert.match(report, /not what removing it would return/);
+  });
+});
+
+describe("compositionDelta", () => {
+  const baseline = {
+    takenOn: "2026-09-13",
+    totalBytes: 10_000,
+    buckets: { "lib/": 4000, "react-dom": 4000, "going-away": 2000 },
+  };
+
+  const compositionOf = (buckets: Record<string, number>) =>
+    summarizeComposition(new Map(Object.entries(buckets)));
+
+  it("reports growth, shrinkage, arrivals and departures", () => {
+    const deltas = compositionDelta(
+      compositionOf({ "lib/": 6000, "react-dom": 3000, "brand-new": 5000 }),
+      baseline,
+    );
+    assert.deepEqual(
+      deltas.map((d) => [d.label, d.deltaBytes]),
+      [
+        ["brand-new", 5000],
+        ["going-away", -2000],
+        ["lib/", 2000],
+        ["react-dom", -1000],
+      ],
+    );
+  });
+
+  it("leaves out the buckets that did not move", () => {
+    // On an ordinary build that is nearly all of them, and a list of two
+    // hundred zeroes hides the four rows worth reading.
+    const deltas = compositionDelta(
+      compositionOf({ "lib/": 4000, "react-dom": 4000, "going-away": 2000 }),
+      baseline,
+    );
+    assert.deepEqual(deltas, []);
+  });
+
+  it("ignores the tail a baseline does not record", () => {
+    // The first thing this reported: a baseline stops at the floor, so every
+    // omitted package read as `(new)` on the next run and the report was
+    // thirty rows of packages that had been there for months.
+    const deltas = compositionDelta(
+      compositionOf({ "lib/": 4000, "react-dom": 4000, "going-away": 2000, tiny: 900 }),
+      baseline,
+    );
+    assert.deepEqual(deltas, []);
+    // Once it crosses the floor it is a real arrival again.
+    const grown = compositionDelta(
+      compositionOf({ "lib/": 4000, "react-dom": 4000, "going-away": 2000, tiny: 2000 }),
+      baseline,
+    );
+    assert.deepEqual(
+      grown.map((d) => d.label),
+      ["tiny"],
+    );
+    assert.equal(BASELINE_BUCKET_FLOOR_BYTES, 1024);
+  });
+
+  it("orders by the size of the move, not by the size of the bucket", () => {
+    // The question is "what changed", so a 40 KiB package that gained 1 KiB
+    // sorts below a 2 KiB one that doubled.
+    const deltas = compositionDelta(
+      compositionOf({ "lib/": 4100, "react-dom": 8000, "going-away": 2000 }),
+      baseline,
+    );
+    assert.deepEqual(
+      deltas.map((d) => d.label),
+      ["react-dom", "lib/"],
+    );
+  });
+});
+
+describe("formatCompositionDriftReport", () => {
+  const baseline = {
+    takenOn: "2026-09-13",
+    totalBytes: 10_240,
+    buckets: { "lib/": 4096, "react-dom": 4096, "going-away": 2048 },
+  };
+  const compositionOf = (buckets: Record<string, number>) =>
+    summarizeComposition(new Map(Object.entries(buckets)));
+
+  it("names the measurement it is speaking from and the totals either side", () => {
+    const report = formatCompositionDriftReport(
+      compositionOf({ "lib/": 6144, "react-dom": 4096, "going-away": 2048 }),
+      baseline,
+    );
+    assert.ok(report !== null);
+    assert.match(report, /since the 2026-09-13 measurement: \+2\.0 KiB \(10\.0 KiB → 12\.0 KiB\)/);
+    assert.match(report, /\+2\.0 KiB {2}lib\//);
+  });
+
+  it("marks an arrival and a departure, because those are the rows that explain themselves", () => {
+    const report = formatCompositionDriftReport(
+      compositionOf({ "lib/": 4096, "react-dom": 4096, newcomer: 3072 }),
+      baseline,
+    );
+    assert.ok(report !== null);
+    assert.match(report, /\+3\.0 KiB {2}newcomer \(new\)/);
+    assert.match(report, /-2\.0 KiB {2}going-away \(gone\)/);
+  });
+
+  it("sums the rows it did not print rather than dropping them", () => {
+    const report = formatCompositionDriftReport(
+      compositionOf({ "lib/": 5120, "react-dom": 5120, "going-away": 3072 }),
+      baseline,
+      { topRows: 1 },
+    );
+    assert.ok(report !== null);
+    assert.match(report, /2 smaller moves/);
+    // 1 KiB + 1 KiB, the two rows past the limit.
+    assert.match(report, /\+2\.0 KiB {2}2 smaller moves/);
+  });
+
+  it("says nothing at all when nothing moved", () => {
+    // A heading over an empty list reads as a measurement that failed.
+    assert.equal(
+      formatCompositionDriftReport(
+        compositionOf({ "lib/": 4096, "react-dom": 4096, "going-away": 2048 }),
+        baseline,
+      ),
+      null,
+    );
+  });
+});
+
+describe("the recorded baseline", () => {
+  it("records only buckets at or above the floor", () => {
+    // The floor is what keeps it re-takeable: below it the list is a churning
+    // tail of one-file packages.
+    for (const [label, bytes] of Object.entries(COMPOSITION_BASELINE.buckets)) {
+      assert.ok(
+        bytes >= BASELINE_BUCKET_FLOOR_BYTES,
+        `${label} is below the floor and should not be in the baseline`,
+      );
+    }
+  });
+
+  it("keeps the tail inside its total", () => {
+    // `totalBytes` is the whole bundle, not the sum of the listed rows, so the
+    // drift report's total stays honest and the unlisted moves show up as the
+    // gap between it and the rows.
+    const listed = Object.values(COMPOSITION_BASELINE.buckets).reduce((s, n) => s + n, 0);
+    assert.ok(listed > 0 && listed < COMPOSITION_BASELINE.totalBytes);
+  });
+
+  it("carries the date the argument needs", () => {
+    assert.match(COMPOSITION_BASELINE.takenOn, /^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("is measured against the same bundle the budget is", () => {
+    // Within a kibibyte: a sourcemapped export appends a `sourceMappingURL`
+    // comment per chunk, which the deploy strips. A baseline that had drifted
+    // further than that would be a measurement of a different tree.
+    assert.ok(
+      Math.abs(COMPOSITION_BASELINE.totalBytes - LAST_MEASURED_BUNDLE_BYTES) < 20 * 1024,
+      `the baseline (${String(COMPOSITION_BASELINE.totalBytes)}) and the budget's measurement (${String(LAST_MEASURED_BUNDLE_BYTES)}) are of different builds`,
+    );
   });
 });

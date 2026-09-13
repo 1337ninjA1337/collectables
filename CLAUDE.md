@@ -46,7 +46,13 @@ Reports, which gate nothing and are run when a question comes up:
 ```bash
 npm run build:sourcemaps   # the same web export WITH sourcemaps (the deploy strips them)
 npm run bundle:composition # what the bundle is made of, per package and per module
+npm run bundle:composition -- --snapshot  # the same numbers as a lib/composition-snapshot.ts literal
 ```
+
+The composition report ends with what has moved since `COMPOSITION_BASELINE` —
+the sentence five budget raises were argued without. Re-take the baseline with
+`--snapshot` when you move the budget, and paste all three fields: a baseline
+with one fresh number among stale ones reports drift that never happened.
 
 `npm run verify` is the single command to run before every commit. It chains
 the NINE steps CI runs (typecheck → lint:all → test → audit baseline → build

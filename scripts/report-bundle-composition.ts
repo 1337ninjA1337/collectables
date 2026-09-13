@@ -23,10 +23,14 @@ import * as path from "node:path";
 
 import {
   attributeChunkBytes,
+  BASELINE_BUCKET_FLOOR_BYTES,
+  formatCompositionDriftReport,
   formatCompositionReport,
   summarizeComposition,
+  type Composition,
   type SourceMapLike,
 } from "../lib/bundle-composition";
+import { COMPOSITION_BASELINE } from "../lib/composition-snapshot";
 import { REPO_ROOT, assertBundlePremise } from "./bundle-premise";
 
 const CHECK_NAME = "report-bundle-composition";
@@ -68,19 +72,51 @@ function main(): void {
     );
   }
 
+  const whole = summarizeComposition(wholeBundle, REPO_ROOT);
+
+  // `--snapshot` prints the literal to paste into `lib/composition-snapshot.ts`
+  // and nothing else, so re-taking the baseline is a copy rather than a
+  // hand-transcription of twenty numbers off a report.
+  if (process.argv.includes("--snapshot")) {
+    console.log(formatSnapshotLiteral(whole));
+    return;
+  }
+
   // The whole bundle first: the budget is a sum over the chunks, so the
   // question "what spent the last raise" is asked of the sum before it is
   // asked of either half.
   if (mapped.length > 1) {
-    console.log(
-      formatCompositionReport(
-        `all ${String(mapped.length)} chunks`,
-        summarizeComposition(wholeBundle, REPO_ROOT),
-      ),
-    );
+    console.log(formatCompositionReport(`all ${String(mapped.length)} chunks`, whole));
     console.log("");
   }
   console.log(sections.join("\n\n"));
+
+  const drift = formatCompositionDriftReport(whole, COMPOSITION_BASELINE);
+  console.log("");
+  console.log(
+    drift ??
+      `${CHECK_NAME}: identical to the ${COMPOSITION_BASELINE.takenOn} measurement — nothing moved.`,
+  );
+}
+
+/**
+ * Today's buckets as the source of `lib/composition-snapshot.ts`.
+ *
+ * Only the buckets above the floor: below it the list is a long tail of
+ * one-file packages that churn on every dependency bump, and a baseline that
+ * churns is one nobody re-takes.
+ */
+function formatSnapshotLiteral(composition: Composition): string {
+  const rows = composition.buckets
+    .filter((entry) => entry.bytes >= BASELINE_BUCKET_FLOOR_BYTES)
+    .map((entry) => `    ${JSON.stringify(entry.label)}: ${String(entry.bytes)},`);
+  return [
+    `  takenOn: ${JSON.stringify(new Date().toISOString().slice(0, 10))},`,
+    `  totalBytes: ${String(composition.totalBytes)},`,
+    "  buckets: {",
+    ...rows,
+    "  },",
+  ].join("\n");
 }
 
 main();
