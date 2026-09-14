@@ -42,7 +42,21 @@
  * Offsets are into whatever string the caller passes. Pass source with
  * comments blanked by `stripComments` if a commented-out tag should not count;
  * that function preserves offsets, so a line number computed afterwards is
- * still the real one.
+ * still the real one. Not optional in practice: an apostrophe in a line
+ * comment inside an open tag used to end the walk for the whole file, and the
+ * `>` in one still ends a tag early.
+ *
+ * A TAG THIS CANNOT READ comes back as -1, and `walkJsx` stops there rather
+ * than guessing — these scanners read files mid-edit, and one that threw would
+ * turn a lint run into a crash. What a RULE should then do is the caller's
+ * decision and it splits cleanly: a rule about a SHAPE (is this button
+ * unlabeled) skips it, because an unreadable tag is not evidence of an
+ * offence; a rule about a REQUIRED ATTRIBUTE (does this input carry the
+ * privacy mask) reports it, because an unreadable tag is exactly where the
+ * attribute might be missing and nobody can tell. All four rules in this
+ * repository are pinned to one side or the other in
+ * `__tests__/jsx-walk-unparseable.test.ts`, which is there because the fourth
+ * was found on the wrong one.
  */
 
 /**
