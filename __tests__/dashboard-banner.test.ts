@@ -5,6 +5,7 @@ import { RADIUS_CARD_SM, SPACING_SECTION } from "@/lib/design-tokens";
 import { assertNoOffenders } from "./helpers/offence-sweep";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { tsxFiles } from "./helpers/source-files";
+import { elementTagWith, elementTags } from "./helpers/jsx-element-props";
 
 /**
  * Structural pins for `<DashboardBanner>` — the "icon disc + title + hint +
@@ -47,8 +48,9 @@ describe("components/dashboard-banner.tsx — markup", () => {
     // `Slot.mergeProps` spreads styles with a plain object spread, so an array
     // reaches the DOM as {0: …, 1: …} and React DOM throws on node.style[0].
     // This is the crash that took the deployed web build down.
-    const pressable = src.match(/<Pressable[\s\S]*?\n {6}>/)?.[0] ?? "";
-    assert.ok(pressable.length > 0, "could not parse the <Pressable> element");
+    // `/<Pressable[\s\S]*?\n {6}>/` until `lint:jsx-walk` landed, which found
+    // the element's end by its INDENTATION — so a reformat moved the answer.
+    const [pressable] = elementTags(src, "Pressable", "components/dashboard-banner.tsx");
     assert.match(pressable, /style=\{\{/, "the Pressable style must be an object literal");
     assert.doesNotMatch(pressable, /style=\{\[/, "an array style here crashes react-native-web");
   });
@@ -125,8 +127,7 @@ describe("dashboard-banner — adoption across the UI", () => {
 
   it("the stats row passes no tone, so the default stays exercised", () => {
     const src = read("app/index.tsx");
-    const stats = src.match(/<DashboardBanner\s*\n\s*href="\/stats"[\s\S]*?\/>/)?.[0] ?? "";
-    assert.ok(stats.length > 0, "could not parse the stats row");
+    const stats = elementTagWith(src, "DashboardBanner", /href="\/stats"/, "the stats row");
     assert.doesNotMatch(stats, /tone=/);
   });
 

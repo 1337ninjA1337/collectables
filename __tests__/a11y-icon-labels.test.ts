@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { openTagsNamed } from "@/lib/jsx-open-tag";
+import { stripComments } from "@/lib/strip-comments";
 
 import { readRepoFile as read } from "./helpers/repo-file";
 
@@ -148,8 +149,8 @@ describe("the leaf components whose icon sits next to its own name", () => {
 
   for (const [file, count, why] of DECORATIVE) {
     it(`${file} hides ${count} decorative icon(s) on all three platforms — ${why}`, () => {
-      const src = read(file).replace(/\/\*[\s\S]*?\*\//g, "");
-      const tags = src.match(/<Ionicons[\s\S]*?\/>/g) ?? [];
+      const src = stripComments(read(file));
+      const tags = openTagsNamed(src, "Ionicons");
       // The count is a fact about the file that no repo-wide rule can state:
       // a new icon added here inherits nothing from the ones already decided.
       assert.equal(tags.length, count, `${file} renders ${tags.length} <Ionicons>, expected ${count}`);
@@ -313,8 +314,8 @@ describe("the header and the friends row, which had the nav bar's bug again", ()
       ["app/_layout.tsx", 3],
       ["app/friends.tsx", 2],
     ] as const) {
-      const src = read(file).replace(/\/\*[\s\S]*?\*\//g, "");
-      const tags = src.match(/<Ionicons[\s\S]*?\/>/g) ?? [];
+      const src = stripComments(read(file));
+      const tags = openTagsNamed(src, "Ionicons");
       assert.equal(tags.length, count, `${file} renders ${tags.length} <Ionicons>, expected ${count}`);
       for (const [i, tag] of tags.entries()) {
         assert.match(tag, /accessibilityElementsHidden/, `${file} #${i}: no iOS hide`);
@@ -354,8 +355,8 @@ describe("the last four screens, which close the sweep", () => {
 
   for (const [file, count, why] of SCREENS) {
     it(`${file} hides ${count} decorative icon(s) on all three platforms — ${why}`, () => {
-      const src = read(file).replace(/\/\*[\s\S]*?\*\//g, "");
-      const tags = src.match(/<Ionicons[\s\S]*?\/>/g) ?? [];
+      const src = stripComments(read(file));
+      const tags = openTagsNamed(src, "Ionicons");
       assert.equal(tags.length, count, `${file} renders ${tags.length} <Ionicons>, expected ${count}`);
       for (const [i, tag] of tags.entries()) {
         assert.match(tag, /accessibilityElementsHidden/, `${file} #${i}: no iOS hide`);

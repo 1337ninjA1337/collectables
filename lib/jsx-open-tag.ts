@@ -51,9 +51,34 @@
  * Backslash escapes are honoured; an unterminated literal consumes the rest of
  * the source, which is the forgiving choice — these scanners read files
  * mid-edit and one that threw would turn a lint run into a crash.
+ *
+ * A `'` or `"` literal ALSO ends at a line break, because one in JavaScript
+ * cannot contain a raw newline. That is a fact about the language and it was
+ * missing here, so an apostrophe consumed the rest of the file:
+ *
+ *     <Pressable
+ *       style={styles.item}
+ *       // the bar's own highlight says which tab you are on
+ *       accessibilityRole="button"
+ *     >
+ *
+ * `components/nav-tab.tsx`, verbatim. The apostrophe in "bar's" opened a
+ * string that never closed, {@link openTagEnd} ran off the end and returned
+ * -1, and {@link walkJsx} stops at a tag that does not close — so the walk
+ * yielded NOTHING for the file, silently, and every rule over it reported a
+ * clean tree. The `>` in a comment is the same class of hazard and the answer
+ * to both is `stripComments`, which these scanners are documented to use; what
+ * makes this one worth fixing in the primitive is that it does not need a `>`
+ * or a tag to fire, it needs an apostrophe, and the failure is the whole file
+ * rather than one tag.
+ *
+ * A template literal still spans lines, because it legally does. A line
+ * continuation (`"a\` then a newline) still works, because the escape is
+ * handled before the newline test.
  */
 export function skipStringLiteral(source: string, i: number): number {
   const quote = source[i];
+  const spansLines = quote === "`";
   let j = i + 1;
   while (j < source.length) {
     if (source[j] === "\\") {
@@ -61,6 +86,10 @@ export function skipStringLiteral(source: string, i: number): number {
       continue;
     }
     if (source[j] === quote) return j + 1;
+    // An unterminated `'` or `"` ends at the line break, which is where the
+    // language ends it. Returning the newline's own index rather than the one
+    // after it keeps the caller's cursor on a character it has not consumed.
+    if (!spansLines && source[j] === "\n") return j;
     j++;
   }
   return source.length;

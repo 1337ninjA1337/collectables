@@ -1,6 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readRepoFile } from "./helpers/repo-file";
+import { assertSomeElementHas, elementTagWith } from "./helpers/jsx-element-props";
+
+const VIEWER_LIST = /numColumns=\{\s*masonryColumnCount\s*\}/;
 
 /**
  * Responsive masonry column count (Masonry VM-B follow-up): the viewer
@@ -53,7 +56,7 @@ describe("app/collection/[id].tsx — responsive masonry column count", () => {
 
   it("the viewer FlatList consumes masonryColumnCount for numColumns — no literal column count", () => {
     const src = readSrc();
-    assert.match(src, /<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
+    assertSomeElementHas(src, "FlatList", /numColumns=\{\s*masonryColumnCount\s*\}/);
     // The pre-responsive literal must not come back on any list.
     assert.doesNotMatch(src, /numColumns=\{\s*\d+\s*\}/);
   });
@@ -63,9 +66,8 @@ describe("app/collection/[id].tsx — responsive masonry column count", () => {
     // RN forbids changing numColumns on a mounted list; the key is the
     // documented escape hatch. It must live on the SAME FlatList block that
     // carries numColumns.
-    const viewerBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
-    assert.ok(viewerBlock, "viewer FlatList (numColumns={masonryColumnCount}) not found");
-    assert.match(viewerBlock![0], /key=\{\s*`viewer-masonry-\$\{masonryColumnCount\}`\s*\}/);
+    const viewerBlock = elementTagWith(src, "FlatList", VIEWER_LIST, "the viewer FlatList");
+    assert.match(viewerBlock, /key=\{\s*`viewer-masonry-\$\{masonryColumnCount\}`\s*\}/);
   });
 
   it("getMasonryRowLayout divides by masonryColumnCount and lists it in its deps", () => {

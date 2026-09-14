@@ -40,8 +40,8 @@ const OPEN = "<";
  * `wildcardTag("HeroBanner", "[\\s\\S]*?")` is what
  * `src.match(/<HeroBanner[\s\S]*?>/)` looks like to the scanner.
  */
-function wildcardTag(name: string, wildcard: string, middle = ""): string {
-  return `${OPEN}${name}${middle}${wildcard}>`;
+function wildcardTag(name: string, wildcard: string, middle = "", tail = ""): string {
+  return `${OPEN}${name}${middle}${wildcard}${tail}>`;
 }
 
 /** A close-tag string search of the banned shape, as source text. */
@@ -95,6 +95,44 @@ describe("findJsxWalks — the open-tag regex", () => {
     // `[^>]*>` several lines down are two unrelated things. The bound is what
     // stops the scan from inventing a finding out of them.
     assert.deepEqual(rules([`${OPEN}Foo`, "[^>]*>"].join("\n")), []);
+  });
+
+  it("reaches the `>` through a bit of anchoring text, which is the same walk", () => {
+    // The bound the rule shipped without. Thirty-one call sites wrote the
+    // wildcard and then a few characters before the `>`:
+    // `/<FlatList[\s\S]*?windowSize=\{5\}[\s\S]*?\/>/` is the commonest here.
+    assert.deepEqual(rules(wildcardTag("FlatList", "[\\s\\S]*?", "", "windowSize=\\{5\\}")), [
+      "open-tag-regex",
+    ]);
+    // And the one that finds the element's end by its INDENTATION, which is
+    // the same answer with a worse reason.
+    assert.deepEqual(rules(wildcardTag("Pressable", "[\\s\\S]*?", "", "\\n {6}")), [
+      "open-tag-regex",
+    ]);
+  });
+
+  it("says nothing about a TypeScript type argument", () => {
+    // `flushPendingQueue<ChatMessage>(pending, {…})` is a generic, and the
+    // only thing separating it from JSX in text is the identifier character
+    // before the `<`, which no tag has. A real finding from the day the bound
+    // above was added.
+    assert.deepEqual(rules(`assert.match(SRC, /flushPendingQueue${OPEN}ChatMessage>\\(x,\\s*\\{[\\s\\S]*?y/);`), []);
+  });
+
+  it("says nothing about a tag whose own `>` the author wrote", () => {
+    // `/<I18nProvider>[\s\S]*?<DiagnosticsProvider>/` is a nesting assertion.
+    // Its author already knows where that opening tag ends, so no wildcard is
+    // being used to find it and the hazard cannot apply.
+    assert.deepEqual(
+      rules(`const r = /${OPEN}I18nProvider>[\\s\\S]*?${OPEN}DiagnosticsProvider>/;`),
+      [],
+    );
+    // Reported as `<I18nProvide>` when this was a `(?!>)` in the pattern: the
+    // lookahead let the NAME backtrack a character to satisfy itself.
+    assert.deepEqual(
+      walks(`const r = /${OPEN}I18nProvider>[\\s\\S]*?${OPEN}DiagnosticsProvider>/;`).map((f) => f.tag),
+      [],
+    );
   });
 
   it("says nothing about an HTML tag, which is a different kind of text", () => {

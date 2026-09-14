@@ -1,5 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+
+import { openTagsNamed } from "@/lib/jsx-open-tag";
+import { stripComments } from "@/lib/strip-comments";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -27,9 +30,8 @@ describe("HM-C4 — CurrencySheet memoization + stable call site", () => {
 
   it("the collection call site passes only referentially stable props", () => {
     const src = readCollectionSrc();
-    const m = src.match(/<CurrencySheet\s+[\s\S]*?\/>/);
-    assert.ok(m, "<CurrencySheet> call site not found");
-    const site = m[0];
+    const [site] = openTagsNamed(stripComments(src), "CurrencySheet");
+    assert.ok(site, "<CurrencySheet> call site not found");
     assert.match(site, /visible=\{\s*currencySheetOpen\s*\}/);
     assert.match(site, /selectedCode=\{\s*editCurrency\s*\}/);
     assert.match(site, /query=\{\s*currencyQuery\s*\}/);

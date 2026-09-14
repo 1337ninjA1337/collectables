@@ -70,6 +70,55 @@ describe("skipping a string literal", () => {
     const src = `"unterminated`;
     assert.equal(skipStringLiteral(src, 0), src.length);
   });
+
+  it("ends a quoted literal at the line break, where the language ends it", () => {
+    // The bug this closes. An APOSTROPHE in a line comment inside an open tag
+    // opened a "string" that never closed, so `openTagEnd` ran off the end,
+    // returned -1, and `walkJsx` — which stops at a tag that does not close —
+    // yielded NOTHING for the file. Silently: every rule over it reported a
+    // clean tree. `components/nav-tab.tsx` was the real one.
+    const src = "'unclosed\nnext line";
+    assert.equal(src.slice(skipStringLiteral(src, 0)), "\nnext line");
+  });
+
+  it("still lets a template literal span lines, because it legally does", () => {
+    const src = "`line one\nline two` rest";
+    assert.equal(src.slice(skipStringLiteral(src, 0)), " rest");
+  });
+
+  it("still honours a line continuation, which is an escape before the break", () => {
+    const src = '"a\\\nb" rest';
+    assert.equal(src.slice(skipStringLiteral(src, 0)), " rest");
+  });
+});
+
+describe("an apostrophe in a comment inside an open tag", () => {
+  it("no longer swallows the rest of the file", () => {
+    // `components/nav-tab.tsx`, near enough verbatim. Before the line-break
+    // rule in skipStringLiteral this walk returned an empty list — not a
+    // wrong answer about one tag, no answer about the whole file.
+    const src = [
+      "<Pressable",
+      "  style={styles.item}",
+      "  // the bar's own highlight says which tab you are on",
+      '  accessibilityRole="button"',
+      ">",
+      '  <Ionicons name="x" />',
+      "</Pressable>",
+    ].join("\n");
+    assert.deepEqual(
+      [...jsxTags(src)].map((tag) => tag.name),
+      ["Pressable", "Ionicons"],
+    );
+  });
+
+  it("and a quoted `>` inside an attribute still does not end the tag", () => {
+    // The property the line-break rule had to not break: a string literal is
+    // still skipped whole when it closes on its own line.
+    const src = '<Text accessibilityLabel=">" nativeID="after">hi</Text>';
+    const [tag] = [...jsxTags(src)];
+    assert.match(tag.attrs, /nativeID="after"/);
+  });
 });
 
 describe("matching a close tag", () => {

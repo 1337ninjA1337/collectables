@@ -22,6 +22,7 @@ import {
   localeStrings,
 } from "./helpers/i18n-locales";
 import { readRepoFile } from "./helpers/repo-file";
+import { elementTagWith } from "./helpers/jsx-element-props";
 
 function readScreenSrc(): string {
   return readRepoFile("app/collection/[id].tsx");
@@ -86,7 +87,16 @@ describe("reorder-blocked-by-sort notice — rendering", () => {
 
   it("gives the reset action a button role and a label", () => {
     const src = readScreenSrc();
-    const action = src.match(/<Pressable\n\s*style=\{styles\.reorderNoticeAction\}[\s\S]*?\/>|<Pressable\n\s*style=\{styles\.reorderNoticeAction\}[\s\S]*?<\/Pressable>/)?.[0] ?? "";
+    // Two alternatives for the same element until `lint:jsx-walk` landed —
+    // one ending at a `/>` and one at a `</Pressable>` — because a wildcard
+    // run has to be told which. `elementTagWith` reads the opening tag, which
+    // is where these props are, and cares about neither.
+    const action = elementTagWith(
+      src,
+      "Pressable",
+      /style=\{styles\.reorderNoticeAction\}/,
+      "the reset-sort action",
+    );
     assert.ok(action.length > 0, "expected to extract the reset-sort Pressable");
     assert.match(action, /accessibilityRole="button"/);
     assert.match(action, /accessibilityLabel=\{t\("reorderResetSort"\)\}/);

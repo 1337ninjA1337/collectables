@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readRepoFile } from "./helpers/repo-file";
+import { elementWith } from "./helpers/jsx-element-props";
 
 const layoutSrc = readRepoFile("app/_layout.tsx");
 
@@ -42,9 +43,13 @@ describe("Crash #4 — Sentry provider wiring", () => {
   });
 
   it("wraps the provider tree with <CrashBoundary>", () => {
+    // The containment, read from the boundary's BODY rather than as a
+    // wildcard from `<CrashBoundary` to the next `>` — which `lint:jsx-walk`
+    // refuses, because that `>` is whatever tag happens to come first.
+    const boundary = elementWith(layoutSrc, "CrashBoundary", /./, "app/_layout.tsx");
     assert.match(
-      layoutSrc,
-      /<CrashBoundary[\s\S]*?<I18nProvider>/,
+      boundary.body,
+      /<I18nProvider>/,
       "CrashBoundary must wrap the I18nProvider (and the rest of the tree)",
     );
     assert.match(

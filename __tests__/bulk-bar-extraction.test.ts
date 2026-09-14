@@ -1,5 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+
+import { openTagsNamed } from "@/lib/jsx-open-tag";
+import { stripComments } from "@/lib/strip-comments";
 import { assertReadsKeys } from "./helpers/i18n-keys-read";
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -38,9 +41,8 @@ describe("BB-A — BulkBar extraction", () => {
 
   it("the page passes the four hoisted handlers into <BulkBar>", () => {
     const src = readCollectionSrc();
-    const m = src.match(/<BulkBar\s+count=[\s\S]*?\/>/);
-    assert.ok(m, "<BulkBar> call site not found");
-    const site = m[0];
+    const [site] = openTagsNamed(stripComments(src), "BulkBar").filter((tag) => /\bcount=/.test(tag));
+    assert.ok(site, "<BulkBar> call site not found");
     assert.match(site, /count=\{\s*selectedIds\.size\s*\}/);
     assert.match(site, /onMove=\{\s*handleOpenMove\s*\}/);
     assert.match(site, /onDelete=\{\s*handleBulkDelete\s*\}/);

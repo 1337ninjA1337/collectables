@@ -1,6 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readRepoFile } from "./helpers/repo-file";
+import { elementTagWith } from "./helpers/jsx-element-props";
+
+const VIEWER_LIST = /numColumns=\{\s*masonryColumnCount\s*\}/;
 
 /**
  * Viewer-branch FlatList `getItemLayout` pins: the 2-column masonry rows are
@@ -80,13 +83,12 @@ describe("viewer FlatList getItemLayout", () => {
 
   it("the viewer FlatList passes getItemLayout + measures its ListHeaderComponent", () => {
     const src = readCollectionSrc();
-    const viewerBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
-    assert.ok(viewerBlock, "viewer FlatList (numColumns={masonryColumnCount}) not found");
-    assert.match(viewerBlock![0], /getItemLayout=\{\s*getMasonryRowLayout\s*\}/);
-    assert.match(viewerBlock![0], /ListHeaderComponent=\{[\s\S]*?onLayout=\{\s*onViewerHeaderLayout\s*\}/);
+    const viewerBlock = elementTagWith(src, "FlatList", VIEWER_LIST, "the viewer FlatList");
+    assert.match(viewerBlock, /getItemLayout=\{\s*getMasonryRowLayout\s*\}/);
+    assert.match(viewerBlock, /ListHeaderComponent=\{[\s\S]*?onLayout=\{\s*onViewerHeaderLayout\s*\}/);
     // The divisor is only correct because numColumns takes the SAME
     // masonryColumnCount variable that getMasonryRowLayout divides by.
-    assert.match(viewerBlock![0], /numColumns=\{\s*masonryColumnCount\s*\}/);
+    assert.match(viewerBlock, /numColumns=\{\s*masonryColumnCount\s*\}/);
   });
 
   it("the contentContainer row gap the offset stride assumes is still SPACING_LIST", () => {

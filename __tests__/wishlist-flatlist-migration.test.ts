@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readRepoFile } from "./helpers/repo-file";
+import { assertSomeElementHas, elementTags } from "./helpers/jsx-element-props";
 
 /**
  * WLF-B structural pins: `app/wishlist.tsx` no longer renders its card list
@@ -26,17 +27,17 @@ describe("app/wishlist.tsx — WLF-B FlatList migration", () => {
     // The old shape passed the refresh props to Screen (whose ScrollView
     // owned the scroll); they now ride on the FlatList's RefreshControl.
     assert.doesNotMatch(src, /<Screen refreshing=/);
-    assert.match(
-      src,
-      /<FlatList[\s\S]*?refreshControl=\{\s*\n?\s*<RefreshControl[\s\S]*?refreshing=\{\s*showRefreshing\s*\}[\s\S]*?onRefresh=\{\s*handleRefresh\s*\}[\s\S]*?\/>[\s\S]*?\}/,
-    );
-    assert.match(src, /<FlatList[\s\S]*?style=\{\s*flatListStyles\.viewerFlatList\s*\}/);
+    const [list] = elementTags(src, "FlatList", "app/wishlist.tsx");
+    assert.match(list, /refreshControl=\{\s*\n?\s*<RefreshControl/);
+    assert.match(list, /refreshing=\{\s*showRefreshing\s*\}/);
+    assert.match(list, /onRefresh=\{\s*handleRefresh\s*\}/);
+    assert.match(list, /style=\{\s*flatListStyles\.viewerFlatList\s*\}/);
   });
 
   it("feeds the FlatList from the chunked window, never the raw array", () => {
     const src = readSrc();
     assert.match(src, /useChunkedList\(\s*wishlistItems\s*,\s*CHUNK_PAGE_SIZE_ROWS\s*\)/);
-    assert.match(src, /<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}/);
+    assertSomeElementHas(src, "FlatList", /data=\{\s*visibleItems\s*\}/);
     assert.doesNotMatch(src, /data=\{\s*wishlistItems\s*\}/);
   });
 

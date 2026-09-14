@@ -10,6 +10,7 @@ import { stripComments } from "@/lib/strip-comments";
 import type { ProfileRelationship } from "@/lib/types";
 
 import { readRepoFile } from "./helpers/repo-file";
+import { elementWith } from "./helpers/jsx-element-props";
 
 /**
  * `<RelationshipActionRow>` — the presentation half of the relationship table.
@@ -168,9 +169,8 @@ describe("all three profile surfaces render through the row", () => {
     // it out of `lib/relationship-actions.ts`, where the people list would
     // then have to decide what to do with an intent it cannot service.
     const src = read("app/profile/[id].tsx");
-    const site = src.match(/<RelationshipActionRow[\s\S]*?<\/RelationshipActionRow>/);
-    assert.ok(site, "<RelationshipActionRow> call site not found");
-    assert.match(site[0], /adminDeleteProfile/);
+    const site = elementWith(src, "RelationshipActionRow", /./, "the profile screen's row");
+    assert.match(site.text, /adminDeleteProfile/);
     assert.doesNotMatch(readCode(COMPONENT), /admin/i);
   });
 });

@@ -7,6 +7,7 @@ import {
 } from "./helpers/i18n-locales";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { readRepoFile as read } from "./helpers/repo-file";
+import { elementWith } from "./helpers/jsx-element-props";
 
 /**
  * The locked "Private" visibility chip announces WHAT it is and WHY it will not
@@ -35,6 +36,19 @@ import { readRepoFile as read } from "./helpers/repo-file";
 const createSrc = read("app/create-collection.tsx");
 const modalSrc = read("components/edit-collection-modal.tsx");
 
+/**
+ * The visibility chip's whole JSX, opening tag and body.
+ *
+ * Was `/<Pressable[\s\S]*?key=\{v\}[\s\S]*?<\/Pressable>/`, written out six
+ * times and refused by `lint:jsx-walk` since 2026-09-14: it starts at the
+ * FIRST `<Pressable` in the screen and ends at the first `</Pressable>` after
+ * the marker, so on a screen whose chip row sits inside another pressable it
+ * was reading a different element's props entirely.
+ */
+function visibilityChip(source: string): string {
+  return elementWith(source, "Pressable", /key=\{v\}/, "the visibility chip").text;
+}
+
 describe("visibility chip — locked private variant announces itself honestly", () => {
   it("create-collection: the chip declares no disabled state (it is not disabled — it opens the upsell)", () => {
     // A `disabled` key inside accessibilityState anywhere in the chip's JSX
@@ -43,24 +57,21 @@ describe("visibility chip — locked private variant announces itself honestly",
     // `disabled: saving` shape, which is scoped to the save row — the
     // visibility chip's JSX must not carry any `disabled:` in an
     // accessibilityState.
-    const chip = /<Pressable[\s\S]*?key=\{v\}[\s\S]*?<\/Pressable>/.exec(createSrc);
-    assert.ok(chip, "visibility chip <Pressable key={v}> not found");
+    const chip = visibilityChip(createSrc);
     assert.doesNotMatch(
-      chip[0],
+      chip,
       /accessibilityState=\{\{[^}]*disabled\b/,
       "the visibility chip must not claim it is disabled — pressing it opens the upsell",
     );
   });
 
   it("create-collection: the chip announces its selected state", () => {
-    const chip = /<Pressable[\s\S]*?key=\{v\}[\s\S]*?<\/Pressable>/.exec(createSrc);
-    assert.ok(chip);
-    assert.match(chip[0], /accessibilityState=\{\{\s*selected\s*\}\}/);
+    const chip = visibilityChip(createSrc);
+    assert.match(chip, /accessibilityState=\{\{\s*selected\s*\}\}/);
   });
 
   it("create-collection: the locked variant carries an accessibilityLabel naming Private and the premium constraint", () => {
-    const chip = /<Pressable[\s\S]*?key=\{v\}[\s\S]*?<\/Pressable>/.exec(createSrc);
-    assert.ok(chip);
+    const chip = visibilityChip(createSrc);
     // The label is expression-shaped (a ternary over `locked`), so the guard's
     // untranslated-label rule (which matches bare double-quoted strings)
     // ignores it. The whole sentence is ONE composed key per locale
@@ -69,29 +80,26 @@ describe("visibility chip — locked private variant announces itself honestly",
     // word order — Russian and Belarusian read the value+notice pair with
     // a colon rather than an em-dash — and the guard has no runtime string
     // concatenation to see through.
-    assert.match(chip[0], /accessibilityLabel=\{\s*locked\s*\?\s*t\("visibilityPrivateLockedA11y"\)\s*:\s*undefined\s*\}/);
+    assert.match(chip, /accessibilityLabel=\{\s*locked\s*\?\s*t\("visibilityPrivateLockedA11y"\)\s*:\s*undefined\s*\}/);
   });
 
   it("edit-collection-modal: the chip declares no disabled state either", () => {
-    const chip = /<Pressable[\s\S]*?key=\{v\}[\s\S]*?<\/Pressable>/.exec(modalSrc);
-    assert.ok(chip, "visibility chip <Pressable key={v}> not found in edit modal");
+    const chip = visibilityChip(modalSrc);
     assert.doesNotMatch(
-      chip[0],
+      chip,
       /accessibilityState=\{\{[^}]*disabled\b/,
       "the edit modal chip must not claim it is disabled — pressing it fires a toast",
     );
   });
 
   it("edit-collection-modal: the chip announces its selected state", () => {
-    const chip = /<Pressable[\s\S]*?key=\{v\}[\s\S]*?<\/Pressable>/.exec(modalSrc);
-    assert.ok(chip);
-    assert.match(chip[0], /accessibilityState=\{\{\s*selected\s*\}\}/);
+    const chip = visibilityChip(modalSrc);
+    assert.match(chip, /accessibilityState=\{\{\s*selected\s*\}\}/);
   });
 
   it("edit-collection-modal: the locked variant carries an accessibilityLabel naming Private and the premium constraint", () => {
-    const chip = /<Pressable[\s\S]*?key=\{v\}[\s\S]*?<\/Pressable>/.exec(modalSrc);
-    assert.ok(chip);
-    assert.match(chip[0], /accessibilityLabel=\{\s*locked\s*\?\s*t\("visibilityPrivateLockedA11y"\)\s*:\s*undefined\s*\}/);
+    const chip = visibilityChip(modalSrc);
+    assert.match(chip, /accessibilityLabel=\{\s*locked\s*\?\s*t\("visibilityPrivateLockedA11y"\)\s*:\s*undefined\s*\}/);
   });
 });
 

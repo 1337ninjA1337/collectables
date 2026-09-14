@@ -1,5 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+
+import { openTagsNamed } from "@/lib/jsx-open-tag";
+import { stripComments } from "@/lib/strip-comments";
 import { assertReadsKeys } from "./helpers/i18n-keys-read";
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -67,9 +70,8 @@ describe("HM-C2 — CollectionShareSheet extraction", () => {
 
   it("the page passes stable handlers + the memoized sharedWithUserIds array", () => {
     const src = readCollectionSrc();
-    const m = src.match(/<CollectionShareSheet\s+[\s\S]*?\/>/);
-    assert.ok(m, "<CollectionShareSheet> call site not found");
-    const site = m[0];
+    const [site] = openTagsNamed(stripComments(src), "CollectionShareSheet");
+    assert.ok(site, "<CollectionShareSheet> call site not found");
     assert.match(site, /visible=\{\s*shareOpen\s*\}/);
     assert.match(site, /collectionId=\{\s*activeCollection\.id\s*\}/);
     assert.match(site, /collectionName=\{\s*activeCollection\.name\s*\}/);

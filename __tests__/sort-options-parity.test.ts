@@ -38,6 +38,7 @@ import {
   assertMatchesInEveryLocaleBody,
 } from "./helpers/i18n-locales";
 import { readRepoFile } from "./helpers/repo-file";
+import { elementWith } from "./helpers/jsx-element-props";
 
 function readComponentSrc(): string {
   return readRepoFile("components/item-filters.tsx");
@@ -163,8 +164,7 @@ describe("<ItemFilterBar> sort chips", () => {
     // the label Text. Both spellings: RN maps `selected` on native and
     // react-native-web renders `aria-checked` from `checked`, which is the
     // state a radio actually carries.
-    const chip = src.match(/<Pressable\n\s*key=\{opt\.mode\}[\s\S]*?<\/Pressable>/)?.[0] ?? "";
-    assert.ok(chip.length > 0, "expected to extract the sort chip Pressable");
+    const chip = elementWith(src, "Pressable", /key=\{opt\.mode\}/, "the sort chip").text;
     assert.match(chip, /accessibilityRole="radio"/);
     assert.match(chip, /accessibilityState=\{\{ selected: active, checked: active \}\}/);
   });

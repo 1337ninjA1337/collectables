@@ -5,6 +5,7 @@ import { stripComments } from "@/lib/strip-comments";
 
 import { assertReadsKeys } from "./helpers/i18n-keys-read";
 import { readRepoFile } from "./helpers/repo-file";
+import { elementTags, elementWith } from "./helpers/jsx-element-props";
 
 /**
  * Structural pins for the shared deep-link share sheet
@@ -125,13 +126,12 @@ describe("ShareSheet — shared deep-link sheet", () => {
 describe("ShareSheet — consumers", () => {
   it("the item screen renders <ShareSheet> with a stable onClose and no local copy state", () => {
     const src = itemSrc();
-    const site = src.match(/<ShareSheet\s[\s\S]*?\/>/);
-    assert.ok(site, "<ShareSheet> call site not found in app/item/[id].tsx");
-    assert.match(site[0], /visible=\{shareOpen\}/);
-    assert.match(site[0], /url=\{buildDeepLink\(`item\/\$\{activeItem\.id\}`\)\}/);
-    assert.match(site[0], /hint=\{t\("shareItemHint"\)\}/);
-    assert.match(site[0], /message=\{activeItem\.title\}/);
-    assert.match(site[0], /onClose=\{closeShareSheet\}/);
+    const [site] = elementTags(src, "ShareSheet", "app/item/[id].tsx");
+    assert.match(site, /visible=\{shareOpen\}/);
+    assert.match(site, /url=\{buildDeepLink\(`item\/\$\{activeItem\.id\}`\)\}/);
+    assert.match(site, /hint=\{t\("shareItemHint"\)\}/);
+    assert.match(site, /message=\{activeItem\.title\}/);
+    assert.match(site, /onClose=\{closeShareSheet\}/);
     assert.match(src, /const closeShareSheet = useCallback\(\(\) => setShareOpen\(false\), \[\]\);/);
     assert.doesNotMatch(src, /linkCopied/, "copy-feedback state belongs to <ShareSheet>");
   });
@@ -151,7 +151,13 @@ describe("ShareSheet — consumers", () => {
   it("the collection sheet composes <ShareSheet> rather than duplicating it", () => {
     const src = collectionSheetSrc();
     assert.match(src, /import\s*\{\s*ShareSheet\s*\}\s*from\s*"@\/components\/share-sheet"/);
-    assert.match(src, /<ShareSheet\b[\s\S]*?<\/ShareSheet>/);
+    // The composition, read as an element rather than as a wildcard to the
+    // first `</ShareSheet>`: the sheet wraps children, so the body is what
+    // "composes rather than duplicates" is about.
+    assert.ok(
+      elementWith(src, "ShareSheet", /./, "the collection share sheet").body.length > 0,
+      "the collection sheet renders <ShareSheet> with nothing inside it",
+    );
     const rnImport = src.match(/import \{([^}]*)\} from "react-native";/);
     assert.ok(rnImport, "react-native import not found");
     assert.doesNotMatch(rnImport[1], /\bModal\b/, "the Modal wrapper belongs to <ShareSheet>");

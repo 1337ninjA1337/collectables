@@ -1,6 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { openTagsNamed } from "@/lib/jsx-open-tag";
+import { stripComments } from "@/lib/strip-comments";
+
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { assertDeclaredInEveryLocale, localeValuesOf } from "./helpers/i18n-locales";
 import { readRepoFile } from "./helpers/repo-file";
@@ -28,9 +31,9 @@ const SETTINGS = readRepoFile("app/settings.tsx");
 
 /** The `<CurrencySheet …/>` element in a screen's source. */
 function callSite(source: string): string {
-  const match = /<CurrencySheet\s+[\s\S]*?\/>/.exec(source);
-  assert.ok(match, "<CurrencySheet> call site not found");
-  return match[0];
+  const [tag] = openTagsNamed(stripComments(source), "CurrencySheet");
+  assert.ok(tag, "<CurrencySheet> call site not found");
+  return tag;
 }
 
 describe("the currency sheet names the question it is asking", () => {

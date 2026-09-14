@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { BulkBarProps } from "@/components/bulk-bar";
+import { openTagsNamed } from "@/lib/jsx-open-tag";
+import { stripComments } from "@/lib/strip-comments";
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -101,10 +103,14 @@ describe("BulkBar — at least one action", () => {
     const screens = ["app/archive.tsx", "app/collection/[id].tsx"];
     const sites = screens.flatMap((path) => {
       const src = readRepoFile(path);
-      // `count=` anchors the match to a real call site: both files also name
-      // `<BulkBar>` in prose, and a bare tag match runs from a comment to
-      // whatever self-closing tag comes next.
-      return [...src.matchAll(/<BulkBar\s+count=[\s\S]*?\/>/g)].map((m) => ({ path, site: m[0] }));
+      // `count=` still anchors this to a real call site: both files also name
+      // `<BulkBar>` in prose, and `openTagsNamed` reads comments as source.
+      // What the walk fixes is the other half of the old regex — `[\s\S]*?\/>`
+      // ran from the open tag to whatever self-closing tag came next, which
+      // for a call site spanning a nested element is not this element's end.
+      return openTagsNamed(stripComments(src), "BulkBar")
+        .filter((site) => /\bcount=/.test(site))
+        .map((site) => ({ path, site }));
     });
     assert.equal(sites.length, 2, "expected exactly the two <BulkBar> call sites");
     for (const { path, site } of sites) {

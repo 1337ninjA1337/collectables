@@ -1,4 +1,5 @@
 import { balancedThrough } from "@/lib/balanced-source";
+import { walkJsx } from "@/lib/jsx-open-tag";
 import { stripComments } from "@/lib/strip-comments";
 
 /**
@@ -63,20 +64,27 @@ function isAllowed(value: string): boolean {
 }
 
 /**
- * Track `<View>` nesting up to `index` and return the style attributes of
- * every View still open at that point (outermost first). Self-closing
- * `<View ... />` tags never enclose anything and are skipped.
+ * What every `<EmptyState>` in a source inherits: the style attributes of the
+ * `<View>`s still open above it, outermost first.
+ *
+ * This was `openViewStylesAt`, a `/<View\b([^>]*?)(\/?)>|<\/View>/` scan with
+ * the bug `lib/jsx-open-tag.ts` exists for and `lint:jsx-walk` refuses:
+ * `[^>]*?` ends the opening tag at the first `>`, which in a wrapper carrying
+ * `style={{ padding: wide ? 24 : 12 }}` is fine and in one carrying
+ * `onLayout={() => measure()}` is the one inside the arrow. The attributes
+ * pushed onto the stack were then a fragment — a `backgroundColor` after that
+ * point was invisible, so the guard reported a clean tree — and the unmatched
+ * `>` left behind desynchronised the open/close pairing for everything after
+ * it in the file.
+ *
+ * `walkJsx` also reaches a `<View>` rendered through a render prop, which the
+ * forward scan stepped over along with everything inside it.
  */
-function openViewStylesAt(source: string, index: number): string[] {
-  const stack: string[] = [];
-  const tag = /<View\b([^>]*?)(\/?)>|<\/View>/g;
-  let m: RegExpExecArray | null;
-  while ((m = tag.exec(source)) && m.index < index) {
-    if (m[0] === "</View>") stack.pop();
-    else if (m[2] !== "/") stack.push(m[1] ?? "");
-  }
-  return stack;
-}
+const VIEW_STACK = {
+  seed: [] as readonly string[],
+  inherit: (tag: { name: string; attrs: string; selfClosing: boolean }, open: readonly string[]) =>
+    tag.name === "View" && !tag.selfClosing ? [...open, tag.attrs] : open,
+};
 
 /**
  * Scan one source string for `<EmptyState` usages wrapped in a
@@ -89,11 +97,10 @@ export function findEmptyStateWrapperOverrides(
 ): EmptyStateWrapperFinding[] {
   const source = stripComments(rawSource);
   const findings: EmptyStateWrapperFinding[] = [];
-  const usage = /<EmptyState\b/g;
-  let m: RegExpExecArray | null;
-  while ((m = usage.exec(source))) {
-    const line = source.slice(0, m.index).split("\n").length;
-    for (const attrs of openViewStylesAt(source, m.index)) {
+  for (const tag of walkJsx(source, VIEW_STACK)) {
+    if (tag.name !== "EmptyState") continue;
+    const line = source.slice(0, tag.start).split("\n").length;
+    for (const attrs of tag.inherited) {
       const styleAttr = /style=\{/.exec(attrs);
       if (!styleAttr) continue;
       const styleBody =

@@ -1,6 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readRepoFile } from "./helpers/repo-file";
+import { assertSomeElementHas, elementTagWith } from "./helpers/jsx-element-props";
+
+const VIEWER_LIST = /numColumns=\{\s*masonryColumnCount\s*\}/;
 
 /**
  * VM-C structural pins: the viewer/read-only branch in
@@ -62,16 +65,13 @@ describe("app/collection/[id].tsx — FlatList viewer-masonry migration (VM-C)",
     // getMasonryRowLayout divides by (a literal here could drift from the
     // divisor), and switching the data source to `items` would undo the
     // chunked-window memory bound that VM-A/B shipped.
-    assert.match(src, /<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}[\s\S]*?\/>/);
-    assert.match(src, /<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
+    assertSomeElementHas(src, "FlatList", /data=\{\s*visibleItems\s*\}/);
+    assertSomeElementHas(src, "FlatList", /numColumns=\{\s*masonryColumnCount\s*\}/);
   });
 
   it("viewer FlatList passes keyExtractor item.id (so React keys survive re-renders)", () => {
     const src = readSrc();
-    assert.match(
-      src,
-      /<FlatList[\s\S]*?keyExtractor=\{\s*\(item\)\s*=>\s*item\.id\s*\}[\s\S]*?\/>/,
-    );
+    assertSomeElementHas(src, "FlatList", /keyExtractor=\{\s*\(item\)\s*=>\s*item\.id\s*\}/);
   });
 
   it("viewer FlatList renders <ItemCard item={item} compact /> per slot", () => {
@@ -97,9 +97,8 @@ describe("app/collection/[id].tsx — FlatList viewer-masonry migration (VM-C)",
     // the selection-mode FlatList (VM-E) is a different list with NO
     // numColumns prop and intentionally keeps scrollEnabled={false}
     // because the outer ScrollView still owns scroll for selection mode.
-    const viewerFlatListBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
-    assert.ok(viewerFlatListBlock, "viewer FlatList (numColumns={masonryColumnCount}) not found");
-    assert.doesNotMatch(viewerFlatListBlock[0], /scrollEnabled=\{\s*false\s*\}/);
+    const viewer = elementTagWith(src, "FlatList", VIEWER_LIST, "the viewer FlatList");
+    assert.doesNotMatch(viewer, /scrollEnabled=\{\s*false\s*\}/);
   });
 
   it("declares masonryList / masonryRow / masonryItem styles for the FlatList", () => {

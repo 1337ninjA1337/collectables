@@ -2,6 +2,12 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { readRepoFile } from "./helpers/repo-file";
+import { elementSpan, tagsNamed } from "@/lib/jsx-open-tag";
+import { stripComments } from "@/lib/strip-comments";
+
+import { elementTagWith } from "./helpers/jsx-element-props";
+
+const VIEWER_LIST = /numColumns=\{\s*masonryColumnCount\s*\}/;
 
 /**
  * VM-D structural pins: the viewer/read-only branch in
@@ -77,9 +83,16 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // load-bearing literal — a missing prop falls back to the React Native
     // default which is far too high (10/10/21 → ~210 mounted rows). The
     // values match the task spec.
-    assert.match(src, /<FlatList[\s\S]*?initialNumToRender=\{\s*10\s*\}[\s\S]*?\/>/);
-    assert.match(src, /<FlatList[\s\S]*?maxToRenderPerBatch=\{\s*8\s*\}[\s\S]*?\/>/);
-    assert.match(src, /<FlatList[\s\S]*?windowSize=\{\s*5\s*\}[\s\S]*?\/>/);
+    // Asked of the viewer FlatList by name since `lint:jsx-walk` landed. The
+    // `<FlatList[\s\S]*?prop[\s\S]*?\/>` these were started at the first of
+    // three FlatLists in this file and ran past the other two, so the
+    // selection list's `windowSize={7}` and the viewer's `{5}` were being
+    // read out of one window — which is precisely the distinction this case
+    // exists to hold.
+    const viewer = elementTagWith(src, "FlatList", VIEWER_LIST, "the viewer FlatList");
+    assert.match(viewer, /initialNumToRender=\{\s*10\s*\}/);
+    assert.match(viewer, /maxToRenderPerBatch=\{\s*8\s*\}/);
+    assert.match(viewer, /windowSize=\{\s*5\s*\}/);
   });
 
   it("viewer FlatList enables removeClippedSubviews on iOS only", () => {
@@ -88,8 +101,8 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // can hide rows that should still render) but a major win on iOS for
     // long lists. The Platform.OS gate matches RN community guidance.
     assert.match(
-      src,
-      /<FlatList[\s\S]*?removeClippedSubviews=\{\s*Platform\.OS\s*===\s*"ios"\s*\}[\s\S]*?\/>/,
+      elementTagWith(src, "FlatList", VIEWER_LIST, "the viewer FlatList"),
+      /removeClippedSubviews=\{\s*Platform\.OS\s*===\s*"ios"\s*\}/,
     );
   });
 
@@ -112,11 +125,10 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // `hasMore ? loadMore : undefined` so a fully-extended window stops
     // the callback entirely. The 0.5 threshold means "half a viewport
     // before the end", per the task spec.
-    const viewerBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
-    assert.ok(viewerBlock, "viewer FlatList (numColumns={masonryColumnCount}) not found");
-    assert.match(viewerBlock[0], /onEndReached=\{\s*hasMore\s*\?\s*loadMore\s*:\s*undefined\s*\}/);
-    assert.match(viewerBlock[0], /onEndReachedThreshold=\{\s*0\.5\s*\}/);
-    assert.doesNotMatch(viewerBlock[0], /ListFooterComponent/);
+    const viewerBlock = elementTagWith(src, "FlatList", VIEWER_LIST, "the viewer FlatList");
+    assert.match(viewerBlock, /onEndReached=\{\s*hasMore\s*\?\s*loadMore\s*:\s*undefined\s*\}/);
+    assert.match(viewerBlock, /onEndReachedThreshold=\{\s*0\.5\s*\}/);
+    assert.doesNotMatch(viewerBlock, /ListFooterComponent/);
   });
 
   it("viewer FlatList carries its own RefreshControl (Screen scroll=false doesn't pass it through)", () => {
@@ -126,10 +138,15 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // path must mount its own RefreshControl directly on the FlatList so
     // pull-to-refresh keeps working.
     assert.match(src, /import\s*\{[^}]*\bRefreshControl\b[^}]*\}\s*from\s*"react-native"/);
-    assert.match(
-      src,
-      /<FlatList[\s\S]*?refreshControl=\{\s*\n?\s*<RefreshControl[\s\S]*?refreshing=\{\s*showRefreshing\s*\}[\s\S]*?onRefresh=\{\s*handleRefresh\s*\}[\s\S]*?\/>[\s\S]*?\}/,
-    );
+    // The RefreshControl is a render-prop element: it lives INSIDE the
+    // FlatList's opening tag, which is exactly what `openTagsNamed` hands
+    // back whole. The wildcard this replaces ran from the first FlatList in
+    // the file to the first `/>` after `onRefresh=`, which is the
+    // RefreshControl's own — two elements read as one.
+    const refreshing = elementTagWith(src, "FlatList", VIEWER_LIST, "the viewer FlatList");
+    assert.match(refreshing, /refreshControl=\{\s*\n?\s*<RefreshControl/);
+    assert.match(refreshing, /refreshing=\{\s*showRefreshing\s*\}/);
+    assert.match(refreshing, /onRefresh=\{\s*handleRefresh\s*\}/);
   });
 
   it("viewer FlatList gets flex:1 via the viewerFlatList style", () => {
@@ -139,7 +156,10 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // virtualization can't fire. The style indirection (viewerFlatList) is
     // there so the style can be tweaked from one place.
     // The style moved to the shared lib/flat-list-styles.ts (WLF-A).
-    assert.match(src, /<FlatList[\s\S]*?style=\{\s*flatListStyles\.viewerFlatList\s*\}[\s\S]*?\/>/);
+    assert.match(
+      elementTagWith(src, "FlatList", VIEWER_LIST, "the viewer FlatList"),
+      /style=\{\s*flatListStyles\.viewerFlatList\s*\}/,
+    );
     const sharedSrc = readRepoFile("lib/flat-list-styles.ts");
     assert.match(sharedSrc, /viewerFlatList:\s*\{[\s\S]*?flex:\s*1[\s\S]*?\}/);
   });
@@ -166,10 +186,16 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // inside FlatList's renderItem/header/footer would re-mount on every
     // scroll. The structural pin is `<FlatList ... /> </FlatList? no — />
     // {modalsBlock}` right before `</Screen>` inside the early-return.
-    assert.match(
-      src,
-      /if\s*\(\s*isViewerFlatListBranch\s*\)[\s\S]*?<FlatList[\s\S]*?\/>\s*\n\s*\{\s*modalsBlock\s*\}\s*\n?\s*<\/Screen>/,
-    );
+    // What follows the viewer FlatList's ELEMENT, rather than a wildcard run
+    // to the next `/>` — which in a branch containing a nested
+    // `<RefreshControl … />` was not this list's end at all.
+    const code = stripComments(src);
+    const branch = code.slice(code.indexOf("if (isViewerFlatListBranch)"));
+    const [list] = tagsNamed(branch, "FlatList");
+    assert.ok(list, "no <FlatList> in the viewer branch");
+    const span = elementSpan(branch, list);
+    assert.ok(span, "the viewer <FlatList> never closes");
+    assert.match(branch.slice(span.end), /^\s*\{\s*modalsBlock\s*\}\s*\n?\s*<\/Screen>/);
   });
 
   it("modalsBlock is also rendered in the non-viewer fallback return so both branches share modals", () => {
@@ -207,8 +233,7 @@ describe("app/collection/[id].tsx — VM-D viewer-branch scroll hoist", () => {
     // mode FlatList from VM-E lives in a different branch and intentionally
     // keeps scrollEnabled={false} because the outer ScrollView still owns
     // scroll for selection mode.
-    const viewerFlatListBlock = src.match(/<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
-    assert.ok(viewerFlatListBlock, "viewer FlatList (numColumns={masonryColumnCount}) not found");
-    assert.doesNotMatch(viewerFlatListBlock[0], /scrollEnabled=\{\s*false\s*\}/);
+    const viewerFlatListBlock = elementTagWith(src, "FlatList", VIEWER_LIST, "the viewer FlatList");
+    assert.doesNotMatch(viewerFlatListBlock, /scrollEnabled=\{\s*false\s*\}/);
   });
 });

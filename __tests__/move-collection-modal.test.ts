@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { assertReadsKeys } from "./helpers/i18n-keys-read";
 import { readRepoFile } from "./helpers/repo-file";
+import { elementTags } from "./helpers/jsx-element-props";
 
 /**
  * HM-C1 structural pins: the "move to collection" picker lives in
@@ -37,9 +38,7 @@ describe("HM-C1 — MoveCollectionModal extraction", () => {
 
   it("the page passes stable handlers + the memoized collections array", () => {
     const src = readCollectionSrc();
-    const m = src.match(/<MoveCollectionModal\s+[\s\S]*?\/>/);
-    assert.ok(m, "<MoveCollectionModal> call site not found");
-    const site = m[0];
+    const [site] = elementTags(src, "MoveCollectionModal", "app/collection/[id].tsx");
     assert.match(site, /visible=\{\s*moveModalOpen\s*\}/);
     assert.match(site, /collections=\{\s*otherOwnedCollections\s*\}/);
     assert.match(site, /onMove=\{\s*handleMoveTo\s*\}/);

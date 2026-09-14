@@ -52,8 +52,9 @@
  * one. String literals are deliberately NOT blanked: `indexOf("</Modal>")`
  * hides its whole offence inside one.
  *
- * Measured against this tree at 962 files: nine findings on the first run,
- * all nine migrated in the same commit, zero since.
+ * Measured against this tree at 963 files: nine findings on the first run
+ * and forty once the second bound below was added, every one of them
+ * migrated in the commit that widened it, zero since.
  */
 
 import { annotation } from "./github-annotations";
@@ -92,9 +93,35 @@ export const MATCH_LIMIT = 72;
  * first wildcard-to-`>` in the literal is the one reported. Bounded to one
  * line because a regex literal cannot span one, which also stops the scan
  * from pairing a `<Foo` in one place with a `[^>]*>` several lines away.
+ *
+ * THE SECOND BOUND, and why the rule shipped without it. It matched a
+ * wildcard IMMEDIATELY followed by `>`, and thirty-one call sites reached the
+ * `>` through a couple of anchoring characters instead:
+ * `/<FlatList[\s\S]*?windowSize=\{5\}[\s\S]*?\/>/` and
+ * `/<Pressable[\s\S]*?\n {6}>/` are the two commonest shapes here, and they
+ * are the same walk — the second one finds the element's end by its
+ * INDENTATION. So a short lazy tail is allowed between the wildcard and the
+ * `>`, which is what turned a green first run into nine findings and then
+ * into forty.
+ *
+ * TWO THINGS THE WIDENING HAD TO EXCLUDE, both found by running it.
+ *
+ * A TYPE ARGUMENT is not a tag: `flushPendingQueue<ChatMessage>(pending, {…})`
+ * is TypeScript, and the only thing separating it from JSX in text is what
+ * comes BEFORE the `<` — an identifier character, which no JSX tag has. Hence
+ * the lookbehind.
+ *
+ * A TAG SPELLED OUT IN FULL is not a tag this rule is about:
+ * `/<I18nProvider>[\s\S]*?<DiagnosticsProvider>/` is a nesting assertion, and
+ * its author already knows where that opening tag ends because they wrote its
+ * `>`. The hazard here is a wildcard used to FIND the end of an open tag, so a
+ * name followed directly by `>` is outside it. Tested in code below rather
+ * than as a `(?!>)` here: a lookahead lets the name group backtrack, and this
+ * one duly reported `<I18nProvide>` — the name a character short, matched
+ * against a rule the full name had just failed.
  */
 const OPEN_TAG_REGEX =
-  /<([A-Z][A-Za-z0-9_.]*)[^\n]{0,160}?(?:\[\^>\]\*|\[\\s\\S\]\*\??|\.\*\??)>/g;
+  /(?<![\w$])<([A-Z][A-Za-z0-9_.]*)[^\n]{0,160}?(?:\[\^>\]\*|\[\\s\\S\]\*\??|\.\*\??)[^\n]{0,40}?\/?>/g;
 
 /**
  * A component close tag handed to a string search.
@@ -147,6 +174,9 @@ export function findJsxWalks(file: string, source: string): JsxWalkFinding[] {
   const found: JsxWalkFinding[] = [];
 
   for (const match of code.matchAll(OPEN_TAG_REGEX)) {
+    // The author wrote the tag's own `>`, so no wildcard is being used to find
+    // where the opening tag ends — see the second exclusion above.
+    if (match[0].startsWith(`<${match[1]}>`)) continue;
     const { line, column } = lineColumn(code, match.index ?? 0);
     found.push({
       file,

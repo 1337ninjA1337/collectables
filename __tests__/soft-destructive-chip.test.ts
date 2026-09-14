@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { CARD_BG_10, DANGER_DEEP_4, DANGER_SOFT_2 } from "@/lib/design-tokens";
+import { openTagsNamed } from "@/lib/jsx-open-tag";
+import { stripComments } from "@/lib/strip-comments";
 import {
   SOFT_DESTRUCTIVE_FOREGROUND,
   SOFT_DESTRUCTIVE_SURFACE,
@@ -62,11 +64,11 @@ describe("<SoftDestructiveChip> component", () => {
     // Asserted per-prop inside the tag rather than as one line: the previous
     // form pinned the prop ORDER too, so adding the three accessibility-hiding
     // props reddened a case about colour. What this owns is the tint.
-    const tag = /<Ionicons[\s\S]*?\/>/.exec(src);
+    const [tag] = openTagsNamed(stripComments(src), "Ionicons");
     assert.ok(tag, "the chip renders no <Ionicons>");
-    assert.match(tag[0], /name=\{icon\}/);
-    assert.match(tag[0], /size=\{14\}/);
-    assert.match(tag[0], /color=\{SOFT_DESTRUCTIVE_FOREGROUND\}/);
+    assert.match(tag, /name=\{icon\}/);
+    assert.match(tag, /size=\{14\}/);
+    assert.match(tag, /color=\{SOFT_DESTRUCTIVE_FOREGROUND\}/);
   });
 
   it("defaults the icon to close-circle, which is what every caller wanted", () => {

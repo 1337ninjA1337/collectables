@@ -6,6 +6,7 @@ import {
   assertValueInEveryLocale,
 } from "./helpers/i18n-locales";
 import { readRepoFile as read } from "./helpers/repo-file";
+import { assertSomeElementHas } from "./helpers/jsx-element-props";
 
 /**
  * Structural pins for the chunked-rendering wiring in `app/collection/[id].tsx`.
@@ -111,9 +112,13 @@ describe("app/collection/[id].tsx — chunked item rendering", () => {
     // mount count, and `numColumns={masonryColumnCount}` MUST consume the
     // shared responsive value (2 mobile / 3 tablet / 4 desktop) so it can't
     // drift from getMasonryRowLayout's divisor.
-    assert.match(src, /<FlatList[\s\S]*?data=\{\s*visibleItems\s*\}[\s\S]*?\/>/);
-    assert.match(src, /<FlatList[\s\S]*?numColumns=\{\s*masonryColumnCount\s*\}[\s\S]*?\/>/);
-    assert.match(src, /<FlatList[\s\S]*?keyExtractor=\{\s*\(item\)\s*=>\s*item\.id\s*\}[\s\S]*?\/>/);
+    // Asked of the element rather than of the file since `lint:jsx-walk`
+    // landed: `<FlatList[\s\S]*?prop[\s\S]*?\/>` starts at the FIRST of the
+    // three FlatLists here and runs past the other two, so a prop on any of
+    // them satisfied an assertion whose name says the viewer's.
+    assertSomeElementHas(src, "FlatList", /data=\{\s*visibleItems\s*\}/);
+    assertSomeElementHas(src, "FlatList", /numColumns=\{\s*masonryColumnCount\s*\}/);
+    assertSomeElementHas(src, "FlatList", /keyExtractor=\{\s*\(item\)\s*=>\s*item\.id\s*\}/);
   });
 
   it("no list renderer ever passes an unbounded array as data (only the chunked visibleItems window)", () => {

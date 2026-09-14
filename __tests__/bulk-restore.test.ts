@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { LISTING_RULE_BY_ITEM_PATH } from "@/lib/marketplace-helpers";
+import { openTagsNamed } from "@/lib/jsx-open-tag";
 import { stripComments } from "@/lib/strip-comments";
 
 import { readI18nSource } from "./helpers/i18n-source-file";
@@ -143,7 +144,7 @@ describe("the archive screen's selection mode", () => {
     // The screen's oldest argument, now stated by omission: no bulk delete on
     // the screen people reach after a mistake. `<BulkBar>` can render one, so
     // the refusal has to be visible at the call site.
-    const site = SCREEN.match(/<BulkBar[\s\S]*?\/>/)?.[0] ?? "";
+    const [site = ""] = openTagsNamed(stripComments(SCREEN), "BulkBar");
     assert.ok(site.length > 0, "<BulkBar> call site not found");
     assert.match(site, /count=\{selectedIds\.size\}/);
     assert.match(site, /onRestore=\{handleBulkRestore\}/);

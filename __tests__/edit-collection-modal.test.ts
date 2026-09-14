@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { assertReadsKeys } from "./helpers/i18n-keys-read";
 import { readRepoFile } from "./helpers/repo-file";
+import { elementTags } from "./helpers/jsx-element-props";
 
 /**
  * HM-C3 structural pins: the edit-collection form lives in
@@ -68,9 +69,7 @@ describe("HM-C3 — EditCollectionModal extraction", () => {
 
   it("the page passes state values + stable setters and handlers", () => {
     const src = readCollectionSrc();
-    const m = src.match(/<EditCollectionModal\s+[\s\S]*?\/>/);
-    assert.ok(m, "<EditCollectionModal> call site not found");
-    const site = m[0];
+    const [site] = elementTags(src, "EditCollectionModal", "app/collection/[id].tsx");
     assert.match(site, /visible=\{\s*editModalOpen\s*\}/);
     assert.match(site, /name=\{\s*editName\s*\}/);
     assert.match(site, /description=\{\s*editDescription\s*\}/);
