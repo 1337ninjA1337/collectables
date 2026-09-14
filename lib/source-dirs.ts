@@ -62,6 +62,32 @@ export const SOURCE_DIRS: readonly string[] = ["app", "components", "data", "lib
 export const MARKUP_DIRS: readonly string[] = ["app", "components"];
 
 /**
+ * Why each remaining {@link SOURCE_DIRS} entry holds no rendered markup.
+ *
+ * The partition half of the constant above, and the thing it arrived without.
+ * `SOURCE_DIRS` has `NON_APP_TS_DIRS` beside it and a case that fails on a
+ * top-level directory in neither; `MARKUP_DIRS` had nothing, so "app and
+ * components" was a narrowing with no statement of what it leaves out.
+ *
+ * These are facts about the TREE, which is what makes them one sentence each
+ * rather than one per rule. They are NOT a replacement for the per-guard
+ * exclusion reasons in `__tests__/guard-scan-dirs.test.ts`: those say what a
+ * particular rule would have been looking for ("no unnamed control to find",
+ * "no lib module renders a TextInput"), which is a different and more useful
+ * sentence than this one, and collapsing five of them into three would lose
+ * the half a reader actually checks when a directory changes character.
+ *
+ * What this adds is the check: every source root is in `MARKUP_DIRS` or has a
+ * reason here, so a sixth top-level directory cannot join the tree and be
+ * silently outside every JSX rule.
+ */
+export const NON_MARKUP_REASONS: Readonly<Record<string, string>> = {
+  data: "seed literals and lookup tables — objects and arrays, no elements declared anywhere in them",
+  lib: "modules that return values; the two that touch JSX read it as TEXT rather than rendering any",
+  scripts: "node tooling that never reaches Metro, so nothing here is rendered on any platform",
+};
+
+/**
  * The suite tree, named once.
  *
  * It is the one non-app root a guard has any business walking — a rule about

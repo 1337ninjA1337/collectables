@@ -4,7 +4,12 @@ import path from "node:path";
 
 import { readRepoFile } from "./helpers/repo-file";
 import { SUITES_REL, assertExemptionsHonest, suiteCode, suiteFiles } from "./helpers/suite-files";
-import { NON_APP_TS_DIRS, SOURCE_DIRS } from "@/lib/source-dirs";
+import {
+  MARKUP_DIRS,
+  NON_APP_TS_DIRS,
+  NON_MARKUP_REASONS,
+  SOURCE_DIRS,
+} from "@/lib/source-dirs";
 
 import {
   __resetSourceFilesCacheForTests,
@@ -147,6 +152,40 @@ describe("SOURCE_DIRS is checked against the tree, not remembered", () => {
     }
     assert.equal(new Set(SOURCE_DIRS).size, SOURCE_DIRS.length);
     assert.equal(new Set(NON_APP_TS_DIRS).size, NON_APP_TS_DIRS.length);
+  });
+
+  it("partitions the source roots into the ones with markup and the ones without", () => {
+    // `MARKUP_DIRS` arrived on 2026-09-14 as a narrowing with no statement of
+    // what it leaves out — which is the shape `NON_APP_TS_DIRS` exists to
+    // prevent one level up. A sixth source root can now no longer join the
+    // tree and be silently outside every JSX rule.
+    const accounted = [...MARKUP_DIRS, ...Object.keys(NON_MARKUP_REASONS)].sort();
+    assert.deepEqual(
+      accounted,
+      [...SOURCE_DIRS].sort(),
+      "every source directory is either markup or has a reason it holds none",
+    );
+    for (const dir of MARKUP_DIRS) {
+      assert.ok(
+        !(dir in NON_MARKUP_REASONS),
+        `${dir} is both a markup root and excused from being one`,
+      );
+    }
+  });
+
+  it("gives every non-markup root a sentence rather than a shrug", () => {
+    // Same rule the per-guard exclusion tables are held to, and the same
+    // reason: widening or narrowing the set should be a paragraph somebody
+    // writes, not a word somebody deletes.
+    for (const [dir, why] of Object.entries(NON_MARKUP_REASONS)) {
+      assert.ok(why.length >= 25, `${dir}'s reason is too short to be one: ${why}`);
+    }
+  });
+
+  it("says every markup root actually holds .tsx, so the list cannot go stale", () => {
+    for (const dir of MARKUP_DIRS) {
+      assert.ok(tsxFiles(dir).length > 0, `MARKUP_DIRS names ${dir}, which renders nothing`);
+    }
   });
 
   it("names __tests__ as not-app-source, because suite-files.ts owns that walk", () => {
