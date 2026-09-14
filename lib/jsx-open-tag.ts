@@ -203,7 +203,18 @@ export function openTagsNamed(code: string, name: string): string[] {
 export type JsxElementSpan = {
   /** Offset of the opening tag's `<`. */
   readonly start: number;
-  /** Offset of the matching `</name>`, or of the end for a self-closing tag. */
+  /**
+   * Offset just PAST the element's last character — exclusive, like every
+   * other end offset a `slice` takes.
+   *
+   * It shipped for one day as "the offset of the close tag", and for a
+   * self-closing tag as "the offset of its `>`", which are two different
+   * meanings for one field: `code.slice(start, end)` returned the whole
+   * element minus its close tag in the first case and the whole element minus
+   * its final `>` in the second. Neither is wrong on its own and a caller
+   * holding a mixed list gets both, which is how half a tag ends up in an
+   * error message. One meaning now, and it is the one a slice wants.
+   */
   readonly end: number;
   /** Everything between the opening tag's `>` and the close — `""` if none. */
   readonly body: string;
@@ -224,19 +235,24 @@ export type JsxElementSpan = {
  * had silently shrunk to nothing — the negative holds either way — so the body
  * is handed back for them to assert something IS in it.
  *
- * A self-closing tag has no body and closes where it ends: `""` and `tagEnd`,
- * rather than null. It is a complete element, and a caller asking what is
- * inside `<HeroBanner />` should get "nothing", not "unparseable".
+ * A self-closing tag has no body and ends where its own tag ends: `""` and
+ * `tagEnd + 1`, rather than null. It is a complete element, and a caller
+ * asking what is inside `<HeroBanner />` should get "nothing", not
+ * "unparseable".
  *
  * null means the close tag is missing, which these scanners meet whenever they
  * read a file mid-edit — the same forgiving answer {@link closeTagIndex}
  * gives, carried up so a caller cannot mistake -1 for an offset.
  */
 export function elementSpan(code: string, tag: JsxTag): JsxElementSpan | null {
-  if (tag.selfClosing) return { start: tag.start, end: tag.tagEnd, body: "" };
-  const end = closeTagIndex(code, tag.tagEnd + 1, tag.name);
-  if (end === -1) return null;
-  return { start: tag.start, end, body: code.slice(tag.tagEnd + 1, end) };
+  if (tag.selfClosing) return { start: tag.start, end: tag.tagEnd + 1, body: "" };
+  const closeAt = closeTagIndex(code, tag.tagEnd + 1, tag.name);
+  if (closeAt === -1) return null;
+  return {
+    start: tag.start,
+    end: closeAt + `</${tag.name}>`.length,
+    body: code.slice(tag.tagEnd + 1, closeAt),
+  };
 }
 
 /**

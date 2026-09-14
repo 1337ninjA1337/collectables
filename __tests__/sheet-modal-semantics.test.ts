@@ -205,10 +205,10 @@ describe("the span reader itself", () => {
     assert.ok(inner.start > outer.start && inner.end < outer.end);
     // The old reader ended the OUTER span at the FIRST close tag, which in
     // this fixture is the inner one — so anything between the two closes read
-    // as outside a Modal. That first close is `inner.end`, asserted above to
-    // sit inside the outer span, which is the whole of what was wrong; the
-    // line that used to say it here searched for `</Modal>` by hand, which is
-    // the shape `lint:jsx-walk` now refuses.
+    // as outside a Modal. The inner span ends just past that first close, and
+    // the line above asserts it sits inside the outer one, which is the whole
+    // of what was wrong; the line that used to say it here searched for
+    // `</Modal>` by hand, which is the shape `lint:jsx-walk` now refuses.
     assert.ok(inner.end < outer.end);
   });
 

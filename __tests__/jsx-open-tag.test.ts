@@ -160,7 +160,21 @@ describe("the extent of an element", () => {
     const code = `<View a><View b>inner</View>tail</View>after`;
     const span = spanOf(code, "View");
     assert.equal(span?.body, `<View b>inner</View>tail`);
-    assert.equal(code.slice(span!.end), "</View>after");
+    assert.equal(code.slice(span!.end), "after");
+  });
+
+  it("slices the WHOLE element in both shapes, which is the one meaning of end", () => {
+    // `end` shipped for a day as "where the close tag starts", and for a
+    // self-closing tag as "where its `>` is" — two meanings, so the same slice
+    // dropped a close tag in one case and a bracket in the other. A caller
+    // holding a mixed list got both.
+    const paired = `<Text>hi</Text>tail`;
+    const pairedSpan = spanOf(paired, "Text")!;
+    assert.equal(paired.slice(pairedSpan.start, pairedSpan.end), "<Text>hi</Text>");
+
+    const alone = `<HeroBanner tone="solid" />tail`;
+    const aloneSpan = spanOf(alone, "HeroBanner")!;
+    assert.equal(alone.slice(aloneSpan.start, aloneSpan.end), `<HeroBanner tone="solid" />`);
   });
 
   it("starts after the `>` rather than on it", () => {
@@ -181,7 +195,7 @@ describe("the extent of an element", () => {
     // the next element's.
     const span = spanOf(`<HeroBanner tone="solid" /><HeroBanner /></HeroBanner>`, "HeroBanner");
     assert.equal(span?.body, "");
-    assert.equal(span?.end, `<HeroBanner tone="solid" /`.length);
+    assert.equal(span?.end, `<HeroBanner tone="solid" />`.length);
   });
 
   it("returns null for an element whose close tag is missing", () => {
