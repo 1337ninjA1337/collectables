@@ -35,6 +35,22 @@ export function declaredScanDirs(guard: string): string[] {
   return [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 }
 
+/**
+ * The roots the SUITE-SIDE JSX rules walk, stated once.
+ *
+ * `empty-state-wrapper-audit` and the two heading sweeps read the same markup
+ * as the two script guards above, and they named their roots at the call site
+ * — three copies of one list. `jsx-walk-reach.test.ts` needs to know it, to
+ * floor how much of that markup the shared walk reads, and for one commit it
+ * knew it by matching the STRING `tsxFiles("app", "components")` in each
+ * suite's source: an assertion about spelling, red on a reformat and green on
+ * the same list built from a constant.
+ *
+ * One constant, three readers, and a comparison of values. Widening a rule is
+ * an edit here, which is what makes the floor follow it.
+ */
+export const JSX_SUITE_SCAN_DIRS = ["app", "components"] as const;
+
 /** The union of several guards' scan lists, sorted and de-duplicated. */
 export function unionOfScanDirs(...guards: readonly string[]): string[] {
   return [...new Set(guards.flatMap((guard) => declaredScanDirs(guard)))].sort();

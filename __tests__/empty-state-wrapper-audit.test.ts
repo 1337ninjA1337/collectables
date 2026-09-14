@@ -9,6 +9,7 @@ import {
 
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, sourceFiles } from "./helpers/source-files";
+import { JSX_SUITE_SCAN_DIRS } from "./helpers/guard-scan-list";
 
 describe("findEmptyStateWrapperOverrides — matcher", () => {
   it("flags an EmptyState wrapped in a View with a card-colored StyleSheet background", () => {
@@ -133,7 +134,7 @@ describe("findEmptyStateWrapperOverrides — matcher", () => {
 });
 
 describe("EmptyState wrapper audit — codebase sweep", () => {
-  const files = sourceFiles("app", "components");
+  const files = sourceFiles(...JSX_SUITE_SCAN_DIRS);
 
   it("finds the component and real callers to scan", () => {
     assert.ok(files.length > 10, "expected app/ + components/ sources");

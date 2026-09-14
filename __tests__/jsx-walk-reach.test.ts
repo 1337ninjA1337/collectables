@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { jsxReach } from "@/lib/jsx-open-tag";
 import { stripComments } from "@/lib/strip-comments";
 
-import { unionOfScanDirs } from "./helpers/guard-scan-list";
+import { JSX_SUITE_SCAN_DIRS, unionOfScanDirs } from "./helpers/guard-scan-list";
 import { readSuite } from "./helpers/suite-files";
 import { sourceCode, tsxFiles } from "./helpers/source-files";
 
@@ -94,20 +94,33 @@ describe("the JSX walk reads the whole of every screen", () => {
 
   it("covers the roots the suite-side rules read too", () => {
     // `empty-state-wrapper-audit` and the two heading sweeps walk this same
-    // JSX from `__tests__/`, where there is no SCANNED_DIRS to parse. If one
-    // of them widens, this is where it says so — a root they read and this
-    // floor does not is a directory whose markup nothing watches.
-    for (const [suite, call] of [
-      ["empty-state-wrapper-audit.test.ts", 'sourceFiles("app", "components")'],
-      ["modal-heading-role.test.ts", 'tsxFiles("app", "components")'],
-      ["screen-heading-role.test.ts", 'tsxFiles("app", "components")'],
-    ] as const) {
-      assert.ok(
-        readSuite(suite).includes(call),
-        `${suite} no longer walks ${call} — check its roots against ${SCANNED.join(" + ")}`,
+    // JSX from `__tests__/`, where there is no SCANNED_DIRS to parse. They
+    // share one constant now, and this compares VALUES — it was a string
+    // match on `tsxFiles("app", "components")` in each suite's source for one
+    // commit, which is an assertion about spelling that a reformat turns red
+    // and a constant turns green while nothing changed.
+    const uncovered = JSX_SUITE_SCAN_DIRS.filter((dir) => !SCANNED.includes(dir));
+    assert.deepEqual(
+      uncovered,
+      [],
+      "a suite-side JSX rule reads a root this floor does not, so that directory's markup is watched by nothing",
+    );
+  });
+
+  it("and the three suites take their roots from that one constant", () => {
+    // The floor under the case above: comparing a constant against itself
+    // proves nothing if the suites have stopped reading it.
+    for (const suite of [
+      "empty-state-wrapper-audit.test.ts",
+      "modal-heading-role.test.ts",
+      "screen-heading-role.test.ts",
+    ]) {
+      assert.match(
+        readSuite(suite),
+        /\.\.\.JSX_SUITE_SCAN_DIRS/,
+        `${suite} names its own roots again instead of sharing the list`,
       );
     }
-    assert.deepEqual(SCANNED, ["app", "components"]);
   });
 });
 

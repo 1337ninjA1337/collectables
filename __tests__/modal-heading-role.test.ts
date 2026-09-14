@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { headingTexts, isHeader, type HeadingText } from "./helpers/jsx-headings";
 import { tsxFiles } from "./helpers/source-files";
+import { JSX_SUITE_SCAN_DIRS } from "./helpers/guard-scan-list";
 
 /**
  * Every heading inside a modal is announced as one.
@@ -83,7 +84,7 @@ function isExempt(attrs: string): boolean {
 }
 
 describe("every modal heading is announced as a header", () => {
-  const FOUND = tsxFiles("app", "components").flatMap((file) => modalTitleTexts(file));
+  const FOUND = tsxFiles(...JSX_SUITE_SCAN_DIRS).flatMap((file) => modalTitleTexts(file));
 
   it("finds the modal titles at all", () => {
     // The floor every scanner in this repository carries: a walk that silently

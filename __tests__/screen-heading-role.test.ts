@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { headingTexts, isHeader } from "./helpers/jsx-headings";
 import { tsxFiles } from "./helpers/source-files";
+import { JSX_SUITE_SCAN_DIRS } from "./helpers/guard-scan-list";
 
 /**
  * Every section heading on an ordinary SCREEN is announced as one.
@@ -47,7 +48,7 @@ import { tsxFiles } from "./helpers/source-files";
 const SECTION_STYLE = /styles\.section(?:Label|Title|Heading)\b/;
 
 describe("every section heading on a screen is announced as a header", () => {
-  const FOUND = tsxFiles("app", "components").flatMap((file) =>
+  const FOUND = tsxFiles(...JSX_SUITE_SCAN_DIRS).flatMap((file) =>
     headingTexts(file, SECTION_STYLE),
   );
 
