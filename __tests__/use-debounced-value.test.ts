@@ -18,10 +18,15 @@ import { readRepoFile } from "./helpers/repo-file";
  * and `components/search-overlay.tsx`), and is the guard the in-collection
  * search will need when live-as-you-type filtering lands.
  *
- * The pure half (`lib/debounce-helpers.ts`) is exercised directly; the hook
- * itself imports `react` and so is pinned structurally, exactly like
- * `use-share-link.test.ts` — the repo has no React mounting harness (see the
- * `[needs-dev-dep]` tasks in .tasks/.tasks.md).
+ * The pure half (`lib/debounce-helpers.ts`) is exercised directly, and what is
+ * left here is structural: which module owns the timer, and that the two
+ * consumers this replaced no longer roll their own.
+ *
+ * It used to say the hook itself could only be pinned structurally because
+ * "the repo has no React mounting harness". That stopped being true when
+ * `helpers/render.ts` landed, and the half it was standing in for — one timer
+ * per burst, cleared on unmount, no timer at all for a zero delay — is run
+ * rather than read in `use-debounced-value-render.test.ts`.
  */
 const readHookSrc = () => readRepoFile("lib", "use-debounced-value.ts");
 const readHelpersSrc = () => readRepoFile("lib", "debounce-helpers.ts");
