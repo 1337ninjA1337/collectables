@@ -14,9 +14,9 @@ import { readRepoFile } from "./helpers/repo-file";
 /**
  * The scanner behind `npm run lint:jsx-walk`.
  *
- * It refuses the two ways of faking `lib/jsx-open-tag.ts`: a regex that
- * wildcards to the first `>` of a component tag, and a string search for its
- * `</Close>`. Three copies of that walk were merged into one module on
+ * It refuses the three ways of faking `lib/jsx-open-tag.ts`: a regex that
+ * wildcards to the first `>` of a component tag, that same walk written out as
+ * a character loop, and a string search for the element's `</Close>`. Three copies of that walk were merged into one module on
  * 2026-09-13 — two of them carrying the same render-prop bug, fixed an hour
  * apart — and what stopped a fourth was a paragraph in a header. The guard
  * found nine more the day it was written.
@@ -161,6 +161,54 @@ describe("findJsxWalks — the open-tag regex", () => {
     // that fired on markup would be one nobody could keep.
     assert.deepEqual(
       rules(`${OPEN}View style={{ flex: 1 }}>${OPEN}Text>hi</Text></View>`),
+      [],
+    );
+  });
+});
+
+describe("findJsxWalks — the open-tag loop", () => {
+  /**
+   * `openTagEnd`'s body, as source text.
+   *
+   * Assembled like everything else here: this suite is inside the tree the
+   * guard walks, and the comparison written out is the offence.
+   */
+  const loopEnd = (depthVar: string) => `if (char ${"==="} ">" && ${depthVar} ${"==="} 0) return i;`;
+
+  it("flags the pair that means `the opening tag ends here`", () => {
+    // Two real ones: a shipping guard's `braceDepth` and a suite's `depth`.
+    assert.deepEqual(rules([loopEnd("braceDepth"), loopEnd("depth")].join("\n")), [
+      "open-tag-loop",
+      "open-tag-loop",
+    ]);
+  });
+
+  it("reports it without a tag name, because a loop ends whatever it is in", () => {
+    assert.deepEqual(
+      walks(loopEnd("depth")).map((f) => f.tag),
+      ["(any tag)"],
+    );
+  });
+
+  it("says nothing about a `>` test on its own", () => {
+    // Ordinary text handling. A markdown blockquote reader does this.
+    assert.deepEqual(rules(`if (trimmed ${"==="} ">") return blockquote;`), []);
+  });
+
+  it("says nothing about a depth counter on its own", () => {
+    // `declared-shape` and `check-platform-pairs` count brackets in
+    // TypeScript type text, which has nothing to do with a JSX tag.
+    assert.deepEqual(
+      rules(`if (char ${"==="} "(" || char ${"==="} "[") depth += 1;`),
+      [],
+    );
+  });
+
+  it("says nothing when the depth test is not the next thing after the `>`", () => {
+    // `char === ">" && code[i - 1] !== "="` closes a GENERIC, and
+    // `check-platform-pairs` is entitled to it. The rule is the adjacency.
+    assert.deepEqual(
+      rules(`if (char ${"==="} ">" && code[i - 1] !${"=="} "=" && depth > 0) close();`),
       [],
     );
   });

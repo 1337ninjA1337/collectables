@@ -18,6 +18,8 @@
  * attribute) — which is exactly what the wrapper itself does.
  */
 
+import { openTagEnd } from "@/lib/jsx-open-tag";
+
 export type ClarityMaskViolation = {
   file: string;
   line: number;
@@ -37,21 +39,22 @@ export const CLARITY_MASK_ALLOWED_FILES: readonly string[] = [
 
 /**
  * Find the end of a JSX opening tag starting at `openIndex` (the `<`).
- * Skips `>` characters inside `{...}` expressions (arrow functions in
- * handlers) so `onChangeText={(v) => ...}` doesn't terminate the scan early.
- * Returns the index just past the closing `>`, or `source.length` if the
- * tag never closes (malformed source — treat the rest of the file as the
- * tag so the mask check still sees every attribute).
+ * Returns the index just past the closing `>`, or `source.length` if the tag
+ * never closes (malformed source — treat the rest of the file as the tag so
+ * the mask check still sees every attribute).
+ *
+ * `openTagEnd` since 2026-09-14, and the reason is what this used to be: a
+ * brace counter with no string-literal skipping, which is the exact half
+ * `lib/jsx-open-tag.ts`'s header records an earlier copy leaving out — written
+ * again here, independently, months later. A `clarity-mask` attribute after a
+ * quoted `>` (`placeholder=">"`) was invisible to it, so a masked input read
+ * as unmasked; and `<TextInput onChangeText={(v) => set(v)} data-clarity-mask>`
+ * was only safe because the brace counter happened to cover the arrow.
+ * `lint:jsx-walk` refuses the shape now, which is how this copy was found.
  */
 function endOfJsxTag(source: string, openIndex: number): number {
-  let braceDepth = 0;
-  for (let i = openIndex; i < source.length; i += 1) {
-    const char = source[i];
-    if (char === "{") braceDepth += 1;
-    else if (char === "}") braceDepth = Math.max(0, braceDepth - 1);
-    else if (char === ">" && braceDepth === 0) return i + 1;
-  }
-  return source.length;
+  const end = openTagEnd(source, openIndex);
+  return end === -1 ? source.length : end + 1;
 }
 
 function lineNumberAt(source: string, index: number): number {

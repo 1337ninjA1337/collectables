@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { readSource, tsxFiles } from "./helpers/source-files";
+import { tagsNamed } from "@/lib/jsx-open-tag";
 
 /**
  * A control that LOOKS active has to SAY it is active.
@@ -40,30 +41,18 @@ const SCREENS = () => tsxFiles("app", "components", "lib");
 /**
  * The opening tags of `<name …>` elements, each as its full source text.
  *
- * Walks from the tag name to the `>` that closes it at brace depth 0, skipping
- * over string literals so a `>` inside one cannot end the tag either.
+ * Twenty-five lines of brace counting and string skipping until 2026-09-14,
+ * which is `openTagsNamed` written out — down to the `char === ">" && depth
+ * === 0` that `lint:jsx-walk`'s loop rule found it by. What it did NOT have
+ * was the backslash escape: a `placeholder="a \" >"` would have closed its
+ * string early and ended the tag inside one. It also stepped over a
+ * `<Pressable>` rendered through a render prop, which the shared walk reaches.
  */
 export function openingTags(source: string, name: string): { index: number; text: string }[] {
-  const tags: { index: number; text: string }[] = [];
-  const opener = new RegExp(`<${name}\\b`, "g");
-  let match: RegExpExecArray | null;
-  while ((match = opener.exec(source)) !== null) {
-    let depth = 0;
-    for (let i = match.index + match[0].length; i < source.length; i += 1) {
-      const char = source[i];
-      if (char === "{") depth += 1;
-      else if (char === "}") depth -= 1;
-      else if (char === '"' || char === "'" || char === "`") {
-        const quote = char;
-        i += 1;
-        while (i < source.length && source[i] !== quote) i += 1;
-      } else if (char === ">" && depth === 0) {
-        tags.push({ index: match.index, text: source.slice(match.index, i + 1) });
-        break;
-      }
-    }
-  }
-  return tags;
+  return tagsNamed(source, name).map((tag) => ({
+    index: tag.start,
+    text: source.slice(tag.start, tag.tagEnd + 1),
+  }));
 }
 
 const ACTIVE_STYLE = /styles\.\w*Active\b/;
