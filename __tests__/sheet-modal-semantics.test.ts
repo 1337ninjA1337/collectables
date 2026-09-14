@@ -57,13 +57,18 @@ const OPT_OUT = /accessibilityRole="none"/g;
 function modalSpans(code: string): { start: number; end: number }[] {
   const spans: { start: number; end: number }[] = [];
   for (const tag of jsxTags(code)) {
-    // A self-closing `<Modal />` covers nothing. `elementSpan` answers that
-    // with an empty body ending at the tag, which is right for it and useless
-    // here: a span from `<Modal />`'s start to its own `>` holds no opt-out,
-    // so skipping it keeps the list to the sheets it is about.
-    if (tag.name !== "Modal" || tag.selfClosing) continue;
+    if (tag.name !== "Modal") continue;
     const span = elementSpan(code, tag);
-    if (span) spans.push({ start: span.start, end: span.end });
+    if (!span) continue;
+    // A Modal with nothing in it wraps no sheet. Asked of the BODY rather
+    // than of the tag shape, which is the change worth reading twice: this
+    // used to skip `tag.selfClosing`, so it was a second statement of what a
+    // self-closing element means — `elementSpan` already says that, with an
+    // empty body — and the two could drift. Asking about the body says the
+    // rule this function actually has, and it covers `<Modal></Modal>` too,
+    // which the old test on the tag shape let through as a real span.
+    if (span.body.trim() === "") continue;
+    spans.push({ start: span.start, end: span.end });
   }
   return spans;
 }
@@ -216,6 +221,20 @@ describe("the span reader itself", () => {
     // Asking for its close tag would find the NEXT sheet's, which is a span
     // that swallows the code between two unrelated modals.
     assert.deepEqual(modalSpans(`<Modal /><Text>x</Text>`), []);
+  });
+
+  it("counts an EMPTY Modal as covering nothing either", () => {
+    // The case the old `tag.selfClosing` skip let through: `<Modal></Modal>`
+    // is a paired element with a real span and nothing inside it, so a sheet
+    // written after it could land in the gap between two spans and read as
+    // outside a Modal for a reason no one would guess from the message.
+    assert.deepEqual(modalSpans(`<Modal></Modal><Text>x</Text>`), []);
+    assert.deepEqual(modalSpans(`<Modal>\n    </Modal>`), []);
+  });
+
+  it("still covers a Modal whose only child is whitespace-separated", () => {
+    // The floor on the rule above: "empty" must mean empty, not "short".
+    assert.equal(modalSpans(`<Modal>\n  <View />\n</Modal>`).length, 1);
   });
 
   it("finds a Modal rendered through a prop", () => {
