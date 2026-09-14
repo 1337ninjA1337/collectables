@@ -92,6 +92,16 @@ const PLANTED: Readonly<
     file: "lib/planted-offender.web.ts",
     source: "export const shim = 1;\n",
   },
+  "check-jsx-walk": {
+    entries: ["app", "components", "data", "lib", "scripts", SUITES_REL],
+    file: "lib/planted-offender.ts",
+    // BUILT, not written, for the third time in this table and the same
+    // reason as the two above: this suite is inside the tree `check-jsx-walk`
+    // walks, so a literal `indexOf("</Modal>")` here would make the file the
+    // offender it is planting. The close-tag rule rather than the regex one
+    // because it is the shorter of the two to assemble.
+    source: `export const at = (code: string) => code.${"indexOf"}("${"<"}/Modal>");\n`,
+  },
   "check-a11y-jsx": {
     entries: ["app", "components"],
     file: "app/planted-offender.tsx",

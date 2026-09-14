@@ -153,6 +153,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "No block comment that ends inside its own body — the prose after the terminator is parsed as code, and the compiler reports it as syntax errors pointing at English",
   },
   {
+    npmScript: "lint:jsx-walk",
+    scriptPath: "scripts/check-jsx-walk.ts",
+    args: [],
+    description:
+      "No hand-rolled JSX scan outside lib/jsx-open-tag.ts — a regex wildcarding to the first > ends inside the tag, and the first </Tag> belongs to the innermost element of that name",
+  },
+  {
     npmScript: "lint:reporter-graph",
     scriptPath: "scripts/check-reporter-graph.ts",
     args: [],

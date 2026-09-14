@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 
 import { findLocaleBlock } from "@/lib/i18n-source";
+import { closeTagIndex } from "@/lib/jsx-open-tag";
 
 import { autoUnmount, installNativeModuleStubs, render } from "./helpers/render";
 import {
@@ -784,7 +785,14 @@ describe("the listener is mounted once, under the toast provider", () => {
     const layout = readSource("app/_layout.tsx");
     const opened = layout.indexOf("<ToastProvider>");
     const mounted = layout.indexOf("<StorageNotice />");
-    const closed = layout.indexOf("</ToastProvider>");
+    // Depth-counted from the open tag since `lint:jsx-walk` landed, rather
+    // than `indexOf("</ToastProvider>")`: the provider tree is the one file in
+    // this repo where a component genuinely could be nested inside itself, and
+    // the inner close would put <StorageNotice /> outside a provider it is in.
+    const closed =
+      opened === -1
+        ? -1
+        : closeTagIndex(layout, opened + "<ToastProvider>".length, "ToastProvider");
 
     assert.ok(opened >= 0 && mounted >= 0 && closed >= 0, "all three tags are in the tree");
     assert.ok(

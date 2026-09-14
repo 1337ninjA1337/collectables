@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { openTagsNamed } from "@/lib/jsx-open-tag";
+
 import { readRepoFile as read } from "./helpers/repo-file";
 
 /**
@@ -19,6 +21,21 @@ import { readRepoFile as read } from "./helpers/repo-file";
  * anywhere in the tree is the follow-up; these cases pin what was fixed so it
  * cannot quietly come back.
  */
+
+/**
+ * Every `<View style={styles.<name>}>` opening tag in a source, whole.
+ *
+ * Was `src.match(/<View\s*\n\s*style=\{styles\.headerBadge\}[\s\S]*?>/g)`,
+ * which `lint:jsx-walk` refuses and which the cases below are the reason to
+ * refuse: they assert about props that come AFTER the style, and a wildcard
+ * run ends at the first `>` in the tag. A badge that gained an `onLayout={()
+ * => …}` before its hide props would have made every one of them fail while
+ * pointing at the wrong thing — and the `\s*\n\s*` in the middle meant the
+ * same badge written on one line was not found at all.
+ */
+function badgeTags(src: string, style: string): string[] {
+  return openTagsNamed(src, "View").filter((tag) => tag.includes(`styles.${style}`));
+}
 
 describe("<NavTab> names itself", () => {
   const src = read("components/nav-tab.tsx");
@@ -230,7 +247,7 @@ describe("the photo-count chip, which was half a sentence twice over", () => {
     // `no-hide-descendants` is Android's word for a container hide, and
     // `accessibilityElementsHidden` / `aria-hidden` already mean the subtree on
     // iOS and the web. Hiding the <Ionicons> on its own would leave the number.
-    const badges = src.match(/<View\s*\n\s*style=\{styles\.photoCountBadge\}[\s\S]*?>/g) ?? [];
+    const badges = badgeTags(src, "photoCountBadge");
     assert.equal(badges.length, 2, `expected 2 photo-count badges, got ${badges.length}`);
     for (const [i, badge] of badges.entries()) {
       assert.match(badge, /accessibilityElementsHidden/, `badge #${i}: no iOS hide`);
@@ -275,7 +292,7 @@ describe("the header and the friends row, which had the nav bar's bug again", ()
 
   it("the header hides the pill whose number the label now carries", () => {
     const src = read("app/_layout.tsx");
-    const badges = src.match(/<View\s*\n\s*style=\{styles\.headerBadge\}[\s\S]*?>/g) ?? [];
+    const badges = badgeTags(src, "headerBadge");
     assert.equal(badges.length, 2, `expected 2 header badges, got ${badges.length}`);
     for (const [i, badge] of badges.entries()) {
       assert.match(badge, /importantForAccessibility="no-hide-descendants"/, `badge #${i}`);

@@ -6,6 +6,7 @@ import {
   closeTagIndex,
   openTagAt,
   openTagEnd,
+  openTagsNamed,
   skipStringLiteral,
   walkJsx,
 } from "@/lib/jsx-open-tag";
@@ -103,6 +104,41 @@ describe("reading the tag that carries an offset", () => {
 
   it("returns empty when the offset is not inside a tag", () => {
     assert.equal(openTagAt("no tags here", 5), "");
+  });
+});
+
+describe("every opening tag of one element", () => {
+  it("returns each tag whole, including the props after the first `>` in it", () => {
+    // The question three suites asked with `/<HeroBanner[\s\S]*?>/`, and the
+    // reason the answer cannot be that: the arrow function ends the naive
+    // match at `onPress={() ` and every assertion made afterwards is about a
+    // fragment.
+    const src = `
+      <HeroBanner tone="solid" onPress={() => open()} title={t("x")} />
+      <HeroBanner tone="amber" />`;
+    const tags = openTagsNamed(src, "HeroBanner");
+    assert.equal(tags.length, 2);
+    assert.ok(tags[0].includes('title={t("x")}'), tags[0]);
+    assert.ok(tags[0].endsWith("/>"), tags[0]);
+    assert.equal(tags[1].trim(), '<HeroBanner tone="amber" />');
+  });
+
+  it("names nothing when the element is not rendered", () => {
+    assert.deepEqual(openTagsNamed("<View><Text>hi</Text></View>", "HeroBanner"), []);
+  });
+
+  it("does not match a longer name that starts with the one asked for", () => {
+    // `<DashboardBanner tone="amber">` is a different component's tone, and
+    // the suite that motivated this helper renders both in one file.
+    assert.deepEqual(openTagsNamed('<DashboardBanner tone="amber" />', "Dashboard"), []);
+  });
+
+  it("finds one rendered through a render prop", () => {
+    // A render prop's JSX lives inside the PARENT'S open tag, which is the
+    // hole `walkJsx` was extracted to close; going through it rather than a
+    // forward scan is what makes this inherit the fix.
+    const tags = openTagsNamed("<Host render={() => (<HeroBanner tone=\"solid\" />)} />", "HeroBanner");
+    assert.deepEqual(tags, ['<HeroBanner tone="solid" />']);
   });
 });
 

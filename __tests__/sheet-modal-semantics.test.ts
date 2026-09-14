@@ -201,9 +201,13 @@ describe("the span reader itself", () => {
     const [outer, inner] = spans;
     assert.equal(outer.start, 0);
     assert.ok(inner.start > outer.start && inner.end < outer.end);
-    // The old reader ended the OUTER span at the inner's close tag, so
-    // anything between them read as outside a Modal.
-    assert.ok(code.indexOf("</Modal>") < outer.end);
+    // The old reader ended the OUTER span at the FIRST close tag, which in
+    // this fixture is the inner one — so anything between the two closes read
+    // as outside a Modal. That first close is `inner.end`, asserted above to
+    // sit inside the outer span, which is the whole of what was wrong; the
+    // line that used to say it here searched for `</Modal>` by hand, which is
+    // the shape `lint:jsx-walk` now refuses.
+    assert.ok(inner.end < outer.end);
   });
 
   it("counts a self-closing Modal as covering nothing", () => {

@@ -1,5 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { walkJsx } from "@/lib/jsx-open-tag";
+
 import { readRepoFile } from "./helpers/repo-file";
 
 /**
@@ -46,9 +48,20 @@ describe("selection-mode FlatList Profiler telemetry", () => {
     const block = m[0];
     assert.match(block, /<Profiler\s+id="selection-flatlist"\s+onRender=\{\s*onSelectionProfilerRender\s*\}\s*>/);
     // The FlatList is the Profiler's immediate child, and the wrapper closes
-    // inside the same ternary block. (String indexOf would false-positive on
-    // the `<FlatList>` mention inside the VM-E comment, hence the regex.)
-    assert.match(block, /<Profiler[^>]*>\s*<FlatList\b/, "Profiler must wrap the FlatList");
+    // inside the same ternary block. Read through `walkJsx` since
+    // `lint:jsx-walk` landed: the `/<Profiler[^>]*>/` this used to be ends at
+    // the first `>` in the tag, which here is the one inside
+    // `onRender={onSelectionProfilerRender}`'s neighbours the day one arrives —
+    // and the case above already asserts this tag has an expression prop.
+    const profiler = [...walkJsx(block, { seed: null, inherit: () => null })].find(
+      (tag) => tag.name === "Profiler",
+    );
+    assert.ok(profiler, "no <Profiler> in the selection-mode branch");
+    assert.match(
+      block.slice(profiler.tagEnd + 1),
+      /^\s*<FlatList\b/,
+      "Profiler must wrap the FlatList",
+    );
     assert.match(block, /<\/Profiler>/);
   });
 });

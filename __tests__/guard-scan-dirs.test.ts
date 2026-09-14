@@ -108,6 +108,15 @@ const GUARD_SCANS: Readonly<
     dirs: ["app", "components", "data", "lib", "scripts", SUITES_REL],
     excludes: {},
   },
+  "check-jsx-walk": {
+    // The same six roots as check-comment-terminators and the same absence of
+    // exclusions. The subject is a SCAN over JSX rather than the JSX itself,
+    // and a scan gets written wherever somebody needs an answer about markup:
+    // all nine copies this guard found on its first run were in the suites,
+    // which is also where two of the three walks it exists to prevent lived.
+    dirs: ["app", "components", "data", "lib", "scripts", SUITES_REL],
+    excludes: {},
+  },
   "check-problem-phrasing-imports": {
     // The one guard that WIDENS past SOURCE_DIRS: its subject is how the
     // scanned-floor phrasing parts are imported, and the suites import them
@@ -221,20 +230,27 @@ describe("the guards' scan lists agree with lib/source-dirs.ts", () => {
 const DECLARING = "lib/source-dirs.ts";
 
 /**
- * The one guard that has to write the five out, and why it is not a copy.
+ * The guards that have to write the five out, and why they are not copies.
  *
- * `check-comment-terminators` walks SOURCE_DIRS entire plus the suites, and
- * `declaredDirs` above reads scan lists by PARSING the source for a literal
- * array — a `[...SOURCE_DIRS, …]` spread would satisfy the one-copy rule and
- * defeat the pin that keeps every guard's list readable from its own file. So
- * the five appear there in order, inside a six-element superset, structurally
- * rather than by anyone deciding to restate the list.
+ * Both walk SOURCE_DIRS entire plus the suites, and `declaredDirs` above reads
+ * scan lists by PARSING the source for a literal array — a `[...SOURCE_DIRS,
+ * …]` spread would satisfy the one-copy rule and defeat the pin that keeps
+ * every guard's list readable from its own file. So the five appear there in
+ * order, inside a six-element superset, structurally rather than by anyone
+ * deciding to restate the list.
  *
- * Named here rather than excused by regex, and held honest below: the day that
- * guard narrows its walk, the entry stops being a superset and the skip stops
- * excusing anything.
+ * It was ONE file until `check-jsx-walk` landed on 2026-09-14 with the same
+ * width for a related reason (its subject is a scan over JSX, and the scans
+ * get written in the suites). A second entry is the point at which "the one
+ * guard that has to" stops being an argument and starts being a list, which is
+ * worth noticing if a third arrives: at that point the pin wants a spread and
+ * a different way of reading the list, not a longer exemption.
+ *
+ * Named here rather than excused by regex, and held honest below: the day
+ * either guard narrows its walk, its entry stops being a superset and the skip
+ * stops excusing anything.
  */
-const SUPERSET = "scripts/check-comment-terminators.ts";
+const SUPERSETS = ["scripts/check-comment-terminators.ts", "scripts/check-jsx-walk.ts"];
 
 describe("lib/source-dirs.ts is the one statement of the list", () => {
   it("holds the extension sets the walk takes, and they differ", () => {
@@ -259,7 +275,7 @@ describe("lib/source-dirs.ts is the one statement of the list", () => {
     // anywhere in the tree is the thing this consolidation removed; the guards
     // declare SUBSETS, which is a different shape and is checked above.
     const offenders = sourceFiles().filter((relative) => {
-      if (relative === DECLARING || relative === SUPERSET) return false;
+      if (relative === DECLARING || SUPERSETS.includes(relative)) return false;
       const code = readRepoFile(relative);
       return /"app",\s*"components",\s*"data",\s*"lib",\s*"scripts"/.test(code);
     });
@@ -273,8 +289,12 @@ describe("lib/source-dirs.ts is the one statement of the list", () => {
     // stops excusing anything while still excusing the file that would hold the
     // next stray copy.
     assertExemptionsHonest({
-      exemptions: [DECLARING, SUPERSET],
-      expected: ["lib/source-dirs.ts", "scripts/check-comment-terminators.ts"],
+      exemptions: [DECLARING, ...SUPERSETS],
+      expected: [
+        "lib/source-dirs.ts",
+        "scripts/check-comment-terminators.ts",
+        "scripts/check-jsx-walk.ts",
+      ],
       rule: "the one-copy-of-the-list sweep",
       walk: sourceFiles(),
       stillNeeded: (module) =>

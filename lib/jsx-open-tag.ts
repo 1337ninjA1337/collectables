@@ -139,6 +139,32 @@ export function openTagAt(source: string, at: number): string {
 }
 
 /**
+ * Every opening tag of one element, whole, `<` through `>`.
+ *
+ * The question three suites were asking with `match(/<HeroBanner[\s\S]*?>/g)`
+ * before `lint:jsx-walk` refused it — "give me the `<HeroBanner>` in this file
+ * so I can assert about its props" — which is the naive form this module's
+ * header opens with: the wildcard stops at the first `>`, and the first `>` in
+ * a tag of any interest is the one inside `onPress={() => close()}`.
+ *
+ * Goes through {@link walkJsx} rather than {@link openTagEnd} alone, so a tag
+ * rendered through a render prop is found too. Self-closing tags are included:
+ * the caller asked for the tag, not for a subtree, and `<HeroBanner tone="…"
+ * />` is exactly the shape the consumers of this are testing.
+ *
+ * Text, not offsets, because that is all these callers want; a rule that needs
+ * to know WHERE the tag is takes `walkJsx` directly and keeps the whole
+ * {@link JsxTag}.
+ */
+export function openTagsNamed(code: string, name: string): string[] {
+  const found: string[] = [];
+  for (const tag of walkJsx(code, { seed: null, inherit: () => null })) {
+    if (tag.name === name) found.push(code.slice(tag.start, tag.tagEnd + 1));
+  }
+  return found;
+}
+
+/**
  * The expression inside `name={…}` on one opening tag, or null if absent.
  *
  * Whitespace is flattened to single spaces so a prop the formatter wrapped

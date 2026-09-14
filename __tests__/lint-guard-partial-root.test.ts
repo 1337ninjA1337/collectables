@@ -126,6 +126,11 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // files, so handing over whole roots would either copy most of the tree or
   // trip the per-root assertion instead of the floor.
   "check-comment-terminators": () => sliceOfEveryRoot("check-comment-terminators"),
+  // The same six roots and the same slice shape as check-comment-terminators,
+  // for the same reason: __tests__/ alone is 612 files, so whole roots would
+  // either copy most of the tree or trip the per-root assertion rather than
+  // the floor this spec is about.
+  "check-jsx-walk": () => sliceOfEveryRoot("check-jsx-walk"),
   "check-a11y-jsx": () => sliceOfEveryRoot("check-a11y-jsx"),
   // Walks the whole tree; app/ is a few dozen of the several hundred files.
   "check-secrets": () => ["app"],

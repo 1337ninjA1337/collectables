@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { closeTagIndex } from "@/lib/jsx-open-tag";
 import { STORAGE_FAILURE_SITES } from "@/lib/report-storage-failure";
 
 import { readI18nSource } from "./helpers/i18n-source-file";
@@ -99,7 +100,14 @@ describe("the notice", () => {
     // And it is a sentence, not a value: printing the effective entry currency
     // here would put two currency codes in a card whose subject is one of them.
     const quiet = SETTINGS.slice(SETTINGS.indexOf('t("entryCurrencySet")'));
-    const line = quiet.slice(0, quiet.indexOf("</Pressable>"));
+    // `closeTagIndex` rather than the `indexOf("</Pressable>")` this was until
+    // `lint:jsx-walk` landed: the slice starts inside the card's own
+    // <Pressable>, so depth 1 is where the count begins, and a <Pressable>
+    // opened between here and the close (a row of chips on the card) would
+    // otherwise end the window at its close instead of the card's.
+    const closesAt = closeTagIndex(quiet, 0, "Pressable");
+    assert.ok(closesAt !== -1, "the entry-currency card's <Pressable> never closes");
+    const line = quiet.slice(0, closesAt);
     assert.ok(
       !line.includes("{entryCurrency}") && !line.includes("{displayCurrency}"),
       "the quiet line shows a currency code beside the display one",

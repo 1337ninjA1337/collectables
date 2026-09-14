@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { RADIUS_HERO_LG, SPACING_CARD, SPACING_GUTTER, SPACING_LIST } from "@/lib/design-tokens";
+import { openTagsNamed } from "@/lib/jsx-open-tag";
 import { assertNoOffenders } from "./helpers/offence-sweep";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { tsxFiles } from "./helpers/source-files";
@@ -247,8 +248,13 @@ describe("hero-banner — adoption across the UI", () => {
   it("no gradient consumer passes a tone, so the default stays exercised", () => {
     // Scoped to the <HeroBanner> element: `app/index.tsx` also renders
     // <DashboardBanner tone="amber">, which is a different component's tone.
+    //
+    // Through `openTagsNamed` since `lint:jsx-walk` landed. The `[\s\S]*?>`
+    // this used to be stopped at the first `>` in the tag, so the day a banner
+    // takes a handler prop the assertion below would be reading the first two
+    // attributes and calling it the element.
     for (const file of GRADIENT_CONSUMERS) {
-      const element = read(file).match(/<HeroBanner[\s\S]*?>/)?.[0] ?? "";
+      const element = openTagsNamed(read(file), "HeroBanner")[0] ?? "";
       assert.ok(element.length > 0, `${file} renders no <HeroBanner>`);
       assert.doesNotMatch(element, /tone=/, file);
     }

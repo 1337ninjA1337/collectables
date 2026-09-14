@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { walkJsx } from "@/lib/jsx-open-tag";
+
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, tsxFiles } from "./helpers/source-files";
 
@@ -34,25 +36,32 @@ const SCAN_DIRS = ["app", "components"] as const;
 /**
  * Every `style={[` that appears on the direct child element of a `<Link …
  * asChild>` opening tag. The child element is the first JSX tag opened after
- * the `asChild` link tag closes, so we scan forward from `asChild` until that
- * tag's own `>` — which is exactly the window a `style=` prop can live in.
+ * the `asChild` link tag closes, which `walkJsx` yields as the next tag in
+ * document order.
+ *
+ * TWO hand-rolled scans until `lint:jsx-walk` landed, and both had the bug
+ * that guard exists for. `/<Link\b[^>]*\basChild\b[^>]*>/` ends at the first
+ * `>` in the link tag, so a `<Link href={`/item/${id}`} onPress={() => …}
+ * asChild>` was never matched at all — the sweep would report a clean tree
+ * while reading none of it. Then `after.indexOf(">", childStart)` ended the
+ * CHILD's tag at its first `>`, so a child whose handler came before its style
+ * had the `style={[` cut off the end of the window and passed.
+ *
+ * That second one is the shape this file is about: `<Pressable onPress={() =>
+ * router.push(…)} style={[styles.card, style]}>` is the exact crash, written
+ * in the order nothing here would have caught.
  */
 function findArrayStylesUnderAsChild(source: string): string[] {
   const hits: string[] = [];
-  const linkOpen = /<Link\b[^>]*\basChild\b[^>]*>/g;
-  let m: RegExpExecArray | null;
-  while ((m = linkOpen.exec(source)) !== null) {
-    const after = source.slice(m.index + m[0].length);
-    // First JSX element opened after the <Link …> tag.
-    const childStart = after.search(/<[A-Za-z]/);
-    if (childStart === -1) continue;
-    const childTagEnd = after.indexOf(">", childStart);
-    if (childTagEnd === -1) continue;
-    const childTag = after.slice(childStart, childTagEnd + 1);
-    if (/\bstyle=\{\[/.test(childTag)) {
-      const line = source.slice(0, m.index + m[0].length + childStart).split("\n").length;
-      hits.push(`line ${line}: ${childTag.split("\n")[0].trim().slice(0, 120)}`);
-    }
+  const tags = [...walkJsx(source, { seed: null, inherit: () => null })];
+  for (const [index, tag] of tags.entries()) {
+    if (tag.name !== "Link" || tag.selfClosing || !/\basChild\b/.test(tag.attrs)) continue;
+    const child = tags[index + 1];
+    if (!child) continue;
+    if (!/\bstyle=\{\[/.test(child.attrs)) continue;
+    const line = source.slice(0, child.start).split("\n").length;
+    const childTag = source.slice(child.start, child.tagEnd + 1);
+    hits.push(`line ${line}: ${childTag.split("\n")[0].trim().slice(0, 120)}`);
   }
   return hits;
 }

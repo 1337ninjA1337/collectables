@@ -890,6 +890,17 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     },
     note: "the six hand-written source roots held 810 .ts/.tsx files on 2026-09-01 (app 19, components 46, data 5, lib 190, scripts 39, tests 511); 600 leaves 26% deletable. The widest walk in the registry, and deliberately so: the rule is about PROSE rather than about code that ships, and every one of these roots is full of it — the file that demonstrated the failure was in scripts/, which the hex and radius walks never read. `roots` carries the no-single-root property, so the number's remaining job is a walk that shrank without losing a root; __tests__/ alone contributes 511, which no floor could ride above without re-measuring monthly.",
   },
+  "check-jsx-walk": {
+    count: {
+      label: "source file",
+      minimum: 700,
+      // The same six roots and the same reason as check-comment-terminators:
+      // through the constants, so `guard-scan-dirs.test.ts` keeps one copy of
+      // the list in the tree.
+      roots: [...SOURCE_DIRS, SUITES_DIR],
+    },
+    note: "the six hand-written source roots held 962 .ts/.tsx files on 2026-09-14 (app 19, components 53, data 3, lib 232, scripts 43, tests 612); 700 leaves 27% deletable. Deliberately the same width as check-comment-terminators rather than the app/ + components/ walk the other JSX rules take: all nine copies this guard found on its first run were in __tests__/, which is where a scratch sweep gets written and where two of the three walks it was built to prevent already lived. `roots` carries the no-single-root property, so this number's remaining job is the walk that shrank without losing a root — __tests__/ alone contributes 612, which no floor could ride above without re-measuring monthly.",
+  },
   "check-reporter-graph": {
     inputs: ["scripts/test-failure-reporter.ts"],
     note: "one fixed entry point, and the graph below it is WALKED rather than declared — listing lib/test-failure-report.ts and lib/thrown-value.ts here would turn a legitimate 'the reporter stopped needing that helper' into a premise failure, the same trap check-sentry-version's note describes for the resolved version strings. The entry is the honest input: without it there is no graph to check, and an empty one is a reporter that would load and do nothing.",
