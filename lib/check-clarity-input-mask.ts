@@ -38,23 +38,28 @@ export const CLARITY_MASK_ALLOWED_FILES: readonly string[] = [
 ];
 
 /**
- * Find the end of a JSX opening tag starting at `openIndex` (the `<`).
- * Returns the index just past the closing `>`, or `source.length` if the tag
- * never closes (malformed source — treat the rest of the file as the tag so
- * the mask check still sees every attribute).
+ * The attribute text of the JSX opening tag starting at `openIndex` (the `<`),
+ * or null when the tag never closes.
  *
  * `openTagEnd` since 2026-09-14, and the reason is what this used to be: a
  * brace counter with no string-literal skipping, which is the exact half
  * `lib/jsx-open-tag.ts`'s header records an earlier copy leaving out — written
  * again here, independently, months later. A `clarity-mask` attribute after a
  * quoted `>` (`placeholder=">"`) was invisible to it, so a masked input read
- * as unmasked; and `<TextInput onChangeText={(v) => set(v)} data-clarity-mask>`
- * was only safe because the brace counter happened to cover the arrow.
- * `lint:jsx-walk` refuses the shape now, which is how this copy was found.
+ * as unmasked. `lint:jsx-walk` refuses the shape now, which is how this copy
+ * was found.
+ *
+ * NULL, not "the rest of the file". The old fallback was
+ * `return source.length` — "treat the rest of the file as the tag so the mask
+ * check still sees every attribute" — which fails OPEN in the worst way
+ * available to this rule: one `clarity-mask` anywhere below an unclosed tag
+ * marks every input under it as compliant, and the guard reports a clean tree.
+ * An unparseable tag is a fact about the file, and {@link findUnmaskedInputTags}
+ * now says so instead of guessing.
  */
-function endOfJsxTag(source: string, openIndex: number): number {
+function openTagText(source: string, openIndex: number): string | null {
   const end = openTagEnd(source, openIndex);
-  return end === -1 ? source.length : end + 1;
+  return end === -1 ? null : source.slice(openIndex, end + 1);
 }
 
 function lineNumberAt(source: string, index: number): number {
@@ -84,14 +89,18 @@ export function findUnmaskedInputTags(
   while ((match = tagPattern.exec(source)) !== null) {
     const before = match.index > 0 ? source[match.index - 1] : "";
     if (before !== "" && IDENTIFIER_CHAR.test(before)) continue; // generic, not JSX
-    const tagEnd = endOfJsxTag(source, match.index);
-    const tagText = source.slice(match.index, tagEnd);
-    if (tagText.includes(MASK_MARKER)) continue;
+    const tagText = openTagText(source, match.index);
+    if (tagText !== null && tagText.includes(MASK_MARKER)) continue;
     violations.push({
       file,
       line: lineNumberAt(source, match.index),
       tag: match[1] as ClarityMaskViolation["tag"],
-      hint: "use MaskedTextInput from components/masked-text-input.tsx (or add data-clarity-mask)",
+      // A tag that never closes is reported rather than skipped: the mask may
+      // well be in it, and the honest answer is that nobody can tell.
+      hint:
+        tagText === null
+          ? "this opening tag never closes, so its attributes cannot be read — fix the tag, then the mask"
+          : "use MaskedTextInput from components/masked-text-input.tsx (or add data-clarity-mask)",
     });
   }
   return violations;

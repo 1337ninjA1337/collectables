@@ -110,4 +110,45 @@ describe("check-clarity-input-mask", () => {
     const wrapper = readRepoFile("components", "masked-text-input.tsx");
     assert.match(wrapper, /clarity-mask/);
   });
+
+  it("reads a mask that sits after a quoted `>`", () => {
+    // The bug in the hand-rolled tag reader this guard carried until
+    // 2026-09-14: it counted braces and did not skip string literals, so the
+    // quoted bracket ended the tag and the attribute after it was never seen.
+    // A masked input reported as unmasked.
+    assert.deepEqual(
+      findUnmaskedInputTags("app/a.tsx", `<TextInput placeholder=">" data-clarity-mask />`),
+      [],
+    );
+  });
+
+  it("reads a mask that sits after an inline arrow", () => {
+    // The half the old reader DID have, kept as a case so the replacement is
+    // held to both.
+    assert.deepEqual(
+      findUnmaskedInputTags(
+        "app/a.tsx",
+        `<TextInput onChangeText={(v) => set(v)} data-clarity-mask />`,
+      ),
+      [],
+    );
+  });
+
+  it("reports a tag that never closes instead of trusting it", () => {
+    // It used to `return source.length` — "treat the rest of the file as the
+    // tag so the mask check still sees every attribute" — which means ONE
+    // `clarity-mask` anywhere below an unclosed tag marks every input under it
+    // compliant, and the guard reports a clean tree. The worst available
+    // failure for a rule about a privacy marker.
+    const source = [
+      "<TextInput style={{ flex: 1", // brace depth never returns to 0
+      "<TextInput data-clarity-mask />",
+    ].join("\n");
+    const found = findUnmaskedInputTags("app/a.tsx", source);
+    // The old reader gave the first tag "the rest of the file", which holds
+    // the marker on the line below — so it reported NOTHING for this source.
+    assert.equal(found.length, 1);
+    assert.equal(found[0].line, 1);
+    assert.match(found[0].hint, /never closes/);
+  });
 });
