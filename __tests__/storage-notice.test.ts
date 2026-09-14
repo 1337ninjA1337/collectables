@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 
 import { findLocaleBlock } from "@/lib/i18n-source";
-import { closeTagIndex } from "@/lib/jsx-open-tag";
+import { elementSpan, tagsNamed } from "@/lib/jsx-open-tag";
 
 import { autoUnmount, installNativeModuleStubs, render } from "./helpers/render";
 import {
@@ -783,20 +783,20 @@ describe("the listener is mounted once, under the toast provider", () => {
 
   it("inside ToastProvider, which is where its two contexts exist", () => {
     const layout = readSource("app/_layout.tsx");
-    const opened = layout.indexOf("<ToastProvider>");
-    const mounted = layout.indexOf("<StorageNotice />");
     // Depth-counted from the open tag since `lint:jsx-walk` landed, rather
     // than `indexOf("</ToastProvider>")`: the provider tree is the one file in
     // this repo where a component genuinely could be nested inside itself, and
     // the inner close would put <StorageNotice /> outside a provider it is in.
-    const closed =
-      opened === -1
-        ? -1
-        : closeTagIndex(layout, opened + "<ToastProvider>".length, "ToastProvider");
-
-    assert.ok(opened >= 0 && mounted >= 0 && closed >= 0, "all three tags are in the tree");
+    const [provider] = tagsNamed(layout, "ToastProvider");
+    assert.ok(provider, "app/_layout.tsx renders no <ToastProvider>");
+    const span = elementSpan(layout, provider);
+    assert.ok(span, "the <ToastProvider> never closes");
+    // The containment, stated over the provider's BODY rather than as an
+    // ordering of three offsets. An ordering holds just as well when the close
+    // tag came back at the end of the file, which is the answer a broken
+    // reader gives; a body that has to contain the mount cannot.
     assert.ok(
-      opened < mounted && mounted < closed,
+      span.body.includes("<StorageNotice />"),
       "useToast and useI18n both throw outside their providers, and I18nProvider is above ToastProvider",
     );
   });

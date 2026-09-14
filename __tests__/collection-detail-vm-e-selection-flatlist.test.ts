@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { closeTagIndex, tagsNamed } from "@/lib/jsx-open-tag";
+import { elementSpan, tagsNamed } from "@/lib/jsx-open-tag";
 
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -81,9 +81,16 @@ describe("app/collection/[id].tsx — VM-E/BB-B selection-mode FlatList", () => 
     // inside would have moved the close tag earlier and made <BulkBar> look
     // like a sibling when it is still inside the outer wrapper.
     const [profiler] = tagsNamed(block, "Profiler");
-    const listCloseIdx = profiler ? closeTagIndex(block, profiler.tagEnd + 1, "Profiler") : -1;
+    assert.ok(profiler, "no <Profiler> in the selection-mode branch");
+    const span = elementSpan(block, profiler);
+    assert.ok(span, "the <Profiler> in the selection-mode branch never closes");
+    // The window is asserted to hold the list before anything is asserted
+    // about where it ends: an ordering check against a close tag that came
+    // back too early passes for the wrong reason, and "after the wrapper
+    // closes" means nothing if the wrapper wrapped nothing.
+    assert.match(span.body, /<FlatList\b/, "the Profiler wraps no FlatList");
     assert.ok(
-      bulkBarIdx !== -1 && listCloseIdx !== -1 && bulkBarIdx > listCloseIdx,
+      bulkBarIdx !== -1 && bulkBarIdx > span.end,
       "<BulkBar> must render after the Profiler-wrapped FlatList closes, not inside it",
     );
   });

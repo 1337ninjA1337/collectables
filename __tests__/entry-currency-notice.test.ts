@@ -108,6 +108,14 @@ describe("the notice", () => {
     const closesAt = closeTagIndex(quiet, 0, "Pressable");
     assert.ok(closesAt !== -1, "the entry-currency card's <Pressable> never closes");
     const line = quiet.slice(0, closesAt);
+    // The window is asserted to still hold the line it is about before the
+    // negative below is asked of it. `!line.includes(…)` is true of an empty
+    // string, so a close tag that came back at offset 0 would pass this case
+    // while reading nothing at all.
+    assert.ok(
+      line.includes('t("entryCurrencySet")'),
+      "the window closed before the line it is supposed to be reading",
+    );
     assert.ok(
       !line.includes("{entryCurrency}") && !line.includes("{displayCurrency}"),
       "the quiet line shows a currency code beside the display one",

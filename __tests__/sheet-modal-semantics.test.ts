@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { attributeValue, closeTagIndex, jsxTags, openTagAt } from "@/lib/jsx-open-tag";
+import { attributeValue, elementSpan, jsxTags, openTagAt } from "@/lib/jsx-open-tag";
 
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 
@@ -57,11 +57,13 @@ const OPT_OUT = /accessibilityRole="none"/g;
 function modalSpans(code: string): { start: number; end: number }[] {
   const spans: { start: number; end: number }[] = [];
   for (const tag of jsxTags(code)) {
-    // A self-closing `<Modal />` covers nothing, and asking for its close tag
-    // would find the next sheet's.
+    // A self-closing `<Modal />` covers nothing. `elementSpan` answers that
+    // with an empty body ending at the tag, which is right for it and useless
+    // here: a span from `<Modal />`'s start to its own `>` holds no opt-out,
+    // so skipping it keeps the list to the sheets it is about.
     if (tag.name !== "Modal" || tag.selfClosing) continue;
-    const end = closeTagIndex(code, tag.tagEnd + 1, "Modal");
-    if (end !== -1) spans.push({ start: tag.start, end });
+    const span = elementSpan(code, tag);
+    if (span) spans.push({ start: span.start, end: span.end });
   }
   return spans;
 }

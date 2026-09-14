@@ -199,6 +199,46 @@ export function openTagsNamed(code: string, name: string): string[] {
   return tagsNamed(code, name).map((tag) => code.slice(tag.start, tag.tagEnd + 1));
 }
 
+/** Where an element starts, where it closes, and what is between. */
+export type JsxElementSpan = {
+  /** Offset of the opening tag's `<`. */
+  readonly start: number;
+  /** Offset of the matching `</name>`, or of the end for a self-closing tag. */
+  readonly end: number;
+  /** Everything between the opening tag's `>` and the close — `""` if none. */
+  readonly body: string;
+};
+
+/**
+ * The extent of the element an opening tag opens, or null if it never closes.
+ *
+ * `closeTagIndex(code, tag.tagEnd + 1, tag.name)` had been written out three
+ * times within a day — the sheet-span reader and two suites asking what a
+ * `<Profiler>` wraps — and every one of them wanted the same two things from
+ * it: where the element ends, and what is inside. The `+ 1` is the part a
+ * fourth copy gets wrong: `tagEnd` is the `>` itself, so starting the count
+ * there would read the open tag as its own first character.
+ *
+ * `body` is what makes a window assertion falsifiable. Three suites checked
+ * that something is NOT in an element and had no way to notice a window that
+ * had silently shrunk to nothing — the negative holds either way — so the body
+ * is handed back for them to assert something IS in it.
+ *
+ * A self-closing tag has no body and closes where it ends: `""` and `tagEnd`,
+ * rather than null. It is a complete element, and a caller asking what is
+ * inside `<HeroBanner />` should get "nothing", not "unparseable".
+ *
+ * null means the close tag is missing, which these scanners meet whenever they
+ * read a file mid-edit — the same forgiving answer {@link closeTagIndex}
+ * gives, carried up so a caller cannot mistake -1 for an offset.
+ */
+export function elementSpan(code: string, tag: JsxTag): JsxElementSpan | null {
+  if (tag.selfClosing) return { start: tag.start, end: tag.tagEnd, body: "" };
+  const end = closeTagIndex(code, tag.tagEnd + 1, tag.name);
+  if (end === -1) return null;
+  return { start: tag.start, end, body: code.slice(tag.tagEnd + 1, end) };
+}
+
 /**
  * The expression inside `name={…}` on one opening tag, or null if absent.
  *

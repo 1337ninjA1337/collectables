@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   attributeValue,
   closeTagIndex,
+  elementSpan,
   jsxTags,
   openTagAt,
   openTagEnd,
@@ -138,6 +139,55 @@ describe("the walk that inherits nothing", () => {
     // case has to be an array a destructure can miss on, not a throw.
     const [missing] = tagsNamed("<View />", "Profiler");
     assert.equal(missing, undefined);
+  });
+});
+
+describe("the extent of an element", () => {
+  const spanOf = (code: string, name: string) => {
+    const [tag] = tagsNamed(code, name);
+    return tag ? elementSpan(code, tag) : null;
+  };
+
+  it("hands back the body, which is what makes a window assertion falsifiable", () => {
+    // The reason this returns text and not just an offset: three suites
+    // asserted something is NOT inside an element, and a negative is true of
+    // an empty window too.
+    const span = spanOf(`<Profiler id="x"><FlatList data={rows} /></Profiler>`, "Profiler");
+    assert.equal(span?.body, `<FlatList data={rows} />`);
+  });
+
+  it("ends at the element's OWN close, not at a nested one's", () => {
+    const code = `<View a><View b>inner</View>tail</View>after`;
+    const span = spanOf(code, "View");
+    assert.equal(span?.body, `<View b>inner</View>tail`);
+    assert.equal(code.slice(span!.end), "</View>after");
+  });
+
+  it("starts after the `>` rather than on it", () => {
+    // The `+ 1` three copies of this had to remember: `tagEnd` is the `>`
+    // itself, so a body counted from there opens with the tag's own last
+    // character.
+    assert.equal(spanOf("<Text>hi</Text>", "Text")?.body, "hi");
+  });
+
+  it("is not ended early by a `>` inside an attribute", () => {
+    const code = `<Pressable onPress={() => go()}>x</Pressable>`;
+    assert.equal(spanOf(code, "Pressable")?.body, "x");
+  });
+
+  it("calls a self-closing tag a complete element with nothing inside", () => {
+    // "Nothing" rather than "unparseable": a caller asking what is inside
+    // `<HeroBanner />` has an answer, and looking for its close tag would find
+    // the next element's.
+    const span = spanOf(`<HeroBanner tone="solid" /><HeroBanner /></HeroBanner>`, "HeroBanner");
+    assert.equal(span?.body, "");
+    assert.equal(span?.end, `<HeroBanner tone="solid" /`.length);
+  });
+
+  it("returns null for an element whose close tag is missing", () => {
+    // Mid-edit files reach these scanners; null rather than -1 so a caller
+    // cannot slice with it by accident.
+    assert.equal(spanOf("<Modal><Text>x</Text>", "Modal"), null);
   });
 });
 
