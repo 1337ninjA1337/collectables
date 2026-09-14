@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { jsxReach } from "@/lib/jsx-open-tag";
 import { stripComments } from "@/lib/strip-comments";
 
+import { unionOfScanDirs } from "./helpers/guard-scan-list";
+import { readSuite } from "./helpers/suite-files";
 import { sourceCode, tsxFiles } from "./helpers/source-files";
 
 /**
@@ -27,8 +29,24 @@ import { sourceCode, tsxFiles } from "./helpers/source-files";
  * would need a `SCANNED_FLOORS` entry whose subject is the same number twice.
  */
 
+/**
+ * The directories the JSX rules actually read, taken from the rules.
+ *
+ * Hand-typed as `("app", "components")` for one commit, which is a copy of an
+ * answer two guards already state — and the copy is only right until one of
+ * them widens. The union is read out of their own `SCANNED_DIRS`, so a rule
+ * that grows a third root grows this floor with it rather than leaving a
+ * directory nothing watches.
+ *
+ * The two suite-side rules over the same walk (`empty-state-wrapper-audit`,
+ * the heading sweeps) declare their roots at their call sites rather than in a
+ * script, so they cannot be read the same way; the last case in this file
+ * pins that they still name this set.
+ */
+const SCANNED = unionOfScanDirs("check-a11y-jsx", "check-clarity-input-mask");
+
 /** Every `.tsx` that renders something, comment-blanked as the rules read it. */
-const SCREENS = tsxFiles("app", "components");
+const SCREENS = tsxFiles(...SCANNED);
 
 /**
  * Opening tags across `app/` + `components/` on 2026-09-14: 1625 in 71 files.
@@ -72,6 +90,24 @@ describe("the JSX walk reads the whole of every screen", () => {
 
   it("walks every screen, so neither number is over a shrunken list", () => {
     assert.ok(SCREENS.length >= 55, `only ${SCREENS.length} .tsx files walked`);
+  });
+
+  it("covers the roots the suite-side rules read too", () => {
+    // `empty-state-wrapper-audit` and the two heading sweeps walk this same
+    // JSX from `__tests__/`, where there is no SCANNED_DIRS to parse. If one
+    // of them widens, this is where it says so — a root they read and this
+    // floor does not is a directory whose markup nothing watches.
+    for (const [suite, call] of [
+      ["empty-state-wrapper-audit.test.ts", 'sourceFiles("app", "components")'],
+      ["modal-heading-role.test.ts", 'tsxFiles("app", "components")'],
+      ["screen-heading-role.test.ts", 'tsxFiles("app", "components")'],
+    ] as const) {
+      assert.ok(
+        readSuite(suite).includes(call),
+        `${suite} no longer walks ${call} — check its roots against ${SCANNED.join(" + ")}`,
+      );
+    }
+    assert.deepEqual(SCANNED, ["app", "components"]);
   });
 });
 

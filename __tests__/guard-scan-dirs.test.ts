@@ -8,6 +8,7 @@ import {
   SOURCE_EXTENSIONS,
 } from "@/lib/source-dirs";
 
+import { declaredScanDirs } from "./helpers/guard-scan-list";
 import { readRepoFile } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
 import { assertExemptionsHonest, SUITES_REL } from "./helpers/suite-files";
@@ -128,13 +129,15 @@ const GUARD_SCANS: Readonly<
   },
 };
 
-/** The scan list a guard declares, read out of its source. */
-function declaredDirs(guard: string): string[] {
-  const source = readRepoFile("scripts", `${guard}.ts`);
-  const match = source.match(/const SCANNED_DIRS = \[([^\]]*)\] as const;/);
-  assert.ok(match, `${guard} does not declare a SCANNED_DIRS list`);
-  return [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
-}
+/**
+ * The scan list a guard declares, read out of its source.
+ *
+ * The parse moved to `helpers/guard-scan-list.ts` on 2026-09-14, when
+ * `jsx-walk-reach.test.ts` became its second reader: that suite's floor has to
+ * cover exactly the roots the JSX rules scan, and a copy of that union would
+ * go stale the first time one of them widened.
+ */
+const declaredDirs = declaredScanDirs;
 
 describe("the guards' scan lists agree with lib/source-dirs.ts", () => {
   it("declares the list this suite pins, in the source and under one name", () => {
