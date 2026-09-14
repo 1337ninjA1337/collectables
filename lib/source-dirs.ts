@@ -80,10 +80,17 @@ export const MARKUP_DIRS: readonly string[] = ["app", "components"];
  * What this adds is the check: every source root is in `MARKUP_DIRS` or has a
  * reason here, so a sixth top-level directory cannot join the tree and be
  * silently outside every JSX rule.
+ *
+ * The `lib/` sentence shipped for one commit as "modules that return values",
+ * which was FALSE — twelve files there render JSX. Eleven are context
+ * providers wrapping `{children}` and nothing else, which is why nobody had
+ * noticed; the twelfth renders a real toast UI. Both halves are checked now
+ * by `__tests__/markup-outside-markup-dirs.test.ts` rather than asserted in
+ * prose, which is the difference between a reason and a guess.
  */
 export const NON_MARKUP_REASONS: Readonly<Record<string, string>> = {
   data: "seed literals and lookup tables — objects and arrays, no elements declared anywhere in them",
-  lib: "modules that return values; the two that touch JSX read it as TEXT rather than rendering any",
+  lib: "modules that return values, plus eleven context providers whose whole JSX is <Ctx.Provider>{children}</Ctx.Provider> — with lib/toast-context.tsx the one real exception, named in MARKUP_OUTSIDE_MARKUP_DIRS",
   scripts: "node tooling that never reaches Metro, so nothing here is rendered on any platform",
 };
 
@@ -99,6 +106,23 @@ export const NON_MARKUP_REASONS: Readonly<Record<string, string>> = {
  * `lib/` guards' constants without inverting the dependency the two halves
  * were separated to keep.
  */
+/**
+ * Files outside {@link MARKUP_DIRS} that render real user-facing markup, and
+ * are therefore scanned by none of the five JSX rules.
+ *
+ * A gap, listed rather than hidden. `lib/toast-context.tsx` draws the toast
+ * host — `<View>`s, two `<Pressable>`s and three `<Text>`s that a screen
+ * reader meets on every error in this app — and the a11y, clarity,
+ * empty-state and heading rules all stop at `app/` and `components/`.
+ *
+ * It is one entry because a sweep found exactly one; eleven other `lib/` files
+ * render JSX and every one of them is a context provider wrapping `{children}`
+ * with no element of its own, which is a shape no markup rule has anything to
+ * say about. `markup-outside-markup-dirs.test.ts` holds that line: a twelfth
+ * file that renders a `<View>` joins this list with a sentence, or moves.
+ */
+export const MARKUP_OUTSIDE_MARKUP_DIRS: readonly string[] = ["lib/toast-context.tsx"];
+
 export const SUITES_DIR = "__tests__";
 
 /**
