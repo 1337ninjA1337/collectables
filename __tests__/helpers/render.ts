@@ -696,6 +696,20 @@ export type RenderResult = {
   texts(): string[];
   /** Fires a node's `onPress` and re-renders if it changed state. */
   press(node: TestNode): void;
+  /**
+   * The same for any other handler prop, by name.
+   *
+   * `press` covered the only event anything here asked about for months, and
+   * the first component moved into this harness on purpose — the toast
+   * overlay — turned out to hang its most interesting behaviour on four
+   * others: `onHoverIn`/`onHoverOut` and `onFocus`/`onBlur` hold the dismissal
+   * window open while the user is reading, which is what stops an undo
+   * expiring under the cursor reaching for it. Three source-text matches were
+   * standing in for it.
+   *
+   * Arguments are passed through, for the handlers that take an event.
+   */
+  fire(node: TestNode, handler: string, ...args: unknown[]): void;
   /** Re-runs the tree with hook state preserved. */
   rerender(next?: React.ReactElement): RenderResult;
   /**
@@ -886,6 +900,15 @@ export function render(element: React.ReactElement): RenderResult {
         throw new Error(`${describeNode(node)} has no onPress`);
       }
       (onPress as () => void)();
+      if (pass.dirty) root = build(currentElement);
+    },
+    fire: (node, handler, ...args) => {
+      requireMounted(handler);
+      const fn = node.props[handler];
+      if (typeof fn !== "function") {
+        throw new Error(`${describeNode(node)} has no ${handler}`);
+      }
+      (fn as (...a: unknown[]) => void)(...args);
       if (pass.dirty) root = build(currentElement);
     },
     rerender: (next) => {

@@ -8,6 +8,7 @@ import {
   SUCCESS_DEEP,
   SUCCESS_GREEN_3,
 } from "@/lib/design-tokens";
+import { TOAST_ACTION_DISPLAY_MS, TOAST_DISPLAY_MS } from "@/lib/toast-timing";
 
 import {
   autoUnmount,
@@ -38,11 +39,48 @@ autoUnmount();
  * dismisses and pressing the action runs the caller's handler BEFORE the
  * dismissal, and that each toast type reaches the screen in its own colours.
  *
- * The source cases in `toast-action.test.ts` stay where they are: they pin the
- * timing shape (`toastDisplayMs`, the hold/release pair, the ref the timeout
- * reads), which is about how the component is WRITTEN rather than about what
- * it draws, and a harness with no real timers cannot say anything about it.
+ * The source cases in `toast-action.test.ts` stay where they are: they pin how
+ * the component is WRITTEN — the ref the timeout reads, the dependency list —
+ * which is not what it does. What it DOES with its timer is asserted below,
+ * against a captured `setTimeout`, which is the half three of those matches
+ * were standing in for.
  */
+
+/** Scheduled timers, in order, while a case holds the global. */
+type Scheduled = { delay: number; run: () => void; cleared: boolean };
+
+/**
+ * Capture `setTimeout` for the duration of one case.
+ *
+ * Not a fake clock — nothing here needs time to pass, only to see WHAT was
+ * scheduled and WHETHER it was cleared. The real global is restored by the
+ * returned function, and every case that takes one calls it, because a suite
+ * that left a stubbed timer installed would break every later file in the
+ * same process.
+ */
+function captureTimers(): { timers: Scheduled[]; restore: () => void } {
+  const timers: Scheduled[] = [];
+  const realSet = globalThis.setTimeout;
+  const realClear = globalThis.clearTimeout;
+  globalThis.setTimeout = ((run: () => void, delay: number) => {
+    timers.push({ delay, run, cleared: false });
+    return timers.length as unknown as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout;
+  globalThis.clearTimeout = ((handle: number) => {
+    const entry = timers[(handle as number) - 1];
+    if (entry) entry.cleared = true;
+  }) as typeof clearTimeout;
+  return {
+    timers,
+    restore: () => {
+      globalThis.setTimeout = realSet;
+      globalThis.clearTimeout = realClear;
+    },
+  };
+}
+
+/** The timers still standing — scheduled and not cleared. */
+const live = (timers: Scheduled[]) => timers.filter((timer) => !timer.cleared);
 
 type Toast = {
   id: number;
@@ -176,5 +214,111 @@ describe("each type reaches the screen in its own colours", () => {
     // one entry would satisfy either of them written on its own.
     assert.notEqual(SUCCESS_GREEN_3, DANGER_DEEP_7);
     assert.notEqual(SUCCESS_DEEP, DANGER_DEEP_8);
+  });
+});
+
+describe("the dismissal window holds while the user is engaged", () => {
+  it("schedules the plain window for a toast with no action", async () => {
+    const { timers, restore } = captureTimers();
+    try {
+      render(await ToastHostElement([toast()], () => {}));
+      assert.deepEqual(
+        live(timers).map((timer) => timer.delay),
+        [TOAST_DISPLAY_MS],
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it("schedules the longer window for a toast the user may want to act on", async () => {
+    // An undo the user cannot reach in time is worse than no undo at all.
+    const { timers, restore } = captureTimers();
+    try {
+      render(
+        await ToastHostElement([toast({ action: { label: "Undo", onPress: () => {} } })], () => {}),
+      );
+      assert.deepEqual(
+        live(timers).map((timer) => timer.delay),
+        [TOAST_ACTION_DISPLAY_MS],
+      );
+      assert.notEqual(TOAST_ACTION_DISPLAY_MS, TOAST_DISPLAY_MS);
+    } finally {
+      restore();
+    }
+  });
+
+  it("clears the window on hover and leaves none standing", async () => {
+    // The feature: an undo must not expire under the cursor reaching for it.
+    // Three source-text matches stood in for this until the overlay moved
+    // somewhere a harness could mount it.
+    const { timers, restore } = captureTimers();
+    try {
+      const result = render(
+        await ToastHostElement([toast({ action: { label: "Undo", onPress: () => {} } })], () => {}),
+      );
+      result.fire(pressables(result.all())[0], "onHoverIn");
+      assert.deepEqual(live(timers), []);
+    } finally {
+      restore();
+    }
+  });
+
+  it("restarts the FULL window on leave, not the remainder", async () => {
+    // Deliberate: the user has just looked away from something they were
+    // reading, and a 300ms stub would be indistinguishable from a toast that
+    // ignored them.
+    const { timers, restore } = captureTimers();
+    try {
+      const result = render(
+        await ToastHostElement([toast({ action: { label: "Undo", onPress: () => {} } })], () => {}),
+      );
+      const body = pressables(result.all())[0];
+      result.fire(body, "onHoverIn");
+      result.fire(body, "onHoverOut");
+      assert.deepEqual(
+        live(timers).map((timer) => timer.delay),
+        [TOAST_ACTION_DISPLAY_MS],
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it("holds on FOCUS too, so a keyboard user gets the same window", async () => {
+    // The action button is `focusable`; on the web it is a tab stop, and a
+    // toast that expired while its button was focused would be the same bug
+    // with a keyboard instead of a mouse.
+    const { timers, restore } = captureTimers();
+    try {
+      const result = render(
+        await ToastHostElement([toast({ action: { label: "Undo", onPress: () => {} } })], () => {}),
+      );
+      result.fire(pressables(result.all())[1], "onFocus");
+      assert.deepEqual(live(timers), []);
+      result.fire(pressables(result.all())[1], "onBlur");
+      assert.deepEqual(
+        live(timers).map((timer) => timer.delay),
+        [TOAST_ACTION_DISPLAY_MS],
+      );
+    } finally {
+      restore();
+    }
+  });
+
+  it("dismisses the right toast when its window finally runs out", async () => {
+    // The other end of the timer: what the callback actually does, which no
+    // source match can say.
+    const { timers, restore } = captureTimers();
+    try {
+      const dismissed: number[] = [];
+      render(
+        await ToastHostElement([toast({ id: 4 }), toast({ id: 5 })], (id) => dismissed.push(id)),
+      );
+      live(timers)[1].run();
+      assert.deepEqual(dismissed, [5]);
+    } finally {
+      restore();
+    }
   });
 });
