@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { walkJsx } from "@/lib/jsx-open-tag";
+import { jsxTags } from "@/lib/jsx-open-tag";
 
 import { readRepoFile } from "./helpers/repo-file";
 import { readSource, tsxFiles } from "./helpers/source-files";
@@ -53,7 +53,7 @@ const SCAN_DIRS = ["app", "components"] as const;
  */
 function findArrayStylesUnderAsChild(source: string): string[] {
   const hits: string[] = [];
-  const tags = [...walkJsx(source, { seed: null, inherit: () => null })];
+  const tags = [...jsxTags(source)];
   for (const [index, tag] of tags.entries()) {
     if (tag.name !== "Link" || tag.selfClosing || !/\basChild\b/.test(tag.attrs)) continue;
     const child = tags[index + 1];

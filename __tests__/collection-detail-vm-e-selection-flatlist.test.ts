@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { closeTagIndex, walkJsx } from "@/lib/jsx-open-tag";
+import { closeTagIndex, tagsNamed } from "@/lib/jsx-open-tag";
 
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -80,9 +80,7 @@ describe("app/collection/[id].tsx — VM-E/BB-B selection-mode FlatList", () => 
     // was right only while this branch held one Profiler: a second one nested
     // inside would have moved the close tag earlier and made <BulkBar> look
     // like a sibling when it is still inside the outer wrapper.
-    const profiler = [...walkJsx(block, { seed: null, inherit: () => null })].find(
-      (tag) => tag.name === "Profiler",
-    );
+    const [profiler] = tagsNamed(block, "Profiler");
     const listCloseIdx = profiler ? closeTagIndex(block, profiler.tagEnd + 1, "Profiler") : -1;
     assert.ok(
       bulkBarIdx !== -1 && listCloseIdx !== -1 && bulkBarIdx > listCloseIdx,

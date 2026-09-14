@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { walkJsx } from "@/lib/jsx-open-tag";
+import { tagsNamed } from "@/lib/jsx-open-tag";
 
 import { readRepoFile } from "./helpers/repo-file";
 
@@ -53,9 +53,7 @@ describe("selection-mode FlatList Profiler telemetry", () => {
     // the first `>` in the tag, which here is the one inside
     // `onRender={onSelectionProfilerRender}`'s neighbours the day one arrives —
     // and the case above already asserts this tag has an expression prop.
-    const profiler = [...walkJsx(block, { seed: null, inherit: () => null })].find(
-      (tag) => tag.name === "Profiler",
-    );
+    const [profiler] = tagsNamed(block, "Profiler");
     assert.ok(profiler, "no <Profiler> in the selection-mode branch");
     assert.match(
       block.slice(profiler.tagEnd + 1),

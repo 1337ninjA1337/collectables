@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { attributeValue, closeTagIndex, openTagAt, walkJsx } from "@/lib/jsx-open-tag";
+import { attributeValue, closeTagIndex, jsxTags, openTagAt } from "@/lib/jsx-open-tag";
 
 import { sourceCode, sourceFiles } from "./helpers/source-files";
 
@@ -46,9 +46,9 @@ const OPT_OUT = /accessibilityRole="none"/g;
 /**
  * Byte ranges covered by a `<Modal …>…</Modal>` element, in one source.
  *
- * The third hand-rolled JSX walk in this repository until this round, and the
+ * The third hand-rolled JSX walk in this repository until 2026-09-13, and the
  * one with an assumption written into it: `code.indexOf("</Modal>")` after
- * each `<Modal`, correct only because these sheets do not nest. `walkJsx`
+ * each `<Modal`, correct only because these sheets do not nest. `jsxTags`
  * finds the tags and `closeTagIndex` counts depth, so nesting is handled
  * rather than documented — and a `<Modal>` rendered through a render prop is
  * found at all, which the `indexOf` version managed only by accident of the
@@ -56,7 +56,7 @@ const OPT_OUT = /accessibilityRole="none"/g;
  */
 function modalSpans(code: string): { start: number; end: number }[] {
   const spans: { start: number; end: number }[] = [];
-  for (const tag of walkJsx(code, { seed: null, inherit: () => null })) {
+  for (const tag of jsxTags(code)) {
     // A self-closing `<Modal />` covers nothing, and asking for its close tag
     // would find the next sheet's.
     if (tag.name !== "Modal" || tag.selfClosing) continue;

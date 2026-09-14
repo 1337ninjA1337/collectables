@@ -139,6 +139,47 @@ export function openTagAt(source: string, at: number): string {
 }
 
 /**
+ * Every opening tag in `code`, for a caller that inherits nothing.
+ *
+ * `walkJsx(code, { seed: null, inherit: () => null })` was written in five
+ * places within a day of the walk being extracted — four suites and
+ * {@link openTagsNamed} below — which is a phrase, not a decision: none of
+ * those callers has an ancestor question, they want the tags. The two that DO
+ * inherit something (the a11y guard's "an ancestor hid this subtree", the
+ * heading sweeps' "a `<Modal>` is above this node") still say so, and now the
+ * difference between the two kinds of caller is visible at the call site
+ * rather than buried in an argument that reads the same either way.
+ *
+ * Yields a plain {@link JsxTag}: the `inherited` field of a walk that inherits
+ * nothing is a null every caller would have to ignore.
+ */
+export function* jsxTags(code: string): Generator<JsxTag> {
+  for (const tag of walkJsx(code, { seed: null, inherit: () => null })) {
+    const { inherited: _inherited, ...rest } = tag;
+    yield rest;
+  }
+}
+
+/**
+ * Every opening tag of one element, with its offsets.
+ *
+ * The `[...jsxTags(code)].find((tag) => tag.name === "Profiler")` two suites
+ * wrote on the same afternoon. Offsets rather than text because these callers
+ * ask a question ABOUT the position — what follows this tag, where does its
+ * element close — which {@link openTagsNamed} cannot answer.
+ *
+ * Self-closing tags are included: the caller asked for the tag, not for a
+ * subtree, and a rule about a subtree has `selfClosing` to check.
+ */
+export function tagsNamed(code: string, name: string): JsxTag[] {
+  const found: JsxTag[] = [];
+  for (const tag of jsxTags(code)) {
+    if (tag.name === name) found.push(tag);
+  }
+  return found;
+}
+
+/**
  * Every opening tag of one element, whole, `<` through `>`.
  *
  * The question three suites were asking with `match(/<HeroBanner[\s\S]*?>/g)`
@@ -148,20 +189,14 @@ export function openTagAt(source: string, at: number): string {
  * a tag of any interest is the one inside `onPress={() => close()}`.
  *
  * Goes through {@link walkJsx} rather than {@link openTagEnd} alone, so a tag
- * rendered through a render prop is found too. Self-closing tags are included:
- * the caller asked for the tag, not for a subtree, and `<HeroBanner tone="…"
- * />` is exactly the shape the consumers of this are testing.
+ * rendered through a render prop is found too.
  *
- * Text, not offsets, because that is all these callers want; a rule that needs
- * to know WHERE the tag is takes `walkJsx` directly and keeps the whole
- * {@link JsxTag}.
+ * The text form of {@link tagsNamed}, and the one most callers want: a rule
+ * that tests `attrs` is reading a string either way, and the slice is the
+ * thing it would otherwise write out.
  */
 export function openTagsNamed(code: string, name: string): string[] {
-  const found: string[] = [];
-  for (const tag of walkJsx(code, { seed: null, inherit: () => null })) {
-    if (tag.name === name) found.push(code.slice(tag.start, tag.tagEnd + 1));
-  }
-  return found;
+  return tagsNamed(code, name).map((tag) => code.slice(tag.start, tag.tagEnd + 1));
 }
 
 /**

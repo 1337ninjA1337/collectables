@@ -4,9 +4,11 @@ import assert from "node:assert/strict";
 import {
   attributeValue,
   closeTagIndex,
+  jsxTags,
   openTagAt,
   openTagEnd,
   openTagsNamed,
+  tagsNamed,
   skipStringLiteral,
   walkJsx,
 } from "@/lib/jsx-open-tag";
@@ -104,6 +106,38 @@ describe("reading the tag that carries an offset", () => {
 
   it("returns empty when the offset is not inside a tag", () => {
     assert.equal(openTagAt("no tags here", 5), "");
+  });
+});
+
+describe("the walk that inherits nothing", () => {
+  it("yields every tag, in document order, without an inherited field", () => {
+    const tags = [...jsxTags("<View><Text>hi</Text></View><Image />")];
+    assert.deepEqual(
+      tags.map((tag) => tag.name),
+      ["View", "Text", "Image"],
+    );
+    // A null every caller would have to ignore is not part of the answer.
+    assert.deepEqual(Object.keys(tags[0]).includes("inherited"), false);
+  });
+
+  it("keeps the offsets, which is the whole reason to take tags over text", () => {
+    const code = `  <Pressable onPress={() => go(">")}><Text>x</Text></Pressable>`;
+    const [first] = [...jsxTags(code)];
+    assert.equal(code[first.tagEnd], ">");
+    assert.match(first.attrs, /onPress=\{\(\) => go\(">"\)\}/);
+  });
+
+  it("narrows to one element by name", () => {
+    const found = tagsNamed("<View><Text>a</Text><Text>b</Text></View>", "Text");
+    assert.equal(found.length, 2);
+    assert.ok(found[0].start < found[1].start);
+  });
+
+  it("returns an empty list rather than nothing findable", () => {
+    // `const [first] = tagsNamed(…)` is how both callers read it, so the empty
+    // case has to be an array a destructure can miss on, not a throw.
+    const [missing] = tagsNamed("<View />", "Profiler");
+    assert.equal(missing, undefined);
   });
 });
 
