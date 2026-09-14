@@ -203,6 +203,53 @@ export function* jsxTags(code: string): Generator<JsxTag> {
   }
 }
 
+/** How much of a source the walk actually got through. */
+export type JsxReach = {
+  /** Opening tags yielded. */
+  readonly tags: number;
+  /**
+   * Offset of the `<` whose opening tag never closes, or null if the walk
+   * reached the end of the source.
+   *
+   * Non-null means everything after that offset was NOT scanned — by any rule
+   * built on this walk. A `file:line` computed from it is the one place a
+   * reader can look.
+   */
+  readonly unreadAt: number | null;
+};
+
+/**
+ * Walk a source and report how far the walk got, rather than what it found.
+ *
+ * The question nothing could ask until 2026-09-14. `walkJsx` stops at a tag
+ * with no end because it has nowhere to resume from, so a single unreadable
+ * tag silently truncates every rule over that file — and the day an
+ * apostrophe in a line comment made `openTagEnd` run off the end of
+ * `components/nav-tab.tsx`, four scanners reported a clean file having read
+ * none of it. The string-literal fix closed that particular door;
+ * `jsx-walk-reach.test.ts` uses this to watch the whole tree for the next one.
+ *
+ * `tags` is the other half and the falsifiable one: "the walk was not
+ * truncated" is also true of a walk that found nothing at all.
+ */
+export function jsxReach(code: string): JsxReach {
+  let tags = 0;
+  let unreadAt: number | null = null;
+  for (const _tag of walkJsx(code, {
+    seed: null,
+    inherit: () => null,
+    onUnreadable: (at) => {
+      // The FIRST one: a render-prop recursion can give up inside a tag that
+      // the outer walk then also gives up on, and the outer offset is the one
+      // a reader should go to.
+      if (unreadAt === null || at < unreadAt) unreadAt = at;
+    },
+  })) {
+    tags++;
+  }
+  return { tags, unreadAt };
+}
+
 /**
  * Every opening tag of one element, with its offsets.
  *
@@ -375,6 +422,18 @@ export type WalkedJsxTag<T> = JsxTag & { readonly inherited: T };
 export type JsxWalk<T> = {
   readonly seed: T;
   readonly inherit: (tag: JsxTag, inherited: T) => T;
+  /**
+   * Called with the offset of a `<` whose opening tag never closes, just
+   * before the walk gives up there.
+   *
+   * The walk has nowhere to resume from after a tag with no end, so it stops
+   * — and until this existed it stopped SILENTLY, which is how an apostrophe
+   * in a comment inside one open tag made four rules report a clean file
+   * while reading none of it. Optional, because the two rules that inherit
+   * something have no use for it; {@link jsxReach} is what a caller that
+   * wants to know takes.
+   */
+  readonly onUnreadable?: (at: number) => void;
 };
 
 /**
@@ -434,7 +493,14 @@ function* walkJsxRange<T>(
     }
     const attrsAt = start + nameMatch[0].length;
     const tagEnd = openTagEnd(code, attrsAt);
-    if (tagEnd === -1 || tagEnd > to) return;
+    if (tagEnd === -1 || tagEnd > to) {
+      // -1 is a tag with no end; `tagEnd > to` is a tag that reaches past the
+      // range this recursion was given, which for a render prop means the
+      // attribute text did not contain a whole element. Only the first is a
+      // file the caller cannot trust.
+      if (tagEnd === -1) walk.onUnreadable?.(start);
+      return;
+    }
     cursor = tagEnd + 1;
     const tag: JsxTag = {
       name: nameMatch[1],
