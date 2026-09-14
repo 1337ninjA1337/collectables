@@ -33,7 +33,8 @@ import { tagsNamed } from "@/lib/jsx-open-tag";
  * {@link openingTags} tracks brace depth and string literals instead.
  *
  * The walk is `helpers/source-files.ts` — `app/` and `components/` because a
- * `<Pressable>` renders, and `lib/` holds one (`toast-context.tsx`), which the
+ * `<Pressable>` renders. `lib/` held one until 2026-09-14 (`toast-context.tsx`,
+ * whose overlay is `components/toast-host.tsx` now), which the
  * `.tsx` filter picks up wherever it lives.
  */
 const SCREENS = () => tsxFiles("app", "components", "lib");

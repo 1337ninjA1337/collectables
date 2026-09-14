@@ -90,7 +90,7 @@ export const MARKUP_DIRS: readonly string[] = ["app", "components"];
  */
 export const NON_MARKUP_REASONS: Readonly<Record<string, string>> = {
   data: "seed literals and lookup tables — objects and arrays, no elements declared anywhere in them",
-  lib: "modules that return values, plus eleven context providers whose whole JSX is <Ctx.Provider>{children}</Ctx.Provider> — with lib/toast-context.tsx the one real exception, named in MARKUP_OUTSIDE_MARKUP_DIRS",
+  lib: "modules that return values, plus twelve context providers whose whole JSX is <Ctx.Provider>{children}</Ctx.Provider> and one composed <ToastHost /> — none of them draws with react-native itself",
   scripts: "node tooling that never reaches Metro, so nothing here is rendered on any platform",
 };
 
@@ -107,21 +107,24 @@ export const NON_MARKUP_REASONS: Readonly<Record<string, string>> = {
  * were separated to keep.
  */
 /**
- * Files outside {@link MARKUP_DIRS} that render real user-facing markup, and
- * are therefore scanned by none of the five JSX rules.
+ * Files outside {@link MARKUP_DIRS} that draw with a UI library, and are
+ * therefore scanned by none of the five JSX rules.
  *
- * A gap, listed rather than hidden. `lib/toast-context.tsx` draws the toast
- * host — `<View>`s, two `<Pressable>`s and three `<Text>`s that a screen
- * reader meets on every error in this app — and the a11y, clarity,
- * empty-state and heading rules all stop at `app/` and `components/`.
+ * EMPTY, which took a move to earn. It held `lib/toast-context.tsx` for one
+ * commit: that file drew the toast overlay — two `<View>`s, two
+ * `<Pressable>`s and three `<Text>`s, the surface every error in this app
+ * lands on — while the a11y, clarity, empty-state and heading rules all stop
+ * at `app/` and `components/`. The overlay is `components/toast-host.tsx` now,
+ * where all five see it; the queue and the api stayed behind, which is what
+ * `lib/` is for.
  *
- * It is one entry because a sweep found exactly one; eleven other `lib/` files
- * render JSX and every one of them is a context provider wrapping `{children}`
- * with no element of its own, which is a shape no markup rule has anything to
- * say about. `markup-outside-markup-dirs.test.ts` holds that line: a twelfth
- * file that renders a `<View>` joins this list with a sentence, or moves.
+ * Kept as a list rather than deleted because the next such file will want
+ * somewhere to be named, and "the list is empty" is a stronger statement than
+ * "there is no list". `markup-outside-markup-dirs.test.ts` holds the line: a
+ * `lib/` module that reaches into `react-native` and draws with it joins this
+ * with a sentence saying why the markup cannot move.
  */
-export const MARKUP_OUTSIDE_MARKUP_DIRS: readonly string[] = ["lib/toast-context.tsx"];
+export const MARKUP_OUTSIDE_MARKUP_DIRS: readonly string[] = [];
 
 export const SUITES_DIR = "__tests__";
 

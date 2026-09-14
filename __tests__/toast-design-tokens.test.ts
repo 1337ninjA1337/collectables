@@ -137,18 +137,20 @@ describe("tokens shipped for the toast migration", () => {
   });
 });
 
-describe("lib/toast-context.tsx adoption", () => {
-  const source = read("lib/toast-context.tsx");
+describe("components/toast-host.tsx adoption", () => {
+  // `lib/toast-context.tsx` until 2026-09-14: the palettes and the styles
+  // moved with the markup they colour.
+  const source = read("components/toast-host.tsx");
 
   it("carries no inline hex literal at all", () => {
     // The real guarantee. `findInlineHexLiterals` is the same matcher
     // `npm run lint:hex` runs, so this fails the moment a colour is re-inlined.
-    assert.deepEqual(findInlineHexLiterals("lib/toast-context.tsx", source), []);
+    assert.deepEqual(findInlineHexLiterals("components/toast-host.tsx", source), []);
   });
 
   it("is no longer exempt from the hex lint", () => {
     assert.ok(
-      !HEX_ALLOWLIST.has("lib/toast-context.tsx"),
+      !HEX_ALLOWLIST.has("components/toast-host.tsx"),
       "the toast palette is tokenised — its allowlist exemption must be gone",
     );
   });
@@ -196,7 +198,13 @@ describe("lib/toast-context.tsx adoption", () => {
   });
 
   it("still declares all three toast types, so no palette slot was dropped", () => {
-    assert.match(source, /export type ToastType = "success" \| "error" \| "info";/);
+    // The TYPE stayed with the queue when the overlay moved to components/ on
+    // 2026-09-14 — it is part of what a caller passes to `show()` — and the
+    // palette that keys off it went with the styles.
+    assert.match(
+      read("lib/toast-context.tsx"),
+      /export type ToastType = "success" \| "error" \| "info";/,
+    );
     for (const type of ["success", "error", "info"]) {
       assert.ok(source.includes(`${type}: {`), `PALETTES lost the ${type} entry`);
     }
@@ -207,7 +215,7 @@ describe("AMBER_SOFT_3 has no inline consumers left", () => {
   it("is referenced by name in both of its call sites", () => {
     // The batch-migrate task this closes named three consumers; empty-state was
     // already migrated, leaving the toast palette as the last inline copy.
-    for (const rel of ["components/empty-state.tsx", "lib/toast-context.tsx"]) {
+    for (const rel of ["components/empty-state.tsx", "components/toast-host.tsx"]) {
       const src = read(rel);
       assert.ok(
         src.includes("AMBER_SOFT_3"),

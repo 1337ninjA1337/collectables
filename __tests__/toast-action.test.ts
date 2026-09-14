@@ -20,7 +20,11 @@ import { readRepoFile } from "./helpers/repo-file";
  * the timing rule lives in its own module and everything else here is
  * structural.
  */
-const toastSrc = readRepoFile("lib/toast-context.tsx");
+// The queue and the api are in `lib/toast-context.tsx`; the markup and the
+// dismissal window moved to `components/toast-host.tsx` on 2026-09-14, so the
+// a11y, clarity, empty-state and heading rules could see them at all.
+const toastSrc = readRepoFile("components/toast-host.tsx");
+const contextSrc = readRepoFile("lib/toast-context.tsx");
 const screenSrc = readRepoFile("app/collection/[id].tsx");
 
 describe("toastDisplayMs", () => {
@@ -93,7 +97,7 @@ describe("the toast renders and times its action", () => {
   it("takes a translated label, not a key", () => {
     // The module sits below the i18n context and every other string it renders
     // arrives the same way.
-    assert.match(toastSrc, /export type ToastAction = \{ label: string; onPress: \(\) => void \};/);
+    assert.match(contextSrc, /export type ToastAction = \{ label: string; onPress: \(\) => void \};/);
     assert.doesNotMatch(toastSrc, /useI18n/);
   });
 });
@@ -135,14 +139,16 @@ describe("toastAnnouncement", () => {
 
 describe("every toast announces itself", () => {
   it("derives the sentence from the toast and speaks it once, in the provider", () => {
-    assert.match(toastSrc, /const spoken = toastAnnouncement\(item\);/);
-    assert.match(toastSrc, /if \(spoken\) announceMessage\(spoken\);/);
+    // The announcement is the PROVIDER's, not the overlay's: it fires when a
+    // toast is queued, whether or not the host ever draws it.
+    assert.match(contextSrc, /const spoken = toastAnnouncement\(item\);/);
+    assert.match(contextSrc, /if \(spoken\) announceMessage\(spoken\);/);
   });
 
   it("speaks through the app's one live region", () => {
     // A second region would interrupt the reorder announcements and the user
     // would hear half of each — see lib/announce.web.ts.
-    assert.match(toastSrc, /import \{ announceMessage \} from "@\/lib\/announce";/);
+    assert.match(contextSrc, /import \{ announceMessage \} from "@\/lib\/announce";/);
     assert.doesNotMatch(toastSrc, /aria-live/);
   });
 });

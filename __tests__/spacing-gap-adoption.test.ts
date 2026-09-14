@@ -61,7 +61,9 @@ const MIGRATED_FILES: ReadonlyArray<{
   { rel: "components/bottom-nav.tsx", list: false, card: true, inline: false },
   { rel: "components/swipe-tabs.tsx", list: false, card: false, inline: true },
   { rel: "components/currency-input.tsx", list: false, card: false, inline: true },
-  { rel: "lib/toast-context.tsx", list: false, card: false, inline: true },
+  // The toast overlay moved to components/ on 2026-09-14, so the five JSX
+  // rules could see the markup it draws; the gap token went with the styles.
+  { rel: "components/toast-host.tsx", list: false, card: false, inline: true },
   // the shared banner the eight hero screens now render (2026-08-08)
   { rel: "components/hero-banner.tsx", list: true, card: false, inline: false },
   // the relationship buttons both profile surfaces now render (2026-08-21)

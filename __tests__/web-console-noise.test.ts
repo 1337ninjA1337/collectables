@@ -106,7 +106,7 @@ describe("Animated — no native-driver warning on web", () => {
   });
 
   it("the transform/opacity animations adopted the constant", () => {
-    for (const file of ["app/wishlist.tsx", "components/skeleton.tsx", "lib/toast-context.tsx"]) {
+    for (const file of ["app/wishlist.tsx", "components/skeleton.tsx", "components/toast-host.tsx"]) {
       const src = read(file);
       assert.match(src, /import \{ USE_NATIVE_DRIVER \} from "@\/lib\/animation-driver";/, file);
       assert.match(src, /useNativeDriver: USE_NATIVE_DRIVER/, file);
