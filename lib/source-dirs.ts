@@ -37,6 +37,31 @@
 export const SOURCE_DIRS: readonly string[] = ["app", "components", "data", "lib", "scripts"];
 
 /**
+ * The directories that hold RENDERED MARKUP — the subset a JSX rule reaches.
+ *
+ * Five rules in this repository walk the app's `.tsx` for a shape in its
+ * markup: `check-a11y-jsx` and `check-clarity-input-mask` from `scripts/`,
+ * `check-empty-state-wrappers` and the two heading sweeps from `__tests__/`.
+ * All five want the same answer, `data/` holds seed literals that declare no
+ * elements and `lib/` returns values rather than JSX, so the narrowing is a
+ * real decision — and it was written out five times, then a sixth when
+ * `jsx-walk-reach.test.ts` came to floor how much of that markup the shared
+ * walk actually reads.
+ *
+ * Named for what it MEANS rather than for who uses it. "The roots the JSX
+ * rules scan" would be a list that has to be re-justified every time one of
+ * them changes; "the roots that hold markup" is a fact about the tree, and a
+ * rule that wants something else has to say why.
+ *
+ * The two script guards still declare their own literal `SCANNED_DIRS` —
+ * `__tests__/guard-scan-dirs.test.ts` parses it, so that every guard's scan
+ * list is readable from its own file — and that suite asserts the two are
+ * EQUAL to this. One statement, plus a checked agreement, rather than two
+ * lists that happen to match.
+ */
+export const MARKUP_DIRS: readonly string[] = ["app", "components"];
+
+/**
  * The suite tree, named once.
  *
  * It is the one non-app root a guard has any business walking — a rule about

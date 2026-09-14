@@ -19,6 +19,8 @@
 
 import assert from "node:assert/strict";
 
+import { MARKUP_DIRS } from "@/lib/source-dirs";
+
 import { readRepoFile } from "./repo-file";
 
 /**
@@ -36,20 +38,20 @@ export function declaredScanDirs(guard: string): string[] {
 }
 
 /**
- * The roots the SUITE-SIDE JSX rules walk, stated once.
+ * The roots the SUITE-SIDE JSX rules walk.
  *
- * `empty-state-wrapper-audit` and the two heading sweeps read the same markup
- * as the two script guards above, and they named their roots at the call site
- * — three copies of one list. `jsx-walk-reach.test.ts` needs to know it, to
- * floor how much of that markup the shared walk reads, and for one commit it
- * knew it by matching the STRING `tsxFiles("app", "components")` in each
- * suite's source: an assertion about spelling, red on a reformat and green on
- * the same list built from a constant.
+ * `lib/source-dirs.ts`'s {@link MARKUP_DIRS}, re-exported under the name the
+ * three suites reach for. It was its own two-element literal for one commit,
+ * which made it the SECOND statement of a list the script guards already
+ * state — the same split `source-dirs.ts` exists to resolve, reproduced one
+ * directory over.
  *
- * One constant, three readers, and a comparison of values. Widening a rule is
- * an edit here, which is what makes the floor follow it.
+ * The alias rather than a bare re-export because the suites' own list used to
+ * be a different thing from the guards' and could become one again; the day a
+ * suite-side rule legitimately reads a root with no markup in it, this is
+ * where that stops being an alias and the diff says so.
  */
-export const JSX_SUITE_SCAN_DIRS = ["app", "components"] as const;
+export const JSX_SUITE_SCAN_DIRS = MARKUP_DIRS;
 
 /** The union of several guards' scan lists, sorted and de-duplicated. */
 export function unionOfScanDirs(...guards: readonly string[]): string[] {

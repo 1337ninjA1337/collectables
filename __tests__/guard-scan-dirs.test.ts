@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  MARKUP_DIRS,
   MARKUP_EXTENSIONS,
   NON_APP_TS_DIRS,
   SOURCE_DIRS,
@@ -163,6 +164,21 @@ describe("the guards' scan lists agree with lib/source-dirs.ts", () => {
         [...new Set(accounted)].sort(),
         [...SOURCE_DIRS].sort(),
         `${guard} neither scans nor explains every source directory`,
+      );
+    }
+  });
+
+  it("the markup rules all narrow to MARKUP_DIRS, and say so by equalling it", () => {
+    // The checked half of `lib/source-dirs.ts`'s one statement. The two script
+    // guards keep their own literal — this suite parses it, so a guard's scan
+    // list stays readable from its own file — and the agreement is asserted
+    // rather than left to hold by coincidence, which is what it did until
+    // 2026-09-14.
+    for (const guard of ["check-a11y-jsx", "check-clarity-input-mask"]) {
+      assert.deepEqual(
+        declaredDirs(guard),
+        [...MARKUP_DIRS],
+        `${guard} scans markup and no longer matches MARKUP_DIRS — widen the constant or say why this rule differs`,
       );
     }
   });
