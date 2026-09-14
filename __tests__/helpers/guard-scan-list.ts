@@ -3,12 +3,14 @@
  *
  * `guard-scan-dirs.test.ts` has parsed `const SCANNED_DIRS = [...] as const;`
  * out of each `scripts/check-*.ts` since the day three guards were found
- * declaring the same list under three different names. The parse lives here
- * rather than in that suite because a second reader arrived on 2026-09-14:
- * `jsx-walk-reach.test.ts` floors how much markup the JSX rules read, and the
- * set of directories it has to cover is not its own decision — it is the union
- * of what those rules scan, and a copy of that union is a number that goes
- * stale the first time a rule widens.
+ * declaring the same list under three different names. It is the only reader
+ * again: `jsx-walk-reach.test.ts` briefly derived its own scope by taking the
+ * union of two guards' lists, which was a second mechanism for a fact that
+ * suite already pins — both markup guards must EQUAL `MARKUP_DIRS` — and the
+ * one of the two that can go red on a reformat. The floor takes the constant.
+ *
+ * The parse stays HERE rather than back in that suite because the other
+ * export below has readers on both sides of the split.
  *
  * A LITERAL is what gets parsed, deliberately. A `[...SOURCE_DIRS]` spread
  * would satisfy the one-copy-of-the-list rule and defeat the pin that keeps
@@ -52,8 +54,3 @@ export function declaredScanDirs(guard: string): string[] {
  * where that stops being an alias and the diff says so.
  */
 export const JSX_SUITE_SCAN_DIRS = MARKUP_DIRS;
-
-/** The union of several guards' scan lists, sorted and de-duplicated. */
-export function unionOfScanDirs(...guards: readonly string[]): string[] {
-  return [...new Set(guards.flatMap((guard) => declaredScanDirs(guard)))].sort();
-}

@@ -2,9 +2,10 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { jsxReach } from "@/lib/jsx-open-tag";
+import { MARKUP_DIRS } from "@/lib/source-dirs";
 import { stripComments } from "@/lib/strip-comments";
 
-import { JSX_SUITE_SCAN_DIRS, unionOfScanDirs } from "./helpers/guard-scan-list";
+import { JSX_SUITE_SCAN_DIRS } from "./helpers/guard-scan-list";
 import { readSuite } from "./helpers/suite-files";
 import { sourceCode, tsxFiles } from "./helpers/source-files";
 
@@ -30,20 +31,18 @@ import { sourceCode, tsxFiles } from "./helpers/source-files";
  */
 
 /**
- * The directories the JSX rules actually read, taken from the rules.
+ * The directories the JSX rules read: `lib/source-dirs.ts`'s markup roots.
  *
- * Hand-typed as `("app", "components")` for one commit, which is a copy of an
- * answer two guards already state — and the copy is only right until one of
- * them widens. The union is read out of their own `SCANNED_DIRS`, so a rule
- * that grows a third root grows this floor with it rather than leaving a
- * directory nothing watches.
+ * Hand-typed as `("app", "components")` for one commit; then derived, for one
+ * more, by parsing `SCANNED_DIRS` out of the two script guards. Both were
+ * answers to "which roots hold the markup these rules scan", which is now a
+ * constant — and `guard-scan-dirs.test.ts` asserts both guards EQUAL it, so
+ * the parse here was a second mechanism for a fact already pinned, and the
+ * one that could go red on a reformat.
  *
- * The two suite-side rules over the same walk (`empty-state-wrapper-audit`,
- * the heading sweeps) declare their roots at their call sites rather than in a
- * script, so they cannot be read the same way; the last case in this file
- * pins that they still name this set.
+ * A rule that widens widens the constant, and this floor follows.
  */
-const SCANNED = unionOfScanDirs("check-a11y-jsx", "check-clarity-input-mask");
+const SCANNED = MARKUP_DIRS;
 
 /** Every `.tsx` that renders something, comment-blanked as the rules read it. */
 const SCREENS = tsxFiles(...SCANNED);
