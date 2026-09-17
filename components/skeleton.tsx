@@ -4,6 +4,7 @@ import { Animated, DimensionValue, Easing, StyleProp, StyleSheet, View, ViewStyl
 
 import { BORDER_2, PAGE_BG_2, SPACING_CARD, SPACING_LIST, TEXT_ON_DARK_SOFT } from "@/lib/design-tokens";
 import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
+import { useReducedMotion } from "@/lib/reduced-motion";
 
 type SkeletonProps = {
   width?: DimensionValue;
@@ -19,7 +20,13 @@ export function Skeleton({ width = "100%", height = 16, borderRadius = 8, style 
   const anim = useRef(new Animated.Value(0)).current;
   const [boxWidth, setBoxWidth] = useState(0);
 
+  const reducedMotion = useReducedMotion();
+
   useEffect(() => {
+    // Not a zero-duration loop: `Animated.loop` of a 0ms timing is a frame
+    // callback that never stops, which is a battery drain handed to the user
+    // who asked for less motion. The box keeps its base colour and sits still.
+    if (reducedMotion) return;
     const loop = Animated.loop(
       Animated.timing(anim, {
         toValue: 1,
@@ -30,7 +37,7 @@ export function Skeleton({ width = "100%", height = 16, borderRadius = 8, style 
     );
     loop.start();
     return () => loop.stop();
-  }, [anim]);
+  }, [anim, reducedMotion]);
 
   const translateX = anim.interpolate({
     inputRange: [0, 1],

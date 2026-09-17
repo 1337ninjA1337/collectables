@@ -43,6 +43,7 @@ import {
 } from "@/lib/design-tokens";
 import type { ToastItem, ToastType } from "@/lib/toast-context";
 import { nextToastDeadline } from "@/lib/toast-timing";
+import { motionDuration, useReducedMotion } from "@/lib/reduced-motion";
 import { useAppAway } from "@/lib/use-app-away";
 
 export function ToastHost({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
@@ -67,14 +68,18 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
   dismissRef.current = onDismiss;
   const [held, setHeld] = useState(false);
 
+  // The entrance is decorative, so `duration: 0` is the whole fix: the toast
+  // still fades in to `opacity: 1` on the next frame, it just does not slide.
+  const reducedMotion = useReducedMotion();
+
   useEffect(() => {
     Animated.timing(anim, {
       toValue: 1,
-      duration: 220,
+      duration: motionDuration(220, reducedMotion),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
-  }, [anim]);
+  }, [anim, reducedMotion]);
 
   /**
    * The dismissal window, held open while the user is engaged with the toast.

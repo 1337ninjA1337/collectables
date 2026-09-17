@@ -19,6 +19,7 @@ import {
   TEXT_DARK_2,
 } from "@/lib/design-tokens";
 import { useAppTheme } from "@/components/use-app-theme";
+import { motionDuration, useReducedMotionRef } from "@/lib/reduced-motion";
 
 export type SwipeTab = { key: string; label: string };
 
@@ -42,6 +43,11 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
   const widthRef = useRef(0);
   const translateX = useRef(new Animated.Value(0)).current;
   const animatingRef = useRef(false);
+
+  // Read through a ref, not a closure: the PanResponder below is built inside
+  // `useRef(...).current` and never rebuilt, so a captured `reduced` would be
+  // the value from the first render for the life of the component.
+  const reducedMotion = useReducedMotionRef();
 
   const activeRef = useRef(active);
   const tabsRef = useRef(tabs);
@@ -68,6 +74,26 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
     animatingRef.current = false;
   }, [active, translateX]);
 
+  /**
+   * Back to rest after a swipe that did not commit.
+   *
+   * Nothing waits on this one, so under reduced motion the instant equivalent
+   * is the value itself — a zero-duration spring is still a spring, and
+   * `setValue` is what "no animation" actually means.
+   */
+  function settleBack() {
+    if (reducedMotion.current) {
+      translateX.setValue(0);
+      return;
+    }
+    Animated.spring(translateX, {
+      toValue: 0,
+      useNativeDriver: false,
+      speed: 20,
+      bounciness: 4,
+    }).start();
+  }
+
   function commitTo(targetKey: string, direction: "next" | "prev") {
     const w = widthRef.current;
     if (!w) {
@@ -75,9 +101,12 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
       return;
     }
     animatingRef.current = true;
+    // Zero rather than skipped: the completion callback below is what changes
+    // the tab, so the animation must still RUN — it just finishes on the next
+    // frame instead of over ANIM_DURATION.
     Animated.timing(translateX, {
       toValue: direction === "next" ? -w : w,
-      duration: ANIM_DURATION,
+      duration: motionDuration(ANIM_DURATION, reducedMotion.current),
       useNativeDriver: false,
     }).start(({ finished }) => {
       if (!finished) {
@@ -145,21 +174,11 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
         } else if (shouldPrev) {
           commitTo(t[idx - 1].key, "prev");
         } else {
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: false,
-            speed: 20,
-            bounciness: 4,
-          }).start();
+          settleBack();
         }
       },
       onPanResponderTerminate: () => {
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: false,
-          speed: 20,
-          bounciness: 4,
-        }).start();
+        settleBack();
       },
     }),
   ).current;

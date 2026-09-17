@@ -73,6 +73,7 @@ import { useToast } from "@/lib/toast-context";
 import { CollectableItem } from "@/lib/types";
 import { FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
+import { motionDuration, useReducedMotionRef } from "@/lib/reduced-motion";
 import { hasFiniteCost } from "@/lib/item-cost";
 
 export default function WishlistScreen() {
@@ -432,6 +433,10 @@ export default function WishlistScreen() {
   const SWIPE_THRESHOLD = 80;
   const sheetTranslateY = useRef(new Animated.Value(0)).current;
   const scrollEnabled = useRef(true);
+  // Read through a ref: the PanResponder below is built inside
+  // `useRef(...).current` and never rebuilt, so a captured value would be the
+  // one from the first render for the life of the screen.
+  const reducedMotion = useReducedMotionRef();
 
   const sheetPanResponder = useRef(
     PanResponder.create({
@@ -450,14 +455,20 @@ export default function WishlistScreen() {
       onPanResponderRelease: (_, gestureState) => {
         scrollEnabled.current = true;
         if (gestureState.dy > SWIPE_THRESHOLD || gestureState.vy > 0.5) {
+          // Zero rather than skipped: the completion callback is what closes
+          // the sheet and resets the offset, so the animation must still run.
           Animated.timing(sheetTranslateY, {
             toValue: 600,
-            duration: 200,
+            duration: motionDuration(200, reducedMotion.current),
             useNativeDriver: USE_NATIVE_DRIVER,
           }).start(() => {
             setAddOpen(false);
             sheetTranslateY.setValue(0);
           });
+        } else if (reducedMotion.current) {
+          // Nothing waits on the spring back, so the instant equivalent is the
+          // value itself — a zero-duration spring is still a spring.
+          sheetTranslateY.setValue(0);
         } else {
           Animated.spring(sheetTranslateY, {
             toValue: 0,

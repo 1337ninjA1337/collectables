@@ -142,6 +142,24 @@ export const Share = {
   share: async () => ({ action: "sharedAction" }),
 };
 
+/**
+ * `AccessibilityInfo`, for the surfaces that ask about reduce-motion.
+ *
+ * Reduce-motion reports DISABLED, which is the value that keeps every
+ * animation running — so a case about a component's ordinary behaviour does
+ * not have to opt out of a preference it never set. The suites that are about
+ * the preference mock the module themselves and drive both answers.
+ *
+ * `announceForAccessibility` is a no-op rather than absent: `lib/announce.ts`
+ * calls it on the native branch, and a missing function there is a TypeError
+ * in whatever test happened to render a surface that announces.
+ */
+export const AccessibilityInfo = {
+  isReduceMotionEnabled: async () => false,
+  announceForAccessibility: () => {},
+  addEventListener: () => ({ remove: () => {} }),
+};
+
 export const AppState = {
   currentState: "active",
   addEventListener: () => ({ remove: () => {} }),
