@@ -789,3 +789,76 @@ export function formatPrivacyPagesReport(
     .map((failure) => formatPrivacyPageFailure(checkName, failure))
     .join("\n");
 }
+
+/**
+ * The bundle ships its non-ASCII copy as UTF-8, not as `\uXXXX` escapes.
+ *
+ * Metro's terser preset sets `output.ascii_only: true`, which rewrites every
+ * character above U+007F as a six-byte escape. This app's UI is translated
+ * into six languages, two of them Cyrillic, and a Cyrillic letter costs two
+ * bytes in UTF-8 and six escaped — so that one option was carrying 115 KiB of
+ * pure encoding overhead, 56 KiB of it in the EAGER entry chunk where the
+ * default Russian locale lives. `metro.config.js` turns it off.
+ *
+ * It is turned off in one line of a config file that nothing else reads, which
+ * makes it exactly the kind of setting a dependency bump or a config rewrite
+ * restores silently: the bundle would still be correct, still pass every other
+ * check, and be 115 KiB heavier. The budget would absorb it and the headroom
+ * would be spent without anybody deciding to spend it.
+ *
+ * ## Why the comparison, and not a count
+ *
+ * "No escapes at all" is the wrong rule — a handful are legitimate, the
+ * escapes a source file wrote deliberately for a zero-width or control
+ * character. "Some literals" is too weak on its own: a bundle could carry a
+ * stray `©` and still be escaping every translation. So it is BOTH, and the
+ * comparison is what carries the meaning: with `ascii_only` on, literals go to
+ * near zero while escapes go to tens of thousands, which is the reverse of
+ * what this asserts and cannot be reached by accident.
+ */
+export type BundleCharsetResult = {
+  readonly ok: boolean;
+  /** Characters above U+007F standing in the bundle as themselves. */
+  readonly literals: number;
+  /** `\uXXXX` escapes of characters above U+007F. */
+  readonly escapes: number;
+};
+
+/**
+ * The smallest number of literal non-ASCII characters the six locales can
+ * plausibly come to.
+ *
+ * An ARGUED floor, well under the ~30,000 measured today: it is here to catch
+ * "the copy is being escaped again", which takes the count to roughly zero,
+ * not to ratify a particular translation's length. Deleting a language would
+ * legitimately move the real number by thousands and must not fail this.
+ */
+export const BUNDLE_NON_ASCII_FLOOR = 1000;
+
+export function evaluateBundleCharset(chunkTexts: readonly string[]): BundleCharsetResult {
+  let literals = 0;
+  let escapes = 0;
+  for (const text of chunkTexts) {
+    for (const char of text) {
+      if (char.codePointAt(0)! > 0x7f) literals += 1;
+    }
+    for (const match of text.matchAll(/\\u([0-9a-fA-F]{4})/g)) {
+      if (Number.parseInt(match[1], 16) > 0x7f) escapes += 1;
+    }
+  }
+  return { ok: literals >= BUNDLE_NON_ASCII_FLOOR && literals > escapes, literals, escapes };
+}
+
+export function formatBundleCharsetReport(
+  checkName: string,
+  result: BundleCharsetResult,
+): string {
+  if (result.ok) {
+    return `${checkName}: ${result.literals} non-ASCII character(s) ship as UTF-8, ${result.escapes} as escapes.`;
+  }
+  return checkError(
+    checkName,
+    `the bundle is escaping its non-ASCII copy: ${result.literals} literal character(s) against ${result.escapes} \\uXXXX escape(s). ` +
+      `That is terser's \`output.ascii_only\`, which costs this app ~115 KiB — check metro.config.js.`,
+  );
+}

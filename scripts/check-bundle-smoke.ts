@@ -16,8 +16,10 @@ import * as path from "node:path";
 
 import {
   PRIVACY_PAGE_TARGETS,
+  evaluateBundleCharset,
   evaluateBundleSmoke,
   evaluatePrivacyPages,
+  formatBundleCharsetReport,
   formatBundleSmokeReport,
   formatPrivacyPagesReport,
   type PrivacyPageInput,
@@ -47,6 +49,10 @@ function main(): void {
 
   const chunkTexts = bundlePaths.map((full) => fs.readFileSync(full, "utf8"));
   const smoke = evaluateBundleSmoke(chunkTexts);
+  // The same chunks, asked a second question: is the copy in them shipping as
+  // UTF-8 or as `\uXXXX`? One line of metro.config.js decides, and the wrong
+  // answer is 115 KiB that every other check reads as correct.
+  const charset = evaluateBundleCharset(chunkTexts);
 
   const privacy = evaluatePrivacyPages(readPrivacyPages(REPO_ROOT));
 
@@ -56,11 +62,14 @@ function main(): void {
   console[smoke.ok ? "log" : "error"](
     formatBundleSmokeReport(CHECK_NAME, smoke),
   );
+  console[charset.ok ? "log" : "error"](
+    formatBundleCharsetReport(CHECK_NAME, charset),
+  );
   console[privacy.ok ? "log" : "error"](
     formatPrivacyPagesReport(CHECK_NAME, privacy),
   );
 
-  if (!smoke.ok || !privacy.ok) process.exit(1);
+  if (!smoke.ok || !charset.ok || !privacy.ok) process.exit(1);
 }
 
 main();

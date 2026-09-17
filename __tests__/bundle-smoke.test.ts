@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
+  BUNDLE_NON_ASCII_FLOOR,
   BUNDLE_SMOKE_I18N_KEYS,
   BUNDLE_SMOKE_LANGUAGE_CODES,
   BUNDLE_SMOKE_PROVIDERS,
@@ -15,11 +16,13 @@ import {
   PRIVACY_PAGE_MARKER,
   PRIVACY_PAGE_RELATIVE_PATH,
   PRIVACY_PAGE_TARGETS,
+  evaluateBundleCharset,
   evaluateBundleSmoke,
   evaluatePrivacyPage,
   evaluatePrivacyPages,
   extractPrivacyPageBodyText,
   extractPrivacyPageHeading,
+  formatBundleCharsetReport,
   formatBundleSmokeReport,
   formatPrivacyPageFailure,
   formatPrivacyPageWordCounts,
@@ -119,6 +122,95 @@ describe("evaluateBundleSmoke — token presence", () => {
     evaluateBundleSmoke(chunks, tokens);
     assert.equal(chunks.length, 1);
     assert.equal(tokens.length, BUNDLE_SMOKE_TOKENS.length);
+  });
+});
+
+/** A chunk's worth of Cyrillic, as UTF-8 and as terser would escape it. */
+const CYRILLIC = "Калекцыянер";
+const ESCAPED = [...CYRILLIC]
+  .map((char) => `\\u${char.codePointAt(0)!.toString(16).padStart(4, "0")}`)
+  .join("");
+
+describe("evaluateBundleCharset", () => {
+  it("passes a bundle whose copy ships as UTF-8", () => {
+    const result = evaluateBundleCharset([CYRILLIC.repeat(200)]);
+    assert.equal(result.ok, true);
+    assert.equal(result.literals, CYRILLIC.length * 200);
+    assert.equal(result.escapes, 0);
+  });
+
+  it("FAILS the bundle terser escaped, which is the whole point", () => {
+    // `ascii_only: true` takes the literals to roughly zero and the escapes to
+    // tens of thousands — the exact reverse of what this asserts.
+    const result = evaluateBundleCharset([ESCAPED.repeat(200)]);
+    assert.equal(result.ok, false);
+    assert.equal(result.literals, 0);
+    assert.equal(result.escapes, CYRILLIC.length * 200);
+  });
+
+  it("counts an escape only when it is of a non-ASCII character", () => {
+    // `\u0041` is "A". A bundle full of those says nothing about the copy.
+    const result = evaluateBundleCharset(["\\u0041\\u007f", CYRILLIC.repeat(200)]);
+    assert.equal(result.escapes, 0);
+  });
+
+  it("tolerates the handful of escapes a source file wrote deliberately", () => {
+    // Zero-width and control characters are legitimately escaped; a rule of
+    // "no escapes at all" would fail on the first one somebody needed.
+    const result = evaluateBundleCharset([`${CYRILLIC.repeat(200)}\\u200b\\u00a0`]);
+    assert.equal(result.ok, true);
+    assert.equal(result.escapes, 2);
+  });
+
+  it("refuses a bundle carrying one stray non-ASCII character and nothing else", () => {
+    // The floor, which is what makes "some literals" more than a formality: a
+    // lone © must not stand in for six locales of translated copy.
+    const result = evaluateBundleCharset(["© 2026"]);
+    assert.equal(result.ok, false);
+    assert.ok(result.literals < BUNDLE_NON_ASCII_FLOOR);
+  });
+
+  it("sums across chunks, because the bundle is the union of them", () => {
+    const half = Math.ceil(BUNDLE_NON_ASCII_FLOOR / CYRILLIC.length / 2) + 1;
+    const one = evaluateBundleCharset([CYRILLIC.repeat(half)]);
+    const both = evaluateBundleCharset([CYRILLIC.repeat(half), CYRILLIC.repeat(half)]);
+    assert.equal(one.ok, false, "one chunk alone should be under the floor");
+    assert.equal(both.ok, true);
+  });
+
+  it("keeps the floor well under what six locales actually come to", () => {
+    // An ARGUED floor: it is here to catch "the copy is being escaped again",
+    // which takes the count to roughly zero — not to ratify a translation's
+    // length. Deleting a language must not fail it.
+    assert.ok(BUNDLE_NON_ASCII_FLOOR >= 100 && BUNDLE_NON_ASCII_FLOOR <= 5000);
+  });
+});
+
+describe("formatBundleCharsetReport", () => {
+  it("reports both counts when it passes", () => {
+    const line = formatBundleCharsetReport("check", evaluateBundleCharset([CYRILLIC.repeat(200)]));
+    assert.match(line, /non-ASCII character\(s\) ship as UTF-8/);
+    assert.doesNotMatch(line, /ERROR/);
+  });
+
+  it("names the option and the cost when it fails", () => {
+    // The failure a reader meets six months from now is one line of a config
+    // file they have never opened; the message has to say which line.
+    const line = formatBundleCharsetReport("check", evaluateBundleCharset([ESCAPED.repeat(200)]));
+    assert.match(line, /ascii_only/);
+    assert.match(line, /metro\.config\.js/);
+    assert.match(line, /115 KiB/);
+  });
+});
+
+describe("metro.config.js turns the escaping off", () => {
+  it("sets ascii_only to false without dropping metro's other output options", () => {
+    // Assigning a fresh `output` object is the way this edit goes wrong:
+    // `quote_style` and `wrap_iife` are metro's and the rest of the toolchain
+    // expects them.
+    const src = read("metro.config.js");
+    assert.match(src, /ascii_only: false/);
+    assert.match(src, /\.\.\.config\.transformer\.minifierConfig\?\.output/);
   });
 });
 
@@ -1515,8 +1607,26 @@ describe("scripts/check-bundle-smoke.ts", () => {
     assert.doesNotMatch(SCRIPT, /PRIVACY_PAGE_RELATIVE_PATH/);
   });
 
-  it("exits non-zero when either half fails", () => {
-    assert.match(SCRIPT, /if \(!smoke\.ok \|\| !privacy\.ok\) process\.exit\(1\)/);
+  it("exits non-zero when any of the three halves fails", () => {
+    // Three since 2026-09-17: the charset question joined the token sweep and
+    // the privacy pages, over the same chunks already read.
+    assert.match(
+      SCRIPT,
+      /if \(!smoke\.ok \|\| !charset\.ok \|\| !privacy\.ok\) process\.exit\(1\)/,
+    );
+  });
+
+  it("reports every half before exiting, rather than failing fast", () => {
+    // A fail-fast chain would hide an escaped bundle behind a missing i18n key
+    // and cost a second CI run to discover it — the same reason lint:all runs
+    // every guard.
+    for (const half of ["smoke", "charset", "privacy"]) {
+      assert.match(
+        SCRIPT,
+        new RegExp(`console\\[${half}\\.ok \\? "log" : "error"\\]`),
+        `${half} must report before the exit`,
+      );
+    }
   });
 });
 
