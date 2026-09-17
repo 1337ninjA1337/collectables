@@ -94,6 +94,14 @@ export type BudgetSnapshot = {
  */
 export const BUDGET_HISTORY: readonly BudgetSnapshot[] = [
   {
+    budgetBytes: 3.57 * 1024 * 1024,
+    bundleBytes: 3_717_291,
+    translationsBytes: 238_255,
+    takenOn: "2026-09-17",
+    because:
+      "the second move that has gone DOWN, and the second found by the composition report: Metro's terser preset was escaping every non-ASCII character as `\\uXXXX`, which costs six bytes where UTF-8 costs two — 115.4 KiB of encoding, 56 of it in the entry chunk, in an app translated into two Cyrillic languages. The budget comes down with it rather than banking the win as headroom: 25.5 KiB, the same order as the 26.0 KiB the last move left and still under Clarity's ~30 KiB, so a statically-imported SDK trips on its own commit",
+  },
+  {
     budgetBytes: 3.67 * 1024 * 1024,
     bundleBytes: 3_821_688,
     translationsBytes: 236_225,

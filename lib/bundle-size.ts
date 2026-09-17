@@ -115,6 +115,18 @@
  * what a per-module number is not — a bucket's bytes are what it contributed,
  * never what removing it would return.
  *
+ * THE SECOND MOVE DOWN, on 2026-09-17, was the sixth's promise being kept:
+ * the composition report named what grew, and what it named was not code at
+ * all. `lib/i18n/be.ts` shipped as 94 KiB and `ru.ts` as 97, against 28-33 KiB
+ * for the four Latin locales carrying the same 554 keys — Metro's terser
+ * preset sets `output.ascii_only: true`, and a Cyrillic letter costs two bytes
+ * in UTF-8 and six as an escape. Turning it off took 115.4 KiB out, 56 of it
+ * from the entry chunk every page load fetches. The budget came down in the
+ * same commit for the reason the paragraph above gives, and
+ * `check-bundle-smoke` now refuses to let the setting come back — it is one
+ * line of a config file nothing else reads, which is what a dependency bump
+ * restores silently.
+ *
  * Raising this is a decision to be argued, not a step in fixing a red build:
  * `bundle-size.test.ts` asserts the headroom stays under the smaller SDK, so a
  * raise that gives up the guard fails there instead of passing quietly.
@@ -126,7 +138,7 @@ import { BUDGET_HISTORY, BUDGET_SNAPSHOT } from "@/lib/budget-snapshot";
 // holds the rule for the whole tree rather than for the UI half of it.
 import { plural } from "@/lib/plural";
 
-export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 3.67 * 1024 * 1024;
+export const DEFAULT_BUNDLE_SIZE_BUDGET_BYTES = 3.57 * 1024 * 1024;
 
 /**
  * The bundle as it stood when the budget last moved.
@@ -416,7 +428,7 @@ export const LAZY_CHUNK_COUNT_FLOOR = 6;
  * copy figure move together at a budget move, and this number moves when the
  * SPLIT changes, which is a different event.
  */
-export const LAST_MEASURED_LAZY_BYTES = 1_370_594;
+export const LAST_MEASURED_LAZY_BYTES = 1_313_325;
 
 /**
  * The smallest of those chunks — the Spanish locale, at 31.2 KiB.
@@ -425,7 +437,7 @@ export const LAST_MEASURED_LAZY_BYTES = 1_370_594;
  * going eager moves the total by less than the slack any honest floor leaves,
  * which is the whole argument for {@link LAZY_CHUNK_COUNT_FLOOR}.
  */
-export const SMALLEST_MEASURED_LAZY_CHUNK_BYTES = 31_976;
+export const SMALLEST_MEASURED_LAZY_CHUNK_BYTES = 31_247;
 
 export type LazySplitResult = {
   /** Bytes in the chunk(s) every page load fetches. */

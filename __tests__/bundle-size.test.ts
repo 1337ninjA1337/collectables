@@ -52,14 +52,17 @@ describe("the budget is a headroom, not a round number", () => {
 });
 
 describe("resolveBundleSizeBudget", () => {
-  it("defaults to 3.67 MiB when the env var is unset or empty", () => {
-    // Down from 4.60 on 2026-09-13, which is the first move in either
-    // direction that was not a raise: the gesture-handler root became a
-    // platform pair and 964.2 KiB of reanimated, worklets and hammerjs left
-    // the web bundle. A saving is banked by lowering the budget in the same
-    // commit — left where it was, the gate would have had 978 KiB of headroom
-    // and caught nothing.
-    assert.equal(DEFAULT_BUNDLE_SIZE_BUDGET_BYTES, 3.67 * 1024 * 1024);
+  it("defaults to 3.57 MiB when the env var is unset or empty", () => {
+    // Down from 3.67 on 2026-09-17, the SECOND move that was not a raise:
+    // Metro's terser preset was escaping every non-ASCII character as an
+    // escape sequence, six bytes where UTF-8 costs two, and turning it off
+    // took 115.4 KiB out of an app translated into two Cyrillic languages.
+    // Before that, down from 4.60 on 2026-09-13, when the gesture-handler
+    // root became a platform pair and 964.2 KiB of reanimated, worklets and
+    // hammerjs left the web bundle. A saving is banked by lowering the budget
+    // in the same commit — left where it was, the gate would have had that
+    // much headroom and caught nothing.
+    assert.equal(DEFAULT_BUNDLE_SIZE_BUDGET_BYTES, 3.57 * 1024 * 1024);
     assert.equal(resolveBundleSizeBudget({}), DEFAULT_BUNDLE_SIZE_BUDGET_BYTES);
     assert.equal(
       resolveBundleSizeBudget({ BUNDLE_SIZE_BUDGET_BYTES: "" }),

@@ -36,25 +36,30 @@ import type { CompositionBaseline } from "@/lib/bundle-composition";
 // an arrival on the next run — one number, so the two halves cannot disagree.
 
 /**
- * Re-taken on 2026-09-13, after the four lazy locale chunks landed, from a
- * `--source-maps` export of the tree `check-bundle-size` measured at 3737.8
+ * Re-taken on 2026-09-17, after `output.ascii_only` was turned off, from a
+ * `--source-maps` export of the tree `check-bundle-size` measured at 3630.2
  * KiB.
  *
- * THE BUCKETS BARELY MOVED AND THE BUNDLE CHANGED COMPLETELY, which is the
- * finding this baseline exists to make readable. The previous one recorded the
- * five Sentry packages at 645 KiB and called them "statically imported"; they
- * are the same 645 KiB today and every one of them is marked `(lazy)`.
- * `app/_layout.tsx` had imported `@sentry/react-native` at module scope for
- * `wrap()` and `<ErrorBoundary>`, so the SDK `lib/sentry.ts` loads through a
- * lazy `import()` was in the entry chunk anyway. Splitting the boundary into
- * `components/crash-boundary.{tsx,web.tsx}` took the entry chunk from 3458.4
- * to 2585.0 KiB — 874.4 KiB off every page load — and moved it into a chunk
- * fetched when diagnostics initialise.
+ * TWO ROWS SHRANK WITH NO CODE REMOVED: `lib/` from 554,338 to 442,000 bytes
+ * and `data/` from 8,725 to 5,603 — the two buckets that hold Cyrillic, the
+ * copy and the seed data. (`components/` is up 4 KiB, which is the ordinary
+ * kind of growth and today's four features.) The previous baseline wrote down
+ * the reason — "`lib/i18n/ru.ts` is the heaviest module a page load still
+ * fetches, at 92 KiB, because Metro escapes non-ASCII as `\uXXXX` and Cyrillic
+ * costs six bytes a letter" — and treated it as a property of the bundle
+ * rather than as a setting somebody had chosen. It is `output.ascii_only:
+ * true` in Metro's terser preset, `metro.config.js` turns it off, and the two
+ * Cyrillic locale maps now weigh what their text weighs: Belarusian 97 KiB →
+ * 43, and 56 KiB off the EAGER entry chunk, where the default Russian locale
+ * lives. `check-bundle-smoke` refuses to let it come back.
  *
- * **A drift report over the buckets alone would have called that round a
- * no-op**: +1.1 KiB total, nothing meaningful in any row. What changed is
- * WHICH CHUNK each bucket is in, which is why the report marks `(lazy)` and
- * `lib/bundle-size.ts` holds a floor under the bytes outside the entry chunk.
+ * **So this round is the mirror image of the last one.** That one changed
+ * which CHUNK every Sentry bucket was in and moved the totals by 1.1 KiB; this
+ * one changes no bucket's membership at all and takes 113 KiB out of two. A
+ * report that only watched the totals would have called the first a no-op, and
+ * one that only watched the rows would have nothing to say about the second
+ * beyond "the copy got smaller" — which is why the report prints both, and why
+ * `(lazy)` is a marker rather than a bucket.
  *
  * `totalBytes` here is above the gate's figure, because a sourcemapped export
  * appends a `sourceMappingURL` comment to each chunk and the deploy strips
@@ -63,36 +68,33 @@ import type { CompositionBaseline } from "@/lib/bundle-composition";
  * budget, which keeps its own figure in `lib/budget-snapshot.ts`. Compare
  * composition totals to composition totals.
  *
- * The headline facts as they stand now: 1339.3 KiB of the bundle is in chunks
+ * The headline facts as they stand now: 1282.5 KiB of the bundle is in chunks
  * a page load does not fetch — the five Sentry packages, the two PostHog ones,
- * and four of the six locale maps — and `lib/` is 552 KiB of this repository's
- * own code, of which the copy is the largest part. `lib/i18n/ru.ts` is the
- * heaviest module a page load still fetches, at 92 KiB, because Metro escapes
- * non-ASCII as `\uXXXX` and Cyrillic costs six bytes a letter; `lib/i18n/be.ts`
- * is 94 KiB of the same and is fetched only by somebody who reads Belarusian.
+ * and four of the six locale maps — and `lib/` is 442 KiB of this repository's
+ * own code, of which the copy is still the largest part.
  */
 export const COMPOSITION_BASELINE: CompositionBaseline = {
-  takenOn: "2026-09-13",
-  totalBytes: 3828569,
+  takenOn: "2026-09-17",
+  totalBytes: 3718329,
   buckets: {
-    "(unattributed)": 624468,
-    "lib/": 554338,
+    "(unattributed)": 625182,
+    "lib/": 442000,
     "@sentry/core": 292950,
     "react-native-web": 282097,
-    "app/": 198307,
+    "app/": 198878,
     "@sentry/react-native": 195253,
-    "react-dom": 171778,
-    "expo-router": 154974,
-    "@posthog/core": 127400,
-    "@sentry-internal/replay": 123677,
-    "components/": 123425,
-    "posthog-react-native": 110929,
+    "react-dom": 171770,
+    "expo-router": 154971,
+    "components/": 127407,
+    "@posthog/core": 127397,
+    "@sentry-internal/replay": 123668,
+    "posthog-react-native": 110926,
     "@supabase/auth-js": 106013,
     "@sentry/browser": 89827,
     "@react-navigation/core": 81554,
     "@sentry-internal/feedback": 48630,
-    "@sentry-internal/browser-utils": 41416,
-    "@react-navigation/elements": 34118,
+    "@sentry-internal/browser-utils": 41413,
+    "@react-navigation/elements": 34115,
     "@supabase/realtime-js": 33751,
     "@sentry/react": 30835,
     "@supabase/phoenix": 25050,
@@ -110,7 +112,6 @@ export const COMPOSITION_BASELINE: CompositionBaseline = {
     "color-convert": 10175,
     "expo": 10000,
     "expo-font": 9170,
-    "data/": 8725,
     "expo-image-picker": 8006,
     "expo-web-browser": 7932,
     "react": 7798,
@@ -119,6 +120,7 @@ export const COMPOSITION_BASELINE: CompositionBaseline = {
     "react-native-safe-area-context": 6318,
     "color": 5860,
     "css-in-js-utils": 5740,
+    "data/": 5603,
     "promise": 5490,
     "@react-navigation/native-stack": 5443,
     "query-string": 5194,
@@ -143,4 +145,3 @@ export const COMPOSITION_BASELINE: CompositionBaseline = {
     "base64-js": 1401,
   },
 };
-

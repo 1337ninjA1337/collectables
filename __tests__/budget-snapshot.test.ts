@@ -188,17 +188,19 @@ describe("BUDGET_HISTORY", () => {
     }
   });
 
-  it("has exactly one downward move, and it is the one that says so", () => {
+  it("has two downward moves, and each one says so", () => {
     // A lowering is not ordinary: it means somebody made the bundle smaller
-    // and banked it. If a second one appears, this case is where the next
-    // reader learns the first was not a fluke — and if one appears with a
-    // `because` that does not mention the saving, that is a budget quietly
-    // being tightened.
+    // and banked it, and a budget quietly tightened with no saving behind it
+    // is the thing this case exists to refuse. The first was 2026-09-13 (the
+    // gesture-handler platform pair) and the second 2026-09-17 (the bundle's
+    // non-ASCII copy, which had been shipping as escapes) — both found by the
+    // composition report, which is the finding the count now carries: it was
+    // not a fluke, it is what that report is FOR.
     const falls = BUDGET_HISTORY.filter(
       (row, i) => i + 1 < BUDGET_HISTORY.length && row.budgetBytes < BUDGET_HISTORY[i + 1].budgetBytes,
     );
-    assert.equal(falls.length, 1);
-    assert.match(falls[0].because, /DOWN/);
+    assert.equal(falls.length, 2);
+    for (const fall of falls) assert.match(fall.because, /DOWN/);
   });
 
   it("records the budget each measurement justified", () => {

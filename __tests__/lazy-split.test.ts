@@ -20,13 +20,13 @@ import { readRepoFile as read } from "./helpers/repo-file";
  * (fetched when diagnostics initialise), PostHog's, and one per lazy locale.
  */
 const TODAY = [
-  { path: "dist/_expo/static/js/web/entry-f272dd67.js", bytes: 2_456_937 },
-  { path: "dist/_expo/static/js/web/index-80a51be8.js", bytes: 895_532 },
-  { path: "dist/_expo/static/js/web/index-7591b89d.js", bytes: 280_243 },
-  { path: "dist/_expo/static/js/web/be-46a895c4.js", bytes: 96_319 },
-  { path: "dist/_expo/static/js/web/pl-27039662.js", bytes: 34_272 },
-  { path: "dist/_expo/static/js/web/de-65760e01.js", bytes: 32_252 },
-  { path: "dist/_expo/static/js/web/es-036baa8e.js", bytes: 31_976 },
+  { path: "dist/_expo/static/js/web/entry-da0c7b75.js", bytes: 2_403_966 },
+  { path: "dist/_expo/static/js/web/index-9e381bfe.js", bytes: 895_520 },
+  { path: "dist/_expo/static/js/web/index-eca6e1e9.js", bytes: 280_237 },
+  { path: "dist/_expo/static/js/web/be-4e17bee6.js", bytes: 43_153 },
+  { path: "dist/_expo/static/js/web/de-dc5ae776.js", bytes: 31_773 },
+  { path: "dist/_expo/static/js/web/es-1a1b4d48.js", bytes: 31_395 },
+  { path: "dist/_expo/static/js/web/pl-7e28100f.js", bytes: 31_247 },
 ];
 
 describe("the floor is under the measurement and over the cliff", () => {
@@ -106,14 +106,14 @@ describe("the floor is under the measurement and over the cliff", () => {
 describe("evaluateLazySplit", () => {
   it("charges the entry chunk to the page load and everything else to import()", () => {
     const result = evaluateLazySplit(TODAY);
-    assert.equal(result.entryBytes, 2_456_937);
-    assert.equal(result.lazyBytes, 1_370_594);
+    assert.equal(result.entryBytes, 2_403_966);
+    assert.equal(result.lazyBytes, 1_313_325);
     assert.equal(result.entryChunkCount, 1);
     assert.equal(result.lazyChunkCount, 6);
     assert.equal(result.belowFloor, false);
     assert.equal(result.tooFewLazyChunks, false);
     assert.equal(result.missingEntryChunk, false);
-    assert.equal(result.marginBytes, 1_370_594 - LAZY_CHUNK_FLOOR_BYTES);
+    assert.equal(result.marginBytes, 1_313_325 - LAZY_CHUNK_FLOOR_BYTES);
   });
 
   it("fails when ONE of the lazy chunks goes eager", () => {
@@ -193,9 +193,9 @@ describe("evaluateLazySplit", () => {
 describe("formatLazySplitReport", () => {
   it("states both halves of the split when it passes", () => {
     const report = formatLazySplitReport(evaluateLazySplit(TODAY));
-    assert.match(report, /1338\.5 KiB of the bundle is lazy in 6 chunks/);
+    assert.match(report, /1282\.5 KiB of the bundle is lazy in 6 chunks/);
     assert.match(report, /above the 1200\.0 KiB floor/);
-    assert.match(report, /2399\.4 KiB in the entry chunk/);
+    assert.match(report, /2347\.6 KiB in the entry chunk/);
     assert.doesNotMatch(report, /FAIL/);
   });
 
