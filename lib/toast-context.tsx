@@ -3,6 +3,7 @@ import { createContext, ReactNode, useCallback, useContext, useMemo, useRef, use
 import { ToastHost } from "@/components/toast-host";
 import { announceMessage } from "@/lib/announce";
 import { toastAnnouncement } from "@/lib/toast-announcement";
+import { capToastStack } from "@/lib/toast-stack";
 
 export type ToastType = "success" | "error" | "info";
 
@@ -67,7 +68,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         message: input.message,
         action: input.action,
       };
-      setToasts((current) => [...current, item]);
+      // Capped rather than appended: a loop that toasts per failure would
+      // otherwise stack an overlay down the whole screen, every entry of it at
+      // `zIndex: 9999` over the app. The oldest goes — see lib/toast-stack.ts.
+      setToasts((current) => capToastStack([...current, item]));
       // Said as well as shown, from here rather than from each caller: the host
       // is an overlay a screen reader reaches only if it walks into it, and by
       // then the toast may be gone. `announceMessage` writes the app's one

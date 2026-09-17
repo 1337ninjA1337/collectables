@@ -8,7 +8,11 @@ import {
   SUCCESS_DEEP,
   SUCCESS_GREEN_3,
 } from "@/lib/design-tokens";
-import { TOAST_ACTION_DISPLAY_MS, TOAST_DISPLAY_MS } from "@/lib/toast-timing";
+import {
+  TOAST_ACTION_DISPLAY_MS,
+  TOAST_DISPLAY_MS,
+  toastHoldCeilingMs,
+} from "@/lib/toast-timing";
 
 import { withCapturedTimers } from "./helpers/capture-timers";
 import {
@@ -71,6 +75,25 @@ const toast = (over: Partial<Toast> = {}): Toast => ({
 
 /** Every Pressable in the tree, in document order. */
 const pressables = (nodes: TestNode[]) => nodes.filter((node) => node.type === "Pressable");
+
+/**
+ * The one live timer is the hold ceiling, give or take the render itself.
+ *
+ * The view measures `elapsedMs` against a real `Date.now()` captured when the
+ * toast mounted, so the delay on hover is the ceiling minus however long the
+ * mount and the hover took — a handful of milliseconds, never zero on purpose.
+ * Asserting equality would be a test that fails on a loaded machine; asserting
+ * `> 0` would pass on a ceiling off by a factor of a thousand. The band is the
+ * honest reading: this delay is the ceiling and not the window.
+ */
+function assertCeiling(delays: number[], hasAction: boolean) {
+  const ceiling = toastHoldCeilingMs(hasAction);
+  assert.equal(delays.length, 1, `expected one held timer, saw ${delays.length}`);
+  assert.ok(
+    delays[0] <= ceiling && delays[0] > ceiling - 1000,
+    `expected roughly the ${ceiling}ms ceiling, got ${delays[0]}`,
+  );
+}
 
 describe("the toast host draws what it is given", () => {
   it("renders nothing at all when the queue is empty", async () => {
@@ -201,16 +224,35 @@ describe("the dismissal window holds while the user is engaged", () => {
     });
   });
 
-  it("clears the window on hover and leaves none standing", async () => {
+  it("swaps the window for the hold ceiling on hover", async () => {
     // The feature: an undo must not expire under the cursor reaching for it.
     // Three source-text matches stood in for this until the overlay moved
     // somewhere a harness could mount it.
+    //
+    // Until 2026-09-17 the hover cleared the timer and scheduled NOTHING, so
+    // an `onHoverIn` whose `onHoverOut` never arrived — a drag ended over the
+    // toast, a stuck hover on a phone — left the overlay up for the rest of
+    // the session. One timer, at the ceiling, is what replaced it.
     await withCapturedTimers(async (timers) => {
       const result = render(
         await ToastHostElement([toast({ action: { label: "Undo", onPress: () => {} } })], () => {}),
       );
       result.fire(pressables(result.all())[0], "onHoverIn");
-      assert.deepEqual(timers.live(), []);
+      assertCeiling(timers.liveDelays(), true);
+    });
+  });
+
+  it("dismisses a toast nobody ever un-hovered, when the ceiling runs out", async () => {
+    // The other end of the same bug: not just that a timer exists, but that
+    // running it closes the toast rather than re-arming forever.
+    await withCapturedTimers(async (timers) => {
+      const dismissed: number[] = [];
+      const result = render(
+        await ToastHostElement([toast({ id: 3 })], (id) => dismissed.push(id)),
+      );
+      result.fire(pressables(result.all())[0], "onHoverIn");
+      timers.live()[0].run();
+      assert.deepEqual(dismissed, [3]);
     });
   });
 
@@ -238,7 +280,7 @@ describe("the dismissal window holds while the user is engaged", () => {
         await ToastHostElement([toast({ action: { label: "Undo", onPress: () => {} } })], () => {}),
       );
       result.fire(pressables(result.all())[1], "onFocus");
-      assert.deepEqual(timers.live(), []);
+      assertCeiling(timers.liveDelays(), true);
       result.fire(pressables(result.all())[1], "onBlur");
       assert.deepEqual(timers.liveDelays(), [TOAST_ACTION_DISPLAY_MS]);
     });

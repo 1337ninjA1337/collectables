@@ -2,10 +2,14 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { toastAnnouncement } from "@/lib/toast-announcement";
+import { capToastStack, TOAST_STACK_MAX } from "@/lib/toast-stack";
 import {
+  nextToastDeadline,
   TOAST_ACTION_DISPLAY_MS,
   TOAST_DISPLAY_MS,
+  TOAST_HOLD_MAX_WINDOWS,
   toastDisplayMs,
+  toastHoldCeilingMs,
 } from "@/lib/toast-timing";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { assertDeclaredInEveryLocale, localeStrings } from "./helpers/i18n-locales";
@@ -44,19 +48,128 @@ describe("toastDisplayMs", () => {
   });
 });
 
+describe("nextToastDeadline", () => {
+  it("gives an unheld toast the full window, whichever window that is", () => {
+    for (const hasAction of [false, true]) {
+      assert.equal(
+        nextToastDeadline({ held: false, hasAction, elapsedMs: 0 }),
+        toastDisplayMs(hasAction),
+      );
+    }
+  });
+
+  it("restarts the FULL window on release, not the remainder", () => {
+    // Deliberate: the user has just looked away from something they were
+    // reading, and a 300ms stub would be indistinguishable from a toast that
+    // ignored them. So elapsed time does not shorten an unheld window.
+    assert.equal(
+      nextToastDeadline({ held: false, hasAction: true, elapsedMs: 6000 }),
+      TOAST_ACTION_DISPLAY_MS,
+    );
+  });
+
+  it("gives a held toast what is left of the ceiling", () => {
+    const ceiling = toastHoldCeilingMs(true);
+    assert.equal(nextToastDeadline({ held: true, hasAction: true, elapsedMs: 0 }), ceiling);
+    assert.equal(nextToastDeadline({ held: true, hasAction: true, elapsedMs: 1000 }), ceiling - 1000);
+  });
+
+  it("dismisses a toast held past the ceiling rather than never", () => {
+    // The bug being fixed: `onHoverIn` with no `onHoverOut` to match it — a
+    // drag that ended over the toast, a stuck hover on a phone — used to mean
+    // no timer at all, and an overlay over the app for the rest of the session.
+    for (const elapsed of [toastHoldCeilingMs(true), toastHoldCeilingMs(true) + 60_000]) {
+      assert.equal(nextToastDeadline({ held: true, hasAction: true, elapsedMs: elapsed }), 0);
+    }
+  });
+
+  it("never returns a negative delay, whatever the clock says", () => {
+    // `setTimeout` treats a negative delay as zero, so this is not a crash —
+    // it is the assertion that says so on purpose rather than by luck. A
+    // system clock that stepped backwards is the way elapsed goes negative.
+    for (const elapsed of [-1, -60_000]) {
+      for (const held of [true, false]) {
+        assert.ok(nextToastDeadline({ held, hasAction: false, elapsedMs: elapsed }) >= 0);
+      }
+    }
+  });
+
+  it("keeps the ceiling long enough to read and short enough to end", () => {
+    // A ceiling under two windows would cut short a user who really is
+    // reading; one in the minutes is the permanent banner with extra steps.
+    assert.ok(TOAST_HOLD_MAX_WINDOWS >= 2 && TOAST_HOLD_MAX_WINDOWS <= 8);
+    assert.ok(toastHoldCeilingMs(true) <= 60_000);
+    assert.ok(toastHoldCeilingMs(true) > TOAST_ACTION_DISPLAY_MS);
+    assert.ok(toastHoldCeilingMs(false) > TOAST_DISPLAY_MS);
+  });
+});
+
+describe("capToastStack", () => {
+  it("leaves a stack that fits alone, by identity", () => {
+    // Identity and not just contents: a fresh array on every `show()` would
+    // re-render every toast in the stack, restart their entrance animations
+    // and reset the very timers the cap exists to bound.
+    const two = [1, 2];
+    assert.equal(capToastStack(two), two);
+    const full = [1, 2, 3].slice(0, TOAST_STACK_MAX);
+    assert.equal(capToastStack(full), full);
+  });
+
+  it("drops the OLDEST when a new toast arrives at a full stack", () => {
+    // The direction is the whole decision: the newest toast describes what
+    // just happened and is the only one whose action is still what the user
+    // is reaching for.
+    const queued = Array.from({ length: TOAST_STACK_MAX + 2 }, (_, i) => i + 1);
+    const kept = capToastStack(queued);
+    assert.equal(kept.length, TOAST_STACK_MAX);
+    assert.deepEqual(kept, queued.slice(queued.length - TOAST_STACK_MAX));
+    assert.equal(kept[kept.length - 1], queued[queued.length - 1]);
+  });
+
+  it("caps a burst of many at the depth, not at some multiple of it", () => {
+    // The failure that produced this: a loop that toasts per failed row.
+    assert.equal(capToastStack(Array.from({ length: 200 }, (_, i) => i)).length, TOAST_STACK_MAX);
+  });
+
+  it("takes an explicit depth, and reads a nonsensical one as empty", () => {
+    assert.deepEqual(capToastStack([1, 2, 3], 1), [3]);
+    assert.deepEqual(capToastStack([1, 2, 3], 0), []);
+    assert.deepEqual(capToastStack([1, 2, 3], -4), []);
+  });
+
+  it("keeps the depth small enough to stay a notice rather than a screen", () => {
+    assert.ok(TOAST_STACK_MAX >= 2 && TOAST_STACK_MAX <= 5);
+  });
+});
+
+describe("the provider caps its own queue", () => {
+  it("routes every queued toast through the cap", () => {
+    // The append was unbounded until 2026-09-17; nothing removed an entry but
+    // its own dismissal timer, and a held toast has no timer running.
+    assert.match(contextSrc, /setToasts\(\(current\) => capToastStack\(\[\.\.\.current, item\]\)\);/);
+    assert.doesNotMatch(
+      contextSrc,
+      /setToasts\(\(current\) => \[\.\.\.current, item\]\)/,
+      "the uncapped append came back",
+    );
+  });
+});
+
 describe("the toast renders and times its action", () => {
   it("takes the window from the shared rule rather than a literal", () => {
-    assert.match(
-      toastSrc,
-      /setTimeout\(\(\) => dismissRef\.current\(\), toastDisplayMs\(!!toast\.action\)\)/,
-    );
+    // The decision itself is `nextToastDeadline`, asserted by being called
+    // above; what stays here is that the view ASKS it rather than growing a
+    // second copy of the numbers.
+    assert.match(toastSrc, /nextToastDeadline\(\{ held, hasAction: !!toast\.action/);
     assert.doesNotMatch(toastSrc, /const DISPLAY_MS = \d+/, "the timing literal came back");
+    assert.doesNotMatch(toastSrc, /toastDisplayMs\(/, "the view decides the window again");
   });
 
   it("holds the window open while the user is engaged with the toast", () => {
     // An undo that expires under the cursor reaching for it is the failure
-    // this prevents; focus counts as engagement for the same reason.
-    assert.match(toastSrc, /if \(held\) return;/);
+    // this prevents; focus counts as engagement for the same reason. What the
+    // hold DOES to the timer is in toast-host-render.test.ts; this is only
+    // that both surfaces are wired to it.
     assert.match(toastSrc, /const hold = \(\) => setHeld\(true\);/);
     assert.match(toastSrc, /const release = \(\) => setHeld\(false\);/);
     const action = toastSrc.match(/\{toast\.action \? \([\s\S]*?\) : null\}/)?.[0] ?? "";
@@ -72,6 +185,14 @@ describe("the toast renders and times its action", () => {
     assert.doesNotMatch(toastSrc, /setTimeout\([^)]*dismiss\(id\)/);
     assert.match(toastSrc, /const dismissRef = useRef\(onDismiss\);/);
     assert.match(toastSrc, /\}, \[held, toast\.action\]\);/);
+  });
+
+  it("measures the ceiling from when the toast appeared, not from the last hover", () => {
+    // A `shownAt` recomputed on each re-run would reset the ceiling on every
+    // hover, which is the unbounded life this was written to end — so the
+    // timestamp is a ref, captured once.
+    assert.match(toastSrc, /const shownAt = useRef\(Date\.now\(\)\);/);
+    assert.match(toastSrc, /elapsedMs: Date\.now\(\) - shownAt\.current/);
   });
 
   it("renders the action only when there is one", () => {

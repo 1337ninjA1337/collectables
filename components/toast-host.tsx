@@ -42,7 +42,7 @@ import {
   SUCCESS_SOFT_2,
 } from "@/lib/design-tokens";
 import type { ToastItem, ToastType } from "@/lib/toast-context";
-import { toastDisplayMs } from "@/lib/toast-timing";
+import { nextToastDeadline } from "@/lib/toast-timing";
 
 export function ToastHost({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
   if (toasts.length === 0) return null;
@@ -80,13 +80,21 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
    *
    * A pointer over it or focus inside it both mean "I am still reading this",
    * and an undo that expires under the cursor reaching for it is the failure
-   * this prevents. Leaving restarts the FULL window rather than resuming the
-   * remainder: the user has just looked away from something they were reading,
-   * and a 300ms stub would be indistinguishable from a toast that ignored them.
+   * this prevents. The hold is bounded, though — see `nextToastDeadline`, which
+   * owns both halves of that rule so they can be asserted by being called.
+   *
+   * `shownAt` is when this toast appeared, and it is a ref rather than state
+   * because reading it must not re-run anything: the effect re-runs on hold and
+   * release, and each re-run asks the rule how long is left of the ceiling from
+   * the toast's ORIGINAL appearance, not from the latest hover.
    */
+  const shownAt = useRef(Date.now());
+
   useEffect(() => {
-    if (held) return;
-    const timer = setTimeout(() => dismissRef.current(), toastDisplayMs(!!toast.action));
+    const timer = setTimeout(
+      () => dismissRef.current(),
+      nextToastDeadline({ held, hasAction: !!toast.action, elapsedMs: Date.now() - shownAt.current }),
+    );
     return () => clearTimeout(timer);
   }, [held, toast.action]);
 
