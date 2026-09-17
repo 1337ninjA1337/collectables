@@ -28,6 +28,7 @@ import {
   mergeItemsFromCloud,
 } from "@/lib/collections-cloud-merge";
 import { dedupeItems } from "@/lib/dedupe-items";
+import { normalizeItemTags } from "@/lib/tag-input";
 import { fetchSettled, fetchSettledRows } from "@/lib/fan-out";
 import {
   subscribeToOwnCollections,
@@ -825,7 +826,16 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
         // Collapse any same-identity duplicates (legacy-id re-upsert dupes,
         // see lib/dedupe-items.ts) so a cached/cloud-pulled double is cleaned
         // out of local storage on hydrate, not just hidden at render.
-        setLocalItems(applyTombstones(dedupeItems(normalizedItems), itemTombstones, (i) => i.id));
+        // The fourth pure pass on this list, beside the id rewrite, the dedupe
+        // and the tombstones: a blob written months ago carries tag colours
+        // from before the label hash, and duplicates a peer's edit introduced.
+        setLocalItems(
+          applyTombstones(
+            dedupeItems(normalizeItemTags(normalizedItems)),
+            itemTombstones,
+            (i) => i.id,
+          ),
+        );
         for (const item of rewritten) {
           upsertItem(item).catch(() => undefined);
         }

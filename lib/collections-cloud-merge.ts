@@ -1,3 +1,4 @@
+import { normalizeTagList } from "@/lib/tag-input";
 import type { Collection, CollectableItem } from "@/lib/types";
 
 /**
@@ -93,6 +94,13 @@ export function mergeCollectionsFromCloud(
   return changed ? Array.from(byId.values()) : (local as Collection[]);
 }
 
+/** One item with its tag list put under the app's rules, by identity when it already is. */
+function normalizedTags(item: CollectableItem): CollectableItem {
+  if (!item.tags) return item;
+  const tags = normalizeTagList(item.tags);
+  return tags === item.tags ? item : { ...item, tags };
+}
+
 /**
  * Merges a cloud-fetched item list into a local item list, deduping by `id`.
  * Cloud rows replace local rows with the same ID (cloud wins on conflict);
@@ -100,6 +108,15 @@ export function mergeCollectionsFromCloud(
  *
  * Returns `local` by reference when the cloud rows changed nothing — see
  * {@link sameValue}.
+ *
+ * Tags are normalised on the way in. This is the seam a peer's edit crosses:
+ * `coerceItemRow` upstream is a defensive validator and says only that the
+ * shape is a `{label, color}[]`, which is true of two casings of one label, an
+ * empty label, and hues derived by a build that predates the label hash. The
+ * rule belongs here rather than there because the comparison below is what
+ * decides whether anything is rewritten, and `normalizeTagList` is idempotent:
+ * a row already under the rules reads as unchanged and the local array comes
+ * back by reference, exactly as it did before.
  */
 export function mergeItemsFromCloud(
   local: readonly CollectableItem[],
@@ -108,7 +125,8 @@ export function mergeItemsFromCloud(
   const byId = new Map<string, CollectableItem>();
   for (const item of local) byId.set(item.id, item);
   let changed = false;
-  for (const item of cloud) {
+  for (const row of cloud) {
+    const item = normalizedTags(row);
     const existing = byId.get(item.id);
     if (!existing) {
       changed = true;

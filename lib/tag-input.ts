@@ -134,3 +134,78 @@ export function removeTagAt(tags: readonly ItemTag[], index: number): ItemTag[] 
   if (index < 0 || index >= tags.length) return tags as ItemTag[];
   return rebalanceTagColors(tags.filter((_, at) => at !== index));
 }
+
+/**
+ * A tag list from OUTSIDE this app's forms, put under the same three rules.
+ *
+ * `addTagToList` and `removeTagAt` keep a list correct while a user is editing
+ * it, and they are not the only way a list arrives. A row pulled from Supabase
+ * was written by another device — possibly an older build, possibly one that
+ * predates the label hash entirely — and a blob read back from AsyncStorage
+ * was written by whatever this app was months ago. Neither has ever been
+ * checked against the rules the forms enforce, so a peer's edit can hand this
+ * app two "sealed" tags in different casings, an empty label, or a set of hues
+ * derived by the old rotation and meaningless anywhere else.
+ *
+ * Three rules, and they are the form's rules rather than new ones:
+ *
+ *  - **An empty label is not a tag.** A chip with nothing in it is unreadable
+ *    and unremovable in the same gesture as any other.
+ *  - **The FIRST of a case-folded duplicate wins**, matching the add rule: the
+ *    casing that arrived first is the one the user typed, and rewriting it is
+ *    a silent edit of data they can see.
+ *  - **Colours are re-derived**, so a label means the same hue here as it does
+ *    on an item created today.
+ *
+ * Idempotent, which is what makes it safe on a read path: the cloud merge
+ * compares a normalized row against a normalized local one, so a list that has
+ * already been through this reads as unchanged and nothing is rewritten. It
+ * also returns the list BY IDENTITY when it had nothing to say, for the same
+ * reason — a fresh array on every pull is a re-render and two storage writes.
+ */
+export function normalizeTagList(tags: readonly ItemTag[]): ItemTag[] {
+  const seen = new Set<string>();
+  const kept: ItemTag[] = [];
+  let dropped = false;
+  for (const tag of tags) {
+    const label = tag.label.trim();
+    const folded = label.toLowerCase();
+    if (!folded || seen.has(folded)) {
+      dropped = true;
+      continue;
+    }
+    seen.add(folded);
+    // The trim is part of the rule, so a label that only differed by
+    // surrounding space is rewritten rather than kept as its own tag.
+    kept.push(label === tag.label ? tag : { ...tag, label });
+  }
+  const rebalanced = rebalanceTagColors(kept);
+  if (dropped) return rebalanced;
+  // `kept` is a fresh array either way; the caller's list is only unchanged
+  // when nothing was dropped AND every tag came through untouched.
+  return rebalanced.every((tag, at) => tag === tags[at]) ? (tags as ItemTag[]) : rebalanced;
+}
+
+/**
+ * {@link normalizeTagList} over a list of items, for the hydrate.
+ *
+ * The item list is where the rule has to be applied on the way IN, not the tag
+ * list: nothing else in this app holds a bare `ItemTag[]` long enough to
+ * normalise it, and the hydrate already runs three passes of exactly this
+ * shape (`normalizeOwnItemIds`, `dedupeItems`, `applyTombstones`), each of
+ * them pure and each returning its input by identity when it found nothing.
+ * This is the fourth, and it is written the same way for the same reason: the
+ * hydrate's result goes straight into state and then into both storage blobs,
+ * so an allocation with no change in it costs a render and two writes.
+ */
+export function normalizeItemTags<T extends { tags?: ItemTag[] }>(items: readonly T[]): T[] {
+  let changed = false;
+  const normalized = items.map((item) => {
+    if (!item.tags) return item;
+    const tags = normalizeTagList(item.tags);
+    if (tags === item.tags) return item;
+    changed = true;
+    return { ...item, tags };
+  });
+  return changed ? normalized : (items as T[]);
+}

@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { TAG_COLORS } from "@/lib/design-tokens";
 import {
   addTagToList,
+  normalizeItemTags,
+  normalizeTagList,
   rebalanceTagColors,
   removeTagAt,
   tagColorForLabel,
@@ -238,6 +240,116 @@ describe("removeTagAt", () => {
     const tags = [tag("a", TAG_COLORS[0]), tag("b", TAG_COLORS[1])];
     removeTagAt(tags, 0);
     assert.equal(tags.length, 2);
+  });
+});
+
+describe("normalizeTagList", () => {
+  it("drops a case-folded duplicate and keeps the FIRST casing", () => {
+    // The add rule, applied to a list that never went through the add: the
+    // casing that arrived first is the one the user typed.
+    const normalized = normalizeTagList([tag("Sealed", TAG_COLORS[0]), tag("sealed", TAG_COLORS[1])]);
+    assert.equal(normalized.length, 1);
+    assert.equal(normalized[0].label, "Sealed");
+  });
+
+  it("drops a label that is empty or only space", () => {
+    // A chip with nothing in it is unreadable and removable only by guessing
+    // which gap in the row it is.
+    const normalized = normalizeTagList([tag("", TAG_COLORS[0]), tag("   ", TAG_COLORS[1]), tag("mint", TAG_COLORS[2])]);
+    assert.deepEqual(normalized.map((t) => t.label), ["mint"]);
+  });
+
+  it("trims rather than treating the space as part of the label", () => {
+    const normalized = normalizeTagList([tag(" sealed ", TAG_COLORS[0])]);
+    assert.equal(normalized[0].label, "sealed");
+  });
+
+  it("folds two labels that differ only by surrounding space into one", () => {
+    const normalized = normalizeTagList([tag("sealed", TAG_COLORS[0]), tag(" SEALED ", TAG_COLORS[1])]);
+    assert.equal(normalized.length, 1);
+  });
+
+  it("re-derives the colours, so an old row means the same hue as a new one", () => {
+    // The vector: a device on an older build, writing hues from the rotation
+    // that predates the label hash.
+    const normalized = normalizeTagList([tag("sealed", TAG_COLORS[9])]);
+    assert.equal(normalized[0].color, tagColorForLabel("sealed", []));
+  });
+
+  it("is idempotent, which is what makes it safe on a read path", () => {
+    // The cloud merge compares a normalized row against a normalized local
+    // one. A pass that changed something on its second run would mark every
+    // pull as a change and rewrite both storage blobs on each one.
+    const messy = [tag("Sealed", TAG_COLORS[0]), tag(" sealed", TAG_COLORS[1]), tag("holo", TAG_COLORS[2])];
+    const once = normalizeTagList(messy);
+    assert.equal(normalizeTagList(once), once, "the second pass should be a no-op, by identity");
+  });
+
+  it("returns a settled list by identity", () => {
+    const settled = normalizeTagList([tag("sealed", TAG_COLORS[0]), tag("graded", TAG_COLORS[1])]);
+    assert.equal(normalizeTagList(settled), settled);
+  });
+
+  it("never mutates the list it was given", () => {
+    const given = [tag(" Sealed ", TAG_COLORS[0]), tag("sealed", TAG_COLORS[1])];
+    normalizeTagList(given);
+    assert.equal(given.length, 2);
+    assert.equal(given[0].label, " Sealed ");
+  });
+
+  it("says nothing about an empty list", () => {
+    assert.deepEqual(normalizeTagList([]), []);
+  });
+});
+
+describe("normalizeItemTags", () => {
+  const item = (id: string, tags?: ItemTag[]) => ({ id, tags });
+
+  it("normalizes each item's tags", () => {
+    const [normalized] = normalizeItemTags([item("a", [tag("Sealed", TAG_COLORS[0]), tag("sealed", TAG_COLORS[1])])]);
+    assert.equal(normalized.tags?.length, 1);
+  });
+
+  it("leaves an item with no tags alone, by identity", () => {
+    const untagged = item("a");
+    assert.equal(normalizeItemTags([untagged])[0], untagged);
+  });
+
+  it("keeps the items it did not change, by identity", () => {
+    // The hydrate writes this straight into state and then into both storage
+    // blobs; an item rebuilt for nothing is a re-render and two writes.
+    const settled = item("a", normalizeTagList([tag("sealed", TAG_COLORS[0])]));
+    const messy = item("b", [tag("Holo", TAG_COLORS[0]), tag("holo", TAG_COLORS[1])]);
+    const normalized = normalizeItemTags([settled, messy]);
+    assert.equal(normalized[0], settled);
+    assert.notEqual(normalized[1], messy);
+  });
+
+  it("returns the whole list by identity when no item moved", () => {
+    const items = [item("a"), item("b", normalizeTagList([tag("sealed", TAG_COLORS[0])]))];
+    assert.equal(normalizeItemTags(items), items);
+  });
+
+  it("never mutates the list it was given", () => {
+    const items = [item("a", [tag("Sealed", TAG_COLORS[0]), tag("sealed", TAG_COLORS[1])])];
+    normalizeItemTags(items);
+    assert.equal(items[0].tags?.length, 2);
+  });
+});
+
+describe("the read paths put an outside list under the same rules", () => {
+  it("normalizes the hydrated item list, beside the three passes already there", () => {
+    const source = readRepoFile("lib/collections-context.tsx");
+    assert.match(source, /dedupeItems\(normalizeItemTags\(normalizedItems\)\)/);
+  });
+
+  it("normalizes a cloud row at the seam it crosses, not in the validator", () => {
+    // `coerceItemRow` is defensive and says only that the shape is a
+    // `{label, color}[]` — which is true of every list this rule rejects. A
+    // product rule inside a validator would also rewrite hues on a path with
+    // no comparison to decide whether anything changed.
+    assert.match(readRepoFile("lib/collections-cloud-merge.ts"), /const item = normalizedTags\(row\);/);
+    assert.doesNotMatch(readRepoFile("lib/supabase-row-coerce.ts"), /normalizeTagList/);
   });
 });
 

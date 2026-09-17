@@ -7,6 +7,7 @@ import {
   mergeCollectionsFromCloud,
   mergeItemsFromCloud,
 } from "../lib/collections-cloud-merge";
+import { tagColorForLabel } from "../lib/tag-input";
 import type { Collection, CollectableItem } from "../lib/types";
 import { readRepoFile as read } from "./helpers/repo-file";
 
@@ -130,6 +131,42 @@ describe("mergeItemsFromCloud", () => {
   it("returns an empty array when both inputs are empty", () => {
     assert.deepEqual(mergeItemsFromCloud([], []), []);
   });
+
+  it("puts a peer's tag list under this app's rules", () => {
+    // The seam a peer's edit crosses. `coerceItemRow` upstream is defensive
+    // and says only that the shape is a `{label, color}[]` — which is true of
+    // two casings of one label and of an empty one.
+    const cloud = [
+      makeItem({
+        id: "i-1",
+        tags: [
+          { label: "Sealed", color: "#fff" },
+          { label: " sealed ", color: "#000" },
+          { label: "  ", color: "#111" },
+        ],
+      }),
+    ];
+    const merged = mergeItemsFromCloud([], cloud);
+    assert.deepEqual(merged[0].tags?.map((t) => t.label), ["Sealed"]);
+    assert.equal(merged[0].tags?.[0].color, tagColorForLabel("sealed", []));
+  });
+
+  it("normalizes a peer's row that is replacing a local one, too", () => {
+    const local = [makeItem({ id: "i-1", tags: [{ label: "sealed", color: tagColorForLabel("sealed", []) }] })];
+    const cloud = [
+      makeItem({ id: "i-1", tags: [{ label: "Holo", color: "#fff" }, { label: "holo", color: "#000" }] }),
+    ];
+    const merged = mergeItemsFromCloud(local, cloud);
+    assert.deepEqual(merged[0].tags?.map((t) => t.label), ["Holo"]);
+  });
+
+  it("still returns the local list by reference for a row already under the rules", () => {
+    // `normalizeTagList` is idempotent, which is the whole reason the rule can
+    // live on a path whose contract is "allocate nothing when nothing moved".
+    const tags = [{ label: "sealed", color: tagColorForLabel("sealed", []) }];
+    const local = [makeItem({ id: "i-1", tags })];
+    assert.equal(mergeItemsFromCloud(local, [makeItem({ id: "i-1", tags: [...tags] })]), local);
+  });
 });
 
 describe("the cloud merges keep their input reference when nothing changed", () => {
@@ -147,7 +184,13 @@ describe("the cloud merges keep their input reference when nothing changed", () 
    * against the identical object would pass without the field comparison.
    */
   it("returns the local items when the cloud row is an equal copy", () => {
-    const local = [makeItem({ id: "i-1", photos: ["a.jpg"], tags: [{ label: "rare", color: "#d89c5b" }] })];
+    // The tag colour is the one the label hash gives "rare": a fixture with a
+    // hue this app no longer writes would be normalised on the way in, and
+    // this case would be asserting the no-op contract against a row that
+    // legitimately changed.
+    const local = [
+      makeItem({ id: "i-1", photos: ["a.jpg"], tags: [{ label: "rare", color: tagColorForLabel("rare", []) }] }),
+    ];
     assert.equal(mergeItemsFromCloud(local, structuredClone(local)), local);
   });
 
@@ -169,9 +212,20 @@ describe("the cloud merges keep their input reference when nothing changed", () 
     // The depth `===` cannot see and the reason the comparison is structural:
     // `photos` and `tags` arrive as new arrays on every fetch, so an identity
     // test would call every row changed and a one-level test would miss this.
-    const local = [makeItem({ id: "i-1", tags: [{ label: "rare", color: "#d89c5b" }] })];
-    const cloud = [makeItem({ id: "i-1", tags: [{ label: "rare", color: "#000000" }] })];
+    const local = [makeItem({ id: "i-1", tags: [{ label: "rare", color: tagColorForLabel("rare", []) }] })];
+    const cloud = [makeItem({ id: "i-1", tags: [{ label: "foil", color: tagColorForLabel("foil", []) }] })];
     assert.notEqual(mergeItemsFromCloud(local, cloud), local);
+  });
+
+  it("does NOT allocate for a peer's row that differs only in a derived hue", () => {
+    // A colour is not data: it is a function of the label, applied on the way
+    // in. So a row written by a build that predates the label hash says the
+    // same thing as the one already held, and treating it as a change would
+    // re-render every collection screen and rewrite both storage blobs on a
+    // delta pull that brought no news.
+    const local = [makeItem({ id: "i-1", tags: [{ label: "rare", color: tagColorForLabel("rare", []) }] })];
+    const cloud = [makeItem({ id: "i-1", tags: [{ label: "rare", color: "#000000" }] })];
+    assert.equal(mergeItemsFromCloud(local, cloud), local);
   });
 
   it("still allocates when the cloud brings an id the local list does not have", () => {
@@ -410,6 +464,9 @@ describe("CollectionsProvider — cloud-sync effect wiring", () => {
     assert.match(src, /recordTombstones\("collections", \[collectionId\]\)/);
     // Hydrate re-applies the persisted set so deleted rows stay gone.
     assert.match(src, /applyTombstones\(visibleCollections, colTombstones/);
-    assert.match(src, /applyTombstones\(dedupeItems\(normalizedItems\), itemTombstones/);
+    assert.match(
+      src,
+      /applyTombstones\(\s*dedupeItems\(normalizeItemTags\(normalizedItems\)\),\s*itemTombstones/,
+    );
   });
 });
