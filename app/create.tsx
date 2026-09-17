@@ -24,7 +24,7 @@ import {
   getDefaultCurrencyForLanguage,
   setEntryCurrency,
 } from "@/lib/locale-helpers";
-import { addTagToList } from "@/lib/tag-input";
+import { addTagToList, removeTagAt } from "@/lib/tag-input";
 import { useEntryCurrencyEffect } from "@/lib/use-entry-currency";
 import { useToast } from "@/lib/toast-context";
 import { ItemCondition, ItemTag } from "@/lib/types";
@@ -378,7 +378,7 @@ export default function CreateItemScreen() {
               <Pressable
                 key={i}
                 style={{...styles.tagChip, backgroundColor: tag.color}}
-                onPress={() => setTags(tags.filter((_, j) => j !== i))}
+                onPress={() => setTags(removeTagAt(tags, i))}
                 accessibilityRole="button"
               >
                 <Text style={styles.tagChipText}>{tag.label}</Text>

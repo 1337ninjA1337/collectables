@@ -2,7 +2,12 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { TAG_COLORS } from "@/lib/design-tokens";
-import { addTagToList, tagColorForLabel } from "@/lib/tag-input";
+import {
+  addTagToList,
+  rebalanceTagColors,
+  removeTagAt,
+  tagColorForLabel,
+} from "@/lib/tag-input";
 import type { ItemTag } from "@/lib/types";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { assertDeclaredInEveryLocale, localeStrings } from "./helpers/i18n-locales";
@@ -109,6 +114,133 @@ describe("addTagToList", () => {
   });
 });
 
+/**
+ * Two labels that hash to the SAME palette slot, found by running the hash
+ * rather than by guessing.
+ *
+ * Every case below about a freed hue needs a real collision: on a list of
+ * labels that never collide, a rebalance and a plain delete produce identical
+ * output and the whole suite would pass on the bug. If the hash or the palette
+ * size changes, this assertion fails first and says so, instead of the cases
+ * quietly going vacuous.
+ */
+const COLLIDING: readonly [string, string] = ["sealed", "holo"];
+
+/** `addTagToList`, for the cases that only ever add labels it accepts. */
+function added(tags: readonly ItemTag[], label: string): ItemTag[] {
+  const result = addTagToList(tags, label);
+  assert.equal(result.status, "added", `expected ${label} to be added`);
+  return result.status === "added" ? result.tags : [];
+}
+
+describe("rebalanceTagColors", () => {
+  it("has a genuine collision to work with", () => {
+    const [first, second] = COLLIDING;
+    assert.equal(
+      tagColorForLabel(first, []),
+      tagColorForLabel(second, []),
+      "the labels no longer collide — pick a new pair from the hash",
+    );
+  });
+
+  it("gives a tag its own hue back once the tag that took it has gone", () => {
+    // The decay this exists for: `tagColorForLabel` looks at the visible set at
+    // ADD time and never again, so a borrowed colour was borrowed for good.
+    const [first, second] = COLLIDING;
+    const preferred = tagColorForLabel(second, []);
+
+    const both = added(added([], first), second);
+    assert.equal(both.length, 2);
+    assert.notEqual(both[1].color, preferred, "the second tag should have taken a rotation colour");
+
+    const left = rebalanceTagColors([both[1]]);
+    assert.equal(left[0].color, preferred);
+    assert.equal(left[0].label, both[1].label, "the label is not what changes");
+  });
+
+  it("leaves the tag the user did not touch where it was", () => {
+    // Left to right, because an earlier tag changing colour when a later one
+    // is deleted is the more surprising of the two directions.
+    const [first, second] = COLLIDING;
+    const preferred = tagColorForLabel(first, []);
+    const rebalanced = rebalanceTagColors([tag(first, preferred), tag(second, TAG_COLORS[7])]);
+    assert.equal(rebalanced[0].color, preferred);
+    assert.notEqual(rebalanced[1].color, preferred, "and the collision is still resolved");
+  });
+
+  it("keeps every colour on the item distinct", () => {
+    const labels = ["sealed", "holo", "error", "open", "graded", "psa10"];
+    const rebalanced = rebalanceTagColors(labels.map((label) => tag(label, TAG_COLORS[0])));
+    assert.equal(new Set(rebalanced.map((t) => t.color)).size, labels.length);
+  });
+
+  it("returns the list by identity when nothing moved", () => {
+    // The callers write this straight back into state; a fresh array every
+    // time would re-render the row on every delete that changed no colour.
+    const settled = rebalanceTagColors([tag("sealed", tagColorForLabel("sealed", []))]);
+    assert.equal(rebalanceTagColors(settled), settled);
+  });
+
+  it("keeps each unchanged tag's own object", () => {
+    const stable = tag("sealed", tagColorForLabel("sealed", []));
+    const rebalanced = rebalanceTagColors([stable, tag("holo", TAG_COLORS[0])]);
+    assert.equal(rebalanced[0], stable);
+  });
+
+  it("never mutates the list it was given", () => {
+    const given = [tag("holo", TAG_COLORS[0])];
+    rebalanceTagColors(given);
+    assert.equal(given[0].color, TAG_COLORS[0]);
+  });
+
+  it("says nothing about an empty list", () => {
+    assert.deepEqual(rebalanceTagColors([]), []);
+  });
+});
+
+describe("removeTagAt", () => {
+  it("removes the entry at that index and nothing else", () => {
+    const tags = [tag("a", TAG_COLORS[0]), tag("b", TAG_COLORS[1]), tag("c", TAG_COLORS[2])];
+    assert.deepEqual(
+      removeTagAt(tags, 1).map((t) => t.label),
+      ["a", "c"],
+    );
+  });
+
+  it("removes by index rather than by label, so two casings do not both go", () => {
+    // `addTagToList` refuses a duplicate, but a list arriving from storage or
+    // a peer's edit can carry both — and a delete that took two rows would be
+    // a silent extra edit.
+    const tags = [tag("Sealed", TAG_COLORS[0]), tag("sealed", TAG_COLORS[1])];
+    assert.equal(removeTagAt(tags, 0).length, 1);
+    assert.equal(removeTagAt(tags, 0)[0].label, "sealed");
+  });
+
+  it("rebalances what is left, which is the whole reason it is not a filter", () => {
+    const [first, second] = COLLIDING;
+    const preferred = tagColorForLabel(second, []);
+    const tags = [tag(first, preferred), tag(second, TAG_COLORS[7])];
+    const left = removeTagAt(tags, 0);
+    assert.equal(left.length, 1);
+    assert.equal(left[0].color, preferred);
+  });
+
+  it("returns the list unchanged, by identity, for an index nothing is at", () => {
+    // A stale press on a row that has already gone is a real sequence on a
+    // slow render.
+    const tags = [tag("a", TAG_COLORS[0])];
+    assert.equal(removeTagAt(tags, 1), tags);
+    assert.equal(removeTagAt(tags, -1), tags);
+    assert.equal(removeTagAt([], 0).length, 0);
+  });
+
+  it("never mutates the list it was given", () => {
+    const tags = [tag("a", TAG_COLORS[0]), tag("b", TAG_COLORS[1])];
+    removeTagAt(tags, 0);
+    assert.equal(tags.length, 2);
+  });
+});
+
 describe("both tag forms go through the one implementation", () => {
   for (const screen of ["app/create.tsx", "app/item/[id].tsx"]) {
     it(`${screen} adds through addTagToList and says when it refuses`, () => {
@@ -118,6 +250,15 @@ describe("both tag forms go through the one implementation", () => {
       // The hand-written rules are gone, not merely bypassed.
       assert.doesNotMatch(source, /tag\.label\.toLowerCase\(\) === label\.toLowerCase\(\)/);
       assert.doesNotMatch(source, /nextTagColor\(/);
+    });
+
+    it(`${screen} removes through removeTagAt, so the hues are rebalanced`, () => {
+      // The inline `filter` both screens wrote is the delete that leaves a
+      // borrowed colour borrowed for good — invisible on the screen that did
+      // it, and wrong on every card the tag appears on afterwards.
+      const source = readRepoFile(screen);
+      assert.match(source, /removeTagAt\(/);
+      assert.doesNotMatch(source, /\.filter\(\(_, j\) => j !== i\)/, "the inline delete came back");
     });
   }
 

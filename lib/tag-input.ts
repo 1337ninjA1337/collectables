@@ -81,3 +81,56 @@ export function addTagToList(tags: readonly ItemTag[], rawLabel: string): AddTag
   const color = tagColorForLabel(label, tags.map((tag) => tag.color));
   return { status: "added", tags: [...tags, { label, color }] };
 }
+
+/**
+ * Every tag's colour re-derived from its own label, collisions resolved left
+ * to right.
+ *
+ * `tagColorForLabel` keeps the visible set distinct at ADD time and never
+ * looks at it again, so the set decays as soon as anything is removed. Put
+ * five tags on an item where the 2nd and 4th hash to the same slot: the 4th
+ * takes a rotation colour, the 2nd is deleted, and its hue is now free while
+ * the 4th keeps the borrowed one for good. The label-consistency this was all
+ * written for — "sealed" is the same colour everywhere — is gone for that tag,
+ * on every card it appears on, and nothing will ever put it back.
+ *
+ * So the rule is re-applied to the whole list rather than to one new entry.
+ * Left to right, because the order is the one the user sees and an earlier tag
+ * changing colour when a later one is deleted would be the more surprising of
+ * the two: the tag they did not touch is the tag that should not move.
+ *
+ * The list is returned BY IDENTITY when no colour changed, and each unchanged
+ * tag keeps its own object. A pass that rebuilt everything would make this
+ * safe to call anywhere and expensive to call from a render, and the callers
+ * write it straight back into state.
+ */
+export function rebalanceTagColors(tags: readonly ItemTag[]): ItemTag[] {
+  const used: string[] = [];
+  let changed = false;
+  const rebalanced = tags.map((tag) => {
+    const color = tagColorForLabel(tag.label, used);
+    used.push(color);
+    if (color === tag.color) return tag;
+    changed = true;
+    return { ...tag, color };
+  });
+  return changed ? rebalanced : (tags as ItemTag[]);
+}
+
+/**
+ * The tag list with the entry at `index` removed, and the rest rebalanced.
+ *
+ * Both forms wrote `tags.filter((_, j) => j !== i)` inline — the same shape
+ * `addTagToList` was extracted to end, one operation down. Removal is where
+ * the colours go stale, so the rebalance rides here rather than being a second
+ * call each screen has to remember: a delete that left the hues alone is
+ * exactly the bug above, and it would be invisible on the screen that did it.
+ *
+ * An index nothing is at returns the list unchanged, by identity. A stale
+ * press on a row that has already gone is a real sequence on a slow render,
+ * and rebuilding the list for it would be a state write with nothing in it.
+ */
+export function removeTagAt(tags: readonly ItemTag[], index: number): ItemTag[] {
+  if (index < 0 || index >= tags.length) return tags as ItemTag[];
+  return rebalanceTagColors(tags.filter((_, at) => at !== index));
+}

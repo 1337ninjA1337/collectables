@@ -50,7 +50,7 @@ import { useMarketplace } from "@/lib/marketplace-context";
 import { placeholderColor } from "@/lib/placeholder-color";
 import { usePremium } from "@/lib/premium-context";
 import { fetchItemById } from "@/lib/supabase-profiles";
-import { addTagToList } from "@/lib/tag-input";
+import { addTagToList, removeTagAt } from "@/lib/tag-input";
 import { useToast } from "@/lib/toast-context";
 import { CollectableItem, ItemCondition, ItemTag, MarketplaceMode } from "@/lib/types";
 import { FONT_DISPLAY, FONT_DISPLAY_EDITORIAL, FONT_BODY, FONT_BODY_SEMIBOLD, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
@@ -582,7 +582,7 @@ export default function ItemDetailsScreen() {
                 <Pressable
                   key={i}
                   style={{...styles.editTagChip, backgroundColor: tag.color}}
-                  onPress={() => setEditTags(editTags.filter((_, j) => j !== i))}
+                  onPress={() => setEditTags(removeTagAt(editTags, i))}
                   accessibilityRole="button"
                 >
                   <Text style={styles.editTagChipText}>{tag.label}</Text>
