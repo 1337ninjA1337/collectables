@@ -187,6 +187,14 @@ describe("the toast renders and times its action", () => {
     assert.match(toastSrc, /\}, \[held, toast\.action\]\);/);
   });
 
+  it("releases the hold when the user leaves, rather than waiting out the ceiling", () => {
+    // The ceiling is a backstop. A tab switched away from mid-hover sends no
+    // `onHoverOut`, and without this the overlay would sit held for four
+    // windows every time — the backstop as the ordinary path.
+    assert.match(toastSrc, /useAppAway\(release\);/);
+    assert.match(toastSrc, /import \{ useAppAway \} from "@\/lib\/use-app-away";/);
+  });
+
   it("measures the ceiling from when the toast appeared, not from the last hover", () => {
     // A `shownAt` recomputed on each re-run would reset the ceiling on every
     // hover, which is the unbounded life this was written to end — so the

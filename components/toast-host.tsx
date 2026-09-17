@@ -43,6 +43,7 @@ import {
 } from "@/lib/design-tokens";
 import type { ToastItem, ToastType } from "@/lib/toast-context";
 import { nextToastDeadline } from "@/lib/toast-timing";
+import { useAppAway } from "@/lib/use-app-away";
 
 export function ToastHost({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
   if (toasts.length === 0) return null;
@@ -100,6 +101,11 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
 
   const hold = () => setHeld(true);
   const release = () => setHeld(false);
+
+  // A hold the pointer never releases: alt-tab away mid-hover, or switch tabs,
+  // and no `onHoverOut` is ever sent. The ceiling above bounds that case; this
+  // ENDS it, and keeps the ceiling the backstop it was meant to be.
+  useAppAway(release);
 
   const palette = PALETTES[toast.type];
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] });

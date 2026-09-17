@@ -21,6 +21,12 @@
  * appended to `head`, only by being sent an event and asked what it did. The
  * registry is also the assertion for the OTHER half of that hook: a listener
  * still in `listeners.visibilitychange` after an unmount is a leak.
+ *
+ * `window` carries its own registry and its own {@link FakeDom.fireWindow},
+ * added for `useAppAway`, which listens for `blur` there. Two surfaces rather
+ * than one alias: a window that loses focus with its tab still visible is a
+ * departure `document.hidden` reports as `false`, so a fake that merged them
+ * would let a hook listening on the wrong object pass.
  */
 
 export type FakeNode = {
@@ -65,6 +71,18 @@ export type FakeDom = {
   fakeWindow: Record<string, unknown>;
   /** Listeners registered on the document, by event type, in registration order. */
   listeners: Record<string, ((event: { type: string }) => void)[]>;
+  /**
+   * The same registry for `window`, which is a SECOND surface rather than an
+   * alias of the first.
+   *
+   * `blur` is why it exists: a window losing focus while its tab stays visible
+   * is a departure `document.hidden` reports as `false`, and it is how a
+   * desktop user most often leaves. A fake that routed both through one
+   * registry would let a hook listening on the wrong object pass.
+   */
+  windowListeners: Record<string, ((event: { type: string }) => void)[]>;
+  /** Fire one event at every `window` listener registered for its type. */
+  fireWindow: (type: string) => void;
   /**
    * Flips `document.hidden` and fires `visibilitychange` at every listener.
    *
@@ -166,8 +184,19 @@ export function setupFakeDom(opts?: {
     },
   };
 
+  const windowListeners: Record<string, ((event: { type: string }) => void)[]> = {};
+
   const fakeWindow: Record<string, unknown> = {
     navigator: { doNotTrack: opts?.doNotTrack ?? "0" },
+    addEventListener(type: string, listener: (event: { type: string }) => void) {
+      (windowListeners[type] ??= []).push(listener);
+    },
+    removeEventListener(type: string, listener: (event: { type: string }) => void) {
+      const forType = windowListeners[type];
+      if (!forType) return;
+      const at = forType.indexOf(listener);
+      if (at >= 0) forType.splice(at, 1);
+    },
   };
 
   const g = globalThis as unknown as {
@@ -186,6 +215,12 @@ export function setupFakeDom(opts?: {
     byId,
     fakeWindow,
     listeners,
+    windowListeners,
+    fireWindow(type: string) {
+      // A copy, for the same reason as `setHidden`: a handler that removes
+      // itself mid-dispatch would otherwise shorten the array being walked.
+      for (const listener of [...(windowListeners[type] ?? [])]) listener({ type });
+    },
     setHidden(hidden: boolean) {
       fakeDocument.hidden = hidden;
       // A copy, because a handler that removes itself while the event is
