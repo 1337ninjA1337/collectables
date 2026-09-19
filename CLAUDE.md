@@ -47,7 +47,18 @@ Reports, which gate nothing and are run when a question comes up:
 npm run build:sourcemaps   # the same web export WITH sourcemaps (the deploy strips them)
 npm run bundle:composition # what the bundle is made of, per package and per module
 npm run bundle:composition -- --snapshot  # the same numbers as a lib/composition-snapshot.ts literal
+npm run bundle:native      # the iOS and Android bundles, which nothing else in this repo builds
+npm run bundle:native ios  # one platform
 ```
+
+`bundle:native` currently FAILS, and that is its first finding rather than a
+bug in it: a second copy of react-native (0.86.0) is installed under
+`node_modules/react-native/node_modules/`, npm's way of satisfying a
+`react-native: *` peer, and Metro resolves a private component out of it that
+the root 0.81.5's codegen cannot parse. The web build never touches that file,
+so `verify` and CI stay green — and the EAS preview job reports success for
+having QUEUED a remote build whose outcome nothing here reads. It is a
+dependency-tree decision, not a code change; `overrides` did not dislodge it.
 
 The composition report ends with what has moved since `COMPOSITION_BASELINE` —
 the sentence five budget raises were argued without. Re-take the baseline with
