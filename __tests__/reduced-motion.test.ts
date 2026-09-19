@@ -9,7 +9,10 @@ import {
   render,
   type RenderResult,
 } from "./helpers/render";
+import { findMotionDrivers, findUnaskedAnimations } from "@/lib/check-reduced-motion";
+
 import { readRepoFile } from "./helpers/repo-file";
+import { sourceFiles } from "./helpers/source-files";
 
 /**
  * "Reduce motion", which four animated surfaces ignored until today.
@@ -206,8 +209,26 @@ describe("every animated surface consults the setting", () => {
   it("stops the skeleton loop rather than running it at zero", () => {
     // `Animated.loop` of a 0ms timing is a frame callback that never stops.
     const src = readRepoFile("components/skeleton.tsx");
-    assert.match(src, /if \(reducedMotion\) return;/);
+    assert.match(src, /if \(reducedMotion\) \{\n\s+anim\.setValue\(0\);\n\s+return;\n\s+\}/);
     assert.match(src, /Animated\.loop\(/);
+  });
+
+  it("parks the skeleton's shimmer at rest rather than wherever it stopped", () => {
+    // The loop's cleanup is `loop.stop()`, which freezes the value where it
+    // had got to. Turning the setting on mid-sweep is the ordinary case — it
+    // is turned on BECAUSE something animated — and without the reset the
+    // highlight band stays parked across the middle of the box for good, which
+    // is the opposite of the "keeps its base colour" the comment promises.
+    const src = readRepoFile("components/skeleton.tsx");
+    const reset = src.indexOf("anim.setValue(0)");
+    const loopStart = src.indexOf("Animated.loop(");
+    assert.ok(reset > 0, "the reduced branch must return the value to rest");
+    assert.ok(reset < loopStart, "and it must do so before the loop is built, not after");
+    assert.doesNotMatch(
+      src,
+      /Animated\.timing\(anim, \{\s*toValue: 0/,
+      "a spring or timing back to rest has nothing waiting on it — setValue is the instant equivalent",
+    );
   });
 
   it("collapses the toast entrance rather than skipping it", () => {
@@ -240,20 +261,20 @@ describe("every animated surface consults the setting", () => {
   });
 
   it("leaves no animated surface that never asks", () => {
-    // The floor under the five above: a fifth surface added without a
-    // consultation is the way this sweep goes quietly out of date.
-    const surfaces = [
-      "components/skeleton.tsx",
-      "components/swipe-tabs.tsx",
-      "components/toast-host.tsx",
-      "app/wishlist.tsx",
-    ];
-    for (const file of surfaces) {
-      assert.match(
-        readRepoFile(file),
-        /from "@\/lib\/reduced-motion"/,
-        `${file} animates and never asks about reduce-motion`,
-      );
-    }
+    // The floor under the five above, and it used to BE the list of four
+    // filenames the five are about — green on the day it was written and
+    // silent about the fifth surface somebody adds next month. `npm run
+    // lint:reduced-motion` walks app/ + components/ + lib/ and asks the
+    // question of whatever it finds, so the list is derived now; this case is
+    // the same claim, stated where a reader of this sweep will look for it.
+    const animated = sourceFiles("app", "components", "lib").filter(
+      (file) => findMotionDrivers(file, readRepoFile(file)).length > 0,
+    );
+    assert.ok(animated.length > 0, "the scanner matched no animation at all");
+    assert.deepEqual(
+      animated.flatMap((file) => findUnaskedAnimations(file, readRepoFile(file))),
+      [],
+      "every animated surface must import @/lib/reduced-motion",
+    );
   });
 });

@@ -801,6 +801,10 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     count: { label: "source file", minimum: 174, roots: ["app", "components", "lib"] },
     note: "app/ + components/ + lib/ held 233 .ts/.tsx files on 2026-08-21 (app 19, components 46, lib 168); 174 leaves 25% of them deletable. What this number is FOR changed on 2026-08-21 and the number did not: the no-single-root property moved to `roots` below, which the guard asserts directly, so this floor no longer has to ride above lib/'s 168 and no longer needs re-measuring when a root grows past it. It still catches the other failure — a walk that came back implausibly small with every root present (a narrowed glob, a broken extension filter, a widened skip list) — which a per-root check cannot see. Re-measure it only when the walk's TOTAL has drifted far from it; `npm run remeasure-floors` prints the breakdown and suggests 174.",
   },
+  "check-reduced-motion": {
+    count: { label: "source file", minimum: 174, roots: ["app", "components", "lib"] },
+    note: "the same app/ + components/ + lib/ walk check-inline-hex takes — 308 .ts/.tsx files on 2026-09-19 (app 19, components 54, lib 235) — so it carries the same 174 for the same reason, and two floors over one walk that disagreed would be two numbers to think about for one event. `roots` holds the no-lost-root property, so neither moves when a root grows. The guard's OTHER premise is not a file count and is not here: it also refuses a run that matched no Animated.timing/spring/decay/loop call at all, which is what a move to Reanimated would look like from inside this rule.",
+  },
   "check-secrets": {
     count: { label: "file", minimum: 500 },
     note: "the whole-tree walk (minus node_modules/.git/dist and non-text extensions) held 713 files on 2026-08-12; 500 survives ordinary pruning while a walk that lost __tests__/ or lib/ does not.",

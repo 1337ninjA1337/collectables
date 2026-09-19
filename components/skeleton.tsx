@@ -26,7 +26,19 @@ export function Skeleton({ width = "100%", height = 16, borderRadius = 8, style 
     // Not a zero-duration loop: `Animated.loop` of a 0ms timing is a frame
     // callback that never stops, which is a battery drain handed to the user
     // who asked for less motion. The box keeps its base colour and sits still.
-    if (reducedMotion) return;
+    //
+    // The `setValue` is what makes that last sentence true when the setting is
+    // turned on MID-SWEEP — which is the moment it most needs to be heard,
+    // because the user is turning it on BECAUSE something here made them ill.
+    // The cleanup's `loop.stop()` freezes `anim` wherever it had got to, so
+    // without this the highlight band parks across the middle of the box and
+    // stays there: a bright stripe, permanently, on the surface that was
+    // supposed to go quiet. Nothing is waiting on the reset, so it is a
+    // `setValue` rather than an animation of any duration.
+    if (reducedMotion) {
+      anim.setValue(0);
+      return;
+    }
     const loop = Animated.loop(
       Animated.timing(anim, {
         toValue: 1,

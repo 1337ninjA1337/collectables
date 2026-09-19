@@ -117,6 +117,13 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // `app` at 19 files is nowhere near it.
   "check-profile-id-pii": () => ["app"],
   "check-console-swap": () => sliceOfEveryRoot("check-console-swap"),
+  // Same app + components + lib walk as check-inline-hex and the same floor of
+  // 174, so the same slice. The guard's second premise — that it matched an
+  // animation at all — is deliberately NOT what this fixture reaches: the
+  // floor assertion runs first, so a slice holding no animated surface still
+  // refuses on below_floor rather than on the lost-subject message, which is
+  // the distinction this suite exists to keep.
+  "check-reduced-motion": () => sliceOfEveryRoot("check-reduced-motion"),
   // Walks app + components + data + lib. `data` holds exactly three .ts files,
   // which is the default slice — so this is the one spec where the slice is a
   // whole root, and it is still a slice of the other three.

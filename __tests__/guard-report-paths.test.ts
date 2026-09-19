@@ -46,6 +46,15 @@ const PLANTED: Readonly<
     file: "app/planted-offender.tsx",
     source: "export const s = { borderRadius: 999 };\n",
   },
+  "check-reduced-motion": {
+    entries: ["app", "components", "lib"],
+    file: "app/planted-offender.tsx",
+    // Written literally, unlike the three built plants below: this suite lives
+    // in `__tests__/`, which is the one source root `check-reduced-motion`
+    // deliberately does not walk — a fixture has to be able to spell a driver
+    // out, and this is the case that needs it.
+    source: 'import { Animated } from "react-native";\n\nexport const go = () => Animated.timing(v, { toValue: 1 }).start();\n',
+  },
   "check-analytics-imports": {
     entries: ["app", "components"],
     file: "app/planted-offender.tsx",

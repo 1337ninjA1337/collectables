@@ -58,6 +58,18 @@ const GUARD_SCANS: Readonly<
       scripts: "build and guard code renders nothing",
     },
   },
+  "check-reduced-motion": {
+    // The same app + components + lib walk as check-inline-hex, and `lib/` is
+    // in it for a reason this tree has already had to learn: twelve context
+    // providers live there and render JSX, so "animation lives where the
+    // markup does" is a narrowing that would have been wrong.
+    dirs: ["app", "components", "lib"],
+    excludes: {
+      data: "seed fixtures are literals — nothing there drives a value",
+      scripts:
+        "node tooling, never in a Metro bundle; an animation there would run on nobody's device",
+    },
+  },
   "check-analytics-imports": {
     dirs: ["app", "components"],
     excludes: {

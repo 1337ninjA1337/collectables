@@ -166,6 +166,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
     description:
       "The test reporter's module graph still loads under node's own loader — extensions named, syntax erasable; both failures kill the whole `npm test` run before any suite can report them",
   },
+  {
+    npmScript: "lint:reduced-motion",
+    scriptPath: "scripts/check-reduced-motion.ts",
+    args: [],
+    description:
+      "No Animated.timing/spring/decay/loop in app/components/lib without @/lib/reduced-motion in scope — the four surfaces that consult the setting were held in place by a list of filenames in a test, which a fifth one joins without asking",
+  },
 ] as const;
 
 /**
