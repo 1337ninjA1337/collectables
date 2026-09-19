@@ -8,6 +8,8 @@ import {
   MARKUP_DIRS,
   NON_APP_TS_DIRS,
   NON_MARKUP_REASONS,
+  NON_RUNTIME_REASONS,
+  RUNTIME_CODE_DIRS,
   SOURCE_DIRS,
 } from "@/lib/source-dirs";
 
@@ -179,6 +181,52 @@ describe("SOURCE_DIRS is checked against the tree, not remembered", () => {
     // writes, not a word somebody deletes.
     for (const [dir, why] of Object.entries(NON_MARKUP_REASONS)) {
       assert.ok(why.length >= 25, `${dir}'s reason is too short to be one: ${why}`);
+    }
+  });
+
+  it("partitions the source roots into code that runs and code that does not", () => {
+    // The same claim `MARKUP_DIRS` makes, one level wider, and it arrived for
+    // the same reason: three rules had narrowed to app + components + lib
+    // separately and each wrote the two exclusions out in its own table.
+    const accounted = [...RUNTIME_CODE_DIRS, ...Object.keys(NON_RUNTIME_REASONS)].sort();
+    assert.deepEqual(
+      accounted,
+      [...SOURCE_DIRS].sort(),
+      "every source directory either runs on a device or has a reason it does not",
+    );
+    for (const dir of RUNTIME_CODE_DIRS) {
+      assert.ok(
+        !(dir in NON_RUNTIME_REASONS),
+        `${dir} is both a runtime root and excused from being one`,
+      );
+    }
+  });
+
+  it("nests the two narrowings rather than leaving them unrelated", () => {
+    // MARKUP_DIRS ⊆ RUNTIME_CODE_DIRS ⊆ SOURCE_DIRS. Markup is a subset of the
+    // code that runs, which is a subset of what this repository holds; a
+    // constant that broke that ordering would be describing a different tree.
+    assert.ok(MARKUP_DIRS.every((dir) => RUNTIME_CODE_DIRS.includes(dir)));
+    assert.ok(RUNTIME_CODE_DIRS.every((dir) => SOURCE_DIRS.includes(dir)));
+    assert.ok(
+      RUNTIME_CODE_DIRS.length > MARKUP_DIRS.length,
+      "two constants naming the same set would be one constant and a synonym",
+    );
+  });
+
+  it("gives every non-runtime root a sentence rather than a shrug", () => {
+    // `scripts/` is the one that has to be said carefully: it RUNS, on a
+    // developer's machine and in CI. What these rules are about is code on a
+    // user's device, which Metro decides, and Metro never resolves it.
+    for (const [dir, why] of Object.entries(NON_RUNTIME_REASONS)) {
+      assert.ok(why.length >= 25, `${dir}'s reason is too short to be one: ${why}`);
+    }
+    assert.match(NON_RUNTIME_REASONS.scripts, /Metro/);
+  });
+
+  it("says every runtime root actually holds source, so the list cannot go stale", () => {
+    for (const dir of RUNTIME_CODE_DIRS) {
+      assert.ok(sourceFiles(dir).length > 0, `RUNTIME_CODE_DIRS names ${dir}, which holds nothing`);
     }
   });
 

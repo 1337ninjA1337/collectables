@@ -95,6 +95,49 @@ export const NON_MARKUP_REASONS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * The directories that hold CODE THAT RUNS ON A DEVICE.
+ *
+ * `app/`, `components/` and `lib/` — the subset of {@link SOURCE_DIRS} that
+ * Metro resolves into a bundle. Three rules narrow to exactly this and each of
+ * them wrote the narrowing out: `check-inline-hex` (a colour literal is a token
+ * decision only where something is drawn), `check-reduced-motion` (an animation
+ * has to consult the setting only where it can run) and `check-latest-ref` (a
+ * per-render ref sync needs a render). All three arrived separately and all
+ * three had to re-argue the same two exclusions.
+ *
+ * This is the same answer {@link MARKUP_DIRS} gives one level narrower, and it
+ * is named for what it MEANS for the same reason: "the roots the three code
+ * rules scan" would be a list to re-justify whenever one of them changes, and
+ * "the roots that hold code that runs" is a fact about the tree that a rule
+ * wanting something else has to argue against.
+ *
+ * It is a SUPERSET of `MARKUP_DIRS` and a subset of `SOURCE_DIRS`, which
+ * `__tests__/guard-scan-dirs.test.ts` pins along with the guards' own literal
+ * `SCANNED_DIRS` — those stay written out in each wrapper, so a guard's scope
+ * is readable from its own file, and the suite asserts the three are EQUAL to
+ * this. One statement plus a checked agreement, rather than three lists that
+ * happen to match.
+ */
+export const RUNTIME_CODE_DIRS: readonly string[] = ["app", "components", "lib"];
+
+/**
+ * Why each remaining {@link SOURCE_DIRS} entry holds no code that runs.
+ *
+ * The other half of the narrowing, and the half the three rules were carrying
+ * as a sentence apiece in three different exclusion tables. `data/` is not
+ * "unimportant" — it is imported and it does ship — but it declares values
+ * rather than behaviour, so there is no render, no animation and no style
+ * decision in it. `scripts/` is the harder one to state correctly: it runs, on
+ * a developer's machine and in CI, and a rule about code that runs would catch
+ * it by a careless reading. What these three rules are about is code on a
+ * USER's device, which Metro decides, and Metro never resolves `scripts/`.
+ */
+export const NON_RUNTIME_REASONS: Readonly<Record<string, string>> = {
+  data: "seed literals and lookup tables — values rather than behaviour: nothing there renders, animates or holds a ref",
+  scripts: "node tooling that never reaches Metro; it runs on a developer's machine and in CI, never on a user's device",
+};
+
+/**
  * The suite tree, named once.
  *
  * It is the one non-app root a guard has any business walking — a rule about

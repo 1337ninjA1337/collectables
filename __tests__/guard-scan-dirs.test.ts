@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   MARKUP_DIRS,
+  RUNTIME_CODE_DIRS,
   MARKUP_EXTENSIONS,
   NON_APP_TS_DIRS,
   SOURCE_DIRS,
@@ -199,6 +200,21 @@ describe("the guards' scan lists agree with lib/source-dirs.ts", () => {
         declaredDirs(guard),
         [...MARKUP_DIRS],
         `${guard} scans markup and no longer matches MARKUP_DIRS — widen the constant or say why this rule differs`,
+      );
+    }
+  });
+
+  it("the code rules all narrow to RUNTIME_CODE_DIRS, and say so by equalling it", () => {
+    // The same statement one level wider, and the same reason: three rules
+    // arrived separately at app + components + lib — a colour literal is a
+    // token decision only where something is drawn, an animation has to
+    // consult reduce-motion only where it can run, a per-render ref sync needs
+    // a render — and each re-argued the two exclusions in its own table.
+    for (const guard of ["check-inline-hex", "check-reduced-motion", "check-latest-ref"]) {
+      assert.deepEqual(
+        declaredDirs(guard),
+        [...RUNTIME_CODE_DIRS],
+        `${guard} scans code that runs and no longer matches RUNTIME_CODE_DIRS — widen the constant or say why this rule differs`,
       );
     }
   });
