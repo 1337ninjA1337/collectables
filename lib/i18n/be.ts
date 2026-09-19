@@ -392,6 +392,7 @@ export const be: TranslationMap = {
   moveDown: "Перамясціць ніжэй",
   reorderPickedUp: (params?: TranslationParams) => `Узята. Пазіцыя ${params?.position ?? 1} з ${params?.total ?? 1}`,
   reorderMoved: (params?: TranslationParams) => `Перамешчана на пазіцыю ${params?.position ?? 1} з ${params?.total ?? 1}`,
+  tabChanged: (params?: TranslationParams) => `${params?.label ?? ""}, укладка ${params?.position ?? 1} з ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Занадта малы TTL кэша профіляў",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS усталяваны ніжэй за 30 секунд. Занадта агрэсіўныя значэнні нагружаюць ліміты Supabase.",

@@ -19,7 +19,9 @@ import {
   TEXT_DARK_2,
 } from "@/lib/design-tokens";
 import { useAppTheme } from "@/components/use-app-theme";
+import { useI18n } from "@/lib/i18n-context";
 import { motionDuration, useReducedMotionRef } from "@/lib/reduced-motion";
+import { announceTabChange } from "@/lib/tab-announcement";
 
 export type SwipeTab = { key: string; label: string };
 
@@ -38,6 +40,7 @@ const ANIM_DURATION = 220;
 export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab, dotHighlight }: Props) {
   const isNative = Platform.OS !== "web";
   const theme = useAppTheme();
+  const { t: translate } = useI18n();
 
   const [width, setWidth] = useState(0);
   const widthRef = useRef(0);
@@ -52,9 +55,16 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
   const activeRef = useRef(active);
   const tabsRef = useRef(tabs);
   const onChangeRef = useRef(onChange);
+  // For the same reason as the three above and as `useReducedMotionRef`: the
+  // PanResponder is built inside `useRef(...).current` and never rebuilt, so a
+  // `translate` captured there is the one from the first render — the
+  // announcement would keep speaking the language the app was started in after
+  // the user changed it.
+  const translateRef = useRef(translate);
   activeRef.current = active;
   tabsRef.current = tabs;
   onChangeRef.current = onChange;
+  translateRef.current = translate;
 
   function handleLayout(e: LayoutChangeEvent) {
     const w = e.nativeEvent.layout.width;
@@ -94,10 +104,37 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
     }).start();
   }
 
-  function commitTo(targetKey: string, direction: "next" | "prev") {
+  /**
+   * The tab a swipe landed on, said out loud — or nothing.
+   *
+   * Reads the tab list and the translator through their refs because every
+   * caller is inside the PanResponder, which captured the first render.
+   * `lib/tab-announcement.ts` owns the decision not to speak: a key that is not
+   * in the list resolves to `-1` here and is refused there rather than read
+   * aloud as a position.
+   */
+  function speakTab(targetKey: string) {
+    const list = tabsRef.current;
+    const index = list.findIndex((x) => x.key === targetKey);
+    announceTabChange(translateRef.current, list[index]?.label ?? "", index, list.length);
+  }
+
+  /**
+   * `spoken` is the GESTURE, not the commit.
+   *
+   * On native there are no tab buttons — the header is a label and a row of
+   * dots, and the swipe is the only way to change tab — so nothing tells a
+   * screen-reader user it happened. On web the same component renders
+   * `<Pressable>`s with `accessibilityState={{ selected }}`, which the platform
+   * announces on press — so this defaults to silent and only the two pan
+   * release call sites opt in, rather than the other way round: a third caller
+   * added later is quiet until somebody decides it should not be.
+   */
+  function commitTo(targetKey: string, direction: "next" | "prev", spoken = false) {
     const w = widthRef.current;
     if (!w) {
       onChangeRef.current(targetKey);
+      if (spoken) speakTab(targetKey);
       return;
     }
     animatingRef.current = true;
@@ -117,6 +154,10 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
       // to 0 *after* React commits the new slot contents, so transform and
       // slot layout change atomically.
       onChangeRef.current(targetKey);
+      // After the change, not before it: the `!finished` branch above returns
+      // without changing anything, and a sentence spoken for a gesture the
+      // pager then abandoned is a lie the listener cannot check.
+      if (spoken) speakTab(targetKey);
     });
   }
 
@@ -170,9 +211,9 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
         const shouldPrev = (g.dx > threshold || (fast && g.vx > 0)) && idx > 0;
 
         if (shouldNext) {
-          commitTo(t[idx + 1].key, "next");
+          commitTo(t[idx + 1].key, "next", true);
         } else if (shouldPrev) {
-          commitTo(t[idx - 1].key, "prev");
+          commitTo(t[idx - 1].key, "prev", true);
         } else {
           settleBack();
         }

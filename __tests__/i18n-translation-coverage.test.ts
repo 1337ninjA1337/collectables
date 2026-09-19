@@ -639,7 +639,12 @@ describe("translation floors", () => {
     // reader finds AFTER going looking; nothing told a user typing into the
     // field that the lists underneath had changed. The count is spoken when it
     // moves, so the noun has to agree with it in all six languages.
-    assert.match(report, /en: 551\/551 keys \(100\.0%\)/);
+    // 552 on 2026-09-19: `tabChanged`. On native the pager's header is a label
+    // and a row of dots — there are no tab BUTTONS, the swipe is the only way
+    // to change tab — so a commit had no spoken feedback at all. The sentence
+    // names the tab AND its place in the row, so the label and both numbers
+    // have to be in all six.
+    assert.match(report, /en: 552\/552 keys \(100\.0%\)/);
     assert.ok(
       COVERAGE.every((row) => row.baseKeys === rowFor("en").declared),
       "every row must be measured against the same denominator",

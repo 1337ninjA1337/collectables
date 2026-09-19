@@ -612,6 +612,7 @@ export const en = {
   moveDown: "Move down",
   reorderPickedUp: (params?: TranslationParams) => `Picked up. Position ${params?.position ?? 1} of ${params?.total ?? 1}`,
   reorderMoved: (params?: TranslationParams) => `Moved to position ${params?.position ?? 1} of ${params?.total ?? 1}`,
+  tabChanged: (params?: TranslationParams) => `${params?.label ?? ""}, tab ${params?.position ?? 1} of ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Profile cache TTL too low",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS is set below 30 seconds. Aggressive overrides can hammer Supabase rate limits.",

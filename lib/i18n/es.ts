@@ -383,6 +383,7 @@ export const es: TranslationMap = {
   moveDown: "Mover abajo",
   reorderPickedUp: (params?: TranslationParams) => `Seleccionado. Posición ${params?.position ?? 1} de ${params?.total ?? 1}`,
   reorderMoved: (params?: TranslationParams) => `Movido a la posición ${params?.position ?? 1} de ${params?.total ?? 1}`,
+  tabChanged: (params?: TranslationParams) => `${params?.label ?? ""}, pestaña ${params?.position ?? 1} de ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "TTL de caché de perfiles demasiado bajo",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS está por debajo de 30 segundos. Valores demasiado agresivos saturan los límites de Supabase.",

@@ -384,6 +384,7 @@ export const pl: TranslationMap = {
   moveDown: "Przenieś niżej",
   reorderPickedUp: (params?: TranslationParams) => `Podniesiono. Pozycja ${params?.position ?? 1} z ${params?.total ?? 1}`,
   reorderMoved: (params?: TranslationParams) => `Przeniesiono na pozycję ${params?.position ?? 1} z ${params?.total ?? 1}`,
+  tabChanged: (params?: TranslationParams) => `${params?.label ?? ""}, karta ${params?.position ?? 1} z ${params?.total ?? 1}`,
   profileCacheTtlLowTitle: "Za niski TTL pamięci podręcznej profili",
   profileCacheTtlLowMessage:
     "EXPO_PUBLIC_PROFILE_CACHE_TTL_MS jest ustawiony poniżej 30 sekund. Zbyt agresywne wartości obciążają limity Supabase.",
