@@ -58,6 +58,14 @@ const GUARD_SCANS: Readonly<
       scripts: "build and guard code renders nothing",
     },
   },
+  "check-latest-ref": {
+    dirs: ["app", "components", "lib"],
+    excludes: {
+      data: "seed fixtures declare no hooks",
+      scripts:
+        "node tooling — nothing there runs in React, so there is no render for a ref to be synced on",
+    },
+  },
   "check-reduced-motion": {
     // The same app + components + lib walk as check-inline-hex, and `lib/` is
     // in it for a reason this tree has already had to learn: twelve context

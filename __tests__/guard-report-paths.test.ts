@@ -46,6 +46,13 @@ const PLANTED: Readonly<
     file: "app/planted-offender.tsx",
     source: "export const s = { borderRadius: 999 };\n",
   },
+  "check-latest-ref": {
+    entries: ["app", "components", "lib"],
+    file: "app/planted-offender.tsx",
+    // Literal, like the reduced-motion plant above and for the same reason:
+    // `__tests__/` is a root this guard deliberately does not walk.
+    source: "export function Screen({ value }: { value: string }) {\n  const valueRef = useRef(value);\n  valueRef.current = value;\n  return null;\n}\n",
+  },
   "check-reduced-motion": {
     entries: ["app", "components", "lib"],
     file: "app/planted-offender.tsx",

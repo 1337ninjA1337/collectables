@@ -124,6 +124,9 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // refuses on below_floor rather than on the lost-subject message, which is
   // the distinction this suite exists to keep.
   "check-reduced-motion": () => sliceOfEveryRoot("check-reduced-motion"),
+  // The same walk and the same floor again; a negative rule has no subject
+  // fixture to build, which is why its slice is the plain one.
+  "check-latest-ref": () => sliceOfEveryRoot("check-latest-ref"),
   // Walks app + components + data + lib. `data` holds exactly three .ts files,
   // which is the default slice — so this is the one spec where the slice is a
   // whole root, and it is still a slice of the other three.

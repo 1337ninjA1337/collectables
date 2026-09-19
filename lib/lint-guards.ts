@@ -167,6 +167,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "The test reporter's module graph still loads under node's own loader — extensions named, syntax erasable; both failures kill the whole `npm test` run before any suite can report them",
   },
   {
+    npmScript: "lint:latest-ref",
+    scriptPath: "scripts/check-latest-ref.ts",
+    args: [],
+    description:
+      "No hand-written `xRef.current = x` at the top of a component body in app/components/lib — useLatestRef owns it; the assignment is the line that gets forgotten, and the ref then silently keeps the first render's value",
+  },
+  {
     npmScript: "lint:reduced-motion",
     scriptPath: "scripts/check-reduced-motion.ts",
     args: [],

@@ -19,6 +19,8 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createElement, useEffect } from "react";
 
+import { findLatestRefSyncs } from "@/lib/check-latest-ref";
+import { LINT_GUARDS } from "@/lib/lint-guards";
 import { useLatestRef } from "@/lib/use-latest-ref";
 
 import { autoUnmount, render, unmountAllTrees } from "./helpers/render";
@@ -106,22 +108,18 @@ describe("useLatestRef — the value a late closure reads", () => {
 });
 
 describe("the sites that were writing it out", () => {
-  it("leaves no render-body ref assignment behind", () => {
-    // The pattern this replaces, matched at the top level of a component body:
-    // `xRef.current = x;` on its own line, with the same name either side. An
-    // assignment inside an effect or a handler is a different thing and is not
-    // matched — the name has to be the identifier the ref was built from.
-    const offenders: string[] = [];
-    for (const file of sourceFiles("app", "components", "lib")) {
-      const source = readRepoFile(file);
-      for (const match of source.matchAll(/^ {2}(\w+)Ref\.current = (\w+);$/gm)) {
-        if (match[1] === match[2]) offenders.push(`${file}: ${match[0].trim()}`);
-      }
-    }
+  it("owns the rule, which lives in lint:latest-ref now", () => {
+    // The sweep that found the eleven sites — and a twelfth the suggestion's
+    // grep had missed — became `npm run lint:latest-ref` the same day, where a
+    // rule about a shipped-code idiom belongs. This case is the pointer; the
+    // matching and its six negatives are run in check-latest-ref.test.ts.
+    const guard = LINT_GUARDS.find((g) => g.npmScript === "lint:latest-ref");
+    assert.ok(guard, "the rule must be in lint:all, not only in a suite");
     assert.deepEqual(
-      offenders,
+      sourceFiles("app", "components", "lib").flatMap((file) =>
+        findLatestRefSyncs(file, readRepoFile(file)),
+      ),
       [],
-      `these should be useLatestRef(...):\n  ${offenders.join("\n  ")}`,
     );
   });
 
