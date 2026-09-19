@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { subscribeToEntryCurrency } from "@/lib/entry-currency-store";
 import { getEntryCurrency } from "@/lib/locale-helpers";
+import { useLatestRef } from "@/lib/use-latest-ref";
 
 /**
  * The currency a cost form should open in, kept current for as long as the
@@ -64,8 +65,7 @@ export function useEntryCurrencyEffect(apply: (stored: string) => void): void {
   // inline arrow, so `apply` in the dep list would re-run this on every render
   // and re-apply a preference over a choice the user is in the middle of
   // making. The effect fires on the VALUE changing, which is the event.
-  const applyRef = useRef(apply);
-  applyRef.current = apply;
+  const applyRef = useLatestRef(apply);
   useEffect(() => {
     if (entryCurrency !== null) applyRef.current(entryCurrency);
   }, [entryCurrency]);

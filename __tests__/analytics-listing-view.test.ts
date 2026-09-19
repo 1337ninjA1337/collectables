@@ -15,11 +15,12 @@ describe("lib/use-dwell-time.ts — shared dwell gate contract", () => {
   });
 
   it("keeps fire in a latest-ref so inline closures never re-arm the timer", () => {
-    // No React mounting harness in the repo (see the [needs-dev-dep] tasks),
-    // so pin the structural contract: ref assigned every render, and the
-    // effect deps are exactly [ms, ...deps] — fire itself is not a dep.
-    assert.match(src, /const\s+fireRef\s*=\s*useRef\(fire\)/);
-    assert.match(src, /fireRef\.current\s*=\s*fire/);
+    // The structural contract: `fire` is latest-ref'd, and the effect deps are
+    // exactly [ms, ...deps] — fire itself is not a dep. The ref and its
+    // per-render assignment are `useLatestRef` now, one hook for the eleven
+    // sites in this tree that were writing the assignment out; the behaviour it
+    // has to have is run in use-latest-ref.test.ts.
+    assert.match(src, /const\s+fireRef\s*=\s*useLatestRef\(fire\)/);
     assert.match(
       src,
       /\},\s*\[ms,\s*\.\.\.deps\]\)/,

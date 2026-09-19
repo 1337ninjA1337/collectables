@@ -41,7 +41,7 @@ describe("useTransitionEvent — structural contract", () => {
   it("keeps fire in a ref and re-arms only on value changes", () => {
     assert.match(
       src,
-      /fireRef\.current\s*=\s*fire/,
+      /const fireRef = useLatestRef\(fire\)/,
       "fire must be latest-ref'd so inline closures don't re-arm the effect",
     );
     assert.match(

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useLatestRef } from "@/lib/use-latest-ref";
 
 /**
  * Rising-edge predicate for "first X" analytics funnels: true only for the
@@ -24,8 +25,7 @@ export function isRisingEdge(prev: boolean, next: boolean): boolean {
  */
 export function useTransitionEvent(value: boolean, fire: () => void): void {
   const prevRef = useRef(value);
-  const fireRef = useRef(fire);
-  fireRef.current = fire;
+  const fireRef = useLatestRef(fire);
   useEffect(() => {
     if (isRisingEdge(prevRef.current, value)) fireRef.current();
     prevRef.current = value;

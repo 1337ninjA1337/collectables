@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useLatestRef } from "@/lib/use-latest-ref";
 import { AppState, Platform } from "react-native";
 
 /**
@@ -7,8 +8,7 @@ import { AppState, Platform } from "react-native";
  * and firing one immediate refresh on resume.
  */
 export function useVisibilityRefresh(refreshFn: () => void, intervalMs: number): void {
-  const refreshRef = useRef(refreshFn);
-  refreshRef.current = refreshFn;
+  const refreshRef = useLatestRef(refreshFn);
 
   useEffect(() => {
     refreshRef.current();

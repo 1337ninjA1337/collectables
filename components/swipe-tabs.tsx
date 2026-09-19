@@ -22,6 +22,7 @@ import { useAppTheme } from "@/components/use-app-theme";
 import { useI18n } from "@/lib/i18n-context";
 import { motionDuration, useReducedMotionRef } from "@/lib/reduced-motion";
 import { announceTabChange } from "@/lib/tab-announcement";
+import { useLatestRef } from "@/lib/use-latest-ref";
 
 export type SwipeTab = { key: string; label: string };
 
@@ -52,19 +53,15 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
   // the value from the first render for the life of the component.
   const reducedMotion = useReducedMotionRef();
 
-  const activeRef = useRef(active);
-  const tabsRef = useRef(tabs);
-  const onChangeRef = useRef(onChange);
+  const activeRef = useLatestRef(active);
+  const tabsRef = useLatestRef(tabs);
+  const onChangeRef = useLatestRef(onChange);
   // For the same reason as the three above and as `useReducedMotionRef`: the
   // PanResponder is built inside `useRef(...).current` and never rebuilt, so a
   // `translate` captured there is the one from the first render — the
   // announcement would keep speaking the language the app was started in after
   // the user changed it.
-  const translateRef = useRef(translate);
-  activeRef.current = active;
-  tabsRef.current = tabs;
-  onChangeRef.current = onChange;
-  translateRef.current = translate;
+  const translateRef = useLatestRef(translate);
 
   function handleLayout(e: LayoutChangeEvent) {
     const w = e.nativeEvent.layout.width;

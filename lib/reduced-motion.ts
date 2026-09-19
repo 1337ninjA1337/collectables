@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AccessibilityInfo } from "react-native";
+
+import { useLatestRef } from "@/lib/use-latest-ref";
 
 /**
  * "Reduce motion" — the system setting every animated surface in this app
@@ -84,12 +86,12 @@ export function useReducedMotion(): boolean {
  * Two of the four surfaces build a `PanResponder` inside `useRef(...).current`,
  * which is created ONCE: a `reduced` captured in that closure is the value
  * from the first render, forever. The gesture handlers read this instead, and
- * the ref is updated on every render by the hook itself rather than by a line
- * each caller has to remember.
+ * the ref is updated on every render by {@link useLatestRef} rather than by a
+ * line each caller has to remember.
+ *
+ * This was the one site in the tree that already had the assignment inside a
+ * hook, which is what suggested pulling the other ten out.
  */
 export function useReducedMotionRef(): { readonly current: boolean } {
-  const reduced = useReducedMotion();
-  const ref = useRef(reduced);
-  ref.current = reduced;
-  return ref;
+  return useLatestRef(useReducedMotion());
 }

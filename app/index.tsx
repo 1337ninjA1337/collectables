@@ -58,6 +58,7 @@ import { placeholderColor } from "@/lib/placeholder-color";
 import { useSocial } from "@/lib/social-context";
 import { Collection } from "@/lib/types";
 import { FONT_DISPLAY_EDITORIAL, FONT_DISPLAY_BOLD, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
+import { useLatestRef } from "@/lib/use-latest-ref";
 
 type CollectionsTab = "mine" | "friends" | "subscribed";
 
@@ -112,8 +113,7 @@ export default function HomeScreen() {
   // that drew the row — a cloud merge between a screen reader focusing a card
   // and the action firing would otherwise commit the order the user is no
   // longer looking at. See ReorderRows in lib/reorder-actions.ts.
-  const ownedCollectionsRef = useRef(ownedCollections);
-  ownedCollectionsRef.current = ownedCollections;
+  const ownedCollectionsRef = useLatestRef(ownedCollections);
 
   /**
    * The collections a friend shared, or that somebody shared with me directly.

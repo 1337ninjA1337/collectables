@@ -80,8 +80,9 @@ describe("owned-collection reorder actions — the actions themselves", () => {
     // hook at all.
     assert.match(renderer(), /rows: \(\) => ownedCollectionsRef\.current,/);
     const src = readHomeSrc();
-    assert.match(src, /const ownedCollectionsRef = useRef\(ownedCollections\);/);
-    assert.match(src, /ownedCollectionsRef\.current = ownedCollections;/);
+    // The assignment used to be a line beside the useRef and is `useLatestRef`
+    // now — one hook for the ten sites in this tree that were writing it out.
+    assert.match(src, /const ownedCollectionsRef = useLatestRef\(ownedCollections\);/);
     assert.ok(
       src.indexOf("const ownedCollectionsRef =") < src.indexOf("if (!ready)"),
       "the ref must be declared above the early return, or it is a conditional hook",

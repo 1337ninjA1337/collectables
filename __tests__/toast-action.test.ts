@@ -183,7 +183,7 @@ describe("the toast renders and times its action", () => {
     // down, and the identity of the per-toast dismiss handler must not restart
     // it either — hence the ref.
     assert.doesNotMatch(toastSrc, /setTimeout\([^)]*dismiss\(id\)/);
-    assert.match(toastSrc, /const dismissRef = useRef\(onDismiss\);/);
+    assert.match(toastSrc, /const dismissRef = useLatestRef\(onDismiss\);/);
     assert.match(toastSrc, /\}, \[held, toast\.action\]\);/);
   });
 

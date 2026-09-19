@@ -45,6 +45,7 @@ import type { ToastItem, ToastType } from "@/lib/toast-context";
 import { nextToastDeadline } from "@/lib/toast-timing";
 import { motionDuration, useReducedMotion } from "@/lib/reduced-motion";
 import { useAppAway } from "@/lib/use-app-away";
+import { useLatestRef } from "@/lib/use-latest-ref";
 
 export function ToastHost({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
   if (toasts.length === 0) return null;
@@ -64,8 +65,7 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
   // The handler changes identity on every render of the host (it closes over
   // the id), and the timer must not restart because of that — so the effect
   // depends on the ref, and the ref is what the timeout reads.
-  const dismissRef = useRef(onDismiss);
-  dismissRef.current = onDismiss;
+  const dismissRef = useLatestRef(onDismiss);
   const [held, setHeld] = useState(false);
 
   // The entrance is decorative, so `duration: 0` is the whole fix: the toast

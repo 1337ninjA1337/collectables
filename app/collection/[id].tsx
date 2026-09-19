@@ -82,6 +82,7 @@ import {
   TEXT_ON_DARK_9,
 } from "@/lib/design-tokens";
 import { PHOTO_SCRIM_GRADIENT } from "@/lib/gradients";
+import { useLatestRef } from "@/lib/use-latest-ref";
 
 export default function CollectionDetailsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -255,8 +256,7 @@ export default function CollectionDetailsScreen() {
   // that drew the row — a `loadMore` or a cloud merge between a screen reader
   // focusing a row and the action firing would otherwise commit the order the
   // user is no longer looking at. See ReorderRows in lib/reorder-actions.ts.
-  const visibleItemsRef = useRef(visibleItems);
-  visibleItemsRef.current = visibleItems;
+  const visibleItemsRef = useLatestRef(visibleItems);
 
   // Resolve profile details for every viewer listed on the collection so the
   // share sheet can show non-friends (link-granted viewers) alongside friends.

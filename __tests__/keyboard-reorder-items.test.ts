@@ -118,8 +118,7 @@ describe("the collection screen's reorder actions", () => {
     assert.match(body, /rows: \(\) => visibleItemsRef\.current,/);
     assert.match(body, /commit: commitItemOrder,/);
     const src = readScreenSrc();
-    assert.match(src, /const visibleItemsRef = useRef\(visibleItems\);/);
-    assert.match(src, /visibleItemsRef\.current = visibleItems;/);
+    assert.match(src, /const visibleItemsRef = useLatestRef\(visibleItems\);/);
   });
 
   it("reads the row's own index rather than assuming one", () => {

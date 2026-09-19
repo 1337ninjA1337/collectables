@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 
+import { useLatestRef } from "@/lib/use-latest-ref";
+
 /**
  * Default dwell gate shared by "user actually engaged with X" analytics
  * events (`chat_opened`, `listing_view`, future `profile_view` /
@@ -28,8 +30,7 @@ export function useDwellTimeEffect(
   ms: number,
   fire: () => void,
 ): void {
-  const fireRef = useRef(fire);
-  fireRef.current = fire;
+  const fireRef = useLatestRef(fire);
   useEffect(() => {
     const timer = setTimeout(() => fireRef.current(), ms);
     return () => clearTimeout(timer);
