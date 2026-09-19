@@ -23,6 +23,30 @@ const config = getSentryExpoConfig(__dirname);
  * replaced: `quote_style: 3` (leave quotes as written) and `wrap_iife` both
  * change output the rest of the toolchain expects, and dropping them by
  * assigning a fresh `output` object is the way this edit would go wrong.
+ *
+ * ## The rest of the preset, measured on 2026-09-19 — and left alone
+ *
+ * `ascii_only` was one setting in a config nobody had opened, so the obvious
+ * follow-up was asked three days running: what about the others? One build
+ * each, against a 3,718,641-byte bundle:
+ *
+ *  - `compress.reduce_funcs: true` — 33 bytes smaller. 0.0009%, and React
+ *    Native disables it deliberately, because inlining single-use functions
+ *    moves work from the wire onto startup. Not a trade.
+ *  - `mangle.toplevel: true` and `toplevel: true` — ZERO bytes, byte for byte
+ *    across all seven chunks, and for a structural reason rather than by luck:
+ *    Metro wraps every module in a `__d(function (global, require, …) { … })`
+ *    factory, so there is no top level to mangle or shake. Whatever these
+ *    options are for, this bundle shape cannot reach it.
+ *  - `output.quote_style`, `output.wrap_iife`, `sourceMap.includeSources` —
+ *    not size questions; the last one affects only a build that emits
+ *    sourcemaps, and the deploy strips them.
+ *
+ * So Metro is right about all of them and nothing here changes. The numbers and
+ * the reasoning live in `lib/minifier-audit.ts`, which a suite checks against
+ * the preset the toolchain actually sends — because a measurement is only as
+ * good as the config it was taken against, and a dependency bump can move a
+ * default without moving anything anybody would notice.
  */
 config.transformer.minifierConfig = {
   ...config.transformer.minifierConfig,
