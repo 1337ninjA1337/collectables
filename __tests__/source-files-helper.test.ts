@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 
+import { RUNTIME_CODE_WALK_FLOOR, SCANNED_FLOORS } from "@/lib/scanned-floor";
+
 import { readRepoFile } from "./helpers/repo-file";
 import { SUITES_REL, assertExemptionsHonest, suiteCode, suiteFiles } from "./helpers/suite-files";
 import {
@@ -222,6 +224,26 @@ describe("SOURCE_DIRS is checked against the tree, not remembered", () => {
       assert.ok(why.length >= 25, `${dir}'s reason is too short to be one: ${why}`);
     }
     assert.match(NON_RUNTIME_REASONS.scripts, /Metro/);
+  });
+
+  it("gives the three guards on this walk one floor instead of three", () => {
+    // The roots were one statement and the NUMBER was still three, each with a
+    // sentence in its note explaining to the reader why it matched the other
+    // two. That argument is the constant now.
+    const onTheWalk = ["check-inline-hex", "check-reduced-motion", "check-latest-ref"];
+    for (const guard of onTheWalk) {
+      const count = SCANNED_FLOORS[guard]?.count;
+      assert.ok(count, `${guard} declares no count floor`);
+      assert.equal(count.minimum, RUNTIME_CODE_WALK_FLOOR, `${guard} should take the shared floor`);
+      assert.deepEqual([...count.roots ?? []], [...RUNTIME_CODE_DIRS]);
+    }
+    // And it is still a floor rather than a ceiling: every root together has
+    // to clear it with room, or the number has stopped meaning anything.
+    const walked = RUNTIME_CODE_DIRS.reduce((sum, dir) => sum + sourceFiles(dir).length, 0);
+    assert.ok(
+      walked > RUNTIME_CODE_WALK_FLOOR,
+      `the walk is ${walked} files against a floor of ${RUNTIME_CODE_WALK_FLOOR}`,
+    );
   });
 
   it("says every runtime root actually holds source, so the list cannot go stale", () => {

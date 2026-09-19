@@ -88,17 +88,17 @@ const CASES: Record<ProblemCodeKey, ProblemCase> = {
   // covered — the reason this is a floor rather than a `count > 0`.
   invalid_minimum: {
     checkName: "check-inline-hex",
-    // The number is READ from the table rather than written here. It was
-    // spelled out, and a floor is re-measured whenever a scan root draws level
-    // with it — so the rewrite silently matched nothing on the run that raised
-    // it, the patched copy kept a perfectly valid entry, and the case failed
-    // claiming the guard would not refuse. A fixture that hardcodes the value
-    // it is mutating breaks on exactly the maintenance it exists to survive.
-    rewrite: (entry) =>
-      entry.replace(
-        new RegExp(`minimum: ${String(SCANNED_FLOORS["check-inline-hex"].count?.minimum ?? -1)}\\b`),
-        "minimum: 0",
-      ),
+    // Whatever is on the right of `minimum:`, rather than the value it
+    // currently has. It was spelled out once and broke when the floor was
+    // re-measured; it then read the number out of the table, and broke again
+    // on 2026-09-19 when three guards on one walk started sharing
+    // `RUNTIME_CODE_WALK_FLOOR` and the right-hand side stopped being a number
+    // at all. Both times the rewrite silently matched NOTHING, the patched
+    // copy kept a perfectly valid entry, and the case failed claiming the
+    // guard would not refuse. A token match survives both, and the assertion
+    // below that the rewrite changed something is what turns a third such
+    // drift into a named failure instead of a puzzling one.
+    rewrite: (entry) => entry.replace(/minimum: [\w$]+/, "minimum: 0"),
   },
   // The label is the noun the failure line uses ("scanned 3 source file(s)");
   // without it the refusal names no unit for what it counted.

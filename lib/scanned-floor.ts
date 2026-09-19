@@ -49,7 +49,7 @@
  */
 
 import { checkError } from "./check-error";
-import { MARKUP_EXTENSIONS, SOURCE_DIRS, SUITES_DIR } from "./source-dirs";
+import { MARKUP_EXTENSIONS, RUNTIME_CODE_DIRS, SOURCE_DIRS, SUITES_DIR } from "./source-dirs";
 
 /** Why a floor check failed. */
 export type ScannedFloorFailureCode =
@@ -796,18 +796,45 @@ export function evaluateParsedInputs(
  * to notice a deleted file, and a floor that trips on ordinary churn is a
  * floor that gets deleted.
  */
+/**
+ * The floor for a walk over {@link RUNTIME_CODE_DIRS}, measured once.
+ *
+ * Three guards take that walk — `check-inline-hex`, `check-reduced-motion` and
+ * `check-latest-ref` — and all three carried `174` with a note explaining to
+ * the reader why it matched the other two. Two floors over one walk that
+ * disagreed would be two numbers to think about for one event, which is the
+ * argument those notes were making; a shared constant is that argument stated
+ * once instead of defended three times.
+ *
+ * WHAT IT IS NOT. Not a bound on how much code this tree may hold, and not a
+ * number anybody should feel pressure from. The no-lost-root property — the
+ * one that catches a walk which came back healthy-looking with `app/` missing
+ * — is carried by each entry's `roots` and asserted directly, so this number's
+ * only remaining job is the walk that came back implausibly small with every
+ * root present: a narrowed glob, a broken extension filter, a widened skip
+ * list.
+ *
+ * MEASURED: `app/` + `components/` + `lib/` held 311 `.ts`/`.tsx` files on
+ * 2026-09-19 (app 19, components 54, lib 238). 174 leaves 44% of them
+ * deletable, which is loose — it is inherited from `check-inline-hex`'s 2026-
+ * 08-21 measurement of the same walk and has been kept rather than re-taken,
+ * because raising it would mean re-taking it again every time the tree grows
+ * and the property it guards does not need a tight number.
+ */
+export const RUNTIME_CODE_WALK_FLOOR = 174;
+
 export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
   "check-inline-hex": {
-    count: { label: "source file", minimum: 174, roots: ["app", "components", "lib"] },
-    note: "app/ + components/ + lib/ held 233 .ts/.tsx files on 2026-08-21 (app 19, components 46, lib 168); 174 leaves 25% of them deletable. What this number is FOR changed on 2026-08-21 and the number did not: the no-single-root property moved to `roots` below, which the guard asserts directly, so this floor no longer has to ride above lib/'s 168 and no longer needs re-measuring when a root grows past it. It still catches the other failure — a walk that came back implausibly small with every root present (a narrowed glob, a broken extension filter, a widened skip list) — which a per-root check cannot see. Re-measure it only when the walk's TOTAL has drifted far from it; `npm run remeasure-floors` prints the breakdown and suggests 174.",
+    count: { label: "source file", minimum: RUNTIME_CODE_WALK_FLOOR, roots: [...RUNTIME_CODE_DIRS] },
+    note: "the first of the three guards on the RUNTIME_CODE_DIRS walk, and where the shared RUNTIME_CODE_WALK_FLOOR was measured: app/ + components/ + lib/ held 233 .ts/.tsx files on 2026-08-21 (app 19, components 46, lib 168) and 174 left 25% of them deletable. What this number is FOR changed that same day and the number did not: the no-single-root property moved to `roots` below, which the guard asserts directly, so it no longer has to ride above lib/'s count and no longer needs re-measuring when a root grows past it. It still catches the other failure — a walk that came back implausibly small with every root present (a narrowed glob, a broken extension filter, a widened skip list) — which a per-root check cannot see. Re-measure it only when the walk's TOTAL has drifted far from it; `npm run remeasure-floors` prints the breakdown.",
   },
   "check-latest-ref": {
-    count: { label: "source file", minimum: 174, roots: ["app", "components", "lib"] },
-    note: "the same app/ + components/ + lib/ walk check-inline-hex and check-reduced-motion take — 311 .ts/.tsx files on 2026-09-19 — so it carries the same 174, and three floors over one walk that disagreed would be three numbers to think about for one event. Unlike check-reduced-motion this guard declares no SUBJECT floor: its healthy state is zero findings and there is nothing in the tree to count, so the pattern still matching is demonstrated against fixtures in its suite rather than against the tree.",
+    count: { label: "source file", minimum: RUNTIME_CODE_WALK_FLOOR, roots: [...RUNTIME_CODE_DIRS] },
+    note: "the RUNTIME_CODE_DIRS walk, so the shared RUNTIME_CODE_WALK_FLOOR, measured on 2026-08-21 over the same three roots and re-checked against 311 files on 2026-09-19 — the alignment with the other two guards on this walk is the constant now rather than a sentence in each of three notes. Unlike check-reduced-motion this guard declares no SUBJECT floor: its healthy state is zero findings and there is nothing in the tree to count, so that the pattern still matches is demonstrated against fixtures in its suite rather than against the tree.",
   },
   "check-reduced-motion": {
-    count: { label: "source file", minimum: 174, roots: ["app", "components", "lib"] },
-    note: "the same app/ + components/ + lib/ walk check-inline-hex takes — 308 .ts/.tsx files on 2026-09-19 (app 19, components 54, lib 235) — so it carries the same 174 for the same reason, and two floors over one walk that disagreed would be two numbers to think about for one event. `roots` holds the no-lost-root property, so neither moves when a root grows. The guard's OTHER premise is not a file count and is not here: it also refuses a run that matched no Animated.timing/spring/decay/loop call at all, which is what a move to Reanimated would look like from inside this rule.",
+    count: { label: "source file", minimum: RUNTIME_CODE_WALK_FLOOR, roots: [...RUNTIME_CODE_DIRS] },
+    note: "the RUNTIME_CODE_DIRS walk, so the shared RUNTIME_CODE_WALK_FLOOR, measured on 2026-08-21 over the same three roots and re-checked against 311 files on 2026-09-19; `roots` holds the no-lost-root property, so neither the constant nor this entry moves when a root grows. The guard's OTHER premise is not a file count and is not here: it also refuses a run that matched no Animated.timing/spring/decay/loop call at all, which is what a move to Reanimated would look like from inside this rule.",
   },
   "check-secrets": {
     count: { label: "file", minimum: 500 },

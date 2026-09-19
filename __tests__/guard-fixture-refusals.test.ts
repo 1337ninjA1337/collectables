@@ -1897,9 +1897,14 @@ describe("entryPatch refusals", () => {
   it("reads the committed table, not just the fixture's idea of one", () => {
     // The cases above pin the parser; this pins the assumption it rests on —
     // that a real `SCANNED_FLOORS` entry is shaped the way they say.
+    //
+    // A TOKEN, not a number: on 2026-09-19 three guards on one walk started
+    // sharing `RUNTIME_CODE_WALK_FLOOR`, so `\d+` stopped matching the entry
+    // this case names and the assertion fired — correctly, which is what it is
+    // for, and about a change that was fine.
     const source = readRepoFile(FLOOR_MODULE);
     const patched = entryPatch("check-inline-hex", (entry) =>
-      entry.replace(/minimum: \d+/, "minimum: 999999"),
+      entry.replace(/minimum: [\w$]+/, "minimum: 999999"),
     )(source);
     assert.match(patched, /"check-inline-hex": \{[\s\S]*?minimum: 999999/);
     assert.equal(
