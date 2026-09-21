@@ -823,6 +823,33 @@ export function evaluateParsedInputs(
  */
 export const RUNTIME_CODE_WALK_FLOOR = 174;
 
+/**
+ * Floor numbers that more than one entry takes from one name, by that name.
+ *
+ * `RUNTIME_CODE_WALK_FLOOR` removed the three copies of 174 from the table.
+ * What it could not remove is that the TOOL still reads three rows: `npm run
+ * remeasure-floors` walks each entry separately, and when the walk has grown
+ * it prints the same suggested number under each of the three — which reads
+ * as three edits, and the obvious way to make them is to paste the number
+ * into each row, un-sharing exactly what the constant was extracted to share.
+ * This is what lets the tool name the constant instead.
+ *
+ * The roots are half the key on purpose. A value alone would group an
+ * unrelated floor that happened to be measured at 174 into this constant and
+ * tell its reader to edit a name their entry does not mention. Value AND
+ * roots is the pair that means "the same walk, so the same number" — which is
+ * the only thing that makes an entry a member rather than a coincidence.
+ *
+ * Membership is derived, never listed: {@link import("./floor-walks").sharedFloorFor}
+ * reads it back out of `SCANNED_FLOORS`, so an entry joins by taking the
+ * constant and leaves by not taking it, and there is no second list to drift.
+ */
+export const SHARED_FLOOR_CONSTANTS: Readonly<
+  Record<string, { readonly value: number; readonly roots: readonly string[] }>
+> = {
+  RUNTIME_CODE_WALK_FLOOR: { value: RUNTIME_CODE_WALK_FLOOR, roots: RUNTIME_CODE_DIRS },
+};
+
 export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
   "check-inline-hex": {
     count: { label: "source file", minimum: RUNTIME_CODE_WALK_FLOOR, roots: [...RUNTIME_CODE_DIRS] },

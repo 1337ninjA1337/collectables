@@ -6,16 +6,19 @@ import {
   describeWalkPremiseProblem,
   FLOOR_DRIFT,
   FLOOR_SLACK,
+  describeSharedEdits,
   floorWalks,
   formatFloorMeasurement,
   measureFloorWalk,
+  sharedFloorFor,
+  sharedFloors,
   UNCOUNTED_MODULE_REASONS,
   unusedUncountedExcuses,
   type RootEvidence,
   type WalkPremiseCode,
 } from "@/lib/floor-walks";
 import { LINT_GUARDS } from "@/lib/lint-guards";
-import { SCANNED_FLOORS } from "@/lib/scanned-floor";
+import { RUNTIME_CODE_WALK_FLOOR, SCANNED_FLOORS } from "@/lib/scanned-floor";
 import { MARKUP_EXTENSIONS, MODULE_EXTENSIONS, SOURCE_EXTENSIONS } from "@/lib/source-dirs";
 import { readRepoFile, REPO_ROOT } from "./helpers/repo-file";
 import { SUITES_REL } from "./helpers/suite-files";
@@ -650,5 +653,121 @@ describe("floorWalks()", () => {
     // with the quarter means a suggestion never claims more room than the
     // notes it imitates.
     assert.ok(FLOOR_SLACK > 0 && FLOOR_SLACK <= 0.3);
+  });
+});
+
+/**
+ * The number three entries no longer spell, and the tool that still prints it
+ * three times.
+ *
+ * `RUNTIME_CODE_WALK_FLOOR` took 174 out of three rows. `remeasure-floors`
+ * walks each floor separately, so a grown tree still produces three identical
+ * suggestions — and the obvious way to act on them is to paste the number into
+ * three `minimum:` fields, which un-shares exactly what the constant was
+ * extracted to share. These pin the sentences that say otherwise.
+ */
+
+describe("sharedFloors", () => {
+  it("derives the members of every declared constant, and none is empty", () => {
+    const shared = sharedFloors();
+    assert.ok(shared.length > 0, "no floor constant is declared, so nothing below means anything");
+    for (const group of shared) {
+      assert.ok(
+        group.members.length > 0,
+        `${group.constantName} is declared shared and no SCANNED_FLOORS entry takes it — either an entry ` +
+          `stopped taking the constant or the roots beside it no longer match the walk`,
+      );
+      for (const member of group.members) {
+        assert.equal(SCANNED_FLOORS[member]?.count?.minimum, group.value);
+      }
+    }
+  });
+
+  it("puts the three guards on the runtime-code walk behind one name", () => {
+    const shared = sharedFloorFor("check-inline-hex");
+    assert.ok(shared, "check-inline-hex takes RUNTIME_CODE_WALK_FLOOR");
+    assert.equal(shared.constantName, "RUNTIME_CODE_WALK_FLOOR");
+    assert.equal(shared.value, RUNTIME_CODE_WALK_FLOOR);
+    assert.deepEqual(
+      [...shared.members].sort(),
+      ["check-inline-hex", "check-latest-ref", "check-reduced-motion"],
+    );
+  });
+
+  it("answers null for a floor that holds its own number", () => {
+    // The roots are half the key: check-console-swap is RUNTIME_CODE_DIRS plus
+    // scripts/, a different walk, so it is not a member however its number
+    // compares.
+    assert.equal(sharedFloorFor("check-console-swap"), null);
+    assert.equal(sharedFloorFor("check-nothing-at-all"), null);
+  });
+});
+
+describe("describeSharedEdits", () => {
+  it("counts edits rather than rows when several members are named", () => {
+    const [sentence, ...rest] = describeSharedEdits([
+      "check-inline-hex",
+      "check-latest-ref",
+      "check-reduced-motion",
+      "check-comment-terminators",
+    ]);
+    assert.deepEqual(rest, [], "one constant, one sentence");
+    assert.match(sentence, /RUNTIME_CODE_WALK_FLOOR in lib\/scanned-floor\.ts/);
+    assert.match(sentence, /3 row\(s\) and one edit/);
+    // The floor that is not a member stays out of the sentence rather than
+    // being swept into a count of rows it does not share a number with.
+    assert.doesNotMatch(sentence, /check-comment-terminators/);
+  });
+
+  it("says nothing when one member drifted alone, because that is one edit either way", () => {
+    assert.deepEqual(describeSharedEdits(["check-inline-hex"]), []);
+    assert.deepEqual(describeSharedEdits([]), []);
+  });
+});
+
+describe("formatFloorMeasurement with a shared floor", () => {
+  it("names the constant and the rows that move with it, under a suggestion", () => {
+    const line = formatFloorMeasurement(
+      measureFloorWalk(
+        "check-inline-hex",
+        RUNTIME_CODE_WALK_FLOOR,
+        "source file",
+        [root("app", 20), root("components", 60), root("lib", 340)],
+        "declared_roots",
+      ),
+    );
+    assert.match(line, /Re-measure to \d+ when convenient/);
+    assert.match(line, /That number is RUNTIME_CODE_WALK_FLOOR in lib\/scanned-floor\.ts/);
+    assert.match(line, /shared with check-latest-ref and check-reduced-motion/);
+    // The instruction that keeps the consolidation: the suggestion's obvious
+    // edit is the wrong one, and the row says so where the number is.
+    assert.match(line, /Edit the constant/);
+    assert.match(line, /un-shares all 3/);
+    // The row never lists itself among the rows that move with it.
+    assert.doesNotMatch(line, /shared with[^\n]*check-inline-hex/);
+  });
+
+  it("keeps quiet on a healthy row, where there is no number to paste anywhere", () => {
+    // 30% deletable: past the measured quarter, short of the drift line, so no
+    // suggestion — and a constant named beside a row nobody is being asked to
+    // edit is the noise that gets the line ignored on the run that matters.
+    const line = formatFloorMeasurement(
+      measureFloorWalk(
+        "check-inline-hex",
+        RUNTIME_CODE_WALK_FLOOR,
+        "source file",
+        [root("app", 50), root("components", 50), root("lib", 149)],
+        "declared_roots",
+      ),
+    );
+    assert.doesNotMatch(line, /RUNTIME_CODE_WALK_FLOOR/);
+  });
+
+  it("says nothing about a constant for a floor that holds its own number", () => {
+    const line = formatFloorMeasurement(
+      measureFloorWalk("check-x", 50, "file", [root("app", 20), root("lib", 80)], "declared_roots"),
+    );
+    assert.match(line, /Re-measure to 75 when convenient/);
+    assert.doesNotMatch(line, /Edit the constant/);
   });
 });

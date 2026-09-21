@@ -55,7 +55,7 @@
  * same split `lib/scanned-floor.ts` and the guard wrappers already have.
  */
 
-import { SCANNED_FLOORS } from "./scanned-floor";
+import { SCANNED_FLOORS, SHARED_FLOOR_CONSTANTS } from "./scanned-floor";
 import { MODULE_EXTENSIONS, SOURCE_EXTENSIONS } from "./source-dirs";
 
 /** One multi-root walk, read out of the floor that declares it. */
@@ -88,6 +88,95 @@ export function floorWalks(): readonly FloorWalk[] {
       roots: floor.count?.roots ?? [],
       extensions: floor.count?.extensions ?? SOURCE_EXTENSIONS,
     }));
+}
+
+/**
+ * A floor number that lives behind a name, and every entry taking it.
+ *
+ * `members` is read out of `SCANNED_FLOORS` rather than listed beside the
+ * constant, for the reason {@link floorWalks} is derived: a list of the rows
+ * that share a number, kept next to the number, is a second place for the
+ * membership to be wrong.
+ */
+export type SharedFloor = {
+  /** The exported identifier a person edits, e.g. `RUNTIME_CODE_WALK_FLOOR`. */
+  readonly constantName: string;
+  readonly value: number;
+  /** Check names taking it, in `SCANNED_FLOORS` order. */
+  readonly members: readonly string[];
+};
+
+/** Same walk, whatever order the roots were written in. */
+function sameRoots(a: readonly string[] | undefined, b: readonly string[]): boolean {
+  if (!a || a.length !== b.length) return false;
+  const left = [...a].sort();
+  const right = [...b].sort();
+  return left.every((root, index) => root === right[index]);
+}
+
+/**
+ * Every named floor constant with the entries that take it, derived.
+ *
+ * Value AND roots decide membership, which is {@link SHARED_FLOOR_CONSTANTS}'s
+ * own rule: an unrelated floor measured at the same number over a different
+ * walk is a coincidence, and telling its reader to edit a constant their entry
+ * does not mention would be worse than saying nothing.
+ */
+export function sharedFloors(): readonly SharedFloor[] {
+  return Object.entries(SHARED_FLOOR_CONSTANTS).map(([constantName, { value, roots }]) => ({
+    constantName,
+    value,
+    members: Object.entries(SCANNED_FLOORS)
+      .filter(([, floor]) => floor.count?.minimum === value && sameRoots(floor.count.roots, roots))
+      .map(([checkName]) => checkName),
+  }));
+}
+
+/** The constant one check takes its floor from, or `null` when it holds its own number. */
+export function sharedFloorFor(checkName: string): SharedFloor | null {
+  return sharedFloors().find((shared) => shared.members.includes(checkName)) ?? null;
+}
+
+/**
+ * `a`, `a and b`, `a, b and c` — the join every note in this repository reads
+ * in.
+ *
+ * Written without a length test on purpose: `lib/plural.ts` owns the
+ * one-versus-many rule and `__tests__/plural.test.ts` sweeps for modules that
+ * decide something by comparing a count against 1. This is not an inflection —
+ * nothing here picks a word — so the honest way past that sweep is to not ask
+ * the question, rather than to add a name to an exemption list. Slicing does
+ * the branching: an empty head means there was nothing before the last name.
+ */
+function joinNames(names: readonly string[]): string {
+  const head = names.slice(0, -1).join(", ");
+  const last = names[names.length - 1] ?? "";
+  return head ? `${head} and ${last}` : last;
+}
+
+/**
+ * How many EDITS a set of rows actually is, one sentence per shared constant.
+ *
+ * The tool's per-row output is per row by construction — it walks each floor
+ * separately — so a run that suggests a new number for the three guards on the
+ * `RUNTIME_CODE_DIRS` walk prints that number three times. A reader doing what
+ * it says lands on three `minimum:` fields and pastes a literal into each,
+ * which is precisely the shape `RUNTIME_CODE_WALK_FLOOR` was extracted to
+ * remove. This is the summary that says it is one.
+ *
+ * Silent below two members: a constant with one entry is a name, not a
+ * saving, and its row already names it.
+ */
+export function describeSharedEdits(checkNames: readonly string[]): string[] {
+  const named = new Set(checkNames);
+  return sharedFloors()
+    .map((shared) => ({ shared, hit: shared.members.filter((member) => named.has(member)) }))
+    .filter(({ hit }) => hit.length > 1)
+    .map(
+      ({ shared, hit }) =>
+        `${joinNames(hit)} take their number from ${shared.constantName} in lib/scanned-floor.ts — ` +
+        `that is ${String(hit.length)} row(s) and one edit.`,
+    );
 }
 
 /**
@@ -425,6 +514,26 @@ export function measureFloorWalk(
 }
 
 /**
+ * Where one row's number actually lives, as the indented lines under a
+ * suggestion.
+ *
+ * Empty for a floor that holds its own literal, which is most of them: a
+ * constant named beside a row nobody is being asked to edit is the noise that
+ * gets the line skipped on the run where it matters.
+ */
+function describeSharedNumber(checkName: string): string[] {
+  const shared = sharedFloorFor(checkName);
+  if (!shared) return [];
+  const siblings = shared.members.filter((member) => member !== checkName);
+  const head = `       That number is ${shared.constantName} in lib/scanned-floor.ts`;
+  if (siblings.length === 0) return [`${head} — edit the constant, not this entry.`];
+  return [
+    `${head}, shared with ${joinNames(siblings)}.`,
+    `       Edit the constant: pasting the number into this entry moves one row and un-shares all ${String(shared.members.length)}.`,
+  ];
+}
+
+/**
  * One measurement as the lines a person reads, `MOVE` first when it needs
  * acting on so the column scans.
  *
@@ -432,9 +541,19 @@ export function measureFloorWalk(
  * its property, or when the slack is TIGHTER than these floors are measured
  * with. A floor with more room than the target is a floor doing its job, and a
  * tool that told its reader to tighten one would be a tool nobody runs twice.
+ *
+ * Where a number IS suggested and the entry takes it from a shared constant,
+ * the lines say which constant and which other rows move with it. Without that
+ * the reader follows the suggestion to a `minimum:` field, pastes a literal in,
+ * and un-shares a number three entries were deliberately made to share — the
+ * tool's own advice undoing the consolidation one row at a time.
  */
 export function formatFloorMeasurement(row: FloorMeasurement): string {
   const breakdown = row.perRoot.map(({ root, count }) => `${root} ${String(count)}`).join(", ");
+  // Only ever printed under a suggested number, which is the moment the reader
+  // goes looking for a `minimum:` to change — and, for a shared floor, the
+  // moment the obvious edit is the wrong one.
+  const sharedLines = describeSharedNumber(row.checkName);
   const lines = [
     `${row.actionable ? "MOVE" : "ok  "} ${row.checkName}`,
     `       declared ${String(row.minimum)} ${row.label}(s); walk holds ${String(row.total)} (${breakdown})`,
@@ -452,6 +571,7 @@ export function formatFloorMeasurement(row: FloorMeasurement): string {
       `       Declare this guard's roots in lib/scanned-floor.ts and assert them in its wrapper — the property`,
       `       stops depending on the number and this row stops needing a re-measure. Or re-measure to ${String(row.suggested)}`,
       `       and say why in the note — the note is the half this tool cannot write.`,
+      ...sharedLines,
     );
   } else if (row.property === "declared_roots" && !row.holds) {
     // Worth saying out loud rather than leaving as a silent `ok`: the number
@@ -477,6 +597,7 @@ export function formatFloorMeasurement(row: FloorMeasurement): string {
       `       holds, and ${String(row.slackPercent)}% is deletable — the tree has grown well past the ~${String(FLOOR_SLACK * 100)}% this was`,
       `       measured at, so the number is doing less than it reads. Re-measure to ${String(row.suggested)} when convenient;`,
       `       nothing is broken, and nothing will go red for this.`,
+      ...sharedLines,
     );
   }
   return lines.join("\n");

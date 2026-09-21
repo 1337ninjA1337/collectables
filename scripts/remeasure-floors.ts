@@ -44,6 +44,7 @@ import * as path from "node:path";
 
 import {
   checkWalkPremise,
+  describeSharedEdits,
   describeWalkPremiseProblem,
   FLOOR_DRIFT,
   floorWalks,
@@ -151,6 +152,11 @@ function main(): void {
         `${drifted.map((row) => row.checkName).join(", ")}. Nothing is broken and nothing will go red for it; ` +
         `re-measure when convenient.`,
     );
+    // The count above is rows; this is edits, and the two stopped being the
+    // same number the day three entries started taking one constant.
+    for (const sentence of describeSharedEdits(drifted.map((row) => row.checkName))) {
+      console.log(`remeasure-floors: ${sentence}`);
+    }
   }
   if (moved.length === 0 && unsound.length === 0) {
     console.log(
@@ -163,6 +169,9 @@ function main(): void {
       `remeasure-floors: ${String(moved.length)} floor(s) hold the no-single-root property by arithmetic and no longer sit above their largest root: ` +
         `${moved.map((row) => row.checkName).join(", ")}. Declare their roots in lib/scanned-floor.ts, or re-measure.`,
     );
+    for (const sentence of describeSharedEdits(moved.map((row) => row.checkName))) {
+      console.log(`remeasure-floors: ${sentence}`);
+    }
   }
   if (unsound.length > 0) {
     // Louder than a moved floor and printed last, because it is the one
