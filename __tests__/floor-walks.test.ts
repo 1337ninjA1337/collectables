@@ -18,7 +18,12 @@ import {
   type WalkPremiseCode,
 } from "@/lib/floor-walks";
 import { LINT_GUARDS } from "@/lib/lint-guards";
-import { RUNTIME_CODE_WALK_FLOOR, SCANNED_FLOORS } from "@/lib/scanned-floor";
+import {
+  RUNTIME_CODE_WALK_FLOOR,
+  SCANNED_FLOORS,
+  SHARED_FLOOR_CONSTANTS,
+} from "@/lib/scanned-floor";
+import { stripComments } from "@/lib/strip-comments";
 import { MARKUP_EXTENSIONS, MODULE_EXTENSIONS, SOURCE_EXTENSIONS } from "@/lib/source-dirs";
 import { readRepoFile, REPO_ROOT } from "./helpers/repo-file";
 import { SUITES_REL } from "./helpers/suite-files";
@@ -692,6 +697,39 @@ describe("sharedFloors", () => {
       [...shared.members].sort(),
       ["check-inline-hex", "check-latest-ref", "check-reduced-motion"],
     );
+  });
+
+  it("names every entry that takes its number from a constant rather than a literal", () => {
+    // The completeness half, and the one the derivation cannot supply:
+    // membership is read out of the table by VALUE, so three entries with 174
+    // pasted into them look exactly like three entries taking the constant.
+    // That is the drift this whole change exists to prevent, and it is visible
+    // only in the spelling.
+    const source = stripComments(readRepoFile("lib", "scanned-floor.ts"));
+    // The colon is load-bearing: `SCANNED_FLOORS_ENTRY_SUBJECT` is declared
+    // earlier in the same file and matches the bare name.
+    const start = source.indexOf("export const SCANNED_FLOORS:");
+    assert.ok(start >= 0, "the floor table moved, and this case is reading the wrong file");
+    const table = source.slice(start, source.indexOf("\n};", start));
+    const taken = [...table.matchAll(/minimum:\s*([A-Za-z_$][\w$]*)/g)].map((match) => match[1]);
+    assert.ok(taken.length > 0, "no entry takes a named floor, so nothing below is checking anything");
+
+    const declared = Object.keys(SHARED_FLOOR_CONSTANTS);
+    assert.deepEqual(
+      [...new Set(taken)].filter((name) => !declared.includes(name)).sort(),
+      [],
+      "a SCANNED_FLOORS entry takes its number from a constant SHARED_FLOOR_CONSTANTS does not name — " +
+        "remeasure-floors reports it as holding its own number, and tells its reader to paste a literal " +
+        "into the row, which is how the constant gets undone one entry at a time",
+    );
+    for (const constantName of declared) {
+      assert.equal(
+        taken.filter((name) => name === constantName).length,
+        sharedFloors().find((shared) => shared.constantName === constantName)?.members.length,
+        `${constantName} is derived over a different number of entries than spell it — a member taking ` +
+          `the same value as a LITERAL is a row that has quietly left the constant while still counting as part of it`,
+      );
+    }
   });
 
   it("answers null for a floor that holds its own number", () => {
