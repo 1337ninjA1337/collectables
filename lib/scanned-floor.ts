@@ -371,6 +371,34 @@ export type ScannedCountFloor = {
    * asserts against.
    */
   readonly extensions?: readonly string[];
+  /**
+   * Why this floor is allowed to sit further under its walk than these floors
+   * are measured with — dated, in the sentence a reader gets instead of a
+   * suggestion.
+   *
+   * `npm run remeasure-floors` reports a floor with more than
+   * {@link import("./floor-walks").FLOOR_DRIFT} of its walk deletable, and is
+   * right to: the number was measured at a quarter, nothing forces a
+   * re-measure any more, and a floor that has drifted to half is doing less
+   * than it reads. But some of them have drifted ON PURPOSE — the three on
+   * `RUNTIME_CODE_WALK_FLOOR` are loose because tightening them would mean
+   * re-taking the number every time the tree grows, for a property that does
+   * not need a tight one — and a tool that asks the same settled question on
+   * every run teaches its reader to skim the section where the UNSETTLED ones
+   * appear.
+   *
+   * So the decision is recorded where the floor is, and the report stops
+   * asking. Not an exemption: the row still prints its percentage, still says
+   * the floor has drifted, and simply says this was argued rather than
+   * offering a number. What it costs is a sentence with a date in it, which is
+   * the thing that makes the decision re-openable later.
+   *
+   * A floor taking its number from a shared constant inherits the constant's
+   * acceptance ({@link SHARED_FLOOR_CONSTANTS}), so one argument covers the
+   * entries that share one number — the same reason the number itself is not
+   * written three times.
+   */
+  readonly driftAccepted?: string;
 };
 
 /**
@@ -845,9 +873,26 @@ export const RUNTIME_CODE_WALK_FLOOR = 174;
  * constant and leaves by not taking it, and there is no second list to drift.
  */
 export const SHARED_FLOOR_CONSTANTS: Readonly<
-  Record<string, { readonly value: number; readonly roots: readonly string[] }>
+  Record<
+    string,
+    {
+      readonly value: number;
+      readonly roots: readonly string[];
+      /**
+       * The looseness argument for every entry taking this number, stated
+       * once — see {@link ScannedCountFloor.driftAccepted}, which is the
+       * per-entry form of the same field.
+       */
+      readonly driftAccepted?: string;
+    }
+  >
 > = {
-  RUNTIME_CODE_WALK_FLOOR: { value: RUNTIME_CODE_WALK_FLOOR, roots: RUNTIME_CODE_DIRS },
+  RUNTIME_CODE_WALK_FLOOR: {
+    value: RUNTIME_CODE_WALK_FLOOR,
+    roots: RUNTIME_CODE_DIRS,
+    driftAccepted:
+      "argued on 2026-09-19 and unchanged: `roots` carries the no-lost-root property, so this number's only remaining job is a walk that came back implausibly small with every root present. 174 against 315 files is loose for that job and deliberately so — raising it would mean re-taking it every time the tree grows, which is the chore declaring the roots removed.",
+  },
 };
 
 export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {

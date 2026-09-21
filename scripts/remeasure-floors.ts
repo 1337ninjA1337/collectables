@@ -46,6 +46,7 @@ import {
   checkWalkPremise,
   describeSharedEdits,
   describeWalkPremiseProblem,
+  driftAccepted,
   FLOOR_DRIFT,
   floorWalks,
   formatFloorMeasurement,
@@ -138,9 +139,13 @@ function main(): void {
     for (const problem of premise) console.log(`       ! ${describeWalkPremiseProblem(problem)}`);
   }
   const moved = rows.filter((row) => row.actionable);
-  const drifted = rows.filter(
-    (row) => !row.actionable && row.slackPercent >= FLOOR_DRIFT * 100,
-  );
+  const loose = rows.filter((row) => !row.actionable && row.slackPercent >= FLOOR_DRIFT * 100);
+  // Split rather than filtered away: a floor whose looseness was argued is
+  // still loose, and hiding it would make this report disagree with the rows
+  // above it. What it is not is a question, so it is counted separately and
+  // never suggested at.
+  const drifted = loose.filter((row) => !driftAccepted(row.checkName));
+  const argued = loose.filter((row) => driftAccepted(row.checkName));
   const unsound = measured.filter((entry) => entry.premise.length > 0);
   console.log("");
   // Named before the early return, because a drifted floor is the one finding
@@ -157,6 +162,13 @@ function main(): void {
     for (const sentence of describeSharedEdits(drifted.map((row) => row.checkName))) {
       console.log(`remeasure-floors: ${sentence}`);
     }
+  }
+  if (argued.length > 0) {
+    console.log(
+      `remeasure-floors: ${String(argued.length)} more floor(s) sit that loose on purpose — ` +
+        `${argued.map((row) => row.checkName).join(", ")}. Each states its reason in the row above; ` +
+        `this does not ask about them again.`,
+    );
   }
   if (moved.length === 0 && unsound.length === 0) {
     console.log(

@@ -7,6 +7,7 @@ import {
   FLOOR_DRIFT,
   FLOOR_SLACK,
   describeSharedEdits,
+  driftAccepted,
   floorWalks,
   formatFloorMeasurement,
   measureFloorWalk,
@@ -741,6 +742,46 @@ describe("sharedFloors", () => {
   });
 });
 
+describe("driftAccepted", () => {
+  /**
+   * A floor may sit loose on purpose, and the report was asking about three of
+   * those on every run.
+   *
+   * `RUNTIME_CODE_WALK_FLOOR`'s looseness was argued in its own header two
+   * days before the drift line started firing on it: the property moved to
+   * `roots`, so the number no longer has to ride above the largest root, and
+   * raising it would reintroduce the re-measure chore declaring the roots
+   * removed. A tool that asks that settled question every run is a tool whose
+   * drift section gets skimmed — including the floors nobody HAS decided
+   * about.
+   */
+  it("reads a shared constant's argument for every entry that takes it", () => {
+    const reason = driftAccepted("check-inline-hex");
+    assert.ok(reason, "check-inline-hex inherits RUNTIME_CODE_WALK_FLOOR's argument");
+    assert.equal(driftAccepted("check-latest-ref"), reason, "one argument, not three");
+    assert.equal(driftAccepted("check-reduced-motion"), reason);
+  });
+
+  it("answers null for a floor nobody has argued about, which is the useful answer", () => {
+    // check-console-swap is 41% deletable today and that is exactly the row
+    // the report should still be asking about.
+    assert.equal(driftAccepted("check-console-swap"), null);
+    assert.equal(driftAccepted("check-nothing-at-all"), null);
+  });
+
+  it("makes every acceptance dated, so the decision can be re-opened", () => {
+    const accepted = [
+      ...Object.values(SHARED_FLOOR_CONSTANTS).map((constant) => constant.driftAccepted),
+      ...Object.values(SCANNED_FLOORS).map((floor) => floor.count?.driftAccepted),
+    ].filter((reason): reason is string => typeof reason === "string");
+    assert.ok(accepted.length > 0, "nothing accepts drift, so this case is checking nothing");
+    for (const reason of accepted) {
+      assert.match(reason, /\d{4}-\d{2}-\d{2}/, `an accepted drift without a date is a decision with no author: ${reason}`);
+      assert.ok(reason.length > 80, "a reason short enough to be a label is a label");
+    }
+  });
+});
+
 describe("describeSharedEdits", () => {
   it("counts edits rather than rows when several members are named", () => {
     const [sentence, ...rest] = describeSharedEdits([
@@ -765,16 +806,20 @@ describe("describeSharedEdits", () => {
 
 describe("formatFloorMeasurement with a shared floor", () => {
   it("names the constant and the rows that move with it, under a suggestion", () => {
+    // The `arithmetic` reading, which is where a suggestion still lands for a
+    // member of a shared floor: the drift reading is argued for this one, and
+    // an argued row is asked nothing. A guard arriving without `roots` is
+    // exactly the case the other value exists for.
     const line = formatFloorMeasurement(
       measureFloorWalk(
         "check-inline-hex",
         RUNTIME_CODE_WALK_FLOOR,
         "source file",
         [root("app", 20), root("components", 60), root("lib", 340)],
-        "declared_roots",
+        "arithmetic",
       ),
     );
-    assert.match(line, /Re-measure to \d+ when convenient/);
+    assert.match(line, /re-measure to \d+/);
     assert.match(line, /That number is RUNTIME_CODE_WALK_FLOOR in lib\/scanned-floor\.ts/);
     assert.match(line, /shared with check-latest-ref and check-reduced-motion/);
     // The instruction that keeps the consolidation: the suggestion's obvious
@@ -799,6 +844,28 @@ describe("formatFloorMeasurement with a shared floor", () => {
       ),
     );
     assert.doesNotMatch(line, /RUNTIME_CODE_WALK_FLOOR/);
+  });
+
+  it("states the drift and drops the suggestion when the looseness was argued", () => {
+    // Still `ok  `, still printing the percentage, still saying the number is
+    // doing less than it reads — what goes away is the question, because it
+    // has an answer and the answer is in the row.
+    const line = formatFloorMeasurement(
+      measureFloorWalk(
+        "check-inline-hex",
+        RUNTIME_CODE_WALK_FLOOR,
+        "source file",
+        [root("app", 20), root("components", 60), root("lib", 340)],
+        "declared_roots",
+      ),
+    );
+    assert.match(line, /^ok {3}check-inline-hex$/m);
+    assert.match(line, /is deletable — the tree has grown/);
+    assert.match(line, /Argued rather than drifted: /);
+    assert.doesNotMatch(line, /Re-measure to/);
+    // And no edit advice either: nobody is being sent to the constant, so
+    // naming it here would be the noise the shared lines exist to avoid.
+    assert.doesNotMatch(line, /Edit the constant/);
   });
 
   it("says nothing about a constant for a floor that holds its own number", () => {

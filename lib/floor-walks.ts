@@ -104,6 +104,8 @@ export type SharedFloor = {
   readonly value: number;
   /** Check names taking it, in `SCANNED_FLOORS` order. */
   readonly members: readonly string[];
+  /** The looseness argument every member inherits, when the constant makes one. */
+  readonly driftAccepted?: string;
 };
 
 /** Same walk, whatever order the roots were written in. */
@@ -123,13 +125,35 @@ function sameRoots(a: readonly string[] | undefined, b: readonly string[]): bool
  * does not mention would be worse than saying nothing.
  */
 export function sharedFloors(): readonly SharedFloor[] {
-  return Object.entries(SHARED_FLOOR_CONSTANTS).map(([constantName, { value, roots }]) => ({
-    constantName,
-    value,
-    members: Object.entries(SCANNED_FLOORS)
-      .filter(([, floor]) => floor.count?.minimum === value && sameRoots(floor.count.roots, roots))
-      .map(([checkName]) => checkName),
-  }));
+  return Object.entries(SHARED_FLOOR_CONSTANTS).map(
+    ([constantName, { value, roots, driftAccepted: accepted }]) => ({
+      constantName,
+      value,
+      members: Object.entries(SCANNED_FLOORS)
+        .filter(([, floor]) => floor.count?.minimum === value && sameRoots(floor.count.roots, roots))
+        .map(([checkName]) => checkName),
+      driftAccepted: accepted,
+    }),
+  );
+}
+
+/**
+ * The argument for a floor's looseness, or `null` where nobody has made one.
+ *
+ * Read from the entry, then from the constant it takes its number from: one
+ * walk's worth of slack is one decision, and writing it into each of the three
+ * entries that share `RUNTIME_CODE_WALK_FLOOR` would be the shape the constant
+ * itself was extracted to remove.
+ *
+ * `null` is the interesting answer — it is what makes the report's drift
+ * section a list of floors nobody has decided about, rather than a list that
+ * happens to include three that were settled two days earlier.
+ */
+export function driftAccepted(checkName: string): string | null {
+  return (
+    SCANNED_FLOORS[checkName]?.count?.driftAccepted ??
+    (sharedFloorFor(checkName)?.driftAccepted || null)
+  );
 }
 
 /** The constant one check takes its floor from, or `null` when it holds its own number. */
@@ -593,12 +617,23 @@ export function formatFloorMeasurement(row: FloorMeasurement): string {
     // `ok  ` and the tool still exits 0, because a floor drifting loose as the
     // tree grows is what these numbers do now that they are no longer pinned
     // to the largest root.
+    //
+    // Unless the looseness was argued, in which case the row says the same
+    // FACT and drops the suggestion. A settled question asked on every run is
+    // what teaches a reader to skim the section the unsettled ones appear in.
+    const accepted = driftAccepted(row.checkName);
     lines.push(
       `       holds, and ${String(row.slackPercent)}% is deletable — the tree has grown well past the ~${String(FLOOR_SLACK * 100)}% this was`,
-      `       measured at, so the number is doing less than it reads. Re-measure to ${String(row.suggested)} when convenient;`,
-      `       nothing is broken, and nothing will go red for this.`,
-      ...sharedLines,
+      `       measured at, so the number is doing less than it reads.`,
     );
+    if (accepted) {
+      lines.push(`       Argued rather than drifted: ${accepted}`);
+    } else {
+      lines.push(
+        `       Re-measure to ${String(row.suggested)} when convenient; nothing is broken, and nothing will go red for this.`,
+        ...sharedLines,
+      );
+    }
   }
   return lines.join("\n");
 }
