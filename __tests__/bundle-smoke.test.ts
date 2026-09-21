@@ -34,6 +34,7 @@ import {
   type PrivacyPageInput,
 } from "../lib/bundle-smoke";
 import { LINT_ALL_EXEMPT } from "../lib/lint-guards";
+import { auditedDeltaKiB } from "../lib/minifier-audit";
 import { PRIVACY_PAGE_LANGUAGES } from "../lib/privacy-languages";
 import { renderPrivacyPage } from "../lib/privacy-page";
 import { readI18nSource } from "./helpers/i18n-source-file";
@@ -200,6 +201,17 @@ describe("formatBundleCharsetReport", () => {
     assert.match(line, /ascii_only/);
     assert.match(line, /metro\.config\.js/);
     assert.match(line, /115 KiB/);
+  });
+
+  it("quotes the cost out of the audit table rather than keeping a second copy", () => {
+    // 115 was written in two places: here and in lib/minifier-audit.ts, where
+    // it is a measurement taken on a dated build. Two copies of a number one
+    // of which gets re-measured is a message that starts lying without anyone
+    // editing it.
+    const line = formatBundleCharsetReport("check", evaluateBundleCharset([ESCAPED.repeat(200)]));
+    const measured = auditedDeltaKiB("output.ascii_only");
+    assert.ok(measured !== null, "the audited row is what this message quotes");
+    assert.ok(line.includes(`~${String(measured)} KiB`));
   });
 });
 

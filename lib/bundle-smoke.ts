@@ -31,6 +31,7 @@
  */
 
 import { checkError } from "./check-error";
+import { auditedDeltaKiB } from "./minifier-audit";
 import { PRIVACY_BODY_BASELINE_WORDS } from "./privacy-body-baselines";
 import {
   PRIVACY_DEFAULT_LANGUAGE,
@@ -856,9 +857,17 @@ export function formatBundleCharsetReport(
   if (result.ok) {
     return `${checkName}: ${result.literals} non-ASCII character(s) ship as UTF-8, ${result.escapes} as escapes.`;
   }
+  // The cost comes out of the audit table rather than being spelled here: the
+  // number is a measurement somebody took on a dated build, and a second copy
+  // of it in a failure message is a copy that stays at 115 after the first one
+  // is re-measured. `null` reads as "no number to quote", which is the honest
+  // sentence when the row it came from is gone.
+  const cost = auditedDeltaKiB("output.ascii_only");
   return checkError(
     checkName,
     `the bundle is escaping its non-ASCII copy: ${result.literals} literal character(s) against ${result.escapes} \\uXXXX escape(s). ` +
-      `That is terser's \`output.ascii_only\`, which costs this app ~115 KiB — check metro.config.js.`,
+      `That is terser's \`output.ascii_only\`` +
+      (cost === null ? "" : `, which costs this app ~${String(cost)} KiB`) +
+      ` — check metro.config.js.`,
   );
 }

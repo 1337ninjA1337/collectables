@@ -52,6 +52,32 @@
  * this stays a function.
  */
 
+/**
+ * What proves an override reached the shipped bundle, for the rows that
+ * override.
+ *
+ * `overridden: true` is a claim about `metro.config.js`, and a config file is
+ * not a bundle. The thing that actually proves `ascii_only: false` took is
+ * `evaluateBundleCharset` counting escapes in `dist/` — which lived one module
+ * over with nothing connecting the two, so the pattern existed exactly once
+ * and only as a coincidence of who happened to write both. A second overridden
+ * row would have arrived with no answer to "and what would go red if it
+ * silently stopped applying?".
+ *
+ * Named parts rather than a sentence, because each is checkable:
+ * `__tests__/minifier-audit.test.ts` reads the guard's script and asserts it
+ * actually calls the evaluator, so a rename or a deleted call site is a red
+ * run rather than a paragraph that has quietly become false.
+ */
+export interface ShippedEvidence {
+  /** The guard that goes red, by check name — `scripts/<check>.ts`. */
+  readonly check: string;
+  /** The exported function in `lib/` that decides it. */
+  readonly evaluator: string;
+  /** What the bundle looks like when the override has stopped applying. */
+  readonly failure: string;
+}
+
 /** One option in the preset, as it was found and as it was priced. */
 export interface AuditedMinifierOption {
   /** Property path inside `transformer.minifierConfig`. */
@@ -65,6 +91,12 @@ export interface AuditedMinifierOption {
   readonly measuredDeltaBytes: number | null;
   /** Whether `metro.config.js` overrides it. */
   readonly overridden: boolean;
+  /**
+   * Required of every overridden row: how the SHIPPED bundle proves the
+   * override took. Absent on the rows that leave Metro's value alone, which
+   * have nothing to have stopped applying.
+   */
+  readonly shippedEvidence?: ShippedEvidence;
   /** Why the current value is the right one. */
   readonly note: string;
 }
@@ -81,6 +113,12 @@ export const AUDITED_MINIFIER_OPTIONS: readonly AuditedMinifierOption[] = [
     metroDefault: true,
     measuredDeltaBytes: -117_760,
     overridden: true,
+    shippedEvidence: {
+      check: "check-bundle-smoke",
+      evaluator: "evaluateBundleCharset",
+      failure:
+        "the bundle's non-ASCII copy comes back as tens of thousands of \\uXXXX escapes against near-zero literal characters, which is the reverse of the comparison the check asserts and cannot happen by accident",
+    },
     note:
       "the one that was wrong for this app: it rewrites every non-ASCII character as a six-byte escape, and a Cyrillic letter costs two bytes in UTF-8. Turned off in metro.config.js on 2026-09-17; every consumer declares UTF-8. Its delta is the ONLY one here not from the 2026-09-19 run — it was measured two days earlier against a smaller tree, and is carried at the 115 KiB that commit reported rather than re-derived, since flipping it back for a fresh number would be a build spent confirming a decision already made.",
   },
@@ -132,6 +170,41 @@ export const AUDITED_MINIFIER_OPTIONS: readonly AuditedMinifierOption[] = [
       "affects only a build that emits sourcemaps, and the deploy strips them — npm run build:sourcemaps is a report, not a shipped artifact.",
   },
 ];
+
+/**
+ * Overridden rows that name nothing in the shipped bundle to prove it.
+ *
+ * The gap this table had while it held exactly one override: `overridden:
+ * true` says what `metro.config.js` asks for, and nothing here said what would
+ * notice if the ask stopped being honoured — a Metro upgrade that reorders the
+ * spread, an edit that replaces `output` instead of spreading it, a preset that
+ * starts ignoring the key. The answer existed for `ascii_only` and existed
+ * nowhere else, so a second override would have been written without one.
+ *
+ * A function over the table rather than a required field, because the
+ * requirement is not "every row" — it is every row that claims to have changed
+ * something, which is a property of the data and belongs where the data can be
+ * asked about it.
+ */
+export function unverifiedOverrides(
+  options: readonly AuditedMinifierOption[] = AUDITED_MINIFIER_OPTIONS,
+): AuditedMinifierOption[] {
+  return options.filter((option) => option.overridden && !option.shippedEvidence);
+}
+
+/**
+ * One audited option's measured delta in KiB, for a message that would
+ * otherwise repeat the number.
+ *
+ * `null` for an option that has no size answer, and for a path the table does
+ * not hold — a caller quoting a cost for an option nobody measured is the
+ * thing worth NOT printing, so the absence is a value rather than a throw.
+ */
+export function auditedDeltaKiB(path: string): number | null {
+  const option = AUDITED_MINIFIER_OPTIONS.find((entry) => entry.path.join(".") === path);
+  if (!option || option.measuredDeltaBytes === null) return null;
+  return Math.round(Math.abs(option.measuredDeltaBytes) / 1024);
+}
 
 /** Read a nested property by path, or `undefined` if any step is missing. */
 function valueAt(config: unknown, path: readonly string[]): unknown {

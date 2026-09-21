@@ -25,10 +25,13 @@ import {
   MINIFIER_AUDIT_DATE,
   MINIFIER_AUDIT_TOTAL_BYTES,
   auditMinifierPreset,
+  auditedDeltaKiB,
   formatMinifierDrift,
+  unverifiedOverrides,
 } from "@/lib/minifier-audit";
 
 import { readRepoFile, repoPath } from "./helpers/repo-file";
+import { sourceFiles } from "./helpers/source-files";
 
 /**
  * Metro's preset as the build sees it.
@@ -126,6 +129,64 @@ describe("the table itself", () => {
     const overridden = AUDITED_MINIFIER_OPTIONS.filter((o) => o.overridden);
     assert.deepEqual(overridden.map((o) => o.path.join(".")), ["output.ascii_only"]);
     assert.match(readRepoFile("metro.config.js"), /ascii_only: false/);
+  });
+
+  /**
+   * `overridden: true` is a claim about a config file, and a config file is
+   * not a bundle. What proves `ascii_only: false` reached `dist/` is a guard
+   * counting escapes in it — which sat one module over with nothing connecting
+   * the two, so the pattern existed once, by coincidence of who wrote both. A
+   * second override would have arrived with no answer to "and what goes red if
+   * it silently stops applying?".
+   */
+  it("makes every override name what would go red in the shipped bundle", () => {
+    assert.deepEqual(
+      unverifiedOverrides().map((o) => o.path.join(".")),
+      [],
+      "an overridden option with no shippedEvidence: metro.config.js asks for something and nothing checks the ask was honoured",
+    );
+    // Non-vacuous: the rule has to be able to find a row that breaks it, or it
+    // is a filter over a table that happens to be clean.
+    assert.deepEqual(
+      unverifiedOverrides([
+        { path: ["compress", "invented"], metroDefault: true, measuredDeltaBytes: null, overridden: true, note: "x" },
+      ]).length,
+      1,
+    );
+  });
+
+  it("names evidence that is a real guard calling a real evaluator", () => {
+    // The half a sentence in a comment could not carry: the guard is read and
+    // the call site is looked for, so a rename or a deleted call is a red run
+    // rather than a paragraph that quietly became false.
+    const libSources = sourceFiles("lib").map((file) => readRepoFile(file));
+    for (const option of AUDITED_MINIFIER_OPTIONS) {
+      const evidence = option.shippedEvidence;
+      if (!evidence) continue;
+      const name = option.path.join(".");
+      const guard = readRepoFile("scripts", `${evidence.check}.ts`);
+      assert.ok(
+        guard.includes(evidence.evaluator),
+        `${name} says ${evidence.check} proves the override took, and that guard never calls ${evidence.evaluator}`,
+      );
+      assert.ok(
+        libSources.some((source) => source.includes(`export function ${evidence.evaluator}`)),
+        `${name} names ${evidence.evaluator} and no module in lib/ exports it`,
+      );
+      assert.ok(
+        evidence.failure.length > 40,
+        `${name} must say what the bundle LOOKS like when the override stops applying, not just who checks`,
+      );
+    }
+  });
+
+  it("gives the measured cost in KiB, and nothing for an option that has no size answer", () => {
+    // The number the charset failure message quotes. It used to be spelled
+    // there as well as here, which is one copy that stays at 115 after the
+    // other is re-measured.
+    assert.equal(auditedDeltaKiB("output.ascii_only"), 115);
+    assert.equal(auditedDeltaKiB("output.quote_style"), null, "not a size question");
+    assert.equal(auditedDeltaKiB("compress.not_an_option"), null, "and no cost for a row that does not exist");
   });
 
   it("keeps the two toplevel options as separate rows", () => {
