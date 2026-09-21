@@ -83,6 +83,12 @@ token from **expo.dev → Account settings → Access tokens**); while the secre
 is unset the job skips gracefully and costs no EAS build minutes. Build
 results appear in the Expo dashboard, not in GitHub Actions.
 
+A green check on that job therefore means **a build was queued**, not that the
+native app built: `--no-wait` returns as soon as EAS accepts the job, and
+nothing in this repository reads the outcome. The job summary says so in those
+words and links the build page, so the check cannot be read as an all-clear
+for the native target.
+
 
 ## Database migrations & local schema testing
 

@@ -61,6 +61,41 @@ describe("eas-preview workflow", () => {
     assert.match(workflow, /permissions:\s*\n\s*contents: read/);
   });
 
+  /**
+   * The check is named "EAS iOS preview build" and goes green for having
+   * QUEUED one. That is the right trade — waiting would hold a runner for a
+   * twenty-minute native build whose result nothing here reads — but it leaves
+   * a green check making a claim about building that nobody measured, which is
+   * the reading a green check invites. These pin the sentence that corrects
+   * it, in the place a reader lands.
+   */
+  it("says in its summary that a green check means queued, not built", () => {
+    assert.match(workflow, /GITHUB_STEP_SUMMARY/, "the job must write a summary at all");
+    assert.match(workflow, /QUEUED\. It has not been built/);
+    assert.match(
+      workflow,
+      /not because the native app compiles/,
+      "the summary has to name the claim it is NOT making, or it reads as a status line",
+    );
+  });
+
+  it("writes that summary whatever happened, including the two non-build paths", () => {
+    // A summary that only ran after a successful queue would be missing on
+    // exactly the runs whose green (skipped token) or red (queue refused) is
+    // hardest to read.
+    assert.match(workflow, /Say what the green check means\n\s*if: always\(\)/);
+    assert.match(workflow, /Nothing was queued\./, "the EXPO_TOKEN-absent path");
+    assert.match(workflow, /The build was not queued\./, "the queue-failed path");
+  });
+
+  it("sends the reader where the outcome actually is", () => {
+    // Best-effort link to the build page, and the dashboard as the fallback:
+    // a summary that says "the outcome is elsewhere" without saying where is
+    // the same dead end in politer words.
+    assert.match(workflow, /build_url=/, "the queued build page is captured from the CLI output");
+    assert.match(workflow, /https:\/\/expo\.dev/, "and the dashboard is named when it is not");
+  });
+
   it("is documented in README-DEPLOY.md with the EXPO_TOKEN secret", () => {
     assert.ok(
       readmeDeploy.includes("eas-preview.yml"),
@@ -70,5 +105,13 @@ describe("eas-preview workflow", () => {
       readmeDeploy.includes("EXPO_TOKEN"),
       "README-DEPLOY.md must document the EXPO_TOKEN secret",
     );
+  });
+
+  it("makes the same queued-not-built point in the deploy doc", () => {
+    // The summary is read by whoever opens the run; the doc is read by whoever
+    // is deciding whether the native target is covered. Both audiences have
+    // been getting the green check's optimistic reading.
+    assert.match(readmeDeploy, /a build was queued/i);
+    assert.match(readmeDeploy, /not that the\s+native app built/);
   });
 });

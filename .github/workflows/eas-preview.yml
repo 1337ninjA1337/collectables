@@ -6,6 +6,12 @@ name: EAS iOS preview build
 # job ends — build minutes are spent on Expo's side, results live in the Expo
 # dashboard.
 #
+# So a green check on this job means "a build was queued", and the job summary
+# says so in those words. The distinction is not pedantry: the check is named
+# after building, nothing here reads the build's outcome, and a reader who
+# takes the green as "the native app builds" has been told the opposite of
+# what was measured.
+#
 # Requires the EXPO_TOKEN repository secret (an Expo access token from
 # https://expo.dev/accounts/[account]/settings/access-tokens). When the secret
 # is absent the job skips gracefully instead of failing, so forks and
@@ -44,7 +50,52 @@ jobs:
         if: steps.token.outputs.present == 'true'
         run: npm ci
       - name: Queue EAS iOS preview build
+        id: queue
         if: steps.token.outputs.present == 'true'
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: npx eas-cli@latest build --platform ios --profile preview --non-interactive --no-wait
+        run: |
+          set -o pipefail
+          npx eas-cli@latest build --platform ios --profile preview --non-interactive --no-wait | tee "$RUNNER_TEMP/eas-queue.log"
+          # The build page EAS prints for the queued build. Best-effort: the
+          # summary below names the dashboard either way, so a changed output
+          # format costs a convenience rather than the whole signal.
+          url="$(grep -Eo 'https://expo\.dev/[^[:space:]]*builds/[0-9a-f-]+' "$RUNNER_TEMP/eas-queue.log" | head -n 1 || true)"
+          echo "build_url=$url" >> "$GITHUB_OUTPUT"
+      # What this job's green check actually claims.
+      #
+      # `--no-wait` is the right trade — a native build holds a runner for
+      # twenty minutes to report something nothing here reads — but it leaves
+      # a check named "EAS iOS preview build" going green for having QUEUED
+      # one. Read as "the native app builds", that is a false all-clear that
+      # has been up for months, and it is exactly the reading a green check
+      # invites. The job says which one it is, in the place a reader lands.
+      - name: Say what the green check means
+        if: always()
+        env:
+          TOKEN_PRESENT: ${{ steps.token.outputs.present }}
+          QUEUE_OUTCOME: ${{ steps.queue.outcome }}
+          BUILD_URL: ${{ steps.queue.outputs.build_url }}
+        run: |
+          {
+            echo "### EAS iOS preview"
+            echo ""
+            if [ "$TOKEN_PRESENT" != "true" ]; then
+              echo "**Nothing was queued.** \`EXPO_TOKEN\` is not configured, so this job skipped"
+              echo "gracefully and spent no EAS build minutes. See README-DEPLOY.md, \"Native (iOS /"
+              echo "App Store) deploys\"."
+            elif [ "$QUEUE_OUTCOME" != "success" ]; then
+              echo "**The build was not queued.** \`eas build --no-wait\` failed before EAS accepted it —"
+              echo "the step log above is the whole story, because nothing reached the dashboard."
+            else
+              echo "**A build was QUEUED. It has not been built.** This check is green because EAS accepted"
+              echo "the job, not because the native app compiles: \`--no-wait\` returns as soon as the build"
+              echo "is in the queue, and nothing in this repository ever reads its outcome."
+              echo ""
+              if [ -n "$BUILD_URL" ]; then
+                echo "Whether it succeeded is here: $BUILD_URL"
+              else
+                echo "Whether it succeeded is in the Expo dashboard: https://expo.dev (Projects → Builds)."
+              fi
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
