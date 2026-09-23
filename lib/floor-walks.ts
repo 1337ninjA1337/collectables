@@ -156,6 +156,30 @@ export function driftAccepted(checkName: string): string | null {
   );
 }
 
+/**
+ * Floors that accept their drift without declaring the roots that earn it.
+ *
+ * Every acceptance written so far makes the same argument: `roots` carries the
+ * no-lost-root property, so the number's only remaining job is a walk that came
+ * back implausibly small with every root present, and a loose number still does
+ * that job. The argument is sound exactly while the roots ARE declared — on an
+ * entry with no `roots`, the number is the only thing holding the property, and
+ * accepting its looseness accepts the hole instead of the chore.
+ *
+ * So the precondition is checked rather than assumed, the direction
+ * {@link unusedUncountedExcuses} reports for an excuse nothing matches: an
+ * acceptance is a decision, and a decision whose premise has gone is a
+ * paragraph nobody reread.
+ */
+export function acceptedWithoutRoots(): string[] {
+  return Object.entries(SCANNED_FLOORS)
+    .filter(([checkName, floor]) => {
+      if (!driftAccepted(checkName)) return false;
+      return (floor.count?.roots ?? []).length === 0;
+    })
+    .map(([checkName]) => checkName);
+}
+
 /** The constant one check takes its floor from, or `null` when it holds its own number. */
 export function sharedFloorFor(checkName: string): SharedFloor | null {
   return sharedFloors().find((shared) => shared.members.includes(checkName)) ?? null;
@@ -201,6 +225,46 @@ export function describeSharedEdits(checkNames: readonly string[]): string[] {
         `${joinNames(hit)} take their number from ${shared.constantName} in lib/scanned-floor.ts — ` +
         `that is ${String(hit.length)} row(s) and one edit.`,
     );
+}
+
+/**
+ * The loose-floor section of the re-measure report, both halves and in order.
+ *
+ * The "more" in "3 MORE floor(s) sit that loose on purpose" is a word about
+ * the sentence above it, and the day every loose floor had been argued that
+ * sentence stopped being printed — leaving "6 more" with nothing to be more
+ * than. A count that reads as a remainder when it is the whole answer is the
+ * same class of mistake the split was written to avoid: the reader is being
+ * told where to look, and looking somewhere that is not there.
+ *
+ * So the two sentences are composed together rather than printed by a script
+ * that knows whether it printed the first one. `describeSharedEdits` belongs
+ * between them (it is about the drifted names, and a reader meets it while
+ * holding them), which is the other reason this is one function.
+ */
+export function describeLooseFloors(
+  drifted: readonly string[],
+  argued: readonly string[],
+): string[] {
+  const lines: string[] = [];
+  if (drifted.length > 0) {
+    lines.push(
+      `${String(drifted.length)} floor(s) have drifted loose as the tree grew — ` +
+        `${drifted.join(", ")}. Nothing is broken and nothing will go red for it; ` +
+        `re-measure when convenient.`,
+    );
+    // The count above is rows; this is edits, and the two stopped being the
+    // same number the day three entries started taking one constant.
+    lines.push(...describeSharedEdits(drifted));
+  }
+  if (argued.length > 0) {
+    lines.push(
+      `${String(argued.length)} ${drifted.length > 0 ? "more floor(s) sit that loose" : "floor(s) sit this loose"} on purpose — ` +
+        `${argued.join(", ")}. Each states its reason in the row above; ` +
+        `this does not ask about them again.`,
+    );
+  }
+  return lines;
 }
 
 /**

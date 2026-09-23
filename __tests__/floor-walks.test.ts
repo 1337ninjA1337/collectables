@@ -7,6 +7,8 @@ import {
   FLOOR_DRIFT,
   FLOOR_SLACK,
   describeSharedEdits,
+  acceptedWithoutRoots,
+  describeLooseFloors,
   driftAccepted,
   floorWalks,
   formatFloorMeasurement,
@@ -763,10 +765,34 @@ describe("driftAccepted", () => {
   });
 
   it("answers null for a floor nobody has argued about, which is the useful answer", () => {
-    // check-console-swap is 41% deletable today and that is exactly the row
-    // the report should still be asking about.
-    assert.equal(driftAccepted("check-console-swap"), null);
+    // check-a11y-jsx sits 33% deletable — under the drift line, never asked
+    // about, and so never argued. The three that WERE being asked about every
+    // run were decided on 2026-09-23; a floor with no acceptance still reads
+    // as one, which is what keeps the next drifted row a question.
+    assert.equal(driftAccepted("check-a11y-jsx"), null);
     assert.equal(driftAccepted("check-nothing-at-all"), null);
+  });
+
+  it("gives the three same-argument floors their own dated reasons, not a shared one", () => {
+    // They walk three different trees and hold three different numbers, so
+    // there is no constant to hang one sentence on — what they share is the
+    // shape of the argument, and each states it about its own walk.
+    const reasons = ["check-console-swap", "check-problem-phrasing-imports", "check-comment-terminators"].map(
+      (name) => driftAccepted(name),
+    );
+    for (const reason of reasons) {
+      assert.ok(reason, "argued on 2026-09-23, after three runs of being asked about");
+      assert.match(reason!, /2026-09-23/);
+    }
+    assert.equal(new Set(reasons).size, 3, "three walks, three arguments");
+    assert.equal(sharedFloorFor("check-console-swap"), null, "and none of them is on a shared constant");
+  });
+
+  it("refuses an acceptance from a floor with no declared roots", () => {
+    // The precondition every acceptance argues from: `roots` carries the
+    // no-lost-root property, so the number may be loose. With no roots the
+    // number is all there is, and accepting its looseness accepts the hole.
+    assert.deepEqual(acceptedWithoutRoots(), []);
   });
 
   it("makes every acceptance dated, so the decision can be re-opened", () => {
@@ -874,5 +900,36 @@ describe("formatFloorMeasurement with a shared floor", () => {
     );
     assert.match(line, /Re-measure to 75 when convenient/);
     assert.doesNotMatch(line, /Edit the constant/);
+  });
+});
+
+describe("describeLooseFloors", () => {
+  it("says 'more' only when there is a sentence above to be more than", () => {
+    // The bug the composition removes: the word belongs to a line the script
+    // used to decide on separately, so the day every loose floor had been
+    // argued the report read "6 more floor(s)" with nothing before it.
+    const [only] = describeLooseFloors([], ["check-console-swap", "check-comment-terminators"]);
+    assert.match(only, /^2 floor\(s\) sit this loose on purpose/);
+    assert.doesNotMatch(only, /more/);
+  });
+
+  it("keeps 'more' when a drifted sentence precedes it", () => {
+    const lines = describeLooseFloors(["check-a11y-jsx"], ["check-console-swap"]);
+    assert.match(lines[0], /^1 floor\(s\) have drifted loose/);
+    assert.match(lines[lines.length - 1], /^1 more floor\(s\) sit that loose on purpose/);
+  });
+
+  it("puts the shared-edit sentence between the two, where its names are", () => {
+    const lines = describeLooseFloors(
+      ["check-inline-hex", "check-latest-ref", "check-reduced-motion"],
+      ["check-console-swap"],
+    );
+    assert.equal(lines.length, 3);
+    assert.match(lines[1], /RUNTIME_CODE_WALK_FLOOR in lib\/scanned-floor\.ts/);
+    assert.match(lines[2], /more floor\(s\)/);
+  });
+
+  it("says nothing at all when no floor is loose either way", () => {
+    assert.deepEqual(describeLooseFloors([], []), []);
   });
 });

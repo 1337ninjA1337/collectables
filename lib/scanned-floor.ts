@@ -913,7 +913,13 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     note: "the whole-tree walk (minus node_modules/.git/dist and non-text extensions) held 713 files on 2026-08-12; 500 survives ordinary pruning while a walk that lost __tests__/ or lib/ does not.",
   },
   "check-console-swap": {
-    count: { label: "source file", minimum: 200, roots: ["app", "components", "lib", "scripts"] },
+    count: {
+      label: "source file",
+      minimum: 200,
+      roots: ["app", "components", "lib", "scripts"],
+      driftAccepted:
+        "argued on 2026-09-23, and the note below had made the argument without a date: `roots` refuses a lost scripts/ by name, so 200's remaining job is a walk that shrank with every root still present. 41% of 361 files is loose for that job and deliberately so — lib/ contributes 242 and grows every week, so a tighter number is a re-measure every few days for a check that would still catch the failure it is for (a glob narrowed to one extension comes back at a tenth of this, not at four fifths).",
+    },
     note: "app/ + components/ + lib/ + scripts/ held 277 .ts/.tsx files on 2026-08-27 (app 19, components 46, lib 180, scripts 32); 200 leaves 27% deletable. `roots` holds the no-single-root property — a lost scripts/ refuses by name rather than by arithmetic — so this number's remaining job is the walk that shrank without losing a root. Deliberately NOT the same walk as check-profile-id-pii, which also reads data/: this rule is about code that runs, and data/ holds seed literals.",
   },
   "check-inline-radius": {
@@ -937,7 +943,13 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
     note: "app/ + components/ + data/ + lib/ held 267 .ts/.tsx files on 2026-09-10 (app 19, components 47, data 3, lib 198); 200 leaves 25% of them deletable. `roots` carries the no-lost-root property — data/ is three files and no count could ever ride above it — so this number's only job is the walk that came back implausibly small with every root present. scripts/ is deliberately absent: Metro never resolves it, so a platform spelling there would be a file nothing imports.",
   },
   "check-problem-phrasing-imports": {
-    count: { label: "source file", minimum: 535, roots: ["app", "components", "lib", "scripts", "__tests__"] },
+    count: {
+      label: "source file",
+      minimum: 535,
+      roots: ["app", "components", "lib", "scripts", "__tests__"],
+      driftAccepted:
+        "argued on 2026-09-23: the note below already says the ride-above-__tests__ property moved to `roots`, which is the whole reason this row stopped being the one likeliest to need re-measuring. __tests__/ is 631 of the 992 files and gains a few every run, so any number tight enough to read well today is a chore tomorrow — the 46% is the price of the property being asserted somewhere better than arithmetic.",
+    },
     note: "app/ + components/ + lib/ + scripts/ + __tests__/ held 716 .ts/.tsx files on 2026-08-21 (app 19, components 46, lib 168, scripts 32, tests 451); 535 leaves 25% deletable. It used to have to ride above the 451 that __tests__/ alone contributes, which made it the entry likeliest to need re-measuring next — 96% of the way there at one point. `roots` holds that property now, asserted by the guard rather than by this number, and what is left is a plausibility check on the total.",
   },
   "check-a11y-jsx": {
@@ -994,6 +1006,8 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
       // guard's own wrapper already holds the only sanctioned near-copy (its
       // scan list must be a literal for that suite's parser to read).
       roots: [...SOURCE_DIRS, SUITES_DIR],
+      driftAccepted:
+        "argued on 2026-09-23, from the sentence the note below ends on: __tests__/ alone contributes 631 of 995, and no floor over this walk could ride above that without being re-measured monthly. The widest walk in the registry drifts fastest by construction, so 40% here is the same decision as the other two and not a worse one.",
     },
     note: "the six hand-written source roots held 810 .ts/.tsx files on 2026-09-01 (app 19, components 46, data 5, lib 190, scripts 39, tests 511); 600 leaves 26% deletable. The widest walk in the registry, and deliberately so: the rule is about PROSE rather than about code that ships, and every one of these roots is full of it — the file that demonstrated the failure was in scripts/, which the hex and radius walks never read. `roots` carries the no-single-root property, so the number's remaining job is a walk that shrank without losing a root; __tests__/ alone contributes 511, which no floor could ride above without re-measuring monthly.",
   },
@@ -1005,6 +1019,8 @@ export const SCANNED_FLOORS: Readonly<Record<string, ScannedFloor>> = {
       // through the constants, so `guard-scan-dirs.test.ts` keeps one copy of
       // the list in the tree.
       roots: [...SOURCE_DIRS, SUITES_DIR],
+      driftAccepted:
+        "argued on 2026-09-23, from the sentence the note below ends on: __tests__/ alone contributes 631 of 995, and no floor over this walk could ride above that without being re-measured monthly. The widest walk in the registry drifts fastest by construction, so 40% here is the same decision as the other two and not a worse one.",
     },
     note: "the six hand-written source roots held 962 .ts/.tsx files on 2026-09-14 (app 19, components 53, data 3, lib 232, scripts 43, tests 612); 700 leaves 27% deletable. Deliberately the same width as check-comment-terminators rather than the app/ + components/ walk the other JSX rules take: all nine copies this guard found on its first run were in __tests__/, which is where a scratch sweep gets written and where two of the three walks it was built to prevent already lived. `roots` carries the no-single-root property, so this number's remaining job is the walk that shrank without losing a root — __tests__/ alone contributes 612, which no floor could ride above without re-measuring monthly.",
   },

@@ -44,6 +44,7 @@ import * as path from "node:path";
 
 import {
   checkWalkPremise,
+  describeLooseFloors,
   describeSharedEdits,
   describeWalkPremiseProblem,
   driftAccepted,
@@ -151,24 +152,11 @@ function main(): void {
   // Named before the early return, because a drifted floor is the one finding
   // here that never fails anything: mentioned only inside the per-row block it
   // would be the line a reader scrolls past on an otherwise-clean run.
-  if (drifted.length > 0) {
-    console.log(
-      `remeasure-floors: ${String(drifted.length)} floor(s) have drifted loose as the tree grew — ` +
-        `${drifted.map((row) => row.checkName).join(", ")}. Nothing is broken and nothing will go red for it; ` +
-        `re-measure when convenient.`,
-    );
-    // The count above is rows; this is edits, and the two stopped being the
-    // same number the day three entries started taking one constant.
-    for (const sentence of describeSharedEdits(drifted.map((row) => row.checkName))) {
-      console.log(`remeasure-floors: ${sentence}`);
-    }
-  }
-  if (argued.length > 0) {
-    console.log(
-      `remeasure-floors: ${String(argued.length)} more floor(s) sit that loose on purpose — ` +
-        `${argued.map((row) => row.checkName).join(", ")}. Each states its reason in the row above; ` +
-        `this does not ask about them again.`,
-    );
+  for (const sentence of describeLooseFloors(
+    drifted.map((row) => row.checkName),
+    argued.map((row) => row.checkName),
+  )) {
+    console.log(`remeasure-floors: ${sentence}`);
   }
   if (moved.length === 0 && unsound.length === 0) {
     console.log(
