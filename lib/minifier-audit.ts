@@ -104,7 +104,27 @@ export interface AuditedMinifierOption {
 /** The date the numbers below were taken, for the report to quote. */
 export const MINIFIER_AUDIT_DATE = "2026-09-19";
 
-/** The total the deltas are against, so a reader can turn them into percentages. */
+/**
+ * The total the deltas are against, so a reader can turn them into percentages.
+ *
+ * The suggestion list carried "3,718,641 here and 3,631.8 KiB in
+ * `check-bundle-size` — both right, and a reader turning a delta into a
+ * percentage cannot tell which denominator they hold" for three runs. Checked
+ * on 2026-09-23, it is one number: 3,718,641 bytes IS 3,631.5 KiB, the same
+ * seven chunks the size gate adds up, in bytes because the deltas are in bytes.
+ * There was never a choice to get wrong — there were two units and no sentence
+ * saying so.
+ *
+ * What CAN go wrong is staleness, and that is not a units question: this is a
+ * measurement dated {@link MINIFIER_AUDIT_DATE}, and `BUDGET_SNAPSHOT` holds
+ * the same quantity taken when the budget last moved (1,350 bytes away, 0.04%).
+ * Two dated readings of one artifact agree until one of them stops being
+ * re-taken, so `minifier-audit.test.ts` holds them against each other rather
+ * than trusting this paragraph.
+ *
+ * {@link auditedDeltaShare} is there so a percentage never needs the
+ * denominator typed at a call site at all.
+ */
 export const MINIFIER_AUDIT_TOTAL_BYTES = 3_718_641;
 
 export const AUDITED_MINIFIER_OPTIONS: readonly AuditedMinifierOption[] = [
@@ -204,6 +224,27 @@ export function auditedDeltaKiB(path: string): number | null {
   const option = AUDITED_MINIFIER_OPTIONS.find((entry) => entry.path.join(".") === path);
   if (!option || option.measuredDeltaBytes === null) return null;
   return Math.round(Math.abs(option.measuredDeltaBytes) / 1024);
+}
+
+/**
+ * One audited option's cost as a share of the bundle it was measured against.
+ *
+ * A delta with no denominator is a number rather than a finding — -33 is
+ * trivial or enormous depending on what it is 33 out of — and the two places
+ * this repository states that denominator are the same quantity in different
+ * units, which is exactly the confusion a reader should not have to resolve on
+ * their own. So the division happens once, here, against the total the delta
+ * was actually taken with.
+ *
+ * A percentage, not a fraction: every note in the table writes these as
+ * percentages ("0.0009%"), and the unit is the half of a number that gets
+ * dropped in a copy. `null` for an option with no size answer or a path the
+ * table does not hold, matching {@link auditedDeltaKiB}.
+ */
+export function auditedDeltaShare(path: string): number | null {
+  const option = AUDITED_MINIFIER_OPTIONS.find((entry) => entry.path.join(".") === path);
+  if (!option || option.measuredDeltaBytes === null) return null;
+  return (Math.abs(option.measuredDeltaBytes) / MINIFIER_AUDIT_TOTAL_BYTES) * 100;
 }
 
 /** Read a nested property by path, or `undefined` if any step is missing. */

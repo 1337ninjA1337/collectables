@@ -26,12 +26,15 @@ import {
   MINIFIER_AUDIT_TOTAL_BYTES,
   auditMinifierPreset,
   auditedDeltaKiB,
+  auditedDeltaShare,
   evidenceClaims,
   evidenceLinkProblems,
   formatEvidenceLinkProblems,
   formatMinifierDrift,
   unverifiedOverrides,
 } from "@/lib/minifier-audit";
+
+import { LAST_MEASURED_BUNDLE_BYTES } from "@/lib/bundle-size";
 
 import { readRepoFile, repoPath } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
@@ -211,6 +214,35 @@ describe("the table itself", () => {
       Math.abs(reduceFuncs!.measuredDeltaBytes!) / MINIFIER_AUDIT_TOTAL_BYTES < 0.0001,
       "the finding is that this is negligible; if it stops being negligible the note is wrong",
     );
+  });
+
+  it("states its total in the same unit-free terms the size gate measures", () => {
+    // The carried suggestion said two denominators; there is one quantity and
+    // two units. 3,718,641 bytes is 3,631.5 KiB, which is the total
+    // check-bundle-size adds up over the same seven chunks.
+    assert.equal(Math.round(MINIFIER_AUDIT_TOTAL_BYTES / 1024), 3631);
+  });
+
+  it("agrees with the budget snapshot, which measures the same artifact on a different day", () => {
+    // Two dated readings of one bundle, and the failure this can catch is not a
+    // units mix-up: it is one of them going stale while a reader keeps dividing
+    // by it. 0.04% apart on 2026-09-23, and the budget's own headroom (23.8 KiB,
+    // 0.6%) bounds how far one build can move them — so a gap this wide means
+    // several budget raises have happened since the audit was taken.
+    const drift = Math.abs(MINIFIER_AUDIT_TOTAL_BYTES - LAST_MEASURED_BUNDLE_BYTES) / MINIFIER_AUDIT_TOTAL_BYTES;
+    assert.ok(
+      drift < 0.05,
+      `the audit's denominator (${String(MINIFIER_AUDIT_TOTAL_BYTES)} B, ${MINIFIER_AUDIT_DATE}) and the budget snapshot (${String(LAST_MEASURED_BUNDLE_BYTES)} B) are ${(drift * 100).toFixed(1)}% apart — re-take MINIFIER_AUDIT_TOTAL_BYTES from a fresh build, or the percentages in the table's notes are against a bundle that no longer exists`,
+    );
+  });
+
+  it("turns a delta into a percentage so no call site picks a denominator", () => {
+    const share = auditedDeltaShare("compress.reduce_funcs");
+    assert.ok(share !== null && share < 0.001, "the note says 0.0009%, and that is where it comes from");
+    assert.equal(auditedDeltaShare("output.quote_style"), null, "not a size question");
+    assert.equal(auditedDeltaShare("compress.not_an_option"), null, "and nothing for a row that does not exist");
+    const ascii = auditedDeltaShare("output.ascii_only");
+    assert.ok(ascii !== null && ascii > 3 && ascii < 3.5, "the 3% the whole audit started from");
   });
 
   it("records the two structural zeroes as zero, not as absent measurements", () => {
