@@ -26,6 +26,9 @@ import {
   MINIFIER_AUDIT_TOTAL_BYTES,
   auditMinifierPreset,
   auditedDeltaKiB,
+  evidenceClaims,
+  evidenceLinkProblems,
+  formatEvidenceLinkProblems,
   formatMinifierDrift,
   unverifiedOverrides,
 } from "@/lib/minifier-audit";
@@ -217,5 +220,112 @@ describe("the table itself", () => {
       const row = AUDITED_MINIFIER_OPTIONS.find((o) => o.path.join(".") === name);
       assert.equal(row?.measuredDeltaBytes, 0, `${name} was built and measured`);
     }
+  });
+});
+
+/**
+ * The direction the table could not see.
+ *
+ * `unverifiedOverrides` asks every override to name what would go red. The
+ * reverse was unasked: an evaluator is cited by a row it cannot read, so
+ * deleting the row — or flipping its `overridden` to false — leaves
+ * `evaluateBundleCharset` running inside a gate leg as a check with no stated
+ * subject. Green forever, about a config line nobody asserts any more. The
+ * marker in the evaluator's own doc is the other end of the link, and this is
+ * where the two ends are made to agree.
+ */
+describe("the shipped-evidence link, both ends", () => {
+  const libModules = sourceFiles("lib").map((file) => ({ path: file, text: readRepoFile(file) }));
+
+  it("has every override and every evaluator naming each other", () => {
+    const problems = evidenceLinkProblems(evidenceClaims(libModules));
+    assert.deepEqual(problems, [], formatEvidenceLinkProblems(problems));
+  });
+
+  it("actually found the one marker in the tree, rather than scanning nothing", () => {
+    // The assertion above is a negative over a parse, and a parse that reads no
+    // markers satisfies it. This is the positive that makes it mean something.
+    const claims = evidenceClaims(libModules);
+    assert.deepEqual(claims, [
+      { module: "lib/bundle-smoke.ts", option: "output.ascii_only", evaluator: "evaluateBundleCharset" },
+    ]);
+  });
+
+  it("reads a doc TAG and not a mention of one", () => {
+    // Why the rule is about a tag line: `lib/minifier-audit.ts` spells the
+    // marker inside its own prose to explain it, and a looser match would read
+    // that sentence as a claim about whatever function came next.
+    const claims = evidenceClaims([
+      { path: "lib/prose.ts", text: "// see @shippedEvidence output.ascii_only for the shape\nexport function f() {}" },
+      { path: "lib/tag.ts", text: "/**\n * @shippedEvidence output.ascii_only\n */\nexport function g() {}" },
+    ]);
+    assert.deepEqual(claims, [{ module: "lib/tag.ts", option: "output.ascii_only", evaluator: "g" }]);
+  });
+
+  it("reports a marker whose row has gone, which is what a deleted row leaves behind", () => {
+    const problems = evidenceLinkProblems(evidenceClaims(libModules), [
+      { path: ["compress", "reduce_funcs"], metroDefault: false, measuredDeltaBytes: -33, overridden: false, note: "x" },
+    ]);
+    assert.deepEqual(problems, [
+      {
+        code: "orphan_claim",
+        option: "output.ascii_only",
+        module: "lib/bundle-smoke.ts",
+        evaluator: "evaluateBundleCharset",
+      },
+    ]);
+    assert.match(formatEvidenceLinkProblems(problems), /no overridden row in AUDITED_MINIFIER_OPTIONS names it/);
+  });
+
+  it("reports a row whose evaluator never says what it is for", () => {
+    const problems = evidenceLinkProblems([], [
+      {
+        path: ["output", "ascii_only"],
+        metroDefault: true,
+        measuredDeltaBytes: -117_760,
+        overridden: true,
+        shippedEvidence: { check: "check-bundle-smoke", evaluator: "evaluateBundleCharset", failure: "x" },
+        note: "x",
+      },
+    ]);
+    assert.deepEqual(problems, [
+      { code: "unclaimed_evaluator", option: "output.ascii_only", evaluator: "evaluateBundleCharset" },
+    ]);
+    assert.match(formatEvidenceLinkProblems(problems), /@shippedEvidence output\.ascii_only/);
+  });
+
+  it("reports evidence left behind by an override that stopped being one, once", () => {
+    // The row keeping its proof after the metro.config.js line goes is the
+    // cheap half — visible from the table alone — and it must not also be
+    // reported as an evaluator that failed to claim it: one broken link, one
+    // finding, or the count in the summary is a lie.
+    const problems = evidenceLinkProblems(evidenceClaims(libModules), [
+      {
+        path: ["output", "ascii_only"],
+        metroDefault: true,
+        measuredDeltaBytes: -117_760,
+        overridden: false,
+        shippedEvidence: { check: "check-bundle-smoke", evaluator: "evaluateBundleCharset", failure: "x" },
+        note: "x",
+      },
+    ]);
+    assert.deepEqual(problems.map((p) => p.code), ["evidence_without_subject", "orphan_claim"]);
+    assert.match(formatEvidenceLinkProblems(problems), /there is no override left to prove/);
+  });
+
+  it("treats a marker documenting nothing exported as a claim, not as absent", () => {
+    // A tag at the bottom of a file, or above a function somebody stopped
+    // exporting: the option is named and there is no callable evidence. The
+    // quiet reading would be "no claim here", which is the same green the whole
+    // rule exists to remove.
+    const problems = evidenceLinkProblems(
+      evidenceClaims([{ path: "lib/loose.ts", text: "/**\n * @shippedEvidence output.ascii_only\n */\nconst h = 1;\n" }]),
+    );
+    assert.deepEqual(problems.map((p) => p.code), ["unclaimed_evaluator", "orphan_claim"]);
+    assert.match(formatEvidenceLinkProblems(problems), /a marker above nothing exported/);
+  });
+
+  it("says nothing when both ends agree", () => {
+    assert.equal(formatEvidenceLinkProblems([]), "");
   });
 });

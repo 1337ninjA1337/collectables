@@ -260,3 +260,153 @@ export function formatMinifierDrift(drift: readonly MinifierDrift[]): string {
   );
   return lines.join("\n");
 }
+
+/**
+ * The marker an evaluator writes in its own doc to name the audited option it
+ * proves — `@shippedEvidence output.ascii_only`.
+ *
+ * {@link unverifiedOverrides} asks one direction: a row claiming to override
+ * something has to name what would go red. Nothing asked the other, and the
+ * other is where the silent failure lives — an evaluator is evidence for a row
+ * it cannot see. Delete the row, or flip its `overridden` to false, and
+ * `evaluateBundleCharset` keeps running inside a gate leg as a check with no
+ * stated subject: green forever, about nothing anybody decided to assert.
+ *
+ * So the link is written at BOTH ends and neither end is a list. The table
+ * names the evaluator; the evaluator's doc names the option. A claim with no
+ * matching overridden row is the same finding {@link
+ * import("./floor-walks").unusedUncountedExcuses} reports for an excuse
+ * nothing matches — a rule kept for a subject that left.
+ *
+ * Deliberately not a second table of "evaluators that are evidence": that list
+ * would have to be remembered, which is the failure this is closing.
+ */
+export const SHIPPED_EVIDENCE_MARKER = "@shippedEvidence";
+
+/** A `lib/` module as the suite read it, for the marker parse. */
+export interface EvidenceModule {
+  /** Repo-relative path, for a finding a reader can open. */
+  readonly path: string;
+  readonly text: string;
+}
+
+/** One `@shippedEvidence` marker, with the export it sits above. */
+export interface EvidenceClaim {
+  readonly module: string;
+  /** The audited option path the marker names. */
+  readonly option: string;
+  /**
+   * The exported function the marker documents — the first `export function`
+   * after it, so renaming the function moves the claim with it. `null` when the
+   * marker documents nothing exported, which is a finding rather than a skip:
+   * a claim nobody can call is not evidence.
+   */
+  readonly evaluator: string | null;
+}
+
+/**
+ * Every `@shippedEvidence` marker in the given modules.
+ *
+ * Takes the sources rather than walking `lib/` itself, the same way
+ * {@link auditMinifierPreset} takes the config: this module stays Node-pure and
+ * the suite does the reading.
+ */
+export function evidenceClaims(modules: readonly EvidenceModule[]): EvidenceClaim[] {
+  const claims: EvidenceClaim[] = [];
+  // A doc TAG, which is a line of its own beginning with the comment star —
+  // not any mention of the word. The distinction is what lets this module's own
+  // header spell the marker inline while explaining it, and it is the shape a
+  // real marker has anyway.
+  const marker = new RegExp(`^\\s*\\*\\s*${SHIPPED_EVIDENCE_MARKER}\\s+([\\w.$]+)`, "gm");
+  for (const module of modules) {
+    for (const match of module.text.matchAll(marker)) {
+      const after = module.text.slice(match.index + match[0].length);
+      const exported = /export function ([\w$]+)/.exec(after);
+      claims.push({ module: module.path, option: match[1], evaluator: exported ? exported[1] : null });
+    }
+  }
+  return claims;
+}
+
+/** A link between the audit table and a shipped-bundle evaluator that is broken. */
+export type EvidenceLinkProblem =
+  | { readonly code: "evidence_without_subject"; readonly option: string; readonly evaluator: string }
+  | { readonly code: "unclaimed_evaluator"; readonly option: string; readonly evaluator: string }
+  | {
+      readonly code: "orphan_claim";
+      readonly option: string;
+      readonly module: string;
+      readonly evaluator: string | null;
+    };
+
+/**
+ * The two-way link, checked in both directions.
+ *
+ * `evidence_without_subject` is the cheap half and it is data-only: a row that
+ * no longer overrides anything has nothing left to prove, so the evidence it
+ * carries is about a config line that was deleted.
+ *
+ * The other two need the evaluator's own source, because the failure they catch
+ * cannot be seen from the table at all. `unclaimed_evaluator` is a row naming
+ * a function that never says what it is for — the state every override was in
+ * before this existed. `orphan_claim` is the reverse and the one the suggestion
+ * was about: a marker naming an option no overridden row matches, which is what
+ * a deleted row, an un-overridden row, a renamed evaluator or a typo in either
+ * end all come out as.
+ */
+export function evidenceLinkProblems(
+  claims: readonly EvidenceClaim[],
+  options: readonly AuditedMinifierOption[] = AUDITED_MINIFIER_OPTIONS,
+): EvidenceLinkProblem[] {
+  const problems: EvidenceLinkProblem[] = [];
+  const claimed = new Set(claims.map((claim) => `${claim.option}\u0000${claim.evaluator ?? ""}`));
+  const proven = new Set<string>();
+  for (const option of options) {
+    const evidence = option.shippedEvidence;
+    if (!evidence) continue;
+    const path = option.path.join(".");
+    if (!option.overridden) {
+      problems.push({ code: "evidence_without_subject", option: path, evaluator: evidence.evaluator });
+      continue;
+    }
+    proven.add(`${path}\u0000${evidence.evaluator}`);
+    if (!claimed.has(`${path}\u0000${evidence.evaluator}`)) {
+      problems.push({ code: "unclaimed_evaluator", option: path, evaluator: evidence.evaluator });
+    }
+  }
+  for (const claim of claims) {
+    if (proven.has(`${claim.option}\u0000${claim.evaluator ?? ""}`)) continue;
+    problems.push({
+      code: "orphan_claim",
+      option: claim.option,
+      module: claim.module,
+      evaluator: claim.evaluator,
+    });
+  }
+  return problems;
+}
+
+/** The broken links as one sentence each, naming both ends and the edit. */
+export function formatEvidenceLinkProblems(problems: readonly EvidenceLinkProblem[]): string {
+  if (problems.length === 0) return "";
+  const lines: string[] = [];
+  for (const problem of problems) {
+    if (problem.code === "evidence_without_subject") {
+      lines.push(
+        `  ${problem.option}: no longer overridden, and still names ${problem.evaluator} as proof the override took — there is no override left to prove. Drop the shippedEvidence with the metro.config.js line, or say why the row is still an override.`,
+      );
+    } else if (problem.code === "unclaimed_evaluator") {
+      lines.push(
+        `  ${problem.option}: names ${problem.evaluator} as its shipped evidence, and that function's doc never says so. Add "${SHIPPED_EVIDENCE_MARKER} ${problem.option}" above it, so deleting this row turns the evaluator into a reported orphan rather than a green check about nothing.`,
+      );
+    } else {
+      lines.push(
+        `  ${problem.module}: ${problem.evaluator === null ? "a marker above nothing exported" : problem.evaluator} claims to be the shipped evidence for ${problem.option}, and no overridden row in AUDITED_MINIFIER_OPTIONS names it. Either the row left (delete the marker with it) or the two ends disagree about a name.`,
+      );
+    }
+  }
+  return [
+    `${problems.length} shipped-evidence link(s) are broken: an override and the guard that proves it have to name each other, and one end of each of these names nothing.`,
+    ...lines,
+  ].join("\n");
+}

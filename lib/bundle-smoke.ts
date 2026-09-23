@@ -836,6 +836,20 @@ export type BundleCharsetResult = {
  */
 export const BUNDLE_NON_ASCII_FLOOR = 1000;
 
+/**
+ * The guard's half of a two-way link, said where the code is.
+ *
+ * @shippedEvidence output.ascii_only
+ *
+ * `AUDITED_MINIFIER_OPTIONS` names this function as what proves the override in
+ * `metro.config.js` reached `dist/`, and for a while that was the only end the
+ * link had. An evaluator cannot see the row that cites it: delete the row, or
+ * flip its `overridden` to false, and this keeps running inside a gate leg as a
+ * check with no stated subject — green forever, about a config line nobody
+ * asserts any more. The marker above is what turns that into a red run, by
+ * being the claim `evidenceLinkProblems` reports as an orphan when no overridden
+ * row matches it.
+ */
 export function evaluateBundleCharset(chunkTexts: readonly string[]): BundleCharsetResult {
   let literals = 0;
   let escapes = 0;
