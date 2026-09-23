@@ -245,6 +245,29 @@ describe("the table itself", () => {
     assert.ok(ascii !== null && ascii > 3 && ascii < 3.5, "the 3% the whole audit started from");
   });
 
+  it("keeps a percentage written in a note in step with the one derived from the row", () => {
+    // `compress.reduce_funcs` argues from "0.0009%" in its own prose, beside a
+    // delta and a total that produce 0.00089%. Two copies of one quotient, and
+    // the note is the one that stays behind when the row is re-measured. The
+    // tolerance is relative and generous because a note ROUNDS on purpose —
+    // what it cannot do is be about a different measurement.
+    let checked = 0;
+    for (const option of AUDITED_MINIFIER_OPTIONS) {
+      const share = auditedDeltaShare(option.path.join("."));
+      if (share === null) continue;
+      for (const match of option.note.matchAll(/([\d.]+)%/g)) {
+        const noted = Number.parseFloat(match[1]);
+        if (!Number.isFinite(noted) || noted === 0) continue;
+        checked += 1;
+        assert.ok(
+          Math.abs(noted - share) / share < 0.2,
+          `${option.path.join(".")}'s note says ${match[1]}% and its delta over MINIFIER_AUDIT_TOTAL_BYTES is ${share.toFixed(5)}% — one of the two was re-measured and the other was not`,
+        );
+      }
+    }
+    assert.ok(checked > 0, "no note quotes a percentage, so this case is checking nothing");
+  });
+
   it("records the two structural zeroes as zero, not as absent measurements", () => {
     // "Not measured" and "measured, and it changed nothing" are different
     // answers, and the second is the interesting one here.
