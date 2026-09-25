@@ -189,7 +189,8 @@ export const LINT_GUARDS: readonly LintGuard[] = [
  * here — a new guard can't silently dodge the aggregate.
  */
 export const LINT_ALL_EXEMPT: Readonly<Record<string, string>> = {
-  lint: "expo lint (ESLint) — separate toolchain, run on demand",
+  lint:
+    "eslint . — the parsing toolchain, which answers what a text scan declines (a ref read in a render body, a conditional hook) and reports 251 findings on this tree today; a report until the tenth-leg decision is argued",
   "lint:ci": "the CI orchestrator that runs lint:all itself",
   "lint:all": "the aggregator itself",
   "lint:secrets:bundle": "needs the exported dist/ web bundle from npm run build",

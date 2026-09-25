@@ -8,7 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run typecheck",
     "test": "tsx --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./__tests__/test-globals.ts --test --test-reporter=tap --test-reporter-destination=stdout --test-reporter=./scripts/test-failure-reporter.ts --test-reporter-destination=stderr __tests__/*.test.ts",
@@ -103,6 +103,8 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "~19.1.10",
     "cross-env": "^10.1.0",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.2",
     "gh-pages": "^6.3.0",
     "tsx": "^4.21.0",
     "typescript": "~5.9.2"

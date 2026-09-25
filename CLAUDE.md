@@ -26,7 +26,7 @@ npm run ios        # iOS simulator
 npm run web        # browser
 
 # Lint
-npm run lint       # expo lint (ESLint under the hood)
+npm run lint       # eslint . over the whole tree (config in eslint.config.js; a report, not a gate leg)
 ```
 
 Tests run on the built-in `node:test` runner via `tsx`:
