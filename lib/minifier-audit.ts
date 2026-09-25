@@ -451,3 +451,260 @@ export function formatEvidenceLinkProblems(problems: readonly EvidenceLinkProble
     ...lines,
   ].join("\n");
 }
+
+/**
+ * How far a number written in prose may sit from the one the row derives.
+ *
+ * Relative, and generous, because prose ROUNDS on purpose: 3.1667% reads as
+ * "3% of the bundle" and 115.0 KiB is written as "115.4 KiB" by the commit
+ * that measured it against a slightly different tree. Both are the number a
+ * reader wants. What the bound refuses is a sentence about a DIFFERENT
+ * measurement — the state every copy falls into the day its row is re-measured
+ * and the sentence is not.
+ *
+ * One constant rather than a `0.2` typed at each call site: the note rule in
+ * `minifier-audit.test.ts` was here first and the prose rule below is the same
+ * judgement about the same kind of number, so the day one of them is argued
+ * looser the other should move with it or be argued separately, out loud.
+ */
+export const PROSE_QUANTITY_TOLERANCE = 0.2;
+
+/**
+ * A measured number this repository states in prose, away from the row that
+ * derives it.
+ *
+ * `auditedDeltaShare` closed the half of this that lives in the table: every
+ * percentage inside a `note` is held against the row it describes. The half it
+ * could not see is the half that started the audit — `ascii_only` cost "3% of
+ * the bundle", "115 KiB", and those sentences are in five module headers and
+ * one budget entry, none of which is a `note` and none of which any case read.
+ * Three copies of one quotient, one of them checked, was the finding.
+ *
+ * The entry is a VERBATIM fragment rather than a number plus a file, and that
+ * is the whole design: a fragment that is still in the file proves the sentence
+ * was not rewritten around the number, the number is parsed back out of the
+ * fragment ({@link quotedQuantity}) so the registry never holds a second copy
+ * of it, and a re-measured row turns every stale site red by name instead of
+ * leaving a reader to grep. Keep each quote on ONE source line — these are
+ * wrapped comments, and a fragment that spans a wrap can never match.
+ */
+export interface ProseQuote {
+  /** Repo-relative path of the module whose prose says it. */
+  readonly file: string;
+  /** The audited option path the sentence is about. */
+  readonly path: string;
+  /** The fragment, exactly as the file spells it, carrying the number. */
+  readonly quote: string;
+}
+
+/**
+ * Every prose statement of an audited measurement outside the table.
+ *
+ * `lib/` only, deliberately: these are the modules a reader reaches for to
+ * learn what the option cost. The suites quote the same 115 KiB in three more
+ * headers and are left out for now — extending the scan there is a suggestion,
+ * not a silent gap, because {@link proseQuoteProblems} reports an unregistered
+ * copy in any module it is HANDED, so the scope is the call site's to widen.
+ */
+export const AUDITED_PROSE_QUOTES: readonly ProseQuote[] = [
+  {
+    file: "lib/minifier-audit.ts",
+    path: "output.ascii_only",
+    quote: "costing 3% of the bundle",
+  },
+  {
+    file: "lib/minifier-audit.ts",
+    path: "output.ascii_only",
+    quote: "bundle: 115 KiB of",
+  },
+  {
+    file: "lib/minifier-audit.ts",
+    path: "output.ascii_only",
+    quote: "carried at the 115 KiB that commit reported",
+  },
+  {
+    file: "lib/minifier-audit.ts",
+    path: "compress.reduce_funcs",
+    quote: "3,718,641 — 0.0009%",
+  },
+  {
+    file: "lib/bundle-smoke.ts",
+    path: "output.ascii_only",
+    quote: "was carrying 115 KiB of",
+  },
+  {
+    file: "lib/bundle-smoke.ts",
+    path: "output.ascii_only",
+    quote: "be 115 KiB heavier",
+  },
+  {
+    file: "lib/native-bundle-report.ts",
+    path: "output.ascii_only",
+    quote: "the 115 KiB that",
+  },
+  {
+    file: "lib/bundle-size.ts",
+    path: "output.ascii_only",
+    quote: "Turning it off took 115.4 KiB out",
+  },
+  {
+    file: "lib/budget-snapshot.ts",
+    path: "output.ascii_only",
+    quote: "115.4 KiB of encoding",
+  },
+];
+
+/** The unit a prose quantity is written in — the two this table measures in. */
+export type ProseQuantityUnit = "KiB" | "%";
+
+/**
+ * The first quantity a fragment states, with its unit.
+ *
+ * Thousands separators are allowed in the digits because the prose writes them
+ * ("33 bytes out of 3,718,641"), and the unit has to follow the number across
+ * whitespace only — which is what makes "3,718,641 — 0.0009%" parse as the
+ * percentage it ends with rather than as the total it opens with.
+ */
+export function quotedQuantity(quote: string): { value: number; unit: ProseQuantityUnit } | null {
+  const match = /(\d[\d,]*(?:\.\d+)?)\s*(KiB|%)/.exec(quote);
+  if (!match) return null;
+  const value = Number.parseFloat(match[1].replace(/,/g, ""));
+  if (!Number.isFinite(value) || value === 0) return null;
+  return { value, unit: match[2] as ProseQuantityUnit };
+}
+
+/** A prose statement of a measurement that no longer matches its row. */
+export type ProseQuoteProblem =
+  | { readonly code: "file_unread"; readonly file: string; readonly path: string; readonly quote: string }
+  | { readonly code: "quote_gone"; readonly file: string; readonly path: string; readonly quote: string }
+  | { readonly code: "no_quantity"; readonly file: string; readonly path: string; readonly quote: string }
+  | { readonly code: "no_measurement"; readonly file: string; readonly path: string; readonly quote: string }
+  | {
+      readonly code: "stale";
+      readonly file: string;
+      readonly path: string;
+      readonly quote: string;
+      readonly noted: number;
+      readonly derived: number;
+      readonly unit: ProseQuantityUnit;
+    }
+  | { readonly code: "unregistered"; readonly file: string; readonly path: string; readonly quote: string };
+
+/** `115` and `115.4` both, and `1154` and `94` neither. */
+function kibMentions(text: string, kib: number): string[] {
+  const pattern = new RegExp(`(?<![\\d.])${String(kib)}(\\.\\d+)?\\s*KiB`, "g");
+  return [...text.matchAll(pattern)].map((match) => match[0]);
+}
+
+/**
+ * The registry held against the tree, in both directions.
+ *
+ * Forward: every registered fragment is still in its file and still states the
+ * number its row derives. That is the direction a re-measurement breaks, and it
+ * breaks loudly, once per stale site.
+ *
+ * Backward, and this is the direction a registry usually lacks: any module that
+ * spells an audited row's KiB figure and has no entry for it is reported as
+ * `unregistered`. A new header quoting "115 KiB" joins the check by existing
+ * rather than by somebody remembering this list — the same argument
+ * {@link evidenceClaims} makes for not keeping a second table of evaluators.
+ *
+ * KiB only for the backward half, and the asymmetry is on purpose: an integer
+ * KiB figure is a string a scan can look for, while a percentage is rounded to
+ * whatever reads well ("3%" for 3.1667%) and cannot be searched for without
+ * guessing how the writer rounded. Rows measured at under half a KiB have no
+ * such string at all — `reduce_funcs` rounds to 0 — so they are checked in the
+ * forward direction only, which is where their percentages are anyway.
+ */
+export function proseQuoteProblems(
+  modules: readonly EvidenceModule[],
+  quotes: readonly ProseQuote[] = AUDITED_PROSE_QUOTES,
+  options: readonly AuditedMinifierOption[] = AUDITED_MINIFIER_OPTIONS,
+): ProseQuoteProblem[] {
+  const problems: ProseQuoteProblem[] = [];
+  const byPath = new Map(modules.map((module) => [module.path, module.text]));
+  for (const entry of quotes) {
+    const text = byPath.get(entry.file);
+    if (text === undefined) {
+      problems.push({ code: "file_unread", ...entry });
+      continue;
+    }
+    if (!text.includes(entry.quote)) {
+      problems.push({ code: "quote_gone", ...entry });
+      continue;
+    }
+    const quantity = quotedQuantity(entry.quote);
+    if (!quantity) {
+      problems.push({ code: "no_quantity", ...entry });
+      continue;
+    }
+    const option = options.find((row) => row.path.join(".") === entry.path);
+    if (!option || option.measuredDeltaBytes === null || option.measuredDeltaBytes === 0) {
+      problems.push({ code: "no_measurement", ...entry });
+      continue;
+    }
+    const bytes = Math.abs(option.measuredDeltaBytes);
+    const derived =
+      quantity.unit === "KiB" ? bytes / 1024 : (bytes / MINIFIER_AUDIT_TOTAL_BYTES) * 100;
+    if (Math.abs(quantity.value - derived) / derived >= PROSE_QUANTITY_TOLERANCE) {
+      problems.push({
+        code: "stale",
+        ...entry,
+        noted: quantity.value,
+        derived,
+        unit: quantity.unit,
+      });
+    }
+  }
+  const registered = new Set(quotes.map((entry) => `${entry.file}\u0000${entry.path}`));
+  for (const option of options) {
+    if (option.measuredDeltaBytes === null || option.measuredDeltaBytes === 0) continue;
+    const kib = Math.round(Math.abs(option.measuredDeltaBytes) / 1024);
+    if (kib === 0) continue;
+    const path = option.path.join(".");
+    for (const module of modules) {
+      if (registered.has(`${module.path}\u0000${path}`)) continue;
+      for (const mention of kibMentions(module.text, kib)) {
+        problems.push({ code: "unregistered", file: module.path, path, quote: mention });
+      }
+    }
+  }
+  return problems;
+}
+
+/** The stale prose as one sentence each, naming the file, the row and the edit. */
+export function formatProseQuoteProblems(problems: readonly ProseQuoteProblem[]): string {
+  if (problems.length === 0) return "";
+  const lines: string[] = [];
+  for (const problem of problems) {
+    if (problem.code === "file_unread") {
+      lines.push(
+        `  ${problem.file}: AUDITED_PROSE_QUOTES says this module quotes ${problem.path}, and it was not among the modules scanned — the file moved or was deleted, and its entry went with it.`,
+      );
+    } else if (problem.code === "quote_gone") {
+      lines.push(
+        `  ${problem.file}: no longer contains "${problem.quote}" (${problem.path}). The sentence was rewritten; re-take the fragment from the file, on one line, so the number stays checked.`,
+      );
+    } else if (problem.code === "no_quantity") {
+      lines.push(
+        `  ${problem.file}: "${problem.quote}" (${problem.path}) states no KiB or % figure, so it pins nothing. Widen the fragment to include the number it was registered for.`,
+      );
+    } else if (problem.code === "no_measurement") {
+      lines.push(
+        `  ${problem.file}: "${problem.quote}" quotes a cost for ${problem.path}, and that row has no non-zero measurement to quote. Either the row lost its delta or the prose is about a different option.`,
+      );
+    } else if (problem.code === "stale") {
+      lines.push(
+        `  ${problem.file}: says ${String(problem.noted)}${problem.unit === "%" ? "%" : " KiB"} for ${problem.path}, and the row derives ${problem.unit === "%" ? `${problem.derived.toFixed(5)}%` : `${problem.derived.toFixed(1)} KiB`} — the row was re-measured and this sentence was not. Update the prose and the fragment in AUDITED_PROSE_QUOTES together.`,
+      );
+    } else {
+      lines.push(
+        `  ${problem.file}: says "${problem.quote}", which is ${problem.path}'s measured cost, and no AUDITED_PROSE_QUOTES entry covers this module for that row. Register it — an unregistered copy is a number that stays behind when the row moves.`,
+      );
+    }
+  }
+  return [
+    `${problems.length} prose statement(s) of an audited measurement disagree with the table: a number written into a sentence is a copy, and the copy is the one that stays behind.`,
+    ...lines,
+  ].join("\n");
+}

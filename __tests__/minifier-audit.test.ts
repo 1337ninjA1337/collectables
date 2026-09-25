@@ -24,13 +24,18 @@ import {
   AUDITED_MINIFIER_OPTIONS,
   MINIFIER_AUDIT_DATE,
   MINIFIER_AUDIT_TOTAL_BYTES,
+  PROSE_QUANTITY_TOLERANCE,
   auditMinifierPreset,
   auditedDeltaKiB,
   auditedDeltaShare,
+  AUDITED_PROSE_QUOTES,
   evidenceClaims,
   evidenceLinkProblems,
   formatEvidenceLinkProblems,
   formatMinifierDrift,
+  formatProseQuoteProblems,
+  proseQuoteProblems,
+  quotedQuantity,
   unverifiedOverrides,
 } from "@/lib/minifier-audit";
 
@@ -260,7 +265,7 @@ describe("the table itself", () => {
         if (!Number.isFinite(noted) || noted === 0) continue;
         checked += 1;
         assert.ok(
-          Math.abs(noted - share) / share < 0.2,
+          Math.abs(noted - share) / share < PROSE_QUANTITY_TOLERANCE,
           `${option.path.join(".")}'s note says ${match[1]}% and its delta over MINIFIER_AUDIT_TOTAL_BYTES is ${share.toFixed(5)}% — one of the two was re-measured and the other was not`,
         );
       }
@@ -382,5 +387,94 @@ describe("the shipped-evidence link, both ends", () => {
 
   it("says nothing when both ends agree", () => {
     assert.equal(formatEvidenceLinkProblems([]), "");
+  });
+});
+
+/**
+ * The other half of the percentage rule, where the prose lives.
+ *
+ * The note rule holds every percentage inside a `note` against the row it
+ * describes, which is the half of the duplication that sits in the table. The
+ * half that started the whole audit sits in module HEADERS: `ascii_only` cost
+ * "3% of the bundle" and "115 KiB", and those sentences are in five `lib/`
+ * modules, none of them a note, none of them read by any case. Three copies of
+ * one quotient, one of them checked.
+ *
+ * Both directions matter and they fail differently. A registered fragment that
+ * stops matching its row is a re-measurement that only reached the data; a
+ * module that spells the figure and is in no entry is the next copy, written
+ * today, checked by nothing.
+ */
+describe("the measurements quoted in prose", () => {
+  const libModules = sourceFiles("lib").map((file) => ({ path: file, text: readRepoFile(file) }));
+
+  it("has every quoted number still in its file and still matching its row", () => {
+    const problems = proseQuoteProblems(libModules);
+    assert.deepEqual(problems, [], formatProseQuoteProblems(problems));
+  });
+
+  it("covers the prose it was written for, rather than an empty registry", () => {
+    // The assertion above is a negative over a list, and an empty list passes
+    // it. These are the copies the finding named: two units, five modules.
+    const files = new Set(AUDITED_PROSE_QUOTES.map((entry) => entry.file));
+    assert.ok(files.size >= 5, `only ${String(files.size)} module(s) registered — the finding named five`);
+    const units = new Set(
+      AUDITED_PROSE_QUOTES.map((entry) => quotedQuantity(entry.quote)?.unit ?? null),
+    );
+    assert.deepEqual([...units].sort(), ["%", "KiB"], "every entry parses, and both units are covered");
+  });
+
+  it("parses the quantity a fragment ends with, not the total it opens with", () => {
+    assert.deepEqual(quotedQuantity("3,718,641 — 0.0009%"), { value: 0.0009, unit: "%" });
+    assert.deepEqual(quotedQuantity("took 115.4 KiB out"), { value: 115.4, unit: "KiB" });
+    assert.equal(quotedQuantity("33 bytes, and no unit this rule knows"), null);
+  });
+
+  it("reports a sentence the row has moved away from", () => {
+    const problems = proseQuoteProblems(
+      [{ path: "lib/made-up.ts", text: "it cost 40 KiB, once" }],
+      [{ file: "lib/made-up.ts", path: "output.ascii_only", quote: "cost 40 KiB" }],
+    );
+    assert.equal(problems.length, 1);
+    assert.equal(problems[0].code, "stale");
+    assert.match(formatProseQuoteProblems(problems), /says 40 KiB for output\.ascii_only/);
+  });
+
+  it("reports a fragment the file no longer spells, which is a rewritten sentence", () => {
+    const problems = proseQuoteProblems(
+      [{ path: "lib/made-up.ts", text: "it cost about 115 KiB" }],
+      [{ file: "lib/made-up.ts", path: "output.ascii_only", quote: "cost 115 KiB" }],
+    );
+    assert.deepEqual(problems.map((problem) => problem.code), ["quote_gone"]);
+  });
+
+  it("reports a module that quotes the figure and is in no entry", () => {
+    // The direction a registry usually lacks: the next header to say "115 KiB"
+    // joins the check by existing, not by somebody remembering this list.
+    const problems = proseQuoteProblems(
+      [{ path: "lib/newcomer.ts", text: " * the 115 KiB that ascii_only bought" }],
+      [],
+    );
+    assert.deepEqual(problems.map((problem) => problem.code), ["unregistered"]);
+    assert.match(formatProseQuoteProblems(problems), /lib\/newcomer\.ts/);
+  });
+
+  it("does not read 94 KiB or 1154 KiB as a mention of 115", () => {
+    // The scan is for the row's figure with its optional decimals, and a
+    // neighbouring number is not it — `lib/bundle-size.ts` states locale sizes
+    // in KiB two lines from the one that IS registered.
+    const problems = proseQuoteProblems(
+      [{ path: "lib/neighbours.ts", text: "94 KiB and 1154 KiB and 3115 KiB" }],
+      [],
+    );
+    assert.deepEqual(problems, []);
+  });
+
+  it("leaves a sub-KiB row to the forward direction alone", () => {
+    // `reduce_funcs` rounds to 0 KiB, so there is no string to scan for; its
+    // percentage is registered and checked, and nothing pretends otherwise.
+    const registered = AUDITED_PROSE_QUOTES.filter((entry) => entry.path === "compress.reduce_funcs");
+    assert.ok(registered.length > 0, "the sub-KiB row is still covered in prose");
+    assert.equal(auditedDeltaKiB("compress.reduce_funcs"), 0, "and rounds to nothing in KiB");
   });
 });
