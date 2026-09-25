@@ -189,8 +189,53 @@ export interface AcceptedAdvisory {
    * fingerprint in all of them to satisfy the compiler rather than the reader.
    */
   readonly absentFingerprint?: string;
+  /**
+   * Why npm's in-range fix cannot be taken here — required of nothing, allowed
+   * only with evidence, and read by {@link evaluateAudit} instead of a red run.
+   *
+   * The gate's whole argument about `fixableInRange` is that a lockfile bump is
+   * never a triage decision, and it is right about that. What it could not
+   * express is the case npm's report cannot see: `fixAvailable: true` means npm
+   * found a patched version it could install without a semver-major change to a
+   * DIRECT dependency, and a transitive dependent's own range is not part of
+   * that judgement. `npm update` then does nothing, `npm audit fix` does
+   * nothing, and the gate keeps printing a command that has already been run.
+   *
+   * So the exemption is not "we decided not to": it is a measurement, and every
+   * field here is one. {@link PinnedFix} says which dependent pins the
+   * vulnerable range, what range it declares, which version first carries the
+   * fix, and what happened when the pin was overridden anyway. The first two
+   * are checkable against `package-lock.json` and
+   * `audit-baseline-pin.test.ts` checks them; the last is a build somebody ran.
+   */
+  readonly inRangeFixPinned?: PinnedFix;
   /** Why these are accepted rather than fixed. One sentence. */
   readonly why: string;
+}
+
+/**
+ * The measurement behind an {@link AcceptedAdvisory.inRangeFixPinned}.
+ *
+ * Deliberately not one `why` string. A sentence saying "we cannot take it" is
+ * the shape this whole file exists to refuse — it is unfalsifiable, it ages
+ * silently, and it is indistinguishable from not having looked. Four named
+ * fields are three facts a case can hold against the tree plus one a person
+ * measured on a stated day.
+ */
+export interface PinnedFix {
+  /**
+   * The lockfile path of the dependent whose range excludes the fix —
+   * `"node_modules/metro"`, as `package-lock.json` keys it.
+   */
+  readonly pinnedBy: string;
+  /** The range that dependent declares for the vulnerable package. */
+  readonly declares: string;
+  /** The first published version carrying the fix, per the advisory. */
+  readonly firstFixed: string;
+  /** What overriding the pin actually did, measured rather than predicted. */
+  readonly whenForced: string;
+  /** The date {@link whenForced} was measured, `YYYY-MM-DD`. */
+  readonly measured: string;
 }
 
 /**
@@ -217,7 +262,15 @@ export const ACCEPTED_HIGH_ADVISORIES: readonly AcceptedAdvisory[] = [
     advisories: ["GHSA-5p2g-fcmc-qvqq", "GHSA-w3rx-r6r6-pgpr"],
     shipsToClient: false,
     absentFingerprint: "invalid invocation. input should be a Uint8Array",
-    why: "JXL/HEIF and ICNS parser DoS in metro's asset pipeline, build-time only (the string in the bundle is the icon name image-size-select-actual, not this package); fix is expo@57, a breaking major",
+    inRangeFixPinned: {
+      pinnedBy: "node_modules/metro",
+      declares: "^1.0.2",
+      firstFixed: "2.0.3",
+      whenForced:
+        "an overrides entry for ^2.0.4 installs, and `npm run build` then dies on the first image asset — image-size@2 dropped its default export and metro's Assets.js calls `_interopRequireDefault(require(\"image-size\")).default(content)`, so the export the web bundle needs is not there: `SyntaxError: node_modules/expo-router/assets/file.png: The \"list\" argument must be an instance of SharedArrayBuffer, ArrayBuffer or ArrayBufferView`",
+      measured: "2026-09-25",
+    },
+    why: "JXL/HEIF and ICNS parser DoS in metro's asset pipeline, build-time only (the string in the bundle is the icon name image-size-select-actual, not this package); npm now reports an in-range fix and the tree cannot take it — see inRangeFixPinned — so the real fix is still expo@57, a breaking major",
   },
   {
     package: "postcss",
@@ -821,6 +874,30 @@ export interface AuditVerdict {
    * severity rather than by being fixed.
    */
   readonly majorOnly: readonly FixableAdvisory[];
+  /**
+   * Advisories npm reports as in-range fixable whose baseline entry carries an
+   * {@link AcceptedAdvisory.inRangeFixPinned} measurement — reported on every
+   * run, never failed.
+   *
+   * Carved out of {@link fixableInRange} rather than left in it and forgiven
+   * later, so the two lists stay what their names say: one is "run this
+   * command", the other is "this command has been run and does nothing". A
+   * finding printed on every run is the compromise — the exemption is loud,
+   * which is the only thing that stops it becoming the silence it replaced.
+   */
+  readonly pinnedFix: readonly FixableAdvisory[];
+  /**
+   * Baseline entries claiming a pinned fix that npm no longer reports as
+   * in-range fixable — the failure that keeps the claim honest.
+   *
+   * The same shape as {@link stale} one level down, for the same reason every
+   * exemption list here is pruned: the day npm goes back to reporting this as
+   * major-only (or the dependent relaxes its range) the measurement stops
+   * describing anything, and an unpruned measurement is a sentence nobody will
+   * re-take. Withheld on an incomplete report, exactly as `stale` is, because
+   * it is built the same way out of what npm did NOT say.
+   */
+  readonly pinnedFixUnused: readonly string[];
 }
 
 /** `package#id`, the form every list in {@link AuditVerdict} carries. */
@@ -1103,6 +1180,15 @@ export function evaluateAudit(
         updatePackage: detail.updatePackage,
       }))
       .sort(bySeverityThenKey);
+  // The keys whose entry has measured that npm's in-range fix cannot be taken.
+  // Read from the SAME accepted list the caller passed, so a suite's fixture
+  // decides its own exemptions rather than inheriting this repo's.
+  const pinnedKeys = new Set(
+    accepted
+      .filter((entry) => entry.inRangeFixPinned)
+      .flatMap((entry) => entry.advisories.map((id) => advisoryKey(entry.package, id))),
+  );
+  const inRange = withFix("in-range");
   return {
     unexpected: [...observed].filter((key) => !acceptedKeys.has(key)).sort(),
     stillPresent: [...acceptedKeys].filter((key) => observed.has(key)).sort(),
@@ -1114,8 +1200,12 @@ export function evaluateAudit(
       ? [...acceptedKeys].filter((key) => !observed.has(key)).sort()
       : [],
     completeness,
-    fixableInRange: withFix("in-range"),
+    fixableInRange: inRange.filter((found) => !pinnedKeys.has(found.key)),
     majorOnly: withFix("major"),
+    pinnedFix: inRange.filter((found) => pinnedKeys.has(found.key)),
+    pinnedFixUnused: completeness.complete
+      ? [...pinnedKeys].filter((key) => !inRange.some((found) => found.key === key)).sort()
+      : [],
   };
 }
 
@@ -1330,6 +1420,28 @@ export function formatAuditVerdict(verdict: AuditVerdict, checkName: string): st
       `${checkName}: ${counted(verdict.stale.length, "baseline entry", "baseline entries")} no longer reported — remove ${plural(verdict.stale.length, "it", "them")}: ${verdict.stale.join(", ")}`,
     );
   }
+  // Printed on the GREEN path too, deliberately. This is the one list here
+  // that suppresses a failure, and an exemption nobody sees is the state this
+  // whole file was written to get out of.
+  if (verdict.pinnedFix.length > 0) {
+    lines.push(
+      `${checkName}: npm reports an in-range fix for ${counted(verdict.pinnedFix.length, "advisory", "advisories")} this tree cannot take:`,
+    );
+    for (const found of verdict.pinnedFix) {
+      lines.push(`  PINNED  ${found.severity.padEnd(8)}  ${found.key}`);
+    }
+    lines.push(
+      "Each has an inRangeFixPinned measurement in lib/audit-baseline.ts naming the dependent that pins the vulnerable range and what forcing it past that pin actually did. npm's fixAvailable is a judgement about direct dependencies only, so it cannot see a transitive range — re-take the measurement rather than the sentence if the tree moves.",
+    );
+  }
+  if (verdict.pinnedFixUnused.length > 0) {
+    lines.push(
+      `${checkName}: ${counted(verdict.pinnedFixUnused.length, "baseline entry", "baseline entries")} claim an in-range fix is pinned and npm no longer reports one: ${verdict.pinnedFixUnused.join(", ")}`,
+    );
+    lines.push(
+      "Drop the inRangeFixPinned field — either the fix became a major again, or the dependent relaxed its range and the fix is now takeable. A measurement about a state the tree has left is the exemption shape this list exists to prune.",
+    );
+  }
   // The measurement, then what it cost. Both are printed on the GREEN path as
   // well as the red one, and that is the point: the run is passing partly
   // because a question was not asked, and a green line that does not say so is
@@ -1419,7 +1531,8 @@ export function isClean(verdict: AuditVerdict): boolean {
   return (
     verdict.unexpected.length === 0 &&
     verdict.fixableInRange.length === 0 &&
-    verdict.stale.length === 0
+    verdict.stale.length === 0 &&
+    verdict.pinnedFixUnused.length === 0
   );
 }
 
@@ -1447,7 +1560,7 @@ export function isClean(verdict: AuditVerdict): boolean {
 export function worthAsking(verdict: AuditVerdict): boolean {
   if (!verdict.completeness.complete) return true;
   return (
-    verdict.stale.length > 0 &&
+    (verdict.stale.length > 0 || verdict.pinnedFixUnused.length > 0) &&
     verdict.unexpected.length === 0 &&
     verdict.fixableInRange.length === 0
   );
@@ -1473,12 +1586,15 @@ export function worthAsking(verdict: AuditVerdict): boolean {
  */
 export function reconcileAudit(first: AuditVerdict, second: AuditVerdict): AuditVerdict {
   const votes = [first, second].filter((verdict) => verdict.completeness.complete);
-  const stale =
+  const intersect = (pick: (verdict: AuditVerdict) => readonly string[]): readonly string[] =>
     votes.length === 0
       ? []
-      : votes
-          .map((verdict) => new Set(verdict.stale))
-          .reduce((both, next) => new Set([...both].filter((key) => next.has(key))));
+      : [
+          ...votes
+            .map((verdict) => new Set(pick(verdict)))
+            .reduce((both, next) => new Set([...both].filter((key) => next.has(key)))),
+        ];
+  const stale = intersect((verdict) => verdict.stale);
   const union = (keys: readonly string[], more: readonly string[]): readonly string[] =>
     [...new Set([...keys, ...more])].sort();
   const byKey = (
@@ -1497,6 +1613,12 @@ export function reconcileAudit(first: AuditVerdict, second: AuditVerdict): Audit
     completeness: votes.at(-1)?.completeness ?? second.completeness,
     fixableInRange: byKey(first.fixableInRange, second.fixableInRange),
     majorOnly: byKey(first.majorOnly, second.majorOnly),
+    // Unioned with the findings, because a pinned fix is something npm SAID;
+    // intersected with the staleness, because an unused pin is something npm
+    // did not say. The two halves of this verdict divide the same way they do
+    // above, and for the same reason.
+    pinnedFix: byKey(first.pinnedFix, second.pinnedFix),
+    pinnedFixUnused: [...intersect((verdict) => verdict.pinnedFixUnused)].sort(),
   };
 }
 

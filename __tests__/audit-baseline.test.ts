@@ -919,6 +919,8 @@ describe("the OK line — upgrades, never advisories", () => {
         stale: [],
         completeness: ACCOUNTED_FOR,
         fixableInRange: [],
+        pinnedFix: [],
+        pinnedFixUnused: [],
         majorOnly: [
           { key: `mild#${A1}`, severity: "low", updatePackage: "one-root" },
           { key: `severe#${A2}`, severity: "high", updatePackage: "one-root" },
@@ -967,6 +969,8 @@ describe("the OK line — upgrades, never advisories", () => {
         stale: [],
         completeness: ACCOUNTED_FOR,
         fixableInRange: [],
+        pinnedFix: [],
+        pinnedFixUnused: [],
         majorOnly: [],
       },
       "check",
@@ -3239,5 +3243,161 @@ describe("the gate script's header names things that exist", () => {
       named.paths.length >= 1,
       measuredFloor(named.paths.length, 1, `repo path(s) named in the header of ${GATE}`),
     );
+  });
+});
+
+/**
+ * The fix npm offers and the tree cannot take.
+ *
+ * `fixableInRange` is the gate's sharpest rule and the argument behind it is
+ * right: a lockfile bump is never a triage decision. What it could not express
+ * is the case npm's own report cannot see. `fixAvailable: true` is a judgement
+ * about DIRECT dependencies — npm found a patched version installable without a
+ * semver-major on anything the manifest declares — and a transitive dependent's
+ * own range is no part of it. `image-size@2.0.3` fixes two high advisories and
+ * `metro` declares `^1.0.2`, so `npm update image-size` does nothing, `npm audit
+ * fix` does nothing, and the gate printed that command on every run.
+ *
+ * The exemption is therefore a MEASUREMENT and not a sentence: which dependent
+ * pins the range, what range it declares, which version first carries the fix,
+ * and what forcing it past the pin actually did. The first two are facts about
+ * `package-lock.json` and are checked here against it.
+ */
+describe("an in-range fix the tree is pinned away from", () => {
+  const lockfile = JSON.parse(readRepoFile("package-lock.json")) as {
+    packages?: Record<string, { dependencies?: Record<string, string> }>;
+  };
+
+  const pinned = ACCEPTED_HIGH_ADVISORIES.filter((entry) => entry.inRangeFixPinned);
+
+  it("names a dependent that really declares the range it claims", () => {
+    // The half a case can check. A `whenForced` is a build somebody ran and a
+    // date they ran it on; `pinnedBy` and `declares` are in the lockfile this
+    // commit carries, so a dependency bump that relaxes the pin turns the
+    // exemption red instead of leaving it describing last month's tree.
+    assert.ok(pinned.length > 0, "nothing claims a pinned fix, so this case checks nothing");
+    for (const entry of pinned) {
+      const pin = entry.inRangeFixPinned;
+      assert.ok(pin, "filtered on it");
+      const dependent = lockfile.packages?.[pin.pinnedBy];
+      assert.ok(
+        dependent,
+        `${entry.package}: inRangeFixPinned names ${pin.pinnedBy} and package-lock.json has no such package — the dependent moved and the measurement did not`,
+      );
+      assert.equal(
+        dependent.dependencies?.[entry.package],
+        pin.declares,
+        `${entry.package}: ${pin.pinnedBy} is recorded as declaring "${String(dependent.dependencies?.[entry.package])}", and the exemption says "${pin.declares}" — re-take the measurement, because the pin it rests on has moved`,
+      );
+    }
+  });
+
+  it("claims a first-fixed version the declared range cannot reach", () => {
+    // The pin only excludes the fix if the fix is outside it. Majors are
+    // enough to decide that here and the assertion says so rather than
+    // pretending to a semver implementation: a caret range admits one major,
+    // and a fix published in a later one is unreachable from it.
+    for (const entry of pinned) {
+      const pin = entry.inRangeFixPinned;
+      assert.ok(pin, "filtered on it");
+      const allowed = /^\^(\d+)\./.exec(pin.declares);
+      assert.ok(allowed, `${entry.package}: "${pin.declares}" is not a caret range this case can reason about`);
+      const fixed = /^(\d+)\./.exec(pin.firstFixed);
+      assert.ok(fixed, `${entry.package}: "${pin.firstFixed}" is not a version`);
+      assert.ok(
+        Number(fixed[1]) > Number(allowed[1]),
+        `${entry.package}: ${pin.firstFixed} is inside ${pin.declares}, so the pin does not exclude the fix — the tree can take it, and this exemption is wrong`,
+      );
+    }
+  });
+
+  it("dates the measurement and says what forcing the pin did", () => {
+    for (const entry of pinned) {
+      const pin = entry.inRangeFixPinned;
+      assert.ok(pin, "filtered on it");
+      assert.match(pin.measured, /^\d{4}-\d{2}-\d{2}$/, `${entry.package}: undated measurement`);
+      assert.ok(
+        pin.whenForced.length > 80,
+        `${entry.package}: whenForced has to be what HAPPENED — a build, an error, a version — not a prediction in six words`,
+      );
+    }
+  });
+
+  it("moves the advisory out of the failing list and into the printed one", () => {
+    const tree = report({
+      pinned: { advisories: [{ ghsa: A1, severity: "high" }], fixAvailable: true },
+      movable: { advisories: [{ ghsa: A2, severity: "high" }], fixAvailable: true },
+    });
+    const verdict = evaluateAudit(tree, [
+      {
+        package: "pinned",
+        advisories: [A1],
+        shipsToClient: false,
+        inRangeFixPinned: {
+          pinnedBy: "node_modules/holder",
+          declares: "^1.0.0",
+          firstFixed: "2.0.0",
+          whenForced: "x",
+          measured: "2026-09-25",
+        },
+        why: "x",
+      },
+      { package: "movable", advisories: [A2], shipsToClient: false, why: "x" },
+    ]);
+    assert.deepEqual(verdict.pinnedFix.map((found) => found.key), [`pinned#${A1}`]);
+    assert.deepEqual(verdict.fixableInRange.map((found) => found.key), [`movable#${A2}`]);
+    assert.equal(isClean(verdict), false, "the one that CAN be fixed still fails the gate");
+  });
+
+  it("prints the exemption on the green path, where it would otherwise be silent", () => {
+    const verdict = evaluateAudit(
+      report({ pinned: { advisories: [{ ghsa: A1, severity: "high" }], fixAvailable: true } }),
+      [
+        {
+          package: "pinned",
+          advisories: [A1],
+          shipsToClient: false,
+          inRangeFixPinned: {
+            pinnedBy: "node_modules/holder",
+            declares: "^1.0.0",
+            firstFixed: "2.0.0",
+            whenForced: "x",
+            measured: "2026-09-25",
+          },
+          why: "x",
+        },
+      ],
+    );
+    assert.equal(isClean(verdict), true);
+    const printed = formatAuditVerdict(verdict, "check");
+    assert.match(printed, /PINNED {2}high {6}pinned#/);
+    assert.doesNotMatch(printed, /npm update/, "the command that does nothing is not printed");
+  });
+
+  it("fails when npm stops offering the fix the exemption is about", () => {
+    // The pruning half. A measurement about a state the tree has left is the
+    // exemption shape this list exists to remove, one level down from `stale`.
+    const verdict = evaluateAudit(
+      report({ pinned: { advisories: [{ ghsa: A1, severity: "high" }], fixAvailable: majorFix("big") } }),
+      [
+        {
+          package: "pinned",
+          advisories: [A1],
+          shipsToClient: false,
+          inRangeFixPinned: {
+            pinnedBy: "node_modules/holder",
+            declares: "^1.0.0",
+            firstFixed: "2.0.0",
+            whenForced: "x",
+            measured: "2026-09-25",
+          },
+          why: "x",
+        },
+      ],
+    );
+    assert.deepEqual(verdict.pinnedFixUnused, [`pinned#${A1}`]);
+    assert.equal(isClean(verdict), false);
+    assert.match(formatAuditVerdict(verdict, "check"), /Drop the inRangeFixPinned field/);
+    assert.equal(worthAsking(verdict), true, "built out of what npm did not say, so it is re-asked");
   });
 });
