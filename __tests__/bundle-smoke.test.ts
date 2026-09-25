@@ -200,7 +200,13 @@ describe("formatBundleCharsetReport", () => {
     const line = formatBundleCharsetReport("check", evaluateBundleCharset([ESCAPED.repeat(200)]));
     assert.match(line, /ascii_only/);
     assert.match(line, /metro\.config\.js/);
-    assert.match(line, /115 KiB/);
+    // A cost, not THE cost. `115` was written here as a literal beside a case
+    // that derives the same number one screen down, which is the copy that
+    // stays behind when the row is re-measured — and, since the prose rule
+    // reaches the suites, the copy that would have had to be registered to
+    // keep a green run. The shape is what this case is about; the value is
+    // the next case's, where it comes out of the table.
+    assert.match(line, /~\d+ KiB/);
   });
 
   it("quotes the cost out of the audit table rather than keeping a second copy", () => {

@@ -500,11 +500,16 @@ export interface ProseQuote {
 /**
  * Every prose statement of an audited measurement outside the table.
  *
- * `lib/` only, deliberately: these are the modules a reader reaches for to
- * learn what the option cost. The suites quote the same 115 KiB in three more
- * headers and are left out for now — extending the scan there is a suggestion,
- * not a silent gap, because {@link proseQuoteProblems} reports an unregistered
- * copy in any module it is HANDED, so the scope is the call site's to widen.
+ * `lib/`, `scripts/` and the suites — every place in this tree that states one
+ * of these numbers in words. It began as `lib/` only, on the argument that a
+ * module header is what a reader reaches for and a suite header is scaffolding
+ * beside the case that proves it; the argument did not survive counting them.
+ * Five of the nine copies were outside `lib/`, one of them was an
+ * `assert.match(line, /115 KiB/)` sitting one screen above a case that derives
+ * the same number out of this table, and a sentence that goes stale goes stale
+ * wherever it is written. {@link proseQuoteProblems} reports an unregistered
+ * copy in any module it is HANDED, so the scope is the call site's — and the
+ * call site now hands it the whole tree.
  */
 export const AUDITED_PROSE_QUOTES: readonly ProseQuote[] = [
   {
@@ -551,6 +556,26 @@ export const AUDITED_PROSE_QUOTES: readonly ProseQuote[] = [
     file: "lib/budget-snapshot.ts",
     path: "output.ascii_only",
     quote: "115.4 KiB of encoding",
+  },
+  {
+    file: "scripts/check-bundle-smoke.ts",
+    path: "output.ascii_only",
+    quote: "answer is 115 KiB that",
+  },
+  {
+    file: "__tests__/bundle-size.test.ts",
+    path: "output.ascii_only",
+    quote: "took 115.4 KiB out of an app",
+  },
+  {
+    file: "__tests__/minifier-audit.test.ts",
+    path: "output.ascii_only",
+    quote: "cost this app 115 KiB for two years",
+  },
+  {
+    file: "__tests__/native-bundle-report.test.ts",
+    path: "output.ascii_only",
+    quote: "the 115 KiB `ascii_only: false` bought",
   },
 ];
 

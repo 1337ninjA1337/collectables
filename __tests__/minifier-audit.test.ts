@@ -43,6 +43,7 @@ import { LAST_MEASURED_BUNDLE_BYTES } from "@/lib/bundle-size";
 
 import { readRepoFile, repoPath } from "./helpers/repo-file";
 import { sourceFiles } from "./helpers/source-files";
+import { readSuite, suiteFiles } from "./helpers/suite-files";
 
 /**
  * Metro's preset as the build sees it.
@@ -406,10 +407,17 @@ describe("the shipped-evidence link, both ends", () => {
  * today, checked by nothing.
  */
 describe("the measurements quoted in prose", () => {
-  const libModules = sourceFiles("lib").map((file) => ({ path: file, text: readRepoFile(file) }));
+  // The WHOLE tree, and the widening is the point: `lib/` alone left five of
+  // the nine copies unscanned, one of them an assertion on a literal `115 KiB`
+  // sitting above a case that derives the same number out of the table. A
+  // number written into a sentence goes stale wherever the sentence is.
+  const everywhere = [
+    ...sourceFiles().map((file) => ({ path: file, text: readRepoFile(file) })),
+    ...suiteFiles().map((file) => ({ path: `__tests__/${file}`, text: readSuite(file) })),
+  ];
 
   it("has every quoted number still in its file and still matching its row", () => {
-    const problems = proseQuoteProblems(libModules);
+    const problems = proseQuoteProblems(everywhere);
     assert.deepEqual(problems, [], formatProseQuoteProblems(problems));
   });
 
@@ -417,7 +425,12 @@ describe("the measurements quoted in prose", () => {
     // The assertion above is a negative over a list, and an empty list passes
     // it. These are the copies the finding named: two units, five modules.
     const files = new Set(AUDITED_PROSE_QUOTES.map((entry) => entry.file));
-    assert.ok(files.size >= 5, `only ${String(files.size)} module(s) registered — the finding named five`);
+    assert.ok(files.size >= 8, `only ${String(files.size)} module(s) registered — the sweep found nine copies in eight files`);
+    assert.ok(
+      [...files].some((file) => file.startsWith("__tests__/")) &&
+        [...files].some((file) => file.startsWith("scripts/")),
+      "the scan reaches past lib/, and the registry has to show it",
+    );
     const units = new Set(
       AUDITED_PROSE_QUOTES.map((entry) => quotedQuantity(entry.quote)?.unit ?? null),
     );
