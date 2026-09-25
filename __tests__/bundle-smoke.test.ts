@@ -34,7 +34,7 @@ import {
   type PrivacyPageInput,
 } from "../lib/bundle-smoke";
 import { LINT_ALL_EXEMPT } from "../lib/lint-guards";
-import { auditedDeltaKiB } from "../lib/minifier-audit";
+import { auditedDelta } from "../lib/minifier-audit";
 import { PRIVACY_PAGE_LANGUAGES } from "../lib/privacy-languages";
 import { renderPrivacyPage } from "../lib/privacy-page";
 import { readI18nSource } from "./helpers/i18n-source-file";
@@ -215,7 +215,7 @@ describe("formatBundleCharsetReport", () => {
     // of which gets re-measured is a message that starts lying without anyone
     // editing it.
     const line = formatBundleCharsetReport("check", evaluateBundleCharset([ESCAPED.repeat(200)]));
-    const measured = auditedDeltaKiB("output.ascii_only");
+    const measured = auditedDelta("output.ascii_only")?.kib ?? null;
     assert.ok(measured !== null, "the audited row is what this message quotes");
     assert.ok(line.includes(`~${String(measured)} KiB`));
   });

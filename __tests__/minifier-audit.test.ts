@@ -26,8 +26,7 @@ import {
   MINIFIER_AUDIT_TOTAL_BYTES,
   PROSE_QUANTITY_TOLERANCE,
   auditMinifierPreset,
-  auditedDeltaKiB,
-  auditedDeltaShare,
+  auditedDelta,
   AUDITED_PROSE_QUOTES,
   evidenceClaims,
   evidenceLinkProblems,
@@ -196,9 +195,9 @@ describe("the table itself", () => {
     // The number the charset failure message quotes. It used to be spelled
     // there as well as here, which is one copy that stays at 115 after the
     // other is re-measured.
-    assert.equal(auditedDeltaKiB("output.ascii_only"), 115);
-    assert.equal(auditedDeltaKiB("output.quote_style"), null, "not a size question");
-    assert.equal(auditedDeltaKiB("compress.not_an_option"), null, "and no cost for a row that does not exist");
+    assert.equal(auditedDelta("output.ascii_only")?.kib, 115);
+    assert.equal(auditedDelta("output.quote_style"), null, "not a size question");
+    assert.equal(auditedDelta("compress.not_an_option"), null, "and no cost for a row that does not exist");
   });
 
   it("keeps the two toplevel options as separate rows", () => {
@@ -243,12 +242,28 @@ describe("the table itself", () => {
   });
 
   it("turns a delta into a percentage so no call site picks a denominator", () => {
-    const share = auditedDeltaShare("compress.reduce_funcs");
-    assert.ok(share !== null && share < 0.001, "the note says 0.0009%, and that is where it comes from");
-    assert.equal(auditedDeltaShare("output.quote_style"), null, "not a size question");
-    assert.equal(auditedDeltaShare("compress.not_an_option"), null, "and nothing for a row that does not exist");
-    const ascii = auditedDeltaShare("output.ascii_only");
-    assert.ok(ascii !== null && ascii > 3 && ascii < 3.5, "the 3% the whole audit started from");
+    const share = auditedDelta("compress.reduce_funcs")?.share;
+    assert.ok(share !== undefined && share < 0.001, "the note says 0.0009%, and that is where it comes from");
+    assert.equal(auditedDelta("output.quote_style"), null, "not a size question");
+    assert.equal(auditedDelta("compress.not_an_option"), null, "and nothing for a row that does not exist");
+    const ascii = auditedDelta("output.ascii_only")?.share;
+    assert.ok(ascii !== undefined && ascii > 3 && ascii < 3.5, "the 3% the whole audit started from");
+  });
+
+  it("answers every unit from one lookup, so a third is not a third function", () => {
+    // It was two functions with the same six lines: one lookup by joined path
+    // each, one `null` rule each, one arithmetic line each. The units are
+    // fields now, and the case that matters is that they describe ONE
+    // measurement rather than three that happen to agree today.
+    const ascii = auditedDelta("output.ascii_only");
+    assert.ok(ascii, "the row the whole audit started from");
+    assert.equal(ascii.kib, Math.round(ascii.bytes / 1024));
+    assert.equal(ascii.share, (ascii.bytes / MINIFIER_AUDIT_TOTAL_BYTES) * 100);
+    // A row measured at exactly zero is a RESULT, not an absence: `toplevel`
+    // was built and moved the bundle by nothing, and a caller that needs to
+    // tell those apart reads the zero rather than a null.
+    assert.deepEqual(auditedDelta("toplevel"), { bytes: 0, kib: 0, share: 0 });
+    assert.equal(auditedDelta("output.wrap_iife"), null, "never a size question, so never measured");
   });
 
   it("keeps a percentage written in a note in step with the one derived from the row", () => {
@@ -259,8 +274,8 @@ describe("the table itself", () => {
     // what it cannot do is be about a different measurement.
     let checked = 0;
     for (const option of AUDITED_MINIFIER_OPTIONS) {
-      const share = auditedDeltaShare(option.path.join("."));
-      if (share === null) continue;
+      const share = auditedDelta(option.path.join("."))?.share;
+      if (share === undefined || share === 0) continue;
       for (const match of option.note.matchAll(/([\d.]+)%/g)) {
         const noted = Number.parseFloat(match[1]);
         if (!Number.isFinite(noted) || noted === 0) continue;
@@ -488,6 +503,6 @@ describe("the measurements quoted in prose", () => {
     // percentage is registered and checked, and nothing pretends otherwise.
     const registered = AUDITED_PROSE_QUOTES.filter((entry) => entry.path === "compress.reduce_funcs");
     assert.ok(registered.length > 0, "the sub-KiB row is still covered in prose");
-    assert.equal(auditedDeltaKiB("compress.reduce_funcs"), 0, "and rounds to nothing in KiB");
+    assert.equal(auditedDelta("compress.reduce_funcs")?.kib, 0, "and rounds to nothing in KiB");
   });
 });

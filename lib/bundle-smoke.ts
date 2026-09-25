@@ -31,7 +31,7 @@
  */
 
 import { checkError } from "./check-error";
-import { auditedDeltaKiB } from "./minifier-audit";
+import { auditedDelta } from "./minifier-audit";
 import { PRIVACY_BODY_BASELINE_WORDS } from "./privacy-body-baselines";
 import {
   PRIVACY_DEFAULT_LANGUAGE,
@@ -876,7 +876,7 @@ export function formatBundleCharsetReport(
   // of it in a failure message is a copy that stays at 115 after the first one
   // is re-measured. `null` reads as "no number to quote", which is the honest
   // sentence when the row it came from is gone.
-  const cost = auditedDeltaKiB("output.ascii_only");
+  const cost = auditedDelta("output.ascii_only")?.kib ?? null;
   return checkError(
     checkName,
     `the bundle is escaping its non-ASCII copy: ${result.literals} literal character(s) against ${result.escapes} \\uXXXX escape(s). ` +

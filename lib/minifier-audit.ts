@@ -122,8 +122,8 @@ export const MINIFIER_AUDIT_DATE = "2026-09-19";
  * re-taken, so `minifier-audit.test.ts` holds them against each other rather
  * than trusting this paragraph.
  *
- * {@link auditedDeltaShare} is there so a percentage never needs the
- * denominator typed at a call site at all.
+ * {@link auditedDelta} is there so a percentage never needs the denominator
+ * typed at a call site at all.
  */
 export const MINIFIER_AUDIT_TOTAL_BYTES = 3_718_641;
 
@@ -213,38 +213,51 @@ export function unverifiedOverrides(
 }
 
 /**
- * One audited option's measured delta in KiB, for a message that would
- * otherwise repeat the number.
+ * One audited option's measurement, in every unit anybody states it in.
+ *
+ * It was two functions, `auditedDeltaKiB` and `auditedDeltaShare`, and they
+ * were the same six lines twice: the same lookup by joined path, the same
+ * `null` for a row with no size answer and for a row that is not there, and
+ * one arithmetic line each. Both existed for one reason — a call site should
+ * not divide by hand — and the shape that reason leads to is not one function
+ * per unit. A third unit would have been a third copy of the lookup.
+ *
+ * So the lookup happens once and the units are fields on what it finds. The
+ * denominator is applied here rather than at a call site because the two
+ * places this repository states it are the same quantity in different units
+ * ({@link MINIFIER_AUDIT_TOTAL_BYTES} is 3,718,641 bytes and
+ * `check-bundle-size` reports 3,631.5 KiB), which is exactly the confusion a
+ * reader should not have to resolve on their own.
  *
  * `null` for an option that has no size answer, and for a path the table does
  * not hold — a caller quoting a cost for an option nobody measured is the
- * thing worth NOT printing, so the absence is a value rather than a throw.
+ * thing worth NOT printing, so the absence is a value rather than a throw. A
+ * row measured at exactly zero is NOT absent: `toplevel` moved the bundle by
+ * zero bytes and that is a result, so it comes back with zeroes in it and the
+ * caller that cares (a prose quote cannot be about a zero) says so itself.
  */
-export function auditedDeltaKiB(path: string): number | null {
-  const option = AUDITED_MINIFIER_OPTIONS.find((entry) => entry.path.join(".") === path);
-  if (!option || option.measuredDeltaBytes === null) return null;
-  return Math.round(Math.abs(option.measuredDeltaBytes) / 1024);
+export interface AuditedDelta {
+  /** The magnitude of the measured move, in bytes, sign dropped. */
+  readonly bytes: number;
+  /** The same rounded to whole KiB, the unit every message states it in. */
+  readonly kib: number;
+  /** The same as a percentage of {@link MINIFIER_AUDIT_TOTAL_BYTES}. */
+  readonly share: number;
 }
 
-/**
- * One audited option's cost as a share of the bundle it was measured against.
- *
- * A delta with no denominator is a number rather than a finding — -33 is
- * trivial or enormous depending on what it is 33 out of — and the two places
- * this repository states that denominator are the same quantity in different
- * units, which is exactly the confusion a reader should not have to resolve on
- * their own. So the division happens once, here, against the total the delta
- * was actually taken with.
- *
- * A percentage, not a fraction: every note in the table writes these as
- * percentages ("0.0009%"), and the unit is the half of a number that gets
- * dropped in a copy. `null` for an option with no size answer or a path the
- * table does not hold, matching {@link auditedDeltaKiB}.
- */
-export function auditedDeltaShare(path: string): number | null {
-  const option = AUDITED_MINIFIER_OPTIONS.find((entry) => entry.path.join(".") === path);
+/** One audited row's measurement, or `null` if it has none. */
+export function auditedDelta(
+  path: string,
+  options: readonly AuditedMinifierOption[] = AUDITED_MINIFIER_OPTIONS,
+): AuditedDelta | null {
+  const option = options.find((entry) => entry.path.join(".") === path);
   if (!option || option.measuredDeltaBytes === null) return null;
-  return (Math.abs(option.measuredDeltaBytes) / MINIFIER_AUDIT_TOTAL_BYTES) * 100;
+  const bytes = Math.abs(option.measuredDeltaBytes);
+  return {
+    bytes,
+    kib: Math.round(bytes / 1024),
+    share: (bytes / MINIFIER_AUDIT_TOTAL_BYTES) * 100,
+  };
 }
 
 /** Read a nested property by path, or `undefined` if any step is missing. */
@@ -473,7 +486,7 @@ export const PROSE_QUANTITY_TOLERANCE = 0.2;
  * A measured number this repository states in prose, away from the row that
  * derives it.
  *
- * `auditedDeltaShare` closed the half of this that lives in the table: every
+ * `auditedDelta` closed the half of this that lives in the table: every
  * percentage inside a `note` is held against the row it describes. The half it
  * could not see is the half that started the audit — `ascii_only` cost "3% of
  * the bundle", "115 KiB", and those sentences are in five module headers and
@@ -663,14 +676,16 @@ export function proseQuoteProblems(
       problems.push({ code: "no_quantity", ...entry });
       continue;
     }
-    const option = options.find((row) => row.path.join(".") === entry.path);
-    if (!option || option.measuredDeltaBytes === null || option.measuredDeltaBytes === 0) {
+    const measured = auditedDelta(entry.path, options);
+    if (!measured || measured.bytes === 0) {
       problems.push({ code: "no_measurement", ...entry });
       continue;
     }
-    const bytes = Math.abs(option.measuredDeltaBytes);
-    const derived =
-      quantity.unit === "KiB" ? bytes / 1024 : (bytes / MINIFIER_AUDIT_TOTAL_BYTES) * 100;
+    // The unrounded KiB, deliberately: `measured.kib` is what a MESSAGE prints
+    // and 115.4 in a sentence is not a stale copy of 115. The tolerance is
+    // what decides that, and it should not be spent on a rounding this
+    // function already applied.
+    const derived = quantity.unit === "KiB" ? measured.bytes / 1024 : measured.share;
     if (Math.abs(quantity.value - derived) / derived >= PROSE_QUANTITY_TOLERANCE) {
       problems.push({
         code: "stale",
