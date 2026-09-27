@@ -22,6 +22,7 @@ import { useAppTheme } from "@/components/use-app-theme";
 import { useI18n } from "@/lib/i18n-context";
 import { motionDuration, useReducedMotionRef } from "@/lib/reduced-motion";
 import { announceTabChange } from "@/lib/tab-announcement";
+import { useConstant } from "@/lib/use-constant";
 import { useLatestRef } from "@/lib/use-latest-ref";
 
 export type SwipeTab = { key: string; label: string };
@@ -45,22 +46,22 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
 
   const [width, setWidth] = useState(0);
   const widthRef = useRef(0);
-  const translateX = useRef(new Animated.Value(0)).current;
+  const translateX = useConstant(() => new Animated.Value(0));
   const animatingRef = useRef(false);
 
-  // Read through a ref, not a closure: the PanResponder below is built inside
-  // `useRef(...).current` and never rebuilt, so a captured `reduced` would be
-  // the value from the first render for the life of the component.
+  // Read through a ref, not a closure: the PanResponder below is built by
+  // `useConstant` and never rebuilt, so a captured `reduced` would be the
+  // value from the first render for the life of the component.
   const reducedMotion = useReducedMotionRef();
 
   const activeRef = useLatestRef(active);
   const tabsRef = useLatestRef(tabs);
   const onChangeRef = useLatestRef(onChange);
   // For the same reason as the three above and as `useReducedMotionRef`: the
-  // PanResponder is built inside `useRef(...).current` and never rebuilt, so a
-  // `translate` captured there is the one from the first render — the
-  // announcement would keep speaking the language the app was started in after
-  // the user changed it.
+  // PanResponder is built by `useConstant` and never rebuilt, so a `translate`
+  // captured there is the one from the first render — the announcement would
+  // keep speaking the language the app was started in after the user changed
+  // it.
   const translateRef = useLatestRef(translate);
 
   function handleLayout(e: LayoutChangeEvent) {
@@ -175,7 +176,12 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
     }
   }
 
-  const panResponder = useRef(
+  // `useConstant`, not `useRef(PanResponder.create(...)).current`: the
+  // retained responder is the first render's either way, but `useRef`
+  // evaluates its argument on every render — a whole handler table built and
+  // discarded per tab change — and the `.current` read is one the linter
+  // cannot tell from the ones that are bugs.
+  const panResponder = useConstant(() =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) =>
         !animatingRef.current &&
@@ -219,7 +225,7 @@ export function SwipeTabs({ tabs, active, onChange, variant = "main", renderTab,
         settleBack();
       },
     }),
-  ).current;
+  );
 
   const activeIndex = Math.max(0, tabs.findIndex((x) => x.key === active));
   const activeLabel = tabs[activeIndex]?.label ?? "";

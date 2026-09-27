@@ -129,9 +129,9 @@ describe("the pager says it, once, on the route that has no other feedback", () 
   });
 
   it("reads the translator through a ref, like everything else the PanResponder touches", () => {
-    // The responder is built inside `useRef(...).current` and never rebuilt, so
-    // a captured `translate` is the language the app was STARTED in — and it
-    // would keep speaking it after the user changed languages.
+    // The responder is built by `useConstant` and never rebuilt, so a captured
+    // `translate` is the language the app was STARTED in — and it would keep
+    // speaking it after the user changed languages.
     const code = src();
     assert.match(code, /const translateRef = useLatestRef\(translate\);/);
     assert.match(code, /announceTabChange\(translateRef\.current,/);

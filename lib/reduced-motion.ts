@@ -83,9 +83,9 @@ export function useReducedMotion(): boolean {
 /**
  * The same signal as a ref, for the callbacks that cannot read state.
  *
- * Two of the four surfaces build a `PanResponder` inside `useRef(...).current`,
- * which is created ONCE: a `reduced` captured in that closure is the value
- * from the first render, forever. The gesture handlers read this instead, and
+ * Two of the four surfaces build a `PanResponder` that is created ONCE and
+ * never rebuilt: a `reduced` captured in that closure is the value from the
+ * first render, forever. The gesture handlers read this instead, and
  * the ref is updated on every render by {@link useLatestRef} rather than by a
  * line each caller has to remember.
  *

@@ -7,9 +7,9 @@ import { useRef, type MutableRefObject } from "react";
  * doing this, and three different reasons for it:
  *
  *  - **A closure built once.** `components/swipe-tabs.tsx` builds its
- *    `PanResponder` inside `useRef(PanResponder.create(…)).current`, which runs
- *    on the first render only. Anything captured in those handlers is the first
- *    render's value for the life of the component — which is how the tab
+ *    `PanResponder` inside `useConstant` (`lib/use-constant.ts`), which runs
+ *    on the first render only. Anything captured in those handlers is the
+ *    first render's value for the life of the component — which is how the tab
  *    announcement would have kept speaking the language the app was STARTED in
  *    after the user changed it.
  *  - **A callback whose identity changes and must not restart anything.**

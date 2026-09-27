@@ -253,8 +253,8 @@ describe("every animated surface consults the setting", () => {
   });
 
   it("reads the setting through a ref wherever a PanResponder needs it", () => {
-    // Both pan responders are built inside `useRef(...).current` and never
-    // rebuilt, so a captured value would be the first render's, forever.
+    // Both pan responders are created once and never rebuilt, so a captured
+    // value would be the first render's, forever.
     for (const file of ["components/swipe-tabs.tsx", "app/wishlist.tsx"]) {
       assert.match(readRepoFile(file), /useReducedMotionRef\(\)/, `${file} must read through a ref`);
     }
