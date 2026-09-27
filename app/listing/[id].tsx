@@ -1,5 +1,5 @@
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
@@ -66,15 +66,34 @@ export default function ListingDetailScreen() {
   const { getProfileById, ensureProfilesLoaded, getRelationship } = useSocial();
   const { ensureChatWith, canMessage, sendMessage } = useChat();
   const [fetchingRemote, setFetchingRemote] = useState(false);
+  // Which id this screen has already asked the cloud about, rather than
+  // whether a request is in flight right now.
+  //
+  // The difference is a request LOOP on a listing that does not exist, which
+  // is the ordinary case for a shared link to something since deleted. The
+  // guard used to be `fetchingRemote`, and `fetchingRemote` was in the
+  // dependency list: the effect set it true, re-ran and bailed, the fetch
+  // resolved `null` and set it false, and the effect re-ran with the listing
+  // still missing and asked again — forever, one network round trip per turn,
+  // the screen flickering between the skeleton and "listing not found". An
+  // in-flight flag cannot end that, because the thing it has to remember is
+  // that the answer already came back and was nothing.
+  //
+  // Keyed by id, not a boolean, so navigating to a second listing inside the
+  // same mounted screen still fetches. `app/collection/[id].tsx` and
+  // `app/item/[id].tsx` do the same read and never had the bug: neither puts
+  // its loading flag in its own dependency list.
+  const askedForRef = useRef<string | null>(null);
   const claiming = claimingListingId === listingId;
 
   const listing = getListingById(listingId);
 
   useEffect(() => {
-    if (listing || !listingId || fetchingRemote) return;
+    if (listing || !listingId || askedForRef.current === listingId) return;
+    askedForRef.current = listingId;
     setFetchingRemote(true);
     fetchListingById(listingId).finally(() => setFetchingRemote(false));
-  }, [listing, listingId, fetchListingById, fetchingRemote]);
+  }, [listing, listingId, fetchListingById]);
 
   const item = listing ? getItemById(listing.itemId) : undefined;
   const owner = listing ? getProfileById(listing.ownerUserId) : undefined;
@@ -100,40 +119,23 @@ export default function ListingDetailScreen() {
     });
   });
 
-  if (!listing) {
-    if (fetchingRemote) {
-      return (
-        <Screen>
-          <Stack.Screen options={{ title: t("marketplaceTitle") }} />
-          <SkeletonItemDetail />
-        </Screen>
-      );
-    }
-    return (
-      <Screen>
-        <Stack.Screen options={{ title: t("marketplaceTitle") }} />
-        <EmptyState
-          icon="🪧"
-          title={t("marketplaceListingNotFound")}
-          hint={t("marketplaceListingNotFoundHint")}
-          actionLabel={t("marketplaceTitle")}
-          onAction={() => router.replace("/marketplace")}
-        />
-      </Screen>
-    );
-  }
-
-  const ownerName = owner?.displayName ?? t("unknownUser");
-  const isSelf = user?.id === listing.ownerUserId;
-  const friendsOnly = !isSelf && !canMessage(listing.ownerUserId);
-  const isSold = listing.soldAt !== null;
-  const isBuyer = !!user && listing.buyerUserId === user.id;
-  const hasArrived = listing.arrivedAt !== null;
-  const buyer = listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined;
-  const buyerName = buyer?.username
-    ? `@${buyer.username}`
-    : buyer?.displayName ?? t("unknownUser");
-
+  // These two hooks sit ABOVE the `if (!listing)` return, and that is the
+  // whole point of where they are.
+  //
+  // They used to sit below it, which is `react-hooks/rules-of-hooks` and is
+  // also a crash on the path the effect above exists to serve: a deep link to
+  // a listing this device has not cached renders once with `listing`
+  // undefined — early return, these two never called — and again when the
+  // fetch lands, with two more hooks than the render before it. React does
+  // not tolerate that; it throws "Rendered more hooks than during the
+  // previous render" and the screen goes white. The early return is fine
+  // where it is. Hooks have to be above it.
+  //
+  // So both read `listing` optionally. `performClaim` already did — it opens
+  // by bailing on a missing listing, because a realtime delete can land while
+  // the confirm dialog is up — and `priceHistory` excludes the listing it is
+  // showing history FOR, which is nothing to exclude when there is no
+  // listing.
   const referenceTitle = item?.title ?? "";
   const priceHistory = useMemo(
     () =>
@@ -142,33 +144,11 @@ export default function ListingDetailScreen() {
             referenceTitle,
             listings,
             (id) => getItemById(id)?.title ?? null,
-            { excludeListingId: listing.id, limit: 10 },
+            { excludeListingId: listing?.id, limit: 10 },
           )
         : [],
-    [referenceTitle, listings, getItemById, listing.id],
+    [referenceTitle, listings, getItemById, listing?.id],
   );
-
-  const photo = item?.photos?.find(Boolean);
-  const itemTitle = item?.title ?? t("marketplaceUnknownItem");
-  const modeLabel =
-    listing.mode === "trade" ? t("marketplaceModeTrade") : t("marketplaceModeSell");
-  const priceLabel =
-    listing.mode === "sell" && typeof listing.askingPrice === "number"
-      ? `${listing.askingPrice} ${listing.currency}`
-      : null;
-
-  function handleMarkReceived() {
-    if (!listing) return;
-    markListingReceived(listing.id);
-    toast.success(t("marketplaceMarkReceivedSuccess"));
-  }
-
-  function handleMessageOwner() {
-    if (!listing) return;
-    const chatId = ensureChatWith(listing.ownerUserId);
-    if (!chatId) return;
-    router.push(`/chat/${listing.ownerUserId}` as never);
-  }
 
   const performClaim = useCallback(async () => {
     if (!listing || !user) return;
@@ -241,6 +221,64 @@ export default function ListingDetailScreen() {
       setClaimingListingId(null);
     }
   }, [listing, user, markListingSold, setClaimingListingId, getItemById, transferItemToBuyer, getRelationship, sendMessage, toast, t, owner]);
+
+  if (!listing) {
+    if (fetchingRemote) {
+      return (
+        <Screen>
+          <Stack.Screen options={{ title: t("marketplaceTitle") }} />
+          <SkeletonItemDetail />
+        </Screen>
+      );
+    }
+    return (
+      <Screen>
+        <Stack.Screen options={{ title: t("marketplaceTitle") }} />
+        <EmptyState
+          icon="🪧"
+          title={t("marketplaceListingNotFound")}
+          hint={t("marketplaceListingNotFoundHint")}
+          actionLabel={t("marketplaceTitle")}
+          onAction={() => router.replace("/marketplace")}
+        />
+      </Screen>
+    );
+  }
+
+  const ownerName = owner?.displayName ?? t("unknownUser");
+  const isSelf = user?.id === listing.ownerUserId;
+  const friendsOnly = !isSelf && !canMessage(listing.ownerUserId);
+  const isSold = listing.soldAt !== null;
+  const isBuyer = !!user && listing.buyerUserId === user.id;
+  const hasArrived = listing.arrivedAt !== null;
+  const buyer = listing.buyerUserId ? getProfileById(listing.buyerUserId) : undefined;
+  const buyerName = buyer?.username
+    ? `@${buyer.username}`
+    : buyer?.displayName ?? t("unknownUser");
+
+
+  const photo = item?.photos?.find(Boolean);
+  const itemTitle = item?.title ?? t("marketplaceUnknownItem");
+  const modeLabel =
+    listing.mode === "trade" ? t("marketplaceModeTrade") : t("marketplaceModeSell");
+  const priceLabel =
+    listing.mode === "sell" && typeof listing.askingPrice === "number"
+      ? `${listing.askingPrice} ${listing.currency}`
+      : null;
+
+  function handleMarkReceived() {
+    if (!listing) return;
+    markListingReceived(listing.id);
+    toast.success(t("marketplaceMarkReceivedSuccess"));
+  }
+
+  function handleMessageOwner() {
+    if (!listing) return;
+    const chatId = ensureChatWith(listing.ownerUserId);
+    if (!chatId) return;
+    router.push(`/chat/${listing.ownerUserId}` as never);
+  }
+
 
   async function handleClaimPress() {
     if (!listing || !user || claiming) return;

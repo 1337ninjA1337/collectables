@@ -108,7 +108,13 @@ describe("listing detail: price history wiring", () => {
     const src = read("app/listing/[id].tsx");
     assert.match(src, /priceHistoryForTitle/);
     assert.match(src, /marketplacePriceHistoryLabel/);
-    assert.match(src, /excludeListingId:\s*listing\.id/);
+    // `listing?.id`, not `listing.id`: the hook moved above the screen's
+    // `if (!listing)` early return on 2026-09-27, because sitting below it
+    // meant a render with two more hooks than the one before it as soon as a
+    // deep-linked listing's fetch landed — which React throws on. The
+    // exclusion is still the listing this screen is showing history FOR;
+    // there is simply nothing to exclude before it arrives.
+    assert.match(src, /excludeListingId:\s*listing\?\.id/);
     // Limit must default to (or pass) 10 per spec.
     assert.match(src, /limit:\s*10/);
   });
