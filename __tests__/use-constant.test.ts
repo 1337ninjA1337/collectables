@@ -120,11 +120,11 @@ describe("useConstant — built on the first render and never again", () => {
 });
 
 describe("the sites that were writing it out", () => {
-  it("leaves no `useRef(...).current` construction in swipe-tabs", () => {
-    // The first of the three files the task names. The other five sites are
-    // still there and are their own pieces; this case is scoped to the one
-    // that is done rather than asserting a tree-wide negative that is not
-    // true yet.
+  it("leaves no `useRef(...).current` construction in the two PanResponder files", () => {
+    // Two of the three files the task names. The four `new Animated.Value(0)`
+    // sites in `toast-host.tsx` and `skeleton.tsx` are still there and are
+    // their own pieces; this case is scoped to what is done rather than
+    // asserting a tree-wide negative that is not true yet.
     const src = readRepoFile("components/swipe-tabs.tsx");
     // `).current` rather than `useRef(...).current`: the construction spans
     // three lines for the responder, and every OTHER `.current` in this file
@@ -139,5 +139,17 @@ describe("the sites that were writing it out", () => {
     assert.doesNotMatch(code, /\)\.current/);
     assert.match(src, /const translateX = useConstant\(\(\) => new Animated\.Value\(0\)\);/);
     assert.match(src, /const panResponder = useConstant\(\(\) =>\n\s+PanResponder\.create\(\{/);
+  });
+
+  it("leaves no `useRef(...).current` construction in wishlist either", () => {
+    const src = readRepoFile("app/wishlist.tsx");
+    // The same comment-stripping as above, and for the same reason.
+    const code = src
+      .split("\n")
+      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+      .join("\n");
+    assert.doesNotMatch(code, /useRef\(/);
+    assert.match(code, /const sheetTranslateY = useConstant\(\(\) => new Animated\.Value\(0\)\);/);
+    assert.match(code, /const sheetPanResponder = useConstant\(\(\) =>\n\s+PanResponder\.create\(\{/);
   });
 });

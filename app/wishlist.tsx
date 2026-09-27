@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, router } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Animated,
@@ -36,6 +36,7 @@ import { placeholderColor } from "@/lib/placeholder-color";
 import { useCollections } from "@/lib/collections-context";
 import { flatListStyles } from "@/lib/flat-list-styles";
 import { CHUNK_PAGE_SIZE_ROWS, useChunkedList } from "@/lib/use-chunked-list";
+import { useConstant } from "@/lib/use-constant";
 import {
   ACCENT_DEEP,
   AMBER_ACCENT,
@@ -431,21 +432,30 @@ export default function WishlistScreen() {
   );
 
   const SWIPE_THRESHOLD = 80;
-  const sheetTranslateY = useRef(new Animated.Value(0)).current;
-  const scrollEnabled = useRef(true);
-  // Read through a ref: the PanResponder below is built inside
-  // `useRef(...).current` and never rebuilt, so a captured value would be the
-  // one from the first render for the life of the screen.
+  const sheetTranslateY = useConstant(() => new Animated.Value(0));
+  // State, not a ref, and the difference is whether the ScrollView ever hears
+  // about it. This was `useRef(true)`, written from the two pan handlers below
+  // and read as a PROP in the render — an assignment React is not watching,
+  // so the sheet's list kept scrolling under the drag until some unrelated
+  // render happened to pick the value up. Which render that was is the other
+  // half of the bug: a re-render mid-drag would have applied the `false`, and
+  // one after the release the `true`, so the symptom depended on what else
+  // the screen was doing. `setScrollEnabled` has a stable identity, so the
+  // responder built once below can call it.
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+  // Read through a ref: the PanResponder below is built by `useConstant` and
+  // never rebuilt, so a captured value would be the one from the first render
+  // for the life of the screen.
   const reducedMotion = useReducedMotionRef();
 
-  const sheetPanResponder = useRef(
+  const sheetPanResponder = useConstant(() =>
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
         return gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
       },
       onPanResponderGrant: () => {
-        scrollEnabled.current = false;
+        setScrollEnabled(false);
       },
       onPanResponderMove: (_, gestureState) => {
         if (gestureState.dy > 0) {
@@ -453,7 +463,7 @@ export default function WishlistScreen() {
         }
       },
       onPanResponderRelease: (_, gestureState) => {
-        scrollEnabled.current = true;
+        setScrollEnabled(true);
         if (gestureState.dy > SWIPE_THRESHOLD || gestureState.vy > 0.5) {
           // Zero rather than skipped: the completion callback is what closes
           // the sheet and resets the offset, so the animation must still run.
@@ -479,7 +489,7 @@ export default function WishlistScreen() {
         }
       },
     }),
-  ).current;
+  );
 
   // WLF-B: the FlatList owns the screen scroll (VM-D shape) so iOS can
   // recycle off-screen wishlist cards instead of mounting every card (and its
@@ -543,7 +553,7 @@ export default function WishlistScreen() {
               <ScrollView
                 style={styles.sheetScrollView}
                 contentContainerStyle={styles.sheetScroll}
-                scrollEnabled={scrollEnabled.current}
+                scrollEnabled={scrollEnabled}
               >
                 <Text style={styles.label}>{t("itemTitleLabel")}</Text>
                 <MaskedTextInput
