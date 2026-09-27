@@ -130,6 +130,10 @@ describe("the sites that were writing it out", () => {
       "components/swipe-tabs.tsx",
       "components/toast-host.tsx",
       "lib/reduced-motion.ts",
+      // The twelfth copy, found on 2026-09-27 by `react-hooks/refs` rather
+      // than by `lint:latest-ref` — see the case below for why the rule could
+      // not see it.
+      "lib/use-app-away.ts",
       "lib/use-dwell-time.ts",
       "lib/use-entry-currency.ts",
       "lib/use-transition-event.ts",
@@ -138,6 +142,34 @@ describe("the sites that were writing it out", () => {
     for (const file of sites) {
       assert.match(readRepoFile(file), /useLatestRef\(/, `${file} must use the shared hook`);
     }
+  });
+
+  it("had a twelfth copy the text rule is designed not to see", () => {
+    // `lib/use-app-away.ts` held `const awayRef = useRef(onAway); awayRef
+    // .current = onAway;` — the idiom exactly, at the top of a hook body, for
+    // the documented reason (an inline arrow that must not re-register an
+    // `AppState` listener). `findLatestRefSyncs` matches `fooRef.current =
+    // foo` with the SAME name either side, and here the parameter is
+    // `onAway` while the ref is `awayRef`, so it never matched.
+    //
+    // The backreference is the rule's design, not an oversight: without it,
+    // `timerRef.current = handle` and `mountedRef.current = flag` come along
+    // too. This case records the cost — a copy that lived eight days and was
+    // found by a linter with a scope — and pins the fix, which is the hook,
+    // not a looser pattern. `check-latest-ref.ts`'s header says a rule that
+    // caught nine of ten would be worse than none; this is the tenth, and it
+    // is the shape that has to be counted rather than argued away.
+    assert.match(readRepoFile("lib/use-app-away.ts"), /const awayRef = useLatestRef\(onAway\);/);
+    assert.deepEqual(
+      findLatestRefSyncs("lib/use-app-away.ts", "  awayRef.current = onAway;"),
+      [],
+      "the rule still does not match it, which is why the fix is the hook",
+    );
+    assert.equal(
+      findLatestRefSyncs("x.ts", "  awayRef.current = away;").length,
+      1,
+      "and it still matches the shape it was built for",
+    );
   });
 
   it("collapsed useReducedMotionRef to the signal plus the hook", () => {

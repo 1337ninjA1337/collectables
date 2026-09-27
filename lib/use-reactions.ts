@@ -50,6 +50,13 @@ export function useReactions(targetType: ReactionTargetType, targetId: string) {
    */
   const queue = useMemo(
     () =>
+      // The rule is reading `onFailure` below, which calls `apply`, which
+      // reads `latest.current`. It is right that a ref is reached from an
+      // argument to a function called during render, and it cannot see that
+      // the argument is not INVOKED during render: `onFailure` runs from a
+      // rejected write, on a promise rejection handler, which is as far after
+      // the commit as this module has. The queue itself never touches a ref.
+      // eslint-disable-next-line react-hooks/refs
       createReactionWriteQueue({
         write: async (plan) => {
           const { userId, targetType: type, targetId: id, emoji } = plan.row;

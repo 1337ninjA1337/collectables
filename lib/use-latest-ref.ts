@@ -51,6 +51,14 @@ import { useRef, type MutableRefObject } from "react";
  */
 export function useLatestRef<T>(value: T): MutableRefObject<T> {
   const ref = useRef(value);
+  // The one write during render this tree keeps, and the reason is the
+  // section above: an effect would be correct and LATER, and a handler that
+  // fires between the render and the effect — a gesture mid-flight, a timer
+  // already scheduled — would read the previous value, which is the bug this
+  // hook exists to prevent rather than a smaller version of it. It is one
+  // line in one module on purpose: every other site in the tree gets the
+  // guarantee without the disable, which is most of what the hook is for.
+  // eslint-disable-next-line react-hooks/refs
   ref.current = value;
   return ref;
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef } from "react";
+import { createContext, useContext, useEffect, useMemo } from "react";
 
 import {
   identifyUser,
@@ -17,6 +17,7 @@ import {
   type IdentifyScheduler,
 } from "@/lib/identify-scheduler";
 import { usePremium } from "@/lib/premium-context";
+import { useConstant } from "@/lib/use-constant";
 
 /**
  * React-facing surface of the analytics wrapper. Call sites that need to fire
@@ -64,15 +65,19 @@ export function AnalyticsProvider({ children }: React.PropsWithChildren) {
   const { language } = useI18n();
   const { isPremium } = usePremium();
   const { diagnosticsEnabled } = useDiagnostics();
-  const schedulerRef = useRef<IdentifyScheduler | null>(null);
-  if (!schedulerRef.current) {
-    schedulerRef.current = createIdentifyScheduler({
+  // Lazy-initialised so that a re-render does not build a second scheduler
+  // and orphan the first one's pending identify. This was the `if
+  // (!ref.current) ref.current = …` spelling of that, which is four lines, a
+  // nullable type the rest of the file then has to ignore, and — because the
+  // next line reads `.current` back out — five of this tree's 44
+  // `react-hooks/refs` errors.
+  const scheduler = useConstant<IdentifyScheduler>(() =>
+    createIdentifyScheduler({
       identify: identifyUser,
       reset: resetUser,
       debounceMs: IDENTIFY_DEBOUNCE_MS,
-    });
-  }
-  const scheduler = schedulerRef.current;
+    }),
+  );
 
   useEffect(() => {
     // Debounced identify on sign-in / trait changes, synchronous reset on the

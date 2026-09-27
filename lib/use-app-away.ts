@@ -1,5 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { AppState, Platform } from "react-native";
+
+import { useLatestRef } from "@/lib/use-latest-ref";
 
 /**
  * Calls back when the user goes away from the app, on either platform.
@@ -41,9 +43,15 @@ import { AppState, Platform } from "react-native";
 export function useAppAway(onAway: () => void): void {
   // The callback is almost always an inline arrow that changes identity every
   // render; the listener must not be torn down and re-registered for that, so
-  // the effect reads a ref and depends on nothing.
-  const awayRef = useRef(onAway);
-  awayRef.current = onAway;
+  // the effect reads a ref and depends only on things that do not change.
+  //
+  // This was the twelfth hand-written copy of that sync, and `lint:latest-ref`
+  // could not see it: the rule matches `fooRef.current = foo` with the same
+  // name either side, and here the parameter is `onAway` while the ref is
+  // `awayRef`. The narrowness is argued in `lib/check-latest-ref.ts` and it is
+  // the right call for a text rule — this is the copy it costs, and the fix is
+  // the hook rather than a looser pattern.
+  const awayRef = useLatestRef(onAway);
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -73,5 +81,9 @@ export function useAppAway(onAway: () => void): void {
       if (state !== "active") awayRef.current();
     });
     return () => sub.remove();
-  }, []);
+    // The ref object, and nothing else. It is the same object every render, so
+    // listing it re-registers no listener — and leaving it out was a missing
+    // dependency to ESLint, which cannot tell a `useLatestRef` result from any
+    // other value a render produced.
+  }, [awayRef]);
 }

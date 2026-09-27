@@ -31,12 +31,19 @@ describe("AnalyticsProvider — identify debounce via createIdentifyScheduler", 
     );
   });
 
-  it("creates the scheduler once per mount (lazy ref, not per render)", () => {
+  it("creates the scheduler once per mount, not per render", () => {
+    // Was `useRef<IdentifyScheduler | null>(null)` plus `if (!ref.current)`,
+    // which is the same guarantee in four lines, a nullable type the rest of
+    // the file then ignores, and — because the next line read `.current` back
+    // out — five `react-hooks/refs` errors. `useConstant` is the factory-runs-
+    // once contract with no ref and no null, and it is asserted by RUNNING in
+    // use-constant.test.ts rather than only matched here.
     assert.match(
       src,
-      /const schedulerRef = useRef<IdentifyScheduler \| null>\(null\);\s*if \(!schedulerRef\.current\) \{/,
-      "the scheduler must live in a lazily-initialised ref so re-renders reuse the same timer state",
+      /const scheduler = useConstant<IdentifyScheduler>\(\(\) =>\n\s+createIdentifyScheduler\(\{/,
+      "the scheduler must be built once per mount so re-renders reuse the same timer state",
     );
+    assert.doesNotMatch(src, /useRef/, "a second scheduler per render is what the ref was guarding against");
   });
 
   it("delegates the effect body to scheduler.update(user?.id ?? null, traits)", () => {

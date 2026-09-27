@@ -29,6 +29,7 @@ import { useConstant } from "@/lib/use-constant";
 
 import { autoUnmount, render, unmountAllTrees } from "./helpers/render";
 import { readRepoFile } from "./helpers/repo-file";
+import { sourceFiles } from "./helpers/source-files";
 
 beforeEach(() => unmountAllTrees());
 autoUnmount();
@@ -174,5 +175,61 @@ describe("the sites that were writing it out", () => {
       /(?<!const )shownAt\s*=[^=]/,
       "nothing may assign the appearance time after it is built",
     );
+  });
+
+  it("takes the last four sites with it, including one that was not an Animated.Value", () => {
+    // `components/skeleton.tsx` is the fourth shimmer; the other three are the
+    // ones above. `lib/analytics-provider.tsx` is the odd one: the
+    // construction there was `useRef<T | null>(null)` plus `if (!ref.current)
+    // ref.current = …`, the lazy-init spelling of the same guarantee, in four
+    // lines and a nullable type nothing else in the file wanted.
+    for (const [file, shape] of [
+      ["components/skeleton.tsx", /const anim = useConstant\(\(\) => new Animated\.Value\(0\)\);/],
+      ["lib/analytics-provider.tsx", /const scheduler = useConstant<IdentifyScheduler>\(\(\) =>/],
+    ] as const) {
+      const code = readRepoFile(file)
+        .split("\n")
+        .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+        .join("\n");
+      assert.match(code, shape, `${file} must build its value once`);
+      assert.doesNotMatch(code, /useRef\(/, `${file} must have no useRef left`);
+    }
+  });
+
+  it("leaves `useRef(...).current` nowhere in the shipped tree", () => {
+    // The tree-wide negative the first of these cases could not make. Every
+    // remaining `useRef` in `app/`, `components/` and `lib/` is a ref that is
+    // written after the render that declared it — a width, a mounted flag, a
+    // timer handle — which is what a ref is for.
+    const offenders = sourceFiles("app", "components", "lib").filter((file) =>
+      /useRef\([\s\S]*?\)\.current/.test(
+        readRepoFile(file)
+          .split("\n")
+          .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+          .join("\n"),
+      ),
+    );
+    assert.deepEqual(offenders, []);
+  });
+
+  it("keeps exactly two `react-hooks/refs` disables, and both are argued", () => {
+    // The rule reported 44 errors across eight files. Two of them are real
+    // shapes the rule cannot decide and stay: `useLatestRef`'s own write
+    // during render, which is the whole hook, and the queue in
+    // `use-reactions.ts`, whose `onFailure` reaches a ref from an argument to
+    // a function called during render but is itself only ever invoked from a
+    // rejected promise. Everything else was fixed. A third disable is a
+    // decision somebody should have to make on purpose.
+    const disables = sourceFiles("app", "components", "lib").flatMap((file) => {
+      const src = readRepoFile(file);
+      return src.includes("eslint-disable-next-line react-hooks/refs") ? [file] : [];
+    });
+    assert.deepEqual(disables, ["lib/use-latest-ref.ts", "lib/use-reactions.ts"]);
+    for (const file of disables) {
+      const src = readRepoFile(file);
+      const at = src.indexOf("// eslint-disable-next-line react-hooks/refs");
+      const before = src.slice(0, at).split("\n").slice(-2).join("\n");
+      assert.match(before, /^\s*\/\//m, `${file} must argue its disable on the lines above it`);
+    }
   });
 });

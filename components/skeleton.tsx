@@ -1,10 +1,11 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Animated, DimensionValue, Easing, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 
 import { BORDER_2, PAGE_BG_2, SPACING_CARD, SPACING_LIST, TEXT_ON_DARK_SOFT } from "@/lib/design-tokens";
 import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
 import { useReducedMotion } from "@/lib/reduced-motion";
+import { useConstant } from "@/lib/use-constant";
 
 type SkeletonProps = {
   width?: DimensionValue;
@@ -17,7 +18,7 @@ const BASE_COLOR = TEXT_ON_DARK_SOFT;
 const HIGHLIGHT = "rgba(255, 250, 244, 0.9)";
 
 export function Skeleton({ width = "100%", height = 16, borderRadius = 8, style }: SkeletonProps) {
-  const anim = useRef(new Animated.Value(0)).current;
+  const anim = useConstant(() => new Animated.Value(0));
   const [boxWidth, setBoxWidth] = useState(0);
 
   const reducedMotion = useReducedMotion();
