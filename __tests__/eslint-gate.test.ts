@@ -189,8 +189,9 @@ describe("it is a leg of the gate, not a script beside it", () => {
   });
 
   it("runs after the text guards, which are the fast half", () => {
-    // ~60s of parsing behind ~2s of scanning: a contributor should hear about
-    // an inline hex literal before waiting for ESLint to walk 1011 files.
+    // ESLint's walk behind the text guards': 22s against 13s on CI, ~60s
+     // against ~2s in the dev sandbox. A contributor should hear about an
+     // inline hex literal before waiting for a parse of 1012 files.
     const legs = gateLegs().map((leg) => leg.script);
     assert.ok(legs.indexOf("lint:eslint-gate") > legs.indexOf("lint:all"));
     assert.ok(legs.indexOf("lint:eslint-gate") < legs.indexOf("test"));

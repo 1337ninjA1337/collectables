@@ -153,7 +153,9 @@ jobs:
       # on the way there — failing the run, and every other rule counted on
       # every run so the number stays visible. The list and the argument are
       # in lib/eslint-gate.ts; it runs after lint:all because the fast text
-      # guards should name their findings before the ~60s parse starts.
+      # guards should name their findings first — 13s against this step's 22s
+      # here, and ~2s against ~60s in the dev sandbox, where the wait is one a
+      # contributor sits through rather than one a runner absorbs.
       - name: ESLint gate (gated rules fail, the rest report)
         run: npm run lint:eslint-gate
 
