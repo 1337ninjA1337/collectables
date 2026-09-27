@@ -1237,7 +1237,7 @@ function severityRank(severity: string): number {
  * The sentence every failure of this gate ends with.
  *
  * This is the one `verify` leg whose verdict can change while the repository
- * does not. The other eight read the tree: the same commit gives the same
+ * does not. The other nine read the tree: the same commit gives the same
  * answer next year. This one asks the npm registry what the world knows about
  * these packages TODAY, so an advisory published overnight, or a fix published
  * overnight, turns a green tree red with no commit in between.
@@ -1261,11 +1261,11 @@ function severityRank(severity: string): number {
  *
  * "The one check here" is a claim about the other legs, and it is measured
  * rather than remembered: `verify-gate-script.test.ts` scans every script the
- * gate runs for a read outside the tree and fails if a second one appears. A
- * tenth leg that shelled out to a registry would otherwise make this sentence
- * false silently, in the one message written to be trusted.
+ * gate runs for a read outside the tree and fails if a second one appears. An
+ * eleventh leg that shelled out to a registry would otherwise make this
+ * sentence false silently, in the one message written to be trusted.
  *
- * "The other eight" is the same kind of claim one level down, and it said
+ * "The other nine" is the same kind of claim one level down, and it said
  * SEVEN for a day after `lint:ships-to-client` joined. `gate-legs-restated.test.ts`
  * counts the legs out of the script chain and reads this comment.
  */

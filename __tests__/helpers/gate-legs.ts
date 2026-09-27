@@ -1,7 +1,7 @@
 /**
  * The legs of `npm run verify`, derived from package.json rather than counted.
  *
- * WHAT THIS IS ABOUT. The gate has nine legs today. That number, and the
+ * WHAT THIS IS ABOUT. The gate has ten legs today. That number, and the
  * ordered list behind it, is written out in prose in five places — CLAUDE.md's
  * Commands section, SECURITY.md's "a red gate here may not be your branch's
  * fault", `PUBLISHED_ELSEWHERE_NOTE`'s doc comment in `lib/audit-baseline.ts`,
@@ -23,7 +23,7 @@
  * A leaf of `verify`'s npm-script chain: a script that runs a real command
  * rather than delegating to other scripts. `verify` → `lint:ci` → `typecheck`
  * bottoms out at `tsc --noEmit`, so `typecheck` is a leg and `lint:ci` is not.
- * That is exactly the population the prose means when it says "nine steps",
+ * That is exactly the population the prose means when it says "ten steps",
  * and it is the one a contributor watches go past on a run.
  *
  * Order is the chain's order, with `pre*` hooks spliced in where npm runs
@@ -66,6 +66,7 @@ export interface GateLeg {
 export const GATE_LEG_LABELS: Readonly<Record<string, string>> = {
   typecheck: "typecheck",
   "lint:all": "lint:all",
+  "lint:eslint-gate": "eslint gate",
   test: "test",
   "lint:audit-baseline": "audit baseline",
   build: "build",
@@ -156,7 +157,7 @@ export function gateScriptPaths(): readonly string[] {
  * `expo install --check` asking it about compatible versions, an HTTP call.
  *
  * These lived in `verify-gate-script.test.ts` until the leg count needed them
- * too: the hermetic count ("the other eight read the tree") that SECURITY.md
+ * too: the hermetic count ("the other nine read the tree") that SECURITY.md
  * and `lib/audit-baseline.ts` both state is the leg count minus the legs these
  * markers fire on, so it is derived from the same scan that decides the audit
  * gate is the only one.

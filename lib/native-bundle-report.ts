@@ -33,8 +33,8 @@
  *
  * ## Why this is a report and not a gate step
  *
- * The gate has nine legs and `npm run verify` chains them fail-fast, so a tenth
- * that cannot pass today would make every commit red for a dependency-tree
+ * The gate has ten legs and `npm run verify` chains them fail-fast, so an
+ * eleventh that cannot pass today would make every commit red for a dependency-tree
  * problem no commit caused. `bundle:composition` is the precedent: it gates
  * nothing and is run when a question comes up. This is run when the question is
  * "how big is the native bundle", and today it answers "there isn't one, and

@@ -26,7 +26,7 @@ npm run ios        # iOS simulator
 npm run web        # browser
 
 # Lint
-npm run lint       # eslint . over the whole tree (config in eslint.config.js; a report, not a gate leg)
+npm run lint       # eslint . over the whole tree (config in eslint.config.js; the full report — 200 findings, 34 of them errors)
 ```
 
 Tests run on the built-in `node:test` runner via `tsx`:
@@ -36,7 +36,8 @@ npm test           # typechecks first (pretest hook), then runs __tests__/*.test
 npm run typecheck  # tsc --noEmit on its own
 npm run test:only  # same suites, skipping the typecheck (tight iteration loop)
 npm run lint:all   # every pure code-style guard in lib/lint-guards.ts
-npm run lint:ci    # typecheck → lint:all → test
+npm run lint:ci    # typecheck → lint:all → eslint gate → test
+npm run lint:eslint-gate # the gated subset of `lint` — fails on three rules, counts the rest (lib/eslint-gate.ts)
 npm run verify:dist # the four guards that read dist/ (needs a build first)
 npm run verify     # lint:ci → build → verify:dist, the full gate — run THIS before committing
 ```
@@ -66,7 +67,7 @@ the sentence five budget raises were argued without. Re-take the baseline with
 with one fresh number among stale ones reports drift that never happened.
 
 `npm run verify` is the single command to run before every commit. It chains
-the NINE steps CI runs (typecheck → lint:all → test → audit baseline → build
+the TEN steps CI runs (typecheck → lint:all → eslint gate → test → audit baseline → build
 → bundle secrets → bundle size → bundle smoke → ships-to-client) in the same order, fail-fast, so a green
 `verify` locally means a green CI. Running the legs by hand is only for
 iterating on one of them — a hand-assembled sequence is exactly how a leg gets
@@ -76,9 +77,9 @@ It said "the four legs" until the day the last three cost a red CI: the
 post-build guards run against `dist/`, so they were left out of the gate and
 out of the case that was supposed to compare the gate with ci.yml — which
 compared it against a hand-written copy of the same four. `verify-gate-script.test.ts`
-reads the step list out of ci.yml now, so a tenth step either joins the gate
-or turns that case red — which is how `lint:ships-to-client`, the ninth, came
-to be in both. The sentences ABOUT that list are checked the same way:
+reads the step list out of ci.yml now, so an eleventh step either joins the
+gate or turns that case red — which is how `lint:ships-to-client`, the ninth,
+came to be in both, and `lint:eslint-gate`, the tenth, after it. The sentences ABOUT that list are checked the same way:
 `gate-legs-restated.test.ts` derives the count from the script chain and reads
 every document that states it, including this one.
 

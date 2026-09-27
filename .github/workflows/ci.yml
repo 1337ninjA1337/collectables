@@ -144,6 +144,19 @@ jobs:
       - name: Code-style guards (lint:all)
         run: npm run lint:all
 
+      # The tenth leg, added 2026-09-27. `npm run lint` has been a report
+      # since the config was committed: ESLint answers what a text scan
+      # declines (a ref read in a render body, a hook below an early return),
+      # and it reported 83 errors, which is not a thing one commit clears. The
+      # decision that followed is a NAMED subset — three React-correctness
+      # rules the tree was driven to zero for, and which found three real bugs
+      # on the way there — failing the run, and every other rule counted on
+      # every run so the number stays visible. The list and the argument are
+      # in lib/eslint-gate.ts; it runs after lint:all because the fast text
+      # guards should name their findings before the ~60s parse starts.
+      - name: ESLint gate (gated rules fail, the rest report)
+        run: npm run lint:eslint-gate
+
       # `npm test` runs TWO reporters: tap on stdout (the play-by-play, and
       # what any log annotation reads), and scripts/test-failure-reporter.ts on
       # stderr, which stays silent all run and then writes the name of every

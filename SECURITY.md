@@ -177,8 +177,8 @@ nobody reads instead of the two somebody does. Demanding a lockfile bump costs
 a command, so severity is the wrong question for it.
 
 **A red gate here may not be your branch's fault.** This is the only one of
-`verify`'s nine legs that reads something outside the repository — the other
-eight give the same answer for the same commit next year, and this one asks the
+`verify`'s ten legs that reads something outside the repository — the other
+nine give the same answer for the same commit next year, and this one asks the
 npm registry what the world knows today. An advisory published overnight, a fix
 published overnight, or an advisory withdrawn turns a green tree red with no
 commit in between, so the run that fails is not the run that caused it. Every

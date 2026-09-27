@@ -1003,7 +1003,7 @@ describe("the OK line — upgrades, never advisories", () => {
 /**
  * The failure shape nobody had met, added 2026-09-02.
  *
- * Eight of the nine `verify` legs read the tree: the same commit gives the
+ * Nine of the ten `verify` legs read the tree: the same commit gives the
  * same answer next year. This one asks the registry what the world knows
  * today, so a green tree goes red with no commit in between — and the first
  * reading of a red gate on your own PR is that your diff did it, because every

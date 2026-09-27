@@ -18,8 +18,8 @@
  *
  * It is not in `npm run verify` and not in ci.yml, and that is a decision
  * rather than an omission: it needs a browser, and a gate that downloads one
- * is a gate that goes red when a download does. The suggestion asking for a
- * tenth leg stands; what this closes is the part that was a chore — nobody
+ * is a gate that goes red when a download does. The suggestion asking for an
+ * eleventh leg stands; what this closes is the part that was a chore — nobody
  * should have to re-derive a static server, a base path and a CDP session to
  * answer "does it still boot".
  *

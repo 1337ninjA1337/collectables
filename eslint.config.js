@@ -20,14 +20,19 @@
  * callback, whether a hook is called conditionally, whether a dependency array
  * is complete.
  *
- * ## Why it is not a `verify` leg yet
+ * ## Part of it gates, and the split is the decision
  *
- * `verify` chains nine steps and `verify-gate-script.test.ts` reads that list
- * out of ci.yml, so a tenth is a decision rather than an addition. This config
- * is the piece that had to exist before the decision could be argued, and the
- * argument is in `.tasks/.tasks.md` under the third piece. Until then `npm run
- * lint` is a report, like `bundle:composition` and `bundle:native` — runnable,
- * reproducible, and gating nothing.
+ * `verify` chained nine steps when this landed, and `verify-gate-script.test.ts`
+ * reads that list out of ci.yml, so a tenth was a decision rather than an
+ * addition. It was argued on 2026-09-27 and the answer is a NAMED SUBSET:
+ * `lint:eslint-gate` fails the run on three React-correctness rules the tree
+ * was driven to zero for, and counts every other rule on every run so the
+ * number stays visible. Which three, and why not the rest, is in
+ * `lib/eslint-gate.ts`.
+ *
+ * `npm run lint` itself stays a report — the whole 200 findings, unfiltered,
+ * like `bundle:composition` and `bundle:native`. The gate is the part somebody
+ * has committed to keeping at zero.
  *
  * ## The scope
  *

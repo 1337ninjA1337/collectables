@@ -181,7 +181,7 @@ describe("the local gate matches what CI runs", () => {
    * of the four legs it already ran. A list restating the thing it checks
    * cannot notice a fifth.
    *
-   * Derived, so the day somebody adds a tenth step the gate either grows or
+   * Derived, so the day somebody adds an eleventh step the gate either grows or
    * goes red — and the failure names the step rather than the number.
    */
   const CI_SCRIPTS = [
@@ -258,7 +258,7 @@ describe("the local gate matches what CI runs", () => {
  * is "the one check here whose answer can change while the repository does
  * not". That sentence was true when it was written and nothing checked it.
  *
- * A tenth leg that shelled out to a registry would make it false silently, in
+ * An eleventh leg that shelled out to a registry would make it false silently, in
  * the one message written to be trusted — and the failure would land on
  * whoever met the audit gate next, not on whoever added the leg.
  *
@@ -289,7 +289,7 @@ describe("only one leg of the gate reads anything outside the tree", () => {
    * The markers and the scanned set both live in `helpers/gate-legs.ts`.
    *
    * They were written here and moved when the leg COUNT needed them too:
-   * "the other eight legs read the tree" is this scan's answer subtracted
+   * "the other nine legs read the tree" is this scan's answer subtracted
    * from the number of legs, and `gate-legs-restated.test.ts` checks that
    * sentence wherever it is written down. Two copies of the marker list would
    * have let the two rules disagree about which legs are hermetic — the exact

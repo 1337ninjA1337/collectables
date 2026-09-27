@@ -1,7 +1,7 @@
 /**
  * Nobody writes the gate's size down and is believed.
  *
- * WHAT THIS IS ABOUT. `npm run verify` has nine legs. That number is stated in
+ * WHAT THIS IS ABOUT. `npm run verify` has ten legs. That number is stated in
  * prose in five places — CLAUDE.md's Commands section, SECURITY.md's "a red
  * gate here may not be your branch's fault", the doc comment above
  * `PUBLISHED_ELSEWHERE_NOTE` in `lib/audit-baseline.ts`, and the headers of
@@ -23,13 +23,13 @@
  *
  * Three claims, all derived from `helpers/gate-legs.ts`:
  *
- *   1. the COUNT ("nine legs", "the NINE steps CI runs"),
+ *   1. the COUNT ("ten legs", "the TEN steps CI runs"),
  *   2. the HERMETIC count, which is the complement of the legs that read
- *      something outside the tree ("the other eight read the tree"),
- *   3. the NEXT position, when prose names one ("a tenth leg that shelled out
+ *      something outside the tree ("the other nine read the tree"),
+ *   3. the NEXT position, when prose names one ("an eleventh leg that shelled out
  *      to a registry would make this sentence false").
  *
- * Plus the ordered list itself: CLAUDE.md prints the nine legs joined by
+ * Plus the ordered list itself: CLAUDE.md prints the ten legs joined by
  * arrows, and that string is built here from `GATE_LEG_LABELS` rather than
  * compared to a copy of itself.
  *
@@ -153,7 +153,7 @@ interface Claim {
  * expected way this rule gets extended, and the population floor below is what
  * makes the extension visible rather than optional.
  *
- * `next` is the odd one: `a tenth leg that shelled out to a registry` names
+ * `next` is the odd one: `an eleventh leg that shelled out to a registry` names
  * the position a leg WOULD take, so it is checked against a count plus one.
  * Two populations are being counted with that shape — the gate's legs, and the
  * legs that read outside the tree ("a second leg of `verify` now reads
@@ -247,7 +247,7 @@ describe("the gate's legs are derived before they are described", () => {
   });
 
   it("finds exactly one leg that reads something outside the tree", () => {
-    // The hermetic count every "the other eight" claim rests on. If a second
+    // The hermetic count every "the other nine" claim rests on. If a second
     // leg ever reaches the registry this fails here, beside the claims, rather
     // than only in verify-gate-script.test.ts's own scan.
     const reaching = LEGS.filter((leg) => legReadsOutsideTheTree(leg) !== undefined).map(
@@ -316,8 +316,8 @@ describe("no document states the gate's size from memory", () => {
     // and `lib/audit-baseline.ts` flattens to 30 KB of prose that buries the
     // one sentence the case is about.
     for (const [file, sentence] of [
-      ["lib/audit-baseline.ts", "A tenth leg that shelled out"],
-      ["SECURITY.md", "the other eight give the same answer"],
+      ["lib/audit-baseline.ts", "An eleventh leg that shelled out"],
+      ["SECURITY.md", "the other nine give the same answer"],
     ] as const) {
       assert.ok(
         prose(file).includes(sentence),
@@ -344,6 +344,7 @@ describe("CLAUDE.md prints the legs the gate runs, in order", () => {
     // something false out loud.
     assert.equal(GATE_LEG_LABELS["lint:audit-baseline"], "audit baseline");
     assert.equal(GATE_LEG_LABELS["lint:ships-to-client"], "ships-to-client");
-    assert.match(ARROWS, /^typecheck → lint:all → test → /);
+    assert.equal(GATE_LEG_LABELS["lint:eslint-gate"], "eslint gate");
+    assert.match(ARROWS, /^typecheck → lint:all → eslint gate → test → /);
   });
 });
