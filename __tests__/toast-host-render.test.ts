@@ -299,3 +299,39 @@ describe("the dismissal window holds while the user is engaged", () => {
     });
   });
 });
+
+describe("a re-render of the host is not a new dismissal window", () => {
+  it("does not restart the timer when onDismiss changes identity", async () => {
+    // The reason `dismissRef` exists. `onDismiss` is `() => onDismiss(toast.id)`
+    // built inside the host's `map`, so it is a new function on every render of
+    // the host — in the effect's dependency list it would clear and re-schedule
+    // the window every time anything above re-rendered, and a toast on a busy
+    // screen would never dismiss at all.
+    //
+    // Until 2026-09-27 that contract was stated in a comment and in `dismissRef`
+    // being absent from the dependency array — which is also how ESLint read it:
+    // a missing dependency. It is listed now (the ref object is the same one
+    // every render, so listing it restarts nothing), and this is the case that
+    // says the listing was honest rather than convenient.
+    await withCapturedTimers(async (timers) => {
+      const result = render(await ToastHostElement([toast({ id: 7 })], () => {}));
+      const scheduled = timers.live();
+      assert.equal(scheduled.length, 1);
+
+      result.rerender(await ToastHostElement([toast({ id: 7 })], () => {}));
+
+      const after = timers.live();
+      assert.equal(after.length, 1, "a re-render must not leave a second window standing");
+      assert.equal(after[0], scheduled[0], "and it must be the SAME timer, not a fresh one");
+    });
+  });
+
+  // `shownAt` — built once, never written, and the other half of what a
+  // re-render must not disturb — has no case here on purpose. The ceiling it
+  // feeds is asserted within a 1000ms band (see `assertCeiling`, and the
+  // reason it is a band), so a `shownAt` rebuilt on every render moves the
+  // delay by the microseconds between two renders and no assertion in this
+  // suite can see it. The claim that is checkable is that nothing writes it,
+  // and that is a source scan, in `use-constant.test.ts` where the other ones
+  // are.
+});

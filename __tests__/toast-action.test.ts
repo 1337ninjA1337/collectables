@@ -184,7 +184,17 @@ describe("the toast renders and times its action", () => {
     // it either — hence the ref.
     assert.doesNotMatch(toastSrc, /setTimeout\([^)]*dismiss\(id\)/);
     assert.match(toastSrc, /const dismissRef = useLatestRef\(onDismiss\);/);
-    assert.match(toastSrc, /\}, \[held, toast\.action\]\);/);
+    // The dependency list, read for what must NOT be in it rather than
+    // matched whole: `dismissRef` and `shownAt` joined it on 2026-09-27
+    // (both stable, so listing them restarts nothing and ESLint stops
+    // reporting a missing dependency), and pinning the literal array made
+    // that honest edit look like a regression. `onDismiss` itself is the one
+    // that would restart the timer on every render of the host, and it is
+    // what this case is actually about. That the listed ones do not restart
+    // it is asserted by RUNNING, in toast-host-render.test.ts.
+    const deps = toastSrc.match(/\}, \[held, toast\.action[^\]]*\]\);/)?.[0] ?? "";
+    assert.ok(deps, "the dismissal effect must still depend on the hold and the action");
+    assert.doesNotMatch(deps, /\bonDismiss\b/);
   });
 
   it("releases the hold when the user leaves, rather than waiting out the ceiling", () => {
@@ -198,9 +208,11 @@ describe("the toast renders and times its action", () => {
   it("measures the ceiling from when the toast appeared, not from the last hover", () => {
     // A `shownAt` recomputed on each re-run would reset the ceiling on every
     // hover, which is the unbounded life this was written to end — so the
-    // timestamp is a ref, captured once.
-    assert.match(toastSrc, /const shownAt = useRef\(Date\.now\(\)\);/);
-    assert.match(toastSrc, /elapsedMs: Date\.now\(\) - shownAt\.current/);
+    // timestamp is captured once. It was `useRef(Date.now())`, which captured
+    // once and CALLED `Date.now()` every render to do it; `useConstant` calls
+    // it once, and nothing here ever needed the mutability a ref implied.
+    assert.match(toastSrc, /const shownAt = useConstant\(\(\) => Date\.now\(\)\);/);
+    assert.match(toastSrc, /elapsedMs: Date\.now\(\) - shownAt\b/);
   });
 
   it("renders the action only when there is one", () => {

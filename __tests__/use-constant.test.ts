@@ -152,4 +152,27 @@ describe("the sites that were writing it out", () => {
     assert.match(code, /const sheetTranslateY = useConstant\(\(\) => new Animated\.Value\(0\)\);/);
     assert.match(code, /const sheetPanResponder = useConstant\(\(\) =>\n\s+PanResponder\.create\(\{/);
   });
+
+  it("leaves toast-host with no useRef at all, including the one nothing ever wrote", () => {
+    // Two constructions, and the second was not an `Animated.Value`:
+    // `useRef(Date.now())` held the toast's appearance time, was never
+    // assigned, and called `Date.now()` on every render to keep the first
+    // answer — which `react-hooks/purity` reported as an impure call during
+    // render, separately from the four `react-hooks/refs` errors the `anim`
+    // line raised. A factory that runs once answers both.
+    const src = readRepoFile("components/toast-host.tsx");
+    const code = src
+      .split("\n")
+      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+      .join("\n");
+    assert.doesNotMatch(code, /useRef\(/);
+    assert.match(code, /const anim = useConstant\(\(\) => new Animated\.Value\(0\)\);/);
+    assert.match(code, /const shownAt = useConstant\(\(\) => Date\.now\(\)\);/);
+    // Anything but the `const` that declares it.
+    assert.doesNotMatch(
+      code,
+      /(?<!const )shownAt\s*=[^=]/,
+      "nothing may assign the appearance time after it is built",
+    );
+  });
 });

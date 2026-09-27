@@ -21,7 +21,7 @@
  * counting down.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Animated, Easing, Platform, Pressable, StatusBar, StyleSheet, Text, View } from "react-native";
 
 import { USE_NATIVE_DRIVER } from "@/lib/animation-driver";
@@ -45,6 +45,7 @@ import type { ToastItem, ToastType } from "@/lib/toast-context";
 import { nextToastDeadline } from "@/lib/toast-timing";
 import { motionDuration, useReducedMotion } from "@/lib/reduced-motion";
 import { useAppAway } from "@/lib/use-app-away";
+import { useConstant } from "@/lib/use-constant";
 import { useLatestRef } from "@/lib/use-latest-ref";
 
 export function ToastHost({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
@@ -61,7 +62,7 @@ export function ToastHost({ toasts, onDismiss }: { toasts: ToastItem[]; onDismis
 }
 
 function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
-  const anim = useRef(new Animated.Value(0)).current;
+  const anim = useConstant(() => new Animated.Value(0));
   // The handler changes identity on every render of the host (it closes over
   // the id), and the timer must not restart because of that — so the effect
   // depends on the ref, and the ref is what the timeout reads.
@@ -89,20 +90,29 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
    * this prevents. The hold is bounded, though — see `nextToastDeadline`, which
    * owns both halves of that rule so they can be asserted by being called.
    *
-   * `shownAt` is when this toast appeared, and it is a ref rather than state
-   * because reading it must not re-run anything: the effect re-runs on hold and
-   * release, and each re-run asks the rule how long is left of the ceiling from
-   * the toast's ORIGINAL appearance, not from the latest hover.
+   * `shownAt` is when this toast appeared, and it is neither state nor a ref:
+   * reading it must not re-run anything, because the effect re-runs on hold
+   * and release and each re-run asks the rule how long is left of the ceiling
+   * from the toast's ORIGINAL appearance, not from the latest hover. Nothing
+   * ever writes it, so `useConstant` says that in the declaration — the
+   * `useRef` it replaces had to say it in a sentence, and read `Date.now()`
+   * on every render to keep the first answer.
    */
-  const shownAt = useRef(Date.now());
+  const shownAt = useConstant(() => Date.now());
 
   useEffect(() => {
     const timer = setTimeout(
       () => dismissRef.current(),
-      nextToastDeadline({ held, hasAction: !!toast.action, elapsedMs: Date.now() - shownAt.current }),
+      nextToastDeadline({ held, hasAction: !!toast.action, elapsedMs: Date.now() - shownAt }),
     );
     return () => clearTimeout(timer);
-  }, [held, toast.action]);
+    // `dismissRef` and `shownAt` are both stable for the life of this toast —
+    // the ref object `useLatestRef` hands back is the same one every render,
+    // and `shownAt` is a number built once — so listing them restarts nothing
+    // and is what the honest dependency array looks like. The two that DO
+    // restart the timer are the two that should: a hold or release, and an
+    // action appearing or going away.
+  }, [held, toast.action, dismissRef, shownAt]);
 
   const hold = () => setHeld(true);
   const release = () => setHeld(false);
