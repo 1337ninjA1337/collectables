@@ -67,6 +67,14 @@ const GUARD_SCANS: Readonly<
         "node tooling — nothing there runs in React, so there is no render for a ref to be synced on",
     },
   },
+  "check-chunked-list-items": {
+    dirs: ["app", "components", "lib"],
+    excludes: {
+      data: "seed fixtures call no hooks, so there is no window to reset",
+      scripts:
+        "node tooling — nothing there renders, and a reference rebuilt per render needs a render to be rebuilt on",
+    },
+  },
   "check-reduced-motion": {
     // The same app + components + lib walk as check-inline-hex, and `lib/` is
     // in it for a reason this tree has already had to learn: twelve context
@@ -209,8 +217,14 @@ describe("the guards' scan lists agree with lib/source-dirs.ts", () => {
     // arrived separately at app + components + lib — a colour literal is a
     // token decision only where something is drawn, an animation has to
     // consult reduce-motion only where it can run, a per-render ref sync needs
-    // a render — and each re-argued the two exclusions in its own table.
-    for (const guard of ["check-inline-hex", "check-reduced-motion", "check-latest-ref"]) {
+    // a render, and an array rebuilt per render needs one too — and each
+    // re-argued the two exclusions in its own table. Four now.
+    for (const guard of [
+      "check-inline-hex",
+      "check-reduced-motion",
+      "check-latest-ref",
+      "check-chunked-list-items",
+    ]) {
       assert.deepEqual(
         declaredDirs(guard),
         [...RUNTIME_CODE_DIRS],

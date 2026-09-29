@@ -11,9 +11,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
  * caller's filter chain produces a new array), the visible window snaps back
  * to `pageSize`. Without this, a user who scrolled to "show 200 items" then
  * filtered down to 3 matches would still see "show 200" worth of empty slots.
- * Callers MUST therefore pass a stable reference when the underlying list
- * doesn't change (i.e. memoize their `.filter()` outputs with `useMemo`) —
- * otherwise the window resets on every render and `loadMore` becomes a no-op.
+ *
+ * **The stable-reference requirement is a CONTRACT, and `lint:chunked-items`
+ * is what holds callers to it.** Callers must pass a reference React itself
+ * holds stable — a `useMemo` result, an array destructured from a `use*()`
+ * hook (a provider memoizes it), or a `useState` value. Anything else resets
+ * the window on every render, so `count` never grows and `loadMore()` becomes
+ * a button that responds to the press and changes nothing on screen.
+ *
+ * That sentence was here, in these words, for as long as the hook existed, and
+ * four of the five call sites then restated it in their own comments — which is
+ * what a contract looks like when nothing enforces it. Nothing could: the types
+ * cannot see it (`T[]` is `T[]` however it was built), this hook cannot see it
+ * (React hands it an array, not the expression that made one), and a rendering
+ * test only catches it if somebody thought to press Load more twice. Nothing
+ * throws and nothing logs. `scripts/check-chunked-list-items.ts` reads the
+ * first argument of every call in `app/`, `components/` and `lib/` and refuses
+ * the ones it cannot prove stable; `lib/check-chunked-list-items.ts` argues
+ * which three forms count and why the list is that short.
  *
  * The hook is intentionally render-pure: no effects, no timers, no remote
  * fetch. Pagination over server-paginated data is a separate concern (this

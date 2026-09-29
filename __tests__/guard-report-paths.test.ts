@@ -53,6 +53,14 @@ const PLANTED: Readonly<
     // `__tests__/` is a root this guard deliberately does not walk.
     source: "export function Screen({ value }: { value: string }) {\n  const valueRef = useRef(value);\n  valueRef.current = value;\n  return null;\n}\n",
   },
+  "check-chunked-list-items": {
+    entries: ["app", "components", "lib"],
+    file: "app/planted-offender.tsx",
+    // Literal for the same reason as the two plants either side of it, and the
+    // plant is the shape the rule is for: a fresh array one line above the
+    // call, which is the version that reads as obviously fine.
+    source: "export default function Screen() {\n  const { items } = useCollections();\n  const owned = items.filter((i) => i.role === \"owner\");\n  const w = useChunkedList(owned, 20);\n  return null;\n}\n",
+  },
   "check-reduced-motion": {
     entries: ["app", "components", "lib"],
     file: "app/planted-offender.tsx",

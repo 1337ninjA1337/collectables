@@ -37,11 +37,19 @@
  * are for; the extra render is the point, and in none of them does the flag
  * feed the dependency list that re-runs the effect.
  *
- * Four are `open`, and they are the interesting ones: state derived from a
+ * Three are `open`, and they are the interesting ones: state derived from a
  * prop, which React's docs say to compute during render or key a remount on
  * instead. Each would be a behaviour change (a draft that stops being
  * clobbered mid-edit is a different screen), so each is a decision, and the
- * decision is not this pass's to make.
+ * decision was not the triage pass's to make.
+ *
+ * There were four, and `lib/use-chunked-list.ts` was the one settled first
+ * (2026-09-29) because it was the only one of the four that was not a question
+ * about what the user should see. The effect is right; what was missing was
+ * anything holding callers to the stable reference it depends on, and
+ * `lint:chunked-items` is that. The other three are still decisions about
+ * behaviour: `app/profile/[id].tsx`'s drafts, `components/item-filters.tsx`'s
+ * sheet draft and `app/collection/[id].tsx`'s sort restore.
  *
  * ## Why it is a registry and not prose
  *
@@ -304,8 +312,8 @@ export const SET_STATE_IN_EFFECT_SITES: readonly SetStateInEffectSite[] = [
     call: "setCount(safePageSize);",
     occurrence: 1,
     shape: "sync-to-prop",
-    verdict: "open",
-    why: "Resets paging when the list or the page size changes, which is right — but it resets on the IDENTITY of `items`, so a caller passing a freshly-built array each render silently pins the list to its first page. Every caller memoizes today. Whether that stays true is a contract this hook does not state or check.",
+    verdict: "keep",
+    why: "Resets paging when the list or the page size changes, which is right, and the reset is the behaviour the hook exists for: a filter narrowing 200 rows to 3 must not leave the user looking at \"show 200\" worth of empty slots. What made this one open was the other half — it resets on the IDENTITY of `items`, so a caller passing a freshly-built array each render silently pins the list to its first page, and the contract was stated in the header and checked by nothing. `lint:chunked-items` checks it now (2026-09-29): every call in app/components/lib must pass a useMemo result, a provider-held array or a useState value, and all five do. Keeping the effect was the cheaper of the two answers — the alternative, keying the reset on a length or an id, silently stops resetting when a filter changes the contents without changing the count.",
   },
   {
     file: "lib/use-connection-notice.ts",

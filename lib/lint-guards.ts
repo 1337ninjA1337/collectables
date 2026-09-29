@@ -174,6 +174,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "No hand-written `xRef.current = x` at the top of a component body in app/components/lib — useLatestRef owns it; the assignment is the line that gets forgotten, and the ref then silently keeps the first render's value",
   },
   {
+    npmScript: "lint:chunked-items",
+    scriptPath: "scripts/check-chunked-list-items.ts",
+    args: [],
+    description:
+      "Every useChunkedList(items) call passes a reference React holds stable (a useMemo result, a provider-held array, useState) — the window resets on the array's identity, so a list rebuilt per render pins itself to page one and Load more silently does nothing",
+  },
+  {
     npmScript: "lint:reduced-motion",
     scriptPath: "scripts/check-reduced-motion.ts",
     args: [],

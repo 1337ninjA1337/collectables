@@ -335,12 +335,23 @@ describe("the one-versus-many rule lives in one module", () => {
    *   `history.length < 2`  — a budget trend needs two moves to be a trend
    *   `values.length === 1` — a VLQ segment of one field names no source
    *   `mapped.length > 1`   — a bundle of one chunk needs no combined total
+   *   `depth === 1`         — a bracket scanner is at the argument's top level
    *
    * The fourth arrived with the budget history and is the same kind: a bounds
    * check on how many rows a claim needs, not a word being inflected. The
    * module it is in DOES import `plural`, for the "time"/"times" in the
    * sentence that bound guards — which is exactly the pair this hole is about:
    * the inflection goes through the rule and the bounds check cannot.
+   *
+   * The seventh is not a count at all, which is the widest the lookalike gets:
+   * `check-chunked-list-items` reads a call's first argument with a depth
+   * counter, and `depth === 1` is "inside this call and no deeper" — the test
+   * that makes the comma at the end of the argument different from the comma
+   * inside an arrow's parameter list. Nothing is being counted and no sentence
+   * is being built; the `1` is a nesting level. It is in the list rather than
+   * dodged, because every spelling that would dodge the pattern (`< 2`,
+   * `<= 1`) is also in it, and rewriting a scanner to fool a sweep is worse
+   * than naming it here.
    *
    * So the hole is empty today, and closing it by widening the rule to
    * conditions would fail three bounds checks and put their names in an
@@ -351,7 +362,7 @@ describe("the one-versus-many rule lives in one module", () => {
    */
   const TWO_LINE_RULE = ifReader(COUNT_COMPARISON);
 
-  it("has an if-shaped hole, and these six are what is in it", () => {
+  it("has an if-shaped hole, and these seven are what is in it", () => {
     assertOnlyTheseMatch({
       rule: TWO_LINE_RULE,
       files: sourceFiles("lib", "scripts", "__tests__/helpers"),
@@ -363,6 +374,9 @@ describe("the one-versus-many rule lives in one module", () => {
         // per-chunk one. Neither picks a word.
         "lib/bundle-composition.ts",
         "lib/bundle-size.ts",
+        // A bracket depth, not a count: `depth === 1` is the argument scanner
+        // asking whether it is still at the top level of the call it is reading.
+        "lib/check-chunked-list-items.ts",
         "lib/db-duplicates.ts",
         "lib/guard-root.ts",
         "lib/privacy-translated-section.ts",

@@ -127,6 +127,11 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // The same walk and the same floor again; a negative rule has no subject
   // fixture to build, which is why its slice is the plain one.
   "check-latest-ref": () => sliceOfEveryRoot("check-latest-ref"),
+  // The same walk and the same shared floor a third time. This guard has a
+  // subject (five useChunkedList calls) but its own floor of one is asserted
+  // AFTER the count floor, so a slice holding no call still refuses on
+  // below_floor — the same ordering check-reduced-motion's note is about.
+  "check-chunked-list-items": () => sliceOfEveryRoot("check-chunked-list-items"),
   // Walks app + components + data + lib. `data` holds exactly three .ts files,
   // which is the default slice — so this is the one spec where the slice is a
   // whole root, and it is still a slice of the other three.

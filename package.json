@@ -49,6 +49,7 @@
     "lint:all": "tsx scripts/lint-all.ts",
     "lint:console-swap": "tsx scripts/check-console-swap.ts",
     "lint:reporter-graph": "tsx scripts/check-reporter-graph.ts",
+    "lint:chunked-items": "tsx scripts/check-chunked-list-items.ts",
     "lint:reduced-motion": "tsx scripts/check-reduced-motion.ts",
     "lint:latest-ref": "tsx scripts/check-latest-ref.ts",
     "lint:comment-terminators": "tsx scripts/check-comment-terminators.ts",
