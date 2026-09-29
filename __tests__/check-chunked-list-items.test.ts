@@ -33,11 +33,10 @@ import {
   chunkedListCalls,
   classifyItemsArgument,
   findChunkedItemsRisks,
-  firstArgumentAt,
   formatChunkedItemsReport,
-  scannableCode,
   stableBindingFor,
 } from "@/lib/check-chunked-list-items";
+import { scannableCode } from "@/lib/declaration-scan";
 import { isAnnotationLine } from "@/lib/github-annotations";
 import { LINT_GUARDS } from "@/lib/lint-guards";
 import { SCANNED_FLOORS } from "@/lib/scanned-floor";
@@ -211,43 +210,11 @@ describe("what it deliberately does not catch", () => {
     assert.deepEqual(findChunkedItemsRisks("lib/lint-guards.ts", prose), []);
   });
 
-  it("keeps line numbers and offsets after blanking a string", () => {
-    const blanked = scannableCode('const a = "useChunkedList(x)";\nconst b = 2;');
-    assert.equal(blanked.split("\n").length, 2);
-    assert.equal(blanked.length, 'const a = "useChunkedList(x)";\nconst b = 2;'.length);
-    assert.doesNotMatch(blanked, /useChunkedList/);
-  });
-
   it("reports the real line after the comment strip", () => {
     const withPreamble = ["/**", " * useChunkedList(rebuilt, 20) is the bug.", " */", REBUILT].join("\n");
     const [finding] = findChunkedItemsRisks("app/screen.tsx", withPreamble);
     assert.equal(finding.line, 7);
     assert.match(withPreamble.split("\n")[finding.line - 1], /useChunkedList\(owned, 20\)/);
-  });
-});
-
-describe("firstArgumentAt", () => {
-  it("stops at the top-level comma", () => {
-    assert.equal(firstArgumentAt("f(a, b)", 1), "a");
-  });
-
-  it("keeps a nested call, an arrow, an object and an array whole", () => {
-    assert.equal(firstArgumentAt("f(g(a, b), c)", 1), "g(a, b)");
-    assert.equal(firstArgumentAt("f(xs.map((x) => x.id), c)", 1), "xs.map((x) => x.id)");
-    assert.equal(firstArgumentAt("f({ a: 1, b: 2 }, c)", 1), "{ a: 1, b: 2 }");
-    assert.equal(firstArgumentAt("f([a, b], c)", 1), "[a, b]");
-  });
-
-  it("does not end on a comma inside a string", () => {
-    assert.equal(firstArgumentAt('f(t("a, b"), c)', 1), 't("a, b")');
-  });
-
-  it("returns the only argument of a one-argument call", () => {
-    assert.equal(firstArgumentAt("f(a)", 1), "a");
-  });
-
-  it("returns null for an unterminated call rather than guessing", () => {
-    assert.equal(firstArgumentAt("f(a", 1), null);
   });
 });
 

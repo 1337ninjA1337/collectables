@@ -67,6 +67,15 @@ const GUARD_SCANS: Readonly<
         "node tooling — nothing there runs in React, so there is no render for a ref to be synced on",
     },
   },
+  "check-context-array-stability": {
+    dirs: ["lib"],
+    excludes: {
+      app: "screens consume a context value; none declares one",
+      components: "markup consumes a context value; none declares one",
+      data: "seed fixtures declare no types and no hooks",
+      scripts: "node tooling — no provider renders there",
+    },
+  },
   "check-chunked-list-items": {
     dirs: ["app", "components", "lib"],
     excludes: {

@@ -1,5 +1,10 @@
+import {
+  BARE_IDENTIFIER,
+  declarations,
+  firstArgumentSpanAt,
+  scannableCode,
+} from "./declaration-scan";
 import { annotation } from "./github-annotations";
-import { stripComments } from "./strip-comments";
 
 /**
  * `useChunkedList`'s one contract, which was prose in six places and checked
@@ -93,8 +98,6 @@ export interface ChunkedItemsFinding {
 /** A binding form React guarantees the identity of, or `null` for anything else. */
 export type StableBindingForm = "useMemo" | "hook-result" | "useState";
 
-const BARE_IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
-
 /**
  * `use` + an uppercase letter, then an optional type argument, then the call —
  * a hook call, whose result React owns.
@@ -114,132 +117,6 @@ function hookCalled(rhs: string): string | null {
 /** 1-indexed line of an offset. */
 function lineOf(source: string, at: number): number {
   return source.slice(0, at).split("\n").length;
-}
-
-/**
- * The first argument of the call whose `(` is at `open`, read with a depth
- * counter so a nested call, an arrow body, an object or an array literal is
- * part of the argument rather than the end of it. Quotes and template literals
- * are skipped whole, so a comma inside a string does not end anything.
- *
- * Returns `null` for an unterminated call, which is a syntax error the
- * compiler reports better than a lint rule can.
- */
-export function firstArgumentAt(code: string, open: number): string | null {
-  const span = firstArgumentSpanAt(code, open);
-  return span ? code.slice(span.start, span.end).trim() : null;
-}
-
-/**
- * The same scan as {@link firstArgumentAt}, as offsets rather than text.
- *
- * The offsets are what let the report quote the REAL source while the scan
- * reads the blanked copy: `stripComments` and {@link scannableCode} both
- * preserve length and line breaks, so an offset means the same thing in both.
- * Without this the report said `items.filter((i) => i.role === " ")` — the
- * guard quoting its own blanking back at the reader.
- */
-export function firstArgumentSpanAt(
-  code: string,
-  open: number,
-): { start: number; end: number } | null {
-  let depth = 0;
-  let quote: string | null = null;
-  for (let i = open; i < code.length; i += 1) {
-    const ch = code[i];
-    if (quote) {
-      if (ch === "\\") i += 1;
-      else if (ch === quote) quote = null;
-      continue;
-    }
-    if (ch === '"' || ch === "'" || ch === "`") {
-      quote = ch;
-      continue;
-    }
-    if (ch === "(" || ch === "[" || ch === "{") {
-      depth += 1;
-      continue;
-    }
-    if (ch === ")" || ch === "]" || ch === "}") {
-      depth -= 1;
-      if (depth === 0) return { start: open + 1, end: i };
-      continue;
-    }
-    if (ch === "," && depth === 1) return { start: open + 1, end: i };
-  }
-  return null;
-}
-
-/** The local names a destructuring pattern body binds (`a, b: c, ...rest`). */
-function destructuredNames(body: string): string[] {
-  return body
-    .split(",")
-    .map((part) => {
-      const piece = part.includes(":") ? part.slice(part.indexOf(":") + 1) : part;
-      return piece.replace(/\.\.\./, "").trim().replace(/=[\s\S]*$/, "").trim();
-    })
-    .filter((name) => BARE_IDENTIFIER.test(name));
-}
-
-/** One `const`/`let`/`var` declaration, as a binding pattern and the head of its initialiser. */
-interface Declaration {
-  /** Bare name for `const x = …`, or the pattern body for `const { a, b } = …`. */
-  readonly names: readonly string[];
-  /** Up to 60 characters of whatever follows the `=`, on one line. */
-  readonly rhs: string;
-}
-
-/**
- * Every declaration in the file, found by walking rather than by one regex.
- *
- * The regex version of this had the bug a fixed-width tail always has: a
- * pattern ending in `([\s\S]{0,60})` consumes sixty characters past the `=`,
- * which on `app/index.tsx` swallowed the `const {` of the very next
- * declaration — the eleven-name `useCollections()` destructure that feeds two
- * of the five windows. `matchAll` cannot return overlapping matches, so the
- * declaration was not merely mis-read, it was invisible, and the guard
- * reported the home screen's argument as unresolved on its first run.
- */
-function declarations(code: string): Declaration[] {
-  const found: Declaration[] = [];
-  for (const match of code.matchAll(/\b(?:const|let|var)\s+/g)) {
-    const at = match.index + match[0].length;
-    const opener = code[at];
-    let namesEnd = at;
-    let names: string[];
-    if (opener === "{" || opener === "[") {
-      const close = matchingBracket(code, at);
-      if (close === null) continue;
-      names = destructuredNames(code.slice(at + 1, close));
-      namesEnd = close + 1;
-    } else {
-      const identifier = /^[A-Za-z_$][\w$]*/.exec(code.slice(at));
-      if (!identifier) continue;
-      names = [identifier[0]];
-      namesEnd = at + identifier[0].length;
-    }
-    // Skip a type annotation, which may itself contain `=` in an arrow type.
-    const assign = code.indexOf("=", namesEnd);
-    if (assign === -1) continue;
-    const between = code.slice(namesEnd, assign);
-    if (/[;)\n]/.test(between) && !between.includes(":")) continue;
-    found.push({ names, rhs: code.slice(assign + 1, assign + 61).trim().split("\n")[0].trim() });
-  }
-  return found;
-}
-
-/** Index of the bracket closing the one at `open`, or `null` when unterminated. */
-function matchingBracket(code: string, open: number): number | null {
-  let depth = 0;
-  for (let i = open; i < code.length; i += 1) {
-    const ch = code[i];
-    if (ch === "{" || ch === "[" || ch === "(") depth += 1;
-    else if (ch === "}" || ch === "]" || ch === ")") {
-      depth -= 1;
-      if (depth === 0) return i;
-    }
-  }
-  return null;
 }
 
 /**
@@ -293,41 +170,6 @@ export function classifyItemsArgument(
     kind: "unstable-binding",
     detail: `bound to \`${head}\`, which React does not hold stable`,
   };
-}
-
-/**
- * Comments removed and every string/template body replaced by spaces of the
- * same length, so offsets and line numbers still point at the real source.
- * Prose about this hook inside a string literal is not a call to it.
- */
-export function scannableCode(source: string): string {
-  const code = stripComments(source);
-  let out = "";
-  let quote: string | null = null;
-  for (let i = 0; i < code.length; i += 1) {
-    const ch = code[i];
-    if (quote) {
-      if (ch === "\\") {
-        out += "  ";
-        i += 1;
-        continue;
-      }
-      if (ch === quote) {
-        quote = null;
-        out += ch;
-        continue;
-      }
-      out += ch === "\n" ? "\n" : " ";
-      continue;
-    }
-    if (ch === '"' || ch === "'" || ch === "`") {
-      quote = ch;
-      out += ch;
-      continue;
-    }
-    out += ch;
-  }
-  return out;
 }
 
 /** Every `useChunkedList` CALL in one file, as `[line, firstArgument]`. */

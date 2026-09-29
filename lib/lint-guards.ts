@@ -174,6 +174,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "No hand-written `xRef.current = x` at the top of a component body in app/components/lib — useLatestRef owns it; the assignment is the line that gets forgotten, and the ref then silently keeps the first render's value",
   },
   {
+    npmScript: "lint:context-arrays",
+    scriptPath: "scripts/check-context-array-stability.ts",
+    args: [],
+    description:
+      "Every array-typed field of a *ContextValue is memoized on its OWN dependencies, not built inside the value factory — the factory's dep list is twenty names, so an array built there is a new reference on any unrelated context update, which is the stability lint:chunked-items trusts a provider for",
+  },
+  {
     npmScript: "lint:chunked-items",
     scriptPath: "scripts/check-chunked-list-items.ts",
     args: [],

@@ -344,7 +344,7 @@ describe("the one-versus-many rule lives in one module", () => {
    * the inflection goes through the rule and the bounds check cannot.
    *
    * The seventh is not a count at all, which is the widest the lookalike gets:
-   * `check-chunked-list-items` reads a call's first argument with a depth
+   * `declaration-scan` reads a call's first argument with a depth
    * counter, and `depth === 1` is "inside this call and no deeper" — the test
    * that makes the comma at the end of the argument different from the comma
    * inside an arrow's parameter list. Nothing is being counted and no sentence
@@ -374,10 +374,10 @@ describe("the one-versus-many rule lives in one module", () => {
         // per-chunk one. Neither picks a word.
         "lib/bundle-composition.ts",
         "lib/bundle-size.ts",
+        "lib/db-duplicates.ts",
         // A bracket depth, not a count: `depth === 1` is the argument scanner
         // asking whether it is still at the top level of the call it is reading.
-        "lib/check-chunked-list-items.ts",
-        "lib/db-duplicates.ts",
+        "lib/declaration-scan.ts",
         "lib/guard-root.ts",
         "lib/privacy-translated-section.ts",
         "scripts/report-bundle-composition.ts",

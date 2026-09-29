@@ -132,6 +132,13 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // AFTER the count floor, so a slice holding no call still refuses on
   // below_floor — the same ordering check-reduced-motion's note is about.
   "check-chunked-list-items": () => sliceOfEveryRoot("check-chunked-list-items"),
+  // The only ONE-root walk here, so `sliceOfEveryRoot` has nothing to slice
+  // between: lib/ is the whole reach. `lib/i18n` is a real subdirectory of it
+  // holding well under the floor of 150, which makes the fixture a partial lib/
+  // rather than a partial walk — the same property, one level down. The
+  // guard's own subject floor (an array-typed context field at all) is again
+  // NOT what this reaches: the count floor is asserted first.
+  "check-context-array-stability": () => ["lib/i18n"],
   // Walks app + components + data + lib. `data` holds exactly three .ts files,
   // which is the default slice — so this is the one spec where the slice is a
   // whole root, and it is still a slice of the other three.
@@ -353,9 +360,30 @@ describe("every count-shaped guard refuses a partial scan root", () => {
  */
 const TOO_EXPENSIVE_TO_SPAWN = "check-problem-phrasing-imports";
 
+/**
+ * The guard for which this property does not exist, and why that is not a hole.
+ *
+ * `check-context-array-stability` walks `lib/` and nothing else, because `lib/`
+ * is where every provider in this tree lives. "No SINGLE root clears a
+ * MULTI-root guard's floor" has no content for a walk of one root: a tree
+ * holding only `lib/` is not a partial walk, it is the whole walk, and the
+ * guard passing over it is the correct answer rather than the failure this
+ * suite is about. Its floor's remaining job — a `lib/` that came back
+ * implausibly small — is the `PARTIAL_FIXTURES` entry above, which hands it
+ * `lib/i18n` and is a partial `lib/` one level down.
+ *
+ * Named rather than spelled inside the `.filter`, per `inline-exclusion.test.ts`
+ * and for the reason the entry above it gives: nothing else would ask whether
+ * the guard is still in the table it is being filtered out of, so a second
+ * root arriving here would leave a filter that excludes nothing and reads
+ * exactly as it does now.
+ */
+const WALKS_ONE_ROOT = "check-context-array-stability";
+
 const SINGLE_ROOT_LOCKS: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
   floorWalks()
     .filter((walk) => walk.checkName !== TOO_EXPENSIVE_TO_SPAWN)
+    .filter((walk) => walk.checkName !== WALKS_ONE_ROOT)
     .map((walk) => [walk.checkName, walk.roots]),
 );
 
@@ -374,8 +402,8 @@ describe("no single scan root clears a multi-root guard's floor", () => {
     // dropped from `FLOOR_WALKS`, or renamed, leaves a filter that reads
     // exactly as it does now and removes nothing.
     assertExemptionsHonest({
-      exemptions: [TOO_EXPENSIVE_TO_SPAWN],
-      expected: ["check-problem-phrasing-imports"],
+      exemptions: [TOO_EXPENSIVE_TO_SPAWN, WALKS_ONE_ROOT],
+      expected: ["check-problem-phrasing-imports", "check-context-array-stability"],
       rule: "the single-root lock table",
       walk: floorWalks().map((walk) => walk.checkName),
       stillNeeded: (checkName) => !Object.hasOwn(SINGLE_ROOT_LOCKS, checkName),

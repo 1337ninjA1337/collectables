@@ -53,6 +53,15 @@ const PLANTED: Readonly<
     // `__tests__/` is a root this guard deliberately does not walk.
     source: "export function Screen({ value }: { value: string }) {\n  const valueRef = useRef(value);\n  valueRef.current = value;\n  return null;\n}\n",
   },
+  "check-context-array-stability": {
+    entries: ["lib"],
+    // The plant has to be a whole provider, because this rule reads a type and
+    // a factory and decides the relationship between them: a one-line offender
+    // has nothing to be unstable about. `-context.tsx` is load-bearing — the
+    // reach is providers named for what they are.
+    file: "lib/planted-context.tsx",
+    source: "type PlantedContextValue = {\n  rows: string[];\n};\n\nexport function PlantedProvider() {\n  const rows = xs.filter(f);\n  const value = useMemo<PlantedContextValue>(() => ({\n    rows,\n  }), [rows]);\n  return value;\n}\n",
+  },
   "check-chunked-list-items": {
     entries: ["app", "components", "lib"],
     file: "app/planted-offender.tsx",
