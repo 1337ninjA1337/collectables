@@ -1715,6 +1715,11 @@ export function CollectionsProvider({ children }: React.PropsWithChildren) {
     }),
     // syncCollection/syncItem are stable useCallback([]) refs, so they're
     // intentionally omitted here (ratesUpdatedAt stays last in the deps list).
+    // `recordTombstones` is the third name the rule reports and it is NOT one
+    // of those: it is useCallback([user]), so its identity moves with `user`
+    // — which is in this list, so the memo recomputes with it. Transitively
+    // covered rather than stable, and the difference is the reason the
+    // sentence above did not already cover it.
     [collections, collectionsById, collectionTotals, ownedTotalCost, items, itemsByCollection, wishlistItems, archivedItems, localCollections, localItems, ready, user, friendCollections, subscribedCollections, followedCollectionIds, sharedWithMeCollections, currencyRates, displayCurrency, ratesUpdatedAt, pendingCollections, pendingItems],
   );
 

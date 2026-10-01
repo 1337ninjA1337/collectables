@@ -1194,6 +1194,16 @@ export default function CollectionDetailsScreen() {
     selectionMode,
     reorderMode,
     t,
+    // Not transitively covered, which is what the omission looked like.
+    // `toggleReorderMode` is a useCallback over [applySort, itemFilters.sort,
+    // reorderMode, t, toast], and this list holds only two of those five:
+    // `allItems` is the UNFILTERED list, so changing the sort moves nothing
+    // here and the memo kept the closure that captured the old sort. Sort by
+    // price, press Reorder, and the early return fires on a stale
+    // `itemFilters.sort === "default"` — the sort is never cleared and the
+    // undo toast never offered, with the drag order and the shown order then
+    // disagreeing about what the user is moving.
+    toggleReorderMode,
     getCollectionTotalCost,
     isCollectionFollowed,
     followCollection,

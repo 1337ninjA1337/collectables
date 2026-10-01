@@ -942,7 +942,11 @@ export function SocialProvider({ children }: React.PropsWithChildren) {
       getVisibleItems: () => visibleSocialItems,
       pendingSyncCount: countPendingSocial(pendingSocial),
     }),
-    [ensureProfilesLoaded, friendIds, following, followingIds, friends, incomingRequestUserIds, isAdmin, pendingSocial, profileById, profiles, ready, requestDirections, syncSocial, user, viewerProfiles, visibleSocialCollections, visibleSocialItems],
+    // `t` is in here for `buildFallbackProfile(user, t)` inside
+    // `updateMyProfile`: without it the factory keeps the translator it was
+    // built with, and a profile created after a language switch gets its
+    // default bio in the previous language.
+    [ensureProfilesLoaded, friendIds, following, followingIds, friends, incomingRequestUserIds, isAdmin, pendingSocial, profileById, profiles, ready, requestDirections, syncSocial, t, user, viewerProfiles, visibleSocialCollections, visibleSocialItems],
   );
 
   return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>;
