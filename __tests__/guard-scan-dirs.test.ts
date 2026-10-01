@@ -76,6 +76,18 @@ const GUARD_SCANS: Readonly<
       scripts: "node tooling — no provider renders there",
     },
   },
+  "check-context-function-deps": {
+    // The same three roots as the four below, and the first guard here that
+    // needs all of them for DIFFERENT halves of one rule: the providers whose
+    // function fields it classifies are in `lib/`, the effects it holds to
+    // that classification are in `app/` and `components/`.
+    dirs: ["app", "components", "lib"],
+    excludes: {
+      data: "seed fixtures declare no context and run no effects",
+      scripts:
+        "node tooling — nothing there mounts a provider, and a closure rebuilt per render needs a render to be rebuilt on",
+    },
+  },
   "check-chunked-list-items": {
     dirs: ["app", "components", "lib"],
     excludes: {
@@ -227,12 +239,15 @@ describe("the guards' scan lists agree with lib/source-dirs.ts", () => {
     // token decision only where something is drawn, an animation has to
     // consult reduce-motion only where it can run, a per-render ref sync needs
     // a render, and an array rebuilt per render needs one too — and each
-    // re-argued the two exclusions in its own table. Four now.
+    // re-argued the two exclusions in its own table. Five now — the fifth
+    // needs the three roots for two different halves of one rule rather than
+    // for one, and lands on the same list anyway.
     for (const guard of [
       "check-inline-hex",
       "check-reduced-motion",
       "check-latest-ref",
       "check-chunked-list-items",
+      "check-context-function-deps",
     ]) {
       assert.deepEqual(
         declaredDirs(guard),

@@ -121,8 +121,10 @@ function scriptPathsIn(command: string): readonly string[] {
  * Every leg of `npm run verify`, in the order a run meets them.
  *
  * The `lint:all` leg is the one that cannot be read off its own command line:
- * its body is `tsx scripts/lint-all.ts` and the nineteen guards it spawns come
- * from `LINT_GUARDS`, which is the registry lint-all itself iterates. Reading
+ * its body is `tsx scripts/lint-all.ts` and the guards it spawns come
+ * from `LINT_GUARDS`, which is the registry lint-all itself iterates — the
+ * count is read from there rather than restated here, which is what the
+ * sentence that said "nineteen" for six more guards was for. Reading
  * the registry is how the guards get into the scanned set at all — a leg's
  * `scriptPaths` is meant to be everything that leg runs, not everything its
  * one-line body happens to name.

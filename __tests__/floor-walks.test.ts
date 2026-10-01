@@ -691,19 +691,20 @@ describe("sharedFloors", () => {
     }
   });
 
-  it("puts the four guards on the runtime-code walk behind one name", () => {
+  it("puts the five guards on the runtime-code walk behind one name", () => {
     const shared = sharedFloorFor("check-inline-hex");
     assert.ok(shared, "check-inline-hex takes RUNTIME_CODE_WALK_FLOOR");
     assert.equal(shared.constantName, "RUNTIME_CODE_WALK_FLOOR");
     assert.equal(shared.value, RUNTIME_CODE_WALK_FLOOR);
-    // Four since 2026-09-29: check-chunked-list-items walks the same three
-    // roots for the same reason the other three do, and takes the constant
-    // rather than a fresh measurement — which is the whole point of the
-    // constant, and the thing pasting a literal in would have looked like.
+    // Four since 2026-09-29 and five since 2026-10-01: both newcomers walk the
+    // same three roots the first three do and take the constant rather than a
+    // fresh measurement — which is the whole point of the constant, and the
+    // thing pasting a literal in would have looked like.
     assert.deepEqual(
       [...shared.members].sort(),
       [
         "check-chunked-list-items",
+        "check-context-function-deps",
         "check-inline-hex",
         "check-latest-ref",
         "check-reduced-motion",
@@ -856,11 +857,14 @@ describe("formatFloorMeasurement with a shared floor", () => {
     );
     assert.match(line, /re-measure to \d+/);
     assert.match(line, /That number is RUNTIME_CODE_WALK_FLOOR in lib\/scanned-floor\.ts/);
-    assert.match(line, /shared with check-latest-ref, check-chunked-list-items and check-reduced-motion/);
+    assert.match(
+      line,
+      /shared with check-latest-ref, check-context-function-deps, check-chunked-list-items and check-reduced-motion/,
+    );
     // The instruction that keeps the consolidation: the suggestion's obvious
     // edit is the wrong one, and the row says so where the number is.
     assert.match(line, /Edit the constant/);
-    assert.match(line, /un-shares all 4/);
+    assert.match(line, /un-shares all 5/);
     // The row never lists itself among the rows that move with it.
     assert.doesNotMatch(line, /shared with[^\n]*check-inline-hex/);
   });

@@ -60,7 +60,17 @@ const PLANTED: Readonly<
     // has nothing to be unstable about. `-context.tsx` is load-bearing — the
     // reach is providers named for what they are.
     file: "lib/planted-context.tsx",
-    source: "type PlantedContextValue = {\n  rows: string[];\n};\n\nexport function PlantedProvider() {\n  const rows = xs.filter(f);\n  const value = useMemo<PlantedContextValue>(() => ({\n    rows,\n  }), [rows]);\n  return value;\n}\n",
+    source: "type PlantedContextValue = {\n  rows: string[];\n};\n\nexport function PlantedProvider() {\n  const rows = xs.filter(f);\n  const value = useMemo<PlantedContextValue>(() => ({\n    rows,\n  }), [rows]);\n  return <PlantedContext.Provider value={value}>{children}</PlantedContext.Provider>;\n}\n",
+  },
+  "check-context-function-deps": {
+    entries: ["app", "components", "lib"],
+    file: "app/planted-offender.tsx",
+    // The plant depends on a REAL factory-built field, because the volatile
+    // set is read out of the providers in `lib/` rather than invented: this
+    // fixture tree carries them. `getItemById` is one of
+    // `CollectionsContextValue`'s thirty-three, and an effect that saves
+    // something is the shape with the incident behind it.
+    source: "export default function Screen() {\n  const { getItemById } = useCollections();\n  useEffect(() => {\n    void save(getItemById(id));\n  }, [getItemById, id]);\n  return null;\n}\n",
   },
   "check-chunked-list-items": {
     entries: ["app", "components", "lib"],

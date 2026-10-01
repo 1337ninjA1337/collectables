@@ -246,24 +246,31 @@ export function contextValueType(code: string): { name: string; body: string } |
   return namedValueType(code) ?? createContextValueType(code);
 }
 
+/** One top-level field of a type body. */
+export interface TypeMember {
+  readonly name: string;
+  /** Everything after the colon, trimmed. */
+  readonly type: string;
+}
+
 /**
- * Top-level fields of a type body whose type is an array and nothing else.
+ * Top-level fields of a type body, by walking rather than by one regex.
  *
- * Read by walking the body and skipping whatever a nested bracket opens, so a
- * field declared inside an inline object or a function signature is not
- * mistaken for a field of the value. A function returning an array is excluded
- * by the type test, not by the walk.
+ * A field declared inside an inline object or a function signature is not
+ * mistaken for a field of the value, because whatever a nested bracket opens
+ * is skipped.
+ *
+ * Angle brackets are NOT counted. `(a: number) => boolean` closes a `>` that
+ * never opened, which drives the depth negative and corrupts the rest of the
+ * walk — `CollectionsContextValue` declares thirty-four function fields and
+ * the first version of this saw five of its fourteen arrays.
  */
-export function arrayFields(body: string): string[] {
-  const fields: string[] = [];
+export function typeMembers(body: string): TypeMember[] {
+  const members: TypeMember[] = [];
   let depth = 0;
   let start = 0;
   for (let i = 0; i <= body.length; i += 1) {
     const ch = body[i];
-    // Angle brackets are NOT counted. `(a: number) => boolean` closes a `>`
-    // that never opened, which drives the depth negative and corrupts the rest
-    // of the walk — `CollectionsContextValue` declares eleven function fields
-    // and the first version of this saw five of its fourteen arrays.
     if (ch === "{" || ch === "(" || ch === "[") depth += 1;
     else if (ch === "}" || ch === ")" || ch === "]") depth -= 1;
     else if ((ch === ";" || ch === undefined) && depth === 0) {
@@ -273,12 +280,30 @@ export function arrayFields(body: string): string[] {
       if (colon === -1) continue;
       const name = member.slice(0, colon).trim().replace(/\?$/, "");
       if (!BARE_IDENTIFIER.test(name)) continue;
-      const type = member.slice(colon + 1).trim();
-      if (type.includes("=>")) continue;
-      if (ARRAY_TYPE.test(type)) fields.push(name);
+      members.push({ name, type: member.slice(colon + 1).trim() });
     }
   }
-  return fields;
+  return members;
+}
+
+/**
+ * Top-level fields whose type is an array and nothing else.
+ *
+ * A function returning an array is excluded by the type test, not by the walk:
+ * `getRow: (id: string) => Row[]` rebuilds its result per call by design, and
+ * its identity question belongs to `lib/context-function-deps.ts`.
+ */
+export function arrayFields(body: string): string[] {
+  return typeMembers(body)
+    .filter((member) => !member.type.includes("=>") && ARRAY_TYPE.test(member.type))
+    .map((member) => member.name);
+}
+
+/** Top-level fields whose type is a function. The other half of the value. */
+export function functionFields(body: string): string[] {
+  return typeMembers(body)
+    .filter((member) => member.type.includes("=>"))
+    .map((member) => member.name);
 }
 
 /**

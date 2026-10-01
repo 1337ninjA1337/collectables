@@ -50,6 +50,7 @@
     "lint:console-swap": "tsx scripts/check-console-swap.ts",
     "lint:reporter-graph": "tsx scripts/check-reporter-graph.ts",
     "lint:context-arrays": "tsx scripts/check-context-array-stability.ts",
+    "lint:context-fn-deps": "tsx scripts/check-context-function-deps.ts",
     "lint:chunked-items": "tsx scripts/check-chunked-list-items.ts",
     "lint:reduced-motion": "tsx scripts/check-reduced-motion.ts",
     "lint:latest-ref": "tsx scripts/check-latest-ref.ts",

@@ -43,8 +43,26 @@ const MESSAGE = "Moved to position 3 of 7";
 /** Lets the queued write land — the module writes the text in a later task. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-/** Long enough for a held sentence to hand the channel to the next one. */
-const afterHold = () => new Promise((resolve) => setTimeout(resolve, ANNOUNCEMENT_HOLD_MS + 10));
+/**
+ * Long enough for a held sentence to hand the channel to the next one, AND
+ * for the write that handover schedules.
+ *
+ * The second half is not belt-and-braces, it is the whole of a flake that
+ * reached CI: `speak` clears the region now and writes the message in a task
+ * of its own, so the handover is two turns and not one. Waiting
+ * `ANNOUNCEMENT_HOLD_MS + 10` is one turn, and it is enough only while the
+ * event loop is keeping up. Under load — nine thousand cases across as many
+ * processes as the machine has cores — the loop can arrive at its timers
+ * phase after BOTH this waiter and the 150ms hold are due. Node then runs
+ * them in expiry order in the same phase: the hold fires first and schedules
+ * its 0ms write, this waiter resolves next, and the case reads an empty
+ * region that is about to be written. One more turn is the fix, and the
+ * assertion that failed is the one that says so: `+ ''` against the sentence.
+ */
+const afterHold = async () => {
+  await new Promise((resolve) => setTimeout(resolve, ANNOUNCEMENT_HOLD_MS + 10));
+  await settle();
+};
 
 /**
  * Runs a case against a fresh fake DOM, and puts the real globals back.

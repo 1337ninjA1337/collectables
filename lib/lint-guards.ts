@@ -181,6 +181,13 @@ export const LINT_GUARDS: readonly LintGuard[] = [
       "Every array-typed field of a context value is memoized on its OWN dependencies, not built inside the value factory — the factory's dep list is twenty names, so an array built there is a new reference on any unrelated context update, which is the stability lint:chunked-items trusts a provider for; a provider whose value type or factory the readers cannot parse is reported rather than passed",
   },
   {
+    npmScript: "lint:context-fn-deps",
+    scriptPath: "scripts/check-context-function-deps.ts",
+    args: [],
+    description:
+      "No useEffect depends on a context function its provider rebuilds inside the value factory without a sanctioned reason — such a function is a new closure on every factory recompute, so the effect re-fires on unrelated context updates, and an effect writes, toasts and navigates; the shared-collection save in app/collection/[id].tsx did all three per attempt until iOS Safari aborted the tab",
+  },
+  {
     npmScript: "lint:chunked-items",
     scriptPath: "scripts/check-chunked-list-items.ts",
     args: [],

@@ -139,6 +139,13 @@ const PARTIAL_FIXTURES: Readonly<Record<string, () => string[]>> = {
   // guard's own subject floor (an array-typed context field at all) is again
   // NOT what this reaches: the count floor is asserted first.
   "check-context-array-stability": () => ["lib/i18n"],
+  // The RUNTIME_CODE_DIRS walk and the shared floor a fifth time, and the
+  // first guard here whose two halves live in different roots: the providers
+  // it classifies are in lib/, the effects it holds to the classification are
+  // in app/ and components/. Its own subject floor (ten factory-built
+  // function fields) is again not what a slice reaches — the count floor is
+  // asserted first.
+  "check-context-function-deps": () => sliceOfEveryRoot("check-context-function-deps"),
   // Walks app + components + data + lib. `data` holds exactly three .ts files,
   // which is the default slice — so this is the one spec where the slice is a
   // whole root, and it is still a slice of the other three.
