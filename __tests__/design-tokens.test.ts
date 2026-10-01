@@ -137,6 +137,7 @@ import {
   SPACING_SECTION,
 } from "@/lib/design-tokens";
 import { readRepoFile as read } from "./helpers/repo-file";
+import { claimsOnlyImportsSatisfy, tokenClaims, withoutImports } from "./helpers/token-claims";
 
 describe("design-tokens module", () => {
   it("exposes the documented brand palette as 6-digit hex strings", () => {
@@ -1665,5 +1666,73 @@ describe("design-tokens adoption", () => {
     assert.ok(SPACING_INLINE < SPACING_LIST, "INLINE < LIST");
     assert.ok(SPACING_LIST < SPACING_CARD, "LIST < CARD");
     assert.ok(SPACING_CARD < SPACING_SECTION, "CARD < SECTION");
+  });
+});
+
+describe("the adoption claims, held to more than an import line", () => {
+  // 462 of them, each spelled `assert.match(src, /\bTOKEN\b/)` against a
+  // file's whole text — and a file's whole text includes the import that
+  // names the token. Three were satisfied by nothing else on 2026-10-01 and
+  // were found by a cleanup that had no interest in them. Rewriting 462
+  // assertions is 462 edits to a file nobody wants to re-read; deriving the
+  // property from this suite's own source is one case, and the 463rd joins it
+  // by being written.
+  const claims = tokenClaims(read("__tests__/design-tokens.test.ts"));
+
+  it("reads every claim in this file, which is what the next case rests on", () => {
+    assert.ok(
+      claims.length >= 400,
+      `only ${claims.length} token claims read — the case titles or the assertion shape moved, and a scan that finds nothing reports clean`,
+    );
+    const files = new Set(claims.map((claim) => claim.file));
+    assert.ok(files.size >= 40, `only ${files.size} files claimed`);
+    for (const file of files) assert.ok(read(file).length > 0, `${file} does not exist`);
+  });
+
+  it("finds no claim that only its import line satisfies", () => {
+    assert.deepEqual(claimsOnlyImportsSatisfy(claims, read), []);
+  });
+
+  it("refuses a claim an import alone satisfies, which is the direction that matters", () => {
+    // A rule nobody has watched refuse anything reads as passing whether it
+    // works or not. The fixture is the exact shape the three real ones had:
+    // imported, never used.
+    const planted = [
+      '  it("app/planted.tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {',
+      '    const src = read("app/planted.tsx");',
+      "    assert.match(src, /\\bUSED_TOKEN\\b/);",
+      "    assert.match(src, /\\bIMPORTED_ONLY\\b/);",
+      "  });",
+    ].join("\n");
+    const screen = [
+      'import { IMPORTED_ONLY, USED_TOKEN } from "@/lib/design-tokens";',
+      "const style = { color: USED_TOKEN };",
+    ].join("\n");
+    const found = tokenClaims(planted);
+    assert.deepEqual(
+      found.map((claim) => claim.token),
+      ["USED_TOKEN", "IMPORTED_ONLY"],
+    );
+    assert.deepEqual(claimsOnlyImportsSatisfy(found, () => screen), [
+      "app/planted.tsx claims IMPORTED_ONLY and only its import line says so",
+    ]);
+  });
+
+  it("strips a multi-line import and leaves a side-effect import alone", () => {
+    // The two shapes that would make the case above lie: an import list
+    // across lines left in place would satisfy every claim, and a
+    // side-effect import removed would prove nothing either way.
+    const source = [
+      "import {",
+      "  AMBER_ACCENT,",
+      "  BORDER,",
+      '} from "@/lib/design-tokens";',
+      'import "./polyfill";',
+      "const style = { borderColor: BORDER };",
+    ].join("\n");
+    const body = withoutImports(source);
+    assert.doesNotMatch(body, /AMBER_ACCENT/);
+    assert.match(body, /\bBORDER\b/);
+    assert.match(body, /polyfill/);
   });
 });
