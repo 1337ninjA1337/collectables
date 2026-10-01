@@ -178,7 +178,7 @@ export const LINT_GUARDS: readonly LintGuard[] = [
     scriptPath: "scripts/check-context-array-stability.ts",
     args: [],
     description:
-      "Every array-typed field of a *ContextValue is memoized on its OWN dependencies, not built inside the value factory — the factory's dep list is twenty names, so an array built there is a new reference on any unrelated context update, which is the stability lint:chunked-items trusts a provider for",
+      "Every array-typed field of a context value is memoized on its OWN dependencies, not built inside the value factory — the factory's dep list is twenty names, so an array built there is a new reference on any unrelated context update, which is the stability lint:chunked-items trusts a provider for; a provider whose value type or factory the readers cannot parse is reported rather than passed",
   },
   {
     npmScript: "lint:chunked-items",

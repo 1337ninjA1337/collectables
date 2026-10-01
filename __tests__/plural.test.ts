@@ -343,6 +343,12 @@ describe("the one-versus-many rule lives in one module", () => {
    * sentence that bound guards — which is exactly the pair this hole is about:
    * the inflection goes through the rule and the bounds check cannot.
    *
+   * The eighth is a union of type shapes: `shapes.length !== 1` asks whether a
+   * `createContext<…>` type argument came down to ONE readable shape after the
+   * `| null` was dropped, and a union of two real shapes is a value type that
+   * rule declines to read. Nothing is inflected and nothing is counted for a
+   * sentence; the `1` is "unambiguous".
+   *
    * The seventh is not a count at all, which is the widest the lookalike gets:
    * `declaration-scan` reads a call's first argument with a depth
    * counter, and `depth === 1` is "inside this call and no deeper" — the test
@@ -362,7 +368,7 @@ describe("the one-versus-many rule lives in one module", () => {
    */
   const TWO_LINE_RULE = ifReader(COUNT_COMPARISON);
 
-  it("has an if-shaped hole, and these seven are what is in it", () => {
+  it("has an if-shaped hole, and these eight are what is in it", () => {
     assertOnlyTheseMatch({
       rule: TWO_LINE_RULE,
       files: sourceFiles("lib", "scripts", "__tests__/helpers"),
@@ -374,6 +380,9 @@ describe("the one-versus-many rule lives in one module", () => {
         // per-chunk one. Neither picks a word.
         "lib/bundle-composition.ts",
         "lib/bundle-size.ts",
+        // A union of two real type shapes is a context value the rule declines
+        // to read; the `1` is "unambiguous", not a quantity in a sentence.
+        "lib/check-context-array-stability.ts",
         "lib/db-duplicates.ts",
         // A bracket depth, not a count: `depth === 1` is the argument scanner
         // asking whether it is still at the top level of the call it is reading.

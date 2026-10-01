@@ -55,6 +55,21 @@ import { annotation } from "./github-annotations";
  * another object are reported rather than guessed at — a spread is exactly how
  * a field would leave this rule's sight.
  *
+ * WHAT IT COULD NOT READ, AND NOW SAYS SO. The first version matched one
+ * shape of each half — a `*ContextValue` type and
+ * `const value = useMemo(() => ({ … }))` — and returned NO FINDINGS for
+ * anything else. Three of the eleven providers in `lib/` were anything else:
+ * `lib/auth-context.tsx` and `lib/realtime-status-context.tsx` write a
+ * block-bodied factory with a `return`, and `lib/toast-context.tsx` calls its
+ * value `api` and its type `ToastApi`. A fourth, `lib/i18n-context.tsx`,
+ * spells the whole value type inline in its `createContext<…>` call and has
+ * had an array field in it the whole time. Both readers are widened — the JSX
+ * `value={…}` names the binding rather than a magic name, a block body's first
+ * top-level `return` is read, and a `createContext` type argument counts as a
+ * value type — and `readProvider` now returns one of THREE answers where there
+ * used to be two: checked, could not read, or no context value here. The
+ * middle one is a finding.
+ *
  * STRING BODIES ARE BLANKED, as everywhere in `declaration-scan`: this header
  * names three field names and a type, and the registry description names the
  * rule.
@@ -70,7 +85,9 @@ export type ContextArrayKind =
   /** Supplied by a name bound to something that is a new value per render. */
   | "unstable-binding"
   /** Not supplied by a named property of the factory's object — a spread, or nothing. */
-  | "unsupplied";
+  | "unsupplied"
+  /** The value type is here and its factory is not readable, so the rule has no opinion at all. */
+  | "unreadable-factory";
 
 /** One array-typed field of one context value. */
 export interface ContextArrayFinding {
@@ -85,8 +102,17 @@ export interface ContextArrayFinding {
   readonly detail: string;
 }
 
-/** An array type and nothing else: `T[]`, `readonly T[]`, `Array<T>`. */
-const ARRAY_TYPE = /^(?:readonly\s+)?(?:[\w$.<>,\s[\]|]*\[\]|Array<[\s\S]*>)$/;
+/**
+ * An array type and nothing else: `T[]`, `readonly T[]`, `Array<T>`.
+ *
+ * The element may be written inline — `lib/i18n-context.tsx` declares
+ * `languageOptions: { code: AppLanguage; label: string }[]`, which is as much
+ * an array field as `Collection[]` is and was read as "not an array" by a
+ * character class that had no `{` in it. Function types never reach here:
+ * `arrayFields` drops anything containing `=>` first, which is the exclusion
+ * that matters and the one this pattern must not be asked to make.
+ */
+const ARRAY_TYPE = /^(?:readonly\s+)?(?:[\w$.<>,;\s[\]|{}:'"&?-]*\[\]|Array<[\s\S]*>)$/;
 
 /** A binding form a PROVIDER may supply an array from. */
 const PROVIDER_HOOKS = /^(useMemo|useState|useRef|useConstant|use[A-Z][\w$]*)\s*(?:<[^;()]*>)?\s*\(/;
@@ -116,8 +142,45 @@ export function bindingInScope(
   return candidates.filter((d) => d.indent === outermost).at(-1) ?? null;
 }
 
+/** Index of the `>` closing the `<` at `open`, or `null` when unterminated. */
+export function matchingAngle(code: string, open: number): number | null {
+  let angles = 0;
+  let brackets = 0;
+  for (let i = open; i < code.length; i += 1) {
+    const ch = code[i];
+    if (ch === "{" || ch === "[" || ch === "(") brackets += 1;
+    else if (ch === "}" || ch === "]" || ch === ")") brackets -= 1;
+    else if (brackets === 0 && ch === "<") angles += 1;
+    // `=>` is not a closing angle, and an arrow is the commonest thing inside
+    // a context value's type argument.
+    else if (brackets === 0 && ch === ">" && code[i - 1] !== "=") {
+      angles -= 1;
+      if (angles === 0) return i;
+    }
+  }
+  return null;
+}
+
+/** Members of a top-level union, so `{ a: "x" | "y" } | null` splits into two and not three. */
+export function unionMembers(type: string): string[] {
+  const members: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i <= type.length; i += 1) {
+    const ch = type[i];
+    if (ch === "{" || ch === "[" || ch === "(" || ch === "<") depth += 1;
+    else if (ch === "}" || ch === "]" || ch === ")" || (ch === ">" && type[i - 1] !== "=")) depth -= 1;
+    else if ((ch === "|" && depth === 0) || i === type.length) {
+      const member = type.slice(start, i).trim();
+      start = i + 1;
+      if (member) members.push(member);
+    }
+  }
+  return members;
+}
+
 /** The body of the first `type X<suffix> = { … }` in the file, with its name. */
-export function contextValueType(code: string): { name: string; body: string } | null {
+function namedValueType(code: string): { name: string; body: string } | null {
   const pattern = new RegExp(`\\b(?:type|interface)\\s+(\\w*${CONTEXT_VALUE_SUFFIX})\\b[^{]*(\\{)`);
   const match = pattern.exec(code);
   if (!match) return null;
@@ -125,6 +188,62 @@ export function contextValueType(code: string): { name: string; body: string } |
   const close = matchingBracket(code, open);
   if (close === null) return null;
   return { name: match[1], body: code.slice(open + 1, close) };
+}
+
+/** The body of `type X = { … }` or `interface X { … }` declared in this file. */
+function declaredTypeBody(code: string, name: string): string | null {
+  const pattern = new RegExp(`\\b(?:type|interface)\\s+${name}\\b[^{]*(\\{)`);
+  const match = pattern.exec(code);
+  if (!match) return null;
+  const open = code.indexOf("{", match.index);
+  const close = matchingBracket(code, open);
+  return close === null ? null : code.slice(open + 1, close);
+}
+
+/**
+ * The type argument of `createContext<…>`, for a provider that never spells
+ * `ContextValue`.
+ *
+ * `lib/i18n-context.tsx` writes the whole shape inline in the `createContext`
+ * call and `lib/toast-context.tsx` calls its type `ToastApi`; neither matches
+ * the suffix, and for the life of this rule both read as "nothing here" —
+ * which is the same answer it gives for a file that genuinely holds no
+ * context, and `languageOptions: { code; label }[]` was sitting in the first
+ * of them the whole time. The `| null` every one of these carries is dropped
+ * because it is the "outside the provider" case and says nothing about the
+ * value's shape.
+ */
+function createContextValueType(code: string): { name: string; body: string } | null {
+  const match = /\b(?:const\s+([A-Za-z_$][\w$]*)\s*=\s*)?createContext\s*</.exec(code);
+  if (!match) return null;
+  const openAngle = match.index + match[0].length - 1;
+  const closeAngle = matchingAngle(code, openAngle);
+  if (closeAngle === null) return null;
+  const shapes = unionMembers(code.slice(openAngle + 1, closeAngle)).filter(
+    (member) => member !== "null" && member !== "undefined",
+  );
+  if (shapes.length !== 1) return null;
+  const [shape] = shapes;
+  const name = match[1] ?? "createContext";
+  if (shape.startsWith("{")) {
+    const open = code.indexOf("{", openAngle);
+    const close = matchingBracket(code, open);
+    return close === null ? null : { name, body: code.slice(open + 1, close) };
+  }
+  if (!BARE_IDENTIFIER.test(shape)) return null;
+  const body = declaredTypeBody(code, shape);
+  return body === null ? null : { name: shape, body };
+}
+
+/**
+ * This file's context value type, by either of the two spellings in the tree.
+ *
+ * The named `*ContextValue` first, because eight of the eleven providers use
+ * it and it is the convention; the `createContext` type argument second, for
+ * the three that do not.
+ */
+export function contextValueType(code: string): { name: string; body: string } | null {
+  return namedValueType(code) ?? createContextValueType(code);
 }
 
 /**
@@ -162,14 +281,75 @@ export function arrayFields(body: string): string[] {
   return fields;
 }
 
-/** The object body of `const value = useMemo…(() => ({ … }), …)`, or `null`. */
+/**
+ * The name the provider hands to its own `<X.Provider value={…}>`.
+ *
+ * "The binding called `value`" was the first version of this and it was a
+ * magic name: `lib/toast-context.tsx` calls its one `api`, so the rule read
+ * the provider that owns every toast in the app as having no factory. The JSX
+ * is the honest statement of which binding is the context value, and every
+ * provider in this tree has to write it.
+ */
+export function providerValueName(code: string): string | null {
+  const match = /<\s*[\w$.]*Provider\s+value=\{\s*([A-Za-z_$][\w$]*)\s*\}/.exec(code);
+  return match ? match[1] : null;
+}
+
+/**
+ * The object a block-bodied factory returns, at the block's OWN top level.
+ *
+ * The first top-level `return` and not the last: `lib/auth-context.tsx`
+ * returns its value object first and then has nine more `return`s inside the
+ * async methods it declares, every one of them a different object. Depth is
+ * what tells them apart, and a top-level `return` of anything other than an
+ * object literal is `null` here — an unreadable factory, which the caller
+ * reports rather than guesses at.
+ */
+export function returnedObjectBody(block: string): string | null {
+  let depth = 0;
+  for (let i = 0; i < block.length; i += 1) {
+    const ch = block[i];
+    if (ch === "{" || ch === "[" || ch === "(") depth += 1;
+    else if (ch === "}" || ch === "]" || ch === ")") depth -= 1;
+    else if (depth === 0 && block.startsWith("return", i) && !/[\w$]/.test(block[i - 1] ?? "") && !/[\w$]/.test(block[i + 6] ?? "")) {
+      const open = /^\s*\(?\s*\{/.exec(block.slice(i + 6));
+      if (!open) return null;
+      const at = i + 6 + open[0].length - 1;
+      const close = matchingBracket(block, at);
+      return close === null ? null : block.slice(at + 1, close);
+    }
+  }
+  return null;
+}
+
+/**
+ * The object body of the provider's value factory, in either arrow form.
+ *
+ * `() => ({ … })` is the common one; `() => { return { … }; }` is what
+ * `lib/auth-context.tsx` and `lib/realtime-status-context.tsx` write, and for
+ * the life of this rule a block body read as "no factory here".
+ */
 export function valueFactoryBody(code: string): { body: string; at: number } | null {
-  const match = /\bconst\s+value\s*=\s*useMemo\s*(?:<[^;()]*>)?\s*\(\s*\(\s*\)\s*=>\s*\(\s*\{/.exec(code);
-  if (!match) return null;
-  const open = code.lastIndexOf("{", match.index + match[0].length);
-  const close = matchingBracket(code, open);
-  if (close === null) return null;
-  return { body: code.slice(open + 1, close), at: match.index };
+  const name = providerValueName(code);
+  if (name === null) return null;
+  const head = new RegExp(
+    `\\bconst\\s+${name}\\s*=\\s*useMemo\\s*(?:<[^;()]*>)?\\s*\\(\\s*\\(\\s*\\)\\s*=>\\s*`,
+  ).exec(code);
+  if (!head) return null;
+  const after = head.index + head[0].length;
+  const inline = /^\(\s*\{/.exec(code.slice(after));
+  if (inline) {
+    const open = after + inline[0].length - 1;
+    const close = matchingBracket(code, open);
+    return close === null ? null : { body: code.slice(open + 1, close), at: head.index };
+  }
+  if (code[after] === "{") {
+    const close = matchingBracket(code, after);
+    if (close === null) return null;
+    const body = returnedObjectBody(code.slice(after + 1, close));
+    return body === null ? null : { body, at: head.index };
+  }
+  return null;
 }
 
 /** How `field` is supplied at the top level of a factory object body. */
@@ -192,14 +372,93 @@ export function supplyOf(body: string, field: string): { shorthand: boolean; val
   return null;
 }
 
-/** Every array-typed field of this file's context value that is not provably memoized. */
-export function findContextArrayRisks(file: string, source: string): ContextArrayFinding[] {
+/** What a module turned out to be, from this rule's point of view. */
+export type ProviderVerdict =
+  /** No context value type here at all, so the rule has no subject — not a hole. */
+  | "no-context-value"
+  /** A value type, and a factory this rule cannot read. Reported, not assumed fine. */
+  | "unreadable-factory"
+  /** A value type and a factory, both read: every array field below has a verdict. */
+  | "read";
+
+/** One provider module, read. */
+export interface ProviderReading {
+  /** Repo-relative path of the module. */
+  readonly file: string;
+  readonly verdict: ProviderVerdict;
+  /** The context value type's name, or `null` when there is none. */
+  readonly valueType: string | null;
+  /** The array-typed fields of that value, which is the rule's subject here. */
+  readonly fields: readonly string[];
+  readonly findings: readonly ContextArrayFinding[];
+}
+
+/**
+ * Read one provider, and SAY WHICH OF THE THREE ANSWERS this is.
+ *
+ * `findContextArrayRisks` returned `[]` for "there is nothing of mine here"
+ * and for "I could not read this", and those are not the same answer. Three
+ * of the eleven providers in `lib/` were the second one — two with a
+ * block-bodied factory, one calling its value `api` — and the rule reported
+ * the same clean run for them as for the eight it actually checked. Both
+ * readers have since been widened, so the tree has no unreadable provider
+ * today; what this type adds is that the next one is a FINDING rather than a
+ * silent pass, which is the `unusedUncountedExcuses` shape this repository has
+ * taken three times: a check with no stated subject is green forever.
+ *
+ * An unreadable factory is a finding whether or not the value declares an
+ * array field, and that is the deliberate half. A rule that only complained
+ * when it could see something worth complaining about would be deciding the
+ * question it just said it could not read.
+ */
+export function readProvider(file: string, source: string): ProviderReading {
   const code = scannableCode(source);
   const valueType = contextValueType(code);
-  if (!valueType) return [];
+  if (!valueType) {
+    return { file, verdict: "no-context-value", valueType: null, fields: [], findings: [] };
+  }
+  const fields = arrayFields(valueType.body);
   const factory = valueFactoryBody(code);
-  if (factory === null) return [];
+  if (factory === null) {
+    const detail = providerValueName(code) === null
+      ? "no `<X.Provider value={…}>` names the context value, so the factory cannot be found"
+      : `\`${providerValueName(code)}\` is not a \`useMemo\` this rule can read, so none of its fields have been checked`;
+    return {
+      file,
+      verdict: "unreadable-factory",
+      valueType: valueType.name,
+      fields,
+      findings: [
+        {
+          file,
+          valueType: valueType.name,
+          field: fields.length === 0 ? "(the whole value)" : fields.join(", "),
+          kind: "unreadable-factory",
+          detail,
+        },
+      ],
+    };
+  }
+  return {
+    file,
+    verdict: "read",
+    valueType: valueType.name,
+    fields,
+    findings: fieldFindings(file, valueType, factory, code),
+  };
+}
 
+/** Every array-typed field of this file's context value that is not provably memoized. */
+export function findContextArrayRisks(file: string, source: string): ContextArrayFinding[] {
+  return [...readProvider(file, source).findings];
+}
+
+function fieldFindings(
+  file: string,
+  valueType: { name: string; body: string },
+  factory: { body: string; at: number },
+  code: string,
+): ContextArrayFinding[] {
   const bindings = declarations(code);
   const found: ContextArrayFinding[] = [];
   for (const field of arrayFields(valueType.body)) {
@@ -244,6 +503,15 @@ export function findContextArrayRisks(file: string, source: string): ContextArra
 /** Human-readable failure report; empty string when there is nothing to say. */
 export function formatContextArrayReport(findings: readonly ContextArrayFinding[]): string {
   if (findings.length === 0) return "";
+  const unreadable = findings.filter((f) => f.kind === "unreadable-factory");
+  if (unreadable.length === findings.length) {
+    return [
+      `Found ${unreadable.length} provider(s) whose value factory this rule cannot read, so nothing in them has been checked.`,
+      `A provider the rule cannot read is reported rather than passed: returning "no findings" for it is the same answer as for a module that holds no context at all, and those are different answers.`,
+      `Either give the factory a shape the reader knows — \`const value = useMemo(() => ({ … }), deps)\` or a block body whose first top-level \`return\` is the object — or widen \`valueFactoryBody\` on purpose.`,
+      ...unreadable.map((f) => `  ${f.file}  ${f.valueType} (${f.field}) — ${f.detail}`),
+    ].join("\n");
+  }
   const lines = [
     `Found ${findings.length} array-typed context field(s) that are not memoized on their own dependencies.`,
     `The value factory is itself a useMemo, so an array built inside it is memoized on the FACTORY's dependency list — twenty names, for CollectionsContextValue. Any of them changing hands every consumer a new array, and a consumer's useChunkedList window snaps back to page one on a context update that had nothing to do with its list.`,

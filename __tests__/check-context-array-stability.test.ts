@@ -32,7 +32,10 @@ import {
   contextValueType,
   findContextArrayRisks,
   formatContextArrayReport,
+  providerValueName,
+  readProvider,
   supplyOf,
+  unionMembers,
   valueFactoryBody,
 } from "@/lib/check-context-array-stability";
 import { declarations, scannableCode } from "@/lib/declaration-scan";
@@ -41,6 +44,7 @@ import { LINT_GUARDS } from "@/lib/lint-guards";
 import { SCANNED_FLOORS } from "@/lib/scanned-floor";
 
 import { readRepoFile } from "./helpers/repo-file";
+import { sourceFiles } from "./helpers/source-files";
 
 /** A provider whose one array field is lifted to its own memo — the good shape. */
 const LIFTED = [
@@ -60,7 +64,10 @@ const LIFTED = [
   "    }),",
   "    [ready, rows, other, another],",
   "  );",
-  "  return value;",
+  // The JSX is not decoration: `providerValueName` reads which binding is the
+  // context value out of it, because `lib/toast-context.tsx` calls its one
+  // `api` and a rule keyed on the name `value` had never read that provider.
+  "  return <ThingContext.Provider value={value}>{children}</ThingContext.Provider>;",
   "}",
 ].join("\n");
 
@@ -178,12 +185,149 @@ describe("what it deliberately does not look at", () => {
     assert.deepEqual(findContextArrayRisks("lib/x.ts", prose), []);
   });
 
-  it("says nothing about a module with no context value or no value factory", () => {
-    assert.deepEqual(findContextArrayRisks("lib/x.ts", "export const x = 1;"), []);
-    assert.deepEqual(
-      findContextArrayRisks("lib/x.ts", "type AContextValue = {\n  rows: Row[];\n};\n"),
-      [],
-    );
+  it("says nothing about a module with no context value, because there is nothing of its there", () => {
+    const reading = readProvider("lib/x.ts", "export const x = 1;");
+    assert.equal(reading.verdict, "no-context-value");
+    assert.deepEqual(reading.findings, []);
+  });
+});
+
+describe("the three answers, which used to be two", () => {
+  it("reports a value type whose factory it cannot read, instead of passing it", () => {
+    // The whole point of the verdict: "I found nothing wrong" and "I could not
+    // look" were the same empty array, and three of the eleven real providers
+    // were the second one.
+    const reading = readProvider("lib/x.tsx", "type AContextValue = {\n  rows: Row[];\n};\n");
+    assert.equal(reading.verdict, "unreadable-factory");
+    assert.equal(reading.valueType, "AContextValue");
+    assert.deepEqual([...reading.fields], ["rows"]);
+    assert.equal(reading.findings.length, 1);
+    assert.equal(reading.findings[0].kind, "unreadable-factory");
+  });
+
+  it("reports an unreadable factory even when the value declares no array at all", () => {
+    // Deliberate. A rule that only complained when it could see something
+    // worth complaining about would be deciding the question it just said it
+    // could not read.
+    const source = [
+      "type AContextValue = { ready: boolean };",
+      "export function AProvider() {",
+      "  const value = buildValue(ready);",
+      "  return <AContext.Provider value={value}>{children}</AContext.Provider>;",
+      "}",
+    ].join("\n");
+    const reading = readProvider("lib/a-context.tsx", source);
+    assert.equal(reading.verdict, "unreadable-factory");
+    assert.deepEqual([...reading.fields], []);
+    assert.match(reading.findings[0].detail, /not a `useMemo` this rule can read/);
+  });
+
+  it("reads the binding the provider's JSX names, not one called `value`", () => {
+    const source = [
+      "type AContextValue = { rows: Row[] };",
+      "export function AProvider() {",
+      "  const rows = useMemo(() => all.filter(isLive), [all]);",
+      "  const api = useMemo<AContextValue>(() => ({ rows }), [rows]);",
+      "  return <AContext.Provider value={api}>{children}</AContext.Provider>;",
+      "}",
+    ].join("\n");
+    assert.equal(providerValueName(source), "api");
+    const reading = readProvider("lib/a-context.tsx", source);
+    assert.equal(reading.verdict, "read");
+    assert.deepEqual(reading.findings, []);
+  });
+
+  it("reads a block-bodied factory at its first TOP-LEVEL return", () => {
+    // `lib/auth-context.tsx` returns its value object first and then has nine
+    // more `return`s inside the async methods it declares. Depth is what tells
+    // them apart.
+    const block = [
+      "type AContextValue = { rows: Row[] };",
+      "export function AProvider() {",
+      "  const rows = useMemo(() => all.filter(isLive), [all]);",
+      "  const value = useMemo<AContextValue>(() => {",
+      "    return {",
+      "      rows,",
+      "      send: async () => {",
+      "        return { error: 1 };",
+      "      },",
+      "    };",
+      "  }, [rows]);",
+      "  return <AContext.Provider value={value}>{children}</AContext.Provider>;",
+      "}",
+    ].join("\n");
+    const factory = valueFactoryBody(block);
+    assert.ok(factory);
+    assert.deepEqual(supplyOf(factory.body, "rows"), { shorthand: true, value: "rows" });
+    assert.deepEqual(readProvider("lib/a-context.tsx", block).findings, []);
+  });
+
+  it("refuses a block body whose first top-level return is not an object", () => {
+    const early = [
+      "type AContextValue = { rows: Row[] };",
+      "export function AProvider() {",
+      "  const value = useMemo<AContextValue>(() => {",
+      "    return buildValue(rows);",
+      "  }, [rows]);",
+      "  return <AContext.Provider value={value}>{children}</AContext.Provider>;",
+      "}",
+    ].join("\n");
+    assert.equal(valueFactoryBody(early), null);
+    assert.equal(readProvider("lib/a-context.tsx", early).verdict, "unreadable-factory");
+  });
+});
+
+describe("a context value that never spells ContextValue", () => {
+  it("reads the type argument written inline in createContext", () => {
+    const inline = [
+      "const ThingContext = createContext<{",
+      "  t: (key: string) => string;",
+      "  options: { code: string; label: string }[];",
+      "} | null>(null);",
+    ].join("\n");
+    const valueType = contextValueType(inline);
+    assert.ok(valueType);
+    assert.equal(valueType.name, "ThingContext");
+    assert.deepEqual(arrayFields(valueType.body), ["options"]);
+  });
+
+  it("resolves a named type argument back to its declaration", () => {
+    const named = [
+      "type ThingApi = {",
+      "  rows: Row[];",
+      "  show: (input: Input) => void;",
+      "};",
+      "",
+      "const ThingContext = createContext<ThingApi | null>(null);",
+    ].join("\n");
+    const valueType = contextValueType(named);
+    assert.ok(valueType);
+    assert.equal(valueType.name, "ThingApi");
+    assert.deepEqual(arrayFields(valueType.body), ["rows"]);
+  });
+
+  it("prefers the named *ContextValue when a file has both", () => {
+    const both = [
+      "type ThingContextValue = { rows: Row[] };",
+      "const ThingContext = createContext<ThingContextValue | null>(null);",
+    ].join("\n");
+    assert.equal(contextValueType(both)?.name, "ThingContextValue");
+  });
+
+  it("splits a union at the top level only, so an inline field union is not a second member", () => {
+    assert.deepEqual(unionMembers("{ a: 'x' | 'y' } | null"), ["{ a: 'x' | 'y' }", "null"]);
+    assert.deepEqual(unionMembers("A | B"), ["A", "B"]);
+  });
+
+  it("does not read an arrow's `>` as the end of the type argument", () => {
+    const arrows = "const C = createContext<{ run: (a: number) => Promise<void>; rows: Row[] } | null>(null);";
+    assert.deepEqual(arrayFields(contextValueType(arrows)?.body ?? ""), ["rows"]);
+  });
+
+  it("counts an inline object element type as an array field", () => {
+    // `lib/i18n-context.tsx` declares exactly this and it read as "not an
+    // array" until the pattern learned about braces.
+    assert.deepEqual(arrayFields("  options: { code: string; label: string }[];\n"), ["options"]);
   });
 });
 
@@ -196,6 +340,7 @@ describe("bindingInScope", () => {
     "  };",
     "  const rows = useMemo(() => all.filter(isLive), [all]);",
     "  const value = useMemo(() => ({ rows }), [rows]);",
+    "  return <AContext.Provider value={value}>{children}</AContext.Provider>;",
     "}",
   ].join("\n");
 
@@ -254,22 +399,39 @@ describe("the report and its annotations", () => {
 });
 
 describe("the tree it guards", () => {
-  it("reads all four context values that declare an array field, and finds none unstable", () => {
+  it("reads all five context values that declare an array field, and finds none unstable", () => {
     const providers = [
       "lib/collections-context.tsx",
       "lib/social-context.tsx",
       "lib/marketplace-context.tsx",
       "lib/chat-context.tsx",
+      // The fifth, and the reason the readers were widened: it spells its
+      // whole value type inline in `createContext<…>` and never writes
+      // `ContextValue`, so `languageOptions` was outside the rule's sight.
+      "lib/i18n-context.tsx",
     ];
     let fields = 0;
     for (const file of providers) {
       const source = readRepoFile(file);
       const valueType = contextValueType(scannableCode(source));
-      assert.ok(valueType, `${file} declares no ${CONTEXT_VALUE_SUFFIX}`);
+      assert.ok(valueType, `${file} declares no readable context value type`);
       fields += arrayFields(valueType.body).length;
       assert.deepEqual(findContextArrayRisks(file, source), [], file);
     }
-    assert.equal(fields, 19, "the subject moved — re-read the fields before trusting the negative");
+    assert.equal(fields, 20, "the subject moved — re-read the fields before trusting the negative");
+  });
+
+  it("can READ every provider in lib/, which is the claim the empty result rests on", () => {
+    // Eleven files, and for the rule's first days three of them read as
+    // "nothing here": two block-bodied factories and one value called `api`.
+    // A regression in either reader turns this red instead of printing a
+    // clean run about eight providers out of eleven.
+    const providers = sourceFiles("lib").filter((file) => file.endsWith("-context.tsx"));
+    assert.equal(providers.length, 11, "the provider count moved");
+    for (const file of providers) {
+      const reading = readProvider(file, readRepoFile(file));
+      assert.equal(reading.verdict, "read", `${file}: ${reading.findings[0]?.detail ?? ""}`);
+    }
   });
 
   it("holds the one field whose comment is this rule's whole argument", () => {

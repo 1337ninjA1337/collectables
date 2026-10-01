@@ -11,6 +11,10 @@
  * inside it gets a fresh identity on any unrelated context update — and
  * `lint:chunked-items` accepts every consumer of such an array as stable
  * because a provider is supposed to have done this.
+ *
+ * It also fails when a provider's value factory cannot be READ, which for the
+ * rule's first days was silently the same as "this file has nothing of mine in
+ * it". Three of the eleven providers were in that state.
  */
 
 import * as fs from "node:fs";
@@ -18,13 +22,11 @@ import * as path from "node:path";
 
 import {
   type ContextArrayFinding,
-  arrayFields,
+  type ProviderReading,
   contextArrayAnnotations,
-  contextValueType,
-  findContextArrayRisks,
   formatContextArrayReport,
+  readProvider,
 } from "../lib/check-context-array-stability";
-import { scannableCode } from "../lib/declaration-scan";
 import { runningUnderActions } from "../lib/github-annotations";
 import { GuardRootError } from "../lib/guard-root";
 import { ScannedFloorError, assertScannedWalk } from "../lib/scanned-floor";
@@ -51,14 +53,28 @@ const CONTEXT_SUFFIX = "-context.tsx";
 /**
  * The guard's own subject, floored.
  *
- * Nineteen array-typed fields across four context values today. A run that
+ * Twenty array-typed fields across five context values today. A run that
  * found NO array field at all has not proved the rule — it has lost its
  * subject, which is what a rename of the value types, a move out of `lib/`, or
  * a formatting change the type walk cannot read would look like from in here.
- * One, not nineteen: a provider losing a list is ordinary, and a floor that
+ * One, not twenty: a provider losing a list is ordinary, and a floor that
  * goes red for it teaches people to edit the floor.
  */
 const FIELD_FLOOR = 1;
+
+/**
+ * Every provider must be one the readers can READ, and the count is the floor.
+ *
+ * Eleven files end in `-context.tsx` and for the life of this rule three of
+ * them were read as "nothing here": two write a block-bodied factory and one
+ * calls its value `api`. The rule printed the same clean line for them as for
+ * the eight it checked, which is the failure mode this repository keeps
+ * finding — a check with no stated subject is green forever. Both readers
+ * cover all eleven now, so an unreadable provider is a FINDING, and a module
+ * that declares no context value at all is named in the run's own output
+ * rather than counted silently.
+ */
+const READABLE_PROVIDER_FLOOR = 11;
 
 function main(): void {
   const repoRoot = guardScanRoot(CHECK_NAME, DEFAULT_REPO_ROOT);
@@ -69,13 +85,27 @@ function main(): void {
   assertScannedWalk(CHECK_NAME, files);
 
   const providers = files.filter((file) => file.endsWith(CONTEXT_SUFFIX));
-  const found: ContextArrayFinding[] = [];
-  let fields = 0;
-  for (const file of providers) {
-    const source = fs.readFileSync(path.join(repoRoot, file), "utf8");
-    const valueType = contextValueType(scannableCode(source));
-    if (valueType) fields += arrayFields(valueType.body).length;
-    found.push(...findContextArrayRisks(file, source));
+  const readings: ProviderReading[] = providers.map((file) =>
+    readProvider(file, fs.readFileSync(path.join(repoRoot, file), "utf8")),
+  );
+  const found: ContextArrayFinding[] = readings.flatMap((reading) => [...reading.findings]);
+  const fields = readings.reduce((total, reading) => total + reading.fields.length, 0);
+  const read = readings.filter((reading) => reading.verdict === "read");
+  const subjectless = readings.filter((reading) => reading.verdict === "no-context-value");
+
+  // Said on every run, pass or fail: the three answers this guard can give are
+  // "checked", "could not read" and "no context value here", and the last two
+  // used to be spelled the same way as the first.
+  for (const reading of subjectless) {
+    console.log(`${CHECK_NAME}: ${reading.file} declares no context value type — nothing here for this rule.`);
+  }
+
+  if (read.length < READABLE_PROVIDER_FLOOR) {
+    console.error(
+      `${CHECK_NAME}: read ${read.length} provider(s) of ${providers.length}, and the floor is ${READABLE_PROVIDER_FLOOR}. A provider this rule cannot read is not a provider it has checked. Either the readers need widening for a new shape, or a provider left \`lib/\` — the findings above name which.`,
+    );
+    if (found.length > 0) console.error(formatContextArrayReport(found));
+    process.exit(1);
   }
 
   if (fields < FIELD_FLOOR) {
@@ -87,7 +117,7 @@ function main(): void {
 
   if (found.length === 0) {
     console.log(
-      `${CHECK_NAME}: scanned ${files.length} file(s), ${providers.length} provider(s), ${fields} array-typed field(s), all memoized on their own dependencies.`,
+      `${CHECK_NAME}: scanned ${files.length} file(s), read ${read.length} of ${providers.length} provider(s), ${fields} array-typed field(s), all memoized on their own dependencies.`,
     );
     return;
   }
