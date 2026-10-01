@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 import { readRepoFile as read } from "./helpers/repo-file";
 import { topLevelSuites } from "./helpers/suite-files";

@@ -21,12 +21,10 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 import * as fs from "node:fs";
-import * as path from "node:path";
 
 import { LINT_GUARDS } from "../lib/lint-guards";
 import { floorWalks } from "../lib/floor-walks";
 import { SCANNED_FLOORS } from "../lib/scanned-floor";
-import { SOURCE_EXTENSIONS } from "../lib/source-dirs";
 import {
   assertNoStackTrace,
   checkNameOf,

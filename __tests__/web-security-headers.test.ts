@@ -1,8 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import * as crypto from "node:crypto";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 import {
   CSP_CONNECT_SRC,

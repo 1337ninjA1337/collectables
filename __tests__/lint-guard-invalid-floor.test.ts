@@ -26,13 +26,11 @@
 
 import { describe, it, after } from "node:test";
 import assert from "node:assert/strict";
-import * as path from "node:path";
 
 import { LINT_GUARDS } from "../lib/lint-guards";
 import {
   describeScannedFloorProblem,
   scannedFloorProblemDetail,
-  SCANNED_FLOORS,
   SCANNED_FLOORS_ENTRY_SUBJECT,
   type ScannedFloorProblemCode,
 } from "../lib/scanned-floor";

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { subscribeToEntryCurrency } from "@/lib/entry-currency-store";
 import { getEntryCurrency } from "@/lib/locale-helpers";

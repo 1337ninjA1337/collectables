@@ -3,15 +3,12 @@ import assert from "node:assert/strict";
 
 import { luminance } from "@/lib/color-luminance";
 import {
-  AMBER_ACCENT,
   AMBER_SOFT_3,
   CARD_BG_15,
   DANGER_DEEP_7,
   DANGER_DEEP_8,
   DANGER_SOFT_6,
   DANGER_SOFT_7,
-  HERO_DARK_2,
-  HERO_DARK_9,
   SUCCESS_DEEP,
   SUCCESS_GREEN_3,
   SUCCESS_SOFT,

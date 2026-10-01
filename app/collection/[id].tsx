@@ -1,7 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { Link, Stack, router, useLocalSearchParams } from "expo-router";
 import { Profiler, useCallback, useEffect, useMemo, useRef, useState, type ProfilerOnRenderCallback } from "react";
-import { Alert, FlatList, Image, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import { Alert, FlatList, Image, Platform, Pressable, RefreshControl, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 
 import { EmptyState } from "@/components/empty-state";
 import { LoadMoreButton } from "@/components/load-more-button";
@@ -56,7 +56,6 @@ import {
   AMBER_MUTED_8,
   AMBER_SOFT,
   BORDER,
-  BORDER_7,
   CARD_BG,
   CARD_BG_3,
   CARD_BG_9,

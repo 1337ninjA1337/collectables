@@ -5,7 +5,7 @@ import { ACCENT_DEEP_2, MUTED_2, RADIUS_PILL, SUCCESS_GREEN_2, TEXT_ON_DARK } fr
 import { useAppTheme } from "@/components/use-app-theme";
 import { useI18n } from "@/lib/i18n-context";
 import { Collection } from "@/lib/types";
-import { FONT_BODY, FONT_BODY_BOLD } from "@/lib/fonts";
+import { FONT_BODY_BOLD } from "@/lib/fonts";
 
 type Variant = "card" | "hero";
 

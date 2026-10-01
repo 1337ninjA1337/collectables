@@ -40,7 +40,7 @@
  */
 
 /** The map every other locale spreads, and the denominator of every ratio. */
-import { DIVISION_FOLLOWS, opensRegExp } from "./js-tokens";
+import { opensRegExp } from "./js-tokens";
 
 export const TRANSLATION_BASE_LANGUAGE = "en";
 

@@ -1,6 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import path from "node:path";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 // Repo-relative, because `readRepoFile` joins the root itself. This suite was

@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 import { readI18nSource } from "./helpers/i18n-source-file";
 import { readRepoFile as read } from "./helpers/repo-file";

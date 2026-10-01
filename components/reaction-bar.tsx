@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { BORDER, CARD_BG, HERO_DARK, MUTED, MUTED_2, RADIUS_PILL, SPACING_INLINE, SPACING_LIST, TEXT_ON_DARK } from "@/lib/design-tokens";
 import { useI18n } from "@/lib/i18n-context";
-import { REACTION_EMOJIS, useReactions } from "@/lib/use-reactions";
+import { useReactions } from "@/lib/use-reactions";
 import { ReactionTargetType } from "@/lib/types";
 
 type Props = {
@@ -16,7 +16,6 @@ export function ReactionBar({ targetType, targetId }: Props) {
 
   if (loading) return null;
 
-  const hasAny = counts.some((c) => c.count > 0);
 
   return (
     <View style={styles.container}>

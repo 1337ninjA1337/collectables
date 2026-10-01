@@ -1,4 +1,4 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text } from "react-native";
 
 import { announceMessage } from "@/lib/announce";
 import { useAuth } from "@/lib/auth-context";

@@ -81,7 +81,15 @@ describe("marketplace context — mySales selector", () => {
     const block = src.slice(valueIdx, valueIdx + 1500);
     assert.match(block, /mySales/);
     // Verify it appears in the deps array (not just the object literal).
-    const depsBlock = block.slice(block.indexOf("], ["));
+    // `block` and not `depsBlock` was the assertion here, which counts three
+    // occurrences anywhere in 1500 characters — the object literal twice and
+    // a comment would have passed it. The slice is what the sentence says.
+    // The object literal's closing `}),` and not `"], ["`: the deps array is
+    // formatted across lines here, so the one-line spelling found nothing and
+    // sliced to the empty string — which is what an assertion against `block`
+    // was hiding.
+    const depsBlock = block.slice(block.indexOf("}),"));
+    assert.match(depsBlock, /mySales/, "mySales must appear in the deps array, not only the object literal");
     assert.ok(
       block.split("mySales").length >= 3,
       "mySales must appear in BOTH the object literal AND the deps array",

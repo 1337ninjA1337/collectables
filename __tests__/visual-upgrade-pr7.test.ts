@@ -1,6 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import path from "node:path";
 import { readRepoFile as read } from "./helpers/repo-file";
 
 // PR7 (visual-upgrade `redesign-item-detail`): app/item/[id].tsx gets the

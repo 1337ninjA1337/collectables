@@ -1,6 +1,5 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import path from "node:path";
 import { readRepoFile } from "./helpers/repo-file";
 import { elementSpan, tagsNamed } from "@/lib/jsx-open-tag";
 import { stripComments } from "@/lib/strip-comments";

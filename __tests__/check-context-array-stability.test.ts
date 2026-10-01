@@ -25,7 +25,6 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  CONTEXT_VALUE_SUFFIX,
   arrayFields,
   bindingInScope,
   contextArrayAnnotations,

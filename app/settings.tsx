@@ -1,5 +1,5 @@
 import { Stack, router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CurrencySheet } from "@/components/currency-sheet";

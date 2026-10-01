@@ -51,7 +51,6 @@ import {
   type AuditSpawnOptions,
   type AuditRead,
   type AuditSkip,
-  type AuditSkipCause,
   type AuditReport,
   type AuditVerdict,
 } from "@/lib/audit-baseline";

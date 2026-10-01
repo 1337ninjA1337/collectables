@@ -68,10 +68,6 @@ function Probe() {
   return createElement("View", null);
 }
 
-async function settle(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
 async function mount() {
   i18n ??= await import("../lib/i18n-context");
   (await import("../lib/report-storage-failure")).__resetStorageFailureReportsForTests();

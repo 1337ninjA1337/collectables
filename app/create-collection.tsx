@@ -48,8 +48,6 @@ import { useToast } from "@/lib/toast-context";
 import { CollectionVisibility } from "@/lib/types";
 import { FONT_DISPLAY, FONT_BODY, FONT_BODY_BOLD, FONT_BODY_EXTRABOLD } from "@/lib/fonts";
 
-const FALLBACK_COVER = "";
-
 export default function CreateCollectionScreen() {
   const { addCollection } = useCollections();
   const { t } = useI18n();

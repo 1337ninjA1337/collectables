@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 
 import {
   ZipFormatError,
-  crc32,
   decodeZipEntryText,
   readZipEntries,
 } from "../lib/zip-archive";

@@ -2,8 +2,6 @@ import { useColorScheme } from "react-native";
 
 import {
   AMBER_ACCENT,
-  AMBER_LIGHT,
-  AMBER_SOFT,
   BORDER,
   BORDER_2,
   CARD_BG,

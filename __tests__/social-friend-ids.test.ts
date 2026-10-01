@@ -5,7 +5,6 @@ import { stripComments } from "@/lib/strip-comments";
 
 import { autoUnmount, mockModule } from "./helpers/render";
 import {
-  drain,
   installSpyAsyncStorage,
   installSpyCapture,
   installSpyToast,

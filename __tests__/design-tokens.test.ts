@@ -20,7 +20,6 @@ import {
   AMBER_SOFT_4,
   AMBER_SOFT_5,
   BORDER,
-  BORDER_2,
   BORDER_3,
   BORDER_4,
   BORDER_5,
@@ -1188,6 +1187,11 @@ describe("design-tokens adoption", () => {
   });
 
   it("app/item/[id].tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
+    // `MUTED` and `SUCCESS_GREEN_2` left this list on 2026-10-01: the screen
+    // imported both and used neither, so the only thing proving "this screen
+    // uses this token" was the import line itself. Deleting 101 unused
+    // imports is what found it, and a mention-shaped assertion is what let it
+    // sit — the hex-literal half below is the part that was always load-bearing.
     const src = read("app/item/[id].tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
     assert.match(src, /\bACCENT_DEEP\b/);
@@ -1203,13 +1207,11 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bDANGER_DEEP_6\b/);
     assert.match(src, /\bDANGER_SOFT_4\b/);
     assert.match(src, /\bHERO_DARK\b/);
-    assert.match(src, /\bMUTED\b/);
     assert.match(src, /\bMUTED_2\b/);
     assert.match(src, /\bMUTED_3\b/);
     assert.match(src, /\bMUTED_10\b/);
     assert.match(src, /\bPLACEHOLDER\b/);
     assert.match(src, /\bSUCCESS_GREEN\b/);
-    assert.match(src, /\bSUCCESS_GREEN_2\b/);
     // The 9 individual TAG_* hues are no longer imported here: the rotation
     // moved into the shared `TAG_COLORS` export + `nextTagColor()` helper
     // (2026-08-07) so the new-item form and the item-edit form can't drift —
@@ -1280,6 +1282,10 @@ describe("design-tokens adoption", () => {
   it("app/collection/[id].tsx imports tokens from lib/design-tokens and has no inline hex literals", () => {
     const src = read("app/collection/[id].tsx");
     assert.match(src, /from\s+"@\/lib\/design-tokens"/);
+    // `BORDER_7` left this list on 2026-10-01: the screen imported it and
+    // used it nowhere, so the import line was the only thing proving the
+    // claim. Still asserted for components/collection-share-sheet.tsx below,
+    // which is where the token actually went when the sheet was extracted.
     // The HM-C1/C2/C3 modal extractions moved a swath of tokens out with
     // their styles (MUTED with the share sheet's link text; AMBER_ACCENT,
     // AMBER_MUTED_2, DANGER, MUTED_2/10/17/23, PLACEHOLDER, SUCCESS_GREEN_2,
@@ -1291,7 +1297,6 @@ describe("design-tokens adoption", () => {
     assert.match(src, /\bAMBER_MUTED_8\b/);
     assert.match(src, /\bAMBER_SOFT\b/);
     assert.match(src, /\bBORDER\b/);
-    assert.match(src, /\bBORDER_7\b/);
     assert.match(src, /\bCARD_BG\b/);
     assert.match(src, /\bCARD_BG_3\b/);
     assert.match(src, /\bCARD_BG_9\b/);

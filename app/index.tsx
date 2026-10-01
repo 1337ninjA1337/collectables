@@ -1,6 +1,6 @@
 import { Link, router } from "expo-router";
 import { Stack } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { NestableDraggableFlatList, ScaleDecorator, RenderItemParams } from "../components/DraggableList";
 
@@ -24,12 +24,10 @@ import {
   AMBER_SOFT,
   BORDER,
   CARD_BG,
-  CARD_BG_3,
   CARD_BG_9,
   HERO_DARK_2,
   MUTED,
   MUTED_2,
-  MUTED_3,
   MUTED_18,
   RADIUS_AVATAR,
   RADIUS_CARD,

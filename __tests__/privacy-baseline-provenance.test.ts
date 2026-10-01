@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import * as fs from "node:fs";
-import * as path from "node:path";
 
 import { LINT_GUARDS } from "../lib/lint-guards";
 import {

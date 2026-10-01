@@ -30,9 +30,20 @@
  * number stays visible. Which three, and why not the rest, is in
  * `lib/eslint-gate.ts`.
  *
- * `npm run lint` itself stays a report — the whole 200 findings, unfiltered,
- * like `bundle:composition` and `bundle:native`. The gate is the part somebody
- * has committed to keeping at zero.
+ * `npm run lint` itself stays a report — the whole report, unfiltered, like
+ * `bundle:composition` and `bundle:native`. The gate is the part somebody has
+ * committed to keeping at zero.
+ *
+ * ## The one rule option this file sets
+ *
+ * `@typescript-eslint/no-unused-vars` was 108 warnings on 2026-10-01 and 101
+ * of them were imports left behind by a refactor — `join` forty times,
+ * `path` twenty-two, in suites that moved to `readRepoFile` and never dropped
+ * the import. Deleting those needed no argument. What was left was seven
+ * bindings, six of them dead and one DELIBERATE: `jsxReach` walks for its
+ * side effect and names the value it does not read `_tag`. The underscore
+ * prefix is how that intent is spelled, and without these patterns it is
+ * spelled the same way as a mistake.
  *
  * ## The scope
  *
@@ -46,6 +57,23 @@ module.exports = [
   ...expoConfig,
   {
     ignores: ["dist/*", ".expo/*", "node_modules/*", "supabase/functions/*"],
+  },
+  {
+    // The plugin is named again here rather than inherited: a flat-config
+    // object may only set a rule whose plugin IT declares, and
+    // `eslint-config-expo/flat` declares this one inside objects of its own.
+    plugins: { "@typescript-eslint": require("@typescript-eslint/eslint-plugin") },
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+        },
+      ],
+    },
   },
   {
     // The two CommonJS files in the tree. Expo's config assumes a React Native

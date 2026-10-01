@@ -271,7 +271,7 @@ async function mountGesture(
   const dragHandles = new Map<number, () => void>();
   const active = new Map<number, boolean>();
 
-  const { tree, list } = await mountShim(name, {
+  const { tree } = await mountShim(name, {
     data: ROWS,
     keyExtractor: (row: Row) => row.id,
     onDragEnd: (params: DragEnd) => drops.push(params),

@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -7,7 +6,6 @@ import {
   DEFAULT_BUNDLE_SIZE_BUDGET_BYTES,
   evaluateBundleSize,
   formatBundleSizeReport,
-  formatDriftLine,
   LAST_MEASURED_BUNDLE_BYTES,
   resolveBundleSizeBudget,
   SMALLEST_GUARDED_SDK_BYTES,
