@@ -29,8 +29,11 @@ import {
   gateFails,
   partitionFindings,
   ruleTally,
+  untriagedFindings,
   type EslintFinding,
 } from "@/lib/eslint-gate";
+import { findingsByFile as exhaustiveDepsByFile } from "@/lib/exhaustive-deps-triage";
+import { findingsByFile as setStateByFile } from "@/lib/set-state-in-effect-triage";
 import { LINT_ALL_EXEMPT } from "@/lib/lint-guards";
 
 import { GATE_LEG_LABELS, gateLegs } from "./helpers/gate-legs";
@@ -207,5 +210,64 @@ describe("it is a leg of the gate, not a script beside it", () => {
     // lint-guards.test.ts refuses.
     assert.ok(LINT_ALL_EXEMPT["lint:eslint-gate"]);
     assert.match(LINT_ALL_EXEMPT["lint:eslint-gate"], /tenth leg/);
+  });
+});
+
+describe("the two read rules stay read", () => {
+  const finding = (file: string, rule: string): EslintFinding => ({
+    file,
+    line: 1,
+    rule,
+    message: "whatever the rule says",
+    severity: 1,
+  });
+  const RULE = "react-hooks/exhaustive-deps";
+  const triaged = [
+    { rule: RULE, registry: "lib/exhaustive-deps-triage.ts", expected: new Map([["lib/a.ts", 2]]) },
+  ];
+
+  it("says nothing when the run and the registry agree", () => {
+    assert.deepEqual(
+      untriagedFindings([finding("lib/a.ts", RULE), finding("lib/a.ts", RULE)], triaged),
+      [],
+    );
+  });
+
+  it("reports a finding nobody has read, which is the whole point", () => {
+    const problems = untriagedFindings(
+      [finding("lib/a.ts", RULE), finding("lib/a.ts", RULE), finding("lib/b.ts", RULE)],
+      triaged,
+    );
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /lib\/b\.ts reports 1 finding\(s\) and lib\/exhaustive-deps-triage\.ts accounts for 0/);
+    assert.match(problems[0], /give it a verdict/);
+  });
+
+  it("reports an entry describing a finding that has gone, from the other side", () => {
+    const problems = untriagedFindings([finding("lib/a.ts", RULE)], triaged);
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /verdict about nothing/);
+  });
+
+  it("ignores findings from every other rule", () => {
+    assert.deepEqual(
+      untriagedFindings(
+        [finding("lib/a.ts", RULE), finding("lib/a.ts", RULE), finding("lib/z.ts", "import/first")],
+        triaged,
+      ),
+      [],
+    );
+  });
+
+  it("both registries account for a tree the gate currently passes", () => {
+    // The registries' own arithmetic, held here as well as by the gate: a
+    // `fixed` verdict contributes nothing, because the finding it describes
+    // is gone. 30 live set-state findings from 31 entries, 11 live
+    // exhaustive-deps findings from 11 entries of which two are fixed and one
+    // stands for three.
+    const sum = (counts: ReadonlyMap<string, number>) =>
+      [...counts.values()].reduce((total, n) => total + n, 0);
+    assert.equal(sum(setStateByFile()), 30);
+    assert.equal(sum(exhaustiveDepsByFile()), 11);
   });
 });

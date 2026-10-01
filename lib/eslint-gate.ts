@@ -35,6 +35,19 @@
  * less of what the linter finds — a gate that reports 34 errors it does not
  * fail on is a gate that keeps asking.
  *
+ * ## The third thing it does: keep the two READINGS complete
+ *
+ * Two of the ungated rules have been read end to end — `set-state-in-effect`
+ * on 2026-09-27 and `exhaustive-deps` on 2026-10-01 — and each reading is a
+ * committed registry of verdicts. Both hold an anchor line per entry, so an
+ * entry about code that has moved fails its own suite. Neither could see the
+ * other direction: a NEW finding of either rule joined no registry and was
+ * counted in the report beside thirty that had been decided. The gate now
+ * holds the real run against both registries per file, so a new finding
+ * fails this leg until somebody writes a verdict — which is a far smaller
+ * ask than a fix, and is what stops a reading from being about the day it
+ * was written.
+ *
  * ## The anti-vacuous half
  *
  * A gated rule that the config does not actually enable passes for free, which
@@ -185,4 +198,62 @@ export function formatGateReport(
     lines.push(`  ${row.rule}  ${row.errors} error(s), ${row.warnings} warning(s)`);
   }
   return lines.join("\n");
+}
+
+/** A rule whose findings are all read and decided somewhere. */
+export interface TriagedRule {
+  /** The ESLint rule id. */
+  readonly rule: string;
+  /** Where the verdicts live, named in the failure message. */
+  readonly registry: string;
+  /** Repo-relative file to the number of LIVE findings its entries account for. */
+  readonly expected: ReadonlyMap<string, number>;
+}
+
+/**
+ * The half the counted report cannot do on its own.
+ *
+ * Two rules in the ungated population have been read end to end —
+ * `set-state-in-effect`'s 31 and `exhaustive-deps`' 13 — and each reading is
+ * a committed registry of verdicts. Both registries hold an anchor line per
+ * entry, so an entry about code that has moved is reported by its own suite.
+ * Neither can see the other direction: a NEW finding of either rule joins no
+ * registry, and the report counts it alongside the thirty that were decided,
+ * in a number nobody re-reads.
+ *
+ * So the gate holds the real run against the registries, per file. A new
+ * finding in a file somebody has read is a count that no longer matches; a
+ * new finding in a file nobody has read is a file with no entry at all; and a
+ * finding that went away without its entry being marked `fixed` is the same
+ * mismatch from the other side, which is the case that keeps a registry from
+ * quietly describing a tree that has moved on.
+ *
+ * Per FILE and not per line, deliberately. A line number changes when
+ * somebody adds an import, and a registry keyed on one would be a registry
+ * nobody could edit — the entries key on the code they read, and the count is
+ * what makes the set complete.
+ */
+export function untriagedFindings(
+  findings: readonly EslintFinding[],
+  triaged: readonly TriagedRule[],
+): string[] {
+  const problems: string[] = [];
+  for (const rule of triaged) {
+    const actual = new Map<string, number>();
+    for (const finding of findings) {
+      if (finding.rule !== rule.rule) continue;
+      actual.set(finding.file, (actual.get(finding.file) ?? 0) + 1);
+    }
+    for (const file of new Set([...actual.keys(), ...rule.expected.keys()])) {
+      const found = actual.get(file) ?? 0;
+      const read = rule.expected.get(file) ?? 0;
+      if (found === read) continue;
+      problems.push(
+        found > read
+          ? `${rule.rule}: ${file} reports ${found} finding(s) and ${rule.registry} accounts for ${read}. Read the new one and give it a verdict — a finding counted beside thirty decided ones is a finding nobody decided.`
+          : `${rule.rule}: ${file} reports ${found} finding(s) and ${rule.registry} accounts for ${read}. An entry describing a finding that has gone is a verdict about nothing — mark it \`fixed\` or drop it.`,
+      );
+    }
+  }
+  return problems.sort();
 }

@@ -409,3 +409,21 @@ export function verdictCounts(): Record<SetStateInEffectVerdict, number> {
   for (const site of SET_STATE_IN_EFFECT_SITES) counts[site.verdict] += 1;
   return counts;
 }
+
+/**
+ * How many LIVE findings each file's entries account for.
+ *
+ * Live: the one `fixed` entry — `app/listing/[id].tsx`'s request loop —
+ * describes a finding that no longer exists, so it contributes nothing. This
+ * is the map `check-eslint-gate` holds the real run against, and it is the
+ * direction `triageProblems` cannot cover: that one catches an entry about
+ * code which moved, this one catches a finding with no entry.
+ */
+export function findingsByFile(): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+  for (const site of SET_STATE_IN_EFFECT_SITES) {
+    if (site.verdict === "fixed") continue;
+    counts.set(site.file, (counts.get(site.file) ?? 0) + 1);
+  }
+  return counts;
+}

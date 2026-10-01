@@ -211,7 +211,7 @@ export const LINT_GUARDS: readonly LintGuard[] = [
  */
 export const LINT_ALL_EXEMPT: Readonly<Record<string, string>> = {
   lint:
-    "eslint . — the parsing toolchain, which answers what a text scan declines (a ref read in a render body, a conditional hook). The full report: 91 findings on this tree today, of which 34 are errors. `lint:eslint-gate` is the part of it that gates",
+    "eslint . — the parsing toolchain, which answers what a text scan declines (a ref read in a render body, a conditional hook). The full report: 91 findings on this tree today, of which 34 are errors. `lint:eslint-gate` is the part of it that gates — three React-correctness rules at zero, plus completeness of the two readings (set-state-in-effect, exhaustive-deps) whose findings are all decided in a registry",
   "lint:eslint-gate":
     "runs ESLint itself rather than a text scan, and is the gate's tenth leg in its own right — see lib/eslint-gate.ts for which rules fail the run and why the other eleven only report",
   "lint:ci": "the CI orchestrator that runs lint:all itself",

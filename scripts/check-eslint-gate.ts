@@ -21,12 +21,16 @@ import { ESLint } from "eslint";
 
 import {
   GATED_RULES,
+  type TriagedRule,
   formatGateReport,
   gateFails,
   partitionFindings,
+  untriagedFindings,
   type EslintFinding,
 } from "../lib/eslint-gate";
+import { findingsByFile as exhaustiveDepsByFile } from "../lib/exhaustive-deps-triage";
 import { runningUnderActions } from "../lib/github-annotations";
+import { findingsByFile as setStateByFile } from "../lib/set-state-in-effect-triage";
 
 const CHECK_NAME = "check-eslint-gate";
 const REPO_ROOT = path.join(__dirname, "..");
@@ -40,6 +44,29 @@ const REPO_ROOT = path.join(__dirname, "..");
  * passing on a `.tsx` file it still reaches.
  */
 const CONFIG_PROBE = "lib/use-latest-ref.ts";
+
+/**
+ * The two ungated rules whose every finding has been read and decided.
+ *
+ * Neither is gated and neither should be: 26 of the 30 `set-state-in-effect`
+ * findings are correct as written, and gating would mean 26 eslint-disable
+ * comments written to make a gate green. What IS gated is that the readings
+ * stay complete — a new finding of either rule fails this leg until somebody
+ * writes a verdict for it, which is a much smaller ask than a fix and is the
+ * one that keeps a registry from describing the day it was written.
+ */
+const TRIAGED_RULES: readonly TriagedRule[] = [
+  {
+    rule: "react-hooks/set-state-in-effect",
+    registry: "lib/set-state-in-effect-triage.ts",
+    expected: setStateByFile(),
+  },
+  {
+    rule: "react-hooks/exhaustive-deps",
+    registry: "lib/exhaustive-deps-triage.ts",
+    expected: exhaustiveDepsByFile(),
+  },
+];
 
 /**
  * Rules the resolved config does not turn on.
@@ -96,6 +123,16 @@ async function main(): Promise<void> {
 
   const partition = partitionFindings(findings);
   const report = formatGateReport(partition, results.length);
+
+  const untriaged = untriagedFindings(findings, TRIAGED_RULES);
+  if (untriaged.length > 0) {
+    console.error(report);
+    console.error(
+      `${CHECK_NAME}: ${untriaged.length} finding(s) of a READ rule are not accounted for by its registry.`,
+    );
+    for (const problem of untriaged) console.error(`  ${problem}`);
+    process.exit(1);
+  }
 
   if (!gateFails(partition)) {
     console.log(report);

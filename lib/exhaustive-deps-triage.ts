@@ -92,6 +92,14 @@ export interface ExhaustiveDepsSite {
   readonly verdict: ExhaustiveDepsVerdict;
   /** One sentence. Why this verdict and not another. */
   readonly why: string;
+  /**
+   * How many of the rule's findings this one entry accounts for.
+   *
+   * One, except where a file spells the SAME fixture several times: three
+   * copies of one decision is one entry, and the gate still has to know the
+   * rule reports three. Omitted means one.
+   */
+  readonly findings?: number;
 }
 
 /** The 13, in the order `npx eslint .` reported them on 2026-10-01. */
@@ -119,6 +127,7 @@ export const EXHAUSTIVE_DEPS_SITES: readonly ExhaustiveDepsSite[] = [
     shape: "fixture",
     verdict: "keep",
     why: "A cleanup that throws, closed over the prop naming which one threw. THREE findings, one entry: the harness spells this fixture three times — for a single failure, for several together, and for a nested tree — and three copies of one fixture is one decision rather than three.",
+    findings: 3,
   },
   {
     file: "app/collection/[id].tsx",
@@ -237,5 +246,24 @@ export function triageProblems(read: (file: string) => string): TriageProblem[] 
 export function verdictCounts(): Record<ExhaustiveDepsVerdict, number> {
   const counts: Record<ExhaustiveDepsVerdict, number> = { keep: 0, fixed: 0, open: 0 };
   for (const site of EXHAUSTIVE_DEPS_SITES) counts[site.verdict] += 1;
+  return counts;
+}
+
+/**
+ * How many LIVE findings each file's entries account for.
+ *
+ * Live: a `fixed` entry describes a finding that no longer exists, so it
+ * contributes nothing. This is the map `check-eslint-gate` holds the real run
+ * against — the direction an anchor check cannot cover. `triageProblems`
+ * catches an entry about code that moved; this catches a finding with no
+ * entry, which is how a triage stops being a reading of the rule and becomes
+ * a reading of the day it was written.
+ */
+export function findingsByFile(): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+  for (const site of EXHAUSTIVE_DEPS_SITES) {
+    if (site.verdict === "fixed") continue;
+    counts.set(site.file, (counts.get(site.file) ?? 0) + (site.findings ?? 1));
+  }
   return counts;
 }
